@@ -1,0 +1,30 @@
+@page "{id:int}"
+@model MatCMS.Pages.Admin.Users.EditModel
+@{
+    ViewData["Title"] = "Benutzer bearbeiten";
+}
+<div class="page-head">
+    <h1>Benutzer: @Model.Current.Username</h1>
+    <a class="btn btn-sm btn-ghost" asp-page="Index">Zurück</a>
+</div>
+
+<div class="card">
+    <form method="post" class="form-grid">
+        <div class="form-field">
+            <label>Benutzername</label>
+            <input value="@Model.Current.Username" disabled />
+            <div class="help">Der Benutzername kann nicht geändert werden.</div>
+        </div>
+        <div class="form-field">
+            <label for="DisplayName">Anzeigename</label>
+            <input id="DisplayName" name="DisplayName" value="@Model.DisplayName" />
+        </div>
+        <div class="form-field">
+            <label for="NewPassword">Neues Passwort</label>
+            <input id="NewPassword" name="NewPassword" type="password" placeholder="leer lassen, um es nicht zu ändern" />
+        </div>
+        <div>
+            <button type="submit" class="btn">Speichern</button>
+        </div>
+    </form>
+</div>

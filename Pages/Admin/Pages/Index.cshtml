@@ -1,0 +1,57 @@
+@page
+@model MatCMS.Pages.Admin.Pages.IndexModel
+@{
+    ViewData["Title"] = "Seiten";
+}
+<div class="page-head">
+    <h1>Seiten</h1>
+</div>
+
+<table class="data">
+    <thead>
+        <tr>
+            <th>Titel</th>
+            <th>URL</th>
+            <th>Status</th>
+            <th>Navigation</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var p in Model.Items)
+        {
+            var url = p.Slug == "home" ? "/" : "/" + p.Slug;
+            <tr>
+                <td><strong>@p.Title</strong></td>
+                <td><a class="mono" href="@url" target="_blank">@url</a></td>
+                <td>
+                    @if (p.IsPublished)
+                    {
+                        <span class="badge badge-on">Veröffentlicht</span>
+                    }
+                    else
+                    {
+                        <span class="badge badge-off">Entwurf</span>
+                    }
+                </td>
+                <td class="muted">
+                    @(p.ShowInNav ? "Menü" : "")@(p.ShowInNav && p.ShowInFooter ? " · " : "")@(p.ShowInFooter ? "Footer" : "")
+                    @(!p.ShowInNav && !p.ShowInFooter ? "—" : "")
+                </td>
+                <td>
+                    <div class="actions">
+                        <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@p.Id">Bearbeiten</a>
+                        <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@p.Id"
+                              onsubmit="return confirm('Seite „@p.Title“ wirklich löschen?');">
+                            <button type="submit" class="btn btn-sm btn-danger">Löschen</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<div class="list-actions">
+    <a class="btn" asp-page="Create">+ Seite erstellen</a>
+</div>

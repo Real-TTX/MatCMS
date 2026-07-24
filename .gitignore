@@ -1,0 +1,20 @@
+# Build output
+bin/
+obj/
+publish/
+
+# Runtime data (SQLite DB, data-protection keys)
+appdata/
+*.db
+*.db-shm
+*.db-wal
+
+# User uploads
+wwwroot/uploads/
+
+# IDE / OS
+.vs/
+.idea/
+*.user
+.DS_Store
+Thumbs.db

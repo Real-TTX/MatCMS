@@ -1,0 +1,21 @@
+@model MatCMS.Content.BlockData
+@{
+    var image = Model.Str("image");
+    var alt = Model.Str("alt");
+    var caption = Model.Str("caption");
+    var width = Model.StrOr("width", "normal");
+}
+@if (!string.IsNullOrWhiteSpace(image))
+{
+    <section class="image-block @(width == "narrow" ? "narrow" : "")">
+        <div class="container">
+            <figure>
+                <img src="@image" alt="@alt" />
+                @if (!string.IsNullOrWhiteSpace(caption))
+                {
+                    <figcaption>@caption</figcaption>
+                }
+            </figure>
+        </div>
+    </section>
+}

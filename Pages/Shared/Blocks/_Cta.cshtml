@@ -1,0 +1,23 @@
+@model MatCMS.Content.BlockData
+@{
+    var heading = Model.Str("heading");
+    var text = Model.Str("text");
+    var btnText = Model.Str("buttonText");
+    var btnUrl = Model.StrOr("buttonUrl", "#");
+}
+<section class="cta-block">
+    <div class="container">
+        @if (!string.IsNullOrWhiteSpace(heading))
+        {
+            <h2>@heading</h2>
+        }
+        @if (!string.IsNullOrWhiteSpace(text))
+        {
+            <p>@text</p>
+        }
+        @if (!string.IsNullOrWhiteSpace(btnText))
+        {
+            <a class="btn" href="@btnUrl">@btnText</a>
+        }
+    </div>
+</section>

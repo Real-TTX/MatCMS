@@ -1,0 +1,19 @@
+@model MatCMS.Content.BlockData
+@{
+    var heading = Model.Str("heading");
+    var body = Model.Str("body");
+    var align = Model.StrOr("align", "left");
+    var width = Model.StrOr("width", "normal");
+    var innerClass = (width == "narrow" ? "narrow " : "") + (align == "center" ? "text-center" : "");
+}
+<section class="section">
+    <div class="container">
+        <div class="@innerClass">
+            @if (!string.IsNullOrWhiteSpace(heading))
+            {
+                <h2>@heading</h2>
+            }
+            <div class="rich">@Html.Raw(body)</div>
+        </div>
+    </div>
+</section>

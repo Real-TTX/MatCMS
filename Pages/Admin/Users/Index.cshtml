@@ -1,0 +1,44 @@
+@page
+@model MatCMS.Pages.Admin.Users.IndexModel
+@{
+    ViewData["Title"] = "Benutzer";
+    var me = User.Identity?.Name;
+}
+<div class="page-head">
+    <h1>Benutzer</h1>
+</div>
+
+<table class="data">
+    <thead>
+        <tr>
+            <th>Benutzername</th>
+            <th>Anzeigename</th>
+            <th>Rolle</th>
+            <th>Erstellt</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var u in Model.Items)
+        {
+            <tr>
+                <td><strong>@u.Username</strong> @(u.Username == me ? "(Sie)" : "")</td>
+                <td>@(string.IsNullOrWhiteSpace(u.DisplayName) ? "—" : u.DisplayName)</td>
+                <td>@u.Role</td>
+                <td class="muted">@u.CreatedAt.ToString("dd.MM.yyyy")</td>
+                <td>
+                    <div class="actions">
+                        <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@u.Id">Bearbeiten</a>
+                        <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@u.Id" onsubmit="return confirm('Benutzer „@u.Username“ wirklich löschen?');">
+                            <button type="submit" class="btn btn-sm btn-danger">Löschen</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<div class="list-actions">
+    <a class="btn" asp-page="Create">+ Benutzer erstellen</a>
+</div>

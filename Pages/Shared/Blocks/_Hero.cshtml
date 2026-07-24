@@ -1,0 +1,40 @@
+@model MatCMS.Content.BlockData
+@{
+    var heading = Model.Str("heading");
+    var sub = Model.Str("subheading");
+    var image = Model.Str("image");
+    var btnText = Model.Str("buttonText");
+    var btnUrl = Model.StrOr("buttonUrl", "#");
+    var align = Model.StrOr("align", "left");
+
+    // Only allow a plain path or http(s) URL for the image source.
+    var safeImage = (!string.IsNullOrWhiteSpace(image)
+        && (image.StartsWith("/") || image.StartsWith("http://") || image.StartsWith("https://"))
+        && image.IndexOfAny(new[] { '\'', '"', '(', ')', '\\', '\n', '\r' }) < 0)
+        ? image : "";
+    var hasImage = safeImage.Length > 0;
+    var classes = "hero"
+        + (hasImage ? " hero--with-image" : "")
+        + (align == "center" ? " hero--center" : "");
+}
+<section class="@classes">
+    <div class="container">
+        <div class="hero__inner">
+            <h1>@heading</h1>
+            @if (!string.IsNullOrWhiteSpace(sub))
+            {
+                <p class="hero__sub">@sub</p>
+            }
+            @if (!string.IsNullOrWhiteSpace(btnText))
+            {
+                <a class="btn" href="@btnUrl">@btnText</a>
+            }
+        </div>
+    </div>
+</section>
+@if (hasImage)
+{
+    <div class="hero-image">
+        <img src="@safeImage" alt="" />
+    </div>
+}

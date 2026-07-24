@@ -1,0 +1,21 @@
+services:
+  web:
+    build:
+      context: .
+      # Always repull the base images (sdk/aspnet:10.0) when building -> "Always Repull".
+      pull: true
+    image: matcms:latest
+    container_name: matcms
+    ports:
+      - "9101:9101"
+    environment:
+      - ASPNETCORE_HTTP_PORTS=9101
+      - ASPNETCORE_ENVIRONMENT=Production
+    volumes:
+      - matcms-data:/app/appdata
+      - matcms-uploads:/app/wwwroot/uploads
+    restart: unless-stopped
+
+volumes:
+  matcms-data:
+  matcms-uploads:

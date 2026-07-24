@@ -1,0 +1,12 @@
+@page "/{slug?}"
+@model MatCMS.Pages.ViewModel
+@foreach (var block in Model.CurrentPage.Blocks.OrderBy(b => b.SortOrder))
+{
+    var def = Model.Registry.Get(block.BlockType);
+    if (def is null || string.IsNullOrWhiteSpace(def.Partial))
+    {
+        continue;
+    }
+    var data = new MatCMS.Content.BlockData(block.DataJson);
+    @await Html.PartialAsync(def.Partial, data)
+}

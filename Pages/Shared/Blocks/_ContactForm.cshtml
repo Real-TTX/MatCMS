@@ -1,0 +1,61 @@
+@model MatCMS.Content.BlockData
+@{
+    var heading = Model.StrOr("heading", "Kontaktformular");
+    var intro = Model.Str("intro");
+    var categories = Model.Str("categories")
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    var success = TempData["ContactSuccess"] as string;
+    var error = TempData["ContactError"] as string;
+    var vName = TempData["cf_name"] as string ?? "";
+    var vEmail = TempData["cf_email"] as string ?? "";
+    var vCategory = TempData["cf_category"] as string ?? "";
+    var vMessage = TempData["cf_message"] as string ?? "";
+}
+<section class="contact-block">
+    <div class="container">
+        <div class="contact-wrap">
+            <h2>@heading</h2>
+            @if (!string.IsNullOrWhiteSpace(intro))
+            {
+                <p class="text-center">@intro</p>
+            }
+            @if (!string.IsNullOrWhiteSpace(success))
+            {
+                <div class="alert alert-success">@success</div>
+            }
+            @if (!string.IsNullOrWhiteSpace(error))
+            {
+                <div class="alert alert-error">@error</div>
+            }
+            <form method="post" asp-page-handler="Contact">
+                <div class="form-field">
+                    <label for="cf_name">Name</label>
+                    <input id="cf_name" name="cf_name" value="@vName" required />
+                </div>
+                <div class="form-field">
+                    <label for="cf_email">E-Mail</label>
+                    <input id="cf_email" name="cf_email" type="email" value="@vEmail" required />
+                </div>
+                @if (categories.Length > 0)
+                {
+                    <div class="form-field">
+                        <label for="cf_category">Kategorie</label>
+                        <select id="cf_category" name="cf_category">
+                            <option value="">– Bitte auswählen –</option>
+                            @foreach (var c in categories)
+                            {
+                                <option value="@c" selected="@(c == vCategory ? "selected" : null)">@c</option>
+                            }
+                        </select>
+                    </div>
+                }
+                <div class="form-field">
+                    <label for="cf_message">Nachricht</label>
+                    <textarea id="cf_message" name="cf_message" required>@vMessage</textarea>
+                </div>
+                <button type="submit" class="btn">Abschicken</button>
+            </form>
+        </div>
+    </div>
+</section>

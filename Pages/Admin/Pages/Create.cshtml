@@ -1,0 +1,31 @@
+@page
+@model MatCMS.Pages.Admin.Pages.CreateModel
+@{
+    ViewData["Title"] = "Neue Seite";
+}
+<div class="page-head">
+    <h1>Neue Seite</h1>
+    <a class="btn btn-sm btn-ghost" asp-page="Index">Zurück</a>
+</div>
+
+<div class="card">
+    @if (!string.IsNullOrWhiteSpace(Model.Error))
+    {
+        <div class="alert alert-error">@Model.Error</div>
+    }
+    <form method="post" class="form-grid">
+        <div class="form-row">
+            <div class="form-field">
+                <label for="Title">Titel</label>
+                <input id="Title" name="Title" value="@Model.Title" required autofocus />
+            </div>
+            <div class="form-field">
+                <label for="Slug">Slug (optional)</label>
+                <input id="Slug" name="Slug" value="@Model.Slug" placeholder="wird aus dem Titel erzeugt" />
+            </div>
+        </div>
+        <div>
+            <button type="submit" class="btn">Seite erstellen &amp; bearbeiten</button>
+        </div>
+    </form>
+</div>

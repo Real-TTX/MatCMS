@@ -1,0 +1,36 @@
+@model MatCMS.Content.BlockData
+@{
+    var heading = Model.Str("heading");
+    var intro = Model.Str("intro");
+    var cols = Model.StrOr("columns", "3");
+    var items = Model.List("items");
+}
+<section class="columns-block">
+    <div class="container">
+        @if (!string.IsNullOrWhiteSpace(heading) || !string.IsNullOrWhiteSpace(intro))
+        {
+            <div class="section__intro">
+                @if (!string.IsNullOrWhiteSpace(heading))
+                {
+                    <h2>@heading</h2>
+                }
+                @if (!string.IsNullOrWhiteSpace(intro))
+                {
+                    <p>@intro</p>
+                }
+            </div>
+        }
+        <div class="columns-grid cols-@cols">
+            @foreach (var item in items)
+            {
+                <div class="column">
+                    @if (!string.IsNullOrWhiteSpace(item.Str("title")))
+                    {
+                        <h3>@item.Str("title")</h3>
+                    }
+                    <div class="rich">@Html.Raw(item.Str("body"))</div>
+                </div>
+            }
+        </div>
+    </div>
+</section>

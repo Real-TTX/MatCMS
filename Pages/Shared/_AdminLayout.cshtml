@@ -1,0 +1,63 @@
+@inject MatCMS.Services.SiteContext Site
+@{
+    var title = ViewData["Title"] as string ?? "Admin";
+    string Active(string path) =>
+        Context.Request.Path.StartsWithSegments(path, StringComparison.OrdinalIgnoreCase) ? "active" : "";
+    var displayName = User.FindFirst("DisplayName")?.Value ?? User.Identity?.Name ?? "Admin";
+}
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@title – @Site.SiteName Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Geologica:wght@@500;600;700&family=Inter:wght@@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" />
+    <link rel="icon" href="@Site.LogoUrl" />
+</head>
+<body class="admin">
+    <aside class="admin-sidebar">
+        <div class="admin-brand">
+            <span class="wm">FEU<span>SYS</span></span>
+            <span class="cms">MatCMS</span>
+        </div>
+        <nav class="admin-nav">
+            <a class="@Active("/admin/pages")" asp-page="/Admin/Pages/Index">📄 Seiten</a>
+            <a class="@Active("/admin/menus")" asp-page="/Admin/Menus/Index">🧭 Menü</a>
+            <a class="@Active("/admin/submissions")" asp-page="/Admin/Submissions/Index">✉️ Anfragen</a>
+            <a class="@Active("/admin/users")" asp-page="/Admin/Users/Index">👤 Benutzer</a>
+            <a class="@Active("/admin/settings")" asp-page="/Admin/Settings/Index">⚙️ Einstellungen</a>
+        </nav>
+        <div class="admin-nav-foot">
+            <a href="/" target="_blank">🌐 Website ansehen</a>
+            <form method="post" asp-page="/Logout">
+                <button type="submit" class="linklike">🚪 Abmelden</button>
+            </form>
+        </div>
+    </aside>
+
+    <div class="admin-main">
+        <header class="admin-topbar">
+            <div class="admin-topbar-title">@title</div>
+            <div class="admin-user">Angemeldet als <strong>@displayName</strong></div>
+        </header>
+
+        <main class="admin-content">
+            @if (TempData["Flash"] is string flash && !string.IsNullOrWhiteSpace(flash))
+            {
+                <div class="alert alert-success">@flash</div>
+            }
+            @if (TempData["FlashError"] is string flashError && !string.IsNullOrWhiteSpace(flashError))
+            {
+                <div class="alert alert-error">@flashError</div>
+            }
+            @RenderBody()
+        </main>
+    </div>
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

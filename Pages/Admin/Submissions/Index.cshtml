@@ -1,0 +1,66 @@
+@page
+@model MatCMS.Pages.Admin.Submissions.IndexModel
+@{
+    ViewData["Title"] = "Anfragen";
+}
+<div class="page-head">
+    <h1>Kontakt-Anfragen</h1>
+</div>
+
+@if (Model.Items.Count == 0)
+{
+    <div class="card"><p class="muted">Noch keine Anfragen eingegangen.</p></div>
+}
+else
+{
+    <table class="data">
+        <thead>
+            <tr>
+                <th>Datum</th>
+                <th>Name</th>
+                <th>E-Mail</th>
+                <th>Kategorie</th>
+                <th>Nachricht</th>
+                <th>Status</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var s in Model.Items)
+            {
+                <tr class="@(s.IsRead ? "" : "row-unread")">
+                    <td class="muted">@s.CreatedAt.ToString("dd.MM.yyyy HH:mm")</td>
+                    <td>@s.Name</td>
+                    <td><a href="mailto:@s.Email">@s.Email</a></td>
+                    <td>@(string.IsNullOrWhiteSpace(s.Category) ? "—" : s.Category)</td>
+                    <td>
+                        <details>
+                            <summary>anzeigen</summary>
+                            <div style="white-space:pre-wrap;margin-top:8px;max-width:420px;">@s.Message</div>
+                        </details>
+                    </td>
+                    <td>
+                        @if (!s.IsRead)
+                        {
+                            <span class="badge badge-new">Neu</span>
+                        }
+                        else
+                        {
+                            <span class="badge badge-off">Gelesen</span>
+                        }
+                    </td>
+                    <td>
+                        <div class="actions">
+                            <form class="inline-form" method="post" asp-page-handler="ToggleRead" asp-route-id="@s.Id">
+                                <button type="submit" class="btn btn-sm btn-ghost">@(s.IsRead ? "Als neu" : "Gelesen")</button>
+                            </form>
+                            <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@s.Id" onsubmit="return confirm('Anfrage wirklich löschen?');">
+                                <button type="submit" class="btn btn-sm btn-danger">Löschen</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

@@ -1,0 +1,33 @@
+@page "{id:int}"
+@model MatCMS.Pages.Admin.Blocks.EditModel
+@{
+    ViewData["Title"] = "Block bearbeiten";
+}
+<div class="page-head">
+    <h1 class="with-icon">
+        <span class="head-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">@Html.Raw(Model.Definition.Svg)</svg>
+        </span>
+        @Model.Definition.Name
+    </h1>
+    <a class="btn btn-sm btn-ghost" asp-page="/Admin/Pages/Edit" asp-route-id="@Model.PageId">Zurück zur Seite „@Model.PageTitle“</a>
+</div>
+<p class="muted">@Model.Definition.Description</p>
+
+<div class="card">
+    <form id="block-form" method="post">
+        <input type="hidden" name="DataJson" id="DataJson" />
+        <div id="block-editor"></div>
+        <div class="editor-actions">
+            <button type="submit" class="btn">Speichern</button>
+            <a class="btn btn-ghost" asp-page="/Admin/Pages/Edit" asp-route-id="@Model.PageId">Abbrechen</a>
+        </div>
+    </form>
+</div>
+
+<script id="block-schema" type="application/json">@Html.Raw(Model.SchemaJson.Replace("</", "<\\/"))</script>
+<script id="block-data" type="application/json">@Html.Raw(Model.CurrentJson.Replace("</", "<\\/"))</script>
+
+@section Scripts {
+    <script src="~/js/admin-blocks.js" asp-append-version="true"></script>
+}

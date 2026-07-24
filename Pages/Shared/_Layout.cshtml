@@ -1,0 +1,86 @@
+@inject MatCMS.Services.SiteContext Site
+@{
+    var title = ViewData["Title"] as string;
+    var pageTitle = string.IsNullOrWhiteSpace(title) ? Site.SiteName : $"{title} – {Site.SiteName}";
+    var metaDescription = ViewData["MetaDescription"] as string;
+}
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@pageTitle</title>
+    @if (!string.IsNullOrWhiteSpace(metaDescription))
+    {
+        <meta name="description" content="@metaDescription" />
+    }
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Geologica:wght@@500;600;700&family=Inter:wght@@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="icon" href="@Site.LogoUrl" />
+</head>
+<body>
+    <header class="site-header">
+        <div class="container header-inner">
+            <a class="logo" href="/">
+                <img src="@Site.LogoUrl" alt="@Site.SiteName" />
+            </a>
+            <div class="header-icons">
+                @if (!string.IsNullOrWhiteSpace(Site.TopBarLink1Url))
+                {
+                    <a class="hicon" href="@Site.TopBarLink1Url" target="_blank" rel="noopener"
+                       title="@Site.TopBarLink1Text" aria-label="@Site.TopBarLink1Text">
+                        <svg viewBox="0 0 512 512" role="img" aria-hidden="true">
+                            <path fill="currentColor" d="M30.7 72.3C37.6 48.4 59.5 32 84.4 32l344 0c24.9 0 46.8 16.4 53.8 40.3l23.4 80.2c12.8 43.7-20.1 87.5-65.6 87.5-26.3 0-49.4-14.9-60.8-37.1-11.6 21.9-34.6 37.1-61.4 37.1-26.6 0-49.7-15-61.3-37-11.6 22-34.7 37-61.3 37-26.8 0-49.8-15.1-61.4-37.1-11.4 22.1-34.5 37.1-60.8 37.1-45.6 0-78.4-43.7-65.6-87.5L30.7 72.3zM96.4 352l320 0 0-66.4c7.6 1.6 15.5 2.4 23.5 2.4 14.3 0 28-2.6 40.5-7.2l0 151.2c0 26.5-21.5 48-48 48l-352 0c-26.5 0-48-21.5-48-48l0-151.2c12.5 4.6 26.1 7.2 40.5 7.2 8.1 0 15.9-.8 23.5-2.4l0 66.4z" />
+                        </svg>
+                    </a>
+                }
+                @if (!string.IsNullOrWhiteSpace(Site.TopBarLink2Url))
+                {
+                    <a class="hicon" href="@Site.TopBarLink2Url" target="_blank" rel="noopener"
+                       title="@Site.TopBarLink2Text" aria-label="@Site.TopBarLink2Text">
+                        <svg viewBox="0 0 512 512" role="img" aria-hidden="true">
+                            <path fill="currentColor" d="M192 56l0 40 128 0 0-40c0-4.4-3.6-8-8-8L200 48c-4.4 0-8 3.6-8 8zm-48 8l0-8c0-30.9 25.1-56 56-56L312 0c30.9 0 56 25.1 56 56l0 424-224 0 0-416zM96 176l0 304-32 0c-35.3 0-64-28.7-64-64L0 160c0-35.3 28.7-64 64-64l32 0 0 80zM416 480l0-384 32 0c35.3 0 64 28.7 64 64l0 256c0 35.3-28.7 64-64 64l-32 0zM244 208c-8.8 0-16 7.2-16 16l0 36-36 0c-8.8 0-16 7.2-16 16l0 24c0 8.8 7.2 16 16 16l36 0 0 36c0 8.8 7.2 16 16 16l24 0c8.8 0 16-7.2 16-16l0-36 36 0c8.8 0 16-7.2 16-16l0-24c0-8.8-7.2-16-16-16l-36 0 0-36c0-8.8-7.2-16-16-16l-24 0z" />
+                        </svg>
+                    </a>
+                }
+            </div>
+            <input type="checkbox" id="nav-toggle" class="nav-toggle" />
+            <label for="nav-toggle" class="nav-toggle-label" aria-label="Menü">
+                <span></span><span></span><span></span>
+            </label>
+            <nav class="main-nav">
+                @foreach (var m in Site.HeaderMenu)
+                {
+                    <a href="@m.Url" target="@(m.OpenInNewTab ? "_blank" : null)" rel="@(m.OpenInNewTab ? "noopener" : null)">@m.Label</a>
+                }
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        @RenderBody()
+    </main>
+
+    <footer class="site-footer">
+        <div class="container footer-inner">
+            <nav class="footer-nav">
+                @foreach (var m in Site.FooterMenu)
+                {
+                    <a href="@m.Url" target="@(m.OpenInNewTab ? "_blank" : null)" rel="@(m.OpenInNewTab ? "noopener" : null)">@m.Label</a>
+                }
+            </nav>
+            <div class="footer-brand">
+                <img src="@Site.LogoUrl" alt="@Site.SiteName" />
+            </div>
+            @if (!string.IsNullOrWhiteSpace(Site.FooterText))
+            {
+                <p class="footer-text">@Site.FooterText</p>
+            }
+        </div>
+    </footer>
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

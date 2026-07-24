@@ -3,6 +3,42 @@
     var title = ViewData["Title"] as string;
     var pageTitle = string.IsNullOrWhiteSpace(title) ? Site.SiteName : $"{title} – {Site.SiteName}";
     var metaDescription = ViewData["MetaDescription"] as string;
+
+    // ---- Active template (theme) ----
+    var tpl = Site.ActiveTemplate;
+
+    // Build the Google Fonts URL from the template's font families (dedup, weights 400-700).
+    string FontQuery(string family) =>
+        Uri.EscapeDataString(family.Trim()).Replace("%20", "+") + ":wght@400;500;600;700";
+    var families = new List<string>();
+    if (!string.IsNullOrWhiteSpace(tpl.HeadingFont)) families.Add(tpl.HeadingFont.Trim());
+    if (!string.IsNullOrWhiteSpace(tpl.BodyFont) &&
+        !string.Equals(tpl.BodyFont.Trim(), tpl.HeadingFont?.Trim(), StringComparison.OrdinalIgnoreCase))
+        families.Add(tpl.BodyFont.Trim());
+    if (families.Count == 0) families.Add("Inter");
+    var fontsHref = "https://fonts.googleapis.com/css2?" +
+        string.Join("&", families.Select(f => "family=" + FontQuery(f))) + "&display=swap";
+
+    // Accent + a slightly darker shade for --accent-dark.
+    var accent = string.IsNullOrWhiteSpace(tpl.AccentColor) ? "#de7e11" : tpl.AccentColor.Trim();
+    string Darken(string hex)
+    {
+        var h = hex.TrimStart('#');
+        if (h.Length == 3)
+            h = string.Concat(h[0], h[0], h[1], h[1], h[2], h[2]);
+        if (h.Length != 6 ||
+            !int.TryParse(h.Substring(0, 2), System.Globalization.NumberStyles.HexNumber, null, out var r) ||
+            !int.TryParse(h.Substring(2, 2), System.Globalization.NumberStyles.HexNumber, null, out var g) ||
+            !int.TryParse(h.Substring(4, 2), System.Globalization.NumberStyles.HexNumber, null, out var b))
+            return hex;
+        r = (int)(r * 0.85); g = (int)(g * 0.85); b = (int)(b * 0.85);
+        return $"#{r:x2}{g:x2}{b:x2}";
+    }
+    var accentDark = Darken(accent);
+
+    var headFamily = string.IsNullOrWhiteSpace(tpl.HeadingFont) ? "Geologica" : tpl.HeadingFont.Trim();
+    var bodyFamily = string.IsNullOrWhiteSpace(tpl.BodyFont) ? "Inter" : tpl.BodyFont.Trim();
+    var outlineButtons = string.Equals(tpl.ButtonStyle?.Trim(), "outline", StringComparison.OrdinalIgnoreCase);
 }
 <!DOCTYPE html>
 <html lang="de">
@@ -16,8 +52,21 @@
     }
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Geologica:wght@@500;600;700&family=Inter:wght@@400;500;600&display=swap" rel="stylesheet" />
+    <link href="@fontsHref" rel="stylesheet" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <style>
+        :root {
+            --accent: @accent;
+            --accent-dark: @accentDark;
+            --font-head: "@headFamily", "Inter", sans-serif;
+            --font-body: "@bodyFamily", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        @if (outlineButtons)
+        {
+            @Html.Raw(".btn { background: transparent; color: var(--accent); border: 2px solid var(--accent); }")
+            @Html.Raw(".btn:hover { background: var(--accent); color: #fff; }")
+        }
+    </style>
     <link rel="icon" href="@Site.LogoUrl" />
 </head>
 <body>

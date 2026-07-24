@@ -46,6 +46,44 @@ docker compose up -d --build # neu bauen & starten
 
 ---
 
+## CI/CD & Versionierung
+
+Zwei GitHub-Actions-Workflows bauen das Docker-Image und pushen es in die
+**GitHub Container Registry (GHCR)** unter
+`ghcr.io/<owner>/matcms` (der `<owner>` wird kleingeschrieben).
+
+| Branch / Kontext | Workflow                       | Version                                   | `:latest`? |
+|------------------|--------------------------------|-------------------------------------------|:----------:|
+| `main` (Release) | `.github/workflows/release.yml`| `MAJOR.MINOR.<build>-<datetime>`          | ja         |
+| `dev` (Nightly)  | `.github/workflows/dev.yml`    | `nightly-<build>-<datetime>`              | nein       |
+| lokal            | (Dockerfile-Default)           | `local-<datetime>` (manuell empfohlen)    | –          |
+
+- `MAJOR.MINOR` kommt aus der Datei **`VERSION`** im Repo-Wurzelverzeichnis
+  (Default `1.0`).
+- `<build>` = `github.run_number` (fortlaufende Lauf-Nummer der Action).
+- `<datetime>` = UTC-Zeitstempel `yyyyMMddHHmmss` (`date -u +%Y%m%d%H%M%S`).
+- Der Login an GHCR erfolgt mit `${{ github.actor }}` und dem automatischen
+  `${{ secrets.GITHUB_TOKEN }}`; die Workflows brauchen dafür
+  `permissions: packages: write, contents: read`.
+- Die berechnete Version wird als Build-Arg **`APP_VERSION`** an den Docker-Build
+  übergeben und im Image als `InformationalVersion` hinterlegt.
+
+### Lokaler Build mit Version
+
+Der Dockerfile-Default für `APP_VERSION` ist `local`. Für einen sauberen lokalen
+Zeitstempel:
+
+```bash
+docker build -t matcms:local \
+  --build-arg APP_VERSION="local-$(date -u +%Y%m%d%H%M%S)" .
+```
+
+Ohne `--build-arg` wird schlicht `local` verwendet. `InformationalVersion` ist ein
+freier String, daher bricht der Build auch bei nicht-numerischen Versionen
+(`nightly-…`, `local-…`) nicht.
+
+---
+
 ## Lokale Entwicklung (Hot Reload)
 
 Voraussetzung: .NET SDK 10.

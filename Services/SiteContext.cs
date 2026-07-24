@@ -39,6 +39,33 @@ public class SiteContext
         .OrderBy(p => p.FooterOrder).ThenBy(p => p.Title)
         .ToList();
 
+    private Template? _activeTemplate;
+    private bool _templateLoaded;
+
+    /// <summary>The active template, or a sensible FeuSys default if none is configured.</summary>
+    public Template ActiveTemplate
+    {
+        get
+        {
+            if (!_templateLoaded)
+            {
+                _activeTemplate = _db.Templates.AsNoTracking()
+                    .OrderByDescending(t => t.IsActive).ThenBy(t => t.Id)
+                    .FirstOrDefault();
+                _templateLoaded = true;
+            }
+            return _activeTemplate ?? new Template
+            {
+                Name = "FeuSys",
+                IsActive = true,
+                AccentColor = "#de7e11",
+                HeadingFont = "Geologica",
+                BodyFont = "Inter",
+                ButtonStyle = "solid"
+            };
+        }
+    }
+
     public string SiteName => Get(SettingKeys.SiteName, "FEUSYS");
     public string LogoUrl => Get(SettingKeys.LogoUrl, "/img/logo.svg");
     public string FooterText => Get(SettingKeys.FooterText, "© FEUSYS");

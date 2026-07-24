@@ -1,0 +1,35 @@
+@model MatCMS.Content.BlockData
+@{
+    var heading = Model.Str("heading");
+    var intro = Model.Str("intro");
+    var items = Model.List("items");
+}
+<section class="section accordion-block">
+    <div class="container">
+        @if (!string.IsNullOrWhiteSpace(heading) || !string.IsNullOrWhiteSpace(intro))
+        {
+            <div class="section__intro">
+                @if (!string.IsNullOrWhiteSpace(heading))
+                {
+                    <h2>@heading</h2>
+                }
+                @if (!string.IsNullOrWhiteSpace(intro))
+                {
+                    <p>@intro</p>
+                }
+            </div>
+        }
+        <div class="accordion">
+            @foreach (var item in items)
+            {
+                <details class="accordion-item">
+                    <summary>
+                        <span>@item.Str("question")</span>
+                        <span class="accordion-icon" aria-hidden="true"></span>
+                    </summary>
+                    <div class="rich accordion-answer">@Html.Raw(item.Str("answer"))</div>
+                </details>
+            }
+        </div>
+    </div>
+</section>

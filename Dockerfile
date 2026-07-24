@@ -7,8 +7,13 @@ WORKDIR /src
 COPY MatCMS.csproj ./
 RUN dotnet restore MatCMS.csproj
 
+# Version passed in by CI (see .github/workflows). Local builds default to "local".
+# We only override InformationalVersion (a free-form string) so the build never
+# breaks even when APP_VERSION has no numeric prefix (e.g. "nightly-...", "local-...").
+ARG APP_VERSION=local
+
 COPY . .
-RUN dotnet publish MatCMS.csproj -c Release -o /app/publish /p:UseAppHost=false
+RUN dotnet publish MatCMS.csproj -c Release -o /app/publish /p:UseAppHost=false /p:InformationalVersion=${APP_VERSION}
 
 # ---- Runtime stage ----
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final

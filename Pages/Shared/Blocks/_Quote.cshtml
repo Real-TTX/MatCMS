@@ -1,0 +1,19 @@
+@model MatCMS.Content.BlockData
+@{
+    var quote = Model.Str("quote");
+    var author = Model.Str("author");
+}
+@if (!string.IsNullOrWhiteSpace(quote))
+{
+    <section class="section quote-block">
+        <div class="container">
+            <figure class="quote">
+                <blockquote>@quote</blockquote>
+                @if (!string.IsNullOrWhiteSpace(author))
+                {
+                    <figcaption>@author</figcaption>
+                }
+            </figure>
+        </div>
+    </section>
+}

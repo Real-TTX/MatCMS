@@ -1,0 +1,11 @@
+@model MatCMS.Content.BlockData
+@{
+    var size = Model.StrOr("size", "medium");
+    var cls = size switch
+    {
+        "small" => "spacer-small",
+        "large" => "spacer-large",
+        _ => "spacer-medium"
+    };
+}
+<div class="spacer @cls" aria-hidden="true"></div>

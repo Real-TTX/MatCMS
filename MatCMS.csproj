@@ -6,6 +6,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>MatCMS</RootNamespace>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Default assembly version. InformationalVersion is supplied at build time
+         via -p:InformationalVersion=<APP_VERSION> (see Dockerfile / GitHub Actions). -->
+    <Version>1.0.0</Version>
   </PropertyGroup>
 
   <ItemGroup>

@@ -1,0 +1,70 @@
+@page
+@model MatCMS.Pages.Admin.Templates.IndexModel
+@{
+    ViewData["Title"] = "Templates";
+}
+<div class="page-head">
+    <h1>Templates</h1>
+</div>
+
+<table class="data">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Akzentfarbe</th>
+            <th>Überschrift</th>
+            <th>Fließtext</th>
+            <th>Buttons</th>
+            <th>Status</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var t in Model.Items)
+        {
+            <tr>
+                <td><strong>@t.Name</strong></td>
+                <td>
+                    <span style="display:inline-flex;align-items:center;gap:8px;">
+                        <span style="width:18px;height:18px;border-radius:4px;border:1px solid var(--line);background:@t.AccentColor;display:inline-block;"></span>
+                        <code>@t.AccentColor</code>
+                    </span>
+                </td>
+                <td>@t.HeadingFont</td>
+                <td>@t.BodyFont</td>
+                <td>@(t.ButtonStyle == "outline" ? "Umrandet" : "Gefüllt")</td>
+                <td>
+                    @if (t.IsActive)
+                    {
+                        <span class="badge badge-on">Aktiv</span>
+                    }
+                    else
+                    {
+                        <span class="muted">—</span>
+                    }
+                </td>
+                <td>
+                    <div class="actions">
+                        @if (!t.IsActive)
+                        {
+                            <form class="inline-form" method="post" asp-page-handler="Activate" asp-route-id="@t.Id">
+                                <button type="submit" class="btn btn-sm btn-ghost">Aktivieren</button>
+                            </form>
+                        }
+                        <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@t.Id">Bearbeiten</a>
+                        @if (!t.IsActive)
+                        {
+                            <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@t.Id" onsubmit="return confirm('Template „@t.Name“ wirklich löschen?');">
+                                <button type="submit" class="btn btn-sm btn-danger">Löschen</button>
+                            </form>
+                        }
+                    </div>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<div class="list-actions">
+    <a class="btn" asp-page="Create">+ Template erstellen</a>
+</div>

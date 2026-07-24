@@ -24,6 +24,11 @@ public class BlockRegistry
     private const string SvgCta = @"<rect x=""3"" y=""8"" width=""18"" height=""8"" rx=""4""/><path d=""M11 12h4""/><path d=""M14 10l2 2-2 2""/>";
     private const string SvgMail = @"<rect x=""3"" y=""5"" width=""18"" height=""14"" rx=""2""/><path d=""M4 7l8 6 8-6""/>";
     private const string SvgImage = @"<rect x=""3"" y=""3"" width=""18"" height=""18"" rx=""2""/><circle cx=""8.5"" cy=""9"" r=""1.5""/><path d=""M21 16l-5-5L6 21""/>";
+    private const string SvgAccordion = @"<rect x=""3"" y=""4"" width=""18"" height=""5"" rx=""1""/><rect x=""3"" y=""13"" width=""18"" height=""7"" rx=""1""/><path d=""M17 6.5l-1.5 1.5""/>";
+    private const string SvgQuote = @"<path d=""M7 7h4v4c0 2-1 3-3 4""/><path d=""M15 7h4v4c0 2-1 3-3 4""/>";
+    private const string SvgImageText = @"<rect x=""3"" y=""4"" width=""8"" height=""16"" rx=""1""/><path d=""M14 7h6""/><path d=""M14 12h6""/><path d=""M14 17h4""/>";
+    private const string SvgSpacer = @"<path d=""M4 12h16""/><path d=""M8 7l4-4 4 4""/><path d=""M8 17l4 4 4-4""/>";
+    private const string SvgLogoStrip = @"<rect x=""3"" y=""9"" width=""5"" height=""6"" rx=""1""/><rect x=""10"" y=""9"" width=""5"" height=""6"" rx=""1""/><rect x=""17"" y=""9"" width=""4"" height=""6"" rx=""1""/>";
 
     private static List<BlockDefinition> Build() =>
     [
@@ -154,6 +159,92 @@ public class BlockRegistry
                 new BlockField { Id = "caption", Label = "Bildunterschrift", Type = FieldType.Text },
                 new BlockField { Id = "width", Label = "Breite", Type = FieldType.Select, Default = "normal",
                     Options = [ new("normal", "Normal"), new("narrow", "Schmal"), new("full", "Volle Breite") ] },
+            ]
+        },
+        new BlockDefinition
+        {
+            Type = "accordion",
+            Name = "Akkordeon (FAQ)",
+            Description = "Aufklappbare Frage-Antwort-Liste – ideal für häufige Fragen (FAQ).",
+            Svg = SvgAccordion,
+            Partial = "Blocks/_Accordion",
+            Fields =
+            [
+                new BlockField { Id = "heading", Label = "Überschrift", Type = FieldType.Text },
+                new BlockField { Id = "intro", Label = "Einleitung", Type = FieldType.Textarea },
+                new BlockField
+                {
+                    Id = "items", Label = "Einträge", Type = FieldType.List, ItemLabel = "Frage",
+                    ItemFields =
+                    [
+                        new BlockField { Id = "question", Label = "Frage", Type = FieldType.Text },
+                        new BlockField { Id = "answer", Label = "Antwort", Type = FieldType.RichText },
+                    ]
+                },
+            ]
+        },
+        new BlockDefinition
+        {
+            Type = "quote",
+            Name = "Zitat",
+            Description = "Hervorgehobenes Zitat oder Kundenstimme mit optionaler Namensangabe.",
+            Svg = SvgQuote,
+            Partial = "Blocks/_Quote",
+            Fields =
+            [
+                new BlockField { Id = "quote", Label = "Zitat", Type = FieldType.Textarea },
+                new BlockField { Id = "author", Label = "Autor / Quelle", Type = FieldType.Text },
+            ]
+        },
+        new BlockDefinition
+        {
+            Type = "imagetext",
+            Name = "Bild & Text",
+            Description = "Bild neben Text – mit Überschrift, formatiertem Fließtext und wählbarer Bildseite.",
+            Svg = SvgImageText,
+            Partial = "Blocks/_ImageText",
+            Fields =
+            [
+                new BlockField { Id = "image", Label = "Bild", Type = FieldType.Image },
+                new BlockField { Id = "heading", Label = "Überschrift", Type = FieldType.Text },
+                new BlockField { Id = "body", Label = "Inhalt", Type = FieldType.RichText },
+                new BlockField { Id = "imageSide", Label = "Bildseite", Type = FieldType.Select, Default = "left",
+                    Options = [ new("left", "Bild links"), new("right", "Bild rechts") ] },
+            ]
+        },
+        new BlockDefinition
+        {
+            Type = "spacer",
+            Name = "Abstand",
+            Description = "Leerer vertikaler Abstand zwischen zwei Blöcken.",
+            Svg = SvgSpacer,
+            Partial = "Blocks/_Spacer",
+            Fields =
+            [
+                new BlockField { Id = "size", Label = "Größe", Type = FieldType.Select, Default = "medium",
+                    Options = [ new("small", "Klein"), new("medium", "Mittel"), new("large", "Groß") ] },
+            ]
+        },
+        new BlockDefinition
+        {
+            Type = "logostrip",
+            Name = "Logo-Leiste",
+            Description = "Reihe von Partner- oder Kundenlogos, optional mit Überschrift und Verlinkung.",
+            Svg = SvgLogoStrip,
+            Partial = "Blocks/_LogoStrip",
+            Fields =
+            [
+                new BlockField { Id = "heading", Label = "Überschrift", Type = FieldType.Text },
+                new BlockField
+                {
+                    Id = "items", Label = "Logos", Type = FieldType.List, ItemLabel = "Logo",
+                    ItemFields =
+                    [
+                        new BlockField { Id = "image", Label = "Logo", Type = FieldType.Image },
+                        new BlockField { Id = "alt", Label = "Alternativtext", Type = FieldType.Text },
+                        new BlockField { Id = "url", Label = "Link (optional)", Type = FieldType.Url },
+                    ]
+                },
             ]
         },
     ];

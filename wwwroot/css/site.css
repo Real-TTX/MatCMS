@@ -319,6 +319,107 @@ h1, h2, h3, h4 {
 .image-block.narrow figure { max-width: 760px; margin: 0 auto; }
 .image-block figcaption { text-align: center; color: var(--muted); font-size: 14px; margin-top: 12px; }
 
+/* ---------- Accordion (FAQ) ---------- */
+.accordion { max-width: 820px; margin: 0 auto; border-top: 1px solid var(--line); }
+.accordion-item { border-bottom: 1px solid var(--line); }
+.accordion-item summary {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 22px 4px;
+    font-family: var(--font-head);
+    font-weight: 600;
+    font-size: 18px;
+    color: var(--black);
+}
+.accordion-item summary::-webkit-details-marker { display: none; }
+.accordion-icon { position: relative; width: 16px; height: 16px; flex: none; }
+.accordion-icon::before,
+.accordion-icon::after {
+    content: "";
+    position: absolute;
+    background: var(--accent);
+    transition: transform .2s ease, opacity .2s ease;
+}
+.accordion-icon::before { top: 7px; left: 0; width: 16px; height: 2px; }
+.accordion-icon::after { top: 0; left: 7px; width: 2px; height: 16px; }
+.accordion-item[open] .accordion-icon::after { transform: scaleY(0); opacity: 0; }
+.accordion-answer { padding: 0 4px 24px; color: var(--muted); }
+.accordion-answer p { margin: 0 0 1em; }
+
+/* ---------- Quote ---------- */
+.quote-block .quote { max-width: 820px; margin: 0 auto; text-align: center; }
+.quote-block blockquote {
+    margin: 0;
+    font-family: var(--font-head);
+    font-weight: 500;
+    font-size: clamp(22px, 3vw, 30px);
+    line-height: 1.35;
+    color: var(--black);
+    position: relative;
+}
+.quote-block blockquote::before {
+    content: "\201C";
+    display: block;
+    font-size: 64px;
+    line-height: .6;
+    color: var(--accent);
+    margin-bottom: 12px;
+}
+.quote-block figcaption {
+    margin-top: 22px;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+}
+
+/* ---------- Image & Text ---------- */
+.imagetext {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 56px;
+    align-items: center;
+}
+.imagetext.no-image { grid-template-columns: 1fr; }
+.imagetext.image-right .imagetext__media { order: 2; }
+.imagetext__media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.imagetext__body h2 { text-transform: uppercase; }
+.imagetext__body .rich { color: var(--muted); }
+
+/* ---------- Spacer ---------- */
+.spacer { width: 100%; }
+.spacer-small { height: 28px; }
+.spacer-medium { height: 60px; }
+.spacer-large { height: 108px; }
+
+/* ---------- Logo strip ---------- */
+.logostrip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 40px 56px;
+}
+.logostrip__item {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+}
+.logostrip__item img {
+    max-height: 64px;
+    width: auto;
+    filter: grayscale(1);
+    opacity: .72;
+    transition: filter .2s ease, opacity .2s ease;
+}
+.logostrip__item:hover img { filter: none; opacity: 1; }
+
 /* ---------- Footer ---------- */
 .site-footer {
     background: var(--bg-alt);
@@ -402,4 +503,7 @@ h1, h2, h3, h4 {
     .service-grid.cols-2,
     .service-grid.cols-3,
     .service-grid.cols-4 { grid-template-columns: 1fr; }
+
+    .imagetext { grid-template-columns: 1fr; gap: 32px; }
+    .imagetext.image-right .imagetext__media { order: 0; }
 }

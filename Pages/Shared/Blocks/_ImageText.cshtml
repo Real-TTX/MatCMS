@@ -1,0 +1,33 @@
+@model MatCMS.Content.BlockData
+@{
+    var image = Model.Str("image");
+    var heading = Model.Str("heading");
+    var body = Model.Str("body");
+    var side = Model.StrOr("imageSide", "left");
+
+    // Only allow a plain path or http(s) URL for the image source.
+    var safeImage = (!string.IsNullOrWhiteSpace(image)
+        && (image.StartsWith("/") || image.StartsWith("http://") || image.StartsWith("https://"))
+        && image.IndexOfAny(new[] { '\'', '"', '(', ')', '\\', '\n', '\r' }) < 0)
+        ? image : "";
+    var hasImage = safeImage.Length > 0;
+}
+<section class="section imagetext-block">
+    <div class="container">
+        <div class="imagetext @(side == "right" ? "image-right" : "image-left") @(hasImage ? "" : "no-image")">
+            @if (hasImage)
+            {
+                <div class="imagetext__media">
+                    <img src="@safeImage" alt="@heading" />
+                </div>
+            }
+            <div class="imagetext__body">
+                @if (!string.IsNullOrWhiteSpace(heading))
+                {
+                    <h2>@heading</h2>
+                }
+                <div class="rich">@Html.Raw(body)</div>
+            </div>
+        </div>
+    </div>
+</section>

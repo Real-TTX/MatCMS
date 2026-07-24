@@ -1,0 +1,40 @@
+@page
+@model MatCMS.Pages.Admin.Transfer.IndexModel
+@{
+    ViewData["Title"] = "Datentransfer";
+}
+<div class="page-head">
+    <h1>Datentransfer</h1>
+</div>
+
+<div class="card">
+    <h2>Export</h2>
+    <p class="help">
+        Exportiert alle Inhalte (Seiten inkl. Blöcke, Menüs und Einstellungen) als JSON-Datei.
+        Benutzerkonten werden aus Sicherheitsgründen nicht exportiert.
+    </p>
+    <form method="post" asp-page-handler="Export">
+        <button type="submit" class="btn">💾 Export herunterladen</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Import</h2>
+    <p class="help">
+        Stellt Inhalte aus einer zuvor exportierten JSON-Datei wieder her.
+        <strong>Achtung:</strong> Der Import überschreibt alle vorhandenen Seiten, Menüs und Einstellungen.
+    </p>
+    <form method="post" asp-page-handler="Import" enctype="multipart/form-data">
+        <div class="form-field">
+            <label>JSON-Datei</label>
+            <input type="file" name="ImportFile" accept="application/json,.json" required />
+        </div>
+        <label class="check">
+            <input type="checkbox" name="Confirm" value="true" />
+            <span>Ja, ich möchte fortfahren – der Import überschreibt alle Inhalte.</span>
+        </label>
+        <div class="list-actions">
+            <button type="submit" class="btn btn-danger">Import starten</button>
+        </div>
+    </form>
+</div>

@@ -16,6 +16,14 @@ public static class DbSeeder
     private const string HeroImage =
         "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1600&q=80";
 
+    // Original feusys.de section images.
+    private const string TransparentImage =
+        "https://feusys.de/wp-content/uploads/2026/07/john-FlPc9_VocJ4-unsplash-1024x683.jpg";
+    private const string NetzwerkpartnerImage =
+        "https://feusys.de/wp-content/uploads/2026/07/krakenimages-Y5bvRlcCx8k-unsplash-1-683x1024.jpg";
+    private const string LoesungspartnerImage =
+        "https://feusys.de/wp-content/uploads/2026/07/rohan-makhecha-jw3GOzxiSkw-unsplash-683x1024.jpg";
+
     public static async Task SeedAsync(IServiceProvider sp)
     {
         var db = sp.GetRequiredService<AppDbContext>();
@@ -69,6 +77,19 @@ public static class DbSeeder
             );
         }
 
+        if (!await db.Templates.AnyAsync())
+        {
+            db.Templates.Add(new Template
+            {
+                Name = "FeuSys",
+                IsActive = true,
+                AccentColor = "#de7e11",
+                HeadingFont = "Geologica",
+                BodyFont = "Inter",
+                ButtonStyle = "solid"
+            });
+        }
+
         await db.SaveChangesAsync();
     }
 
@@ -109,12 +130,12 @@ public static class DbSeeder
                     buttonUrl = "/kontakt",
                     align = "left"
                 }),
-                B("richtext", 1, new
+                B("imagetext", 1, new
                 {
+                    image = TransparentImage,
                     heading = "TRANSPARENTE DIENSTLEISTUNG FÜR ZUVERLÄSSIGEN IT-SERVICE",
                     body = "<p>Bei FEUSYS gibt es keine anonyme Hotline und kein Ticket-Ping-Pong. Ihr Ansprechpartner kennt Ihre Infrastruktur und Ihre Anforderungen genau. Wenn Sie zusätzliche Sicherheit wollen, bieten wir einfache Dienstleistungsverträge mit klar geregeltem SLA – ganz ohne Vertragszwang. So bestimmen Sie selbst, wie viel Verbindlichkeit Sie brauchen.</p>",
-                    align = "center",
-                    width = "narrow"
+                    imageSide = "left"
                 }),
                 B("cta", 2, new
                 {
@@ -123,18 +144,28 @@ public static class DbSeeder
                     buttonText = "Kontaktieren Sie uns",
                     buttonUrl = "/kontakt"
                 }),
-                B("columns", 3, new
+                B("richtext", 3, new
                 {
                     heading = "PARTNERSCHAFTEN, DIE IHRE IT STÄRKEN",
-                    intro = "Der beste Service entsteht selten allein. Unsere Netzwerkpartner und Lösungspartner sind fester Bestandteil dessen, was FEUSYS ausmacht.",
-                    columns = "2",
-                    items = new object[]
-                    {
-                        new { title = "NETZWERKPARTNER", body = "<p>Mit unseren Netzwerkpartnern verbindet uns eine enge, vertrauensvolle Zusammenarbeit auf Augenhöhe. Gemeinsam ergänzen wir uns in Know-how und Ressourcen, um unseren Kunden noch mehr bieten zu können – auf diese Partnerschaften sind wir bei FEUSYS besonders stolz.</p>" },
-                        new { title = "LÖSUNGSPARTNER", body = "<p>Unsere Lösungspartner ermöglichen es uns, Ihnen stets ausgereifte, zuverlässige und zukunftssichere Produkte anzubieten. Diese Beziehungen zu führenden Herstellern sehen wir bei FEUSYS als echten Wettbewerbsvorteil und als etwas, das wir mit Freude und Überzeugung pflegen.</p>" }
-                    }
+                    body = "<p>Der beste Service entsteht selten allein. Unsere Netzwerkpartner und Lösungspartner sind fester Bestandteil dessen, was FEUSYS ausmacht.</p>",
+                    align = "center",
+                    width = "narrow"
                 }),
-                B("servicegrid", 4, new
+                B("imagetext", 4, new
+                {
+                    image = NetzwerkpartnerImage,
+                    heading = "NETZWERKPARTNER",
+                    body = "<p>Mit unseren Netzwerkpartnern verbindet uns eine enge, vertrauensvolle Zusammenarbeit auf Augenhöhe. Gemeinsam ergänzen wir uns in Know-how und Ressourcen, um unseren Kunden noch mehr bieten zu können – auf diese Partnerschaften sind wir bei FEUSYS besonders stolz.</p>",
+                    imageSide = "right"
+                }),
+                B("imagetext", 5, new
+                {
+                    image = LoesungspartnerImage,
+                    heading = "LÖSUNGSPARTNER",
+                    body = "<p>Unsere Lösungspartner ermöglichen es uns, Ihnen stets ausgereifte, zuverlässige und zukunftssichere Produkte anzubieten. Diese Beziehungen zu führenden Herstellern sehen wir bei FEUSYS als echten Wettbewerbsvorteil und als etwas, das wir mit Freude und Überzeugung pflegen.</p>",
+                    imageSide = "left"
+                }),
+                B("servicegrid", 6, new
                 {
                     heading = "FEUSYS: IT-SYSTEMBETREUUNG, DIE GENAU PASST",
                     intro = "Unser Serviceportfolio begleitet Sie durch Ihre gesamte IT-Landschaft: von On-Premise-Systemen bis hin zu modernen Cloud-Lösungen, immer gut betreut.",
@@ -151,7 +182,7 @@ public static class DbSeeder
                         new { title = "Hard- und Software", text = "Wir beraten und beliefern Sie mit passender Hard- und Software aus einer Hand." }
                     }
                 }),
-                B("columns", 5, new
+                B("columns", 7, new
                 {
                     heading = "SPEZIALIST FÜR IHRE INFRASTRUKTUR – SICHERHEIT RUND UM IHRE IDENTITÄT",
                     intro = "",
@@ -221,6 +252,14 @@ public static class DbSeeder
                     body = "<p>Als zertifizierter DATEV-Partner bietet unser Partner die Help4You GmbH nicht nur fundiertes Fachwissen rund um DATEV-konforme IT-Lösungen, sondern auch maßgeschneiderte ASP- und Hosting-Dienste in diesem Bereich. Diese Lösungen ermöglichen einen sicheren, ortsunabhängigen Zugriff auf Ihre Systeme und Anwendungen – revisionssicher, leistungsfähig und jederzeit verfügbar. Damit schaffen wir die technische Grundlage für eine moderne, digitale Zusammenarbeit zwischen Kanzleien und Mandanten.</p>",
                     align = "center",
                     width = "narrow"
+                }),
+                B("logostrip", 2, new
+                {
+                    heading = "UNSERE PARTNER",
+                    items = new object[]
+                    {
+                        new { image = "https://feusys.de/wp-content/uploads/2025/09/Logo_help_4_you-1024x234.png", alt = "Help4You GmbH – DATEV-Partner", url = "" }
+                    }
                 }),
             ]
         });

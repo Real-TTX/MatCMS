@@ -13,6 +13,7 @@ public class AppDbContext : DbContext
     public DbSet<ContactSubmission> ContactSubmissions => Set<ContactSubmission>();
     public DbSet<SiteSetting> SiteSettings => Set<SiteSetting>();
     public DbSet<MenuItem> MenuItems => Set<MenuItem>();
+    public DbSet<Template> Templates => Set<Template>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {

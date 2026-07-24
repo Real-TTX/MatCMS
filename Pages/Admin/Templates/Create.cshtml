@@ -1,0 +1,59 @@
+@page
+@model MatCMS.Pages.Admin.Templates.CreateModel
+@using MatCMS.Content
+@{
+    ViewData["Title"] = "Neues Template";
+}
+<div class="page-head">
+    <h1>Neues Template</h1>
+    <a class="btn btn-sm btn-ghost" asp-page="Index">Zurück</a>
+</div>
+
+<div class="card">
+    @if (!string.IsNullOrWhiteSpace(Model.Error))
+    {
+        <div class="alert alert-error">@Model.Error</div>
+    }
+    <form method="post" class="form-grid">
+        <div class="form-row">
+            <div class="form-field">
+                <label for="Name">Name</label>
+                <input id="Name" name="Name" value="@Model.Name" required autofocus />
+            </div>
+            <div class="form-field">
+                <label for="AccentColor">Akzentfarbe</label>
+                <input id="AccentColor" name="AccentColor" type="color" value="@Model.AccentColor" />
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-field">
+                <label for="HeadingFont">Überschrift-Schrift</label>
+                <select id="HeadingFont" name="HeadingFont">
+                    @foreach (var f in TemplateFonts.Families)
+                    {
+                        <option value="@f" selected="@(Model.HeadingFont == f)">@f</option>
+                    }
+                </select>
+            </div>
+            <div class="form-field">
+                <label for="BodyFont">Fließtext-Schrift</label>
+                <select id="BodyFont" name="BodyFont">
+                    @foreach (var f in TemplateFonts.Families)
+                    {
+                        <option value="@f" selected="@(Model.BodyFont == f)">@f</option>
+                    }
+                </select>
+            </div>
+        </div>
+        <div class="form-field">
+            <label for="ButtonStyle">Button-Stil</label>
+            <select id="ButtonStyle" name="ButtonStyle">
+                <option value="solid" selected="@(Model.ButtonStyle != "outline")">Gefüllt</option>
+                <option value="outline" selected="@(Model.ButtonStyle == "outline")">Umrandet</option>
+            </select>
+        </div>
+        <div>
+            <button type="submit" class="btn">Template anlegen</button>
+        </div>
+    </form>
+</div>

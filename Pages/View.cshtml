@@ -1,5 +1,10 @@
 @page "/{slug?}"
 @model MatCMS.Pages.ViewModel
+@{
+    // Editor preview mode: only for admins, adds per-block wrappers + inspector highlighting.
+    var http = ViewContext.HttpContext;
+    var editor = http.Request.Query.ContainsKey("editor") && http.User.IsInRole("Admin");
+}
 @foreach (var block in Model.CurrentPage.Blocks.OrderBy(b => b.SortOrder))
 {
     var def = Model.Registry.Get(block.BlockType);
@@ -8,5 +13,66 @@
         continue;
     }
     var data = new MatCMS.Content.BlockData(block.DataJson);
-    @await Html.PartialAsync(def.Partial, data)
+    if (editor)
+    {
+        <div class="mat-ed-block" id="block-@block.Id" data-block-id="@block.Id" data-block-name="@def.Name">
+            @await Html.PartialAsync(def.Partial, data)
+        </div>
+    }
+    else
+    {
+        @await Html.PartialAsync(def.Partial, data)
+    }
+}
+
+@if (editor)
+{
+    <style>
+        .mat-ed-block { position: relative; }
+        .mat-ed-block::after {
+            content: attr(data-block-name);
+            position: absolute; top: 6px; left: 6px; z-index: 9998;
+            background: #2563eb; color: #fff; font: 600 11px/1 Inter, sans-serif;
+            padding: 4px 8px; border-radius: 5px; letter-spacing: .03em;
+            opacity: 0; transform: translateY(-4px); transition: opacity .12s ease, transform .12s ease;
+            pointer-events: none;
+        }
+        .mat-ed-block:hover { outline: 2px solid #2563eb; outline-offset: -2px; cursor: pointer; }
+        .mat-ed-block:hover::after { opacity: 1; transform: translateY(0); }
+        .mat-ed-block.mat-selected { outline: 3px solid #2563eb; outline-offset: -3px; }
+        .mat-ed-block.mat-flash { animation: matFlash 1s ease; }
+        @@keyframes matFlash { 0%,100% { background: transparent; } 30% { background: rgba(37,99,235,.10); } }
+    </style>
+    <script>
+        (function () {
+            var selected = null;
+            function post(msg) { if (window.parent && window.parent !== window) window.parent.postMessage(msg, "*"); }
+
+            // In editor mode, clicking anywhere selects the containing block (and never navigates).
+            document.addEventListener("click", function (e) {
+                var block = e.target.closest(".mat-ed-block");
+                if (block) { e.preventDefault(); e.stopPropagation(); post({ type: "mat-select-block", id: block.getAttribute("data-block-id") }); }
+                else {
+                    var a = e.target.closest("a");
+                    if (a) e.preventDefault(); // keep the preview stable
+                }
+            }, true);
+
+            // Receive scroll/select requests from the editor.
+            window.addEventListener("message", function (e) {
+                var d = e.data || {};
+                if (d.type === "mat-scroll" && d.id) {
+                    var el = document.getElementById("block-" + d.id);
+                    if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.classList.add("mat-flash"); setTimeout(function () { el.classList.remove("mat-flash"); }, 1000); }
+                }
+                if (d.type === "mat-select" && d.id) {
+                    if (selected) selected.classList.remove("mat-selected");
+                    selected = document.getElementById("block-" + d.id);
+                    if (selected) { selected.classList.add("mat-selected"); selected.scrollIntoView({ behavior: "smooth", block: "center" }); }
+                }
+            });
+
+            post({ type: "mat-preview-ready" });
+        })();
+    </script>
 }

@@ -1,112 +1,148 @@
 @page "{id:int}"
 @model MatCMS.Pages.Admin.Pages.EditModel
 @{
-    ViewData["Title"] = "Seite bearbeiten";
+    ViewData["Title"] = "Editor";
     var blocks = Model.Current.Blocks.OrderBy(b => b.SortOrder).ToList();
     var url = Model.Current.Slug == "home" ? "/" : "/" + Model.Current.Slug;
+    var previewUrl = url + (url.Contains('?') ? "&" : "?") + "editor=1";
+    var editing = Model.SelectedBlock is not null && Model.SelectedDef is not null;
 }
-<div class="page-head">
-    <h1>@Model.Current.Title</h1>
-    <div class="actions">
-        <a class="btn btn-sm btn-ghost" href="@url" target="_blank">Vorschau ansehen</a>
-        <a class="btn btn-sm btn-ghost" asp-page="Index">Zurück zur Übersicht</a>
-    </div>
-</div>
 
-<div class="card">
-    <h2>Blöcke</h2>
-    <p class="help">Zum Umsortieren am Griff <span class="mono">⠿</span> ziehen (Drag &amp; Drop).</p>
-    @if (blocks.Count == 0)
-    {
-        <p class="muted">Diese Seite hat noch keine Blöcke. Fügen Sie unten einen hinzu.</p>
-    }
-    <div class="block-list" id="block-list">
-        @foreach (var b in blocks)
+<div class="live-editor" data-page-id="@Model.Current.Id" data-selected-block="@(Model.SelectedBlock?.Id)">
+    <aside class="le-sidebar">
+        @if (editing)
         {
-            var def = Model.Registry.Get(b.BlockType);
-            <div class="block-item" data-block-id="@b.Id">
-                <span class="drag-handle" title="Ziehen zum Sortieren" aria-hidden="true">⠿</span>
-                <div class="b-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">@Html.Raw(def?.Svg)</svg>
+            <div class="le-head">
+                <a class="le-back" asp-page="Edit" asp-route-id="@Model.Current.Id">‹ Alle Blöcke</a>
+            </div>
+            <div class="le-panel">
+                <div class="le-panel-head">
+                    <span class="head-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">@Html.Raw(Model.SelectedDef!.Svg)</svg>
+                    </span>
+                    <span class="le-panel-title">@Model.SelectedDef!.Name</span>
                 </div>
-                <div class="b-info">
-                    <div class="b-type">@(def?.Name ?? b.BlockType)</div>
-                    <div class="b-sum">@Model.BlockSummary(b)</div>
+                <form id="block-form" method="post" asp-page-handler="SaveBlock" asp-route-id="@Model.Current.Id" asp-route-blockId="@Model.SelectedBlock!.Id">
+                    <input type="hidden" name="DataJson" id="DataJson" />
+                    <div id="block-editor"></div>
+                    <div class="le-panel-actions">
+                        <button type="submit" class="btn btn-sm">Speichern</button>
+                        <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@Model.Current.Id">Fertig</a>
+                    </div>
+                </form>
+                <form class="inline-form le-delete" method="post" asp-page-handler="DeleteBlock" asp-route-id="@Model.Current.Id" asp-route-blockId="@Model.SelectedBlock!.Id" onsubmit="return confirm('Diesen Block wirklich löschen?');">
+                    <button type="submit" class="btn btn-sm btn-danger">Block löschen</button>
+                </form>
+            </div>
+            <script id="block-schema" type="application/json">@Html.Raw(Model.SchemaJson.Replace("</", "<\\/"))</script>
+            <script id="block-data" type="application/json">@Html.Raw(Model.CurrentJson.Replace("</", "<\\/"))</script>
+        }
+        else
+        {
+            <div class="le-head">
+                <a class="le-back" asp-page="Index">‹ Seiten</a>
+                <div class="le-title">@Model.Current.Title</div>
+            </div>
+
+            <div class="le-scroll">
+                <div class="le-section-label">Blöcke</div>
+                @if (blocks.Count == 0)
+                {
+                    <p class="muted" style="padding:0 4px;">Noch keine Blöcke – füge unten einen hinzu.</p>
+                }
+                <div class="block-list sortable" id="block-list" data-sortable data-reorder-form="reorder-form">
+                    @foreach (var b in blocks)
+                    {
+                        var def = Model.Registry.Get(b.BlockType);
+                        <div class="block-item sortable-item" data-item-id="@b.Id" data-block-id="@b.Id">
+                            <span class="drag-handle" title="Ziehen zum Sortieren" aria-hidden="true">⠿</span>
+                            <a class="b-open" asp-page="Edit" asp-route-id="@Model.Current.Id" asp-route-block="@b.Id">
+                                <span class="b-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">@Html.Raw(def?.Svg)</svg>
+                                </span>
+                                <span class="b-info">
+                                    <span class="b-type">@(def?.Name ?? b.BlockType)</span>
+                                    <span class="b-sum">@Model.BlockSummary(b)</span>
+                                </span>
+                            </a>
+                            <form class="inline-form" method="post" asp-page-handler="DeleteBlock" asp-route-id="@Model.Current.Id" asp-route-blockId="@b.Id" onsubmit="return confirm('Diesen Block wirklich löschen?');">
+                                <button type="submit" class="icon-btn" title="Löschen">✕</button>
+                            </form>
+                        </div>
+                    }
                 </div>
-                <div class="actions">
-                    <a class="btn btn-sm btn-ghost" asp-page="/Admin/Blocks/Edit" asp-route-id="@b.Id">Bearbeiten</a>
-                    <form class="inline-form" method="post" asp-page-handler="DeleteBlock" asp-route-id="@Model.Current.Id" asp-route-blockId="@b.Id" onsubmit="return confirm('Diesen Block wirklich löschen?');">
-                        <button type="submit" class="btn btn-sm btn-danger" title="Löschen">✕</button>
+                <form id="reorder-form" method="post" asp-page-handler="Reorder" asp-route-id="@Model.Current.Id" style="display:none;">
+                    <div data-order-inputs></div>
+                </form>
+
+                <div class="le-add">
+                    <button type="button" class="btn btn-block" id="add-block-btn">+ Block hinzufügen</button>
+                </div>
+
+                <details class="le-settings">
+                    <summary>Seiteneinstellungen</summary>
+                    <form method="post" asp-page-handler="Meta" asp-route-id="@Model.Current.Id" class="form-grid">
+                        <div class="form-field">
+                            <label>Titel</label>
+                            <input name="Meta.Title" value="@Model.Meta.Title" required />
+                        </div>
+                        <div class="form-field">
+                            <label>Slug</label>
+                            <input name="Meta.Slug" value="@Model.Meta.Slug" required />
+                        </div>
+                        <div class="form-field">
+                            <label>Meta-Beschreibung</label>
+                            <input name="Meta.MetaDescription" value="@Model.Meta.MetaDescription" />
+                        </div>
+                        <label class="check">
+                            <input type="checkbox" name="Meta.IsPublished" value="true" @(Model.Meta.IsPublished ? "checked" : "") /> Veröffentlicht
+                        </label>
+                        <div><button type="submit" class="btn btn-sm">Speichern</button></div>
                     </form>
+                </details>
+            </div>
+
+            @* Add-block modal *@
+            <div class="modal-overlay" id="add-block-modal">
+                <div class="modal" role="dialog" aria-modal="true" aria-label="Block hinzufügen">
+                    <div class="modal-head">
+                        <h2>Block hinzufügen</h2>
+                        <button type="button" class="modal-close" id="add-block-close" aria-label="Schließen">✕</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="picker">
+                            @foreach (var def in Model.Registry.All)
+                            {
+                                <form method="post" asp-page-handler="AddBlock" asp-route-id="@Model.Current.Id" asp-route-type="@def.Type">
+                                    <button type="submit" class="tile">
+                                        <span class="t-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">@Html.Raw(def.Svg)</svg>
+                                        </span>
+                                        <span class="t-name">@def.Name</span>
+                                        <span class="t-desc">@def.Description</span>
+                                    </button>
+                                </form>
+                            }
+                        </div>
+                    </div>
                 </div>
             </div>
         }
-    </div>
+    </aside>
 
-    <div class="list-actions">
-        <button type="button" class="btn" id="add-block-btn">+ Block hinzufügen</button>
-    </div>
-</div>
-
-@* Hidden form that persists a new block order after drag & drop *@
-<form id="reorder-form" method="post" asp-page-handler="Reorder" asp-route-id="@Model.Current.Id" style="display:none;">
-    <div id="reorder-inputs"></div>
-</form>
-
-@* Modal: pick a block type to add *@
-<div class="modal-overlay" id="add-block-modal">
-    <div class="modal" role="dialog" aria-modal="true" aria-label="Block hinzufügen">
-        <div class="modal-head">
-            <h2>Block hinzufügen</h2>
-            <button type="button" class="modal-close" id="add-block-close" aria-label="Schließen">✕</button>
+    <main class="le-preview">
+        <div class="le-toolbar">
+            <span class="le-url mono">@url</span>
+            <a class="btn btn-sm btn-ghost" href="@url" target="_blank">In neuem Tab öffnen</a>
         </div>
-        <div class="modal-body">
-            <div class="picker">
-                @foreach (var def in Model.Registry.All)
-                {
-                    <form method="post" asp-page-handler="AddBlock" asp-route-id="@Model.Current.Id" asp-route-type="@def.Type">
-                        <button type="submit" class="tile">
-                            <span class="t-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">@Html.Raw(def.Svg)</svg>
-                            </span>
-                            <span class="t-name">@def.Name</span>
-                            <span class="t-desc">@def.Description</span>
-                        </button>
-                    </form>
-                }
-            </div>
+        <div class="le-frame-wrap">
+            <iframe id="preview-frame" src="@previewUrl" title="Live-Vorschau"></iframe>
         </div>
-    </div>
-</div>
-
-<div class="card">
-    <h2>Seiteneinstellungen</h2>
-    <form method="post" asp-page-handler="Meta" asp-route-id="@Model.Current.Id" class="form-grid">
-        <div class="form-row">
-            <div class="form-field">
-                <label>Titel</label>
-                <input name="Meta.Title" value="@Model.Meta.Title" required />
-            </div>
-            <div class="form-field">
-                <label>Slug</label>
-                <input name="Meta.Slug" value="@Model.Meta.Slug" required />
-                <div class="help">URL-Pfad. „home“ wird unter / ausgeliefert.</div>
-            </div>
-        </div>
-        <div class="form-field">
-            <label>Meta-Beschreibung (SEO)</label>
-            <input name="Meta.MetaDescription" value="@Model.Meta.MetaDescription" />
-        </div>
-        <label class="check">
-            <input type="checkbox" name="Meta.IsPublished" value="true" @(Model.Meta.IsPublished ? "checked" : "") /> Veröffentlicht (sonst nur als Entwurf sichtbar)
-        </label>
-        <p class="help">Die Navigation (Haupt- und Footer-Menü) verwaltest du zentral unter <strong>Menü</strong>.</p>
-        <div>
-            <button type="submit" class="btn">Einstellungen speichern</button>
-        </div>
-    </form>
+    </main>
 </div>
 
 @section Scripts {
+    <script src="~/js/admin-sortable.js" asp-append-version="true"></script>
+    <script src="~/js/admin-blocks.js" asp-append-version="true"></script>
     <script src="~/js/admin-page-editor.js" asp-append-version="true"></script>
 }

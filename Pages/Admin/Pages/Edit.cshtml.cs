@@ -1,3 +1,7 @@
+using System.Text.Encodings.Web;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using MatCMS.Content;
 using MatCMS.Data;
@@ -22,7 +26,14 @@ public class EditModel : PageModel
     public BlockRegistry Registry { get; }
     public PageEntity Current { get; private set; } = default!;
 
+    // Inline block settings panel (Shopify-style): when ?block=<id> is set.
+    public ContentBlock? SelectedBlock { get; private set; }
+    public BlockDefinition? SelectedDef { get; private set; }
+    public string SchemaJson { get; private set; } = "[]";
+    public string CurrentJson { get; private set; } = "{}";
+
     [BindProperty] public PageMetaInput Meta { get; set; } = new();
+    [BindProperty] public string DataJson { get; set; } = "{}";
 
     public class PageMetaInput
     {
@@ -32,7 +43,15 @@ public class EditModel : PageModel
         public bool IsPublished { get; set; }
     }
 
-    public async Task<IActionResult> OnGetAsync(int id)
+    private static readonly JsonSerializerOptions SchemaOpts = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Converters = { new JsonStringEnumConverter() },
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+
+    public async Task<IActionResult> OnGetAsync(int id, int? block)
     {
         var page = await Load(id);
         if (page is null) return NotFound();
@@ -45,7 +64,46 @@ public class EditModel : PageModel
             MetaDescription = page.MetaDescription,
             IsPublished = page.IsPublished
         };
+
+        if (block is int blockId)
+        {
+            SelectedBlock = page.Blocks.FirstOrDefault(b => b.Id == blockId);
+            if (SelectedBlock is not null)
+            {
+                SelectedDef = Registry.Get(SelectedBlock.BlockType);
+                if (SelectedDef is not null)
+                {
+                    SchemaJson = JsonSerializer.Serialize(SelectedDef.Fields, SchemaOpts);
+                    CurrentJson = string.IsNullOrWhiteSpace(SelectedBlock.DataJson) ? "{}" : SelectedBlock.DataJson;
+                }
+            }
+        }
         return Page();
+    }
+
+    public async Task<IActionResult> OnPostSaveBlockAsync(int id, int blockId)
+    {
+        var block = await _db.ContentBlocks.Include(b => b.Page).FirstOrDefaultAsync(b => b.Id == blockId && b.PageId == id);
+        if (block is null) return NotFound();
+
+        var json = string.IsNullOrWhiteSpace(DataJson) ? "{}" : DataJson;
+        try
+        {
+            if (JsonNode.Parse(json) is not JsonObject)
+                throw new FormatException();
+        }
+        catch
+        {
+            TempData["FlashError"] = "Der Block konnte nicht gespeichert werden (ungültiges Format).";
+            return RedirectToPage(new { id, block = blockId });
+        }
+
+        block.DataJson = json;
+        if (block.Page is not null) block.Page.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        TempData["Flash"] = "Block gespeichert.";
+        return RedirectToPage(new { id, block = blockId });
     }
 
     public async Task<IActionResult> OnPostMetaAsync(int id)
@@ -92,7 +150,8 @@ public class EditModel : PageModel
         _db.ContentBlocks.Add(block);
         await _db.SaveChangesAsync();
 
-        return RedirectToPage("/Admin/Blocks/Edit", new { id = block.Id });
+        // Open the new block's settings inline in the editor.
+        return RedirectToPage(new { id, block = block.Id });
     }
 
     // New order arrives as a sequence of block ids (drag & drop in the editor).
@@ -133,7 +192,7 @@ public class EditModel : PageModel
         {
             var v = data.Str(key);
             if (!string.IsNullOrWhiteSpace(v))
-                return Truncate(StripHtml(v), 90);
+                return Truncate(StripHtml(v), 60);
         }
         return "(leer)";
     }

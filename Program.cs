@@ -1,13 +1,21 @@
+using System.Globalization;
 using System.Threading.RateLimiting;
 using MatCMS.Content;
 using MatCMS.Data;
 using MatCMS.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// --- Localization ---------------------------------------------------------
+// Supported cultures (UI language + public content locales). Adding a language = drop
+// Resources/<culture>.json and add the code to Localizer.SupportedCultures — the switcher, cookie
+// provider, content routing and Localizer all pick it up automatically.
+string[] supportedCultures = Localizer.SupportedCultures;
 
 // --- Storage locations (persisted via Docker volume at /app/appdata) ---
 // NOTE: folder is "appdata" (not "data") to avoid clashing with the source "Data/" folder
@@ -44,6 +52,23 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("Admin", policy => policy.RequireRole("Admin"));
 });
 
+builder.Services.AddLocalization();
+builder.Services.AddSingleton<Localizer>();
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    var cultures = supportedCultures.Select(c => new CultureInfo(c)).ToList();
+    options.DefaultRequestCulture = new RequestCulture(Localizer.DefaultCulture);
+    options.SupportedCultures = cultures;
+    options.SupportedUICultures = cultures;
+    // Cookie first (explicit user choice), then Accept-Language header.
+    options.RequestCultureProviders =
+    [
+        new CookieRequestCultureProvider(),
+        new AcceptLanguageHeaderRequestCultureProvider()
+    ];
+});
+
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddSingleton<BlockRegistry>();
 builder.Services.AddScoped<SiteContext>();
@@ -69,6 +94,17 @@ builder.Services.AddRazorPages(options =>
 {
     // Everything under /Admin requires the Admin role.
     options.Conventions.AuthorizeFolder("/Admin", "Admin");
+
+    // Multilingual content routing: the default locale (de) keeps its existing root URLs
+    // (handled by the page's own "/{slug?}" route). Every non-default locale gets a second
+    // route on the same View page: "/{culture}/{slug?}" (e.g. /en, /en/about), constrained to
+    // the supported non-default cultures so it never shadows the default slug route.
+    if (Localizer.NonDefaultCultures.Count > 0)
+    {
+        var pattern = string.Join("|", Localizer.NonDefaultCultures
+            .Select(System.Text.RegularExpressions.Regex.Escape));
+        options.Conventions.AddPageRoute("/View", $"{{culture:regex(^({pattern})$)}}/{{slug?}}");
+    }
 });
 
 var app = builder.Build();
@@ -91,12 +127,42 @@ app.UseStaticFiles(new StaticFileOptions
     OnPrepareResponse = ctx =>
         ctx.Context.Response.Headers["X-Content-Type-Options"] = "nosniff"
 });
+
+// Set CultureInfo.Current(UI)Culture per request (cookie / Accept-Language / default "de").
+app.UseRequestLocalization(app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<RequestLocalizationOptions>>().Value);
+
 app.UseRouting();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapRazorPages();
+
+// Language switcher: sets the culture cookie and redirects back to a safe, local URL.
+// Values arrive as form fields (posted by the switcher), read them directly to avoid
+// minimal-API form-binding/antiforgery coupling.
+app.MapPost("/set-language", async (HttpContext ctx) =>
+{
+    var form = ctx.Request.HasFormContentType ? await ctx.Request.ReadFormAsync() : null;
+    var culture = form?["culture"].ToString() ?? ctx.Request.Query["culture"].ToString();
+    var returnUrl = form?["returnUrl"].ToString() ?? ctx.Request.Query["returnUrl"].ToString();
+
+    if (!string.IsNullOrEmpty(culture) && supportedCultures.Contains(culture))
+    {
+        ctx.Response.Cookies.Append(
+            CookieRequestCultureProvider.DefaultCookieName,
+            CookieRequestCultureProvider.MakeCookieValue(new RequestCulture(culture)),
+            new CookieOptions { Expires = DateTimeOffset.UtcNow.AddYears(1), IsEssential = true, SameSite = SameSiteMode.Lax });
+    }
+
+    // Only ever redirect to a local path ("/..." but not "//...") to avoid open-redirect abuse.
+    var target = !string.IsNullOrEmpty(returnUrl)
+                 && returnUrl.StartsWith('/') && !returnUrl.StartsWith("//")
+                 && Uri.IsWellFormedUriString(returnUrl, UriKind.Relative)
+        ? returnUrl
+        : "/";
+    return Results.LocalRedirect(target);
+});
 
 // Simple image upload endpoint used by the block editor / settings (admin only).
 app.MapPost("/admin/api/upload", async (HttpRequest request, IWebHostEnvironment env) =>

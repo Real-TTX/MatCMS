@@ -14,17 +14,29 @@ public class AppDbContext : DbContext
     public DbSet<SiteSetting> SiteSettings => Set<SiteSetting>();
     public DbSet<MenuItem> MenuItems => Set<MenuItem>();
     public DbSet<Template> Templates => Set<Template>();
+    public DbSet<Form> Forms => Set<Form>();
+    public DbSet<FormSubmission> FormSubmissions => Set<FormSubmission>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
         b.Entity<User>().HasIndex(u => u.Username).IsUnique();
-        b.Entity<Page>().HasIndex(p => p.Slug).IsUnique();
+        // A slug is unique per locale (the same slug may exist once per content locale).
+        b.Entity<Page>().HasIndex(p => new { p.Slug, p.Locale }).IsUnique();
+        b.Entity<Page>().HasIndex(p => p.TranslationGroup);
+        b.Entity<MenuItem>().HasIndex(m => new { m.Menu, m.Locale });
         b.Entity<SiteSetting>().HasIndex(s => s.Key).IsUnique();
+        b.Entity<Form>().HasIndex(f => f.Slug).IsUnique();
 
         b.Entity<ContentBlock>()
             .HasOne(cb => cb.Page)
             .WithMany(p => p.Blocks)
             .HasForeignKey(cb => cb.PageId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        b.Entity<FormSubmission>()
+            .HasOne(fs => fs.Form)
+            .WithMany(f => f.Submissions)
+            .HasForeignKey(fs => fs.FormId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

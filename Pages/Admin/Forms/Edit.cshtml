@@ -1,0 +1,145 @@
+@page "{id:int}"
+@using MatCMS.Content
+@model MatCMS.Pages.Admin.Forms.EditModel
+@{
+    ViewData["Title"] = T["forms.editorTitle"];
+    var editing = Model.SelectedElement is not null;
+    var previewUrl = $"/admin/forms/preview/{Model.Current.Id}?builder=1";
+
+    string TypeName(string t) => T["forms.el." + t + ".name"];
+    string ElSummary(FormElement e)
+    {
+        var lbl = string.IsNullOrWhiteSpace(e.Label) ? T["editor.blockEmpty"] : e.Label;
+        if (e.Type == "group") return $"{lbl} · {e.Fields.Count} {T["forms.fieldsShort"]}";
+        return lbl;
+    }
+}
+
+<div class="live-editor" data-form-id="@Model.Current.Id" data-selected-element="@(Model.SelectedElement?.Id)">
+    <aside class="le-sidebar">
+        @if (editing)
+        {
+            var sel = Model.SelectedElement!;
+            <div class="le-head">
+                <a class="le-back" asp-page="Edit" asp-route-id="@Model.Current.Id">@T["forms.allElements"]</a>
+            </div>
+            <div class="le-panel">
+                <div class="le-panel-head">
+                    <span class="le-panel-title">@TypeName(sel.Type)</span>
+                </div>
+                <form id="element-form" method="post" asp-page-handler="SaveElement" asp-route-id="@Model.Current.Id" asp-route-elementId="@sel.Id">
+                    <input type="hidden" name="ElementJson" id="ElementJson" />
+                    <div id="element-editor"></div>
+                    <div class="le-panel-actions">
+                        <button type="submit" class="btn btn-sm">@T["action.save"]</button>
+                        <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@Model.Current.Id">@T["editor.done"]</a>
+                    </div>
+                </form>
+                <form class="inline-form le-delete" method="post" asp-page-handler="DeleteElement" asp-route-id="@Model.Current.Id" asp-route-elementId="@sel.Id" onsubmit="return confirm('@T["forms.confirmDeleteElement"]');">
+                    <button type="submit" class="btn btn-sm btn-danger">@T["forms.deleteElement"]</button>
+                </form>
+            </div>
+            <script id="element-data" type="application/json">@Html.Raw(Model.ElementJsonData.Replace("</", "<\\/"))</script>
+            <script id="available-fields" type="application/json">@Html.Raw(Model.AvailableFieldsJson.Replace("</", "<\\/"))</script>
+            <script id="element-type" type="application/json">"@sel.Type"</script>
+        }
+        else
+        {
+            <div class="le-head">
+                <a class="le-back" asp-page="Index">@T["forms.backToForms"]</a>
+                <div class="le-title">@Model.Current.Name</div>
+            </div>
+
+            <div class="le-scroll">
+                <div class="le-section-label">@T["forms.elements"]</div>
+                @if (Model.Elements.Count == 0)
+                {
+                    <p class="muted" style="padding:0 4px;">@T["forms.noElements"]</p>
+                }
+                <div class="block-list sortable" id="element-list" data-sortable data-reorder-form="reorder-form">
+                    @foreach (var e in Model.Elements)
+                    {
+                        var svg = MatCMS.Pages.Admin.Forms.EditModel.ElementTypes.FirstOrDefault(t => t.Type == e.Type).Svg;
+                        <div class="block-item sortable-item" data-item-id="@e.Id" data-element-id="@e.Id">
+                            <span class="drag-handle" title="@T["editor.dragToSort"]" aria-hidden="true">⠿</span>
+                            <a class="b-open" asp-page="Edit" asp-route-id="@Model.Current.Id" asp-route-element="@e.Id">
+                                <span class="b-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">@Html.Raw(svg)</svg>
+                                </span>
+                                <span class="b-info">
+                                    <span class="b-type">@TypeName(e.Type)</span>
+                                    <span class="b-sum">@ElSummary(e)</span>
+                                </span>
+                            </a>
+                            <form class="inline-form" method="post" asp-page-handler="DeleteElement" asp-route-id="@Model.Current.Id" asp-route-elementId="@e.Id" onsubmit="return confirm('@T["forms.confirmDeleteElement"]');">
+                                <button type="submit" class="icon-btn" title="@T["editor.delete"]">✕</button>
+                            </form>
+                        </div>
+                    }
+                </div>
+                <form id="reorder-form" method="post" asp-page-handler="Reorder" asp-route-id="@Model.Current.Id" style="display:none;">
+                    <div data-order-inputs></div>
+                </form>
+
+                <div class="le-add">
+                    <button type="button" class="btn btn-block" id="add-element-btn">@T["forms.addElement"]</button>
+                </div>
+
+                <details class="le-settings">
+                    <summary>@T["forms.settings"]</summary>
+                    <form method="post" asp-page-handler="Meta" asp-route-id="@Model.Current.Id" class="form-grid">
+                        <div class="form-field">
+                            <label>@T["forms.nameField"]</label>
+                            <input name="Meta.Name" value="@Model.Meta.Name" required />
+                        </div>
+                        <div class="form-field">
+                            <label>@T["forms.slug"]</label>
+                            <input name="Meta.Slug" value="@Model.Meta.Slug" required />
+                        </div>
+                        <div><button type="submit" class="btn btn-sm">@T["action.save"]</button></div>
+                    </form>
+                </details>
+            </div>
+
+            @* Add-element modal *@
+            <div class="modal-overlay" id="add-element-modal">
+                <div class="modal" role="dialog" aria-modal="true" aria-label="@T["forms.addElement"]">
+                    <div class="modal-head">
+                        <h2>@T["forms.addElement"]</h2>
+                        <button type="button" class="modal-close" id="add-element-close" aria-label="@T["editor.close"]">✕</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="picker">
+                            @foreach (var t in MatCMS.Pages.Admin.Forms.EditModel.ElementTypes)
+                            {
+                                <form method="post" asp-page-handler="AddElement" asp-route-id="@Model.Current.Id" asp-route-type="@t.Type">
+                                    <button type="submit" class="tile">
+                                        <span class="t-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">@Html.Raw(t.Svg)</svg>
+                                        </span>
+                                        <span class="t-name">@TypeName(t.Type)</span>
+                                        <span class="t-desc">@T["forms.el." + t.Type + ".desc"]</span>
+                                    </button>
+                                </form>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </aside>
+
+    <main class="le-preview">
+        <div class="le-toolbar">
+            <span class="le-url mono">@T["forms.previewLabel"]</span>
+        </div>
+        <div class="le-frame-wrap">
+            <iframe id="preview-frame" src="@previewUrl" title="@T["editor.livePreview"]"></iframe>
+        </div>
+    </main>
+</div>
+
+@section Scripts {
+    <script src="~/js/admin-sortable.js" asp-append-version="true"></script>
+    <script src="~/js/admin-form-builder.js" asp-append-version="true"></script>
+}

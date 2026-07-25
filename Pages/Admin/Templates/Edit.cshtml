@@ -2,11 +2,11 @@
 @model MatCMS.Pages.Admin.Templates.EditModel
 @using MatCMS.Content
 @{
-    ViewData["Title"] = "Template bearbeiten";
+    ViewData["Title"] = T["templates.edit"];
 }
 <div class="page-head">
-    <h1>Template bearbeiten</h1>
-    <a class="btn btn-sm btn-ghost" asp-page="Index">Zurück</a>
+    <h1>@T["templates.edit"]</h1>
+    <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
 </div>
 
 <div class="card">
@@ -16,23 +16,23 @@
     }
     @if (Model.IsActive)
     {
-        <p class="muted">Dieses Template ist aktuell <strong>aktiv</strong>. Änderungen wirken sich sofort auf die Website aus.</p>
+        <p class="muted">@Html.Raw(T["templates.activeNotice"])</p>
     }
     <form method="post" class="form-grid">
         <input type="hidden" name="Id" value="@Model.Id" />
         <div class="form-row">
             <div class="form-field">
-                <label for="Name">Name</label>
+                <label for="Name">@T["templates.name"]</label>
                 <input id="Name" name="Name" value="@Model.Name" required autofocus />
             </div>
             <div class="form-field">
-                <label for="AccentColor">Akzentfarbe</label>
+                <label for="AccentColor">@T["templates.accentColor"]</label>
                 <input id="AccentColor" name="AccentColor" type="color" value="@Model.AccentColor" />
             </div>
         </div>
         <div class="form-row">
             <div class="form-field">
-                <label for="HeadingFont">Überschrift-Schrift</label>
+                <label for="HeadingFont">@T["templates.headingFont"]</label>
                 <select id="HeadingFont" name="HeadingFont">
                     @foreach (var f in TemplateFonts.Families)
                     {
@@ -41,7 +41,7 @@
                 </select>
             </div>
             <div class="form-field">
-                <label for="BodyFont">Fließtext-Schrift</label>
+                <label for="BodyFont">@T["templates.bodyFont"]</label>
                 <select id="BodyFont" name="BodyFont">
                     @foreach (var f in TemplateFonts.Families)
                     {
@@ -51,14 +51,14 @@
             </div>
         </div>
         <div class="form-field">
-            <label for="ButtonStyle">Button-Stil</label>
+            <label for="ButtonStyle">@T["templates.buttonStyle"]</label>
             <select id="ButtonStyle" name="ButtonStyle">
-                <option value="solid" selected="@(Model.ButtonStyle != "outline")">Gefüllt</option>
-                <option value="outline" selected="@(Model.ButtonStyle == "outline")">Umrandet</option>
+                <option value="solid" selected="@(Model.ButtonStyle != "outline")">@T["templates.buttonSolid"]</option>
+                <option value="outline" selected="@(Model.ButtonStyle == "outline")">@T["templates.buttonOutline"]</option>
             </select>
         </div>
         <div>
-            <button type="submit" class="btn">Speichern</button>
+            <button type="submit" class="btn">@T["action.save"]</button>
         </div>
     </form>
 </div>

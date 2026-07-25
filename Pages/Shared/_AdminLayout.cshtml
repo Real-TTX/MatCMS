@@ -1,9 +1,15 @@
 @inject MatCMS.Services.SiteContext Site
+@inject Microsoft.Extensions.Options.IOptions<Microsoft.AspNetCore.Builder.RequestLocalizationOptions> LocOptions
 @{
     var title = ViewData["Title"] as string ?? "Admin";
     string Active(string path) =>
         Context.Request.Path.StartsWithSegments(path, StringComparison.OrdinalIgnoreCase) ? "active" : "";
     var displayName = User.FindFirst("DisplayName")?.Value ?? User.Identity?.Name ?? "Admin";
+
+    // Language switcher: enumerate supported cultures (lights up once a 2nd language is added).
+    var cultures = LocOptions.Value.SupportedUICultures ?? new System.Collections.Generic.List<System.Globalization.CultureInfo>();
+    var currentCulture = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
 
     // Brand wordmark is driven by the site name (not hardcoded); split roughly in half for the two-tone look.
     var brand = string.IsNullOrWhiteSpace(Site.SiteName) ? "MatCMS" : Site.SiteName;
@@ -31,18 +37,19 @@
             <span class="cms">MatCMS</span>
         </div>
         <nav class="admin-nav">
-            <a class="@Active("/admin/pages")" asp-page="/Admin/Pages/Index">📄 Seiten</a>
-            <a class="@Active("/admin/menus")" asp-page="/Admin/Menus/Index">🧭 Menü</a>
-            <a class="@Active("/admin/submissions")" asp-page="/Admin/Submissions/Index">✉️ Anfragen</a>
-            <a class="@Active("/admin/users")" asp-page="/Admin/Users/Index">👤 Benutzer</a>
-            <a class="@Active("/admin/settings")" asp-page="/Admin/Settings/Index">⚙️ Einstellungen</a>
-            <a class="@Active("/admin/templates")" asp-page="/Admin/Templates/Index">🎨 Templates</a>
-            <a class="@Active("/admin/backup")" asp-page="/Admin/Backup/Index">💾 Backup</a>
+            <a class="@Active("/admin/pages")" asp-page="/Admin/Pages/Index">📄 @T["nav.pages"]</a>
+            <a class="@Active("/admin/menus")" asp-page="/Admin/Menus/Index">🧭 @T["nav.menus"]</a>
+            <a class="@Active("/admin/submissions")" asp-page="/Admin/Submissions/Index">✉️ @T["nav.submissions"]</a>
+            <a class="@Active("/admin/forms")" asp-page="/Admin/Forms/Index">📝 @T["nav.forms"]</a>
+            <a class="@Active("/admin/users")" asp-page="/Admin/Users/Index">👤 @T["nav.users"]</a>
+            <a class="@Active("/admin/settings")" asp-page="/Admin/Settings/Index">⚙️ @T["nav.settings"]</a>
+            <a class="@Active("/admin/templates")" asp-page="/Admin/Templates/Index">🎨 @T["nav.templates"]</a>
+            <a class="@Active("/admin/backup")" asp-page="/Admin/Backup/Index">💾 @T["nav.backup"]</a>
         </nav>
         <div class="admin-nav-foot">
-            <a href="/" target="_blank">🌐 Website ansehen</a>
+            <a href="/" target="_blank">🌐 @T["nav.viewSite"]</a>
             <form method="post" asp-page="/Logout">
-                <button type="submit" class="linklike">🚪 Abmelden</button>
+                <button type="submit" class="linklike">🚪 @T["nav.logout"]</button>
             </form>
         </div>
     </aside>
@@ -50,7 +57,22 @@
     <div class="admin-main">
         <header class="admin-topbar">
             <div class="admin-topbar-title">@title</div>
-            <div class="admin-user">Angemeldet als <strong>@displayName</strong></div>
+            <div class="admin-topbar-right">
+                @if (cultures.Count > 1)
+                {
+                    <form class="lang-switch" method="post" action="/set-language">
+                        <input type="hidden" name="returnUrl" value="@returnUrl" />
+                        <select name="culture" aria-label="@T["admin.language"]" onchange="this.form.submit()">
+                            @foreach (var c in cultures)
+                            {
+                                var code = c.TwoLetterISOLanguageName;
+                                <option value="@code" selected="@(code == currentCulture)">@T["lang." + code]</option>
+                            }
+                        </select>
+                    </form>
+                }
+                <div class="admin-user">@T["admin.loggedInAs"] <strong>@displayName</strong></div>
+            </div>
         </header>
 
         <main class="admin-content">

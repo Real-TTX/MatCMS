@@ -1,4 +1,5 @@
 using MatCMS.Data;
+using MatCMS.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
@@ -32,13 +33,20 @@ public class CreateModel : PageModel
             Error = $"Der Slug „{slug}“ ist reserviert und kann nicht verwendet werden.";
             return Page();
         }
-        if (await _db.Pages.AnyAsync(p => p.Slug == slug))
+        if (await _db.Pages.AnyAsync(p => p.Slug == slug && p.Locale == Localizer.DefaultCulture))
         {
             Error = $"Der Slug „{slug}“ ist bereits vergeben.";
             return Page();
         }
 
-        var page = new PageEntity { Title = title, Slug = slug, IsPublished = false };
+        var page = new PageEntity
+        {
+            Title = title,
+            Slug = slug,
+            IsPublished = false,
+            Locale = Localizer.DefaultCulture,
+            TranslationGroup = Guid.NewGuid().ToString("N")
+        };
         _db.Pages.Add(page);
         await _db.SaveChangesAsync();
 

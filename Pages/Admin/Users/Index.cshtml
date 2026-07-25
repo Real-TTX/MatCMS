@@ -1,20 +1,20 @@
 @page
 @model MatCMS.Pages.Admin.Users.IndexModel
 @{
-    ViewData["Title"] = "Benutzer";
+    ViewData["Title"] = T["users.title"];
     var me = User.Identity?.Name;
 }
 <div class="page-head">
-    <h1>Benutzer</h1>
+    <h1>@T["users.title"]</h1>
 </div>
 
 <table class="data">
     <thead>
         <tr>
-            <th>Benutzername</th>
-            <th>Anzeigename</th>
-            <th>Rolle</th>
-            <th>Erstellt</th>
+            <th>@T["users.colUsername"]</th>
+            <th>@T["users.colDisplayName"]</th>
+            <th>@T["users.colRole"]</th>
+            <th>@T["users.colCreated"]</th>
             <th></th>
         </tr>
     </thead>
@@ -22,15 +22,15 @@
         @foreach (var u in Model.Items)
         {
             <tr>
-                <td><strong>@u.Username</strong> @(u.Username == me ? "(Sie)" : "")</td>
+                <td><strong>@u.Username</strong> @(u.Username == me ? T["users.you"] : "")</td>
                 <td>@(string.IsNullOrWhiteSpace(u.DisplayName) ? "—" : u.DisplayName)</td>
                 <td>@u.Role</td>
                 <td class="muted">@u.CreatedAt.ToString("dd.MM.yyyy")</td>
                 <td>
                     <div class="actions">
-                        <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@u.Id">Bearbeiten</a>
-                        <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@u.Id" onsubmit="return confirm('Benutzer „@u.Username“ wirklich löschen?');">
-                            <button type="submit" class="btn btn-sm btn-danger">Löschen</button>
+                        <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@u.Id">@T["action.edit"]</a>
+                        <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@u.Id" onsubmit="return confirm('@T["users.confirmDelete", u.Username]');">
+                            <button type="submit" class="btn btn-sm btn-danger">@T["action.delete"]</button>
                         </form>
                     </div>
                 </td>
@@ -40,5 +40,5 @@
 </table>
 
 <div class="list-actions">
-    <a class="btn" asp-page="Create">+ Benutzer erstellen</a>
+    <a class="btn" asp-page="Create">@T["users.create"]</a>
 </div>

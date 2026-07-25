@@ -1,32 +1,32 @@
 @page
 @model MatCMS.Pages.Admin.Menus.IndexModel
 @{
-    ViewData["Title"] = "Menü";
+    ViewData["Title"] = T["menus.title"];
 }
 <div class="page-head">
-    <h1>Menü-Verwaltung</h1>
+    <h1>@T["menus.heading"]</h1>
 </div>
 
 <div class="card">
-    <h2>Hauptmenü (Header)</h2>
-    <p class="help">Zum Umsortieren am Griff <span class="mono">⠿</span> ziehen.</p>
+    <h2>@T["menus.headerMenu"]</h2>
+    <p class="help">@Html.Raw(T["menus.dragHint"])</p>
     @if (Model.Header.Count == 0)
     {
-        <p class="muted">Noch keine Menüpunkte.</p>
+        <p class="muted">@T["menus.noItems"]</p>
     }
     <div class="block-list sortable" data-sortable data-reorder-form="reorder-header">
         @foreach (var it in Model.Header)
         {
             <div class="block-item sortable-item" data-item-id="@it.Id">
-                <span class="drag-handle" title="Ziehen zum Sortieren" aria-hidden="true">⠿</span>
+                <span class="drag-handle" title="@T["editor.dragToSort"]" aria-hidden="true">⠿</span>
                 <div class="b-info">
                     <div class="b-type">@it.Label</div>
-                    <div class="b-sum">@it.Url@(it.OpenInNewTab ? " · neuer Tab" : "")</div>
+                    <div class="b-sum">@it.Url@(it.OpenInNewTab ? " · " + T["menus.newTab"] : "")</div>
                 </div>
                 <div class="actions">
-                    <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@it.Id">Bearbeiten</a>
-                    <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@it.Id" onsubmit="return confirm('Menüpunkt „@it.Label“ löschen?');">
-                        <button type="submit" class="btn btn-sm btn-danger" title="Löschen">✕</button>
+                    <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@it.Id">@T["action.edit"]</a>
+                    <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@it.Id" onsubmit="return confirm('@T["menus.confirmDelete", it.Label]');">
+                        <button type="submit" class="btn btn-sm btn-danger" title="@T["action.delete"]">✕</button>
                     </form>
                 </div>
             </div>
@@ -36,30 +36,30 @@
         <div data-order-inputs></div>
     </form>
     <div class="list-actions">
-        <a class="btn" asp-page="Create" asp-route-menu="header">+ Menüpunkt hinzufügen</a>
+        <a class="btn" asp-page="Create" asp-route-menu="header">@T["menus.addItem"]</a>
     </div>
 </div>
 
 <div class="card">
-    <h2>Footer-Menü</h2>
-    <p class="help">Zum Umsortieren am Griff <span class="mono">⠿</span> ziehen.</p>
+    <h2>@T["menus.footerMenu"]</h2>
+    <p class="help">@Html.Raw(T["menus.dragHint"])</p>
     @if (Model.Footer.Count == 0)
     {
-        <p class="muted">Noch keine Menüpunkte.</p>
+        <p class="muted">@T["menus.noItems"]</p>
     }
     <div class="block-list sortable" data-sortable data-reorder-form="reorder-footer">
         @foreach (var it in Model.Footer)
         {
             <div class="block-item sortable-item" data-item-id="@it.Id">
-                <span class="drag-handle" title="Ziehen zum Sortieren" aria-hidden="true">⠿</span>
+                <span class="drag-handle" title="@T["editor.dragToSort"]" aria-hidden="true">⠿</span>
                 <div class="b-info">
                     <div class="b-type">@it.Label</div>
-                    <div class="b-sum">@it.Url@(it.OpenInNewTab ? " · neuer Tab" : "")</div>
+                    <div class="b-sum">@it.Url@(it.OpenInNewTab ? " · " + T["menus.newTab"] : "")</div>
                 </div>
                 <div class="actions">
-                    <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@it.Id">Bearbeiten</a>
-                    <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@it.Id" onsubmit="return confirm('Menüpunkt „@it.Label“ löschen?');">
-                        <button type="submit" class="btn btn-sm btn-danger" title="Löschen">✕</button>
+                    <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@it.Id">@T["action.edit"]</a>
+                    <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@it.Id" onsubmit="return confirm('@T["menus.confirmDelete", it.Label]');">
+                        <button type="submit" class="btn btn-sm btn-danger" title="@T["action.delete"]">✕</button>
                     </form>
                 </div>
             </div>
@@ -69,7 +69,7 @@
         <div data-order-inputs></div>
     </form>
     <div class="list-actions">
-        <a class="btn" asp-page="Create" asp-route-menu="footer">+ Menüpunkt hinzufügen</a>
+        <a class="btn" asp-page="Create" asp-route-menu="footer">@T["menus.addItem"]</a>
     </div>
 </div>
 

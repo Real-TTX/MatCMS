@@ -1,11 +1,11 @@
 @page
 @model MatCMS.Pages.Admin.Users.CreateModel
 @{
-    ViewData["Title"] = "Neuer Benutzer";
+    ViewData["Title"] = T["users.new"];
 }
 <div class="page-head">
-    <h1>Neuer Benutzer</h1>
-    <a class="btn btn-sm btn-ghost" asp-page="Index">Zurück</a>
+    <h1>@T["users.new"]</h1>
+    <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
 </div>
 
 <div class="card">
@@ -16,20 +16,20 @@
     <form method="post" class="form-grid">
         <div class="form-row">
             <div class="form-field">
-                <label for="Username">Benutzername</label>
+                <label for="Username">@T["users.username"]</label>
                 <input id="Username" name="Username" value="@Model.Username" required autofocus />
             </div>
             <div class="form-field">
-                <label for="DisplayName">Anzeigename (optional)</label>
+                <label for="DisplayName">@T["users.displayNameOptional"]</label>
                 <input id="DisplayName" name="DisplayName" value="@Model.DisplayName" />
             </div>
         </div>
         <div class="form-field">
-            <label for="Password">Passwort</label>
+            <label for="Password">@T["users.password"]</label>
             <input id="Password" name="Password" type="password" required />
         </div>
         <div>
-            <button type="submit" class="btn">Benutzer anlegen</button>
+            <button type="submit" class="btn">@T["users.createSubmit"]</button>
         </div>
     </form>
 </div>

@@ -1,5 +1,6 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using MatCMS.Content;
 using MatCMS.Models;
 using MatCMS.Services;
 using Microsoft.EntityFrameworkCore;
@@ -60,10 +61,25 @@ public static class DbSeeder
             });
         }
 
+        if (!await db.Forms.AnyAsync())
+        {
+            db.Forms.Add(new Form
+            {
+                Name = "Kontakt",
+                Slug = "kontakt",
+                DefinitionJson = BuildContactFormDefinition()
+            });
+        }
+
         if (!await db.Pages.AnyAsync())
         {
             foreach (var page in BuildPages())
+            {
+                // Seeded pages are in the default locale; each is its own translation group.
+                page.Locale = Localizer.DefaultCulture;
+                page.TranslationGroup = Guid.NewGuid().ToString("N");
                 db.Pages.Add(page);
+            }
         }
 
         if (!await db.MenuItems.AnyAsync())
@@ -82,7 +98,7 @@ public static class DbSeeder
     private static SiteSetting S(string key, string value) => new() { Key = key, Value = value };
 
     private static MenuItem Mi(string menu, string label, string url, int order) =>
-        new() { Menu = menu, Label = label, Url = url, SortOrder = order };
+        new() { Menu = menu, Label = label, Url = url, SortOrder = order, Locale = Localizer.DefaultCulture };
 
     private static string Json(object data) => JsonSerializer.Serialize(data, JsonOpts);
 
@@ -160,10 +176,31 @@ public static class DbSeeder
             Blocks =
             [
                 B("hero", 0, new { heading = "KONTAKT", subheading = "", image = "", buttonText = "", buttonUrl = "", align = "center" }),
-                B("contactform", 1, new { heading = "Kontaktformular", intro = "", categories = "Allgemeine Anfrage" }),
+                B("form", 1, new { form = "kontakt", heading = "Kontaktformular", intro = "" }),
             ]
         });
 
         return pages;
+    }
+
+    // Default "Kontakt" form definition (Name, E-Mail, Kategorie, Nachricht).
+    private static string BuildContactFormDefinition()
+    {
+        var elements = new List<FormElement>
+        {
+            new() { Id = "name", Type = "text", Label = "Name", Required = true },
+            new() { Id = "email", Type = "email", Label = "E-Mail", Required = true },
+            new()
+            {
+                Id = "kategorie", Type = "select", Label = "Kategorie",
+                Options =
+                [
+                    new FormOption { Value = "Allgemeine Anfrage", Label = "Allgemeine Anfrage" },
+                    new FormOption { Value = "Service Anfrage", Label = "Service Anfrage" }
+                ]
+            },
+            new() { Id = "nachricht", Type = "text", Label = "Nachricht", Required = true },
+        };
+        return FormDefinition.Serialize(elements);
     }
 }

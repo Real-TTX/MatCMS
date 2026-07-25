@@ -104,6 +104,19 @@
                 {
                     <a href="@m.Url" target="@(m.OpenInNewTab ? "_blank" : null)" rel="@(m.OpenInNewTab ? "noopener" : null)">@m.Label</a>
                 }
+                @{
+                    var langLinks = Site.LanguageLinks();
+                }
+                @if (langLinks.Count > 1)
+                {
+                    <span class="lang-switch" aria-label="@T["nav.language"]">
+                        @foreach (var l in langLinks)
+                        {
+                            <a href="@l.Url" hreflang="@l.Locale" class="@(l.IsCurrent ? "lang-current" : null)"
+                               aria-current="@(l.IsCurrent ? "true" : null)">@l.Locale.ToUpperInvariant()</a>
+                        }
+                    </span>
+                }
             </nav>
         </div>
     </header>

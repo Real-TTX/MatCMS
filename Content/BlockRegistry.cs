@@ -29,64 +29,69 @@ public class BlockRegistry
     private const string SvgImageText = @"<rect x=""3"" y=""4"" width=""8"" height=""16"" rx=""1""/><path d=""M14 7h6""/><path d=""M14 12h6""/><path d=""M14 17h4""/>";
     private const string SvgSpacer = @"<path d=""M4 12h16""/><path d=""M8 7l4-4 4 4""/><path d=""M8 17l4 4 4-4""/>";
     private const string SvgLogoStrip = @"<rect x=""3"" y=""9"" width=""5"" height=""6"" rx=""1""/><rect x=""10"" y=""9"" width=""5"" height=""6"" rx=""1""/><rect x=""17"" y=""9"" width=""4"" height=""6"" rx=""1""/>";
+    private const string SvgForm = @"<rect x=""4"" y=""3"" width=""16"" height=""18"" rx=""2""/><path d=""M8 8h8""/><path d=""M8 12h8""/><path d=""M8 16h4""/>";
 
+    // Name / Description / field Label / option Label / ItemLabel hold LOCALIZATION KEYS
+    // (not display text). They are resolved at render time via the Localizer (@T[...]); the
+    // German text lives in Resources/de.json. BlockRegistry is built once at startup, so it
+    // must NOT call the localizer here. Placeholders/help stay as literal German for now.
     private static List<BlockDefinition> Build() =>
     [
         new BlockDefinition
         {
             Type = "hero",
-            Name = "Hero (Kopfbereich)",
-            Description = "Großer Seitenkopf: Überschrift, optionaler Untertext, Button und Bildband darunter.",
+            Name = "block.hero.name",
+            Description = "block.hero.desc",
             Svg = SvgHero,
             Partial = "Blocks/_Hero",
             Fields =
             [
-                new BlockField { Id = "heading", Label = "Überschrift", Type = FieldType.Textarea, Placeholder = "SICHERE IT.\nKLARE STRUKTUREN.", Help = "Zeilenumbrüche werden übernommen." },
-                new BlockField { Id = "subheading", Label = "Untertext", Type = FieldType.Textarea },
-                new BlockField { Id = "image", Label = "Bild (Band darunter)", Type = FieldType.Image },
-                new BlockField { Id = "buttonText", Label = "Button-Text", Type = FieldType.Text, Placeholder = "Kontaktieren Sie uns" },
-                new BlockField { Id = "buttonUrl", Label = "Button-Link", Type = FieldType.Url, Placeholder = "/kontakt" },
-                new BlockField { Id = "align", Label = "Ausrichtung", Type = FieldType.Select, Default = "left",
-                    Options = [ new("left", "Links"), new("center", "Zentriert") ] },
+                new BlockField { Id = "heading", Label = "block.hero.f.heading", Type = FieldType.Textarea, Placeholder = "SICHERE IT.\nKLARE STRUKTUREN.", Help = "Zeilenumbrüche werden übernommen." },
+                new BlockField { Id = "subheading", Label = "block.hero.f.subheading", Type = FieldType.Textarea },
+                new BlockField { Id = "image", Label = "block.hero.f.image", Type = FieldType.Image },
+                new BlockField { Id = "buttonText", Label = "block.hero.f.buttonText", Type = FieldType.Text, Placeholder = "Kontaktieren Sie uns" },
+                new BlockField { Id = "buttonUrl", Label = "block.hero.f.buttonUrl", Type = FieldType.Url, Placeholder = "/kontakt" },
+                new BlockField { Id = "align", Label = "block.hero.f.align", Type = FieldType.Select, Default = "left",
+                    Options = [ new("left", "block.opt.align.left"), new("center", "block.opt.align.center") ] },
             ]
         },
         new BlockDefinition
         {
             Type = "richtext",
-            Name = "Text",
-            Description = "Textabschnitt mit optionaler Überschrift und formatiertem Fließtext (fett, Listen, Links).",
+            Name = "block.richtext.name",
+            Description = "block.richtext.desc",
             Svg = SvgText,
             Partial = "Blocks/_RichText",
             Fields =
             [
-                new BlockField { Id = "heading", Label = "Überschrift", Type = FieldType.Text },
-                new BlockField { Id = "body", Label = "Inhalt", Type = FieldType.RichText },
-                new BlockField { Id = "align", Label = "Ausrichtung", Type = FieldType.Select, Default = "left",
-                    Options = [ new("left", "Links"), new("center", "Zentriert") ] },
-                new BlockField { Id = "width", Label = "Breite", Type = FieldType.Select, Default = "normal",
-                    Options = [ new("normal", "Normal"), new("narrow", "Schmal") ] },
+                new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },
+                new BlockField { Id = "body", Label = "block.f.body", Type = FieldType.RichText },
+                new BlockField { Id = "align", Label = "block.richtext.f.align", Type = FieldType.Select, Default = "left",
+                    Options = [ new("left", "block.opt.align.left"), new("center", "block.opt.align.center") ] },
+                new BlockField { Id = "width", Label = "block.f.width", Type = FieldType.Select, Default = "normal",
+                    Options = [ new("normal", "block.opt.width.normal"), new("narrow", "block.opt.width.narrow") ] },
             ]
         },
         new BlockDefinition
         {
             Type = "columns",
-            Name = "Spalten",
-            Description = "Zwei oder drei nebeneinanderliegende Text-Spalten mit Titel – z. B. für Partner oder Leistungsbereiche.",
+            Name = "block.columns.name",
+            Description = "block.columns.desc",
             Svg = SvgColumns,
             Partial = "Blocks/_Columns",
             Fields =
             [
-                new BlockField { Id = "heading", Label = "Überschrift", Type = FieldType.Text },
-                new BlockField { Id = "intro", Label = "Einleitung", Type = FieldType.Textarea },
-                new BlockField { Id = "columns", Label = "Spaltenanzahl", Type = FieldType.Select, Default = "3",
-                    Options = [ new("2", "2 Spalten"), new("3", "3 Spalten") ] },
+                new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },
+                new BlockField { Id = "intro", Label = "block.f.intro", Type = FieldType.Textarea },
+                new BlockField { Id = "columns", Label = "block.columns.f.columns", Type = FieldType.Select, Default = "3",
+                    Options = [ new("2", "block.opt.columns.2"), new("3", "block.opt.columns.3") ] },
                 new BlockField
                 {
-                    Id = "items", Label = "Spalten", Type = FieldType.List, ItemLabel = "Spalte",
+                    Id = "items", Label = "block.columns.f.items", Type = FieldType.List, ItemLabel = "block.columns.item",
                     ItemFields =
                     [
-                        new BlockField { Id = "title", Label = "Titel", Type = FieldType.Text },
-                        new BlockField { Id = "body", Label = "Text", Type = FieldType.RichText },
+                        new BlockField { Id = "title", Label = "block.f.title", Type = FieldType.Text },
+                        new BlockField { Id = "body", Label = "block.f.text", Type = FieldType.RichText },
                     ]
                 },
             ]
@@ -94,23 +99,23 @@ public class BlockRegistry
         new BlockDefinition
         {
             Type = "servicegrid",
-            Name = "Leistungen (Raster)",
-            Description = "Kachel-Raster für Leistungen oder Features, je Kachel Titel und kurze Beschreibung.",
+            Name = "block.servicegrid.name",
+            Description = "block.servicegrid.desc",
             Svg = SvgGrid,
             Partial = "Blocks/_ServiceGrid",
             Fields =
             [
-                new BlockField { Id = "heading", Label = "Überschrift", Type = FieldType.Text },
-                new BlockField { Id = "intro", Label = "Einleitung", Type = FieldType.Textarea },
-                new BlockField { Id = "columns", Label = "Spalten (Desktop)", Type = FieldType.Select, Default = "4",
+                new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },
+                new BlockField { Id = "intro", Label = "block.f.intro", Type = FieldType.Textarea },
+                new BlockField { Id = "columns", Label = "block.servicegrid.f.columns", Type = FieldType.Select, Default = "4",
                     Options = [ new("2", "2"), new("3", "3"), new("4", "4") ] },
                 new BlockField
                 {
-                    Id = "items", Label = "Leistungen", Type = FieldType.List, ItemLabel = "Leistung",
+                    Id = "items", Label = "block.servicegrid.f.items", Type = FieldType.List, ItemLabel = "block.servicegrid.item",
                     ItemFields =
                     [
-                        new BlockField { Id = "title", Label = "Titel", Type = FieldType.Text },
-                        new BlockField { Id = "text", Label = "Beschreibung", Type = FieldType.Textarea },
+                        new BlockField { Id = "title", Label = "block.f.title", Type = FieldType.Text },
+                        new BlockField { Id = "text", Label = "block.f.description", Type = FieldType.Textarea },
                     ]
                 },
             ]
@@ -118,67 +123,82 @@ public class BlockRegistry
         new BlockDefinition
         {
             Type = "cta",
-            Name = "Call-to-Action",
-            Description = "Hervorgehobener Aufruf: große Aussage mit optionalem Text und Button (z. B. „Kontaktieren Sie uns“).",
+            Name = "block.cta.name",
+            Description = "block.cta.desc",
             Svg = SvgCta,
             Partial = "Blocks/_Cta",
             Fields =
             [
-                new BlockField { Id = "heading", Label = "Überschrift", Type = FieldType.Text },
-                new BlockField { Id = "text", Label = "Text", Type = FieldType.Textarea },
-                new BlockField { Id = "buttonText", Label = "Button-Text", Type = FieldType.Text },
-                new BlockField { Id = "buttonUrl", Label = "Button-Link", Type = FieldType.Url },
+                new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },
+                new BlockField { Id = "text", Label = "block.f.text", Type = FieldType.Textarea },
+                new BlockField { Id = "buttonText", Label = "block.f.buttonText", Type = FieldType.Text },
+                new BlockField { Id = "buttonUrl", Label = "block.f.buttonUrl", Type = FieldType.Url },
             ]
         },
         new BlockDefinition
         {
             Type = "contactform",
-            Name = "Kontaktformular",
-            Description = "Formular für Name, E-Mail, Kategorie und Nachricht. Einsendungen erscheinen im Admin unter „Anfragen“.",
+            Name = "block.contactform.name",
+            Description = "block.contactform.desc",
             Svg = SvgMail,
             Partial = "Blocks/_ContactForm",
             Fields =
             [
-                new BlockField { Id = "heading", Label = "Überschrift", Type = FieldType.Text, Default = "Kontaktformular" },
-                new BlockField { Id = "intro", Label = "Einleitung", Type = FieldType.Textarea },
-                new BlockField { Id = "categories", Label = "Kategorien", Type = FieldType.Text,
+                new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text, Default = "Kontaktformular" },
+                new BlockField { Id = "intro", Label = "block.f.intro", Type = FieldType.Textarea },
+                new BlockField { Id = "categories", Label = "block.contactform.f.categories", Type = FieldType.Text,
                     Placeholder = "Allgemeine Anfrage, Service Anfrage", Help = "Komma-getrennt. Leer lassen für keine Auswahl." },
             ]
         },
         new BlockDefinition
         {
+            Type = "form",
+            Name = "block.form.name",
+            Description = "block.form.desc",
+            Svg = SvgForm,
+            Partial = "Blocks/_Form",
+            Fields =
+            [
+                new BlockField { Id = "form", Label = "block.form.f.form", Type = FieldType.Select, OptionsSource = "forms",
+                    Help = "Formulare werden unter „Formulare“ verwaltet." },
+                new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },
+                new BlockField { Id = "intro", Label = "block.f.intro", Type = FieldType.Textarea },
+            ]
+        },
+        new BlockDefinition
+        {
             Type = "image",
-            Name = "Bild",
-            Description = "Einzelnes Bild mit optionaler Bildunterschrift – als Upload oder per URL.",
+            Name = "block.image.name",
+            Description = "block.image.desc",
             Svg = SvgImage,
             Partial = "Blocks/_Image",
             Fields =
             [
-                new BlockField { Id = "image", Label = "Bild", Type = FieldType.Image },
-                new BlockField { Id = "alt", Label = "Alternativtext", Type = FieldType.Text },
-                new BlockField { Id = "caption", Label = "Bildunterschrift", Type = FieldType.Text },
-                new BlockField { Id = "width", Label = "Breite", Type = FieldType.Select, Default = "normal",
-                    Options = [ new("normal", "Normal"), new("narrow", "Schmal"), new("full", "Volle Breite") ] },
+                new BlockField { Id = "image", Label = "block.f.image", Type = FieldType.Image },
+                new BlockField { Id = "alt", Label = "block.f.alt", Type = FieldType.Text },
+                new BlockField { Id = "caption", Label = "block.image.f.caption", Type = FieldType.Text },
+                new BlockField { Id = "width", Label = "block.f.width", Type = FieldType.Select, Default = "normal",
+                    Options = [ new("normal", "block.opt.width.normal"), new("narrow", "block.opt.width.narrow"), new("full", "block.opt.width.full") ] },
             ]
         },
         new BlockDefinition
         {
             Type = "accordion",
-            Name = "Akkordeon (FAQ)",
-            Description = "Aufklappbare Frage-Antwort-Liste – ideal für häufige Fragen (FAQ).",
+            Name = "block.accordion.name",
+            Description = "block.accordion.desc",
             Svg = SvgAccordion,
             Partial = "Blocks/_Accordion",
             Fields =
             [
-                new BlockField { Id = "heading", Label = "Überschrift", Type = FieldType.Text },
-                new BlockField { Id = "intro", Label = "Einleitung", Type = FieldType.Textarea },
+                new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },
+                new BlockField { Id = "intro", Label = "block.f.intro", Type = FieldType.Textarea },
                 new BlockField
                 {
-                    Id = "items", Label = "Einträge", Type = FieldType.List, ItemLabel = "Frage",
+                    Id = "items", Label = "block.accordion.f.items", Type = FieldType.List, ItemLabel = "block.accordion.item",
                     ItemFields =
                     [
-                        new BlockField { Id = "question", Label = "Frage", Type = FieldType.Text },
-                        new BlockField { Id = "answer", Label = "Antwort", Type = FieldType.RichText },
+                        new BlockField { Id = "question", Label = "block.accordion.f.question", Type = FieldType.Text },
+                        new BlockField { Id = "answer", Label = "block.accordion.f.answer", Type = FieldType.RichText },
                     ]
                 },
             ]
@@ -186,63 +206,63 @@ public class BlockRegistry
         new BlockDefinition
         {
             Type = "quote",
-            Name = "Zitat",
-            Description = "Hervorgehobenes Zitat oder Kundenstimme mit optionaler Namensangabe.",
+            Name = "block.quote.name",
+            Description = "block.quote.desc",
             Svg = SvgQuote,
             Partial = "Blocks/_Quote",
             Fields =
             [
-                new BlockField { Id = "quote", Label = "Zitat", Type = FieldType.Textarea },
-                new BlockField { Id = "author", Label = "Autor / Quelle", Type = FieldType.Text },
+                new BlockField { Id = "quote", Label = "block.quote.f.quote", Type = FieldType.Textarea },
+                new BlockField { Id = "author", Label = "block.quote.f.author", Type = FieldType.Text },
             ]
         },
         new BlockDefinition
         {
             Type = "imagetext",
-            Name = "Bild & Text",
-            Description = "Bild neben Text – mit Überschrift, formatiertem Fließtext und wählbarer Bildseite.",
+            Name = "block.imagetext.name",
+            Description = "block.imagetext.desc",
             Svg = SvgImageText,
             Partial = "Blocks/_ImageText",
             Fields =
             [
-                new BlockField { Id = "image", Label = "Bild", Type = FieldType.Image },
-                new BlockField { Id = "heading", Label = "Überschrift", Type = FieldType.Text },
-                new BlockField { Id = "body", Label = "Inhalt", Type = FieldType.RichText },
-                new BlockField { Id = "imageSide", Label = "Bildseite", Type = FieldType.Select, Default = "left",
-                    Options = [ new("left", "Bild links"), new("right", "Bild rechts") ] },
+                new BlockField { Id = "image", Label = "block.f.image", Type = FieldType.Image },
+                new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },
+                new BlockField { Id = "body", Label = "block.f.body", Type = FieldType.RichText },
+                new BlockField { Id = "imageSide", Label = "block.imagetext.f.imageSide", Type = FieldType.Select, Default = "left",
+                    Options = [ new("left", "block.opt.imageSide.left"), new("right", "block.opt.imageSide.right") ] },
             ]
         },
         new BlockDefinition
         {
             Type = "spacer",
-            Name = "Abstand",
-            Description = "Leerer vertikaler Abstand zwischen zwei Blöcken.",
+            Name = "block.spacer.name",
+            Description = "block.spacer.desc",
             Svg = SvgSpacer,
             Partial = "Blocks/_Spacer",
             Fields =
             [
-                new BlockField { Id = "size", Label = "Größe", Type = FieldType.Select, Default = "medium",
-                    Options = [ new("small", "Klein"), new("medium", "Mittel"), new("large", "Groß") ] },
+                new BlockField { Id = "size", Label = "block.spacer.f.size", Type = FieldType.Select, Default = "medium",
+                    Options = [ new("small", "block.opt.size.small"), new("medium", "block.opt.size.medium"), new("large", "block.opt.size.large") ] },
             ]
         },
         new BlockDefinition
         {
             Type = "logostrip",
-            Name = "Logo-Leiste",
-            Description = "Reihe von Partner- oder Kundenlogos, optional mit Überschrift und Verlinkung.",
+            Name = "block.logostrip.name",
+            Description = "block.logostrip.desc",
             Svg = SvgLogoStrip,
             Partial = "Blocks/_LogoStrip",
             Fields =
             [
-                new BlockField { Id = "heading", Label = "Überschrift", Type = FieldType.Text },
+                new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },
                 new BlockField
                 {
-                    Id = "items", Label = "Logos", Type = FieldType.List, ItemLabel = "Logo",
+                    Id = "items", Label = "block.logostrip.f.items", Type = FieldType.List, ItemLabel = "block.logostrip.item",
                     ItemFields =
                     [
-                        new BlockField { Id = "image", Label = "Logo", Type = FieldType.Image },
-                        new BlockField { Id = "alt", Label = "Alternativtext", Type = FieldType.Text },
-                        new BlockField { Id = "url", Label = "Link (optional)", Type = FieldType.Url },
+                        new BlockField { Id = "image", Label = "block.logostrip.f.image", Type = FieldType.Image },
+                        new BlockField { Id = "alt", Label = "block.f.alt", Type = FieldType.Text },
+                        new BlockField { Id = "url", Label = "block.logostrip.f.url", Type = FieldType.Url },
                     ]
                 },
             ]

@@ -8,11 +8,41 @@ namespace MatCMS.Services;
 public class SiteContext
 {
     private readonly AppDbContext _db;
+    private readonly IHttpContextAccessor _http;
     private Dictionary<string, string>? _settings;
     private List<Page>? _navPages;
     private List<Page>? _footerPages;
 
-    public SiteContext(AppDbContext db) => _db = db;
+    public SiteContext(AppDbContext db, IHttpContextAccessor http)
+    {
+        _db = db;
+        _http = http;
+    }
+
+    // ------------------------------------------------------------------
+    // Content locale (driven by the route, NOT the UI-culture cookie)
+    // ------------------------------------------------------------------
+
+    private string? _currentLocale;
+
+    /// <summary>
+    /// The content locale of the current request. Comes from the "{culture}" route value on the
+    /// prefixed content route (/en/…); absent on the default routes → the default locale ("de").
+    /// </summary>
+    public string CurrentLocale
+    {
+        get
+        {
+            if (_currentLocale is not null) return _currentLocale;
+            var routeCulture = _http.HttpContext?.Request.RouteValues.TryGetValue("culture", out var c) == true
+                ? c as string
+                : null;
+            _currentLocale = Localizer.IsSupported(routeCulture) ? routeCulture! : Localizer.DefaultCulture;
+            return _currentLocale;
+        }
+    }
+
+    public bool IsDefaultLocale => CurrentLocale == Localizer.DefaultCulture;
 
     public string Get(string key, string fallback = "")
     {
@@ -23,21 +53,100 @@ public class SiteContext
     private List<MenuItem>? _headerMenu;
     private List<MenuItem>? _footerMenu;
 
+    // Menus are served per content locale.
     public IReadOnlyList<MenuItem> HeaderMenu => _headerMenu ??= _db.MenuItems.AsNoTracking()
-        .Where(m => m.Menu == "header").OrderBy(m => m.SortOrder).ThenBy(m => m.Id).ToList();
+        .Where(m => m.Menu == "header" && m.Locale == CurrentLocale)
+        .OrderBy(m => m.SortOrder).ThenBy(m => m.Id).ToList();
 
     public IReadOnlyList<MenuItem> FooterMenu => _footerMenu ??= _db.MenuItems.AsNoTracking()
-        .Where(m => m.Menu == "footer").OrderBy(m => m.SortOrder).ThenBy(m => m.Id).ToList();
+        .Where(m => m.Menu == "footer" && m.Locale == CurrentLocale)
+        .OrderBy(m => m.SortOrder).ThenBy(m => m.Id).ToList();
 
     public IReadOnlyList<Page> NavPages => _navPages ??= _db.Pages.AsNoTracking()
-        .Where(p => p.IsPublished && p.ShowInNav)
+        .Where(p => p.IsPublished && p.ShowInNav && p.Locale == CurrentLocale)
         .OrderBy(p => p.NavOrder).ThenBy(p => p.Title)
         .ToList();
 
     public IReadOnlyList<Page> FooterPages => _footerPages ??= _db.Pages.AsNoTracking()
-        .Where(p => p.IsPublished && p.ShowInFooter)
+        .Where(p => p.IsPublished && p.ShowInFooter && p.Locale == CurrentLocale)
         .OrderBy(p => p.FooterOrder).ThenBy(p => p.Title)
         .ToList();
+
+    // ------------------------------------------------------------------
+    // Language switcher
+    // ------------------------------------------------------------------
+
+    private List<string>? _availableLocales;
+
+    /// <summary>
+    /// Content locales that actually have at least one published page (default locale first, then
+    /// the remaining supported cultures in their configured order). With a single-locale site this
+    /// is just ["de"] and the switcher renders as a single/hidden entry.
+    /// </summary>
+    public IReadOnlyList<string> AvailableLocales
+    {
+        get
+        {
+            if (_availableLocales is not null) return _availableLocales;
+            var present = _db.Pages.AsNoTracking().Where(p => p.IsPublished)
+                .Select(p => p.Locale).Distinct().ToHashSet();
+            present.Add(Localizer.DefaultCulture);
+            _availableLocales = Localizer.SupportedCultures.Where(present.Contains).ToList();
+            return _availableLocales;
+        }
+    }
+
+    /// <summary>A single language-switcher target.</summary>
+    public sealed record LocaleLink(string Locale, string Url, bool IsCurrent);
+
+    private List<LocaleLink>? _languageLinks;
+
+    /// <summary>
+    /// Targets for the header language switcher: for each available locale, the translation of the
+    /// current page (same TranslationGroup) if one exists, otherwise that locale's home page.
+    /// </summary>
+    public IReadOnlyList<LocaleLink> LanguageLinks()
+    {
+        if (_languageLinks is not null) return _languageLinks;
+
+        var locales = AvailableLocales;
+        var links = new List<LocaleLink>(locales.Count);
+
+        // Single-locale site: no cross-locale lookups needed (switcher renders hidden anyway).
+        if (locales.Count <= 1)
+        {
+            foreach (var loc in locales)
+                links.Add(new LocaleLink(loc, LocalizedUrl(loc, "home"), loc == CurrentLocale));
+            _languageLinks = links;
+            return _languageLinks;
+        }
+
+        // Resolve the current page from the route (slug + current locale) to find its siblings.
+        var slug = NormalizeSlug(_http.HttpContext?.Request.RouteValues.TryGetValue("slug", out var s) == true
+            ? s as string
+            : null);
+        List<Page> siblings = new();
+        var group = _db.Pages.AsNoTracking()
+            .Where(p => p.Slug == slug && p.Locale == CurrentLocale)
+            .Select(p => p.TranslationGroup)
+            .FirstOrDefault();
+        if (!string.IsNullOrEmpty(group))
+        {
+            siblings = _db.Pages.AsNoTracking()
+                .Where(p => p.TranslationGroup == group && p.IsPublished)
+                .ToList();
+        }
+
+        foreach (var loc in locales)
+        {
+            var sib = siblings.FirstOrDefault(p => p.Locale == loc);
+            var url = sib is not null ? LocalizedUrl(sib.Locale, sib.Slug) : LocalizedUrl(loc, "home");
+            links.Add(new LocaleLink(loc, url, loc == CurrentLocale));
+        }
+
+        _languageLinks = links;
+        return _languageLinks;
+    }
 
     private Template? _activeTemplate;
     private bool _templateLoaded;
@@ -75,5 +184,21 @@ public class SiteContext
     public string TopBarLink2Text => Get(SettingKeys.TopBarLink2Text);
     public string TopBarLink2Url => Get(SettingKeys.TopBarLink2Url);
 
-    public static string PageUrl(Page p) => p.Slug == "home" ? "/" : "/" + p.Slug;
+    /// <summary>Public URL of a page including its locale prefix (default locale = no prefix).</summary>
+    public static string PageUrl(Page p) => LocalizedUrl(p.Locale, p.Slug);
+
+    /// <summary>
+    /// Builds a public URL for (locale, slug): the default locale keeps root URLs (/, /kontakt);
+    /// every other locale is served under a "/{locale}" prefix (/en, /en/about).
+    /// </summary>
+    public static string LocalizedUrl(string? locale, string? slug)
+    {
+        var isHome = string.IsNullOrEmpty(slug) || slug == "home";
+        var prefix = string.IsNullOrEmpty(locale) || locale == Localizer.DefaultCulture ? "" : "/" + locale;
+        if (isHome) return prefix.Length == 0 ? "/" : prefix;
+        return prefix + "/" + slug;
+    }
+
+    private static string NormalizeSlug(string? slug) =>
+        string.IsNullOrWhiteSpace(slug) ? "home" : slug.Trim().ToLowerInvariant();
 }

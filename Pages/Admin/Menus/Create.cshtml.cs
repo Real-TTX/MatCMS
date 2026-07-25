@@ -48,7 +48,8 @@ public class CreateModel : PageModel
             Label = label,
             Url = url,
             OpenInNewTab = OpenInNewTab,
-            SortOrder = max + 1
+            SortOrder = max + 1,
+            Locale = MatCMS.Services.Localizer.DefaultCulture
         });
         await _db.SaveChangesAsync();
 

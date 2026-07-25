@@ -1,0 +1,56 @@
+@page
+@model MatCMS.Pages.Admin.Forms.IndexModel
+@{
+    ViewData["Title"] = T["forms.title"];
+}
+<div class="page-head">
+    <h1>@T["forms.title"]</h1>
+</div>
+
+@if (Model.Items.Count == 0)
+{
+    <div class="card"><p class="muted">@T["forms.none"]</p></div>
+}
+else
+{
+    <table class="data">
+        <thead>
+            <tr>
+                <th>@T["forms.colName"]</th>
+                <th>@T["forms.colSlug"]</th>
+                <th>@T["forms.colSubmissions"]</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var r in Model.Items)
+            {
+                <tr>
+                    <td><strong>@r.Form.Name</strong></td>
+                    <td><span class="mono">@r.Form.Slug</span></td>
+                    <td>
+                        <a asp-page="Submissions" asp-route-id="@r.Form.Id">@r.Total</a>
+                        @if (r.Unread > 0)
+                        {
+                            <span class="badge badge-new">@r.Unread @T["forms.unreadLabel"]</span>
+                        }
+                    </td>
+                    <td>
+                        <div class="actions">
+                            <a class="btn btn-sm btn-ghost" asp-page="Submissions" asp-route-id="@r.Form.Id">@T["forms.submissions"]</a>
+                            <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@r.Form.Id">@T["action.edit"]</a>
+                            <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@r.Form.Id"
+                                  onsubmit="return confirm('@T["forms.confirmDelete", r.Form.Name]');">
+                                <button type="submit" class="btn btn-sm btn-danger">@T["action.delete"]</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<div class="list-actions">
+    <a class="btn" asp-page="Create">@T["forms.create"]</a>
+</div>

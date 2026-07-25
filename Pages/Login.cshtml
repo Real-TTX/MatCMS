@@ -9,7 +9,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Anmeldung – @Site.SiteName</title>
+    <title>@T["login.pageTitle"] – @Site.SiteName</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Geologica:wght@@500;600;700&family=Inter:wght@@400;500;600&display=swap" rel="stylesheet" />
@@ -20,7 +20,7 @@
 <body class="login-page">
     <div class="login-card">
         <img class="login-logo" src="@Site.LogoUrl" alt="@Site.SiteName" />
-        <h1>Admin-Anmeldung</h1>
+        <h1>@T["login.heading"]</h1>
         @if (!string.IsNullOrWhiteSpace(Model.Error))
         {
             <div class="alert alert-error">@Model.Error</div>
@@ -28,19 +28,19 @@
         <form method="post">
             <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
             <div class="form-field">
-                <label for="Username">Benutzername</label>
+                <label for="Username">@T["login.username"]</label>
                 <input id="Username" name="Username" value="@Model.Username" autofocus required />
             </div>
             <div class="form-field">
-                <label for="Password">Passwort</label>
+                <label for="Password">@T["login.password"]</label>
                 <input id="Password" name="Password" type="password" required />
             </div>
             <label class="checkbox-row">
-                <input type="checkbox" name="RememberMe" value="true" /> Angemeldet bleiben
+                <input type="checkbox" name="RememberMe" value="true" /> @T["login.rememberMe"]
             </label>
-            <button type="submit" class="btn btn-block">Anmelden</button>
+            <button type="submit" class="btn btn-block">@T["login.submit"]</button>
         </form>
-        <a class="login-back" href="/">← Zurück zur Website</a>
+        <a class="login-back" href="/">@T["login.back"]</a>
     </div>
 </body>
 </html>

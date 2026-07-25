@@ -1,7 +1,7 @@
 @page "{id:int}"
 @model MatCMS.Pages.Admin.Pages.EditModel
 @{
-    ViewData["Title"] = "Editor";
+    ViewData["Title"] = T["editor.title"];
     var blocks = Model.Current.Blocks.OrderBy(b => b.SortOrder).ToList();
     var url = Model.Current.Slug == "home" ? "/" : "/" + Model.Current.Slug;
     var previewUrl = url + (url.Contains('?') ? "&" : "?") + "editor=1";
@@ -13,25 +13,25 @@
         @if (editing)
         {
             <div class="le-head">
-                <a class="le-back" asp-page="Edit" asp-route-id="@Model.Current.Id">‹ Alle Blöcke</a>
+                <a class="le-back" asp-page="Edit" asp-route-id="@Model.Current.Id">@T["editor.allBlocks"]</a>
             </div>
             <div class="le-panel">
                 <div class="le-panel-head">
                     <span class="head-icon">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">@Html.Raw(Model.SelectedDef!.Svg)</svg>
                     </span>
-                    <span class="le-panel-title">@Model.SelectedDef!.Name</span>
+                    <span class="le-panel-title">@T[Model.SelectedDef!.Name]</span>
                 </div>
                 <form id="block-form" method="post" asp-page-handler="SaveBlock" asp-route-id="@Model.Current.Id" asp-route-blockId="@Model.SelectedBlock!.Id">
                     <input type="hidden" name="DataJson" id="DataJson" />
                     <div id="block-editor"></div>
                     <div class="le-panel-actions">
-                        <button type="submit" class="btn btn-sm">Speichern</button>
-                        <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@Model.Current.Id">Fertig</a>
+                        <button type="submit" class="btn btn-sm">@T["action.save"]</button>
+                        <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@Model.Current.Id">@T["editor.done"]</a>
                     </div>
                 </form>
-                <form class="inline-form le-delete" method="post" asp-page-handler="DeleteBlock" asp-route-id="@Model.Current.Id" asp-route-blockId="@Model.SelectedBlock!.Id" onsubmit="return confirm('Diesen Block wirklich löschen?');">
-                    <button type="submit" class="btn btn-sm btn-danger">Block löschen</button>
+                <form class="inline-form le-delete" method="post" asp-page-handler="DeleteBlock" asp-route-id="@Model.Current.Id" asp-route-blockId="@Model.SelectedBlock!.Id" onsubmit="return confirm('@T["editor.confirmDeleteBlock"]');">
+                    <button type="submit" class="btn btn-sm btn-danger">@T["editor.blockDelete"]</button>
                 </form>
             </div>
             <script id="block-schema" type="application/json">@Html.Raw(Model.SchemaJson.Replace("</", "<\\/"))</script>
@@ -40,33 +40,33 @@
         else
         {
             <div class="le-head">
-                <a class="le-back" asp-page="Index">‹ Seiten</a>
+                <a class="le-back" asp-page="Index">@T["editor.backToPages"]</a>
                 <div class="le-title">@Model.Current.Title</div>
             </div>
 
             <div class="le-scroll">
-                <div class="le-section-label">Blöcke</div>
+                <div class="le-section-label">@T["editor.blocks"]</div>
                 @if (blocks.Count == 0)
                 {
-                    <p class="muted" style="padding:0 4px;">Noch keine Blöcke – füge unten einen hinzu.</p>
+                    <p class="muted" style="padding:0 4px;">@T["editor.noBlocks"]</p>
                 }
                 <div class="block-list sortable" id="block-list" data-sortable data-reorder-form="reorder-form">
                     @foreach (var b in blocks)
                     {
                         var def = Model.Registry.Get(b.BlockType);
                         <div class="block-item sortable-item" data-item-id="@b.Id" data-block-id="@b.Id">
-                            <span class="drag-handle" title="Ziehen zum Sortieren" aria-hidden="true">⠿</span>
+                            <span class="drag-handle" title="@T["editor.dragToSort"]" aria-hidden="true">⠿</span>
                             <a class="b-open" asp-page="Edit" asp-route-id="@Model.Current.Id" asp-route-block="@b.Id">
                                 <span class="b-icon">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">@Html.Raw(def?.Svg)</svg>
                                 </span>
                                 <span class="b-info">
-                                    <span class="b-type">@(def?.Name ?? b.BlockType)</span>
+                                    <span class="b-type">@(def is not null ? T[def.Name] : b.BlockType)</span>
                                     <span class="b-sum">@Model.BlockSummary(b)</span>
                                 </span>
                             </a>
-                            <form class="inline-form" method="post" asp-page-handler="DeleteBlock" asp-route-id="@Model.Current.Id" asp-route-blockId="@b.Id" onsubmit="return confirm('Diesen Block wirklich löschen?');">
-                                <button type="submit" class="icon-btn" title="Löschen">✕</button>
+                            <form class="inline-form" method="post" asp-page-handler="DeleteBlock" asp-route-id="@Model.Current.Id" asp-route-blockId="@b.Id" onsubmit="return confirm('@T["editor.confirmDeleteBlock"]');">
+                                <button type="submit" class="icon-btn" title="@T["editor.delete"]">✕</button>
                             </form>
                         </div>
                     }
@@ -76,38 +76,103 @@
                 </form>
 
                 <div class="le-add">
-                    <button type="button" class="btn btn-block" id="add-block-btn">+ Block hinzufügen</button>
+                    <button type="button" class="btn btn-block" id="add-block-btn">@T["editor.addBlock"]</button>
                 </div>
 
                 <details class="le-settings">
-                    <summary>Seiteneinstellungen</summary>
+                    <summary>@T["editor.pageSettings"]</summary>
                     <form method="post" asp-page-handler="Meta" asp-route-id="@Model.Current.Id" class="form-grid">
                         <div class="form-field">
-                            <label>Titel</label>
+                            <label>@T["editor.metaTitle"]</label>
                             <input name="Meta.Title" value="@Model.Meta.Title" required />
                         </div>
                         <div class="form-field">
-                            <label>Slug</label>
+                            <label>@T["editor.slug"]</label>
                             <input name="Meta.Slug" value="@Model.Meta.Slug" required />
                         </div>
+                        @if (Model.SupportedLocales.Count > 1)
+                        {
+                            <div class="form-field">
+                                <label>@T["editor.locale"]</label>
+                                <select name="Meta.Locale">
+                                    @foreach (var loc in Model.SupportedLocales)
+                                    {
+                                        <option value="@loc" selected="@(loc == Model.Meta.Locale)">@T["lang." + loc]</option>
+                                    }
+                                </select>
+                            </div>
+                        }
+                        else
+                        {
+                            <input type="hidden" name="Meta.Locale" value="@Model.Meta.Locale" />
+                        }
                         <div class="form-field">
-                            <label>Meta-Beschreibung</label>
+                            <label>@T["editor.metaDescription"]</label>
                             <input name="Meta.MetaDescription" value="@Model.Meta.MetaDescription" />
                         </div>
                         <label class="check">
-                            <input type="checkbox" name="Meta.IsPublished" value="true" @(Model.Meta.IsPublished ? "checked" : "") /> Veröffentlicht
+                            <input type="checkbox" name="Meta.IsPublished" value="true" @(Model.Meta.IsPublished ? "checked" : "") /> @T["editor.published"]
                         </label>
-                        <div><button type="submit" class="btn btn-sm">Speichern</button></div>
+                        <div><button type="submit" class="btn btn-sm">@T["action.save"]</button></div>
                     </form>
                 </details>
+
+                @if (Model.SupportedLocales.Count > 1)
+                {
+                    <details class="le-settings">
+                        <summary>@T["editor.translations"]</summary>
+                        <div class="form-grid">
+                            <div class="le-section-label">@T["editor.translationsExisting"]</div>
+                            @foreach (var t in Model.Translations)
+                            {
+                                <div class="block-item">
+                                    <span class="badge badge-on mono">@t.Locale</span>
+                                    @if (t.Id == Model.Current.Id)
+                                    {
+                                        <span class="b-info"><span class="b-type">@t.Title @T["editor.translationCurrent"]</span></span>
+                                    }
+                                    else
+                                    {
+                                        <a class="b-open" asp-page="Edit" asp-route-id="@t.Id">
+                                            <span class="b-info"><span class="b-type">@t.Title</span></span>
+                                        </a>
+                                    }
+                                </div>
+                            }
+
+                            @foreach (var loc in Model.MissingLocales)
+                            {
+                                <form method="post" asp-page-handler="CreateTranslation" asp-route-id="@Model.Current.Id" asp-route-locale="@loc">
+                                    <button type="submit" class="btn btn-sm btn-ghost">@T["editor.translationCreate", T["lang." + loc]]</button>
+                                </form>
+                            }
+
+                            @if (Model.LinkCandidates.Count > 0)
+                            {
+                                <form method="post" asp-page-handler="LinkTranslation" asp-route-id="@Model.Current.Id" class="form-row">
+                                    <div class="form-field">
+                                        <label>@T["editor.translationLink"]</label>
+                                        <select name="targetId">
+                                            @foreach (var c in Model.LinkCandidates)
+                                            {
+                                                <option value="@c.Id">[@c.Locale] @c.Title</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div><button type="submit" class="btn btn-sm">@T["editor.translationLinkSubmit"]</button></div>
+                                </form>
+                            }
+                        </div>
+                    </details>
+                }
             </div>
 
             @* Add-block modal *@
             <div class="modal-overlay" id="add-block-modal">
-                <div class="modal" role="dialog" aria-modal="true" aria-label="Block hinzufügen">
+                <div class="modal" role="dialog" aria-modal="true" aria-label="@T["editor.addBlockModal"]">
                     <div class="modal-head">
-                        <h2>Block hinzufügen</h2>
-                        <button type="button" class="modal-close" id="add-block-close" aria-label="Schließen">✕</button>
+                        <h2>@T["editor.addBlockModal"]</h2>
+                        <button type="button" class="modal-close" id="add-block-close" aria-label="@T["editor.close"]">✕</button>
                     </div>
                     <div class="modal-body">
                         <div class="picker">
@@ -118,8 +183,8 @@
                                         <span class="t-icon">
                                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">@Html.Raw(def.Svg)</svg>
                                         </span>
-                                        <span class="t-name">@def.Name</span>
-                                        <span class="t-desc">@def.Description</span>
+                                        <span class="t-name">@T[def.Name]</span>
+                                        <span class="t-desc">@T[def.Description]</span>
                                     </button>
                                 </form>
                             }
@@ -133,10 +198,10 @@
     <main class="le-preview">
         <div class="le-toolbar">
             <span class="le-url mono">@url</span>
-            <a class="btn btn-sm btn-ghost" href="@url" target="_blank">In neuem Tab öffnen</a>
+            <a class="btn btn-sm btn-ghost" href="@url" target="_blank">@T["editor.openNewTab"]</a>
         </div>
         <div class="le-frame-wrap">
-            <iframe id="preview-frame" src="@previewUrl" title="Live-Vorschau"></iframe>
+            <iframe id="preview-frame" src="@previewUrl" title="@T["editor.livePreview"]"></iframe>
         </div>
     </main>
 </div>

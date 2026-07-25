@@ -10,6 +10,19 @@ public class Page
     /// <summary>URL segment, e.g. "ueber-uns". "home" is served at "/".</summary>
     public string Slug { get; set; } = "";
 
+    /// <summary>
+    /// Content locale of this page (e.g. "de", "en"). The default locale ("de") is served at the
+    /// root URLs (/, /kontakt); other locales are served under a culture prefix (/en, /en/about).
+    /// A given (Slug, Locale) pair is unique — the same slug may exist once per locale.
+    /// </summary>
+    public string Locale { get; set; } = "de";
+
+    /// <summary>
+    /// Groups pages that are translations of each other (one page per locale). Assigned as a GUID
+    /// when a page is created; shared with its translations.
+    /// </summary>
+    public string? TranslationGroup { get; set; }
+
     /// <summary>Label used in navigation (falls back to Title).</summary>
     public string? NavLabel { get; set; }
 

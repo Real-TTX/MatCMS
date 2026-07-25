@@ -6,10 +6,21 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>MatCMS</RootNamespace>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Invariant globalization keeps the image small & formatting stable, but we still want to
+         create named CultureInfo objects (de, and future languages) for RequestLocalization. -->
+    <PredefinedCulturesOnly>false</PredefinedCulturesOnly>
     <!-- Default assembly version. InformationalVersion is supplied at build time
          via -p:InformationalVersion=<APP_VERSION> (see Dockerfile / GitHub Actions). -->
     <Version>1.0.0</Version>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Localization resource files (Resources/<culture>.json) must ship to output & publish.
+         Use Update (not Include): the Web SDK already globs JSON as Content by default. -->
+    <Content Update="Resources\**\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 
   <ItemGroup>
     <!-- Floating 10.0.* so restores/rebuilds always pick up the latest patch ("immer aktuell"). -->

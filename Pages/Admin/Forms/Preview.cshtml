@@ -1,0 +1,28 @@
+@page "/admin/forms/preview/{id:int}"
+@model MatCMS.Pages.Admin.Forms.PreviewModel
+@inject MatCMS.Services.SiteContext Site
+@{
+    Layout = null;
+    var tpl = Site.ActiveTemplate;
+    var accent = string.IsNullOrWhiteSpace(tpl.AccentColor) ? "#2563eb" : tpl.AccentColor.Trim();
+}
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@Model.Render?.Name</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <style>
+        :root { --accent: @accent; --accent-dark: @accent; }
+        body { background: #fff; }
+        .contact-block { padding: 40px 0; }
+    </style>
+</head>
+<body>
+    @if (Model.Render is not null)
+    {
+        @await Html.PartialAsync("Blocks/_FormRender", Model.Render)
+    }
+</body>
+</html>

@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using MatCMS.Content;
 using MatCMS.Data;
 using MatCMS.Models;
+using MatCMS.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
@@ -16,15 +17,25 @@ namespace MatCMS.Pages.Admin.Pages;
 public class EditModel : PageModel
 {
     private readonly AppDbContext _db;
+    private readonly Localizer _t;
 
-    public EditModel(AppDbContext db, BlockRegistry registry)
+    public EditModel(AppDbContext db, BlockRegistry registry, Localizer t)
     {
         _db = db;
         Registry = registry;
+        _t = t;
     }
 
     public BlockRegistry Registry { get; }
     public PageEntity Current { get; private set; } = default!;
+
+    // Translations of the current page (same TranslationGroup), keyed for the editor's language panel.
+    public IReadOnlyList<PageEntity> Translations { get; private set; } = new List<PageEntity>();
+    // Existing pages in another locale that could be linked as a translation of this one.
+    public IReadOnlyList<PageEntity> LinkCandidates { get; private set; } = new List<PageEntity>();
+    public IReadOnlyList<string> SupportedLocales => Localizer.SupportedCultures;
+    // Supported locales that do not yet have a translation in this group (→ "create translation").
+    public IReadOnlyList<string> MissingLocales { get; private set; } = new List<string>();
 
     // Inline block settings panel (Shopify-style): when ?block=<id> is set.
     public ContentBlock? SelectedBlock { get; private set; }
@@ -39,6 +50,7 @@ public class EditModel : PageModel
     {
         public string Title { get; set; } = "";
         public string Slug { get; set; } = "";
+        public string Locale { get; set; } = Localizer.DefaultCulture;
         public string? MetaDescription { get; set; }
         public bool IsPublished { get; set; }
     }
@@ -61,9 +73,12 @@ public class EditModel : PageModel
         {
             Title = page.Title,
             Slug = page.Slug,
+            Locale = page.Locale,
             MetaDescription = page.MetaDescription,
             IsPublished = page.IsPublished
         };
+
+        await LoadTranslationsAsync(page);
 
         if (block is int blockId)
         {
@@ -73,7 +88,17 @@ public class EditModel : PageModel
                 SelectedDef = Registry.Get(SelectedBlock.BlockType);
                 if (SelectedDef is not null)
                 {
-                    SchemaJson = JsonSerializer.Serialize(SelectedDef.Fields, SchemaOpts);
+                    // Dynamic select sources (e.g. the "form" block's form picker) are resolved
+                    // from the database at edit time.
+                    var formOptions = SelectedDef.Fields.Any(f => f.OptionsSource == "forms")
+                        ? await _db.Forms.AsNoTracking().OrderBy(f => f.Name)
+                            .Select(f => new SelectOption(f.Slug, f.Name)).ToListAsync()
+                        : new List<SelectOption>();
+
+                    // Resolve the localization keys (Label/Options/ItemLabel) into display text
+                    // for the current UI culture before handing the schema to the JS editor.
+                    var localized = SelectedDef.Fields.Select(f => LocalizeField(f, formOptions)).ToList();
+                    SchemaJson = JsonSerializer.Serialize(localized, SchemaOpts);
                     CurrentJson = string.IsNullOrWhiteSpace(SelectedBlock.DataJson) ? "{}" : SelectedBlock.DataJson;
                 }
             }
@@ -112,6 +137,7 @@ public class EditModel : PageModel
         if (page is null) return NotFound();
 
         var slug = IndexModel.Slugify(string.IsNullOrWhiteSpace(Meta.Slug) ? Meta.Title : Meta.Slug);
+        var locale = Localizer.IsSupported(Meta.Locale) ? Meta.Locale : page.Locale;
         if (string.IsNullOrWhiteSpace(Meta.Title) || string.IsNullOrWhiteSpace(slug))
         {
             TempData["FlashError"] = "Titel und Slug dürfen nicht leer sein.";
@@ -122,20 +148,113 @@ public class EditModel : PageModel
             TempData["FlashError"] = $"Der Slug „{slug}“ ist reserviert und kann nicht verwendet werden.";
             return RedirectToPage(new { id });
         }
-        if (await _db.Pages.AnyAsync(p => p.Slug == slug && p.Id != id))
+        // A slug is unique per locale.
+        if (await _db.Pages.AnyAsync(p => p.Slug == slug && p.Locale == locale && p.Id != id))
         {
-            TempData["FlashError"] = $"Der Slug „{slug}“ ist bereits vergeben.";
+            TempData["FlashError"] = $"Der Slug „{slug}“ ist in dieser Sprache bereits vergeben.";
             return RedirectToPage(new { id });
         }
 
         page.Title = Meta.Title.Trim();
         page.Slug = slug;
+        page.Locale = locale;
+        if (string.IsNullOrEmpty(page.TranslationGroup))
+            page.TranslationGroup = Guid.NewGuid().ToString("N");
         page.MetaDescription = Meta.MetaDescription;
         page.IsPublished = Meta.IsPublished;
         page.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
 
         TempData["Flash"] = "Seiteneinstellungen gespeichert.";
+        return RedirectToPage(new { id });
+    }
+
+    // Creates a translation of this page in another locale (same TranslationGroup), copying its
+    // blocks as a starting point. The new page is a draft and opens in the editor.
+    public async Task<IActionResult> OnPostCreateTranslationAsync(int id, string locale)
+    {
+        var page = await _db.Pages.Include(p => p.Blocks).FirstOrDefaultAsync(p => p.Id == id);
+        if (page is null) return NotFound();
+
+        if (!Localizer.IsSupported(locale) || locale == page.Locale)
+        {
+            TempData["FlashError"] = "Ungültige Zielsprache.";
+            return RedirectToPage(new { id });
+        }
+
+        if (string.IsNullOrEmpty(page.TranslationGroup))
+        {
+            page.TranslationGroup = Guid.NewGuid().ToString("N");
+            await _db.SaveChangesAsync();
+        }
+
+        // One page per locale within a group.
+        if (await _db.Pages.AnyAsync(p => p.TranslationGroup == page.TranslationGroup && p.Locale == locale))
+        {
+            TempData["FlashError"] = "Für diese Sprache existiert bereits eine Übersetzung.";
+            return RedirectToPage(new { id });
+        }
+
+        // A slug is unique per locale; keep the same slug if free, otherwise suffix the locale.
+        var slug = page.Slug;
+        if (await _db.Pages.AnyAsync(p => p.Slug == slug && p.Locale == locale))
+            slug = $"{page.Slug}-{locale}";
+
+        var translation = new PageEntity
+        {
+            Title = page.Title,
+            Slug = slug,
+            Locale = locale,
+            TranslationGroup = page.TranslationGroup,
+            NavLabel = page.NavLabel,
+            IsPublished = false,
+            ShowInNav = page.ShowInNav,
+            ShowInFooter = page.ShowInFooter,
+            NavOrder = page.NavOrder,
+            FooterOrder = page.FooterOrder,
+            MetaDescription = page.MetaDescription,
+            Blocks = page.Blocks.OrderBy(b => b.SortOrder).Select(b => new ContentBlock
+            {
+                BlockType = b.BlockType,
+                SortOrder = b.SortOrder,
+                DataJson = b.DataJson
+            }).ToList()
+        };
+        _db.Pages.Add(translation);
+        await _db.SaveChangesAsync();
+
+        TempData["Flash"] = "Übersetzung erstellt.";
+        return RedirectToPage(new { id = translation.Id });
+    }
+
+    // Links an existing page (in another locale) as a translation of this one by merging it into
+    // this page's TranslationGroup.
+    public async Task<IActionResult> OnPostLinkTranslationAsync(int id, int targetId)
+    {
+        var page = await _db.Pages.FindAsync(id);
+        var target = await _db.Pages.FindAsync(targetId);
+        if (page is null || target is null) return NotFound();
+
+        if (target.Locale == page.Locale)
+        {
+            TempData["FlashError"] = "Eine Übersetzung muss eine andere Sprache haben.";
+            return RedirectToPage(new { id });
+        }
+
+        if (string.IsNullOrEmpty(page.TranslationGroup))
+            page.TranslationGroup = Guid.NewGuid().ToString("N");
+
+        if (await _db.Pages.AnyAsync(p => p.TranslationGroup == page.TranslationGroup
+                                          && p.Locale == target.Locale && p.Id != target.Id))
+        {
+            TempData["FlashError"] = "Für diese Sprache ist bereits eine Übersetzung verknüpft.";
+            return RedirectToPage(new { id });
+        }
+
+        target.TranslationGroup = page.TranslationGroup;
+        await _db.SaveChangesAsync();
+
+        TempData["Flash"] = "Übersetzung verknüpft.";
         return RedirectToPage(new { id });
     }
 
@@ -185,6 +304,31 @@ public class EditModel : PageModel
         return RedirectToPage(new { id });
     }
 
+    // Produces a JSON-friendly copy of a field with all localization keys resolved to text.
+    private object LocalizeField(BlockField f) => LocalizeField(f, null);
+
+    private object LocalizeField(BlockField f, IReadOnlyList<SelectOption>? dynamicOptions)
+    {
+        // A dynamic source (e.g. "forms") replaces the static options; its labels are already
+        // display text and must not be run through the localizer.
+        var options = f.OptionsSource == "forms" && dynamicOptions is not null
+            ? dynamicOptions.Select(o => new { value = o.Value, label = o.Label }).ToList()
+            : f.Options.Select(o => new { value = o.Value, label = _t[o.Label] }).ToList();
+
+        return new
+        {
+            id = f.Id,
+            label = _t[f.Label],
+            type = f.Type,
+            placeholder = f.Placeholder,
+            help = f.Help,
+            @default = f.Default,
+            options,
+            itemFields = f.ItemFields.Select(LocalizeField).ToList(),
+            itemLabel = _t[f.ItemLabel]
+        };
+    }
+
     public string BlockSummary(ContentBlock b)
     {
         var data = new BlockData(b.DataJson);
@@ -194,7 +338,7 @@ public class EditModel : PageModel
             if (!string.IsNullOrWhiteSpace(v))
                 return Truncate(StripHtml(v), 60);
         }
-        return "(leer)";
+        return _t["editor.blockEmpty"];
     }
 
     private static string StripHtml(string s) =>
@@ -205,4 +349,29 @@ public class EditModel : PageModel
 
     private Task<PageEntity?> Load(int id) =>
         _db.Pages.Include(p => p.Blocks).FirstOrDefaultAsync(p => p.Id == id);
+
+    // Populates the language panel: existing translations, locales still missing a translation, and
+    // candidate pages (other locales, not yet grouped here) that could be linked as translations.
+    private async Task LoadTranslationsAsync(PageEntity page)
+    {
+        var group = page.TranslationGroup;
+        Translations = string.IsNullOrEmpty(group)
+            ? new List<PageEntity> { page }
+            : await _db.Pages.AsNoTracking()
+                .Where(p => p.TranslationGroup == group)
+                .OrderBy(p => p.Locale)
+                .ToListAsync();
+
+        var usedLocales = Translations.Select(p => p.Locale).ToHashSet();
+        MissingLocales = Localizer.SupportedCultures.Where(c => !usedLocales.Contains(c)).ToList();
+
+        LinkCandidates = MissingLocales.Count == 0
+            ? new List<PageEntity>()
+            : await _db.Pages.AsNoTracking()
+                .Where(p => p.Locale != page.Locale
+                            && (p.TranslationGroup == null || p.TranslationGroup != group)
+                            && MissingLocales.Contains(p.Locale))
+                .OrderBy(p => p.Locale).ThenBy(p => p.Title)
+                .ToListAsync();
+    }
 }

@@ -1,21 +1,21 @@
 @page
 @model MatCMS.Pages.Admin.Templates.IndexModel
 @{
-    ViewData["Title"] = "Templates";
+    ViewData["Title"] = T["templates.title"];
 }
 <div class="page-head">
-    <h1>Templates</h1>
+    <h1>@T["templates.title"]</h1>
 </div>
 
 <table class="data">
     <thead>
         <tr>
-            <th>Name</th>
-            <th>Akzentfarbe</th>
-            <th>Überschrift</th>
-            <th>Fließtext</th>
-            <th>Buttons</th>
-            <th>Status</th>
+            <th>@T["templates.colName"]</th>
+            <th>@T["templates.colAccent"]</th>
+            <th>@T["templates.colHeading"]</th>
+            <th>@T["templates.colBody"]</th>
+            <th>@T["templates.colButtons"]</th>
+            <th>@T["templates.colStatus"]</th>
             <th></th>
         </tr>
     </thead>
@@ -32,11 +32,11 @@
                 </td>
                 <td>@t.HeadingFont</td>
                 <td>@t.BodyFont</td>
-                <td>@(t.ButtonStyle == "outline" ? "Umrandet" : "Gefüllt")</td>
+                <td>@(t.ButtonStyle == "outline" ? T["templates.buttonOutline"] : T["templates.buttonSolid"])</td>
                 <td>
                     @if (t.IsActive)
                     {
-                        <span class="badge badge-on">Aktiv</span>
+                        <span class="badge badge-on">@T["templates.active"]</span>
                     }
                     else
                     {
@@ -48,14 +48,14 @@
                         @if (!t.IsActive)
                         {
                             <form class="inline-form" method="post" asp-page-handler="Activate" asp-route-id="@t.Id">
-                                <button type="submit" class="btn btn-sm btn-ghost">Aktivieren</button>
+                                <button type="submit" class="btn btn-sm btn-ghost">@T["templates.activate"]</button>
                             </form>
                         }
-                        <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@t.Id">Bearbeiten</a>
+                        <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@t.Id">@T["action.edit"]</a>
                         @if (!t.IsActive)
                         {
-                            <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@t.Id" onsubmit="return confirm('Template „@t.Name“ wirklich löschen?');">
-                                <button type="submit" class="btn btn-sm btn-danger">Löschen</button>
+                            <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@t.Id" onsubmit="return confirm('@T["templates.confirmDelete", t.Name]');">
+                                <button type="submit" class="btn btn-sm btn-danger">@T["action.delete"]</button>
                             </form>
                         }
                     </div>
@@ -66,5 +66,5 @@
 </table>
 
 <div class="list-actions">
-    <a class="btn" asp-page="Create">+ Template erstellen</a>
+    <a class="btn" asp-page="Create">@T["templates.create"]</a>
 </div>

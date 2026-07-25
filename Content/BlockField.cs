@@ -18,6 +18,12 @@ public class BlockField
 
     /// <summary>Label for a single list item in the editor, e.g. "Leistung".</summary>
     public string ItemLabel { get; set; } = "Eintrag";
+
+    /// <summary>
+    /// For <see cref="FieldType.Select"/>: a dynamic option source resolved at edit time
+    /// instead of the static <see cref="Options"/> list. Currently supported: "forms".
+    /// </summary>
+    public string? OptionsSource { get; set; }
 }
 
 public class SelectOption

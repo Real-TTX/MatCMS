@@ -1,44 +1,45 @@
 @page
 @model MatCMS.Pages.Admin.Backup.IndexModel
 @{
-    ViewData["Title"] = "Backup";
+    ViewData["Title"] = T["backup.title"];
 }
 <div class="page-head">
-    <h1>Backup &amp; Restore</h1>
+    <h1>@T["backup.heading"]</h1>
 </div>
 
 <div class="card">
-    <h2>Backup erstellen</h2>
-    <p class="muted">Wähle aus, welche Bereiche im Backup enthalten sein sollen. Es wird eine ZIP-Datei (Inhalte + Medien) heruntergeladen.</p>
+    <h2>@T["backup.createHeading"]</h2>
+    <p class="muted">@T["backup.createIntro"]</p>
     <form method="post" asp-page-handler="Export">
         <div class="form-grid">
-            <label class="check"><input type="checkbox" name="IncTemplates" value="true" checked /> Templates</label>
-            <label class="check"><input type="checkbox" name="IncPages" value="true" checked /> Seiten (inkl. Blöcke)</label>
-            <label class="check"><input type="checkbox" name="IncMenus" value="true" checked /> Menüs</label>
-            <label class="check"><input type="checkbox" name="IncSettings" value="true" checked /> Einstellungen</label>
-            <label class="check"><input type="checkbox" name="IncSubmissions" value="true" checked /> Anfragen (Submissions)</label>
-            <label class="check"><input type="checkbox" name="IncAssets" value="true" checked /> Medien / Logo (Uploads)</label>
+            <label class="check"><input type="checkbox" name="IncTemplates" value="true" checked /> @T["backup.templates"]</label>
+            <label class="check"><input type="checkbox" name="IncPages" value="true" checked /> @T["backup.pages"]</label>
+            <label class="check"><input type="checkbox" name="IncMenus" value="true" checked /> @T["backup.menus"]</label>
+            <label class="check"><input type="checkbox" name="IncSettings" value="true" checked /> @T["backup.settings"]</label>
+            <label class="check"><input type="checkbox" name="IncSubmissions" value="true" checked /> @T["backup.submissions"]</label>
+            <label class="check"><input type="checkbox" name="IncForms" value="true" checked /> @T["backup.forms"]</label>
+            <label class="check"><input type="checkbox" name="IncAssets" value="true" checked /> @T["backup.assets"]</label>
         </div>
         <div style="margin-top:18px;">
-            <button type="submit" class="btn">Backup herunterladen</button>
+            <button type="submit" class="btn">@T["backup.download"]</button>
         </div>
     </form>
 </div>
 
 <div class="card">
-    <h2>Wiederherstellen (Restore)</h2>
-    <p class="muted">Ein zuvor erstelltes Backup einspielen. Es werden <strong>nur die im Backup enthaltenen Bereiche</strong> überschrieben – Bereiche, die nicht im Backup sind, bleiben unverändert.</p>
+    <h2>@T["backup.restoreHeading"]</h2>
+    <p class="muted">@Html.Raw(T["backup.restoreIntro"])</p>
     <form method="post" asp-page-handler="Import" enctype="multipart/form-data">
         <div class="form-field">
-            <label for="ImportFile">Backup-Datei (.zip oder .json)</label>
+            <label for="ImportFile">@T["backup.fileLabel"]</label>
             <input id="ImportFile" type="file" name="ImportFile" accept=".zip,application/zip,application/json,.json" required />
         </div>
         <label class="check">
             <input type="checkbox" name="Confirm" value="true" required />
-            Ich bestätige, dass die im Backup enthaltenen Bereiche überschrieben werden.
+            @T["backup.confirmLabel"]
         </label>
         <div style="margin-top:18px;">
-            <button type="submit" class="btn btn-danger">Backup einspielen</button>
+            <button type="submit" class="btn btn-danger">@T["backup.restoreSubmit"]</button>
         </div>
     </form>
 </div>

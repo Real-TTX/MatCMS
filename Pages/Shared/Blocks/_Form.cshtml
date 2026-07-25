@@ -1,0 +1,46 @@
+@using MatCMS.Content
+@using Microsoft.EntityFrameworkCore
+@model MatCMS.Content.BlockData
+@inject MatCMS.Data.AppDbContext Db
+@{
+    var slug = Model.Str("form");
+    var form = string.IsNullOrWhiteSpace(slug)
+        ? null
+        : Db.Forms.AsNoTracking().FirstOrDefault(f => f.Slug == slug);
+}
+@if (form is null)
+{
+    if (User.IsInRole("Admin"))
+    {
+        <section class="contact-block"><div class="container"><div class="contact-wrap">
+            <p class="muted text-center">Kein Formular ausgewählt oder Formular nicht gefunden.</p>
+        </div></div></section>
+    }
+}
+else
+{
+    var rm = new FormRenderModel
+    {
+        FormId = form.Id,
+        Slug = form.Slug,
+        Name = form.Name,
+        Heading = Model.Str("heading"),
+        Intro = Model.Str("intro"),
+        Elements = FormDefinition.Parse(form.DefinitionJson),
+        Success = TempData["FormSuccess_" + form.Slug] as string,
+        Errors = ParseList(TempData["FormErrors_" + form.Slug] as string),
+        Values = ParseDict(TempData["FormValues_" + form.Slug] as string)
+    };
+    @await Html.PartialAsync("Blocks/_FormRender", rm)
+}
+@functions {
+    static List<string> ParseList(string? json) =>
+        string.IsNullOrWhiteSpace(json)
+            ? new()
+            : (System.Text.Json.JsonSerializer.Deserialize<List<string>>(json) ?? new());
+
+    static Dictionary<string, string> ParseDict(string? json) =>
+        string.IsNullOrWhiteSpace(json)
+            ? new()
+            : (System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(json) ?? new());
+}

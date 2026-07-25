@@ -2,69 +2,69 @@
 @model MatCMS.Pages.Admin.Settings.IndexModel
 @using MatCMS.Services
 @{
-    ViewData["Title"] = "Einstellungen";
+    ViewData["Title"] = T["settings.title"];
     string V(string key) => Model.Values.TryGetValue(key, out var v) ? v : "";
 }
 <div class="page-head">
-    <h1>Einstellungen</h1>
+    <h1>@T["settings.title"]</h1>
 </div>
 
 <form method="post">
     <div class="card">
-        <h2>Allgemein</h2>
+        <h2>@T["settings.general"]</h2>
         <div class="form-field">
-            <label>Seitenname</label>
+            <label>@T["settings.siteName"]</label>
             <input name="Values[@SettingKeys.SiteName]" value="@V(SettingKeys.SiteName)" />
         </div>
         <div class="form-field">
-            <label>Logo</label>
+            <label>@T["settings.logo"]</label>
             <div class="image-field">
                 <div id="logo-preview" class="preview"></div>
                 <div class="image-controls">
                     <input id="logo-url" name="Values[@SettingKeys.LogoUrl]" value="@V(SettingKeys.LogoUrl)" placeholder="/img/logo.svg oder /uploads/..." />
                     <div style="margin-top:8px;">
-                        <button type="button" id="logo-upload-btn" class="btn btn-ghost btn-sm">Logo hochladen</button>
+                        <button type="button" id="logo-upload-btn" class="btn btn-ghost btn-sm">@T["settings.uploadLogo"]</button>
                         <input type="file" id="logo-file" accept="image/*" style="display:none;" />
                     </div>
                 </div>
             </div>
         </div>
         <div class="form-field">
-            <label>Footer-Text</label>
+            <label>@T["settings.footerText"]</label>
             <input name="Values[@SettingKeys.FooterText]" value="@V(SettingKeys.FooterText)" />
         </div>
         <div class="form-field">
-            <label>Kontakt-E-Mail (Empfänger, informativ)</label>
+            <label>@T["settings.contactEmail"]</label>
             <input name="Values[@SettingKeys.ContactRecipient]" value="@V(SettingKeys.ContactRecipient)" />
-            <div class="help">Wird aktuell nicht zum Versand genutzt – Anfragen erscheinen unter „Anfragen“.</div>
+            <div class="help">@T["settings.contactEmailHelp"]</div>
         </div>
     </div>
 
     <div class="card">
-        <h2>Obere Leiste (Header)</h2>
+        <h2>@T["settings.topBar"]</h2>
         <div class="form-row">
             <div class="form-field">
-                <label>Link 1 – Text</label>
+                <label>@T["settings.link1Text"]</label>
                 <input name="Values[@SettingKeys.TopBarLink1Text]" value="@V(SettingKeys.TopBarLink1Text)" />
             </div>
             <div class="form-field">
-                <label>Link 1 – URL</label>
+                <label>@T["settings.link1Url"]</label>
                 <input name="Values[@SettingKeys.TopBarLink1Url]" value="@V(SettingKeys.TopBarLink1Url)" />
             </div>
         </div>
         <div class="form-row">
             <div class="form-field">
-                <label>Link 2 – Text</label>
+                <label>@T["settings.link2Text"]</label>
                 <input name="Values[@SettingKeys.TopBarLink2Text]" value="@V(SettingKeys.TopBarLink2Text)" />
             </div>
             <div class="form-field">
-                <label>Link 2 – URL</label>
+                <label>@T["settings.link2Url"]</label>
                 <input name="Values[@SettingKeys.TopBarLink2Url]" value="@V(SettingKeys.TopBarLink2Url)" />
             </div>
         </div>
     </div>
 
-    <button type="submit" class="btn">Einstellungen speichern</button>
+    <button type="submit" class="btn">@T["settings.save"]</button>
 </form>
 
 @section Scripts {

@@ -16,6 +16,7 @@ public class IndexModel : PageModel
     [BindProperty] public bool IncMenus { get; set; } = true;
     [BindProperty] public bool IncSettings { get; set; } = true;
     [BindProperty] public bool IncSubmissions { get; set; } = true;
+    [BindProperty] public bool IncForms { get; set; } = true;
     [BindProperty] public bool IncAssets { get; set; } = true;
 
     [BindProperty] public IFormFile? ImportFile { get; set; }
@@ -32,6 +33,7 @@ public class IndexModel : PageModel
             Menus = IncMenus,
             Settings = IncSettings,
             Submissions = IncSubmissions,
+            Forms = IncForms,
             Assets = IncAssets
         };
         if (!options.Any)

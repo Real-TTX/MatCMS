@@ -15,7 +15,7 @@
     var data = new MatCMS.Content.BlockData(block.DataJson);
     if (editor)
     {
-        <div class="mat-ed-block" id="block-@block.Id" data-block-id="@block.Id" data-block-name="@def.Name">
+        <div class="mat-ed-block" id="block-@block.Id" data-block-id="@block.Id" data-block-name="@T[def.Name]">
             @await Html.PartialAsync(def.Partial, data)
         </div>
     }

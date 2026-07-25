@@ -291,6 +291,17 @@ table.data .btn { white-space: nowrap; }
 
 .editor-actions { display: flex; gap: 12px; margin-top: 26px; padding-top: 20px; border-top: 1px solid var(--line); }
 
+/* ---- Form builder ---- */
+.opt-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: center; }
+.cond-field .cond-box { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.cond-field .cond-box select, .cond-field .cond-box input { width: 100%; }
+.field.cond-field { border-top: 1px dashed var(--line); padding-top: 14px; }
+
+/* per-form submissions: dynamic field list */
+.sub-fields { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 14px; max-width: 520px; }
+.sub-fields dt { font-weight: 600; color: var(--muted); font-size: 13px; }
+.sub-fields dd { margin: 0; white-space: pre-wrap; }
+
 /* ============ Responsive ============ */
 @media (max-width: 820px) {
     .admin { grid-template-columns: 1fr; }

@@ -1,11 +1,11 @@
 @page
 @model MatCMS.Pages.Admin.Menus.CreateModel
 @{
-    ViewData["Title"] = "Neuer Menüpunkt";
+    ViewData["Title"] = T["menus.new"];
 }
 <div class="page-head">
-    <h1>Neuer Menüpunkt</h1>
-    <a class="btn btn-sm btn-ghost" asp-page="Index">Zurück</a>
+    <h1>@T["menus.new"]</h1>
+    <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
 </div>
 
 <div class="card">
@@ -16,38 +16,38 @@
     <form method="post" class="form-grid">
         <div class="form-row">
             <div class="form-field">
-                <label for="Menu">Menü</label>
+                <label for="Menu">@T["menus.menu"]</label>
                 <select id="Menu" name="Menu">
-                    <option value="header" selected="@(Model.Menu == "header" ? "selected" : null)">Hauptmenü (Header)</option>
-                    <option value="footer" selected="@(Model.Menu == "footer" ? "selected" : null)">Footer-Menü</option>
+                    <option value="header" selected="@(Model.Menu == "header" ? "selected" : null)">@T["menus.headerMenu"]</option>
+                    <option value="footer" selected="@(Model.Menu == "footer" ? "selected" : null)">@T["menus.footerMenu"]</option>
                 </select>
             </div>
             <div class="form-field">
-                <label for="page-picker">Schnellauswahl: Seite</label>
+                <label for="page-picker">@T["menus.quickPick"]</label>
                 <select id="page-picker">
-                    <option value="">— eigene URL —</option>
+                    <option value="">@T["menus.ownUrl"]</option>
                     @foreach (var p in Model.Pages)
                     {
                         var purl = p.Slug == "home" ? "/" : "/" + p.Slug;
                         <option value="@purl" data-title="@p.Title">@p.Title</option>
                     }
                 </select>
-                <div class="help">Füllt Label &amp; Ziel automatisch aus einer Seite.</div>
+                <div class="help">@T["menus.quickPickHelpCreate"]</div>
             </div>
         </div>
         <div class="form-field">
-            <label for="mi-label">Label (Menütext)</label>
+            <label for="mi-label">@T["menus.label"]</label>
             <input id="mi-label" name="Label" value="@Model.Label" required autofocus />
         </div>
         <div class="form-field">
-            <label for="mi-url">Ziel (URL)</label>
-            <input id="mi-url" name="Url" value="@Model.Url" placeholder="/kontakt oder https://…" required />
+            <label for="mi-url">@T["menus.target"]</label>
+            <input id="mi-url" name="Url" value="@Model.Url" placeholder="@T["menus.targetPlaceholder"]" required />
         </div>
         <label class="check">
-            <input type="checkbox" name="OpenInNewTab" value="true" @(Model.OpenInNewTab ? "checked" : "") /> In neuem Tab öffnen
+            <input type="checkbox" name="OpenInNewTab" value="true" @(Model.OpenInNewTab ? "checked" : "") /> @T["menus.openNewTab"]
         </label>
         <div>
-            <button type="submit" class="btn">Menüpunkt hinzufügen</button>
+            <button type="submit" class="btn">@T["menus.addSubmit"]</button>
         </div>
     </form>
 </div>

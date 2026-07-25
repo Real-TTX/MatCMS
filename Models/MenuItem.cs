@@ -7,6 +7,9 @@ public class MenuItem
     /// <summary>"header" or "footer".</summary>
     public string Menu { get; set; } = "header";
 
+    /// <summary>Content locale this menu belongs to (e.g. "de", "en"). Menus are served per-locale.</summary>
+    public string Locale { get; set; } = "de";
+
     public string Label { get; set; } = "";
 
     /// <summary>Internal path (e.g. "/kontakt") or absolute URL.</summary>

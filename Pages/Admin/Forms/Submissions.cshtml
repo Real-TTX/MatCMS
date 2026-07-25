@@ -1,15 +1,16 @@
-@page
-@model MatCMS.Pages.Admin.Submissions.IndexModel
+@page "{id:int}"
+@model MatCMS.Pages.Admin.Forms.SubmissionsModel
 @{
-    ViewData["Title"] = T["submissions.title"];
+    ViewData["Title"] = T["forms.submissionsTitle"];
 }
 <div class="page-head">
-    <h1>@T["submissions.heading"]</h1>
+    <h1>@Model.Current.Name – @T["forms.submissions"]</h1>
+    <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
 </div>
 
 @if (Model.Items.Count == 0)
 {
-    <div class="card"><p class="muted">@T["submissions.none"]</p></div>
+    <div class="card"><p class="muted">@T["forms.noSubmissions"]</p></div>
 }
 else
 {
@@ -17,10 +18,7 @@ else
         <thead>
             <tr>
                 <th>@T["submissions.colDate"]</th>
-                <th>@T["submissions.colName"]</th>
-                <th>@T["submissions.colEmail"]</th>
-                <th>@T["submissions.colCategory"]</th>
-                <th>@T["submissions.colMessage"]</th>
+                <th>@T["forms.colData"]</th>
                 <th>@T["submissions.colStatus"]</th>
                 <th></th>
             </tr>
@@ -30,14 +28,14 @@ else
             {
                 <tr class="@(s.IsRead ? "" : "row-unread")">
                     <td class="muted">@s.CreatedAt.ToString("dd.MM.yyyy HH:mm")</td>
-                    <td>@s.Name</td>
-                    <td><a href="mailto:@s.Email">@s.Email</a></td>
-                    <td>@(string.IsNullOrWhiteSpace(s.Category) ? "—" : s.Category)</td>
                     <td>
-                        <details>
-                            <summary>@T["submissions.show"]</summary>
-                            <div style="white-space:pre-wrap;margin-top:8px;max-width:420px;">@s.Message</div>
-                        </details>
+                        <dl class="sub-fields">
+                            @foreach (var f in s.Fields)
+                            {
+                                <dt>@f.Label</dt>
+                                <dd>@(string.IsNullOrWhiteSpace(f.Value) ? "—" : f.Value)</dd>
+                            }
+                        </dl>
                     </td>
                     <td>
                         @if (!s.IsRead)
@@ -51,10 +49,10 @@ else
                     </td>
                     <td>
                         <div class="actions">
-                            <form class="inline-form" method="post" asp-page-handler="ToggleRead" asp-route-id="@s.Id">
+                            <form class="inline-form" method="post" asp-page-handler="ToggleRead" asp-route-id="@Model.Current.Id" asp-route-subId="@s.Id">
                                 <button type="submit" class="btn btn-sm btn-ghost">@(s.IsRead ? T["submissions.markNew"] : T["submissions.markRead"])</button>
                             </form>
-                            <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@s.Id" onsubmit="return confirm('@T["submissions.confirmDelete"]');">
+                            <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@Model.Current.Id" asp-route-subId="@s.Id" onsubmit="return confirm('@T["submissions.confirmDelete"]');">
                                 <button type="submit" class="btn btn-sm btn-danger">@T["action.delete"]</button>
                             </form>
                         </div>

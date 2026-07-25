@@ -50,9 +50,10 @@ public class ContentTransferService
         public bool Menus { get; set; } = true;
         public bool Settings { get; set; } = true;
         public bool Submissions { get; set; } = true;
+        public bool Forms { get; set; } = true;
         public bool Assets { get; set; } = true;
 
-        public bool Any => Templates || Pages || Menus || Settings || Submissions || Assets;
+        public bool Any => Templates || Pages || Menus || Settings || Submissions || Forms || Assets;
     }
 
     private string UploadsDir => Path.Combine(_env.WebRootPath, "uploads");
@@ -108,6 +109,7 @@ public class ContentTransferService
             dto.Pages = pages.Select(p => new PageDto
             {
                 Title = p.Title, Slug = p.Slug, NavLabel = p.NavLabel,
+                Locale = p.Locale, TranslationGroup = p.TranslationGroup,
                 IsPublished = p.IsPublished, ShowInNav = p.ShowInNav, ShowInFooter = p.ShowInFooter,
                 NavOrder = p.NavOrder, FooterOrder = p.FooterOrder, MetaDescription = p.MetaDescription,
                 CreatedAt = p.CreatedAt, UpdatedAt = p.UpdatedAt,
@@ -123,7 +125,8 @@ public class ContentTransferService
             dto.MenuItems = (await _db.MenuItems.AsNoTracking().OrderBy(m => m.Menu).ThenBy(m => m.SortOrder).ToListAsync())
                 .Select(m => new MenuItemDto
                 {
-                    Menu = m.Menu, Label = m.Label, Url = m.Url, SortOrder = m.SortOrder, OpenInNewTab = m.OpenInNewTab
+                    Menu = m.Menu, Label = m.Label, Url = m.Url, SortOrder = m.SortOrder,
+                    OpenInNewTab = m.OpenInNewTab, Locale = m.Locale
                 }).ToList();
         }
 
@@ -140,6 +143,24 @@ public class ContentTransferService
                 {
                     Name = s.Name, Email = s.Email, Category = s.Category,
                     Message = s.Message, IsRead = s.IsRead, CreatedAt = s.CreatedAt
+                }).ToList();
+        }
+
+        if (options.Forms)
+        {
+            var forms = await _db.Forms.AsNoTracking().OrderBy(f => f.Id).ToListAsync();
+            dto.Forms = forms.Select(f => new FormDto
+            {
+                Name = f.Name, Slug = f.Slug, DefinitionJson = f.DefinitionJson, CreatedAt = f.CreatedAt
+            }).ToList();
+
+            var idToSlug = forms.ToDictionary(f => f.Id, f => f.Slug);
+            var subs = await _db.FormSubmissions.AsNoTracking().OrderBy(s => s.Id).ToListAsync();
+            dto.FormSubmissions = subs
+                .Where(s => idToSlug.ContainsKey(s.FormId))
+                .Select(s => new FormSubmissionDto
+                {
+                    FormSlug = idToSlug[s.FormId], DataJson = s.DataJson, IsRead = s.IsRead, CreatedAt = s.CreatedAt
                 }).ToList();
         }
 
@@ -212,7 +233,8 @@ public class ContentTransferService
         }
 
         if (dto is null || (dto.Templates is null && dto.Pages is null && dto.MenuItems is null
-                            && dto.Settings is null && dto.Submissions is null))
+                            && dto.Settings is null && dto.Submissions is null
+                            && dto.Forms is null && dto.FormSubmissions is null))
             throw new InvalidOperationException(
                 "Die Datei hat kein bekanntes Backup-Format (keine Abschnitte gefunden).");
 
@@ -253,6 +275,11 @@ public class ContentTransferService
                 {
                     Title = p.Title ?? "",
                     Slug = p.Slug ?? "",
+                    // Legacy backups (pre-P2) carry no locale → treat as the default locale.
+                    Locale = string.IsNullOrWhiteSpace(p.Locale) ? Localizer.DefaultCulture : p.Locale!,
+                    TranslationGroup = string.IsNullOrWhiteSpace(p.TranslationGroup)
+                        ? Guid.NewGuid().ToString("N")
+                        : p.TranslationGroup,
                     NavLabel = p.NavLabel,
                     IsPublished = p.IsPublished,
                     ShowInNav = p.ShowInNav,
@@ -286,7 +313,8 @@ public class ContentTransferService
                 _db.MenuItems.Add(new MenuItem
                 {
                     Menu = string.IsNullOrWhiteSpace(m.Menu) ? "header" : m.Menu!,
-                    Label = m.Label ?? "", Url = m.Url ?? "", SortOrder = m.SortOrder, OpenInNewTab = m.OpenInNewTab
+                    Label = m.Label ?? "", Url = m.Url ?? "", SortOrder = m.SortOrder, OpenInNewTab = m.OpenInNewTab,
+                    Locale = string.IsNullOrWhiteSpace(m.Locale) ? Localizer.DefaultCulture : m.Locale!
                 });
             await _db.SaveChangesAsync();
             summary.Add($"{dto.MenuItems.Count} Menüeinträge");
@@ -317,6 +345,51 @@ public class ContentTransferService
             summary.Add($"{dto.Submissions.Count} Anfragen");
         }
 
+        if (dto.Forms is not null)
+        {
+            // Removing forms cascades to their submissions; re-added below if present.
+            _db.FormSubmissions.RemoveRange(_db.FormSubmissions);
+            _db.Forms.RemoveRange(_db.Forms);
+            await _db.SaveChangesAsync();
+            foreach (var f in dto.Forms.Where(f => !string.IsNullOrWhiteSpace(f.Slug)))
+                _db.Forms.Add(new Form
+                {
+                    Name = f.Name ?? "Formular",
+                    Slug = f.Slug!,
+                    DefinitionJson = string.IsNullOrWhiteSpace(f.DefinitionJson) ? "[]" : f.DefinitionJson!,
+                    CreatedAt = f.CreatedAt == default ? DateTime.UtcNow : f.CreatedAt
+                });
+            await _db.SaveChangesAsync();
+            summary.Add($"{dto.Forms.Count} Formulare");
+        }
+
+        if (dto.FormSubmissions is not null)
+        {
+            var slugToId = await _db.Forms.ToDictionaryAsync(f => f.Slug, f => f.Id);
+            // If forms were part of this import, their old submissions are already gone.
+            // Otherwise replace all submissions to keep the import deterministic.
+            if (dto.Forms is null)
+            {
+                _db.FormSubmissions.RemoveRange(_db.FormSubmissions);
+                await _db.SaveChangesAsync();
+            }
+            var count = 0;
+            foreach (var s in dto.FormSubmissions)
+            {
+                if (s.FormSlug is null || !slugToId.TryGetValue(s.FormSlug, out var fid)) continue;
+                _db.FormSubmissions.Add(new FormSubmission
+                {
+                    FormId = fid,
+                    DataJson = string.IsNullOrWhiteSpace(s.DataJson) ? "[]" : s.DataJson!,
+                    IsRead = s.IsRead,
+                    CreatedAt = s.CreatedAt == default ? DateTime.UtcNow : s.CreatedAt
+                });
+                count++;
+            }
+            await _db.SaveChangesAsync();
+            summary.Add($"{count} Formular-Einsendungen");
+        }
+
         await tx.CommitAsync();
         return summary.Count == 0 ? "Nichts importiert" : string.Join(", ", summary) + " wiederhergestellt";
     }
@@ -333,6 +406,24 @@ public class ContentTransferService
         public List<MenuItemDto>? MenuItems { get; set; }
         public List<SettingDto>? Settings { get; set; }
         public List<SubmissionDto>? Submissions { get; set; }
+        public List<FormDto>? Forms { get; set; }
+        public List<FormSubmissionDto>? FormSubmissions { get; set; }
+    }
+
+    private sealed class FormDto
+    {
+        public string? Name { get; set; }
+        public string? Slug { get; set; }
+        public string? DefinitionJson { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+
+    private sealed class FormSubmissionDto
+    {
+        public string? FormSlug { get; set; }
+        public string? DataJson { get; set; }
+        public bool IsRead { get; set; }
+        public DateTime CreatedAt { get; set; }
     }
 
     private sealed class TemplateDto
@@ -349,6 +440,8 @@ public class ContentTransferService
     {
         public string? Title { get; set; }
         public string? Slug { get; set; }
+        public string? Locale { get; set; }
+        public string? TranslationGroup { get; set; }
         public string? NavLabel { get; set; }
         public bool IsPublished { get; set; }
         public bool ShowInNav { get; set; }
@@ -375,6 +468,7 @@ public class ContentTransferService
         public string? Url { get; set; }
         public int SortOrder { get; set; }
         public bool OpenInNewTab { get; set; }
+        public string? Locale { get; set; }
     }
 
     private sealed class SettingDto

@@ -1,37 +1,35 @@
 @page
 @model MatCMS.Pages.Admin.IndexModel
 @{
-    ViewData["Title"] = "Dashboard";
+    ViewData["Title"] = T["dashboard.title"];
 }
 <div class="page-head">
-    <h1>Dashboard</h1>
-    <a class="btn btn-sm" asp-page="/Admin/Pages/Index">Seiten bearbeiten</a>
+    <h1>@T["dashboard.title"]</h1>
+    <a class="btn btn-sm" asp-page="/Admin/Pages/Index">@T["dashboard.editPages"]</a>
 </div>
 
 <div class="stat-grid">
     <a class="stat" asp-page="/Admin/Pages/Index">
         <div class="n">@Model.PageCount</div>
-        <div class="l">Seiten</div>
+        <div class="l">@T["dashboard.pages"]</div>
     </a>
     <a class="stat" asp-page="/Admin/Submissions/Index">
         <div class="n">@Model.UnreadCount</div>
-        <div class="l">Neue Anfragen</div>
+        <div class="l">@T["dashboard.newSubmissions"]</div>
     </a>
     <a class="stat" asp-page="/Admin/Submissions/Index">
         <div class="n">@Model.SubmissionCount</div>
-        <div class="l">Anfragen gesamt</div>
+        <div class="l">@T["dashboard.totalSubmissions"]</div>
     </a>
     <a class="stat" asp-page="/Admin/Users/Index">
         <div class="n">@Model.UserCount</div>
-        <div class="l">Benutzer</div>
+        <div class="l">@T["dashboard.users"]</div>
     </a>
 </div>
 
 <div class="card">
-    <h2>Schnellstart</h2>
+    <h2>@T["dashboard.quickstart"]</h2>
     <p class="muted">
-        Bearbeiten Sie Ihre Inhalte über <strong>Seiten</strong>. Jede Seite besteht aus
-        <em>Blöcken</em> (Hero, Text, Spalten, Leistungen, Kontaktformular …), die Sie
-        hinzufügen, bearbeiten, verschieben und löschen können – das Layout bleibt dabei erhalten.
+        @Html.Raw(T["dashboard.quickstartText"])
     </p>
 </div>

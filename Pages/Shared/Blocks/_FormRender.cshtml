@@ -1,0 +1,211 @@
+@using MatCMS.Content
+@using Microsoft.AspNetCore.Html
+@model MatCMS.Content.FormRenderModel
+@{
+    var containerId = "form-" + Model.Slug;
+
+    // Renders a single input element (text/date/number/phone/email/select).
+    Func<FormElement, IHtmlContent> renderInput = null!;
+    renderInput = el =>
+    {
+        var htmlType = el.Type switch
+        {
+            "email" => "email",
+            "number" => "number",
+            "date" => "date",
+            "phone" => "tel",
+            _ => "text"
+        };
+        var val = Model.Values.TryGetValue(el.Id, out var v) ? v : "";
+        var sb = new System.Text.StringBuilder();
+        sb.Append("<div class=\"form-field\" data-el=\"").Append(el.Id).Append('"');
+        if (el.Condition is not null && el.Condition.IsSet)
+        {
+            sb.Append(" data-cond-field=\"").Append(System.Net.WebUtility.HtmlEncode(el.Condition.Field)).Append('"');
+            sb.Append(" data-cond-op=\"").Append(System.Net.WebUtility.HtmlEncode(el.Condition.Op)).Append('"');
+            sb.Append(" data-cond-value=\"").Append(System.Net.WebUtility.HtmlEncode(el.Condition.Value ?? "")).Append('"');
+        }
+        sb.Append('>');
+
+        if (!string.IsNullOrWhiteSpace(el.Label))
+        {
+            sb.Append("<label for=\"fld_").Append(el.Id).Append("\">").Append(System.Net.WebUtility.HtmlEncode(el.Label));
+            if (el.Required) sb.Append(" <span class=\"req\">*</span>");
+            sb.Append("</label>");
+        }
+
+        var reqAttr = el.Required ? " required data-required=\"1\"" : "";
+        var disAttr = Model.Preview ? " disabled" : "";
+        if (el.Type == "select")
+        {
+            sb.Append("<select id=\"fld_").Append(el.Id).Append("\" name=\"").Append(el.Id).Append('"').Append(reqAttr).Append(disAttr).Append('>');
+            sb.Append("<option value=\"\">– Bitte auswählen –</option>");
+            foreach (var o in el.Options)
+            {
+                var sel = string.Equals(o.Value, val, StringComparison.Ordinal) ? " selected" : "";
+                sb.Append("<option value=\"").Append(System.Net.WebUtility.HtmlEncode(o.Value)).Append('"').Append(sel).Append('>')
+                  .Append(System.Net.WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(o.Label) ? o.Value : o.Label)).Append("</option>");
+            }
+            sb.Append("</select>");
+        }
+        else
+        {
+            sb.Append("<input type=\"").Append(htmlType).Append("\" id=\"fld_").Append(el.Id).Append("\" name=\"").Append(el.Id).Append('"');
+            sb.Append(" value=\"").Append(System.Net.WebUtility.HtmlEncode(val)).Append('"');
+            if (!string.IsNullOrWhiteSpace(el.Placeholder))
+                sb.Append(" placeholder=\"").Append(System.Net.WebUtility.HtmlEncode(el.Placeholder)).Append('"');
+            if (!string.IsNullOrWhiteSpace(el.Regex))
+                sb.Append(" pattern=\"").Append(System.Net.WebUtility.HtmlEncode(el.Regex)).Append('"');
+            sb.Append(reqAttr).Append(disAttr).Append('>');
+        }
+
+        if (!string.IsNullOrWhiteSpace(el.Help))
+            sb.Append("<div class=\"field-help\">").Append(System.Net.WebUtility.HtmlEncode(el.Help)).Append("</div>");
+        sb.Append("</div>");
+        return new HtmlString(sb.ToString());
+    };
+
+    Func<FormElement, IHtmlContent> renderElement = null!;
+    renderElement = el =>
+    {
+        switch (el.Type)
+        {
+            case "title":
+                return new HtmlString("<h3 class=\"form-el-title\">" + System.Net.WebUtility.HtmlEncode(el.Label) + "</h3>");
+            case "description":
+                return new HtmlString("<p class=\"form-el-desc\">" + System.Net.WebUtility.HtmlEncode(el.Label) + "</p>");
+            case "group":
+            {
+                var sb = new System.Text.StringBuilder();
+                sb.Append("<fieldset class=\"form-group\" data-el=\"").Append(el.Id).Append('"');
+                if (el.Condition is not null && el.Condition.IsSet)
+                {
+                    sb.Append(" data-cond-field=\"").Append(System.Net.WebUtility.HtmlEncode(el.Condition.Field)).Append('"');
+                    sb.Append(" data-cond-op=\"").Append(System.Net.WebUtility.HtmlEncode(el.Condition.Op)).Append('"');
+                    sb.Append(" data-cond-value=\"").Append(System.Net.WebUtility.HtmlEncode(el.Condition.Value ?? "")).Append('"');
+                }
+                sb.Append('>');
+                if (!string.IsNullOrWhiteSpace(el.Label))
+                    sb.Append("<legend>").Append(System.Net.WebUtility.HtmlEncode(el.Label)).Append("</legend>");
+                sb.Append("</fieldset>");
+                // Build the fieldset content by concatenating children html, then inject.
+                var inner = new System.Text.StringBuilder();
+                foreach (var c in el.Fields)
+                    inner.Append(FormDefinition.IsInput(c.Type) ? renderInput(c).ToString() : renderElement(c).ToString());
+                var html = sb.ToString().Replace("</fieldset>", inner + "</fieldset>");
+                return new HtmlString(html);
+            }
+            default:
+                return renderInput(el);
+        }
+    };
+}
+<section class="contact-block form-block" id="@containerId" data-form-slug="@Model.Slug">
+    <div class="container">
+        <div class="contact-wrap">
+            @if (!string.IsNullOrWhiteSpace(Model.Heading))
+            {
+                <h2>@Model.Heading</h2>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.Intro))
+            {
+                <p class="text-center">@Model.Intro</p>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.Success))
+            {
+                <div class="alert alert-success">@Model.Success</div>
+            }
+            @if (Model.Errors.Count > 0)
+            {
+                <div class="alert alert-error">@string.Join(" ", Model.Errors)</div>
+            }
+
+            @if (Model.Elements.Count == 0)
+            {
+                <p class="muted text-center">Dieses Formular hat noch keine Felder.</p>
+            }
+            else if (Model.Preview)
+            {
+                <form onsubmit="return false;" class="form-fields">
+                    @foreach (var el in Model.Elements)
+                    {
+                        @renderElement(el)
+                    }
+                    <button type="submit" class="btn" disabled>Absenden</button>
+                </form>
+            }
+            else
+            {
+                <form method="post" asp-page-handler="Form" asp-route-slug="@ViewContext.RouteData.Values["slug"]" class="form-fields">
+                    <input type="hidden" name="__formSlug" value="@Model.Slug" />
+                    @foreach (var el in Model.Elements)
+                    {
+                        @renderElement(el)
+                    }
+                    <button type="submit" class="btn">Absenden</button>
+                </form>
+            }
+        </div>
+    </div>
+</section>
+<script>
+    (function () {
+        var root = document.getElementById("@containerId");
+        if (!root) return;
+        var conds = Array.prototype.slice.call(root.querySelectorAll("[data-cond-field]"));
+
+        function valueOf(name) {
+            var el = root.querySelector("[name='" + (window.CSS && CSS.escape ? CSS.escape(name) : name) + "']");
+            if (!el) return "";
+            return (el.value || "").trim();
+        }
+        function apply() {
+            conds.forEach(function (w) {
+                var f = w.getAttribute("data-cond-field");
+                var op = w.getAttribute("data-cond-op");
+                var target = w.getAttribute("data-cond-value") || "";
+                var v = valueOf(f);
+                var show;
+                switch (op) {
+                    case "neq": show = v.toLowerCase() !== target.toLowerCase(); break;
+                    case "contains": show = v.toLowerCase().indexOf(target.toLowerCase()) >= 0; break;
+                    case "filled": show = v !== ""; break;
+                    default: show = v.toLowerCase() === target.toLowerCase();
+                }
+                w.style.display = show ? "" : "none";
+                Array.prototype.slice.call(w.querySelectorAll("input,select,textarea")).forEach(function (inp) {
+                    if (show) {
+                        if (inp.getAttribute("data-required") === "1") inp.required = true;
+                        inp.disabled = @(Model.Preview ? "true" : "false");
+                    } else {
+                        inp.required = false;
+                        inp.disabled = true;
+                    }
+                });
+            });
+        }
+        root.addEventListener("input", apply);
+        root.addEventListener("change", apply);
+        apply();
+
+        @if (Model.Builder)
+        {
+            <text>
+            // Builder bridge: clicking an element selects it in the parent editor.
+            function post(msg) { if (window.parent && window.parent !== window) window.parent.postMessage(msg, "*"); }
+            document.addEventListener("click", function (e) {
+                var host = e.target.closest("[data-el]");
+                if (host) { e.preventDefault(); e.stopPropagation(); post({ type: "mat-select-element", id: host.getAttribute("data-el") }); }
+            }, true);
+            window.addEventListener("message", function (e) {
+                var d = e.data || {};
+                if (d.type === "mat-scroll-element" && d.id) {
+                    var el = root.querySelector("[data-el='" + d.id + "']");
+                    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                }
+            });
+            post({ type: "mat-preview-ready" });
+            </text>
+        }
+    })();
+</script>

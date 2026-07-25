@@ -110,6 +110,11 @@ table.data .row-unread td { font-weight: 600; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .inline-form { display: inline; }
 
+/* Keep row action buttons on a single line (last column shrinks to fit) */
+table.data th:last-child, table.data td:last-child { width: 1%; white-space: nowrap; }
+table.data .actions { flex-wrap: nowrap; justify-content: flex-end; }
+table.data .btn { white-space: nowrap; }
+
 .muted { color: var(--muted); }
 .mono { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 13px; }
 

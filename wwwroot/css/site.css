@@ -256,6 +256,42 @@ h1, h2, h3, h4 {
 .column .rich { color: #2e2013; }
 .column .rich a { color: #1a1008; }
 
+/* ---------- Gallery block + lightbox ---------- */
+.gallery { margin-top: 8px; }
+.gallery__item { margin: 0; }
+.gallery__link { display: block; overflow: hidden; }
+.gallery__link img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .3s ease; }
+.gallery__link:hover img { transform: scale(1.04); }
+.gallery figcaption { font-size: 14px; color: var(--muted); margin-top: 8px; }
+
+.gallery--grid { display: grid; gap: 16px; }
+.gallery--grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+.gallery--grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.gallery--grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+.gallery--grid .gallery__link { aspect-ratio: 4 / 3; }
+
+.gallery--masonry { columns: 3; column-gap: 16px; }
+.gallery--masonry.cols-2 { columns: 2; }
+.gallery--masonry.cols-4 { columns: 4; }
+.gallery--masonry .gallery__item { break-inside: avoid; margin-bottom: 16px; }
+
+@media (max-width: 720px) {
+    .gallery--grid.cols-3, .gallery--grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
+    .gallery--masonry { columns: 2; }
+}
+
+.lightbox { position: fixed; inset: 0; z-index: 1000; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.9); padding: 40px; }
+.lightbox.open { display: flex; }
+.lightbox .lb-figure { margin: 0; max-width: 90vw; max-height: 90vh; text-align: center; }
+.lightbox .lb-img { max-width: 90vw; max-height: 82vh; object-fit: contain; }
+.lightbox .lb-cap { color: #eee; margin-top: 12px; font-size: 15px; }
+.lightbox button { position: absolute; background: none; border: none; color: #fff; cursor: pointer; opacity: .85; }
+.lightbox button:hover { opacity: 1; }
+.lightbox .lb-close { top: 18px; right: 24px; font-size: 40px; line-height: 1; }
+.lightbox .lb-prev, .lightbox .lb-next { top: 50%; transform: translateY(-50%); font-size: 60px; padding: 0 18px; }
+.lightbox .lb-prev { left: 8px; }
+.lightbox .lb-next { right: 8px; }
+
 /* ---------- Service grid ---------- */
 .service-grid { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); }
 .service-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }

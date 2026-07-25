@@ -16,6 +16,7 @@ public class AppDbContext : DbContext
     public DbSet<Template> Templates => Set<Template>();
     public DbSet<Form> Forms => Set<Form>();
     public DbSet<FormSubmission> FormSubmissions => Set<FormSubmission>();
+    public DbSet<Media> Media => Set<Media>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {

@@ -254,6 +254,32 @@ public class BlockRegistry
         },
         new BlockDefinition
         {
+            Type = "gallery",
+            Name = "block.gallery.name",
+            Description = "block.gallery.desc",
+            Svg = SvgGrid,
+            Partial = "Blocks/_Gallery",
+            Fields =
+            [
+                new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },
+                new BlockField { Id = "layout", Label = "block.gallery.f.layout", Type = FieldType.Select, Default = "grid",
+                    Options = [ new("grid", "block.opt.layout.grid"), new("masonry", "block.opt.layout.masonry") ] },
+                new BlockField { Id = "columns", Label = "block.gallery.f.columns", Type = FieldType.Select, Default = "3",
+                    Options = [ new("2", "block.opt.columns.2"), new("3", "block.opt.columns.3"), new("4", "block.opt.columns.4") ] },
+                new BlockField
+                {
+                    Id = "images", Label = "block.gallery.f.images", Type = FieldType.List, ItemLabel = "block.gallery.item",
+                    ItemFields =
+                    [
+                        new BlockField { Id = "image", Label = "block.gallery.f.image", Type = FieldType.Image },
+                        new BlockField { Id = "alt", Label = "block.f.alt", Type = FieldType.Text },
+                        new BlockField { Id = "caption", Label = "block.gallery.f.caption", Type = FieldType.Text },
+                    ]
+                },
+            ]
+        },
+        new BlockDefinition
+        {
             Type = "html",
             Name = "block.html.name",
             Description = "block.html.desc",

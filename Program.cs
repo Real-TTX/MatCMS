@@ -166,8 +166,8 @@ app.MapPost("/set-language", async (HttpContext ctx) =>
     return Results.LocalRedirect(target);
 });
 
-// Simple image upload endpoint used by the block editor / settings (admin only).
-app.MapPost("/admin/api/upload", async (HttpRequest request, IWebHostEnvironment env) =>
+// Simple image upload endpoint used by the block editor / settings / media library (admin only).
+app.MapPost("/admin/api/upload", async (HttpRequest request, IWebHostEnvironment env, MatCMS.Data.AppDbContext db) =>
 {
     if (!request.HasFormContentType)
         return Results.BadRequest(new { error = "Ungültige Anfrage." });
@@ -191,7 +191,27 @@ app.MapPost("/admin/api/upload", async (HttpRequest request, IWebHostEnvironment
     await using (var stream = File.Create(Path.Combine(uploads, name)))
         await file.CopyToAsync(stream);
 
-    return Results.Ok(new { url = $"/uploads/{name}" });
+    var url = $"/uploads/{name}";
+    // Record it in the media library.
+    db.Media.Add(new MatCMS.Models.Media
+    {
+        Url = url,
+        FileName = file.FileName,
+        ContentType = file.ContentType ?? "",
+        SizeBytes = file.Length
+    });
+    await db.SaveChangesAsync();
+
+    return Results.Ok(new { url });
+}).RequireAuthorization("Admin");
+
+// Media library listing (admin only) — used by the image picker.
+app.MapGet("/admin/api/media", async (MatCMS.Data.AppDbContext db) =>
+{
+    var items = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
+        db.Media.AsNoTracking().OrderByDescending(m => m.Id)
+            .Select(m => new { url = m.Url, name = m.FileName }));
+    return Results.Ok(items);
 }).RequireAuthorization("Admin");
 
 app.Run();

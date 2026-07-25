@@ -1,0 +1,69 @@
+@page
+@model MatCMS.Pages.Admin.Media.IndexModel
+@{
+    ViewData["Title"] = T["media.title"];
+}
+<div class="page-head">
+    <h1>@T["media.title"]</h1>
+    <div>
+        <button type="button" id="media-upload-btn" class="btn">@T["media.upload"]</button>
+        <input type="file" id="media-file" accept="image/*" multiple style="display:none;" />
+    </div>
+</div>
+
+@if (Model.Items.Count == 0)
+{
+    <div class="card"><p class="muted">@T["media.empty"]</p></div>
+}
+
+<div class="media-grid">
+    @foreach (var m in Model.Items)
+    {
+        <div class="media-card">
+            <div class="media-thumb" style="background-image:url('@m.Url')"></div>
+            <div class="media-meta">
+                <div class="media-name" title="@m.FileName">@m.FileName</div>
+                <div class="media-actions">
+                    <button type="button" class="btn btn-sm btn-ghost media-copy" data-url="@m.Url">@T["media.copy"]</button>
+                    <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@m.Id" onsubmit="return confirm('@T["media.confirmDelete"]');">
+                        <button type="submit" class="btn btn-sm btn-danger" title="@T["action.delete"]">✕</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            var btn = document.getElementById('media-upload-btn');
+            var file = document.getElementById('media-file');
+            btn.addEventListener('click', function () { file.click(); });
+            file.addEventListener('change', function () {
+                if (!file.files || !file.files.length) return;
+                btn.disabled = true; btn.textContent = '@T["action.uploading"]';
+                var files = Array.prototype.slice.call(file.files);
+                var chain = Promise.resolve();
+                files.forEach(function (f) {
+                    chain = chain.then(function () {
+                        var fd = new FormData(); fd.append('file', f);
+                        return fetch('/admin/api/upload', { method: 'POST', body: fd })
+                            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+                            .then(function (r) { if (!r.ok) alert(r.j.error || 'Upload fehlgeschlagen.'); });
+                    });
+                });
+                chain.then(function () { window.location.reload(); });
+            });
+            // Copy URL to clipboard.
+            document.querySelectorAll('.media-copy').forEach(function (b) {
+                b.addEventListener('click', function () {
+                    var u = b.getAttribute('data-url');
+                    (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject())
+                        .then(function () { var t = b.textContent; b.textContent = '✓'; setTimeout(function () { b.textContent = t; }, 1200); })
+                        .catch(function () { window.prompt('URL', u); });
+                });
+            });
+        })();
+    </script>
+}

@@ -87,6 +87,20 @@
 .page-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; gap: 16px; flex-wrap: wrap; }
 .page-head h1 { font-size: 26px; margin: 0; }
 
+/* Media library grid */
+.media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
+.media-card { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; }
+.media-thumb { aspect-ratio: 4 / 3; background-size: cover; background-position: center; background-color: #f1f1f1; }
+.media-meta { padding: 10px 12px; }
+.media-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.media-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+
+/* Media picker modal (image fields) */
+.media-picker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; max-height: 60vh; overflow-y: auto; }
+.media-pick { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; cursor: pointer; background: #fff; padding: 0; aspect-ratio: 1 / 1; }
+.media-pick img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.media-pick:hover { border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
+
 /* Toolbar-menu icon picker */
 .icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 8px; max-width: 620px; margin-top: 4px; }
 .icon-tile { display: inline-flex; align-items: center; justify-content: center; height: 48px; border: 1px solid var(--line); border-radius: 8px; background: #fff; cursor: pointer; color: var(--ink); }

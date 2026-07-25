@@ -170,6 +170,17 @@ public class ContentTransferService
                 }).ToList();
         }
 
+        // Media-library records travel with the asset files.
+        if (options.Assets)
+        {
+            dto.Media = (await _db.Media.AsNoTracking().OrderBy(m => m.Id).ToListAsync())
+                .Select(m => new MediaDto
+                {
+                    Url = m.Url, FileName = m.FileName, Alt = m.Alt,
+                    ContentType = m.ContentType, SizeBytes = m.SizeBytes, CreatedAt = m.CreatedAt
+                }).ToList();
+        }
+
         return JsonSerializer.Serialize(dto, WriteOpts);
     }
 
@@ -409,6 +420,27 @@ public class ContentTransferService
             summary.Add($"{count} Formular-Einsendungen");
         }
 
+        if (dto.Media is not null)
+        {
+            _db.Media.RemoveRange(_db.Media);
+            await _db.SaveChangesAsync();
+            foreach (var m in dto.Media)
+            {
+                if (string.IsNullOrWhiteSpace(m.Url)) continue;
+                _db.Media.Add(new Media
+                {
+                    Url = m.Url!,
+                    FileName = m.FileName ?? "",
+                    Alt = m.Alt,
+                    ContentType = m.ContentType ?? "",
+                    SizeBytes = m.SizeBytes,
+                    CreatedAt = m.CreatedAt == default ? DateTime.UtcNow : m.CreatedAt
+                });
+            }
+            await _db.SaveChangesAsync();
+            summary.Add($"{dto.Media.Count} Medien");
+        }
+
         await tx.CommitAsync();
         return summary.Count == 0 ? "Nichts importiert" : string.Join(", ", summary) + " wiederhergestellt";
     }
@@ -427,6 +459,7 @@ public class ContentTransferService
         public List<SubmissionDto>? Submissions { get; set; }
         public List<FormDto>? Forms { get; set; }
         public List<FormSubmissionDto>? FormSubmissions { get; set; }
+        public List<MediaDto>? Media { get; set; }
     }
 
     private sealed class FormDto
@@ -490,6 +523,16 @@ public class ContentTransferService
         public string? BlockType { get; set; }
         public int SortOrder { get; set; }
         public string? DataJson { get; set; }
+    }
+
+    private sealed class MediaDto
+    {
+        public string? Url { get; set; }
+        public string? FileName { get; set; }
+        public string? Alt { get; set; }
+        public string? ContentType { get; set; }
+        public long SizeBytes { get; set; }
+        public DateTime CreatedAt { get; set; }
     }
 
     private sealed class MenuItemDto

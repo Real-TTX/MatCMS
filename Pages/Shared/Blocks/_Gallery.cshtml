@@ -1,0 +1,41 @@
+@model MatCMS.Content.BlockData
+@{
+    var heading = Model.Str("heading");
+    var layout = Model.StrOr("layout", "grid");
+    var columns = Model.StrOr("columns", "3");
+    var images = Model.List("images");
+
+    static string SafeSrc(string image) =>
+        (!string.IsNullOrWhiteSpace(image)
+            && (image.StartsWith("/") || image.StartsWith("http://") || image.StartsWith("https://"))
+            && image.IndexOfAny(new[] { '\'', '"', '(', ')', '\\', '\n', '\r' }) < 0)
+            ? image : "";
+
+    var cls = "gallery gallery--" + (layout == "masonry" ? "masonry" : "grid") + " cols-" + columns;
+}
+<section class="section gallery-block">
+    <div class="container">
+        @if (!string.IsNullOrWhiteSpace(heading))
+        {
+            <div class="section__intro"><h2>@heading</h2></div>
+        }
+        <div class="@cls" data-gallery>
+            @foreach (var item in images)
+            {
+                var src = SafeSrc(item.Str("image"));
+                if (string.IsNullOrEmpty(src)) { continue; }
+                var alt = item.Str("alt");
+                var caption = item.Str("caption");
+                <figure class="gallery__item">
+                    <a href="@src" class="gallery__link" data-lightbox data-caption="@caption">
+                        <img src="@src" alt="@alt" loading="lazy" />
+                    </a>
+                    @if (!string.IsNullOrWhiteSpace(caption))
+                    {
+                        <figcaption>@caption</figcaption>
+                    }
+                </figure>
+            }
+        </div>
+    </div>
+</section>

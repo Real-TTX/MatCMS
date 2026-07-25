@@ -59,4 +59,11 @@ public class Template
 
     /// <summary>Raw JavaScript injected before &lt;/body&gt; on every public page (advanced).</summary>
     public string CustomJs { get; set; } = "";
+
+    /// <summary>
+    /// Advanced: a custom HTML body layout with placeholders ({{content}}, {{nav}}, {{logo}} …).
+    /// Only applied when it contains {{content}}; otherwise the default layout is used. The document
+    /// head (fonts, theme, favicon) always stays managed, so this can't break page styling.
+    /// </summary>
+    public string LayoutHtml { get; set; } = "";
 }

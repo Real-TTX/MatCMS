@@ -285,6 +285,8 @@
   "templates.customCssHelp": "Wird auf jeder öffentlichen Seite eingebunden.",
   "templates.customJs": "Eigenes JavaScript",
   "templates.customJsHelp": "Wird vor dem schließenden </body> jeder öffentlichen Seite ausgeführt.",
+  "templates.layoutHtml": "Eigenes Body-Layout (HTML)",
+  "templates.layoutHtmlHelp": "Optional & Advanced. Ersetzt den Body-Aufbau. Variablen: <code>{{content}}</code> (Seiteninhalt, Pflicht), <code>{{nav}}</code>, <code>{{footer_nav}}</code>, <code>{{toolbar}}</code>, <code>{{logo}}</code>, <code>{{site_name}}</code>, <code>{{footer_text}}</code>, <code>{{year}}</code>. Der &lt;head&gt; (Fonts/Design/Favicon) bleibt erhalten. Ohne <code>{{content}}</code> wird das Standard-Layout genutzt.",
   "templates.secColors": "Farben",
   "templates.secType": "Schrift",
   "templates.secLayout": "Buttons & Layout",

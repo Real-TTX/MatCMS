@@ -105,7 +105,7 @@ public class ContentTransferService
                     BackgroundColor = t.BackgroundColor, AltBackground = t.AltBackground,
                     ContainerWidth = t.ContainerWidth, ButtonRadius = t.ButtonRadius,
                     HeaderBackground = t.HeaderBackground, HeaderTextColor = t.HeaderTextColor, HeaderPadding = t.HeaderPadding,
-                    CustomCss = t.CustomCss, CustomJs = t.CustomJs
+                    CustomCss = t.CustomCss, CustomJs = t.CustomJs, LayoutHtml = t.LayoutHtml
                 }).ToList();
         }
 
@@ -283,7 +283,8 @@ public class ContentTransferService
                     HeaderTextColor = t.HeaderTextColor ?? "",
                     HeaderPadding = string.IsNullOrWhiteSpace(t.HeaderPadding) ? "16" : t.HeaderPadding!,
                     CustomCss = t.CustomCss ?? "",
-                    CustomJs = t.CustomJs ?? ""
+                    CustomJs = t.CustomJs ?? "",
+                    LayoutHtml = t.LayoutHtml ?? ""
                 });
             await _db.SaveChangesAsync();
             var all = await _db.Templates.ToListAsync();
@@ -498,6 +499,7 @@ public class ContentTransferService
         public string? HeaderPadding { get; set; }
         public string? CustomCss { get; set; }
         public string? CustomJs { get; set; }
+        public string? LayoutHtml { get; set; }
     }
 
     private sealed class PageDto

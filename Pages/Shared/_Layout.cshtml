@@ -53,6 +53,35 @@
     var headerBg = (tpl.HeaderBackground ?? "").Trim();
     var headerText = (tpl.HeaderTextColor ?? "").Trim();
     var headerPad = Px(tpl.HeaderPadding, "16px");
+
+    // Capture the page body once, so it can go into either the default or a custom body layout.
+    var bodyWriter = new System.IO.StringWriter();
+    RenderBody().WriteTo(bodyWriter, System.Text.Encodings.Web.HtmlEncoder.Default);
+    var contentHtml = bodyWriter.ToString();
+
+    // Advanced: a custom HTML body layout (only used when it actually contains {{content}}).
+    var useCustomLayout = !string.IsNullOrWhiteSpace(tpl.LayoutHtml) && tpl.LayoutHtml.Contains("{{content}}");
+    var customBody = "";
+    if (useCustomLayout)
+    {
+        string Enc(string? s) => System.Net.WebUtility.HtmlEncode(s ?? "");
+        string Link(string url, string label, bool nt) =>
+            $"<a href=\"{Enc(url)}\"{(nt ? " target=\"_blank\" rel=\"noopener\"" : "")}>{Enc(label)}</a>";
+        var navHtml = string.Concat(Site.HeaderMenu.Select(m => Link(m.Url, m.Label, m.OpenInNewTab)));
+        var footerNavHtml = string.Concat(Site.FooterMenu.Select(m => Link(m.Url, m.Label, m.OpenInNewTab)));
+        var toolbarHtml = string.Concat(Site.ToolbarMenu.Select(t =>
+            $"<a class=\"hicon\" href=\"{Enc(t.Url)}\"{(t.OpenInNewTab ? " target=\"_blank\" rel=\"noopener\"" : "")} title=\"{Enc(t.Label)}\"><svg viewBox=\"0 0 24 24\" fill=\"currentColor\">{MatCMS.Content.MenuIcons.Svg(t.Icon)}</svg></a>"));
+        var logoHtml = $"<img src=\"{Enc(Site.LogoUrl)}\" alt=\"{Enc(Site.SiteName)}\" />";
+        customBody = tpl.LayoutHtml
+            .Replace("{{content}}", contentHtml)
+            .Replace("{{nav}}", navHtml)
+            .Replace("{{footer_nav}}", footerNavHtml)
+            .Replace("{{toolbar}}", toolbarHtml)
+            .Replace("{{logo}}", logoHtml)
+            .Replace("{{site_name}}", Enc(Site.SiteName))
+            .Replace("{{footer_text}}", Enc(Site.FooterText))
+            .Replace("{{year}}", DateTime.UtcNow.Year.ToString());
+    }
 }
 <!DOCTYPE html>
 <html lang="de">
@@ -106,6 +135,12 @@
     <link rel="icon" href="@Site.FaviconUrl" />
 </head>
 <body>
+@if (useCustomLayout)
+{
+    @Html.Raw(customBody)
+}
+else
+{
     <header class="site-header">
         <div class="container header-inner">
             <a class="logo" href="/">
@@ -147,7 +182,7 @@
     </header>
 
     <main>
-        @RenderBody()
+        @Html.Raw(contentHtml)
     </main>
 
     <footer class="site-footer">
@@ -167,6 +202,7 @@
             }
         </div>
     </footer>
+}
 
     <script src="~/js/gallery.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)

@@ -122,6 +122,11 @@
             <textarea id="CustomJs" name="CustomJs" rows="6" class="code" spellcheck="false" placeholder="// JavaScript">@Model.CustomJs</textarea>
             <div class="help">@T["templates.customJsHelp"]</div>
         </div>
+        <div class="form-field">
+            <label for="LayoutHtml">@T["templates.layoutHtml"]</label>
+            <textarea id="LayoutHtml" name="LayoutHtml" rows="10" class="code" spellcheck="false" placeholder="<header>{{logo}} {{nav}}</header>&#10;<main>{{content}}</main>&#10;<footer>{{footer_nav}}</footer>">@Model.LayoutHtml</textarea>
+            <div class="help">@Html.Raw(T["templates.layoutHtmlHelp"])</div>
+        </div>
 
         <div>
             <button type="submit" class="btn">@T["action.save"]</button>

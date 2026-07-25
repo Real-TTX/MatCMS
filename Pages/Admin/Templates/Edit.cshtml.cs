@@ -28,6 +28,7 @@ public class EditModel : PageModel
     [BindProperty] public string? HeaderPadding { get; set; }
     [BindProperty] public string? CustomCss { get; set; }
     [BindProperty] public string? CustomJs { get; set; }
+    [BindProperty] public string? LayoutHtml { get; set; }
     public bool IsActive { get; private set; }
     public string? Error { get; private set; }
 
@@ -54,6 +55,7 @@ public class EditModel : PageModel
         HeaderPadding = t.HeaderPadding;
         CustomCss = t.CustomCss;
         CustomJs = t.CustomJs;
+        LayoutHtml = t.LayoutHtml;
         IsActive = t.IsActive;
         return Page();
     }
@@ -88,6 +90,7 @@ public class EditModel : PageModel
         t.HeaderPadding = TemplateFonts.Int(HeaderPadding, "16", 4, 60);
         t.CustomCss = TemplateFonts.Code(CustomCss);
         t.CustomJs = TemplateFonts.Code(CustomJs);
+        t.LayoutHtml = TemplateFonts.Code(LayoutHtml, 50000);
         await _db.SaveChangesAsync();
 
         TempData["Flash"] = "Template gespeichert.";

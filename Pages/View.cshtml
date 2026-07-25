@@ -48,6 +48,29 @@
             var selected = null;
             function post(msg) { if (window.parent && window.parent !== window) window.parent.postMessage(msg, "*"); }
 
+            // Selecting a block reloads the editor page, which reloads this iframe. Persist the
+            // scroll position so the preview stays put instead of jumping back to the top.
+            var scrollKey = "mat-ed-scroll:" + location.pathname;
+            function saveScroll() { try { sessionStorage.setItem(scrollKey, String(window.scrollY)); } catch (e) {} }
+            function restoreScroll() {
+                try { var y = parseInt(sessionStorage.getItem(scrollKey) || "0", 10); if (y > 0) window.scrollTo(0, y); } catch (e) {}
+            }
+            window.addEventListener("scroll", saveScroll, { passive: true });
+            window.addEventListener("beforeunload", saveScroll);
+            restoreScroll();
+            window.addEventListener("load", restoreScroll);
+
+            // Only scroll when the element isn't already comfortably in view (avoids re-scrolling
+            // to a block that's already visible).
+            function inView(el) {
+                var r = el.getBoundingClientRect();
+                var h = window.innerHeight || document.documentElement.clientHeight;
+                return r.top >= 0 && r.bottom <= h;
+            }
+            function ensureVisible(el) {
+                if (!inView(el)) el.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+
             // In editor mode, clicking anywhere selects the containing block (and never navigates).
             document.addEventListener("click", function (e) {
                 var block = e.target.closest(".mat-ed-block");
@@ -63,12 +86,12 @@
                 var d = e.data || {};
                 if (d.type === "mat-scroll" && d.id) {
                     var el = document.getElementById("block-" + d.id);
-                    if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.classList.add("mat-flash"); setTimeout(function () { el.classList.remove("mat-flash"); }, 1000); }
+                    if (el) { ensureVisible(el); el.classList.add("mat-flash"); setTimeout(function () { el.classList.remove("mat-flash"); }, 1000); }
                 }
                 if (d.type === "mat-select" && d.id) {
                     if (selected) selected.classList.remove("mat-selected");
                     selected = document.getElementById("block-" + d.id);
-                    if (selected) { selected.classList.add("mat-selected"); selected.scrollIntoView({ behavior: "smooth", block: "center" }); }
+                    if (selected) { selected.classList.add("mat-selected"); ensureVisible(selected); }
                 }
             });
 

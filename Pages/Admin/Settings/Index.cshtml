@@ -18,14 +18,28 @@
         </div>
         <div class="form-field">
             <label>@T["settings.logo"]</label>
-            <div class="image-field">
-                <div id="logo-preview" class="preview"></div>
+            <div class="image-field" data-upload>
+                <div class="preview" data-preview></div>
                 <div class="image-controls">
-                    <input id="logo-url" name="Values[@SettingKeys.LogoUrl]" value="@V(SettingKeys.LogoUrl)" placeholder="/img/logo.svg oder /uploads/..." />
+                    <input name="Values[@SettingKeys.LogoUrl]" value="@V(SettingKeys.LogoUrl)" placeholder="/img/logo.svg oder /uploads/..." data-url />
                     <div style="margin-top:8px;">
-                        <button type="button" id="logo-upload-btn" class="btn btn-ghost btn-sm">@T["settings.uploadLogo"]</button>
-                        <input type="file" id="logo-file" accept="image/*" style="display:none;" />
+                        <button type="button" class="btn btn-ghost btn-sm" data-upload-btn>@T["settings.uploadLogo"]</button>
+                        <input type="file" accept="image/*" style="display:none;" data-file />
                     </div>
+                </div>
+            </div>
+        </div>
+        <div class="form-field">
+            <label>@T["settings.favicon"]</label>
+            <div class="image-field" data-upload>
+                <div class="preview" data-preview></div>
+                <div class="image-controls">
+                    <input name="Values[@SettingKeys.FaviconUrl]" value="@V(SettingKeys.FaviconUrl)" placeholder="@T["settings.faviconPlaceholder"]" data-url />
+                    <div style="margin-top:8px;">
+                        <button type="button" class="btn btn-ghost btn-sm" data-upload-btn>@T["settings.uploadFavicon"]</button>
+                        <input type="file" accept="image/*,.ico" style="display:none;" data-file />
+                    </div>
+                    <div class="help">@T["settings.faviconHelp"]</div>
                 </div>
             </div>
         </div>
@@ -69,19 +83,21 @@
 
 @section Scripts {
     <script>
-        (function () {
-            var input = document.getElementById('logo-url');
-            var file = document.getElementById('logo-file');
-            var btn = document.getElementById('logo-upload-btn');
-            var prev = document.getElementById('logo-preview');
-            if (!btn) return;
+        // Wire every [data-upload] image field (logo, favicon, …) to the shared upload endpoint.
+        document.querySelectorAll('.image-field[data-upload]').forEach(function (field) {
+            var input = field.querySelector('[data-url]');
+            var file = field.querySelector('[data-file]');
+            var btn = field.querySelector('[data-upload-btn]');
+            var prev = field.querySelector('[data-preview]');
+            if (!btn || !input) return;
             function setPrev(u) { if (prev) prev.style.backgroundImage = u ? "url('" + u + "')" : ''; }
             setPrev(input.value);
             input.addEventListener('input', function () { setPrev(input.value); });
             btn.addEventListener('click', function () { file.click(); });
+            var label = btn.textContent;
             file.addEventListener('change', function () {
                 if (!file.files || !file.files[0]) return;
-                btn.disabled = true; btn.textContent = 'Lädt…';
+                btn.disabled = true; btn.textContent = '@T["action.uploading"]';
                 var fd = new FormData(); fd.append('file', file.files[0]);
                 fetch('/admin/api/upload', { method: 'POST', body: fd })
                     .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
@@ -90,8 +106,8 @@
                         else alert(r.j.error || 'Upload fehlgeschlagen.');
                     })
                     .catch(function () { alert('Upload fehlgeschlagen.'); })
-                    .then(function () { btn.disabled = false; btn.textContent = 'Logo hochladen'; file.value = ''; });
+                    .then(function () { btn.disabled = false; btn.textContent = label; file.value = ''; });
             });
-        })();
+        });
     </script>
 }

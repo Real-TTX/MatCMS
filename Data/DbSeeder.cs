@@ -39,6 +39,7 @@ public static class DbSeeder
             db.SiteSettings.AddRange(
                 S(SettingKeys.SiteName, "MatCMS"),
                 S(SettingKeys.LogoUrl, "/img/logo.svg"),
+                S(SettingKeys.FaviconUrl, ""),
                 S(SettingKeys.TopBarLink1Text, ""),
                 S(SettingKeys.TopBarLink1Url, ""),
                 S(SettingKeys.TopBarLink2Text, ""),

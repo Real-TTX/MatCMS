@@ -15,7 +15,7 @@
     }
 }
 
-<div class="live-editor" data-form-id="@Model.Current.Id" data-selected-element="@(Model.SelectedElement?.Id)">
+<div class="live-editor form-builder@(editing ? " editing" : "")" data-form-id="@Model.Current.Id" data-selected-element="@(Model.SelectedElement?.Id)">
     <aside class="le-sidebar">
         @if (editing)
         {

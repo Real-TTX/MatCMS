@@ -73,6 +73,8 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddSingleton<BlockRegistry>();
 builder.Services.AddScoped<SiteContext>();
 builder.Services.AddScoped<ContentTransferService>();
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<VersionService>();
 
 // Basic brute-force protection for the login endpoint (per client IP).
 // Behind a reverse proxy, enable ForwardedHeaders so the real client IP is used.

@@ -1,0 +1,65 @@
+@page
+@model MatCMS.Pages.Admin.About.IndexModel
+@{
+    ViewData["Title"] = T["about.title"];
+}
+<div class="page-head">
+    <h1>@T["about.title"]</h1>
+</div>
+
+<div class="card">
+    <h2>@T["about.version"]</h2>
+    <div class="kv">
+        <span class="kv-label">@T["about.runningVersion"]</span>
+        <span class="kv-value mono">@Model.Current</span>
+    </div>
+    <div class="kv">
+        <span class="kv-label">@T["about.image"]</span>
+        <span class="kv-value mono">@Model.ImageRef</span>
+    </div>
+
+    <div class="update-check" style="margin-top:18px;">
+        <button type="button" id="check-btn" class="btn btn-sm">@T["about.checkUpdates"]</button>
+        <span id="check-result" class="update-result"></span>
+    </div>
+</div>
+
+<div class="card">
+    <h2>@T["about.howToUpdate"]</h2>
+    <p class="help">@T["about.updateVia"]</p>
+    <pre class="code-block"><code>@Model.UpdateCommand</code></pre>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            var btn = document.getElementById('check-btn');
+            var out = document.getElementById('check-result');
+            if (!btn) return;
+            btn.addEventListener('click', function () {
+                btn.disabled = true;
+                out.className = 'update-result';
+                out.textContent = '@T["about.checking"]';
+                fetch('?handler=Check', { headers: { 'RequestVerificationToken': '' } })
+                    .then(function (r) { return r.json(); })
+                    .then(function (j) {
+                        if (j.error) {
+                            out.className = 'update-result warn';
+                            out.textContent = '@T["about.checkFailed"]' + ' (' + j.error + ')';
+                        } else if (j.updateAvailable) {
+                            out.className = 'update-result update';
+                            out.textContent = '@T["about.updateAvailable"]'.replace('{0}', j.latest);
+                        } else {
+                            out.className = 'update-result ok';
+                            out.textContent = '@T["about.upToDate"]' + (j.latest ? ' (' + j.latest + ')' : '');
+                        }
+                    })
+                    .catch(function () {
+                        out.className = 'update-result warn';
+                        out.textContent = '@T["about.checkFailed"]';
+                    })
+                    .then(function () { btn.disabled = false; });
+            });
+        })();
+    </script>
+}

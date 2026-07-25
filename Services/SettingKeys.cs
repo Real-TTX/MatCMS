@@ -4,6 +4,7 @@ public static class SettingKeys
 {
     public const string SiteName = "SiteName";
     public const string LogoUrl = "LogoUrl";
+    public const string FaviconUrl = "FaviconUrl";
     public const string TopBarLink1Text = "TopBarLink1Text";
     public const string TopBarLink1Url = "TopBarLink1Url";
     public const string TopBarLink2Text = "TopBarLink2Text";
@@ -13,7 +14,7 @@ public static class SettingKeys
 
     public static readonly string[] All =
     [
-        SiteName, LogoUrl,
+        SiteName, LogoUrl, FaviconUrl,
         TopBarLink1Text, TopBarLink1Url,
         TopBarLink2Text, TopBarLink2Url,
         FooterText, ContactRecipient

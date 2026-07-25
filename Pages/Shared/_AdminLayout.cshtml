@@ -10,12 +10,6 @@
     var cultures = LocOptions.Value.SupportedUICultures ?? new System.Collections.Generic.List<System.Globalization.CultureInfo>();
     var currentCulture = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
     var returnUrl = Context.Request.Path + Context.Request.QueryString;
-
-    // Brand wordmark is driven by the site name (not hardcoded); split roughly in half for the two-tone look.
-    var brand = string.IsNullOrWhiteSpace(Site.SiteName) ? "MatCMS" : Site.SiteName;
-    var brandSplit = (brand.Length + 1) / 2;
-    var brandA = brand.Substring(0, brandSplit);
-    var brandB = brand.Substring(brandSplit);
 }
 <!DOCTYPE html>
 <html lang="de">
@@ -28,13 +22,15 @@
     <link href="https://fonts.googleapis.com/css2?family=Geologica:wght@@500;600;700&family=Inter:wght@@400;500;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" />
-    <link rel="icon" href="@Site.LogoUrl" />
+    <link rel="icon" href="@Site.FaviconUrl" />
 </head>
 <body class="admin">
     <aside class="admin-sidebar">
         <div class="admin-brand">
-            <span class="wm">@brandA<span>@brandB</span></span>
-            <span class="cms">MatCMS</span>
+            <a class="admin-brand-link" asp-page="/Admin/Index" title="@Site.SiteName">
+                <img class="admin-logo" src="@Site.LogoUrl" alt="@Site.SiteName" />
+                <span class="cms">MatCMS</span>
+            </a>
         </div>
         <nav class="admin-nav">
             <a class="@Active("/admin/pages")" asp-page="/Admin/Pages/Index">📄 @T["nav.pages"]</a>
@@ -45,6 +41,7 @@
             <a class="@Active("/admin/settings")" asp-page="/Admin/Settings/Index">⚙️ @T["nav.settings"]</a>
             <a class="@Active("/admin/templates")" asp-page="/Admin/Templates/Index">🎨 @T["nav.templates"]</a>
             <a class="@Active("/admin/backup")" asp-page="/Admin/Backup/Index">💾 @T["nav.backup"]</a>
+            <a class="@Active("/admin/about")" asp-page="/Admin/About/Index">ℹ️ @T["nav.about"]</a>
         </nav>
         <div class="admin-nav-foot">
             <a href="/" target="_blank">🌐 @T["nav.viewSite"]</a>

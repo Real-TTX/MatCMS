@@ -177,6 +177,8 @@ public class SiteContext
 
     public string SiteName => Get(SettingKeys.SiteName, "FEUSYS");
     public string LogoUrl => Get(SettingKeys.LogoUrl, "/img/logo.svg");
+    /// <summary>Favicon URL; falls back to the site logo when no separate favicon is configured.</summary>
+    public string FaviconUrl => Get(SettingKeys.FaviconUrl, LogoUrl);
     public string FooterText => Get(SettingKeys.FooterText, "© FEUSYS");
 
     public string TopBarLink1Text => Get(SettingKeys.TopBarLink1Text);

@@ -1,5 +1,6 @@
 @page "/login"
 @model MatCMS.Pages.LoginModel
+@inject MatCMS.Services.SiteContext Site
 @{
     Layout = null;
 }
@@ -8,17 +9,17 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Anmeldung – FEUSYS</title>
+    <title>Anmeldung – @Site.SiteName</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Geologica:wght@@500;600;700&family=Inter:wght@@400;500;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" />
-    <link rel="icon" href="/img/logo.svg" />
+    <link rel="icon" href="@Site.LogoUrl" />
 </head>
 <body class="login-page">
     <div class="login-card">
-        <img class="login-logo" src="/img/logo.svg" alt="FEUSYS" />
+        <img class="login-logo" src="@Site.LogoUrl" alt="@Site.SiteName" />
         <h1>Admin-Anmeldung</h1>
         @if (!string.IsNullOrWhiteSpace(Model.Error))
         {

@@ -4,6 +4,12 @@
     string Active(string path) =>
         Context.Request.Path.StartsWithSegments(path, StringComparison.OrdinalIgnoreCase) ? "active" : "";
     var displayName = User.FindFirst("DisplayName")?.Value ?? User.Identity?.Name ?? "Admin";
+
+    // Brand wordmark is driven by the site name (not hardcoded); split roughly in half for the two-tone look.
+    var brand = string.IsNullOrWhiteSpace(Site.SiteName) ? "MatCMS" : Site.SiteName;
+    var brandSplit = (brand.Length + 1) / 2;
+    var brandA = brand.Substring(0, brandSplit);
+    var brandB = brand.Substring(brandSplit);
 }
 <!DOCTYPE html>
 <html lang="de">
@@ -21,7 +27,7 @@
 <body class="admin">
     <aside class="admin-sidebar">
         <div class="admin-brand">
-            <span class="wm">FEU<span>SYS</span></span>
+            <span class="wm">@brandA<span>@brandB</span></span>
             <span class="cms">MatCMS</span>
         </div>
         <nav class="admin-nav">

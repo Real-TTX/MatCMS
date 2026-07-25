@@ -51,9 +51,13 @@
             </form>
         </div>
     </aside>
+    <div class="admin-backdrop" data-admin-backdrop></div>
 
     <div class="admin-main">
         <header class="admin-topbar">
+            <button type="button" class="admin-menu-toggle" data-admin-toggle aria-label="@T["nav.menu"]" aria-expanded="false">
+                <span></span><span></span><span></span>
+            </button>
             <div class="admin-topbar-title">@title</div>
             <div class="admin-topbar-right">
                 @if (cultures.Count > 1)
@@ -86,6 +90,25 @@
         </main>
     </div>
 
+    <script>
+        // Mobile admin menu: off-canvas drawer toggle.
+        (function () {
+            var body = document.body;
+            var toggle = document.querySelector('[data-admin-toggle]');
+            var backdrop = document.querySelector('[data-admin-backdrop]');
+            function setOpen(open) {
+                body.classList.toggle('nav-open', open);
+                if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            }
+            if (toggle) toggle.addEventListener('click', function () { setOpen(!body.classList.contains('nav-open')); });
+            if (backdrop) backdrop.addEventListener('click', function () { setOpen(false); });
+            // Close when a nav link is followed.
+            document.querySelectorAll('.admin-sidebar a').forEach(function (a) {
+                a.addEventListener('click', function () { setOpen(false); });
+            });
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') setOpen(false); });
+        })();
+    </script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

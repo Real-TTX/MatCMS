@@ -104,6 +104,7 @@ public class ContentTransferService
                     SecondaryColor = t.SecondaryColor, HeadingColor = t.HeadingColor, TextColor = t.TextColor,
                     BackgroundColor = t.BackgroundColor, AltBackground = t.AltBackground,
                     ContainerWidth = t.ContainerWidth, ButtonRadius = t.ButtonRadius,
+                    HeaderBackground = t.HeaderBackground, HeaderTextColor = t.HeaderTextColor, HeaderPadding = t.HeaderPadding,
                     CustomCss = t.CustomCss, CustomJs = t.CustomJs
                 }).ToList();
         }
@@ -267,6 +268,9 @@ public class ContentTransferService
                     AltBackground = string.IsNullOrWhiteSpace(t.AltBackground) ? "#f6f7f9" : t.AltBackground!,
                     ContainerWidth = string.IsNullOrWhiteSpace(t.ContainerWidth) ? "1180" : t.ContainerWidth!,
                     ButtonRadius = string.IsNullOrWhiteSpace(t.ButtonRadius) ? "0" : t.ButtonRadius!,
+                    HeaderBackground = t.HeaderBackground ?? "",
+                    HeaderTextColor = t.HeaderTextColor ?? "",
+                    HeaderPadding = string.IsNullOrWhiteSpace(t.HeaderPadding) ? "16" : t.HeaderPadding!,
                     CustomCss = t.CustomCss ?? "",
                     CustomJs = t.CustomJs ?? ""
                 });
@@ -456,6 +460,9 @@ public class ContentTransferService
         public string? AltBackground { get; set; }
         public string? ContainerWidth { get; set; }
         public string? ButtonRadius { get; set; }
+        public string? HeaderBackground { get; set; }
+        public string? HeaderTextColor { get; set; }
+        public string? HeaderPadding { get; set; }
         public string? CustomCss { get; set; }
         public string? CustomJs { get; set; }
     }

@@ -23,6 +23,9 @@ public class EditModel : PageModel
     [BindProperty] public string? ButtonStyle { get; set; }
     [BindProperty] public string? ContainerWidth { get; set; }
     [BindProperty] public string? ButtonRadius { get; set; }
+    [BindProperty] public string? HeaderBackground { get; set; }
+    [BindProperty] public string? HeaderTextColor { get; set; }
+    [BindProperty] public string? HeaderPadding { get; set; }
     [BindProperty] public string? CustomCss { get; set; }
     [BindProperty] public string? CustomJs { get; set; }
     public bool IsActive { get; private set; }
@@ -46,6 +49,9 @@ public class EditModel : PageModel
         ButtonStyle = t.ButtonStyle;
         ContainerWidth = t.ContainerWidth;
         ButtonRadius = t.ButtonRadius;
+        HeaderBackground = t.HeaderBackground;
+        HeaderTextColor = t.HeaderTextColor;
+        HeaderPadding = t.HeaderPadding;
         CustomCss = t.CustomCss;
         CustomJs = t.CustomJs;
         IsActive = t.IsActive;
@@ -77,6 +83,9 @@ public class EditModel : PageModel
         t.ButtonStyle = ButtonStyle == "outline" ? "outline" : "solid";
         t.ContainerWidth = TemplateFonts.Int(ContainerWidth, "1180", 600, 2000);
         t.ButtonRadius = TemplateFonts.Int(ButtonRadius, "0", 0, 60);
+        t.HeaderBackground = TemplateFonts.OptionalColor(HeaderBackground);
+        t.HeaderTextColor = TemplateFonts.OptionalColor(HeaderTextColor);
+        t.HeaderPadding = TemplateFonts.Int(HeaderPadding, "16", 4, 60);
         t.CustomCss = TemplateFonts.Code(CustomCss);
         t.CustomJs = TemplateFonts.Code(CustomJs);
         await _db.SaveChangesAsync();

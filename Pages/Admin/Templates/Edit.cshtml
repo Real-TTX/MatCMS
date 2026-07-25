@@ -95,6 +95,22 @@
             </div>
         </div>
 
+        <h3 class="form-section">@T["templates.secHeader"]</h3>
+        <div class="form-row">
+            <div class="form-field">
+                <label for="HeaderBackground">@T["templates.headerBg"]</label>
+                <input id="HeaderBackground" name="HeaderBackground" value="@Model.HeaderBackground" placeholder="@T["templates.optionalColor"]" />
+            </div>
+            <div class="form-field">
+                <label for="HeaderTextColor">@T["templates.headerText"]</label>
+                <input id="HeaderTextColor" name="HeaderTextColor" value="@Model.HeaderTextColor" placeholder="@T["templates.optionalColor"]" />
+            </div>
+            <div class="form-field">
+                <label for="HeaderPadding">@T["templates.headerPadding"]</label>
+                <input id="HeaderPadding" name="HeaderPadding" type="number" min="4" max="60" value="@Model.HeaderPadding" />
+            </div>
+        </div>
+
         <h3 class="form-section">@T["templates.secAdvanced"]</h3>
         <div class="form-field">
             <label for="CustomCss">@T["templates.customCss"]</label>

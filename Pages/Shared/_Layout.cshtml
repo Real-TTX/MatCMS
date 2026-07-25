@@ -50,6 +50,9 @@
     var accent2 = ColorOr(tpl.SecondaryColor, accent);
     var containerW = Px(tpl.ContainerWidth, "1180px");
     var btnRadius = Px(tpl.ButtonRadius, "0px");
+    var headerBg = (tpl.HeaderBackground ?? "").Trim();
+    var headerText = (tpl.HeaderTextColor ?? "").Trim();
+    var headerPad = Px(tpl.HeaderPadding, "16px");
 }
 <!DOCTYPE html>
 <html lang="de">
@@ -81,6 +84,15 @@
         }
         body { background: var(--bg); color: var(--ink); }
         .btn { border-radius: var(--btn-radius); }
+        .header-inner { padding-top: @headerPad; padding-bottom: @headerPad; }
+        @if (!string.IsNullOrEmpty(headerBg))
+        {
+            @Html.Raw($".site-header {{ background: {headerBg}; backdrop-filter: none; -webkit-backdrop-filter: none; }}")
+        }
+        @if (!string.IsNullOrEmpty(headerText))
+        {
+            @Html.Raw($".main-nav a {{ color: {headerText}; }}")
+        }
         @if (outlineButtons)
         {
             @Html.Raw(".btn { background: transparent; color: var(--accent); border: 2px solid var(--accent); }")

@@ -45,6 +45,15 @@ public class Template
     /// <summary>Button corner radius in px (digits only).</summary>
     public string ButtonRadius { get; set; } = "0";
 
+    /// <summary>Header background color. Empty = keep the default translucent white.</summary>
+    public string HeaderBackground { get; set; } = "";
+
+    /// <summary>Header link/text color. Empty = inherit the body text color.</summary>
+    public string HeaderTextColor { get; set; } = "";
+
+    /// <summary>Header vertical padding in px (controls header height).</summary>
+    public string HeaderPadding { get; set; } = "16";
+
     /// <summary>Raw CSS injected into every public page (advanced).</summary>
     public string CustomCss { get; set; } = "";
 

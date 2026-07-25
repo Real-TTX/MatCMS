@@ -1,0 +1,29 @@
+@model MatCMS.Content.ContainerBlockModel
+@{
+    var heading = Model.Data.Str("heading");
+    var intro = Model.Data.Str("intro");
+    var columns = Model.Data.StrOr("columns", "3");
+}
+<section class="section leistungen-block">
+    <div class="container">
+        @if (!string.IsNullOrWhiteSpace(heading) || !string.IsNullOrWhiteSpace(intro))
+        {
+            <div class="section__intro">
+                @if (!string.IsNullOrWhiteSpace(heading))
+                {
+                    <h2>@heading</h2>
+                }
+                @if (!string.IsNullOrWhiteSpace(intro))
+                {
+                    <p>@intro</p>
+                }
+            </div>
+        }
+        <div class="leistungen-grid cols-@columns">
+            @foreach (var child in Model.Children)
+            {
+                @await Html.PartialAsync(child.Partial, child.Data)
+            }
+        </div>
+    </div>
+</section>

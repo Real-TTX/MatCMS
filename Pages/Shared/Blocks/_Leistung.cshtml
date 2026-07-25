@@ -1,0 +1,28 @@
+@model MatCMS.Content.BlockData
+@{
+    var title = Model.Str("title");
+    var text = Model.Str("text");
+    var image = Model.Str("image");
+
+    static string SafeSrc(string img) =>
+        (!string.IsNullOrWhiteSpace(img)
+            && (img.StartsWith("/") || img.StartsWith("http://") || img.StartsWith("https://"))
+            && img.IndexOfAny(new[] { '\'', '"', '(', ')', '\\', '\n', '\r' }) < 0)
+            ? img : "";
+
+    var src = SafeSrc(image);
+}
+<div class="leistung-card">
+    @if (!string.IsNullOrEmpty(src))
+    {
+        <img class="leistung-card__img" src="@src" alt="@title" loading="lazy" />
+    }
+    @if (!string.IsNullOrWhiteSpace(title))
+    {
+        <h3>@title</h3>
+    }
+    @if (!string.IsNullOrWhiteSpace(text))
+    {
+        <p>@text</p>
+    }
+</div>

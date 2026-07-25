@@ -258,14 +258,28 @@ public class EditModel : PageModel
         return RedirectToPage(new { id });
     }
 
-    public async Task<IActionResult> OnPostAddBlockAsync(int id, string type)
+    public async Task<IActionResult> OnPostAddBlockAsync(int id, string type, int? parentId)
     {
         var def = Registry.Get(type);
         var page = await _db.Pages.Include(p => p.Blocks).FirstOrDefaultAsync(p => p.Id == id);
         if (page is null || def is null) return NotFound();
 
-        var order = page.Blocks.Count == 0 ? 0 : page.Blocks.Max(b => b.SortOrder) + 1;
-        var block = new ContentBlock { PageId = id, BlockType = def.Type, SortOrder = order, DataJson = "{}" };
+        // When adding a child, validate the parent exists and allows this child type.
+        if (parentId is int pid)
+        {
+            var parent = page.Blocks.FirstOrDefault(b => b.Id == pid);
+            var parentDef = parent is null ? null : Registry.Get(parent.BlockType);
+            if (parent is null || parentDef is null || !parentDef.AllowedChildren.Contains(type))
+                return BadRequest();
+        }
+        else if (def.ChildOnly)
+        {
+            return BadRequest(); // child-only blocks can't be added at the top level
+        }
+
+        var siblings = page.Blocks.Where(b => b.ParentId == parentId).ToList();
+        var order = siblings.Count == 0 ? 0 : siblings.Max(b => b.SortOrder) + 1;
+        var block = new ContentBlock { PageId = id, ParentId = parentId, BlockType = def.Type, SortOrder = order, DataJson = "{}" };
         _db.ContentBlocks.Add(block);
         await _db.SaveChangesAsync();
 

@@ -2,7 +2,7 @@
 @model MatCMS.Pages.Admin.Pages.EditModel
 @{
     ViewData["Title"] = T["editor.title"];
-    var blocks = Model.Current.Blocks.OrderBy(b => b.SortOrder).ToList();
+    var blocks = Model.Current.Blocks.Where(b => b.ParentId == null).OrderBy(b => b.SortOrder).ToList();
     var url = Model.Current.Slug == "home" ? "/" : "/" + Model.Current.Slug;
     var previewUrl = url + (url.Contains('?') ? "&" : "?") + "editor=1";
     var editing = Model.SelectedBlock is not null && Model.SelectedDef is not null;
@@ -54,20 +54,54 @@
                     @foreach (var b in blocks)
                     {
                         var def = Model.Registry.Get(b.BlockType);
-                        <div class="block-item sortable-item" data-item-id="@b.Id" data-block-id="@b.Id">
-                            <span class="drag-handle" title="@T["editor.dragToSort"]" aria-hidden="true">⠿</span>
-                            <a class="b-open" asp-page="Edit" asp-route-id="@Model.Current.Id" asp-route-block="@b.Id">
-                                <span class="b-icon">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">@Html.Raw(def?.Svg)</svg>
-                                </span>
-                                <span class="b-info">
-                                    <span class="b-type">@(def is not null ? T[def.Name] : b.BlockType)</span>
-                                    <span class="b-sum">@Model.BlockSummary(b)</span>
-                                </span>
-                            </a>
-                            <form class="inline-form" method="post" asp-page-handler="DeleteBlock" asp-route-id="@Model.Current.Id" asp-route-blockId="@b.Id" onsubmit="return confirm('@T["editor.confirmDeleteBlock"]');">
-                                <button type="submit" class="icon-btn" title="@T["editor.delete"]">✕</button>
-                            </form>
+                        var isContainer = def is not null && def.IsContainer;
+                        <div class="block-group sortable-item" data-item-id="@b.Id">
+                            <div class="block-item" data-block-id="@b.Id">
+                                <span class="drag-handle" title="@T["editor.dragToSort"]" aria-hidden="true">⠿</span>
+                                <a class="b-open" asp-page="Edit" asp-route-id="@Model.Current.Id" asp-route-block="@b.Id">
+                                    <span class="b-icon">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">@Html.Raw(def?.Svg)</svg>
+                                    </span>
+                                    <span class="b-info">
+                                        <span class="b-type">@(def is not null ? T[def.Name] : b.BlockType)</span>
+                                        <span class="b-sum">@Model.BlockSummary(b)</span>
+                                    </span>
+                                </a>
+                                <form class="inline-form" method="post" asp-page-handler="DeleteBlock" asp-route-id="@Model.Current.Id" asp-route-blockId="@b.Id" onsubmit="return confirm('@T["editor.confirmDeleteBlock"]');">
+                                    <button type="submit" class="icon-btn" title="@T["editor.delete"]">✕</button>
+                                </form>
+                            </div>
+                            @if (isContainer)
+                            {
+                                var children = Model.Current.Blocks.Where(c => c.ParentId == b.Id).OrderBy(c => c.SortOrder).ToList();
+                                <div class="block-children">
+                                    @foreach (var c in children)
+                                    {
+                                        var cdef = Model.Registry.Get(c.BlockType);
+                                        <div class="block-item block-child" data-block-id="@c.Id">
+                                            <a class="b-open" asp-page="Edit" asp-route-id="@Model.Current.Id" asp-route-block="@c.Id">
+                                                <span class="b-icon">
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">@Html.Raw(cdef?.Svg)</svg>
+                                                </span>
+                                                <span class="b-info">
+                                                    <span class="b-type">@(cdef is not null ? T[cdef.Name] : c.BlockType)</span>
+                                                    <span class="b-sum">@Model.BlockSummary(c)</span>
+                                                </span>
+                                            </a>
+                                            <form class="inline-form" method="post" asp-page-handler="DeleteBlock" asp-route-id="@Model.Current.Id" asp-route-blockId="@c.Id" onsubmit="return confirm('@T["editor.confirmDeleteBlock"]');">
+                                                <button type="submit" class="icon-btn" title="@T["editor.delete"]">✕</button>
+                                            </form>
+                                        </div>
+                                    }
+                                    @foreach (var ct in def!.AllowedChildren)
+                                    {
+                                        var ctDef = Model.Registry.Get(ct);
+                                        <form class="inline-form" method="post" asp-page-handler="AddBlock" asp-route-id="@Model.Current.Id" asp-route-type="@ct" asp-route-parentId="@b.Id">
+                                            <button type="submit" class="btn btn-sm btn-ghost add-child">＋ @(ctDef is not null ? T[ctDef.Name] : ct)</button>
+                                        </form>
+                                    }
+                                </div>
+                            }
                         </div>
                     }
                 </div>
@@ -176,7 +210,7 @@
                     </div>
                     <div class="modal-body">
                         <div class="picker">
-                            @foreach (var def in Model.Registry.All)
+                            @foreach (var def in Model.Registry.All.Where(d => !d.ChildOnly))
                             {
                                 <form method="post" asp-page-handler="AddBlock" asp-route-id="@Model.Current.Id" asp-route-type="@def.Type">
                                     <button type="submit" class="tile">

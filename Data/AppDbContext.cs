@@ -34,6 +34,13 @@ public class AppDbContext : DbContext
             .HasForeignKey(cb => cb.PageId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        // Self-reference for nested blocks (container → children).
+        b.Entity<ContentBlock>()
+            .HasOne(cb => cb.Parent)
+            .WithMany(cb => cb.Children)
+            .HasForeignKey(cb => cb.ParentId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         b.Entity<FormSubmission>()
             .HasOne(fs => fs.Form)
             .WithMany(f => f.Submissions)

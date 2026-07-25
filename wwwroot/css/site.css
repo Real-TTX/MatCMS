@@ -256,6 +256,19 @@ h1, h2, h3, h4 {
 .column .rich { color: #2e2013; }
 .column .rich a { color: #1a1008; }
 
+/* ---------- Nested "Leistungen" container ---------- */
+.leistungen-block .leistungen-grid { display: grid; gap: 28px; margin-top: 8px; }
+.leistungen-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+.leistungen-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.leistungen-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+.leistung-card { border: 1px solid var(--line); padding: 28px; background: #fff; }
+.leistung-card__img { width: 100%; height: 180px; object-fit: cover; margin-bottom: 16px; }
+.leistung-card h3 { margin: 0 0 10px; }
+.leistung-card p { margin: 0; color: var(--muted); }
+@media (max-width: 720px) {
+    .leistungen-grid.cols-3, .leistungen-grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
+}
+
 /* ---------- Gallery block + lightbox ---------- */
 .gallery { margin-top: 8px; }
 .gallery__item { margin: 0; }

@@ -289,6 +289,10 @@ table.data .btn { white-space: nowrap; }
 .b-type { font-weight: 600; font-size: 14px; }
 .b-sum { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+.le-sidebar .block-children { margin: 8px 0 4px 16px; padding-left: 12px; border-left: 2px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
+.le-sidebar .block-child { background: #fafafa; }
+.le-sidebar .add-child { align-self: flex-start; }
+
 .le-add { margin-top: 12px; }
 .le-settings { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
 .le-settings summary { cursor: pointer; font-weight: 600; font-size: 14px; }

@@ -5,23 +5,44 @@
     var http = ViewContext.HttpContext;
     var editor = http.Request.Query.ContainsKey("editor") && http.User.IsInRole("Admin");
 }
-@foreach (var block in Model.CurrentPage.Blocks.OrderBy(b => b.SortOrder))
+@{
+    var allBlocks = Model.CurrentPage.Blocks;
+}
+@foreach (var block in allBlocks.Where(b => b.ParentId == null).OrderBy(b => b.SortOrder))
 {
     var def = Model.Registry.Get(block.BlockType);
     if (def is null || string.IsNullOrWhiteSpace(def.Partial))
     {
         continue;
     }
-    var data = new MatCMS.Content.BlockData(block.DataJson);
+    object partialModel;
+    if (def.IsContainer)
+    {
+        var kids = allBlocks.Where(b => b.ParentId == block.Id).OrderBy(b => b.SortOrder)
+            .Select(cb =>
+            {
+                var cdef = Model.Registry.Get(cb.BlockType);
+                return cdef is null || string.IsNullOrWhiteSpace(cdef.Partial)
+                    ? null
+                    : new MatCMS.Content.ContainerBlockModel.ChildBlock(cdef.Partial, new MatCMS.Content.BlockData(cb.DataJson));
+            })
+            .Where(x => x is not null).Select(x => x!).ToList();
+        partialModel = new MatCMS.Content.ContainerBlockModel(new MatCMS.Content.BlockData(block.DataJson), kids);
+    }
+    else
+    {
+        partialModel = new MatCMS.Content.BlockData(block.DataJson);
+    }
+
     if (editor)
     {
         <div class="mat-ed-block" id="block-@block.Id" data-block-id="@block.Id" data-block-name="@T[def.Name]">
-            @await Html.PartialAsync(def.Partial, data)
+            @await Html.PartialAsync(def.Partial, partialModel)
         </div>
     }
     else
     {
-        @await Html.PartialAsync(def.Partial, data)
+        @await Html.PartialAsync(def.Partial, partialModel)
     }
 }
 

@@ -254,6 +254,37 @@ public class BlockRegistry
         },
         new BlockDefinition
         {
+            Type = "leistungen",
+            Name = "block.leistungen.name",
+            Description = "block.leistungen.desc",
+            Svg = SvgGrid,
+            Partial = "Blocks/_Leistungen",
+            AllowedChildren = ["leistung"],
+            Fields =
+            [
+                new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },
+                new BlockField { Id = "intro", Label = "block.f.intro", Type = FieldType.Textarea },
+                new BlockField { Id = "columns", Label = "block.columns.f.columns", Type = FieldType.Select, Default = "3",
+                    Options = [ new("2", "block.opt.columns.2"), new("3", "block.opt.columns.3"), new("4", "block.opt.columns.4") ] },
+            ]
+        },
+        new BlockDefinition
+        {
+            Type = "leistung",
+            Name = "block.leistung.name",
+            Description = "block.leistung.desc",
+            Svg = SvgText,
+            Partial = "Blocks/_Leistung",
+            ChildOnly = true,
+            Fields =
+            [
+                new BlockField { Id = "title", Label = "block.f.title", Type = FieldType.Text },
+                new BlockField { Id = "text", Label = "block.f.text", Type = FieldType.Textarea },
+                new BlockField { Id = "image", Label = "block.leistung.f.image", Type = FieldType.Image },
+            ]
+        },
+        new BlockDefinition
+        {
             Type = "gallery",
             Name = "block.gallery.name",
             Description = "block.gallery.desc",

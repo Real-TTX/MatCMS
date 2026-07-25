@@ -18,7 +18,7 @@ public class IndexModel : PageModel
     {
         PageCount = await _db.Pages.CountAsync();
         UserCount = await _db.Users.CountAsync();
-        SubmissionCount = await _db.ContactSubmissions.CountAsync();
-        UnreadCount = await _db.ContactSubmissions.CountAsync(s => !s.IsRead);
+        SubmissionCount = await _db.FormSubmissions.CountAsync();
+        UnreadCount = await _db.FormSubmissions.CountAsync(s => !s.IsRead);
     }
 }

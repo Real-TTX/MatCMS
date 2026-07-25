@@ -137,21 +137,6 @@ public class BlockRegistry
         },
         new BlockDefinition
         {
-            Type = "contactform",
-            Name = "block.contactform.name",
-            Description = "block.contactform.desc",
-            Svg = SvgMail,
-            Partial = "Blocks/_ContactForm",
-            Fields =
-            [
-                new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text, Default = "Kontaktformular" },
-                new BlockField { Id = "intro", Label = "block.f.intro", Type = FieldType.Textarea },
-                new BlockField { Id = "categories", Label = "block.contactform.f.categories", Type = FieldType.Text,
-                    Placeholder = "Allgemeine Anfrage, Service Anfrage", Help = "Komma-getrennt. Leer lassen für keine Auswahl." },
-            ]
-        },
-        new BlockDefinition
-        {
             Type = "form",
             Name = "block.form.name",
             Description = "block.form.desc",

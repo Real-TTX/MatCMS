@@ -129,6 +129,64 @@ public static class DbSeeder
         }
 
         await db.SaveChangesAsync();
+
+        await MigrateLegacyContactAsync(db);
+    }
+
+    /// <summary>
+    /// One-time, idempotent migration of the legacy contact form onto the new Forms system:
+    /// converts "contactform" blocks into "form" blocks pointing at a "kontakt" form and moves any
+    /// old ContactSubmission rows into FormSubmission. Runs on every startup but is a no-op once done.
+    /// </summary>
+    private static async Task MigrateLegacyContactAsync(AppDbContext db)
+    {
+        var hasLegacyBlocks = await db.ContentBlocks.AnyAsync(b => b.BlockType == "contactform");
+        var hasLegacySubs = await db.ContactSubmissions.AnyAsync();
+        if (!hasLegacyBlocks && !hasLegacySubs) return;
+
+        // Ensure the target "kontakt" form exists.
+        var kontakt = await db.Forms.FirstOrDefaultAsync(f => f.Slug == "kontakt");
+        if (kontakt is null)
+        {
+            kontakt = new Form { Name = "Kontakt", Slug = "kontakt", DefinitionJson = BuildContactFormDefinition() };
+            db.Forms.Add(kontakt);
+            await db.SaveChangesAsync();
+        }
+
+        if (hasLegacyBlocks)
+        {
+            foreach (var b in await db.ContentBlocks.Where(b => b.BlockType == "contactform").ToListAsync())
+            {
+                var heading = "Kontakt";
+                try
+                {
+                    using var doc = JsonDocument.Parse(b.DataJson);
+                    if (doc.RootElement.TryGetProperty("heading", out var h) && h.ValueKind == JsonValueKind.String)
+                        heading = h.GetString() ?? heading;
+                }
+                catch { /* keep default heading */ }
+                b.BlockType = "form";
+                b.DataJson = Json(new { form = "kontakt", heading, intro = "" });
+            }
+        }
+
+        if (hasLegacySubs)
+        {
+            var subs = await db.ContactSubmissions.ToListAsync();
+            foreach (var s in subs)
+            {
+                db.FormSubmissions.Add(new FormSubmission
+                {
+                    FormId = kontakt.Id,
+                    DataJson = Json(new { name = s.Name, email = s.Email, kategorie = s.Category ?? "", nachricht = s.Message }),
+                    CreatedAt = s.CreatedAt,
+                    IsRead = s.IsRead
+                });
+            }
+            db.ContactSubmissions.RemoveRange(subs);
+        }
+
+        await db.SaveChangesAsync();
     }
 
     private const string ModernTemplateName = "MatCMS Modern";

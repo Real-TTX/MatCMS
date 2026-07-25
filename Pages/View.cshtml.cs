@@ -36,50 +36,6 @@ public class ViewModel : PageModel
         return Page();
     }
 
-    public async Task<IActionResult> OnPostContactAsync(string? slug, string? culture)
-    {
-        var key = Normalize(slug);
-        var locale = ResolveLocale(culture);
-
-        // Only accept submissions for a published page that actually contains a contact-form block.
-        var page = await LoadAsync(slug, locale);
-        if (page is null || !page.IsPublished || page.Blocks.All(b => b.BlockType != "contactform"))
-            return NotFound();
-
-        var name = Request.Form["cf_name"].ToString().Trim();
-        var email = Request.Form["cf_email"].ToString().Trim();
-        var category = Request.Form["cf_category"].ToString().Trim();
-        var message = Request.Form["cf_message"].ToString().Trim();
-
-        var errors = new List<string>();
-        if (string.IsNullOrWhiteSpace(name)) errors.Add("Bitte geben Sie Ihren Namen an.");
-        if (string.IsNullOrWhiteSpace(email) || !email.Contains('@')) errors.Add("Bitte geben Sie eine gültige E-Mail-Adresse an.");
-        if (string.IsNullOrWhiteSpace(message)) errors.Add("Bitte geben Sie eine Nachricht ein.");
-
-        if (errors.Count > 0)
-        {
-            TempData["ContactError"] = string.Join(" ", errors);
-            TempData["cf_name"] = name;
-            TempData["cf_email"] = email;
-            TempData["cf_category"] = category;
-            TempData["cf_message"] = message;
-        }
-        else
-        {
-            _db.ContactSubmissions.Add(new ContactSubmission
-            {
-                Name = name,
-                Email = email,
-                Category = string.IsNullOrWhiteSpace(category) ? null : category,
-                Message = message
-            });
-            await _db.SaveChangesAsync();
-            TempData["ContactSuccess"] = "Vielen Dank! Ihre Nachricht wurde übermittelt. Wir melden uns zeitnah.";
-        }
-
-        return RedirectToPage(RouteFor(key, locale));
-    }
-
     public async Task<IActionResult> OnPostFormAsync(string? slug, string? culture)
     {
         var key = Normalize(slug);

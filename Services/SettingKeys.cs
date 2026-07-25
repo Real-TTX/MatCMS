@@ -12,11 +12,11 @@ public static class SettingKeys
     public const string FooterText = "FooterText";
     public const string ContactRecipient = "ContactRecipient";
 
+    // Note: TopBarLink1/2 are intentionally NOT here — the top bar moved to the "toolbar" menu.
+    // The constants remain for the one-time migration in DbSeeder.
     public static readonly string[] All =
     [
         SiteName, LogoUrl, FaviconUrl,
-        TopBarLink1Text, TopBarLink1Url,
-        TopBarLink2Text, TopBarLink2Url,
         FooterText, ContactRecipient
     ];
 }

@@ -56,26 +56,7 @@
 
     <div class="card">
         <h2>@T["settings.topBar"]</h2>
-        <div class="form-row">
-            <div class="form-field">
-                <label>@T["settings.link1Text"]</label>
-                <input name="Values[@SettingKeys.TopBarLink1Text]" value="@V(SettingKeys.TopBarLink1Text)" />
-            </div>
-            <div class="form-field">
-                <label>@T["settings.link1Url"]</label>
-                <input name="Values[@SettingKeys.TopBarLink1Url]" value="@V(SettingKeys.TopBarLink1Url)" />
-            </div>
-        </div>
-        <div class="form-row">
-            <div class="form-field">
-                <label>@T["settings.link2Text"]</label>
-                <input name="Values[@SettingKeys.TopBarLink2Text]" value="@V(SettingKeys.TopBarLink2Text)" />
-            </div>
-            <div class="form-field">
-                <label>@T["settings.link2Url"]</label>
-                <input name="Values[@SettingKeys.TopBarLink2Url]" value="@V(SettingKeys.TopBarLink2Url)" />
-            </div>
-        </div>
+        <p class="help">@Html.Raw(T["settings.topBarMoved"])</p>
     </div>
 
     <button type="submit" class="btn">@T["settings.save"]</button>

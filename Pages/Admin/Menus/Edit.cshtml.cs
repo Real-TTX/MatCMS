@@ -15,6 +15,7 @@ public class EditModel : PageModel
     [BindProperty] public string Menu { get; set; } = "header";
     [BindProperty] public string? Label { get; set; }
     [BindProperty] public string? Url { get; set; }
+    [BindProperty] public string? Icon { get; set; }
     [BindProperty] public bool OpenInNewTab { get; set; }
 
     public List<PageEntity> Pages { get; private set; } = new();
@@ -28,6 +29,7 @@ public class EditModel : PageModel
         Menu = item.Menu;
         Label = item.Label;
         Url = item.Url;
+        Icon = item.Icon;
         OpenInNewTab = item.OpenInNewTab;
         await LoadPagesAsync();
         return Page();
@@ -40,7 +42,7 @@ public class EditModel : PageModel
 
         var label = (Label ?? "").Trim();
         var url = (Url ?? "").Trim();
-        if (Menu is not ("header" or "footer")) Menu = "header";
+        if (Menu is not ("header" or "footer" or "toolbar")) Menu = "header";
 
         if (string.IsNullOrWhiteSpace(label) || string.IsNullOrWhiteSpace(url))
         {
@@ -52,6 +54,7 @@ public class EditModel : PageModel
         item.Menu = Menu;
         item.Label = label;
         item.Url = url;
+        item.Icon = MatCMS.Content.MenuIcons.IsValid(Icon) ? Icon : null;
         item.OpenInNewTab = OpenInNewTab;
         await _db.SaveChangesAsync();
 

@@ -52,10 +52,16 @@ public class SiteContext
 
     private List<MenuItem>? _headerMenu;
     private List<MenuItem>? _footerMenu;
+    private List<MenuItem>? _toolbarMenu;
 
     // Menus are served per content locale.
     public IReadOnlyList<MenuItem> HeaderMenu => _headerMenu ??= _db.MenuItems.AsNoTracking()
         .Where(m => m.Menu == "header" && m.Locale == CurrentLocale)
+        .OrderBy(m => m.SortOrder).ThenBy(m => m.Id).ToList();
+
+    /// <summary>Top-bar icon strip ("Obere Leiste"), served per content locale.</summary>
+    public IReadOnlyList<MenuItem> ToolbarMenu => _toolbarMenu ??= _db.MenuItems.AsNoTracking()
+        .Where(m => m.Menu == "toolbar" && m.Locale == CurrentLocale)
         .OrderBy(m => m.SortOrder).ThenBy(m => m.Id).ToList();
 
     public IReadOnlyList<MenuItem> FooterMenu => _footerMenu ??= _db.MenuItems.AsNoTracking()

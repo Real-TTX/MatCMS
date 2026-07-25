@@ -73,6 +73,42 @@
     </div>
 </div>
 
+<div class="card">
+    <h2>@T["menus.toolbarMenu"]</h2>
+    <p class="help">@T["menus.toolbarHelp"]</p>
+    @if (Model.Toolbar.Count == 0)
+    {
+        <p class="muted">@T["menus.noItems"]</p>
+    }
+    <div class="block-list sortable" data-sortable data-reorder-form="reorder-toolbar">
+        @foreach (var it in Model.Toolbar)
+        {
+            <div class="block-item sortable-item" data-item-id="@it.Id">
+                <span class="drag-handle" title="@T["editor.dragToSort"]" aria-hidden="true">⠿</span>
+                <span class="b-icon">
+                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">@Html.Raw(MatCMS.Content.MenuIcons.Svg(it.Icon))</svg>
+                </span>
+                <div class="b-info">
+                    <div class="b-type">@it.Label</div>
+                    <div class="b-sum">@it.Url@(it.OpenInNewTab ? " · " + T["menus.newTab"] : "")</div>
+                </div>
+                <div class="actions">
+                    <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@it.Id">@T["action.edit"]</a>
+                    <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@it.Id" onsubmit="return confirm('@T["menus.confirmDelete", it.Label]');">
+                        <button type="submit" class="btn btn-sm btn-danger" title="@T["action.delete"]">✕</button>
+                    </form>
+                </div>
+            </div>
+        }
+    </div>
+    <form id="reorder-toolbar" method="post" asp-page-handler="Reorder" asp-route-menu="toolbar" style="display:none;">
+        <div data-order-inputs></div>
+    </form>
+    <div class="list-actions">
+        <a class="btn" asp-page="Create" asp-route-menu="toolbar">@T["menus.addItem"]</a>
+    </div>
+</div>
+
 @section Scripts {
     <script src="~/js/admin-sortable.js" asp-append-version="true"></script>
 }

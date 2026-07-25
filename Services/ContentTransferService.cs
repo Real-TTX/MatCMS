@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using MatCMS.Content;
 using MatCMS.Data;
 using MatCMS.Models;
 using Microsoft.EntityFrameworkCore;
@@ -130,7 +131,7 @@ public class ContentTransferService
                 .Select(m => new MenuItemDto
                 {
                     Menu = m.Menu, Label = m.Label, Url = m.Url, SortOrder = m.SortOrder,
-                    OpenInNewTab = m.OpenInNewTab, Locale = m.Locale
+                    OpenInNewTab = m.OpenInNewTab, Locale = m.Locale, Icon = m.Icon
                 }).ToList();
         }
 
@@ -327,7 +328,8 @@ public class ContentTransferService
                 {
                     Menu = string.IsNullOrWhiteSpace(m.Menu) ? "header" : m.Menu!,
                     Label = m.Label ?? "", Url = m.Url ?? "", SortOrder = m.SortOrder, OpenInNewTab = m.OpenInNewTab,
-                    Locale = string.IsNullOrWhiteSpace(m.Locale) ? Localizer.DefaultCulture : m.Locale!
+                    Locale = string.IsNullOrWhiteSpace(m.Locale) ? Localizer.DefaultCulture : m.Locale!,
+                    Icon = MenuIcons.IsValid(m.Icon) ? m.Icon : null
                 });
             await _db.SaveChangesAsync();
             summary.Add($"{dto.MenuItems.Count} Menüeinträge");
@@ -491,6 +493,7 @@ public class ContentTransferService
         public int SortOrder { get; set; }
         public bool OpenInNewTab { get; set; }
         public string? Locale { get; set; }
+        public string? Icon { get; set; }
     }
 
     private sealed class SettingDto

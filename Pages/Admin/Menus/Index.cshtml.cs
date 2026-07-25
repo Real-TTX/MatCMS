@@ -13,12 +13,14 @@ public class IndexModel : PageModel
 
     public List<MenuItem> Header { get; private set; } = new();
     public List<MenuItem> Footer { get; private set; } = new();
+    public List<MenuItem> Toolbar { get; private set; } = new();
 
     public async Task OnGetAsync()
     {
         var all = await _db.MenuItems.OrderBy(m => m.SortOrder).ThenBy(m => m.Id).ToListAsync();
         Header = all.Where(m => m.Menu == "header").ToList();
         Footer = all.Where(m => m.Menu == "footer").ToList();
+        Toolbar = all.Where(m => m.Menu == "toolbar").ToList();
     }
 
     public async Task<IActionResult> OnPostDeleteAsync(int id)

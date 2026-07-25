@@ -1,0 +1,36 @@
+@model string?
+@* Icon picker for toolbar ("Obere Leiste") menu items. Shown only when the menu is "toolbar". *@
+<div class="form-field icon-picker" data-icon-picker>
+    <label>@T["menus.icon"]</label>
+    <input type="hidden" name="Icon" value="@Model" data-icon-input />
+    <div class="icon-grid">
+        <button type="button" class="icon-tile@(string.IsNullOrEmpty(Model) ? " sel" : "")" data-icon="" title="@T["menus.iconNone"]">
+            <span class="icon-none">—</span>
+        </button>
+        @foreach (var ic in MatCMS.Content.MenuIcons.All)
+        {
+            <button type="button" class="icon-tile@(Model == ic.Key ? " sel" : "")" data-icon="@ic.Key" title="@ic.Label">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">@Html.Raw(ic.Svg)</svg>
+            </button>
+        }
+    </div>
+    <div class="help">@T["menus.iconHelp"]</div>
+</div>
+<script>
+    (function () {
+        var wrap = document.querySelector('[data-icon-picker]');
+        if (!wrap) return;
+        var input = wrap.querySelector('[data-icon-input]');
+        wrap.querySelectorAll('.icon-tile').forEach(function (t) {
+            t.addEventListener('click', function () {
+                wrap.querySelectorAll('.icon-tile').forEach(function (x) { x.classList.remove('sel'); });
+                t.classList.add('sel');
+                input.value = t.getAttribute('data-icon') || '';
+            });
+        });
+        // The icon only applies to the toolbar menu — hide the picker for header/footer.
+        var menu = document.getElementById('Menu');
+        function sync() { wrap.style.display = (menu && menu.value === 'toolbar') ? '' : 'none'; }
+        if (menu) { menu.addEventListener('change', sync); sync(); }
+    })();
+</script>

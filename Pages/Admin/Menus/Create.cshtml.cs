@@ -15,6 +15,7 @@ public class CreateModel : PageModel
     [BindProperty] public string Menu { get; set; } = "header";
     [BindProperty] public string? Label { get; set; }
     [BindProperty] public string? Url { get; set; }
+    [BindProperty] public string? Icon { get; set; }
     [BindProperty] public bool OpenInNewTab { get; set; }
 
     public List<PageEntity> Pages { get; private set; } = new();
@@ -22,7 +23,7 @@ public class CreateModel : PageModel
 
     public async Task OnGetAsync(string? menu)
     {
-        if (menu is "header" or "footer") Menu = menu;
+        if (menu is "header" or "footer" or "toolbar") Menu = menu;
         await LoadPagesAsync();
     }
 
@@ -30,7 +31,7 @@ public class CreateModel : PageModel
     {
         var label = (Label ?? "").Trim();
         var url = (Url ?? "").Trim();
-        if (Menu is not ("header" or "footer")) Menu = "header";
+        if (Menu is not ("header" or "footer" or "toolbar")) Menu = "header";
 
         if (string.IsNullOrWhiteSpace(label) || string.IsNullOrWhiteSpace(url))
         {
@@ -47,6 +48,7 @@ public class CreateModel : PageModel
             Menu = Menu,
             Label = label,
             Url = url,
+            Icon = MatCMS.Content.MenuIcons.IsValid(Icon) ? Icon : null,
             OpenInNewTab = OpenInNewTab,
             SortOrder = max + 1,
             Locale = MatCMS.Services.Localizer.DefaultCulture

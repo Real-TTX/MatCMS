@@ -20,6 +20,7 @@
                 <select id="Menu" name="Menu">
                     <option value="header" selected="@(Model.Menu == "header" ? "selected" : null)">@T["menus.headerMenu"]</option>
                     <option value="footer" selected="@(Model.Menu == "footer" ? "selected" : null)">@T["menus.footerMenu"]</option>
+                    <option value="toolbar" selected="@(Model.Menu == "toolbar" ? "selected" : null)">@T["menus.toolbarMenu"]</option>
                 </select>
             </div>
             <div class="form-field">
@@ -43,6 +44,7 @@
             <label for="mi-url">@T["menus.target"]</label>
             <input id="mi-url" name="Url" value="@Model.Url" placeholder="@T["menus.targetPlaceholder"]" required />
         </div>
+        <partial name="_IconPicker" model="Model.Icon" />
         <label class="check">
             <input type="checkbox" name="OpenInNewTab" value="true" @(Model.OpenInNewTab ? "checked" : "") /> @T["menus.openNewTab"]
         </label>

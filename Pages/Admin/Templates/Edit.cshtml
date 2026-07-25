@@ -26,36 +26,32 @@
             <label for="Name">@T["templates.name"]</label>
             <input id="Name" name="Name" value="@Model.Name" required autofocus />
         </div>
-        <div class="form-row">
-            <div class="form-field">
-                <label for="AccentColor">@T["templates.accentColor"]</label>
-                <input id="AccentColor" name="AccentColor" type="color" value="@Model.AccentColor" />
-            </div>
-            <div class="form-field">
-                <label for="SecondaryColor">@T["templates.secondaryColor"]</label>
-                <input id="SecondaryColor" name="SecondaryColor" type="color" value="@(string.IsNullOrWhiteSpace(Model.SecondaryColor) ? Model.AccentColor : Model.SecondaryColor)" />
-                <div class="help">@T["templates.secondaryHelp"]</div>
-            </div>
-        </div>
-        <div class="form-row">
-            <div class="form-field">
-                <label for="HeadingColor">@T["templates.headingColor"]</label>
-                <input id="HeadingColor" name="HeadingColor" type="color" value="@Model.HeadingColor" />
-            </div>
-            <div class="form-field">
-                <label for="TextColor">@T["templates.textColor"]</label>
-                <input id="TextColor" name="TextColor" type="color" value="@Model.TextColor" />
-            </div>
-        </div>
-        <div class="form-row">
-            <div class="form-field">
-                <label for="BackgroundColor">@T["templates.backgroundColor"]</label>
-                <input id="BackgroundColor" name="BackgroundColor" type="color" value="@Model.BackgroundColor" />
-            </div>
-            <div class="form-field">
-                <label for="AltBackground">@T["templates.altBackground"]</label>
-                <input id="AltBackground" name="AltBackground" type="color" value="@Model.AltBackground" />
-            </div>
+        @{
+            var colorFields = new (string Name, string LabelKey, string Value, string Help)[]
+            {
+                ("AccentColor", "templates.accentColor", Model.AccentColor ?? "#de7e11", ""),
+                ("SecondaryColor", "templates.secondaryColor", string.IsNullOrWhiteSpace(Model.SecondaryColor) ? (Model.AccentColor ?? "#de7e11") : Model.SecondaryColor!, T["templates.secondaryHelp"]),
+                ("HeadingColor", "templates.headingColor", Model.HeadingColor ?? "#010101", ""),
+                ("TextColor", "templates.textColor", Model.TextColor ?? "#1a1a1a", ""),
+                ("BackgroundColor", "templates.backgroundColor", Model.BackgroundColor ?? "#ffffff", ""),
+                ("AltBackground", "templates.altBackground", Model.AltBackground ?? "#f6f7f9", ""),
+            };
+        }
+        <div class="color-grid">
+            @foreach (var c in colorFields)
+            {
+                <div class="form-field">
+                    <label for="@c.Name">@T[c.LabelKey]</label>
+                    <div class="color-field">
+                        <input id="@c.Name" name="@c.Name" type="color" value="@c.Value" />
+                        <input type="text" class="hex" value="@c.Value" aria-label="@T[c.LabelKey]" spellcheck="false" />
+                    </div>
+                    @if (!string.IsNullOrEmpty(c.Help))
+                    {
+                        <div class="help">@c.Help</div>
+                    }
+                </div>
+            }
         </div>
 
         <h3 class="form-section">@T["templates.secType"]</h3>
@@ -116,3 +112,20 @@
         </div>
     </form>
 </div>
+
+@section Scripts {
+    <script>
+        // Keep each color swatch and its hex text field in sync.
+        document.querySelectorAll('.color-field').forEach(function (cf) {
+            var color = cf.querySelector('input[type=color]');
+            var hex = cf.querySelector('.hex');
+            if (!color || !hex) return;
+            hex.value = color.value;
+            color.addEventListener('input', function () { hex.value = color.value; });
+            hex.addEventListener('input', function () {
+                var v = hex.value.trim();
+                if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v)) color.value = v;
+            });
+        });
+    </script>
+}

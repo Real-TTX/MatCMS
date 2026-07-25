@@ -100,6 +100,34 @@ public static class DbSeeder
             );
         }
 
+        // Migrate legacy top-bar links (old Settings fields) into the new "toolbar" menu, once.
+        if (!await db.MenuItems.AnyAsync(m => m.Menu == "toolbar"))
+        {
+            var legacy = await db.SiteSettings.Where(s =>
+                s.Key == SettingKeys.TopBarLink1Text || s.Key == SettingKeys.TopBarLink1Url ||
+                s.Key == SettingKeys.TopBarLink2Text || s.Key == SettingKeys.TopBarLink2Url).ToListAsync();
+            string G(string k) => legacy.FirstOrDefault(s => s.Key == k)?.Value ?? "";
+            var order = 0;
+            void AddLink(string text, string url)
+            {
+                if (string.IsNullOrWhiteSpace(url)) return;
+                db.MenuItems.Add(new MenuItem
+                {
+                    Menu = "toolbar",
+                    Label = string.IsNullOrWhiteSpace(text) ? url : text,
+                    Url = url,
+                    Icon = "link",
+                    OpenInNewTab = true,
+                    SortOrder = order++,
+                    Locale = Localizer.DefaultCulture
+                });
+            }
+            AddLink(G(SettingKeys.TopBarLink1Text), G(SettingKeys.TopBarLink1Url));
+            AddLink(G(SettingKeys.TopBarLink2Text), G(SettingKeys.TopBarLink2Url));
+            // Blank the legacy settings so a later manual delete of toolbar items won't re-migrate.
+            foreach (var s in legacy) s.Value = "";
+        }
+
         await db.SaveChangesAsync();
     }
 

@@ -4,8 +4,11 @@ public class MenuItem
 {
     public int Id { get; set; }
 
-    /// <summary>"header" or "footer".</summary>
+    /// <summary>"header", "footer" or "toolbar" (the top-bar icon strip).</summary>
     public string Menu { get; set; } = "header";
+
+    /// <summary>Optional icon key (see <see cref="MatCMS.Content.MenuIcons"/>); used by the toolbar menu.</summary>
+    public string? Icon { get; set; }
 
     /// <summary>Content locale this menu belongs to (e.g. "de", "en"). Menus are served per-locale.</summary>
     public string Locale { get; set; } = "de";

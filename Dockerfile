@@ -26,9 +26,10 @@ USER root
 RUN mkdir -p /app/appdata /app/wwwroot/uploads && chown -R app:app /app
 USER app
 
-ENV ASPNETCORE_HTTP_PORTS=9101 \
-    ASPNETCORE_ENVIRONMENT=Production
+# The internal port stays the ASP.NET base-image default (8080).
+# The externally reachable port is set only via the compose port mapping.
+ENV ASPNETCORE_ENVIRONMENT=Production
 
-EXPOSE 9101
+EXPOSE 8080
 
 ENTRYPOINT ["dotnet", "MatCMS.dll"]

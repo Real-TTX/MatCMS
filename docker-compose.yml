@@ -7,9 +7,9 @@ services:
     image: matcms:latest
     container_name: matcms
     ports:
-      - "9101:9101"
+      # host 9101 -> container 8080 (ASP.NET base-image default port)
+      - "9101:8080"
     environment:
-      - ASPNETCORE_HTTP_PORTS=9101
       - ASPNETCORE_ENVIRONMENT=Production
     volumes:
       - matcms-data:/app/appdata

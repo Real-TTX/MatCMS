@@ -144,7 +144,8 @@ automatisch aus dem Feld-Schema.
   *Benutzer → Bearbeiten* ein neues Passwort setzen (und/oder einen neuen
   Admin-Benutzer anlegen und `admin` löschen).
 - Für den öffentlichen Betrieb sollte die App **hinter einem Reverse-Proxy mit
-  HTTPS** (z. B. nginx/Traefik/Caddy) laufen. Der Container selbst spricht HTTP auf 9101.
+  HTTPS** (z. B. nginx/Traefik/Caddy) laufen. Der Container spricht intern HTTP auf **8080**
+  (ASP.NET-Basis-Image-Default); der Host-Port **9101** wird nur über das Compose-Mapping gesetzt.
 - **Login-Schutz:** `/login` ist pro Client-IP ratenbegrenzt (10 Versuche/Minute).
   Hinter einem Reverse-Proxy sollte `ForwardedHeaders` aktiviert werden, damit die
   echte Client-IP (statt der Proxy-IP) zählt.

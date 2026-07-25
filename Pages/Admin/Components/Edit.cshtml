@@ -1,0 +1,60 @@
+@page "{id:int}"
+@model MatCMS.Pages.Admin.Components.EditModel
+@{
+    ViewData["Title"] = T["components.edit"];
+}
+<div class="page-head">
+    <h1>@T["components.edit"]</h1>
+    <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
+</div>
+
+<div class="card">
+    @if (!string.IsNullOrWhiteSpace(Model.Error))
+    {
+        <div class="alert alert-error">@Model.Error</div>
+    }
+    <form method="post" class="form-grid" id="component-form">
+        <div class="form-row">
+            <div class="form-field">
+                <label for="Name">@T["components.name"]</label>
+                <input id="Name" name="Name" value="@Model.Name" required />
+            </div>
+            <div class="form-field">
+                <label>@T["components.type"]</label>
+                <input value="@Model.Current.Type" class="mono" readonly />
+            </div>
+        </div>
+        <div class="form-field">
+            <label for="Description">@T["components.description"]</label>
+            <input id="Description" name="Description" value="@Model.Description" />
+        </div>
+
+        <h3 class="form-section">@T["components.fields"]</h3>
+        <div id="field-rows" data-fields="@Model.FieldsJson"></div>
+        <div><button type="button" class="btn btn-sm btn-ghost" id="add-field">＋ @T["components.addField"]</button></div>
+        <input type="hidden" name="FieldsJson" id="FieldsJson" />
+
+        <h3 class="form-section">@T["components.template"]</h3>
+        <div class="form-field">
+            <label for="TemplateHtml">@T["components.templateHtml"]</label>
+            <textarea id="TemplateHtml" name="TemplateHtml" rows="10" class="code" spellcheck="false">@Model.TemplateHtml</textarea>
+            <div class="help">@T["components.templateHelp"] <span id="placeholder-hint" class="mono"></span></div>
+        </div>
+
+        <div><button type="submit" class="btn">@T["action.save"]</button></div>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        window.MATCMS_FIELD_TYPES = [
+            ["text", "@T["components.type.text"]"],
+            ["textarea", "@T["components.type.textarea"]"],
+            ["richtext", "@T["components.type.richtext"]"],
+            ["image", "@T["components.type.image"]"],
+            ["url", "@T["components.type.url"]"]
+        ];
+        window.MATCMS_REMOVE = "@T["action.delete"]";
+    </script>
+    <script src="~/js/admin-component-editor.js" asp-append-version="true"></script>
+}

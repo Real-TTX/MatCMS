@@ -1,0 +1,39 @@
+@page
+@model MatCMS.Pages.Admin.Components.IndexModel
+@{
+    ViewData["Title"] = T["components.title"];
+}
+<div class="page-head">
+    <h1>@T["components.title"]</h1>
+</div>
+
+<div class="card">
+    <p class="help">@T["components.intro"]</p>
+    @if (Model.Items.Count == 0)
+    {
+        <p class="muted">@T["components.empty"]</p>
+    }
+    else
+    {
+        <div class="block-list">
+            @foreach (var c in Model.Items)
+            {
+                <div class="block-item">
+                    <div class="b-info">
+                        <div class="b-type">@c.Name</div>
+                        <div class="b-sum mono">@c.Type</div>
+                    </div>
+                    <div class="actions">
+                        <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@c.Id">@T["action.edit"]</a>
+                        <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@c.Id" onsubmit="return confirm('@T["components.confirmDelete"]');">
+                            <button type="submit" class="btn btn-sm btn-danger" title="@T["action.delete"]">✕</button>
+                        </form>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    <div class="list-actions">
+        <a class="btn" asp-page="Create">@T["components.new"]</a>
+    </div>
+</div>

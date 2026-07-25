@@ -17,6 +17,7 @@ public class AppDbContext : DbContext
     public DbSet<Form> Forms => Set<Form>();
     public DbSet<FormSubmission> FormSubmissions => Set<FormSubmission>();
     public DbSet<Media> Media => Set<Media>();
+    public DbSet<Component> Components => Set<Component>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -27,6 +28,7 @@ public class AppDbContext : DbContext
         b.Entity<MenuItem>().HasIndex(m => new { m.Menu, m.Locale });
         b.Entity<SiteSetting>().HasIndex(s => s.Key).IsUnique();
         b.Entity<Form>().HasIndex(f => f.Slug).IsUnique();
+        b.Entity<Component>().HasIndex(c => c.Type).IsUnique();
 
         b.Entity<ContentBlock>()
             .HasOne(cb => cb.Page)

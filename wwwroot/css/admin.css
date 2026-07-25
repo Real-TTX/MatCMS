@@ -87,6 +87,12 @@
 .page-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; gap: 16px; flex-wrap: wrap; }
 .page-head h1 { font-size: 26px; margin: 0; }
 
+/* Component field rows */
+.field-row { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
+.field-row .fr-label { flex: 1; }
+.field-row .fr-type { width: 160px; }
+#placeholder-hint { color: var(--accent); }
+
 /* Media library grid */
 .media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
 .media-card { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; }

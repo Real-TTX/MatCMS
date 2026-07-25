@@ -6,11 +6,29 @@ namespace MatCMS.Content;
 /// </summary>
 public class BlockRegistry
 {
-    public IReadOnlyList<BlockDefinition> All { get; }
+    // Built-in blocks — built once (static), shared across requests.
+    private static readonly IReadOnlyList<BlockDefinition> Builtin = Build();
 
-    public BlockRegistry()
+    /// <summary>The reserved built-in block type slugs (a component may not reuse these).</summary>
+    public static readonly HashSet<string> BuiltinTypes =
+        Builtin.Select(b => b.Type).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    private readonly MatCMS.Data.AppDbContext _db;
+    private IReadOnlyList<BlockDefinition>? _all;
+
+    public BlockRegistry(MatCMS.Data.AppDbContext db) => _db = db;
+
+    /// <summary>All block definitions: built-in blocks plus user-defined components (from the DB).</summary>
+    public IReadOnlyList<BlockDefinition> All => _all ??= BuildAll();
+
+    private IReadOnlyList<BlockDefinition> BuildAll()
     {
-        All = Build();
+        var list = new List<BlockDefinition>(Builtin);
+        foreach (var c in _db.Components.OrderBy(c => c.Name).ToList())
+        {
+            list.Add(ComponentDefinition.FromComponent(c));
+        }
+        return list;
     }
 
     public BlockDefinition? Get(string type) =>

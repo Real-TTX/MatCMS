@@ -21,4 +21,9 @@ public class BlockDefinition
     public bool ChildOnly { get; set; }
 
     public bool IsContainer => AllowedChildren.Count > 0;
+
+    /// <summary>For user-defined components: the HTML template with {{field}} placeholders (null for built-ins).</summary>
+    public string? ComponentTemplate { get; set; }
+
+    public bool IsComponent => ComponentTemplate is not null;
 }

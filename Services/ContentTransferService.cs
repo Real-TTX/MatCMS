@@ -107,6 +107,13 @@ public class ContentTransferService
                     HeaderBackground = t.HeaderBackground, HeaderTextColor = t.HeaderTextColor, HeaderPadding = t.HeaderPadding,
                     CustomCss = t.CustomCss, CustomJs = t.CustomJs, LayoutHtml = t.LayoutHtml
                 }).ToList();
+
+            dto.Components = (await _db.Components.AsNoTracking().OrderBy(c => c.Name).ToListAsync())
+                .Select(c => new ComponentDto
+                {
+                    Type = c.Type, Name = c.Name, Description = c.Description,
+                    FieldsJson = c.FieldsJson, TemplateHtml = c.TemplateHtml, CreatedAt = c.CreatedAt
+                }).ToList();
         }
 
         if (options.Pages)
@@ -293,6 +300,27 @@ public class ContentTransferService
             summary.Add($"{dto.Templates.Count} Templates");
         }
 
+        if (dto.Components is not null)
+        {
+            _db.Components.RemoveRange(_db.Components);
+            await _db.SaveChangesAsync();
+            foreach (var c in dto.Components)
+            {
+                if (string.IsNullOrWhiteSpace(c.Type)) continue;
+                _db.Components.Add(new Component
+                {
+                    Type = c.Type!,
+                    Name = c.Name ?? c.Type!,
+                    Description = c.Description ?? "",
+                    FieldsJson = string.IsNullOrWhiteSpace(c.FieldsJson) ? "[]" : c.FieldsJson!,
+                    TemplateHtml = c.TemplateHtml ?? "",
+                    CreatedAt = c.CreatedAt == default ? DateTime.UtcNow : c.CreatedAt
+                });
+            }
+            await _db.SaveChangesAsync();
+            summary.Add($"{dto.Components.Count} Komponenten");
+        }
+
         if (dto.Pages is not null)
         {
             _db.ContentBlocks.RemoveRange(_db.ContentBlocks);
@@ -461,6 +489,7 @@ public class ContentTransferService
         public List<FormDto>? Forms { get; set; }
         public List<FormSubmissionDto>? FormSubmissions { get; set; }
         public List<MediaDto>? Media { get; set; }
+        public List<ComponentDto>? Components { get; set; }
     }
 
     private sealed class FormDto
@@ -525,6 +554,16 @@ public class ContentTransferService
         public string? BlockType { get; set; }
         public int SortOrder { get; set; }
         public string? DataJson { get; set; }
+    }
+
+    private sealed class ComponentDto
+    {
+        public string? Type { get; set; }
+        public string? Name { get; set; }
+        public string? Description { get; set; }
+        public string? FieldsJson { get; set; }
+        public string? TemplateHtml { get; set; }
+        public DateTime CreatedAt { get; set; }
     }
 
     private sealed class MediaDto

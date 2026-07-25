@@ -15,7 +15,10 @@
     {
         continue;
     }
-    object partialModel;
+    var data = new MatCMS.Content.BlockData(block.DataJson);
+
+    // Container blocks need their children resolved to (partial, data) pairs.
+    MatCMS.Content.ContainerBlockModel? containerModel = null;
     if (def.IsContainer)
     {
         var kids = allBlocks.Where(b => b.ParentId == block.Id).OrderBy(b => b.SortOrder)
@@ -27,22 +30,37 @@
                     : new MatCMS.Content.ContainerBlockModel.ChildBlock(cdef.Partial, new MatCMS.Content.BlockData(cb.DataJson));
             })
             .Where(x => x is not null).Select(x => x!).ToList();
-        partialModel = new MatCMS.Content.ContainerBlockModel(new MatCMS.Content.BlockData(block.DataJson), kids);
-    }
-    else
-    {
-        partialModel = new MatCMS.Content.BlockData(block.DataJson);
+        containerModel = new MatCMS.Content.ContainerBlockModel(data, kids);
     }
 
     if (editor)
     {
         <div class="mat-ed-block" id="block-@block.Id" data-block-id="@block.Id" data-block-name="@T[def.Name]">
-            @await Html.PartialAsync(def.Partial, partialModel)
+            @if (def.IsComponent)
+            {
+                @Html.Raw(MatCMS.Content.ComponentDefinition.Render(def, data))
+            }
+            else if (def.IsContainer)
+            {
+                @await Html.PartialAsync(def.Partial, containerModel)
+            }
+            else
+            {
+                @await Html.PartialAsync(def.Partial, data)
+            }
         </div>
+    }
+    else if (def.IsComponent)
+    {
+        @Html.Raw(MatCMS.Content.ComponentDefinition.Render(def, data))
+    }
+    else if (def.IsContainer)
+    {
+        @await Html.PartialAsync(def.Partial, containerModel)
     }
     else
     {
-        @await Html.PartialAsync(def.Partial, partialModel)
+        @await Html.PartialAsync(def.Partial, data)
     }
 }
 

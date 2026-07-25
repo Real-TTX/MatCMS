@@ -1,3 +1,5 @@
+using System.IO.Compression;
+using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using MatCMS.Data;
@@ -7,17 +9,24 @@ using Microsoft.EntityFrameworkCore;
 namespace MatCMS.Services;
 
 /// <summary>
-/// Backup &amp; Restore of the site content. Each section can be included independently:
-/// Templates, Pages (incl. their ContentBlocks), Menu items, Site settings and contact submissions.
-/// Users are deliberately excluded for security reasons.
-/// On restore, only the sections present in the file are replaced; missing sections are left untouched.
+/// Backup &amp; Restore of the site. A backup is a ZIP containing <c>content.json</c>
+/// (Templates, Pages incl. ContentBlocks, Menu items, Settings, contact submissions) and,
+/// optionally, an <c>assets/</c> folder with the uploaded media (wwwroot/uploads).
+/// Users are deliberately excluded for security. On restore, only the sections present are
+/// replaced; missing sections/assets are left untouched. Legacy plain-JSON backups are also accepted.
 /// </summary>
 public class ContentTransferService
 {
     private const int CurrentVersion = 2;
 
     private readonly AppDbContext _db;
-    public ContentTransferService(AppDbContext db) => _db = db;
+    private readonly IWebHostEnvironment _env;
+
+    public ContentTransferService(AppDbContext db, IWebHostEnvironment env)
+    {
+        _db = db;
+        _env = env;
+    }
 
     private static readonly JsonSerializerOptions WriteOpts = new()
     {
@@ -30,6 +39,9 @@ public class ContentTransferService
         PropertyNameCaseInsensitive = true
     };
 
+    private static readonly string[] AllowedAssetExtensions =
+        [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"];
+
     /// <summary>Which sections to include in a backup.</summary>
     public sealed class BackupOptions
     {
@@ -38,11 +50,41 @@ public class ContentTransferService
         public bool Menus { get; set; } = true;
         public bool Settings { get; set; } = true;
         public bool Submissions { get; set; } = true;
+        public bool Assets { get; set; } = true;
 
-        public bool Any => Templates || Pages || Menus || Settings || Submissions;
+        public bool Any => Templates || Pages || Menus || Settings || Submissions || Assets;
     }
 
-    public async Task<string> ExportAsync(BackupOptions options, string? exportedAtUtc = null)
+    private string UploadsDir => Path.Combine(_env.WebRootPath, "uploads");
+
+    /// <summary>Builds a ZIP backup (content.json + optional assets/) and returns its bytes.</summary>
+    public async Task<byte[]> ExportAsync(BackupOptions options, string? exportedAtUtc = null)
+    {
+        var json = await BuildJsonAsync(options, exportedAtUtc);
+
+        using var ms = new MemoryStream();
+        using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            var contentEntry = zip.CreateEntry("content.json", CompressionLevel.Optimal);
+            await using (var w = new StreamWriter(contentEntry.Open(), Encoding.UTF8))
+                await w.WriteAsync(json);
+
+            if (options.Assets && Directory.Exists(UploadsDir))
+            {
+                foreach (var file in Directory.GetFiles(UploadsDir))
+                {
+                    var name = Path.GetFileName(file);
+                    var entry = zip.CreateEntry("assets/" + name, CompressionLevel.Optimal);
+                    await using var es = entry.Open();
+                    await using var fs = File.OpenRead(file);
+                    await fs.CopyToAsync(es);
+                }
+            }
+        }
+        return ms.ToArray();
+    }
+
+    private async Task<string> BuildJsonAsync(BackupOptions options, string? exportedAtUtc)
     {
         var dto = new TransferDto
         {
@@ -55,12 +97,8 @@ public class ContentTransferService
             dto.Templates = (await _db.Templates.AsNoTracking().OrderBy(t => t.Id).ToListAsync())
                 .Select(t => new TemplateDto
                 {
-                    Name = t.Name,
-                    IsActive = t.IsActive,
-                    AccentColor = t.AccentColor,
-                    HeadingFont = t.HeadingFont,
-                    BodyFont = t.BodyFont,
-                    ButtonStyle = t.ButtonStyle
+                    Name = t.Name, IsActive = t.IsActive, AccentColor = t.AccentColor,
+                    HeadingFont = t.HeadingFont, BodyFont = t.BodyFont, ButtonStyle = t.ButtonStyle
                 }).ToList();
         }
 
@@ -69,22 +107,13 @@ public class ContentTransferService
             var pages = await _db.Pages.AsNoTracking().Include(p => p.Blocks).OrderBy(p => p.Id).ToListAsync();
             dto.Pages = pages.Select(p => new PageDto
             {
-                Title = p.Title,
-                Slug = p.Slug,
-                NavLabel = p.NavLabel,
-                IsPublished = p.IsPublished,
-                ShowInNav = p.ShowInNav,
-                ShowInFooter = p.ShowInFooter,
-                NavOrder = p.NavOrder,
-                FooterOrder = p.FooterOrder,
-                MetaDescription = p.MetaDescription,
-                CreatedAt = p.CreatedAt,
-                UpdatedAt = p.UpdatedAt,
+                Title = p.Title, Slug = p.Slug, NavLabel = p.NavLabel,
+                IsPublished = p.IsPublished, ShowInNav = p.ShowInNav, ShowInFooter = p.ShowInFooter,
+                NavOrder = p.NavOrder, FooterOrder = p.FooterOrder, MetaDescription = p.MetaDescription,
+                CreatedAt = p.CreatedAt, UpdatedAt = p.UpdatedAt,
                 Blocks = p.Blocks.OrderBy(b => b.SortOrder).Select(b => new BlockDto
                 {
-                    BlockType = b.BlockType,
-                    SortOrder = b.SortOrder,
-                    DataJson = b.DataJson
+                    BlockType = b.BlockType, SortOrder = b.SortOrder, DataJson = b.DataJson
                 }).ToList()
             }).ToList();
         }
@@ -117,11 +146,57 @@ public class ContentTransferService
         return JsonSerializer.Serialize(dto, WriteOpts);
     }
 
+    /// <summary>Restores a backup. Accepts a ZIP (content.json + assets/) or a legacy plain-JSON file.</summary>
+    public async Task<string> ImportAsync(byte[] data)
+    {
+        if (data is null || data.Length == 0)
+            throw new InvalidOperationException("Die Datei ist leer.");
+
+        // ZIP magic bytes "PK\x03\x04"
+        var isZip = data.Length >= 4 && data[0] == 0x50 && data[1] == 0x4B && data[2] == 0x03 && data[3] == 0x04;
+
+        if (!isZip)
+            return await ImportJsonAsync(Encoding.UTF8.GetString(data));
+
+        using var ms = new MemoryStream(data);
+        using var zip = new ZipArchive(ms, ZipArchiveMode.Read);
+
+        var contentEntry = zip.GetEntry("content.json")
+            ?? throw new InvalidOperationException("Das ZIP enthält keine content.json.");
+
+        string json;
+        using (var r = new StreamReader(contentEntry.Open(), Encoding.UTF8))
+            json = await r.ReadToEndAsync();
+
+        var summary = await ImportJsonAsync(json);
+
+        // Restore assets into wwwroot/uploads (filename only -> no path traversal; image types only).
+        var assetCount = 0;
+        var uploads = UploadsDir;
+        foreach (var entry in zip.Entries)
+        {
+            if (!entry.FullName.StartsWith("assets/", StringComparison.OrdinalIgnoreCase)) continue;
+            var name = Path.GetFileName(entry.FullName);
+            if (string.IsNullOrWhiteSpace(name)) continue;
+            var ext = Path.GetExtension(name).ToLowerInvariant();
+            if (!AllowedAssetExtensions.Contains(ext)) continue;
+
+            Directory.CreateDirectory(uploads);
+            var dest = Path.Combine(uploads, name);
+            await using (var es = entry.Open())
+            await using (var fs = File.Create(dest))
+                await es.CopyToAsync(fs);
+            assetCount++;
+        }
+
+        return assetCount > 0 ? $"{summary} ({assetCount} Medien)" : summary;
+    }
+
     /// <summary>
-    /// Restores the sections present in the file (transactional). Each present section replaces
+    /// Restores the sections present in the JSON (transactional). Each present section replaces
     /// the corresponding table; sections not in the file are left untouched.
     /// </summary>
-    public async Task<string> ImportAsync(string json)
+    private async Task<string> ImportJsonAsync(string json)
     {
         if (string.IsNullOrWhiteSpace(json))
             throw new InvalidOperationException("Die Datei ist leer.");
@@ -150,7 +225,6 @@ public class ContentTransferService
             _db.Templates.RemoveRange(_db.Templates);
             await _db.SaveChangesAsync();
             foreach (var t in dto.Templates)
-            {
                 _db.Templates.Add(new Template
                 {
                     Name = t.Name ?? "Template",
@@ -160,7 +234,6 @@ public class ContentTransferService
                     BodyFont = string.IsNullOrWhiteSpace(t.BodyFont) ? "Inter" : t.BodyFont!,
                     ButtonStyle = string.IsNullOrWhiteSpace(t.ButtonStyle) ? "solid" : t.ButtonStyle!
                 });
-            }
             await _db.SaveChangesAsync();
             var all = await _db.Templates.ToListAsync();
             if (all.Count > 0 && all.All(t => !t.IsActive)) all[0].IsActive = true;
@@ -245,7 +318,7 @@ public class ContentTransferService
         }
 
         await tx.CommitAsync();
-        return summary.Count == 0 ? "Nichts importiert." : string.Join(", ", summary) + " wiederhergestellt.";
+        return summary.Count == 0 ? "Nichts importiert" : string.Join(", ", summary) + " wiederhergestellt";
     }
 
     // ------------------------------------------------------------------

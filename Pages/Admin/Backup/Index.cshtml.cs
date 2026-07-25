@@ -16,6 +16,7 @@ public class IndexModel : PageModel
     [BindProperty] public bool IncMenus { get; set; } = true;
     [BindProperty] public bool IncSettings { get; set; } = true;
     [BindProperty] public bool IncSubmissions { get; set; } = true;
+    [BindProperty] public bool IncAssets { get; set; } = true;
 
     [BindProperty] public IFormFile? ImportFile { get; set; }
     [BindProperty] public bool Confirm { get; set; }
@@ -30,7 +31,8 @@ public class IndexModel : PageModel
             Pages = IncPages,
             Menus = IncMenus,
             Settings = IncSettings,
-            Submissions = IncSubmissions
+            Submissions = IncSubmissions,
+            Assets = IncAssets
         };
         if (!options.Any)
         {
@@ -38,10 +40,9 @@ public class IndexModel : PageModel
             return RedirectToPage();
         }
 
-        var json = await _transfer.ExportAsync(options);
-        var bytes = Encoding.UTF8.GetBytes(json);
-        var name = $"matcms-backup-{DateTime.UtcNow:yyyy-MM-dd-HHmm}.json";
-        return File(bytes, "application/json", name);
+        var bytes = await _transfer.ExportAsync(options);
+        var name = $"matcms-backup-{DateTime.UtcNow:yyyy-MM-dd-HHmm}.zip";
+        return File(bytes, "application/zip", name);
     }
 
     public async Task<IActionResult> OnPostImportAsync()
@@ -53,17 +54,20 @@ public class IndexModel : PageModel
         }
         if (ImportFile is null || ImportFile.Length == 0)
         {
-            TempData["FlashError"] = "Bitte eine Backup-Datei (.json) auswählen.";
+            TempData["FlashError"] = "Bitte eine Backup-Datei (.zip oder .json) auswählen.";
             return RedirectToPage();
         }
 
-        string json;
-        using (var reader = new StreamReader(ImportFile.OpenReadStream(), Encoding.UTF8))
-            json = await reader.ReadToEndAsync();
+        byte[] data;
+        using (var ms = new MemoryStream())
+        {
+            await ImportFile.CopyToAsync(ms);
+            data = ms.ToArray();
+        }
 
         try
         {
-            var summary = await _transfer.ImportAsync(json);
+            var summary = await _transfer.ImportAsync(data);
             TempData["Flash"] = $"Wiederhergestellt: {summary}";
         }
         catch (Exception ex)

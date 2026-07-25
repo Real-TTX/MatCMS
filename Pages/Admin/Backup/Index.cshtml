@@ -9,7 +9,7 @@
 
 <div class="card">
     <h2>Backup erstellen</h2>
-    <p class="muted">Wähle aus, welche Bereiche im Backup enthalten sein sollen. Es wird eine JSON-Datei heruntergeladen.</p>
+    <p class="muted">Wähle aus, welche Bereiche im Backup enthalten sein sollen. Es wird eine ZIP-Datei (Inhalte + Medien) heruntergeladen.</p>
     <form method="post" asp-page-handler="Export">
         <div class="form-grid">
             <label class="check"><input type="checkbox" name="IncTemplates" value="true" checked /> Templates</label>
@@ -17,6 +17,7 @@
             <label class="check"><input type="checkbox" name="IncMenus" value="true" checked /> Menüs</label>
             <label class="check"><input type="checkbox" name="IncSettings" value="true" checked /> Einstellungen</label>
             <label class="check"><input type="checkbox" name="IncSubmissions" value="true" checked /> Anfragen (Submissions)</label>
+            <label class="check"><input type="checkbox" name="IncAssets" value="true" checked /> Medien / Logo (Uploads)</label>
         </div>
         <div style="margin-top:18px;">
             <button type="submit" class="btn">Backup herunterladen</button>
@@ -29,8 +30,8 @@
     <p class="muted">Ein zuvor erstelltes Backup einspielen. Es werden <strong>nur die im Backup enthaltenen Bereiche</strong> überschrieben – Bereiche, die nicht im Backup sind, bleiben unverändert.</p>
     <form method="post" asp-page-handler="Import" enctype="multipart/form-data">
         <div class="form-field">
-            <label for="ImportFile">Backup-Datei (.json)</label>
-            <input id="ImportFile" type="file" name="ImportFile" accept="application/json,.json" required />
+            <label for="ImportFile">Backup-Datei (.zip oder .json)</label>
+            <input id="ImportFile" type="file" name="ImportFile" accept=".zip,application/zip,application/json,.json" required />
         </div>
         <label class="check">
             <input type="checkbox" name="Confirm" value="true" required />

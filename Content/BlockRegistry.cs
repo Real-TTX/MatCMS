@@ -267,5 +267,17 @@ public class BlockRegistry
                 },
             ]
         },
+        new BlockDefinition
+        {
+            Type = "html",
+            Name = "block.html.name",
+            Description = "block.html.desc",
+            Svg = @"<path d=""M9 8l-4 4 4 4""/><path d=""M15 8l4 4-4 4""/>",
+            Partial = "Blocks/_Html",
+            Fields =
+            [
+                new BlockField { Id = "html", Label = "block.html.f.html", Type = FieldType.Textarea, Help = "Eigenes HTML – wird 1:1 ausgegeben. Nur für vertrauenswürdige Inhalte." },
+            ]
+        },
     ];
 }

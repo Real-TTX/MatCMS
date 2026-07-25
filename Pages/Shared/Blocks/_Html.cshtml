@@ -1,0 +1,6 @@
+@model MatCMS.Content.BlockData
+@{
+    var html = Model.Str("html");
+}
+@* Advanced: raw HTML component. Authored by an admin, rendered verbatim. *@
+<div class="html-block">@Html.Raw(html)</div>

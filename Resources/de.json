@@ -370,6 +370,9 @@
   "block.spacer.desc": "Leerer vertikaler Abstand zwischen zwei Blöcken.",
   "block.spacer.f.size": "Größe",
 
+  "block.html.name": "HTML",
+  "block.html.desc": "Eigener HTML-Code (Advanced)",
+  "block.html.f.html": "HTML",
   "block.logostrip.name": "Logo-Leiste",
   "block.logostrip.desc": "Reihe von Partner- oder Kundenlogos, optional mit Überschrift und Verlinkung.",
   "block.logostrip.f.items": "Logos",

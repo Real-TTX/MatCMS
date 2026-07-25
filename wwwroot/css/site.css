@@ -4,10 +4,12 @@
     --muted: #5b5b5b;
     --line: #e6e6e6;
     --bg: #ffffff;
-    --bg-alt: #faf6f1;
-    --accent: #de7e11;
-    --accent-dark: #c26c0c;
-    --accent-card: #e79a3f;
+    --bg-alt: #f6f7f9;
+    /* Accent + derived shades. The active Template overrides --accent (and --accent-dark);
+       --accent-card follows automatically so themes stay colour-consistent. */
+    --accent: #2563eb;
+    --accent-dark: color-mix(in srgb, var(--accent) 85%, #000);
+    --accent-card: color-mix(in srgb, var(--accent) 82%, #fff);
     --max: 1180px;
     --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     --font-head: "Geologica", "Inter", sans-serif;

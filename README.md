@@ -1,13 +1,14 @@
-# FEUSYS Web – Block-basiertes CMS
+# MatCMS – Lightweight block-based CMS
 
-Nachbau der Website **feusys.de** als eigenständige, editierbare Anwendung.
-Das Layout ist optisch übernommen, die Inhalte sind über ein kleines CMS mit
-**block-basiertem Editor** (im Stil von Shopify-Sections) bearbeitbar.
+**MatCMS** ist ein leichtgewichtiges, block-basiertes CMS (WordPress-Alternative) mit
+**block-basiertem Editor** (im Stil von Shopify-Sections), Menü- und Template-Verwaltung
+sowie **Backup & Restore**. Der Standard-Seed ist generisch (plain MatCMS); eine konkrete
+Website (z. B. FeuSys) wird per **Backup-Import** unter *Admin → Backup* eingespielt.
 
 - **Framework:** ASP.NET Core 10 (Razor Pages), C#
 - **Datenbank:** SQLite (via EF Core) – eine Datei, kein extra DB-Container
 - **Auth:** Cookie-basiert, Login **nur** über `/login` (Standard: `admin` / `admin`)
-- **Port:** `9101`
+- **Port:** intern `8080` (Basis-Image-Default), gemappt auf Host `9101`
 - **Docker:** ASP.NET-Core-Basis-Image, einfaches `docker-compose`, Basis-Images werden immer neu gezogen
 
 ---

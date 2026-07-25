@@ -21,4 +21,33 @@ public class Template
 
     /// <summary>"solid" or "outline".</summary>
     public string ButtonStyle { get; set; } = "solid";
+
+    // ---- Extended theme options (defaults match the built-in look, so unset = no change) ----
+
+    /// <summary>Secondary/brand color (gradients, hover). Empty = fall back to the accent color.</summary>
+    public string SecondaryColor { get; set; } = "";
+
+    /// <summary>Heading text color.</summary>
+    public string HeadingColor { get; set; } = "#010101";
+
+    /// <summary>Body text color.</summary>
+    public string TextColor { get; set; } = "#1a1a1a";
+
+    /// <summary>Page background color.</summary>
+    public string BackgroundColor { get; set; } = "#ffffff";
+
+    /// <summary>Alternate section background color.</summary>
+    public string AltBackground { get; set; } = "#f6f7f9";
+
+    /// <summary>Max content width in px (digits only).</summary>
+    public string ContainerWidth { get; set; } = "1180";
+
+    /// <summary>Button corner radius in px (digits only).</summary>
+    public string ButtonRadius { get; set; } = "0";
+
+    /// <summary>Raw CSS injected into every public page (advanced).</summary>
+    public string CustomCss { get; set; } = "";
+
+    /// <summary>Raw JavaScript injected before &lt;/body&gt; on every public page (advanced).</summary>
+    public string CustomJs { get; set; } = "";
 }

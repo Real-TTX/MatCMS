@@ -62,6 +62,13 @@ public static class DbSeeder
             });
         }
 
+        // A ready-made alternative template. Ensured on every startup (not only on a fresh DB) so
+        // it also reappears after importing a backup that only carried the previous theme.
+        if (!await db.Templates.AnyAsync(t => t.Name == ModernTemplateName))
+        {
+            db.Templates.Add(BuildModernTemplate());
+        }
+
         if (!await db.Forms.AnyAsync())
         {
             db.Forms.Add(new Form
@@ -95,6 +102,36 @@ public static class DbSeeder
 
         await db.SaveChangesAsync();
     }
+
+    private const string ModernTemplateName = "MatCMS Modern";
+
+    /// <summary>A distinct, modern alternative theme (gradient hero, rounded floating cards).</summary>
+    private static Template BuildModernTemplate() => new()
+    {
+        Name = ModernTemplateName,
+        IsActive = false,
+        AccentColor = "#7c5cff",
+        SecondaryColor = "#22d3ee",
+        HeadingColor = "#0f172a",
+        TextColor = "#334155",
+        BackgroundColor = "#ffffff",
+        AltBackground = "#f1f5f9",
+        HeadingFont = "Poppins",
+        BodyFont = "Inter",
+        ButtonStyle = "solid",
+        ButtonRadius = "10",
+        ContainerWidth = "1200",
+        CustomCss = """
+            .hero { background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
+            .hero__inner h1, .hero__inner p { color: #fff; }
+            .service-grid { gap: 20px; background: transparent; border: none; }
+            .service-card { border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 10px 30px rgba(2,6,23,.06); transition: transform .18s ease, box-shadow .18s ease; }
+            .service-card:hover { transform: translateY(-3px); box-shadow: 0 16px 40px rgba(2,6,23,.10); background: #fff; }
+            .columns-grid { gap: 28px; }
+            .btn { box-shadow: 0 8px 22px color-mix(in srgb, var(--accent) 30%, transparent); }
+            """,
+        CustomJs = ""
+    };
 
     private static SiteSetting S(string key, string value) => new() { Key = key, Value = value };
 

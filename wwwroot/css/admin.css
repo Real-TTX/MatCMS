@@ -84,6 +84,11 @@
 .page-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; gap: 16px; flex-wrap: wrap; }
 .page-head h1 { font-size: 26px; margin: 0; }
 
+/* Form section sub-heading + code textareas (template editor) */
+.form-section { margin: 22px 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+.form-section:first-of-type { margin-top: 4px; }
+textarea.code { font-family: var(--font-mono, ui-monospace, monospace); font-size: 13px; line-height: 1.5; white-space: pre; overflow-wrap: normal; }
+
 /* About / system page */
 .kv { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
 .kv:last-of-type { border-bottom: none; }

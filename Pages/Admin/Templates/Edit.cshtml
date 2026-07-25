@@ -20,16 +20,45 @@
     }
     <form method="post" class="form-grid">
         <input type="hidden" name="Id" value="@Model.Id" />
+
+        <h3 class="form-section">@T["templates.secColors"]</h3>
+        <div class="form-field">
+            <label for="Name">@T["templates.name"]</label>
+            <input id="Name" name="Name" value="@Model.Name" required autofocus />
+        </div>
         <div class="form-row">
-            <div class="form-field">
-                <label for="Name">@T["templates.name"]</label>
-                <input id="Name" name="Name" value="@Model.Name" required autofocus />
-            </div>
             <div class="form-field">
                 <label for="AccentColor">@T["templates.accentColor"]</label>
                 <input id="AccentColor" name="AccentColor" type="color" value="@Model.AccentColor" />
             </div>
+            <div class="form-field">
+                <label for="SecondaryColor">@T["templates.secondaryColor"]</label>
+                <input id="SecondaryColor" name="SecondaryColor" type="color" value="@(string.IsNullOrWhiteSpace(Model.SecondaryColor) ? Model.AccentColor : Model.SecondaryColor)" />
+                <div class="help">@T["templates.secondaryHelp"]</div>
+            </div>
         </div>
+        <div class="form-row">
+            <div class="form-field">
+                <label for="HeadingColor">@T["templates.headingColor"]</label>
+                <input id="HeadingColor" name="HeadingColor" type="color" value="@Model.HeadingColor" />
+            </div>
+            <div class="form-field">
+                <label for="TextColor">@T["templates.textColor"]</label>
+                <input id="TextColor" name="TextColor" type="color" value="@Model.TextColor" />
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-field">
+                <label for="BackgroundColor">@T["templates.backgroundColor"]</label>
+                <input id="BackgroundColor" name="BackgroundColor" type="color" value="@Model.BackgroundColor" />
+            </div>
+            <div class="form-field">
+                <label for="AltBackground">@T["templates.altBackground"]</label>
+                <input id="AltBackground" name="AltBackground" type="color" value="@Model.AltBackground" />
+            </div>
+        </div>
+
+        <h3 class="form-section">@T["templates.secType"]</h3>
         <div class="form-row">
             <div class="form-field">
                 <label for="HeadingFont">@T["templates.headingFont"]</label>
@@ -50,13 +79,38 @@
                 </select>
             </div>
         </div>
-        <div class="form-field">
-            <label for="ButtonStyle">@T["templates.buttonStyle"]</label>
-            <select id="ButtonStyle" name="ButtonStyle">
-                <option value="solid" selected="@(Model.ButtonStyle != "outline")">@T["templates.buttonSolid"]</option>
-                <option value="outline" selected="@(Model.ButtonStyle == "outline")">@T["templates.buttonOutline"]</option>
-            </select>
+
+        <h3 class="form-section">@T["templates.secLayout"]</h3>
+        <div class="form-row">
+            <div class="form-field">
+                <label for="ButtonStyle">@T["templates.buttonStyle"]</label>
+                <select id="ButtonStyle" name="ButtonStyle">
+                    <option value="solid" selected="@(Model.ButtonStyle != "outline")">@T["templates.buttonSolid"]</option>
+                    <option value="outline" selected="@(Model.ButtonStyle == "outline")">@T["templates.buttonOutline"]</option>
+                </select>
+            </div>
+            <div class="form-field">
+                <label for="ButtonRadius">@T["templates.buttonRadius"]</label>
+                <input id="ButtonRadius" name="ButtonRadius" type="number" min="0" max="60" value="@Model.ButtonRadius" />
+            </div>
+            <div class="form-field">
+                <label for="ContainerWidth">@T["templates.containerWidth"]</label>
+                <input id="ContainerWidth" name="ContainerWidth" type="number" min="600" max="2000" value="@Model.ContainerWidth" />
+            </div>
         </div>
+
+        <h3 class="form-section">@T["templates.secAdvanced"]</h3>
+        <div class="form-field">
+            <label for="CustomCss">@T["templates.customCss"]</label>
+            <textarea id="CustomCss" name="CustomCss" rows="6" class="code" spellcheck="false" placeholder=".hero { ... }">@Model.CustomCss</textarea>
+            <div class="help">@T["templates.customCssHelp"]</div>
+        </div>
+        <div class="form-field">
+            <label for="CustomJs">@T["templates.customJs"]</label>
+            <textarea id="CustomJs" name="CustomJs" rows="6" class="code" spellcheck="false" placeholder="// JavaScript">@Model.CustomJs</textarea>
+            <div class="help">@T["templates.customJsHelp"]</div>
+        </div>
+
         <div>
             <button type="submit" class="btn">@T["action.save"]</button>
         </div>

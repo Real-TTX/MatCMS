@@ -99,7 +99,11 @@ public class ContentTransferService
                 .Select(t => new TemplateDto
                 {
                     Name = t.Name, IsActive = t.IsActive, AccentColor = t.AccentColor,
-                    HeadingFont = t.HeadingFont, BodyFont = t.BodyFont, ButtonStyle = t.ButtonStyle
+                    HeadingFont = t.HeadingFont, BodyFont = t.BodyFont, ButtonStyle = t.ButtonStyle,
+                    SecondaryColor = t.SecondaryColor, HeadingColor = t.HeadingColor, TextColor = t.TextColor,
+                    BackgroundColor = t.BackgroundColor, AltBackground = t.AltBackground,
+                    ContainerWidth = t.ContainerWidth, ButtonRadius = t.ButtonRadius,
+                    CustomCss = t.CustomCss, CustomJs = t.CustomJs
                 }).ToList();
         }
 
@@ -254,7 +258,16 @@ public class ContentTransferService
                     AccentColor = string.IsNullOrWhiteSpace(t.AccentColor) ? "#2563eb" : t.AccentColor!,
                     HeadingFont = string.IsNullOrWhiteSpace(t.HeadingFont) ? "Geologica" : t.HeadingFont!,
                     BodyFont = string.IsNullOrWhiteSpace(t.BodyFont) ? "Inter" : t.BodyFont!,
-                    ButtonStyle = string.IsNullOrWhiteSpace(t.ButtonStyle) ? "solid" : t.ButtonStyle!
+                    ButtonStyle = string.IsNullOrWhiteSpace(t.ButtonStyle) ? "solid" : t.ButtonStyle!,
+                    SecondaryColor = t.SecondaryColor ?? "",
+                    HeadingColor = string.IsNullOrWhiteSpace(t.HeadingColor) ? "#010101" : t.HeadingColor!,
+                    TextColor = string.IsNullOrWhiteSpace(t.TextColor) ? "#1a1a1a" : t.TextColor!,
+                    BackgroundColor = string.IsNullOrWhiteSpace(t.BackgroundColor) ? "#ffffff" : t.BackgroundColor!,
+                    AltBackground = string.IsNullOrWhiteSpace(t.AltBackground) ? "#f6f7f9" : t.AltBackground!,
+                    ContainerWidth = string.IsNullOrWhiteSpace(t.ContainerWidth) ? "1180" : t.ContainerWidth!,
+                    ButtonRadius = string.IsNullOrWhiteSpace(t.ButtonRadius) ? "0" : t.ButtonRadius!,
+                    CustomCss = t.CustomCss ?? "",
+                    CustomJs = t.CustomJs ?? ""
                 });
             await _db.SaveChangesAsync();
             var all = await _db.Templates.ToListAsync();
@@ -434,6 +447,15 @@ public class ContentTransferService
         public string? HeadingFont { get; set; }
         public string? BodyFont { get; set; }
         public string? ButtonStyle { get; set; }
+        public string? SecondaryColor { get; set; }
+        public string? HeadingColor { get; set; }
+        public string? TextColor { get; set; }
+        public string? BackgroundColor { get; set; }
+        public string? AltBackground { get; set; }
+        public string? ContainerWidth { get; set; }
+        public string? ButtonRadius { get; set; }
+        public string? CustomCss { get; set; }
+        public string? CustomJs { get; set; }
     }
 
     private sealed class PageDto

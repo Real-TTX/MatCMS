@@ -25,4 +25,34 @@ public static class TemplateFonts
         var v = (value ?? "").Trim();
         return Regex.IsMatch(v, "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$") ? v.ToLowerInvariant() : "#de7e11";
     }
+
+    /// <summary>Validate/normalize a hex color; fall back to <paramref name="fallback"/> on garbage.</summary>
+    public static string NormalizeColorOr(string? value, string fallback)
+    {
+        var v = (value ?? "").Trim();
+        return Regex.IsMatch(v, "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$") ? v.ToLowerInvariant() : fallback;
+    }
+
+    /// <summary>Optional hex color: empty stays empty, garbage becomes empty, valid is normalized.</summary>
+    public static string OptionalColor(string? value)
+    {
+        var v = (value ?? "").Trim();
+        if (v.Length == 0) return "";
+        return Regex.IsMatch(v, "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$") ? v.ToLowerInvariant() : "";
+    }
+
+    /// <summary>Digits-only integer (clamped); returns <paramref name="fallback"/> on garbage.</summary>
+    public static string Int(string? value, string fallback, int min, int max)
+    {
+        var v = (value ?? "").Trim();
+        if (int.TryParse(v, out var n)) return Math.Clamp(n, min, max).ToString();
+        return fallback;
+    }
+
+    /// <summary>Trim advanced CSS/JS and cap length to keep pages sane.</summary>
+    public static string Code(string? value, int max = 20000)
+    {
+        var v = (value ?? "").Trim();
+        return v.Length > max ? v[..max] : v;
+    }
 }

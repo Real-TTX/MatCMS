@@ -39,6 +39,17 @@
     var headFamily = string.IsNullOrWhiteSpace(tpl.HeadingFont) ? "Geologica" : tpl.HeadingFont.Trim();
     var bodyFamily = string.IsNullOrWhiteSpace(tpl.BodyFont) ? "Inter" : tpl.BodyFont.Trim();
     var outlineButtons = string.Equals(tpl.ButtonStyle?.Trim(), "outline", StringComparison.OrdinalIgnoreCase);
+
+    // Extended theme values (defaults match the built-in look → unset = no visual change).
+    string ColorOr(string? v, string fb) => string.IsNullOrWhiteSpace(v) ? fb : v.Trim();
+    string Px(string? v, string fb) => System.Text.RegularExpressions.Regex.IsMatch((v ?? "").Trim(), @"^\d+$") ? v!.Trim() + "px" : fb;
+    var headingColor = ColorOr(tpl.HeadingColor, "#010101");
+    var textColor = ColorOr(tpl.TextColor, "#1a1a1a");
+    var bgColor = ColorOr(tpl.BackgroundColor, "#ffffff");
+    var altBg = ColorOr(tpl.AltBackground, "#f6f7f9");
+    var accent2 = ColorOr(tpl.SecondaryColor, accent);
+    var containerW = Px(tpl.ContainerWidth, "1180px");
+    var btnRadius = Px(tpl.ButtonRadius, "0px");
 }
 <!DOCTYPE html>
 <html lang="de">
@@ -58,15 +69,28 @@
         :root {
             --accent: @accent;
             --accent-dark: @accentDark;
+            --accent-2: @accent2;
+            --black: @headingColor;
+            --ink: @textColor;
+            --bg: @bgColor;
+            --bg-alt: @altBg;
+            --max: @containerW;
+            --btn-radius: @btnRadius;
             --font-head: "@headFamily", "Inter", sans-serif;
             --font-body: "@bodyFamily", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
+        body { background: var(--bg); color: var(--ink); }
+        .btn { border-radius: var(--btn-radius); }
         @if (outlineButtons)
         {
             @Html.Raw(".btn { background: transparent; color: var(--accent); border: 2px solid var(--accent); }")
             @Html.Raw(".btn:hover { background: var(--accent); color: #fff; }")
         }
     </style>
+    @if (!string.IsNullOrWhiteSpace(tpl.CustomCss))
+    {
+        <style>@Html.Raw(tpl.CustomCss)</style>
+    }
     <link rel="icon" href="@Site.FaviconUrl" />
 </head>
 <body>
@@ -144,5 +168,9 @@
     </footer>
 
     @await RenderSectionAsync("Scripts", required: false)
+    @if (!string.IsNullOrWhiteSpace(tpl.CustomJs))
+    {
+        <script>@Html.Raw(tpl.CustomJs)</script>
+    }
 </body>
 </html>

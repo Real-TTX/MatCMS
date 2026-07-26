@@ -45,7 +45,31 @@
     </form>
 </div>
 
+<div class="card component-preview" id="cp-card">
+    <div class="cp-head">
+        <h2>@T["components.preview"]</h2>
+        <button type="button" class="btn btn-sm btn-ghost" id="cp-debug-toggle">@T["components.debug"]</button>
+    </div>
+    <div class="help">@T["components.sampleData"]</div>
+    <div class="cp-sample" id="cp-sample"></div>
+    <div class="cp-frame-wrap">
+        <iframe id="cp-frame" class="cp-frame" title="@T["components.preview"]"></iframe>
+    </div>
+    <div class="cp-debug" id="cp-debug" hidden></div>
+</div>
+
 @section Scripts {
+    <script>
+        window.MATCMS_CP = {
+            debug: "@T["components.debug"]",
+            dbgPlaceholders: "@T["components.dbgPlaceholders"]",
+            dbgUnknown: "@T["components.dbgUnknown"]",
+            dbgUnused: "@T["components.dbgUnused"]",
+            dbgOutput: "@T["components.dbgOutput"]",
+            dbgOk: "@T["components.dbgOk"]",
+            dbgEmpty: "@T["components.dbgEmpty"]"
+        };
+    </script>
     <script>
         window.MATCMS_FIELD_TYPES = [
             ["text", "@T["components.type.text"]"],

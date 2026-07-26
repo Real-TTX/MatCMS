@@ -133,6 +133,28 @@ body.nav-open .admin-menu-toggle span:nth-child(3) { transform: translateY(-6px)
 .field-row { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
 .field-row .fr-label { flex: 1; }
 .field-row .fr-type { width: 160px; }
+
+/* Component designer: live preview + debug */
+.component-preview .cp-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.component-preview .cp-head h2 { margin: 0; }
+.cp-sample { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px 16px; margin: 10px 0 16px; }
+.cp-sample-row { display: flex; flex-direction: column; gap: 4px; }
+.cp-sample-lab { font-size: 12.5px; color: var(--muted); }
+.cp-sample-lab { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; }
+.cp-sample-inp { font-size: 13.5px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px; font-family: inherit; }
+textarea.cp-sample-inp { resize: vertical; min-height: 0; }
+.cp-frame-wrap { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #fff; }
+.cp-frame { width: 100%; height: 300px; border: 0; display: block; background: #fff; }
+.cp-debug { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 14px; font-size: 13px; }
+.cp-dbg-row { display: flex; gap: 12px; align-items: baseline; padding: 4px 0; flex-wrap: wrap; }
+.cp-dbg-row > span { color: var(--muted); min-width: 210px; }
+.cp-dbg-row .cp-warn { color: #b3261e; }
+.cp-debug code { background: #eef0f3; padding: 2px 8px; border-radius: 5px; font-size: 12.5px; margin: 0 2px 2px 0; display: inline-block; }
+.cp-debug code.cp-bad { background: #fbeaea; color: #b3261e; }
+.cp-dbg-ok { color: #2b6a2b; padding: 6px 0; }
+.cp-dbg-out { margin-top: 10px; }
+.cp-dbg-out-label { color: var(--muted); margin-bottom: 5px; }
+.cp-dbg-out pre { background: #0f1115; color: #d6d6d6; border-radius: 8px; padding: 12px 14px; overflow-x: auto; max-height: 220px; font-family: ui-monospace, monospace; font-size: 12.5px; line-height: 1.55; white-space: pre-wrap; margin: 0; }
 #placeholder-hint { color: var(--accent); }
 
 /* Tag filter chips (media library) */

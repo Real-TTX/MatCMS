@@ -1,0 +1,14 @@
+@page "{key}"
+@model MatCMS.Pages.Admin.Plugin.IndexModel
+@{
+    ViewData["Title"] = Model.Key;
+}
+@if (!Model.Found)
+{
+    <div class="page-head"><h1>@T["plugins.pageNotFound"]</h1></div>
+    <div class="card"><p class="muted">@T["plugins.pageNotFoundHelp"]</p></div>
+}
+else
+{
+    @Html.Raw(Model.Html)
+}

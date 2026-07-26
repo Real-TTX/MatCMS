@@ -16,13 +16,14 @@ public class EditModel : PageModel
         _db = db; _registry = registry; _runner = runner;
     }
 
-    public Plugin Current { get; private set; } = default!;
+    public MatCMS.Models.Plugin Current { get; private set; } = default!;
     [BindProperty] public string? Name { get; set; }
     [BindProperty] public string? Description { get; set; }
     [BindProperty] public string? Code { get; set; }
     [BindProperty] public bool Enabled { get; set; }
     public string? Error { get; private set; }
     public string? RunError { get; private set; }
+    public IReadOnlyList<string> Log => _registry.Log;
 
     public async Task<IActionResult> OnGetAsync(int id)
     {

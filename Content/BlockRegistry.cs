@@ -13,12 +13,19 @@ public class BlockRegistry
     public static readonly HashSet<string> BuiltinTypes =
         Builtin.Select(b => b.Type).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+    private const string SvgPlugin = @"<path d=""M9 3v5""/><path d=""M15 3v5""/><rect x=""6"" y=""8"" width=""12"" height=""8"" rx=""2""/><path d=""M12 16v5""/>";
+
     private readonly MatCMS.Data.AppDbContext _db;
+    private readonly MatCMS.Services.PluginRegistry _plugins;
     private IReadOnlyList<BlockDefinition>? _all;
 
-    public BlockRegistry(MatCMS.Data.AppDbContext db) => _db = db;
+    public BlockRegistry(MatCMS.Data.AppDbContext db, MatCMS.Services.PluginRegistry plugins)
+    {
+        _db = db;
+        _plugins = plugins;
+    }
 
-    /// <summary>All block definitions: built-in blocks plus user-defined components (from the DB).</summary>
+    /// <summary>All block definitions: built-in blocks, user-defined components, and plugin blocks.</summary>
     public IReadOnlyList<BlockDefinition> All => _all ??= BuildAll();
 
     private IReadOnlyList<BlockDefinition> BuildAll()
@@ -27,6 +34,18 @@ public class BlockRegistry
         foreach (var c in _db.Components.OrderBy(c => c.Name).ToList())
         {
             list.Add(ComponentDefinition.FromComponent(c));
+        }
+        foreach (var pb in _plugins.Blocks)
+        {
+            list.Add(new BlockDefinition
+            {
+                Type = pb.Type,
+                Name = pb.Name,
+                Description = pb.Description,
+                Svg = SvgPlugin,
+                Partial = "(plugin)",
+                PluginRender = pb.Render
+            });
         }
         return list;
     }

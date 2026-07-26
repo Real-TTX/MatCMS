@@ -30,7 +30,7 @@ public class CreateModel : PageModel
             Error = "Bitte einen Namen angeben.";
             return Page();
         }
-        var plugin = new Plugin { Name = name, Code = Starter, Enabled = false };
+        var plugin = new MatCMS.Models.Plugin { Name = name, Code = Starter, Enabled = false };
         _db.Plugins.Add(plugin);
         await _db.SaveChangesAsync();
         return RedirectToPage("Edit", new { id = plugin.Id });

@@ -41,6 +41,18 @@
 </div>
 
 <div class="card">
+    <h2>@T["plugins.log"]</h2>
+    @if (Model.Log.Count == 0)
+    {
+        <p class="muted">@T["plugins.logEmpty"]</p>
+    }
+    else
+    {
+        <pre class="plugin-log">@string.Join("\n", Model.Log.Reverse())</pre>
+    }
+</div>
+
+<div class="card">
     <h2>@T["plugins.deletePlugin"]</h2>
     <form method="post" asp-page-handler="Delete" asp-route-id="@Model.Current.Id" onsubmit="return confirm('@T["plugins.confirmDelete"]');">
         <button type="submit" class="btn btn-danger">@T["plugins.deletePlugin"]</button>

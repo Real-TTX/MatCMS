@@ -36,7 +36,11 @@
     if (editor)
     {
         <div class="mat-ed-block" id="block-@block.Id" data-block-id="@block.Id" data-block-name="@T[def.Name]">
-            @if (def.IsComponent)
+            @if (def.IsPluginBlock)
+            {
+                @Html.Raw(RenderPluginBlock(def, block.DataJson))
+            }
+            else if (def.IsComponent)
             {
                 @Html.Raw(MatCMS.Content.ComponentDefinition.Render(def, data))
             }
@@ -50,6 +54,10 @@
             }
         </div>
     }
+    else if (def.IsPluginBlock)
+    {
+        @Html.Raw(RenderPluginBlock(def, block.DataJson))
+    }
     else if (def.IsComponent)
     {
         @Html.Raw(MatCMS.Content.ComponentDefinition.Render(def, data))
@@ -61,6 +69,16 @@
     else
     {
         @await Html.PartialAsync(def.Partial, data)
+    }
+}
+@functions {
+    string RenderPluginBlock(MatCMS.Content.BlockDefinition def, string dataJson)
+    {
+        var svc = ViewContext.HttpContext.RequestServices;
+        var reg = svc.GetService(typeof(MatCMS.Services.PluginRegistry)) as MatCMS.Services.PluginRegistry;
+        var pr = new MatCMS.Services.PluginRequest { Services = svc, Registry = reg!, Data = dataJson };
+        try { return def.PluginRender!(pr); }
+        catch (Exception ex) { return "<!-- plugin block error: " + System.Net.WebUtility.HtmlEncode(ex.Message) + " -->"; }
     }
 }
 

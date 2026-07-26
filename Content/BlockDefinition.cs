@@ -26,4 +26,9 @@ public class BlockDefinition
     public string? ComponentTemplate { get; set; }
 
     public bool IsComponent => ComponentTemplate is not null;
+
+    /// <summary>For plugin-provided blocks: renders HTML from a request context (null otherwise).</summary>
+    public Func<MatCMS.Services.PluginRequest, string>? PluginRender { get; set; }
+
+    public bool IsPluginBlock => PluginRender is not null;
 }

@@ -17,7 +17,7 @@ public class IndexModel : PageModel
         _db = db; _registry = registry; _runner = runner;
     }
 
-    public List<Plugin> Items { get; private set; } = new();
+    public List<MatCMS.Models.Plugin> Items { get; private set; } = new();
     public IReadOnlyDictionary<int, string> Errors => _registry.Errors;
 
     public async Task OnGetAsync() =>

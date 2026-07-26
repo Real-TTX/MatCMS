@@ -48,7 +48,7 @@ public class IndexModel : PageModel
         var m = await _db.Media.FindAsync(id);
         if (m is not null)
         {
-            var path = Path.Combine(_env.WebRootPath, "uploads", Path.GetFileName(m.Url));
+            var path = Path.Combine(MatCMS.Services.StoragePaths.Uploads(_env), Path.GetFileName(m.Url));
             try { if (System.IO.File.Exists(path)) System.IO.File.Delete(path); } catch { /* ignore */ }
             _db.Media.Remove(m);
             await _db.SaveChangesAsync();

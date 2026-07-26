@@ -12,10 +12,9 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
     volumes:
+      # One volume holds everything the app persists: DB, data-protection keys, scheduled backups, uploads.
       - matcms-data:/app/appdata
-      - matcms-uploads:/app/wwwroot/uploads
     restart: unless-stopped
 
 volumes:
   matcms-data:
-  matcms-uploads:

@@ -91,7 +91,7 @@ public class ContentTransferService
         public bool FormsPartial { get; set; }
     }
 
-    private string UploadsDir => Path.Combine(_env.WebRootPath, "uploads");
+    private string UploadsDir => StoragePaths.Uploads(_env);
 
     /// <summary>Builds a ZIP backup (content.json + optional assets/) and returns its bytes.</summary>
     public async Task<byte[]> ExportAsync(BackupOptions options, string? exportedAtUtc = null)

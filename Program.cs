@@ -142,6 +142,28 @@ app.UseStaticFiles(new StaticFileOptions
         ctx.Context.Response.Headers["X-Content-Type-Options"] = "nosniff"
 });
 
+// Serve uploaded media from the persisted data volume (appdata/uploads) at /uploads, so a single
+// volume mounted at /app/appdata holds everything. One-time migration from the legacy wwwroot/uploads.
+var uploadsDir = MatCMS.Services.StoragePaths.Uploads(app.Environment);
+Directory.CreateDirectory(uploadsDir);
+var legacyUploads = Path.Combine(app.Environment.WebRootPath, "uploads");
+if (Directory.Exists(legacyUploads) && !string.Equals(legacyUploads, uploadsDir, StringComparison.OrdinalIgnoreCase))
+{
+    foreach (var src in Directory.GetFiles(legacyUploads))
+    {
+        var dest = Path.Combine(uploadsDir, Path.GetFileName(src));
+        if (!File.Exists(dest))
+            try { File.Copy(src, dest); } catch { /* best-effort migration */ }
+    }
+}
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(uploadsDir),
+    RequestPath = "/uploads",
+    OnPrepareResponse = ctx =>
+        ctx.Context.Response.Headers["X-Content-Type-Options"] = "nosniff"
+});
+
 // Set CultureInfo.Current(UI)Culture per request (cookie / Accept-Language / default "de").
 app.UseRequestLocalization(app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<RequestLocalizationOptions>>().Value);
 
@@ -197,7 +219,7 @@ app.MapPost("/admin/api/upload", async (HttpRequest request, IWebHostEnvironment
     if (file.Length > 8 * 1024 * 1024)
         return Results.BadRequest(new { error = "Datei zu groß (max. 8 MB)." });
 
-    var uploads = Path.Combine(env.WebRootPath, "uploads");
+    var uploads = MatCMS.Services.StoragePaths.Uploads(env);
     Directory.CreateDirectory(uploads);
     var name = $"{Guid.NewGuid():N}{ext}";
     await using (var stream = File.Create(Path.Combine(uploads, name)))

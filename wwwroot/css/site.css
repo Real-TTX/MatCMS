@@ -392,6 +392,7 @@ h1, h2, h3, h4 {
 .alert { padding: 14px 18px; margin-bottom: 24px; font-size: 15px; border: 1px solid; }
 .alert-success { background: #f0f7f0; border-color: #b7d7b7; color: #24631f; }
 .alert-error { background: #fbf0f0; border-color: #e3bdbd; color: #8a2222; }
+.alert-info { background: #eef3fb; border-color: #c3d5ee; color: #2a4a75; }
 
 /* ---------- Form block (built with the form builder) ---------- */
 .form-block .form-el-title { margin: 26px 0 10px; }

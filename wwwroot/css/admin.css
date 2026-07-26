@@ -112,6 +112,10 @@ body.nav-open .admin-menu-toggle span:nth-child(3) { transform: translateY(-6px)
 .menu-map-row code { background: #f1f1f1; padding: 4px 8px; border-radius: 5px; }
 .menu-map-row .menu-map-arrow { color: var(--muted); }
 .menu-map-row select { min-width: 220px; }
+.menu-ref { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.menu-ref li { display: flex; align-items: center; gap: 12px; }
+.menu-ref li code { background: #f1f1f1; padding: 3px 9px; border-radius: 5px; min-width: 84px; }
+.menu-ref li span { color: var(--muted); font-size: 13.5px; }
 
 /* Custom-layout: label + starter button row, live slot detection */
 .label-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }

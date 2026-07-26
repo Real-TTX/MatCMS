@@ -65,22 +65,23 @@
     if (useCustomLayout)
     {
         string Enc(string? s) => System.Net.WebUtility.HtmlEncode(s ?? "");
-        string Link(string url, string label, bool nt) =>
-            $"<a href=\"{Enc(url)}\"{(nt ? " target=\"_blank\" rel=\"noopener\"" : "")}>{Enc(label)}</a>";
-        var navHtml = string.Concat(Site.HeaderMenu.Select(m => Link(m.Url, m.Label, m.OpenInNewTab)));
-        var footerNavHtml = string.Concat(Site.FooterMenu.Select(m => Link(m.Url, m.Label, m.OpenInNewTab)));
-        var toolbarHtml = string.Concat(Site.ToolbarMenu.Select(t =>
-            $"<a class=\"hicon\" href=\"{Enc(t.Url)}\"{(t.OpenInNewTab ? " target=\"_blank\" rel=\"noopener\"" : "")} title=\"{Enc(t.Label)}\"><svg viewBox=\"0 0 24 24\" fill=\"currentColor\">{MatCMS.Content.MenuIcons.Svg(t.Icon)}</svg></a>"));
-        var logoHtml = $"<img src=\"{Enc(Site.LogoUrl)}\" alt=\"{Enc(Site.SiteName)}\" />";
-        customBody = tpl.LayoutHtml
-            .Replace("{{content}}", contentHtml)
-            .Replace("{{nav}}", navHtml)
-            .Replace("{{footer_nav}}", footerNavHtml)
-            .Replace("{{toolbar}}", toolbarHtml)
-            .Replace("{{logo}}", logoHtml)
-            .Replace("{{site_name}}", Enc(Site.SiteName))
-            .Replace("{{footer_text}}", Enc(Site.FooterText))
-            .Replace("{{year}}", DateTime.UtcNow.Year.ToString());
+        string Link(MatCMS.Models.MenuItem mi) =>
+            $"<a href=\"{Enc(mi.Url)}\"{(mi.OpenInNewTab ? " target=\"_blank\" rel=\"noopener\"" : "")}>{Enc(mi.Label)}</a>";
+        var globals = new Dictionary<string, string>
+        {
+            ["content"] = contentHtml,
+            ["logo"] = $"<img src=\"{Enc(Site.LogoUrl)}\" alt=\"{Enc(Site.SiteName)}\" />",
+            ["site_name"] = Enc(Site.SiteName),
+            ["footer_text"] = Enc(Site.FooterText),
+            ["year"] = DateTime.UtcNow.Year.ToString(),
+            // Back-compat whole-menu placeholders.
+            ["nav"] = string.Concat(Site.HeaderMenu.Select(Link)),
+            ["footer_nav"] = string.Concat(Site.FooterMenu.Select(Link)),
+            ["toolbar"] = string.Concat(Site.ToolbarMenu.Select(t =>
+                $"<a class=\"hicon\" href=\"{Enc(t.Url)}\"{(t.OpenInNewTab ? " target=\"_blank\" rel=\"noopener\"" : "")} title=\"{Enc(t.Label)}\"><svg viewBox=\"0 0 24 24\" fill=\"currentColor\">{MatCMS.Content.MenuIcons.Svg(t.Icon)}</svg></a>")),
+        };
+        var menuMap = MatCMS.Content.LayoutRenderer.ParseMap(tpl.MenuMapJson);
+        customBody = MatCMS.Content.LayoutRenderer.Render(tpl.LayoutHtml, globals, menuMap, key => Site.MenuItems(key));
     }
 }
 <!DOCTYPE html>

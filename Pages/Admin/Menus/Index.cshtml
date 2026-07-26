@@ -7,106 +7,70 @@
     <h1>@T["menus.heading"]</h1>
 </div>
 
-<div class="card">
-    <h2>@T["menus.headerMenu"]</h2>
-    <p class="help">@Html.Raw(T["menus.dragHint"])</p>
-    @if (Model.Header.Count == 0)
-    {
-        <p class="muted">@T["menus.noItems"]</p>
-    }
-    <div class="block-list sortable" data-sortable data-reorder-form="reorder-header">
-        @foreach (var it in Model.Header)
-        {
-            <div class="block-item sortable-item" data-item-id="@it.Id">
-                <span class="drag-handle" title="@T["editor.dragToSort"]" aria-hidden="true">⠿</span>
-                <div class="b-info">
-                    <div class="b-type">@it.Label</div>
-                    <div class="b-sum">@it.Url@(it.OpenInNewTab ? " · " + T["menus.newTab"] : "")</div>
-                </div>
-                <div class="actions">
-                    <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@it.Id">@T["action.edit"]</a>
-                    <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@it.Id" onsubmit="return confirm('@T["menus.confirmDelete", it.Label]');">
-                        <button type="submit" class="btn btn-sm btn-danger" title="@T["action.delete"]">✕</button>
-                    </form>
-                </div>
+@foreach (var menu in Model.Menus)
+{
+    var items = Model.Items.TryGetValue(menu.Key, out var list) ? list : new List<MatCMS.Models.MenuItem>();
+    var reorderId = $"reorder-{menu.Key}";
+    <div class="card">
+        <div class="menu-card-head">
+            <div>
+                <h2>@menu.Name</h2>
+                <div class="b-sum mono">@menu.Key@(menu.Key == "toolbar" ? " · " + T["menus.toolbarMenu"] : "")</div>
             </div>
+            @if (!menu.BuiltIn)
+            {
+                <form class="inline-form" method="post" asp-page-handler="DeleteMenu" asp-route-id="@menu.Id" onsubmit="return confirm('@T["menus.confirmDeleteMenu"]');">
+                    <button type="submit" class="btn btn-sm btn-danger">@T["menus.deleteMenu"]</button>
+                </form>
+            }
+        </div>
+        @if (items.Count == 0)
+        {
+            <p class="muted">@T["menus.noItems"]</p>
         }
+        <div class="block-list sortable" data-sortable data-reorder-form="@reorderId">
+            @foreach (var it in items)
+            {
+                <div class="block-item sortable-item" data-item-id="@it.Id">
+                    <span class="drag-handle" title="@T["editor.dragToSort"]" aria-hidden="true">⠿</span>
+                    @if (!string.IsNullOrEmpty(it.Icon))
+                    {
+                        <span class="b-icon">
+                            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">@Html.Raw(MatCMS.Content.MenuIcons.Svg(it.Icon))</svg>
+                        </span>
+                    }
+                    <div class="b-info">
+                        <div class="b-type">@it.Label</div>
+                        <div class="b-sum">@it.Url@(it.OpenInNewTab ? " · " + T["menus.newTab"] : "")</div>
+                    </div>
+                    <div class="actions">
+                        <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@it.Id">@T["action.edit"]</a>
+                        <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@it.Id" onsubmit="return confirm('@T["menus.confirmDelete", it.Label]');">
+                            <button type="submit" class="btn btn-sm btn-danger" title="@T["action.delete"]">✕</button>
+                        </form>
+                    </div>
+                </div>
+            }
+        </div>
+        <form id="@reorderId" method="post" asp-page-handler="Reorder" asp-route-menu="@menu.Key" style="display:none;">
+            <div data-order-inputs></div>
+        </form>
+        <div class="list-actions">
+            <a class="btn" asp-page="Create" asp-route-menu="@menu.Key">@T["menus.addItem"]</a>
+        </div>
     </div>
-    <form id="reorder-header" method="post" asp-page-handler="Reorder" asp-route-menu="header" style="display:none;">
-        <div data-order-inputs></div>
-    </form>
-    <div class="list-actions">
-        <a class="btn" asp-page="Create" asp-route-menu="header">@T["menus.addItem"]</a>
-    </div>
-</div>
+}
 
 <div class="card">
-    <h2>@T["menus.footerMenu"]</h2>
-    <p class="help">@Html.Raw(T["menus.dragHint"])</p>
-    @if (Model.Footer.Count == 0)
-    {
-        <p class="muted">@T["menus.noItems"]</p>
-    }
-    <div class="block-list sortable" data-sortable data-reorder-form="reorder-footer">
-        @foreach (var it in Model.Footer)
-        {
-            <div class="block-item sortable-item" data-item-id="@it.Id">
-                <span class="drag-handle" title="@T["editor.dragToSort"]" aria-hidden="true">⠿</span>
-                <div class="b-info">
-                    <div class="b-type">@it.Label</div>
-                    <div class="b-sum">@it.Url@(it.OpenInNewTab ? " · " + T["menus.newTab"] : "")</div>
-                </div>
-                <div class="actions">
-                    <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@it.Id">@T["action.edit"]</a>
-                    <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@it.Id" onsubmit="return confirm('@T["menus.confirmDelete", it.Label]');">
-                        <button type="submit" class="btn btn-sm btn-danger" title="@T["action.delete"]">✕</button>
-                    </form>
-                </div>
-            </div>
-        }
-    </div>
-    <form id="reorder-footer" method="post" asp-page-handler="Reorder" asp-route-menu="footer" style="display:none;">
-        <div data-order-inputs></div>
+    <h2>@T["menus.newMenu"]</h2>
+    <p class="help">@T["menus.newMenuHelp"]</p>
+    <form method="post" asp-page-handler="CreateMenu" class="form-row" style="align-items:end;">
+        <div class="form-field">
+            <label for="new-menu-name">@T["menus.menuName"]</label>
+            <input id="new-menu-name" name="name" required />
+        </div>
+        <div><button type="submit" class="btn">@T["menus.createMenu"]</button></div>
     </form>
-    <div class="list-actions">
-        <a class="btn" asp-page="Create" asp-route-menu="footer">@T["menus.addItem"]</a>
-    </div>
-</div>
-
-<div class="card">
-    <h2>@T["menus.toolbarMenu"]</h2>
-    <p class="help">@T["menus.toolbarHelp"]</p>
-    @if (Model.Toolbar.Count == 0)
-    {
-        <p class="muted">@T["menus.noItems"]</p>
-    }
-    <div class="block-list sortable" data-sortable data-reorder-form="reorder-toolbar">
-        @foreach (var it in Model.Toolbar)
-        {
-            <div class="block-item sortable-item" data-item-id="@it.Id">
-                <span class="drag-handle" title="@T["editor.dragToSort"]" aria-hidden="true">⠿</span>
-                <span class="b-icon">
-                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">@Html.Raw(MatCMS.Content.MenuIcons.Svg(it.Icon))</svg>
-                </span>
-                <div class="b-info">
-                    <div class="b-type">@it.Label</div>
-                    <div class="b-sum">@it.Url@(it.OpenInNewTab ? " · " + T["menus.newTab"] : "")</div>
-                </div>
-                <div class="actions">
-                    <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@it.Id">@T["action.edit"]</a>
-                    <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@it.Id" onsubmit="return confirm('@T["menus.confirmDelete", it.Label]');">
-                        <button type="submit" class="btn btn-sm btn-danger" title="@T["action.delete"]">✕</button>
-                    </form>
-                </div>
-            </div>
-        }
-    </div>
-    <form id="reorder-toolbar" method="post" asp-page-handler="Reorder" asp-route-menu="toolbar" style="display:none;">
-        <div data-order-inputs></div>
-    </form>
-    <div class="list-actions">
-        <a class="btn" asp-page="Create" asp-route-menu="toolbar">@T["menus.addItem"]</a>
-    </div>
 </div>
 
 @section Scripts {

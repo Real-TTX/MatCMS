@@ -105,7 +105,8 @@ public class ContentTransferService
                     BackgroundColor = t.BackgroundColor, AltBackground = t.AltBackground,
                     ContainerWidth = t.ContainerWidth, ButtonRadius = t.ButtonRadius,
                     HeaderBackground = t.HeaderBackground, HeaderTextColor = t.HeaderTextColor, HeaderPadding = t.HeaderPadding,
-                    CustomCss = t.CustomCss, CustomJs = t.CustomJs, LayoutHtml = t.LayoutHtml
+                    CustomCss = t.CustomCss, CustomJs = t.CustomJs, LayoutHtml = t.LayoutHtml,
+                    MenuMapJson = t.MenuMapJson
                 }).ToList();
 
             dto.Components = (await _db.Components.AsNoTracking().OrderBy(c => c.Name).ToListAsync())
@@ -135,6 +136,9 @@ public class ContentTransferService
 
         if (options.Menus)
         {
+            dto.Menus = (await _db.Menus.AsNoTracking().OrderBy(m => m.SortOrder).ThenBy(m => m.Id).ToListAsync())
+                .Select(m => new MenuDto { Key = m.Key, Name = m.Name, SortOrder = m.SortOrder, BuiltIn = m.BuiltIn })
+                .ToList();
             dto.MenuItems = (await _db.MenuItems.AsNoTracking().OrderBy(m => m.Menu).ThenBy(m => m.SortOrder).ToListAsync())
                 .Select(m => new MenuItemDto
                 {
@@ -291,7 +295,8 @@ public class ContentTransferService
                     HeaderPadding = string.IsNullOrWhiteSpace(t.HeaderPadding) ? "16" : t.HeaderPadding!,
                     CustomCss = t.CustomCss ?? "",
                     CustomJs = t.CustomJs ?? "",
-                    LayoutHtml = t.LayoutHtml ?? ""
+                    LayoutHtml = t.LayoutHtml ?? "",
+                    MenuMapJson = string.IsNullOrWhiteSpace(t.MenuMapJson) ? "{}" : t.MenuMapJson!
                 });
             await _db.SaveChangesAsync();
             var all = await _db.Templates.ToListAsync();
@@ -361,6 +366,21 @@ public class ContentTransferService
             }
             await _db.SaveChangesAsync();
             summary.Add($"{dto.Pages.Count} Seiten ({blockCount} Blöcke)");
+        }
+
+        if (dto.Menus is not null)
+        {
+            var existing = await _db.Menus.ToListAsync();
+            foreach (var md in dto.Menus)
+            {
+                if (string.IsNullOrWhiteSpace(md.Key)) continue;
+                var m = existing.FirstOrDefault(x => x.Key == md.Key);
+                if (m is null)
+                    _db.Menus.Add(new Menu { Key = md.Key!, Name = md.Name ?? md.Key!, SortOrder = md.SortOrder, BuiltIn = md.BuiltIn });
+                else { m.Name = md.Name ?? m.Name; m.SortOrder = md.SortOrder; }
+            }
+            await _db.SaveChangesAsync();
+            summary.Add($"{dto.Menus.Count} Menüs");
         }
 
         if (dto.MenuItems is not null)
@@ -483,6 +503,7 @@ public class ContentTransferService
         public string ExportedAtUtc { get; set; } = "";
         public List<TemplateDto>? Templates { get; set; }
         public List<PageDto>? Pages { get; set; }
+        public List<MenuDto>? Menus { get; set; }
         public List<MenuItemDto>? MenuItems { get; set; }
         public List<SettingDto>? Settings { get; set; }
         public List<SubmissionDto>? Submissions { get; set; }
@@ -529,6 +550,7 @@ public class ContentTransferService
         public string? CustomCss { get; set; }
         public string? CustomJs { get; set; }
         public string? LayoutHtml { get; set; }
+        public string? MenuMapJson { get; set; }
     }
 
     private sealed class PageDto
@@ -574,6 +596,14 @@ public class ContentTransferService
         public string? ContentType { get; set; }
         public long SizeBytes { get; set; }
         public DateTime CreatedAt { get; set; }
+    }
+
+    private sealed class MenuDto
+    {
+        public string? Key { get; set; }
+        public string? Name { get; set; }
+        public int SortOrder { get; set; }
+        public bool BuiltIn { get; set; }
     }
 
     private sealed class MenuItemDto

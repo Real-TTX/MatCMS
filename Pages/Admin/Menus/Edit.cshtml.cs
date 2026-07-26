@@ -19,6 +19,7 @@ public class EditModel : PageModel
     [BindProperty] public bool OpenInNewTab { get; set; }
 
     public List<PageEntity> Pages { get; private set; } = new();
+    public List<Menu> Menus { get; private set; } = new();
     public string? Error { get; private set; }
 
     public async Task<IActionResult> OnGetAsync(int id)
@@ -31,7 +32,7 @@ public class EditModel : PageModel
         Url = item.Url;
         Icon = item.Icon;
         OpenInNewTab = item.OpenInNewTab;
-        await LoadPagesAsync();
+        await LoadListsAsync();
         return Page();
     }
 
@@ -40,14 +41,14 @@ public class EditModel : PageModel
         var item = await _db.MenuItems.FindAsync(id);
         if (item is null) return NotFound();
 
+        await LoadListsAsync();
         var label = (Label ?? "").Trim();
         var url = (Url ?? "").Trim();
-        if (Menu is not ("header" or "footer" or "toolbar")) Menu = "header";
+        if (!Menus.Any(m => m.Key == Menu)) Menu = Menus.FirstOrDefault()?.Key ?? "header";
 
         if (string.IsNullOrWhiteSpace(label) || string.IsNullOrWhiteSpace(url))
         {
             Error = "Bitte Label und Ziel (URL) angeben.";
-            await LoadPagesAsync();
             return Page();
         }
 
@@ -62,6 +63,9 @@ public class EditModel : PageModel
         return RedirectToPage("Index");
     }
 
-    private async Task LoadPagesAsync() =>
+    private async Task LoadListsAsync()
+    {
         Pages = await _db.Pages.OrderBy(p => p.Title).ToListAsync();
+        Menus = await _db.Menus.OrderBy(m => m.SortOrder).ThenBy(m => m.Id).ToListAsync();
+    }
 }

@@ -50,23 +50,29 @@ public class SiteContext
         return _settings.TryGetValue(key, out var v) && !string.IsNullOrWhiteSpace(v) ? v : fallback;
     }
 
-    private List<MenuItem>? _headerMenu;
-    private List<MenuItem>? _footerMenu;
-    private List<MenuItem>? _toolbarMenu;
+    private readonly Dictionary<string, IReadOnlyList<MenuItem>> _menuCache = new();
+    private List<Menu>? _allMenus;
 
-    // Menus are served per content locale.
-    public IReadOnlyList<MenuItem> HeaderMenu => _headerMenu ??= _db.MenuItems.AsNoTracking()
-        .Where(m => m.Menu == "header" && m.Locale == CurrentLocale)
+    /// <summary>All defined menus (built-in + user-created), ordered.</summary>
+    public IReadOnlyList<Menu> AllMenus => _allMenus ??= _db.Menus.AsNoTracking()
         .OrderBy(m => m.SortOrder).ThenBy(m => m.Id).ToList();
 
-    /// <summary>Top-bar icon strip ("Obere Leiste"), served per content locale.</summary>
-    public IReadOnlyList<MenuItem> ToolbarMenu => _toolbarMenu ??= _db.MenuItems.AsNoTracking()
-        .Where(m => m.Menu == "toolbar" && m.Locale == CurrentLocale)
-        .OrderBy(m => m.SortOrder).ThenBy(m => m.Id).ToList();
+    /// <summary>Items of the menu with the given key, for the current content locale.</summary>
+    public IReadOnlyList<MenuItem> MenuItems(string key)
+    {
+        if (_menuCache.TryGetValue(key, out var cached)) return cached;
+        var items = _db.MenuItems.AsNoTracking()
+            .Where(m => m.Menu == key && m.Locale == CurrentLocale)
+            .OrderBy(m => m.SortOrder).ThenBy(m => m.Id).ToList();
+        _menuCache[key] = items;
+        return items;
+    }
 
-    public IReadOnlyList<MenuItem> FooterMenu => _footerMenu ??= _db.MenuItems.AsNoTracking()
-        .Where(m => m.Menu == "footer" && m.Locale == CurrentLocale)
-        .OrderBy(m => m.SortOrder).ThenBy(m => m.Id).ToList();
+    // Convenience accessors for the built-in menus (served per content locale).
+    public IReadOnlyList<MenuItem> HeaderMenu => MenuItems("header");
+    public IReadOnlyList<MenuItem> FooterMenu => MenuItems("footer");
+    /// <summary>Top-bar icon strip ("Obere Leiste").</summary>
+    public IReadOnlyList<MenuItem> ToolbarMenu => MenuItems("toolbar");
 
     public IReadOnlyList<Page> NavPages => _navPages ??= _db.Pages.AsNoTracking()
         .Where(p => p.IsPublished && p.ShowInNav && p.Locale == CurrentLocale)

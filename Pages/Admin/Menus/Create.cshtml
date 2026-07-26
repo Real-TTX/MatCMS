@@ -18,9 +18,10 @@
             <div class="form-field">
                 <label for="Menu">@T["menus.menu"]</label>
                 <select id="Menu" name="Menu">
-                    <option value="header" selected="@(Model.Menu == "header" ? "selected" : null)">@T["menus.headerMenu"]</option>
-                    <option value="footer" selected="@(Model.Menu == "footer" ? "selected" : null)">@T["menus.footerMenu"]</option>
-                    <option value="toolbar" selected="@(Model.Menu == "toolbar" ? "selected" : null)">@T["menus.toolbarMenu"]</option>
+                    @foreach (var m in Model.Menus)
+                    {
+                        <option value="@m.Key" selected="@(Model.Menu == m.Key ? "selected" : null)">@m.Name</option>
+                    }
                 </select>
             </div>
             <div class="form-field">

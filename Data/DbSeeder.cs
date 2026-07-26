@@ -101,6 +101,13 @@ public static class DbSeeder
             );
         }
 
+        // Ensure the built-in menu definitions exist (also on already-seeded databases).
+        foreach (var (key, name, order) in new[] { ("header", "Hauptmenü", 0), ("footer", "Footer", 1), ("toolbar", "Obere Leiste", 2) })
+        {
+            if (!await db.Menus.AnyAsync(m => m.Key == key))
+                db.Menus.Add(new Menu { Key = key, Name = name, SortOrder = order, BuiltIn = true });
+        }
+
         // Migrate legacy top-bar links (old Settings fields) into the new "toolbar" menu, once.
         if (!await db.MenuItems.AnyAsync(m => m.Menu == "toolbar"))
         {

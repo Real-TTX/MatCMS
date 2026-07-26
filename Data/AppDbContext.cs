@@ -13,6 +13,7 @@ public class AppDbContext : DbContext
     public DbSet<ContactSubmission> ContactSubmissions => Set<ContactSubmission>();
     public DbSet<SiteSetting> SiteSettings => Set<SiteSetting>();
     public DbSet<MenuItem> MenuItems => Set<MenuItem>();
+    public DbSet<Menu> Menus => Set<Menu>();
     public DbSet<Template> Templates => Set<Template>();
     public DbSet<Form> Forms => Set<Form>();
     public DbSet<FormSubmission> FormSubmissions => Set<FormSubmission>();
@@ -29,6 +30,7 @@ public class AppDbContext : DbContext
         b.Entity<SiteSetting>().HasIndex(s => s.Key).IsUnique();
         b.Entity<Form>().HasIndex(f => f.Slug).IsUnique();
         b.Entity<Component>().HasIndex(c => c.Type).IsUnique();
+        b.Entity<Menu>().HasIndex(m => m.Key).IsUnique();
 
         b.Entity<ContentBlock>()
             .HasOne(cb => cb.Page)

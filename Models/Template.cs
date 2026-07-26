@@ -66,4 +66,10 @@ public class Template
     /// head (fonts, theme, favicon) always stays managed, so this can't break page styling.
     /// </summary>
     public string LayoutHtml { get; set; } = "";
+
+    /// <summary>
+    /// Maps template menu slots to actual menu keys, as JSON ({ "slot": "menuKey" }). Used to
+    /// resolve {{menu:slot}} / {{#menu:slot}}…{{/menu:slot}} placeholders in <see cref="LayoutHtml"/>.
+    /// </summary>
+    public string MenuMapJson { get; set; } = "{}";
 }

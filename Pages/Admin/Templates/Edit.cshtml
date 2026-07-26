@@ -126,7 +126,33 @@
             <label for="LayoutHtml">@T["templates.layoutHtml"]</label>
             <textarea id="LayoutHtml" name="LayoutHtml" rows="10" class="code" spellcheck="false" placeholder="<header>{{logo}} {{nav}}</header>&#10;<main>{{content}}</main>&#10;<footer>{{footer_nav}}</footer>">@Model.LayoutHtml</textarea>
             <div class="help">@Html.Raw(T["templates.layoutHtmlHelp"])</div>
+            <div class="help">@Html.Raw(T["templates.menuLoopHelp"])</div>
         </div>
+
+        @if (Model.MenuSlots.Count > 0)
+        {
+            <div class="form-field">
+                <label>@T["templates.menuMapping"]</label>
+                <div class="help">@T["templates.menuMappingHelp"]</div>
+                <div class="menu-map">
+                    @foreach (var slot in Model.MenuSlots)
+                    {
+                        <div class="menu-map-row">
+                            <code class="mono">{{menu:@slot}}</code>
+                            <span class="menu-map-arrow">→</span>
+                            <select name="MenuMap[@slot]">
+                                <option value="">@T["templates.menuUnmapped"]</option>
+                                @foreach (var m in Model.AvailableMenus)
+                                {
+                                    var sel = Model.MenuMap.TryGetValue(slot, out var mv) && mv == m.Key;
+                                    <option value="@m.Key" selected="@(sel ? "selected" : null)">@m.Name</option>
+                                }
+                            </select>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
 
         <div>
             <button type="submit" class="btn">@T["action.save"]</button>

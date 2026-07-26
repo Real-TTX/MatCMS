@@ -21,9 +21,7 @@
                 <span class="drag-handle" title="@T["editor.dragToSort"]" aria-hidden="true">⠿</span>
                 @if (!string.IsNullOrEmpty(it.Icon))
                 {
-                    <span class="b-icon">
-                        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">@Html.Raw(MatCMS.Content.MenuIcons.Svg(it.Icon))</svg>
-                    </span>
+                    <span class="b-icon"><i class="ti ti-@MatCMS.Content.MenuIcons.Resolve(it.Icon)" aria-hidden="true"></i></span>
                 }
                 <div class="b-info">
                     <div class="b-type">@it.Label</div>

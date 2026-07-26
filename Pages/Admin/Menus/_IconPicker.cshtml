@@ -1,33 +1,70 @@
 @model string?
-@* Icon picker for toolbar ("Obere Leiste") menu items. Shown only when the menu is "toolbar". *@
+@{
+    var current = MatCMS.Content.MenuIcons.Resolve(Model);
+}
+@* Searchable Tabler-icon picker for toolbar ("Obere Leiste") menu items. *@
 <div class="form-field icon-picker" data-icon-picker>
     <label>@T["menus.icon"]</label>
-    <input type="hidden" name="Icon" value="@Model" data-icon-input />
-    <div class="icon-grid">
-        <button type="button" class="icon-tile@(string.IsNullOrEmpty(Model) ? " sel" : "")" data-icon="" title="@T["menus.iconNone"]">
-            <span class="icon-none">—</span>
-        </button>
-        @foreach (var ic in MatCMS.Content.MenuIcons.All)
-        {
-            <button type="button" class="icon-tile@(Model == ic.Key ? " sel" : "")" data-icon="@ic.Key" title="@ic.Label">
-                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">@Html.Raw(ic.Svg)</svg>
-            </button>
-        }
+    <input type="hidden" name="Icon" value="@current" data-icon-input />
+    <div class="icon-current">
+        <span class="icon-current-preview" data-icon-preview>
+            @if (!string.IsNullOrEmpty(current))
+            {
+                <i class="ti ti-@current" aria-hidden="true"></i>
+            }
+        </span>
+        <span class="icon-current-name" data-icon-name>@(string.IsNullOrEmpty(current) ? "—" : current)</span>
+        <button type="button" class="btn btn-sm btn-ghost" data-icon-clear>@T["menus.iconNone"]</button>
     </div>
+    <input type="text" class="icon-search" placeholder="@T["menus.iconSearch"]" data-icon-search autocomplete="off" />
+    <div class="icon-grid" data-icon-grid></div>
     <div class="help">@T["menus.iconHelp"]</div>
 </div>
+<script src="~/lib/tabler-icons/icon-names.js" asp-append-version="true"></script>
 <script>
     (function () {
         var wrap = document.querySelector('[data-icon-picker]');
         if (!wrap) return;
         var input = wrap.querySelector('[data-icon-input]');
-        wrap.querySelectorAll('.icon-tile').forEach(function (t) {
-            t.addEventListener('click', function () {
-                wrap.querySelectorAll('.icon-tile').forEach(function (x) { x.classList.remove('sel'); });
-                t.classList.add('sel');
-                input.value = t.getAttribute('data-icon') || '';
+        var grid = wrap.querySelector('[data-icon-grid]');
+        var search = wrap.querySelector('[data-icon-search]');
+        var preview = wrap.querySelector('[data-icon-preview]');
+        var nameEl = wrap.querySelector('[data-icon-name]');
+        var all = window.TABLER_ICONS || [];
+        var CAP = 120;
+
+        function select(name) {
+            input.value = name || '';
+            preview.innerHTML = name ? '<i class="ti ti-' + name + '"></i>' : '';
+            nameEl.textContent = name || '—';
+            grid.querySelectorAll('.icon-tile').forEach(function (t) {
+                t.classList.toggle('sel', t.getAttribute('data-icon') === name);
             });
+        }
+        function render(q) {
+            q = (q || '').trim().toLowerCase();
+            var list = q ? all.filter(function (n) { return n.indexOf(q) !== -1; }) : all;
+            var shown = list.slice(0, CAP);
+            var html = shown.map(function (n) {
+                return '<button type="button" class="icon-tile' + (n === input.value ? ' sel' : '') +
+                    '" data-icon="' + n + '" title="' + n + '"><i class="ti ti-' + n + '"></i></button>';
+            }).join('');
+            if (list.length === 0) html += '<div class="icon-more">' + '@T["menus.iconNoResults"]' + '</div>';
+            else if (list.length > CAP) html += '<div class="icon-more">+' + (list.length - CAP) + ' …</div>';
+            grid.innerHTML = html;
+        }
+        grid.addEventListener('click', function (e) {
+            var t = e.target.closest('.icon-tile');
+            if (t) select(t.getAttribute('data-icon'));
         });
+        var deb;
+        search.addEventListener('input', function () {
+            clearTimeout(deb);
+            deb = setTimeout(function () { render(search.value); }, 120);
+        });
+        wrap.querySelector('[data-icon-clear]').addEventListener('click', function () { select(''); });
+        render('');
+
         // The icon only applies to the toolbar menu — hide the picker for header/footer.
         var menu = document.getElementById('Menu');
         function sync() { wrap.style.display = (menu && menu.value === 'toolbar') ? '' : 'none'; }

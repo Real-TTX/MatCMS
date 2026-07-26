@@ -78,7 +78,7 @@
             ["nav"] = string.Concat(Site.HeaderMenu.Select(Link)),
             ["footer_nav"] = string.Concat(Site.FooterMenu.Select(Link)),
             ["toolbar"] = string.Concat(Site.ToolbarMenu.Select(t =>
-                $"<a class=\"hicon\" href=\"{Enc(t.Url)}\"{(t.OpenInNewTab ? " target=\"_blank\" rel=\"noopener\"" : "")} title=\"{Enc(t.Label)}\"><svg viewBox=\"0 0 24 24\" fill=\"currentColor\">{MatCMS.Content.MenuIcons.Svg(t.Icon)}</svg></a>")),
+                $"<a class=\"hicon\" href=\"{Enc(t.Url)}\"{(t.OpenInNewTab ? " target=\"_blank\" rel=\"noopener\"" : "")} title=\"{Enc(t.Label)}\">{MatCMS.Content.MenuIcons.IconMarkup(t.Icon)}</a>")),
         };
         var menuMap = MatCMS.Content.LayoutRenderer.ParseMap(tpl.MenuMapJson);
         customBody = MatCMS.Content.LayoutRenderer.Render(tpl.LayoutHtml, globals, menuMap, key => Site.MenuItems(key));
@@ -97,6 +97,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="@fontsHref" rel="stylesheet" />
+    <link rel="stylesheet" href="~/lib/tabler-icons/tabler-icons.min.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <style>
         :root {
@@ -152,7 +153,7 @@ else
                 {
                     <a class="hicon" href="@t.Url" target="@(t.OpenInNewTab ? "_blank" : null)" rel="@(t.OpenInNewTab ? "noopener" : null)"
                        title="@t.Label" aria-label="@t.Label">
-                        <svg viewBox="0 0 24 24" role="img" aria-hidden="true" fill="currentColor">@Html.Raw(MatCMS.Content.MenuIcons.Svg(t.Icon))</svg>
+                        <i class="ti ti-@MatCMS.Content.MenuIcons.Resolve(t.Icon)" aria-hidden="true"></i>
                     </a>
                 }
             </div>

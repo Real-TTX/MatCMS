@@ -92,6 +92,7 @@ h1, h2, h3, h4 {
 .header-icons { display: flex; align-items: center; gap: 16px; }
 .hicon { color: var(--accent); display: inline-flex; transition: color .18s ease, transform .18s ease; }
 .hicon svg { width: 31px; height: 31px; display: block; }
+.hicon .ti { font-size: 29px; line-height: 1; display: block; }
 .hicon:hover { color: var(--accent-dark); transform: translateY(-2px); }
 
 .main-nav {
@@ -567,6 +568,7 @@ h1, h2, h3, h4 {
     }
     .header-icons { margin-left: auto; }
     .hicon svg { width: 27px; height: 27px; }
+    .hicon .ti { font-size: 26px; }
     .logo img { height: 46px; }
     .nav-toggle-label span {
         display: block; height: 2px; width: 100%;

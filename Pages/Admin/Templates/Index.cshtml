@@ -24,14 +24,14 @@
                     <span class="muted-font">@t.HeadingFont</span>
                 </div>
                 <div class="actions">
-                    <a class="btn btn-sm" asp-page="Edit" asp-route-id="@t.Id">@T["action.edit"]</a>
+                    <a class="btn btn-sm btn-ghost btn-icon" asp-page="Edit" asp-route-id="@t.Id" title="@T["action.edit"]" aria-label="@T["action.edit"]"><i class="ti ti-pencil" aria-hidden="true"></i></a>
                     @if (!t.IsActive)
                     {
                         <form class="inline-form" method="post" asp-page-handler="Activate" asp-route-id="@t.Id">
-                            <button type="submit" class="btn btn-sm btn-ghost">@T["templates.activate"]</button>
+                            <button type="submit" class="btn btn-sm btn-ghost btn-icon" title="@T["templates.activate"]" aria-label="@T["templates.activate"]"><i class="ti ti-check" aria-hidden="true"></i></button>
                         </form>
                         <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@t.Id" onsubmit="return confirm('@T["templates.confirmDelete", t.Name]');">
-                            <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
+                            <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><i class="ti ti-trash" aria-hidden="true"></i></button>
                         </form>
                     }
                 </div>

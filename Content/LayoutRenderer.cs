@@ -62,9 +62,7 @@ public static class LayoutRenderer
     private static string RenderItem(string tpl, MenuItem it)
     {
         var target = it.OpenInNewTab ? " target=\"_blank\" rel=\"noopener\"" : "";
-        var icon = MenuIcons.IsValid(it.Icon)
-            ? $"<svg viewBox=\"0 0 24 24\" fill=\"currentColor\">{MenuIcons.Svg(it.Icon)}</svg>"
-            : "";
+        var icon = MenuIcons.IconMarkup(it.Icon);
         return tpl
             .Replace("{{label}}", WebUtility.HtmlEncode(it.Label))
             .Replace("{{url}}", WebUtility.HtmlEncode(it.Url))

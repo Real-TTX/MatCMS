@@ -269,22 +269,12 @@ table.data .btn { white-space: nowrap; }
 .check { display: flex; align-items: center; gap: 8px; }
 
 /* Template gallery: each card shows a small live-styled preview instead of raw columns */
-.tpl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 20px; }
-.tpl-card { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #fff; display: flex; flex-direction: column; }
+.tpl-grid { display: grid; grid-template-columns: repeat(auto-fill, 256px); gap: 20px; }
+.tpl-card { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #fff; display: flex; flex-direction: column; width: 256px; }
 .tpl-card.is-active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-.tpl-preview { height: 158px; overflow: hidden; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; background: var(--pv-bg, #fff); }
-.pv-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; background: var(--pv-hbg, #fff); border-bottom: 1px solid rgba(0, 0, 0, .05); }
-.pv-logo { width: 26px; height: 8px; border-radius: 2px; background: var(--pv-accent); }
-.pv-nav { display: inline-flex; gap: 5px; }
-.pv-nav i { width: 15px; height: 4px; border-radius: 2px; background: var(--pv-htext, #333); opacity: .45; }
-.pv-body { padding: 12px 14px 10px; flex: 1; min-height: 0; }
-.pv-h { font-size: 15px; font-weight: 700; color: var(--pv-head, #111); line-height: 1.1; margin-bottom: 7px; font-family: var(--pv-headfont, inherit); }
-.pv-line { height: 4px; border-radius: 2px; background: var(--pv-text, #333); opacity: .22; margin-bottom: 5px; }
-.pv-line.short { width: 55%; }
-.pv-btn { display: inline-block; margin-top: 9px; padding: 5px 14px; border-radius: var(--pv-radius, 0); background: var(--pv-accent); color: #fff; font-size: 9px; font-weight: 600; }
-.pv-btn.outline { background: transparent; color: var(--pv-accent); border: 1.5px solid var(--pv-accent); padding: 3.5px 12.5px; }
-.pv-alt { display: flex; gap: 6px; padding: 9px 14px; background: var(--pv-alt, #f6f7f9); }
-.pv-chip { flex: 1; height: 18px; border-radius: 3px; background: #fff; border: 1px solid rgba(0, 0, 0, .06); }
+/* Live preview: the real public page rendered with this template, scaled down to a thumbnail. */
+.tpl-preview { display: block; height: 180px; overflow: hidden; border-bottom: 1px solid var(--line); position: relative; background: #fff; }
+.tpl-iframe { position: absolute; top: 0; left: 0; width: 1280px; height: 960px; border: 0; transform: scale(0.2); transform-origin: top left; pointer-events: none; background: #fff; }
 .tpl-card-foot { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
 .tpl-name { display: flex; align-items: center; gap: 8px; font-weight: 600; }
 .tpl-name .muted-font { color: var(--muted); font-weight: 400; font-size: 12px; }

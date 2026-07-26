@@ -170,7 +170,15 @@ public class SiteContext
         {
             if (!_templateLoaded)
             {
-                _activeTemplate = _db.Templates.AsNoTracking()
+                // Admin-only live preview: render the public page with a specific template so the
+                // template gallery can show a real, scaled <iframe> thumbnail (?previewTemplate=ID).
+                var http = _http.HttpContext;
+                if (http?.User?.IsInRole("Admin") == true &&
+                    int.TryParse(http.Request.Query["previewTemplate"], out var pvId) && pvId > 0)
+                {
+                    _activeTemplate = _db.Templates.AsNoTracking().FirstOrDefault(t => t.Id == pvId);
+                }
+                _activeTemplate ??= _db.Templates.AsNoTracking()
                     .OrderByDescending(t => t.IsActive).ThenBy(t => t.Id)
                     .FirstOrDefault();
                 _templateLoaded = true;

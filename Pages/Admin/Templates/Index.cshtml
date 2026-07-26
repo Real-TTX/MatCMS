@@ -2,24 +2,6 @@
 @model MatCMS.Pages.Admin.Templates.IndexModel
 @{
     ViewData["Title"] = T["templates.title"];
-
-    // Load the Google Fonts the templates use, so each preview shows its real headline font.
-    string FontQuery(string f) => Uri.EscapeDataString(f.Trim()).Replace("%20", "+") + ":wght@400;600;700";
-    var fonts = Model.Items
-        .SelectMany(t => new[] { t.HeadingFont, t.BodyFont })
-        .Where(f => !string.IsNullOrWhiteSpace(f))
-        .Select(f => f!.Trim())
-        .Distinct(StringComparer.OrdinalIgnoreCase)
-        .ToList();
-    var fontsHref = fonts.Count > 0
-        ? "https://fonts.googleapis.com/css2?" + string.Join("&", fonts.Select(FontQuery)) + "&display=swap"
-        : null;
-
-    string Or(string? v, string fb) => string.IsNullOrWhiteSpace(v) ? fb : v!.Trim();
-}
-@if (fontsHref is not null)
-{
-    <link href="@fontsHref" rel="stylesheet" />
 }
 <div class="page-head">
     <h1>@T["templates.title"]</h1>
@@ -28,36 +10,10 @@
 <div class="tpl-grid">
     @foreach (var t in Model.Items)
     {
-        var bg = Or(t.BackgroundColor, "#ffffff");
-        var accent = Or(t.AccentColor, "#de7e11");
-        var head = Or(t.HeadingColor, "#010101");
-        var text = Or(t.TextColor, "#1a1a1a");
-        var alt = Or(t.AltBackground, "#f6f7f9");
-        var hbg = Or(t.HeaderBackground, bg);
-        var htext = Or(t.HeaderTextColor, text);
-        var radius = (System.Text.RegularExpressions.Regex.IsMatch(Or(t.ButtonRadius, "0"), @"^\d+$") ? t.ButtonRadius!.Trim() : "0") + "px";
-        var headFont = Or(t.HeadingFont, "inherit");
-        var bodyFont = Or(t.BodyFont, "inherit");
-        var outline = t.ButtonStyle == "outline";
-        var style = $"--pv-bg:{bg};--pv-accent:{accent};--pv-head:{head};--pv-text:{text};--pv-alt:{alt};--pv-hbg:{hbg};--pv-htext:{htext};--pv-radius:{radius};--pv-headfont:'{headFont}';font-family:'{bodyFont}',sans-serif;";
         <div class="tpl-card @(t.IsActive ? "is-active" : "")">
-            <div class="tpl-preview" style="@style" aria-hidden="true">
-                <div class="pv-header">
-                    <span class="pv-logo"></span>
-                    <span class="pv-nav"><i></i><i></i><i></i></span>
-                </div>
-                <div class="pv-body">
-                    <div class="pv-h">@T["templates.previewHeading"]</div>
-                    <div class="pv-line"></div>
-                    <div class="pv-line short"></div>
-                    <span class="pv-btn @(outline ? "outline" : "")">@T["templates.previewButton"]</span>
-                </div>
-                <div class="pv-alt">
-                    <span class="pv-chip"></span>
-                    <span class="pv-chip"></span>
-                    <span class="pv-chip"></span>
-                </div>
-            </div>
+            <a class="tpl-preview" asp-page="Edit" asp-route-id="@t.Id" title="@t.Name" aria-label="@t.Name">
+                <iframe class="tpl-iframe" src="~/?previewTemplate=@t.Id" title="@t.Name" loading="lazy" tabindex="-1" scrolling="no" aria-hidden="true"></iframe>
+            </a>
             <div class="tpl-card-foot">
                 <div class="tpl-name">
                     <span>@t.Name</span>

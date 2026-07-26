@@ -54,6 +54,12 @@ builder.Services.AddAuthorization(options =>
 
 builder.Services.AddLocalization();
 builder.Services.AddSingleton<Localizer>();
+
+// Let Razor emit non-ASCII characters (umlauts, en-dash, ellipsis) literally instead of as HTML
+// numeric entities. The entity form is fine in HTML body text but shows up raw when a localized
+// string is placed into a <script> and assigned to element.textContent (e.g. the update check).
+builder.Services.Configure<Microsoft.Extensions.WebEncoders.WebEncoderOptions>(options =>
+    options.TextEncoderSettings = new System.Text.Encodings.Web.TextEncoderSettings(System.Text.Unicode.UnicodeRanges.All));
 builder.Services.Configure<RequestLocalizationOptions>(options =>
 {
     var cultures = supportedCultures.Select(c => new CultureInfo(c)).ToList();

@@ -25,14 +25,15 @@
                 <form id="block-form" method="post" asp-page-handler="SaveBlock" asp-route-id="@Model.Current.Id" asp-route-blockId="@Model.SelectedBlock!.Id">
                     <input type="hidden" name="DataJson" id="DataJson" />
                     <div id="block-editor"></div>
-                    <div class="le-panel-actions">
-                        <button type="submit" class="btn btn-sm">@T["action.save"]</button>
-                        <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@Model.Current.Id">@T["editor.done"]</a>
-                    </div>
                 </form>
-                <form class="inline-form le-delete" method="post" asp-page-handler="DeleteBlock" asp-route-id="@Model.Current.Id" asp-route-blockId="@Model.SelectedBlock!.Id" onsubmit="return confirm('@T["editor.confirmDeleteBlock"]');">
-                    <button type="submit" class="btn btn-sm btn-danger">@T["editor.blockDelete"]</button>
-                </form>
+                @* One tidy action row: positive → negative, destructive set apart on the right. *@
+                <div class="le-panel-actions">
+                    <button type="submit" form="block-form" class="btn btn-sm">@T["action.save"]</button>
+                    <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@Model.Current.Id">@T["editor.done"]</a>
+                    <form class="inline-form le-delete" method="post" asp-page-handler="DeleteBlock" asp-route-id="@Model.Current.Id" asp-route-blockId="@Model.SelectedBlock!.Id" onsubmit="return confirm('@T["editor.confirmDeleteBlock"]');">
+                        <button type="submit" class="btn btn-sm btn-danger">@T["editor.blockDelete"]</button>
+                    </form>
+                </div>
             </div>
             <script id="block-schema" type="application/json">@Html.Raw(Model.SchemaJson.Replace("</", "<\\/"))</script>
             <script id="block-data" type="application/json">@Html.Raw(Model.CurrentJson.Replace("</", "<\\/"))</script>

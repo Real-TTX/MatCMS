@@ -180,10 +180,8 @@ public class ContentTransferService
                 IsPublished = p.IsPublished, ShowInNav = p.ShowInNav, ShowInFooter = p.ShowInFooter,
                 NavOrder = p.NavOrder, FooterOrder = p.FooterOrder, MetaDescription = p.MetaDescription,
                 CreatedAt = p.CreatedAt, UpdatedAt = p.UpdatedAt,
-                Blocks = p.Blocks.OrderBy(b => b.SortOrder).Select(b => new BlockDto
-                {
-                    BlockType = b.BlockType, SortOrder = b.SortOrder, DataJson = b.DataJson
-                }).ToList()
+                // Preserve the block hierarchy: top-level blocks with their children nested inside.
+                Blocks = BuildBlockDtos(p.Blocks, null)
             }).ToList();
         }
 
@@ -411,16 +409,6 @@ public class ContentTransferService
         if (dto.Pages is not null)
         {
             var blockCount = 0;
-            List<ContentBlock> BuildBlocks(PageDto p) => (p.Blocks ?? new()).Select(b =>
-            {
-                blockCount++;
-                return new ContentBlock
-                {
-                    BlockType = b.BlockType ?? "",
-                    SortOrder = b.SortOrder,
-                    DataJson = string.IsNullOrWhiteSpace(b.DataJson) ? "{}" : b.DataJson!
-                };
-            }).ToList();
 
             if (dto.PagesPartial)
             {
@@ -436,19 +424,19 @@ public class ContentTransferService
                         string.Equals(x.Locale, locale, StringComparison.OrdinalIgnoreCase));
                     if (row is null)
                     {
-                        row = new Page { Blocks = BuildBlocks(p) };
+                        row = new Page();
                         ApplyPageFields(row, p, locale);
                         _db.Pages.Add(row);
                         existing.Add(row);   // so a duplicate (slug,locale) in the same backup upserts, not double-inserts
                     }
                     else
                     {
-                        _db.ContentBlocks.RemoveRange(row.Blocks);
+                        _db.ContentBlocks.RemoveRange(row.Blocks); // drop the page's old blocks (all levels)
                         ApplyPageFields(row, p, locale);
-                        row.Blocks = BuildBlocks(p);
                     }
+                    await _db.SaveChangesAsync();               // ensure page Id exists + old blocks removed
+                    blockCount += await InsertBlockTreeAsync(p.Blocks, row.Id, null);
                 }
-                await _db.SaveChangesAsync();
                 summary.Add($"{dto.Pages.Count} Seiten (aktualisiert, {blockCount} Blöcke)");
             }
             else
@@ -458,12 +446,13 @@ public class ContentTransferService
                 await _db.SaveChangesAsync();
                 foreach (var p in dto.Pages)
                 {
-                    var row = new Page { Blocks = BuildBlocks(p) };
+                    var row = new Page();
                     ApplyPageFields(row, p, string.IsNullOrWhiteSpace(p.Locale) ? Localizer.DefaultCulture : p.Locale!);
                     row.CreatedAt = p.CreatedAt == default ? DateTime.UtcNow : p.CreatedAt;
                     _db.Pages.Add(row);
+                    await _db.SaveChangesAsync();               // page Id
+                    blockCount += await InsertBlockTreeAsync(p.Blocks, row.Id, null);
                 }
-                await _db.SaveChangesAsync();
                 summary.Add($"{dto.Pages.Count} Seiten ({blockCount} Blöcke)");
             }
         }
@@ -679,6 +668,44 @@ public class ContentTransferService
         row.MenuMapJson = string.IsNullOrWhiteSpace(t.MenuMapJson) ? "{}" : t.MenuMapJson!;
     }
 
+    /// <summary>Builds the nested block DTO tree for a page: top-level blocks (parentId == null),
+    /// each carrying its children recursively. Ordered by SortOrder at every level.</summary>
+    private static List<BlockDto> BuildBlockDtos(IEnumerable<ContentBlock> all, int? parentId)
+    {
+        var list = all as IReadOnlyCollection<ContentBlock> ?? all.ToList();
+        return list.Where(b => b.ParentId == parentId).OrderBy(b => b.SortOrder).Select(b => new BlockDto
+        {
+            BlockType = b.BlockType,
+            SortOrder = b.SortOrder,
+            DataJson = b.DataJson,
+            Children = BuildBlockDtos(list, b.Id) is { Count: > 0 } c ? c : null
+        }).ToList();
+    }
+
+    /// <summary>Inserts a block tree under a page, preserving nesting: each block is saved to obtain
+    /// its Id before its children are inserted with that Id as their ParentId. Returns the block count.</summary>
+    private async Task<int> InsertBlockTreeAsync(List<BlockDto>? dtos, int pageId, int? parentId)
+    {
+        var count = 0;
+        foreach (var b in dtos ?? new())
+        {
+            var cb = new ContentBlock
+            {
+                PageId = pageId,
+                ParentId = parentId,
+                BlockType = b.BlockType ?? "",
+                SortOrder = b.SortOrder,
+                DataJson = string.IsNullOrWhiteSpace(b.DataJson) ? "{}" : b.DataJson!
+            };
+            _db.ContentBlocks.Add(cb);
+            await _db.SaveChangesAsync();
+            count++;
+            if (b.Children is { Count: > 0 })
+                count += await InsertBlockTreeAsync(b.Children, pageId, cb.Id);
+        }
+        return count;
+    }
+
     /// <summary>Copies a backed-up page's scalar fields onto an entity (Blocks handled by the caller).</summary>
     private static void ApplyPageFields(Page row, PageDto p, string locale)
     {
@@ -838,6 +865,8 @@ public class ContentTransferService
         public string? BlockType { get; set; }
         public int SortOrder { get; set; }
         public string? DataJson { get; set; }
+        /// <summary>Nested child blocks (container blocks). Null/absent for leaf and legacy-flat blocks.</summary>
+        public List<BlockDto>? Children { get; set; }
     }
 
     private sealed class ComponentDto

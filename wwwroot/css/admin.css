@@ -113,6 +113,13 @@ body.nav-open .admin-menu-toggle span:nth-child(3) { transform: translateY(-6px)
 .menu-map-row .menu-map-arrow { color: var(--muted); }
 .menu-map-row select { min-width: 220px; }
 
+/* Custom-layout: label + starter button row, live slot detection */
+.label-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.slot-detect { margin-top: 8px; font-size: 13px; }
+.slot-detect.muted { color: var(--muted); }
+.slot-detect.has-slots { color: #2b6a2b; }
+.slot-detect code { background: #eef4ee; padding: 2px 7px; border-radius: 5px; margin-right: 4px; }
+
 /* Component field rows */
 .field-row { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
 .field-row .fr-label { flex: 1; }

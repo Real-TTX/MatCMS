@@ -65,9 +65,19 @@ public static class DbSeeder
 
         // A ready-made alternative template. Ensured on every startup (not only on a fresh DB) so
         // it also reappears after importing a backup that only carried the previous theme.
-        if (!await db.Templates.AnyAsync(t => t.Name == ModernTemplateName))
+        var modern = await db.Templates.FirstOrDefaultAsync(t => t.Name == ModernTemplateName);
+        if (modern is null)
         {
             db.Templates.Add(BuildModernTemplate());
+        }
+        else if (string.IsNullOrWhiteSpace(modern.LayoutHtml))
+        {
+            // Upgrade an older "Modern" row (colors/CSS only) to the new slot-based custom layout,
+            // so the alternative template actually demonstrates {{menu:slot}} without a volume reset.
+            var m = BuildModernTemplate();
+            modern.LayoutHtml = m.LayoutHtml;
+            modern.MenuMapJson = m.MenuMapJson;
+            modern.CustomCss = m.CustomCss;
         }
 
         // A ready-made example component so the component designer has something to look at.
@@ -416,7 +426,36 @@ public static class DbSeeder
         ButtonStyle = "solid",
         ButtonRadius = "10",
         ContainerWidth = "1200",
+        // A genuinely different body structure — centred brand + pill navigation + gradient footer —
+        // driven entirely by the CI variables from the managed <head> (accent, fonts). It uses named
+        // menu slots so the slot→menu mapping is visible and editable in the template editor.
+        LayoutHtml = """
+            <div class="v2-topbar">
+              <div class="v2-wrap">
+                <span class="v2-brandline">{{site_name}}</span>
+                <span class="v2-tools">{{toolbar}}</span>
+              </div>
+            </div>
+            <header class="v2-header">
+              <a class="v2-logo" href="/">{{logo}}</a>
+              <nav class="v2-nav">
+                {{#menu:primary}}<a class="v2-navlink" href="{{url}}"{{target}}><span class="v2-ico">{{icon}}</span>{{label}}</a>{{/menu:primary}}
+              </nav>
+            </header>
+            <main class="v2-main">{{content}}</main>
+            <footer class="v2-footer">
+              <div class="v2-wrap v2-footgrid">
+                <div class="v2-footbrand">{{logo}}<p>{{footer_text}}</p></div>
+                <nav class="v2-footnav">
+                  {{#menu:secondary}}<a href="{{url}}"{{target}}>{{label}}</a>{{/menu:secondary}}
+                </nav>
+              </div>
+              <div class="v2-copy">© {{year}} {{site_name}}</div>
+            </footer>
+            """,
+        MenuMapJson = """{"primary":"header","secondary":"footer"}""",
         CustomCss = """
+            /* Block styling (shared with the default look) */
             .hero { background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
             .hero__inner h1, .hero__inner p { color: #fff; }
             .service-grid { gap: 20px; background: transparent; border: none; }
@@ -424,6 +463,31 @@ public static class DbSeeder
             .service-card:hover { transform: translateY(-3px); box-shadow: 0 16px 40px rgba(2,6,23,.10); background: #fff; }
             .columns-grid { gap: 28px; }
             .btn { box-shadow: 0 8px 22px color-mix(in srgb, var(--accent) 30%, transparent); }
+
+            /* V2 custom layout */
+            .v2-wrap { max-width: var(--max); margin: 0 auto; padding: 0 24px; }
+            .v2-topbar { background: var(--accent); color: #fff; font-size: 13px; }
+            .v2-topbar .v2-wrap { display: flex; justify-content: space-between; align-items: center; height: 38px; }
+            .v2-tools { display: inline-flex; gap: 12px; align-items: center; }
+            .v2-tools a { color: #fff; display: inline-flex; }
+            .v2-tools svg { width: 17px; height: 17px; }
+            .v2-header { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 30px 24px 0; }
+            .v2-logo img { height: 48px; display: block; }
+            .v2-nav { display: inline-flex; flex-wrap: wrap; gap: 6px; background: var(--bg-alt); padding: 8px; border-radius: 999px; }
+            .v2-navlink { display: inline-flex; align-items: center; gap: 7px; padding: 9px 18px; border-radius: 999px; text-decoration: none; color: var(--black); font-weight: 600; font-family: var(--font-head); font-size: 14px; transition: background .15s ease, color .15s ease; }
+            .v2-navlink:hover { background: #fff; color: var(--accent); box-shadow: 0 4px 12px rgba(2,6,23,.08); }
+            .v2-ico svg { width: 16px; height: 16px; display: block; }
+            .v2-ico:empty { display: none; }
+            .v2-main { max-width: var(--max); margin: 34px auto 0; padding: 0 24px; }
+            .v2-footer { margin-top: 64px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; }
+            .v2-footgrid { display: flex; justify-content: space-between; gap: 40px; padding: 48px 24px; flex-wrap: wrap; }
+            .v2-footbrand img { height: 40px; filter: brightness(0) invert(1); }
+            .v2-footbrand p { max-width: 320px; opacity: .85; font-size: 14px; margin: 12px 0 0; }
+            .v2-footnav { display: flex; flex-direction: column; gap: 10px; }
+            .v2-footnav a { color: #fff; text-decoration: none; opacity: .9; }
+            .v2-footnav a:hover { text-decoration: underline; opacity: 1; }
+            .v2-copy { border-top: 1px solid rgba(255,255,255,.2); text-align: center; padding: 18px; font-size: 13px; }
+            @media (max-width: 700px) { .v2-footgrid { flex-direction: column; gap: 24px; } }
             """,
         CustomJs = ""
     };

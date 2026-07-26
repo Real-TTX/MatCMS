@@ -123,10 +123,14 @@
             <div class="help">@T["templates.customJsHelp"]</div>
         </div>
         <div class="form-field">
-            <label for="LayoutHtml">@T["templates.layoutHtml"]</label>
-            <textarea id="LayoutHtml" name="LayoutHtml" rows="10" class="code" spellcheck="false" placeholder="<header>{{logo}} {{nav}}</header>&#10;<main>{{content}}</main>&#10;<footer>{{footer_nav}}</footer>">@Model.LayoutHtml</textarea>
+            <div class="label-row">
+                <label for="LayoutHtml">@T["templates.layoutHtml"]</label>
+                <button type="button" id="insert-starter" class="btn btn-sm btn-ghost">@T["templates.insertStarter"]</button>
+            </div>
+            <textarea id="LayoutHtml" name="LayoutHtml" rows="10" class="code" spellcheck="false" placeholder="<header>{{logo}} {{menu:primary}}</header>&#10;<main>{{content}}</main>&#10;<footer>{{menu:secondary}}</footer>">@Model.LayoutHtml</textarea>
             <div class="help">@Html.Raw(T["templates.layoutHtmlHelp"])</div>
             <div class="help">@Html.Raw(T["templates.menuLoopHelp"])</div>
+            <div id="slot-detect" class="slot-detect"></div>
         </div>
 
         @if (Model.MenuSlots.Count > 0)
@@ -162,6 +166,57 @@
 
 @section Scripts {
     <script>
+        // ---- Custom-layout helpers: starter template + live slot detection ----
+        (function () {
+            var ta = document.getElementById('LayoutHtml');
+            var detect = document.getElementById('slot-detect');
+            var starterBtn = document.getElementById('insert-starter');
+            if (!ta) return;
+
+            var STARTER = [
+                '<header class="site-header">',
+                '  <div class="container header-inner">',
+                '    <a class="logo" href="/">{{logo}}</a>',
+                '    <nav class="main-nav">{{menu:primary}}</nav>',
+                '  </div>',
+                '</header>',
+                '',
+                '<main>{{content}}</main>',
+                '',
+                '<footer class="site-footer">',
+                '  <div class="container footer-inner">',
+                '    <nav class="footer-nav">',
+                '      {{#menu:secondary}}<a href="{{url}}"{{target}}>{{icon}}{{label}}</a>{{/menu:secondary}}',
+                '    </nav>',
+                '    <p class="footer-text">© {{year}} {{site_name}}</p>',
+                '  </div>',
+                '</footer>'
+            ].join('\n');
+
+            function detectSlots() {
+                var v = ta.value;
+                var re = /\{\{#?menu:([a-zA-Z0-9_-]+)\}\}/g, m, set = [];
+                while ((m = re.exec(v)) !== null) { if (set.indexOf(m[1]) === -1) set.push(m[1]); }
+                if (!set.length) {
+                    detect.className = 'slot-detect muted';
+                    detect.textContent = '@T["templates.slotsNone"]';
+                    return;
+                }
+                detect.className = 'slot-detect has-slots';
+                detect.innerHTML = '<span>@T["templates.slotsDetected"]</span> ' +
+                    set.map(function (s) { return '<code class="mono">{{menu:' + s + '}}</code>'; }).join(' ');
+            }
+
+            starterBtn && starterBtn.addEventListener('click', function () {
+                if (ta.value.trim() && !confirm('@T["templates.starterConfirm"]')) return;
+                ta.value = STARTER;
+                detectSlots();
+                ta.focus();
+            });
+            ta.addEventListener('input', detectSlots);
+            detectSlots();
+        })();
+
         // Keep each color swatch and its hex text field in sync.
         document.querySelectorAll('.color-field').forEach(function (cf) {
             var color = cf.querySelector('input[type=color]');

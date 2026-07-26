@@ -23,8 +23,13 @@ public class BackupScheduleConfig
     public bool Forms { get; set; } = true;
     public bool Assets { get; set; } = true;
 
-    /// <summary>Empty = all templates; otherwise only these template names are backed up.</summary>
+    // Granular within-section selection. Empty = the whole section; otherwise only these items.
+    /// <summary>Template names to back up (empty = all).</summary>
     public List<string> TemplateNames { get; set; } = new();
+    /// <summary>Page keys ("slug|locale") to back up (empty = all).</summary>
+    public List<string> PageKeys { get; set; } = new();
+    /// <summary>Form slugs to back up (empty = all).</summary>
+    public List<string> FormSlugs { get; set; } = new();
 
     /// <summary>UTC timestamp (ISO-8601) of the last successful scheduled run, or null.</summary>
     public string? LastRunUtc { get; set; }

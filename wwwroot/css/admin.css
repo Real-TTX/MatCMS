@@ -246,9 +246,24 @@ table.data .btn { white-space: nowrap; }
 .form-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
 .check { display: flex; align-items: center; gap: 8px; }
 
-/* Backup: sub-selection (per template), action rows, inspection, schedule status */
+/* Tabs (Backup / Restore / Schedule) */
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 22px; }
+.tab { appearance: none; background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -1px; padding: 10px 16px; font: inherit; font-size: 14.5px; font-weight: 600; color: var(--muted); cursor: pointer; }
+.tab:hover { color: var(--black); }
+.tab.active { color: var(--black); border-bottom-color: var(--accent); }
+
+/* Backup: collapsible per-item groups, action rows, inspection, schedule status */
 .form-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
-.subselect { margin: -6px 0 4px 26px; padding: 10px 14px; border-left: 2px solid var(--line); display: flex; flex-direction: column; gap: 7px; }
+.backup-group { border: 1px solid var(--line); border-radius: 8px; padding: 4px 12px; }
+.backup-group > summary { display: flex; align-items: center; gap: 10px; list-style: none; cursor: pointer; padding: 8px 4px; }
+.backup-group > summary::-webkit-details-marker { display: none; }
+.backup-group > summary::before { content: "▸"; color: var(--muted); font-size: 12px; transition: transform .15s; }
+.backup-group[open] > summary::before { transform: rotate(90deg); }
+.backup-group .backup-count { margin-left: auto; font-size: 12px; color: var(--muted); background: #eef0f3; border-radius: 999px; padding: 1px 9px; }
+.backup-items { display: flex; flex-direction: column; gap: 7px; padding: 4px 4px 12px 24px; }
+/* Flat sections (no children) — same box, no arrow, aligned checkbox */
+.backup-flat .backup-head { display: flex; align-items: center; gap: 10px; padding: 8px 4px; }
+.backup-flat .backup-head::before { content: "▸"; visibility: hidden; font-size: 12px; }
 .check-sm { font-size: 13.5px; gap: 7px; }
 .inspect-result { margin: 4px 0 16px; padding: 14px 16px; border-radius: 8px; font-size: 14px; }
 .inspect-result.ok { background: #f2f7f2; border: 1px solid #cfe3cf; }

@@ -30,8 +30,10 @@ public class IndexModel : PageModel
     [BindProperty] public bool IncSubmissions { get; set; }
     [BindProperty] public bool IncForms { get; set; }
     [BindProperty] public bool IncAssets { get; set; }
-    /// <summary>Selected template names (empty = all templates in the section).</summary>
+    // Granular within-section selection (empty = the whole section).
     [BindProperty] public List<string> TemplateNames { get; set; } = new();
+    [BindProperty] public List<string> PageKeys { get; set; } = new();
+    [BindProperty] public List<string> FormSlugs { get; set; } = new();
 
     [BindProperty] public IFormFile? ImportFile { get; set; }
     [BindProperty] public bool Confirm { get; set; }
@@ -40,34 +42,54 @@ public class IndexModel : PageModel
 
     // View data.
     public List<Template> AllTemplates { get; private set; } = new();
+    public List<MatCMS.Models.Page> AllPages { get; private set; } = new();
+    public List<Form> AllForms { get; private set; } = new();
     public BackupScheduleConfig ScheduleConfig { get; private set; } = new();
     public List<BackupManager.StoredBackup> StoredBackups { get; private set; } = new();
+
+    /// <summary>Stable key for a page checkbox: "slug|locale".</summary>
+    public static string PageKey(MatCMS.Models.Page p) => ContentTransferService.PageKey(p.Slug, p.Locale);
 
     public async Task OnGetAsync() => await LoadAsync();
 
     private async Task LoadAsync()
     {
         AllTemplates = await _db.Templates.AsNoTracking().OrderByDescending(t => t.IsActive).ThenBy(t => t.Name).ToListAsync();
+        AllPages = await _db.Pages.AsNoTracking().OrderBy(p => p.Locale).ThenBy(p => p.Title).ToListAsync();
+        AllForms = await _db.Forms.AsNoTracking().OrderBy(f => f.Name).ToListAsync();
         ScheduleConfig = await _backups.GetConfigAsync();
         Schedule = ScheduleConfig; // so asp-for checkboxes reflect the saved schedule
         StoredBackups = _backups.ListStored();
     }
 
-    private ContentTransferService.BackupOptions BuildOptions() => new()
+    /// <summary>A selection counts as "granular" (→ upsert on restore) only when it is a STRICT
+    /// subset of what exists. All items selected (or none) means the whole section (→ replace-all).</summary>
+    private static List<string>? Subset(List<string> selected, int total) =>
+        selected.Count > 0 && selected.Count < total ? selected : null;
+
+    private async Task<ContentTransferService.BackupOptions> BuildOptionsAsync()
     {
-        Templates = IncTemplates,
-        Pages = IncPages,
-        Menus = IncMenus,
-        Settings = IncSettings,
-        Submissions = IncSubmissions,
-        Forms = IncForms,
-        Assets = IncAssets,
-        TemplateNames = TemplateNames is { Count: > 0 } ? TemplateNames : null
-    };
+        var tplTotal = await _db.Templates.CountAsync();
+        var pageTotal = await _db.Pages.CountAsync();
+        var formTotal = await _db.Forms.CountAsync();
+        return new()
+        {
+            Templates = IncTemplates,
+            Pages = IncPages,
+            Menus = IncMenus,
+            Settings = IncSettings,
+            Submissions = IncSubmissions,
+            Forms = IncForms,
+            Assets = IncAssets,
+            TemplateNames = Subset(TemplateNames, tplTotal),
+            PageKeys = Subset(PageKeys, pageTotal),
+            FormSlugs = Subset(FormSlugs, formTotal)
+        };
+    }
 
     public async Task<IActionResult> OnPostExportAsync()
     {
-        var options = BuildOptions();
+        var options = await BuildOptionsAsync();
         if (!options.Any)
         {
             TempData["FlashError"] = "Bitte mindestens einen Bereich für das Backup auswählen.";
@@ -102,12 +124,12 @@ public class IndexModel : PageModel
         if (!Confirm)
         {
             TempData["FlashError"] = "Bitte bestätigen, dass die im Backup enthaltenen Bereiche überschrieben werden.";
-            return RedirectToPage();
+            return RedirectToPage(new { tab = "restore" });
         }
         if (ImportFile is null || ImportFile.Length == 0)
         {
             TempData["FlashError"] = "Bitte eine Backup-Datei (.zip oder .json) auswählen.";
-            return RedirectToPage();
+            return RedirectToPage(new { tab = "restore" });
         }
 
         byte[] data;
@@ -122,7 +144,7 @@ public class IndexModel : PageModel
         {
             TempData["FlashError"] = $"Import fehlgeschlagen: {ex.Message}";
         }
-        return RedirectToPage();
+        return RedirectToPage(new { tab = "restore" });
     }
 
     // ---- Scheduler ----
@@ -131,12 +153,18 @@ public class IndexModel : PageModel
     {
         var existing = await _backups.GetConfigAsync();
         Schedule.LastRunUtc = existing.LastRunUtc; // never editable from the form
-        Schedule.TemplateNames = TemplateNames ?? new();
+        // Store granular keys only when a strict subset is selected; "all" is stored as empty (= all).
+        var tplTotal = await _db.Templates.CountAsync();
+        var pageTotal = await _db.Pages.CountAsync();
+        var formTotal = await _db.Forms.CountAsync();
+        Schedule.TemplateNames = Subset(TemplateNames, tplTotal) ?? new();
+        Schedule.PageKeys = Subset(PageKeys, pageTotal) ?? new();
+        Schedule.FormSlugs = Subset(FormSlugs, formTotal) ?? new();
         if (Schedule.IntervalHours < 1) Schedule.IntervalHours = 1;
         if (Schedule.Retain < 1) Schedule.Retain = 1;
         await _backups.SaveConfigAsync(Schedule);
         TempData["Flash"] = "Backup-Zeitplan gespeichert.";
-        return RedirectToPage();
+        return RedirectToPage(new { tab = "schedule" });
     }
 
     public async Task<IActionResult> OnPostRunNowAsync()
@@ -151,7 +179,7 @@ public class IndexModel : PageModel
         {
             TempData["FlashError"] = $"Backup fehlgeschlagen: {ex.Message}";
         }
-        return RedirectToPage();
+        return RedirectToPage(new { tab = "schedule" });
     }
 
     public async Task<IActionResult> OnGetDownloadAsync(string name)
@@ -167,7 +195,7 @@ public class IndexModel : PageModel
         if (data is null)
         {
             TempData["FlashError"] = "Backup-Datei nicht gefunden.";
-            return RedirectToPage();
+            return RedirectToPage(new { tab = "schedule" });
         }
         try
         {
@@ -178,13 +206,13 @@ public class IndexModel : PageModel
         {
             TempData["FlashError"] = $"Import fehlgeschlagen: {ex.Message}";
         }
-        return RedirectToPage();
+        return RedirectToPage(new { tab = "schedule" });
     }
 
     public IActionResult OnPostDeleteStored(string name)
     {
         var ok = _backups.DeleteStored(name);
         TempData[ok ? "Flash" : "FlashError"] = ok ? "Backup gelöscht." : "Backup nicht gefunden.";
-        return RedirectToPage();
+        return RedirectToPage(new { tab = "schedule" });
     }
 }

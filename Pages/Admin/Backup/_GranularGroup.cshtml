@@ -1,0 +1,48 @@
+@model MatCMS.Pages.Admin.Backup.GranularGroupVm
+@{
+    // Shared section-include checkbox (+ hidden "false" fallback for the bound Schedule object).
+}
+@if (Model.Flat)
+{
+    <div class="backup-group backup-flat">
+        <div class="backup-head">
+            <label class="check" onclick="event.stopPropagation()">
+                <input type="checkbox" name="@Model.SectionName" value="true" @(Model.SectionChecked ? "checked" : "") />
+                @if (Model.RenderHiddenFalse)
+                {
+                    <input type="hidden" name="@Model.SectionName" value="false" />
+                }
+                <span>@Model.SectionLabel</span>
+            </label>
+        </div>
+    </div>
+}
+else
+{
+    <details class="backup-group">
+        <summary>
+            <label class="check" onclick="event.stopPropagation()">
+                <input type="checkbox" name="@Model.SectionName" value="true" @(Model.SectionChecked ? "checked" : "") />
+                @if (Model.RenderHiddenFalse)
+                {
+                    <input type="hidden" name="@Model.SectionName" value="false" />
+                }
+                <span>@Model.SectionLabel</span>
+            </label>
+            <span class="backup-count">@Model.Items.Count</span>
+        </summary>
+        <div class="backup-items">
+            @if (Model.Items.Count == 0)
+            {
+                <span class="muted">—</span>
+            }
+            @foreach (var it in Model.Items)
+            {
+                <label class="check check-sm">
+                    <input type="checkbox" name="@Model.ItemName" value="@it.Value" @(it.Checked ? "checked" : "") />
+                    @it.Label
+                </label>
+            }
+        </div>
+    </details>
+}

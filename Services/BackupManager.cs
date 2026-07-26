@@ -75,7 +75,9 @@ public class BackupManager
         Submissions = cfg.Submissions,
         Forms = cfg.Forms,
         Assets = cfg.Assets,
-        TemplateNames = cfg.TemplateNames is { Count: > 0 } ? cfg.TemplateNames : null
+        TemplateNames = cfg.TemplateNames is { Count: > 0 } ? cfg.TemplateNames : null,
+        PageKeys = cfg.PageKeys is { Count: > 0 } ? cfg.PageKeys : null,
+        FormSlugs = cfg.FormSlugs is { Count: > 0 } ? cfg.FormSlugs : null
     };
 
     /// <summary>Runs a backup with the config's selection, writes it to disk, prunes old files, and

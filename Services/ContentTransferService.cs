@@ -55,13 +55,20 @@ public class ContentTransferService
         public bool Assets { get; set; } = true;
 
         /// <summary>
-        /// When set (non-empty), only templates whose name is in this list are exported — the
-        /// granular "back up only this template" case. Null/empty = all templates in the section.
+        /// Granular selection within a section (non-empty = only these items; null/empty = the whole
+        /// section). Restore treats such a backup as "partial" and upserts the items by their key
+        /// instead of replacing the whole table.
         /// </summary>
-        public List<string>? TemplateNames { get; set; }
+        public List<string>? TemplateNames { get; set; } // by template Name
+        public List<string>? PageKeys { get; set; }      // by "slug|locale" (see PageKey)
+        public List<string>? FormSlugs { get; set; }     // by form Slug
 
         public bool Any => Templates || Pages || Menus || Settings || Submissions || Forms || Assets;
     }
+
+    /// <summary>Stable identity of a page for granular backup/restore: slug + content locale.</summary>
+    public static string PageKey(string? slug, string? locale) =>
+        $"{(slug ?? "").Trim()}|{(string.IsNullOrWhiteSpace(locale) ? Localizer.DefaultCulture : locale!.Trim())}";
 
     /// <summary>What a backup file contains — shown before a restore so nothing is overwritten blind.</summary>
     public sealed class BackupInfo
@@ -78,6 +85,10 @@ public class ContentTransferService
         public int Media { get; set; }
         public int Components { get; set; }
         public bool HasAssets { get; set; }
+        // True when that section restores as a per-item UPSERT (others survive); false = replace-all.
+        public bool TemplatesPartial { get; set; }
+        public bool PagesPartial { get; set; }
+        public bool FormsPartial { get; set; }
     }
 
     private string UploadsDir => Path.Combine(_env.WebRootPath, "uploads");
@@ -115,7 +126,9 @@ public class ContentTransferService
         {
             Version = CurrentVersion,
             ExportedAtUtc = exportedAtUtc ?? DateTime.UtcNow.ToString("o"),
-            TemplatesPartial = options.Templates && options.TemplateNames is { Count: > 0 }
+            TemplatesPartial = options.Templates && options.TemplateNames is { Count: > 0 },
+            PagesPartial = options.Pages && options.PageKeys is { Count: > 0 },
+            FormsPartial = options.Forms && options.FormSlugs is { Count: > 0 }
         };
 
         if (options.Templates)
@@ -155,6 +168,11 @@ public class ContentTransferService
         if (options.Pages)
         {
             var pages = await _db.Pages.AsNoTracking().Include(p => p.Blocks).OrderBy(p => p.Id).ToListAsync();
+            if (options.PageKeys is { Count: > 0 })
+            {
+                var wanted = new HashSet<string>(options.PageKeys, StringComparer.OrdinalIgnoreCase);
+                pages = pages.Where(p => wanted.Contains(PageKey(p.Slug, p.Locale))).ToList();
+            }
             dto.Pages = pages.Select(p => new PageDto
             {
                 Title = p.Title, Slug = p.Slug, NavLabel = p.NavLabel,
@@ -201,6 +219,11 @@ public class ContentTransferService
         if (options.Forms)
         {
             var forms = await _db.Forms.AsNoTracking().OrderBy(f => f.Id).ToListAsync();
+            if (options.FormSlugs is { Count: > 0 })
+            {
+                var wanted = new HashSet<string>(options.FormSlugs, StringComparer.OrdinalIgnoreCase);
+                forms = forms.Where(f => wanted.Contains(f.Slug)).ToList();
+            }
             dto.Forms = forms.Select(f => new FormDto
             {
                 Name = f.Name, Slug = f.Slug, DefinitionJson = f.DefinitionJson, CreatedAt = f.CreatedAt
@@ -295,9 +318,10 @@ public class ContentTransferService
             throw new InvalidOperationException($"Ungültige JSON-Datei: {ex.Message}");
         }
 
-        if (dto is null || (dto.Templates is null && dto.Pages is null && dto.MenuItems is null
-                            && dto.Settings is null && dto.Submissions is null
-                            && dto.Forms is null && dto.FormSubmissions is null))
+        if (dto is null || (dto.Templates is null && dto.Pages is null && dto.Menus is null
+                            && dto.MenuItems is null && dto.Settings is null && dto.Submissions is null
+                            && dto.Forms is null && dto.FormSubmissions is null
+                            && dto.Media is null && dto.Components is null))
             throw new InvalidOperationException(
                 "Die Datei hat kein bekanntes Backup-Format (keine Abschnitte gefunden).");
 
@@ -313,10 +337,14 @@ public class ContentTransferService
             foreach (var t in dto.Templates)
             {
                 var name = string.IsNullOrWhiteSpace(t.Name) ? "Template" : t.Name!;
-                var row = existing.FirstOrDefault(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase))
-                          ?? new Template { Name = name };
+                var row = existing.FirstOrDefault(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
+                if (row is null)
+                {
+                    row = new Template { Name = name };
+                    _db.Templates.Add(row);
+                    existing.Add(row);   // same-named entries in one backup map to one row, no duplicate insert
+                }
                 ApplyTemplate(row, t); // fields only — the active theme is deliberately left as-is
-                if (row.Id == 0) _db.Templates.Add(row);
             }
             await _db.SaveChangesAsync();
             var all = await _db.Templates.ToListAsync();
@@ -382,57 +410,86 @@ public class ContentTransferService
 
         if (dto.Pages is not null)
         {
-            _db.ContentBlocks.RemoveRange(_db.ContentBlocks);
-            _db.Pages.RemoveRange(_db.Pages);
-            await _db.SaveChangesAsync();
             var blockCount = 0;
-            foreach (var p in dto.Pages)
+            List<ContentBlock> BuildBlocks(PageDto p) => (p.Blocks ?? new()).Select(b =>
             {
-                _db.Pages.Add(new Page
+                blockCount++;
+                return new ContentBlock
                 {
-                    Title = p.Title ?? "",
-                    Slug = p.Slug ?? "",
-                    // Legacy backups (pre-P2) carry no locale → treat as the default locale.
-                    Locale = string.IsNullOrWhiteSpace(p.Locale) ? Localizer.DefaultCulture : p.Locale!,
-                    TranslationGroup = string.IsNullOrWhiteSpace(p.TranslationGroup)
-                        ? Guid.NewGuid().ToString("N")
-                        : p.TranslationGroup,
-                    NavLabel = p.NavLabel,
-                    IsPublished = p.IsPublished,
-                    ShowInNav = p.ShowInNav,
-                    ShowInFooter = p.ShowInFooter,
-                    NavOrder = p.NavOrder,
-                    FooterOrder = p.FooterOrder,
-                    MetaDescription = p.MetaDescription,
-                    CreatedAt = p.CreatedAt == default ? DateTime.UtcNow : p.CreatedAt,
-                    UpdatedAt = p.UpdatedAt == default ? DateTime.UtcNow : p.UpdatedAt,
-                    Blocks = (p.Blocks ?? new()).Select(b =>
+                    BlockType = b.BlockType ?? "",
+                    SortOrder = b.SortOrder,
+                    DataJson = string.IsNullOrWhiteSpace(b.DataJson) ? "{}" : b.DataJson!
+                };
+            }).ToList();
+
+            if (dto.PagesPartial)
+            {
+                // Granular restore: upsert each page by (slug, locale); its blocks are replaced.
+                // Pages not in the backup are left untouched.
+                var existing = await _db.Pages.Include(p => p.Blocks).ToListAsync();
+                foreach (var p in dto.Pages)
+                {
+                    var slug = (p.Slug ?? "").Trim();
+                    var locale = (string.IsNullOrWhiteSpace(p.Locale) ? Localizer.DefaultCulture : p.Locale!).Trim();
+                    var row = existing.FirstOrDefault(x =>
+                        string.Equals(x.Slug, slug, StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(x.Locale, locale, StringComparison.OrdinalIgnoreCase));
+                    if (row is null)
                     {
-                        blockCount++;
-                        return new ContentBlock
-                        {
-                            BlockType = b.BlockType ?? "",
-                            SortOrder = b.SortOrder,
-                            DataJson = string.IsNullOrWhiteSpace(b.DataJson) ? "{}" : b.DataJson!
-                        };
-                    }).ToList()
-                });
+                        row = new Page { Blocks = BuildBlocks(p) };
+                        ApplyPageFields(row, p, locale);
+                        _db.Pages.Add(row);
+                        existing.Add(row);   // so a duplicate (slug,locale) in the same backup upserts, not double-inserts
+                    }
+                    else
+                    {
+                        _db.ContentBlocks.RemoveRange(row.Blocks);
+                        ApplyPageFields(row, p, locale);
+                        row.Blocks = BuildBlocks(p);
+                    }
+                }
+                await _db.SaveChangesAsync();
+                summary.Add($"{dto.Pages.Count} Seiten (aktualisiert, {blockCount} Blöcke)");
             }
-            await _db.SaveChangesAsync();
-            summary.Add($"{dto.Pages.Count} Seiten ({blockCount} Blöcke)");
+            else
+            {
+                _db.ContentBlocks.RemoveRange(_db.ContentBlocks);
+                _db.Pages.RemoveRange(_db.Pages);
+                await _db.SaveChangesAsync();
+                foreach (var p in dto.Pages)
+                {
+                    var row = new Page { Blocks = BuildBlocks(p) };
+                    ApplyPageFields(row, p, string.IsNullOrWhiteSpace(p.Locale) ? Localizer.DefaultCulture : p.Locale!);
+                    row.CreatedAt = p.CreatedAt == default ? DateTime.UtcNow : p.CreatedAt;
+                    _db.Pages.Add(row);
+                }
+                await _db.SaveChangesAsync();
+                summary.Add($"{dto.Pages.Count} Seiten ({blockCount} Blöcke)");
+            }
         }
 
         if (dto.Menus is not null)
         {
             var existing = await _db.Menus.ToListAsync();
+            var kept = new HashSet<string>(StringComparer.Ordinal);
             foreach (var md in dto.Menus)
             {
                 if (string.IsNullOrWhiteSpace(md.Key)) continue;
                 var m = existing.FirstOrDefault(x => x.Key == md.Key);
                 if (m is null)
-                    _db.Menus.Add(new Menu { Key = md.Key!, Name = md.Name ?? md.Key!, SortOrder = md.SortOrder, BuiltIn = md.BuiltIn });
-                else { m.Name = md.Name ?? m.Name; m.SortOrder = md.SortOrder; }
+                {
+                    m = new Menu { Key = md.Key!, BuiltIn = md.BuiltIn };
+                    _db.Menus.Add(m);
+                    existing.Add(m);   // dedupe same-key entries within one backup
+                }
+                m.Name = md.Name ?? md.Key!;
+                m.SortOrder = md.SortOrder;
+                kept.Add(md.Key!);
             }
+            // Full-restore replace semantics: drop custom menus the backup did not carry (never the
+            // built-in header/footer/toolbar). Their items are wiped by the MenuItems replace below.
+            var orphans = existing.Where(x => !x.BuiltIn && !kept.Contains(x.Key)).ToList();
+            if (orphans.Count > 0) _db.Menus.RemoveRange(orphans);
             await _db.SaveChangesAsync();
             summary.Add($"{dto.Menus.Count} Menüs");
         }
@@ -478,7 +535,55 @@ public class ContentTransferService
             summary.Add($"{dto.Submissions.Count} Anfragen");
         }
 
-        if (dto.Forms is not null)
+        var partialForms = dto.Forms is not null && dto.FormsPartial;
+
+        if (partialForms)
+        {
+            // Granular restore: upsert forms by slug; forms not in the backup are left untouched.
+            var existing = await _db.Forms.ToListAsync();
+            var newlyCreated = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var f in dto.Forms!.Where(f => !string.IsNullOrWhiteSpace(f.Slug)))
+            {
+                var row = existing.FirstOrDefault(x => string.Equals(x.Slug, f.Slug, StringComparison.OrdinalIgnoreCase));
+                if (row is null)
+                {
+                    row = new Form { Slug = f.Slug! };
+                    _db.Forms.Add(row);
+                    existing.Add(row);          // so a duplicate slug in the same backup upserts, not double-inserts
+                    newlyCreated.Add(f.Slug!);
+                }
+                row.Name = string.IsNullOrWhiteSpace(f.Name) ? (string.IsNullOrWhiteSpace(row.Name) ? "Formular" : row.Name) : f.Name!;
+                row.DefinitionJson = string.IsNullOrWhiteSpace(f.DefinitionJson) ? "[]" : f.DefinitionJson!;
+                if (row.CreatedAt == default) row.CreatedAt = f.CreatedAt == default ? DateTime.UtcNow : f.CreatedAt;
+            }
+            await _db.SaveChangesAsync();
+            summary.Add($"{dto.Forms!.Count} Formulare (aktualisiert)");
+
+            // Restore submissions ONLY for forms this restore just CREATED. For forms that already
+            // existed we deliberately leave their live submissions untouched — reverting a form's
+            // definition must never destroy answers collected since the backup was taken.
+            if (dto.FormSubmissions is not null && newlyCreated.Count > 0)
+            {
+                var slugToId = (await _db.Forms.ToListAsync())
+                    .Where(f => newlyCreated.Contains(f.Slug))
+                    .ToDictionary(f => f.Slug, f => f.Id, StringComparer.OrdinalIgnoreCase);
+                var count = 0;
+                foreach (var s in dto.FormSubmissions)
+                {
+                    if (s.FormSlug is null || !slugToId.TryGetValue(s.FormSlug, out var fid)) continue;
+                    _db.FormSubmissions.Add(new FormSubmission
+                    {
+                        FormId = fid,
+                        DataJson = string.IsNullOrWhiteSpace(s.DataJson) ? "[]" : s.DataJson!,
+                        IsRead = s.IsRead,
+                        CreatedAt = s.CreatedAt == default ? DateTime.UtcNow : s.CreatedAt
+                    });
+                    count++;
+                }
+                if (count > 0) { await _db.SaveChangesAsync(); summary.Add($"{count} Formular-Einsendungen"); }
+            }
+        }
+        else if (dto.Forms is not null)
         {
             // Removing forms cascades to their submissions; re-added below if present.
             _db.FormSubmissions.RemoveRange(_db.FormSubmissions);
@@ -496,7 +601,8 @@ public class ContentTransferService
             summary.Add($"{dto.Forms.Count} Formulare");
         }
 
-        if (dto.FormSubmissions is not null)
+        // Generic submissions restore — skipped when a partial forms restore already handled them.
+        if (dto.FormSubmissions is not null && !partialForms)
         {
             var slugToId = await _db.Forms.ToDictionaryAsync(f => f.Slug, f => f.Id);
             // If forms were part of this import, their old submissions are already gone.
@@ -573,6 +679,25 @@ public class ContentTransferService
         row.MenuMapJson = string.IsNullOrWhiteSpace(t.MenuMapJson) ? "{}" : t.MenuMapJson!;
     }
 
+    /// <summary>Copies a backed-up page's scalar fields onto an entity (Blocks handled by the caller).</summary>
+    private static void ApplyPageFields(Page row, PageDto p, string locale)
+    {
+        row.Title = p.Title ?? "";
+        row.Slug = (p.Slug ?? "").Trim();
+        row.Locale = locale;
+        if (string.IsNullOrWhiteSpace(row.TranslationGroup))
+            row.TranslationGroup = string.IsNullOrWhiteSpace(p.TranslationGroup)
+                ? Guid.NewGuid().ToString("N") : p.TranslationGroup;
+        row.NavLabel = p.NavLabel;
+        row.IsPublished = p.IsPublished;
+        row.ShowInNav = p.ShowInNav;
+        row.ShowInFooter = p.ShowInFooter;
+        row.NavOrder = p.NavOrder;
+        row.FooterOrder = p.FooterOrder;
+        row.MetaDescription = p.MetaDescription;
+        row.UpdatedAt = DateTime.UtcNow;
+    }
+
     /// <summary>
     /// Reads a backup file (ZIP or legacy JSON) WITHOUT importing it, returning a summary of its
     /// contents so a restore can be reviewed first. Throws on an unreadable file.
@@ -619,7 +744,10 @@ public class ContentTransferService
             Forms = dto.Forms?.Count ?? 0,
             Media = dto.Media?.Count ?? 0,
             Components = dto.Components?.Count ?? 0,
-            HasAssets = hasAssets
+            HasAssets = hasAssets,
+            TemplatesPartial = dto.TemplatesPartial,
+            PagesPartial = dto.PagesPartial,
+            FormsPartial = dto.FormsPartial
         };
     }
 
@@ -630,9 +758,11 @@ public class ContentTransferService
     {
         public int Version { get; set; }
         public string ExportedAtUtc { get; set; } = "";
-        /// <summary>True when the export was narrowed to specific templates → restore upserts by name
-        /// instead of replacing the whole template set (so it can't wipe the site's other themes).</summary>
+        /// <summary>True when the export was narrowed to specific items → restore upserts those items
+        /// by their key instead of replacing the whole table (so it can't wipe the untouched rest).</summary>
         public bool TemplatesPartial { get; set; }
+        public bool PagesPartial { get; set; }
+        public bool FormsPartial { get; set; }
         public List<TemplateDto>? Templates { get; set; }
         public List<PageDto>? Pages { get; set; }
         public List<MenuDto>? Menus { get; set; }

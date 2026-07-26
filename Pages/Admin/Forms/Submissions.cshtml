@@ -53,7 +53,7 @@ else
                                 <button type="submit" class="btn btn-sm btn-ghost">@(s.IsRead ? T["submissions.markNew"] : T["submissions.markRead"])</button>
                             </form>
                             <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@Model.Current.Id" asp-route-subId="@s.Id" onsubmit="return confirm('@T["submissions.confirmDelete"]');">
-                                <button type="submit" class="btn btn-sm btn-danger">@T["action.delete"]</button>
+                                <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
                             </form>
                         </div>
                     </td>

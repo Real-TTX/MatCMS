@@ -204,7 +204,7 @@
                                 </form>
                                 <form method="post" asp-page-handler="DeleteStored" asp-route-name="@b.Name" class="inline-form"
                                       onsubmit="return confirm('@T["backup.deleteConfirm"]');">
-                                    <button type="submit" class="btn btn-sm btn-danger" title="@T["action.delete"]">✕</button>
+                                    <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
                                 </form>
                             </td>
                         </tr>

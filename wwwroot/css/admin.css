@@ -248,6 +248,10 @@ table.data .row-unread td { font-weight: 600; }
 .btn-ghost:hover { background: var(--black); color: #fff; border-color: var(--black); }
 .btn-danger { background: #b3261e; border-color: #b3261e; color: #fff; }
 .btn-danger:hover { background: #fff; color: #b3261e; }
+/* Icon-only button (e.g. delete): square, matches .btn-sm height, never wraps. Combine with
+   .btn .btn-sm .btn-danger / .btn-ghost. Give it a title/aria-label for accessibility. */
+.btn-icon { padding: 0; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+.btn-icon svg { width: 16px; height: 16px; display: block; }
 
 .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .inline-form { display: inline; }

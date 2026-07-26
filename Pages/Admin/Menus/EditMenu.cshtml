@@ -32,7 +32,7 @@
                 <div class="actions">
                     <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@it.Id">@T["action.edit"]</a>
                     <form class="inline-form" method="post" asp-page-handler="DeleteItem" asp-route-id="@Model.Current.Id" asp-route-itemId="@it.Id" onsubmit="return confirm('@T["menus.confirmDelete", it.Label]');">
-                        <button type="submit" class="btn btn-sm btn-danger" title="@T["action.delete"]">✕</button>
+                        <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
                     </form>
                 </div>
             </div>

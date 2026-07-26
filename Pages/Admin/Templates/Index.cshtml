@@ -75,7 +75,7 @@
                             <button type="submit" class="btn btn-sm btn-ghost">@T["templates.activate"]</button>
                         </form>
                         <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@t.Id" onsubmit="return confirm('@T["templates.confirmDelete", t.Name]');">
-                            <button type="submit" class="btn btn-sm btn-danger">@T["action.delete"]</button>
+                            <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
                         </form>
                     }
                 </div>

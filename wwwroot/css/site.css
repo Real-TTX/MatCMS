@@ -163,6 +163,7 @@ h1, h2, h3, h4 {
     border: 2px solid var(--accent);
     transition: background .2s ease, color .2s ease, border-color .2s ease;
     cursor: pointer;
+    white-space: nowrap;
 }
 
 .btn:hover { background: var(--accent-dark); border-color: var(--accent-dark); color: #fff; }

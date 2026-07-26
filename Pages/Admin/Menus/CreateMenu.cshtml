@@ -1,0 +1,24 @@
+@page
+@model MatCMS.Pages.Admin.Menus.CreateMenuModel
+@{
+    ViewData["Title"] = T["menus.newMenu"];
+}
+<div class="page-head">
+    <h1>@T["menus.newMenu"]</h1>
+    <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
+</div>
+
+<div class="card">
+    @if (!string.IsNullOrWhiteSpace(Model.Error))
+    {
+        <div class="alert alert-error">@Model.Error</div>
+    }
+    <form method="post" class="form-grid">
+        <div class="form-field">
+            <label for="Name">@T["menus.menuName"]</label>
+            <input id="Name" name="Name" value="@Model.Name" required autofocus />
+            <div class="help">@T["menus.newMenuHelp"]</div>
+        </div>
+        <div><button type="submit" class="btn">@T["menus.createMenu"]</button></div>
+    </form>
+</div>

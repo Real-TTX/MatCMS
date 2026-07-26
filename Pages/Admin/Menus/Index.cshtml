@@ -5,6 +5,7 @@
 }
 <div class="page-head">
     <h1>@T["menus.heading"]</h1>
+    <a class="btn" asp-page="CreateMenu">@T["menus.newMenu"]</a>
 </div>
 
 @foreach (var menu in Model.Menus)
@@ -17,12 +18,7 @@
                 <h2>@menu.Name</h2>
                 <div class="b-sum mono">@menu.Key@(menu.Key == "toolbar" ? " · " + T["menus.toolbarMenu"] : "")</div>
             </div>
-            @if (!menu.BuiltIn)
-            {
-                <form class="inline-form" method="post" asp-page-handler="DeleteMenu" asp-route-id="@menu.Id" onsubmit="return confirm('@T["menus.confirmDeleteMenu"]');">
-                    <button type="submit" class="btn btn-sm btn-danger">@T["menus.deleteMenu"]</button>
-                </form>
-            }
+            <a class="btn btn-sm btn-ghost" asp-page="EditMenu" asp-route-id="@menu.Id">@T["menus.editMenu"]</a>
         </div>
         @if (items.Count == 0)
         {
@@ -60,18 +56,6 @@
         </div>
     </div>
 }
-
-<div class="card">
-    <h2>@T["menus.newMenu"]</h2>
-    <p class="help">@T["menus.newMenuHelp"]</p>
-    <form method="post" asp-page-handler="CreateMenu" class="form-row" style="align-items:end;">
-        <div class="form-field">
-            <label for="new-menu-name">@T["menus.menuName"]</label>
-            <input id="new-menu-name" name="name" required />
-        </div>
-        <div><button type="submit" class="btn">@T["menus.createMenu"]</button></div>
-    </form>
-</div>
 
 @section Scripts {
     <script src="~/js/admin-sortable.js" asp-append-version="true"></script>

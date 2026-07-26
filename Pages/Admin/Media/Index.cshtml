@@ -26,21 +26,30 @@
 <div class="media-grid">
     @foreach (var m in Model.Items)
     {
-        <div class="media-card">
+        var tagList = MatCMS.Content.TagUtil.Split(m.Tags).ToList();
+        <button type="button" class="media-card"
+                data-id="@m.Id"
+                data-url="@m.Url"
+                data-name="@m.FileName"
+                data-tags="@m.Tags"
+                data-alt="@m.Alt"
+                data-type="@m.ContentType"
+                data-size="@m.SizeBytes"
+                title="@T["media.clickHint"]">
             <div class="media-thumb" style="background-image:url('@m.Url')"></div>
             <div class="media-meta">
                 <div class="media-name" title="@m.FileName">@m.FileName</div>
-                <form class="media-tags-form" method="post" asp-page-handler="Tags" asp-route-id="@m.Id" asp-route-tag="@Model.ActiveTag">
-                    <input class="media-tags-input" name="tags" value="@m.Tags" placeholder="@T["media.tagsPlaceholder"]" />
-                </form>
-                <div class="media-actions">
-                    <button type="button" class="btn btn-sm btn-ghost media-copy" data-url="@m.Url">@T["media.copy"]</button>
-                    <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@m.Id" asp-route-tag="@Model.ActiveTag" onsubmit="return confirm('@T["media.confirmDelete"]');">
-                        <button type="submit" class="btn btn-sm btn-danger" title="@T["action.delete"]">✕</button>
-                    </form>
-                </div>
+                @if (tagList.Count > 0)
+                {
+                    <div class="media-card-tags">
+                        @foreach (var t in tagList.Take(4))
+                        {
+                            <span class="mini-chip">@t</span>
+                        }
+                    </div>
+                }
             </div>
-        </div>
+        </button>
     }
 </div>
 
@@ -49,9 +58,72 @@
     <input type="file" id="media-file" accept="image/*" multiple style="display:none;" />
 </div>
 
+@* ---- Detail dialog ---- *@
+<div class="modal-overlay" id="media-modal">
+    <div class="modal modal-media" role="dialog" aria-modal="true" aria-labelledby="mm-title">
+        <div class="modal-head">
+            <h2 id="mm-title">@T["media.detail"]</h2>
+            <button type="button" class="modal-close" id="mm-close" aria-label="@T["action.close"]">✕</button>
+        </div>
+        <div class="modal-body media-modal-body">
+            <div class="media-preview">
+                <img id="mm-img" src="" alt="" />
+            </div>
+            <div class="media-detail">
+                <div class="media-detail-name" id="mm-name"></div>
+
+                <div class="form-field">
+                    <label for="mm-url">@T["media.url"]</label>
+                    <div class="copy-row">
+                        <input id="mm-url" readonly />
+                        <button type="button" class="btn btn-sm btn-ghost" id="mm-copy">@T["media.copy"]</button>
+                    </div>
+                </div>
+
+                <form method="post" asp-page-handler="Save" asp-route-tag="@Model.ActiveTag" class="media-detail-form">
+                    <input type="hidden" name="id" id="mm-id" />
+
+                    <div class="form-field">
+                        <label for="mm-alt">@T["media.alt"]</label>
+                        <input id="mm-alt" name="alt" placeholder="@T["media.altPlaceholder"]" />
+                    </div>
+
+                    <div class="form-field">
+                        <label for="mm-tags">@T["media.tags"]</label>
+                        <input id="mm-tags" name="tags" placeholder="@T["media.tagsPlaceholder"]" />
+                        @if (Model.AllTags.Count > 0)
+                        {
+                            <div class="tag-suggest" id="mm-suggest">
+                                @foreach (var t in Model.AllTags)
+                                {
+                                    <button type="button" class="mini-chip mini-chip-add" data-tag="@t">+ @t</button>
+                                }
+                            </div>
+                            <div class="help">@T["media.suggestHint"]</div>
+                        }
+                    </div>
+
+                    <div class="media-detail-info" id="mm-info"></div>
+
+                    <div class="modal-foot">
+                        <button type="submit" class="btn">@T["action.save"]</button>
+                    </div>
+                </form>
+
+                <form method="post" asp-page-handler="Delete" asp-route-tag="@Model.ActiveTag" class="media-delete-form"
+                      onsubmit="return confirm('@T["media.confirmDelete"]');">
+                    <input type="hidden" name="id" id="mm-del-id" />
+                    <button type="submit" class="btn btn-danger btn-sm">@T["action.delete"]</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <script>
         (function () {
+            // ---- Upload ----
             var btn = document.getElementById('media-upload-btn');
             var file = document.getElementById('media-file');
             btn.addEventListener('click', function () { file.click(); });
@@ -70,21 +142,65 @@
                 });
                 chain.then(function () { window.location.reload(); });
             });
-            // Save tags automatically when the field loses focus (if changed).
-            document.querySelectorAll('.media-tags-input').forEach(function (inp) {
-                var initial = inp.value;
-                inp.addEventListener('blur', function () {
-                    if (inp.value !== initial) inp.form.submit();
-                });
+
+            // ---- Detail dialog ----
+            var modal = document.getElementById('media-modal');
+            var img = document.getElementById('mm-img');
+            var nameEl = document.getElementById('mm-name');
+            var urlEl = document.getElementById('mm-url');
+            var altEl = document.getElementById('mm-alt');
+            var tagsEl = document.getElementById('mm-tags');
+            var infoEl = document.getElementById('mm-info');
+            var idEl = document.getElementById('mm-id');
+            var delIdEl = document.getElementById('mm-del-id');
+
+            function fmtBytes(n) {
+                n = parseInt(n, 10) || 0;
+                if (n < 1024) return n + ' B';
+                if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+                return (n / 1024 / 1024).toFixed(1) + ' MB';
+            }
+            function open(card) {
+                var d = card.dataset;
+                img.src = d.url; img.alt = d.alt || d.name || '';
+                nameEl.textContent = d.name || '';
+                urlEl.value = d.url || '';
+                altEl.value = d.alt || '';
+                tagsEl.value = d.tags || '';
+                idEl.value = d.id; delIdEl.value = d.id;
+                infoEl.textContent = [d.type, fmtBytes(d.size)].filter(Boolean).join('  ·  ');
+                modal.classList.add('open');
+            }
+            function close() { modal.classList.remove('open'); }
+
+            document.querySelectorAll('.media-card').forEach(function (c) {
+                c.addEventListener('click', function () { open(c); });
             });
-            // Copy URL to clipboard.
-            document.querySelectorAll('.media-copy').forEach(function (b) {
-                b.addEventListener('click', function () {
-                    var u = b.getAttribute('data-url');
-                    (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject())
-                        .then(function () { var t = b.textContent; b.textContent = '✓'; setTimeout(function () { b.textContent = t; }, 1200); })
-                        .catch(function () { window.prompt('URL', u); });
+            document.getElementById('mm-close').addEventListener('click', close);
+            modal.addEventListener('click', function (e) { if (e.target === modal) close(); });
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && modal.classList.contains('open')) close(); });
+
+            // Tag suggestion chips → append to the tags input.
+            var suggest = document.getElementById('mm-suggest');
+            if (suggest) {
+                suggest.addEventListener('click', function (e) {
+                    var chip = e.target.closest('.mini-chip-add');
+                    if (!chip) return;
+                    var tag = chip.getAttribute('data-tag');
+                    var cur = tagsEl.value.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+                    if (cur.some(function (t) { return t.toLowerCase() === tag.toLowerCase(); })) return;
+                    cur.push(tag);
+                    tagsEl.value = cur.join(', ');
+                    tagsEl.focus();
                 });
+            }
+
+            // Copy URL.
+            document.getElementById('mm-copy').addEventListener('click', function () {
+                var b = this, u = urlEl.value;
+                (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject())
+                    .then(function () { var t = b.textContent; b.textContent = '@T["media.copied"]'; setTimeout(function () { b.textContent = t; }, 1200); })
+                    .catch(function () { urlEl.select(); document.execCommand('copy'); });
             });
         })();
     </script>

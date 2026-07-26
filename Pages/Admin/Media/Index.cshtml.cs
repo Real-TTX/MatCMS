@@ -30,14 +30,15 @@ public class IndexModel : PageModel
             : all.Where(m => MatCMS.Content.TagUtil.Split(m.Tags).Contains(ActiveTag, StringComparer.OrdinalIgnoreCase)).ToList();
     }
 
-    public async Task<IActionResult> OnPostTagsAsync(int id, string? tags)
+    public async Task<IActionResult> OnPostSaveAsync(int id, string? tags, string? alt)
     {
         var m = await _db.Media.FindAsync(id);
         if (m is not null)
         {
             m.Tags = MatCMS.Content.TagUtil.Normalize(tags);
+            m.Alt = string.IsNullOrWhiteSpace(alt) ? null : alt.Trim();
             await _db.SaveChangesAsync();
-            TempData["Flash"] = "Tags gespeichert.";
+            TempData["Flash"] = "Medium gespeichert.";
         }
         return RedirectToPage(new { tag = ActiveTag });
     }

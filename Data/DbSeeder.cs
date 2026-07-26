@@ -70,6 +70,12 @@ public static class DbSeeder
             db.Templates.Add(BuildModernTemplate());
         }
 
+        // A ready-made example component so the component designer has something to look at.
+        if (!await db.Components.AnyAsync(c => c.Type == ExampleComponentType))
+        {
+            db.Components.Add(BuildExampleComponent());
+        }
+
         if (!await db.Forms.AnyAsync())
         {
             db.Forms.Add(new Form
@@ -248,6 +254,33 @@ public static class DbSeeder
 
         await db.SaveChangesAsync();
     }
+
+    private const string ExampleComponentType = "cta-box";
+
+    /// <summary>A ready-made demo component (a call-to-action box) for the component designer.</summary>
+    private static Component BuildExampleComponent() => new()
+    {
+        Type = ExampleComponentType,
+        Name = "CTA-Box (Beispiel)",
+        Description = "Beispiel-Komponente: Überschrift, Text und ein Button.",
+        FieldsJson = """
+            [
+              {"id":"heading","label":"Überschrift","type":"text"},
+              {"id":"text","label":"Text","type":"textarea"},
+              {"id":"button","label":"Button-Text","type":"text"},
+              {"id":"url","label":"Button-Link","type":"url"}
+            ]
+            """,
+        TemplateHtml = """
+            <section class="section"><div class="container">
+              <div style="border:1px solid var(--line);border-left:4px solid var(--accent);background:var(--bg-alt);padding:28px 32px;max-width:760px;margin:0 auto;">
+                <h3 style="margin:0 0 10px;">{{heading}}</h3>
+                <p style="margin:0 0 18px;color:var(--muted);">{{text}}</p>
+                <a class="btn" href="{{url}}">{{button}}</a>
+              </div>
+            </div></section>
+            """
+    };
 
     private const string ModernTemplateName = "MatCMS Modern";
 

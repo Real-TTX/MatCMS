@@ -27,6 +27,9 @@
 .admin {
     display: grid;
     grid-template-columns: 250px 1fr;
+    /* Fixed row = viewport height (minmax(0,…) stops the row growing to content) so each column
+       is exactly 100dvh tall and scrolls its own overflow — sidebar nav vs. main content. */
+    grid-template-rows: minmax(0, 100dvh);
     height: 100dvh;
     overflow: hidden;
     background: var(--bg-alt);

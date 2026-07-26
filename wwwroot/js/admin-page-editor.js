@@ -23,12 +23,6 @@
 
     function post(msg) { if (frame.contentWindow) frame.contentWindow.postMessage(msg, "*"); }
 
-    // Hovering a block row scrolls the preview to that block.
-    Array.prototype.slice.call(document.querySelectorAll(".block-item[data-block-id]")).forEach(function (row) {
-        var id = row.getAttribute("data-block-id");
-        row.addEventListener("mouseenter", function () { post({ type: "mat-scroll", id: id }); });
-    });
-
     // Highlight the currently-edited block in the preview.
     function syncSelection() { if (selectedBlock) post({ type: "mat-select", id: selectedBlock }); }
     frame.addEventListener("load", syncSelection);

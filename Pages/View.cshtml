@@ -76,9 +76,12 @@
             opacity: 0; transform: translateY(-4px); transition: opacity .12s ease, transform .12s ease;
             pointer-events: none;
         }
-        .mat-ed-block:hover { outline: 2px solid #2563eb; outline-offset: -2px; cursor: pointer; }
+        .mat-ed-block { cursor: pointer; }
+        /* Subtle hover affordance — clearly different from the solid "selected" outline. */
+        .mat-ed-block:hover { outline: 1px dashed rgba(37, 99, 235, .5); outline-offset: -1px; }
         .mat-ed-block:hover::after { opacity: 1; transform: translateY(0); }
         .mat-ed-block.mat-selected { outline: 3px solid #2563eb; outline-offset: -3px; }
+        .mat-ed-block.mat-selected:hover { outline: 3px solid #2563eb; }
         .mat-ed-block.mat-flash { animation: matFlash 1s ease; }
         @@keyframes matFlash { 0%,100% { background: transparent; } 30% { background: rgba(37,99,235,.10); } }
     </style>

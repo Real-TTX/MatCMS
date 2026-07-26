@@ -20,12 +20,14 @@ public class CreateModel : PageModel
 
     public List<PageEntity> Pages { get; private set; } = new();
     public List<Menu> Menus { get; private set; } = new();
+    public int? MenuId { get; private set; }
     public string? Error { get; private set; }
 
     public async Task OnGetAsync(string? menu)
     {
         await LoadListsAsync();
         if (!string.IsNullOrEmpty(menu) && Menus.Any(m => m.Key == menu)) Menu = menu;
+        MenuId = Menus.FirstOrDefault(m => m.Key == Menu)?.Id;
     }
 
     public async Task<IActionResult> OnPostAsync()
@@ -34,6 +36,7 @@ public class CreateModel : PageModel
         var label = (Label ?? "").Trim();
         var url = (Url ?? "").Trim();
         if (!Menus.Any(m => m.Key == Menu)) Menu = Menus.FirstOrDefault()?.Key ?? "header";
+        MenuId = Menus.FirstOrDefault(m => m.Key == Menu)?.Id;
 
         if (string.IsNullOrWhiteSpace(label) || string.IsNullOrWhiteSpace(url))
         {
@@ -57,7 +60,7 @@ public class CreateModel : PageModel
         await _db.SaveChangesAsync();
 
         TempData["Flash"] = "Menüpunkt hinzugefügt.";
-        return RedirectToPage("Index");
+        return MenuId is int mid ? RedirectToPage("EditMenu", new { id = mid }) : RedirectToPage("Index");
     }
 
     private async Task LoadListsAsync()

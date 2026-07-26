@@ -20,6 +20,7 @@ public class EditModel : PageModel
 
     public List<PageEntity> Pages { get; private set; } = new();
     public List<Menu> Menus { get; private set; } = new();
+    public int? MenuId { get; private set; }
     public string? Error { get; private set; }
 
     public async Task<IActionResult> OnGetAsync(int id)
@@ -33,6 +34,7 @@ public class EditModel : PageModel
         Icon = item.Icon;
         OpenInNewTab = item.OpenInNewTab;
         await LoadListsAsync();
+        MenuId = Menus.FirstOrDefault(m => m.Key == Menu)?.Id;
         return Page();
     }
 
@@ -45,6 +47,7 @@ public class EditModel : PageModel
         var label = (Label ?? "").Trim();
         var url = (Url ?? "").Trim();
         if (!Menus.Any(m => m.Key == Menu)) Menu = Menus.FirstOrDefault()?.Key ?? "header";
+        MenuId = Menus.FirstOrDefault(m => m.Key == Menu)?.Id;
 
         if (string.IsNullOrWhiteSpace(label) || string.IsNullOrWhiteSpace(url))
         {
@@ -60,7 +63,7 @@ public class EditModel : PageModel
         await _db.SaveChangesAsync();
 
         TempData["Flash"] = "Menüpunkt gespeichert.";
-        return RedirectToPage("Index");
+        return MenuId is int mid ? RedirectToPage("EditMenu", new { id = mid }) : RedirectToPage("Index");
     }
 
     private async Task LoadListsAsync()

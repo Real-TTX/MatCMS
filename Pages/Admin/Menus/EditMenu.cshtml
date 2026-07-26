@@ -1,23 +1,63 @@
 @page "{id:int}"
 @model MatCMS.Pages.Admin.Menus.EditMenuModel
 @{
-    ViewData["Title"] = T["menus.editMenu"];
+    ViewData["Title"] = Model.Current.Name;
 }
 <div class="page-head">
-    <h1>@T["menus.editMenu"]</h1>
-    <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
+    <h1>@Model.Current.Name</h1>
+    <a class="btn btn-sm btn-ghost" asp-page="Index">@T["menus.backToMenus"]</a>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.Error))
+{
+    <div class="alert alert-error">@Model.Error</div>
+}
+
+<div class="card">
+    <h2>@T["menus.entries"]</h2>
+    @if (Model.Items.Count == 0)
+    {
+        <p class="muted">@T["menus.noItems"]</p>
+    }
+    <div class="block-list sortable" data-sortable data-reorder-form="reorder-items">
+        @foreach (var it in Model.Items)
+        {
+            <div class="block-item sortable-item" data-item-id="@it.Id">
+                <span class="drag-handle" title="@T["editor.dragToSort"]" aria-hidden="true">⠿</span>
+                @if (!string.IsNullOrEmpty(it.Icon))
+                {
+                    <span class="b-icon">
+                        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">@Html.Raw(MatCMS.Content.MenuIcons.Svg(it.Icon))</svg>
+                    </span>
+                }
+                <div class="b-info">
+                    <div class="b-type">@it.Label</div>
+                    <div class="b-sum">@it.Url@(it.OpenInNewTab ? " · " + T["menus.newTab"] : "")</div>
+                </div>
+                <div class="actions">
+                    <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@it.Id">@T["action.edit"]</a>
+                    <form class="inline-form" method="post" asp-page-handler="DeleteItem" asp-route-id="@Model.Current.Id" asp-route-itemId="@it.Id" onsubmit="return confirm('@T["menus.confirmDelete", it.Label]');">
+                        <button type="submit" class="btn btn-sm btn-danger" title="@T["action.delete"]">✕</button>
+                    </form>
+                </div>
+            </div>
+        }
+    </div>
+    <form id="reorder-items" method="post" asp-page-handler="Reorder" asp-route-id="@Model.Current.Id" asp-route-menu="@Model.Current.Key" style="display:none;">
+        <div data-order-inputs></div>
+    </form>
+    <div class="list-actions">
+        <a class="btn" asp-page="Create" asp-route-menu="@Model.Current.Key">@T["menus.addItem"]</a>
+    </div>
 </div>
 
 <div class="card">
-    @if (!string.IsNullOrWhiteSpace(Model.Error))
-    {
-        <div class="alert alert-error">@Model.Error</div>
-    }
+    <h2>@T["menus.menuSettings"]</h2>
     <form method="post" class="form-grid">
         <div class="form-row">
             <div class="form-field">
                 <label for="Name">@T["menus.menuName"]</label>
-                <input id="Name" name="Name" value="@Model.Name" required autofocus />
+                <input id="Name" name="Name" value="@Model.Name" required />
             </div>
             <div class="form-field">
                 <label>@T["menus.menuKey"]</label>
@@ -40,4 +80,8 @@
 else
 {
     <p class="muted">@T["menus.builtinNote"]</p>
+}
+
+@section Scripts {
+    <script src="~/js/admin-sortable.js" asp-append-version="true"></script>
 }

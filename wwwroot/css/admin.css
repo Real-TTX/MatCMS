@@ -100,6 +100,10 @@ body.nav-open .admin-menu-toggle span:nth-child(3) { transform: translateY(-6px)
 .page-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; gap: 16px; flex-wrap: wrap; }
 .page-head h1 { font-size: 26px; margin: 0; }
 
+/* Clickable list rows (menu list) */
+.block-item-link { text-decoration: none; color: inherit; cursor: pointer; }
+.block-item-link:hover { border-color: var(--accent); }
+
 /* Menu management + template menu mapping */
 .menu-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .menu-card-head h2 { margin: 0 0 2px; }

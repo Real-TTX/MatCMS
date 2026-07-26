@@ -8,55 +8,21 @@
     <a class="btn" asp-page="CreateMenu">@T["menus.newMenu"]</a>
 </div>
 
-@foreach (var menu in Model.Menus)
-{
-    var items = Model.Items.TryGetValue(menu.Key, out var list) ? list : new List<MatCMS.Models.MenuItem>();
-    var reorderId = $"reorder-{menu.Key}";
-    <div class="card">
-        <div class="menu-card-head">
-            <div>
-                <h2>@menu.Name</h2>
-                <div class="b-sum mono">@menu.Key@(menu.Key == "toolbar" ? " · " + T["menus.toolbarMenu"] : "")</div>
-            </div>
-            <a class="btn btn-sm btn-ghost" asp-page="EditMenu" asp-route-id="@menu.Id">@T["menus.editMenu"]</a>
-        </div>
-        @if (items.Count == 0)
+<div class="card">
+    <div class="block-list">
+        @foreach (var menu in Model.Menus)
         {
-            <p class="muted">@T["menus.noItems"]</p>
-        }
-        <div class="block-list sortable" data-sortable data-reorder-form="@reorderId">
-            @foreach (var it in items)
-            {
-                <div class="block-item sortable-item" data-item-id="@it.Id">
-                    <span class="drag-handle" title="@T["editor.dragToSort"]" aria-hidden="true">⠿</span>
-                    @if (!string.IsNullOrEmpty(it.Icon))
-                    {
-                        <span class="b-icon">
-                            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">@Html.Raw(MatCMS.Content.MenuIcons.Svg(it.Icon))</svg>
-                        </span>
-                    }
-                    <div class="b-info">
-                        <div class="b-type">@it.Label</div>
-                        <div class="b-sum">@it.Url@(it.OpenInNewTab ? " · " + T["menus.newTab"] : "")</div>
-                    </div>
-                    <div class="actions">
-                        <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@it.Id">@T["action.edit"]</a>
-                        <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@it.Id" onsubmit="return confirm('@T["menus.confirmDelete", it.Label]');">
-                            <button type="submit" class="btn btn-sm btn-danger" title="@T["action.delete"]">✕</button>
-                        </form>
-                    </div>
+            var count = Model.Counts.TryGetValue(menu.Key, out var c) ? c : 0;
+            <a class="block-item block-item-link" asp-page="EditMenu" asp-route-id="@menu.Id">
+                <div class="b-info">
+                    <div class="b-type">@menu.Name</div>
+                    <div class="b-sum mono">@menu.Key@(menu.Key == "toolbar" ? " · " + T["menus.toolbarMenu"] : "")</div>
                 </div>
-            }
-        </div>
-        <form id="@reorderId" method="post" asp-page-handler="Reorder" asp-route-menu="@menu.Key" style="display:none;">
-            <div data-order-inputs></div>
-        </form>
-        <div class="list-actions">
-            <a class="btn" asp-page="Create" asp-route-menu="@menu.Key">@T["menus.addItem"]</a>
-        </div>
+                <div class="actions">
+                    <span class="badge badge-off">@count @T["menus.entries"]</span>
+                    <span class="btn btn-sm btn-ghost">@T["menus.manage"]</span>
+                </div>
+            </a>
+        }
     </div>
-}
-
-@section Scripts {
-    <script src="~/js/admin-sortable.js" asp-append-version="true"></script>
-}
+</div>

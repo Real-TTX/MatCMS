@@ -5,7 +5,14 @@
 }
 <div class="page-head">
     <h1>@T["menus.edit"]</h1>
-    <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
+    @if (Model.MenuId is int backId)
+    {
+        <a class="btn btn-sm btn-ghost" asp-page="EditMenu" asp-route-id="@backId">@T["action.back"]</a>
+    }
+    else
+    {
+        <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
+    }
 </div>
 
 <div class="card">

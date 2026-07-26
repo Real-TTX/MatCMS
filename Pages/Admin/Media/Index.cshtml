@@ -115,17 +115,17 @@
 
                     <div class="media-detail-info" id="mm-info"></div>
                 </form>
+            </div>
 
-                @* Actions run positive → negative; the destructive action is separated to the right. *@
-                <div class="modal-foot action-bar">
-                    <button type="submit" form="mm-save-form" class="btn">@T["action.save"]</button>
-                    <button type="button" class="btn btn-ghost" id="mm-cancel">@T["action.cancel"]</button>
-                    <form method="post" asp-page-handler="Delete" asp-route-tag="@Model.ActiveTag" class="media-delete-form act-danger"
-                          onsubmit="return confirm('@T["media.confirmDelete"]');">
-                        <input type="hidden" name="id" id="mm-del-id" />
-                        <button type="submit" class="btn btn-danger">@T["action.delete"]</button>
-                    </form>
-                </div>
+            @* Full-width action bar spanning both columns: positive → negative, destructive set apart. *@
+            <div class="modal-foot action-bar">
+                <button type="submit" form="mm-save-form" class="btn">@T["action.save"]</button>
+                <button type="button" class="btn btn-ghost" id="mm-cancel">@T["action.cancel"]</button>
+                <form method="post" asp-page-handler="Delete" asp-route-tag="@Model.ActiveTag" class="media-delete-form act-danger"
+                      onsubmit="return confirm('@T["media.confirmDelete"]');">
+                    <input type="hidden" name="id" id="mm-del-id" />
+                    <button type="submit" class="btn btn-danger">@T["action.delete"]</button>
+                </form>
             </div>
         </div>
     </div>

@@ -80,7 +80,7 @@
                     </div>
                 </div>
 
-                <form method="post" asp-page-handler="Save" asp-route-tag="@Model.ActiveTag" class="media-detail-form">
+                <form id="mm-save-form" method="post" asp-page-handler="Save" asp-route-tag="@Model.ActiveTag" class="media-detail-form">
                     <input type="hidden" name="id" id="mm-id" />
 
                     <div class="form-field">
@@ -89,10 +89,20 @@
                     </div>
 
                     <div class="form-field">
-                        <label for="mm-tags">@T["media.tags"]</label>
-                        <input id="mm-tags" name="tags" placeholder="@T["media.tagsPlaceholder"]" />
+                        <label for="mm-tag-entry">@T["media.tags"]</label>
+                        <div class="tag-input" id="mm-tag-input">
+                            <input type="text" id="mm-tag-entry" class="tag-entry" placeholder="@T["media.tagAdd"]"
+                                   autocomplete="off" list="mm-tag-list" />
+                        </div>
+                        <input type="hidden" name="tags" id="mm-tags" />
                         @if (Model.AllTags.Count > 0)
                         {
+                            <datalist id="mm-tag-list">
+                                @foreach (var t in Model.AllTags)
+                                {
+                                    <option value="@t"></option>
+                                }
+                            </datalist>
                             <div class="tag-suggest" id="mm-suggest">
                                 @foreach (var t in Model.AllTags)
                                 {
@@ -104,17 +114,18 @@
                     </div>
 
                     <div class="media-detail-info" id="mm-info"></div>
-
-                    <div class="modal-foot">
-                        <button type="submit" class="btn">@T["action.save"]</button>
-                    </div>
                 </form>
 
-                <form method="post" asp-page-handler="Delete" asp-route-tag="@Model.ActiveTag" class="media-delete-form"
-                      onsubmit="return confirm('@T["media.confirmDelete"]');">
-                    <input type="hidden" name="id" id="mm-del-id" />
-                    <button type="submit" class="btn btn-danger btn-sm">@T["action.delete"]</button>
-                </form>
+                @* Actions run positive → negative; the destructive action is separated to the right. *@
+                <div class="modal-foot action-bar">
+                    <button type="submit" form="mm-save-form" class="btn">@T["action.save"]</button>
+                    <button type="button" class="btn btn-ghost" id="mm-cancel">@T["action.cancel"]</button>
+                    <form method="post" asp-page-handler="Delete" asp-route-tag="@Model.ActiveTag" class="media-delete-form act-danger"
+                          onsubmit="return confirm('@T["media.confirmDelete"]');">
+                        <input type="hidden" name="id" id="mm-del-id" />
+                        <button type="submit" class="btn btn-danger">@T["action.delete"]</button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
@@ -149,10 +160,52 @@
             var nameEl = document.getElementById('mm-name');
             var urlEl = document.getElementById('mm-url');
             var altEl = document.getElementById('mm-alt');
-            var tagsEl = document.getElementById('mm-tags');
             var infoEl = document.getElementById('mm-info');
             var idEl = document.getElementById('mm-id');
             var delIdEl = document.getElementById('mm-del-id');
+
+            // ---- Tag chip picker ----
+            var tagsHidden = document.getElementById('mm-tags');
+            var tagBox = document.getElementById('mm-tag-input');
+            var tagEntry = document.getElementById('mm-tag-entry');
+            var chips = [];
+            function renderChips() {
+                Array.prototype.slice.call(tagBox.querySelectorAll('.tag-chip-item')).forEach(function (el) { el.remove(); });
+                chips.forEach(function (tag) {
+                    var el = document.createElement('span');
+                    el.className = 'tag-chip-item';
+                    el.textContent = tag;
+                    var x = document.createElement('button');
+                    x.type = 'button'; x.className = 'tag-x'; x.setAttribute('aria-label', 'entfernen'); x.textContent = '×';
+                    x.addEventListener('click', function () { removeTag(tag); tagEntry.focus(); });
+                    el.appendChild(x);
+                    tagBox.insertBefore(el, tagEntry);
+                });
+                tagsHidden.value = chips.join(', ');
+            }
+            function addTag(raw) {
+                var t = (raw || '').replace(/,/g, ' ').trim();
+                if (!t) return;
+                if (chips.some(function (c) { return c.toLowerCase() === t.toLowerCase(); })) return;
+                chips.push(t); renderChips();
+            }
+            function removeTag(tag) { chips = chips.filter(function (c) { return c !== tag; }); renderChips(); }
+            function setTags(str) {
+                var seen = {};
+                chips = (str || '').split(',').map(function (s) { return s.trim(); }).filter(function (c) {
+                    if (!c) return false; var k = c.toLowerCase(); if (seen[k]) return false; seen[k] = 1; return true;
+                });
+                renderChips();
+            }
+            tagEntry.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(tagEntry.value); tagEntry.value = ''; }
+                else if (e.key === 'Backspace' && !tagEntry.value && chips.length) { removeTag(chips[chips.length - 1]); }
+            });
+            tagEntry.addEventListener('blur', function () { if (tagEntry.value.trim()) { addTag(tagEntry.value); tagEntry.value = ''; } });
+            tagBox.addEventListener('click', function (e) { if (e.target === tagBox) tagEntry.focus(); });
+            document.getElementById('mm-save-form').addEventListener('submit', function () {
+                if (tagEntry.value.trim()) { addTag(tagEntry.value); tagEntry.value = ''; }
+            });
 
             function fmtBytes(n) {
                 n = parseInt(n, 10) || 0;
@@ -166,7 +219,7 @@
                 nameEl.textContent = d.name || '';
                 urlEl.value = d.url || '';
                 altEl.value = d.alt || '';
-                tagsEl.value = d.tags || '';
+                setTags(d.tags || ''); tagEntry.value = '';
                 idEl.value = d.id; delIdEl.value = d.id;
                 infoEl.textContent = [d.type, fmtBytes(d.size)].filter(Boolean).join('  ·  ');
                 modal.classList.add('open');
@@ -177,21 +230,18 @@
                 c.addEventListener('click', function () { open(c); });
             });
             document.getElementById('mm-close').addEventListener('click', close);
+            document.getElementById('mm-cancel').addEventListener('click', close);
             modal.addEventListener('click', function (e) { if (e.target === modal) close(); });
             document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && modal.classList.contains('open')) close(); });
 
-            // Tag suggestion chips → append to the tags input.
+            // Tag suggestion chips → add as a chip.
             var suggest = document.getElementById('mm-suggest');
             if (suggest) {
                 suggest.addEventListener('click', function (e) {
                     var chip = e.target.closest('.mini-chip-add');
                     if (!chip) return;
-                    var tag = chip.getAttribute('data-tag');
-                    var cur = tagsEl.value.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
-                    if (cur.some(function (t) { return t.toLowerCase() === tag.toLowerCase(); })) return;
-                    cur.push(tag);
-                    tagsEl.value = cur.join(', ');
-                    tagsEl.focus();
+                    addTag(chip.getAttribute('data-tag'));
+                    tagEntry.focus();
                 });
             }
 

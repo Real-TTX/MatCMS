@@ -22,6 +22,7 @@
   "media.allTags": "Alle",
   "media.tagsPlaceholder": "Tags, komma-getrennt",
   "media.tags": "Tags",
+  "media.tagAdd": "Tag eingeben, Enter",
   "media.url": "URL",
   "media.alt": "Alternativtext",
   "media.altPlaceholder": "Bildbeschreibung (für Barrierefreiheit / SEO)",

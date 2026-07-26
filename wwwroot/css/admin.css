@@ -162,8 +162,19 @@ body.nav-open .admin-menu-toggle span:nth-child(3) { transform: translateY(-6px)
 .copy-row { display: flex; gap: 8px; }
 .copy-row input { flex: 1; min-width: 0; }
 .tag-suggest { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.modal-foot { display: flex; gap: 10px; padding-top: 4px; }
-.media-delete-form { margin: 0; padding-top: 12px; border-top: 1px solid var(--line); }
+.modal-foot { display: flex; gap: 10px; padding-top: 4px; align-items: center; }
+
+/* Tag chip picker (type + Enter, no manual commas) */
+.tag-input { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; cursor: text; }
+.tag-input:focus-within { border-color: var(--accent); }
+.tag-chip-item { display: inline-flex; align-items: center; gap: 4px; background: var(--accent); color: #fff; border-radius: 999px; padding: 3px 6px 3px 11px; font-size: 12.5px; line-height: 1.6; }
+.tag-x { background: none; border: none; color: #fff; cursor: pointer; font-size: 15px; line-height: 1; padding: 0 2px; opacity: .8; }
+.tag-x:hover { opacity: 1; }
+.tag-entry { flex: 1; min-width: 90px; border: none; outline: none; padding: 4px 2px; margin: 0; font: inherit; font-size: 13.5px; background: transparent; }
+
+/* Action bar: positive → negative order; the destructive action sits apart on the right */
+.action-bar { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 16px; }
+.action-bar .act-danger { margin: 0; margin-left: auto; }
 
 /* Media picker modal (image fields) */
 .media-picker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; max-height: 60vh; overflow-y: auto; }

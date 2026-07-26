@@ -1,4 +1,6 @@
+using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using MatCMS.Data;
 using MatCMS.Models;
 using Microsoft.EntityFrameworkCore;
@@ -80,6 +82,26 @@ public class BackupManager
         FormSlugs = cfg.FormSlugs is { Count: > 0 } ? cfg.FormSlugs : null
     };
 
+    /// <summary>The site name as a safe filename slug (used as the backup filename prefix).</summary>
+    public async Task<string> SiteSlugAsync()
+    {
+        var name = (await _db.SiteSettings.AsNoTracking().FirstOrDefaultAsync(s => s.Key == SettingKeys.SiteName))?.Value;
+        var slug = FileSlug(name);
+        return string.IsNullOrEmpty(slug) ? "backup" : slug;
+    }
+
+    /// <summary>Normalises text to a lowercase, ASCII, filename-safe slug (umlauts transliterated,
+    /// everything else collapsed to single underscores).</summary>
+    public static string FileSlug(string? s)
+    {
+        s = (s ?? "").Trim().ToLowerInvariant()
+            .Replace("ä", "ae").Replace("ö", "oe").Replace("ü", "ue").Replace("ß", "ss");
+        var sb = new StringBuilder(s.Length);
+        foreach (var ch in s)
+            sb.Append(ch < 128 && char.IsLetterOrDigit(ch) ? ch : '_');
+        return Regex.Replace(sb.ToString(), "_+", "_").Trim('_');
+    }
+
     /// <summary>Runs a backup with the config's selection, writes it to disk, prunes old files, and
     /// records the run time. Returns the created file name.</summary>
     public async Task<string> RunAsync(BackupScheduleConfig cfg, string prefix = "auto")
@@ -87,7 +109,7 @@ public class BackupManager
         var options = ToOptions(cfg);
         var bytes = await _transfer.ExportAsync(options);
         var stamp = DateTime.UtcNow.ToString("yyyy-MM-dd-HHmmss");
-        var name = $"{prefix}-{stamp}.zip";
+        var name = $"{await SiteSlugAsync()}_{prefix}_{stamp}.zip";
         await File.WriteAllBytesAsync(Path.Combine(BackupsDir, name), bytes);
 
         Prune(cfg.Retain);

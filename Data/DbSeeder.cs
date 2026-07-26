@@ -80,6 +80,23 @@ public static class DbSeeder
             modern.CustomCss = m.CustomCss;
         }
 
+        // A warm, cosy holiday-let theme.
+        var ferien = await db.Templates.FirstOrDefaultAsync(t => t.Name == FerienTemplateName);
+        if (ferien is null)
+        {
+            db.Templates.Add(BuildFerienTemplate());
+        }
+        else if (string.IsNullOrWhiteSpace(ferien.LayoutHtml))
+        {
+            var f = BuildFerienTemplate();
+            ferien.AccentColor = f.AccentColor; ferien.SecondaryColor = f.SecondaryColor;
+            ferien.HeadingColor = f.HeadingColor; ferien.TextColor = f.TextColor;
+            ferien.BackgroundColor = f.BackgroundColor; ferien.AltBackground = f.AltBackground;
+            ferien.HeadingFont = f.HeadingFont; ferien.BodyFont = f.BodyFont;
+            ferien.ButtonRadius = f.ButtonRadius; ferien.LayoutHtml = f.LayoutHtml;
+            ferien.MenuMapJson = f.MenuMapJson; ferien.CustomCss = f.CustomCss;
+        }
+
         // A ready-made example component so the component designer has something to look at.
         if (!await db.Components.AnyAsync(c => c.Type == ExampleComponentType))
         {
@@ -409,6 +426,74 @@ public static class DbSeeder
     };
 
     private const string ModernTemplateName = "MatCMS Modern";
+    private const string FerienTemplateName = "Ferienwohnung";
+
+    /// <summary>A warm, cosy holiday-let theme (sticky header, rounded cards, dark cosy footer).</summary>
+    private static Template BuildFerienTemplate() => new()
+    {
+        Name = FerienTemplateName,
+        IsActive = false,
+        AccentColor = "#b0703f",
+        SecondaryColor = "#7f9b6f",
+        HeadingColor = "#33291e",
+        TextColor = "#524839",
+        BackgroundColor = "#fdfbf6",
+        AltBackground = "#f1eadd",
+        HeadingFont = "Poppins",
+        BodyFont = "Nunito",
+        ButtonStyle = "solid",
+        ButtonRadius = "14",
+        ContainerWidth = "1140",
+        LayoutHtml = """
+            <header class="fw-header">
+              <div class="fw-wrap">
+                <a class="fw-logo" href="/">{{logo}}</a>
+                <nav class="fw-nav">{{#menu:primary}}<a href="{{url}}"{{target}}>{{label}}</a>{{/menu:primary}}</nav>
+                <span class="fw-tools">{{toolbar}}</span>
+              </div>
+            </header>
+            <main class="fw-main">{{content}}</main>
+            <footer class="fw-footer">
+              <div class="fw-wrap fw-footgrid">
+                <div class="fw-footbrand">{{logo}}<p>{{footer_text}}</p></div>
+                <nav class="fw-footnav">{{#menu:secondary}}<a href="{{url}}"{{target}}>{{label}}</a>{{/menu:secondary}}</nav>
+              </div>
+              <div class="fw-copy">© {{year}} {{site_name}}</div>
+            </footer>
+            """,
+        MenuMapJson = """{"primary":"header","secondary":"footer"}""",
+        CustomCss = """
+            .fw-wrap { max-width: var(--max); margin: 0 auto; padding: 0 24px; }
+            .fw-header { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 86%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1px solid color-mix(in srgb, var(--black) 8%, transparent); }
+            .fw-header .fw-wrap { display: flex; align-items: center; gap: 22px; min-height: 76px; }
+            .fw-logo img { height: 46px; display: block; }
+            .fw-nav { display: inline-flex; gap: 4px; margin-left: auto; flex-wrap: wrap; }
+            .fw-nav a { text-decoration: none; color: var(--black); font-family: var(--font-head); font-weight: 600; font-size: 14.5px; padding: 9px 16px; border-radius: 999px; transition: background .15s ease, color .15s ease; }
+            .fw-nav a:hover { background: var(--accent); color: #fff; }
+            .fw-tools { display: inline-flex; gap: 12px; align-items: center; color: var(--accent); }
+            .fw-tools .ti { font-size: 22px; }
+            .fw-footer { margin-top: 72px; background: var(--black); color: #efe7da; }
+            .fw-footgrid { display: flex; justify-content: space-between; gap: 40px; padding: 54px 24px; flex-wrap: wrap; }
+            .fw-footbrand img { height: 42px; filter: brightness(0) invert(1); opacity: .9; }
+            .fw-footbrand p { max-width: 320px; opacity: .8; margin: 12px 0 0; font-size: 14px; }
+            .fw-footnav { display: flex; flex-direction: column; gap: 10px; }
+            .fw-footnav a { color: #efe7da; text-decoration: none; opacity: .85; }
+            .fw-footnav a:hover { opacity: 1; text-decoration: underline; }
+            .fw-copy { border-top: 1px solid rgba(255,255,255,.14); text-align: center; padding: 18px; font-size: 13px; opacity: .7; }
+            @media (max-width: 700px) { .fw-footgrid { flex-direction: column; gap: 24px; } .fw-header .fw-wrap { padding-top: 12px; padding-bottom: 12px; flex-wrap: wrap; } }
+
+            /* Warm, cosy blocks */
+            .btn { box-shadow: 0 10px 24px color-mix(in srgb, var(--accent) 26%, transparent); }
+            .hero__inner h1 { letter-spacing: -.01em; }
+            .service-grid { gap: 20px; background: transparent; border: none; }
+            .service-card { background: #fff; border: 1px solid color-mix(in srgb, var(--black) 8%, transparent); border-radius: 18px; box-shadow: 0 12px 30px rgba(51,41,30,.06); transition: transform .18s ease, box-shadow .18s ease; }
+            .service-card:hover { transform: translateY(-4px); box-shadow: 0 18px 44px rgba(51,41,30,.12); }
+            .columns-grid { gap: 26px; }
+            .column { background: #fff; border: 1px solid color-mix(in srgb, var(--black) 8%, transparent); border-radius: 18px; padding: 26px; box-shadow: 0 12px 30px rgba(51,41,30,.05); }
+            .imagetext__media img { border-radius: 20px; box-shadow: 0 18px 40px rgba(51,41,30,.12); }
+            """,
+        CustomJs = ""
+    };
 
     /// <summary>A distinct, modern alternative theme (gradient hero, rounded floating cards).</summary>
     private static Template BuildModernTemplate() => new()

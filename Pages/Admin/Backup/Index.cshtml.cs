@@ -97,7 +97,7 @@ public class IndexModel : PageModel
         }
 
         var bytes = await _transfer.ExportAsync(options);
-        var name = $"matcms-backup-{DateTime.UtcNow:yyyy-MM-dd-HHmm}.zip";
+        var name = $"{await _backups.SiteSlugAsync()}_{DateTime.UtcNow:yyyy-MM-dd-HHmm}.zip";
         return File(bytes, "application/zip", name);
     }
 

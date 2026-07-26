@@ -2,17 +2,42 @@
 @model MatCMS.Pages.Admin.Backup.IndexModel
 @{
     ViewData["Title"] = T["backup.title"];
+    var cfg = Model.ScheduleConfig;
+    string Fmt(long b) => b < 1024 ? $"{b} B" : b < 1024 * 1024 ? $"{b / 1024.0:0.0} KB" : $"{b / 1024.0 / 1024.0:0.0} MB";
+    string nextDue;
+    if (!cfg.Enabled) { nextDue = "–"; }
+    else if (string.IsNullOrWhiteSpace(cfg.LastRunUtc)) { nextDue = T["backup.schedDueNow"]; }
+    else if (DateTime.TryParse(cfg.LastRunUtc, null, System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out var lr))
+    { var due = lr.AddHours(Math.Max(1, cfg.IntervalHours)); nextDue = due <= DateTime.UtcNow ? T["backup.schedDueNow"] : due.ToLocalTime().ToString("g"); }
+    else { nextDue = T["backup.schedDueNow"]; }
 }
 <div class="page-head">
     <h1>@T["backup.heading"]</h1>
 </div>
 
+@* ---------- Manual export ---------- *@
 <div class="card">
     <h2>@T["backup.createHeading"]</h2>
     <p class="muted">@T["backup.createIntro"]</p>
     <form method="post" asp-page-handler="Export">
         <div class="form-grid">
-            <label class="check"><input type="checkbox" name="IncTemplates" value="true" checked /> @T["backup.templates"]</label>
+            <label class="check"><input type="checkbox" name="IncTemplates" value="true" checked id="inc-templates" /> @T["backup.templates"]</label>
+
+            @if (Model.AllTemplates.Count > 0)
+            {
+                <div class="subselect" id="template-picker">
+                    <div class="help">@T["backup.templatePick"]</div>
+                    @foreach (var t in Model.AllTemplates)
+                    {
+                        <label class="check check-sm">
+                            <input type="checkbox" name="TemplateNames" value="@t.Name" checked />
+                            @t.Name @(t.IsActive ? "★" : "")
+                        </label>
+                    }
+                    <div class="help">@T["backup.templateHint"]</div>
+                </div>
+            }
+
             <label class="check"><input type="checkbox" name="IncPages" value="true" checked /> @T["backup.pages"]</label>
             <label class="check"><input type="checkbox" name="IncMenus" value="true" checked /> @T["backup.menus"]</label>
             <label class="check"><input type="checkbox" name="IncSettings" value="true" checked /> @T["backup.settings"]</label>
@@ -20,26 +45,182 @@
             <label class="check"><input type="checkbox" name="IncForms" value="true" checked /> @T["backup.forms"]</label>
             <label class="check"><input type="checkbox" name="IncAssets" value="true" checked /> @T["backup.assets"]</label>
         </div>
-        <div style="margin-top:18px;">
+        <div class="form-actions">
             <button type="submit" class="btn">@T["backup.download"]</button>
         </div>
     </form>
 </div>
 
+@* ---------- Restore (with inspection) ---------- *@
 <div class="card">
     <h2>@T["backup.restoreHeading"]</h2>
     <p class="muted">@Html.Raw(T["backup.restoreIntro"])</p>
-    <form method="post" asp-page-handler="Import" enctype="multipart/form-data">
+    <form method="post" asp-page-handler="Import" enctype="multipart/form-data" id="restore-form">
         <div class="form-field">
             <label for="ImportFile">@T["backup.fileLabel"]</label>
-            <input id="ImportFile" type="file" name="ImportFile" accept=".zip,application/zip,application/json,.json" required />
+            <div class="copy-row">
+                <input id="ImportFile" type="file" name="ImportFile" accept=".zip,application/zip,application/json,.json" required />
+                <button type="button" id="inspect-btn" class="btn btn-sm btn-ghost">@T["backup.inspect"]</button>
+            </div>
         </div>
+
+        <div id="inspect-result" class="inspect-result" hidden></div>
+
         <label class="check">
             <input type="checkbox" name="Confirm" value="true" required />
             @T["backup.confirmLabel"]
         </label>
-        <div style="margin-top:18px;">
+        <div class="form-actions">
             <button type="submit" class="btn btn-danger">@T["backup.restoreSubmit"]</button>
         </div>
     </form>
 </div>
+
+@* ---------- Scheduler ---------- *@
+<div class="card">
+    <h2>@T["backup.schedHeading"]</h2>
+    <p class="muted">@T["backup.schedIntro"]</p>
+    <form method="post" asp-page-handler="SaveSchedule">
+        <label class="check">
+            <input asp-for="Schedule.Enabled" type="checkbox" /> @T["backup.schedEnabled"]
+        </label>
+
+        <div class="form-row" style="margin-top:12px;">
+            <div class="form-field">
+                <label asp-for="Schedule.IntervalHours">@T["backup.schedInterval"]</label>
+                <input asp-for="Schedule.IntervalHours" type="number" min="1" max="8760" />
+            </div>
+            <div class="form-field">
+                <label asp-for="Schedule.Retain">@T["backup.schedRetain"]</label>
+                <input asp-for="Schedule.Retain" type="number" min="1" max="200" />
+            </div>
+        </div>
+
+        <div class="form-field">
+            <label>@T["backup.schedSections"]</label>
+            <div class="form-grid">
+                <label class="check"><input asp-for="Schedule.Templates" type="checkbox" /> @T["backup.templates"]</label>
+                @if (Model.AllTemplates.Count > 0)
+                {
+                    <div class="subselect">
+                        <div class="help">@T["backup.templatePick"]</div>
+                        @foreach (var t in Model.AllTemplates)
+                        {
+                            var picked = cfg.TemplateNames.Contains(t.Name, StringComparer.OrdinalIgnoreCase);
+                            <label class="check check-sm">
+                                <input type="checkbox" name="TemplateNames" value="@t.Name" checked="@(picked || cfg.TemplateNames.Count == 0)" />
+                                @t.Name @(t.IsActive ? "★" : "")
+                            </label>
+                        }
+                    </div>
+                }
+                <label class="check"><input asp-for="Schedule.Pages" type="checkbox" /> @T["backup.pages"]</label>
+                <label class="check"><input asp-for="Schedule.Menus" type="checkbox" /> @T["backup.menus"]</label>
+                <label class="check"><input asp-for="Schedule.Settings" type="checkbox" /> @T["backup.settings"]</label>
+                <label class="check"><input asp-for="Schedule.Submissions" type="checkbox" /> @T["backup.submissions"]</label>
+                <label class="check"><input asp-for="Schedule.Forms" type="checkbox" /> @T["backup.forms"]</label>
+                <label class="check"><input asp-for="Schedule.Assets" type="checkbox" /> @T["backup.assets"]</label>
+            </div>
+        </div>
+
+        <div class="sched-status">
+            <span>@T["backup.schedLastRun"]: <strong>@(string.IsNullOrWhiteSpace(cfg.LastRunUtc) ? T["backup.schedNever"] : (DateTime.TryParse(cfg.LastRunUtc, null, System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out var l) ? l.ToLocalTime().ToString("g") : cfg.LastRunUtc))</strong></span>
+            <span>@T["backup.schedNextDue"]: <strong>@nextDue</strong></span>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn">@T["backup.schedSave"]</button>
+            <button type="submit" class="btn btn-ghost" asp-page-handler="RunNow">@T["backup.schedRunNow"]</button>
+        </div>
+    </form>
+
+    <h3 class="form-section">@T["backup.storedHeading"]</h3>
+    @if (Model.StoredBackups.Count == 0)
+    {
+        <p class="muted">@T["backup.storedNone"]</p>
+    }
+    else
+    {
+        <table class="data">
+            <thead>
+                <tr>
+                    <th>@T["backup.colFile"]</th>
+                    <th>@T["backup.colSize"]</th>
+                    <th>@T["backup.colDate"]</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var b in Model.StoredBackups)
+                {
+                    <tr>
+                        <td class="mono">@b.Name</td>
+                        <td>@Fmt(b.SizeBytes)</td>
+                        <td>@b.ModifiedUtc.ToLocalTime().ToString("g")</td>
+                        <td class="actions">
+                            <a class="btn btn-sm btn-ghost" asp-page-handler="Download" asp-route-name="@b.Name">↓</a>
+                            <form method="post" asp-page-handler="RestoreStored" asp-route-name="@b.Name" class="inline-form"
+                                  onsubmit="return confirm('@T["backup.restoreStoredConfirm"]');">
+                                <button type="submit" class="btn btn-sm btn-ghost">@T["backup.restoreThis"]</button>
+                            </form>
+                            <form method="post" asp-page-handler="DeleteStored" asp-route-name="@b.Name" class="inline-form"
+                                  onsubmit="return confirm('@T["backup.deleteConfirm"]');">
+                                <button type="submit" class="btn btn-sm btn-danger" title="@T["action.delete"]">✕</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            // Reveal/hide the per-template picker with the Templates section toggle (export form).
+            var incTpl = document.getElementById('inc-templates');
+            var picker = document.getElementById('template-picker');
+            function syncPicker() { if (picker) picker.style.display = incTpl.checked ? '' : 'none'; }
+            if (incTpl) { incTpl.addEventListener('change', syncPicker); syncPicker(); }
+
+            // ---- Inspect an uploaded backup before restoring ----
+            var fileInput = document.getElementById('ImportFile');
+            var inspectBtn = document.getElementById('inspect-btn');
+            var out = document.getElementById('inspect-result');
+            var token = document.querySelector('#restore-form input[name="__RequestVerificationToken"]');
+
+            function row(label, val) { return val ? '<li><span>' + label + '</span><strong>' + val + '</strong></li>' : ''; }
+
+            inspectBtn && inspectBtn.addEventListener('click', function () {
+                if (!fileInput.files || !fileInput.files.length) { fileInput.click(); return; }
+                inspectBtn.disabled = true; inspectBtn.textContent = '@T["backup.inspecting"]';
+                var fd = new FormData();
+                fd.append('ImportFile', fileInput.files[0]);
+                if (token) fd.append('__RequestVerificationToken', token.value);
+                fetch('?handler=Inspect', { method: 'POST', body: fd })
+                    .then(function (r) { return r.json(); })
+                    .then(function (j) {
+                        out.hidden = false;
+                        if (!j.ok) { out.className = 'inspect-result err'; out.textContent = j.error || 'Fehler'; return; }
+                        var i = j.info;
+                        var tpls = (i.templateNames && i.templateNames.length) ? i.templateNames.join(', ') : '';
+                        var html = '<div class="inspect-title">@T["backup.contents"]</div><ul class="inspect-list">';
+                        html += row('@T["backup.exportedAt"]', i.exportedAtUtc ? new Date(i.exportedAtUtc).toLocaleString() : '');
+                        html += row('@T["backup.templates"]', tpls || (i.templateNames && i.templateNames.length));
+                        html += row('@T["backup.pages"]', i.pages);
+                        html += row('@T["backup.menus"]', i.menus + (i.menuItems ? ' (' + i.menuItems + ')' : ''));
+                        html += row('@T["backup.settings"]', i.settings);
+                        html += row('@T["backup.submissions"]', i.submissions);
+                        html += row('@T["backup.forms"]', i.forms);
+                        html += row('@T["backup.assets"]', i.media || (i.hasAssets ? '✓' : ''));
+                        html += '</ul>';
+                        out.className = 'inspect-result ok';
+                        out.innerHTML = html;
+                    })
+                    .catch(function () { out.hidden = false; out.className = 'inspect-result err'; out.textContent = 'Fehler'; })
+                    .finally(function () { inspectBtn.disabled = false; inspectBtn.textContent = '@T["backup.inspect"]'; });
+            });
+        })();
+    </script>
+}

@@ -245,6 +245,20 @@ table.data .btn { white-space: nowrap; }
 .form-grid { display: grid; gap: 18px; }
 .form-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
 .check { display: flex; align-items: center; gap: 8px; }
+
+/* Backup: sub-selection (per template), action rows, inspection, schedule status */
+.form-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+.subselect { margin: -6px 0 4px 26px; padding: 10px 14px; border-left: 2px solid var(--line); display: flex; flex-direction: column; gap: 7px; }
+.check-sm { font-size: 13.5px; gap: 7px; }
+.inspect-result { margin: 4px 0 16px; padding: 14px 16px; border-radius: 8px; font-size: 14px; }
+.inspect-result.ok { background: #f2f7f2; border: 1px solid #cfe3cf; }
+.inspect-result.err { background: #fbeaea; border: 1px solid #e6bcbc; color: #922; }
+.inspect-title { font-weight: 600; margin-bottom: 8px; }
+.inspect-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; }
+.inspect-list li { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px dotted var(--line); padding: 3px 0; }
+.inspect-list span { color: var(--muted); }
+.sched-status { display: flex; gap: 28px; flex-wrap: wrap; margin-top: 14px; font-size: 14px; color: var(--muted); }
+.sched-status strong { color: var(--black); }
 .check input { width: auto; }
 .help { font-size: 13px; color: var(--muted); margin-top: 5px; }
 

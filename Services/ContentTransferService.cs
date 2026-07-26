@@ -54,7 +54,30 @@ public class ContentTransferService
         public bool Forms { get; set; } = true;
         public bool Assets { get; set; } = true;
 
+        /// <summary>
+        /// When set (non-empty), only templates whose name is in this list are exported — the
+        /// granular "back up only this template" case. Null/empty = all templates in the section.
+        /// </summary>
+        public List<string>? TemplateNames { get; set; }
+
         public bool Any => Templates || Pages || Menus || Settings || Submissions || Forms || Assets;
+    }
+
+    /// <summary>What a backup file contains — shown before a restore so nothing is overwritten blind.</summary>
+    public sealed class BackupInfo
+    {
+        public string? ExportedAtUtc { get; set; }
+        public int Version { get; set; }
+        public List<string> TemplateNames { get; set; } = new();
+        public int Pages { get; set; }
+        public int Menus { get; set; }
+        public int MenuItems { get; set; }
+        public int Settings { get; set; }
+        public int Submissions { get; set; }
+        public int Forms { get; set; }
+        public int Media { get; set; }
+        public int Components { get; set; }
+        public bool HasAssets { get; set; }
     }
 
     private string UploadsDir => Path.Combine(_env.WebRootPath, "uploads");
@@ -91,12 +114,19 @@ public class ContentTransferService
         var dto = new TransferDto
         {
             Version = CurrentVersion,
-            ExportedAtUtc = exportedAtUtc ?? DateTime.UtcNow.ToString("o")
+            ExportedAtUtc = exportedAtUtc ?? DateTime.UtcNow.ToString("o"),
+            TemplatesPartial = options.Templates && options.TemplateNames is { Count: > 0 }
         };
 
         if (options.Templates)
         {
-            dto.Templates = (await _db.Templates.AsNoTracking().OrderBy(t => t.Id).ToListAsync())
+            var tplQuery = await _db.Templates.AsNoTracking().OrderBy(t => t.Id).ToListAsync();
+            if (options.TemplateNames is { Count: > 0 })
+            {
+                var wanted = new HashSet<string>(options.TemplateNames, StringComparer.OrdinalIgnoreCase);
+                tplQuery = tplQuery.Where(t => wanted.Contains(t.Name)).ToList();
+            }
+            dto.Templates = tplQuery
                 .Select(t => new TemplateDto
                 {
                     Name = t.Name, IsActive = t.IsActive, AccentColor = t.AccentColor,
@@ -109,12 +139,17 @@ public class ContentTransferService
                     MenuMapJson = t.MenuMapJson
                 }).ToList();
 
-            dto.Components = (await _db.Components.AsNoTracking().OrderBy(c => c.Name).ToListAsync())
-                .Select(c => new ComponentDto
-                {
-                    Type = c.Type, Name = c.Name, Description = c.Description,
-                    FieldsJson = c.FieldsJson, TemplateHtml = c.TemplateHtml, CreatedAt = c.CreatedAt
-                }).ToList();
+            // Component-designer components travel with the full template section, but not when the
+            // user narrowed the export to specific templates (then they want just those templates).
+            if (options.TemplateNames is null or { Count: 0 })
+            {
+                dto.Components = (await _db.Components.AsNoTracking().OrderBy(c => c.Name).ToListAsync())
+                    .Select(c => new ComponentDto
+                    {
+                        Type = c.Type, Name = c.Name, Description = c.Description,
+                        FieldsJson = c.FieldsJson, TemplateHtml = c.TemplateHtml, CreatedAt = c.CreatedAt
+                    }).ToList();
+            }
         }
 
         if (options.Pages)
@@ -270,7 +305,26 @@ public class ContentTransferService
 
         await using var tx = await _db.Database.BeginTransactionAsync();
 
-        if (dto.Templates is not null)
+        if (dto.Templates is not null && dto.TemplatesPartial)
+        {
+            // Granular restore: upsert each template by name, leaving the site's other themes and the
+            // currently-active template untouched (unless nothing is active afterwards).
+            var existing = await _db.Templates.ToListAsync();
+            foreach (var t in dto.Templates)
+            {
+                var name = string.IsNullOrWhiteSpace(t.Name) ? "Template" : t.Name!;
+                var row = existing.FirstOrDefault(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase))
+                          ?? new Template { Name = name };
+                ApplyTemplate(row, t); // fields only — the active theme is deliberately left as-is
+                if (row.Id == 0) _db.Templates.Add(row);
+            }
+            await _db.SaveChangesAsync();
+            var all = await _db.Templates.ToListAsync();
+            if (all.Count > 0 && all.All(t => !t.IsActive)) all[0].IsActive = true;
+            await _db.SaveChangesAsync();
+            summary.Add($"{dto.Templates.Count} Templates (aktualisiert)");
+        }
+        else if (dto.Templates is not null)
         {
             _db.Templates.RemoveRange(_db.Templates);
             await _db.SaveChangesAsync();
@@ -495,6 +549,80 @@ public class ContentTransferService
         return summary.Count == 0 ? "Nichts importiert" : string.Join(", ", summary) + " wiederhergestellt";
     }
 
+    /// <summary>Copies a backed-up template's style fields onto an entity (Name set; IsActive left to the caller).</summary>
+    private static void ApplyTemplate(Template row, TemplateDto t)
+    {
+        if (!string.IsNullOrWhiteSpace(t.Name)) row.Name = t.Name!;
+        row.AccentColor = string.IsNullOrWhiteSpace(t.AccentColor) ? "#2563eb" : t.AccentColor!;
+        row.HeadingFont = string.IsNullOrWhiteSpace(t.HeadingFont) ? "Geologica" : t.HeadingFont!;
+        row.BodyFont = string.IsNullOrWhiteSpace(t.BodyFont) ? "Inter" : t.BodyFont!;
+        row.ButtonStyle = string.IsNullOrWhiteSpace(t.ButtonStyle) ? "solid" : t.ButtonStyle!;
+        row.SecondaryColor = t.SecondaryColor ?? "";
+        row.HeadingColor = string.IsNullOrWhiteSpace(t.HeadingColor) ? "#010101" : t.HeadingColor!;
+        row.TextColor = string.IsNullOrWhiteSpace(t.TextColor) ? "#1a1a1a" : t.TextColor!;
+        row.BackgroundColor = string.IsNullOrWhiteSpace(t.BackgroundColor) ? "#ffffff" : t.BackgroundColor!;
+        row.AltBackground = string.IsNullOrWhiteSpace(t.AltBackground) ? "#f6f7f9" : t.AltBackground!;
+        row.ContainerWidth = string.IsNullOrWhiteSpace(t.ContainerWidth) ? "1180" : t.ContainerWidth!;
+        row.ButtonRadius = string.IsNullOrWhiteSpace(t.ButtonRadius) ? "0" : t.ButtonRadius!;
+        row.HeaderBackground = t.HeaderBackground ?? "";
+        row.HeaderTextColor = t.HeaderTextColor ?? "";
+        row.HeaderPadding = string.IsNullOrWhiteSpace(t.HeaderPadding) ? "16" : t.HeaderPadding!;
+        row.CustomCss = t.CustomCss ?? "";
+        row.CustomJs = t.CustomJs ?? "";
+        row.LayoutHtml = t.LayoutHtml ?? "";
+        row.MenuMapJson = string.IsNullOrWhiteSpace(t.MenuMapJson) ? "{}" : t.MenuMapJson!;
+    }
+
+    /// <summary>
+    /// Reads a backup file (ZIP or legacy JSON) WITHOUT importing it, returning a summary of its
+    /// contents so a restore can be reviewed first. Throws on an unreadable file.
+    /// </summary>
+    public BackupInfo Inspect(byte[] data)
+    {
+        if (data is null || data.Length == 0)
+            throw new InvalidOperationException("Die Datei ist leer.");
+
+        var isZip = data.Length >= 4 && data[0] == 0x50 && data[1] == 0x4B && data[2] == 0x03 && data[3] == 0x04;
+        string json;
+        var hasAssets = false;
+        if (isZip)
+        {
+            using var ms = new MemoryStream(data);
+            using var zip = new ZipArchive(ms, ZipArchiveMode.Read);
+            var contentEntry = zip.GetEntry("content.json")
+                ?? throw new InvalidOperationException("Das ZIP enthält keine content.json.");
+            using var r = new StreamReader(contentEntry.Open(), Encoding.UTF8);
+            json = r.ReadToEnd();
+            hasAssets = zip.Entries.Any(e => e.FullName.StartsWith("assets/", StringComparison.OrdinalIgnoreCase)
+                                             && !string.IsNullOrWhiteSpace(Path.GetFileName(e.FullName)));
+        }
+        else
+        {
+            json = Encoding.UTF8.GetString(data);
+        }
+
+        TransferDto? dto;
+        try { dto = JsonSerializer.Deserialize<TransferDto>(json, ReadOpts); }
+        catch (JsonException ex) { throw new InvalidOperationException($"Ungültige JSON-Datei: {ex.Message}"); }
+        if (dto is null) throw new InvalidOperationException("Kein bekanntes Backup-Format.");
+
+        return new BackupInfo
+        {
+            Version = dto.Version,
+            ExportedAtUtc = dto.ExportedAtUtc,
+            TemplateNames = dto.Templates?.Select(t => t.Name ?? "Template").ToList() ?? new(),
+            Pages = dto.Pages?.Count ?? 0,
+            Menus = dto.Menus?.Count ?? 0,
+            MenuItems = dto.MenuItems?.Count ?? 0,
+            Settings = dto.Settings?.Count ?? 0,
+            Submissions = dto.Submissions?.Count ?? 0,
+            Forms = dto.Forms?.Count ?? 0,
+            Media = dto.Media?.Count ?? 0,
+            Components = dto.Components?.Count ?? 0,
+            HasAssets = hasAssets
+        };
+    }
+
     // ------------------------------------------------------------------
     // Transfer DTOs (stable JSON shape, independent of the EF entities)
     // ------------------------------------------------------------------
@@ -502,6 +630,9 @@ public class ContentTransferService
     {
         public int Version { get; set; }
         public string ExportedAtUtc { get; set; } = "";
+        /// <summary>True when the export was narrowed to specific templates → restore upserts by name
+        /// instead of replacing the whole template set (so it can't wipe the site's other themes).</summary>
+        public bool TemplatesPartial { get; set; }
         public List<TemplateDto>? Templates { get; set; }
         public List<PageDto>? Pages { get; set; }
         public List<MenuDto>? Menus { get; set; }

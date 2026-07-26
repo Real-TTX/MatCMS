@@ -73,6 +73,8 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<BlockRegistry>();
 builder.Services.AddScoped<SiteContext>();
 builder.Services.AddScoped<ContentTransferService>();
+builder.Services.AddScoped<BackupManager>();
+builder.Services.AddHostedService<BackupSchedulerService>();
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<VersionService>();
 builder.Services.AddSingleton<PluginRegistry>();

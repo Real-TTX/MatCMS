@@ -1,10 +1,8 @@
-@model MatCMS.Content.BlockData
+@model MatCMS.Content.ContainerBlockModel
 @{
-    var heading = Model.Str("heading");
-    var intro = Model.Str("intro");
-    var cols = Model.StrOr("columns", "4");
-    var items = Model.List("items");
-    var i = 0;
+    var heading = Model.Data.Str("heading");
+    var intro = Model.Data.Str("intro");
+    var cols = Model.Data.StrOr("columns", "4");
 }
 <section class="section section--alt">
     <div class="container">
@@ -22,14 +20,9 @@
             </div>
         }
         <div class="service-grid cols-@cols">
-            @foreach (var item in items)
+            @foreach (var child in Model.Children)
             {
-                i++;
-                <div class="service-card">
-                    <span class="num">@i.ToString("00")</span>
-                    <h3>@item.Str("title")</h3>
-                    <p>@item.Str("text")</p>
-                </div>
+                @await Html.PartialAsync(child.Partial, child.Data)
             }
         </div>
     </div>

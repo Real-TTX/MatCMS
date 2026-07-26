@@ -1,0 +1,12 @@
+@model MatCMS.Content.BlockData
+@{
+    var title = Model.Str("title");
+    var body = Model.Str("body");
+}
+<div class="column">
+    @if (!string.IsNullOrWhiteSpace(title))
+    {
+        <h3>@title</h3>
+    }
+    <div class="rich">@Html.Raw(body)</div>
+</div>

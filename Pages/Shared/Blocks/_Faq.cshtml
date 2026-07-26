@@ -1,0 +1,12 @@
+@model MatCMS.Content.BlockData
+@{
+    var question = Model.Str("question");
+    var answer = Model.Str("answer");
+}
+<details class="accordion-item">
+    <summary>
+        <span>@question</span>
+        <span class="accordion-icon" aria-hidden="true"></span>
+    </summary>
+    <div class="rich accordion-answer">@Html.Raw(answer)</div>
+</details>

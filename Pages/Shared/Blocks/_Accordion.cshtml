@@ -1,8 +1,7 @@
-@model MatCMS.Content.BlockData
+@model MatCMS.Content.ContainerBlockModel
 @{
-    var heading = Model.Str("heading");
-    var intro = Model.Str("intro");
-    var items = Model.List("items");
+    var heading = Model.Data.Str("heading");
+    var intro = Model.Data.Str("intro");
 }
 <section class="section accordion-block">
     <div class="container">
@@ -20,15 +19,9 @@
             </div>
         }
         <div class="accordion">
-            @foreach (var item in items)
+            @foreach (var child in Model.Children)
             {
-                <details class="accordion-item">
-                    <summary>
-                        <span>@item.Str("question")</span>
-                        <span class="accordion-icon" aria-hidden="true"></span>
-                    </summary>
-                    <div class="rich accordion-answer">@Html.Raw(item.Str("answer"))</div>
-                </details>
+                @await Html.PartialAsync(child.Partial, child.Data)
             }
         </div>
     </div>

@@ -1,5 +1,6 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using MatCMS.Content;
 using MatCMS.Models;
 using MatCMS.Services;
@@ -131,6 +132,58 @@ public static class DbSeeder
         await db.SaveChangesAsync();
 
         await MigrateLegacyContactAsync(db);
+        await MigrateListBlocksAsync(db);
+    }
+
+    /// <summary>
+    /// Converts list-based blocks (columns/servicegrid/accordion) into nested container blocks:
+    /// each "items" entry becomes a child block. Idempotent — skips blocks already migrated.
+    /// </summary>
+    private static async Task MigrateListBlocksAsync(AppDbContext db)
+    {
+        (string Container, string Child)[] maps =
+        {
+            ("columns", "column"),
+            ("servicegrid", "service"),
+            ("accordion", "faq"),
+        };
+
+        var changed = false;
+        foreach (var (container, child) in maps)
+        {
+            var blocks = await db.ContentBlocks.Where(b => b.BlockType == container).ToListAsync();
+            foreach (var b in blocks)
+            {
+                // Already migrated? (has children, or its "items" array was already stripped)
+                if (await db.ContentBlocks.AnyAsync(c => c.ParentId == b.Id)) continue;
+                try
+                {
+                    if (JsonNode.Parse(string.IsNullOrWhiteSpace(b.DataJson) ? "{}" : b.DataJson) is not JsonObject node)
+                        continue;
+                    if (node["items"] is not JsonArray items || items.Count == 0) continue;
+
+                    var order = 0;
+                    foreach (var item in items)
+                    {
+                        if (item is not JsonObject) continue;
+                        db.ContentBlocks.Add(new ContentBlock
+                        {
+                            PageId = b.PageId,
+                            ParentId = b.Id,
+                            BlockType = child,
+                            SortOrder = order++,
+                            DataJson = item.ToJsonString()
+                        });
+                    }
+                    node.Remove("items");
+                    b.DataJson = node.ToJsonString();
+                    changed = true;
+                }
+                catch { /* leave the block untouched on parse errors */ }
+            }
+        }
+
+        if (changed) await db.SaveChangesAsync();
     }
 
     /// <summary>

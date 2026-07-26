@@ -1,9 +1,8 @@
-@model MatCMS.Content.BlockData
+@model MatCMS.Content.ContainerBlockModel
 @{
-    var heading = Model.Str("heading");
-    var intro = Model.Str("intro");
-    var cols = Model.StrOr("columns", "3");
-    var items = Model.List("items");
+    var heading = Model.Data.Str("heading");
+    var intro = Model.Data.Str("intro");
+    var cols = Model.Data.StrOr("columns", "3");
 }
 <section class="columns-block">
     <div class="container">
@@ -21,15 +20,9 @@
             </div>
         }
         <div class="columns-grid cols-@cols">
-            @foreach (var item in items)
+            @foreach (var child in Model.Children)
             {
-                <div class="column">
-                    @if (!string.IsNullOrWhiteSpace(item.Str("title")))
-                    {
-                        <h3>@item.Str("title")</h3>
-                    }
-                    <div class="rich">@Html.Raw(item.Str("body"))</div>
-                </div>
+                @await Html.PartialAsync(child.Partial, child.Data)
             }
         </div>
     </div>

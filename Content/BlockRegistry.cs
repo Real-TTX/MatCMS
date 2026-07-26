@@ -97,21 +97,27 @@ public class BlockRegistry
             Description = "block.columns.desc",
             Svg = SvgColumns,
             Partial = "Blocks/_Columns",
+            AllowedChildren = ["column"],
             Fields =
             [
                 new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },
                 new BlockField { Id = "intro", Label = "block.f.intro", Type = FieldType.Textarea },
                 new BlockField { Id = "columns", Label = "block.columns.f.columns", Type = FieldType.Select, Default = "3",
                     Options = [ new("2", "block.opt.columns.2"), new("3", "block.opt.columns.3") ] },
-                new BlockField
-                {
-                    Id = "items", Label = "block.columns.f.items", Type = FieldType.List, ItemLabel = "block.columns.item",
-                    ItemFields =
-                    [
-                        new BlockField { Id = "title", Label = "block.f.title", Type = FieldType.Text },
-                        new BlockField { Id = "body", Label = "block.f.text", Type = FieldType.RichText },
-                    ]
-                },
+            ]
+        },
+        new BlockDefinition
+        {
+            Type = "column",
+            Name = "block.column.name",
+            Description = "block.column.desc",
+            Svg = SvgText,
+            Partial = "Blocks/_Column",
+            ChildOnly = true,
+            Fields =
+            [
+                new BlockField { Id = "title", Label = "block.f.title", Type = FieldType.Text },
+                new BlockField { Id = "body", Label = "block.f.text", Type = FieldType.RichText },
             ]
         },
         new BlockDefinition
@@ -121,21 +127,27 @@ public class BlockRegistry
             Description = "block.servicegrid.desc",
             Svg = SvgGrid,
             Partial = "Blocks/_ServiceGrid",
+            AllowedChildren = ["service"],
             Fields =
             [
                 new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },
                 new BlockField { Id = "intro", Label = "block.f.intro", Type = FieldType.Textarea },
                 new BlockField { Id = "columns", Label = "block.servicegrid.f.columns", Type = FieldType.Select, Default = "4",
                     Options = [ new("2", "2"), new("3", "3"), new("4", "4") ] },
-                new BlockField
-                {
-                    Id = "items", Label = "block.servicegrid.f.items", Type = FieldType.List, ItemLabel = "block.servicegrid.item",
-                    ItemFields =
-                    [
-                        new BlockField { Id = "title", Label = "block.f.title", Type = FieldType.Text },
-                        new BlockField { Id = "text", Label = "block.f.description", Type = FieldType.Textarea },
-                    ]
-                },
+            ]
+        },
+        new BlockDefinition
+        {
+            Type = "service",
+            Name = "block.service.name",
+            Description = "block.service.desc",
+            Svg = SvgGrid,
+            Partial = "Blocks/_Service",
+            ChildOnly = true,
+            Fields =
+            [
+                new BlockField { Id = "title", Label = "block.f.title", Type = FieldType.Text },
+                new BlockField { Id = "text", Label = "block.f.description", Type = FieldType.Textarea },
             ]
         },
         new BlockDefinition
@@ -191,19 +203,25 @@ public class BlockRegistry
             Description = "block.accordion.desc",
             Svg = SvgAccordion,
             Partial = "Blocks/_Accordion",
+            AllowedChildren = ["faq"],
             Fields =
             [
                 new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },
                 new BlockField { Id = "intro", Label = "block.f.intro", Type = FieldType.Textarea },
-                new BlockField
-                {
-                    Id = "items", Label = "block.accordion.f.items", Type = FieldType.List, ItemLabel = "block.accordion.item",
-                    ItemFields =
-                    [
-                        new BlockField { Id = "question", Label = "block.accordion.f.question", Type = FieldType.Text },
-                        new BlockField { Id = "answer", Label = "block.accordion.f.answer", Type = FieldType.RichText },
-                    ]
-                },
+            ]
+        },
+        new BlockDefinition
+        {
+            Type = "faq",
+            Name = "block.faq.name",
+            Description = "block.faq.desc",
+            Svg = SvgAccordion,
+            Partial = "Blocks/_Faq",
+            ChildOnly = true,
+            Fields =
+            [
+                new BlockField { Id = "question", Label = "block.accordion.f.question", Type = FieldType.Text },
+                new BlockField { Id = "answer", Label = "block.accordion.f.answer", Type = FieldType.RichText },
             ]
         },
         new BlockDefinition

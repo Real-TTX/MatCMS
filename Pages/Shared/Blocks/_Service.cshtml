@@ -1,0 +1,16 @@
+@model MatCMS.Content.BlockData
+@{
+    var title = Model.Str("title");
+    var text = Model.Str("text");
+}
+<div class="service-card">
+    <span class="num" aria-hidden="true"></span>
+    @if (!string.IsNullOrWhiteSpace(title))
+    {
+        <h3>@title</h3>
+    }
+    @if (!string.IsNullOrWhiteSpace(text))
+    {
+        <p>@text</p>
+    }
+</div>

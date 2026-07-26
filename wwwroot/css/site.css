@@ -306,7 +306,9 @@ h1, h2, h3, h4 {
 .lightbox .lb-next { right: 8px; }
 
 /* ---------- Service grid ---------- */
-.service-grid { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+.service-grid { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); counter-reset: svc; }
+.service-card { counter-increment: svc; }
+.service-card .num::before { content: counter(svc, decimal-leading-zero); }
 .service-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
 .service-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
 .service-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }

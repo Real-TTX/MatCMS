@@ -32,8 +32,9 @@
 }
 
 .admin-sidebar {
-    background: #0f0f10;
-    color: #cfcfcf;
+    background: #edeff2;
+    color: #3a3a3a;
+    border-right: 1px solid var(--line);
     display: flex;
     flex-direction: column;
     padding: 22px 16px;
@@ -41,30 +42,30 @@
     top: 0;
     height: 100vh;
 }
-.admin-brand { padding: 10px 8px 20px; border-bottom: 1px solid #262626; margin-bottom: 16px; }
+.admin-brand { padding: 10px 8px 20px; border-bottom: 1px solid #dfe1e6; margin-bottom: 16px; }
 .admin-brand-link { display: flex; flex-direction: column; gap: 8px; text-decoration: none; }
 .admin-logo { max-height: 40px; max-width: 100%; width: auto; object-fit: contain; align-self: flex-start; }
-.admin-brand .cms { font-family: var(--font-head); font-weight: 600; letter-spacing: .22em; font-size: 11px; color: #6f6f6f; text-transform: uppercase; }
+.admin-brand .cms { font-family: var(--font-head); font-weight: 600; letter-spacing: .22em; font-size: 11px; color: #8a8f98; text-transform: uppercase; }
 
 .admin-nav { display: flex; flex-direction: column; gap: 4px; flex: 1; }
 .admin-nav a {
     text-decoration: none;
-    color: #cfcfcf;
+    color: #3a3d42;
     padding: 11px 12px;
     border-radius: 8px;
     font-size: 14.5px;
     font-weight: 500;
     transition: background .15s ease, color .15s ease;
 }
-.admin-nav a:hover { background: #1c1c1e; color: #fff; }
-.admin-nav a.active { background: #fff; color: #0f0f10; }
+.admin-nav a:hover { background: #e2e5ea; color: var(--black); }
+.admin-nav a.active { background: var(--accent); color: #fff; }
 
-.admin-nav-foot { border-top: 1px solid #262626; padding-top: 14px; display: flex; flex-direction: column; gap: 6px; }
+.admin-nav-foot { border-top: 1px solid #dfe1e6; padding-top: 14px; display: flex; flex-direction: column; gap: 6px; }
 .admin-nav-foot a, .admin-nav-foot .linklike {
-    text-decoration: none; color: #9a9a9a; font-size: 14px; padding: 8px 12px;
+    text-decoration: none; color: #6b7078; font-size: 14px; padding: 8px 12px;
     background: none; border: none; text-align: left; cursor: pointer; font-family: inherit;
 }
-.admin-nav-foot a:hover, .admin-nav-foot .linklike:hover { color: #fff; }
+.admin-nav-foot a:hover, .admin-nav-foot .linklike:hover { color: var(--black); }
 
 .admin-main { display: flex; flex-direction: column; min-width: 0; }
 .admin-topbar {

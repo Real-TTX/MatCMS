@@ -5,7 +5,6 @@ services:
     ports:
       - 9101:8080
     volumes:
-      # One volume holds everything the app persists: DB, keys, scheduled backups and uploaded media.
       - matcms-data:/app/appdata
     networks:
       - main

@@ -40,14 +40,16 @@
     padding: 22px 16px;
     position: sticky;
     top: 0;
-    height: 100vh;
+    height: 100dvh;
 }
 .admin-brand { padding: 10px 8px 20px; border-bottom: 1px solid #dfe1e6; margin-bottom: 16px; }
 .admin-brand-link { display: flex; flex-direction: column; gap: 8px; text-decoration: none; }
 .admin-logo { max-height: 40px; max-width: 100%; width: auto; object-fit: contain; align-self: flex-start; }
 .admin-brand .cms { font-family: var(--font-head); font-weight: 600; letter-spacing: .22em; font-size: 11px; color: #8a8f98; text-transform: uppercase; }
 
-.admin-nav { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+/* Nav scrolls on its own so brand + footer stay pinned and the grey fills the full height even
+   on short screens (flex child needs min-height:0 to be allowed to shrink and scroll). */
+.admin-nav { display: flex; flex-direction: column; gap: 4px; flex: 1; overflow-y: auto; min-height: 0; margin: 0 -6px; padding: 0 6px; }
 .admin-nav a {
     text-decoration: none;
     color: #3a3d42;

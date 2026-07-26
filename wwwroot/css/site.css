@@ -270,6 +270,10 @@ h1, h2, h3, h4 {
 }
 
 /* ---------- Gallery block + lightbox ---------- */
+.gallery-filter { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
+.gallery-filter .gfilter { font: inherit; font-size: 14px; padding: 7px 16px; border: 1px solid var(--line); background: #fff; border-radius: 999px; cursor: pointer; color: var(--ink); transition: background .15s ease, color .15s ease, border-color .15s ease; }
+.gallery-filter .gfilter:hover { border-color: var(--accent); }
+.gallery-filter .gfilter.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 .gallery { margin-top: 8px; }
 .gallery__item { margin: 0; }
 .gallery__link { display: block; overflow: hidden; }

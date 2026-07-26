@@ -329,6 +329,10 @@ public class BlockRegistry
             Fields =
             [
                 new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },
+                new BlockField { Id = "source", Label = "block.gallery.f.source", Type = FieldType.Select, Default = "manual",
+                    Options = [ new("manual", "block.gallery.opt.source.manual"), new("media", "block.gallery.opt.source.media") ] },
+                new BlockField { Id = "tags", Label = "block.gallery.f.tags", Type = FieldType.Text,
+                    Help = "Nur bei Quelle Mediathek. Komma-getrennt; leer = alle Medien. Besucher können nach diesen Tags filtern." },
                 new BlockField { Id = "layout", Label = "block.gallery.f.layout", Type = FieldType.Select, Default = "grid",
                     Options = [ new("grid", "block.opt.layout.grid"), new("masonry", "block.opt.layout.masonry") ] },
                 new BlockField { Id = "columns", Label = "block.gallery.f.columns", Type = FieldType.Select, Default = "3",

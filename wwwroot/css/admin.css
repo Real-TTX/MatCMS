@@ -119,6 +119,15 @@ body.nav-open .admin-menu-toggle span:nth-child(3) { transform: translateY(-6px)
 .field-row .fr-type { width: 160px; }
 #placeholder-hint { color: var(--accent); }
 
+/* Tag filter chips (media library) */
+.tag-filter { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.tag-chip { text-decoration: none; font-size: 13px; padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); background: #fff; }
+.tag-chip:hover { border-color: var(--accent); }
+.tag-chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.media-tags-form { margin: 6px 0; }
+.media-tags-input { width: 100%; font-size: 12.5px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; }
+.media-tags-input:focus { outline: none; border-color: var(--accent); }
+
 /* Media library grid */
 .media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
 .media-card { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; }

@@ -1,15 +1,47 @@
 @model MatCMS.Content.BlockData
+@inject MatCMS.Data.AppDbContext Db
+@using Microsoft.EntityFrameworkCore
 @{
     var heading = Model.Str("heading");
     var layout = Model.StrOr("layout", "grid");
     var columns = Model.StrOr("columns", "3");
-    var images = Model.List("images");
+    var source = Model.StrOr("source", "manual");
 
     static string SafeSrc(string image) =>
         (!string.IsNullOrWhiteSpace(image)
             && (image.StartsWith("/") || image.StartsWith("http://") || image.StartsWith("https://"))
             && image.IndexOfAny(new[] { '\'', '"', '(', ')', '\\', '\n', '\r' }) < 0)
             ? image : "";
+
+    // Collect gallery items from either the manual list or the media library (by tag).
+    var items = new List<(string Src, string Alt, string Caption, string Tags)>();
+    var filterTags = new List<string>();
+
+    if (source == "media")
+    {
+        var wanted = MatCMS.Content.TagUtil.Split(Model.Str("tags")).ToList();
+        var media = Db.Media.AsNoTracking().OrderByDescending(m => m.Id).ToList();
+        foreach (var m in media)
+        {
+            var mtags = MatCMS.Content.TagUtil.Split(m.Tags).ToList();
+            if (wanted.Count > 0 && !wanted.Any(w => mtags.Contains(w, StringComparer.OrdinalIgnoreCase)))
+                continue;
+            var src = SafeSrc(m.Url);
+            if (src.Length == 0) continue;
+            items.Add((src, m.Alt ?? "", "", string.Join(" ", mtags)));
+        }
+        filterTags = items.SelectMany(i => i.Tags.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(t => t, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+    else
+    {
+        foreach (var item in Model.List("images"))
+        {
+            var src = SafeSrc(item.Str("image"));
+            if (src.Length == 0) continue;
+            items.Add((src, item.Str("alt"), item.Str("caption"), ""));
+        }
+    }
 
     var cls = "gallery gallery--" + (layout == "masonry" ? "masonry" : "grid") + " cols-" + columns;
 }
@@ -19,20 +51,26 @@
         {
             <div class="section__intro"><h2>@heading</h2></div>
         }
+        @if (filterTags.Count > 0)
+        {
+            <div class="gallery-filter" data-gallery-filter>
+                <button type="button" class="gfilter active" data-tag="">Alle</button>
+                @foreach (var t in filterTags)
+                {
+                    <button type="button" class="gfilter" data-tag="@t">@t</button>
+                }
+            </div>
+        }
         <div class="@cls" data-gallery>
-            @foreach (var item in images)
+            @foreach (var it in items)
             {
-                var src = SafeSrc(item.Str("image"));
-                if (string.IsNullOrEmpty(src)) { continue; }
-                var alt = item.Str("alt");
-                var caption = item.Str("caption");
-                <figure class="gallery__item">
-                    <a href="@src" class="gallery__link" data-lightbox data-caption="@caption">
-                        <img src="@src" alt="@alt" loading="lazy" />
+                <figure class="gallery__item" data-tags="@it.Tags">
+                    <a href="@it.Src" class="gallery__link" data-lightbox data-caption="@it.Caption">
+                        <img src="@it.Src" alt="@it.Alt" loading="lazy" />
                     </a>
-                    @if (!string.IsNullOrWhiteSpace(caption))
+                    @if (!string.IsNullOrWhiteSpace(it.Caption))
                     {
-                        <figcaption>@caption</figcaption>
+                        <figcaption>@it.Caption</figcaption>
                     }
                 </figure>
             }

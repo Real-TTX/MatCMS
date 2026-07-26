@@ -11,6 +11,17 @@
     </div>
 </div>
 
+@if (Model.AllTags.Count > 0)
+{
+    <div class="tag-filter">
+        <a class="tag-chip @(Model.ActiveTag is null ? "active" : "")" asp-page="Index">@T["media.allTags"]</a>
+        @foreach (var t in Model.AllTags)
+        {
+            <a class="tag-chip @(string.Equals(Model.ActiveTag, t, StringComparison.OrdinalIgnoreCase) ? "active" : "")" asp-page="Index" asp-route-tag="@t">@t</a>
+        }
+    </div>
+}
+
 @if (Model.Items.Count == 0)
 {
     <div class="card"><p class="muted">@T["media.empty"]</p></div>
@@ -23,9 +34,12 @@
             <div class="media-thumb" style="background-image:url('@m.Url')"></div>
             <div class="media-meta">
                 <div class="media-name" title="@m.FileName">@m.FileName</div>
+                <form class="media-tags-form" method="post" asp-page-handler="Tags" asp-route-id="@m.Id" asp-route-tag="@Model.ActiveTag">
+                    <input class="media-tags-input" name="tags" value="@m.Tags" placeholder="@T["media.tagsPlaceholder"]" />
+                </form>
                 <div class="media-actions">
                     <button type="button" class="btn btn-sm btn-ghost media-copy" data-url="@m.Url">@T["media.copy"]</button>
-                    <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@m.Id" onsubmit="return confirm('@T["media.confirmDelete"]');">
+                    <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@m.Id" asp-route-tag="@Model.ActiveTag" onsubmit="return confirm('@T["media.confirmDelete"]');">
                         <button type="submit" class="btn btn-sm btn-danger" title="@T["action.delete"]">✕</button>
                     </form>
                 </div>
@@ -54,6 +68,13 @@
                     });
                 });
                 chain.then(function () { window.location.reload(); });
+            });
+            // Save tags automatically when the field loses focus (if changed).
+            document.querySelectorAll('.media-tags-input').forEach(function (inp) {
+                var initial = inp.value;
+                inp.addEventListener('blur', function () {
+                    if (inp.value !== initial) inp.form.submit();
+                });
             });
             // Copy URL to clipboard.
             document.querySelectorAll('.media-copy').forEach(function (b) {

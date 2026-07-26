@@ -13,6 +13,9 @@ public class Media
 
     public string? Alt { get; set; }
 
+    /// <summary>Comma-separated tags for filtering (e.g. "produkt, team").</summary>
+    public string Tags { get; set; } = "";
+
     public string ContentType { get; set; } = "";
 
     public long SizeBytes { get; set; }

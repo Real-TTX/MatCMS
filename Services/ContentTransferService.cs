@@ -187,7 +187,7 @@ public class ContentTransferService
             dto.Media = (await _db.Media.AsNoTracking().OrderBy(m => m.Id).ToListAsync())
                 .Select(m => new MediaDto
                 {
-                    Url = m.Url, FileName = m.FileName, Alt = m.Alt,
+                    Url = m.Url, FileName = m.FileName, Alt = m.Alt, Tags = m.Tags,
                     ContentType = m.ContentType, SizeBytes = m.SizeBytes, CreatedAt = m.CreatedAt
                 }).ToList();
         }
@@ -481,6 +481,7 @@ public class ContentTransferService
                     Url = m.Url!,
                     FileName = m.FileName ?? "",
                     Alt = m.Alt,
+                    Tags = m.Tags ?? "",
                     ContentType = m.ContentType ?? "",
                     SizeBytes = m.SizeBytes,
                     CreatedAt = m.CreatedAt == default ? DateTime.UtcNow : m.CreatedAt
@@ -593,6 +594,7 @@ public class ContentTransferService
         public string? Url { get; set; }
         public string? FileName { get; set; }
         public string? Alt { get; set; }
+        public string? Tags { get; set; }
         public string? ContentType { get; set; }
         public long SizeBytes { get; set; }
         public DateTime CreatedAt { get; set; }

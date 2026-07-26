@@ -1,3 +1,24 @@
+// Client-side tag filtering for media galleries.
+(function () {
+    "use strict";
+    Array.prototype.slice.call(document.querySelectorAll("[data-gallery-filter]")).forEach(function (bar) {
+        var gallery = bar.parentNode.querySelector("[data-gallery]");
+        if (!gallery) return;
+        var items = Array.prototype.slice.call(gallery.querySelectorAll(".gallery__item"));
+        bar.addEventListener("click", function (e) {
+            var btn = e.target.closest(".gfilter");
+            if (!btn) return;
+            var tag = (btn.getAttribute("data-tag") || "").toLowerCase();
+            bar.querySelectorAll(".gfilter").forEach(function (b) { b.classList.remove("active"); });
+            btn.classList.add("active");
+            items.forEach(function (it) {
+                var tags = (it.getAttribute("data-tags") || "").toLowerCase().split(" ");
+                it.style.display = (!tag || tags.indexOf(tag) !== -1) ? "" : "none";
+            });
+        });
+    });
+})();
+
 // Self-contained lightbox for gallery blocks. No dependencies.
 (function () {
     "use strict";

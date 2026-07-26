@@ -375,6 +375,8 @@
   "templates.layoutHtml": "Eigenes Body-Layout (HTML)",
   "templates.layoutHtmlHelp": "Optional & Advanced. Ersetzt den Body-Aufbau. Variablen: <code>{{content}}</code> (Seiteninhalt, Pflicht), <code>{{nav}}</code>, <code>{{footer_nav}}</code>, <code>{{toolbar}}</code>, <code>{{logo}}</code>, <code>{{site_name}}</code>, <code>{{footer_text}}</code>, <code>{{year}}</code>. Der &lt;head&gt; (Fonts/Design/Favicon) bleibt erhalten. Ohne <code>{{content}}</code> wird das Standard-Layout genutzt.",
   "templates.menuLoopHelp": "Menüs: <code>{{menu:slot}}</code> gibt das ganze Menü als Links aus. Für eigenes Markup je Eintrag: <code>{{#menu:slot}}&lt;li&gt;&lt;a href=\"{{url}}\"{{target}}&gt;{{icon}}{{label}}&lt;/a&gt;&lt;/li&gt;{{/menu:slot}}</code> – verfügbar sind <code>{{label}}</code>, <code>{{url}}</code>, <code>{{icon}}</code>, <code>{{target}}</code>.",
+  "templates.previewHeading": "Überschrift",
+  "templates.previewButton": "Button",
   "templates.tabDesign": "Design",
   "templates.tabHeader": "Header",
   "templates.tabMenus": "Menüs",

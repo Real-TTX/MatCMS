@@ -1,0 +1,54 @@
+@page
+@model MatCMS.Pages.Admin.Plugins.IndexModel
+@{
+    ViewData["Title"] = T["plugins.title"];
+}
+<div class="page-head">
+    <h1>@T["plugins.title"]</h1>
+</div>
+
+<div class="card">
+    <p class="help">@Html.Raw(T["plugins.intro"])</p>
+    @if (Model.Items.Count == 0)
+    {
+        <p class="muted">@T["plugins.empty"]</p>
+    }
+    <div class="block-list">
+        @foreach (var p in Model.Items)
+        {
+            var err = Model.Errors.TryGetValue(p.Id, out var e) ? e : null;
+            <div class="block-item">
+                <div class="b-info">
+                    <div class="b-type">
+                        @p.Name
+                        @if (p.Enabled)
+                        {
+                            <span class="badge badge-on">@T["plugins.enabled"]</span>
+                        }
+                        else
+                        {
+                            <span class="badge badge-off">@T["plugins.disabled"]</span>
+                        }
+                        @if (p.Enabled && err is not null)
+                        {
+                            <span class="badge badge-err">@T["plugins.error"]</span>
+                        }
+                    </div>
+                    <div class="b-sum">@(string.IsNullOrWhiteSpace(p.Description) ? (err ?? "") : p.Description)</div>
+                </div>
+                <div class="actions">
+                    <form class="inline-form" method="post" asp-page-handler="Toggle" asp-route-id="@p.Id">
+                        <button type="submit" class="btn btn-sm btn-ghost">@(p.Enabled ? T["plugins.disable"] : T["plugins.enable"])</button>
+                    </form>
+                    <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@p.Id">@T["action.edit"]</a>
+                    <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@p.Id" onsubmit="return confirm('@T["plugins.confirmDelete"]');">
+                        <button type="submit" class="btn btn-sm btn-danger" title="@T["action.delete"]">✕</button>
+                    </form>
+                </div>
+            </div>
+        }
+    </div>
+    <div class="list-actions">
+        <a class="btn" asp-page="Create">@T["plugins.new"]</a>
+    </div>
+</div>

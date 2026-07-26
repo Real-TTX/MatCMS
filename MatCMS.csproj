@@ -26,6 +26,8 @@
     <!-- Floating 10.0.* so restores/rebuilds always pick up the latest patch ("immer aktuell"). -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.*" />
     <PackageReference Include="Microsoft.Extensions.Identity.Core" Version="10.0.*" />
+    <!-- Roslyn C# scripting: runs admin-authored plugin code at runtime. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.*" />
     <!-- Override the transitive (vulnerable) SQLitePCLRaw 2.1.11 with the current 3.0.x bundle. -->
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.*" />
   </ItemGroup>

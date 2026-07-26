@@ -19,6 +19,7 @@ public class AppDbContext : DbContext
     public DbSet<FormSubmission> FormSubmissions => Set<FormSubmission>();
     public DbSet<Media> Media => Set<Media>();
     public DbSet<Component> Components => Set<Component>();
+    public DbSet<Plugin> Plugins => Set<Plugin>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {

@@ -75,6 +75,8 @@ builder.Services.AddScoped<SiteContext>();
 builder.Services.AddScoped<ContentTransferService>();
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<VersionService>();
+builder.Services.AddSingleton<PluginRegistry>();
+builder.Services.AddScoped<PluginRunner>();
 
 // Basic brute-force protection for the login endpoint (per client IP).
 // Behind a reverse proxy, enable ForwardedHeaders so the real client IP is used.
@@ -117,6 +119,8 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.EnsureCreated();
     await DbSeeder.SeedAsync(scope.ServiceProvider);
+    // Run enabled plugins once at startup so their registrations are available.
+    await scope.ServiceProvider.GetRequiredService<PluginRunner>().RunAllAsync();
 }
 
 if (!app.Environment.IsDevelopment())

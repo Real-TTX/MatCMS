@@ -1,0 +1,48 @@
+@page "{id:int}"
+@model MatCMS.Pages.Admin.Plugins.EditModel
+@{
+    ViewData["Title"] = T["plugins.edit"];
+}
+<div class="page-head">
+    <h1>@T["plugins.edit"]</h1>
+    <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
+</div>
+
+<div class="card">
+    @if (!string.IsNullOrWhiteSpace(Model.Error))
+    {
+        <div class="alert alert-error">@Model.Error</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Model.RunError))
+    {
+        <div class="alert alert-error"><strong>@T["plugins.runError"]:</strong> <span class="mono">@Model.RunError</span></div>
+    }
+    <form method="post" class="form-grid">
+        <div class="form-row">
+            <div class="form-field">
+                <label for="Name">@T["plugins.name"]</label>
+                <input id="Name" name="Name" value="@Model.Name" required />
+            </div>
+            <div class="form-field">
+                <label for="Description">@T["plugins.description"]</label>
+                <input id="Description" name="Description" value="@Model.Description" />
+            </div>
+        </div>
+        <label class="check">
+            <input type="checkbox" name="Enabled" value="true" @(Model.Enabled ? "checked" : "") /> @T["plugins.enabledLabel"]
+        </label>
+        <div class="form-field">
+            <label for="Code">@T["plugins.code"]</label>
+            <textarea id="Code" name="Code" rows="16" class="code" spellcheck="false">@Model.Code</textarea>
+            <div class="help">@Html.Raw(T["plugins.codeHelp"])</div>
+        </div>
+        <div><button type="submit" class="btn">@T["action.save"]</button></div>
+    </form>
+</div>
+
+<div class="card">
+    <h2>@T["plugins.deletePlugin"]</h2>
+    <form method="post" asp-page-handler="Delete" asp-route-id="@Model.Current.Id" onsubmit="return confirm('@T["plugins.confirmDelete"]');">
+        <button type="submit" class="btn btn-danger">@T["plugins.deletePlugin"]</button>
+    </form>
+</div>

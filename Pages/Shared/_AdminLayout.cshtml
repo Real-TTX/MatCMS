@@ -1,5 +1,6 @@
 @inject MatCMS.Services.SiteContext Site
 @inject MatCMS.Services.PluginRegistry Plugins
+@inject MatCMS.Services.VersionService Version
 @inject Microsoft.Extensions.Options.IOptions<Microsoft.AspNetCore.Builder.RequestLocalizationOptions> LocOptions
 @{
     var title = ViewData["Title"] as string ?? "Admin";
@@ -31,7 +32,6 @@
         <div class="admin-brand">
             <a class="admin-brand-link" asp-page="/Admin/Index" title="@Site.SiteName">
                 <img class="admin-logo" src="@Site.LogoUrl" alt="@Site.SiteName" />
-                <span class="cms">MatCMS</span>
             </a>
         </div>
         <nav class="admin-nav">
@@ -61,6 +61,10 @@
             <form method="post" asp-page="/Logout">
                 <button type="submit" class="linklike">🚪 @T["nav.logout"]</button>
             </form>
+            <a class="admin-cms-foot" asp-page="/Admin/About/Index" title="@T["nav.about"]">
+                <span class="cms">MatCMS</span>
+                <span class="admin-version">v@(Version.Current)</span>
+            </a>
         </div>
     </aside>
     <div class="admin-backdrop" data-admin-backdrop></div>

@@ -48,7 +48,6 @@
 .admin-brand { padding: 10px 8px 20px; border-bottom: 1px solid #dfe1e6; margin-bottom: 16px; }
 .admin-brand-link { display: flex; flex-direction: column; gap: 8px; text-decoration: none; }
 .admin-logo { max-height: 40px; max-width: 100%; width: auto; object-fit: contain; align-self: flex-start; }
-.admin-brand .cms { font-family: var(--font-head); font-weight: 600; letter-spacing: .22em; font-size: 11px; color: #8a8f98; text-transform: uppercase; }
 
 /* Nav scrolls on its own so brand + footer stay pinned and the grey fills the full height even
    on short screens (flex child needs min-height:0 to be allowed to shrink and scroll). */
@@ -71,6 +70,11 @@
     background: none; border: none; text-align: left; cursor: pointer; font-family: inherit;
 }
 .admin-nav-foot a:hover, .admin-nav-foot .linklike:hover { color: var(--black); }
+/* Engine name + running version, pinned at the very bottom under the logout button. */
+.admin-cms-foot { display: flex; align-items: baseline; gap: 8px; margin-top: 6px; padding-top: 12px; border-top: 1px solid #e6e8ec; }
+.admin-cms-foot .cms { font-family: var(--font-head); font-weight: 600; letter-spacing: .22em; font-size: 11px; color: #8a8f98; text-transform: uppercase; }
+.admin-cms-foot .admin-version { font-family: var(--font-head); font-size: 11px; color: #a8adb4; letter-spacing: .02em; }
+.admin-cms-foot:hover .cms, .admin-cms-foot:hover .admin-version { color: var(--accent); }
 
 .admin-main { display: flex; flex-direction: column; min-width: 0; height: 100%; min-height: 0; overflow-y: auto; }
 .admin-topbar {

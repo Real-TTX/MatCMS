@@ -7,6 +7,12 @@
     <h1>@T["pages.title"]</h1>
 </div>
 
+@if (Model.Items.Count == 0)
+{
+    <div class="card"><p class="muted">@T["pages.none"]</p></div>
+}
+else
+{
 <table class="data">
     <thead>
         <tr>
@@ -46,6 +52,7 @@
         }
     </tbody>
 </table>
+}
 
 <div class="list-actions">
     <a class="btn" asp-page="Create">@T["pages.create"]</a>

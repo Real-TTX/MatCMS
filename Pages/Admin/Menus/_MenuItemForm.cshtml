@@ -1,0 +1,56 @@
+@model MatCMS.Pages.Admin.Menus.MenuItemFormVm
+<form method="post" class="form-grid">
+    <div class="form-row">
+        <div class="form-field">
+            <label for="Menu">@T["menus.menu"]</label>
+            <select id="Menu" name="Menu">
+                @foreach (var m in Model.Menus)
+                {
+                    <option value="@m.Key" selected="@(Model.Menu == m.Key ? "selected" : null)">@m.Name</option>
+                }
+            </select>
+        </div>
+        <div class="form-field">
+            <label for="page-picker">@T["menus.quickPick"]</label>
+            <select id="page-picker">
+                <option value="">@T["menus.ownUrl"]</option>
+                @foreach (var p in Model.Pages)
+                {
+                    var purl = p.Slug == "home" ? "/" : "/" + p.Slug;
+                    <option value="@purl" data-title="@p.Title">@p.Title</option>
+                }
+            </select>
+            <div class="help">@T[Model.QuickPickHelpKey]</div>
+        </div>
+    </div>
+    <div class="form-field">
+        <label for="mi-label">@T["menus.label"]</label>
+        <input id="mi-label" name="Label" value="@Model.Label" required autofocus="@(Model.AutofocusLabel ? "autofocus" : null)" />
+    </div>
+    <div class="form-field">
+        <label for="mi-url">@T["menus.target"]</label>
+        <input id="mi-url" name="Url" value="@Model.Url" placeholder="@T["menus.targetPlaceholder"]" required />
+    </div>
+    <partial name="_IconPicker" model="Model.Icon" />
+    <label class="check">
+        <input type="checkbox" name="OpenInNewTab" value="true" @(Model.OpenInNewTab ? "checked" : "") /> @T["menus.openNewTab"]
+    </label>
+    <div>
+        <button type="submit" class="btn">@T[Model.SubmitLabelKey]</button>
+    </div>
+</form>
+
+<script>
+    (function () {
+        var picker = document.getElementById("page-picker");
+        var label = document.getElementById("mi-label");
+        var url = document.getElementById("mi-url");
+        if (!picker) return;
+        picker.addEventListener("change", function () {
+            if (!picker.value) return;
+            url.value = picker.value;
+            var opt = picker.options[picker.selectedIndex];
+            if (!label.value) label.value = opt.getAttribute("data-title") || "";
+        });
+    })();
+</script>

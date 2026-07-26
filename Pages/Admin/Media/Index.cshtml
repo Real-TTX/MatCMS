@@ -5,10 +5,6 @@
 }
 <div class="page-head">
     <h1>@T["media.title"]</h1>
-    <div>
-        <button type="button" id="media-upload-btn" class="btn">@T["media.upload"]</button>
-        <input type="file" id="media-file" accept="image/*" multiple style="display:none;" />
-    </div>
 </div>
 
 @if (Model.AllTags.Count > 0)
@@ -48,6 +44,11 @@
     }
 </div>
 
+<div class="list-actions">
+    <button type="button" id="media-upload-btn" class="btn">@T["media.upload"]</button>
+    <input type="file" id="media-file" accept="image/*" multiple style="display:none;" />
+</div>
+
 @section Scripts {
     <script>
         (function () {
@@ -64,7 +65,7 @@
                         var fd = new FormData(); fd.append('file', f);
                         return fetch('/admin/api/upload', { method: 'POST', body: fd })
                             .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-                            .then(function (r) { if (!r.ok) alert(r.j.error || 'Upload fehlgeschlagen.'); });
+                            .then(function (r) { if (!r.ok) alert(r.j.error || '@T["media.uploadFailed"]'); });
                     });
                 });
                 chain.then(function () { window.location.reload(); });

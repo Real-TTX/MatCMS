@@ -13,6 +13,8 @@
     {
         <p class="muted">@T["plugins.empty"]</p>
     }
+    else
+    {
     <div class="block-list">
         @foreach (var p in Model.Items)
         {
@@ -48,6 +50,7 @@
             </div>
         }
     </div>
+    }
     <div class="list-actions">
         <a class="btn" asp-page="Create">@T["plugins.new"]</a>
     </div>

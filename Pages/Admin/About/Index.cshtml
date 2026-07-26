@@ -40,7 +40,7 @@
                 btn.disabled = true;
                 out.className = 'update-result';
                 out.textContent = '@T["about.checking"]';
-                fetch('?handler=Check', { headers: { 'RequestVerificationToken': '' } })
+                fetch('?handler=Check')
                     .then(function (r) { return r.json(); })
                     .then(function (j) {
                         if (j.error) {

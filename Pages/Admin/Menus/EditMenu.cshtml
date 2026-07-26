@@ -5,13 +5,8 @@
 }
 <div class="page-head">
     <h1>@Model.Current.Name</h1>
-    <a class="btn btn-sm btn-ghost" asp-page="Index">@T["menus.backToMenus"]</a>
+    <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
 </div>
-
-@if (!string.IsNullOrWhiteSpace(Model.Error))
-{
-    <div class="alert alert-error">@Model.Error</div>
-}
 
 <div class="card">
     <h2>@T["menus.entries"]</h2>
@@ -53,6 +48,10 @@
 
 <div class="card">
     <h2>@T["menus.menuSettings"]</h2>
+    @if (!string.IsNullOrWhiteSpace(Model.Error))
+    {
+        <div class="alert alert-error">@Model.Error</div>
+    }
     <form method="post" class="form-grid">
         <div class="form-row">
             <div class="form-field">

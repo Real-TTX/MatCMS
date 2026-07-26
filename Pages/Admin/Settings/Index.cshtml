@@ -21,7 +21,7 @@
             <div class="image-field" data-upload>
                 <div class="preview" data-preview></div>
                 <div class="image-controls">
-                    <input name="Values[@SettingKeys.LogoUrl]" value="@V(SettingKeys.LogoUrl)" placeholder="/img/logo.svg oder /uploads/..." data-url />
+                    <input name="Values[@SettingKeys.LogoUrl]" value="@V(SettingKeys.LogoUrl)" placeholder="@T["settings.logoPlaceholder"]" data-url />
                     <div style="margin-top:8px;">
                         <button type="button" class="btn btn-ghost btn-sm" data-upload-btn>@T["settings.uploadLogo"]</button>
                         <input type="file" accept="image/*" style="display:none;" data-file />
@@ -52,9 +52,8 @@
             <input name="Values[@SettingKeys.ContactRecipient]" value="@V(SettingKeys.ContactRecipient)" />
             <div class="help">@T["settings.contactEmailHelp"]</div>
         </div>
+        <div><button type="submit" class="btn">@T["settings.save"]</button></div>
     </div>
-
-    <button type="submit" class="btn">@T["settings.save"]</button>
 </form>
 
 @section Scripts {
@@ -79,9 +78,9 @@
                     .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
                     .then(function (r) {
                         if (r.ok && r.j.url) { input.value = r.j.url; setPrev(r.j.url); }
-                        else alert(r.j.error || 'Upload fehlgeschlagen.');
+                        else alert(r.j.error || '@T["settings.uploadFailed"]');
                     })
-                    .catch(function () { alert('Upload fehlgeschlagen.'); })
+                    .catch(function () { alert('@T["settings.uploadFailed"]'); })
                     .then(function () { btn.disabled = false; btn.textContent = label; file.value = ''; });
             });
         });

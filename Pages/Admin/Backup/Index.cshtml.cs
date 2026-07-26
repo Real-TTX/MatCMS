@@ -10,14 +10,16 @@ public class IndexModel : PageModel
     private readonly ContentTransferService _transfer;
     public IndexModel(ContentTransferService transfer) => _transfer = transfer;
 
-    // Which sections to include in the exported backup (defaults: all).
-    [BindProperty] public bool IncTemplates { get; set; } = true;
-    [BindProperty] public bool IncPages { get; set; } = true;
-    [BindProperty] public bool IncMenus { get; set; } = true;
-    [BindProperty] public bool IncSettings { get; set; } = true;
-    [BindProperty] public bool IncSubmissions { get; set; } = true;
-    [BindProperty] public bool IncForms { get; set; } = true;
-    [BindProperty] public bool IncAssets { get; set; } = true;
+    // Which sections to include in the exported backup. The checkboxes render "checked" on GET
+    // (default = all), but the bind props must default to false so that unchecking a box on POST
+    // (which sends no value) actually excludes that section.
+    [BindProperty] public bool IncTemplates { get; set; }
+    [BindProperty] public bool IncPages { get; set; }
+    [BindProperty] public bool IncMenus { get; set; }
+    [BindProperty] public bool IncSettings { get; set; }
+    [BindProperty] public bool IncSubmissions { get; set; }
+    [BindProperty] public bool IncForms { get; set; }
+    [BindProperty] public bool IncAssets { get; set; }
 
     [BindProperty] public IFormFile? ImportFile { get; set; }
     [BindProperty] public bool Confirm { get; set; }

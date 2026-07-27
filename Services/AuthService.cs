@@ -24,9 +24,14 @@ public class AuthService
             or PasswordVerificationResult.SuccessRehashNeeded;
     }
 
-    public async Task<User?> ValidateAsync(string username, string password)
+    /// <summary>Validates a login by e-mail (primary) or, as a fallback, the legacy username —
+    /// so pre-existing accounts (e.g. the seeded "admin") keep working after the switch to e-mail login.</summary>
+    public async Task<User?> ValidateAsync(string identifier, string password)
     {
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Username == username);
+        var id = (identifier ?? "").Trim().ToLower();
+        if (id.Length == 0) return null;
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email != null && u.Email.ToLower() == id)
+                   ?? await _db.Users.FirstOrDefaultAsync(u => u.Username.ToLower() == id);
         if (user is null) return null;
         return VerifyPassword(user, password) ? user : null;
     }

@@ -35,14 +35,14 @@ public class LoginModel : PageModel
 
         if (string.IsNullOrWhiteSpace(Username) || string.IsNullOrWhiteSpace(Password))
         {
-            Error = "Bitte Benutzername und Passwort eingeben.";
+            Error = "Bitte E-Mail und Passwort eingeben.";
             return Page();
         }
 
         var user = await _auth.ValidateAsync(Username.Trim(), Password);
         if (user is null)
         {
-            Error = "Benutzername oder Passwort ist falsch.";
+            Error = "E-Mail oder Passwort ist falsch.";
             return Page();
         }
 

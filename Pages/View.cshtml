@@ -103,6 +103,12 @@
         .mat-ed-block.mat-selected { outline: 3px solid #2563eb; outline-offset: -3px; }
         .mat-ed-block.mat-selected:hover { outline: 3px solid #2563eb; }
         .mat-ed-block.mat-flash { animation: matFlash 1s ease; }
+        /* Insert-between-blocks zones (page-builder style) shown in the preview. */
+        .mat-insert { display: block; width: 100%; border: none; background: none; padding: 0; margin: 0; cursor: pointer; position: relative; height: 22px; opacity: 0; transition: opacity .12s ease; z-index: 9997; }
+        .mat-insert::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 3px; background: #2563eb; border-radius: 3px; transform: translateY(-50%); }
+        .mat-insert span { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 1; font: 700 11px/1 Inter, sans-serif; background: #2563eb; color: #fff; padding: 4px 14px; border-radius: 999px; white-space: nowrap; box-shadow: 0 2px 8px rgba(37,99,235,.4); }
+        body:hover .mat-insert { opacity: .16; }
+        .mat-insert:hover { opacity: 1; }
         @@keyframes matFlash { 0%,100% { background: transparent; } 30% { background: rgba(37,99,235,.10); } }
     </style>
     <script>
@@ -156,6 +162,25 @@
                     if (selected) { selected.classList.add("mat-selected"); ensureVisible(selected); }
                 }
             });
+
+            // Insert-between-blocks zones: one before each top-level block + one at the end.
+            (function () {
+                var blocks = Array.prototype.slice.call(document.querySelectorAll(".mat-ed-block"));
+                function makeZone(index) {
+                    var z = document.createElement("button");
+                    z.type = "button";
+                    z.className = "mat-insert";
+                    z.title = "Block hier einfügen";
+                    z.innerHTML = "<span>+ Block</span>";
+                    z.addEventListener("click", function (e) {
+                        e.preventDefault(); e.stopPropagation();
+                        post({ type: "mat-insert-at", index: index });
+                    });
+                    return z;
+                }
+                blocks.forEach(function (b, i) { b.parentNode.insertBefore(makeZone(i), b); });
+                if (blocks.length) blocks[blocks.length - 1].insertAdjacentElement("afterend", makeZone(blocks.length));
+            })();
 
             post({ type: "mat-preview-ready" });
         })();

@@ -7,23 +7,17 @@
     var modal = document.getElementById("add-block-modal");
     var openBtn = document.getElementById("add-block-btn");
     var closeBtn = document.getElementById("add-block-close");
-    if (modal && openBtn) {
-        var positionInputs = modal.querySelectorAll(".add-position");
-        function setInsertPosition(val) { positionInputs.forEach(function (i) { i.value = val; }); }
-
-        // Bottom "add block" button appends (no position).
-        openBtn.addEventListener("click", function () { setInsertPosition(""); modal.classList.add("open"); });
+    // Open the block picker; `position` = insert index (null = append to the end).
+    function openPicker(position) {
+        if (!modal) return;
+        modal.querySelectorAll(".add-position").forEach(function (i) { i.value = position == null ? "" : String(position); });
+        modal.classList.add("open");
+    }
+    if (modal) {
+        if (openBtn) openBtn.addEventListener("click", function () { openPicker(null); });
         if (closeBtn) closeBtn.addEventListener("click", function () { modal.classList.remove("open"); });
         modal.addEventListener("click", function (e) { if (e.target === modal) modal.classList.remove("open"); });
         document.addEventListener("keydown", function (e) { if (e.key === "Escape") modal.classList.remove("open"); });
-
-        // "Insert here" zones between blocks open the same picker but target a specific index.
-        document.querySelectorAll(".block-insert").forEach(function (zone) {
-            zone.addEventListener("click", function () {
-                setInsertPosition(zone.getAttribute("data-insert-at") || "");
-                modal.classList.add("open");
-            });
-        });
     }
 
     // ---------- Live preview linking ----------
@@ -46,5 +40,6 @@
         if (d.type === "mat-select-block" && d.id) {
             window.location.search = "?block=" + encodeURIComponent(d.id);
         }
+        if (d.type === "mat-insert-at") openPicker(d.index);
     });
 })();

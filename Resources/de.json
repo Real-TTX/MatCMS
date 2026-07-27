@@ -122,7 +122,7 @@
 
   "login.pageTitle": "Anmeldung",
   "login.heading": "Admin-Anmeldung",
-  "login.username": "Benutzername",
+  "login.username": "E-Mail-Adresse",
   "login.password": "Passwort",
   "login.rememberMe": "Angemeldet bleiben",
   "login.submit": "Anmelden",
@@ -237,6 +237,8 @@
   "users.displayName": "Anzeigename",
   "users.email": "E-Mail-Adresse",
   "users.emailHelp": "Optional. Kann als Empfänger für Formular-Benachrichtigungen ausgewählt werden.",
+  "users.emailLogin": "Dient als Login und kann Empfänger für Formular-Benachrichtigungen sein.",
+  "users.colEmail": "E-Mail",
   "users.newPassword": "Neues Passwort",
   "users.newPasswordPlaceholder": "leer lassen, um es nicht zu ändern",
 

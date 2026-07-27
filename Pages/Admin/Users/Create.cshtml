@@ -16,18 +16,14 @@
     <form method="post" class="form-grid">
         <div class="form-row">
             <div class="form-field">
-                <label for="Username">@T["users.username"]</label>
-                <input id="Username" name="Username" value="@Model.Username" required autofocus />
+                <label for="Email">@T["users.email"]</label>
+                <input id="Email" name="Email" type="email" value="@Model.Email" placeholder="name@example.com" required autofocus />
+                <div class="help">@T["users.emailLogin"]</div>
             </div>
             <div class="form-field">
                 <label for="DisplayName">@T["users.displayNameOptional"]</label>
                 <input id="DisplayName" name="DisplayName" value="@Model.DisplayName" />
             </div>
-        </div>
-        <div class="form-field">
-            <label for="Email">@T["users.email"]</label>
-            <input id="Email" name="Email" type="email" value="@Model.Email" placeholder="name@example.com" />
-            <div class="help">@T["users.emailHelp"]</div>
         </div>
         <div class="form-field">
             <label for="Password">@T["users.password"]</label>

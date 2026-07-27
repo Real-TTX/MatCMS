@@ -11,7 +11,7 @@
 <table class="data">
     <thead>
         <tr>
-            <th>@T["users.colUsername"]</th>
+            <th>@T["users.colEmail"]</th>
             <th>@T["users.colDisplayName"]</th>
             <th>@T["users.colRole"]</th>
             <th>@T["users.colCreated"]</th>
@@ -22,7 +22,7 @@
         @foreach (var u in Model.Items)
         {
             <tr>
-                <td><strong>@u.Username</strong> @(u.Username == me ? T["users.you"] : "")</td>
+                <td><strong>@(string.IsNullOrWhiteSpace(u.Email) ? u.Username : u.Email)</strong> @(u.Username == me ? T["users.you"] : "")</td>
                 <td>@(string.IsNullOrWhiteSpace(u.DisplayName) ? "—" : u.DisplayName)</td>
                 <td>@u.Role</td>
                 <td class="muted">@u.CreatedAt.ToString("dd.MM.yyyy")</td>

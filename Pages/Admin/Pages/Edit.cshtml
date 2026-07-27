@@ -80,10 +80,8 @@
                     <p class="muted" style="padding:0 4px;">@T["editor.noBlocks"]</p>
                 }
                 <div class="block-list sortable" id="block-list" data-sortable data-reorder-form="reorder-form">
-                    @for (var _i = 0; _i < blocks.Count; _i++)
+                    @foreach (var b in blocks)
                     {
-                        var b = blocks[_i];
-                        <button type="button" class="block-insert" data-insert-at="@_i" title="@T["editor.insertHere"]"><span>+ @T["editor.addBlock"]</span></button>
                         var def = Model.Registry.Get(b.BlockType);
                         var isContainer = def is not null && def.IsContainer;
                         <div class="block-group sortable-item" data-item-id="@b.Id">
@@ -135,7 +133,6 @@
                             }
                         </div>
                     }
-                    <button type="button" class="block-insert" data-insert-at="@blocks.Count" title="@T["editor.insertHere"]"><span>+ @T["editor.addBlock"]</span></button>
                 </div>
                 <form id="reorder-form" method="post" asp-page-handler="Reorder" asp-route-id="@Model.Current.Id" style="display:none;">
                     <div data-order-inputs></div>

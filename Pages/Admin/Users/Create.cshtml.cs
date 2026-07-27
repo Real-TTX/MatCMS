@@ -28,23 +28,24 @@ public class CreateModel : PageModel
 
     public async Task<IActionResult> OnPostAsync()
     {
-        var username = (Username ?? "").Trim();
-        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(Password))
+        var email = (Email ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(Password))
         {
-            Error = "Benutzername und Passwort sind erforderlich.";
+            Error = "E-Mail und Passwort sind erforderlich.";
             return Page();
         }
-        if (await _db.Users.AnyAsync(u => u.Username == username))
+        var emailLower = email.ToLower();
+        if (await _db.Users.AnyAsync(u => (u.Email != null && u.Email.ToLower() == emailLower) || u.Username.ToLower() == emailLower))
         {
-            Error = $"Der Benutzername „{username}“ ist bereits vergeben.";
+            Error = $"Die E-Mail-Adresse „{email}“ ist bereits vergeben.";
             return Page();
         }
 
         _db.Users.Add(new User
         {
-            Username = username,
+            Username = email,   // the e-mail is the login identity; Username mirrors it (kept as the unique key)
+            Email = email,
             DisplayName = string.IsNullOrWhiteSpace(DisplayName) ? null : DisplayName!.Trim(),
-            Email = string.IsNullOrWhiteSpace(Email) ? null : Email!.Trim(),
             Role = "Admin",
             PasswordHash = _auth.HashPassword(Password!)
         });

@@ -16,6 +16,9 @@ public static class SettingKeys
     public const string NotFoundPage = "error.notFoundPage";
     public const string ErrorPage = "error.errorPage";
 
+    // "1" once the setup wizard has been completed (drives the dashboard prompt).
+    public const string SetupComplete = "setup.complete";
+
     // SMTP / e-mail settings (own tab under Settings; kept out of `All` so each form saves only its own keys).
     public const string SmtpHost = "smtp.host";
     public const string SmtpPort = "smtp.port";

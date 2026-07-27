@@ -470,6 +470,23 @@ table.data .btn { white-space: nowrap; }
 .modal-close:hover { color: var(--black); }
 .modal-body { padding: 22px 24px; }
 
+.setup-banner { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.setup-banner .btn { flex: 0 0 auto; }
+
+/* Setup wizard */
+.wiz-steps { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; margin: 0 0 22px; }
+.wiz-steps li { flex: 1 1 auto; text-align: center; font-size: 12.5px; font-weight: 600; color: var(--muted); padding: 8px 6px; border-bottom: 3px solid var(--line); }
+.wiz-steps li.active { color: var(--accent); border-bottom-color: var(--accent); }
+.wiz-panel h2 { margin-top: 0; }
+.wiz-actions { display: flex; gap: 10px; margin-top: 20px; }
+.wiz-actions #wiz-next, .wiz-actions #wiz-finish { margin-left: auto; }
+.wiz-themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.wiz-theme input { position: absolute; opacity: 0; }
+.wiz-theme-card { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border: 2px solid var(--line); border-radius: 10px; cursor: pointer; }
+.wiz-theme input:checked + .wiz-theme-card { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent); }
+.wiz-theme-card strong { margin-left: 2px; font-size: 13.5px; }
+.wiz-swatch { width: 18px; height: 18px; border-radius: 50%; display: inline-block; flex: 0 0 auto; }
+
 /* On phones, dialogs go full-screen so pickers/forms have room and feel native. */
 @media (max-width: 640px) {
     .modal-overlay.open { padding: 0; align-items: stretch; }

@@ -8,6 +8,16 @@
     <a class="btn btn-sm" asp-page="/Admin/Pages/Index">@T["dashboard.editPages"]</a>
 </div>
 
+@if (!Model.SetupComplete)
+{
+    <div class="alert alert-info setup-banner">
+        <div>
+            <strong>Willkommen!</strong> Richten Sie Admin-Konto, Theme, E-Mail und erste Seite in wenigen Schritten ein.
+        </div>
+        <a class="btn btn-sm" asp-page="/Admin/Setup/Index">Einrichtung starten</a>
+    </div>
+}
+
 <div class="stat-grid">
     <a class="stat" asp-page="/Admin/Pages/Index">
         <div class="n">@Model.PageCount</div>

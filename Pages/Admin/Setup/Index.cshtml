@@ -1,0 +1,120 @@
+@page
+@model MatCMS.Pages.Admin.Setup.IndexModel
+@using MatCMS.Services
+@{
+    ViewData["Title"] = "Einrichtung";
+    string SmtpV(string k) => Model.Smtp.TryGetValue(k, out var v) ? v : "";
+}
+<div class="page-head">
+    <h1>Einrichtungs-Assistent</h1>
+    <a class="btn btn-sm btn-ghost" asp-page="/Admin/Index">Überspringen</a>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.Error))
+{
+    <div class="alert alert-error">@Model.Error</div>
+}
+
+<div class="card">
+    <ol class="wiz-steps" id="wiz-steps">
+        <li class="active">Admin-Konto</li>
+        <li>Theme</li>
+        <li>SMTP</li>
+        <li>Erste Seite</li>
+    </ol>
+
+    <form method="post" id="wiz-form">
+        <div class="wiz-panel" data-panel="0">
+            <h2>1 · Admin-Konto</h2>
+            <p class="muted">Legen Sie Ihre Zugangsdaten fest. Die E-Mail-Adresse ist Ihr Login.</p>
+            <div class="form-field">
+                <label for="AdminEmail">E-Mail-Adresse</label>
+                <input id="AdminEmail" name="AdminEmail" type="email" value="@Model.AdminEmail" placeholder="name@example.com" required />
+            </div>
+            <div class="form-field">
+                <label for="AdminName">Anzeigename</label>
+                <input id="AdminName" name="AdminName" value="@Model.AdminName" placeholder="Ihr Name" />
+            </div>
+            <div class="form-field">
+                <label for="AdminPassword">Neues Passwort</label>
+                <input id="AdminPassword" name="AdminPassword" type="password" placeholder="Leer lassen = unverändert" />
+            </div>
+        </div>
+
+        <div class="wiz-panel" data-panel="1" hidden>
+            <h2>2 · Theme</h2>
+            <p class="muted">Wählen Sie das Erscheinungsbild. Später jederzeit unter „Templates" änderbar.</p>
+            <div class="wiz-themes">
+                @foreach (var t in Model.Themes)
+                {
+                    <label class="wiz-theme">
+                        <input type="radio" name="ThemeName" value="@t.Name" checked="@(t.Name == Model.ThemeName)" />
+                        <span class="wiz-theme-card">
+                            <span class="wiz-swatch" style="background:@t.AccentColor"></span>
+                            <span class="wiz-swatch" style="background:@(string.IsNullOrWhiteSpace(t.SecondaryColor) ? t.AccentColor : t.SecondaryColor)"></span>
+                            <span class="wiz-swatch" style="background:@t.BackgroundColor; border:1px solid #ddd;"></span>
+                            <strong>@t.Name</strong>
+                        </span>
+                    </label>
+                }
+            </div>
+        </div>
+
+        <div class="wiz-panel" data-panel="2" hidden>
+            <h2>3 · E-Mail (SMTP)</h2>
+            <p class="muted">Für Formular-Benachrichtigungen. Kann übersprungen und später ausgefüllt werden.</p>
+            <div class="form-grid">
+                <div class="form-field"><label>Server (Host)</label><input name="Smtp[@SettingKeys.SmtpHost]" value="@SmtpV(SettingKeys.SmtpHost)" placeholder="smtp.example.com" /></div>
+                <div class="form-field"><label>Port</label><input name="Smtp[@SettingKeys.SmtpPort]" value="@SmtpV(SettingKeys.SmtpPort)" placeholder="587" inputmode="numeric" /></div>
+                <div class="form-field"><label>Benutzername</label><input name="Smtp[@SettingKeys.SmtpUser]" value="@SmtpV(SettingKeys.SmtpUser)" autocomplete="off" /></div>
+                <div class="form-field"><label>Passwort</label><input type="password" name="Smtp[@SettingKeys.SmtpPassword]" value="@SmtpV(SettingKeys.SmtpPassword)" autocomplete="new-password" /></div>
+                <div class="form-field"><label>Absender-Adresse</label><input name="Smtp[@SettingKeys.SmtpFromEmail]" value="@SmtpV(SettingKeys.SmtpFromEmail)" placeholder="noreply@example.com" /></div>
+                <div class="form-field"><label>Absender-Name</label><input name="Smtp[@SettingKeys.SmtpFromName]" value="@SmtpV(SettingKeys.SmtpFromName)" /></div>
+            </div>
+        </div>
+
+        <div class="wiz-panel" data-panel="3" hidden>
+            <h2>4 · Erste Seite</h2>
+            <p class="muted">Optional eine erste Seite anlegen. Leer lassen zum Überspringen.</p>
+            <div class="form-field">
+                <label for="PageTitle">Seitentitel</label>
+                <input id="PageTitle" name="PageTitle" value="@Model.PageTitle" placeholder="z. B. Über uns" />
+            </div>
+        </div>
+
+        <div class="wiz-actions">
+            <button type="button" class="btn btn-ghost" id="wiz-back" hidden>Zurück</button>
+            <button type="button" class="btn" id="wiz-next">Weiter</button>
+            <button type="submit" class="btn" id="wiz-finish" hidden>Fertigstellen</button>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            var panels = Array.prototype.slice.call(document.querySelectorAll(".wiz-panel"));
+            var steps = Array.prototype.slice.call(document.querySelectorAll("#wiz-steps li"));
+            var back = document.getElementById("wiz-back");
+            var next = document.getElementById("wiz-next");
+            var finish = document.getElementById("wiz-finish");
+            var email = document.getElementById("AdminEmail");
+            var cur = 0;
+            function show(i) {
+                cur = Math.max(0, Math.min(panels.length - 1, i));
+                panels.forEach(function (p, idx) { p.hidden = idx !== cur; });
+                steps.forEach(function (s, idx) { s.classList.toggle("active", idx <= cur); });
+                back.hidden = cur === 0;
+                next.hidden = cur === panels.length - 1;
+                finish.hidden = cur !== panels.length - 1;
+            }
+            next.addEventListener("click", function () {
+                // basic required check on step 1 (admin e-mail)
+                if (cur === 0 && email && !email.checkValidity()) { email.reportValidity(); return; }
+                show(cur + 1);
+            });
+            back.addEventListener("click", function () { show(cur - 1); });
+            show(0);
+        })();
+    </script>
+}

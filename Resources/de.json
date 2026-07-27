@@ -15,6 +15,8 @@
   "nav.media": "Medien",
   "media.title": "Mediathek",
   "media.upload": "Hochladen",
+  "media.dragToSort": "Ziehen zum Sortieren",
+  "media.dragHint": "Tipp: Medien per Ziehgriff (⠿) umsortieren — Galerien mit „Aus Mediathek“ folgen dieser Reihenfolge.",
   "media.empty": "Noch keine Medien. Lade Bilder hoch oder nutze den Upload in den Block-Bildfeldern.",
   "media.copy": "URL kopieren",
   "media.uploadFailed": "Upload fehlgeschlagen.",

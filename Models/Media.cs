@@ -20,5 +20,8 @@ public class Media
 
     public long SizeBytes { get; set; }
 
+    /// <summary>Manual ordering for galleries/library (ascending; new uploads get the next value).</summary>
+    public int SortOrder { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

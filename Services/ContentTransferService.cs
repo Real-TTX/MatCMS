@@ -245,7 +245,7 @@ public class ContentTransferService
                 .Select(m => new MediaDto
                 {
                     Url = m.Url, FileName = m.FileName, Alt = m.Alt, Tags = m.Tags,
-                    ContentType = m.ContentType, SizeBytes = m.SizeBytes, CreatedAt = m.CreatedAt
+                    ContentType = m.ContentType, SizeBytes = m.SizeBytes, SortOrder = m.SortOrder, CreatedAt = m.CreatedAt
                 }).ToList();
         }
 
@@ -640,6 +640,7 @@ public class ContentTransferService
                     Tags = m.Tags ?? "",
                     ContentType = m.ContentType ?? "",
                     SizeBytes = m.SizeBytes,
+                    SortOrder = m.SortOrder,
                     CreatedAt = m.CreatedAt == default ? DateTime.UtcNow : m.CreatedAt
                 });
             }
@@ -897,6 +898,7 @@ public class ContentTransferService
         public string? Tags { get; set; }
         public string? ContentType { get; set; }
         public long SizeBytes { get; set; }
+        public int SortOrder { get; set; }
         public DateTime CreatedAt { get; set; }
     }
 

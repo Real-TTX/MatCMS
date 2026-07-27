@@ -23,7 +23,8 @@
     <div class="card"><p class="muted">@T["media.empty"]</p></div>
 }
 
-<div class="media-grid">
+@{ var canSort = Model.ActiveTag is null; }
+<div class="media-grid@(canSort ? " media-grid--sortable" : "")" id="media-grid">
     @foreach (var m in Model.Items)
     {
         var tagList = MatCMS.Content.TagUtil.Split(m.Tags).ToList();
@@ -36,6 +37,10 @@
                 data-type="@m.ContentType"
                 data-size="@m.SizeBytes"
                 title="@T["media.clickHint"]">
+            @if (canSort)
+            {
+                <span class="media-drag" title="@T["media.dragToSort"]" aria-hidden="true">⠿</span>
+            }
             <div class="media-thumb" style="background-image:url('@m.Url')"></div>
             <div class="media-meta">
                 <div class="media-name" title="@m.FileName">@m.FileName</div>
@@ -52,6 +57,11 @@
         </button>
     }
 </div>
+@if (canSort)
+{
+    <form id="media-reorder-form" method="post" asp-page-handler="Reorder" style="display:none;"><div data-order-inputs></div></form>
+    <p class="help">@T["media.dragHint"]</p>
+}
 
 <div class="list-actions">
     <button type="button" id="media-upload-btn" class="btn">@T["media.upload"]</button>
@@ -261,6 +271,62 @@
                 (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject())
                     .then(function () { var t = b.textContent; b.textContent = '@T["media.copied"]'; setTimeout(function () { b.textContent = t; }, 1200); })
                     .catch(function () { urlEl.select(); document.execCommand('copy'); });
+            });
+        })();
+    </script>
+    <script>
+        // Grid drag-reordering of the media library (unfiltered view only). Persists Media.SortOrder.
+        (function () {
+            var grid = document.getElementById("media-grid");
+            var form = document.getElementById("media-reorder-form");
+            if (!grid || !form || !grid.classList.contains("media-grid--sortable")) return;
+            var inputs = form.querySelector("[data-order-inputs]");
+            var dragged = null;
+            function cards() { return Array.prototype.slice.call(grid.querySelectorAll(".media-card")); }
+            function orderStr() { return cards().map(function (c) { return c.getAttribute("data-id"); }).join(","); }
+            var initial = orderStr();
+
+            cards().forEach(function (card) {
+                var handle = card.querySelector(".media-drag");
+                if (!handle) return;
+                handle.addEventListener("mousedown", function (e) { e.stopPropagation(); card.draggable = true; });
+                handle.addEventListener("click", function (e) { e.stopPropagation(); e.preventDefault(); });
+                card.addEventListener("dragstart", function (e) {
+                    dragged = card; card.classList.add("dragging");
+                    if (e.dataTransfer) { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", ""); }
+                });
+                card.addEventListener("dragend", function () {
+                    card.classList.remove("dragging"); card.draggable = false; dragged = null;
+                    if (orderStr() !== initial) {
+                        inputs.innerHTML = "";
+                        cards().forEach(function (c) {
+                            var i = document.createElement("input");
+                            i.type = "hidden"; i.name = "order"; i.value = c.getAttribute("data-id");
+                            inputs.appendChild(i);
+                        });
+                        form.submit();
+                    }
+                });
+            });
+
+            grid.addEventListener("dragover", function (e) {
+                if (!dragged) return;
+                e.preventDefault();
+                var x = e.clientX, y = e.clientY, target = null, best = Infinity;
+                cards().forEach(function (c) {
+                    if (c === dragged) return;
+                    var b = c.getBoundingClientRect();
+                    var cx = b.left + b.width / 2, cy = b.top + b.height / 2;
+                    var d = Math.hypot(x - cx, y - cy);
+                    if (d < best) { best = d; target = { el: c, cx: cx, top: b.top, bottom: b.bottom }; }
+                });
+                if (!target) return;
+                var before = (y < target.top) || (y <= target.bottom && x < target.cx);
+                grid.insertBefore(dragged, before ? target.el : target.el.nextSibling);
+            });
+
+            document.addEventListener("mouseup", function () {
+                cards().forEach(function (c) { if (c !== dragged) c.draggable = false; });
             });
         })();
     </script>

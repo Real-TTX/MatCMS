@@ -230,13 +230,16 @@ app.MapPost("/admin/api/upload", async (HttpRequest request, IWebHostEnvironment
         await file.CopyToAsync(stream);
 
     var url = $"/uploads/{name}";
-    // Record it in the media library.
+    // Record it in the media library, appended after existing media (highest SortOrder).
+    var nextOrder = (await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
+        .MaxAsync(db.Media, m => (int?)m.SortOrder) ?? 0) + 1;
     db.Media.Add(new MatCMS.Models.Media
     {
         Url = url,
         FileName = file.FileName,
         ContentType = file.ContentType ?? "",
-        SizeBytes = file.Length
+        SizeBytes = file.Length,
+        SortOrder = nextOrder
     });
     await db.SaveChangesAsync();
 

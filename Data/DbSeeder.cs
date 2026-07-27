@@ -253,6 +253,7 @@ public static class DbSeeder
         await AddColumnIfMissingAsync(db, "Forms", "SuccessMessage", "TEXT");
         await AddColumnIfMissingAsync(db, "Forms", "NotifyEnabled", "INTEGER NOT NULL DEFAULT 0");
         await AddColumnIfMissingAsync(db, "Forms", "NotifyJson", "TEXT NOT NULL DEFAULT ''");
+        await AddColumnIfMissingAsync(db, "Media", "SortOrder", "INTEGER NOT NULL DEFAULT 0");
     }
 
     private static async Task AddColumnIfMissingAsync(AppDbContext db, string table, string column, string type)

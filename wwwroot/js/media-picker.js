@@ -4,12 +4,17 @@
     "use strict";
     if (window.openMediaPicker) return;
 
-    window.openMediaPicker = function (onPick) {
+    // openMediaPicker(onPick)                      → single pick; onPick(url) then closes.
+    // openMediaPicker(onPick, { multiple: true })  → multi pick; onPick([url, …]) in click order.
+    window.openMediaPicker = function (onPick, opts) {
+        var multiple = !!(opts && opts.multiple);
         var overlay = document.createElement("div");
         overlay.className = "modal-overlay open";
         overlay.innerHTML = '<div class="modal" role="dialog" aria-modal="true">' +
-            '<div class="modal-head"><h2>Medium wählen</h2><button type="button" class="modal-close" aria-label="Schließen">✕</button></div>' +
-            '<div class="modal-body"><div class="media-picker-grid"></div></div></div>';
+            '<div class="modal-head"><h2>' + (multiple ? 'Medien wählen' : 'Medium wählen') + '</h2><button type="button" class="modal-close" aria-label="Schließen">✕</button></div>' +
+            '<div class="modal-body"><div class="media-picker-grid"></div></div>' +
+            (multiple ? '<div class="modal-foot media-picker-foot"><span class="mp-count muted">0 gewählt</span><button type="button" class="btn btn-sm" data-mp-apply disabled>Übernehmen</button></div>' : '') +
+            '</div>';
         document.body.appendChild(overlay);
         var grid = overlay.querySelector(".media-picker-grid");
         function close() { overlay.remove(); }
@@ -18,6 +23,16 @@
         document.addEventListener("keydown", function esc(e) {
             if (e.key === "Escape") { close(); document.removeEventListener("keydown", esc); }
         });
+
+        var selected = [];   // ordered urls (multi mode)
+        var applyBtn = overlay.querySelector("[data-mp-apply]");
+        var countEl = overlay.querySelector(".mp-count");
+        function refresh() {
+            if (countEl) countEl.textContent = selected.length + " gewählt";
+            if (applyBtn) applyBtn.disabled = selected.length === 0;
+        }
+        if (applyBtn) applyBtn.addEventListener("click", function () { if (selected.length) { onPick(selected.slice()); close(); } });
+
         fetch("/admin/api/media").then(function (r) { return r.json(); }).then(function (list) {
             if (!list || !list.length) { grid.innerHTML = '<p class="muted">Noch keine Medien vorhanden.</p>'; return; }
             list.forEach(function (m) {
@@ -25,7 +40,13 @@
                 b.type = "button"; b.className = "media-pick"; b.title = m.name || m.url;
                 var img = document.createElement("img"); img.src = m.url; img.alt = m.name || "";
                 b.appendChild(img);
-                b.addEventListener("click", function () { onPick(m.url); close(); });
+                b.addEventListener("click", function () {
+                    if (!multiple) { onPick(m.url); close(); return; }
+                    var i = selected.indexOf(m.url);
+                    if (i >= 0) { selected.splice(i, 1); b.classList.remove("selected"); }
+                    else { selected.push(m.url); b.classList.add("selected"); }
+                    refresh();
+                });
                 grid.appendChild(b);
             });
         }).catch(function () { grid.innerHTML = '<p class="muted">Konnte Mediathek nicht laden.</p>'; });

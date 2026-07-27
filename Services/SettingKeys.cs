@@ -45,8 +45,8 @@ public static class SettingKeys
     // The constants remain for the one-time migration in DbSeeder.
     public static readonly string[] All =
     [
-        SiteName, LogoUrl, FaviconUrl,
-        FooterText, ContactRecipient, SitemapEnabled, CanonicalUrl
+        CanonicalUrl, SiteName, LogoUrl, FaviconUrl,
+        FooterText, ContactRecipient
     ];
 
     /// <summary>SMTP setting keys (managed on the Settings → SMTP tab).</summary>

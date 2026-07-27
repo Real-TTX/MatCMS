@@ -50,7 +50,6 @@
             @* Verwaltung & System *@
             <a class="@Active("/admin/users")" asp-page="/Admin/Users/Index">👤 @T["nav.users"]</a>
             <a class="@Active("/admin/backup")" asp-page="/Admin/Backup/Index">💾 @T["nav.backup"]</a>
-            <a class="@Active("/admin/about")" asp-page="/Admin/About/Index">ℹ️ @T["nav.about"]</a>
             @if (Plugins.AdminMenu.Count > 0)
             {
                 <div class="admin-nav-plugins">

@@ -22,6 +22,11 @@
         <div class="card">
             <h2>@T["settings.general"]</h2>
             <div class="form-field">
+                <label>URL</label>
+                <input name="Values[@SettingKeys.CanonicalUrl]" value="@V(SettingKeys.CanonicalUrl)" placeholder="https://www.beispiel.de" spellcheck="false" />
+                <div class="help">Öffentliche Basis-URL der Website (für Sitemap, <code>robots.txt</code> und kanonische Links). Hinter einem HTTPS-Reverse-Proxy hier die echte <code>https://</code>-Adresse eintragen.</div>
+            </div>
+            <div class="form-field">
                 <label>@T["settings.siteName"]</label>
                 <input name="Values[@SettingKeys.SiteName]" value="@V(SettingKeys.SiteName)" />
             </div>
@@ -62,18 +67,6 @@
                 <label>@T["settings.contactEmail"]</label>
                 <input name="Values[@SettingKeys.ContactRecipient]" value="@V(SettingKeys.ContactRecipient)" />
                 <div class="help">@T["settings.contactEmailHelp"]</div>
-            </div>
-            <div class="form-field">
-                <label class="check">
-                    <input type="checkbox" name="Values[@SettingKeys.SitemapEnabled]" value="true" @(V(SettingKeys.SitemapEnabled) == "true" ? "checked" : "") />
-                    XML-Sitemap aktivieren
-                </label>
-                <div class="help">Stellt <code>/sitemap.xml</code> mit allen veröffentlichten Seiten bereit und eine <code>/robots.txt</code>, die darauf verweist. Für Suchmaschinen (Google Search Console usw.).</div>
-            </div>
-            <div class="form-field">
-                <label>Kanonische Website-Adresse (optional)</label>
-                <input name="Values[@SettingKeys.CanonicalUrl]" value="@V(SettingKeys.CanonicalUrl)" placeholder="https://www.beispiel.de" spellcheck="false" />
-                <div class="help">Öffentliche Basis-URL für die Sitemap und <code>robots.txt</code>. Leer lassen = automatisch aus der Anfrage. Hinter einem HTTPS-Reverse-Proxy hier die echte <code>https://</code>-Adresse eintragen, damit die Sitemap korrekte (kanonische) URLs enthält.</div>
             </div>
             <div><button type="submit" class="btn">@T["settings.save"]</button></div>
         </div>
@@ -166,6 +159,15 @@
         <div class="card">
             <h2>Code &amp; Tracking</h2>
             <p class="muted">Eigener HTML-/Script-Code, der auf allen Seiten eingebunden wird — z.&nbsp;B. Google&nbsp;Analytics, Matomo, Meta-Pixel oder ein Consent-Tool. Wird nur hier im Admin verwaltet.</p>
+
+            <div class="form-field">
+                <label>XML-Sitemap</label>
+                <select name="Values[@SettingKeys.SitemapEnabled]">
+                    <option value="true" selected="@(V(SettingKeys.SitemapEnabled) != "false")">Aktiviert</option>
+                    <option value="false" selected="@(V(SettingKeys.SitemapEnabled) == "false")">Deaktiviert</option>
+                </select>
+                <div class="help">Stellt <code>/sitemap.xml</code> (alle veröffentlichten Seiten) und eine darauf verweisende <code>/robots.txt</code> bereit — für Suchmaschinen (Google Search Console usw.). Standardmäßig aktiv.</div>
+            </div>
 
             <div class="form-field">
                 <label>Google Analytics (GA4) Mess-ID</label>

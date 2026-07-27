@@ -313,6 +313,24 @@
         addBtn.addEventListener("click", function () { addItem({}); });
         container.appendChild(addBtn);
 
+        // If items carry an image, allow picking several from the media library at once; each becomes
+        // an ordered entry (reorder with ▲▼). Lets a gallery use images in its OWN per-block order.
+        var imgField = (field.itemFields || []).filter(function (f) { return f.type === "image"; })[0];
+        if (imgField && window.openMediaPicker) {
+            var bulkBtn = document.createElement("button");
+            bulkBtn.type = "button";
+            bulkBtn.className = "btn btn-ghost btn-sm";
+            bulkBtn.style.marginTop = "10px";
+            bulkBtn.style.marginLeft = "8px";
+            bulkBtn.textContent = "+ Aus Mediathek (mehrere)";
+            bulkBtn.addEventListener("click", function () {
+                window.openMediaPicker(function (urls) {
+                    (urls || []).forEach(function (u) { var o = {}; o[imgField.id] = u; addItem(o); });
+                }, { multiple: true });
+            });
+            container.appendChild(bulkBtn);
+        }
+
         function get() {
             var result = [];
             Array.prototype.slice.call(listEl.children).forEach(function (childEl) {

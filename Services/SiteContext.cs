@@ -211,8 +211,9 @@ public class SiteContext
     /// <summary>GA4 Measurement-ID (e.g. "G-XXXXXXX"); empty = no analytics.</summary>
     public string AnalyticsGa4 => Get(SettingKeys.AnalyticsGa4);
 
-    /// <summary>When true, /sitemap.xml (+ a referencing /robots.txt) is served.</summary>
-    public bool SitemapEnabled => string.Equals(Get(SettingKeys.SitemapEnabled), "true", StringComparison.OrdinalIgnoreCase);
+    /// <summary>When true, /sitemap.xml (+ a referencing /robots.txt) is served. On by default; only
+    /// an explicit "false" disables it.</summary>
+    public bool SitemapEnabled => !string.Equals(Get(SettingKeys.SitemapEnabled, "true"), "false", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Base URL (scheme + host, no trailing slash) for absolute links such as the sitemap. Uses the

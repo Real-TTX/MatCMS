@@ -5,76 +5,7 @@
     var http = ViewContext.HttpContext;
     var editor = http.Request.Query.ContainsKey("editor") && http.User.IsInRole("Admin");
 }
-@{
-    var allBlocks = Model.CurrentPage.Blocks;
-}
-@foreach (var block in allBlocks.Where(b => b.ParentId == null).OrderBy(b => b.SortOrder))
-{
-    var def = Model.Registry.Get(block.BlockType);
-    if (def is null || string.IsNullOrWhiteSpace(def.Partial))
-    {
-        continue;
-    }
-    var data = new MatCMS.Content.BlockData(block.DataJson);
-
-    // Container blocks need their children resolved to (partial, data) pairs.
-    MatCMS.Content.ContainerBlockModel? containerModel = null;
-    if (def.IsContainer)
-    {
-        var kids = allBlocks.Where(b => b.ParentId == block.Id).OrderBy(b => b.SortOrder)
-            .Select(cb =>
-            {
-                var cdef = Model.Registry.Get(cb.BlockType);
-                return cdef is null || string.IsNullOrWhiteSpace(cdef.Partial)
-                    ? null
-                    : new MatCMS.Content.ContainerBlockModel.ChildBlock(cdef.Partial, new MatCMS.Content.BlockData(cb.DataJson));
-            })
-            .Where(x => x is not null).Select(x => x!).ToList();
-        containerModel = new MatCMS.Content.ContainerBlockModel(data, kids);
-    }
-
-    // Global layout options (width + top/bottom spacing) — one wrapper for both preview and live.
-    var _lw = data.Str("_width");
-    var _lst = data.Str("_spaceTop");
-    var _lsb = data.Str("_spaceBottom");
-    var layoutCls = "";
-    if (_lw == "narrow") { layoutCls += " bw-narrow"; } else if (_lw == "full") { layoutCls += " bw-full"; }
-    if (_lst.Length > 0) { layoutCls += " bst-" + _lst; }
-    if (_lsb.Length > 0) { layoutCls += " bsb-" + _lsb; }
-    var wrapCls = (editor ? "mat-ed-block" : "block-wrap") + layoutCls;
-    var edAttrs = editor
-        ? new Microsoft.AspNetCore.Html.HtmlString($" id=\"block-{block.Id}\" data-block-id=\"{block.Id}\" data-block-name=\"{System.Net.WebUtility.HtmlEncode(T[def.Name])}\"")
-        : Microsoft.AspNetCore.Html.HtmlString.Empty;
-
-    <div class="@wrapCls"@edAttrs>
-        @if (def.IsPluginBlock)
-        {
-            @Html.Raw(RenderPluginBlock(def, block.DataJson))
-        }
-        else if (def.IsComponent)
-        {
-            @Html.Raw(MatCMS.Content.ComponentDefinition.Render(def, data))
-        }
-        else if (def.IsContainer)
-        {
-            @await Html.PartialAsync(def.Partial, containerModel)
-        }
-        else
-        {
-            @await Html.PartialAsync(def.Partial, data)
-        }
-    </div>
-}
-@functions {
-    string RenderPluginBlock(MatCMS.Content.BlockDefinition def, string dataJson)
-    {
-        var svc = ViewContext.HttpContext.RequestServices;
-        var reg = svc.GetService(typeof(MatCMS.Services.PluginRegistry)) as MatCMS.Services.PluginRegistry;
-        var pr = new MatCMS.Services.PluginRequest { Services = svc, Registry = reg!, Data = dataJson };
-        try { return def.PluginRender!(pr); }
-        catch (Exception ex) { return "<!-- plugin block error: " + System.Net.WebUtility.HtmlEncode(ex.Message) + " -->"; }
-    }
-}
+@await Html.PartialAsync("_BlockList", new MatCMS.Content.BlockListModel(Model.CurrentPage.Blocks, Model.Registry, editor))
 
 @if (editor)
 {

@@ -7,33 +7,89 @@
     <h1>@T["components.title"]</h1>
 </div>
 
-<div class="card">
-    <p class="help">@T["components.intro"]</p>
-    @if (Model.Items.Count == 0)
-    {
-        <p class="muted">@T["components.empty"]</p>
-    }
-    else
-    {
+<div class="tabs" role="tablist">
+    <button type="button" class="tab active" data-tab="custom">@T["components.tabCustom"]</button>
+    <button type="button" class="tab" data-tab="system">@T["components.tabSystem"]</button>
+</div>
+
+@* ============ EIGENE KOMPONENTEN ============ *@
+<div class="tab-panel" data-panel="custom">
+    <div class="card">
+        <p class="help">@T["components.intro"]</p>
+        @if (Model.Items.Count == 0)
+        {
+            <p class="muted">@T["components.empty"]</p>
+        }
+        else
+        {
+            <div class="block-list">
+                @foreach (var c in Model.Items)
+                {
+                    <div class="block-item">
+                        <div class="b-info">
+                            <div class="b-type">@c.Name</div>
+                            <div class="b-sum mono">@c.Type</div>
+                        </div>
+                        <div class="actions">
+                            <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@c.Id">@T["action.edit"]</a>
+                            <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@c.Id" onsubmit="return confirm('@T["components.confirmDelete"]');">
+                                <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
+                            </form>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        <div class="list-actions">
+            <a class="btn" asp-page="Create">@T["components.new"]</a>
+        </div>
+    </div>
+</div>
+
+@* ============ SYSTEMKOMPONENTEN (readonly) ============ *@
+<div class="tab-panel" data-panel="system" hidden>
+    <div class="card components-system">
+        <p class="help">@T["components.systemIntro"]</p>
         <div class="block-list">
-            @foreach (var c in Model.Items)
+            @foreach (var def in Model.System)
             {
                 <div class="block-item">
+                    <span class="b-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">@Html.Raw(def.Svg)</svg>
+                    </span>
                     <div class="b-info">
-                        <div class="b-type">@c.Name</div>
-                        <div class="b-sum mono">@c.Type</div>
+                        <div class="b-type">@T[def.Name]</div>
+                        <div class="sys-desc">@T[def.Description]</div>
                     </div>
-                    <div class="actions">
-                        <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@c.Id">@T["action.edit"]</a>
-                        <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@c.Id" onsubmit="return confirm('@T["components.confirmDelete"]');">
-                            <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
-                        </form>
+                    <div class="sys-meta">
+                        @if (def.IsContainer)
+                        {
+                            <span class="badge badge-on">@T["components.systemContainer"]</span>
+                        }
+                        @if (def.ChildOnly)
+                        {
+                            <span class="badge badge-off">@T["components.systemChildOnly"]</span>
+                        }
+                        <code class="mono">@def.Type</code>
                     </div>
                 </div>
             }
         </div>
-    }
-    <div class="list-actions">
-        <a class="btn" asp-page="Create">@T["components.new"]</a>
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        (function () {
+            var tabs = document.querySelectorAll('.tab');
+            var panels = document.querySelectorAll('.tab-panel');
+            function show(name) {
+                tabs.forEach(function (t) { t.classList.toggle('active', t.dataset.tab === name); });
+                panels.forEach(function (p) { p.hidden = p.dataset.panel !== name; });
+            }
+            tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.tab); }); });
+            var want = new URLSearchParams(location.search).get('tab');
+            if (want) show(want);
+        })();
+    </script>
+}

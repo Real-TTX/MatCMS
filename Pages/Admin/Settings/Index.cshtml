@@ -9,55 +9,121 @@
     <h1>@T["settings.title"]</h1>
 </div>
 
-<form method="post">
-    <div class="card">
-        <h2>@T["settings.general"]</h2>
-        <div class="form-field">
-            <label>@T["settings.siteName"]</label>
-            <input name="Values[@SettingKeys.SiteName]" value="@V(SettingKeys.SiteName)" />
-        </div>
-        <div class="form-field">
-            <label>@T["settings.logo"]</label>
-            <div class="image-field" data-upload>
-                <div class="preview" data-preview></div>
-                <div class="image-controls">
-                    <input name="Values[@SettingKeys.LogoUrl]" value="@V(SettingKeys.LogoUrl)" placeholder="@T["settings.logoPlaceholder"]" data-url />
-                    <div style="margin-top:8px;">
-                        <button type="button" class="btn btn-ghost btn-sm" data-upload-btn>@T["settings.uploadLogo"]</button>
-                        <input type="file" accept="image/*" style="display:none;" data-file />
+<div class="tabs" role="tablist">
+    <button type="button" class="tab active" data-tab="general">@T["settings.tabGeneral"]</button>
+    <button type="button" class="tab" data-tab="smtp">@T["settings.tabSmtp"]</button>
+</div>
+
+@* ============ GENERAL ============ *@
+<div class="tab-panel" data-panel="general">
+    <form method="post">
+        <div class="card">
+            <h2>@T["settings.general"]</h2>
+            <div class="form-field">
+                <label>@T["settings.siteName"]</label>
+                <input name="Values[@SettingKeys.SiteName]" value="@V(SettingKeys.SiteName)" />
+            </div>
+            <div class="form-field">
+                <label>@T["settings.logo"]</label>
+                <div class="image-field" data-upload>
+                    <div class="preview" data-preview></div>
+                    <div class="image-controls">
+                        <input name="Values[@SettingKeys.LogoUrl]" value="@V(SettingKeys.LogoUrl)" placeholder="@T["settings.logoPlaceholder"]" data-url />
+                        <div style="margin-top:8px;">
+                            <button type="button" class="btn btn-ghost btn-sm" data-upload-btn>@T["settings.uploadLogo"]</button>
+                            <input type="file" accept="image/*" style="display:none;" data-file />
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-        <div class="form-field">
-            <label>@T["settings.favicon"]</label>
-            <div class="image-field" data-upload>
-                <div class="preview" data-preview></div>
-                <div class="image-controls">
-                    <input name="Values[@SettingKeys.FaviconUrl]" value="@V(SettingKeys.FaviconUrl)" placeholder="@T["settings.faviconPlaceholder"]" data-url />
-                    <div style="margin-top:8px;">
-                        <button type="button" class="btn btn-ghost btn-sm" data-upload-btn>@T["settings.uploadFavicon"]</button>
-                        <input type="file" accept="image/*,.ico" style="display:none;" data-file />
+            <div class="form-field">
+                <label>@T["settings.favicon"]</label>
+                <div class="image-field" data-upload>
+                    <div class="preview" data-preview></div>
+                    <div class="image-controls">
+                        <input name="Values[@SettingKeys.FaviconUrl]" value="@V(SettingKeys.FaviconUrl)" placeholder="@T["settings.faviconPlaceholder"]" data-url />
+                        <div style="margin-top:8px;">
+                            <button type="button" class="btn btn-ghost btn-sm" data-upload-btn>@T["settings.uploadFavicon"]</button>
+                            <input type="file" accept="image/*,.ico" style="display:none;" data-file />
+                        </div>
+                        <div class="help">@T["settings.faviconHelp"]</div>
                     </div>
-                    <div class="help">@T["settings.faviconHelp"]</div>
                 </div>
             </div>
+            <div class="form-field">
+                <label>@T["settings.footerText"]</label>
+                <input name="Values[@SettingKeys.FooterText]" value="@V(SettingKeys.FooterText)" />
+            </div>
+            <div class="form-field">
+                <label>@T["settings.contactEmail"]</label>
+                <input name="Values[@SettingKeys.ContactRecipient]" value="@V(SettingKeys.ContactRecipient)" />
+                <div class="help">@T["settings.contactEmailHelp"]</div>
+            </div>
+            <div><button type="submit" class="btn">@T["settings.save"]</button></div>
         </div>
-        <div class="form-field">
-            <label>@T["settings.footerText"]</label>
-            <input name="Values[@SettingKeys.FooterText]" value="@V(SettingKeys.FooterText)" />
+    </form>
+</div>
+
+@* ============ SMTP ============ *@
+<div class="tab-panel" data-panel="smtp" hidden>
+    <form method="post" asp-page-handler="Smtp">
+        <div class="card">
+            <h2>@T["settings.smtpHeading"]</h2>
+            <p class="muted">@T["settings.smtpIntro"]</p>
+            <div class="form-grid">
+                <div class="form-field">
+                    <label>@T["settings.smtpHost"]</label>
+                    <input name="Values[@SettingKeys.SmtpHost]" value="@V(SettingKeys.SmtpHost)" placeholder="smtp.example.com" />
+                </div>
+                <div class="form-field">
+                    <label>@T["settings.smtpPort"]</label>
+                    <input name="Values[@SettingKeys.SmtpPort]" value="@V(SettingKeys.SmtpPort)" placeholder="587" inputmode="numeric" />
+                </div>
+                <div class="form-field">
+                    <label>@T["settings.smtpUser"]</label>
+                    <input name="Values[@SettingKeys.SmtpUser]" value="@V(SettingKeys.SmtpUser)" autocomplete="off" />
+                </div>
+                <div class="form-field">
+                    <label>@T["settings.smtpPassword"]</label>
+                    <input type="password" name="Values[@SettingKeys.SmtpPassword]" value="@V(SettingKeys.SmtpPassword)" autocomplete="new-password" />
+                </div>
+                <div class="form-field">
+                    <label>@T["settings.smtpFromEmail"]</label>
+                    <input name="Values[@SettingKeys.SmtpFromEmail]" value="@V(SettingKeys.SmtpFromEmail)" placeholder="noreply@example.com" />
+                </div>
+                <div class="form-field">
+                    <label>@T["settings.smtpFromName"]</label>
+                    <input name="Values[@SettingKeys.SmtpFromName]" value="@V(SettingKeys.SmtpFromName)" placeholder="@V(SettingKeys.SiteName)" />
+                </div>
+                <div class="form-field">
+                    <label>@T["settings.smtpSsl"]</label>
+                    <select name="Values[@SettingKeys.SmtpSsl]">
+                        <option value="true" selected="@(V(SettingKeys.SmtpSsl) == "true")">@T["settings.smtpSslOn"]</option>
+                        <option value="false" selected="@(V(SettingKeys.SmtpSsl) != "true")">@T["settings.smtpSslOff"]</option>
+                    </select>
+                    <div class="help">@T["settings.smtpSslHelp"]</div>
+                </div>
+            </div>
+            <div><button type="submit" class="btn">@T["settings.save"]</button></div>
         </div>
-        <div class="form-field">
-            <label>@T["settings.contactEmail"]</label>
-            <input name="Values[@SettingKeys.ContactRecipient]" value="@V(SettingKeys.ContactRecipient)" />
-            <div class="help">@T["settings.contactEmailHelp"]</div>
-        </div>
-        <div><button type="submit" class="btn">@T["settings.save"]</button></div>
-    </div>
-</form>
+    </form>
+</div>
 
 @section Scripts {
     <script>
+        (function () {
+            // Tabs
+            var tabs = document.querySelectorAll('.tab');
+            var panels = document.querySelectorAll('.tab-panel');
+            function show(name) {
+                tabs.forEach(function (t) { t.classList.toggle('active', t.dataset.tab === name); });
+                panels.forEach(function (p) { p.hidden = p.dataset.panel !== name; });
+            }
+            tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.tab); }); });
+            var want = new URLSearchParams(location.search).get('tab');
+            if (want) show(want);
+        })();
+
         // Wire every [data-upload] image field (logo, favicon, …) to the shared upload endpoint.
         document.querySelectorAll('.image-field[data-upload]').forEach(function (field) {
             var input = field.querySelector('[data-url]');

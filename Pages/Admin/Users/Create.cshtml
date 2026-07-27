@@ -25,6 +25,11 @@
             </div>
         </div>
         <div class="form-field">
+            <label for="Email">@T["users.email"]</label>
+            <input id="Email" name="Email" type="email" value="@Model.Email" placeholder="name@example.com" />
+            <div class="help">@T["users.emailHelp"]</div>
+        </div>
+        <div class="form-field">
             <label for="Password">@T["users.password"]</label>
             <input id="Password" name="Password" type="password" required />
         </div>

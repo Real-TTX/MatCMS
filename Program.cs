@@ -83,6 +83,7 @@ builder.Services.AddScoped<BackupManager>();
 builder.Services.AddHostedService<BackupSchedulerService>();
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<VersionService>();
+builder.Services.AddScoped<EmailService>();
 builder.Services.AddSingleton<PluginRegistry>();
 builder.Services.AddScoped<PluginRunner>();
 

@@ -17,13 +17,27 @@ public class IndexModel : PageModel
     public async Task OnGetAsync()
     {
         var existing = await _db.SiteSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
-        foreach (var key in SettingKeys.All)
+        foreach (var key in SettingKeys.All.Concat(SettingKeys.Smtp))
             Values[key] = existing.TryGetValue(key, out var v) ? v : "";
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
-        foreach (var key in SettingKeys.All)
+        await SaveKeysAsync(SettingKeys.All);
+        TempData["Flash"] = "Einstellungen gespeichert.";
+        return RedirectToPage();
+    }
+
+    public async Task<IActionResult> OnPostSmtpAsync()
+    {
+        await SaveKeysAsync(SettingKeys.Smtp);
+        TempData["Flash"] = "SMTP-Einstellungen gespeichert.";
+        return RedirectToPage(new { tab = "smtp" });
+    }
+
+    private async Task SaveKeysAsync(IEnumerable<string> keys)
+    {
+        foreach (var key in keys)
         {
             var value = Values.TryGetValue(key, out var v) ? (v ?? "") : "";
             var setting = await _db.SiteSettings.FirstOrDefaultAsync(s => s.Key == key);
@@ -33,7 +47,5 @@ public class IndexModel : PageModel
                 setting.Value = value;
         }
         await _db.SaveChangesAsync();
-        TempData["Flash"] = "Einstellungen gespeichert.";
-        return RedirectToPage();
     }
 }

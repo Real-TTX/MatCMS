@@ -99,6 +99,52 @@
                         <div><button type="submit" class="btn btn-sm">@T["action.save"]</button></div>
                     </form>
                 </details>
+
+                <details class="le-settings">
+                    <summary>@T["forms.notifyTitle"]</summary>
+                    <form method="post" asp-page-handler="Settings" asp-route-id="@Model.Current.Id" class="form-grid">
+                        <div class="form-field">
+                            <label>@T["forms.successMessage"]</label>
+                            <textarea name="Settings.SuccessMessage" rows="2" placeholder="@T["forms.successPlaceholder"]">@Model.Settings.SuccessMessage</textarea>
+                            <div class="help">@T["forms.successHelp"]</div>
+                        </div>
+                        <div class="form-field">
+                            <label class="check">
+                                <input type="checkbox" name="Settings.NotifyEnabled" value="true" @(Model.Settings.NotifyEnabled ? "checked" : "") />
+                                <span>@T["forms.notifyEnable"]</span>
+                            </label>
+                            <div class="help">@T["forms.notifyHelp"]</div>
+                        </div>
+                        <div class="form-field">
+                            <label>@T["forms.notifyUsers"]</label>
+                            @if (Model.AllUsers.Count == 0)
+                            {
+                                <p class="muted">@T["forms.notifyNoUsers"]</p>
+                            }
+                            else
+                            {
+                                <div class="check-list">
+                                    @foreach (var u in Model.AllUsers)
+                                    {
+                                        var hasEmail = !string.IsNullOrWhiteSpace(u.Email);
+                                        <label class="check@(hasEmail ? "" : " is-muted")">
+                                            <input type="checkbox" name="Settings.NotifyUserIds" value="@u.Id"
+                                                   @(Model.Settings.NotifyUserIds.Contains(u.Id) ? "checked" : "") @(hasEmail ? "" : "disabled") />
+                                            <span>@(string.IsNullOrWhiteSpace(u.DisplayName) ? u.Username : u.DisplayName)</span>
+                                            <span class="muted">@(hasEmail ? u.Email : T["forms.notifyNoEmail"])</span>
+                                        </label>
+                                    }
+                                </div>
+                            }
+                        </div>
+                        <div class="form-field">
+                            <label>@T["forms.notifyEmails"]</label>
+                            <textarea name="Settings.NotifyEmails" rows="2" placeholder="beispiel@@domain.de, weitere@@domain.de">@Model.Settings.NotifyEmails</textarea>
+                            <div class="help">@T["forms.notifyEmailsHelp"]</div>
+                        </div>
+                        <div><button type="submit" class="btn btn-sm">@T["action.save"]</button></div>
+                    </form>
+                </details>
             </div>
 
             @* Add-element modal *@

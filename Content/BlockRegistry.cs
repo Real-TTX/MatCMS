@@ -13,6 +13,9 @@ public class BlockRegistry
     public static readonly HashSet<string> BuiltinTypes =
         Builtin.Select(b => b.Type).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>The built-in block definitions ("system components") — read-only reference list.</summary>
+    public static IReadOnlyList<BlockDefinition> Builtins => Builtin;
+
     private const string SvgPlugin = @"<path d=""M9 3v5""/><path d=""M15 3v5""/><rect x=""6"" y=""8"" width=""12"" height=""8"" rx=""2""/><path d=""M12 16v5""/>";
 
     private readonly MatCMS.Data.AppDbContext _db;
@@ -350,8 +353,8 @@ public class BlockRegistry
                 new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },
                 new BlockField { Id = "source", Label = "block.gallery.f.source", Type = FieldType.Select, Default = "manual",
                     Options = [ new("manual", "block.gallery.opt.source.manual"), new("media", "block.gallery.opt.source.media") ] },
-                new BlockField { Id = "tags", Label = "block.gallery.f.tags", Type = FieldType.Text,
-                    Help = "Nur bei Quelle Mediathek. Komma-getrennt; leer = alle Medien. Besucher können nach diesen Tags filtern." },
+                new BlockField { Id = "tags", Label = "block.gallery.f.tags", Type = FieldType.Select, OptionsSource = "mediaTags",
+                    Help = "Nur bei Quelle Mediathek: einen Tag wählen – es werden alle Medien mit diesem Tag angezeigt (leer = alle)." },
                 new BlockField { Id = "layout", Label = "block.gallery.f.layout", Type = FieldType.Select, Default = "grid",
                     Options = [ new("grid", "block.opt.layout.grid"), new("masonry", "block.opt.layout.masonry") ] },
                 new BlockField { Id = "columns", Label = "block.gallery.f.columns", Type = FieldType.Select, Default = "3",

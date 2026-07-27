@@ -24,6 +24,10 @@ public static class DbSeeder
         var db = sp.GetRequiredService<AppDbContext>();
         var auth = sp.GetRequiredService<AuthService>();
 
+        // Bring an existing DB up to the current schema before any EF query touches the new columns
+        // (EnsureCreated never ALTERs an existing table, so added columns must be patched in here).
+        await MigrateSchemaAsync(db);
+
         if (!await db.Users.AnyAsync())
         {
             db.Users.Add(new User
@@ -230,6 +234,34 @@ public static class DbSeeder
         }
 
         if (changed) await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Idempotently adds columns introduced after the DB was first created. EnsureCreated() never
+    /// alters an existing table, so new model columns must be patched in with ALTER TABLE. Runs before
+    /// any EF query so reads of the new columns don't fail on an older database. A fresh DB already has
+    /// the columns (created from the model), so each ALTER is a no-op there (duplicate-column ignored).
+    /// </summary>
+    private static async Task MigrateSchemaAsync(AppDbContext db)
+    {
+        await AddColumnIfMissingAsync(db, "Users", "Email", "TEXT");
+        await AddColumnIfMissingAsync(db, "Forms", "SuccessMessage", "TEXT");
+        await AddColumnIfMissingAsync(db, "Forms", "NotifyEnabled", "INTEGER NOT NULL DEFAULT 0");
+        await AddColumnIfMissingAsync(db, "Forms", "NotifyJson", "TEXT NOT NULL DEFAULT ''");
+    }
+
+    private static async Task AddColumnIfMissingAsync(AppDbContext db, string table, string column, string type)
+    {
+        // table/column/type are hard-coded constants (never user input) — safe to inline.
+        var sql = "ALTER TABLE \"" + table + "\" ADD COLUMN \"" + column + "\" " + type;
+        try
+        {
+            await db.Database.ExecuteSqlRawAsync(sql);
+        }
+        catch (Exception ex) when (ex.Message.Contains("duplicate column", StringComparison.OrdinalIgnoreCase))
+        {
+            // Column already exists (fresh DB or a previous run) — nothing to do.
+        }
     }
 
     /// <summary>

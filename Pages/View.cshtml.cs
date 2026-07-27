@@ -12,11 +12,13 @@ namespace MatCMS.Pages;
 public class ViewModel : PageModel
 {
     private readonly AppDbContext _db;
+    private readonly EmailService _email;
 
-    public ViewModel(AppDbContext db, BlockRegistry registry)
+    public ViewModel(AppDbContext db, BlockRegistry registry, EmailService email)
     {
         _db = db;
         Registry = registry;
+        _email = email;
     }
 
     public BlockRegistry Registry { get; }
@@ -68,6 +70,7 @@ public class ViewModel : PageModel
         // Validate only currently-visible (active) fields.
         var errors = new List<string>();
         var stored = new List<object>();
+        var answered = new List<(string Label, string Value)>();
         foreach (var el in inputs)
         {
             if (!FormDefinition.IsActive(el, values)) continue;
@@ -85,6 +88,7 @@ public class ViewModel : PageModel
             }
 
             stored.Add(new { id = el.Id, label, value = val });
+            answered.Add((label, val));
         }
 
         if (errors.Count > 0)
@@ -100,10 +104,55 @@ public class ViewModel : PageModel
                 DataJson = System.Text.Json.JsonSerializer.Serialize(stored, FormDefinition.Opts)
             });
             await _db.SaveChangesAsync();
-            TempData["FormSuccess_" + formSlug] = "Vielen Dank! Ihre Angaben wurden übermittelt.";
+
+            TempData["FormSuccess_" + formSlug] = string.IsNullOrWhiteSpace(form.SuccessMessage)
+                ? "Vielen Dank! Ihre Angaben wurden übermittelt."
+                : form.SuccessMessage!.Trim();
+
+            if (form.NotifyEnabled)
+                await TrySendNotificationAsync(form, answered, inputs, values);
         }
 
         return RedirectToPage(RouteFor(key, locale));
+    }
+
+    /// <summary>Best-effort submission notification e-mail. Never throws — a mail problem must never
+    /// break the visitor's submission (which is already saved at this point).</summary>
+    private async Task TrySendNotificationAsync(
+        Form form, List<(string Label, string Value)> answered,
+        List<FormElement> inputs, Dictionary<string, string> values)
+    {
+        try
+        {
+            var notify = FormNotify.Parse(form.NotifyJson);
+            var recipients = new List<string>(notify.Emails);
+            if (notify.UserIds.Count > 0)
+            {
+                var userEmails = await _db.Users.AsNoTracking()
+                    .Where(u => notify.UserIds.Contains(u.Id) && u.Email != null && u.Email != "")
+                    .Select(u => u.Email!)
+                    .ToListAsync();
+                recipients.AddRange(userEmails);
+            }
+            if (recipients.Count == 0) return;
+
+            var body = new System.Text.StringBuilder();
+            body.AppendLine($"Neue Einsendung über das Formular „{form.Name}“:");
+            body.AppendLine(new string('-', 44));
+            foreach (var (label, value) in answered)
+                body.AppendLine($"{label}: {(string.IsNullOrWhiteSpace(value) ? "—" : value)}");
+
+            // Reply straight to the visitor if the form captured an e-mail address.
+            var replyTo = inputs.FirstOrDefault(e => e.Type == "email") is { Id: var eid }
+                          && values.TryGetValue(eid, out var ev) && !string.IsNullOrWhiteSpace(ev)
+                ? ev.Trim() : null;
+
+            await _email.SendAsync(recipients, $"Neue Einsendung: {form.Name}", body.ToString(), replyTo);
+        }
+        catch
+        {
+            // swallowed on purpose — the submission already succeeded
+        }
     }
 
     private Task<PageEntity?> LoadAsync(string? slug, string locale) =>

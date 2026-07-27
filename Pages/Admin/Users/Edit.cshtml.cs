@@ -20,6 +20,7 @@ public class EditModel : PageModel
     public User Current { get; private set; } = default!;
 
     [BindProperty] public string? DisplayName { get; set; }
+    [BindProperty] public string? Email { get; set; }
     [BindProperty] public string? NewPassword { get; set; }
 
     public async Task<IActionResult> OnGetAsync(int id)
@@ -29,6 +30,7 @@ public class EditModel : PageModel
 
         Current = user;
         DisplayName = user.DisplayName;
+        Email = user.Email;
         return Page();
     }
 
@@ -38,6 +40,7 @@ public class EditModel : PageModel
         if (user is null) return NotFound();
 
         user.DisplayName = string.IsNullOrWhiteSpace(DisplayName) ? null : DisplayName!.Trim();
+        user.Email = string.IsNullOrWhiteSpace(Email) ? null : Email!.Trim();
         if (!string.IsNullOrWhiteSpace(NewPassword))
             user.PasswordHash = _auth.HashPassword(NewPassword!);
 

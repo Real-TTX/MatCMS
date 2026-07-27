@@ -90,14 +90,17 @@ public class EditModel : PageModel
                 {
                     // Dynamic select sources (e.g. the "form" block's form picker) are resolved
                     // from the database at edit time.
-                    var formOptions = SelectedDef.Fields.Any(f => f.OptionsSource == "forms")
-                        ? await _db.Forms.AsNoTracking().OrderBy(f => f.Name)
-                            .Select(f => new SelectOption(f.Slug, f.Name)).ToListAsync()
-                        : new List<SelectOption>();
+                    // Dynamic <select> sources resolved from the DB at edit time (keyed by OptionsSource).
+                    var dynamicSources = new Dictionary<string, List<SelectOption>>(StringComparer.Ordinal);
+                    if (SelectedDef.Fields.Any(f => f.OptionsSource == "forms"))
+                        dynamicSources["forms"] = await _db.Forms.AsNoTracking().OrderBy(f => f.Name)
+                            .Select(f => new SelectOption(f.Slug, f.Name)).ToListAsync();
+                    if (SelectedDef.Fields.Any(f => f.OptionsSource == "mediaTags"))
+                        dynamicSources["mediaTags"] = await LoadMediaTagOptionsAsync();
 
                     // Resolve the localization keys (Label/Options/ItemLabel) into display text
                     // for the current UI culture before handing the schema to the JS editor.
-                    var localized = SelectedDef.Fields.Select(f => LocalizeField(f, formOptions)).ToList();
+                    var localized = SelectedDef.Fields.Select(f => LocalizeField(f, dynamicSources)).ToList();
                     SchemaJson = JsonSerializer.Serialize(localized, SchemaOpts);
                     CurrentJson = string.IsNullOrWhiteSpace(SelectedBlock.DataJson) ? "{}" : SelectedBlock.DataJson;
                 }
@@ -321,12 +324,13 @@ public class EditModel : PageModel
     // Produces a JSON-friendly copy of a field with all localization keys resolved to text.
     private object LocalizeField(BlockField f) => LocalizeField(f, null);
 
-    private object LocalizeField(BlockField f, IReadOnlyList<SelectOption>? dynamicOptions)
+    private object LocalizeField(BlockField f, IReadOnlyDictionary<string, List<SelectOption>>? dynamicSources)
     {
-        // A dynamic source (e.g. "forms") replaces the static options; its labels are already
-        // display text and must not be run through the localizer.
-        var options = f.OptionsSource == "forms" && dynamicOptions is not null
-            ? dynamicOptions.Select(o => new { value = o.Value, label = o.Label }).ToList()
+        // A dynamic source (e.g. "forms", "mediaTags") replaces the static options; its labels are
+        // already display text and must not be run through the localizer.
+        var options = (f.OptionsSource is not null && dynamicSources is not null
+                       && dynamicSources.TryGetValue(f.OptionsSource, out var dyn))
+            ? dyn.Select(o => new { value = o.Value, label = o.Label }).ToList()
             : f.Options.Select(o => new { value = o.Value, label = _t[o.Label] }).ToList();
 
         return new
@@ -338,9 +342,22 @@ public class EditModel : PageModel
             help = f.Help,
             @default = f.Default,
             options,
-            itemFields = f.ItemFields.Select(LocalizeField).ToList(),
+            itemFields = f.ItemFields.Select(x => LocalizeField(x, dynamicSources)).ToList(),
             itemLabel = _t[f.ItemLabel]
         };
+    }
+
+    /// <summary>Distinct media-library tags for the gallery tag picker, with an "all media" entry first.</summary>
+    private async Task<List<SelectOption>> LoadMediaTagOptionsAsync()
+    {
+        var tagStrings = await _db.Media.AsNoTracking().Select(m => m.Tags).ToListAsync();
+        var options = new List<SelectOption> { new("", "Alle Medien") };
+        options.AddRange(tagStrings
+            .SelectMany(TagUtil.Split)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(t => t, StringComparer.OrdinalIgnoreCase)
+            .Select(t => new SelectOption(t, t)));
+        return options;
     }
 
     public string BlockSummary(ContentBlock b)

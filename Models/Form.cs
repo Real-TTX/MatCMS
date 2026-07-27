@@ -18,6 +18,15 @@ public class Form
     /// <summary>The form fields serialized as a JSON array of elements.</summary>
     public string DefinitionJson { get; set; } = "[]";
 
+    /// <summary>Custom confirmation message shown after a successful submission (empty = default text).</summary>
+    public string? SuccessMessage { get; set; }
+
+    /// <summary>When true, a notification e-mail is sent on each submission (needs SMTP configured).</summary>
+    public bool NotifyEnabled { get; set; }
+
+    /// <summary>Notification recipients as JSON: {"userIds":[1,2],"emails":["a@b.com"]}.</summary>
+    public string NotifyJson { get; set; } = "";
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public List<FormSubmission> Submissions { get; set; } = new();

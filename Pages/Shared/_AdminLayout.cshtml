@@ -35,15 +35,20 @@
             </a>
         </div>
         <nav class="admin-nav">
+            @* Inhalt *@
             <a class="@Active("/admin/pages")" asp-page="/Admin/Pages/Index">📄 @T["nav.pages"]</a>
             <a class="@Active("/admin/menus")" asp-page="/Admin/Menus/Index">🧭 @T["nav.menus"]</a>
             <a class="@Active("/admin/forms")" asp-page="/Admin/Forms/Index">📝 @T["nav.forms"]</a>
             <a class="@Active("/admin/media")" asp-page="/Admin/Media/Index">🖼️ @T["nav.media"]</a>
-            <a class="@Active("/admin/users")" asp-page="/Admin/Users/Index">👤 @T["nav.users"]</a>
-            <a class="@Active("/admin/settings")" asp-page="/Admin/Settings/Index">⚙️ @T["nav.settings"]</a>
+            <div class="admin-nav-sep" role="separator"></div>
+            @* Gestaltung & Konfiguration *@
             <a class="@Active("/admin/templates")" asp-page="/Admin/Templates/Index">🎨 @T["nav.templates"]</a>
             <a class="@Active("/admin/components")" asp-page="/Admin/Components/Index">🧩 @T["nav.components"]</a>
             <a class="@Active("/admin/plugins")" asp-page="/Admin/Plugins/Index">🔌 @T["nav.plugins"]</a>
+            <a class="@Active("/admin/settings")" asp-page="/Admin/Settings/Index">⚙️ @T["nav.settings"]</a>
+            <div class="admin-nav-sep" role="separator"></div>
+            @* Verwaltung & System *@
+            <a class="@Active("/admin/users")" asp-page="/Admin/Users/Index">👤 @T["nav.users"]</a>
             <a class="@Active("/admin/backup")" asp-page="/Admin/Backup/Index">💾 @T["nav.backup"]</a>
             <a class="@Active("/admin/about")" asp-page="/Admin/About/Index">ℹ️ @T["nav.about"]</a>
             @if (Plugins.AdminMenu.Count > 0)

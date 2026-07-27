@@ -23,11 +23,23 @@ public class EditModel : PageModel
 
     [BindProperty] public FormMetaInput Meta { get; set; } = new();
     [BindProperty] public string ElementJson { get; set; } = "";
+    [BindProperty] public SettingsInput Settings { get; set; } = new();
+
+    /// <summary>All users — offered as selectable notification recipients (those with an e-mail).</summary>
+    public List<User> AllUsers { get; private set; } = new();
 
     public class FormMetaInput
     {
         public string Name { get; set; } = "";
         public string Slug { get; set; } = "";
+    }
+
+    public class SettingsInput
+    {
+        public string SuccessMessage { get; set; } = "";
+        public bool NotifyEnabled { get; set; }
+        public List<int> NotifyUserIds { get; set; } = new();
+        public string NotifyEmails { get; set; } = "";
     }
 
     /// <summary>Element types offered in the "+ Element" picker (inner SVG markup for a 0 0 24 24 icon).</summary>
@@ -52,6 +64,16 @@ public class EditModel : PageModel
         Current = form;
         Meta = new FormMetaInput { Name = form.Name, Slug = form.Slug };
         Elements = FormDefinition.Parse(form.DefinitionJson);
+
+        AllUsers = await _db.Users.AsNoTracking().OrderBy(u => u.Username).ToListAsync();
+        var notify = FormNotify.Parse(form.NotifyJson);
+        Settings = new SettingsInput
+        {
+            SuccessMessage = form.SuccessMessage ?? "",
+            NotifyEnabled = form.NotifyEnabled,
+            NotifyUserIds = notify.UserIds,
+            NotifyEmails = string.Join("\n", notify.Emails)
+        };
 
         if (!string.IsNullOrWhiteSpace(element))
         {
@@ -171,6 +193,25 @@ public class EditModel : PageModel
         form.Slug = slug;
         await _db.SaveChangesAsync();
         TempData["Flash"] = "Formular-Einstellungen gespeichert.";
+        return RedirectToPage(new { id });
+    }
+
+    /// <summary>Saves the confirmation message and e-mail-notification settings of the form.</summary>
+    public async Task<IActionResult> OnPostSettingsAsync(int id)
+    {
+        var form = await _db.Forms.FindAsync(id);
+        if (form is null) return NotFound();
+
+        form.SuccessMessage = string.IsNullOrWhiteSpace(Settings.SuccessMessage) ? null : Settings.SuccessMessage.Trim();
+        form.NotifyEnabled = Settings.NotifyEnabled;
+        form.NotifyJson = new FormNotify
+        {
+            UserIds = (Settings.NotifyUserIds ?? new()).Distinct().ToList(),
+            Emails = FormNotify.ParseEmails(Settings.NotifyEmails)
+        }.Serialize();
+
+        await _db.SaveChangesAsync();
+        TempData["Flash"] = "Meldung & Benachrichtigungen gespeichert.";
         return RedirectToPage(new { id });
     }
 

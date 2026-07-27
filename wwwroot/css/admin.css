@@ -63,6 +63,8 @@
 }
 .admin-nav a:hover { background: #e2e5ea; color: var(--black); }
 .admin-nav a.active { background: var(--accent); color: #fff; }
+/* Thin divider between logical nav groups (Inhalt / Konfiguration / Verwaltung). */
+.admin-nav-sep { height: 1px; background: #dfe1e6; margin: 9px 6px; flex-shrink: 0; }
 
 .admin-nav-foot { border-top: 1px solid #dfe1e6; padding-top: 14px; display: flex; flex-direction: column; gap: 6px; }
 .admin-nav-foot a, .admin-nav-foot .linklike {
@@ -277,6 +279,18 @@ table.data .row-unread td { font-weight: 600; }
 .badge-new { background: #0f0f10; color: #fff; }
 .badge-err { background: #fde8e8; color: #b42318; }
 .admin-nav-plugins { margin-top: 6px; padding-top: 8px; border-top: 1px dashed #dfe1e6; display: flex; flex-direction: column; gap: 4px; }
+
+/* Checkbox lists (e.g. form-notification recipients). */
+.check { display: flex; align-items: center; gap: 8px; font-weight: 400; cursor: pointer; }
+.check input { flex: 0 0 auto; }
+.check-list { display: flex; flex-direction: column; gap: 6px; }
+.check-list .check .muted { margin-left: auto; font-size: 12.5px; }
+.check.is-muted { opacity: .6; }
+
+/* Read-only "Systemkomponenten" reference list (Components tab). */
+.components-system .sys-desc { color: var(--muted); font-size: 13.5px; margin-top: 2px; }
+.components-system .sys-meta { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.components-system .sys-meta .mono { color: var(--muted); background: #f4f5f7; padding: 2px 7px; border-radius: 5px; }
 .plugin-log { background: #0f1115; color: #d6d6d6; border-radius: 8px; padding: 14px 16px; overflow-x: auto; max-height: 320px; font-family: var(--font-mono, ui-monospace, monospace); font-size: 12.5px; line-height: 1.6; white-space: pre-wrap; margin: 0; }
 
 .btn-sm { padding: 8px 16px; font-size: 12.5px; }
@@ -476,7 +490,8 @@ table.data .btn { white-space: nowrap; }
 .le-panel-head { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
 .le-panel-title { font-weight: 700; font-size: 16px; }
 .le-panel-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
-.le-delete { margin: 0; margin-left: auto; }
+.le-delete { margin: 0; }
+.le-panel-actions .le-save { margin-left: auto; }
 .le-sidebar .btn { white-space: nowrap; }
 
 .le-preview { display: flex; flex-direction: column; min-width: 0; background: #eceef1; }

@@ -20,6 +20,7 @@ public class CreateModel : PageModel
 
     [BindProperty] public string? Username { get; set; }
     [BindProperty] public string? DisplayName { get; set; }
+    [BindProperty] public string? Email { get; set; }
     [BindProperty] public string? Password { get; set; }
     public string? Error { get; private set; }
 
@@ -43,6 +44,7 @@ public class CreateModel : PageModel
         {
             Username = username,
             DisplayName = string.IsNullOrWhiteSpace(DisplayName) ? null : DisplayName!.Trim(),
+            Email = string.IsNullOrWhiteSpace(Email) ? null : Email!.Trim(),
             Role = "Admin",
             PasswordHash = _auth.HashPassword(Password!)
         });

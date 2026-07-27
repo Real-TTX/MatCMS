@@ -26,13 +26,13 @@
                     <input type="hidden" name="DataJson" id="DataJson" />
                     <div id="block-editor"></div>
                 </form>
-                @* One tidy action row: positive → negative, destructive set apart on the right. *@
+                @* Compact icon-only action row: delete flush-left, save + done on the right — never wraps. *@
                 <div class="le-panel-actions">
-                    <button type="submit" form="block-form" class="btn btn-sm">@T["action.save"]</button>
-                    <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@Model.Current.Id">@T["editor.done"]</a>
                     <form class="inline-form le-delete" method="post" asp-page-handler="DeleteBlock" asp-route-id="@Model.Current.Id" asp-route-blockId="@Model.SelectedBlock!.Id" onsubmit="return confirm('@T["editor.confirmDeleteBlock"]');">
-                        <button type="submit" class="btn btn-sm btn-danger">@T["editor.blockDelete"]</button>
+                        <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["editor.blockDelete"]" aria-label="@T["editor.blockDelete"]"><i class="ti ti-trash" aria-hidden="true"></i></button>
                     </form>
+                    <button type="submit" form="block-form" class="btn btn-sm btn-icon le-save" title="@T["action.save"]" aria-label="@T["action.save"]"><i class="ti ti-device-floppy" aria-hidden="true"></i></button>
+                    <a class="btn btn-sm btn-ghost btn-icon" asp-page="Edit" asp-route-id="@Model.Current.Id" title="@T["editor.done"]" aria-label="@T["editor.done"]"><i class="ti ti-check" aria-hidden="true"></i></a>
                 </div>
             </div>
             <script id="block-schema" type="application/json">@Html.Raw(Model.SchemaJson.Replace("</", "<\\/"))</script>

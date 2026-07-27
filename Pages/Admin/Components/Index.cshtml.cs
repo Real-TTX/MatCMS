@@ -1,3 +1,4 @@
+using MatCMS.Content;
 using MatCMS.Data;
 using MatCMS.Models;
 using Microsoft.AspNetCore.Mvc;
@@ -11,7 +12,11 @@ public class IndexModel : PageModel
     private readonly AppDbContext _db;
     public IndexModel(AppDbContext db) => _db = db;
 
+    /// <summary>User-defined components ("Eigene Komponenten").</summary>
     public List<Component> Items { get; private set; } = new();
+
+    /// <summary>Built-in block types ("Systemkomponenten"), shown read-only.</summary>
+    public IReadOnlyList<BlockDefinition> System { get; private set; } = BlockRegistry.Builtins;
 
     public async Task OnGetAsync() =>
         Items = await _db.Components.OrderBy(c => c.Name).ToListAsync();

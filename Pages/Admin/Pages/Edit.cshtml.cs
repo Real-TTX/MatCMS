@@ -329,6 +329,103 @@ public class EditModel : PageModel
         return RedirectToPage(new { id });
     }
 
+    // ===== Live WYSIWYG: draft preview (no DB write) + save-the-whole-tree =====
+    // The editor keeps the whole block tree as a client-side draft. New blocks use NEGATIVE ids
+    // (assigned in JS); existing blocks keep their real positive ids. Nothing persists until "Save".
+
+    /// <summary>One block in the editor's client draft.</summary>
+    public class DraftBlockInput
+    {
+        public int Id { get; set; }            // real (positive) or new (negative, from JS)
+        public string BlockType { get; set; } = "";
+        public int? ParentId { get; set; }     // container parent (may be negative if the parent is new)
+        public int SortOrder { get; set; }
+        public string DataJson { get; set; } = "{}";
+    }
+
+    [BindProperty] public string? Draft { get; set; }
+
+    private static readonly JsonSerializerOptions DraftOpts = new() { PropertyNameCaseInsensitive = true };
+
+    private List<DraftBlockInput> ParseDraft()
+    {
+        if (string.IsNullOrWhiteSpace(Draft)) return new();
+        try { return JsonSerializer.Deserialize<List<DraftBlockInput>>(Draft, DraftOpts) ?? new(); }
+        catch { return new(); }
+    }
+
+    /// <summary>Renders the draft block tree (editor mode) WITHOUT touching the DB — for the live preview.</summary>
+    public IActionResult OnPostRenderPreview(int id)
+    {
+        var blocks = ParseDraft().Select(d => new ContentBlock
+        {
+            Id = d.Id,
+            PageId = id,
+            ParentId = d.ParentId,
+            BlockType = d.BlockType ?? "",
+            SortOrder = d.SortOrder,
+            DataJson = string.IsNullOrWhiteSpace(d.DataJson) ? "{}" : d.DataJson
+        }).ToList();
+        return Partial("_BlockList", new BlockListModel(blocks, Registry, true));
+    }
+
+    /// <summary>Reconciles the whole draft into the page's ContentBlock rows in one transaction.</summary>
+    public async Task<IActionResult> OnPostSaveAllAsync(int id)
+    {
+        var page = await _db.Pages.Include(p => p.Blocks).FirstOrDefaultAsync(p => p.Id == id);
+        if (page is null) return NotFound();
+
+        var draft = ParseDraft();
+        // Only accept known block types + valid JSON data.
+        draft = draft.Where(d => Registry.Get(d.BlockType) is not null && IsJsonObject(d.DataJson)).ToList();
+
+        var existing = page.Blocks.ToDictionary(b => b.Id);
+        var draftIds = draft.Where(d => d.Id > 0).Select(d => d.Id).ToHashSet();
+
+        // 1) Delete rows that are no longer in the draft.
+        foreach (var b in page.Blocks.Where(b => !draftIds.Contains(b.Id)).ToList())
+            _db.ContentBlocks.Remove(b);
+
+        // 2) Upsert; set positive parents now, defer new (negative) parents to pass 2. Keyed by the
+        //    draft id (positive real / negative new) so pass 2 can map a negative parent to its entity.
+        var byDraftId = new Dictionary<int, ContentBlock>();
+        foreach (var d in draft)
+        {
+            var e = (d.Id > 0 && existing.TryGetValue(d.Id, out var ex)) ? ex : new ContentBlock { PageId = id };
+            if (e.Id == 0) _db.ContentBlocks.Add(e);
+            e.BlockType = d.BlockType;
+            e.SortOrder = d.SortOrder;
+            e.DataJson = string.IsNullOrWhiteSpace(d.DataJson) ? "{}" : d.DataJson;
+            e.ParentId = (d.ParentId is int pp && pp > 0) ? pp : null;
+            byDraftId[d.Id] = e;
+        }
+        page.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync(); // new blocks now have real ids
+
+        // Pass 2: wire up children whose parent was a NEW block (negative draft id) → its real id.
+        var changed = false;
+        foreach (var d in draft)
+        {
+            if (d.ParentId is int np && np < 0
+                && byDraftId.TryGetValue(np, out var parentEntity)
+                && byDraftId.TryGetValue(d.Id, out var childEntity)
+                && childEntity.ParentId != parentEntity.Id)
+            {
+                childEntity.ParentId = parentEntity.Id;
+                changed = true;
+            }
+        }
+        if (changed) await _db.SaveChangesAsync();
+
+        return new JsonResult(new { ok = true });
+    }
+
+    private static bool IsJsonObject(string? json)
+    {
+        try { return JsonNode.Parse(string.IsNullOrWhiteSpace(json) ? "{}" : json) is JsonObject; }
+        catch { return false; }
+    }
+
     // Shared layout options appended to every top-level block (Shopify-style). Labels are literal
     // German (the localizer falls back to the given text when there's no matching key).
     private static readonly BlockField[] GlobalLayoutFields =

@@ -22,6 +22,8 @@ public class CreateModel : PageModel
         "// IncludeScript(\"app.js\");     // lädt /plugin-assets/<key>/app.js auf allen Seiten\n" +
         "// IncludeStyle(\"style.css\");   // lädt eine CSS-Datei im <head>\n" +
         "// var url = AssetUrl(\"logo.png\"); // URL einer Asset-Datei\n\n" +
+        "// Einmalige Datenmigration bei Updates (läuft je Version genau einmal):\n" +
+        "// Migrate(\"2\", () => { /* gespeicherte Daten aufs neue Format bringen */ });\n\n" +
         "// Datenzugriff:\n" +
         "// var db = Service<AppDbContext>();\n" +
         "// var seiten = db.Pages.Count();\n";

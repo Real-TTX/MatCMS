@@ -18,6 +18,14 @@ public class Plugin
 
     public string Description { get; set; } = "";
 
+    /// <summary>Author-declared version of this plugin (e.g. "1" or "1.2"). Shown in the UI and
+    /// carried in the export bundle; a same-Key import replaces the plugin with this version.</summary>
+    public string Version { get; set; } = "";
+
+    /// <summary>The version this plugin's stored data was last migrated to (see <c>Migrate</c> in the
+    /// plugin API). Lets a plugin evolve its data idempotently across updates.</summary>
+    public string DataVersion { get; set; } = "";
+
     /// <summary>C# script body executed with a <c>PluginContext</c> as globals.</summary>
     public string Code { get; set; } = "";
 

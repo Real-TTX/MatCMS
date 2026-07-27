@@ -117,6 +117,54 @@ public class PluginContext
         _registry.AddHead($"<link rel=\"stylesheet\" href=\"{System.Net.WebUtility.HtmlEncode(url)}\" />");
     }
 
+    /// <summary>
+    /// Runs a one-time data migration for THIS plugin. If the plugin's stored data version is lower
+    /// than <paramref name="toVersion"/>, executes <paramref name="migrate"/> and then records the new
+    /// data version. Idempotent: each version's migration runs at most once, even though plugin code
+    /// runs on every startup/save. Use it to evolve a plugin's stored data across updates, e.g.
+    /// <c>Migrate("2", () =&gt; { /* rewrite plugin.todos to the new shape */ });</c>
+    /// </summary>
+    public void Migrate(string toVersion, Action migrate)
+    {
+        if (string.IsNullOrWhiteSpace(toVersion) || string.IsNullOrEmpty(Key) || migrate is null) return;
+        var db = Service<AppDbContext>();
+        var p = db?.Plugins.FirstOrDefault(x => x.Key == Key);
+        if (db is null || p is null) return;
+        if (CompareVersions(p.DataVersion, toVersion) >= 0) return; // already at/after this version
+
+        // Run the migration body + the version bump atomically. If the body throws, roll back and drop
+        // any partial tracked writes so nothing half-migrated is committed and DataVersion stays put
+        // (the migration will simply be retried next run). Errors surface via RunAllAsync's catch.
+        using var tx = db.Database.BeginTransaction();
+        try
+        {
+            migrate();
+            p.DataVersion = toVersion.Trim();
+            db.SaveChanges();
+            tx.Commit();
+        }
+        catch
+        {
+            try { tx.Rollback(); } catch { /* ignore */ }
+            db.ChangeTracker.Clear();
+            throw;
+        }
+    }
+
+    /// <summary>Compares version strings (System.Version when parseable, else ordinal). Empty = lowest.</summary>
+    private static int CompareVersions(string? a, string? b)
+    {
+        static string Norm(string? s)
+        {
+            s = (s ?? "").Trim();
+            if (s.Length == 0) s = "0";
+            return s.Contains('.') ? s : s + ".0";
+        }
+        if (Version.TryParse(Norm(a), out var va) && Version.TryParse(Norm(b), out var vb))
+            return va.CompareTo(vb);
+        return string.CompareOrdinal((a ?? "").Trim(), (b ?? "").Trim());
+    }
+
     /// <summary>Register an entry in the admin sidebar (label, target URL, emoji icon).</summary>
     public void AddAdminMenu(string label, string url, string icon = "🔌")
         => _registry.AdminMenu.Add(new(label ?? "", string.IsNullOrWhiteSpace(url) ? "#" : url, string.IsNullOrWhiteSpace(icon) ? "🔌" : icon));
@@ -148,6 +196,11 @@ public class PluginRunner
     private readonly IServiceProvider _services;
     private readonly ILogger<PluginRunner> _log;
 
+    // Serializes runs process-wide: RunAllAsync clears + repopulates the singleton registry and runs
+    // migrations that write to the DB, so two concurrent runs would corrupt the registry and could
+    // double-apply a migration. One run at a time.
+    private static readonly SemaphoreSlim _gate = new(1, 1);
+
     public PluginRunner(AppDbContext db, PluginRegistry registry, IServiceProvider services, ILogger<PluginRunner> log)
     {
         _db = db;
@@ -158,35 +211,43 @@ public class PluginRunner
 
     public async Task RunAllAsync()
     {
-        _registry.Reset();
-
-        List<Models.Plugin> plugins;
-        try { plugins = await _db.Plugins.Where(p => p.Enabled).OrderBy(p => p.Id).ToListAsync(); }
-        catch { return; } // table may not exist yet on the very first startup
-
-        // Reference every loaded assembly so scripts can use the framework + app types.
-        var refs = AppDomain.CurrentDomain.GetAssemblies()
-            .Where(a => !a.IsDynamic && !string.IsNullOrWhiteSpace(a.Location))
-            .ToList();
-        var options = ScriptOptions.Default
-            .WithReferences(refs)
-            .WithImports("System", "System.Linq", "System.Collections.Generic", "System.Threading.Tasks",
-                         "MatCMS.Services", "MatCMS.Data", "MatCMS.Models", "Microsoft.EntityFrameworkCore");
-
-        foreach (var p in plugins)
+        await _gate.WaitAsync();
+        try
         {
-            // Each plugin gets its own context carrying its Key, so AssetUrl/IncludeScript resolve to
-            // that plugin's own asset folder (/plugin-assets/{key}/…).
-            var ctx = new PluginContext(_registry, _services, p.Key);
-            try
+            _registry.Reset();
+
+            List<Models.Plugin> plugins;
+            try { plugins = await _db.Plugins.Where(p => p.Enabled).OrderBy(p => p.Id).ToListAsync(); }
+            catch { return; } // table may not exist yet on the very first startup
+
+            // Reference every loaded assembly so scripts can use the framework + app types.
+            var refs = AppDomain.CurrentDomain.GetAssemblies()
+                .Where(a => !a.IsDynamic && !string.IsNullOrWhiteSpace(a.Location))
+                .ToList();
+            var options = ScriptOptions.Default
+                .WithReferences(refs)
+                .WithImports("System", "System.Linq", "System.Collections.Generic", "System.Threading.Tasks",
+                             "MatCMS.Services", "MatCMS.Data", "MatCMS.Models", "Microsoft.EntityFrameworkCore");
+
+            foreach (var p in plugins)
             {
-                await CSharpScript.RunAsync(p.Code ?? "", options, globals: ctx, globalsType: typeof(PluginContext));
+                // Each plugin gets its own context carrying its Key, so AssetUrl/IncludeScript resolve to
+                // that plugin's own asset folder (/plugin-assets/{key}/…).
+                var ctx = new PluginContext(_registry, _services, p.Key);
+                try
+                {
+                    await CSharpScript.RunAsync(p.Code ?? "", options, globals: ctx, globalsType: typeof(PluginContext));
+                }
+                catch (Exception ex)
+                {
+                    _registry.Errors[p.Id] = ex.Message;
+                    _log.LogWarning(ex, "Plugin '{Name}' failed", p.Name);
+                }
             }
-            catch (Exception ex)
-            {
-                _registry.Errors[p.Id] = ex.Message;
-                _log.LogWarning(ex, "Plugin '{Name}' failed", p.Name);
-            }
+        }
+        finally
+        {
+            _gate.Release();
         }
     }
 }

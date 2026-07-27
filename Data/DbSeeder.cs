@@ -242,6 +242,8 @@ public static class DbSeeder
         await AddColumnIfMissingAsync(db, "Forms", "NotifyJson", "TEXT NOT NULL DEFAULT ''");
         await AddColumnIfMissingAsync(db, "Media", "SortOrder", "INTEGER NOT NULL DEFAULT 0");
         await AddColumnIfMissingAsync(db, "Plugins", "Key", "TEXT NOT NULL DEFAULT ''");
+        await AddColumnIfMissingAsync(db, "Plugins", "Version", "TEXT NOT NULL DEFAULT ''");
+        await AddColumnIfMissingAsync(db, "Plugins", "DataVersion", "TEXT NOT NULL DEFAULT ''");
     }
 
     /// <summary>Assigns a stable slug Key to any plugin created before the Key column existed.</summary>
@@ -369,6 +371,7 @@ public static class DbSeeder
     {
         Name = TodoPluginName,
         Key = "todo-verwaltung-beispiel",
+        Version = "1.0",
         Description = "Beispiel-Plugin: Todo-Verwaltung + Block + Log.",
         Enabled = true,
         Code = """

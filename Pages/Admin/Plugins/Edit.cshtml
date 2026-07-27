@@ -5,7 +5,10 @@
 }
 <div class="page-head">
     <h1>@T["plugins.edit"]</h1>
-    <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
+    <div class="head-actions">
+        <a class="btn btn-sm btn-ghost" asp-page-handler="Export" asp-route-id="@Model.Current.Id">Exportieren (ZIP)</a>
+        <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
+    </div>
 </div>
 
 <div class="card">
@@ -26,6 +29,14 @@
             <div class="form-field">
                 <label for="Description">@T["plugins.description"]</label>
                 <input id="Description" name="Description" value="@Model.Description" />
+            </div>
+            <div class="form-field" style="max-width:130px;">
+                <label for="Version">Version</label>
+                <input id="Version" name="Version" value="@Model.Version" placeholder="z.B. 1.0" spellcheck="false" />
+                @if (!string.IsNullOrWhiteSpace(Model.Current.DataVersion))
+                {
+                    <div class="help">Daten migriert bis: @Model.Current.DataVersion</div>
+                }
             </div>
         </div>
         <label class="check">

@@ -19,6 +19,7 @@ public class EditModel : PageModel
     public MatCMS.Models.Plugin Current { get; private set; } = default!;
     [BindProperty] public string? Name { get; set; }
     [BindProperty] public string? Description { get; set; }
+    [BindProperty] public string? Version { get; set; }
     [BindProperty] public string? Code { get; set; }
     [BindProperty] public bool Enabled { get; set; }
     public string? Error { get; private set; }
@@ -29,20 +30,25 @@ public class EditModel : PageModel
     public sealed record AssetFile(string Name, long Size, string Kind);
     public List<AssetFile> Assets { get; private set; } = new();
 
-    // Files a plugin may carry. SVG is intentionally excluded (like the media uploader): it can carry
-    // active content and would be a same-origin stored-XSS vector when served from /plugin-assets.
-    private static readonly string[] AllowedExt =
-        [".js", ".mjs", ".css", ".json", ".map", ".woff", ".woff2", ".ttf", ".eot", ".png", ".jpg", ".jpeg", ".gif", ".webp"];
-
     public async Task<IActionResult> OnGetAsync(int id)
     {
         var p = await _db.Plugins.FindAsync(id);
         if (p is null) return RedirectToPage("Index");
         Current = p;
-        Name = p.Name; Description = p.Description; Code = p.Code; Enabled = p.Enabled;
+        Name = p.Name; Description = p.Description; Code = p.Code; Enabled = p.Enabled; Version = p.Version;
         RunError = _registry.Errors.TryGetValue(id, out var e) ? e : null;
         LoadAssets();
         return Page();
+    }
+
+    /// <summary>Downloads this plugin as a self-contained ZIP bundle (plugin.json + assets/).</summary>
+    public async Task<IActionResult> OnGetExportAsync(int id)
+    {
+        var p = await _db.Plugins.FindAsync(id);
+        if (p is null) return RedirectToPage("Index");
+        var bytes = PluginPackager.Export(p, _env);
+        var fileName = (string.IsNullOrWhiteSpace(p.Key) ? "plugin" : p.Key) + ".plugin.zip";
+        return File(bytes, "application/zip", fileName);
     }
 
     public async Task<IActionResult> OnPostAsync(int id)
@@ -61,6 +67,7 @@ public class EditModel : PageModel
 
         p.Name = name;
         p.Description = (Description ?? "").Trim();
+        p.Version = (Version ?? "").Trim();
         p.Code = Code ?? "";
         p.Enabled = Enabled;
         await _db.SaveChangesAsync();
@@ -72,7 +79,7 @@ public class EditModel : PageModel
         if (RunError is not null)
         {
             // Stay on the page and show the compile/run error.
-            Name = p.Name; Description = p.Description; Code = p.Code; Enabled = p.Enabled;
+            Name = p.Name; Description = p.Description; Code = p.Code; Enabled = p.Enabled; Version = p.Version;
             return Page();
         }
 
@@ -113,10 +120,10 @@ public class EditModel : PageModel
             TempData["FlashError"] = "Keine Datei erhalten.";
         else
         {
-            var name = SanitizeName(file.FileName);
+            var name = PluginPackager.SanitizeFileName(file.FileName);
             var ext = Path.GetExtension(name).ToLowerInvariant();
-            if (string.IsNullOrEmpty(name) || !AllowedExt.Contains(ext))
-                TempData["FlashError"] = $"Dateityp nicht erlaubt ({ext}). Erlaubt: {string.Join(", ", AllowedExt)}";
+            if (string.IsNullOrEmpty(name) || !PluginPackager.AllowedAssetExt.Contains(ext))
+                TempData["FlashError"] = $"Dateityp nicht erlaubt ({ext}). Erlaubt: {string.Join(", ", PluginPackager.AllowedAssetExt)}";
             else if (file.Length > 5 * 1024 * 1024)
                 TempData["FlashError"] = "Datei zu groß (max. 5 MB).";
             else
@@ -136,7 +143,7 @@ public class EditModel : PageModel
         var p = await _db.Plugins.FindAsync(id);
         if (p is null) return RedirectToPage("Index");
 
-        name = SanitizeName(name);
+        name = PluginPackager.SanitizeFileName(name);
         if (!string.IsNullOrEmpty(name))
         {
             var path = Path.Combine(StoragePaths.PluginAssetDir(_env, p.Key), name);
@@ -164,15 +171,4 @@ public class EditModel : PageModel
         ".css" => "css",
         _ => "file"
     };
-
-    /// <summary>Strips any directory part and keeps only safe filename characters.</summary>
-    private static string SanitizeName(string? raw)
-    {
-        if (string.IsNullOrWhiteSpace(raw)) return "";
-        var baseName = Path.GetFileName(raw.Trim());
-        var sb = new System.Text.StringBuilder(baseName.Length);
-        foreach (var ch in baseName)
-            if (char.IsLetterOrDigit(ch) || ch is '.' or '-' or '_') sb.Append(ch);
-        return sb.ToString().TrimStart('.');
-    }
 }

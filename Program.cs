@@ -276,4 +276,39 @@ app.MapGet("/admin/api/pages", async (MatCMS.Data.AppDbContext db) =>
     return Results.Ok(items);
 }).RequireAuthorization("Admin");
 
+// --- SEO: XML sitemap + robots.txt (both served only when "sitemap.enabled" is on) ---
+app.MapGet("/sitemap.xml", async (HttpContext ctx, MatCMS.Data.AppDbContext db, MatCMS.Services.SiteContext site) =>
+{
+    if (!site.SitemapEnabled) return Results.NotFound();
+
+    // Only locales the app can actually route (mirrors the content routing + AvailableLocales), so the
+    // sitemap never advertises a /{locale}/… URL that would 404.
+    var supported = MatCMS.Services.Localizer.SupportedCultures;
+    var pages = await db.Pages.AsNoTracking()
+        .Where(p => p.IsPublished && supported.Contains(p.Locale))
+        .OrderBy(p => p.Locale).ThenBy(p => p.NavOrder).ThenBy(p => p.Title)
+        .Select(p => new { p.Slug, p.Locale, p.UpdatedAt })
+        .ToListAsync();
+
+    var baseUrl = site.CanonicalBaseUrl(ctx.Request);
+    var sb = new System.Text.StringBuilder();
+    sb.Append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+    sb.Append("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n");
+    foreach (var p in pages)
+    {
+        var loc = baseUrl + MatCMS.Services.SiteContext.LocalizedUrl(p.Locale, p.Slug);
+        sb.Append("  <url><loc>").Append(System.Security.SecurityElement.Escape(loc)).Append("</loc>")
+          .Append("<lastmod>").Append(p.UpdatedAt.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)).Append("</lastmod></url>\n");
+    }
+    sb.Append("</urlset>\n");
+    return Results.Content(sb.ToString(), "application/xml", System.Text.Encoding.UTF8);
+});
+
+app.MapGet("/robots.txt", (HttpContext ctx, MatCMS.Services.SiteContext site) =>
+{
+    if (!site.SitemapEnabled) return Results.NotFound();
+    var body = $"User-agent: *\nDisallow: /admin/\n\nSitemap: {site.CanonicalBaseUrl(ctx.Request)}/sitemap.xml\n";
+    return Results.Text(body, "text/plain", System.Text.Encoding.UTF8);
+});
+
 app.Run();

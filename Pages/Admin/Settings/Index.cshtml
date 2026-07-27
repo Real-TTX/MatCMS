@@ -63,6 +63,18 @@
                 <input name="Values[@SettingKeys.ContactRecipient]" value="@V(SettingKeys.ContactRecipient)" />
                 <div class="help">@T["settings.contactEmailHelp"]</div>
             </div>
+            <div class="form-field">
+                <label class="check">
+                    <input type="checkbox" name="Values[@SettingKeys.SitemapEnabled]" value="true" @(V(SettingKeys.SitemapEnabled) == "true" ? "checked" : "") />
+                    XML-Sitemap aktivieren
+                </label>
+                <div class="help">Stellt <code>/sitemap.xml</code> mit allen veröffentlichten Seiten bereit und eine <code>/robots.txt</code>, die darauf verweist. Für Suchmaschinen (Google Search Console usw.).</div>
+            </div>
+            <div class="form-field">
+                <label>Kanonische Website-Adresse (optional)</label>
+                <input name="Values[@SettingKeys.CanonicalUrl]" value="@V(SettingKeys.CanonicalUrl)" placeholder="https://www.beispiel.de" spellcheck="false" />
+                <div class="help">Öffentliche Basis-URL für die Sitemap und <code>robots.txt</code>. Leer lassen = automatisch aus der Anfrage. Hinter einem HTTPS-Reverse-Proxy hier die echte <code>https://</code>-Adresse eintragen, damit die Sitemap korrekte (kanonische) URLs enthält.</div>
+            </div>
             <div><button type="submit" class="btn">@T["settings.save"]</button></div>
         </div>
     </form>

@@ -211,6 +211,22 @@ public class SiteContext
     /// <summary>GA4 Measurement-ID (e.g. "G-XXXXXXX"); empty = no analytics.</summary>
     public string AnalyticsGa4 => Get(SettingKeys.AnalyticsGa4);
 
+    /// <summary>When true, /sitemap.xml (+ a referencing /robots.txt) is served.</summary>
+    public bool SitemapEnabled => string.Equals(Get(SettingKeys.SitemapEnabled), "true", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Base URL (scheme + host, no trailing slash) for absolute links such as the sitemap. Uses the
+    /// admin-configured canonical URL when set (correct behind a TLS-terminating reverse proxy, where
+    /// the request scheme is plain http); otherwise falls back to the current request's scheme + host.
+    /// </summary>
+    public string CanonicalBaseUrl(HttpRequest request)
+    {
+        var configured = Get(SettingKeys.CanonicalUrl).TrimEnd('/');
+        return !string.IsNullOrWhiteSpace(configured)
+            ? configured
+            : $"{request.Scheme}://{request.Host}";
+    }
+
     /// <summary>Filenames (under /plugin-assets) that are auto-included site-wide, in order.</summary>
     public IReadOnlyList<string> PluginAutoIncludes =>
         Get(SettingKeys.PluginAutoInclude)

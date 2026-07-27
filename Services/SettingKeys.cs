@@ -16,6 +16,13 @@ public static class SettingKeys
     public const string NotFoundPage = "error.notFoundPage";
     public const string ErrorPage = "error.errorPage";
 
+    // SEO: "true" serves /sitemap.xml (+ a /robots.txt that references it); anything else = off.
+    public const string SitemapEnabled = "sitemap.enabled";
+
+    // Optional public base URL (e.g. "https://example.com") used for absolute links in the sitemap /
+    // robots.txt. Empty = derive from the request (only correct when not behind a scheme-changing proxy).
+    public const string CanonicalUrl = "site.canonicalUrl";
+
     // "1" once the setup wizard has been completed (drives the dashboard prompt).
     public const string SetupComplete = "setup.complete";
 
@@ -42,7 +49,7 @@ public static class SettingKeys
     public static readonly string[] All =
     [
         SiteName, LogoUrl, FaviconUrl,
-        FooterText, ContactRecipient
+        FooterText, ContactRecipient, SitemapEnabled, CanonicalUrl
     ];
 
     /// <summary>SMTP setting keys (managed on the Settings → SMTP tab).</summary>

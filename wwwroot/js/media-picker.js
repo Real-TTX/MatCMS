@@ -54,9 +54,29 @@
                 b.innerHTML = '<span class="lp-title"></span><span class="lp-url mono"></span>';
                 b.querySelector(".lp-title").textContent = p.title || p.url;
                 b.querySelector(".lp-url").textContent = p.url;
-                b.addEventListener("click", function () { onPick(p.url); close(); });
+                b.addEventListener("click", function () { onPick(p.url, p.title || ""); close(); });
                 list.appendChild(b);
             });
         }).catch(function () { list.innerHTML = '<p class="muted">Konnte Seiten nicht laden.</p>'; });
     };
+
+    // Reusable pattern: any [data-link-btn] opens the link picker and fills a target input.
+    // Optional data-target (CSS selector for the URL input) and data-label (selector for a label
+    // input that is auto-filled with the page title when still empty).
+    function wireLinkButtons() {
+        document.querySelectorAll("[data-link-btn]").forEach(function (btn) {
+            if (btn._linkWired) return;
+            btn._linkWired = true;
+            btn.addEventListener("click", function () {
+                var input = btn.dataset.target ? document.querySelector(btn.dataset.target) : null;
+                var label = btn.dataset.label ? document.querySelector(btn.dataset.label) : null;
+                window.openLinkPicker(function (url, title) {
+                    if (input) { input.value = url; input.dispatchEvent(new Event("input", { bubbles: true })); }
+                    if (label && !label.value && title) label.value = title;
+                });
+            });
+        });
+    }
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", wireLinkButtons);
+    else wireLinkButtons();
 })();

@@ -84,22 +84,8 @@ public static class DbSeeder
             modern.CustomCss = m.CustomCss;
         }
 
-        // A warm, cosy holiday-let theme.
-        var ferien = await db.Templates.FirstOrDefaultAsync(t => t.Name == FerienTemplateName);
-        if (ferien is null)
-        {
-            db.Templates.Add(BuildFerienTemplate());
-        }
-        else if (string.IsNullOrWhiteSpace(ferien.LayoutHtml))
-        {
-            var f = BuildFerienTemplate();
-            ferien.AccentColor = f.AccentColor; ferien.SecondaryColor = f.SecondaryColor;
-            ferien.HeadingColor = f.HeadingColor; ferien.TextColor = f.TextColor;
-            ferien.BackgroundColor = f.BackgroundColor; ferien.AltBackground = f.AltBackground;
-            ferien.HeadingFont = f.HeadingFont; ferien.BodyFont = f.BodyFont;
-            ferien.ButtonRadius = f.ButtonRadius; ferien.LayoutHtml = f.LayoutHtml;
-            ferien.MenuMapJson = f.MenuMapJson; ferien.CustomCss = f.CustomCss;
-        }
+        // Note: instance-specific themes (FeuSys, Ferienwohnung) are NOT seeded into the base image —
+        // they are delivered per instance via a backup import. The base image ships only generic themes.
 
         // A few bundled starter themes (added to any DB that doesn't have them yet).
         await EnsureThemeAsync(db, BusinessThemeName, BuildBusinessTemplate);

@@ -212,6 +212,7 @@
   "menus.edit": "Menüpunkt bearbeiten",
   "menus.menu": "Menü",
   "menus.quickPick": "Schnellauswahl: Seite",
+  "menus.pickPage": "Seite wählen",
   "menus.ownUrl": "— eigene URL —",
   "menus.quickPickHelpCreate": "Füllt Label & Ziel automatisch aus einer Seite.",
   "menus.quickPickHelpEdit": "Setzt das Ziel (URL) aus einer Seite.",

@@ -30,7 +30,11 @@
             if (src.Length == 0) continue;
             items.Add((src, m.Alt ?? "", "", string.Join(" ", mtags)));
         }
+        // The block's own filter tag(s) select which media appear; they'd be redundant as filter
+        // buttons (every shown item has them), so offer only the remaining tags (e.g. room categories)
+        // as filters — and none at all when there are no sub-categories.
         filterTags = items.SelectMany(i => i.Tags.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            .Where(t => !wanted.Contains(t, StringComparer.OrdinalIgnoreCase))
             .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(t => t, StringComparer.OrdinalIgnoreCase).ToList();
     }
     else

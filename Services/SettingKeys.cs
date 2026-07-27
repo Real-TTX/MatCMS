@@ -12,6 +12,10 @@ public static class SettingKeys
     public const string FooterText = "FooterText";
     public const string ContactRecipient = "ContactRecipient";
 
+    // Error handling: slug of the page shown for 404 / server errors (empty = built-in default).
+    public const string NotFoundPage = "error.notFoundPage";
+    public const string ErrorPage = "error.errorPage";
+
     // SMTP / e-mail settings (own tab under Settings; kept out of `All` so each form saves only its own keys).
     public const string SmtpHost = "smtp.host";
     public const string SmtpPort = "smtp.port";
@@ -34,4 +38,7 @@ public static class SettingKeys
     [
         SmtpHost, SmtpPort, SmtpUser, SmtpPassword, SmtpFromEmail, SmtpFromName, SmtpSsl
     ];
+
+    /// <summary>Error-handling setting keys (managed on the Settings → Fehlerhandling tab).</summary>
+    public static readonly string[] Errors = [NotFoundPage, ErrorPage];
 }

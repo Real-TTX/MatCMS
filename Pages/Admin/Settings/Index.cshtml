@@ -12,6 +12,7 @@
 <div class="tabs" role="tablist">
     <button type="button" class="tab active" data-tab="general">@T["settings.tabGeneral"]</button>
     <button type="button" class="tab" data-tab="smtp">@T["settings.tabSmtp"]</button>
+    <button type="button" class="tab" data-tab="errors">@T["settings.tabErrors"]</button>
 </div>
 
 @* ============ GENERAL ============ *@
@@ -111,6 +112,37 @@
                 <button type="submit" class="btn btn-ghost" formaction="?handler=TestSmtp">@T["settings.smtpTest"]</button>
             </div>
             <p class="help">@T["settings.smtpTestHelp"]</p>
+        </div>
+    </form>
+</div>
+
+@* ============ FEHLERHANDLING ============ *@
+<div class="tab-panel" data-panel="errors" hidden>
+    <form method="post" asp-page-handler="Errors">
+        <div class="card">
+            <h2>@T["settings.errorsHeading"]</h2>
+            <p class="muted">@T["settings.errorsIntro"]</p>
+            <div class="form-field">
+                <label>@T["settings.error404"]</label>
+                <select name="Values[@SettingKeys.NotFoundPage]">
+                    <option value="">@T["settings.errorDefault"]</option>
+                    @foreach (var p in Model.AllPages)
+                    {
+                        <option value="@p.Slug" selected="@(V(SettingKeys.NotFoundPage) == p.Slug)">@p.Title (/@p.Slug)</option>
+                    }
+                </select>
+            </div>
+            <div class="form-field">
+                <label>@T["settings.error500"]</label>
+                <select name="Values[@SettingKeys.ErrorPage]">
+                    <option value="">@T["settings.errorDefault"]</option>
+                    @foreach (var p in Model.AllPages)
+                    {
+                        <option value="@p.Slug" selected="@(V(SettingKeys.ErrorPage) == p.Slug)">@p.Title (/@p.Slug)</option>
+                    }
+                </select>
+            </div>
+            <div><button type="submit" class="btn">@T["settings.save"]</button></div>
         </div>
     </form>
 </div>

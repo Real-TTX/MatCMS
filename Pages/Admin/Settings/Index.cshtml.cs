@@ -15,11 +15,17 @@ public class IndexModel : PageModel
 
     [BindProperty] public Dictionary<string, string> Values { get; set; } = new();
 
+    /// <summary>Published pages offered as 404 / error targets (Fehlerhandling tab).</summary>
+    public List<MatCMS.Models.Page> AllPages { get; private set; } = new();
+
     public async Task OnGetAsync()
     {
         var existing = await _db.SiteSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
-        foreach (var key in SettingKeys.All.Concat(SettingKeys.Smtp))
+        foreach (var key in SettingKeys.All.Concat(SettingKeys.Smtp).Concat(SettingKeys.Errors))
             Values[key] = existing.TryGetValue(key, out var v) ? v : "";
+        AllPages = await _db.Pages.AsNoTracking()
+            .Where(p => p.Locale == Localizer.DefaultCulture)
+            .OrderBy(p => p.Title).ToListAsync();
     }
 
     public async Task<IActionResult> OnPostAsync()
@@ -34,6 +40,13 @@ public class IndexModel : PageModel
         await SaveKeysAsync(SettingKeys.Smtp);
         TempData["Flash"] = "SMTP-Einstellungen gespeichert.";
         return RedirectToPage(new { tab = "smtp" });
+    }
+
+    public async Task<IActionResult> OnPostErrorsAsync()
+    {
+        await SaveKeysAsync(SettingKeys.Errors);
+        TempData["Flash"] = "Fehlerhandling gespeichert.";
+        return RedirectToPage(new { tab = "errors" });
     }
 
     /// <summary>Sends a test e-mail using the values currently entered (no need to save first).</summary>

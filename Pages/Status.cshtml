@@ -1,0 +1,51 @@
+@page "/_status"
+@model MatCMS.Pages.StatusModel
+@{
+    Layout = "_Layout";
+}
+@if (Model.CustomPage is not null)
+{
+    var allBlocks = Model.CustomPage.Blocks;
+    foreach (var block in allBlocks.Where(b => b.ParentId == null).OrderBy(b => b.SortOrder))
+    {
+        var def = Model.Registry.Get(block.BlockType);
+        if (def is null || string.IsNullOrWhiteSpace(def.Partial)) { continue; }
+        var data = new MatCMS.Content.BlockData(block.DataJson);
+
+        if (def.IsContainer)
+        {
+            var kids = allBlocks.Where(b => b.ParentId == block.Id).OrderBy(b => b.SortOrder)
+                .Select(cb =>
+                {
+                    var cdef = Model.Registry.Get(cb.BlockType);
+                    return cdef is null || string.IsNullOrWhiteSpace(cdef.Partial)
+                        ? null
+                        : new MatCMS.Content.ContainerBlockModel.ChildBlock(cdef.Partial, new MatCMS.Content.BlockData(cb.DataJson));
+                })
+                .Where(x => x is not null).Select(x => x!).ToList();
+            @await Html.PartialAsync(def.Partial, new MatCMS.Content.ContainerBlockModel(data, kids))
+        }
+        else if (def.IsComponent)
+        {
+            @Html.Raw(MatCMS.Content.ComponentDefinition.Render(def, data))
+        }
+        else
+        {
+            @await Html.PartialAsync(def.Partial, data)
+        }
+    }
+}
+else
+{
+    <section class="section">
+        <div class="container" style="text-align:center; padding:90px 0;">
+            <h1>@(Model.Code == 404 ? "Seite nicht gefunden" : "Ein Fehler ist aufgetreten")</h1>
+            <p class="muted" style="margin:14px 0 26px;">
+                @(Model.Code == 404
+                    ? "Die angeforderte Seite existiert nicht oder wurde verschoben."
+                    : "Beim Laden der Seite ist ein Fehler aufgetreten. Bitte versuchen Sie es später erneut.")
+            </p>
+            <a class="btn" href="/">Zur Startseite</a>
+        </div>
+    </section>
+}

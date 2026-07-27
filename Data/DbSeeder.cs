@@ -101,6 +101,11 @@ public static class DbSeeder
             ferien.MenuMapJson = f.MenuMapJson; ferien.CustomCss = f.CustomCss;
         }
 
+        // A few bundled starter themes (added to any DB that doesn't have them yet).
+        await EnsureThemeAsync(db, BusinessThemeName, BuildBusinessTemplate);
+        await EnsureThemeAsync(db, TechThemeName, BuildTechTemplate);
+        await EnsureThemeAsync(db, ArtThemeName, BuildArtTemplate);
+
         // A ready-made example component so the component designer has something to look at.
         if (!await db.Components.AnyAsync(c => c.Type == ExampleComponentType))
         {
@@ -459,6 +464,81 @@ public static class DbSeeder
 
     private const string ModernTemplateName = "MatCMS Modern";
     private const string FerienTemplateName = "Ferienwohnung";
+    private const string BusinessThemeName = "MatBusiness";
+    private const string TechThemeName = "MatTech";
+    private const string ArtThemeName = "MatArt";
+
+    /// <summary>Adds a bundled theme to any database that doesn't already have it (idempotent).</summary>
+    private static async Task EnsureThemeAsync(AppDbContext db, string name, Func<Template> build)
+    {
+        if (!await db.Templates.AnyAsync(t => t.Name == name))
+            db.Templates.Add(build());
+    }
+
+    // Bundled starter themes. Each rides on the default (var-driven) site layout, so a distinct
+    // palette + font pairing + radius + header treatment re-skins the whole site — corporate, dark
+    // tech, and vibrant artistic looks that are clearly different from one another.
+    private static Template BuildBusinessTemplate() => new()
+    {
+        Name = BusinessThemeName, IsActive = false,
+        AccentColor = "#1e3a8a", SecondaryColor = "#0ea5e9",
+        HeadingColor = "#0f172a", TextColor = "#334155",
+        BackgroundColor = "#ffffff", AltBackground = "#eef2f7",
+        HeadingFont = "Montserrat", BodyFont = "Open Sans",
+        ButtonStyle = "solid", ButtonRadius = "4", ContainerWidth = "1240",
+        HeaderBackground = "#0f172a", HeaderTextColor = "#ffffff", HeaderPadding = "18",
+        CustomCss = """
+            /* MatBusiness — crisp corporate look */
+            .site-header a { color: #e2e8f0; }
+            .site-header a:hover { color: #fff; }
+            .btn { text-transform: uppercase; letter-spacing: .07em; font-weight: 700; }
+            .section h2 { letter-spacing: -.01em; }
+            .card, .column { box-shadow: 0 1px 2px rgba(15,23,42,.06); border: 1px solid #e2e8f0; }
+            """
+    };
+
+    private static Template BuildTechTemplate() => new()
+    {
+        Name = TechThemeName, IsActive = false,
+        AccentColor = "#22d3ee", SecondaryColor = "#a855f7",
+        HeadingColor = "#f8fafc", TextColor = "#c7d2fe",
+        BackgroundColor = "#0b1020", AltBackground = "#141b34",
+        HeadingFont = "Poppins", BodyFont = "Roboto",
+        ButtonStyle = "solid", ButtonRadius = "12", ContainerWidth = "1200",
+        HeaderBackground = "#0b1020", HeaderTextColor = "#e2e8f0", HeaderPadding = "18",
+        CustomCss = """
+            /* MatTech — dark neon */
+            body { background:
+                radial-gradient(1200px 600px at 80% -10%, rgba(168,85,247,.18), transparent 60%),
+                radial-gradient(900px 500px at -10% 10%, rgba(34,211,238,.16), transparent 55%),
+                var(--bg); }
+            .site-header a { color: #cbd5e1; }
+            .site-header a:hover { color: var(--accent); }
+            h1, h2, h3 { color: var(--black); }
+            .btn { box-shadow: 0 0 0 1px rgba(34,211,238,.35), 0 8px 30px rgba(34,211,238,.18); font-weight: 600; }
+            .card, .column { background: rgba(255,255,255,.03); border: 1px solid rgba(148,163,184,.18); }
+            a { color: var(--accent); }
+            """
+    };
+
+    private static Template BuildArtTemplate() => new()
+    {
+        Name = ArtThemeName, IsActive = false,
+        AccentColor = "#ff5d8f", SecondaryColor = "#ffb703",
+        HeadingColor = "#2b2d42", TextColor = "#4a4e69",
+        BackgroundColor = "#fff8f0", AltBackground = "#ffe8d6",
+        HeadingFont = "Poppins", BodyFont = "Nunito",
+        ButtonStyle = "solid", ButtonRadius = "26", ContainerWidth = "1120",
+        HeaderBackground = "", HeaderTextColor = "", HeaderPadding = "20",
+        CustomCss = """
+            /* MatArt — playful & vibrant */
+            h1, h2, h3 { letter-spacing: -.02em; }
+            .btn { font-weight: 800; box-shadow: 6px 6px 0 rgba(43,45,66,.14); }
+            .card, .column { border-radius: 22px; box-shadow: 8px 8px 0 rgba(255,93,143,.12); }
+            .section:nth-child(even) { background: var(--bg-alt); }
+            .hero { background: linear-gradient(120deg, rgba(255,93,143,.10), rgba(255,183,3,.12)); }
+            """
+    };
 
     /// <summary>A warm, cosy holiday-let theme (sticky header, rounded cards, dark cosy footer).</summary>
     private static Template BuildFerienTemplate() => new()

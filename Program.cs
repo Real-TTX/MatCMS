@@ -168,6 +168,9 @@ app.UseStaticFiles(new StaticFileOptions
 // Set CultureInfo.Current(UI)Culture per request (cookie / Accept-Language / default "de").
 app.UseRequestLocalization(app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<RequestLocalizationOptions>>().Value);
 
+// 404 / server-error → admin-assigned page (Settings → Fehlerhandling) or a built-in fallback.
+app.UseStatusCodePagesWithReExecute("/_status", "?code={0}");
+
 app.UseRouting();
 app.UseRateLimiter();
 app.UseAuthentication();

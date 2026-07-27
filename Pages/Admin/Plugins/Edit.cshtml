@@ -47,6 +47,13 @@
             <textarea id="Code" name="Code" rows="16" class="code" spellcheck="false">@Model.Code</textarea>
             <div class="help">@Html.Raw(T["plugins.codeHelp"])</div>
         </div>
+
+        <h3 class="form-section">Konfiguration</h3>
+        <div class="help">Schlüssel/Wert-Paare, die das Plugin per <code>Config("schlüssel")</code> liest — getrennt vom Code, damit man ein Plugin einstellen kann, ohne es zu bearbeiten.</div>
+        <div id="cfg-rows" data-config="@Model.ConfigJson"></div>
+        <div style="margin-top:8px;"><button type="button" class="btn btn-sm btn-ghost" id="cfg-add">＋ Feld</button></div>
+        <input type="hidden" name="ConfigJson" id="ConfigJson" />
+
         <div><button type="submit" class="btn">@T["action.save"]</button></div>
     </form>
 </div>
@@ -113,3 +120,38 @@
         <button type="submit" class="btn btn-danger">@T["plugins.deletePlugin"]</button>
     </form>
 </div>
+
+@section Scripts {
+    <script>
+        // Plugin configuration: key/value rows -> hidden ConfigJson on submit of the main form.
+        (function () {
+            var rows = document.getElementById('cfg-rows');
+            var addBtn = document.getElementById('cfg-add');
+            var hidden = document.getElementById('ConfigJson');
+            var form = hidden ? hidden.closest('form') : null;
+            if (!rows || !form || !addBtn) return;
+            function addRow(k, v) {
+                var row = document.createElement('div'); row.className = 'field-row';
+                var key = document.createElement('input'); key.type = 'text'; key.placeholder = 'Schlüssel'; key.className = 'cfg-key fr-label'; key.value = k || '';
+                var val = document.createElement('input'); val.type = 'text'; val.placeholder = 'Wert'; val.className = 'cfg-val fr-label'; val.value = v || '';
+                var rm = document.createElement('button'); rm.type = 'button'; rm.className = 'btn btn-sm btn-danger btn-icon'; rm.title = '@T["action.delete"]';
+                rm.innerHTML = '<i class="ti ti-trash" aria-hidden="true"></i>';
+                rm.addEventListener('click', function () { row.remove(); });
+                row.appendChild(key); row.appendChild(val); row.appendChild(rm);
+                rows.appendChild(row);
+            }
+            var data = {};
+            try { data = JSON.parse(rows.getAttribute('data-config') || '{}') || {}; } catch (e) { }
+            Object.keys(data).forEach(function (k) { addRow(k, data[k]); });
+            addBtn.addEventListener('click', function () { addRow('', ''); });
+            form.addEventListener('submit', function () {
+                var o = {};
+                Array.prototype.slice.call(rows.querySelectorAll('.field-row')).forEach(function (r) {
+                    var k = r.querySelector('.cfg-key').value.trim();
+                    if (k) o[k] = r.querySelector('.cfg-val').value;
+                });
+                hidden.value = JSON.stringify(o);
+            });
+        })();
+    </script>
+}

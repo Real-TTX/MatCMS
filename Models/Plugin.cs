@@ -29,6 +29,10 @@ public class Plugin
     /// <summary>C# script body executed with a <c>PluginContext</c> as globals.</summary>
     public string Code { get; set; } = "";
 
+    /// <summary>Admin-editable configuration as a JSON object of string key→value pairs. Kept separate
+    /// from the code so a plugin can be configured without editing it; read at runtime via <c>Config("key")</c>.</summary>
+    public string ConfigJson { get; set; } = "{}";
+
     public bool Enabled { get; set; } = true;
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

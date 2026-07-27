@@ -21,6 +21,7 @@ public class EditModel : PageModel
     [BindProperty] public string? Description { get; set; }
     [BindProperty] public string? Version { get; set; }
     [BindProperty] public string? Code { get; set; }
+    [BindProperty] public string? ConfigJson { get; set; }
     [BindProperty] public bool Enabled { get; set; }
     public string? Error { get; private set; }
     public string? RunError { get; private set; }
@@ -35,7 +36,7 @@ public class EditModel : PageModel
         var p = await _db.Plugins.FindAsync(id);
         if (p is null) return RedirectToPage("Index");
         Current = p;
-        Name = p.Name; Description = p.Description; Code = p.Code; Enabled = p.Enabled; Version = p.Version;
+        Name = p.Name; Description = p.Description; Code = p.Code; Enabled = p.Enabled; Version = p.Version; ConfigJson = p.ConfigJson;
         RunError = _registry.Errors.TryGetValue(id, out var e) ? e : null;
         LoadAssets();
         return Page();
@@ -69,6 +70,7 @@ public class EditModel : PageModel
         p.Description = (Description ?? "").Trim();
         p.Version = (Version ?? "").Trim();
         p.Code = Code ?? "";
+        p.ConfigJson = SanitizeConfig(ConfigJson);
         p.Enabled = Enabled;
         await _db.SaveChangesAsync();
 
@@ -79,7 +81,7 @@ public class EditModel : PageModel
         if (RunError is not null)
         {
             // Stay on the page and show the compile/run error.
-            Name = p.Name; Description = p.Description; Code = p.Code; Enabled = p.Enabled; Version = p.Version;
+            Name = p.Name; Description = p.Description; Code = p.Code; Enabled = p.Enabled; Version = p.Version; ConfigJson = p.ConfigJson;
             return Page();
         }
 
@@ -171,4 +173,26 @@ public class EditModel : PageModel
         ".css" => "css",
         _ => "file"
     };
+
+    /// <summary>Normalizes the posted config into a clean JSON object of trimmed string key→value pairs.</summary>
+    private static string SanitizeConfig(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return "{}";
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object) return "{}";
+            var obj = new System.Text.Json.Nodes.JsonObject();
+            foreach (var p in doc.RootElement.EnumerateObject())
+            {
+                var key = p.Name.Trim();
+                if (key.Length == 0) continue;
+                obj[key] = p.Value.ValueKind == System.Text.Json.JsonValueKind.String
+                    ? (p.Value.GetString() ?? "")
+                    : p.Value.ToString();
+            }
+            return obj.ToJsonString();
+        }
+        catch { return "{}"; }
+    }
 }

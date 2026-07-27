@@ -75,12 +75,19 @@ public class PluginContext
     /// <summary>This plugin's stable slug — also the name of its asset folder / URL prefix.</summary>
     public string Key { get; }
 
-    public PluginContext(PluginRegistry registry, IServiceProvider services, string key = "")
+    private readonly IReadOnlyDictionary<string, string> _config;
+
+    public PluginContext(PluginRegistry registry, IServiceProvider services, string key = "",
+        IReadOnlyDictionary<string, string>? config = null)
     {
         _registry = registry;
         Services = services;
         Key = key ?? "";
+        _config = config ?? new Dictionary<string, string>();
     }
+
+    /// <summary>Reads an admin-set configuration value (from the plugin's "Konfiguration"), or "" if unset.</summary>
+    public string Config(string key) => _config.TryGetValue(key ?? "", out var v) ? v : "";
 
     /// <summary>Public URL of a file in THIS plugin's asset folder, e.g. AssetUrl("app.js") → /plugin-assets/{key}/app.js.</summary>
     public string AssetUrl(string file)
@@ -231,9 +238,9 @@ public class PluginRunner
 
             foreach (var p in plugins)
             {
-                // Each plugin gets its own context carrying its Key, so AssetUrl/IncludeScript resolve to
-                // that plugin's own asset folder (/plugin-assets/{key}/…).
-                var ctx = new PluginContext(_registry, _services, p.Key);
+                // Each plugin gets its own context carrying its Key (asset folder / URL prefix) and its
+                // admin-set configuration (read via Config("key")).
+                var ctx = new PluginContext(_registry, _services, p.Key, ParseConfig(p.ConfigJson));
                 try
                 {
                     await CSharpScript.RunAsync(p.Code ?? "", options, globals: ctx, globalsType: typeof(PluginContext));
@@ -249,5 +256,23 @@ public class PluginRunner
         {
             _gate.Release();
         }
+    }
+
+    /// <summary>Parses a plugin's ConfigJson object into a string→string map (best-effort).</summary>
+    private static Dictionary<string, string> ParseConfig(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return new();
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            var d = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object)
+                foreach (var prop in doc.RootElement.EnumerateObject())
+                    d[prop.Name] = prop.Value.ValueKind == System.Text.Json.JsonValueKind.String
+                        ? (prop.Value.GetString() ?? "")
+                        : prop.Value.ToString();
+            return d;
+        }
+        catch { return new(); }
     }
 }

@@ -111,11 +111,19 @@
             <div class="form-row">
                 <div class="form-field">
                     <label for="HeaderBackground">@T["templates.headerBg"]</label>
-                    <input id="HeaderBackground" name="HeaderBackground" value="@Model.HeaderBackground" placeholder="@T["templates.optionalColor"]" />
+                    <div class="optcolor" data-optcolor>
+                        <input type="color" class="optcolor-pick" value="@(string.IsNullOrWhiteSpace(Model.HeaderBackground) ? "#ffffff" : Model.HeaderBackground)" aria-label="@T["templates.headerBg"]" />
+                        <input type="text" id="HeaderBackground" name="HeaderBackground" class="optcolor-hex" value="@Model.HeaderBackground" placeholder="@T["templates.optionalColor"]" spellcheck="false" />
+                        <button type="button" class="optcolor-clear" title="Leeren" aria-label="Leeren">×</button>
+                    </div>
                 </div>
                 <div class="form-field">
                     <label for="HeaderTextColor">@T["templates.headerText"]</label>
-                    <input id="HeaderTextColor" name="HeaderTextColor" value="@Model.HeaderTextColor" placeholder="@T["templates.optionalColor"]" />
+                    <div class="optcolor" data-optcolor>
+                        <input type="color" class="optcolor-pick" value="@(string.IsNullOrWhiteSpace(Model.HeaderTextColor) ? "#111111" : Model.HeaderTextColor)" aria-label="@T["templates.headerText"]" />
+                        <input type="text" id="HeaderTextColor" name="HeaderTextColor" class="optcolor-hex" value="@Model.HeaderTextColor" placeholder="@T["templates.optionalColor"]" spellcheck="false" />
+                        <button type="button" class="optcolor-clear" title="Leeren" aria-label="Leeren">×</button>
+                    </div>
                 </div>
                 <div class="form-field">
                     <label for="HeaderPadding">@T["templates.headerPadding"]</label>
@@ -274,6 +282,23 @@
                 var v = hex.value.trim();
                 if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v)) color.value = v;
             });
+        });
+
+        // Optional color widget: a color swatch + a text field that may be empty ("" = no override).
+        document.querySelectorAll('[data-optcolor]').forEach(function (oc) {
+            var pick = oc.querySelector('.optcolor-pick');
+            var hex = oc.querySelector('.optcolor-hex');
+            var clear = oc.querySelector('.optcolor-clear');
+            if (!pick || !hex) return;
+            function reflectEmpty() { oc.classList.toggle('is-empty', hex.value.trim() === ''); }
+            pick.addEventListener('input', function () { hex.value = pick.value; reflectEmpty(); });
+            hex.addEventListener('input', function () {
+                var v = hex.value.trim();
+                if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v)) pick.value = v;
+                reflectEmpty();
+            });
+            if (clear) clear.addEventListener('click', function () { hex.value = ''; reflectEmpty(); hex.focus(); });
+            reflectEmpty();
         });
     </script>
 }

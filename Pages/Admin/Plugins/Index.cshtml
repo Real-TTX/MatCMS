@@ -55,3 +55,60 @@
         <a class="btn" asp-page="Create">@T["plugins.new"]</a>
     </div>
 </div>
+
+@* ============ DATEIEN / BIBLIOTHEKEN ============ *@
+<div class="card">
+    <h2>Dateien &amp; Bibliotheken</h2>
+    <p class="help">Lade JS-/CSS-Bibliotheken oder andere Dateien hoch. Sie werden unter <code>/plugin-assets/&lt;datei&gt;</code> ausgeliefert und können von Plugins, Templates oder dem eigenen Code eingebunden werden. Mit „Auto" wird eine <code>.js</code>-/<code>.css</code>-Datei automatisch auf allen Seiten geladen.</p>
+
+    <form method="post" asp-page-handler="UploadAsset" enctype="multipart/form-data" class="asset-upload">
+        <input type="file" name="file" required
+               accept=".js,.mjs,.css,.json,.map,.woff,.woff2,.ttf,.eot,.svg,.png,.jpg,.jpeg,.gif,.webp" />
+        <button type="submit" class="btn btn-sm">Hochladen</button>
+    </form>
+
+    @if (Model.Assets.Count == 0)
+    {
+        <p class="muted">Noch keine Dateien hochgeladen.</p>
+    }
+    else
+    {
+        <table class="asset-table">
+            <thead>
+                <tr><th>Datei</th><th>Typ</th><th>Größe</th><th>URL</th><th>Auto</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var a in Model.Assets)
+                {
+                    var url = "/plugin-assets/" + a.Name;
+                    <tr>
+                        <td class="a-name">@a.Name</td>
+                        <td><span class="badge">@a.Kind</span></td>
+                        <td>@(a.Size < 1024 ? a.Size + " B" : (a.Size / 1024) + " KB")</td>
+                        <td><input class="a-url" value="@url" readonly onclick="this.select()" /></td>
+                        <td>
+                            @if (a.Kind == "js" || a.Kind == "css")
+                            {
+                                <form class="inline-form" method="post" asp-page-handler="ToggleInclude" asp-route-name="@a.Name">
+                                    <button type="submit" class="btn btn-sm @(a.AutoInclude ? "" : "btn-ghost")" title="Automatisch auf allen Seiten einbinden">
+                                        @(a.AutoInclude ? "✓ An" : "Aus")
+                                    </button>
+                                </form>
+                            }
+                            else
+                            {
+                                <span class="muted">–</span>
+                            }
+                        </td>
+                        <td>
+                            <form class="inline-form" method="post" asp-page-handler="DeleteAsset" asp-route-name="@a.Name"
+                                  onsubmit="return confirm('Datei „@a.Name“ wirklich löschen?');">
+                                <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>

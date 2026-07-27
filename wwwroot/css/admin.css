@@ -229,10 +229,35 @@ textarea.cp-sample-inp { resize: vertical; min-height: 0; }
 .media-pick { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; cursor: pointer; background: #fff; padding: 0; aspect-ratio: 1 / 1; }
 .media-pick img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .media-pick:hover { border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
-/* URL text field with an integrated "pick page" button (reusable via [data-link-btn]). */
-.link-field { display: flex; gap: 8px; align-items: center; }
-.link-field input { flex: 1 1 auto; min-width: 0; }
-.link-field .btn { flex: 0 0 auto; white-space: nowrap; }
+/* URL text field with the "pick page" button integrated INTO the field (right edge). */
+.link-field { position: relative; display: block; }
+.link-field > input { width: 100%; padding-right: 40px; box-sizing: border-box; }
+.link-field .link-field-btn {
+    position: absolute; top: 50%; right: 4px; transform: translateY(-50%);
+    width: 30px; height: 30px; padding: 0; margin: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: none; background: transparent; color: var(--muted, #6b7280);
+    border-radius: 6px; cursor: pointer; font-size: 18px; line-height: 1;
+}
+.link-field .link-field-btn:hover { background: var(--accent, #de7e11); color: #fff; }
+.link-field .link-field-btn .ti { font-size: 18px; }
+
+/* Optional color widget: swatch + hex text (may be empty) + clear button. */
+.optcolor { display: flex; align-items: center; gap: 8px; }
+.optcolor .optcolor-pick { flex: 0 0 auto; width: 40px; height: 34px; padding: 2px; border: 1px solid var(--line, #d9dce1); border-radius: 6px; cursor: pointer; background: #fff; }
+.optcolor .optcolor-hex { flex: 1 1 auto; min-width: 0; }
+.optcolor .optcolor-clear { flex: 0 0 auto; width: 30px; height: 30px; border: 1px solid var(--line, #d9dce1); background: #fff; border-radius: 6px; cursor: pointer; color: #6b7280; font-size: 18px; line-height: 1; }
+.optcolor .optcolor-clear:hover { background: #f3f4f6; color: #111; }
+.optcolor.is-empty .optcolor-pick { opacity: .4; }
+
+/* Plugin asset (library) file manager. */
+.asset-upload { display: flex; gap: 8px; align-items: center; margin: 10px 0 14px; flex-wrap: wrap; }
+.asset-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.asset-table th, .asset-table td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line, #eceef1); vertical-align: middle; }
+.asset-table th { font-weight: 600; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+.asset-table .a-name { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.asset-table .a-url { width: 100%; min-width: 160px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; padding: 4px 6px; }
+textarea.code-area { width: 100%; box-sizing: border-box; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; line-height: 1.5; }
 .link-picker-list { display: flex; flex-direction: column; gap: 6px; max-height: 60vh; overflow-y: auto; }
 .link-pick { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 10px 14px; border: 1px solid var(--line); border-radius: 8px; background: #fff; cursor: pointer; }
 .link-pick:hover { border-color: var(--accent); background: #f7f8fa; }

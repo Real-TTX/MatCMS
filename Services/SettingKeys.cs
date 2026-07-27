@@ -19,6 +19,15 @@ public static class SettingKeys
     // "1" once the setup wizard has been completed (drives the dashboard prompt).
     public const string SetupComplete = "setup.complete";
 
+    // Custom code / tracking (own tab under Settings). Raw HTML injected site-wide.
+    public const string CodeHead = "code.head";           // before </head>
+    public const string CodeBodyStart = "code.bodyStart"; // right after <body>
+    public const string CodeBodyEnd = "code.bodyEnd";     // before </body>
+    public const string AnalyticsGa4 = "analytics.ga4";   // GA4 Measurement-ID (G-XXXXXXX) → auto-snippet
+
+    // Comma-separated list of plugin-asset filenames that are auto-included site-wide.
+    public const string PluginAutoInclude = "plugins.autoInclude";
+
     // SMTP / e-mail settings (own tab under Settings; kept out of `All` so each form saves only its own keys).
     public const string SmtpHost = "smtp.host";
     public const string SmtpPort = "smtp.port";
@@ -44,4 +53,7 @@ public static class SettingKeys
 
     /// <summary>Error-handling setting keys (managed on the Settings → Fehlerhandling tab).</summary>
     public static readonly string[] Errors = [NotFoundPage, ErrorPage];
+
+    /// <summary>Custom-code / tracking keys (managed on the Settings → Code tab).</summary>
+    public static readonly string[] Code = [AnalyticsGa4, CodeHead, CodeBodyStart, CodeBodyEnd];
 }

@@ -81,20 +81,24 @@
             wrap.appendChild(im.node);
             get = im.get;
         } else if (type === "url") {
+            var lf = document.createElement("div");
+            lf.className = "link-field";
             var iu = document.createElement("input");
             iu.type = "text"; // text (not url) so internal paths like "/kontakt" pass validation
             iu.value = value != null ? value : (field.default || "");
             if (field.placeholder) iu.placeholder = field.placeholder;
-            wrap.appendChild(iu);
+            lf.appendChild(iu);
             var lb = document.createElement("button");
             lb.type = "button";
-            lb.className = "btn btn-ghost btn-sm";
-            lb.style.marginTop = "8px";
-            lb.textContent = "Seite verlinken";
+            lb.className = "link-field-btn";
+            lb.title = "Seite verlinken";
+            lb.setAttribute("aria-label", "Seite verlinken");
+            lb.innerHTML = '<i class="ti ti-link" aria-hidden="true"></i>';
             lb.addEventListener("click", function () {
                 if (window.openLinkPicker) window.openLinkPicker(function (u) { iu.value = u; });
             });
-            wrap.appendChild(lb);
+            lf.appendChild(lb);
+            wrap.appendChild(lf);
             get = function () { return iu.value.trim(); };
         } else if (type === "list") {
             var li = buildList(field, Array.isArray(value) ? value : []);

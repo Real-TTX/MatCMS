@@ -31,6 +31,25 @@ else
         Errors = ParseList(TempData["FormErrors_" + form.Slug] as string),
         Values = ParseDict(TempData["FormValues_" + form.Slug] as string)
     };
+
+    // Prefill from the query string (?field=value) on first display — only when there are no
+    // post-back values yet. Fields match by their Id or by a slug of their label, e.g.
+    // /kontakt?betreff=Angebot&anliegen=Klimaanlage
+    if (rm.Values.Count == 0 && Context.Request.Query.Count > 0)
+    {
+        foreach (var el in FormDefinition.Flatten(rm.Elements).Where(e => FormDefinition.IsInput(e.Type)))
+        {
+            foreach (var qk in Context.Request.Query.Keys)
+            {
+                if (string.Equals(qk, el.Id, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(qk, Slugify(el.Label), StringComparison.OrdinalIgnoreCase))
+                {
+                    rm.Values[el.Id] = Context.Request.Query[qk].ToString();
+                    break;
+                }
+            }
+        }
+    }
     @await Html.PartialAsync("Blocks/_FormRender", rm)
 }
 @functions {
@@ -43,4 +62,18 @@ else
         string.IsNullOrWhiteSpace(json)
             ? new()
             : (System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(json) ?? new());
+
+    // Lowercase, non-alphanumerics → single dash (used to match query keys against field labels).
+    static string Slugify(string? s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return "";
+        var sb = new System.Text.StringBuilder(s.Length);
+        bool prevDash = false;
+        foreach (var ch in s.Trim().ToLowerInvariant())
+        {
+            if (char.IsLetterOrDigit(ch)) { sb.Append(ch); prevDash = false; }
+            else if (!prevDash) { sb.Append('-'); prevDash = true; }
+        }
+        return sb.ToString().Trim('-');
+    }
 }

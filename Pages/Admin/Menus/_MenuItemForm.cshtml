@@ -19,7 +19,7 @@
         <label for="mi-url">@T["menus.target"]</label>
         <div class="link-field">
             <input id="mi-url" name="Url" value="@Model.Url" placeholder="@T["menus.targetPlaceholder"]" required />
-            <button type="button" class="btn btn-sm btn-ghost" data-link-btn data-target="#mi-url" data-label="#mi-label">@T["menus.pickPage"]</button>
+            <button type="button" class="link-field-btn" data-link-btn data-target="#mi-url" data-label="#mi-label" title="@T["menus.pickPage"]" aria-label="@T["menus.pickPage"]"><i class="ti ti-link" aria-hidden="true"></i></button>
         </div>
         <div class="help">@T[Model.QuickPickHelpKey]</div>
     </div>

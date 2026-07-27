@@ -135,8 +135,34 @@
         <style>@Html.Raw(tpl.CustomCss)</style>
     }
     <link rel="icon" href="@Site.FaviconUrl" />
+    @{
+        // GA4: derive a safe measurement id (letters/digits/-/_ only) and emit the standard snippet.
+        var gaId = new string((Site.AnalyticsGa4 ?? "").Trim().Where(ch => char.IsLetterOrDigit(ch) || ch is '-' or '_').ToArray());
+    }
+    @if (!string.IsNullOrEmpty(gaId))
+    {
+        <script async src="https://www.googletagmanager.com/gtag/js?id=@gaId"></script>
+        <script>
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){ dataLayer.push(arguments); }
+            gtag('js', new Date());
+            gtag('config', '@Html.Raw(gaId)');
+        </script>
+    }
+    @foreach (var f in Site.PluginAutoIncludes.Where(f => f.EndsWith(".css", StringComparison.OrdinalIgnoreCase)))
+    {
+        <link rel="stylesheet" href="/plugin-assets/@f" />
+    }
+    @if (!string.IsNullOrWhiteSpace(Site.HeadCode))
+    {
+        @Html.Raw(Site.HeadCode)
+    }
 </head>
 <body>
+@if (!string.IsNullOrWhiteSpace(Site.BodyStartCode))
+{
+    @Html.Raw(Site.BodyStartCode)
+}
 @if (useCustomLayout)
 {
     @Html.Raw(customBody)
@@ -211,6 +237,14 @@ else
     @if (!string.IsNullOrWhiteSpace(tpl.CustomJs))
     {
         <script>@Html.Raw(tpl.CustomJs)</script>
+    }
+    @foreach (var f in Site.PluginAutoIncludes.Where(f => f.EndsWith(".js", StringComparison.OrdinalIgnoreCase)))
+    {
+        <script src="/plugin-assets/@f" defer></script>
+    }
+    @if (!string.IsNullOrWhiteSpace(Site.BodyEndCode))
+    {
+        @Html.Raw(Site.BodyEndCode)
     }
 </body>
 </html>

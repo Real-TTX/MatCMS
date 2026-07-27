@@ -12,4 +12,7 @@ public static class StoragePaths
 
     /// <summary>Uploaded media files, served publicly under <c>/uploads</c>.</summary>
     public static string Uploads(IWebHostEnvironment env) => Path.Combine(DataDir(env), "uploads");
+
+    /// <summary>Plugin asset files (JS/CSS libraries etc.), served publicly under <c>/plugin-assets</c>.</summary>
+    public static string PluginAssets(IWebHostEnvironment env) => Path.Combine(DataDir(env), "plugin-assets");
 }

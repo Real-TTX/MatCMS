@@ -165,6 +165,17 @@ app.UseStaticFiles(new StaticFileOptions
         ctx.Context.Response.Headers["X-Content-Type-Options"] = "nosniff"
 });
 
+// Serve plugin asset files (uploaded JS/CSS libraries etc.) from appdata/plugin-assets at /plugin-assets.
+var pluginAssetsDir = MatCMS.Services.StoragePaths.PluginAssets(app.Environment);
+Directory.CreateDirectory(pluginAssetsDir);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(pluginAssetsDir),
+    RequestPath = "/plugin-assets",
+    OnPrepareResponse = ctx =>
+        ctx.Context.Response.Headers["X-Content-Type-Options"] = "nosniff"
+});
+
 // Set CultureInfo.Current(UI)Culture per request (cookie / Accept-Language / default "de").
 app.UseRequestLocalization(app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<RequestLocalizationOptions>>().Value);
 

@@ -21,7 +21,7 @@ public class IndexModel : PageModel
     public async Task OnGetAsync()
     {
         var existing = await _db.SiteSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
-        foreach (var key in SettingKeys.All.Concat(SettingKeys.Smtp).Concat(SettingKeys.Errors))
+        foreach (var key in SettingKeys.All.Concat(SettingKeys.Smtp).Concat(SettingKeys.Errors).Concat(SettingKeys.Code))
             Values[key] = existing.TryGetValue(key, out var v) ? v : "";
         AllPages = await _db.Pages.AsNoTracking()
             .Where(p => p.Locale == Localizer.DefaultCulture)
@@ -47,6 +47,13 @@ public class IndexModel : PageModel
         await SaveKeysAsync(SettingKeys.Errors);
         TempData["Flash"] = "Fehlerhandling gespeichert.";
         return RedirectToPage(new { tab = "errors" });
+    }
+
+    public async Task<IActionResult> OnPostCodeAsync()
+    {
+        await SaveKeysAsync(SettingKeys.Code);
+        TempData["Flash"] = "Code / Tracking gespeichert.";
+        return RedirectToPage(new { tab = "code" });
     }
 
     /// <summary>Sends a test e-mail using the values currently entered (no need to save first).</summary>

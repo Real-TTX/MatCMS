@@ -201,6 +201,23 @@ public class SiteContext
     public string FaviconUrl => Get(SettingKeys.FaviconUrl, LogoUrl);
     public string FooterText => Get(SettingKeys.FooterText, "© FEUSYS");
 
+    // --- Custom code / tracking (Settings → Code) ---
+    /// <summary>Raw HTML injected right before &lt;/head&gt;.</summary>
+    public string HeadCode => Get(SettingKeys.CodeHead);
+    /// <summary>Raw HTML injected right after &lt;body&gt;.</summary>
+    public string BodyStartCode => Get(SettingKeys.CodeBodyStart);
+    /// <summary>Raw HTML injected right before &lt;/body&gt;.</summary>
+    public string BodyEndCode => Get(SettingKeys.CodeBodyEnd);
+    /// <summary>GA4 Measurement-ID (e.g. "G-XXXXXXX"); empty = no analytics.</summary>
+    public string AnalyticsGa4 => Get(SettingKeys.AnalyticsGa4);
+
+    /// <summary>Filenames (under /plugin-assets) that are auto-included site-wide, in order.</summary>
+    public IReadOnlyList<string> PluginAutoIncludes =>
+        Get(SettingKeys.PluginAutoInclude)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct()
+            .ToList();
+
     public string TopBarLink1Text => Get(SettingKeys.TopBarLink1Text);
     public string TopBarLink1Url => Get(SettingKeys.TopBarLink1Url);
     public string TopBarLink2Text => Get(SettingKeys.TopBarLink2Text);

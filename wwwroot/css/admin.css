@@ -224,6 +224,11 @@ textarea.cp-sample-inp { resize: vertical; min-height: 0; }
 .media-pick { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; cursor: pointer; background: #fff; padding: 0; aspect-ratio: 1 / 1; }
 .media-pick img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .media-pick:hover { border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
+.link-picker-list { display: flex; flex-direction: column; gap: 6px; max-height: 60vh; overflow-y: auto; }
+.link-pick { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 10px 14px; border: 1px solid var(--line); border-radius: 8px; background: #fff; cursor: pointer; }
+.link-pick:hover { border-color: var(--accent); background: #f7f8fa; }
+.link-pick .lp-title { font-weight: 600; }
+.link-pick .lp-url { font-size: 12.5px; color: var(--muted); }
 
 /* Toolbar-menu icon picker */
 .icon-picker .icon-current { display: flex; align-items: center; gap: 12px; margin: 4px 0 10px; }

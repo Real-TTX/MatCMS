@@ -82,10 +82,19 @@
             get = im.get;
         } else if (type === "url") {
             var iu = document.createElement("input");
-            iu.type = "url";
+            iu.type = "text"; // text (not url) so internal paths like "/kontakt" pass validation
             iu.value = value != null ? value : (field.default || "");
             if (field.placeholder) iu.placeholder = field.placeholder;
             wrap.appendChild(iu);
+            var lb = document.createElement("button");
+            lb.type = "button";
+            lb.className = "btn btn-ghost btn-sm";
+            lb.style.marginTop = "8px";
+            lb.textContent = "Seite verlinken";
+            lb.addEventListener("click", function () {
+                if (window.openLinkPicker) window.openLinkPicker(function (u) { iu.value = u; });
+            });
+            wrap.appendChild(lb);
             get = function () { return iu.value.trim(); };
         } else if (type === "list") {
             var li = buildList(field, Array.isArray(value) ? value : []);

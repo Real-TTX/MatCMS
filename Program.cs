@@ -252,4 +252,14 @@ app.MapGet("/admin/api/media", async (MatCMS.Data.AppDbContext db) =>
     return Results.Ok(items);
 }).RequireAuthorization("Admin");
 
+// Published pages (admin only) — used by the internal link picker for URL fields.
+app.MapGet("/admin/api/pages", async (MatCMS.Data.AppDbContext db) =>
+{
+    var items = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
+        db.Pages.AsNoTracking().Where(p => p.IsPublished)
+            .OrderBy(p => p.Locale).ThenBy(p => p.Title)
+            .Select(p => new { title = p.Title, url = p.Slug == "home" ? "/" : "/" + p.Slug, locale = p.Locale }));
+    return Results.Ok(items);
+}).RequireAuthorization("Admin");
+
 app.Run();

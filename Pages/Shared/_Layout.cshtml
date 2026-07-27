@@ -1,4 +1,5 @@
 @inject MatCMS.Services.SiteContext Site
+@inject MatCMS.Services.PluginRegistry PluginReg
 @{
     var title = ViewData["Title"] as string;
     var pageTitle = string.IsNullOrWhiteSpace(title) ? Site.SiteName : $"{title} – {Site.SiteName}";
@@ -149,9 +150,9 @@
             gtag('config', '@Html.Raw(gaId)');
         </script>
     }
-    @foreach (var f in Site.PluginAutoIncludes.Where(f => f.EndsWith(".css", StringComparison.OrdinalIgnoreCase)))
+    @foreach (var h in PluginReg.HeadHtml)
     {
-        <link rel="stylesheet" href="/plugin-assets/@f" />
+        @Html.Raw(h)
     }
     @if (!string.IsNullOrWhiteSpace(Site.HeadCode))
     {
@@ -238,9 +239,9 @@ else
     {
         <script>@Html.Raw(tpl.CustomJs)</script>
     }
-    @foreach (var f in Site.PluginAutoIncludes.Where(f => f.EndsWith(".js", StringComparison.OrdinalIgnoreCase)))
+    @foreach (var b in PluginReg.BodyHtml)
     {
-        <script src="/plugin-assets/@f" defer></script>
+        @Html.Raw(b)
     }
     @if (!string.IsNullOrWhiteSpace(Site.BodyEndCode))
     {

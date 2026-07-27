@@ -227,13 +227,6 @@ public class SiteContext
             : $"{request.Scheme}://{request.Host}";
     }
 
-    /// <summary>Filenames (under /plugin-assets) that are auto-included site-wide, in order.</summary>
-    public IReadOnlyList<string> PluginAutoIncludes =>
-        Get(SettingKeys.PluginAutoInclude)
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Distinct()
-            .ToList();
-
     public string TopBarLink1Text => Get(SettingKeys.TopBarLink1Text);
     public string TopBarLink1Url => Get(SettingKeys.TopBarLink1Url);
     public string TopBarLink2Text => Get(SettingKeys.TopBarLink2Text);

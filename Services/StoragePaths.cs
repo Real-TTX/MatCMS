@@ -13,6 +13,10 @@ public static class StoragePaths
     /// <summary>Uploaded media files, served publicly under <c>/uploads</c>.</summary>
     public static string Uploads(IWebHostEnvironment env) => Path.Combine(DataDir(env), "uploads");
 
-    /// <summary>Plugin asset files (JS/CSS libraries etc.), served publicly under <c>/plugin-assets</c>.</summary>
+    /// <summary>Root of all plugin asset folders, served publicly under <c>/plugin-assets</c>.</summary>
     public static string PluginAssets(IWebHostEnvironment env) => Path.Combine(DataDir(env), "plugin-assets");
+
+    /// <summary>One plugin's own asset folder (<c>plugin-assets/{key}</c>). The key is a trusted slug.</summary>
+    public static string PluginAssetDir(IWebHostEnvironment env, string key) =>
+        Path.Combine(PluginAssets(env), key);
 }

@@ -8,6 +8,14 @@ public class Plugin
 {
     public int Id { get; set; }
     public string Name { get; set; } = "";
+
+    /// <summary>
+    /// Stable, filesystem/URL-safe slug identifying this plugin. Assigned once at creation and never
+    /// changed. Names the plugin's own asset folder (<c>appdata/plugin-assets/{Key}/</c>, served at
+    /// <c>/plugin-assets/{Key}/…</c>) so every plugin is a self-contained bundle (code + its assets).
+    /// </summary>
+    public string Key { get; set; } = "";
+
     public string Description { get; set; } = "";
 
     /// <summary>C# script body executed with a <c>PluginContext</c> as globals.</summary>

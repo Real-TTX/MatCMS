@@ -32,9 +32,6 @@ public static class SettingKeys
     public const string CodeBodyEnd = "code.bodyEnd";     // before </body>
     public const string AnalyticsGa4 = "analytics.ga4";   // GA4 Measurement-ID (G-XXXXXXX) → auto-snippet
 
-    // Comma-separated list of plugin-asset filenames that are auto-included site-wide.
-    public const string PluginAutoInclude = "plugins.autoInclude";
-
     // SMTP / e-mail settings (own tab under Settings; kept out of `All` so each form saves only its own keys).
     public const string SmtpHost = "smtp.host";
     public const string SmtpPort = "smtp.port";

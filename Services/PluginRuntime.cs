@@ -36,6 +36,16 @@ public class PluginRegistry
     public Dictionary<string, Func<PluginRequest, string>> Pages { get; } = new();
     public Dictionary<int, string> Errors { get; } = new();
 
+    // Raw HTML fragments plugins asked to inject site-wide, before </head> / </body>. Written by
+    // RunAllAsync (admin actions) and read by _Layout on every public request → all access is locked,
+    // and the getters return a snapshot so the view can enumerate safely during a concurrent re-run.
+    private readonly List<string> _headHtml = new();
+    private readonly List<string> _bodyHtml = new();
+    public IReadOnlyList<string> HeadHtml { get { lock (_lock) return _headHtml.ToArray(); } }
+    public IReadOnlyList<string> BodyHtml { get { lock (_lock) return _bodyHtml.ToArray(); } }
+    public void AddHead(string html) { lock (_lock) _headHtml.Add(html); }
+    public void AddBody(string html) { lock (_lock) _bodyHtml.Add(html); }
+
     // Rolling log written by plugins via Log(...); newest last. Survives re-runs.
     private readonly List<string> _log = new();
     public IReadOnlyList<string> Log { get { lock (_lock) return _log.ToList(); } }
@@ -52,7 +62,7 @@ public class PluginRegistry
     /// <summary>Clears registrations before a re-run (keeps the log so output history survives).</summary>
     public void Reset()
     {
-        lock (_lock) { AdminMenu.Clear(); Blocks.Clear(); Pages.Clear(); Errors.Clear(); }
+        lock (_lock) { AdminMenu.Clear(); Blocks.Clear(); Pages.Clear(); Errors.Clear(); _headHtml.Clear(); _bodyHtml.Clear(); }
     }
 }
 
@@ -62,10 +72,49 @@ public class PluginContext
     private readonly PluginRegistry _registry;
     public IServiceProvider Services { get; }
 
-    public PluginContext(PluginRegistry registry, IServiceProvider services)
+    /// <summary>This plugin's stable slug — also the name of its asset folder / URL prefix.</summary>
+    public string Key { get; }
+
+    public PluginContext(PluginRegistry registry, IServiceProvider services, string key = "")
     {
         _registry = registry;
         Services = services;
+        Key = key ?? "";
+    }
+
+    /// <summary>Public URL of a file in THIS plugin's asset folder, e.g. AssetUrl("app.js") → /plugin-assets/{key}/app.js.</summary>
+    public string AssetUrl(string file)
+    {
+        var name = System.IO.Path.GetFileName((file ?? "").Trim());
+        return string.IsNullOrEmpty(Key) || string.IsNullOrEmpty(name) ? "" : $"/plugin-assets/{Key}/{name}";
+    }
+
+    /// <summary>Injects raw HTML site-wide, just before &lt;/head&gt;.</summary>
+    public void AddHeadHtml(string html) { if (!string.IsNullOrWhiteSpace(html)) _registry.AddHead(html); }
+
+    /// <summary>Injects raw HTML site-wide, just before &lt;/body&gt;.</summary>
+    public void AddBodyHtml(string html) { if (!string.IsNullOrWhiteSpace(html)) _registry.AddBody(html); }
+
+    /// <summary>
+    /// Loads a JS file from this plugin's asset folder site-wide. Scripts run in include order.
+    /// By default the tag is NOT deferred, so a library loaded here is available to any inline init
+    /// the plugin emits afterwards (via AddBodyHtml or a block). Pass defer: true for independent
+    /// scripts that may run after the document parses. Set inHead to load it in &lt;head&gt;.
+    /// </summary>
+    public void IncludeScript(string file, bool inHead = false, bool defer = false)
+    {
+        var url = AssetUrl(file);
+        if (url.Length == 0) return;
+        var tag = $"<script src=\"{System.Net.WebUtility.HtmlEncode(url)}\"{(defer ? " defer" : "")}></script>";
+        if (inHead) _registry.AddHead(tag); else _registry.AddBody(tag);
+    }
+
+    /// <summary>Loads a CSS file from this plugin's asset folder site-wide (in &lt;head&gt;).</summary>
+    public void IncludeStyle(string file)
+    {
+        var url = AssetUrl(file);
+        if (url.Length == 0) return;
+        _registry.AddHead($"<link rel=\"stylesheet\" href=\"{System.Net.WebUtility.HtmlEncode(url)}\" />");
     }
 
     /// <summary>Register an entry in the admin sidebar (label, target URL, emoji icon).</summary>
@@ -124,9 +173,11 @@ public class PluginRunner
             .WithImports("System", "System.Linq", "System.Collections.Generic", "System.Threading.Tasks",
                          "MatCMS.Services", "MatCMS.Data", "MatCMS.Models", "Microsoft.EntityFrameworkCore");
 
-        var ctx = new PluginContext(_registry, _services);
         foreach (var p in plugins)
         {
+            // Each plugin gets its own context carrying its Key, so AssetUrl/IncludeScript resolve to
+            // that plugin's own asset folder (/plugin-assets/{key}/…).
+            var ctx = new PluginContext(_registry, _services, p.Key);
             try
             {
                 await CSharpScript.RunAsync(p.Code ?? "", options, globals: ctx, globalsType: typeof(PluginContext));

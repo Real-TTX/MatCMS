@@ -41,6 +41,50 @@
 </div>
 
 <div class="card">
+    <h2>Dateien dieses Plugins</h2>
+    <p class="help">
+        Eigener Asset-Ordner: <code>/plugin-assets/@Model.Current.Key/</code>. Im Plugin-Code einbinden mit
+        <code>IncludeScript("datei.js")</code>, <code>IncludeStyle("datei.css")</code> oder per URL
+        <code>AssetUrl("datei")</code>. So bleibt jedes Plugin ein eigenständiges Bündel.
+    </p>
+    <form method="post" asp-page-handler="UploadAsset" asp-route-id="@Model.Current.Id" enctype="multipart/form-data" class="asset-upload">
+        <input type="file" name="file" required
+               accept=".js,.mjs,.css,.json,.map,.woff,.woff2,.ttf,.eot,.png,.jpg,.jpeg,.gif,.webp" />
+        <button type="submit" class="btn btn-sm">Hochladen</button>
+    </form>
+    @if (Model.Assets.Count == 0)
+    {
+        <p class="muted">Noch keine Dateien in diesem Plugin.</p>
+    }
+    else
+    {
+        <table class="asset-table">
+            <thead>
+                <tr><th>Datei</th><th>Typ</th><th>Größe</th><th>URL</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var a in Model.Assets)
+                {
+                    var url = "/plugin-assets/" + Model.Current.Key + "/" + a.Name;
+                    <tr>
+                        <td class="a-name">@a.Name</td>
+                        <td><span class="badge">@a.Kind</span></td>
+                        <td>@(a.Size < 1024 ? a.Size + " B" : (a.Size / 1024) + " KB")</td>
+                        <td><input class="a-url" value="@url" readonly onclick="this.select()" /></td>
+                        <td>
+                            <form class="inline-form" method="post" asp-page-handler="DeleteAsset" asp-route-id="@Model.Current.Id" asp-route-name="@a.Name"
+                                  onsubmit="return confirm('Datei „@a.Name“ wirklich löschen?');">
+                                <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+<div class="card">
     <h2>@T["plugins.log"]</h2>
     @if (Model.Log.Count == 0)
     {

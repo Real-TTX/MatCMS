@@ -27,6 +27,7 @@ public static class DbSeeder
         // Bring an existing DB up to the current schema before any EF query touches the new columns
         // (EnsureCreated never ALTERs an existing table, so added columns must be patched in here).
         await MigrateSchemaAsync(db);
+        await BackfillPluginKeysAsync(db);
 
         if (!await db.Users.AnyAsync())
         {
@@ -240,6 +241,28 @@ public static class DbSeeder
         await AddColumnIfMissingAsync(db, "Forms", "NotifyEnabled", "INTEGER NOT NULL DEFAULT 0");
         await AddColumnIfMissingAsync(db, "Forms", "NotifyJson", "TEXT NOT NULL DEFAULT ''");
         await AddColumnIfMissingAsync(db, "Media", "SortOrder", "INTEGER NOT NULL DEFAULT 0");
+        await AddColumnIfMissingAsync(db, "Plugins", "Key", "TEXT NOT NULL DEFAULT ''");
+    }
+
+    /// <summary>Assigns a stable slug Key to any plugin created before the Key column existed.</summary>
+    private static async Task BackfillPluginKeysAsync(AppDbContext db)
+    {
+        List<Plugin> pending;
+        try { pending = await db.Plugins.Where(p => p.Key == null || p.Key == "").ToListAsync(); }
+        catch { return; }
+        if (pending.Count == 0) return;
+
+        var used = (await db.Plugins.Where(p => p.Key != null && p.Key != "")
+            .Select(p => p.Key).ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var p in pending)
+        {
+            var baseKey = MatCMS.Pages.Admin.Pages.IndexModel.Slugify(p.Name ?? "");
+            if (string.IsNullOrEmpty(baseKey)) baseKey = "plugin-" + p.Id;
+            var key = baseKey; var n = 2;
+            while (used.Contains(key)) key = baseKey + "-" + n++;
+            p.Key = key; used.Add(key);
+        }
+        await db.SaveChangesAsync();
     }
 
     private static async Task AddColumnIfMissingAsync(AppDbContext db, string table, string column, string type)
@@ -345,6 +368,7 @@ public static class DbSeeder
     private static Plugin BuildTodoPlugin() => new()
     {
         Name = TodoPluginName,
+        Key = "todo-verwaltung-beispiel",
         Description = "Beispiel-Plugin: Todo-Verwaltung + Block + Log.",
         Enabled = true,
         Code = """

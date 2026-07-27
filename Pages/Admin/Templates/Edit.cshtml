@@ -22,14 +22,13 @@
         <input type="hidden" name="Id" value="@Model.Id" />
 
         <div class="tabs" role="tablist">
-            <button type="button" class="tab active" data-tab="design">@T["templates.tabDesign"]</button>
-            <button type="button" class="tab" data-tab="header">@T["templates.tabHeader"]</button>
-            <button type="button" class="tab" data-tab="menus">@T["templates.tabMenus"]</button>
-            <button type="button" class="tab" data-tab="advanced">@T["templates.tabAdvanced"]</button>
+            <button type="button" class="tab active" data-tab="designer">🎨 Designer</button>
+            <button type="button" class="tab" data-tab="params">⚙️ Parameter</button>
         </div>
+        <p class="help" data-group-hint></p>
 
         @* ============ DESIGN ============ *@
-        <div class="tab-panel form-grid" data-panel="design">
+        <div class="tab-panel form-grid" data-panel="design" data-group="designer">
             <div class="form-field">
                 <label for="Name">@T["templates.name"]</label>
                 <input id="Name" name="Name" value="@Model.Name" required autofocus />
@@ -107,7 +106,7 @@
         </div>
 
         @* ============ HEADER ============ *@
-        <div class="tab-panel form-grid" data-panel="header" hidden>
+        <div class="tab-panel form-grid" data-panel="header" data-group="designer" hidden>
             <div class="form-row">
                 <div class="form-field">
                     <label for="HeaderBackground">@T["templates.headerBg"]</label>
@@ -133,7 +132,7 @@
         </div>
 
         @* ============ MENÜS ============ *@
-        <div class="tab-panel form-grid" data-panel="menus" hidden>
+        <div class="tab-panel form-grid" data-panel="menus" data-group="params" hidden>
             <div class="help">@Html.Raw(T["templates.menusIntro"])</div>
 
             @if (Model.MenuSlots.Count > 0)
@@ -178,7 +177,7 @@
         </div>
 
         @* ============ ERWEITERT ============ *@
-        <div class="tab-panel form-grid" data-panel="advanced" hidden>
+        <div class="tab-panel form-grid" data-panel="advanced" data-group="params" hidden>
             <div class="form-field">
                 <label for="CustomCss">@T["templates.customCss"]</label>
                 <textarea id="CustomCss" name="CustomCss" rows="6" class="code" spellcheck="false" placeholder=".hero { ... }">@Model.CustomCss</textarea>
@@ -209,15 +208,23 @@
 
 @section Scripts {
     <script>
-        // ---- Tabs ----
+        // ---- Two areas: Designer (Aussehen) vs. Parameter (Menü-Mapping + Layout/Code) ----
         (function () {
             var tabs = document.querySelectorAll('.tab');
             var panels = document.querySelectorAll('.tab-panel');
+            var hint = document.querySelector('[data-group-hint]');
+            var HINTS = {
+                designer: 'Aussehen: Farben, Schrift, Layout und Header.',
+                params: 'Technik: Menü-Zuordnung (Mapping) und das Layout-HTML/CSS/JS des Templates.'
+            };
             function show(name) {
+                if (name !== 'params') name = 'designer';
                 tabs.forEach(function (t) { t.classList.toggle('active', t.dataset.tab === name); });
-                panels.forEach(function (p) { p.hidden = p.dataset.panel !== name; });
+                panels.forEach(function (p) { p.hidden = p.dataset.group !== name; });
+                if (hint) hint.textContent = HINTS[name] || '';
             }
             tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.tab); }); });
+            show(new URLSearchParams(location.search).get('tab'));
         })();
 
         // ---- Custom-layout helpers: starter template + live slot detection ----

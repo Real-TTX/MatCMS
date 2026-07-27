@@ -24,7 +24,8 @@
                     <span class="muted-font">@t.HeadingFont</span>
                 </div>
                 <div class="actions">
-                    <a class="btn btn-sm btn-ghost btn-icon" asp-page="Edit" asp-route-id="@t.Id" title="@T["action.edit"]" aria-label="@T["action.edit"]"><i class="ti ti-pencil" aria-hidden="true"></i></a>
+                    <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@t.Id" asp-route-tab="designer" title="Aussehen: Farben, Schrift, Layout, Header">Designer</a>
+                    <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@t.Id" asp-route-tab="params" title="Menü-Mapping + Layout-HTML/CSS/JS">Parameter</a>
                     @if (!t.IsActive)
                     {
                         <form class="inline-form" method="post" asp-page-handler="Activate" asp-route-id="@t.Id">

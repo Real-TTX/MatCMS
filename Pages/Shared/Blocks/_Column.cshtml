@@ -2,8 +2,14 @@
 @{
     var title = Model.Str("title");
     var body = Model.Str("body");
+    var bg = Model.Str("bg");
+    var fg = Model.Str("fg");
+    var tinted = !string.IsNullOrWhiteSpace(bg) || !string.IsNullOrWhiteSpace(fg);
+    var style = "";
+    if (!string.IsNullOrWhiteSpace(bg)) style += $"background:{bg};";
+    if (!string.IsNullOrWhiteSpace(fg)) style += $"color:{fg};";
 }
-<div class="column">
+<div class="column@(tinted ? " column--tinted" : "")"@(tinted ? new Microsoft.AspNetCore.Html.HtmlString($" style=\"{style}\"") : Microsoft.AspNetCore.Html.HtmlString.Empty)>
     @if (!string.IsNullOrWhiteSpace(title))
     {
         <h3>@title</h3>

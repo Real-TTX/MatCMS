@@ -97,6 +97,8 @@ public class EditModel : PageModel
                             .Select(f => new SelectOption(f.Slug, f.Name)).ToListAsync();
                     if (SelectedDef.Fields.Any(f => f.OptionsSource == "mediaTags"))
                         dynamicSources["mediaTags"] = await LoadMediaTagOptionsAsync();
+                    if (SelectedDef.Fields.Any(f => f.OptionsSource == "themeColors"))
+                        dynamicSources["themeColors"] = await LoadThemeColorOptionsAsync();
 
                     // Resolve the localization keys (Label/Options/ItemLabel) into display text
                     // for the current UI culture before handing the schema to the JS editor.
@@ -346,6 +348,25 @@ public class EditModel : PageModel
             itemFields = f.ItemFields.Select(x => LocalizeField(x, dynamicSources)).ToList(),
             itemLabel = _t[f.ItemLabel]
         };
+    }
+
+    /// <summary>Active theme's palette as selectable colour options (value = hex), "Standard" first.</summary>
+    private async Task<List<SelectOption>> LoadThemeColorOptionsAsync()
+    {
+        var t = await _db.Templates.AsNoTracking().FirstOrDefaultAsync(x => x.IsActive)
+                ?? await _db.Templates.AsNoTracking().FirstOrDefaultAsync();
+        var opts = new List<SelectOption> { new("", "Standard") };
+        if (t is null) return opts;
+        void Add(string? val, string label) { if (!string.IsNullOrWhiteSpace(val)) opts.Add(new SelectOption(val!, label)); }
+        Add(t.AccentColor, "Akzent");
+        Add(t.SecondaryColor, "Sekundär");
+        Add(t.HeadingColor, "Überschrift");
+        Add(t.TextColor, "Text");
+        Add(t.BackgroundColor, "Hintergrund");
+        Add(t.AltBackground, "Alt-Hintergrund");
+        Add("#ffffff", "Weiß");
+        Add("#111111", "Dunkel");
+        return opts;
     }
 
     /// <summary>Distinct media-library tags for the gallery tag picker, with an "all media" entry first.</summary>

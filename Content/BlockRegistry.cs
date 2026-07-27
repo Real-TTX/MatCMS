@@ -140,6 +140,8 @@ public class BlockRegistry
             [
                 new BlockField { Id = "title", Label = "block.f.title", Type = FieldType.Text },
                 new BlockField { Id = "body", Label = "block.f.text", Type = FieldType.RichText },
+                new BlockField { Id = "bg", Label = "block.column.f.bg", Type = FieldType.Select, OptionsSource = "themeColors" },
+                new BlockField { Id = "fg", Label = "block.column.f.fg", Type = FieldType.Select, OptionsSource = "themeColors" },
             ]
         },
         new BlockDefinition

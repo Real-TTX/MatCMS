@@ -22,6 +22,34 @@
                     </span>
                     <span class="le-panel-title">@T[Model.SelectedDef!.Name]</span>
                 </div>
+                @{
+                    var _sel = Model.SelectedBlock!;
+                    var _all = Model.Current.Blocks;
+                    MatCMS.Models.ContentBlock? _root = _sel.ParentId != null
+                        ? _all.FirstOrDefault(b => b.Id == _sel.ParentId)
+                        : (Model.SelectedDef!.IsContainer ? _sel : null);
+                    var _kids = _root != null
+                        ? _all.Where(b => b.ParentId == _root.Id).OrderBy(b => b.SortOrder).ToList()
+                        : new List<MatCMS.Models.ContentBlock>();
+                }
+                @if (_root != null && _kids.Count > 0)
+                {
+                    var _rdef = Model.Registry.Get(_root.BlockType);
+                    <nav class="le-tree" aria-label="@T["editor.blockTree"]">
+                        <a class="le-tree-node@(_root.Id == _sel.Id ? " active" : "")" asp-page="Edit" asp-route-id="@Model.Current.Id" asp-route-block="@_root.Id">
+                            <span class="b-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">@Html.Raw(_rdef?.Svg)</svg></span>
+                            <span class="le-tree-label">@(_rdef is not null ? T[_rdef.Name] : _root.BlockType)</span>
+                        </a>
+                        @foreach (var _k in _kids)
+                        {
+                            var _kdef = Model.Registry.Get(_k.BlockType);
+                            <a class="le-tree-node le-tree-child@(_k.Id == _sel.Id ? " active" : "")" asp-page="Edit" asp-route-id="@Model.Current.Id" asp-route-block="@_k.Id">
+                                <span class="b-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">@Html.Raw(_kdef?.Svg)</svg></span>
+                                <span class="le-tree-label">@(_kdef is not null ? T[_kdef.Name] : _k.BlockType)</span>
+                            </a>
+                        }
+                    </nav>
+                }
                 <form id="block-form" method="post" asp-page-handler="SaveBlock" asp-route-id="@Model.Current.Id" asp-route-blockId="@Model.SelectedBlock!.Id">
                     <input type="hidden" name="DataJson" id="DataJson" />
                     <div id="block-editor"></div>

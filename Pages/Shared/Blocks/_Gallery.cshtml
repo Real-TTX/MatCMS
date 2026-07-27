@@ -20,7 +20,8 @@
     if (source == "media")
     {
         var wanted = MatCMS.Content.TagUtil.Split(Model.Str("tags")).ToList();
-        var media = Db.Media.AsNoTracking().OrderByDescending(m => m.Id).ToList();
+        // Oldest first so newly-uploaded media with a matching tag always appear at the end.
+        var media = Db.Media.AsNoTracking().OrderBy(m => m.Id).ToList();
         foreach (var m in media)
         {
             var mtags = MatCMS.Content.TagUtil.Split(m.Tags).ToList();

@@ -211,6 +211,9 @@ textarea.cp-sample-inp { resize: vertical; min-height: 0; }
 .tag-entry { flex: 0 1 auto; min-width: 140px; border: 1px solid var(--line); border-radius: 999px; outline: none; padding: 4px 14px; margin: 0; font: inherit; font-size: 12.5px; background: #fff; color: var(--black); }
 .tag-entry::placeholder { color: var(--muted); }
 .tag-entry:focus { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent); }
+/* Collapsed "+" chip that expands into the tag input on click. */
+.tag-add-chip { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0; border: 1px dashed var(--muted); border-radius: 999px; background: #fff; color: var(--muted); font-size: 17px; line-height: 1; cursor: pointer; transition: border-color .15s ease, color .15s ease; }
+.tag-add-chip:hover { border-color: var(--accent); color: var(--accent); border-style: solid; }
 
 /* Action bar: positive → negative order; the destructive action sits apart on the right */
 .action-bar { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 16px; }
@@ -496,6 +499,16 @@ table.data .btn { white-space: nowrap; }
 .le-panel-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
 .le-delete { margin: 0; }
 .le-panel-actions .le-save { margin-left: auto; }
+
+/* Block family tree in the edit panel — jump between a container and its children. */
+.le-tree { display: flex; flex-direction: column; gap: 2px; margin-bottom: 14px; padding: 6px; background: #f1f2f4; border: 1px solid var(--line); border-radius: 8px; }
+.le-tree-node { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; text-decoration: none; color: #3a3d42; font-size: 13.5px; font-weight: 500; }
+.le-tree-node:hover { background: #e2e5ea; color: var(--black); }
+.le-tree-node.active { background: var(--accent); color: #fff; }
+.le-tree-node .b-icon svg { width: 16px; height: 16px; display: block; }
+.le-tree-node .le-tree-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.le-tree-child { margin-left: 16px; }
+.le-tree-child .le-tree-label::before { content: "↳ "; opacity: .45; }
 .le-sidebar .btn { white-space: nowrap; }
 
 .le-preview { display: flex; flex-direction: column; min-width: 0; background: #eceef1; }

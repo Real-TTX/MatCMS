@@ -31,6 +31,7 @@
                         <input name="Values[@SettingKeys.LogoUrl]" value="@V(SettingKeys.LogoUrl)" placeholder="@T["settings.logoPlaceholder"]" data-url />
                         <div style="margin-top:8px;">
                             <button type="button" class="btn btn-ghost btn-sm" data-upload-btn>@T["settings.uploadLogo"]</button>
+                            <button type="button" class="btn btn-ghost btn-sm" data-lib-btn>@T["settings.fromLibrary"]</button>
                             <input type="file" accept="image/*" style="display:none;" data-file />
                         </div>
                     </div>
@@ -44,6 +45,7 @@
                         <input name="Values[@SettingKeys.FaviconUrl]" value="@V(SettingKeys.FaviconUrl)" placeholder="@T["settings.faviconPlaceholder"]" data-url />
                         <div style="margin-top:8px;">
                             <button type="button" class="btn btn-ghost btn-sm" data-upload-btn>@T["settings.uploadFavicon"]</button>
+                            <button type="button" class="btn btn-ghost btn-sm" data-lib-btn>@T["settings.fromLibrary"]</button>
                             <input type="file" accept="image/*,.ico" style="display:none;" data-file />
                         </div>
                         <div class="help">@T["settings.faviconHelp"]</div>
@@ -139,6 +141,10 @@
             setPrev(input.value);
             input.addEventListener('input', function () { setPrev(input.value); });
             btn.addEventListener('click', function () { file.click(); });
+            var libBtn = field.querySelector('[data-lib-btn]');
+            if (libBtn) libBtn.addEventListener('click', function () {
+                if (window.openMediaPicker) window.openMediaPicker(function (u) { input.value = u; setPrev(u); });
+            });
             var label = btn.textContent;
             file.addEventListener('change', function () {
                 if (!file.files || !file.files[0]) return;

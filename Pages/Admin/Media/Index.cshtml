@@ -92,7 +92,8 @@
                         <label for="mm-tag-entry">@T["media.tags"]</label>
                         <div class="tag-input" id="mm-tag-input">
                             <input type="text" id="mm-tag-entry" class="tag-entry" placeholder="@T["media.tagAdd"]"
-                                   autocomplete="off" list="mm-tag-list" />
+                                   autocomplete="off" list="mm-tag-list" hidden />
+                            <button type="button" class="tag-add-chip" id="mm-tag-add" title="@T["media.tagAdd"]" aria-label="@T["media.tagAdd"]">+</button>
                         </div>
                         <input type="hidden" name="tags" id="mm-tags" />
                         @if (Model.AllTags.Count > 0)
@@ -168,7 +169,12 @@
             var tagsHidden = document.getElementById('mm-tags');
             var tagBox = document.getElementById('mm-tag-input');
             var tagEntry = document.getElementById('mm-tag-entry');
+            var tagAdd = document.getElementById('mm-tag-add');
             var chips = [];
+            // The entry is hidden behind a "+" chip; clicking it reveals an inline input.
+            function showEntry() { tagAdd.hidden = true; tagEntry.hidden = false; tagEntry.focus(); }
+            function hideEntry() { tagEntry.hidden = true; tagAdd.hidden = false; }
+            tagAdd.addEventListener('click', showEntry);
             function renderChips() {
                 Array.prototype.slice.call(tagBox.querySelectorAll('.tag-chip-item')).forEach(function (el) { el.remove(); });
                 chips.forEach(function (tag) {
@@ -199,9 +205,13 @@
             }
             tagEntry.addEventListener('keydown', function (e) {
                 if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(tagEntry.value); tagEntry.value = ''; }
+                else if (e.key === 'Escape') { e.preventDefault(); tagEntry.value = ''; hideEntry(); }
                 else if (e.key === 'Backspace' && !tagEntry.value && chips.length) { removeTag(chips[chips.length - 1]); }
             });
-            tagEntry.addEventListener('blur', function () { if (tagEntry.value.trim()) { addTag(tagEntry.value); tagEntry.value = ''; } });
+            tagEntry.addEventListener('blur', function () {
+                if (tagEntry.value.trim()) { addTag(tagEntry.value); tagEntry.value = ''; }
+                hideEntry();
+            });
             tagBox.addEventListener('click', function (e) { if (e.target === tagBox) tagEntry.focus(); });
             document.getElementById('mm-save-form').addEventListener('submit', function () {
                 if (tagEntry.value.trim()) { addTag(tagEntry.value); tagEntry.value = ''; }
@@ -219,7 +229,7 @@
                 nameEl.textContent = d.name || '';
                 urlEl.value = d.url || '';
                 altEl.value = d.alt || '';
-                setTags(d.tags || ''); tagEntry.value = '';
+                setTags(d.tags || ''); tagEntry.value = ''; hideEntry();
                 idEl.value = d.id; delIdEl.value = d.id;
                 infoEl.textContent = [d.type, fmtBytes(d.size)].filter(Boolean).join('  ·  ');
                 modal.classList.add('open');

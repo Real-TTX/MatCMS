@@ -257,6 +257,10 @@ h1, h2, h3, h4 {
 
 .column .rich { color: #2e2013; }
 .column .rich a { color: #1a1008; }
+/* Per-column tint: when a background/text colour is picked in the editor, the inline style wins
+   and the headings/body inherit the chosen text colour instead of the fixed defaults above. */
+.column--tinted h3, .column--tinted .rich, .column--tinted .rich a { color: inherit; }
+.column--tinted h3 { border-bottom-color: currentColor; }
 
 /* ---------- Nested "Leistungen" container ---------- */
 .leistungen-block .leistungen-grid { display: grid; gap: 28px; margin-top: 8px; }

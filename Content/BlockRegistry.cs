@@ -93,6 +93,8 @@ public class BlockRegistry
                 new BlockField { Id = "buttonUrl", Label = "block.hero.f.buttonUrl", Type = FieldType.Url, Placeholder = "/kontakt" },
                 new BlockField { Id = "align", Label = "block.hero.f.align", Type = FieldType.Select, Default = "left",
                     Options = [ new("left", "block.opt.align.left"), new("center", "block.opt.align.center") ] },
+                new BlockField { Id = "imageHeight", Label = "block.hero.f.imageHeight", Type = FieldType.Select, Default = "",
+                    Options = [ new("", "block.opt.h.auto"), new("sm", "block.opt.h.sm"), new("md", "block.opt.h.md"), new("lg", "block.opt.h.lg"), new("full", "block.opt.h.full") ] },
             ]
         },
         new BlockDefinition

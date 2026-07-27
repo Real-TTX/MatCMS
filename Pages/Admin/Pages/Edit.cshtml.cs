@@ -103,6 +103,9 @@ public class EditModel : PageModel
                     // Resolve the localization keys (Label/Options/ItemLabel) into display text
                     // for the current UI culture before handing the schema to the JS editor.
                     var localized = SelectedDef.Fields.Select(f => LocalizeField(f, dynamicSources)).ToList();
+                    // Global layout options (width + spacing) apply to every top-level block.
+                    if (!SelectedDef.ChildOnly)
+                        localized.AddRange(GlobalLayoutFields.Select(f => LocalizeField(f, dynamicSources)));
                     SchemaJson = JsonSerializer.Serialize(localized, SchemaOpts);
                     CurrentJson = string.IsNullOrWhiteSpace(SelectedBlock.DataJson) ? "{}" : SelectedBlock.DataJson;
                 }
@@ -325,6 +328,18 @@ public class EditModel : PageModel
         }
         return RedirectToPage(new { id });
     }
+
+    // Shared layout options appended to every top-level block (Shopify-style). Labels are literal
+    // German (the localizer falls back to the given text when there's no matching key).
+    private static readonly BlockField[] GlobalLayoutFields =
+    [
+        new BlockField { Id = "_width", Label = "Breite", Type = FieldType.Select, Default = "",
+            Options = [ new("", "Normal"), new("narrow", "Schmal"), new("full", "Volle Breite") ] },
+        new BlockField { Id = "_spaceTop", Label = "Abstand oben", Type = FieldType.Select, Default = "",
+            Options = [ new("", "Standard"), new("s", "Klein"), new("m", "Mittel"), new("l", "Groß") ] },
+        new BlockField { Id = "_spaceBottom", Label = "Abstand unten", Type = FieldType.Select, Default = "",
+            Options = [ new("", "Standard"), new("s", "Klein"), new("m", "Mittel"), new("l", "Groß") ] },
+    ];
 
     // Produces a JSON-friendly copy of a field with all localization keys resolved to text.
     private object LocalizeField(BlockField f) => LocalizeField(f, null);

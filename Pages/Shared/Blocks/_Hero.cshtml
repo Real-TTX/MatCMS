@@ -6,6 +6,7 @@
     var btnText = Model.Str("buttonText");
     var btnUrl = Model.StrOr("buttonUrl", "#");
     var align = Model.StrOr("align", "left");
+    var imgH = Model.Str("imageHeight");
 
     // Only allow a plain path or http(s) URL for the image source.
     var safeImage = (!string.IsNullOrWhiteSpace(image)
@@ -34,7 +35,7 @@
 </section>
 @if (hasImage)
 {
-    <div class="hero-image">
+    <div class="hero-image@(imgH.Length > 0 ? " hero-image--" + imgH : "")">
         <img src="@safeImage" alt="" />
     </div>
 }

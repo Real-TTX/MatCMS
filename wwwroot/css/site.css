@@ -275,6 +275,18 @@ h1, h2, h3, h4 {
     .leistungen-grid.cols-3, .leistungen-grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
 }
 
+/* ---------- Global per-block layout options (width + spacing, set in the editor) ---------- */
+.block-wrap { display: block; }
+.bw-narrow .container { max-width: 760px; }
+.bw-full .container { max-width: 100%; }
+.bst-s { margin-top: 24px; } .bst-m { margin-top: 52px; } .bst-l { margin-top: 90px; }
+.bsb-s { margin-bottom: 24px; } .bsb-m { margin-bottom: 52px; } .bsb-l { margin-bottom: 90px; }
+/* Hero image height options. */
+.hero-image--sm img { height: 300px; object-fit: cover; }
+.hero-image--md img { height: 460px; object-fit: cover; }
+.hero-image--lg img { height: 620px; object-fit: cover; }
+.hero-image--full img { height: 88vh; object-fit: cover; }
+
 /* ---------- Gallery block + lightbox ---------- */
 .gallery-filter { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
 .gallery-filter .gfilter { font: inherit; font-size: 14px; padding: 7px 16px; border: 1px solid var(--line); background: #fff; border-radius: 999px; cursor: pointer; color: var(--ink); transition: background .15s ease, color .15s ease, border-color .15s ease; }

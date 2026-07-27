@@ -2,7 +2,9 @@
 @{
     var current = MatCMS.Content.MenuIcons.Resolve(Model);
 }
-@* Searchable Tabler-icon picker for toolbar ("Obere Leiste") menu items. *@
+@* Reusable searchable Tabler-icon picker. Posts the chosen name in a hidden input named "Icon".
+   Used by menu items (toolbar), components, … The menu-only visibility rule at the bottom stays
+   inert on pages without a #Menu select. *@
 <div class="form-field icon-picker" data-icon-picker>
     <label>@T["menus.icon"]</label>
     <input type="hidden" name="Icon" value="@current" data-icon-input />
@@ -65,7 +67,7 @@
         wrap.querySelector('[data-icon-clear]').addEventListener('click', function () { select(''); });
         render('');
 
-        // The icon only applies to the toolbar menu — hide the picker for header/footer.
+        // Menu-only rule: on the menu-item form the icon applies to the toolbar menu only. Inert elsewhere.
         var menu = document.getElementById('Menu');
         function sync() { wrap.style.display = (menu && menu.value === 'toolbar') ? '' : 'none'; }
         if (menu) { menu.addEventListener('change', sync); sync(); }

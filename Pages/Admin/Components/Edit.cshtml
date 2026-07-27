@@ -28,6 +28,7 @@
             <label for="Description">@T["components.description"]</label>
             <input id="Description" name="Description" value="@Model.Description" />
         </div>
+        <partial name="_IconPicker" model="Model.Icon" />
 
         <h3 class="form-section">@T["components.fields"]</h3>
         <div id="field-rows" data-fields="@Model.FieldsJson"></div>

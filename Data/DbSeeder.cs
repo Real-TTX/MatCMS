@@ -244,6 +244,7 @@ public static class DbSeeder
         await AddColumnIfMissingAsync(db, "Plugins", "Key", "TEXT NOT NULL DEFAULT ''");
         await AddColumnIfMissingAsync(db, "Plugins", "Version", "TEXT NOT NULL DEFAULT ''");
         await AddColumnIfMissingAsync(db, "Plugins", "DataVersion", "TEXT NOT NULL DEFAULT ''");
+        await AddColumnIfMissingAsync(db, "Components", "Icon", "TEXT NOT NULL DEFAULT ''");
     }
 
     /// <summary>Assigns a stable slug Key to any plugin created before the Key column existed.</summary>

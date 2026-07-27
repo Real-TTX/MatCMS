@@ -16,6 +16,7 @@ public class EditModel : PageModel
 
     [BindProperty] public string? Name { get; set; }
     [BindProperty] public string? Description { get; set; }
+    [BindProperty] public string? Icon { get; set; }
     [BindProperty] public string? FieldsJson { get; set; }
     [BindProperty] public string? TemplateHtml { get; set; }
     public string? Error { get; private set; }
@@ -27,6 +28,7 @@ public class EditModel : PageModel
         Current = c;
         Name = c.Name;
         Description = c.Description;
+        Icon = c.Icon;
         FieldsJson = c.FieldsJson;
         TemplateHtml = c.TemplateHtml;
         return Page();
@@ -47,6 +49,7 @@ public class EditModel : PageModel
 
         c.Name = name;
         c.Description = (Description ?? "").Trim();
+        c.Icon = MatCMS.Content.MenuIcons.IsValid(Icon) ? Icon!.Trim() : "";
         c.FieldsJson = SanitizeFields(FieldsJson);
         var tpl = TemplateHtml ?? "";
         c.TemplateHtml = tpl.Length > 50000 ? tpl[..50000] : tpl;

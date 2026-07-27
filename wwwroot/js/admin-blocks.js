@@ -187,48 +187,16 @@
         var row = document.createElement("div");
         row.style.marginTop = "8px";
 
-        var file = document.createElement("input");
-        file.type = "file";
-        file.accept = "image/*";
-        file.style.display = "none";
-
+        // Single button → the media dialog (which itself can upload). No separate upload button.
         var btn = document.createElement("button");
         btn.type = "button";
         btn.className = "btn btn-ghost btn-sm";
-        btn.textContent = "Bild hochladen";
-        btn.addEventListener("click", function () { file.click(); });
-
-        file.addEventListener("change", function () {
-            if (!file.files || !file.files[0]) return;
-            btn.textContent = "Lädt…"; btn.disabled = true;
-            var fd = new FormData();
-            fd.append("file", file.files[0]);
-            fetch("/admin/api/upload", { method: "POST", body: fd })
-                .then(function (res) { return res.json().then(function (j) { return { ok: res.ok, j: j }; }); })
-                .then(function (r) {
-                    if (r.ok && r.j.url) {
-                        inp.value = r.j.url;
-                        preview.style.backgroundImage = "url('" + r.j.url + "')";
-                    } else {
-                        alert(r.j.error || "Upload fehlgeschlagen.");
-                    }
-                })
-                .catch(function () { alert("Upload fehlgeschlagen."); })
-                .then(function () { btn.textContent = "Bild hochladen"; btn.disabled = false; file.value = ""; });
-        });
-
-        var libBtn = document.createElement("button");
-        libBtn.type = "button";
-        libBtn.className = "btn btn-ghost btn-sm";
-        libBtn.style.marginLeft = "6px";
-        libBtn.textContent = "Aus Mediathek";
-        libBtn.addEventListener("click", function () {
+        btn.textContent = "Bild wählen";
+        btn.addEventListener("click", function () {
             openMediaPicker(function (u) { inp.value = u; preview.style.backgroundImage = "url('" + u + "')"; });
         });
 
         row.appendChild(btn);
-        row.appendChild(libBtn);
-        row.appendChild(file);
         controls.appendChild(inp);
         controls.appendChild(row);
         container.appendChild(preview);

@@ -26,6 +26,16 @@
                 @foreach (var c in Model.Items)
                 {
                     <div class="block-item">
+                        <span class="b-icon">
+                            @if (!string.IsNullOrEmpty(c.Icon))
+                            {
+                                <i class="ti ti-@c.Icon" aria-hidden="true"></i>
+                            }
+                            else
+                            {
+                                <i class="ti ti-puzzle" aria-hidden="true"></i>
+                            }
+                        </span>
                         <div class="b-info">
                             <div class="b-type">@c.Name</div>
                             <div class="b-sum mono">@c.Type</div>

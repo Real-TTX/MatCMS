@@ -37,9 +37,7 @@
                     <div class="image-controls">
                         <input name="Values[@SettingKeys.LogoUrl]" value="@V(SettingKeys.LogoUrl)" placeholder="@T["settings.logoPlaceholder"]" data-url />
                         <div style="margin-top:8px;">
-                            <button type="button" class="btn btn-ghost btn-sm" data-upload-btn>@T["settings.uploadLogo"]</button>
-                            <button type="button" class="btn btn-ghost btn-sm" data-lib-btn>@T["settings.fromLibrary"]</button>
-                            <input type="file" accept="image/*" style="display:none;" data-file />
+                            <button type="button" class="btn btn-ghost btn-sm" data-lib-btn>Bild wählen</button>
                         </div>
                     </div>
                 </div>
@@ -51,9 +49,7 @@
                     <div class="image-controls">
                         <input name="Values[@SettingKeys.FaviconUrl]" value="@V(SettingKeys.FaviconUrl)" placeholder="@T["settings.faviconPlaceholder"]" data-url />
                         <div style="margin-top:8px;">
-                            <button type="button" class="btn btn-ghost btn-sm" data-upload-btn>@T["settings.uploadFavicon"]</button>
-                            <button type="button" class="btn btn-ghost btn-sm" data-lib-btn>@T["settings.fromLibrary"]</button>
-                            <input type="file" accept="image/*,.ico" style="display:none;" data-file />
+                            <button type="button" class="btn btn-ghost btn-sm" data-lib-btn>Bild wählen</button>
                         </div>
                         <div class="help">@T["settings.faviconHelp"]</div>
                     </div>
@@ -213,34 +209,18 @@
             if (want) show(want);
         })();
 
-        // Wire every [data-upload] image field (logo, favicon, …) to the shared upload endpoint.
+        // Wire every [data-upload] image field (logo, favicon, …) to the shared media dialog, which
+        // now handles uploading itself — so a single "Bild wählen" button is enough.
         document.querySelectorAll('.image-field[data-upload]').forEach(function (field) {
             var input = field.querySelector('[data-url]');
-            var file = field.querySelector('[data-file]');
-            var btn = field.querySelector('[data-upload-btn]');
             var prev = field.querySelector('[data-preview]');
-            if (!btn || !input) return;
+            var libBtn = field.querySelector('[data-lib-btn]');
+            if (!input) return;
             function setPrev(u) { if (prev) prev.style.backgroundImage = u ? "url('" + u + "')" : ''; }
             setPrev(input.value);
             input.addEventListener('input', function () { setPrev(input.value); });
-            btn.addEventListener('click', function () { file.click(); });
-            var libBtn = field.querySelector('[data-lib-btn]');
             if (libBtn) libBtn.addEventListener('click', function () {
                 if (window.openMediaPicker) window.openMediaPicker(function (u) { input.value = u; setPrev(u); });
-            });
-            var label = btn.textContent;
-            file.addEventListener('change', function () {
-                if (!file.files || !file.files[0]) return;
-                btn.disabled = true; btn.textContent = '@T["action.uploading"]';
-                var fd = new FormData(); fd.append('file', file.files[0]);
-                fetch('/admin/api/upload', { method: 'POST', body: fd })
-                    .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-                    .then(function (r) {
-                        if (r.ok && r.j.url) { input.value = r.j.url; setPrev(r.j.url); }
-                        else alert(r.j.error || '@T["settings.uploadFailed"]');
-                    })
-                    .catch(function () { alert('@T["settings.uploadFailed"]'); })
-                    .then(function () { btn.disabled = false; btn.textContent = label; file.value = ''; });
             });
         });
     </script>

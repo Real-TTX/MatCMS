@@ -11,12 +11,19 @@
         var overlay = document.createElement("div");
         overlay.className = "modal-overlay open";
         overlay.innerHTML = '<div class="modal" role="dialog" aria-modal="true">' +
-            '<div class="modal-head"><h2>' + (multiple ? 'Medien wählen' : 'Medium wählen') + '</h2><button type="button" class="modal-close" aria-label="Schließen">✕</button></div>' +
+            '<div class="modal-head"><h2>' + (multiple ? 'Medien wählen' : 'Medium wählen') + '</h2>' +
+            '<div class="mp-head-actions">' +
+            '<button type="button" class="btn btn-sm" data-mp-upload>Hochladen</button>' +
+            '<button type="button" class="modal-close" aria-label="Schließen">✕</button>' +
+            '</div></div>' +
             '<div class="modal-body"><div class="media-picker-grid"></div></div>' +
             (multiple ? '<div class="modal-foot media-picker-foot"><span class="mp-count muted">0 gewählt</span><button type="button" class="btn btn-sm" data-mp-apply disabled>Übernehmen</button></div>' : '') +
             '</div>';
         document.body.appendChild(overlay);
         var grid = overlay.querySelector(".media-picker-grid");
+        var fileInp = document.createElement("input");
+        fileInp.type = "file"; fileInp.accept = "image/*"; fileInp.style.display = "none";
+        overlay.appendChild(fileInp);
         function close() { overlay.remove(); }
         overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
         overlay.querySelector(".modal-close").addEventListener("click", close);
@@ -33,22 +40,46 @@
         }
         if (applyBtn) applyBtn.addEventListener("click", function () { if (selected.length) { onPick(selected.slice()); close(); } });
 
+        function makeTile(m) {
+            var b = document.createElement("button");
+            b.type = "button"; b.className = "media-pick"; b.title = m.name || m.url;
+            var img = document.createElement("img"); img.src = m.url; img.alt = m.name || "";
+            b.appendChild(img);
+            b.addEventListener("click", function () {
+                if (!multiple) { onPick(m.url); close(); return; }
+                var i = selected.indexOf(m.url);
+                if (i >= 0) { selected.splice(i, 1); b.classList.remove("selected"); }
+                else { selected.push(m.url); b.classList.add("selected"); }
+                refresh();
+            });
+            return b;
+        }
+
+        // Upload straight from the dialog: the new file appears in the grid and is picked/selected.
+        var uploadBtn = overlay.querySelector("[data-mp-upload]");
+        uploadBtn.addEventListener("click", function () { fileInp.click(); });
+        fileInp.addEventListener("change", function () {
+            if (!fileInp.files || !fileInp.files[0]) return;
+            uploadBtn.disabled = true; var lbl = uploadBtn.textContent; uploadBtn.textContent = "Lädt…";
+            var fd = new FormData(); fd.append("file", fileInp.files[0]);
+            fetch("/admin/api/upload", { method: "POST", body: fd })
+                .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+                .then(function (r) {
+                    if (r.ok && r.j.url) {
+                        if (!multiple) { onPick(r.j.url); close(); return; }
+                        var tile = makeTile({ url: r.j.url, name: "" });
+                        var empty = grid.querySelector("p.muted"); if (empty) grid.innerHTML = "";
+                        grid.insertBefore(tile, grid.firstChild);
+                        selected.push(r.j.url); tile.classList.add("selected"); refresh();
+                    } else alert((r.j && r.j.error) || "Upload fehlgeschlagen.");
+                })
+                .catch(function () { alert("Upload fehlgeschlagen."); })
+                .then(function () { uploadBtn.disabled = false; uploadBtn.textContent = lbl; fileInp.value = ""; });
+        });
+
         fetch("/admin/api/media").then(function (r) { return r.json(); }).then(function (list) {
             if (!list || !list.length) { grid.innerHTML = '<p class="muted">Noch keine Medien vorhanden.</p>'; return; }
-            list.forEach(function (m) {
-                var b = document.createElement("button");
-                b.type = "button"; b.className = "media-pick"; b.title = m.name || m.url;
-                var img = document.createElement("img"); img.src = m.url; img.alt = m.name || "";
-                b.appendChild(img);
-                b.addEventListener("click", function () {
-                    if (!multiple) { onPick(m.url); close(); return; }
-                    var i = selected.indexOf(m.url);
-                    if (i >= 0) { selected.splice(i, 1); b.classList.remove("selected"); }
-                    else { selected.push(m.url); b.classList.add("selected"); }
-                    refresh();
-                });
-                grid.appendChild(b);
-            });
+            list.forEach(function (m) { grid.appendChild(makeTile(m)); });
         }).catch(function () { grid.innerHTML = '<p class="muted">Konnte Mediathek nicht laden.</p>'; });
     };
 

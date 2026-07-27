@@ -42,6 +42,8 @@ public class EditModel : PageModel
     public BlockDefinition? SelectedDef { get; private set; }
     public string SchemaJson { get; private set; } = "[]";
     public string CurrentJson { get; private set; } = "{}";
+    // The whole page's blocks, seeded to the editor as the client draft for live preview.
+    public string BlocksJson { get; private set; } = "[]";
 
     [BindProperty] public PageMetaInput Meta { get; set; } = new();
     [BindProperty] public string DataJson { get; set; } = "{}";
@@ -69,6 +71,15 @@ public class EditModel : PageModel
         if (page is null) return NotFound();
 
         Current = page;
+        BlocksJson = JsonSerializer.Serialize(
+            page.Blocks.OrderBy(b => b.SortOrder).Select(b => new
+            {
+                id = b.Id,
+                blockType = b.BlockType,
+                parentId = b.ParentId,
+                sortOrder = b.SortOrder,
+                dataJson = b.DataJson
+            }), SchemaOpts);
         Meta = new PageMetaInput
         {
             Title = page.Title,

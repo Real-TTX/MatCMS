@@ -9,6 +9,8 @@
 }
 
 <div class="live-editor" data-page-id="@Model.Current.Id" data-selected-block="@(Model.SelectedBlock?.Id)">
+    @Html.AntiForgeryToken()
+    <script id="page-blocks" type="application/json">@Html.Raw(Model.BlocksJson.Replace("</", "<\\/"))</script>
     <aside class="le-sidebar">
         @if (editing)
         {

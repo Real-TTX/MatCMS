@@ -33,6 +33,47 @@
     function syncSelection() { if (selectedBlock) post({ type: "mat-select", id: selectedBlock }); }
     frame.addEventListener("load", syncSelection);
 
+    // ---------- Live draft preview (nothing persists until "Speichern") ----------
+    // The whole page's blocks are seeded as a client draft. Editing the selected block's fields
+    // updates the draft and re-renders the preview via the server (no DB write).
+    var seedEl = document.getElementById("page-blocks");
+    var tokenEl = document.querySelector('.live-editor input[name="__RequestVerificationToken"]');
+    var draft = [];
+    try { draft = JSON.parse((seedEl && seedEl.textContent) || "[]") || []; } catch (e) { draft = []; }
+
+    var renderT;
+    function renderPreview() {
+        if (!tokenEl) return;
+        clearTimeout(renderT);
+        renderT = setTimeout(function () {
+            var body = new URLSearchParams();
+            body.set("__RequestVerificationToken", tokenEl.value);
+            body.set("Draft", JSON.stringify(draft));
+            fetch(location.pathname + "?handler=RenderPreview", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded", "RequestVerificationToken": tokenEl.value },
+                body: body.toString(),
+                credentials: "same-origin"
+            })
+                .then(function (r) { return r.ok ? r.text() : null; })
+                .then(function (html) {
+                    if (html == null) return;
+                    post({ type: "mat-render", html: html });
+                    if (selectedBlock) post({ type: "mat-select", id: selectedBlock });
+                })
+                .catch(function () { });
+        }, 80);
+    }
+
+    // Called by admin-blocks.js on every field change of the selected block.
+    window.matOnBlockDataChange = function (dataJson) {
+        if (!selectedBlock) return;
+        var e = draft.filter(function (b) { return String(b.id) === String(selectedBlock); })[0];
+        if (!e) return;
+        e.dataJson = dataJson;
+        renderPreview();
+    };
+
     // Clicking a block inside the preview opens its settings inline.
     window.addEventListener("message", function (e) {
         var d = e.data || {};

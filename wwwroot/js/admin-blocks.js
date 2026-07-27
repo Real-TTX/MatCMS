@@ -33,11 +33,29 @@
     editor.addEventListener("input", applyConditions);
     applyConditions();
 
-    form.addEventListener("submit", function () {
+    function serialize() {
         var obj = {};
         collectors.forEach(function (c) { obj[c.id] = c.get(); });
-        output.value = JSON.stringify(obj);
+        return obj;
+    }
+
+    form.addEventListener("submit", function () {
+        output.value = JSON.stringify(serialize());
     });
+
+    // Live preview: on any field change, hand the block's current data up to the page editor, which
+    // updates its draft and re-renders the preview (nothing is persisted until "Speichern").
+    var liveT;
+    function pushLive() {
+        clearTimeout(liveT);
+        liveT = setTimeout(function () {
+            if (typeof window.matOnBlockDataChange === "function") {
+                try { window.matOnBlockDataChange(JSON.stringify(serialize())); } catch (e) { }
+            }
+        }, 250);
+    }
+    editor.addEventListener("input", pushLive);
+    editor.addEventListener("change", pushLive);
 
     function safeParse(txt, fallback) {
         try { return JSON.parse(txt) || fallback; } catch (e) { return fallback; }

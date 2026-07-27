@@ -5,7 +5,16 @@
     var http = ViewContext.HttpContext;
     var editor = http.Request.Query.ContainsKey("editor") && http.User.IsInRole("Admin");
 }
-@await Html.PartialAsync("_BlockList", new MatCMS.Content.BlockListModel(Model.CurrentPage.Blocks, Model.Registry, editor))
+@if (editor)
+{
+    <div id="mat-blocks">
+        @await Html.PartialAsync("_BlockList", new MatCMS.Content.BlockListModel(Model.CurrentPage.Blocks, Model.Registry, true))
+    </div>
+}
+else
+{
+    @await Html.PartialAsync("_BlockList", new MatCMS.Content.BlockListModel(Model.CurrentPage.Blocks, Model.Registry, false))
+}
 
 @if (editor)
 {
@@ -86,10 +95,17 @@
                     selected = document.getElementById("block-" + d.id);
                     if (selected) { selected.classList.add("mat-selected"); ensureVisible(selected); }
                 }
+                // Live preview: replace the block area with freshly-rendered draft HTML (no reload).
+                if (d.type === "mat-render" && typeof d.html === "string") {
+                    var container = document.getElementById("mat-blocks");
+                    if (container) { container.innerHTML = d.html; selected = null; buildInsertZones(); }
+                }
             });
 
             // Insert-between-blocks zones: one before each top-level block + one at the end.
-            (function () {
+            // A function (not an IIFE) so it can be re-run after a live-preview swap.
+            function buildInsertZones() {
+                Array.prototype.slice.call(document.querySelectorAll(".mat-insert")).forEach(function (z) { z.remove(); });
                 var blocks = Array.prototype.slice.call(document.querySelectorAll(".mat-ed-block"));
                 function makeZone(index) {
                     var z = document.createElement("button");
@@ -105,7 +121,8 @@
                 }
                 blocks.forEach(function (b, i) { b.parentNode.insertBefore(makeZone(i), b); });
                 if (blocks.length) blocks[blocks.length - 1].insertAdjacentElement("afterend", makeZone(blocks.length));
-            })();
+            }
+            buildInsertZones();
 
             post({ type: "mat-preview-ready" });
         })();

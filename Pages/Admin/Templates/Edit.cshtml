@@ -198,6 +198,12 @@
                 <div class="help">@Html.Raw(T["templates.menuLoopHelp"])</div>
                 <div id="slot-detect" class="slot-detect"></div>
             </div>
+
+            <h3 class="form-section">Parameter (für Nutzer)</h3>
+            <div class="help">Parameter, die ein Nutzer dieses Templates unter „Anpassen" einstellen kann — ohne das Template zu bearbeiten. Im Template verwendbar als <code>{{param:id}}</code> (in CSS oder Layout-HTML). Die ID wird aus dem Label erzeugt.</div>
+            <div id="param-rows" data-params="@Model.ParametersJson"></div>
+            <div style="margin-top:8px;"><button type="button" class="btn btn-sm btn-ghost" id="param-add">＋ Parameter</button></div>
+            <input type="hidden" name="ParametersJson" id="ParametersJson" />
         </div>
 
         <div class="form-actions">
@@ -307,5 +313,48 @@
             if (clear) clear.addEventListener('click', function () { hex.value = ''; reflectEmpty(); hex.focus(); });
             reflectEmpty();
         });
+
+        // Published parameter rows (designer declares) -> hidden ParametersJson on submit.
+        (function () {
+            var rows = document.getElementById('param-rows');
+            var addBtn = document.getElementById('param-add');
+            var hidden = document.getElementById('ParametersJson');
+            if (!rows || !addBtn || !hidden) return;
+            var form = hidden.closest('form');
+            var TYPES = [['text', 'Text'], ['select', 'Auswahl'], ['color', 'Farbe'], ['number', 'Zahl'], ['bool', 'Ja/Nein']];
+            function slug(s) {
+                return (s || '').trim().toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue')
+                    .replace(/ß/g, 'ss').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+            }
+            function addRow(p) {
+                p = p || {};
+                var row = document.createElement('div'); row.className = 'field-row param-row';
+                var label = document.createElement('input'); label.type = 'text'; label.placeholder = 'Label'; label.className = 'pr-label fr-label'; label.value = p.label || '';
+                var type = document.createElement('select'); type.className = 'pr-type';
+                TYPES.forEach(function (t) { var o = document.createElement('option'); o.value = t[0]; o.textContent = t[1]; if ((p.type || 'text') === t[0]) o.selected = true; type.appendChild(o); });
+                var opts = document.createElement('input'); opts.type = 'text'; opts.placeholder = 'Optionen (Komma)'; opts.className = 'pr-options fr-label'; opts.value = p.options || '';
+                var def = document.createElement('input'); def.type = 'text'; def.placeholder = 'Standard'; def.className = 'pr-default fr-label'; def.value = p['default'] || '';
+                var rm = document.createElement('button'); rm.type = 'button'; rm.className = 'btn btn-sm btn-danger btn-icon'; rm.innerHTML = '<i class="ti ti-trash" aria-hidden="true"></i>';
+                rm.addEventListener('click', function () { row.remove(); });
+                function syncOpts() { opts.style.display = type.value === 'select' ? '' : 'none'; }
+                type.addEventListener('change', syncOpts); syncOpts();
+                row.appendChild(label); row.appendChild(type); row.appendChild(opts); row.appendChild(def); row.appendChild(rm);
+                rows.appendChild(row);
+            }
+            var data = [];
+            try { data = JSON.parse(rows.getAttribute('data-params') || '[]') || []; } catch (e) { }
+            data.forEach(addRow);
+            addBtn.addEventListener('click', function () { addRow({}); });
+            form.addEventListener('submit', function () {
+                var arr = [];
+                Array.prototype.slice.call(rows.querySelectorAll('.param-row')).forEach(function (r) {
+                    var label = r.querySelector('.pr-label').value.trim();
+                    var id = slug(label);
+                    if (!id) return;
+                    arr.push({ id: id, label: label || id, type: r.querySelector('.pr-type').value, options: r.querySelector('.pr-options').value.trim(), 'default': r.querySelector('.pr-default').value });
+                });
+                hidden.value = JSON.stringify(arr);
+            });
+        })();
     </script>
 }

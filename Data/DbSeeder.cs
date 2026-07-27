@@ -248,6 +248,8 @@ public static class DbSeeder
         // NB: default is '' (not '{}') — ExecuteSqlRaw treats "{}" as a format placeholder and throws.
         // Empty is parsed as an empty config anyway, and saving normalizes it to {}.
         await AddColumnIfMissingAsync(db, "Plugins", "ConfigJson", "TEXT NOT NULL DEFAULT ''");
+        await AddColumnIfMissingAsync(db, "Templates", "ParametersJson", "TEXT NOT NULL DEFAULT '[]'");
+        await AddColumnIfMissingAsync(db, "Templates", "ParamValuesJson", "TEXT NOT NULL DEFAULT ''");
     }
 
     /// <summary>Assigns a stable slug Key to any plugin created before the Key column existed.</summary>

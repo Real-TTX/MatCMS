@@ -72,4 +72,14 @@ public class Template
     /// resolve {{menu:slot}} / {{#menu:slot}}…{{/menu:slot}} placeholders in <see cref="LayoutHtml"/>.
     /// </summary>
     public string MenuMapJson { get; set; } = "{}";
+
+    /// <summary>
+    /// Parameters the template DESIGNER publishes for users to tune (without editing the template):
+    /// JSON array [{ id, label, type, options, default }]. Types: text|select|color|number|bool.
+    /// Referenced in <see cref="CustomCss"/> / <see cref="LayoutHtml"/> as <c>{{param:id}}</c>.
+    /// </summary>
+    public string ParametersJson { get; set; } = "[]";
+
+    /// <summary>The values a USER set for the published parameters (JSON object { id: value }).</summary>
+    public string ParamValuesJson { get; set; } = "{}";
 }

@@ -32,6 +32,7 @@ public class EditModel : PageModel
     [BindProperty] public string? CustomCss { get; set; }
     [BindProperty] public string? CustomJs { get; set; }
     [BindProperty] public string? LayoutHtml { get; set; }
+    [BindProperty] public string? ParametersJson { get; set; }
     [BindProperty] public Dictionary<string, string> MenuMap { get; set; } = new();
     public bool IsActive { get; private set; }
     public string? Error { get; private set; }
@@ -64,6 +65,7 @@ public class EditModel : PageModel
         CustomCss = t.CustomCss;
         CustomJs = t.CustomJs;
         LayoutHtml = t.LayoutHtml;
+        ParametersJson = t.ParametersJson;
         IsActive = t.IsActive;
 
         await LoadMenuMappingAsync(t.LayoutHtml, LayoutRenderer.ParseMap(t.MenuMapJson));
@@ -102,6 +104,7 @@ public class EditModel : PageModel
         t.CustomCss = TemplateFonts.Code(CustomCss);
         t.CustomJs = TemplateFonts.Code(CustomJs);
         t.LayoutHtml = TemplateFonts.Code(LayoutHtml, 50000);
+        t.ParametersJson = SanitizeParameters(ParametersJson);
 
         // Persist only slots that actually map to an existing menu.
         var menuKeys = await _db.Menus.Select(m => m.Key).ToListAsync();
@@ -121,5 +124,39 @@ public class EditModel : PageModel
         MenuSlots = LayoutRenderer.ExtractSlots(layoutHtml);
         AvailableMenus = await _db.Menus.OrderBy(m => m.SortOrder).ThenBy(m => m.Id).ToListAsync();
         MenuMap = currentMap;
+    }
+
+    // Normalize the published parameter schema: clean [{id,label,type,options,default}] with slug ids.
+    private static string SanitizeParameters(string? json)
+    {
+        try
+        {
+            if (System.Text.Json.Nodes.JsonNode.Parse(string.IsNullOrWhiteSpace(json) ? "[]" : json) is not System.Text.Json.Nodes.JsonArray arr)
+                return "[]";
+            string[] allowed = { "text", "select", "color", "number", "bool" };
+            var outArr = new System.Text.Json.Nodes.JsonArray();
+            var used = new HashSet<string>();
+            foreach (var el in arr)
+            {
+                var label = el?["label"]?.GetValue<string>()?.Trim() ?? "";
+                var id = el?["id"]?.GetValue<string>()?.Trim() ?? "";
+                var type = el?["type"]?.GetValue<string>()?.Trim() ?? "text";
+                var options = el?["options"]?.GetValue<string>()?.Trim() ?? "";
+                var def = el?["default"]?.GetValue<string>() ?? "";
+                if (!allowed.Contains(type)) type = "text";
+                if (string.IsNullOrEmpty(id)) id = MatCMS.Pages.Admin.Pages.IndexModel.Slugify(label);
+                if (string.IsNullOrEmpty(id) || !used.Add(id)) continue;
+                outArr.Add(new System.Text.Json.Nodes.JsonObject
+                {
+                    ["id"] = id,
+                    ["label"] = string.IsNullOrEmpty(label) ? id : label,
+                    ["type"] = type,
+                    ["options"] = options,
+                    ["default"] = def
+                });
+            }
+            return outArr.ToJsonString();
+        }
+        catch { return "[]"; }
     }
 }

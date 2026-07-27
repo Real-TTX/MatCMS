@@ -7,6 +7,8 @@
 
     // ---- Active template (theme) ----
     var tpl = Site.ActiveTemplate;
+    // Resolved designer-published parameters (user value or default) for {{param:id}} placeholders.
+    var tplParams = MatCMS.Content.TemplateParams.Resolve(tpl);
 
     // Build the Google Fonts URL from the template's font families (dedup, weights 400-700).
     string FontQuery(string family) =>
@@ -81,6 +83,8 @@
             ["toolbar"] = string.Concat(Site.ToolbarMenu.Select(t =>
                 $"<a class=\"hicon\" href=\"{Enc(t.Url)}\"{(t.OpenInNewTab ? " target=\"_blank\" rel=\"noopener\"" : "")} title=\"{Enc(t.Label)}\">{MatCMS.Content.MenuIcons.IconMarkup(t.Icon)}</a>")),
         };
+        foreach (var kv in tplParams)
+            globals["param:" + kv.Key] = Enc(kv.Value);
         var menuMap = MatCMS.Content.LayoutRenderer.ParseMap(tpl.MenuMapJson);
         customBody = MatCMS.Content.LayoutRenderer.Render(tpl.LayoutHtml, globals, menuMap, key => Site.MenuItems(key));
     }
@@ -131,9 +135,10 @@
             @Html.Raw(".btn:hover { background: var(--accent); color: #fff; }")
         }
     </style>
-    @if (!string.IsNullOrWhiteSpace(tpl.CustomCss))
+    @{ var customCssResolved = MatCMS.Content.TemplateParams.Apply(tpl.CustomCss, tplParams, css: true); }
+    @if (!string.IsNullOrWhiteSpace(customCssResolved))
     {
-        <style>@Html.Raw(tpl.CustomCss)</style>
+        <style>@Html.Raw(customCssResolved)</style>
     }
     <link rel="icon" href="@Site.FaviconUrl" />
     @{

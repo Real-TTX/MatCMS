@@ -80,8 +80,10 @@
                     <p class="muted" style="padding:0 4px;">@T["editor.noBlocks"]</p>
                 }
                 <div class="block-list sortable" id="block-list" data-sortable data-reorder-form="reorder-form">
-                    @foreach (var b in blocks)
+                    @for (var _i = 0; _i < blocks.Count; _i++)
                     {
+                        var b = blocks[_i];
+                        <button type="button" class="block-insert" data-insert-at="@_i" title="@T["editor.insertHere"]"><span>+ @T["editor.addBlock"]</span></button>
                         var def = Model.Registry.Get(b.BlockType);
                         var isContainer = def is not null && def.IsContainer;
                         <div class="block-group sortable-item" data-item-id="@b.Id">
@@ -133,6 +135,7 @@
                             }
                         </div>
                     }
+                    <button type="button" class="block-insert" data-insert-at="@blocks.Count" title="@T["editor.insertHere"]"><span>+ @T["editor.addBlock"]</span></button>
                 </div>
                 <form id="reorder-form" method="post" asp-page-handler="Reorder" asp-route-id="@Model.Current.Id" style="display:none;">
                     <div data-order-inputs></div>
@@ -242,6 +245,7 @@
                             @foreach (var def in Model.Registry.All.Where(d => !d.ChildOnly))
                             {
                                 <form method="post" asp-page-handler="AddBlock" asp-route-id="@Model.Current.Id" asp-route-type="@def.Type">
+                                    <input type="hidden" name="position" class="add-position" value="" />
                                     <button type="submit" class="tile">
                                         <span class="t-icon">
                                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">@Html.Raw(def.Svg)</svg>

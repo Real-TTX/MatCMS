@@ -263,7 +263,7 @@ public class EditModel : PageModel
         return RedirectToPage(new { id });
     }
 
-    public async Task<IActionResult> OnPostAddBlockAsync(int id, string type, int? parentId)
+    public async Task<IActionResult> OnPostAddBlockAsync(int id, string type, int? parentId, int? position)
     {
         var def = Registry.Get(type);
         var page = await _db.Pages.Include(p => p.Blocks).FirstOrDefaultAsync(p => p.Id == id);
@@ -282,9 +282,12 @@ public class EditModel : PageModel
             return BadRequest(); // child-only blocks can't be added at the top level
         }
 
-        var siblings = page.Blocks.Where(b => b.ParentId == parentId).ToList();
-        var order = siblings.Count == 0 ? 0 : siblings.Max(b => b.SortOrder) + 1;
-        var block = new ContentBlock { PageId = id, ParentId = parentId, BlockType = def.Type, SortOrder = order, DataJson = "{}" };
+        // Insert at the requested index (from an "insert between blocks" zone), else append.
+        var siblings = page.Blocks.Where(b => b.ParentId == parentId).OrderBy(b => b.SortOrder).ToList();
+        var block = new ContentBlock { PageId = id, ParentId = parentId, BlockType = def.Type, DataJson = "{}" };
+        var insertAt = position is int p && p >= 0 && p <= siblings.Count ? p : siblings.Count;
+        siblings.Insert(insertAt, block);
+        for (var i = 0; i < siblings.Count; i++) siblings[i].SortOrder = i; // contiguous reindex
         _db.ContentBlocks.Add(block);
         await _db.SaveChangesAsync();
 

@@ -8,10 +8,22 @@
     var openBtn = document.getElementById("add-block-btn");
     var closeBtn = document.getElementById("add-block-close");
     if (modal && openBtn) {
-        openBtn.addEventListener("click", function () { modal.classList.add("open"); });
+        var positionInputs = modal.querySelectorAll(".add-position");
+        function setInsertPosition(val) { positionInputs.forEach(function (i) { i.value = val; }); }
+
+        // Bottom "add block" button appends (no position).
+        openBtn.addEventListener("click", function () { setInsertPosition(""); modal.classList.add("open"); });
         if (closeBtn) closeBtn.addEventListener("click", function () { modal.classList.remove("open"); });
         modal.addEventListener("click", function (e) { if (e.target === modal) modal.classList.remove("open"); });
         document.addEventListener("keydown", function (e) { if (e.key === "Escape") modal.classList.remove("open"); });
+
+        // "Insert here" zones between blocks open the same picker but target a specific index.
+        document.querySelectorAll(".block-insert").forEach(function (zone) {
+            zone.addEventListener("click", function () {
+                setInsertPosition(zone.getAttribute("data-insert-at") || "");
+                modal.classList.add("open");
+            });
+        });
     }
 
     // ---------- Live preview linking ----------

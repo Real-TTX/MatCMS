@@ -30,14 +30,15 @@
                 <form id="element-form" method="post" asp-page-handler="SaveElement" asp-route-id="@Model.Current.Id" asp-route-elementId="@sel.Id">
                     <input type="hidden" name="ElementJson" id="ElementJson" />
                     <div id="element-editor"></div>
-                    <div class="le-panel-actions">
-                        <button type="submit" class="btn btn-sm">@T["action.save"]</button>
-                        <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@Model.Current.Id">@T["editor.done"]</a>
-                    </div>
                 </form>
-                <form class="inline-form le-delete" method="post" asp-page-handler="DeleteElement" asp-route-id="@Model.Current.Id" asp-route-elementId="@sel.Id" onsubmit="return confirm('@T["forms.confirmDeleteElement"]');">
-                    <button type="submit" class="btn btn-sm btn-danger">@T["forms.deleteElement"]</button>
-                </form>
+                @* Same compact icon action row as the block editor: delete left, save + done right. *@
+                <div class="le-panel-actions">
+                    <form class="inline-form le-delete" method="post" asp-page-handler="DeleteElement" asp-route-id="@Model.Current.Id" asp-route-elementId="@sel.Id" onsubmit="return confirm('@T["forms.confirmDeleteElement"]');">
+                        <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["forms.deleteElement"]" aria-label="@T["forms.deleteElement"]"><i class="ti ti-trash" aria-hidden="true"></i></button>
+                    </form>
+                    <button type="submit" form="element-form" class="btn btn-sm btn-icon le-save" title="@T["action.save"]" aria-label="@T["action.save"]"><i class="ti ti-device-floppy" aria-hidden="true"></i></button>
+                    <a class="btn btn-sm btn-ghost btn-icon" asp-page="Edit" asp-route-id="@Model.Current.Id" title="@T["editor.done"]" aria-label="@T["editor.done"]"><i class="ti ti-check" aria-hidden="true"></i></a>
+                </div>
             </div>
             <script id="element-data" type="application/json">@Html.Raw(Model.ElementJsonData.Replace("</", "<\\/"))</script>
             <script id="available-fields" type="application/json">@Html.Raw(Model.AvailableFieldsJson.Replace("</", "<\\/"))</script>

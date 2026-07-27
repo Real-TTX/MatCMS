@@ -18,7 +18,8 @@ public class IndexModel : PageModel
     public async Task OnGetAsync(string? tag)
     {
         ActiveTag = string.IsNullOrWhiteSpace(tag) ? null : tag.Trim();
-        var all = await _db.Media.OrderBy(m => m.SortOrder).ThenBy(m => m.Id).ToListAsync();
+        // Ordering is done per gallery block now (not here), so just show newest uploads first.
+        var all = await _db.Media.OrderByDescending(m => m.Id).ToListAsync();
 
         AllTags = all.SelectMany(m => MatCMS.Content.TagUtil.Split(m.Tags))
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -41,20 +42,6 @@ public class IndexModel : PageModel
             TempData["Flash"] = "Medium gespeichert.";
         }
         return RedirectToPage(new { tag = ActiveTag });
-    }
-
-    /// <summary>Persists a new media order (only used from the unfiltered view, so `order` is the full set).</summary>
-    public async Task<IActionResult> OnPostReorderAsync(int[] order)
-    {
-        if (order is { Length: > 0 })
-        {
-            var media = await _db.Media.ToDictionaryAsync(m => m.Id);
-            var pos = 0;
-            foreach (var mid in order)
-                if (media.TryGetValue(mid, out var m)) m.SortOrder = pos++;
-            await _db.SaveChangesAsync();
-        }
-        return RedirectToPage();
     }
 
     public async Task<IActionResult> OnPostDeleteAsync(int id)

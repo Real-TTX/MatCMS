@@ -104,7 +104,11 @@
                     <div class="help">@T["settings.smtpSslHelp"]</div>
                 </div>
             </div>
-            <div><button type="submit" class="btn">@T["settings.save"]</button></div>
+            <div class="form-actions">
+                <button type="submit" class="btn">@T["settings.save"]</button>
+                <button type="submit" class="btn btn-ghost" formaction="?handler=TestSmtp">@T["settings.smtpTest"]</button>
+            </div>
+            <p class="help">@T["settings.smtpTestHelp"]</p>
         </div>
     </form>
 </div>

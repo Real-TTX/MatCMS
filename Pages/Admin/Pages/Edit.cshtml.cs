@@ -342,6 +342,7 @@ public class EditModel : PageModel
             help = f.Help,
             @default = f.Default,
             options,
+            showWhen = f.ShowWhenField is null ? null : new { field = f.ShowWhenField, value = f.ShowWhenValue },
             itemFields = f.ItemFields.Select(x => LocalizeField(x, dynamicSources)).ToList(),
             itemLabel = _t[f.ItemLabel]
         };

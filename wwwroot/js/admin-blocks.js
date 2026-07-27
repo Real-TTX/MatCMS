@@ -17,8 +17,21 @@
     schema.forEach(function (field) {
         var built = buildField(field, data[field.id]);
         editor.appendChild(built.el);
-        collectors.push({ id: field.id, get: built.get });
+        collectors.push({ id: field.id, get: built.get, el: built.el, showWhen: field.showWhen });
     });
+
+    // Conditional field visibility (e.g. the gallery "tags" field only when source = "media").
+    function applyConditions() {
+        collectors.forEach(function (c) {
+            if (!c.showWhen) return;
+            var src = collectors.filter(function (x) { return x.id === c.showWhen.field; })[0];
+            var match = src && String(src.get()) === String(c.showWhen.value);
+            c.el.style.display = match ? "" : "none";
+        });
+    }
+    editor.addEventListener("change", applyConditions);
+    editor.addEventListener("input", applyConditions);
+    applyConditions();
 
     form.addEventListener("submit", function () {
         var obj = {};

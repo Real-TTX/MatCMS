@@ -47,12 +47,21 @@ public class EmailService
 
     public async Task<bool> IsConfiguredAsync() => (await GetConfigAsync()).IsConfigured;
 
-    /// <summary>Sends a plain-text mail to the recipients. Returns (ok, error); never throws.</summary>
+    /// <summary>Sends a plain-text mail using the saved SMTP config. Returns (ok, error); never throws.</summary>
     public async Task<(bool ok, string? error)> SendAsync(
         IEnumerable<string> to, string subject, string body, string? replyTo = null)
+        => await SendCoreAsync(await GetConfigAsync(), to, subject, body, replyTo);
+
+    /// <summary>Sends a test e-mail with an explicit (possibly unsaved) config — used by the SMTP test button.</summary>
+    public async Task<(bool ok, string? error)> SendTestAsync(SmtpConfig cfg, string to)
+        => await SendCoreAsync(cfg, new[] { to },
+            "MatCMS – SMTP-Test",
+            "Diese Test-E-Mail bestätigt, dass die SMTP-Einstellungen funktionieren.\r\n\r\n– MatCMS");
+
+    private async Task<(bool ok, string? error)> SendCoreAsync(
+        SmtpConfig cfg, IEnumerable<string> to, string subject, string body, string? replyTo = null)
     {
-        var cfg = await GetConfigAsync();
-        if (!cfg.IsConfigured) return (false, "SMTP ist nicht konfiguriert.");
+        if (!cfg.IsConfigured) return (false, "SMTP ist nicht konfiguriert (Host und Absender-Adresse erforderlich).");
 
         var recipients = to.Where(e => !string.IsNullOrWhiteSpace(e))
             .Select(e => e.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();

@@ -85,6 +85,8 @@
 @if (editor)
 {
     <style>
+        /* Editor mode: only blocks are interactive — everything else (header, menu, footer) is off-limits. */
+        html { cursor: not-allowed; }
         .mat-ed-block { position: relative; }
         .mat-ed-block::after {
             content: attr(data-block-name);

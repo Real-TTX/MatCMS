@@ -24,6 +24,11 @@ public class BlockField
     /// instead of the static <see cref="Options"/> list. Currently supported: "forms".
     /// </summary>
     public string? OptionsSource { get; set; }
+
+    /// <summary>Conditional visibility: only show this field when another field (<see cref="ShowWhenField"/>)
+    /// currently equals <see cref="ShowWhenValue"/>. Null = always shown.</summary>
+    public string? ShowWhenField { get; set; }
+    public string? ShowWhenValue { get; set; }
 }
 
 public class SelectOption

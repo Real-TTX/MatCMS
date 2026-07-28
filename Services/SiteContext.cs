@@ -88,12 +88,19 @@ public class SiteContext
     // Language switcher
     // ------------------------------------------------------------------
 
+    private IReadOnlyList<string>? _activeLocales;
+
+    /// <summary>The ACTIVE content languages for this site (admin setting <c>i18n.languages</c>; the
+    /// default language is always included). These are the languages offered for translation and shown
+    /// in the language selector.</summary>
+    public IReadOnlyList<string> ActiveLocales =>
+        _activeLocales ??= Localizer.ParseActive(Get(SettingKeys.Languages));
+
     private List<string>? _availableLocales;
 
     /// <summary>
-    /// Content locales that actually have at least one published page (default locale first, then
-    /// the remaining supported cultures in their configured order). With a single-locale site this
-    /// is just ["de"] and the switcher renders as a single/hidden entry.
+    /// Content locales that are ACTIVE and actually have at least one published page (default locale
+    /// first). With a single-locale site this is just ["de"] and the switcher renders hidden.
     /// </summary>
     public IReadOnlyList<string> AvailableLocales
     {
@@ -103,7 +110,7 @@ public class SiteContext
             var present = _db.Pages.AsNoTracking().Where(p => p.IsPublished)
                 .Select(p => p.Locale).Distinct().ToHashSet();
             present.Add(Localizer.DefaultCulture);
-            _availableLocales = Localizer.SupportedCultures.Where(present.Contains).ToList();
+            _availableLocales = ActiveLocales.Where(present.Contains).ToList();
             return _availableLocales;
         }
     }

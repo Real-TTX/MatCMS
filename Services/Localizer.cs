@@ -20,15 +20,45 @@ public class Localizer
     /// served under a culture prefix (/en, /fr …). Adding a language = drop a Resources/&lt;c&gt;.json
     /// and add the code here — routing, the language switcher and this localizer pick it up.
     /// </summary>
-    public static readonly string[] SupportedCultures = [DefaultCulture, "en"];
+    /// <summary>
+    /// The ROUTABLE culture universe: languages the build ships routes/RequestLocalization for. Which
+    /// of these are actually ACTIVE on a site is an admin setting (<c>i18n.languages</c>, see
+    /// <see cref="ParseActive"/>) — so a language can be switched on without a code change. German is
+    /// the default (root URLs); every other entry is served under a "/{culture}" prefix. Adding a truly
+    /// new language = add its code here (+ optional Resources/&lt;c&gt;.json for the admin UI).
+    /// </summary>
+    public static readonly string[] SupportedCultures = [DefaultCulture, "en", "fr", "it", "es", "hr", "nl", "pl"];
 
-    /// <summary>Supported cultures other than the default (served under a URL prefix).</summary>
+    /// <summary>Routable cultures other than the default (served under a URL prefix).</summary>
     public static readonly IReadOnlyList<string> NonDefaultCultures =
         SupportedCultures.Where(c => c != DefaultCulture).ToArray();
 
-    /// <summary>True if <paramref name="culture"/> is one of the supported cultures.</summary>
+    /// <summary>Human names for the language picker.</summary>
+    public static readonly IReadOnlyDictionary<string, string> DisplayNames = new Dictionary<string, string>
+    {
+        ["de"] = "Deutsch", ["en"] = "English", ["fr"] = "Français", ["it"] = "Italiano",
+        ["es"] = "Español", ["hr"] = "Hrvatski", ["nl"] = "Nederlands", ["pl"] = "Polski"
+    };
+
+    public static string DisplayName(string code) =>
+        DisplayNames.TryGetValue((code ?? "").ToLowerInvariant(), out var n) ? n : (code ?? "").ToUpperInvariant();
+
+    /// <summary>True if <paramref name="culture"/> is one of the routable cultures.</summary>
     public static bool IsSupported(string? culture) =>
         !string.IsNullOrEmpty(culture) && SupportedCultures.Contains(culture);
+
+    /// <summary>The ACTIVE content languages, parsed from the admin <c>i18n.languages</c> setting
+    /// (a comma list). The default culture is always active; order follows <see cref="SupportedCultures"/>;
+    /// unknown/non-routable codes are ignored. An empty/unset setting → only the default language.</summary>
+    public static IReadOnlyList<string> ParseActive(string? csv)
+    {
+        var chosen = (csv ?? "")
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(s => s.ToLowerInvariant())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        chosen.Add(DefaultCulture); // the original language is always active
+        return SupportedCultures.Where(chosen.Contains).ToList();
+    }
 
     private readonly IWebHostEnvironment _env;
     private static readonly ConcurrentDictionary<string, Dictionary<string, string>> _cache = new();

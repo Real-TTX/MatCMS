@@ -62,7 +62,12 @@ builder.Services.Configure<Microsoft.Extensions.WebEncoders.WebEncoderOptions>(o
     options.TextEncoderSettings = new System.Text.Encodings.Web.TextEncoderSettings(System.Text.Unicode.UnicodeRanges.All));
 builder.Services.Configure<RequestLocalizationOptions>(options =>
 {
-    var cultures = supportedCultures.Select(c => new CultureInfo(c)).ToList();
+    // Build CultureInfos defensively: under some runtime globalization modes a specific culture may
+    // not be creatable — skip those rather than failing startup (the default must always work).
+    var cultures = supportedCultures
+        .Select(c => { try { return new CultureInfo(c); } catch { return null; } })
+        .Where(c => c is not null).Select(c => c!).ToList();
+    if (cultures.Count == 0) cultures.Add(new CultureInfo(Localizer.DefaultCulture));
     options.DefaultRequestCulture = new RequestCulture(Localizer.DefaultCulture);
     options.SupportedCultures = cultures;
     options.SupportedUICultures = cultures;
@@ -353,9 +358,9 @@ app.MapGet("/sitemap.xml", async (HttpContext ctx, MatCMS.Data.AppDbContext db, 
 {
     if (!site.SitemapEnabled) return Results.NotFound();
 
-    // Only locales the app can actually route (mirrors the content routing + AvailableLocales), so the
-    // sitemap never advertises a /{locale}/… URL that would 404.
-    var supported = MatCMS.Services.Localizer.SupportedCultures;
+    // Only the site's ACTIVE content languages (admin setting) — so the sitemap never advertises a
+    // /{locale}/… URL for a language that isn't turned on.
+    var supported = site.ActiveLocales.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
     // The pages assigned as the 404 / server-error page must never be indexed — drop them.
     var errorSlugs = (await db.SiteSettings.AsNoTracking()

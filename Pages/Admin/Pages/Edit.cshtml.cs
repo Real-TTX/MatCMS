@@ -33,8 +33,9 @@ public class EditModel : PageModel
     public IReadOnlyList<PageEntity> Translations { get; private set; } = new List<PageEntity>();
     // Existing pages in another locale that could be linked as a translation of this one.
     public IReadOnlyList<PageEntity> LinkCandidates { get; private set; } = new List<PageEntity>();
-    public IReadOnlyList<string> SupportedLocales => Localizer.SupportedCultures;
-    // Supported locales that do not yet have a translation in this group (→ "create translation").
+    // Active content languages (admin setting) — the only ones offered for translating this page.
+    public IReadOnlyList<string> SupportedLocales { get; private set; } = new List<string>();
+    // Active locales that do not yet have a translation in this group (→ "create translation").
     public IReadOnlyList<string> MissingLocales { get; private set; } = new List<string>();
 
     // Inline block settings panel (Shopify-style): when ?block=<id> is set.
@@ -541,8 +542,12 @@ public class EditModel : PageModel
                 .OrderBy(p => p.Locale)
                 .ToListAsync();
 
+        // Only the site's ACTIVE languages are offered for translation (admin setting i18n.languages).
+        var active = Localizer.ParseActive(
+            (await _db.SiteSettings.AsNoTracking().FirstOrDefaultAsync(s => s.Key == SettingKeys.Languages))?.Value);
+        SupportedLocales = active;
         var usedLocales = Translations.Select(p => p.Locale).ToHashSet();
-        MissingLocales = Localizer.SupportedCultures.Where(c => !usedLocales.Contains(c)).ToList();
+        MissingLocales = active.Where(c => !usedLocales.Contains(c)).ToList();
 
         LinkCandidates = MissingLocales.Count == 0
             ? new List<PageEntity>()

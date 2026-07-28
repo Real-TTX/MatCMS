@@ -16,6 +16,10 @@ public static class SettingKeys
     public const string NotFoundPage = "error.notFoundPage";
     public const string ErrorPage = "error.errorPage";
 
+    // i18n: comma-separated list of ACTIVE content languages (besides the always-on default "de"),
+    // e.g. "en,fr". Managed under Settings → Sprachen. Only routable codes count (Localizer).
+    public const string Languages = "i18n.languages";
+
     // SEO: "true" serves /sitemap.xml (+ a /robots.txt that references it); anything else = off.
     public const string SitemapEnabled = "sitemap.enabled";
 

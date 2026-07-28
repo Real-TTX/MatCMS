@@ -14,6 +14,7 @@
     <button type="button" class="tab" data-tab="smtp">@T["settings.tabSmtp"]</button>
     <button type="button" class="tab" data-tab="errors">@T["settings.tabErrors"]</button>
     <button type="button" class="tab" data-tab="code">Code &amp; Tracking</button>
+    <button type="button" class="tab" data-tab="languages">Sprachen</button>
 </div>
 
 @* ============ GENERAL ============ *@
@@ -189,6 +190,27 @@
                 <div class="help">Wird direkt vor &lt;/body&gt; eingefügt.</div>
             </div>
 
+            <div><button type="submit" class="btn">Speichern</button></div>
+        </div>
+    </form>
+</div>
+
+<div class="tab-panel" data-panel="languages" hidden>
+    <form method="post" asp-page-handler="Languages">
+        <div class="card">
+            <h2>Sprachen</h2>
+            <p class="muted">Aktive Inhalts-Sprachen der Website. <strong>Deutsch</strong> ist die Originalsprache und immer aktiv. Übersetzungen pflegst du je Seite im Seiten-Editor (Sprach-Panel). Der Sprach-Umschalter erscheint automatisch auf der Website, sobald eine Seite in einer weiteren Sprache veröffentlicht ist.</p>
+            <div class="form-field">
+                <label>Verfügbare Sprachen</label>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-top:6px;">
+                    <label style="display:flex;align-items:center;gap:8px;opacity:.6;"><input type="checkbox" checked disabled /> Deutsch <span class="muted">(Original)</span></label>
+                    @foreach (var code in Model.RoutableLanguages.Where(c => c != MatCMS.Services.Localizer.DefaultCulture))
+                    {
+                        <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" name="ActiveLanguages" value="@code" checked="@Model.CurrentActive.Contains(code)" /> @MatCMS.Services.Localizer.DisplayName(code) <span class="muted">(@code)</span></label>
+                    }
+                </div>
+                <div class="help">Eine ausgewählte Sprache wird im Seiten-Editor zum Übersetzen angeboten und – sobald Inhalte dafür veröffentlicht sind – im Sprach-Umschalter der Website gezeigt (URLs unter <code>/@("{code}")/…</code>).</div>
+            </div>
             <div><button type="submit" class="btn">Speichern</button></div>
         </div>
     </form>

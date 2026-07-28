@@ -15,17 +15,43 @@ public class IndexModel : PageModel
 
     [BindProperty] public Dictionary<string, string> Values { get; set; } = new();
 
+    /// <summary>Checked non-default language codes (Sprachen tab).</summary>
+    [BindProperty] public List<string> ActiveLanguages { get; set; } = new();
+
     /// <summary>Published pages offered as 404 / error targets (Fehlerhandling tab).</summary>
     public List<MatCMS.Models.Page> AllPages { get; private set; } = new();
+
+    /// <summary>All routable language codes (Sprachen tab) and which are currently active.</summary>
+    public IReadOnlyList<string> RoutableLanguages => Localizer.SupportedCultures;
+    public HashSet<string> CurrentActive { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
 
     public async Task OnGetAsync()
     {
         var existing = await _db.SiteSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
         foreach (var key in SettingKeys.All.Concat(SettingKeys.Smtp).Concat(SettingKeys.Errors).Concat(SettingKeys.Code))
             Values[key] = existing.TryGetValue(key, out var v) ? v : "";
+        CurrentActive = Localizer.ParseActive(existing.TryGetValue(SettingKeys.Languages, out var lv) ? lv : "")
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         AllPages = await _db.Pages.AsNoTracking()
             .Where(p => p.Locale == Localizer.DefaultCulture)
             .OrderBy(p => p.Title).ToListAsync();
+    }
+
+    public async Task<IActionResult> OnPostLanguagesAsync()
+    {
+        // Keep only routable, non-default codes; store as a CSV (the default language is always active).
+        var routable = Localizer.SupportedCultures.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var chosen = (ActiveLanguages ?? new())
+            .Select(c => (c ?? "").Trim().ToLowerInvariant())
+            .Where(c => c.Length > 0 && c != Localizer.DefaultCulture && routable.Contains(c))
+            .Distinct().ToList();
+        var csv = string.Join(",", chosen);
+        var setting = await _db.SiteSettings.FirstOrDefaultAsync(s => s.Key == SettingKeys.Languages);
+        if (setting is null) _db.SiteSettings.Add(new SiteSetting { Key = SettingKeys.Languages, Value = csv });
+        else setting.Value = csv;
+        await _db.SaveChangesAsync();
+        TempData["Flash"] = "Sprachen gespeichert.";
+        return RedirectToPage(new { tab = "languages" });
     }
 
     public async Task<IActionResult> OnPostAsync()

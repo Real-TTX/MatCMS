@@ -1,3 +1,4 @@
+using System.Text;
 using MatCMS.Data;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
@@ -18,13 +19,85 @@ public class PluginRequest
     /// <summary>Block field data (JSON) — only for block render callbacks.</summary>
     public string Data { get; init; } = "{}";
 
+    /// <summary>Pre-rendered hidden antiforgery &lt;input&gt; for admin POST forms (empty on public/
+    /// anonymous requests). Include it in any custom &lt;form method="post"&gt;, or — simpler — use
+    /// <see cref="Ui"/>, whose Form/ActionButton helpers add it for you.</summary>
+    public string Antiforgery { get; init; } = "";
+
     public PluginRegistry Registry { get; init; } = default!;
     public T? Service<T>() => Services.GetService(typeof(T)) is T t ? t : default;
     public string Q(string key) => Query.TryGetValue(key, out var v) ? v : "";
     public string F(string key) => Form.TryGetValue(key, out var v) ? v : "";
     public bool IsPost => string.Equals(Method, "POST", StringComparison.OrdinalIgnoreCase);
+    /// <summary>Convenience: the posted <c>action</c> field — handy for dispatching POST handlers.</summary>
+    public string Action => F("action");
+    /// <summary>A tiny admin-UI builder (cards, alerts, POST forms/buttons that auto-carry the
+    /// antiforgery token). Access as <c>req.Ui</c>. See <see cref="AdminUi"/>.</summary>
+    public AdminUi Ui => new(Antiforgery);
     /// <summary>Write a line to the plugin log (visible under Plugins in the admin).</summary>
     public void Log(object? message) => Registry?.AddLog(message?.ToString() ?? "");
+}
+
+/// <summary>
+/// A small helper for building admin-page HTML from plugins without hand-writing boilerplate: cards,
+/// alerts, tables, and — crucially — POST forms/buttons that automatically include the antiforgery
+/// token, so plugin admin actions POST correctly to the auto-validated <c>/admin</c> Razor Pages.
+/// Obtained per request via <c>req.Ui</c>. All text arguments are HTML-encoded; pass ready-made markup
+/// only through the explicit <c>*Html</c> parameters.
+/// </summary>
+public sealed class AdminUi
+{
+    private readonly string _csrf; // pre-rendered hidden antiforgery field ("" on public requests)
+    public AdminUi(string antiforgeryField) => _csrf = antiforgeryField ?? "";
+
+    private static string Enc(string? s) => System.Net.WebUtility.HtmlEncode(s ?? "");
+
+    /// <summary>The raw hidden antiforgery &lt;input&gt; — drop it into any custom POST form.</summary>
+    public string Token => _csrf;
+
+    /// <summary>Page header: an optional &lt;h1&gt; and/or a muted subtitle. Omit the title when the admin
+    /// topbar already shows it (avoids a duplicate heading).</summary>
+    public string PageHead(string? subtitle = null, string? title = null) =>
+        "<div class=\"page-head\">" +
+        (string.IsNullOrWhiteSpace(title) ? "" : "<h1>" + Enc(title) + "</h1>") +
+        (string.IsNullOrWhiteSpace(subtitle) ? "" : "<p class=\"muted\">" + Enc(subtitle) + "</p>") +
+        "</div>";
+
+    /// <summary>A card panel with an optional heading. <paramref name="innerHtml"/> is emitted verbatim.</summary>
+    public string Card(string innerHtml, string? title = null) =>
+        "<div class=\"card\">" + (string.IsNullOrWhiteSpace(title) ? "" : "<h2>" + Enc(title) + "</h2>") + (innerHtml ?? "") + "</div>";
+
+    /// <summary>A status banner. <paramref name="type"/>: info | success | error | warning.</summary>
+    public string Alert(string message, string type = "info") =>
+        "<div class=\"alert alert-" + Enc(type) + "\">" + Enc(message) + "</div>";
+
+    /// <summary>A POST &lt;form&gt; that carries the antiforgery token plus any <paramref name="hidden"/>
+    /// fields; <paramref name="innerHtml"/> is your own markup (inputs, buttons). Posts to the current page.</summary>
+    public string Form(string innerHtml, IDictionary<string, string>? hidden = null, string? cssClass = null)
+    {
+        var sb = new StringBuilder("<form method=\"post\"");
+        if (!string.IsNullOrWhiteSpace(cssClass)) sb.Append(" class=\"").Append(Enc(cssClass)).Append('"');
+        sb.Append('>').Append(_csrf);
+        if (hidden != null)
+            foreach (var kv in hidden)
+                sb.Append("<input type=\"hidden\" name=\"").Append(Enc(kv.Key)).Append("\" value=\"").Append(Enc(kv.Value)).Append("\"/>");
+        sb.Append(innerHtml ?? "").Append("</form>");
+        return sb.ToString();
+    }
+
+    /// <summary>A compact row action: a mini POST form rendering one submit button that carries the token
+    /// plus <paramref name="hidden"/> fields. <paramref name="confirm"/> adds a JS confirmation prompt.</summary>
+    public string ActionButton(string label, IDictionary<string, string> hidden, string? cssClass = null, string? confirm = null)
+    {
+        var onclick = "";
+        if (!string.IsNullOrWhiteSpace(confirm))
+        {
+            var js = confirm.Replace("\\", "\\\\").Replace("'", "\\'").Replace("\r", " ").Replace("\n", " ");
+            onclick = " onclick=\"return confirm('" + Enc(js) + "')\"";
+        }
+        var btn = "<button type=\"submit\" class=\"btn btn-sm " + Enc(cssClass) + "\"" + onclick + ">" + Enc(label) + "</button>";
+        return Form(btn, hidden, "inline-form");
+    }
 }
 
 /// <summary>What plugins registered on their last run (shared across requests, singleton).</summary>

@@ -508,7 +508,7 @@ public static class DbSeeder
     {
         Name = ReviewPluginName,
         Key = "bewertungen",
-        Version = "1.1",
+        Version = "1.2",
         Description = "Bewertungsabgabe: Besucher geben Rezensionen mit Sternebewertung ab (Anzeige als Karten, Moderation im Admin).",
         Enabled = true,
         Code = """
@@ -693,30 +693,34 @@ public static class DbSeeder
 
                 string Card(string store, JsonObject r, bool isPending)
                 {
-                    var id = r["id"]?.GetValue<long>() ?? 0;
+                    var id = (r["id"]?.GetValue<long>() ?? 0).ToString();
                     var b = new StringBuilder("<div class='block-item'><div class='b-info' style='flex:1;'>");
                     b.Append("<div class='b-type'>" + Stars(r["rating"]?.GetValue<int>() ?? 5) + " <strong>" + Enc(r["name"]?.GetValue<string>()) + "</strong> <span class='muted' style='font-size:12px;'>(" + Enc(store) + ")</span></div>");
                     b.Append("<div class='muted' style='font-size:14px;margin-top:4px;'>" + Enc(r["text"]?.GetValue<string>()) + "</div></div>");
-                    string Btn(string act, string label, string cls) =>
-                        "<form method='post' class='inline-form'><input type='hidden' name='action' value='" + act + "'/><input type='hidden' name='store' value='" + Enc(store) + "'/><input type='hidden' name='id' value='" + id + "'/><button class='btn btn-sm " + cls + "' type='submit'>" + label + "</button></form>";
-                    b.Append(isPending ? Btn("approve", "✓ Freigeben", "") : Btn("unpublish", "Verbergen", "btn-ghost"));
-                    b.Append(Btn("delete", "✕", "btn-danger"));
+                    // Row actions via the admin-UI builder — each is a POST form that auto-carries the
+                    // antiforgery token (which is why Freigeben/Verbergen/Löschen now work).
+                    var f = new Dictionary<string, string> { ["store"] = store, ["id"] = id };
+                    b.Append(isPending
+                        ? req.Ui.ActionButton("✓ Freigeben", new Dictionary<string, string>(f) { ["action"] = "approve" }, "")
+                        : req.Ui.ActionButton("Verbergen", new Dictionary<string, string>(f) { ["action"] = "unpublish" }, "btn-ghost"));
+                    b.Append(req.Ui.ActionButton("✕", new Dictionary<string, string>(f) { ["action"] = "delete" }, "btn-danger", "Diese Bewertung wirklich löschen?"));
                     b.Append("</div>");
                     return b.ToString();
                 }
 
+                // Topbar already shows the plugin title ("Bewertungen"), so only a subtitle here.
                 var sb = new StringBuilder();
-                // No <h1> here: the admin topbar already shows the plugin title ("Bewertungen"),
-                // so the page only adds a short subtitle (avoids a duplicate heading).
-                sb.Append("<div class='page-head'><p class='muted'>Neue Bewertungen freigeben, verbergen oder löschen.</p></div>");
-                sb.Append("<div class='card'><h2>Wartet auf Freigabe (" + pend.Count + ")</h2><div class='block-list'>");
-                if (pend.Count == 0) sb.Append("<p class='muted'>Nichts zu prüfen.</p>");
-                foreach (var x in pend) sb.Append(Card(x.Store, x.R, true));
-                sb.Append("</div></div>");
-                sb.Append("<div class='card' style='margin-top:16px;'><h2>Veröffentlicht (" + pub.Count + ")</h2><div class='block-list'>");
-                if (pub.Count == 0) sb.Append("<p class='muted'>Noch nichts veröffentlicht.</p>");
-                foreach (var x in pub) sb.Append(Card(x.Store, x.R, false));
-                sb.Append("</div></div>");
+                sb.Append(req.Ui.PageHead("Neue Bewertungen freigeben, verbergen oder löschen."));
+                var pendInner = new StringBuilder("<div class='block-list'>");
+                if (pend.Count == 0) pendInner.Append("<p class='muted'>Nichts zu prüfen.</p>");
+                foreach (var x in pend) pendInner.Append(Card(x.Store, x.R, true));
+                pendInner.Append("</div>");
+                sb.Append(req.Ui.Card(pendInner.ToString(), "Wartet auf Freigabe (" + pend.Count + ")"));
+                var pubInner = new StringBuilder("<div class='block-list'>");
+                if (pub.Count == 0) pubInner.Append("<p class='muted'>Noch nichts veröffentlicht.</p>");
+                foreach (var x in pub) pubInner.Append(Card(x.Store, x.R, false));
+                pubInner.Append("</div>");
+                sb.Append(req.Ui.Card(pubInner.ToString(), "Veröffentlicht (" + pub.Count + ")"));
                 return sb.ToString();
             });
 

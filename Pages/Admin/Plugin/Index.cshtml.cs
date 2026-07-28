@@ -1,4 +1,5 @@
 using MatCMS.Services;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
@@ -8,7 +9,12 @@ namespace MatCMS.Pages.Admin.Plugin;
 public class IndexModel : PageModel
 {
     private readonly PluginRegistry _registry;
-    public IndexModel(PluginRegistry registry) => _registry = registry;
+    private readonly IAntiforgery _antiforgery;
+    public IndexModel(PluginRegistry registry, IAntiforgery antiforgery)
+    {
+        _registry = registry;
+        _antiforgery = antiforgery;
+    }
 
     public string Key { get; private set; } = "";
     /// <summary>Human page title for the topbar — the plugin's admin-menu label, not the raw route key.</summary>
@@ -57,13 +63,18 @@ public class IndexModel : PageModel
         foreach (var kv in Request.Query)
             query[kv.Key] = kv.Value.ToString();
 
+        // A valid antiforgery field so plugin-built POST forms pass the /admin auto-validation.
+        var tokens = _antiforgery.GetAndStoreTokens(HttpContext);
+        var csrf = $"<input type=\"hidden\" name=\"{tokens.FormFieldName}\" value=\"{System.Net.WebUtility.HtmlEncode(tokens.RequestToken)}\" />";
+
         var pr = new PluginRequest
         {
             Services = HttpContext.RequestServices,
             Registry = _registry,
             Method = method,
             Query = query,
-            Form = (IReadOnlyDictionary<string, string>)form
+            Form = (IReadOnlyDictionary<string, string>)form,
+            Antiforgery = csrf
         };
         try { Html = handler(pr); }
         catch (Exception ex) { Html = "<div class=\"alert alert-error\">Plugin-Fehler: " + System.Net.WebUtility.HtmlEncode(ex.Message) + "</div>"; }

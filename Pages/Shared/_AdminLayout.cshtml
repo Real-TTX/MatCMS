@@ -68,10 +68,12 @@
             }
         </nav>
         <div class="admin-nav-foot">
-            <a href="/" target="_blank">🌐 @T["nav.viewSite"]</a>
-            <form method="post" asp-page="/Logout">
-                <button type="submit" class="linklike">🚪 @T["nav.logout"]</button>
-            </form>
+            <div class="admin-foot-actions">
+                <a class="admin-foot-btn" href="/" target="_blank" rel="noopener">🌐 @T["nav.viewSite"]</a>
+                <form method="post" asp-page="/Logout">
+                    <button type="submit" class="admin-foot-btn">🚪 @T["nav.logout"]</button>
+                </form>
+            </div>
             <a class="admin-cms-foot" asp-page="/Admin/About/Index" title="@T["nav.about"]">
                 <span class="cms">MatCMS</span>
                 <span class="admin-version">v@(Version.Current)</span>

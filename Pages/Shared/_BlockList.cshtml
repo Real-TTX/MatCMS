@@ -13,20 +13,12 @@
     }
     var data = new MatCMS.Content.BlockData(block.DataJson);
 
-    // Container blocks need their children resolved to (partial, data) pairs.
+    // Container blocks need their children resolved. A child that is itself a container gets its own
+    // sub-model built recursively (so e.g. a cards block inside a section renders its own cards).
     MatCMS.Content.ContainerBlockModel? containerModel = null;
     if (def.IsContainer)
     {
-        var kids = allBlocks.Where(b => b.ParentId == block.Id).OrderBy(b => b.SortOrder)
-            .Select(cb =>
-            {
-                var cdef = registry.Get(cb.BlockType);
-                return cdef is null || string.IsNullOrWhiteSpace(cdef.Partial)
-                    ? null
-                    : new MatCMS.Content.ContainerBlockModel.ChildBlock(cdef.Partial, new MatCMS.Content.BlockData(cb.DataJson));
-            })
-            .Where(x => x is not null).Select(x => x!).ToList();
-        containerModel = new MatCMS.Content.ContainerBlockModel(data, kids);
+        containerModel = BuildContainer(block.Id, data, registry, allBlocks, 0);
     }
 
     // Global layout options (width + top/bottom spacing) — one wrapper for both preview and live.
@@ -62,6 +54,26 @@
     </div>
 }
 @functions {
+    // Resolves a container's children into (partial, data) pairs; a child that is itself a container
+    // gets its own sub-model built recursively (depth-guarded) so arbitrary nesting renders.
+    static MatCMS.Content.ContainerBlockModel BuildContainer(int parentId, MatCMS.Content.BlockData data,
+        MatCMS.Content.BlockRegistry reg, IReadOnlyList<MatCMS.Models.ContentBlock> all, int depth)
+    {
+        var kids = new List<MatCMS.Content.ContainerBlockModel.ChildBlock>();
+        if (depth <= 6)
+        {
+            foreach (var cb in all.Where(b => b.ParentId == parentId).OrderBy(b => b.SortOrder))
+            {
+                var cdef = reg.Get(cb.BlockType);
+                if (cdef is null || string.IsNullOrWhiteSpace(cdef.Partial)) continue;
+                var cdata = new MatCMS.Content.BlockData(cb.DataJson);
+                var sub = cdef.IsContainer ? BuildContainer(cb.Id, cdata, reg, all, depth + 1) : null;
+                kids.Add(new MatCMS.Content.ContainerBlockModel.ChildBlock(cdef.Partial, cdata, sub));
+            }
+        }
+        return new MatCMS.Content.ContainerBlockModel(data, kids);
+    }
+
     string RenderPluginBlock(MatCMS.Content.BlockDefinition def, string dataJson)
     {
         var http = ViewContext.HttpContext;

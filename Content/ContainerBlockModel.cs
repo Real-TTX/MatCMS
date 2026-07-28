@@ -12,6 +12,8 @@ public sealed class ContainerBlockModel
         Children = children;
     }
 
-    /// <summary>A nested child block: which partial renders it and its field data.</summary>
-    public sealed record ChildBlock(string Partial, BlockData Data);
+    /// <summary>A nested child block: which partial renders it and its field data. When the child is
+    /// itself a container, <see cref="Container"/> carries its resolved sub-model (for recursive
+    /// rendering, e.g. a cards block inside a section); it is null for ordinary leaf children.</summary>
+    public sealed record ChildBlock(string Partial, BlockData Data, ContainerBlockModel? Container = null);
 }

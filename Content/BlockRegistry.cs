@@ -427,9 +427,10 @@ public class BlockRegistry
             Description = "block.section.desc",
             Svg = SvgColumns,
             Partial = "Blocks/_Section",
-            // Generic grouping container: holds arbitrary CONTENT (leaf) blocks. Nested containers are
-            // intentionally excluded for now (they need recursive rendering — a separate change).
-            AllowedChildren = ["richtext", "image", "imagetext", "cta", "quote", "html", "gallery", "logostrip", "spacer", "posts"],
+            // Generic grouping container: holds arbitrary content blocks AND other containers (cards,
+            // columns, service grid, accordion, leistungen) — nested containers render recursively.
+            AllowedChildren = ["richtext", "image", "imagetext", "cta", "quote", "html", "gallery", "logostrip", "spacer", "posts",
+                               "cards", "columns", "servicegrid", "accordion", "leistungen", "section"],
             Fields =
             [
                 new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },

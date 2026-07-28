@@ -26,7 +26,15 @@
             @foreach (var child in Model.Children)
             {
                 <div class="section-item">
-                    @await Html.PartialAsync(child.Partial, child.Data)
+                    @if (child.Container is not null)
+                    {
+                        @* Nested container (e.g. cards/columns) — render with its recursive sub-model. *@
+                        @await Html.PartialAsync(child.Partial, child.Container)
+                    }
+                    else
+                    {
+                        @await Html.PartialAsync(child.Partial, child.Data)
+                    }
                 </div>
             }
         </div>

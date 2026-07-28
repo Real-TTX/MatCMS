@@ -2,14 +2,20 @@
 @inject MatCMS.Services.PluginRegistry Plugins
 @inject MatCMS.Services.VersionService Version
 @inject Microsoft.Extensions.Options.IOptions<Microsoft.AspNetCore.Builder.RequestLocalizationOptions> LocOptions
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment Env
 @{
     var title = ViewData["Title"] as string ?? "Admin";
     string Active(string path) =>
         Context.Request.Path.StartsWithSegments(path, StringComparison.OrdinalIgnoreCase) ? "active" : "";
     var displayName = User.FindFirst("DisplayName")?.Value ?? User.Identity?.Name ?? "Admin";
 
-    // Language switcher: enumerate supported cultures (lights up once a 2nd language is added).
-    var cultures = LocOptions.Value.SupportedUICultures ?? new System.Collections.Generic.List<System.Globalization.CultureInfo>();
+    // Admin-UI language switcher: only offer cultures that actually have an admin translation file
+    // (Resources/<lang>.json). A content-only language (e.g. English pages) must NOT add an admin-UI
+    // toggle here — the visitor-facing language selector lives in the public template, not the admin.
+    var allUiCultures = LocOptions.Value.SupportedUICultures ?? new System.Collections.Generic.List<System.Globalization.CultureInfo>();
+    string _uiLang(System.Globalization.CultureInfo c) => c.Name.Split('-', 2)[0];
+    var cultures = allUiCultures.Where(c => System.IO.File.Exists(
+        System.IO.Path.Combine(Env.ContentRootPath, "Resources", _uiLang(c) + ".json"))).ToList();
     var currentCulture = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
     var returnUrl = Context.Request.Path + Context.Request.QueryString;
 }

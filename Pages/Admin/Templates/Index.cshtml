@@ -21,11 +21,10 @@
                     {
                         <span class="badge badge-on">@T["templates.active"]</span>
                     }
-                    <span class="muted-font">@t.HeadingFont</span>
                 </div>
                 <div class="actions">
-                    <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@t.Id" title="Designer – Aussehen, Layout &amp; Menü-Zuordnung"><i class="ti ti-palette" aria-hidden="true"></i> Designer</a>
-                    <a class="btn btn-sm btn-ghost" asp-page="Customize" asp-route-id="@t.Id" title="Edit – Einstellungen dieses Templates anpassen"><i class="ti ti-pencil" aria-hidden="true"></i> Edit</a>
+                    <a class="btn btn-sm btn-ghost btn-icon" asp-page="Edit" asp-route-id="@t.Id" title="Designer – Aussehen, Layout &amp; Menü-Zuordnung" aria-label="Designer"><i class="ti ti-palette" aria-hidden="true"></i></a>
+                    <a class="btn btn-sm btn-ghost btn-icon" asp-page="Customize" asp-route-id="@t.Id" title="Edit – Einstellungen dieses Templates anpassen" aria-label="Edit"><i class="ti ti-pencil" aria-hidden="true"></i></a>
                     @if (!t.IsActive)
                     {
                         <form class="inline-form" method="post" asp-page-handler="Activate" asp-route-id="@t.Id">

@@ -3,58 +3,117 @@
 @using Microsoft.EntityFrameworkCore
 @{
     var heading = Model.Str("heading");
-    var tag = Model.Str("tag").Trim();
+    var display = Model.StrOr("display", "cards");   // "cards" | "blog"
+    var isBlog = display == "blog";
+    var tag = Model.Str("tag").Trim();               // admin pre-filter
     var columns = Model.StrOr("columns", "3");
     var showFilter = Model.StrOr("showFilter", "no") == "yes";
     var limit = int.TryParse(Model.Str("limit"), out var lim) && lim > 0 ? lim : 0;
+    var perPage = int.TryParse(Model.Str("perPage"), out var pp) && pp > 0 ? pp : 0;
+
+    // Server-side filter + paging (works with paging, unlike the client-side gallery filter).
+    var req = ViewContext.HttpContext.Request;
+    var path = req.Path.HasValue ? req.Path.Value! : "/";
+    var activeTag = req.Query["ptag"].ToString().Trim();
+    var pageNum = int.TryParse(req.Query["pseite"].ToString(), out var pn) && pn > 1 ? pn : 1;
 
     string SafeImg(string? s) =>
         (!string.IsNullOrWhiteSpace(s) && (s.StartsWith("/") || s.StartsWith("http"))
          && s.IndexOfAny(new[] { '"', '\'', '<', '>' }) < 0) ? s! : "";
 
-    var posts = Db.Posts.AsNoTracking()
+    string TagUrl(string t) => string.IsNullOrEmpty(t) ? path : path + "?ptag=" + Uri.EscapeDataString(t);
+    string PageUrl(int pg)
+    {
+        var qs = new List<string>();
+        if (!string.IsNullOrEmpty(activeTag)) qs.Add("ptag=" + Uri.EscapeDataString(activeTag));
+        if (pg > 1) qs.Add("pseite=" + pg);
+        return qs.Count > 0 ? path + "?" + string.Join("&", qs) : path;
+    }
+
+    // Base set: published (de), admin pre-filter tag, optional overall limit.
+    var all = Db.Posts.AsNoTracking()
         .Where(p => p.IsPublished && p.Locale == "de")
         .OrderByDescending(p => p.PublishedAt).ThenByDescending(p => p.Id)
         .ToList();
     if (!string.IsNullOrWhiteSpace(tag))
-        posts = posts.Where(p => MatCMS.Content.TagUtil.Split(p.Tags)
-            .Contains(tag, StringComparer.OrdinalIgnoreCase)).ToList();
-    if (limit > 0) posts = posts.Take(limit).ToList();
+        all = all.Where(p => MatCMS.Content.TagUtil.Split(p.Tags).Contains(tag, StringComparer.OrdinalIgnoreCase)).ToList();
+    if (limit > 0) all = all.Take(limit).ToList();
 
-    var filterTags = posts.SelectMany(p => MatCMS.Content.TagUtil.Split(p.Tags))
+    // Filter chips = tags across the base set (minus the admin pre-filter tag).
+    var filterTags = all.SelectMany(p => MatCMS.Content.TagUtil.Split(p.Tags))
         .Where(t => !string.Equals(t, tag, StringComparison.OrdinalIgnoreCase))
         .Distinct(StringComparer.OrdinalIgnoreCase)
         .OrderBy(t => t, StringComparer.OrdinalIgnoreCase).ToList();
+
+    // Active (clicked) tag filter, then paginate.
+    var filtered = string.IsNullOrEmpty(activeTag)
+        ? all
+        : all.Where(p => MatCMS.Content.TagUtil.Split(p.Tags).Contains(activeTag, StringComparer.OrdinalIgnoreCase)).ToList();
+
+    var total = filtered.Count;
+    var totalPages = perPage > 0 ? (int)Math.Ceiling(total / (double)perPage) : 1;
+    if (totalPages < 1) totalPages = 1;
+    if (pageNum > totalPages) pageNum = totalPages;
+    var posts = perPage > 0 ? filtered.Skip((pageNum - 1) * perPage).Take(perPage).ToList() : filtered;
 }
 <section class="section posts-block">
-    <div class="container">
+    <div class="container@(isBlog ? " narrow" : "")">
         @if (!string.IsNullOrWhiteSpace(heading))
         {
             <div class="section__intro"><h2>@heading</h2></div>
         }
+
+        @if (showFilter && filterTags.Count > 0)
+        {
+            <div class="posts-filter">
+                <a class="pfilter @(string.IsNullOrEmpty(activeTag) ? "active" : "")" href="@TagUrl("")">Alle</a>
+                @foreach (var t in filterTags)
+                {
+                    <a class="pfilter @(string.Equals(activeTag, t, StringComparison.OrdinalIgnoreCase) ? "active" : "")" href="@TagUrl(t)">@t</a>
+                }
+            </div>
+        }
+
         @if (posts.Count == 0)
         {
-            <p class="muted">Noch keine Beiträge.</p>
+            <p class="muted">Keine Beiträge gefunden.</p>
         }
-        else
+        else if (isBlog)
         {
-            @if (showFilter && filterTags.Count > 0)
-            {
-                <div class="gallery-filter" data-gallery-filter>
-                    <button type="button" class="gfilter active" data-tag="">Alle</button>
-                    @foreach (var t in filterTags)
-                    {
-                        <button type="button" class="gfilter" data-tag="@t">@t</button>
-                    }
-                </div>
-            }
-            <div class="posts-grid cols-@columns" data-gallery>
+            <div class="blog-list">
                 @foreach (var p in posts)
                 {
                     var img = SafeImg(p.TitleImage);
-                    var ptags = string.Join(" ", MatCMS.Content.TagUtil.Split(p.Tags));
-                    <article class="post-card gallery__item" data-tags="@ptags">
-                        <a class="post-card__link" href="/beitrag/@p.Slug">
+                    <article class="blog-post">
+                        @if (img.Length > 0)
+                        {
+                            <a href="/blog/@p.Slug" class="blog-post__imglink"><div class="blog-post__img" style="background-image:url('@img')"></div></a>
+                        }
+                        <p class="blog-post__meta">@p.PublishedAt.ToLocalTime().ToString("dd. MMMM yyyy")</p>
+                        <h2 class="blog-post__title"><a href="/blog/@p.Slug">@p.Title</a></h2>
+                        @if (!string.IsNullOrWhiteSpace(p.Tags))
+                        {
+                            <div class="post-card__tags">
+                                @foreach (var t in MatCMS.Content.TagUtil.Split(p.Tags))
+                                {
+                                    <a class="post-tag" href="@TagUrl(t)">@t</a>
+                                }
+                            </div>
+                        }
+                        <div class="rich blog-post__body">@Html.Raw(p.ContentHtml)</div>
+                        <a class="blog-post__more" href="/blog/@p.Slug">Zum Beitrag →</a>
+                    </article>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="posts-grid cols-@columns">
+                @foreach (var p in posts)
+                {
+                    var img = SafeImg(p.TitleImage);
+                    <article class="post-card">
+                        <a class="post-card__link" href="/blog/@p.Slug">
                             @if (img.Length > 0)
                             {
                                 <div class="post-card__img" style="background-image:url('@img')"></div>
@@ -81,6 +140,24 @@
                 }
             </div>
         }
+
+        @if (totalPages > 1)
+        {
+            <nav class="posts-pager" aria-label="Seiten">
+                @if (pageNum > 1)
+                {
+                    <a class="pager-btn" href="@PageUrl(pageNum - 1)" rel="prev">‹ Zurück</a>
+                }
+                @for (var i = 1; i <= totalPages; i++)
+                {
+                    <a class="pager-num @(i == pageNum ? "active" : "")" href="@PageUrl(i)">@i</a>
+                }
+                @if (pageNum < totalPages)
+                {
+                    <a class="pager-btn" href="@PageUrl(pageNum + 1)" rel="next">Weiter ›</a>
+                }
+            </nav>
+        }
     </div>
 </section>
 <style>
@@ -95,8 +172,36 @@
     .post-card__body { padding: 18px 20px 20px; }
     .post-card__tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
     .post-tag { font-size: 12px; font-weight: 600; color: var(--accent); background: var(--bg-alt, #f5f0e8);
-        padding: 3px 9px; border-radius: 999px; }
+        padding: 3px 9px; border-radius: 999px; text-decoration: none; }
+    a.post-tag:hover { background: var(--accent); color: #fff; }
     .post-card__title { font-family: var(--font-head); margin: 0 0 8px; font-size: 1.25rem; }
     .post-card__excerpt { margin: 0 0 12px; line-height: 1.6; opacity: .85; }
     .post-card__more { font-weight: 700; color: var(--accent); }
+
+    /* Filter chips (server-side links) */
+    .posts-filter { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 26px; }
+    .pfilter { text-decoration: none; font-size: 14px; font-weight: 600; padding: 6px 14px; border-radius: 999px;
+        border: 1px solid #e2d6c3; color: var(--ink); background: #fff; }
+    .pfilter:hover { border-color: var(--accent); color: var(--accent); }
+    .pfilter.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+    /* Blog (full post) list */
+    .blog-list { display: flex; flex-direction: column; gap: 56px; }
+    .blog-post__imglink { display: block; }
+    .blog-post__img { height: 340px; background-size: cover; background-position: center; border-radius: 14px;
+        box-shadow: 0 12px 30px rgba(26,21,18,.14); margin-bottom: 18px; }
+    .blog-post__meta { font-size: 13px; letter-spacing: .05em; text-transform: uppercase; color: #8a7f72; margin: 0 0 6px; }
+    .blog-post__title { font-family: var(--font-head); margin: 0 0 12px; font-size: clamp(1.6rem, 3vw, 2.2rem); }
+    .blog-post__title a { color: inherit; text-decoration: none; }
+    .blog-post__title a:hover { color: var(--accent); }
+    .blog-post__body { line-height: 1.75; margin: 12px 0 14px; }
+    .blog-post__body img { max-width: 100%; height: auto; border-radius: 8px; }
+    .blog-post__more { font-weight: 700; color: var(--accent); text-decoration: none; }
+
+    /* Pagination */
+    .posts-pager { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; align-items: center; margin-top: 44px; }
+    .posts-pager a { text-decoration: none; min-width: 40px; text-align: center; padding: 8px 12px; border-radius: 8px;
+        border: 1px solid #e2d6c3; color: var(--ink); background: #fff; font-weight: 600; }
+    .posts-pager a:hover { border-color: var(--accent); color: var(--accent); }
+    .posts-pager .pager-num.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 </style>

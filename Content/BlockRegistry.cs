@@ -451,15 +451,21 @@ public class BlockRegistry
             Fields =
             [
                 new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },
+                new BlockField { Id = "display", Label = "block.posts.f.display", Type = FieldType.Select, Default = "cards",
+                    Options = [ new("cards", "block.posts.opt.cards"), new("blog", "block.posts.opt.blog") ],
+                    Help = "Kacheln (Teaser + Weiterlesen-Link) oder Blog (ganzer Beitrag je Eintrag)." },
                 new BlockField { Id = "tag", Label = "block.posts.f.tag", Type = FieldType.Text,
                     Help = "Nur Beiträge mit diesem Tag anzeigen (leer = alle)." },
                 new BlockField { Id = "columns", Label = "block.gallery.f.columns", Type = FieldType.Select, Default = "3",
-                    Options = [ new("2", "block.opt.columns.2"), new("3", "block.opt.columns.3") ] },
+                    Options = [ new("2", "block.opt.columns.2"), new("3", "block.opt.columns.3") ],
+                    Help = "Nur im Kachel-Modus." },
+                new BlockField { Id = "perPage", Label = "block.posts.f.perPage", Type = FieldType.Text,
+                    Help = "Beiträge pro Seite (Paginierung). Leer/0 = alle auf einer Seite." },
                 new BlockField { Id = "limit", Label = "block.posts.f.limit", Type = FieldType.Text,
-                    Help = "Maximale Anzahl (leer = alle)." },
+                    Help = "Obergrenze insgesamt (leer = alle)." },
                 new BlockField { Id = "showFilter", Label = "block.gallery.f.showFilter", Type = FieldType.Select, Default = "no",
                     Options = [ new("yes", "block.opt.yesno.yes"), new("no", "block.opt.yesno.no") ],
-                    Help = "Klickbare Tag-Chips zum Weiterfiltern auf der Seite anzeigen." },
+                    Help = "Klickbare Tag-Chips zum Filtern auf der Seite anzeigen." },
             ]
         },
         new BlockDefinition

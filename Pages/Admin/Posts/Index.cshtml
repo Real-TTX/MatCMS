@@ -32,12 +32,12 @@ else
                             }
                         </div>
                         <div class="muted" style="font-size:13px;margin-top:3px;">
-                            /beitrag/@p.Slug · @p.PublishedAt.ToLocalTime().ToString("dd.MM.yyyy")
+                            /blog/@p.Slug · @p.PublishedAt.ToLocalTime().ToString("dd.MM.yyyy")
                             @if (!string.IsNullOrWhiteSpace(p.Tags)) { <text> · @p.Tags</text> }
                         </div>
                     </div>
                     <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@p.Id"><i class="ti ti-pencil" aria-hidden="true"></i> Bearbeiten</a>
-                    <a class="btn btn-sm btn-ghost" href="/beitrag/@p.Slug" target="_blank" rel="noopener" title="Ansehen"><i class="ti ti-external-link" aria-hidden="true"></i></a>
+                    <a class="btn btn-sm btn-ghost" href="/blog/@p.Slug" target="_blank" rel="noopener" title="Ansehen"><i class="ti ti-external-link" aria-hidden="true"></i></a>
                     <form method="post" asp-page-handler="Delete" asp-route-id="@p.Id" class="inline-form"
                           onsubmit="return confirm('Beitrag „@p.Title“ wirklich löschen?');">
                         <button type="submit" class="btn btn-sm btn-danger btn-icon" title="Löschen" aria-label="Löschen"><i class="ti ti-trash" aria-hidden="true"></i></button>

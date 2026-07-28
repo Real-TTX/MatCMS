@@ -13,8 +13,10 @@ namespace MatCMS.Services;
 /// Backup &amp; Restore of the site. A backup is a ZIP containing <c>content.json</c>
 /// (Templates, Pages incl. ContentBlocks, Menu items, Settings, contact submissions) and,
 /// optionally, an <c>assets/</c> folder with the uploaded media (wwwroot/uploads).
-/// Users are deliberately excluded for security. On restore, only the sections present are
-/// replaced; missing sections/assets are left untouched. Legacy plain-JSON backups are also accepted.
+/// Admin users (incl. password hashes) are an OPT-IN section (off by default) — sensitive, meant for
+/// full migrations; on restore they UPSERT by username so the current admin can't be locked out.
+/// On restore, only the sections present are replaced; missing sections/assets are left untouched.
+/// Legacy plain-JSON backups are also accepted.
 /// </summary>
 public class ContentTransferService
 {
@@ -54,6 +56,8 @@ public class ContentTransferService
         public bool Submissions { get; set; } = true;
         public bool Forms { get; set; } = true;
         public bool Assets { get; set; } = true;
+        /// <summary>Admin users incl. password hashes. OFF by default — sensitive; only for full migrations.</summary>
+        public bool Users { get; set; } = false;
 
         /// <summary>
         /// Granular selection within a section (non-empty = only these items; null/empty = the whole
@@ -85,6 +89,7 @@ public class ContentTransferService
         public int Forms { get; set; }
         public int Media { get; set; }
         public int Components { get; set; }
+        public int Users { get; set; }
         public bool HasAssets { get; set; }
         // True when that section restores as a per-item UPSERT (others survive); false = replace-all.
         public bool TemplatesPartial { get; set; }
@@ -250,6 +255,17 @@ public class ContentTransferService
                 }).ToList();
         }
 
+        // Admin users (opt-in) — includes password hashes; only for full migrations.
+        if (options.Users)
+        {
+            dto.Users = (await _db.Users.AsNoTracking().OrderBy(u => u.Id).ToListAsync())
+                .Select(u => new UserDto
+                {
+                    Username = u.Username, PasswordHash = u.PasswordHash, Role = u.Role,
+                    DisplayName = u.DisplayName, Email = u.Email, CreatedAt = u.CreatedAt
+                }).ToList();
+        }
+
         return JsonSerializer.Serialize(dto, WriteOpts);
     }
 
@@ -321,7 +337,7 @@ public class ContentTransferService
         if (dto is null || (dto.Templates is null && dto.Pages is null && dto.Menus is null
                             && dto.MenuItems is null && dto.Settings is null && dto.Submissions is null
                             && dto.Forms is null && dto.FormSubmissions is null
-                            && dto.Media is null && dto.Components is null))
+                            && dto.Media is null && dto.Components is null && dto.Users is null))
             throw new InvalidOperationException(
                 "Die Datei hat kein bekanntes Backup-Format (keine Abschnitte gefunden).");
 
@@ -649,6 +665,33 @@ public class ContentTransferService
             summary.Add($"{dto.Media.Count} Medien");
         }
 
+        // Users: UPSERT by username (never a replace-all) so the current admin can't be locked out.
+        if (dto.Users is not null)
+        {
+            var existingUsers = await _db.Users.ToListAsync();
+            var n = 0;
+            foreach (var u in dto.Users)
+            {
+                var uname = (u.Username ?? "").Trim();
+                if (uname.Length == 0 || string.IsNullOrWhiteSpace(u.PasswordHash)) continue;
+                var row = existingUsers.FirstOrDefault(x => string.Equals(x.Username, uname, StringComparison.OrdinalIgnoreCase));
+                if (row is null)
+                {
+                    row = new User { Username = uname };
+                    _db.Users.Add(row);
+                    existingUsers.Add(row);
+                }
+                row.PasswordHash = u.PasswordHash!;
+                row.Role = string.IsNullOrWhiteSpace(u.Role) ? "Admin" : u.Role!;
+                row.DisplayName = u.DisplayName;
+                row.Email = u.Email;
+                if (u.CreatedAt != default) row.CreatedAt = u.CreatedAt;
+                n++;
+            }
+            await _db.SaveChangesAsync();
+            summary.Add($"{n} Benutzer");
+        }
+
         await tx.CommitAsync();
         return summary.Count == 0 ? "Nichts importiert" : string.Join(", ", summary) + " wiederhergestellt";
     }
@@ -780,6 +823,7 @@ public class ContentTransferService
             Forms = dto.Forms?.Count ?? 0,
             Media = dto.Media?.Count ?? 0,
             Components = dto.Components?.Count ?? 0,
+            Users = dto.Users?.Count ?? 0,
             HasAssets = hasAssets,
             TemplatesPartial = dto.TemplatesPartial,
             PagesPartial = dto.PagesPartial,
@@ -809,6 +853,17 @@ public class ContentTransferService
         public List<FormSubmissionDto>? FormSubmissions { get; set; }
         public List<MediaDto>? Media { get; set; }
         public List<ComponentDto>? Components { get; set; }
+        public List<UserDto>? Users { get; set; }
+    }
+
+    private sealed class UserDto
+    {
+        public string? Username { get; set; }
+        public string? PasswordHash { get; set; }
+        public string? Role { get; set; }
+        public string? DisplayName { get; set; }
+        public string? Email { get; set; }
+        public DateTime CreatedAt { get; set; }
     }
 
     private sealed class FormDto

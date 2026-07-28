@@ -41,7 +41,8 @@ public class ContentTransferService
     };
 
     private static readonly string[] AllowedAssetExtensions =
-        [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"];
+        [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg",
+         ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".csv", ".zip"];
 
     /// <summary>Which sections to include in a backup.</summary>
     public sealed class BackupOptions

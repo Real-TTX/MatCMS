@@ -6,6 +6,12 @@
 <div class="page-head">
     <h1>@T["media.title"]</h1>
 </div>
+<style>
+    /* Non-image media (PDF/Doc/…) show an extension badge instead of a thumbnail. */
+    .media-thumb-file { display: flex; align-items: center; justify-content: center; background: var(--bg-alt, #f1efe9); }
+    .media-fileext { font: 700 13px/1 var(--font-head, sans-serif); letter-spacing: .06em; color: #6b6257;
+        border: 2px solid currentColor; border-radius: 6px; padding: 8px 11px; }
+</style>
 
 @if (Model.AllTags.Count > 0)
 {
@@ -27,6 +33,8 @@
     @foreach (var m in Model.Items)
     {
         var tagList = MatCMS.Content.TagUtil.Split(m.Tags).ToList();
+        var mext = System.IO.Path.GetExtension(m.FileName ?? m.Url ?? "").ToLowerInvariant();
+        var mIsImg = mext is ".png" or ".jpg" or ".jpeg" or ".gif" or ".webp" or ".svg";
         <button type="button" class="media-card"
                 data-id="@m.Id"
                 data-url="@m.Url"
@@ -36,7 +44,14 @@
                 data-type="@m.ContentType"
                 data-size="@m.SizeBytes"
                 title="@T["media.clickHint"]">
-            <div class="media-thumb" style="background-image:url('@m.Url')"></div>
+            @if (mIsImg)
+            {
+                <div class="media-thumb" style="background-image:url('@m.Url')"></div>
+            }
+            else
+            {
+                <div class="media-thumb media-thumb-file"><span class="media-fileext">@(string.IsNullOrEmpty(mext) ? "FILE" : mext.TrimStart('.').ToUpperInvariant())</span></div>
+            }
             <div class="media-meta">
                 <div class="media-name" title="@m.FileName">@m.FileName</div>
                 @if (tagList.Count > 0)
@@ -55,7 +70,7 @@
 
 <div class="list-actions">
     <button type="button" id="media-upload-btn" class="btn">@T["media.upload"]</button>
-    <input type="file" id="media-file" accept="image/*" multiple style="display:none;" />
+    <input type="file" id="media-file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip" multiple style="display:none;" />
 </div>
 
 @* ---- Detail dialog ---- *@

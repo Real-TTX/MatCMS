@@ -296,11 +296,15 @@ app.MapPost("/admin/api/upload", async (HttpRequest request, IWebHostEnvironment
 
     var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
     // SVG is intentionally excluded: it can carry active content (stored XSS on direct navigation).
-    string[] allowed = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
-    if (!allowed.Contains(ext))
-        return Results.BadRequest(new { error = "Dateityp nicht erlaubt (erlaubt: PNG, JPG, GIF, WEBP)." });
-    if (file.Length > 8 * 1024 * 1024)
-        return Results.BadRequest(new { error = "Datei zu groß (max. 8 MB)." });
+    string[] images = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
+    string[] docs = [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".csv", ".zip"];
+    var isImage = images.Contains(ext);
+    if (!isImage && !docs.Contains(ext))
+        return Results.BadRequest(new { error = "Dateityp nicht erlaubt (Bilder: PNG/JPG/GIF/WEBP · Dateien: PDF, DOC(X), XLS(X), PPT(X), TXT, CSV, ZIP)." });
+    // Images stay small; documents may be larger.
+    var maxMb = isImage ? 8 : 25;
+    if (file.Length > maxMb * 1024 * 1024)
+        return Results.BadRequest(new { error = $"Datei zu groß (max. {maxMb} MB)." });
 
     var uploads = MatCMS.Services.StoragePaths.Uploads(env);
     Directory.CreateDirectory(uploads);

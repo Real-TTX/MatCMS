@@ -93,7 +93,13 @@
                         </select>
                     </form>
                 }
-                <div class="admin-user">@T["admin.loggedInAs"] <strong>@displayName</strong></div>
+                <form method="post" asp-page="/Logout" class="admin-user-form" style="margin:0;">
+                    <button type="submit" class="admin-user admin-user-btn" title="@T["nav.logout"]"
+                            style="display:inline-flex;align-items:center;gap:7px;background:none;border:0;cursor:pointer;font:inherit;color:inherit;padding:6px 10px;border-radius:8px;">
+                        @T["admin.loggedInAs"] <strong>@displayName</strong>
+                        <i class="ti ti-logout" aria-hidden="true"></i>
+                    </button>
+                </form>
             </div>
         </header>
 

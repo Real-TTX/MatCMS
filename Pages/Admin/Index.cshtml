@@ -2,10 +2,17 @@
 @model MatCMS.Pages.Admin.IndexModel
 @{
     ViewData["Title"] = T["dashboard.title"];
+    var dashUser = User.FindFirst("DisplayName")?.Value ?? User.Identity?.Name ?? "Admin";
 }
 <div class="page-head">
     <h1>@T["dashboard.title"]</h1>
-    <a class="btn btn-sm" asp-page="/Admin/Pages/Index">@T["dashboard.editPages"]</a>
+    <div class="dash-actions" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <span class="muted">Willkommen, <strong>@dashUser</strong></span>
+        <a class="btn btn-sm" href="/" target="_blank" rel="noopener"><i class="ti ti-external-link" aria-hidden="true"></i> Website aufrufen</a>
+        <form method="post" asp-page="/Logout" class="inline-form" style="margin:0;">
+            <button type="submit" class="btn btn-sm btn-ghost"><i class="ti ti-logout" aria-hidden="true"></i> Ausloggen</button>
+        </form>
+    </div>
 </div>
 
 @if (!Model.SetupComplete)

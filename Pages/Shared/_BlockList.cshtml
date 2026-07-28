@@ -64,9 +64,21 @@
 @functions {
     string RenderPluginBlock(MatCMS.Content.BlockDefinition def, string dataJson)
     {
-        var svc = ViewContext.HttpContext.RequestServices;
+        var http = ViewContext.HttpContext;
+        var svc = http.RequestServices;
         var reg = svc.GetService(typeof(MatCMS.Services.PluginRegistry)) as MatCMS.Services.PluginRegistry;
-        var pr = new MatCMS.Services.PluginRequest { Services = svc, Registry = reg!, Data = dataJson };
+        // Make the block render request-aware (e.g. read a ?flag=... success marker, build a return URL).
+        var query = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var kv in http.Request.Query) query[kv.Key] = kv.Value.ToString();
+        var pr = new MatCMS.Services.PluginRequest
+        {
+            Services = svc,
+            Registry = reg!,
+            Data = dataJson,
+            Method = http.Request.Method,
+            Path = http.Request.Path.Value ?? "",
+            Query = query
+        };
         try { return def.PluginRender!(pr); }
         catch (Exception ex) { return "<!-- plugin block error: " + System.Net.WebUtility.HtmlEncode(ex.Message) + " -->"; }
     }

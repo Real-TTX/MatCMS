@@ -92,12 +92,31 @@ builder.Services.AddScoped<PluginRunner>();
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    // Ensure a rejected request reports 429 (not a generic 400) even when its body was never read.
+    options.OnRejected = (context, _) =>
+    {
+        if (!context.HttpContext.Response.HasStarted)
+            context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        return ValueTask.CompletedTask;
+    };
     options.AddPolicy("login", ctx =>
         RateLimitPartition.GetFixedWindowLimiter(
             ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+
+    // Anonymous public plugin endpoints (/plugin/{key}) — throttle per client IP so a visitor-facing
+    // write endpoint (e.g. review submission) can't be hammered to bloat storage.
+    options.AddPolicy("publicPlugin", ctx =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
             }));
@@ -214,6 +233,54 @@ app.MapPost("/set-language", async (HttpContext ctx) =>
         : "/";
     return Results.LocalRedirect(target);
 });
+
+// Public plugin endpoints at /plugin/{key} — anonymous, for visitor-facing actions (e.g. submitting
+// a review). Antiforgery is intentionally not required (public submission, no authenticated state);
+// abuse is bounded by the "publicPlugin" rate limit + each plugin's own validation/caps. The handler
+// runs with Form/Query/Method/Path populated; a POST then redirects (PRG) to the form's __return field
+// when it is a safe local path, otherwise to "/".
+app.MapMethods("/plugin/{key}", new[] { "GET", "POST" }, async (HttpContext ctx, string key, MatCMS.Services.PluginRegistry registry) =>
+{
+    // Thread-safe read: a plugin re-run (admin save) may be clearing/repopulating PublicPages concurrently.
+    if (!registry.TryGetPublicPage(key, out var handler) || handler is null)
+        return Results.NotFound();
+
+    var form = new Dictionary<string, string>(StringComparer.Ordinal);
+    if (ctx.Request.HasFormContentType)
+        foreach (var kv in await ctx.Request.ReadFormAsync())
+            form[kv.Key] = kv.Value.ToString();
+    var query = new Dictionary<string, string>(StringComparer.Ordinal);
+    foreach (var kv in ctx.Request.Query)
+        query[kv.Key] = kv.Value.ToString();
+
+    var pr = new MatCMS.Services.PluginRequest
+    {
+        Services = ctx.RequestServices,
+        Registry = registry,
+        Method = ctx.Request.Method,
+        Path = ctx.Request.Path.Value ?? "",
+        Query = query,
+        Form = form
+    };
+
+    string html;
+    try { html = handler(pr) ?? ""; }
+    catch (Exception ex)
+    {
+        registry.AddLog("Public-Endpoint '" + key + "' Fehler: " + ex.Message);
+        html = "";
+    }
+
+    if (HttpMethods.IsPost(ctx.Request.Method))
+    {
+        // Only ever redirect to a local path ("/..." but not "//...") to avoid open-redirect abuse.
+        var r = form.TryGetValue("__return", out var rv) ? rv : "";
+        var ret = !string.IsNullOrEmpty(r) && r.StartsWith('/') && !r.StartsWith("//")
+                  && Uri.IsWellFormedUriString(r, UriKind.Relative) ? r : "/";
+        return Results.LocalRedirect(ret);
+    }
+    return Results.Content(html, "text/html; charset=utf-8");
+}).RequireRateLimiting("publicPlugin");
 
 // Simple image upload endpoint used by the block editor / settings / media library (admin only).
 app.MapPost("/admin/api/upload", async (HttpRequest request, IWebHostEnvironment env, MatCMS.Data.AppDbContext db) =>

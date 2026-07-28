@@ -10,6 +10,9 @@ public class PluginRequest
 {
     public IServiceProvider Services { get; init; } = default!;
     public string Method { get; init; } = "GET";
+    /// <summary>Request path (e.g. "/leser") — set for block renders and public endpoints. Handy for
+    /// building a same-page return URL after a public POST.</summary>
+    public string Path { get; init; } = "";
     public IReadOnlyDictionary<string, string> Query { get; init; } = new Dictionary<string, string>();
     public IReadOnlyDictionary<string, string> Form { get; init; } = new Dictionary<string, string>();
     /// <summary>Block field data (JSON) — only for block render callbacks.</summary>
@@ -34,7 +37,24 @@ public class PluginRegistry
     public List<AdminMenuEntry> AdminMenu { get; } = new();
     public List<PluginBlock> Blocks { get; } = new();
     public Dictionary<string, Func<PluginRequest, string>> Pages { get; } = new();
+    /// <summary>Public (anonymous) endpoints served at <c>/plugin/{key}</c> — for visitor-facing
+    /// actions such as submitting a review or a comment. Cleared/repopulated on each plugin run.
+    /// Accessed via <see cref="AddPublicPageEntry"/> / <see cref="TryGetPublicPage"/> under the lock,
+    /// because it is read on the anonymous request hot path while a re-run may be rewriting it.</summary>
+    private readonly Dictionary<string, Func<PluginRequest, string>> _publicPages = new();
     public Dictionary<int, string> Errors { get; } = new();
+
+    /// <summary>Registers/replaces a public endpoint handler (thread-safe).</summary>
+    public void AddPublicPageEntry(string key, Func<PluginRequest, string> handler)
+    {
+        lock (_lock) _publicPages[key] = handler;
+    }
+
+    /// <summary>Looks up a public endpoint handler (thread-safe against a concurrent plugin re-run).</summary>
+    public bool TryGetPublicPage(string key, out Func<PluginRequest, string>? handler)
+    {
+        lock (_lock) return _publicPages.TryGetValue(key, out handler);
+    }
 
     // Raw HTML fragments plugins asked to inject site-wide, before </head> / </body>. Written by
     // RunAllAsync (admin actions) and read by _Layout on every public request → all access is locked,
@@ -62,7 +82,7 @@ public class PluginRegistry
     /// <summary>Clears registrations before a re-run (keeps the log so output history survives).</summary>
     public void Reset()
     {
-        lock (_lock) { AdminMenu.Clear(); Blocks.Clear(); Pages.Clear(); Errors.Clear(); _headHtml.Clear(); _bodyHtml.Clear(); }
+        lock (_lock) { AdminMenu.Clear(); Blocks.Clear(); Pages.Clear(); _publicPages.Clear(); Errors.Clear(); _headHtml.Clear(); _bodyHtml.Clear(); }
     }
 }
 
@@ -180,6 +200,16 @@ public class PluginContext
     public void AddAdminPage(string key, Func<PluginRequest, string> handler)
     {
         if (!string.IsNullOrWhiteSpace(key)) _registry.Pages[key] = handler;
+    }
+
+    /// <summary>Register a PUBLIC (anonymous) endpoint served at <c>/plugin/{endpointKey}</c>. GET returns
+    /// the callback's HTML; POST runs the callback (a mutating action) and then redirects — to the form's
+    /// <c>__return</c> field when it is a safe local path, otherwise to "/". Always include a <c>__return</c>
+    /// hidden field in your form. Use for visitor submissions (reviews, comments). The callback gets
+    /// Form/Query/Method/Path on the request. The endpoint is rate-limited per client IP.</summary>
+    public void AddPublicPage(string endpointKey, Func<PluginRequest, string> handler)
+    {
+        if (!string.IsNullOrWhiteSpace(endpointKey) && handler is not null) _registry.AddPublicPageEntry(endpointKey, handler);
     }
 
     /// <summary>Register a content block. The render callback gets the block's data + request services.</summary>

@@ -422,6 +422,26 @@ public class BlockRegistry
         },
         new BlockDefinition
         {
+            Type = "section",
+            Name = "block.section.name",
+            Description = "block.section.desc",
+            Svg = SvgColumns,
+            Partial = "Blocks/_Section",
+            // Generic grouping container: holds arbitrary CONTENT (leaf) blocks. Nested containers are
+            // intentionally excluded for now (they need recursive rendering — a separate change).
+            AllowedChildren = ["richtext", "image", "imagetext", "cta", "quote", "html", "gallery", "logostrip", "spacer", "posts"],
+            Fields =
+            [
+                new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },
+                new BlockField { Id = "intro", Label = "block.f.intro", Type = FieldType.Textarea },
+                new BlockField { Id = "layout", Label = "block.section.f.layout", Type = FieldType.Select, Default = "stack",
+                    Options = [ new("stack", "block.section.opt.stack"), new("cols2", "block.section.opt.cols2"), new("cols3", "block.section.opt.cols3") ] },
+                new BlockField { Id = "bg", Label = "block.section.f.bg", Type = FieldType.Select, Default = "none",
+                    Options = [ new("none", "block.section.opt.bgnone"), new("alt", "block.section.opt.bgalt"), new("accent", "block.section.opt.bgaccent") ] },
+            ]
+        },
+        new BlockDefinition
+        {
             Type = "posts",
             Name = "block.posts.name",
             Description = "block.posts.desc",

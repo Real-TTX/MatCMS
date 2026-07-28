@@ -1,0 +1,46 @@
+@model MatCMS.Content.ContainerBlockModel
+@{
+    var heading = Model.Data.Str("heading");
+    var intro = Model.Data.Str("intro");
+    var layout = Model.Data.StrOr("layout", "stack");
+    var bg = Model.Data.StrOr("bg", "none");
+
+    var sectionCls = "section section-block";
+    if (bg == "alt") { sectionCls += " section-block--alt"; }
+    else if (bg == "accent") { sectionCls += " section-block--accent"; }
+
+    var inner = layout == "cols2" ? "section-grid cols-2"
+              : layout == "cols3" ? "section-grid cols-3"
+              : "section-stack";
+}
+<section class="@sectionCls">
+    <div class="container">
+        @if (!string.IsNullOrWhiteSpace(heading) || !string.IsNullOrWhiteSpace(intro))
+        {
+            <div class="section__intro">
+                @if (!string.IsNullOrWhiteSpace(heading)) { <h2>@heading</h2> }
+                @if (!string.IsNullOrWhiteSpace(intro)) { <p>@intro</p> }
+            </div>
+        }
+        <div class="@inner">
+            @foreach (var child in Model.Children)
+            {
+                <div class="section-item">
+                    @await Html.PartialAsync(child.Partial, child.Data)
+                </div>
+            }
+        </div>
+    </div>
+</section>
+<style>
+    .section-block--alt { background: var(--bg-alt, #f2f6f7); }
+    .section-block--accent { background: var(--accent, #2f7d95); color: #fff; }
+    .section-block--accent h2, .section-block--accent h3 { color: #fff; }
+    .section-grid { display: grid; gap: 26px; }
+    .section-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+    .section-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+    @@media (max-width: 820px) { .section-grid.cols-2, .section-grid.cols-3 { grid-template-columns: 1fr; } }
+    /* Child blocks inside a section shouldn't add their own outer section padding/container. */
+    .section-item > .section { padding: 0; }
+    .section-item > .section > .container { padding: 0; max-width: none; }
+</style>

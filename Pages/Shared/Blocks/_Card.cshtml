@@ -25,6 +25,10 @@
         <div class="feat-card__img" style="background-image:url('@src')"></div>
     }
     <div class="feat-card__body">
+        @if (!string.IsNullOrWhiteSpace(title))
+        {
+            <h3>@title</h3>
+        }
         @if (tagList.Length > 0)
         {
             <div class="feat-card__tags">
@@ -33,10 +37,6 @@
                     <span class="feat-card__tag">@t</span>
                 }
             </div>
-        }
-        @if (!string.IsNullOrWhiteSpace(title))
-        {
-            <h3>@title</h3>
         }
         @if (!string.IsNullOrWhiteSpace(text))
         {

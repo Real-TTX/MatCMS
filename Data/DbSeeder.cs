@@ -28,6 +28,7 @@ public static class DbSeeder
         // (EnsureCreated never ALTERs an existing table, so added columns must be patched in here).
         await MigrateSchemaAsync(db);
         await BackfillPluginKeysAsync(db);
+        await BackfillLanguagesAsync(db);
 
         if (!await db.Users.AnyAsync())
         {
@@ -316,6 +317,31 @@ public static class DbSeeder
     {
         try { await db.Database.ExecuteSqlRawAsync(sql); }
         catch { /* already exists / concurrent create — safe to ignore */ }
+    }
+
+    /// <summary>One-time upgrade back-fill for admin-managed languages: if the <c>i18n.languages</c>
+    /// setting doesn't exist yet, activate the languages that ALREADY have published content — so an
+    /// instance that was multilingual before this feature (e.g. published /en pages) keeps those
+    /// languages in the public switcher + sitemap instead of silently dropping to German-only. The row
+    /// is written exactly once (even empty), so later admin choices under Settings → Sprachen win.</summary>
+    private static async Task BackfillLanguagesAsync(AppDbContext db)
+    {
+        try
+        {
+            if (await db.SiteSettings.AnyAsync(s => s.Key == MatCMS.Services.SettingKeys.Languages)) return;
+            var present = await db.Pages
+                .Where(p => p.IsPublished && p.Locale != MatCMS.Services.Localizer.DefaultCulture)
+                .Select(p => p.Locale).Distinct().ToListAsync();
+            var nonDefault = MatCMS.Services.Localizer.ParseActive(string.Join(",", present))
+                .Where(c => c != MatCMS.Services.Localizer.DefaultCulture);
+            db.SiteSettings.Add(new SiteSetting
+            {
+                Key = MatCMS.Services.SettingKeys.Languages,
+                Value = string.Join(",", nonDefault)
+            });
+            await db.SaveChangesAsync();
+        }
+        catch { /* first-ever startup before Pages exist — safe to skip; runs again next boot */ }
     }
 
     private static async Task AddColumnIfMissingAsync(AppDbContext db, string table, string column, string type)

@@ -382,6 +382,46 @@ public class BlockRegistry
         },
         new BlockDefinition
         {
+            Type = "cards",
+            Name = "block.cards.name",
+            Description = "block.cards.desc",
+            Svg = SvgColumns,
+            Partial = "Blocks/_Cards",
+            AllowedChildren = ["card"],
+            Fields =
+            [
+                new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },
+                new BlockField { Id = "intro", Label = "block.f.intro", Type = FieldType.Textarea },
+                new BlockField { Id = "columns", Label = "block.gallery.f.columns", Type = FieldType.Select, Default = "3",
+                    Options = [ new("2", "block.opt.columns.2"), new("3", "block.opt.columns.3"), new("4", "block.opt.columns.4") ] },
+                new BlockField { Id = "layout", Label = "block.cards.f.layout", Type = FieldType.Select, Default = "grid",
+                    Options = [ new("grid", "block.cards.opt.grid"), new("carousel", "block.cards.opt.carousel") ],
+                    Help = "Nebeneinander (Raster) oder als scrollbares Carousel." },
+            ]
+        },
+        new BlockDefinition
+        {
+            Type = "card",
+            Name = "block.card.name",
+            Description = "block.card.desc",
+            Svg = SvgImageText,
+            Partial = "Blocks/_Card",
+            ChildOnly = true,
+            Fields =
+            [
+                new BlockField { Id = "image", Label = "block.f.image", Type = FieldType.Image },
+                new BlockField { Id = "title", Label = "block.f.title", Type = FieldType.Text },
+                new BlockField { Id = "tags", Label = "block.card.f.tags", Type = FieldType.Text,
+                    Help = "Merkmale als Chips (kommagetrennt), z. B. „3 Zimmer, Balkon, WLAN“." },
+                new BlockField { Id = "text", Label = "block.f.text", Type = FieldType.Textarea },
+                new BlockField { Id = "features", Label = "block.card.f.features", Type = FieldType.Textarea,
+                    Help = "Detail-Kacheln – eine pro Zeile." },
+                new BlockField { Id = "buttonText", Label = "block.f.buttonText", Type = FieldType.Text },
+                new BlockField { Id = "buttonUrl", Label = "block.f.buttonUrl", Type = FieldType.Url },
+            ]
+        },
+        new BlockDefinition
+        {
             Type = "posts",
             Name = "block.posts.name",
             Description = "block.posts.desc",

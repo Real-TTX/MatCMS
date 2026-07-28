@@ -1,0 +1,59 @@
+@model MatCMS.Content.BlockData
+@{
+    var image = Model.Str("image");
+    var title = Model.Str("title");
+    var text = Model.Str("text");
+    var tags = Model.Str("tags");
+    var features = Model.Str("features");
+    var btnText = Model.Str("buttonText");
+    var btnUrl = Model.StrOr("buttonUrl", "#");
+
+    static string Safe(string v, bool url = false) =>
+        (!string.IsNullOrWhiteSpace(v)
+            && (v.StartsWith("/") || v.StartsWith("http://") || v.StartsWith("https://") || (url && (v.StartsWith("#") || v.StartsWith("mailto:") || v.StartsWith("tel:"))))
+            && v.IndexOfAny(new[] { '"', '\'', '(', ')', '\\', '\n', '\r', ' ' }) < 0)
+            ? v : (url ? "#" : "");
+    var src = Safe(image);
+    var href = Safe(btnUrl, url: true);
+
+    var tagList = tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    var featureList = features.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+}
+<article class="feat-card">
+    @if (src.Length > 0)
+    {
+        <div class="feat-card__img" style="background-image:url('@src')"></div>
+    }
+    <div class="feat-card__body">
+        @if (tagList.Length > 0)
+        {
+            <div class="feat-card__tags">
+                @foreach (var t in tagList)
+                {
+                    <span class="feat-card__tag">@t</span>
+                }
+            </div>
+        }
+        @if (!string.IsNullOrWhiteSpace(title))
+        {
+            <h3>@title</h3>
+        }
+        @if (!string.IsNullOrWhiteSpace(text))
+        {
+            <p class="feat-card__text">@text</p>
+        }
+        @if (featureList.Length > 0)
+        {
+            <ul class="feat-card__features">
+                @foreach (var f in featureList)
+                {
+                    <li>@f</li>
+                }
+            </ul>
+        }
+        @if (!string.IsNullOrWhiteSpace(btnText))
+        {
+            <a class="btn" href="@href">@btnText</a>
+        }
+    </div>
+</article>

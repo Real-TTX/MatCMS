@@ -1,0 +1,57 @@
+@model MatCMS.Content.ContainerBlockModel
+@{
+    var heading = Model.Data.Str("heading");
+    var intro = Model.Data.Str("intro");
+    var columns = Model.Data.StrOr("columns", "3");
+    var isCarousel = Model.Data.StrOr("layout", "grid") == "carousel";
+}
+<section class="section cards-block">
+    <div class="container">
+        @if (!string.IsNullOrWhiteSpace(heading) || !string.IsNullOrWhiteSpace(intro))
+        {
+            <div class="section__intro">
+                @if (!string.IsNullOrWhiteSpace(heading)) { <h2>@heading</h2> }
+                @if (!string.IsNullOrWhiteSpace(intro)) { <p>@intro</p> }
+            </div>
+        }
+        <div class="cards-wrap @(isCarousel ? "is-carousel" : "")" @(isCarousel ? "data-carousel" : "")>
+            <div class="cards-grid cols-@columns">
+                @foreach (var child in Model.Children)
+                {
+                    @await Html.PartialAsync(child.Partial, child.Data)
+                }
+            </div>
+        </div>
+    </div>
+</section>
+<style>
+    .cards-grid { display: grid; gap: 26px; grid-template-columns: repeat(3, 1fr); }
+    .cards-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+    .cards-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+    @@media (max-width: 900px) { .cards-grid, .cards-grid.cols-2, .cards-grid.cols-4 { grid-template-columns: 1fr; } }
+    .feat-card { display: flex; flex-direction: column; background: #fff; border: 1px solid #ece3d5;
+        border-radius: 16px; overflow: hidden; box-shadow: 0 2px 12px rgba(26,21,18,.06); }
+    .feat-card__img { height: 210px; background-size: cover; background-position: center; }
+    .feat-card__body { padding: 20px 22px 22px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+    .feat-card__tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .feat-card__tag { font-size: 12px; font-weight: 600; color: var(--accent); background: var(--bg-alt, #f5f0e8); padding: 3px 10px; border-radius: 999px; }
+    .feat-card h3 { font-family: var(--font-head); margin: 2px 0 0; }
+    .feat-card__text { margin: 0; line-height: 1.6; opacity: .85; }
+    .feat-card__features { list-style: none; padding: 0; margin: 4px 0 0; display: grid; gap: 6px; }
+    .feat-card__features li { position: relative; padding-left: 22px; font-size: 14px; }
+    .feat-card__features li::before { content: "✓"; position: absolute; left: 0; color: var(--accent); font-weight: 700; }
+    .feat-card .btn { margin-top: auto; align-self: flex-start; }
+
+    /* Carousel layout: horizontal scroll-snap with arrow controls (carousel.js). */
+    .cards-wrap.is-carousel { position: relative; }
+    .cards-wrap.is-carousel .cards-grid { grid-auto-flow: column; grid-template-columns: none;
+        grid-auto-columns: minmax(300px, 1fr); overflow-x: auto; scroll-snap-type: x mandatory;
+        padding-bottom: 10px; scrollbar-width: thin; }
+    .cards-wrap.is-carousel .feat-card { scroll-snap-align: start; }
+    .carousel-btn { position: absolute; top: 40%; transform: translateY(-50%); z-index: 3; width: 42px; height: 42px;
+        border-radius: 50%; border: 1px solid #e2d6c3; background: #fff; cursor: pointer; font-size: 20px; line-height: 1;
+        box-shadow: 0 4px 14px rgba(0,0,0,.14); display: flex; align-items: center; justify-content: center; }
+    .carousel-btn[disabled] { opacity: .35; cursor: default; }
+    .carousel-btn.prev { left: -8px; }
+    .carousel-btn.next { right: -8px; }
+</style>

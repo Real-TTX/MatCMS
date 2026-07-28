@@ -82,4 +82,14 @@ public class Template
 
     /// <summary>The values a USER set for the published parameters (JSON object { id: value }).</summary>
     public string ParamValuesJson { get; set; } = "{}";
+
+    // ---- Versioned per-page-type layout parts (see MatCMS.Content.TemplateSchema) ----
+
+    /// <summary>The template FORMAT version this row was written in. Older templates are converted up
+    /// to <see cref="MatCMS.Content.TemplateSchema.Current"/> automatically on startup.</summary>
+    public int SchemaVersion { get; set; } = 1;
+
+    /// <summary>Per-page-type layout overrides as JSON ({ "post": "&lt;html with {{tokens}}&gt;", … }).
+    /// A page type not present here uses the engine's built-in default layout.</summary>
+    public string PartsJson { get; set; } = "{}";
 }

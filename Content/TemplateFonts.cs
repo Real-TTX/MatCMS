@@ -49,10 +49,12 @@ public static class TemplateFonts
         return fallback;
     }
 
-    /// <summary>Trim advanced CSS/JS and cap length to keep pages sane.</summary>
+    /// <summary>Trim advanced CSS/JS/HTML, normalize newlines to LF, and cap length to keep pages sane.
+    /// LF-normalization matters because browsers submit textarea content with CRLF: without it, a value
+    /// could never compare equal to an LF-only default constant (e.g. the template's default page part).</summary>
     public static string Code(string? value, int max = 20000)
     {
-        var v = (value ?? "").Trim();
+        var v = (value ?? "").Replace("\r\n", "\n").Replace("\r", "\n").Trim();
         return v.Length > max ? v[..max] : v;
     }
 }

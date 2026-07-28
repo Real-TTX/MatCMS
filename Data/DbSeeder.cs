@@ -191,6 +191,32 @@ public static class DbSeeder
 
         await MigrateLegacyContactAsync(db);
         await MigrateListBlocksAsync(db);
+        await UpgradeTemplatesAsync(db);
+    }
+
+    /// <summary>Converts every stored template up to the current template schema version
+    /// (<see cref="MatCMS.Content.TemplateSchema.Current"/>). Runs on every startup — old instances
+    /// (written at V1) are migrated seamlessly, exactly like the column/data migrations above. Runs
+    /// after the main save so freshly-seeded templates are included on a first-ever boot too.</summary>
+    private static async Task UpgradeTemplatesAsync(AppDbContext db)
+    {
+        List<Template> outdated;
+        try
+        {
+            outdated = await db.Templates
+                .Where(t => t.SchemaVersion < MatCMS.Content.TemplateSchema.Current)
+                .ToListAsync();
+        }
+        catch { return; } // columns not present yet on a very old DB — retried next boot
+        if (outdated.Count == 0) return;
+
+        var n = 0;
+        foreach (var t in outdated)
+            if (MatCMS.Content.TemplateSchema.Upgrade(t)) n++;
+        if (n == 0) return;
+
+        await db.SaveChangesAsync();
+        Console.WriteLine($"[MatCMS] {n} Template(s) auf Schema V{MatCMS.Content.TemplateSchema.Current} konvertiert.");
     }
 
     /// <summary>
@@ -266,6 +292,11 @@ public static class DbSeeder
         await AddColumnIfMissingAsync(db, "Plugins", "ConfigJson", "TEXT NOT NULL DEFAULT ''");
         await AddColumnIfMissingAsync(db, "Templates", "ParametersJson", "TEXT NOT NULL DEFAULT '[]'");
         await AddColumnIfMissingAsync(db, "Templates", "ParamValuesJson", "TEXT NOT NULL DEFAULT ''");
+        // Versioned per-page-type layout parts. Existing templates default to V1 and are converted up
+        // to the current schema on startup (UpgradeTemplatesAsync). PartsJson default is '' (not '{}') —
+        // ExecuteSqlRaw treats "{}" as a format placeholder and throws; empty is parsed as no parts.
+        await AddColumnIfMissingAsync(db, "Templates", "SchemaVersion", "INTEGER NOT NULL DEFAULT 1");
+        await AddColumnIfMissingAsync(db, "Templates", "PartsJson", "TEXT NOT NULL DEFAULT ''");
 
         // New table added after first release: EnsureCreated won't add it to an existing DB, so create
         // it idempotently here (fresh DBs already have it from the model → IF NOT EXISTS is a no-op).

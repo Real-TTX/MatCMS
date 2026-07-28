@@ -34,8 +34,16 @@ public class EditModel : PageModel
     [BindProperty] public string? LayoutHtml { get; set; }
     [BindProperty] public string? ParametersJson { get; set; }
     [BindProperty] public Dictionary<string, string> MenuMap { get; set; } = new();
+    // Per-page-type layout overrides, keyed by part (currently just "post"). Bound from Parts[post].
+    [BindProperty] public Dictionary<string, string> Parts { get; set; } = new();
     public bool IsActive { get; private set; }
     public string? Error { get; private set; }
+
+    // Template FORMAT version of this row + the version the engine currently writes (for the badge).
+    public int SchemaVersion { get; private set; }
+    public int CurrentSchemaVersion => TemplateSchema.Current;
+    /// <summary>Built-in default for the blog-detail part, used to prefill/reset the editor.</summary>
+    public string DefaultPostPart => TemplateSchema.DefaultPostPart;
 
     // Menu slots referenced by the layout + the menus available to map them to.
     public List<string> MenuSlots { get; private set; } = new();
@@ -67,6 +75,8 @@ public class EditModel : PageModel
         LayoutHtml = t.LayoutHtml;
         ParametersJson = t.ParametersJson;
         IsActive = t.IsActive;
+        SchemaVersion = t.SchemaVersion;
+        Parts = TemplateSchema.Parse(t.PartsJson);
 
         await LoadMenuMappingAsync(t.LayoutHtml, LayoutRenderer.ParseMap(t.MenuMapJson));
         return Page();
@@ -81,6 +91,7 @@ public class EditModel : PageModel
         if (string.IsNullOrWhiteSpace(name))
         {
             IsActive = t.IsActive;
+            SchemaVersion = t.SchemaVersion;
             Error = "Der Name ist erforderlich.";
             await LoadMenuMappingAsync(LayoutHtml, MenuMap);
             return Page();
@@ -112,6 +123,21 @@ public class EditModel : PageModel
             .Where(kv => !string.IsNullOrWhiteSpace(kv.Value) && menuKeys.Contains(kv.Value))
             .ToDictionary(kv => kv.Key, kv => kv.Value);
         t.MenuMapJson = JsonSerializer.Serialize(cleanMap);
+
+        // Per-page-type layout parts: keep only known parts that were actually customised (a part left
+        // at its built-in default is stored as "unset" so the row stays clean and default changes in a
+        // later engine version still apply). TemplateFonts.Code trims, LF-normalizes (so the browser's
+        // CRLF can match the LF-only default constant) and caps size.
+        var cleanParts = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var key in TemplateSchema.KnownParts)
+        {
+            var html = TemplateFonts.Code(Parts.TryGetValue(key, out var v) ? v : "", 50000);
+            if (!string.IsNullOrWhiteSpace(html) && html.Trim() != TemplateSchema.DefaultFor(key).Trim())
+                cleanParts[key] = html;
+        }
+        t.PartsJson = TemplateSchema.Serialize(cleanParts);
+        // A saved template is written in the current format.
+        t.SchemaVersion = TemplateSchema.Current;
 
         await _db.SaveChangesAsync();
 

@@ -155,7 +155,8 @@ public class ContentTransferService
                     ContainerWidth = t.ContainerWidth, ButtonRadius = t.ButtonRadius,
                     HeaderBackground = t.HeaderBackground, HeaderTextColor = t.HeaderTextColor, HeaderPadding = t.HeaderPadding,
                     CustomCss = t.CustomCss, CustomJs = t.CustomJs, LayoutHtml = t.LayoutHtml,
-                    MenuMapJson = t.MenuMapJson
+                    MenuMapJson = t.MenuMapJson,
+                    SchemaVersion = t.SchemaVersion, PartsJson = t.PartsJson
                 }).ToList();
 
             // Component-designer components travel with the full template section, but not when the
@@ -388,7 +389,8 @@ public class ContentTransferService
             _db.Templates.RemoveRange(_db.Templates);
             await _db.SaveChangesAsync();
             foreach (var t in dto.Templates)
-                _db.Templates.Add(new Template
+            {
+                var row = new Template
                 {
                     Name = t.Name ?? "Template",
                     IsActive = t.IsActive,
@@ -409,8 +411,14 @@ public class ContentTransferService
                     CustomCss = t.CustomCss ?? "",
                     CustomJs = t.CustomJs ?? "",
                     LayoutHtml = t.LayoutHtml ?? "",
-                    MenuMapJson = string.IsNullOrWhiteSpace(t.MenuMapJson) ? "{}" : t.MenuMapJson!
-                });
+                    MenuMapJson = string.IsNullOrWhiteSpace(t.MenuMapJson) ? "{}" : t.MenuMapJson!,
+                    SchemaVersion = t.SchemaVersion <= 0 ? 1 : t.SchemaVersion,
+                    PartsJson = string.IsNullOrWhiteSpace(t.PartsJson) ? "{}" : t.PartsJson!
+                };
+                // Bring a template from an older backup up to the current format immediately.
+                MatCMS.Content.TemplateSchema.Upgrade(row);
+                _db.Templates.Add(row);
+            }
             await _db.SaveChangesAsync();
             var all = await _db.Templates.ToListAsync();
             if (all.Count > 0 && all.All(t => !t.IsActive)) all[0].IsActive = true;
@@ -756,6 +764,9 @@ public class ContentTransferService
         row.CustomJs = t.CustomJs ?? "";
         row.LayoutHtml = t.LayoutHtml ?? "";
         row.MenuMapJson = string.IsNullOrWhiteSpace(t.MenuMapJson) ? "{}" : t.MenuMapJson!;
+        row.SchemaVersion = t.SchemaVersion <= 0 ? 1 : t.SchemaVersion;
+        row.PartsJson = string.IsNullOrWhiteSpace(t.PartsJson) ? "{}" : t.PartsJson!;
+        MatCMS.Content.TemplateSchema.Upgrade(row); // bring older backups up to the current format
     }
 
     /// <summary>Builds the nested block DTO tree for a page: top-level blocks (parentId == null),
@@ -962,6 +973,8 @@ public class ContentTransferService
         public string? CustomJs { get; set; }
         public string? LayoutHtml { get; set; }
         public string? MenuMapJson { get; set; }
+        public int SchemaVersion { get; set; }
+        public string? PartsJson { get; set; }
     }
 
     private sealed class PageDto

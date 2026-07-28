@@ -5,7 +5,10 @@
     ViewData["Title"] = T["templates.edit"];
 }
 <div class="page-head">
-    <h1>@T["templates.edit"]</h1>
+    <h1>
+        @T["templates.edit"]
+        <span class="badge" title="@T["templates.versionHint"]" style="margin-left:8px;vertical-align:middle;font-size:12px;">@T["templates.version"] V@(Model.SchemaVersion)</span>
+    </h1>
     <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
 </div>
 
@@ -23,6 +26,7 @@
 
         <div class="tabs" role="tablist">
             <button type="button" class="tab active" data-tab="designer">🎨 Designer</button>
+            <button type="button" class="tab" data-tab="pages">📄 @T["templates.tabPages"]</button>
             <button type="button" class="tab" data-tab="params">⚙️ Parameter</button>
         </div>
         <p class="help" data-group-hint></p>
@@ -206,6 +210,41 @@
             <input type="hidden" name="ParametersJson" id="ParametersJson" />
         </div>
 
+        @* ============ SEITEN (per-page-type layout parts) ============ *@
+        @{
+            var postValue = Model.Parts.TryGetValue("post", out var pp) && !string.IsNullOrWhiteSpace(pp)
+                ? pp : Model.DefaultPostPart;
+            var postTokens = new (string Token, string LabelKey)[]
+            {
+                ("{{post_image}}", "templates.tok.image"),
+                ("{{post_date}}", "templates.tok.date"),
+                ("{{post_title}}", "templates.tok.title"),
+                ("{{post_excerpt}}", "templates.tok.excerpt"),
+                ("{{post_body}}", "templates.tok.body"),
+                ("{{post_tags}}", "templates.tok.tags"),
+                ("{{post_attachments}}", "templates.tok.attachments"),
+            };
+        }
+        <div class="tab-panel form-grid" data-panel="pages" data-group="pages" hidden>
+            <div class="help">@Html.Raw(T["templates.pagesIntro"])</div>
+            <div class="form-field">
+                <div class="label-row">
+                    <label for="Part_post">@T["templates.postLayout"]</label>
+                    <button type="button" id="insert-post-default" class="btn btn-sm btn-ghost">@T["templates.insertDefault"]</button>
+                </div>
+                <textarea id="Part_post" name="Parts[post]" rows="16" class="code" spellcheck="false"
+                          data-default="@Model.DefaultPostPart">@postValue</textarea>
+                <div class="help">@Html.Raw(T["templates.postLayoutHelp"])</div>
+                <div class="help" style="margin-top:6px;">@T["templates.tokensAvailable"]</div>
+                <ul class="menu-ref">
+                    @foreach (var tk in postTokens)
+                    {
+                        <li><code class="mono">@tk.Token</code><span>@T[tk.LabelKey]</span></li>
+                    }
+                </ul>
+            </div>
+        </div>
+
         <div class="form-actions">
             <button type="submit" class="btn">@T["action.save"]</button>
         </div>
@@ -221,10 +260,11 @@
             var hint = document.querySelector('[data-group-hint]');
             var HINTS = {
                 designer: 'Aussehen: Farben, Schrift, Layout und Header.',
+                pages: 'Seiten-Layouts: eigene Vorlagen pro Seitentyp (z. B. die Blog-Detailseite).',
                 params: 'Technik: Menü-Zuordnung (Mapping) und das Layout-HTML/CSS/JS des Templates.'
             };
             function show(name) {
-                if (name !== 'params') name = 'designer';
+                if (name !== 'params' && name !== 'pages') name = 'designer';
                 tabs.forEach(function (t) { t.classList.toggle('active', t.dataset.tab === name); });
                 panels.forEach(function (p) { p.hidden = p.dataset.group !== name; });
                 if (hint) hint.textContent = HINTS[name] || '';
@@ -282,6 +322,18 @@
             });
             ta.addEventListener('input', detectSlots);
             detectSlots();
+        })();
+
+        // ---- Page-part layouts: "insert default" restores the built-in blog-detail layout ----
+        (function () {
+            var btn = document.getElementById('insert-post-default');
+            var ta = document.getElementById('Part_post');
+            if (!btn || !ta) return;
+            btn.addEventListener('click', function () {
+                if (ta.value.trim() && !confirm('@T["templates.starterConfirm"]')) return;
+                ta.value = ta.getAttribute('data-default') || '';
+                ta.focus();
+            });
         })();
 
         // Keep each color swatch and its hex text field in sync.

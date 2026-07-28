@@ -38,7 +38,8 @@ public class CreateModel : PageModel
             AccentColor = TemplateFonts.NormalizeColor(AccentColor),
             HeadingFont = TemplateFonts.Coerce(HeadingFont, "Geologica"),
             BodyFont = TemplateFonts.Coerce(BodyFont, "Inter"),
-            ButtonStyle = ButtonStyle == "outline" ? "outline" : "solid"
+            ButtonStyle = ButtonStyle == "outline" ? "outline" : "solid",
+            SchemaVersion = TemplateSchema.Current
         });
         await _db.SaveChangesAsync();
 

@@ -1,48 +1,65 @@
 @page "/blog/{slug}"
+@inject MatCMS.Services.SiteContext Site
 @model MatCMS.Pages.PostModel
 @{
     var p = Model.Current;
+    string Enc(string? s) => System.Net.WebUtility.HtmlEncode(s ?? "");
     string SafeImg(string? s) =>
         (!string.IsNullOrWhiteSpace(s) && (s.StartsWith("/") || s.StartsWith("http")) && s.IndexOfAny(new[] { '"', '\'', '<', '>' }) < 0) ? s! : "";
     var titleImg = SafeImg(p.TitleImage);
-}
-<article class="section post-single">
-    <div class="container narrow">
-        @if (titleImg.Length > 0)
-        {
-            <div class="post-hero"><img src="@titleImg" alt="@p.Title" /></div>
-        }
-        <p class="post-meta muted">@p.PublishedAt.ToLocalTime().ToString("dd. MMMM yyyy")</p>
-        <h1 class="post-title">@p.Title</h1>
-        @if (!string.IsNullOrWhiteSpace(p.Excerpt))
-        {
-            <p class="post-lead">@p.Excerpt</p>
-        }
-        <div class="rich post-body">@Html.Raw(p.ContentHtml)</div>
 
-        @if (Model.Attachments.Count > 0)
+    // ---- Build the token values for the template's "post" layout part. Everything dynamic is
+    //      HTML-encoded here; only the post body (trusted stored HTML) is inserted raw. ----
+    var heroHtml = titleImg.Length > 0
+        ? $"<div class=\"post-hero\"><img src=\"{Enc(titleImg)}\" alt=\"{Enc(p.Title)}\" /></div>"
+        : "";
+    var excerptHtml = !string.IsNullOrWhiteSpace(p.Excerpt)
+        ? $"<p class=\"post-lead\">{Enc(p.Excerpt)}</p>"
+        : "";
+
+    var tags = (p.Tags ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    var tagsHtml = "";
+    if (tags.Length > 0)
+    {
+        var tb = new System.Text.StringBuilder("<div class=\"post-tags\">");
+        foreach (var t in tags) tb.Append($"<span class=\"post-tag\">{Enc(t)}</span>");
+        tb.Append("</div>");
+        tagsHtml = tb.ToString();
+    }
+
+    var attHtml = "";
+    if (Model.Attachments.Count > 0)
+    {
+        var ab = new System.Text.StringBuilder("<div class=\"post-attachments\"><h3>Anhänge</h3><ul class=\"att-list\">");
+        foreach (var a in Model.Attachments)
         {
-            <div class="post-attachments">
-                <h3>Anhänge</h3>
-                <ul class="att-list">
-                    @foreach (var a in Model.Attachments)
-                    {
-                        <li>
-                            @if (a.IsImage)
-                            {
-                                <a href="@a.Url" target="_blank" rel="noopener"><img src="@a.Url" alt="@a.Name" style="max-width:220px;height:auto;border-radius:8px;" /></a>
-                            }
-                            else
-                            {
-                                <a href="@a.Url" target="_blank" rel="noopener">📎 @a.Name</a>
-                            }
-                        </li>
-                    }
-                </ul>
-            </div>
+            var url = Enc(a.Url);
+            if (a.IsImage)
+                ab.Append($"<li><a href=\"{url}\" target=\"_blank\" rel=\"noopener\"><img src=\"{url}\" alt=\"{Enc(a.Name)}\" style=\"max-width:220px;height:auto;border-radius:8px;\" /></a></li>");
+            else
+                ab.Append($"<li><a href=\"{url}\" target=\"_blank\" rel=\"noopener\">📎 {Enc(a.Name)}</a></li>");
         }
-    </div>
-</article>
+        ab.Append("</ul></div>");
+        attHtml = ab.ToString();
+    }
+
+    var tokens = new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        ["post_image"] = heroHtml,
+        ["post_date"] = Enc(p.PublishedAt.ToLocalTime().ToString("dd. MMMM yyyy")),
+        ["post_title"] = Enc(p.Title),
+        ["post_excerpt"] = excerptHtml,
+        ["post_body"] = p.ContentHtml ?? "",
+        ["post_tags"] = tagsHtml,
+        ["post_attachments"] = attHtml,
+    };
+
+    // The active template may override the blog-detail layout ("post" part); otherwise the built-in
+    // default is used. Both go through the same token renderer, so output is identical when unset.
+    var partHtml = MatCMS.Content.TemplateSchema.EffectivePart(Site.ActiveTemplate, MatCMS.Content.TemplateSchema.PartPost);
+    var rendered = MatCMS.Content.TemplateSchema.RenderPost(partHtml, tokens);
+}
+@Html.Raw(rendered)
 
 <style>
     .post-single { padding: 40px 0 64px; }
@@ -53,6 +70,8 @@
     .post-lead { font-size: 1.15rem; line-height: 1.6; color: var(--ink); opacity: .85; margin: 0 0 22px; }
     .post-body { line-height: 1.75; }
     .post-body img { max-width: 100%; height: auto; border-radius: 8px; }
+    .post-tags { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 22px; }
+    .post-tag { font-size: 12px; letter-spacing: .03em; text-transform: uppercase; background: var(--bg-alt); color: var(--ink); border-radius: 999px; padding: 4px 12px; }
     .post-attachments { margin-top: 34px; border-top: 1px solid #e7ddce; padding-top: 20px; }
     .post-attachments .att-list { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 16px; }
     .post-attachments a { text-decoration: none; color: var(--accent); font-weight: 600; }

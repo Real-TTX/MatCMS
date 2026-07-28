@@ -20,7 +20,7 @@ public class Localizer
     /// served under a culture prefix (/en, /fr …). Adding a language = drop a Resources/&lt;c&gt;.json
     /// and add the code here — routing, the language switcher and this localizer pick it up.
     /// </summary>
-    public static readonly string[] SupportedCultures = [DefaultCulture /* , "en" */];
+    public static readonly string[] SupportedCultures = [DefaultCulture, "en"];
 
     /// <summary>Supported cultures other than the default (served under a URL prefix).</summary>
     public static readonly IReadOnlyList<string> NonDefaultCultures =

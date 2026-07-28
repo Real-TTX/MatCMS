@@ -86,7 +86,30 @@
         foreach (var kv in tplParams)
             globals["param:" + kv.Key] = Enc(kv.Value);
         var menuMap = MatCMS.Content.LayoutRenderer.ParseMap(tpl.MenuMapJson);
-        customBody = MatCMS.Content.LayoutRenderer.Render(tpl.LayoutHtml, globals, menuMap, key => Site.MenuItems(key));
+        var custLangs = Site.LanguageLinks()
+            .Select(l => new MatCMS.Content.LayoutRenderer.LangLink(l.Locale, l.Url, l.IsCurrent)).ToList();
+        customBody = MatCMS.Content.LayoutRenderer.Render(tpl.LayoutHtml, globals, menuMap, key => Site.MenuItems(key), custLangs);
+
+        // Overlay fallback: if the template doesn't place a {{#languages}}/{{languages}} switcher itself,
+        // inject a small floating one so a multilingual site always has a language selector.
+        var hasLangPlaceholder = tpl.LayoutHtml is not null
+            && (tpl.LayoutHtml.Contains("{{#languages}}") || tpl.LayoutHtml.Contains("{{languages}}"));
+        if (!hasLangPlaceholder && custLangs.Count > 1)
+        {
+            var ov = new System.Text.StringBuilder(
+                "<div class=\"mat-lang-overlay\" role=\"navigation\" aria-label=\"Sprache\" " +
+                "style=\"position:fixed;top:12px;right:12px;z-index:1000;display:flex;gap:4px;" +
+                "background:rgba(255,255,255,.92);backdrop-filter:blur(6px);border:1px solid rgba(0,0,0,.1);" +
+                "border-radius:999px;padding:4px 6px;box-shadow:0 4px 14px rgba(0,0,0,.14);" +
+                "font:600 13px/1 system-ui,sans-serif;\">");
+            foreach (var l in custLangs)
+                ov.Append($"<a href=\"{Enc(l.Url)}\" hreflang=\"{Enc(l.Locale)}\" " +
+                          $"style=\"text-decoration:none;padding:5px 9px;border-radius:999px;" +
+                          $"{(l.IsCurrent ? "background:#111;color:#fff;" : "color:#333;")}\">" +
+                          $"{Enc(l.Locale.ToUpperInvariant())}</a>");
+            ov.Append("</div>");
+            customBody += ov.ToString();
+        }
     }
 }
 <!DOCTYPE html>

@@ -19,12 +19,18 @@ public static class LayoutRenderer
         new(@"\{\{#menu:([a-zA-Z0-9_-]+)\}\}(.*?)\{\{/menu:\1\}\}", RegexOptions.Singleline | RegexOptions.Compiled);
     private static readonly Regex MenuRx =
         new(@"\{\{menu:([a-zA-Z0-9_-]+)\}\}", RegexOptions.Compiled);
+    private static readonly Regex LangLoopRx =
+        new(@"\{\{#languages\}\}(.*?)\{\{/languages\}\}", RegexOptions.Singleline | RegexOptions.Compiled);
+
+    /// <summary>One language-switcher target for the <c>{{#languages}}</c> layout loop.</summary>
+    public sealed record LangLink(string Locale, string Url, bool IsCurrent);
 
     public static string Render(
         string layoutHtml,
         IReadOnlyDictionary<string, string> globals,
         IReadOnlyDictionary<string, string> menuMap,
-        Func<string, IReadOnlyList<MenuItem>> menuItems)
+        Func<string, IReadOnlyList<MenuItem>> menuItems,
+        IReadOnlyList<LangLink>? languages = null)
     {
         string Key(string slot) => menuMap.TryGetValue(slot, out var k) && !string.IsNullOrWhiteSpace(k) ? k : slot;
 
@@ -46,6 +52,19 @@ public static class LayoutRenderer
                 sb.Append(DefaultLink(it));
             return sb.ToString();
         });
+
+        // 2b) Language switcher: per-item loop ({{#languages}} … {{locale}}/{{label}}/{{url}}/{{current}} …)
+        //     plus a whole-switcher default {{languages}}. Both render empty on a single-language site.
+        var langs = languages ?? Array.Empty<LangLink>();
+        html = LangLoopRx.Replace(html, m =>
+        {
+            if (langs.Count <= 1) return "";
+            var inner = m.Groups[1].Value;
+            var sb = new StringBuilder();
+            foreach (var l in langs) sb.Append(RenderLang(inner, l));
+            return sb.ToString();
+        });
+        html = html.Replace("{{languages}}", langs.Count > 1 ? DefaultLangs(langs) : "");
 
         // 3) Global placeholders — everything except {{content}} first, then the page content last
         //    (so block HTML isn't itself scanned for placeholders).
@@ -74,6 +93,23 @@ public static class LayoutRenderer
     {
         var target = it.OpenInNewTab ? " target=\"_blank\" rel=\"noopener\"" : "";
         return $"<a href=\"{WebUtility.HtmlEncode(it.Url)}\"{target}>{WebUtility.HtmlEncode(it.Label)}</a>";
+    }
+
+    private static string RenderLang(string tpl, LangLink l) =>
+        tpl.Replace("{{locale}}", WebUtility.HtmlEncode(l.Locale))
+           .Replace("{{label}}", WebUtility.HtmlEncode(l.Locale.ToUpperInvariant()))
+           .Replace("{{url}}", WebUtility.HtmlEncode(l.Url))
+           .Replace("{{current}}", l.IsCurrent ? " class=\"lang-current\" aria-current=\"true\"" : "");
+
+    private static string DefaultLangs(IReadOnlyList<LangLink> langs)
+    {
+        var sb = new StringBuilder("<span class=\"lang-switch\">");
+        foreach (var l in langs)
+            sb.Append($"<a href=\"{WebUtility.HtmlEncode(l.Url)}\" hreflang=\"{WebUtility.HtmlEncode(l.Locale)}\"")
+              .Append(l.IsCurrent ? " class=\"lang-current\" aria-current=\"true\"" : "")
+              .Append('>').Append(WebUtility.HtmlEncode(l.Locale.ToUpperInvariant())).Append("</a>");
+        sb.Append("</span>");
+        return sb.ToString();
     }
 
     /// <summary>Parse the stored slot→menu map.</summary>

@@ -382,6 +382,27 @@ public class BlockRegistry
         },
         new BlockDefinition
         {
+            Type = "posts",
+            Name = "block.posts.name",
+            Description = "block.posts.desc",
+            Svg = SvgGrid,
+            Partial = "Blocks/_Posts",
+            Fields =
+            [
+                new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },
+                new BlockField { Id = "tag", Label = "block.posts.f.tag", Type = FieldType.Text,
+                    Help = "Nur Beiträge mit diesem Tag anzeigen (leer = alle)." },
+                new BlockField { Id = "columns", Label = "block.gallery.f.columns", Type = FieldType.Select, Default = "3",
+                    Options = [ new("2", "block.opt.columns.2"), new("3", "block.opt.columns.3") ] },
+                new BlockField { Id = "limit", Label = "block.posts.f.limit", Type = FieldType.Text,
+                    Help = "Maximale Anzahl (leer = alle)." },
+                new BlockField { Id = "showFilter", Label = "block.gallery.f.showFilter", Type = FieldType.Select, Default = "no",
+                    Options = [ new("yes", "block.opt.yesno.yes"), new("no", "block.opt.yesno.no") ],
+                    Help = "Klickbare Tag-Chips zum Weiterfiltern auf der Seite anzeigen." },
+            ]
+        },
+        new BlockDefinition
+        {
             Type = "html",
             Name = "block.html.name",
             Description = "block.html.desc",

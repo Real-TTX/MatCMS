@@ -255,6 +255,20 @@ public class ContentTransferService
                 }).ToList();
         }
 
+        // Blog posts travel with the full Pages section (not a granular page subset).
+        if (options.Pages && (options.PageKeys is null || options.PageKeys.Count == 0))
+        {
+            dto.Posts = (await _db.Posts.AsNoTracking()
+                .OrderByDescending(p => p.PublishedAt).ThenBy(p => p.Id).ToListAsync())
+                .Select(p => new PostDto
+                {
+                    Title = p.Title, Slug = p.Slug, TitleImage = p.TitleImage, Excerpt = p.Excerpt,
+                    ContentHtml = p.ContentHtml, Tags = p.Tags, AttachmentsJson = p.AttachmentsJson,
+                    Locale = p.Locale, IsPublished = p.IsPublished,
+                    PublishedAt = p.PublishedAt, CreatedAt = p.CreatedAt, UpdatedAt = p.UpdatedAt
+                }).ToList();
+        }
+
         // Admin users (opt-in) — includes password hashes; only for full migrations.
         if (options.Users)
         {
@@ -337,7 +351,8 @@ public class ContentTransferService
         if (dto is null || (dto.Templates is null && dto.Pages is null && dto.Menus is null
                             && dto.MenuItems is null && dto.Settings is null && dto.Submissions is null
                             && dto.Forms is null && dto.FormSubmissions is null
-                            && dto.Media is null && dto.Components is null && dto.Users is null))
+                            && dto.Media is null && dto.Components is null && dto.Users is null
+                            && dto.Posts is null))
             throw new InvalidOperationException(
                 "Die Datei hat kein bekanntes Backup-Format (keine Abschnitte gefunden).");
 
@@ -665,6 +680,29 @@ public class ContentTransferService
             summary.Add($"{dto.Media.Count} Medien");
         }
 
+        if (dto.Posts is not null)
+        {
+            _db.Posts.RemoveRange(_db.Posts);
+            await _db.SaveChangesAsync();
+            foreach (var p in dto.Posts)
+            {
+                if (string.IsNullOrWhiteSpace(p.Slug)) continue;
+                _db.Posts.Add(new Post
+                {
+                    Title = p.Title ?? "", Slug = p.Slug!, TitleImage = p.TitleImage,
+                    Excerpt = p.Excerpt ?? "", ContentHtml = p.ContentHtml ?? "", Tags = p.Tags ?? "",
+                    AttachmentsJson = string.IsNullOrWhiteSpace(p.AttachmentsJson) ? "[]" : p.AttachmentsJson!,
+                    Locale = string.IsNullOrWhiteSpace(p.Locale) ? "de" : p.Locale!,
+                    IsPublished = p.IsPublished,
+                    PublishedAt = p.PublishedAt == default ? DateTime.UtcNow : p.PublishedAt,
+                    CreatedAt = p.CreatedAt == default ? DateTime.UtcNow : p.CreatedAt,
+                    UpdatedAt = p.UpdatedAt == default ? DateTime.UtcNow : p.UpdatedAt
+                });
+            }
+            await _db.SaveChangesAsync();
+            summary.Add($"{dto.Posts.Count} Beiträge");
+        }
+
         // Users: UPSERT by username (never a replace-all) so the current admin can't be locked out.
         if (dto.Users is not null)
         {
@@ -854,6 +892,23 @@ public class ContentTransferService
         public List<MediaDto>? Media { get; set; }
         public List<ComponentDto>? Components { get; set; }
         public List<UserDto>? Users { get; set; }
+        public List<PostDto>? Posts { get; set; }
+    }
+
+    private sealed class PostDto
+    {
+        public string? Title { get; set; }
+        public string? Slug { get; set; }
+        public string? TitleImage { get; set; }
+        public string? Excerpt { get; set; }
+        public string? ContentHtml { get; set; }
+        public string? Tags { get; set; }
+        public string? AttachmentsJson { get; set; }
+        public string? Locale { get; set; }
+        public bool IsPublished { get; set; }
+        public DateTime PublishedAt { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
     }
 
     private sealed class UserDto

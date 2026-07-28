@@ -1,0 +1,59 @@
+@page "/beitrag/{slug}"
+@model MatCMS.Pages.PostModel
+@{
+    var p = Model.Current;
+    string SafeImg(string? s) =>
+        (!string.IsNullOrWhiteSpace(s) && (s.StartsWith("/") || s.StartsWith("http")) && s.IndexOfAny(new[] { '"', '\'', '<', '>' }) < 0) ? s! : "";
+    var titleImg = SafeImg(p.TitleImage);
+}
+<article class="section post-single">
+    <div class="container narrow">
+        @if (titleImg.Length > 0)
+        {
+            <div class="post-hero"><img src="@titleImg" alt="@p.Title" /></div>
+        }
+        <p class="post-meta muted">@p.PublishedAt.ToLocalTime().ToString("dd. MMMM yyyy")</p>
+        <h1 class="post-title">@p.Title</h1>
+        @if (!string.IsNullOrWhiteSpace(p.Excerpt))
+        {
+            <p class="post-lead">@p.Excerpt</p>
+        }
+        <div class="rich post-body">@Html.Raw(p.ContentHtml)</div>
+
+        @if (Model.Attachments.Count > 0)
+        {
+            <div class="post-attachments">
+                <h3>Anhänge</h3>
+                <ul class="att-list">
+                    @foreach (var a in Model.Attachments)
+                    {
+                        <li>
+                            @if (a.IsImage)
+                            {
+                                <a href="@a.Url" target="_blank" rel="noopener"><img src="@a.Url" alt="@a.Name" style="max-width:220px;height:auto;border-radius:8px;" /></a>
+                            }
+                            else
+                            {
+                                <a href="@a.Url" target="_blank" rel="noopener">📎 @a.Name</a>
+                            }
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+    </div>
+</article>
+
+<style>
+    .post-single { padding: 40px 0 64px; }
+    .post-single .narrow { max-width: 760px; }
+    .post-hero img { width: 100%; height: auto; border-radius: 14px; margin-bottom: 22px; box-shadow: 0 14px 34px rgba(0,0,0,.14); }
+    .post-meta { font-size: 14px; letter-spacing: .04em; text-transform: uppercase; margin: 0 0 6px; }
+    .post-title { font-family: var(--font-head); margin: 0 0 14px; }
+    .post-lead { font-size: 1.15rem; line-height: 1.6; color: var(--ink); opacity: .85; margin: 0 0 22px; }
+    .post-body { line-height: 1.75; }
+    .post-body img { max-width: 100%; height: auto; border-radius: 8px; }
+    .post-attachments { margin-top: 34px; border-top: 1px solid #e7ddce; padding-top: 20px; }
+    .post-attachments .att-list { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 16px; }
+    .post-attachments a { text-decoration: none; color: var(--accent); font-weight: 600; }
+</style>

@@ -1,0 +1,102 @@
+@model MatCMS.Content.BlockData
+@inject MatCMS.Data.AppDbContext Db
+@using Microsoft.EntityFrameworkCore
+@{
+    var heading = Model.Str("heading");
+    var tag = Model.Str("tag").Trim();
+    var columns = Model.StrOr("columns", "3");
+    var showFilter = Model.StrOr("showFilter", "no") == "yes";
+    var limit = int.TryParse(Model.Str("limit"), out var lim) && lim > 0 ? lim : 0;
+
+    string SafeImg(string? s) =>
+        (!string.IsNullOrWhiteSpace(s) && (s.StartsWith("/") || s.StartsWith("http"))
+         && s.IndexOfAny(new[] { '"', '\'', '<', '>' }) < 0) ? s! : "";
+
+    var posts = Db.Posts.AsNoTracking()
+        .Where(p => p.IsPublished && p.Locale == "de")
+        .OrderByDescending(p => p.PublishedAt).ThenByDescending(p => p.Id)
+        .ToList();
+    if (!string.IsNullOrWhiteSpace(tag))
+        posts = posts.Where(p => MatCMS.Content.TagUtil.Split(p.Tags)
+            .Contains(tag, StringComparer.OrdinalIgnoreCase)).ToList();
+    if (limit > 0) posts = posts.Take(limit).ToList();
+
+    var filterTags = posts.SelectMany(p => MatCMS.Content.TagUtil.Split(p.Tags))
+        .Where(t => !string.Equals(t, tag, StringComparison.OrdinalIgnoreCase))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(t => t, StringComparer.OrdinalIgnoreCase).ToList();
+}
+<section class="section posts-block">
+    <div class="container">
+        @if (!string.IsNullOrWhiteSpace(heading))
+        {
+            <div class="section__intro"><h2>@heading</h2></div>
+        }
+        @if (posts.Count == 0)
+        {
+            <p class="muted">Noch keine Beiträge.</p>
+        }
+        else
+        {
+            @if (showFilter && filterTags.Count > 0)
+            {
+                <div class="gallery-filter" data-gallery-filter>
+                    <button type="button" class="gfilter active" data-tag="">Alle</button>
+                    @foreach (var t in filterTags)
+                    {
+                        <button type="button" class="gfilter" data-tag="@t">@t</button>
+                    }
+                </div>
+            }
+            <div class="posts-grid cols-@columns" data-gallery>
+                @foreach (var p in posts)
+                {
+                    var img = SafeImg(p.TitleImage);
+                    var ptags = string.Join(" ", MatCMS.Content.TagUtil.Split(p.Tags));
+                    <article class="post-card gallery__item" data-tags="@ptags">
+                        <a class="post-card__link" href="/beitrag/@p.Slug">
+                            @if (img.Length > 0)
+                            {
+                                <div class="post-card__img" style="background-image:url('@img')"></div>
+                            }
+                            <div class="post-card__body">
+                                @if (!string.IsNullOrWhiteSpace(p.Tags))
+                                {
+                                    <div class="post-card__tags">
+                                        @foreach (var t in MatCMS.Content.TagUtil.Split(p.Tags))
+                                        {
+                                            <span class="post-tag">@t</span>
+                                        }
+                                    </div>
+                                }
+                                <h3 class="post-card__title">@p.Title</h3>
+                                @if (!string.IsNullOrWhiteSpace(p.Excerpt))
+                                {
+                                    <p class="post-card__excerpt">@p.Excerpt</p>
+                                }
+                                <span class="post-card__more">Weiterlesen →</span>
+                            </div>
+                        </a>
+                    </article>
+                }
+            </div>
+        }
+    </div>
+</section>
+<style>
+    .posts-grid { display: grid; gap: 26px; grid-template-columns: repeat(3, 1fr); }
+    .posts-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+    @@media (max-width: 820px) { .posts-grid, .posts-grid.cols-2 { grid-template-columns: 1fr; } }
+    .post-card { background: #fff; border: 1px solid #ece3d5; border-radius: 14px; overflow: hidden;
+        box-shadow: 0 2px 10px rgba(26,21,18,.05); transition: transform .15s ease, box-shadow .15s ease; }
+    .post-card:hover { transform: translateY(-3px); box-shadow: 0 14px 30px rgba(26,21,18,.12); }
+    .post-card__link { text-decoration: none; color: inherit; display: block; }
+    .post-card__img { height: 190px; background-size: cover; background-position: center; }
+    .post-card__body { padding: 18px 20px 20px; }
+    .post-card__tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+    .post-tag { font-size: 12px; font-weight: 600; color: var(--accent); background: var(--bg-alt, #f5f0e8);
+        padding: 3px 9px; border-radius: 999px; }
+    .post-card__title { font-family: var(--font-head); margin: 0 0 8px; font-size: 1.25rem; }
+    .post-card__excerpt { margin: 0 0 12px; line-height: 1.6; opacity: .85; }
+    .post-card__more { font-weight: 700; color: var(--accent); }
+</style>

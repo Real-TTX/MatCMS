@@ -20,9 +20,11 @@ public class AppDbContext : DbContext
     public DbSet<Media> Media => Set<Media>();
     public DbSet<Component> Components => Set<Component>();
     public DbSet<Plugin> Plugins => Set<Plugin>();
+    public DbSet<Post> Posts => Set<Post>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
+        b.Entity<Post>().HasIndex(p => new { p.Slug, p.Locale }).IsUnique();
         b.Entity<User>().HasIndex(u => u.Username).IsUnique();
         // A slug is unique per locale (the same slug may exist once per content locale).
         b.Entity<Page>().HasIndex(p => new { p.Slug, p.Locale }).IsUnique();

@@ -265,6 +265,29 @@ public static class DbSeeder
         await AddColumnIfMissingAsync(db, "Plugins", "ConfigJson", "TEXT NOT NULL DEFAULT ''");
         await AddColumnIfMissingAsync(db, "Templates", "ParametersJson", "TEXT NOT NULL DEFAULT '[]'");
         await AddColumnIfMissingAsync(db, "Templates", "ParamValuesJson", "TEXT NOT NULL DEFAULT ''");
+
+        // New table added after first release: EnsureCreated won't add it to an existing DB, so create
+        // it idempotently here (fresh DBs already have it from the model → IF NOT EXISTS is a no-op).
+        await CreateTableIfMissingAsync(db,
+            """
+            CREATE TABLE IF NOT EXISTS "Posts" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_Posts" PRIMARY KEY AUTOINCREMENT,
+                "Title" TEXT NOT NULL DEFAULT '',
+                "Slug" TEXT NOT NULL DEFAULT '',
+                "TitleImage" TEXT NULL,
+                "Excerpt" TEXT NOT NULL DEFAULT '',
+                "ContentHtml" TEXT NOT NULL DEFAULT '',
+                "Tags" TEXT NOT NULL DEFAULT '',
+                "AttachmentsJson" TEXT NOT NULL DEFAULT '[]',
+                "Locale" TEXT NOT NULL DEFAULT 'de',
+                "IsPublished" INTEGER NOT NULL DEFAULT 0,
+                "PublishedAt" TEXT NOT NULL DEFAULT '',
+                "CreatedAt" TEXT NOT NULL DEFAULT '',
+                "UpdatedAt" TEXT NOT NULL DEFAULT ''
+            )
+            """);
+        await CreateTableIfMissingAsync(db,
+            "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_Posts_Slug_Locale\" ON \"Posts\" (\"Slug\", \"Locale\")");
     }
 
     /// <summary>Assigns a stable slug Key to any plugin created before the Key column existed.</summary>
@@ -286,6 +309,13 @@ public static class DbSeeder
             p.Key = key; used.Add(key);
         }
         await db.SaveChangesAsync();
+    }
+
+    /// <summary>Runs a hard-coded, idempotent DDL statement (CREATE TABLE/INDEX IF NOT EXISTS).</summary>
+    private static async Task CreateTableIfMissingAsync(AppDbContext db, string sql)
+    {
+        try { await db.Database.ExecuteSqlRawAsync(sql); }
+        catch { /* already exists / concurrent create — safe to ignore */ }
     }
 
     private static async Task AddColumnIfMissingAsync(AppDbContext db, string table, string column, string type)

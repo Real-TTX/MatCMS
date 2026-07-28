@@ -1,0 +1,49 @@
+@page
+@model MatCMS.Pages.Admin.Posts.IndexModel
+@{
+    ViewData["Title"] = "Beiträge";
+}
+<div class="page-head">
+    <h1>Beiträge</h1>
+    <a class="btn btn-sm" asp-page="Edit" asp-route-id="0">+ Neuer Beitrag</a>
+</div>
+
+@if (Model.Items.Count == 0)
+{
+    <div class="card"><p class="muted">Noch keine Beiträge. Lege den ersten an.</p></div>
+}
+else
+{
+    <div class="card">
+        <div class="block-list">
+            @foreach (var p in Model.Items)
+            {
+                <div class="block-item">
+                    <div class="b-info" style="flex:1;">
+                        <div class="b-type">
+                            <strong>@p.Title</strong>
+                            @if (p.IsPublished)
+                            {
+                                <span class="badge badge-on">veröffentlicht</span>
+                            }
+                            else
+                            {
+                                <span class="badge">Entwurf</span>
+                            }
+                        </div>
+                        <div class="muted" style="font-size:13px;margin-top:3px;">
+                            /beitrag/@p.Slug · @p.PublishedAt.ToLocalTime().ToString("dd.MM.yyyy")
+                            @if (!string.IsNullOrWhiteSpace(p.Tags)) { <text> · @p.Tags</text> }
+                        </div>
+                    </div>
+                    <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@p.Id"><i class="ti ti-pencil" aria-hidden="true"></i> Bearbeiten</a>
+                    <a class="btn btn-sm btn-ghost" href="/beitrag/@p.Slug" target="_blank" rel="noopener" title="Ansehen"><i class="ti ti-external-link" aria-hidden="true"></i></a>
+                    <form method="post" asp-page-handler="Delete" asp-route-id="@p.Id" class="inline-form"
+                          onsubmit="return confirm('Beitrag „@p.Title“ wirklich löschen?');">
+                        <button type="submit" class="btn btn-sm btn-danger btn-icon" title="Löschen" aria-label="Löschen"><i class="ti ti-trash" aria-hidden="true"></i></button>
+                    </form>
+                </div>
+            }
+        </div>
+    </div>
+}

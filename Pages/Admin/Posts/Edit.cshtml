@@ -1,0 +1,153 @@
+@page "{id:int}"
+@model MatCMS.Pages.Admin.Posts.EditModel
+@{
+    ViewData["Title"] = Model.IsNew ? "Neuer Beitrag" : "Beitrag bearbeiten";
+}
+<div class="page-head">
+    <h1>@(Model.IsNew ? "Neuer Beitrag" : "Beitrag bearbeiten")</h1>
+    <div style="display:flex;gap:8px;">
+        @if (!Model.IsNew)
+        {
+            <a class="btn btn-sm btn-ghost" href="/beitrag/@Model.Input.Slug" target="_blank" rel="noopener"><i class="ti ti-external-link" aria-hidden="true"></i> Ansehen</a>
+        }
+        <a class="btn btn-sm btn-ghost" asp-page="Index">Zurück</a>
+    </div>
+</div>
+
+<form method="post" asp-route-id="@Model.PostId" id="post-form" class="form-grid" style="max-width:860px;">
+    <div asp-validation-summary="All" class="alert alert-error" style="display:@(ViewData.ModelState.IsValid ? "none" : "block")"></div>
+
+    <div class="field">
+        <label>Überschrift</label>
+        <input asp-for="Input.Title" placeholder="Titel des Beitrags" required />
+    </div>
+
+    <div class="field">
+        <label>URL-Slug <span class="muted">(optional – wird aus dem Titel erzeugt)</span></label>
+        <input asp-for="Input.Slug" placeholder="mein-beitrag" />
+    </div>
+
+    <div class="field">
+        <label>Titelbild</label>
+        <div class="image-field">
+            <div class="preview" id="ti-preview" style="@(string.IsNullOrWhiteSpace(Model.Input.TitleImage) ? "" : $"background-image:url('{Model.Input.TitleImage}')")"></div>
+            <div class="image-controls">
+                <input asp-for="Input.TitleImage" id="ti-url" placeholder="/uploads/… oder https://…" />
+                <div style="margin-top:8px;">
+                    <button type="button" class="btn btn-ghost btn-sm" id="ti-pick">Bild wählen</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="field">
+        <label>Kurztext / Teaser <span class="muted">(für Karten &amp; Listen)</span></label>
+        <textarea asp-for="Input.Excerpt" rows="2" placeholder="Kurze Zusammenfassung…"></textarea>
+    </div>
+
+    <div class="field">
+        <label>Inhalt</label>
+        <div class="rt-toolbar" id="rt-toolbar">
+            <button type="button" data-cmd="bold" title="Fett">F</button>
+            <button type="button" data-cmd="italic" title="Kursiv">K</button>
+            <button type="button" data-cmd="formatBlock" data-arg="H2" title="Überschrift 2">H2</button>
+            <button type="button" data-cmd="formatBlock" data-arg="H3" title="Überschrift 3">H3</button>
+            <button type="button" data-cmd="formatBlock" data-arg="P" title="Absatz">¶</button>
+            <button type="button" data-cmd="insertUnorderedList" title="Liste">• Liste</button>
+            <button type="button" data-cmd="createLink" data-prompt="1" title="Link">Link</button>
+            <button type="button" data-cmd="removeFormat" title="Format entfernen">✕</button>
+        </div>
+        <div class="rt-editor" id="rt-editor" contenteditable="true" style="min-height:220px;">@Html.Raw(Model.Input.ContentHtml)</div>
+        <input type="hidden" asp-for="Input.ContentHtml" id="rt-hidden" />
+    </div>
+
+    <div class="field">
+        <label>Tags <span class="muted">(kommagetrennt)</span></label>
+        <input asp-for="Input.Tags" placeholder="News, Tipps" />
+    </div>
+
+    <div class="field">
+        <label>Anhänge <span class="muted">(Bilder/Dateien, optional)</span></label>
+        <div id="att-list" class="att-list" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+        <div style="margin-top:8px;">
+            <button type="button" class="btn btn-ghost btn-sm" id="att-add">+ Datei / Bild hinzufügen</button>
+        </div>
+        <input type="hidden" asp-for="Input.AttachmentsJson" id="att-json" />
+    </div>
+
+    <div class="field">
+        <label><input type="checkbox" asp-for="Input.IsPublished" /> Veröffentlicht</label>
+    </div>
+
+    <div class="field">
+        <label>Datum</label>
+        <input type="date" asp-for="Input.PublishedAt" />
+    </div>
+
+    <div class="form-actions" style="display:flex;gap:8px;">
+        <button type="submit" class="btn">Speichern</button>
+        <a class="btn btn-ghost" asp-page="Index">Abbrechen</a>
+    </div>
+</form>
+
+@section Scripts {
+    <style>
+        .rt-toolbar { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:6px; }
+        .rt-toolbar button { padding:5px 10px; border:1px solid var(--line,#ddd); background:#fff; border-radius:6px; cursor:pointer; font-size:13px; }
+        .rt-toolbar button:hover { background:var(--bg-alt,#f1efe9); }
+        .rt-editor { border:1px solid var(--line,#ddd); border-radius:8px; padding:12px 14px; background:#fff; }
+        .rt-editor:focus { outline:2px solid var(--accent,#b23a2e); outline-offset:-1px; }
+        .att-chip { display:inline-flex; align-items:center; gap:6px; background:var(--bg-alt,#f1efe9); border:1px solid #e2d6c3; border-radius:8px; padding:6px 10px; font-size:13px; }
+        .att-chip a { text-decoration:none; color:var(--accent,#b23a2e); }
+        .att-chip button { border:0; background:none; cursor:pointer; color:#a00; font-weight:700; }
+    </style>
+    <script>
+        (function () {
+            // ---- Rich text ----
+            var ed = document.getElementById('rt-editor');
+            var hidden = document.getElementById('rt-hidden');
+            document.getElementById('rt-toolbar').addEventListener('click', function (e) {
+                var b = e.target.closest('button'); if (!b) return;
+                ed.focus();
+                var cmd = b.getAttribute('data-cmd'), arg = b.getAttribute('data-arg');
+                if (b.getAttribute('data-prompt')) {
+                    var url = window.prompt('Link-Adresse (URL):', 'https://'); if (url) document.execCommand(cmd, false, url);
+                } else { document.execCommand(cmd, false, arg || null); }
+            });
+            document.getElementById('post-form').addEventListener('submit', function () { hidden.value = ed.innerHTML.trim(); });
+
+            // ---- Title image ----
+            var tiUrl = document.getElementById('ti-url'), tiPrev = document.getElementById('ti-preview');
+            function syncTi() { tiPrev.style.backgroundImage = tiUrl.value ? "url('" + tiUrl.value + "')" : ''; }
+            tiUrl.addEventListener('input', syncTi);
+            document.getElementById('ti-pick').addEventListener('click', function () {
+                if (window.openMediaPicker) window.openMediaPicker(function (u) { tiUrl.value = u; syncTi(); });
+            });
+
+            // ---- Attachments ----
+            var attJson = document.getElementById('att-json'), attList = document.getElementById('att-list');
+            var atts = [];
+            try { atts = JSON.parse(attJson.value || '[]') || []; } catch (e) { atts = []; }
+            function nameFromUrl(u) { try { return decodeURIComponent((u || '').split('/').pop().split('?')[0]); } catch (e) { return u; } }
+            function renderAtts() {
+                attList.innerHTML = '';
+                atts.forEach(function (a, i) {
+                    var chip = document.createElement('span'); chip.className = 'att-chip';
+                    var link = document.createElement('a'); link.href = a.url; link.target = '_blank'; link.rel = 'noopener'; link.textContent = a.name || nameFromUrl(a.url);
+                    var x = document.createElement('button'); x.type = 'button'; x.textContent = '×';
+                    x.addEventListener('click', function () { atts.splice(i, 1); sync(); });
+                    chip.appendChild(link); chip.appendChild(x); attList.appendChild(chip);
+                });
+            }
+            function sync() { attJson.value = JSON.stringify(atts); renderAtts(); }
+            document.getElementById('att-add').addEventListener('click', function () {
+                if (!window.openMediaPicker) return;
+                window.openMediaPicker(function (urls) {
+                    (Array.isArray(urls) ? urls : [urls]).forEach(function (u) { if (u) atts.push({ url: u, name: nameFromUrl(u) }); });
+                    sync();
+                }, { multiple: true });
+            });
+            renderAtts();
+        })();
+    </script>
+}

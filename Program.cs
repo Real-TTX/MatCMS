@@ -330,7 +330,7 @@ app.MapGet("/admin/api/media", async (MatCMS.Data.AppDbContext db) =>
 {
     var items = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
         db.Media.AsNoTracking().OrderByDescending(m => m.Id)
-            .Select(m => new { url = m.Url, name = m.FileName }));
+            .Select(m => new { url = m.Url, name = m.FileName, tags = m.Tags }));
     return Results.Ok(items);
 }).RequireAuthorization("Admin");
 
@@ -352,11 +352,22 @@ app.MapGet("/sitemap.xml", async (HttpContext ctx, MatCMS.Data.AppDbContext db, 
     // Only locales the app can actually route (mirrors the content routing + AvailableLocales), so the
     // sitemap never advertises a /{locale}/… URL that would 404.
     var supported = MatCMS.Services.Localizer.SupportedCultures;
-    var pages = await db.Pages.AsNoTracking()
+
+    // The pages assigned as the 404 / server-error page must never be indexed — drop them.
+    var errorSlugs = (await db.SiteSettings.AsNoTracking()
+            .Where(s => s.Key == MatCMS.Services.SettingKeys.NotFoundPage
+                     || s.Key == MatCMS.Services.SettingKeys.ErrorPage)
+            .Select(s => s.Value).ToListAsync())
+        .Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => v!.Trim())
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    var pages = (await db.Pages.AsNoTracking()
         .Where(p => p.IsPublished && supported.Contains(p.Locale))
         .OrderBy(p => p.Locale).ThenBy(p => p.NavOrder).ThenBy(p => p.Title)
         .Select(p => new { p.Slug, p.Locale, p.UpdatedAt })
-        .ToListAsync();
+        .ToListAsync())
+        .Where(p => !errorSlugs.Contains(p.Slug))
+        .ToList();
 
     var baseUrl = site.CanonicalBaseUrl(ctx.Request);
     var sb = new System.Text.StringBuilder();

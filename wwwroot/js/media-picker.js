@@ -43,6 +43,7 @@
         function makeTile(m) {
             var b = document.createElement("button");
             b.type = "button"; b.className = "media-pick"; b.title = m.name || m.url;
+            b.dataset.tags = m.tags || "";
             var img = document.createElement("img"); img.src = m.url; img.alt = m.name || "";
             b.appendChild(img);
             b.addEventListener("click", function () {
@@ -77,8 +78,43 @@
                 .then(function () { uploadBtn.disabled = false; uploadBtn.textContent = lbl; fileInp.value = ""; });
         });
 
+        // A tag-filter bar above the grid: "Alle" + one chip per distinct tag (case preserved,
+        // deduped case-insensitively). Clicking a chip shows only tiles carrying that tag.
+        function buildFilter(list) {
+            var tags = [], seen = {};
+            list.forEach(function (m) {
+                (m.tags || "").split(",").forEach(function (t) {
+                    t = t.trim(); if (!t) return;
+                    var k = t.toLowerCase(); if (!seen[k]) { seen[k] = 1; tags.push(t); }
+                });
+            });
+            if (tags.length < 2) return; // nothing useful to filter by
+            tags.sort(function (a, b) { return a.toLowerCase().localeCompare(b.toLowerCase()); });
+            var bar = document.createElement("div");
+            bar.className = "tag-filter media-picker-filter";
+            function chip(label, tag, active) {
+                var c = document.createElement("button");
+                c.type = "button"; c.className = "tag-chip" + (active ? " active" : "");
+                c.textContent = label; c.dataset.tag = tag; return c;
+            }
+            bar.appendChild(chip("Alle", "", true));
+            tags.forEach(function (t) { bar.appendChild(chip(t, t.toLowerCase(), false)); });
+            bar.addEventListener("click", function (e) {
+                var b = e.target.closest(".tag-chip"); if (!b) return;
+                var tag = b.dataset.tag;
+                bar.querySelectorAll(".tag-chip").forEach(function (x) { x.classList.remove("active"); });
+                b.classList.add("active");
+                Array.prototype.slice.call(grid.querySelectorAll(".media-pick")).forEach(function (tile) {
+                    var tl = (tile.dataset.tags || "").toLowerCase().split(",").map(function (s) { return s.trim(); });
+                    tile.style.display = (!tag || tl.indexOf(tag) !== -1) ? "" : "none";
+                });
+            });
+            grid.parentNode.insertBefore(bar, grid);
+        }
+
         fetch("/admin/api/media").then(function (r) { return r.json(); }).then(function (list) {
             if (!list || !list.length) { grid.innerHTML = '<p class="muted">Noch keine Medien vorhanden.</p>'; return; }
+            buildFilter(list);
             list.forEach(function (m) { grid.appendChild(makeTile(m)); });
         }).catch(function () { grid.innerHTML = '<p class="muted">Konnte Mediathek nicht laden.</p>'; });
     };

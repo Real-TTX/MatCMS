@@ -6,6 +6,7 @@
     var layout = Model.StrOr("layout", "grid");
     var columns = Model.StrOr("columns", "3");
     var source = Model.StrOr("source", "manual");
+    var showFilter = Model.StrOr("showFilter", "yes") != "no";
 
     static string SafeSrc(string image) =>
         (!string.IsNullOrWhiteSpace(image)
@@ -56,7 +57,7 @@
         {
             <div class="section__intro"><h2>@heading</h2></div>
         }
-        @if (filterTags.Count > 0)
+        @if (showFilter && filterTags.Count > 0)
         {
             <div class="gallery-filter" data-gallery-filter>
                 <button type="button" class="gfilter active" data-tag="">Alle</button>

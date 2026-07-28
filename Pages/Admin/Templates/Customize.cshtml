@@ -1,19 +1,19 @@
 @page "{id:int}"
 @model MatCMS.Pages.Admin.Templates.CustomizeModel
 @{
-    ViewData["Title"] = "Template anpassen";
+    ViewData["Title"] = "Template-Edit";
     string V(string id) => Model.Values.TryGetValue(id, out var v) ? v : "";
 }
 <div class="page-head">
-    <h1>Template anpassen – @Model.Current.Name</h1>
+    <h1>Edit – @Model.Current.Name</h1>
     <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
 </div>
 
 <div class="card">
-    <p class="help">Hier stellst du die vom Designer bereitgestellten Parameter dieses Templates ein — ohne das Template selbst zu bearbeiten.</p>
+    <p class="help">Hier passt du die vom Designer bereitgestellten Einstellungen dieses Templates an — ohne das Template selbst zu bearbeiten.</p>
     @if (Model.Params.Count == 0)
     {
-        <p class="muted">Dieses Template stellt keine Parameter zum Anpassen bereit.</p>
+        <p class="muted">Dieses Template stellt keine Einstellungen zum Anpassen bereit.</p>
     }
     else
     {

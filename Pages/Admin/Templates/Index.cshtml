@@ -24,8 +24,8 @@
                     <span class="muted-font">@t.HeadingFont</span>
                 </div>
                 <div class="actions">
-                    <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@t.Id" title="Template bearbeiten (Designer)">Bearbeiten</a>
-                    <a class="btn btn-sm btn-ghost" asp-page="Customize" asp-route-id="@t.Id" title="Vom Designer bereitgestellte Parameter einstellen">Anpassen</a>
+                    <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@t.Id" title="Designer – Aussehen, Layout &amp; Menü-Zuordnung"><i class="ti ti-palette" aria-hidden="true"></i> Designer</a>
+                    <a class="btn btn-sm btn-ghost" asp-page="Customize" asp-route-id="@t.Id" title="Edit – Einstellungen dieses Templates anpassen"><i class="ti ti-pencil" aria-hidden="true"></i> Edit</a>
                     @if (!t.IsActive)
                     {
                         <form class="inline-form" method="post" asp-page-handler="Activate" asp-route-id="@t.Id">

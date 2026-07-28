@@ -92,7 +92,8 @@ builder.Services.AddScoped<PluginRunner>();
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    // Ensure a rejected request reports 429 (not a generic 400) even when its body was never read.
+    // On rejection, report 429 where possible. (A body-bearing POST rejected before its body is read
+    // can still surface as 400 from Kestrel; the request is rejected either way, so abuse stays bounded.)
     options.OnRejected = (context, _) =>
     {
         if (!context.HttpContext.Response.HasStarted)

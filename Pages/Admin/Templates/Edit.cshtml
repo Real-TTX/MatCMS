@@ -3,6 +3,79 @@
 @using MatCMS.Content
 @{
     ViewData["Title"] = T["templates.edit"];
+
+    // ---- The template's editable "files" (unified list). Each maps to an existing backing field, so
+    //      storage/rendering are unchanged — only the management is unified. Index order MUST match the
+    //      hidden <textarea> order and the FILES JS array below. ----
+    var postValue = Model.Parts.TryGetValue("post", out var pp) && !string.IsNullOrWhiteSpace(pp)
+        ? pp : Model.DefaultPostPart;
+
+    // Starter for body.html ("Standard einfügen"). body.html is EMPTY by default (built-in layout);
+    // this is only inserted on demand.
+    const string StarterBody =
+        "<header class=\"site-header\">\n" +
+        "  <div class=\"container header-inner\">\n" +
+        "    <a class=\"logo\" href=\"/\">{{logo}}</a>\n" +
+        "    <nav class=\"main-nav\">{{menu:primary}}</nav>\n" +
+        "  </div>\n" +
+        "</header>\n\n" +
+        "<main>{{content}}</main>\n\n" +
+        "<footer class=\"site-footer\">\n" +
+        "  <div class=\"container footer-inner\">\n" +
+        "    <nav class=\"footer-nav\">\n" +
+        "      {{#menu:secondary}}<a href=\"{{url}}\"{{target}}>{{icon}}{{label}}</a>{{/menu:secondary}}\n" +
+        "    </nav>\n" +
+        "    <p class=\"footer-text\">© {{year}} {{site_name}}</p>\n" +
+        "  </div>\n" +
+        "</footer>";
+
+    // Per-file metadata for the client editor (mode/insert-default/"baseline"=value counting as unset/tokens).
+    var filesMeta = new object[]
+    {
+        new {
+            name = "body.html", mode = "htmlmixed", insertDefault = StarterBody, baseline = "",
+            tokens = new[] {
+                new { t = "{{content}}", l = "Seiteninhalt (Pflicht fürs Custom-Layout)" },
+                new { t = "{{logo}}", l = "Logo-Bild" },
+                new { t = "{{site_name}}", l = "Seitenname" },
+                new { t = "{{footer_text}}", l = "Footer-Text" },
+                new { t = "{{year}}", l = "Aktuelles Jahr" },
+                new { t = "{{menu:primary}}", l = "Menü (Slot)" },
+                new { t = "{{#menu:primary}}…{{/menu:primary}}", l = "Menü-Schleife ({{label}}/{{url}}/{{icon}})" },
+                new { t = "{{param:id}}", l = "Template-Parameter" },
+                new { t = "{{languages}}", l = "Sprachauswahl" },
+            }
+        },
+        new {
+            name = "article.html", mode = "htmlmixed", insertDefault = Model.DefaultPostPart, baseline = Model.DefaultPostPart,
+            tokens = new[] {
+                new { t = "{{post_image}}", l = "Titelbild" },
+                new { t = "{{post_date}}", l = "Datum" },
+                new { t = "{{post_title}}", l = "Überschrift" },
+                new { t = "{{post_excerpt}}", l = "Teaser" },
+                new { t = "{{post_body}}", l = "Beitragstext" },
+                new { t = "{{post_tags}}", l = "Tags" },
+                new { t = "{{post_attachments}}", l = "Anhänge" },
+            }
+        },
+        new {
+            name = "styles.css", mode = "css", insertDefault = "", baseline = "",
+            tokens = new[] { new { t = "{{param:id}}", l = "Template-Parameter" } }
+        },
+        new {
+            name = "script.js", mode = "javascript", insertDefault = "", baseline = "",
+            tokens = new object[0]
+        },
+    };
+    var filesJson = System.Text.Json.JsonSerializer.Serialize(filesMeta);
+
+    var fileRows = new[]
+    {
+        new { Name = "body.html", Ext = "html", Desc = T["tplfiles.body.desc"],    Custom = !string.IsNullOrWhiteSpace(Model.LayoutHtml) },
+        new { Name = "article.html", Ext = "html", Desc = T["tplfiles.article.desc"], Custom = Model.Parts.ContainsKey("post") },
+        new { Name = "styles.css", Ext = "css",  Desc = T["tplfiles.styles.desc"],  Custom = !string.IsNullOrWhiteSpace(Model.CustomCss) },
+        new { Name = "script.js",  Ext = "js",   Desc = T["tplfiles.script.desc"],  Custom = !string.IsNullOrWhiteSpace(Model.CustomJs) },
+    };
 }
 <div class="page-head">
     <h1>
@@ -21,12 +94,12 @@
     {
         <p class="muted">@Html.Raw(T["templates.activeNotice"])</p>
     }
-    <form method="post">
+    <form method="post" id="tpl-form">
         <input type="hidden" name="Id" value="@Model.Id" />
 
         <div class="tabs" role="tablist">
             <button type="button" class="tab active" data-tab="designer">🎨 Designer</button>
-            <button type="button" class="tab" data-tab="pages">📄 @T["templates.tabPages"]</button>
+            <button type="button" class="tab" data-tab="files">📁 @T["tplfiles.tab"]</button>
             <button type="button" class="tab" data-tab="params">⚙️ Parameter</button>
         </div>
         <p class="help" data-group-hint></p>
@@ -135,6 +208,33 @@
             </div>
         </div>
 
+        @* ============ DATEIEN (unified template files) ============ *@
+        <div class="tab-panel" data-panel="files" data-group="files" hidden>
+            <div class="help">@Html.Raw(T["tplfiles.intro"])</div>
+            <div class="tpl-files">
+                @for (var i = 0; i < fileRows.Length; i++)
+                {
+                    var f = fileRows[i];
+                    <button type="button" class="tpl-file" data-file-idx="@i">
+                        <span class="tpl-file-ext ext-@f.Ext">@f.Ext</span>
+                        <span class="tpl-file-main">
+                            <span class="tpl-file-name"><code>@f.Name</code>
+                                <span class="tpl-file-badge @(f.Custom ? "on" : "")">@(f.Custom ? T["tplfiles.badgeCustom"] : T["tplfiles.badgeEmpty"])</span>
+                            </span>
+                            <span class="tpl-file-desc">@f.Desc</span>
+                        </span>
+                        <span class="tpl-file-open"><i class="ti ti-code" aria-hidden="true"></i> @T["tplfiles.edit"]</span>
+                    </button>
+                }
+            </div>
+
+            @* Hidden stores — these are what the form actually submits. Order matches fileRows/FILES. *@
+            <textarea class="tpl-file-store" data-idx="0" name="LayoutHtml" hidden>@Model.LayoutHtml</textarea>
+            <textarea class="tpl-file-store" data-idx="1" name="Parts[post]" hidden>@postValue</textarea>
+            <textarea class="tpl-file-store" data-idx="2" name="CustomCss" hidden>@Model.CustomCss</textarea>
+            <textarea class="tpl-file-store" data-idx="3" name="CustomJs" hidden>@Model.CustomJs</textarea>
+        </div>
+
         @* ============ MENÜS ============ *@
         <div class="tab-panel form-grid" data-panel="menus" data-group="params" hidden>
             <div class="help">@Html.Raw(T["templates.menusIntro"])</div>
@@ -180,69 +280,13 @@
             </div>
         </div>
 
-        @* ============ ERWEITERT ============ *@
+        @* ============ PARAMETER (designer-published) ============ *@
         <div class="tab-panel form-grid" data-panel="advanced" data-group="params" hidden>
-            <div class="form-field">
-                <label for="CustomCss">@T["templates.customCss"]</label>
-                <textarea id="CustomCss" name="CustomCss" rows="6" class="code" spellcheck="false" placeholder=".hero { ... }">@Model.CustomCss</textarea>
-                <div class="help">@T["templates.customCssHelp"]</div>
-            </div>
-            <div class="form-field">
-                <label for="CustomJs">@T["templates.customJs"]</label>
-                <textarea id="CustomJs" name="CustomJs" rows="6" class="code" spellcheck="false" placeholder="// JavaScript">@Model.CustomJs</textarea>
-                <div class="help">@T["templates.customJsHelp"]</div>
-            </div>
-            <div class="form-field">
-                <div class="label-row">
-                    <label for="LayoutHtml">@T["templates.layoutHtml"]</label>
-                    <button type="button" id="insert-starter" class="btn btn-sm btn-ghost">@T["templates.insertStarter"]</button>
-                </div>
-                <textarea id="LayoutHtml" name="LayoutHtml" rows="10" class="code" spellcheck="false" placeholder="<header>{{logo}} {{menu:primary}}</header>&#10;<main>{{content}}</main>&#10;<footer>{{menu:secondary}}</footer>">@Model.LayoutHtml</textarea>
-                <div class="help">@Html.Raw(T["templates.layoutHtmlHelp"])</div>
-                <div class="help">@Html.Raw(T["templates.menuLoopHelp"])</div>
-                <div id="slot-detect" class="slot-detect"></div>
-            </div>
-
             <h3 class="form-section">Parameter (für Nutzer)</h3>
-            <div class="help">Parameter, die ein Nutzer dieses Templates unter „Anpassen" einstellen kann — ohne das Template zu bearbeiten. Im Template verwendbar als <code>{{param:id}}</code> (in CSS oder Layout-HTML). Die ID wird aus dem Label erzeugt.</div>
+            <div class="help">Parameter, die ein Nutzer dieses Templates unter „Anpassen" einstellen kann — ohne das Template zu bearbeiten. Im Template verwendbar als <code>{{param:id}}</code> (in <code>styles.css</code> oder <code>body.html</code>). Die ID wird aus dem Label erzeugt.</div>
             <div id="param-rows" data-params="@Model.ParametersJson"></div>
             <div style="margin-top:8px;"><button type="button" class="btn btn-sm btn-ghost" id="param-add">＋ Parameter</button></div>
             <input type="hidden" name="ParametersJson" id="ParametersJson" />
-        </div>
-
-        @* ============ SEITEN (per-page-type layout parts) ============ *@
-        @{
-            var postValue = Model.Parts.TryGetValue("post", out var pp) && !string.IsNullOrWhiteSpace(pp)
-                ? pp : Model.DefaultPostPart;
-            var postTokens = new (string Token, string LabelKey)[]
-            {
-                ("{{post_image}}", "templates.tok.image"),
-                ("{{post_date}}", "templates.tok.date"),
-                ("{{post_title}}", "templates.tok.title"),
-                ("{{post_excerpt}}", "templates.tok.excerpt"),
-                ("{{post_body}}", "templates.tok.body"),
-                ("{{post_tags}}", "templates.tok.tags"),
-                ("{{post_attachments}}", "templates.tok.attachments"),
-            };
-        }
-        <div class="tab-panel form-grid" data-panel="pages" data-group="pages" hidden>
-            <div class="help">@Html.Raw(T["templates.pagesIntro"])</div>
-            <div class="form-field">
-                <div class="label-row">
-                    <label for="Part_post">@T["templates.postLayout"]</label>
-                    <button type="button" id="insert-post-default" class="btn btn-sm btn-ghost">@T["templates.insertDefault"]</button>
-                </div>
-                <textarea id="Part_post" name="Parts[post]" rows="16" class="code" spellcheck="false"
-                          data-default="@Model.DefaultPostPart">@postValue</textarea>
-                <div class="help">@Html.Raw(T["templates.postLayoutHelp"])</div>
-                <div class="help" style="margin-top:6px;">@T["templates.tokensAvailable"]</div>
-                <ul class="menu-ref">
-                    @foreach (var tk in postTokens)
-                    {
-                        <li><code class="mono">@tk.Token</code><span>@T[tk.LabelKey]</span></li>
-                    }
-                </ul>
-            </div>
         </div>
 
         <div class="form-actions">
@@ -251,20 +295,84 @@
     </form>
 </div>
 
+@* ============ IDE-style file editor modal ============ *@
+<div class="cm-modal" id="file-editor" hidden>
+    <div class="cm-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="cm-file-name">
+        <div class="cm-modal-head">
+            <span class="cm-modal-file"><i class="ti ti-file-code" aria-hidden="true"></i> <code id="cm-file-name"></code></span>
+            <button type="button" class="cm-modal-close" id="cm-close" title="@T["tplfiles.cancel"]" aria-label="@T["tplfiles.cancel"]">✕</button>
+        </div>
+        <div class="cm-modal-editor" id="cm-host"></div>
+        <div class="cm-modal-tokens">
+            <span class="cm-tokens-label">@T["tplfiles.tokens"]</span>
+            <span id="cm-tokens"></span>
+        </div>
+        <div class="cm-modal-foot">
+            <button type="button" class="btn btn-sm btn-ghost" id="cm-insert-default" hidden>@T["tplfiles.insertDefault"]</button>
+            <span style="flex:1;"></span>
+            <button type="button" class="btn btn-sm btn-ghost" id="cm-cancel">@T["tplfiles.cancel"]</button>
+            <button type="button" class="btn btn-sm" id="cm-apply">@T["tplfiles.apply"]</button>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
+    <link rel="stylesheet" href="~/lib/codemirror/codemirror.min.css" asp-append-version="true" />
+    <style>
+        /* File list */
+        .tpl-files { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+        .tpl-file { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left;
+            background: #fff; border: 1px solid var(--line, #e2e4e8); border-radius: 10px; padding: 12px 14px; cursor: pointer; font: inherit; }
+        .tpl-file:hover { border-color: var(--accent); box-shadow: 0 2px 10px rgba(0,0,0,.05); }
+        .tpl-file-ext { flex: none; width: 46px; height: 46px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center;
+            font-family: var(--font-head, sans-serif); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #fff; }
+        .ext-html { background: #e44d26; } .ext-css { background: #2965f1; } .ext-js { background: #b8a316; }
+        .tpl-file-main { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+        .tpl-file-name { font-size: 15px; display: flex; align-items: center; gap: 8px; }
+        .tpl-file-name code { font-size: 14px; }
+        .tpl-file-badge { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #8a8f98; background: #f1f2f4; border-radius: 999px; padding: 2px 9px; }
+        .tpl-file-badge.on { color: #fff; background: var(--accent); }
+        .tpl-file-desc { font-size: 12.5px; color: #6b7078; }
+        .tpl-file-open { flex: none; color: var(--accent); font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; }
+
+        /* Modal */
+        .cm-modal { position: fixed; inset: 0; z-index: 3000; background: rgba(17,19,24,.55); display: flex; align-items: stretch; justify-content: center; padding: 3vh 2vw; }
+        .cm-modal[hidden] { display: none; }
+        .cm-modal-dialog { background: #fff; border-radius: 12px; width: min(1100px, 100%); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 24px 70px rgba(0,0,0,.4); }
+        .cm-modal-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--line, #e2e4e8); }
+        .cm-modal-file { font-size: 15px; display: inline-flex; align-items: center; gap: 8px; }
+        .cm-modal-file code { font-size: 14px; }
+        .cm-modal-close { border: 0; background: none; font-size: 20px; line-height: 1; cursor: pointer; color: #6b7078; padding: 4px 8px; border-radius: 6px; }
+        .cm-modal-close:hover { background: #f1f2f4; color: #111; }
+        .cm-modal-editor { flex: 1; min-height: 0; overflow: hidden; }
+        .cm-modal-editor .CodeMirror { height: 100%; font-size: 13.5px; line-height: 1.5; }
+        .cm-modal-tokens { padding: 8px 14px; border-top: 1px solid var(--line, #eee); display: flex; flex-wrap: wrap; align-items: center; gap: 6px; max-height: 92px; overflow-y: auto; }
+        .cm-tokens-label { font-size: 12px; color: #6b7078; margin-right: 4px; }
+        .cm-token { font-family: var(--mono, monospace); font-size: 12px; background: #f1f2f4; border: 1px solid #e2e4e8; border-radius: 6px; padding: 2px 7px; cursor: pointer; }
+        .cm-token:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .cm-modal-foot { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line, #e2e4e8); background: #fafbfc; }
+    </style>
+    <script src="~/lib/codemirror/codemirror.min.js" asp-append-version="true"></script>
+    <script src="~/lib/codemirror/mode/xml.min.js" asp-append-version="true"></script>
+    <script src="~/lib/codemirror/mode/javascript.min.js" asp-append-version="true"></script>
+    <script src="~/lib/codemirror/mode/css.min.js" asp-append-version="true"></script>
+    <script src="~/lib/codemirror/mode/htmlmixed.min.js" asp-append-version="true"></script>
+    <script src="~/lib/codemirror/addon/closebrackets.min.js" asp-append-version="true"></script>
+    <script src="~/lib/codemirror/addon/matchbrackets.min.js" asp-append-version="true"></script>
+    <script src="~/lib/codemirror/addon/active-line.min.js" asp-append-version="true"></script>
     <script>
-        // ---- Two areas: Designer (Aussehen) vs. Parameter (Menü-Mapping + Layout/Code) ----
+        // ---- Tabs: Designer (Aussehen) / Dateien (Layout-Dateien) / Parameter (Menü + Parameter) ----
         (function () {
             var tabs = document.querySelectorAll('.tab');
             var panels = document.querySelectorAll('.tab-panel');
             var hint = document.querySelector('[data-group-hint]');
             var HINTS = {
                 designer: 'Aussehen: Farben, Schrift, Layout und Header.',
-                pages: 'Seiten-Layouts: eigene Vorlagen pro Seitentyp (z. B. die Blog-Detailseite).',
-                params: 'Technik: Menü-Zuordnung (Mapping) und das Layout-HTML/CSS/JS des Templates.'
+                files: 'Die Layout-Dateien des Templates (HTML/CSS/JS) – anklicken zum Bearbeiten im Editor.',
+                params: 'Technik: Menü-Zuordnung (Mapping) und die Parameter für Nutzer.'
             };
             function show(name) {
-                if (name !== 'params' && name !== 'pages') name = 'designer';
+                if (name !== 'params' && name !== 'files') name = 'designer';
                 tabs.forEach(function (t) { t.classList.toggle('active', t.dataset.tab === name); });
                 panels.forEach(function (p) { p.hidden = p.dataset.group !== name; });
                 if (hint) hint.textContent = HINTS[name] || '';
@@ -273,66 +381,70 @@
             show(new URLSearchParams(location.search).get('tab'));
         })();
 
-        // ---- Custom-layout helpers: starter template + live slot detection ----
+        // ---- Unified file editor (CodeMirror IDE modal) ----
         (function () {
-            var ta = document.getElementById('LayoutHtml');
-            var detect = document.getElementById('slot-detect');
-            var starterBtn = document.getElementById('insert-starter');
-            if (!ta) return;
+            var FILES = @Html.Raw(filesJson);
+            var stores = Array.prototype.slice.call(document.querySelectorAll('.tpl-file-store'));
+            var rows = Array.prototype.slice.call(document.querySelectorAll('.tpl-file'));
+            var modal = document.getElementById('file-editor');
+            var host = document.getElementById('cm-host');
+            var nameEl = document.getElementById('cm-file-name');
+            var tokEl = document.getElementById('cm-tokens');
+            var insDefBtn = document.getElementById('cm-insert-default');
+            var cm = null, cur = -1;
 
-            var STARTER = [
-                '<header class="site-header">',
-                '  <div class="container header-inner">',
-                '    <a class="logo" href="/">{{logo}}</a>',
-                '    <nav class="main-nav">{{menu:primary}}</nav>',
-                '  </div>',
-                '</header>',
-                '',
-                '<main>{{content}}</main>',
-                '',
-                '<footer class="site-footer">',
-                '  <div class="container footer-inner">',
-                '    <nav class="footer-nav">',
-                '      {{#menu:secondary}}<a href="{{url}}"{{target}}>{{icon}}{{label}}</a>{{/menu:secondary}}',
-                '    </nav>',
-                '    <p class="footer-text">© {{year}} {{site_name}}</p>',
-                '  </div>',
-                '</footer>'
-            ].join('\n');
-
-            function detectSlots() {
-                var v = ta.value;
-                var re = /\{\{#?menu:([a-zA-Z0-9_-]+)\}\}/g, m, set = [];
-                while ((m = re.exec(v)) !== null) { if (set.indexOf(m[1]) === -1) set.push(m[1]); }
-                if (!set.length) {
-                    detect.className = 'slot-detect muted';
-                    detect.textContent = '@T["templates.slotsNone"]';
-                    return;
-                }
-                detect.className = 'slot-detect has-slots';
-                detect.innerHTML = '<span>@T["templates.slotsDetected"]</span> ' +
-                    set.map(function (s) { return '<code class="mono">{{menu:' + s + '}}</code>'; }).join(' ');
+            function ensureCm() {
+                if (cm) return cm;
+                cm = CodeMirror(host, {
+                    lineNumbers: true, autoCloseBrackets: true, matchBrackets: true, styleActiveLine: true,
+                    indentUnit: 2, tabSize: 2, lineWrapping: false,
+                    extraKeys: { Tab: function (c) { c.replaceSelection('  '); } }
+                });
+                return cm;
+            }
+            function norm(s) { return (s || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n'); }
+            function updateBadge(idx) {
+                var meta = FILES[idx], v = norm(stores[idx].value).trim();
+                var custom = v !== '' && v !== norm(meta.baseline).trim();
+                var b = rows[idx].querySelector('.tpl-file-badge');
+                if (b) { b.classList.toggle('on', custom); b.textContent = custom ? '@T["tplfiles.badgeCustom"]' : '@T["tplfiles.badgeEmpty"]'; }
+            }
+            function open(idx) {
+                cur = idx; var meta = FILES[idx];
+                nameEl.textContent = meta.name;
+                tokEl.innerHTML = '';
+                (meta.tokens || []).forEach(function (tk) {
+                    var s = document.createElement('button');
+                    s.type = 'button'; s.className = 'cm-token'; s.textContent = tk.t; s.title = tk.l;
+                    s.addEventListener('click', function () { cm.replaceSelection(tk.t); cm.focus(); });
+                    tokEl.appendChild(s);
+                });
+                insDefBtn.hidden = !meta.insertDefault;
+                modal.hidden = false;
+                ensureCm();
+                cm.setOption('mode', meta.mode);
+                cm.setValue(stores[idx].value || '');
+                cm.clearHistory();
+                setTimeout(function () { cm.refresh(); cm.focus(); cm.setCursor(0, 0); }, 10);
+            }
+            function close() { modal.hidden = true; cur = -1; }
+            function apply() {
+                if (cur < 0) return;
+                stores[cur].value = cm.getValue();
+                updateBadge(cur);
+                close();
             }
 
-            starterBtn && starterBtn.addEventListener('click', function () {
-                if (ta.value.trim() && !confirm('@T["templates.starterConfirm"]')) return;
-                ta.value = STARTER;
-                detectSlots();
-                ta.focus();
-            });
-            ta.addEventListener('input', detectSlots);
-            detectSlots();
-        })();
-
-        // ---- Page-part layouts: "insert default" restores the built-in blog-detail layout ----
-        (function () {
-            var btn = document.getElementById('insert-post-default');
-            var ta = document.getElementById('Part_post');
-            if (!btn || !ta) return;
-            btn.addEventListener('click', function () {
-                if (ta.value.trim() && !confirm('@T["templates.starterConfirm"]')) return;
-                ta.value = ta.getAttribute('data-default') || '';
-                ta.focus();
+            rows.forEach(function (r) { r.addEventListener('click', function () { open(parseInt(r.dataset.fileIdx, 10)); }); });
+            document.getElementById('cm-apply').addEventListener('click', apply);
+            document.getElementById('cm-cancel').addEventListener('click', close);
+            document.getElementById('cm-close').addEventListener('click', close);
+            insDefBtn.addEventListener('click', function () { if (cur >= 0) cm.setValue(FILES[cur].insertDefault || ''); cm.focus(); });
+            modal.addEventListener('click', function (e) { if (e.target === modal) close(); });
+            document.addEventListener('keydown', function (e) {
+                if (modal.hidden) return;
+                if (e.key === 'Escape') close();
+                else if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'Enter')) { e.preventDefault(); apply(); }
             });
         })();
 

@@ -11,6 +11,8 @@ public class IndexModel : PageModel
     public IndexModel(PluginRegistry registry) => _registry = registry;
 
     public string Key { get; private set; } = "";
+    /// <summary>Human page title for the topbar — the plugin's admin-menu label, not the raw route key.</summary>
+    public string Title { get; private set; } = "";
     public string Html { get; private set; } = "";
     public bool Found { get; private set; }
 
@@ -35,6 +37,15 @@ public class IndexModel : PageModel
 
     private void Run(string method, IDictionary<string, string> form)
     {
+        // Topbar title: use the plugin's admin-menu label (its human name), matched by this page's URL —
+        // not the lowercase route key. Strip a trailing " (N)" badge (e.g. "Bewertungen (3)"). Falls back to the key.
+        var url = "/admin/plugin/" + Key;
+        var label = _registry.AdminMenu
+            .FirstOrDefault(m => string.Equals(m.Url, url, StringComparison.OrdinalIgnoreCase))?.Label;
+        if (!string.IsNullOrWhiteSpace(label))
+            label = System.Text.RegularExpressions.Regex.Replace(label, @"\s*\(\d+\)\s*$", "");
+        Title = string.IsNullOrWhiteSpace(label) ? Key : label!;
+
         if (!_registry.Pages.TryGetValue(Key, out var handler))
         {
             Found = false;

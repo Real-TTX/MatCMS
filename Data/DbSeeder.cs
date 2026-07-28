@@ -454,7 +454,8 @@ public static class DbSeeder
                 }
 
                 var sb = new StringBuilder();
-                sb.Append("<div class='page-head'><h1>✅ Todos</h1></div>");
+                // Topbar already shows the plugin title ("Todos") — no duplicate <h1> here.
+                sb.Append("<div class='page-head'><p class='muted'>Beispiel-Plugin: einfache Aufgabenliste.</p></div>");
                 sb.Append("<div class='card'><form method='post' class='form-row' style='align-items:end;'><input type='hidden' name='action' value='add'/>");
                 sb.Append("<div class='form-field' style='flex:1;'><label>Neues Todo</label><input name='text' required/></div>");
                 sb.Append("<div><button class='btn' type='submit'>Hinzufügen</button></div></form>");
@@ -705,7 +706,9 @@ public static class DbSeeder
                 }
 
                 var sb = new StringBuilder();
-                sb.Append("<div class='page-head'><h1>⭐ Bewertungen</h1><p class='muted'>Neue Bewertungen freigeben, verbergen oder löschen.</p></div>");
+                // No <h1> here: the admin topbar already shows the plugin title ("Bewertungen"),
+                // so the page only adds a short subtitle (avoids a duplicate heading).
+                sb.Append("<div class='page-head'><p class='muted'>Neue Bewertungen freigeben, verbergen oder löschen.</p></div>");
                 sb.Append("<div class='card'><h2>Wartet auf Freigabe (" + pend.Count + ")</h2><div class='block-list'>");
                 if (pend.Count == 0) sb.Append("<p class='muted'>Nichts zu prüfen.</p>");
                 foreach (var x in pend) sb.Append(Card(x.Store, x.R, true));

@@ -217,10 +217,7 @@ else
                 <span></span><span></span><span></span>
             </label>
             <nav class="main-nav">
-                @foreach (var m in Site.HeaderMenu)
-                {
-                    <a href="@m.Url" target="@(m.OpenInNewTab ? "_blank" : null)" rel="@(m.OpenInNewTab ? "noopener" : null)">@m.Label</a>
-                }
+                @Html.Raw(MatCMS.Content.LayoutRenderer.RenderInlineMenu(Site.HeaderMenu))
                 @{
                     var langLinks = Site.LanguageLinks();
                 }
@@ -245,10 +242,7 @@ else
     <footer class="site-footer">
         <div class="container footer-inner">
             <nav class="footer-nav">
-                @foreach (var m in Site.FooterMenu)
-                {
-                    <a href="@m.Url" target="@(m.OpenInNewTab ? "_blank" : null)" rel="@(m.OpenInNewTab ? "noopener" : null)">@m.Label</a>
-                }
+                @Html.Raw(MatCMS.Content.LayoutRenderer.RenderInlineMenu(Site.FooterMenu))
             </nav>
             <div class="footer-brand">
                 <img src="@Site.LogoUrl" alt="@Site.SiteName" />

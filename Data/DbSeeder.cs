@@ -298,6 +298,7 @@ public static class DbSeeder
         await AddColumnIfMissingAsync(db, "Forms", "NotifyEnabled", "INTEGER NOT NULL DEFAULT 0");
         await AddColumnIfMissingAsync(db, "Forms", "NotifyJson", "TEXT NOT NULL DEFAULT ''");
         await AddColumnIfMissingAsync(db, "Media", "SortOrder", "INTEGER NOT NULL DEFAULT 0");
+        await AddColumnIfMissingAsync(db, "MenuItems", "ParentId", "INTEGER"); // hierarchical menus (nullable self-ref)
         await AddColumnIfMissingAsync(db, "Plugins", "Key", "TEXT NOT NULL DEFAULT ''");
         await AddColumnIfMissingAsync(db, "Plugins", "Version", "TEXT NOT NULL DEFAULT ''");
         await AddColumnIfMissingAsync(db, "Plugins", "DataVersion", "TEXT NOT NULL DEFAULT ''");

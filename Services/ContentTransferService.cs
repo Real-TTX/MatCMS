@@ -200,6 +200,7 @@ public class ContentTransferService
             dto.MenuItems = (await _db.MenuItems.AsNoTracking().OrderBy(m => m.Menu).ThenBy(m => m.SortOrder).ToListAsync())
                 .Select(m => new MenuItemDto
                 {
+                    Id = m.Id, ParentId = m.ParentId,
                     Menu = m.Menu, Label = m.Label, Url = m.Url, SortOrder = m.SortOrder,
                     OpenInNewTab = m.OpenInNewTab, Locale = m.Locale, Icon = m.Icon
                 }).ToList();
@@ -528,15 +529,27 @@ public class ContentTransferService
         {
             _db.MenuItems.RemoveRange(_db.MenuItems);
             await _db.SaveChangesAsync();
+            // Pass 1: insert every item, tracking original id → new row.
+            var menuMap = new Dictionary<int, MenuItem>();
             foreach (var m in dto.MenuItems)
-                _db.MenuItems.Add(new MenuItem
+            {
+                var row = new MenuItem
                 {
                     Menu = string.IsNullOrWhiteSpace(m.Menu) ? "header" : m.Menu!,
                     Label = m.Label ?? "", Url = m.Url ?? "", SortOrder = m.SortOrder, OpenInNewTab = m.OpenInNewTab,
                     Locale = string.IsNullOrWhiteSpace(m.Locale) ? Localizer.DefaultCulture : m.Locale!,
                     Icon = MenuIcons.IsValid(m.Icon) ? m.Icon : null
-                });
+                };
+                _db.MenuItems.Add(row);
+                if (m.Id != 0) menuMap[m.Id] = row;
+            }
             await _db.SaveChangesAsync();
+            // Pass 2: re-link ParentId via the id map (legacy backups without ids stay flat).
+            var relinked = false;
+            foreach (var m in dto.MenuItems)
+                if (m.ParentId is int pid && menuMap.TryGetValue(m.Id, out var child) && menuMap.TryGetValue(pid, out var parent))
+                { child.ParentId = parent.Id; relinked = true; }
+            if (relinked) await _db.SaveChangesAsync();
             summary.Add($"{dto.MenuItems.Count} Menüeinträge");
         }
 
@@ -1036,6 +1049,10 @@ public class ContentTransferService
 
     private sealed class MenuItemDto
     {
+        /// <summary>Original id — used only to re-link ParentId on import (ids regenerate).</summary>
+        public int Id { get; set; }
+        /// <summary>Original parent id (hierarchical menus); remapped to the new item on import.</summary>
+        public int? ParentId { get; set; }
         public string? Menu { get; set; }
         public string? Label { get; set; }
         public string? Url { get; set; }

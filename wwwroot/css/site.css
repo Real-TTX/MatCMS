@@ -616,3 +616,31 @@ h1, h2, h3, h4 {
     .imagetext { grid-template-columns: 1fr; gap: 32px; }
     .imagetext.image-right .imagetext__media { order: 0; }
 }
+
+/* ===== Hierarchical menus (dropdowns / submenus) =====
+   One ruleset for every nav: custom-template loops, default {{menu:X}} render, and the
+   built-in header/footer. A parent item is wrapped in .mat-hassub carrying a .mat-sub. */
+.mat-hassub { position: relative; }
+.mat-sub { display: none; }
+@media (min-width: 861px) {
+    .mat-hassub { display: inline-flex; align-items: center; }
+    .mat-hassub > .mat-sub {
+        position: absolute; top: 100%; left: 0; z-index: 500;
+        flex-direction: column; min-width: 210px; padding: 8px 0;
+        background: #fff; border: 1px solid rgba(0,0,0,.10); border-radius: 12px;
+        box-shadow: 0 16px 40px rgba(0,0,0,.16);
+    }
+    .mat-hassub:hover > .mat-sub, .mat-hassub:focus-within > .mat-sub { display: flex; }
+    .mat-sub a {
+        display: block; padding: 8px 20px; margin: 0; white-space: nowrap;
+        color: #1a1a1a; font-size: 15px; line-height: 1.5; border: 0;
+    }
+    .mat-sub a::after { display: none !important; } /* kill inherited underline/caret animations */
+    .mat-sub a:hover { background: rgba(0,0,0,.06); }
+    .mat-sub .mat-hassub > .mat-sub { top: -8px; left: 100%; } /* 3rd level opens sideways */
+}
+@media (max-width: 860px) {
+    /* Stacked/burger nav: submenus render as static indented lists (no hover needed). */
+    .mat-hassub { display: block; }
+    .mat-hassub > .mat-sub { display: flex; flex-direction: column; padding-left: 16px; }
+}

@@ -739,3 +739,18 @@ table.data .btn { white-space: nowrap; }
 [data-list].list-view-table [data-list-tiles] { display: none; }
 [data-list].list-view-tiles [data-list-table] { display: none; }
 @media (max-width: 640px) { .list-search { min-width: 0; flex: 1 1 auto; } }
+
+/* ===== Page version switcher (language versions) in the block editor header ===== */
+.le-versions { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+.le-ver {
+    display: inline-block; padding: 3px 11px; border-radius: 999px; font-size: 12px;
+    font-weight: 600; letter-spacing: .03em; text-decoration: none; cursor: pointer;
+    border: 1px solid var(--line, #e2e4e8); background: #fff; color: var(--muted, #6b7078);
+    line-height: 1.6;
+}
+.le-ver:hover { border-color: var(--accent, #2563eb); color: var(--accent, #2563eb); }
+.le-ver.is-current {
+    border-color: var(--accent, #2563eb); background: var(--accent, #2563eb); color: #fff; cursor: default;
+}
+.le-ver-addform { display: inline; margin: 0; padding: 0; }
+.le-ver-add { border-style: dashed; background: transparent; }

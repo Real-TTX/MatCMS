@@ -13,6 +13,10 @@ public class MenuItem
     /// <summary>Content locale this menu belongs to (e.g. "de", "en"). Menus are served per-locale.</summary>
     public string Locale { get; set; } = "de";
 
+    /// <summary>Optional parent menu item — set to nest this entry as a sub-item (dropdown/submenu).
+    /// Null = top-level. The parent must be in the same menu and locale.</summary>
+    public int? ParentId { get; set; }
+
     public string Label { get; set; } = "";
 
     /// <summary>Internal path (e.g. "/kontakt") or absolute URL.</summary>

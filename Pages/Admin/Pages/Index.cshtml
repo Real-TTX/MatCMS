@@ -1,4 +1,5 @@
 @page
+@using MatCMS.Services
 @model MatCMS.Pages.Admin.Pages.IndexModel
 @{
     ViewData["Title"] = T["pages.title"];
@@ -12,7 +13,7 @@
         </div>
     </div>
 
-    @if (Model.Items.Count == 0)
+    @if (Model.Groups.Count == 0)
     {
         <div class="card"><p class="muted">@T["pages.none"]</p></div>
     }
@@ -23,17 +24,36 @@
                 <tr>
                     <th>@T["pages.colTitle"]</th>
                     <th>@T["pages.colUrl"]</th>
+                    <th>Sprachen</th>
                     <th>@T["pages.colStatus"]</th>
                     <th></th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (var p in Model.Items)
+                @foreach (var g in Model.Groups)
                 {
-                    var url = p.Slug == "home" ? "/" : "/" + p.Slug;
-                    <tr data-search="@(p.Title + " " + url)">
-                        <td><strong>@p.Title</strong></td>
-                        <td><a class="mono" href="@url" target="_blank">@url</a></td>
+                    var p = g.Primary;
+                    var search = p.Title + " " + g.Url + " " + string.Join(" ", g.Versions.Select(v => v.Locale));
+                    <tr data-search="@search">
+                        <td>
+                            <strong>@p.Title</strong>
+                            @if (g.Versions.Count > 1)
+                            {
+                                <span class="muted" style="font-size:12px;"> · @g.Versions.Count Sprachversionen</span>
+                            }
+                        </td>
+                        <td><a class="mono" href="@g.Url" target="_blank">@g.Url</a></td>
+                        <td>
+                            <div class="ver-chips">
+                                @foreach (var v in g.Versions)
+                                {
+                                    var isDef = v.Locale == Localizer.DefaultCulture;
+                                    <a class="ver-chip@(isDef ? " is-default" : "")@(v.IsPublished ? "" : " is-draft")"
+                                       asp-page="Edit" asp-route-id="@v.Id"
+                                       title="@Localizer.DisplayName(v.Locale)@(isDef ? " (Original)" : "")@(v.IsPublished ? "" : " – Entwurf")">@v.Locale.ToUpperInvariant()</a>
+                                }
+                            </div>
+                        </td>
                         <td>
                             @if (p.IsPublished)
                             {
@@ -61,3 +81,15 @@
         <nav class="list-pager" data-list-pager aria-label="Seiten"></nav>
     }
 </div>
+
+<style>
+    .ver-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+    .ver-chip {
+        display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px;
+        font-weight: 600; letter-spacing: .03em; text-decoration: none;
+        border: 1px solid var(--line, #e2e4e8); color: var(--muted, #6b7078); background: #fff;
+    }
+    .ver-chip:hover { border-color: var(--accent, #2563eb); color: var(--accent, #2563eb); }
+    .ver-chip.is-default { border-color: var(--accent, #2563eb); color: var(--accent, #2563eb); background: color-mix(in srgb, var(--accent, #2563eb) 8%, #fff); }
+    .ver-chip.is-draft { opacity: .55; font-style: italic; }
+</style>

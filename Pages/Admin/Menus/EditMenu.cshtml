@@ -15,16 +15,20 @@
         <p class="muted">@T["menus.noItems"]</p>
     }
     <div class="block-list sortable" data-sortable data-reorder-form="reorder-items">
-        @foreach (var it in Model.Items)
+        @foreach (var (it, depth) in Model.Rows)
         {
-            <div class="block-item sortable-item" data-item-id="@it.Id">
+            <div class="block-item sortable-item" data-item-id="@it.Id" style="@(depth > 0 ? $"margin-left:{depth * 28}px;" : null)">
                 <span class="drag-handle" title="@T["editor.dragToSort"]" aria-hidden="true">⠿</span>
+                @if (depth > 0)
+                {
+                    <span class="muted" aria-hidden="true" style="margin-right:2px;">↳</span>
+                }
                 @if (!string.IsNullOrEmpty(it.Icon))
                 {
                     <span class="b-icon"><i class="ti ti-@MatCMS.Content.MenuIcons.Resolve(it.Icon)" aria-hidden="true"></i></span>
                 }
                 <div class="b-info">
-                    <div class="b-type">@it.Label</div>
+                    <div class="b-type">@it.Label <span class="badge badge-off mono" style="font-size:10px;">@it.Locale</span></div>
                     <div class="b-sum">@it.Url@(it.OpenInNewTab ? " · " + T["menus.newTab"] : "")</div>
                 </div>
                 <div class="actions">

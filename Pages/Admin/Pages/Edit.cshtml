@@ -88,6 +88,30 @@
             <div class="le-head">
                 <a class="le-back" asp-page="Index">@T["editor.backToPages"]</a>
                 <div class="le-title">@Model.Current.Title</div>
+                @if (Model.SupportedLocales.Count > 1)
+                {
+                    var allVers = Model.Translations.Append(Model.Current)
+                        .OrderBy(p => Array.IndexOf(MatCMS.Services.Localizer.SupportedCultures.ToArray(), p.Locale)).ToList();
+                    <div class="le-versions" role="tablist" aria-label="Sprachversionen">
+                        @foreach (var v in allVers)
+                        {
+                            if (v.Id == Model.Current.Id)
+                            {
+                                <span class="le-ver is-current" aria-current="true" title="@MatCMS.Services.Localizer.DisplayName(v.Locale)">@v.Locale.ToUpperInvariant()</span>
+                            }
+                            else
+                            {
+                                <a class="le-ver" asp-page="Edit" asp-route-id="@v.Id" title="Zu @MatCMS.Services.Localizer.DisplayName(v.Locale) wechseln">@v.Locale.ToUpperInvariant()</a>
+                            }
+                        }
+                        @foreach (var loc in Model.MissingLocales)
+                        {
+                            <form method="post" asp-page-handler="CreateTranslation" asp-route-id="@Model.Current.Id" asp-route-locale="@loc" class="le-ver-addform">
+                                <button type="submit" class="le-ver le-ver-add" title="@MatCMS.Services.Localizer.DisplayName(loc) hinzufügen (Inhalt wird kopiert)">+ @loc.ToUpperInvariant()</button>
+                            </form>
+                        }
+                    </div>
+                }
             </div>
 
             <div class="le-scroll">

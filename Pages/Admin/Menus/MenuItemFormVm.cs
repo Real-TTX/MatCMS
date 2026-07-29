@@ -8,8 +8,13 @@ public class MenuItemFormVm
     public string? Url { get; set; }
     public string? Icon { get; set; }
     public bool OpenInNewTab { get; set; }
+    public int? ParentId { get; set; }
     public List<MatCMS.Models.Menu> Menus { get; set; } = new();
     public List<MatCMS.Models.Page> Pages { get; set; } = new();
+
+    /// <summary>Candidate parent items (same menu + locale, minus self/descendants) for the
+    /// "übergeordneter Eintrag" picker. Empty = only top-level possible.</summary>
+    public List<MatCMS.Models.MenuItem> ParentOptions { get; set; } = new();
 
     // Per-page differences.
     public string QuickPickHelpKey { get; set; } = "menus.quickPickHelpCreate";

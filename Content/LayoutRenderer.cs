@@ -34,24 +34,20 @@ public static class LayoutRenderer
     {
         string Key(string slot) => menuMap.TryGetValue(slot, out var k) && !string.IsNullOrWhiteSpace(k) ? k : slot;
 
-        // 1) Per-item loops with custom markup.
+        // 1) Per-item loops with custom markup (hierarchy-aware: a node with children is wrapped so
+        //    its sub-items render as a dropdown next to the parent — see .mat-hassub/.mat-sub CSS).
         var html = LoopRx.Replace(layoutHtml, m =>
         {
             var inner = m.Groups[2].Value;
             var sb = new StringBuilder();
-            foreach (var it in menuItems(Key(m.Groups[1].Value)))
-                sb.Append(RenderItem(inner, it));
+            foreach (var node in MenuTree.Build(menuItems(Key(m.Groups[1].Value))))
+                AppendInline(sb, it => RenderItem(inner, it), node);
             return sb.ToString();
         });
 
-        // 2) Whole-menu default render.
+        // 2) Whole-menu default render → inline links, with children as .mat-sub dropdowns.
         html = MenuRx.Replace(html, m =>
-        {
-            var sb = new StringBuilder();
-            foreach (var it in menuItems(Key(m.Groups[1].Value)))
-                sb.Append(DefaultLink(it));
-            return sb.ToString();
-        });
+            RenderInlineMenu(menuItems(Key(m.Groups[1].Value))));
 
         // 2b) Language switcher: per-item loop ({{#languages}} … {{locale}}/{{label}}/{{url}}/{{current}} …)
         //     plus a whole-switcher default {{languages}}. Both render empty on a single-language site.
@@ -76,6 +72,29 @@ public static class LayoutRenderer
         if (globals.TryGetValue("content", out var content))
             html = html.Replace("{{content}}", content);
         return html;
+    }
+
+    /// <summary>Renders a flat item list as an inline menu: leaf items render as a plain link
+    /// (backward-compatible with flat menus); a node with children is wrapped in a <c>.mat-hassub</c>
+    /// span carrying a <c>.mat-sub</c> dropdown with the child items. Used for the default menu render
+    /// and by the built-in layout header/footer, so one CSS ruleset covers every menu.</summary>
+    public static string RenderInlineMenu(IReadOnlyList<MenuItem> flat)
+    {
+        var sb = new StringBuilder();
+        foreach (var node in MenuTree.Build(flat)) AppendInline(sb, DefaultLink, node);
+        return sb.ToString();
+    }
+
+    /// <summary>Appends one node (recursively) using <paramref name="link"/> to render each item;
+    /// nodes with children get a <c>.mat-hassub</c>/<c>.mat-sub</c> dropdown wrapper.</summary>
+    private static void AppendInline(StringBuilder sb, Func<MenuItem, string> link, MenuNode node)
+    {
+        if (!node.HasChildren) { sb.Append(link(node.Item)); return; }
+        sb.Append("<span class=\"mat-hassub\">");
+        sb.Append(link(node.Item));
+        sb.Append("<span class=\"mat-sub\">");
+        foreach (var c in node.Children) AppendInline(sb, link, c);
+        sb.Append("</span></span>");
     }
 
     private static string RenderItem(string tpl, MenuItem it)

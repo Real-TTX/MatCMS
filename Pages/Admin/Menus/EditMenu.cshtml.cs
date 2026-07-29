@@ -13,6 +13,10 @@ public class EditMenuModel : PageModel
 
     public Menu Current { get; private set; } = default!;
     public List<MenuItem> Items { get; private set; } = new();
+
+    /// <summary>Items in tree order (parent then its children), each with an indent depth — so the
+    /// list shows the hierarchy. Children of nested items follow their parent.</summary>
+    public List<(MenuItem Item, int Depth)> Rows { get; private set; } = new();
     [BindProperty] public string? Name { get; set; }
     public string? Error { get; private set; }
 
@@ -90,7 +94,17 @@ public class EditMenuModel : PageModel
         return RedirectToPage(new { id });
     }
 
-    private async Task LoadItemsAsync(string key) =>
+    private async Task LoadItemsAsync(string key)
+    {
         Items = await _db.MenuItems.Where(m => m.Menu == key)
             .OrderBy(m => m.SortOrder).ThenBy(m => m.Id).ToListAsync();
+
+        // Flatten the tree (parent → children) with a depth for indentation.
+        Rows = new List<(MenuItem, int)>();
+        void Walk(IReadOnlyList<MatCMS.Content.MenuNode> nodes, int depth)
+        {
+            foreach (var n in nodes) { Rows.Add((n.Item, depth)); Walk(n.Children, depth + 1); }
+        }
+        Walk(MatCMS.Content.MenuTree.Build(Items), 0);
+    }
 }

@@ -17,9 +17,11 @@ public class CreateModel : PageModel
     [BindProperty] public string? Url { get; set; }
     [BindProperty] public string? Icon { get; set; }
     [BindProperty] public bool OpenInNewTab { get; set; }
+    [BindProperty] public int? ParentId { get; set; }
 
     public List<PageEntity> Pages { get; private set; } = new();
     public List<Menu> Menus { get; private set; } = new();
+    public List<MenuItem> ParentOptions { get; private set; } = new();
     public int? MenuId { get; private set; }
     public string? Error { get; private set; }
 
@@ -28,6 +30,7 @@ public class CreateModel : PageModel
         await LoadListsAsync();
         if (!string.IsNullOrEmpty(menu) && Menus.Any(m => m.Key == menu)) Menu = menu;
         MenuId = Menus.FirstOrDefault(m => m.Key == Menu)?.Id;
+        await LoadParentOptionsAsync();
     }
 
     public async Task<IActionResult> OnPostAsync()
@@ -37,6 +40,7 @@ public class CreateModel : PageModel
         var url = (Url ?? "").Trim();
         if (!Menus.Any(m => m.Key == Menu)) Menu = Menus.FirstOrDefault()?.Key ?? "header";
         MenuId = Menus.FirstOrDefault(m => m.Key == Menu)?.Id;
+        await LoadParentOptionsAsync();
 
         if (string.IsNullOrWhiteSpace(label) || string.IsNullOrWhiteSpace(url))
         {
@@ -47,6 +51,9 @@ public class CreateModel : PageModel
         var max = await _db.MenuItems.Where(m => m.Menu == Menu)
             .Select(m => (int?)m.SortOrder).MaxAsync() ?? -1;
 
+        // Only accept a parent that is a real item in this same menu (locale defaults to the new item's).
+        var parent = ParentId is int pid ? ParentOptions.FirstOrDefault(o => o.Id == pid) : null;
+
         _db.MenuItems.Add(new MenuItem
         {
             Menu = Menu,
@@ -54,6 +61,7 @@ public class CreateModel : PageModel
             Url = url,
             Icon = MatCMS.Content.MenuIcons.IsValid(Icon) ? Icon : null,
             OpenInNewTab = OpenInNewTab,
+            ParentId = parent?.Id,
             SortOrder = max + 1,
             Locale = MatCMS.Services.Localizer.DefaultCulture
         });
@@ -68,4 +76,10 @@ public class CreateModel : PageModel
         Pages = await _db.Pages.OrderBy(p => p.Title).ToListAsync();
         Menus = await _db.Menus.OrderBy(m => m.SortOrder).ThenBy(m => m.Id).ToListAsync();
     }
+
+    // New items are created in the default locale → offer that locale's top-level items as parents.
+    private async Task LoadParentOptionsAsync() =>
+        ParentOptions = await _db.MenuItems
+            .Where(m => m.Menu == Menu && m.Locale == MatCMS.Services.Localizer.DefaultCulture && m.ParentId == null)
+            .OrderBy(m => m.SortOrder).ThenBy(m => m.Id).ToListAsync();
 }

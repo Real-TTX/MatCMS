@@ -13,24 +13,22 @@
         </div>
     </div>
 
-    @if (Model.Items.Count == 0)
-    {
-        <div class="card"><p class="muted">Noch keine Beiträge. Lege den ersten an.</p></div>
-    }
-    else
-    {
-        <table class="data" data-list-table>
-            <thead>
-                <tr>
-                    <th>Titel</th>
-                    <th>URL</th>
-                    <th>Datum</th>
-                    <th>Tags</th>
-                    <th>Status</th>
-                    <th></th>
-                </tr>
-            </thead>
+    <table class="data" data-list-table>
+        <thead>
+            <tr>
+                <th>Titel</th>
+                <th>URL</th>
+                <th>Datum</th>
+                <th>Tags</th>
+                <th>Status</th>
+                <th></th>
+            </tr>
+        </thead>
             <tbody>
+                @if (Model.Items.Count == 0)
+                {
+                    <tr><td colspan="6" class="muted" style="text-align:center;padding:22px;">Noch keine Beiträge. Lege den ersten an.</td></tr>
+                }
                 @foreach (var p in Model.Items)
                 {
                     <tr data-search="@(p.Title + " " + p.Slug + " " + p.Tags)">
@@ -73,5 +71,4 @@
         </table>
         <div class="list-empty" data-list-empty hidden>Keine Treffer.</div>
         <nav class="list-pager" data-list-pager aria-label="Seiten"></nav>
-    }
 </div>

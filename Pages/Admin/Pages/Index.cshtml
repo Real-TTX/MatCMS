@@ -13,83 +13,117 @@
         </div>
     </div>
 
-    @if (Model.Groups.Count == 0)
-    {
-        <div class="card"><p class="muted">@T["pages.none"]</p></div>
-    }
-    else
-    {
-        <table class="data" data-list-table>
-            <thead>
-                <tr>
-                    <th>@T["pages.colTitle"]</th>
-                    <th>@T["pages.colUrl"]</th>
-                    <th>Sprachen</th>
-                    <th>@T["pages.colStatus"]</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var g in Model.Groups)
-                {
-                    var p = g.Primary;
-                    var search = p.Title + " " + g.Url + " " + string.Join(" ", g.Versions.Select(v => v.Locale));
-                    <tr data-search="@search">
-                        <td>
-                            <strong>@p.Title</strong>
-                            @if (g.Versions.Count > 1)
+    <table class="data" data-list-table>
+        <thead>
+            <tr>
+                <th>@T["pages.colTitle"]</th>
+                <th>@T["pages.colUrl"]</th>
+                <th>@T["pages.colStatus"]</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Groups.Count == 0)
+            {
+                <tr><td colspan="4" class="muted" style="text-align:center;padding:22px;">@T["pages.none"]</td></tr>
+            }
+            @foreach (var g in Model.Groups)
+            {
+                var p = g.Primary;
+                var multi = g.Versions.Count > 1;
+                var search = p.Title + " " + g.Url + " " + string.Join(" ", g.Versions.Select(v => v.Locale));
+                <tr data-search="@search">
+                    <td>
+                        <div class="pg-title">
+                            @if (multi)
                             {
-                                <span class="muted" style="font-size:12px;"> · @g.Versions.Count Sprachversionen</span>
-                            }
-                        </td>
-                        <td><a class="mono" href="@g.Url" target="_blank">@g.Url</a></td>
-                        <td>
-                            <div class="ver-chips">
-                                @foreach (var v in g.Versions)
-                                {
-                                    var isDef = v.Locale == Localizer.DefaultCulture;
-                                    <a class="ver-chip@(isDef ? " is-default" : "")@(v.IsPublished ? "" : " is-draft")"
-                                       asp-page="Edit" asp-route-id="@v.Id"
-                                       title="@Localizer.DisplayName(v.Locale)@(isDef ? " (Original)" : "")@(v.IsPublished ? "" : " – Entwurf")">@v.Locale.ToUpperInvariant()</a>
-                                }
-                            </div>
-                        </td>
-                        <td>
-                            @if (p.IsPublished)
-                            {
-                                <span class="badge badge-on">@T["pages.published"]</span>
+                                <button type="button" class="pg-toggle" data-pg-toggle aria-expanded="false" title="Sprachversionen"></button>
                             }
                             else
                             {
-                                <span class="badge badge-off">@T["pages.draft"]</span>
+                                <span class="pg-toggle-spacer"></span>
                             }
-                        </td>
-                        <td>
-                            <div class="actions">
-                                <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@p.Id">@T["action.edit"]</a>
-                                <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@p.Id"
-                                      onsubmit="return confirm('@T["pages.confirmDelete", p.Title]');">
-                                    <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
-                                </form>
+                            <strong>@p.Title</strong>
+                            @if (multi)
+                            {
+                                <span class="muted" style="font-size:12px;">· @g.Versions.Count Versionen</span>
+                            }
+                        </div>
+                        @if (multi)
+                        {
+                            <div class="pg-versions" hidden>
+                                @foreach (var v in g.Versions)
+                                {
+                                    var isDef = v.Locale == Localizer.DefaultCulture;
+                                    <a class="pg-version" asp-page="Edit" asp-route-id="@v.Id">
+                                        <span class="badge @(isDef ? "badge-on" : "badge-off") mono">@v.Locale.ToUpperInvariant()</span>
+                                        <span>@Localizer.DisplayName(v.Locale)@(isDef ? " · Original" : "")</span>
+                                        @if (!v.IsPublished)
+                                        {
+                                            <span class="muted" style="font-size:11px;">· @T["pages.draft"]</span>
+                                        }
+                                    </a>
+                                }
                             </div>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-        <div class="list-empty" data-list-empty hidden>Keine Treffer.</div>
-        <nav class="list-pager" data-list-pager aria-label="Seiten"></nav>
-    }
+                        }
+                    </td>
+                    <td><a class="mono" href="@g.Url" target="_blank">@g.Url</a></td>
+                    <td>
+                        @if (p.IsPublished)
+                        {
+                            <span class="badge badge-on">@T["pages.published"]</span>
+                        }
+                        else
+                        {
+                            <span class="badge badge-off">@T["pages.draft"]</span>
+                        }
+                    </td>
+                    <td>
+                        <div class="actions">
+                            <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@p.Id">@T["action.edit"]</a>
+                            <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@p.Id"
+                                  onsubmit="return confirm('@T["pages.confirmDelete", p.Title]');">
+                                <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <div class="list-empty" data-list-empty hidden>Keine Treffer.</div>
+    <nav class="list-pager" data-list-pager aria-label="Seiten"></nav>
 </div>
 
 <style>
-    .ver-chips { display: flex; flex-wrap: wrap; gap: 4px; }
-    .ver-chip {
-        display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px;
-        font-weight: 600; letter-spacing: .03em; text-decoration: none;
-        border: 1px solid var(--line, #e2e4e8); color: var(--muted, #6b7078); background: #fff;
+    .pg-title { display: flex; align-items: center; gap: 8px; }
+    .pg-toggle {
+        width: 20px; height: 20px; flex: none; padding: 0; cursor: pointer; border: 0; background: none;
+        color: var(--muted, #6b7078); border-radius: 5px; font-size: 11px; line-height: 1;
     }
-    .ver-chip:hover { border-color: var(--accent, #2563eb); color: var(--accent, #2563eb); }
-    .ver-chip.is-default { border-color: var(--accent, #2563eb); color: var(--accent, #2563eb); background: color-mix(in srgb, var(--accent, #2563eb) 8%, #fff); }
-    .ver-chip.is-draft { opacity: .55; font-style: italic; }
+    .pg-toggle::before { content: "\25B8"; display: inline-block; transition: transform .12s ease; }
+    .pg-toggle[aria-expanded="true"]::before { transform: rotate(90deg); }
+    .pg-toggle:hover { background: #eef1f6; color: var(--black, #111); }
+    .pg-toggle-spacer { display: inline-block; width: 20px; flex: none; }
+    .pg-versions { display: flex; flex-direction: column; gap: 2px; margin: 6px 0 2px 28px; }
+    .pg-version {
+        display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 7px;
+        text-decoration: none; color: var(--ink, #1a1a1a); border: 1px solid transparent;
+    }
+    .pg-version:hover { background: #f4f6f9; border-color: var(--line, #e2e4e8); }
 </style>
+
+@section Scripts {
+    <script>
+        document.querySelectorAll('[data-pg-toggle]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var cell = btn.closest('td');
+                var box = cell ? cell.querySelector('.pg-versions') : null;
+                if (!box) return;
+                var open = box.hidden;
+                box.hidden = !open;
+                btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            });
+        });
+    </script>
+}

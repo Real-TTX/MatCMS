@@ -12,22 +12,20 @@
         </div>
     </div>
 
-    @if (Model.Items.Count == 0)
-    {
-        <div class="card"><p class="muted">@T["forms.none"]</p></div>
-    }
-    else
-    {
-        <table class="data" data-list-table>
-            <thead>
-                <tr>
-                    <th>@T["forms.colName"]</th>
-                    <th>@T["forms.colSlug"]</th>
-                    <th>@T["forms.colSubmissions"]</th>
-                    <th></th>
-                </tr>
-            </thead>
+    <table class="data" data-list-table>
+        <thead>
+            <tr>
+                <th>@T["forms.colName"]</th>
+                <th>@T["forms.colSlug"]</th>
+                <th>@T["forms.colSubmissions"]</th>
+                <th></th>
+            </tr>
+        </thead>
             <tbody>
+                @if (Model.Items.Count == 0)
+                {
+                    <tr><td colspan="4" class="muted" style="text-align:center;padding:22px;">@T["forms.none"]</td></tr>
+                }
                 @foreach (var r in Model.Items)
                 {
                     <tr data-search="@(r.Form.Name + " " + r.Form.Slug)">
@@ -56,5 +54,4 @@
         </table>
         <div class="list-empty" data-list-empty hidden>Keine Treffer.</div>
         <nav class="list-pager" data-list-pager aria-label="Seiten"></nav>
-    }
 </div>

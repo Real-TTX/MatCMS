@@ -113,7 +113,9 @@ public class ViewModel : PageModel
                 await TrySendNotificationAsync(form, answered, inputs, values);
         }
 
-        return RedirectToPage(RouteFor(key, locale));
+        // The custom /{slug?} content routing isn't resolvable via RedirectToPage (throws
+        // "No page named …"), so build the localized URL directly and PRG-redirect back to it.
+        return Redirect(MatCMS.Services.SiteContext.LocalizedUrl(locale, key));
     }
 
     /// <summary>Best-effort submission notification e-mail. Never throws — a mail problem must never

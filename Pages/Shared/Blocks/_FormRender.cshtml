@@ -136,7 +136,12 @@
             }
             else
             {
-                <form method="post" asp-page-handler="Form" asp-route-slug="@ViewContext.RouteData.Values["slug"]" class="form-fields">
+                @* Explicit action: the content page uses custom routing (/{slug?}), where the
+                   asp-page-handler tag helper can't resolve the ambient page and renders an empty
+                   action. Post to the current path with ?handler=Form so OnPostFormAsync runs. A plain
+                   <form> gets no auto antiforgery token, so add it explicitly. *@
+                <form method="post" action="@(ViewContext.HttpContext.Request.Path)?handler=Form" class="form-fields">
+                    @Html.AntiForgeryToken()
                     <input type="hidden" name="__formSlug" value="@Model.Slug" />
                     @foreach (var el in Model.Elements)
                     {

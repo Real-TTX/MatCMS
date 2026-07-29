@@ -614,7 +614,7 @@ public static class DbSeeder
     {
         Name = "Google Bewertungen",
         Key = "google-reviews",
-        Version = "1.0",
+        Version = "1.1",
         Description = "Zeigt Google-Rezensionen (Places API) als Block an. Place-ID + API-Key unter „Konfiguration\" hinterlegen.",
         Enabled = true,
         ConfigJson = "{\"placeId\":\"\",\"apiKey\":\"\",\"maxReviews\":\"6\",\"minRating\":\"0\",\"refreshHours\":\"12\"}",
@@ -624,6 +624,21 @@ public static class DbSeeder
             using System.Text.Json.Nodes;
 
             string Enc(string s) => System.Net.WebUtility.HtmlEncode(s ?? "");
+            const string CfgKey = "plugin.googlereviews.cfg";
+            // Config is set on the plugin's own admin page (stored in SiteSettings); falls back to the
+            // generic key/value plugin config (Config("key")) so either editor works.
+            string GetCfg(PluginRequest req, string key) {
+                try {
+                    var db = req.Service<AppDbContext>();
+                    var row = db.SiteSettings.FirstOrDefault(x => x.Key == CfgKey);
+                    if (row != null && !string.IsNullOrWhiteSpace(row.Value)) {
+                        var o = JsonNode.Parse(row.Value) as JsonObject;
+                        var v = o?[key]?.GetValue<string>();
+                        if (!string.IsNullOrWhiteSpace(v)) return v;
+                    }
+                } catch {}
+                return Config(key) ?? "";
+            }
             string CacheKey(string pid) {
                 var s = new string((pid ?? "").Where(c => (c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')).ToArray());
                 if (s.Length > 40) s = s.Substring(0, 40);
@@ -655,6 +670,47 @@ public static class DbSeeder
               ".matg-empty{color:#8a7f72;font-style:italic;padding:16px 0;}" +
               "</style>");
 
+            // Admin config page: Place-ID Finder link + a form for Place-ID/API-Key/options (saved to SiteSettings).
+            AddAdminMenu("Google Bewertungen", "/admin/plugin/google-reviews", "🗺️");
+            AddAdminPage("google-reviews", req =>
+            {
+                var db = req.Service<AppDbContext>();
+                var row = db.SiteSettings.FirstOrDefault(x => x.Key == CfgKey);
+                var saved = false;
+                if (req.IsPost)
+                {
+                    var cfg = new JsonObject {
+                        ["placeId"] = (req.F("placeId") ?? "").Trim(),
+                        ["apiKey"] = (req.F("apiKey") ?? "").Trim(),
+                        ["maxReviews"] = (req.F("maxReviews") ?? "").Trim(),
+                        ["minRating"] = (req.F("minRating") ?? "").Trim(),
+                        ["refreshHours"] = (req.F("refreshHours") ?? "").Trim()
+                    };
+                    if (row == null) db.SiteSettings.Add(new SiteSetting { Key = CfgKey, Value = cfg.ToJsonString() });
+                    else row.Value = cfg.ToJsonString();
+                    foreach (var s in db.SiteSettings.Where(x => x.Key.StartsWith("plugin.googlereviews.") && x.Key != CfgKey).ToList()) db.SiteSettings.Remove(s);
+                    db.SaveChanges();
+                    saved = true;
+                    req.Log("Google-Reviews-Konfiguration gespeichert.");
+                }
+                string V(string k) => Enc(GetCfg(req, k));
+                var inner =
+                    "<p style='margin:0 0 16px'><a class='btn btn-ghost' href='https://developers.google.com/maps/documentation/places/web-service/place-id' target='_blank' rel='noopener'>🔎 Place-ID Finder öffnen</a> <span class='muted'>Ort suchen, die ChIJ…-ID kopieren und unten einfügen.</span></p>" +
+                    "<div class='form-field'><label>Place-ID</label><input name='placeId' value='" + V("placeId") + "' placeholder='ChIJ…' style='width:100%;max-width:520px'></div>" +
+                    "<div class='form-field'><label>API-Key (Google Places API)</label><input name='apiKey' value='" + V("apiKey") + "' placeholder='AIza…' style='width:100%;max-width:520px'><div class='help'>Google-Cloud-Projekt mit aktivierter Places API + Billing.</div></div>" +
+                    "<div class='form-row'>" +
+                    "<div class='form-field'><label>Max. Bewertungen</label><input name='maxReviews' value='" + V("maxReviews") + "' placeholder='6' style='width:110px'></div>" +
+                    "<div class='form-field'><label>Min. Sterne</label><input name='minRating' value='" + V("minRating") + "' placeholder='0' style='width:110px'></div>" +
+                    "<div class='form-field'><label>Cache (Stunden)</label><input name='refreshHours' value='" + V("refreshHours") + "' placeholder='12' style='width:110px'></div>" +
+                    "</div>" +
+                    "<div style='margin-top:12px'><button type='submit' class='btn'>Speichern</button></div>";
+                var sb = new StringBuilder();
+                sb.Append(req.Ui.PageHead("Place-ID und API-Key hinterlegen, dann den Block Google Bewertungen auf einer Seite einsetzen."));
+                if (saved) sb.Append(req.Ui.Alert("Gespeichert. Zwischenspeicher geleert - die Bewertungen werden beim naechsten Aufruf neu geladen.", "success"));
+                sb.Append(req.Ui.Card(req.Ui.Form(inner)));
+                return sb.ToString();
+            });
+
             AddBlock("googlereviews", "Google Bewertungen", "Zeigt Google-Rezensionen (Places API) als Karten.", req =>
             {
                 try
@@ -662,14 +718,14 @@ public static class DbSeeder
                     string heading = "Das sagen unsere Gäste";
                     try { var d = JsonNode.Parse(req.Data) as JsonObject; if (d != null && d["heading"] != null) { var h = d["heading"].GetValue<string>(); if (!string.IsNullOrWhiteSpace(h)) heading = h; } } catch {}
 
-                    var placeId = (Config("placeId") ?? "").Trim();
-                    var apiKey = (Config("apiKey") ?? "").Trim();
-                    int maxReviews = int.TryParse(Config("maxReviews"), out var mrv) && mrv > 0 ? mrv : 6;
-                    int minRating = int.TryParse(Config("minRating"), out var mnr) ? mnr : 0;
-                    int refreshHours = int.TryParse(Config("refreshHours"), out var rfh) && rfh > 0 ? rfh : 12;
+                    var placeId = GetCfg(req, "placeId").Trim();
+                    var apiKey = GetCfg(req, "apiKey").Trim();
+                    int maxReviews = int.TryParse(GetCfg(req, "maxReviews"), out var mrv) && mrv > 0 ? mrv : 6;
+                    int minRating = int.TryParse(GetCfg(req, "minRating"), out var mnr) ? mnr : 0;
+                    int refreshHours = int.TryParse(GetCfg(req, "refreshHours"), out var rfh) && rfh > 0 ? rfh : 12;
 
                     if (placeId.Length == 0 || apiKey.Length == 0)
-                        return "<div class='matg'><div class='matg-empty'>Google-Bewertungen: Bitte Place-ID und API-Key in den Plugin-Einstellungen hinterlegen.</div></div>";
+                        return "<div class='matg'><div class='matg-empty'>Google-Bewertungen: Bitte unter Plugins → Google Bewertungen Place-ID und API-Key hinterlegen.</div></div>";
 
                     var db = req.Service<AppDbContext>();
                     var ckey = CacheKey(placeId);

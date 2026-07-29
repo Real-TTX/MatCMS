@@ -92,9 +92,11 @@ builder.Services.Configure<RequestLocalizationOptions>(options =>
     options.DefaultRequestCulture = new RequestCulture(Localizer.ResourceFallbackCulture);
     options.SupportedCultures = cultures;
     options.SupportedUICultures = cultures;
-    // Cookie first (explicit user choice), then Accept-Language header.
+    // Our provider decides first (admin → English default + cookie override; public → content locale
+    // from the URL). It always yields a result; cookie/Accept-Language remain as harmless fallbacks.
     options.RequestCultureProviders =
     [
+        new MatCMS.Services.MatCmsCultureProvider(),
         new CookieRequestCultureProvider(),
         new AcceptLanguageHeaderRequestCultureProvider()
     ];

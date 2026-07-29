@@ -754,3 +754,10 @@ table.data .btn { white-space: nowrap; }
     border: 1px dashed var(--line, #cdd2da); background: transparent; color: var(--muted, #6b7078); cursor: pointer;
 }
 .le-ver-add:hover { border-color: var(--accent, #2563eb); color: var(--accent, #2563eb); }
+
+/* ===== Simple modal dialog (e.g. add-language on the Languages settings tab) ===== */
+.mat-dialog {
+    border: 0; border-radius: 14px; padding: 22px 24px; min-width: 320px; max-width: 92vw;
+    box-shadow: 0 24px 60px rgba(0,0,0,.28); color: var(--ink, #1a1a1a); background: #fff;
+}
+.mat-dialog::backdrop { background: rgba(15,18,24,.45); }

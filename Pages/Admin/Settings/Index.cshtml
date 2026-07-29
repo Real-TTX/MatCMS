@@ -196,38 +196,95 @@
 </div>
 
 <div class="tab-panel" data-panel="languages" hidden>
-    <form method="post" asp-page-handler="Languages">
+    @{
+        var routableNames = Model.RoutableLanguages.ToDictionary(c => c, c => MatCMS.Services.Localizer.DisplayName(c));
+        var activeList = Model.RoutableLanguages.Where(c => Model.CurrentActive.Contains(c)).ToList();
+    }
+    <form method="post" asp-page-handler="Languages" id="lang-form">
         <div class="card">
-            <h2>Sprachen</h2>
-            <p class="muted">Aktive Inhalts-Sprachen der Website. <strong>Deutsch</strong> ist die Originalsprache und immer aktiv. Übersetzungen pflegst du je Seite im Seiten-Editor (Sprach-Panel). Der Sprach-Umschalter erscheint automatisch auf der Website, sobald eine Seite in einer weiteren Sprache veröffentlicht ist.</p>
-            <div class="form-field">
-                <label>Verfügbare Sprachen</label>
-                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-top:6px;">
-                    <label style="display:flex;align-items:center;gap:8px;opacity:.6;"><input type="checkbox" checked disabled /> Deutsch <span class="muted">(Original)</span></label>
-                    @foreach (var code in Model.RoutableLanguages.Where(c => c != MatCMS.Services.Localizer.DefaultCulture))
-                    {
-                        <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" name="ActiveLanguages" value="@code" checked="@Model.CurrentActive.Contains(code)" /> @MatCMS.Services.Localizer.DisplayName(code) <span class="muted">(@code)</span></label>
-                    }
+            <div class="page-head" style="margin-bottom:14px;">
+                <h2 style="margin:0;">Sprachen</h2>
+                <div class="list-toolbar">
+                    <button type="button" class="btn btn-sm" id="lang-add">+ Sprache</button>
                 </div>
-                <div class="help">Eine ausgewählte Sprache wird im Seiten-Editor zum Übersetzen angeboten und – sobald Inhalte dafür veröffentlicht sind – im Sprach-Umschalter der Website gezeigt (URLs unter <code>/@("{code}")/…</code>).</div>
             </div>
-            @{
-                var defaultOptions = Model.RoutableLanguages
-                    .Where(c => c == MatCMS.Services.Localizer.DefaultCulture || Model.CurrentActive.Contains(c)).ToList();
-            }
-            <div class="form-field">
-                <label for="DefaultLanguage">Standardsprache (Wurzel-URLs)</label>
-                <select id="DefaultLanguage" name="DefaultLanguage" style="max-width:280px;">
-                    @foreach (var code in defaultOptions)
-                    {
-                        <option value="@code" selected="@(Model.CurrentDefaultLanguage == code ? "selected" : null)">@MatCMS.Services.Localizer.DisplayName(code) (@code)</option>
-                    }
-                </select>
-                <div class="help">Diese Sprache wird ohne Präfix unter <code>/</code>, <code>/kontakt</code> … ausgeliefert; alle anderen aktiven Sprachen unter <code>/&lt;code&gt;/…</code>. <strong>Wirkt erst nach einem Neustart des Servers</strong> (betrifft Routing/URLs). Auswahl nur aus den aktiven Sprachen.</div>
-            </div>
-            <div><button type="submit" class="btn">Speichern</button></div>
+            <table class="data">
+                <thead><tr><th>Sprache</th><th>Code</th><th>URL</th><th></th></tr></thead>
+                <tbody id="lang-rows"></tbody>
+            </table>
+            <div id="lang-hidden"></div>
+            <p class="help" style="margin-top:12px;">Standard = Wurzel-URLs (<code>/</code>). Standardwechsel wirkt nach Neustart.</p>
+            <div style="margin-top:8px;"><button type="submit" class="btn">Speichern</button></div>
         </div>
     </form>
+
+    <dialog id="lang-dialog" class="mat-dialog">
+        <form method="dialog">
+            <h3 style="margin:0 0 12px;">Sprache hinzufügen</h3>
+            <select id="lang-dialog-select" style="width:100%;"></select>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+                <button class="btn btn-ghost btn-sm" value="cancel">Abbrechen</button>
+                <button class="btn btn-sm" value="add" id="lang-dialog-ok">Hinzufügen</button>
+            </div>
+        </form>
+    </dialog>
+
+    <script>
+        (function () {
+            var NAMES = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(routableNames));
+            var active = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(activeList));
+            var def = "@Model.CurrentDefaultLanguage";
+            var rows = document.getElementById("lang-rows");
+            var hidden = document.getElementById("lang-hidden");
+            var dialog = document.getElementById("lang-dialog");
+            var dsel = document.getElementById("lang-dialog-select");
+
+            function render() {
+                rows.innerHTML = ""; hidden.innerHTML = "";
+                if (!active.includes(def)) def = active[0];
+                active.forEach(function (code) {
+                    var tr = document.createElement("tr");
+                    var isDef = code === def;
+                    var url = isDef ? "/" : "/" + code + "/";
+                    tr.innerHTML =
+                        '<td><strong>' + NAMES[code] + '</strong>' + (isDef ? ' <span class="badge badge-on">Standard</span>' : '') + '</td>' +
+                        '<td><span class="mono">' + code + '</span></td>' +
+                        '<td><span class="mono muted">' + url + '</span></td>' +
+                        '<td class="actions"></td>';
+                    var act = tr.querySelector(".actions");
+                    if (!isDef) {
+                        var mk = document.createElement("button");
+                        mk.type = "button"; mk.className = "btn btn-sm btn-ghost"; mk.textContent = "Als Standard";
+                        mk.onclick = function () { def = code; render(); };
+                        act.appendChild(mk);
+                        var rm = document.createElement("button");
+                        rm.type = "button"; rm.className = "btn btn-sm btn-danger btn-icon"; rm.title = "Entfernen"; rm.textContent = "✕";
+                        rm.onclick = function () { active = active.filter(function (c) { return c !== code; }); render(); };
+                        act.appendChild(rm);
+                    }
+                    rows.appendChild(tr);
+                    var h = document.createElement("input");
+                    h.type = "hidden"; h.name = "ActiveLanguages"; h.value = code; hidden.appendChild(h);
+                });
+                var hd = document.createElement("input");
+                hd.type = "hidden"; hd.name = "DefaultLanguage"; hd.value = def; hidden.appendChild(hd);
+            }
+
+            document.getElementById("lang-add").onclick = function () {
+                dsel.innerHTML = "";
+                Object.keys(NAMES).forEach(function (code) {
+                    if (active.includes(code)) return;
+                    var o = document.createElement("option"); o.value = code; o.textContent = NAMES[code] + " (" + code + ")"; dsel.appendChild(o);
+                });
+                if (!dsel.options.length) { alert("Alle verfügbaren Sprachen sind bereits aktiv."); return; }
+                if (typeof dialog.showModal === "function") dialog.showModal(); else dialog.setAttribute("open", "");
+            };
+            document.getElementById("lang-dialog-ok").onclick = function () {
+                if (dsel.value && !active.includes(dsel.value)) { active.push(dsel.value); render(); }
+            };
+            render();
+        })();
+    </script>
 </div>
 
 @section Scripts {

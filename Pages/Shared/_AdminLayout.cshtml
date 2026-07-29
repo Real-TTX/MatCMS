@@ -16,7 +16,9 @@
     string _uiLang(System.Globalization.CultureInfo c) => c.Name.Split('-', 2)[0];
     var cultures = allUiCultures.Where(c => System.IO.File.Exists(
         System.IO.Path.Combine(Env.ContentRootPath, "Resources", _uiLang(c) + ".json"))).ToList();
-    var currentCulture = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+    // Use Name (not TwoLetterISOLanguageName): under InvariantGlobalization the latter collapses to "iv".
+    var currentCulture = System.Globalization.CultureInfo.CurrentUICulture.Name.Split('-', 2)[0];
+    if (string.IsNullOrEmpty(currentCulture)) currentCulture = MatCMS.Services.Localizer.ResourceFallbackCulture;
     var returnUrl = Context.Request.Path + Context.Request.QueryString;
 }
 <!DOCTYPE html>
@@ -96,19 +98,12 @@
                         <select name="culture" aria-label="@T["admin.language"]" onchange="this.form.submit()">
                             @foreach (var c in cultures)
                             {
-                                var code = c.TwoLetterISOLanguageName;
+                                var code = _uiLang(c);
                                 <option value="@code" selected="@(code == currentCulture)">@T["lang." + code]</option>
                             }
                         </select>
                     </form>
                 }
-                <form method="post" asp-page="/Logout" class="admin-user-form" style="margin:0;">
-                    <button type="submit" class="admin-user admin-user-btn" title="@T["nav.logout"]"
-                            style="display:inline-flex;align-items:center;gap:7px;background:none;border:0;cursor:pointer;font:inherit;color:inherit;padding:6px 10px;border-radius:8px;">
-                        @T["admin.loggedInAs"] <strong>@displayName</strong>
-                        <i class="ti ti-logout" aria-hidden="true"></i>
-                    </button>
-                </form>
             </div>
         </header>
 

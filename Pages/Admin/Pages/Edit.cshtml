@@ -88,14 +88,18 @@
             <div class="le-head">
                 <a class="le-back" asp-page="Index">@T["editor.backToPages"]</a>
                 <div class="le-title">@Model.Current.Title</div>
+            </div>
+
+            <div class="le-scroll">
                 @if (Model.SupportedLocales.Count > 1)
                 {
-                    @* Language versions of this page. Model.Translations already includes the current
-                       page, so we iterate it directly (no Append → no duplicate current-locale entry). *@
+                    @* Language versions of this page — placed above the block list (under the breadcrumb).
+                       Model.Translations already includes the current page, so iterate it directly
+                       (no Append → no duplicate current-locale entry). *@
                     var versions = Model.Translations
                         .OrderBy(p => Array.IndexOf(MatCMS.Services.Localizer.SupportedCultures.ToArray(), p.Locale)).ToList();
                     <div class="le-versions">
-                        <label class="le-ver-lbl" for="le-verselect">Sprache</label>
+                        <label class="le-ver-lbl" for="le-verselect">@T["editor.language"]</label>
                         <select id="le-verselect" class="le-verselect" onchange="if(this.value){window.location.href=this.value;}">
                             @foreach (var v in versions)
                             {
@@ -111,9 +115,6 @@
                         }
                     </div>
                 }
-            </div>
-
-            <div class="le-scroll">
                 <div class="le-section-label">@T["editor.blocks"]</div>
                 @if (blocks.Count == 0)
                 {

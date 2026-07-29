@@ -185,6 +185,7 @@
   "editor.livePreview": "Live-Vorschau",
   "editor.blockEmpty": "(leer)",
   "editor.locale": "Sprache",
+  "editor.language": "Sprache",
   "editor.translations": "Übersetzungen",
   "editor.translationsExisting": "Vorhandene Sprachversionen",
   "editor.translationCurrent": "(diese Seite)",

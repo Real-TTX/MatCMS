@@ -71,8 +71,25 @@
         </nav>
         <div class="admin-nav-foot">
             <div class="admin-foot-actions">
-                <a class="admin-foot-btn" href="/" target="_blank" rel="noopener">🌐 @T["nav.viewSite"]</a>
-                <form method="post" asp-page="/Logout">
+                <a class="admin-foot-btn admin-foot-icon" href="/" target="_blank" rel="noopener" title="@T["nav.viewSite"]" aria-label="@T["nav.viewSite"]">🌐</a>
+                @if (cultures.Count > 1)
+                {
+                    <div class="admin-foot-lang" data-lang>
+                        <button type="button" class="admin-foot-btn" data-lang-toggle aria-haspopup="true" aria-expanded="false" title="@T["admin.language"]">@currentCulture.ToUpperInvariant()</button>
+                        <div class="admin-foot-lang-menu" data-lang-menu hidden>
+                            @foreach (var c in cultures)
+                            {
+                                var lc = _uiLang(c);
+                                <form method="post" action="/set-language">
+                                    <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                    <input type="hidden" name="culture" value="@lc" />
+                                    <button type="submit" class="admin-lang-opt@(lc == currentCulture ? " is-current" : "")">@T["lang." + lc] <span class="muted mono">@lc.ToUpperInvariant()</span></button>
+                                </form>
+                            }
+                        </div>
+                    </div>
+                }
+                <form method="post" asp-page="/Logout" class="admin-foot-logout">
                     <button type="submit" class="admin-foot-btn">🚪 @T["nav.logout"]</button>
                 </form>
             </div>
@@ -91,18 +108,6 @@
             </button>
             <div class="admin-topbar-title">@title</div>
             <div class="admin-topbar-right">
-                @if (cultures.Count > 1)
-                {
-                    <form class="lang-switch" method="post" action="/set-language">
-                        <input type="hidden" name="returnUrl" value="@returnUrl" />
-                        <select name="culture" aria-label="@T["admin.language"]" onchange="this.form.submit()">
-                            @foreach (var c in cultures)
-                            {
-                                var code = _uiLang(c);
-                                <option value="@code" selected="@(code == currentCulture)">@T["lang." + code]</option>
-                            }
-                        </select>
-                    </form>
                 }
             </div>
         </header>
@@ -137,6 +142,22 @@
                 a.addEventListener('click', function () { setOpen(false); });
             });
             document.addEventListener('keydown', function (e) { if (e.key === 'Escape') setOpen(false); });
+        })();
+
+        // Language dropdown in the sidebar footer (the "EN"/"DE" button).
+        (function () {
+            var wrap = document.querySelector('[data-lang]');
+            if (!wrap) return;
+            var btn = wrap.querySelector('[data-lang-toggle]');
+            var menu = wrap.querySelector('[data-lang-menu]');
+            function close() { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); }
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                var open = menu.hidden;
+                menu.hidden = !open; btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            });
+            document.addEventListener('click', function (e) { if (!wrap.contains(e.target)) close(); });
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
         })();
     </script>
     <script src="~/js/media-picker.js" asp-append-version="true"></script>

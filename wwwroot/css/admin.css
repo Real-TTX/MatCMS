@@ -73,15 +73,34 @@
 }
 .admin-nav-foot a:hover, .admin-nav-foot .linklike:hover { color: var(--black); }
 /* "Website" + "Ausloggen" as two equal buttons side by side. */
-.admin-foot-actions { display: flex; gap: 6px; margin-bottom: 4px; }
-.admin-foot-actions form { flex: 1; margin: 0; display: flex; }
+.admin-foot-actions { display: flex; gap: 6px; margin-bottom: 4px; align-items: stretch; }
+/* Website (icon) 25% · language (code) 25% · logout 50% */
+.admin-foot-actions > .admin-foot-icon { flex: 1; }
+.admin-foot-actions > .admin-foot-lang { flex: 1; position: relative; display: flex; }
+.admin-foot-actions > .admin-foot-logout { flex: 2; margin: 0; display: flex; }
+.admin-foot-lang .admin-foot-btn, .admin-foot-logout .admin-foot-btn { width: 100%; }
 .admin-foot-actions .admin-foot-btn {
-    flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;
+    width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;
     white-space: nowrap; line-height: 1.2;
     text-decoration: none; color: #4a4f57; font-size: 13px; font-family: inherit;
     background: #f3f4f6; border: 1px solid #e2e4e8; border-radius: 8px; padding: 8px 8px; cursor: pointer;
 }
 .admin-foot-actions .admin-foot-btn:hover { color: var(--black); background: #e9ebef; border-color: #d3d6db; }
+.admin-foot-icon { font-size: 15px; }
+/* Language dropdown (opens upward, above the button) */
+.admin-foot-lang-menu {
+    position: absolute; bottom: calc(100% + 6px); left: 0; min-width: 168px; z-index: 60;
+    background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 6px;
+    box-shadow: 0 12px 30px rgba(0,0,0,.16); display: flex; flex-direction: column; gap: 2px;
+}
+.admin-foot-lang-menu form { flex: none; margin: 0; display: block; }
+.admin-lang-opt {
+    width: 100%; text-align: left; background: none; border: 0; cursor: pointer;
+    padding: 8px 10px; border-radius: 7px; font: inherit; color: var(--black);
+    display: flex; justify-content: space-between; gap: 10px; align-items: center;
+}
+.admin-lang-opt:hover { background: #eef1f6; }
+.admin-lang-opt.is-current { color: var(--accent); font-weight: 600; }
 /* Engine name + running version, pinned at the very bottom under the logout button. */
 .admin-cms-foot { display: flex; align-items: baseline; gap: 8px; margin-top: 2px; padding-top: 8px; border-top: 1px solid #e6e8ec; }
 .admin-cms-foot .cms { font-family: var(--font-head); font-weight: 600; letter-spacing: .22em; font-size: 11px; color: #8a8f98; text-transform: uppercase; }

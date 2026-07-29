@@ -12,25 +12,39 @@ namespace MatCMS.Services;
 /// </summary>
 public class Localizer
 {
-    public const string DefaultCulture = "de";
+    /// <summary>The site's DEFAULT (root) content language — served at the prefix-less URLs (/ , /kontakt);
+    /// every other active language is served under a "/{culture}" prefix. Defaults to German but is
+    /// configurable per site via the <c>i18n.default</c> setting (applied at startup by
+    /// <see cref="SetDefaultCulture"/>). This is the CONTENT root language, independent of the admin UI
+    /// language (whose fallback is <see cref="ResourceFallbackCulture"/>).</summary>
+    public static string DefaultCulture { get; private set; } = "de";
 
-    /// <summary>
-    /// All cultures the site supports, for both the admin UI language and the public content
-    /// locales. German ("de") is the default and is served at the root URLs; every other entry is
-    /// served under a culture prefix (/en, /fr …). Adding a language = drop a Resources/&lt;c&gt;.json
-    /// and add the code here — routing, the language switcher and this localizer pick it up.
-    /// </summary>
+    /// <summary>The language the UI resource files (<c>Resources/*.json</c>) are authored in and the
+    /// ultimate fallback for missing <c>@T</c> keys. Fixed (not the per-site content default), so changing
+    /// a site's root content language never leaves admin strings untranslated.</summary>
+    public const string ResourceFallbackCulture = "de";
+
+    /// <summary>Sets the site's default (root) content language from the <c>i18n.default</c> setting.
+    /// Must be one of <see cref="SupportedCultures"/> (else ignored). Call ONCE at startup, before
+    /// routing and RequestLocalization are built.</summary>
+    public static void SetDefaultCulture(string? code)
+    {
+        code = (code ?? "").Trim().ToLowerInvariant();
+        if (SupportedCultures.Contains(code)) DefaultCulture = code;
+    }
+
     /// <summary>
     /// The ROUTABLE culture universe: languages the build ships routes/RequestLocalization for. Which
     /// of these are actually ACTIVE on a site is an admin setting (<c>i18n.languages</c>, see
-    /// <see cref="ParseActive"/>) — so a language can be switched on without a code change. German is
-    /// the default (root URLs); every other entry is served under a "/{culture}" prefix. Adding a truly
-    /// new language = add its code here (+ optional Resources/&lt;c&gt;.json for the admin UI).
+    /// <see cref="ParseActive"/>); which one is the ROOT (prefix-less) language is <c>i18n.default</c>
+    /// (see <see cref="DefaultCulture"/>). Adding a truly new language = add its code here
+    /// (+ optional Resources/&lt;c&gt;.json for the admin UI).
     /// </summary>
-    public static readonly string[] SupportedCultures = [DefaultCulture, "en", "fr", "it", "es", "hr", "sk", "nl", "pl"];
+    public static readonly string[] SupportedCultures = ["de", "en", "fr", "it", "es", "hr", "sk", "nl", "pl"];
 
-    /// <summary>Routable cultures other than the default (served under a URL prefix).</summary>
-    public static readonly IReadOnlyList<string> NonDefaultCultures =
+    /// <summary>Routable cultures other than the current default (served under a URL prefix). Computed
+    /// (not cached) so it reflects the configured <see cref="DefaultCulture"/>.</summary>
+    public static IReadOnlyList<string> NonDefaultCultures =>
         SupportedCultures.Where(c => c != DefaultCulture).ToArray();
 
     /// <summary>Human names for the language picker.</summary>
@@ -82,8 +96,10 @@ public class Localizer
         // InvariantGlobalization, TwoLetterISOLanguageName collapses to "iv", so we must
         // rely on Name here — otherwise a non-default culture could never be matched.
         var culture = CultureInfo.CurrentUICulture.Name.Split('-', 2)[0];
-        if (string.IsNullOrEmpty(culture)) culture = DefaultCulture;
-        foreach (var c in culture == DefaultCulture ? new[] { culture } : new[] { culture, DefaultCulture })
+        if (string.IsNullOrEmpty(culture)) culture = ResourceFallbackCulture;
+        // Resolve against the current UI culture, then fall back to the resource-authoring language
+        // (NOT the per-site content default) so admin strings stay translated whatever the root language.
+        foreach (var c in culture == ResourceFallbackCulture ? new[] { culture } : new[] { culture, ResourceFallbackCulture })
         {
             if (Load(c).TryGetValue(key, out var v))
                 return v;

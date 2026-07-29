@@ -28,6 +28,25 @@ var connectionString = builder.Configuration.GetConnectionString("Default")
 
 builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite(connectionString));
 
+// Apply the per-site DEFAULT (root) content language BEFORE routing/localization are configured
+// (both capture Localizer.DefaultCulture at startup). Read directly from the settings table; a missing
+// DB/table/row leaves the built-in "de". An env var wins (handy for containers). A change needs a restart.
+{
+    var configuredDefault = Environment.GetEnvironmentVariable("MATCMS_DEFAULT_LANG");
+    if (string.IsNullOrWhiteSpace(configuredDefault))
+    {
+        try
+        {
+            var opts = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connectionString).Options;
+            using var probe = new AppDbContext(opts);
+            configuredDefault = probe.SiteSettings.AsNoTracking()
+                .FirstOrDefault(s => s.Key == SettingKeys.DefaultLanguage)?.Value;
+        }
+        catch { /* fresh DB / not migrated yet → keep the built-in default */ }
+    }
+    Localizer.SetDefaultCulture(configuredDefault);
+}
+
 // Persist data-protection keys so auth cookies survive container restarts.
 builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(dataDir, "keys")))
@@ -67,8 +86,10 @@ builder.Services.Configure<RequestLocalizationOptions>(options =>
     var cultures = supportedCultures
         .Select(c => { try { return new CultureInfo(c); } catch { return null; } })
         .Where(c => c is not null).Select(c => c!).ToList();
-    if (cultures.Count == 0) cultures.Add(new CultureInfo(Localizer.DefaultCulture));
-    options.DefaultRequestCulture = new RequestCulture(Localizer.DefaultCulture);
+    if (cultures.Count == 0) cultures.Add(new CultureInfo(Localizer.ResourceFallbackCulture));
+    // UI default = the resource-authoring language (admin chrome), independent of the site's content
+    // root language (Localizer.DefaultCulture) — a cookie / Accept-Language still overrides per request.
+    options.DefaultRequestCulture = new RequestCulture(Localizer.ResourceFallbackCulture);
     options.SupportedCultures = cultures;
     options.SupportedUICultures = cultures;
     // Cookie first (explicit user choice), then Accept-Language header.

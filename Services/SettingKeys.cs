@@ -20,6 +20,10 @@ public static class SettingKeys
     // e.g. "en,fr". Managed under Settings → Sprachen. Only routable codes count (Localizer).
     public const string Languages = "i18n.languages";
 
+    // i18n: the DEFAULT (root) content language served at prefix-less URLs. Empty = "de". Applied at
+    // startup (Localizer.SetDefaultCulture) → a change needs an app restart. Managed under Settings → Sprachen.
+    public const string DefaultLanguage = "i18n.default";
+
     // SEO: "true" serves /sitemap.xml (+ a /robots.txt that references it); anything else = off.
     public const string SitemapEnabled = "sitemap.enabled";
 

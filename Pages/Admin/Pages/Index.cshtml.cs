@@ -13,8 +13,8 @@ public class IndexModel : PageModel
     private readonly AppDbContext _db;
     public IndexModel(AppDbContext db) => _db = db;
 
-    /// <summary>One language version of a logical page.</summary>
-    public record Version(int Id, string Locale, bool IsPublished);
+    /// <summary>One language version of a logical page (with its own public URL).</summary>
+    public record Version(int Id, string Locale, bool IsPublished, string Url);
 
     /// <summary>A logical page and all its language versions (the "versions" of one page).</summary>
     public record Group(PageEntity Primary, string Url, IReadOnlyList<Version> Versions);
@@ -37,8 +37,10 @@ public class IndexModel : PageModel
             {
                 var ordered = g.OrderBy(p => localeRank(p.Locale)).ThenBy(p => p.Id).ToList();
                 var primary = ordered.FirstOrDefault(p => p.Locale == Localizer.DefaultCulture) ?? ordered[0];
-                var url = primary.Slug == "home" ? "/" : "/" + primary.Slug;
-                var versions = ordered.Select(p => new Version(p.Id, p.Locale, p.IsPublished)).ToList();
+                var versions = ordered
+                    .Select(p => new Version(p.Id, p.Locale, p.IsPublished, MatCMS.Services.SiteContext.LocalizedUrl(p.Locale, p.Slug)))
+                    .ToList();
+                var url = versions.FirstOrDefault(v => v.Id == primary.Id)?.Url ?? "/";
                 return new Group(primary, url, versions);
             })
             .OrderBy(g => g.Primary.NavOrder).ThenBy(g => g.Primary.FooterOrder).ThenBy(g => g.Primary.Title)

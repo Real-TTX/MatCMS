@@ -17,6 +17,7 @@
         <thead>
             <tr>
                 <th>@T["pages.colTitle"]</th>
+                <th>@T["editor.language"]</th>
                 <th>@T["pages.colUrl"]</th>
                 <th>@T["pages.colStatus"]</th>
                 <th></th>
@@ -25,51 +26,37 @@
         <tbody>
             @if (Model.Groups.Count == 0)
             {
-                <tr><td colspan="4" class="muted" style="text-align:center;padding:22px;">@T["pages.none"]</td></tr>
+                <tr><td colspan="5" class="muted" style="text-align:center;padding:22px;">@T["pages.none"]</td></tr>
             }
             @foreach (var g in Model.Groups)
             {
                 var p = g.Primary;
                 var multi = g.Versions.Count > 1;
-                var search = p.Title + " " + g.Url + " " + string.Join(" ", g.Versions.Select(v => v.Locale));
+                var primaryVer = g.Versions.FirstOrDefault(v => v.Id == p.Id) ?? g.Versions[0];
+                var children = g.Versions.Where(v => v.Id != p.Id).ToList();
+                var gid = "g" + p.Id;
+                var search = p.Title + " " + string.Join(" ", g.Versions.Select(v => v.Locale + " " + v.Url));
                 <tr data-search="@search">
                     <td>
                         <div class="pg-title">
                             @if (multi)
                             {
-                                <button type="button" class="pg-toggle" data-pg-toggle aria-expanded="false" title="Sprachversionen"></button>
+                                <button type="button" class="pg-toggle" data-pg-toggle="@gid" aria-expanded="false" title="Sprachversionen"></button>
                             }
                             else
                             {
                                 <span class="pg-toggle-spacer"></span>
                             }
                             <strong>@p.Title</strong>
-                            @if (multi)
-                            {
-                                <span class="muted" style="font-size:12px;">· @g.Versions.Count Versionen</span>
-                            }
                         </div>
-                        @if (multi)
-                        {
-                            <div class="pg-versions" hidden>
-                                @foreach (var v in g.Versions)
-                                {
-                                    var isDef = v.Locale == Localizer.DefaultCulture;
-                                    <a class="pg-version" asp-page="Edit" asp-route-id="@v.Id">
-                                        <span class="badge @(isDef ? "badge-on" : "badge-off") mono">@v.Locale.ToUpperInvariant()</span>
-                                        <span>@Localizer.DisplayName(v.Locale)@(isDef ? " · Original" : "")</span>
-                                        @if (!v.IsPublished)
-                                        {
-                                            <span class="muted" style="font-size:11px;">· @T["pages.draft"]</span>
-                                        }
-                                    </a>
-                                }
-                            </div>
-                        }
                     </td>
-                    <td><a class="mono" href="@g.Url" target="_blank">@g.Url</a></td>
                     <td>
-                        @if (p.IsPublished)
+                        <span class="badge badge-on mono">@primaryVer.Locale.ToUpperInvariant()</span>
+                        <span class="muted" style="font-size:12px;">@Localizer.DisplayName(primaryVer.Locale) · Original</span>
+                    </td>
+                    <td><a class="mono" href="@primaryVer.Url" target="_blank">@primaryVer.Url</a></td>
+                    <td>
+                        @if (primaryVer.IsPublished)
                         {
                             <span class="badge badge-on">@T["pages.published"]</span>
                         }
@@ -88,6 +75,32 @@
                         </div>
                     </td>
                 </tr>
+                @foreach (var v in children)
+                {
+                    <tr class="pg-child" data-pg-child="@gid" data-search="@search">
+                        <td><span class="pg-branch" aria-hidden="true">↳</span></td>
+                        <td>
+                            <span class="badge badge-off mono">@v.Locale.ToUpperInvariant()</span>
+                            <span class="muted" style="font-size:12px;">@Localizer.DisplayName(v.Locale)</span>
+                        </td>
+                        <td><a class="mono" href="@v.Url" target="_blank">@v.Url</a></td>
+                        <td>
+                            @if (v.IsPublished)
+                            {
+                                <span class="badge badge-on">@T["pages.published"]</span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-off">@T["pages.draft"]</span>
+                            }
+                        </td>
+                        <td>
+                            <div class="actions">
+                                <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@v.Id">@T["action.edit"]</a>
+                            </div>
+                        </td>
+                    </tr>
+                }
             }
         </tbody>
     </table>
@@ -105,24 +118,22 @@
     .pg-toggle[aria-expanded="true"]::before { transform: rotate(90deg); }
     .pg-toggle:hover { background: #eef1f6; color: var(--black, #111); }
     .pg-toggle-spacer { display: inline-block; width: 20px; flex: none; }
-    .pg-versions { display: flex; flex-direction: column; gap: 2px; margin: 6px 0 2px 28px; }
-    .pg-version {
-        display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 7px;
-        text-decoration: none; color: var(--ink, #1a1a1a); border: 1px solid transparent;
-    }
-    .pg-version:hover { background: #f4f6f9; border-color: var(--line, #e2e4e8); }
+    /* Child version rows: collapsed by default (class, not [hidden], so list-search can't force them open). */
+    tr.pg-child:not(.pg-open) { display: none; }
+    tr.pg-child > td:first-child { text-align: right; color: var(--muted, #6b7078); padding-left: 28px; }
+    tr.pg-child { background: #fafbfc; }
 </style>
 
 @section Scripts {
     <script>
         document.querySelectorAll('[data-pg-toggle]').forEach(function (btn) {
             btn.addEventListener('click', function () {
-                var cell = btn.closest('td');
-                var box = cell ? cell.querySelector('.pg-versions') : null;
-                if (!box) return;
-                var open = box.hidden;
-                box.hidden = !open;
-                btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+                var gid = btn.getAttribute('data-pg-toggle');
+                var open = btn.getAttribute('aria-expanded') === 'true';
+                document.querySelectorAll('tr.pg-child[data-pg-child="' + gid + '"]').forEach(function (row) {
+                    row.classList.toggle('pg-open', !open);
+                });
+                btn.setAttribute('aria-expanded', open ? 'false' : 'true');
             });
         });
     </script>

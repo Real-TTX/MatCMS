@@ -777,3 +777,6 @@ table.data .btn { white-space: nowrap; }
     box-shadow: 0 24px 60px rgba(0,0,0,.28); color: var(--ink, #1a1a1a); background: #fff;
 }
 .mat-dialog::backdrop { background: rgba(15,18,24,.45); }
+
+.admin-foot-lang-menu[hidden]{display:none!important}
+.pg-versions[hidden]{display:none!important}

@@ -7,7 +7,7 @@
     <div class="page-head">
         <h1>@T["menus.heading"]</h1>
         <div class="list-toolbar">
-            <input type="search" class="list-search" data-list-search placeholder="Suchen…" aria-label="Suchen" autocomplete="off" />
+            <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
             <a class="btn btn-sm" asp-page="CreateMenu">@T["menus.newMenu"]</a>
         </div>
     </div>
@@ -15,8 +15,8 @@
     <table class="data" data-list-table>
         <thead>
             <tr>
-                <th>Name</th>
-                <th>Schlüssel</th>
+                <th>@T["menus.colName"]</th>
+                <th>@T["menus.colKey"]</th>
                 <th>@T["menus.entries"]</th>
                 <th></th>
             </tr>
@@ -38,5 +38,5 @@
             }
         </tbody>
     </table>
-    <div class="list-empty" data-list-empty hidden>Keine Treffer.</div>
+    <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
 </div>

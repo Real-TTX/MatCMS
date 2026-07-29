@@ -1,74 +1,74 @@
 @page
 @model MatCMS.Pages.Admin.Posts.IndexModel
 @{
-    ViewData["Title"] = "Beiträge";
+    ViewData["Title"] = T["posts.title"];
     var now = DateTime.UtcNow;
 }
 <div data-list data-list-page-size="25">
     <div class="page-head">
-        <h1>Beiträge</h1>
+        <h1>@T["posts.title"]</h1>
         <div class="list-toolbar">
-            <input type="search" class="list-search" data-list-search placeholder="Suchen…" aria-label="Suchen" autocomplete="off" />
-            <a class="btn btn-sm" asp-page="Edit" asp-route-id="0">+ Neuer Beitrag</a>
+            <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+            <a class="btn btn-sm" asp-page="Edit" asp-route-id="0">@T["posts.new"]</a>
         </div>
     </div>
 
     <table class="data" data-list-table>
         <thead>
             <tr>
-                <th>Titel</th>
-                <th>URL</th>
-                <th>Datum</th>
-                <th>Tags</th>
-                <th>Status</th>
+                <th>@T["pages.colTitle"]</th>
+                <th>@T["pages.colUrl"]</th>
+                <th>@T["posts.colDate"]</th>
+                <th>@T["media.tags"]</th>
+                <th>@T["pages.colStatus"]</th>
                 <th></th>
             </tr>
         </thead>
-            <tbody>
-                @if (Model.Items.Count == 0)
-                {
-                    <tr><td colspan="6" class="muted" style="text-align:center;padding:22px;">Noch keine Beiträge. Lege den ersten an.</td></tr>
-                }
-                @foreach (var p in Model.Items)
-                {
-                    <tr data-search="@(p.Title + " " + p.Slug + " " + p.Tags)">
-                        <td><strong>@p.Title</strong></td>
-                        <td><a class="mono" href="/blog/@p.Slug" target="_blank" rel="noopener">/blog/@p.Slug</a></td>
-                        <td>@p.PublishedAt.ToLocalTime().ToString("dd.MM.yyyy")</td>
-                        <td>
-                            @foreach (var t in MatCMS.Content.TagUtil.Split(p.Tags))
-                            {
-                                <span class="mini-chip">@t</span>
-                            }
-                        </td>
-                        <td>
-                            @if (!p.IsPublished)
-                            {
-                                <span class="badge badge-off">Entwurf</span>
-                            }
-                            else if (p.PublishedAt > now)
-                            {
-                                <span class="badge badge-new" title="Wird erst ab dem Datum öffentlich sichtbar">geplant</span>
-                            }
-                            else
-                            {
-                                <span class="badge badge-on">veröffentlicht</span>
-                            }
-                        </td>
-                        <td>
-                            <div class="actions">
-                                <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@p.Id">Bearbeiten</a>
-                                <a class="btn btn-sm btn-ghost btn-icon" href="/blog/@p.Slug" target="_blank" rel="noopener" title="Ansehen" aria-label="Ansehen"><i class="ti ti-external-link" aria-hidden="true"></i></a>
-                                <form method="post" asp-page-handler="Delete" asp-route-id="@p.Id" class="inline-form"
-                                      onsubmit="return confirm('Beitrag „@p.Title“ wirklich löschen?');">
-                                    <button type="submit" class="btn btn-sm btn-danger btn-icon" title="Löschen" aria-label="Löschen"><i class="ti ti-trash" aria-hidden="true"></i></button>
-                                </form>
-                            </div>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-        <div class="list-empty" data-list-empty hidden>Keine Treffer.</div>
-        <nav class="list-pager" data-list-pager aria-label="Seiten"></nav>
+        <tbody>
+            @if (Model.Items.Count == 0)
+            {
+                <tr><td colspan="6" class="muted" style="text-align:center;padding:22px;">@T["posts.none"]</td></tr>
+            }
+            @foreach (var p in Model.Items)
+            {
+                <tr data-search="@(p.Title + " " + p.Slug + " " + p.Tags)">
+                    <td><strong>@p.Title</strong></td>
+                    <td><a class="mono" href="/blog/@p.Slug" target="_blank" rel="noopener">/blog/@p.Slug</a></td>
+                    <td>@p.PublishedAt.ToLocalTime().ToString("dd.MM.yyyy")</td>
+                    <td>
+                        @foreach (var t in MatCMS.Content.TagUtil.Split(p.Tags))
+                        {
+                            <span class="mini-chip">@t</span>
+                        }
+                    </td>
+                    <td>
+                        @if (!p.IsPublished)
+                        {
+                            <span class="badge badge-off">@T["posts.draft"]</span>
+                        }
+                        else if (p.PublishedAt > now)
+                        {
+                            <span class="badge badge-new" title="@T["posts.scheduledHint"]">@T["posts.scheduled"]</span>
+                        }
+                        else
+                        {
+                            <span class="badge badge-on">@T["posts.published"]</span>
+                        }
+                    </td>
+                    <td>
+                        <div class="actions">
+                            <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@p.Id">@T["action.edit"]</a>
+                            <a class="btn btn-sm btn-ghost btn-icon" href="/blog/@p.Slug" target="_blank" rel="noopener" title="@T["posts.view"]" aria-label="@T["posts.view"]"><i class="ti ti-external-link" aria-hidden="true"></i></a>
+                            <form method="post" asp-page-handler="Delete" asp-route-id="@p.Id" class="inline-form"
+                                  onsubmit="return confirm('@T["posts.confirmDelete", p.Title]');">
+                                <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><i class="ti ti-trash" aria-hidden="true"></i></button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+    <nav class="list-pager" data-list-pager aria-label="@T["posts.title"]"></nav>
 </div>

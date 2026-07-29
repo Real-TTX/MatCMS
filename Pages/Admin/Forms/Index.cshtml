@@ -7,7 +7,7 @@
     <div class="page-head">
         <h1>@T["forms.title"]</h1>
         <div class="list-toolbar">
-            <input type="search" class="list-search" data-list-search placeholder="Suchen…" aria-label="Suchen" autocomplete="off" />
+            <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
             <a class="btn btn-sm" asp-page="Create">@T["forms.create"]</a>
         </div>
     </div>
@@ -52,6 +52,6 @@
                 }
             </tbody>
         </table>
-        <div class="list-empty" data-list-empty hidden>Keine Treffer.</div>
+        <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
         <nav class="list-pager" data-list-pager aria-label="Seiten"></nav>
 </div>

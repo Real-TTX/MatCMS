@@ -7,7 +7,7 @@
     <div class="page-head">
         <h1>@T["media.title"]</h1>
         <div class="list-toolbar">
-            <input type="search" class="list-search" data-list-search placeholder="Suchen…" aria-label="Suchen" autocomplete="off" />
+            <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
             <div class="view-toggle" data-list-viewtoggle>
                 <button type="button" class="vt-btn" data-view="tiles" title="Kacheln" aria-label="Kacheln"><i class="ti ti-layout-grid" aria-hidden="true"></i></button>
                 <button type="button" class="vt-btn" data-view="table" title="Tabelle" aria-label="Tabelle"><i class="ti ti-list" aria-hidden="true"></i></button>
@@ -97,7 +97,7 @@
             }
         </tbody>
     </table>
-    <div class="list-empty" data-list-empty hidden>Keine Treffer.</div>
+    <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
 </div>
 
 @* ---- Detail dialog ---- *@

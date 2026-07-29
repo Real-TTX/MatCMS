@@ -1,16 +1,16 @@
 @page "{id:int}"
 @model MatCMS.Pages.Admin.Posts.EditModel
 @{
-    ViewData["Title"] = Model.IsNew ? "Neuer Beitrag" : "Beitrag bearbeiten";
+    ViewData["Title"] = Model.IsNew ? T["posts.newTitle"] : T["posts.editTitle"];
 }
 <div class="page-head">
-    <h1>@(Model.IsNew ? "Neuer Beitrag" : "Beitrag bearbeiten")</h1>
+    <h1>@(Model.IsNew ? T["posts.newTitle"] : T["posts.editTitle"])</h1>
     <div style="display:flex;gap:8px;">
         @if (!Model.IsNew)
         {
-            <a class="btn btn-sm btn-ghost" href="/blog/@Model.Input.Slug" target="_blank" rel="noopener"><i class="ti ti-external-link" aria-hidden="true"></i> Ansehen</a>
+            <a class="btn btn-sm btn-ghost" href="/blog/@Model.Input.Slug" target="_blank" rel="noopener"><i class="ti ti-external-link" aria-hidden="true"></i> @T["posts.view"]</a>
         }
-        <a class="btn btn-sm btn-ghost" asp-page="Index">Zurück</a>
+        <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
     </div>
 </div>
 
@@ -18,54 +18,54 @@
     <div asp-validation-summary="All" class="alert alert-error" style="display:@(ViewData.ModelState.IsValid ? "none" : "block")"></div>
 
     <div class="field">
-        <label>Überschrift</label>
-        <input asp-for="Input.Title" placeholder="Titel des Beitrags" required />
+        <label>@T["posts.heading"]</label>
+        <input asp-for="Input.Title" placeholder="@T["posts.headingPlaceholder"]" required />
     </div>
 
     <div class="field">
-        <label>URL-Slug <span class="muted">(optional – wird aus dem Titel erzeugt)</span></label>
+        <label>@T["posts.slug"] <span class="muted">@T["posts.slugHint"]</span></label>
         <input asp-for="Input.Slug" placeholder="mein-beitrag" />
     </div>
 
     <div class="field">
-        <label>Titelbild</label>
+        <label>@T["posts.titleImage"]</label>
         <div class="image-field">
             <div class="preview" id="ti-preview" style="@(string.IsNullOrWhiteSpace(Model.Input.TitleImage) ? "" : $"background-image:url('{Model.Input.TitleImage}')")"></div>
             <div class="image-controls">
-                <input asp-for="Input.TitleImage" id="ti-url" placeholder="/uploads/… oder https://…" />
+                <input asp-for="Input.TitleImage" id="ti-url" placeholder="@T["posts.imgPlaceholder"]" />
                 <div style="margin-top:8px;">
-                    <button type="button" class="btn btn-ghost btn-sm" id="ti-pick">Bild wählen</button>
+                    <button type="button" class="btn btn-ghost btn-sm" id="ti-pick">@T["posts.pickImage"]</button>
                 </div>
             </div>
         </div>
     </div>
 
     <div class="field">
-        <label>Kurztext / Teaser <span class="muted">(für Karten &amp; Listen)</span></label>
-        <textarea asp-for="Input.Excerpt" rows="2" placeholder="Kurze Zusammenfassung…"></textarea>
+        <label>@T["posts.excerpt"] <span class="muted">@T["posts.excerptHint"]</span></label>
+        <textarea asp-for="Input.Excerpt" rows="2" placeholder="@T["posts.excerptPlaceholder"]"></textarea>
     </div>
 
     <div class="field">
-        <label>Inhalt</label>
+        <label>@T["posts.content"]</label>
         <div class="rt-toolbar" id="rt-toolbar">
-            <button type="button" data-cmd="bold" title="Fett">F</button>
-            <button type="button" data-cmd="italic" title="Kursiv">K</button>
-            <button type="button" data-cmd="formatBlock" data-arg="H2" title="Überschrift 2">H2</button>
-            <button type="button" data-cmd="formatBlock" data-arg="H3" title="Überschrift 3">H3</button>
-            <button type="button" data-cmd="formatBlock" data-arg="P" title="Absatz">¶</button>
-            <button type="button" data-cmd="insertUnorderedList" title="Liste">• Liste</button>
-            <button type="button" data-cmd="createLink" data-prompt="1" title="Link">Link</button>
-            <button type="button" data-cmd="removeFormat" title="Format entfernen">✕</button>
+            <button type="button" data-cmd="bold" title="@T["posts.rtBold"]">F</button>
+            <button type="button" data-cmd="italic" title="@T["posts.rtItalic"]">K</button>
+            <button type="button" data-cmd="formatBlock" data-arg="H2" title="@T["posts.rtH2"]">H2</button>
+            <button type="button" data-cmd="formatBlock" data-arg="H3" title="@T["posts.rtH3"]">H3</button>
+            <button type="button" data-cmd="formatBlock" data-arg="P" title="@T["posts.rtParagraph"]">¶</button>
+            <button type="button" data-cmd="insertUnorderedList" title="@T["posts.rtList"]">@T["posts.rtListLabel"]</button>
+            <button type="button" data-cmd="createLink" data-prompt="1" title="@T["posts.rtLink"]">@T["posts.rtLink"]</button>
+            <button type="button" data-cmd="removeFormat" title="@T["posts.rtClear"]">✕</button>
         </div>
         <div class="rt-editor" id="rt-editor" contenteditable="true" style="min-height:220px;">@Html.Raw(Model.Input.ContentHtml)</div>
         <input type="hidden" asp-for="Input.ContentHtml" id="rt-hidden" />
     </div>
 
     <div class="field">
-        <label>Tags <span class="muted">(Enter oder Komma zum Hinzufügen)</span></label>
+        <label>@T["media.tags"] <span class="muted">@T["posts.tagsHint"]</span></label>
         <div class="tag-input" id="pt-tag-input">
-            <input type="text" id="pt-tag-entry" class="tag-entry" placeholder="Tag …" autocomplete="off" hidden />
-            <button type="button" class="tag-add-chip" id="pt-tag-add" title="Tag hinzufügen" aria-label="Tag hinzufügen">+</button>
+            <input type="text" id="pt-tag-entry" class="tag-entry" placeholder="@T["posts.tagEntryPlaceholder"]" autocomplete="off" hidden />
+            <button type="button" class="tag-add-chip" id="pt-tag-add" title="@T["posts.addTag"]" aria-label="@T["posts.addTag"]">+</button>
         </div>
         <input type="hidden" asp-for="Input.Tags" id="pt-tags" />
         @if (Model.AllTags.Count > 0)
@@ -76,31 +76,31 @@
                     <button type="button" class="mini-chip mini-chip-add" data-tag="@t">+ @t</button>
                 }
             </div>
-            <div class="help">Vorhandene Tags anklicken oder eigene eingeben.</div>
+            <div class="help">@T["posts.tagSuggestHint"]</div>
         }
     </div>
 
     <div class="field">
-        <label>Anhänge <span class="muted">(Bilder/Dateien, optional)</span></label>
+        <label>@T["posts.attachments"] <span class="muted">@T["posts.attachmentsHint"]</span></label>
         <div id="att-list" class="att-list" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
         <div style="margin-top:8px;">
-            <button type="button" class="btn btn-ghost btn-sm" id="att-add">+ Datei / Bild hinzufügen</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="att-add">@T["posts.addAttachment"]</button>
         </div>
         <input type="hidden" asp-for="Input.AttachmentsJson" id="att-json" />
     </div>
 
     <div class="field">
-        <label><input type="checkbox" asp-for="Input.IsPublished" /> Veröffentlicht</label>
+        <label><input type="checkbox" asp-for="Input.IsPublished" /> @T["posts.publishedLabel"]</label>
     </div>
 
     <div class="field">
-        <label>Datum</label>
+        <label>@T["posts.date"]</label>
         <input type="date" asp-for="Input.PublishedAt" />
     </div>
 
     <div class="form-actions" style="display:flex;gap:8px;">
-        <button type="submit" class="btn">Speichern</button>
-        <a class="btn btn-ghost" asp-page="Index">Abbrechen</a>
+        <button type="submit" class="btn">@T["action.save"]</button>
+        <a class="btn btn-ghost" asp-page="Index">@T["action.cancel"]</a>
     </div>
 </form>
 
@@ -125,7 +125,7 @@
                 ed.focus();
                 var cmd = b.getAttribute('data-cmd'), arg = b.getAttribute('data-arg');
                 if (b.getAttribute('data-prompt')) {
-                    var url = window.prompt('Link-Adresse (URL):', 'https://'); if (url) document.execCommand(cmd, false, url);
+                    var url = window.prompt('@T["posts.linkPrompt"]', 'https://'); if (url) document.execCommand(cmd, false, url);
                 } else { document.execCommand(cmd, false, arg || null); }
             });
             document.getElementById('post-form').addEventListener('submit', function () { hidden.value = ed.innerHTML.trim(); });
@@ -180,7 +180,7 @@
                 Array.prototype.slice.call(box.querySelectorAll('.tag-chip-item')).forEach(function (e) { e.remove(); });
                 chips.forEach(function (tag) {
                     var el = document.createElement('span'); el.className = 'tag-chip-item'; el.textContent = tag;
-                    var x = document.createElement('button'); x.type = 'button'; x.className = 'tag-x'; x.setAttribute('aria-label', 'entfernen'); x.textContent = '×';
+                    var x = document.createElement('button'); x.type = 'button'; x.className = 'tag-x'; x.setAttribute('aria-label', '@T["posts.tagRemove"]'); x.textContent = '×';
                     x.addEventListener('click', function () { removeTag(tag); entry.focus(); });
                     el.appendChild(x); box.insertBefore(el, entry);
                 });

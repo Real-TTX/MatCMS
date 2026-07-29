@@ -31,8 +31,12 @@
     }
 
     // Base set: published (de), admin pre-filter tag, optional overall limit.
+    // Scheduling: a future PublishedAt hides the post from the public until that date; admins still
+    // see it (preview) so they can check a scheduled post before it goes live.
+    var isAdmin = ViewContext.HttpContext.User?.IsInRole("Admin") == true;
+    var nowUtc = DateTime.UtcNow;
     var all = Db.Posts.AsNoTracking()
-        .Where(p => p.IsPublished && p.Locale == "de")
+        .Where(p => p.IsPublished && p.Locale == "de" && (isAdmin || p.PublishedAt <= nowUtc))
         .OrderByDescending(p => p.PublishedAt).ThenByDescending(p => p.Id)
         .ToList();
     if (!string.IsNullOrWhiteSpace(tag))

@@ -62,8 +62,22 @@
     </div>
 
     <div class="field">
-        <label>Tags <span class="muted">(kommagetrennt)</span></label>
-        <input asp-for="Input.Tags" placeholder="News, Tipps" />
+        <label>Tags <span class="muted">(Enter oder Komma zum Hinzufügen)</span></label>
+        <div class="tag-input" id="pt-tag-input">
+            <input type="text" id="pt-tag-entry" class="tag-entry" placeholder="Tag …" autocomplete="off" hidden />
+            <button type="button" class="tag-add-chip" id="pt-tag-add" title="Tag hinzufügen" aria-label="Tag hinzufügen">+</button>
+        </div>
+        <input type="hidden" asp-for="Input.Tags" id="pt-tags" />
+        @if (Model.AllTags.Count > 0)
+        {
+            <div class="tag-suggest" id="pt-suggest">
+                @foreach (var t in Model.AllTags)
+                {
+                    <button type="button" class="mini-chip mini-chip-add" data-tag="@t">+ @t</button>
+                }
+            </div>
+            <div class="help">Vorhandene Tags anklicken oder eigene eingeben.</div>
+        }
     </div>
 
     <div class="field">
@@ -148,6 +162,56 @@
                 }, { multiple: true });
             });
             renderAtts();
+        })();
+
+        // ---- Tag picker (chips + suggestions), syncs the hidden Input.Tags field ----
+        (function () {
+            var box = document.getElementById('pt-tag-input');
+            var entry = document.getElementById('pt-tag-entry');
+            var addBtn = document.getElementById('pt-tag-add');
+            var hidden = document.getElementById('pt-tags');
+            var suggest = document.getElementById('pt-suggest');
+            if (!box || !entry || !addBtn || !hidden) return;
+            var chips = [];
+            function showEntry() { addBtn.hidden = true; entry.hidden = false; entry.focus(); }
+            function hideEntry() { entry.hidden = true; addBtn.hidden = false; }
+            addBtn.addEventListener('click', showEntry);
+            function render() {
+                Array.prototype.slice.call(box.querySelectorAll('.tag-chip-item')).forEach(function (e) { e.remove(); });
+                chips.forEach(function (tag) {
+                    var el = document.createElement('span'); el.className = 'tag-chip-item'; el.textContent = tag;
+                    var x = document.createElement('button'); x.type = 'button'; x.className = 'tag-x'; x.setAttribute('aria-label', 'entfernen'); x.textContent = '×';
+                    x.addEventListener('click', function () { removeTag(tag); entry.focus(); });
+                    el.appendChild(x); box.insertBefore(el, entry);
+                });
+                hidden.value = chips.join(', ');
+            }
+            function addTag(raw) {
+                var t = (raw || '').replace(/,/g, ' ').trim(); if (!t) return;
+                if (chips.some(function (c) { return c.toLowerCase() === t.toLowerCase(); })) return;
+                chips.push(t); render();
+            }
+            function removeTag(tag) { chips = chips.filter(function (c) { return c !== tag; }); render(); }
+            function setTags(str) {
+                var seen = {};
+                chips = (str || '').split(',').map(function (s) { return s.trim(); }).filter(function (c) {
+                    if (!c) return false; var k = c.toLowerCase(); if (seen[k]) return false; seen[k] = 1; return true;
+                });
+                render();
+            }
+            entry.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(entry.value); entry.value = ''; }
+                else if (e.key === 'Escape') { e.preventDefault(); entry.value = ''; hideEntry(); }
+                else if (e.key === 'Backspace' && !entry.value && chips.length) { removeTag(chips[chips.length - 1]); }
+            });
+            entry.addEventListener('blur', function () { if (entry.value.trim()) { addTag(entry.value); entry.value = ''; } hideEntry(); });
+            box.addEventListener('click', function (e) { if (e.target === box) showEntry(); });
+            if (suggest) suggest.addEventListener('click', function (e) {
+                var c = e.target.closest('.mini-chip-add'); if (!c) return; addTag(c.getAttribute('data-tag')); entry.focus();
+            });
+            var form = document.getElementById('post-form');
+            if (form) form.addEventListener('submit', function () { if (entry.value.trim()) { addTag(entry.value); entry.value = ''; } });
+            setTags(hidden.value);
         })();
     </script>
 }

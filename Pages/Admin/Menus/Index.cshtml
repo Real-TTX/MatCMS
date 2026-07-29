@@ -3,28 +3,40 @@
 @{
     ViewData["Title"] = T["menus.title"];
 }
-<div class="page-head">
-    <h1>@T["menus.heading"]</h1>
-</div>
+<div data-list>
+    <div class="page-head">
+        <h1>@T["menus.heading"]</h1>
+        <div class="list-toolbar">
+            <input type="search" class="list-search" data-list-search placeholder="Suchen…" aria-label="Suchen" autocomplete="off" />
+            <a class="btn btn-sm" asp-page="CreateMenu">@T["menus.newMenu"]</a>
+        </div>
+    </div>
 
-<div class="card">
-    <div class="block-list">
-        @foreach (var menu in Model.Menus)
-        {
-            var count = Model.Counts.TryGetValue(menu.Key, out var c) ? c : 0;
-            <a class="block-item block-item-link" asp-page="EditMenu" asp-route-id="@menu.Id">
-                <div class="b-info">
-                    <div class="b-type">@menu.Name</div>
-                    <div class="b-sum mono">@menu.Key@(menu.Key == "toolbar" ? " · " + T["menus.toolbarMenu"] : "")</div>
-                </div>
-                <div class="actions">
-                    <span class="badge badge-off">@count @T["menus.entries"]</span>
-                    <span class="btn btn-sm btn-ghost">@T["menus.manage"]</span>
-                </div>
-            </a>
-        }
-    </div>
-    <div class="list-actions">
-        <a class="btn" asp-page="CreateMenu">@T["menus.newMenu"]</a>
-    </div>
+    <table class="data" data-list-table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Schlüssel</th>
+                <th>@T["menus.entries"]</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var menu in Model.Menus)
+            {
+                var count = Model.Counts.TryGetValue(menu.Key, out var c) ? c : 0;
+                <tr data-search="@(menu.Name + " " + menu.Key)">
+                    <td><strong>@menu.Name</strong></td>
+                    <td><span class="mono">@menu.Key@(menu.Key == "toolbar" ? " · " + T["menus.toolbarMenu"] : "")</span></td>
+                    <td><span class="badge badge-off">@count @T["menus.entries"]</span></td>
+                    <td>
+                        <div class="actions">
+                            <a class="btn btn-sm btn-ghost" asp-page="EditMenu" asp-route-id="@menu.Id">@T["menus.manage"]</a>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <div class="list-empty" data-list-empty hidden>Keine Treffer.</div>
 </div>

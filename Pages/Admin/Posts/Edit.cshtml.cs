@@ -13,8 +13,16 @@ public class EditModel : PageModel
 
     public int PostId { get; private set; }
     public bool IsNew => PostId == 0;
+    /// <summary>Distinct tags across all posts — offered as one-click suggestions in the tag picker.</summary>
+    public List<string> AllTags { get; private set; } = new();
 
     [BindProperty] public InputModel Input { get; set; } = new();
+
+    private async Task<List<string>> LoadAllTagsAsync() =>
+        (await _db.Posts.AsNoTracking().Select(p => p.Tags).ToListAsync())
+            .SelectMany(t => MatCMS.Content.TagUtil.Split(t))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(t => t, StringComparer.OrdinalIgnoreCase).ToList();
 
     public class InputModel
     {
@@ -32,6 +40,7 @@ public class EditModel : PageModel
     public async Task<IActionResult> OnGetAsync(int id)
     {
         PostId = id;
+        AllTags = await LoadAllTagsAsync();
         if (id == 0)
         {
             Input.PublishedAt = DateTime.UtcNow.ToString("yyyy-MM-dd");
@@ -54,6 +63,7 @@ public class EditModel : PageModel
         PostId = id;
         if (string.IsNullOrWhiteSpace(Input.Title))
         {
+            AllTags = await LoadAllTagsAsync();
             ModelState.AddModelError("Input.Title", "Titel ist erforderlich.");
             return Page();
         }

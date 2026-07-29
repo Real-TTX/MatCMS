@@ -720,3 +720,21 @@ table.data .btn { white-space: nowrap; }
     .block-item .actions { width: 100%; justify-content: flex-start; }
     .page-head .btn { flex: 1 1 auto; text-align: center; }
 }
+
+/* ===== List toolbar + client-side search / paging / view-toggle (admin index pages) ===== */
+.list-toolbar { flex: 1 1 auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.list-toolbar .list-search { margin-right: auto; }   /* pushes toggle + primary button to the right */
+.list-search { height: 34px; min-width: 200px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 13.5px; background: #fff; }
+.list-search:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent); }
+.list-empty { color: var(--muted, #6b7078); padding: 16px 2px; }
+.list-pager { display: flex; gap: 6px; margin-top: 16px; flex-wrap: wrap; }
+.pager-btn { min-width: 34px; height: 34px; padding: 0 10px; border: 1px solid var(--line); background: #fff; border-radius: 8px; cursor: pointer; font: inherit; font-size: 13px; color: var(--ink); }
+.pager-btn:hover { border-color: var(--accent); }
+.pager-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.view-toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.vt-btn { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border: 0; background: #fff; color: var(--muted, #6b7078); cursor: pointer; }
+.vt-btn + .vt-btn { border-left: 1px solid var(--line); }
+.vt-btn.active { background: var(--accent); color: #fff; }
+[data-list].list-view-table [data-list-tiles] { display: none; }
+[data-list].list-view-tiles [data-list-table] { display: none; }
+@media (max-width: 640px) { .list-search { min-width: 0; flex: 1 1 auto; } }

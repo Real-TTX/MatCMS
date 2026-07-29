@@ -18,7 +18,10 @@ public class PostModel : PageModel
     {
         var s = (slug ?? "").Trim().ToLowerInvariant();
         var post = await _db.Posts.AsNoTracking().FirstOrDefaultAsync(p => p.Slug == s && p.Locale == "de");
-        if (post is null || (!post.IsPublished && !User.IsInRole("Admin"))) return NotFound();
+        // Scheduling: the public sees a post only once it is published AND its PublishedAt has arrived;
+        // an admin can always open it (preview of drafts + scheduled posts).
+        var isAdmin = User.IsInRole("Admin");
+        if (post is null || (!isAdmin && (!post.IsPublished || post.PublishedAt > DateTime.UtcNow))) return NotFound();
 
         Current = post;
         ViewData["Title"] = post.Title;

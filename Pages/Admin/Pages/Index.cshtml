@@ -3,57 +3,61 @@
 @{
     ViewData["Title"] = T["pages.title"];
 }
-<div class="page-head">
-    <h1>@T["pages.title"]</h1>
-</div>
+<div data-list data-list-page-size="25">
+    <div class="page-head">
+        <h1>@T["pages.title"]</h1>
+        <div class="list-toolbar">
+            <input type="search" class="list-search" data-list-search placeholder="Suchen…" aria-label="Suchen" autocomplete="off" />
+            <a class="btn btn-sm" asp-page="Create">@T["pages.create"]</a>
+        </div>
+    </div>
 
-@if (Model.Items.Count == 0)
-{
-    <div class="card"><p class="muted">@T["pages.none"]</p></div>
-}
-else
-{
-<table class="data">
-    <thead>
-        <tr>
-            <th>@T["pages.colTitle"]</th>
-            <th>@T["pages.colUrl"]</th>
-            <th>@T["pages.colStatus"]</th>
-            <th></th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach (var p in Model.Items)
-        {
-            var url = p.Slug == "home" ? "/" : "/" + p.Slug;
-            <tr>
-                <td><strong>@p.Title</strong></td>
-                <td><a class="mono" href="@url" target="_blank">@url</a></td>
-                <td>
-                    @if (p.IsPublished)
-                    {
-                        <span class="badge badge-on">@T["pages.published"]</span>
-                    }
-                    else
-                    {
-                        <span class="badge badge-off">@T["pages.draft"]</span>
-                    }
-                </td>
-                <td>
-                    <div class="actions">
-                        <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@p.Id">@T["action.edit"]</a>
-                        <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@p.Id"
-                              onsubmit="return confirm('@T["pages.confirmDelete", p.Title]');">
-                            <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
-                        </form>
-                    </div>
-                </td>
-            </tr>
-        }
-    </tbody>
-</table>
-}
-
-<div class="list-actions">
-    <a class="btn" asp-page="Create">@T["pages.create"]</a>
+    @if (Model.Items.Count == 0)
+    {
+        <div class="card"><p class="muted">@T["pages.none"]</p></div>
+    }
+    else
+    {
+        <table class="data" data-list-table>
+            <thead>
+                <tr>
+                    <th>@T["pages.colTitle"]</th>
+                    <th>@T["pages.colUrl"]</th>
+                    <th>@T["pages.colStatus"]</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in Model.Items)
+                {
+                    var url = p.Slug == "home" ? "/" : "/" + p.Slug;
+                    <tr data-search="@(p.Title + " " + url)">
+                        <td><strong>@p.Title</strong></td>
+                        <td><a class="mono" href="@url" target="_blank">@url</a></td>
+                        <td>
+                            @if (p.IsPublished)
+                            {
+                                <span class="badge badge-on">@T["pages.published"]</span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-off">@T["pages.draft"]</span>
+                            }
+                        </td>
+                        <td>
+                            <div class="actions">
+                                <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@p.Id">@T["action.edit"]</a>
+                                <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@p.Id"
+                                      onsubmit="return confirm('@T["pages.confirmDelete", p.Title]');">
+                                    <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <div class="list-empty" data-list-empty hidden>Keine Treffer.</div>
+        <nav class="list-pager" data-list-pager aria-label="Seiten"></nav>
+    }
 </div>

@@ -305,7 +305,28 @@
         var valInput = document.createElement("input");
         valInput.type = "text"; valInput.placeholder = "Wert"; valInput.value = (cond && cond.value) || "";
 
-        box.appendChild(fieldSel); box.appendChild(opSel); box.appendChild(valInput);
+        // For a SELECT source field, compare against its real option VALUES via a dropdown — a
+        // free-text label would never equal the value the form actually submits.
+        var valSelect = document.createElement("select");
+        function sourceField() {
+            for (var i = 0; i < available.length; i++) if (available[i].id === fieldSel.value) return available[i];
+            return null;
+        }
+        function isSelectSource() {
+            var f = sourceField(); return !!(f && f.type === "select" && f.options && f.options.length);
+        }
+        function populateSelect(prefer) {
+            var f = sourceField(); if (!(f && f.options)) return;
+            var cur = prefer != null ? prefer : valSelect.value;
+            valSelect.innerHTML = "";
+            f.options.forEach(function (o) {
+                var op = document.createElement("option"); op.value = o.value; op.textContent = o.label || o.value;
+                valSelect.appendChild(op);
+            });
+            if (cur != null) valSelect.value = cur;
+        }
+
+        box.appendChild(fieldSel); box.appendChild(opSel); box.appendChild(valInput); box.appendChild(valSelect);
         wrap.appendChild(box);
 
         if (available.length === 0) {
@@ -316,17 +337,23 @@
 
         function refresh() {
             box.style.display = enable.checked ? "" : "none";
-            valInput.style.display = opSel.value === "filled" ? "none" : "";
+            var sel = isSelectSource(), filled = opSel.value === "filled";
+            valInput.style.display = (!filled && !sel) ? "" : "none";
+            valSelect.style.display = (!filled && sel) ? "" : "none";
         }
         enable.addEventListener("change", refresh);
         opSel.addEventListener("change", refresh);
+        fieldSel.addEventListener("change", function () { populateSelect(); refresh(); });
+        populateSelect((cond && cond.value) || null);   // seed the dropdown when the source is a select
         refresh();
 
         return {
             node: wrap,
             get: function () {
                 if (!enable.checked || !fieldSel.value) return null;
-                return { field: fieldSel.value, op: opSel.value, value: opSel.value === "filled" ? "" : valInput.value };
+                if (opSel.value === "filled") return { field: fieldSel.value, op: opSel.value, value: "" };
+                var v = isSelectSource() ? valSelect.value : valInput.value;
+                return { field: fieldSel.value, op: opSel.value, value: v };
             }
         };
     }

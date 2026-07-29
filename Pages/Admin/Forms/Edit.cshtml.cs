@@ -77,15 +77,26 @@ public class EditModel : PageModel
 
         if (!string.IsNullOrWhiteSpace(element))
         {
-            SelectedElement = Elements.FirstOrDefault(e => e.Id == element);
+            // A field inside a group isn't a top-level element — clicking it in the preview selects
+            // its parent group (whose panel then shows that child), instead of resolving to nothing.
+            SelectedElement = Elements.FirstOrDefault(e => e.Id == element)
+                ?? Elements.FirstOrDefault(e => e.Type == "group" && e.Fields.Any(f => f.Id == element));
             if (SelectedElement is not null)
             {
                 ElementJsonData = FormDefinition.Serialize(new[] { SelectedElement })[1..^1]; // unwrap the single-element array
                 // Fields available as condition sources: all input fields except the selected element (and its own children).
+                // Include each field's type + (for selects) its options, so the condition editor can offer the
+                // real option VALUES to compare against — a free-text label never matches the submitted value.
                 var ownChildIds = SelectedElement.Fields.Select(f => f.Id).ToHashSet();
                 var available = FormDefinition.Flatten(Elements)
                     .Where(e => FormDefinition.IsInput(e.Type) && e.Id != SelectedElement.Id && !ownChildIds.Contains(e.Id))
-                    .Select(e => new { id = e.Id, label = string.IsNullOrWhiteSpace(e.Label) ? e.Id : e.Label })
+                    .Select(e => new
+                    {
+                        id = e.Id,
+                        label = string.IsNullOrWhiteSpace(e.Label) ? e.Id : e.Label,
+                        type = e.Type,
+                        options = (e.Options ?? new()).Select(o => new { value = o.Value, label = o.Label }).ToList()
+                    })
                     .ToList();
                 AvailableFieldsJson = JsonSerializer.Serialize(available, FormDefinition.Opts);
             }

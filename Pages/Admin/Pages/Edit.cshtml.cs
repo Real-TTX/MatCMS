@@ -232,15 +232,24 @@ public class EditModel : PageModel
             ShowInFooter = page.ShowInFooter,
             NavOrder = page.NavOrder,
             FooterOrder = page.FooterOrder,
-            MetaDescription = page.MetaDescription,
-            Blocks = page.Blocks.OrderBy(b => b.SortOrder).Select(b => new ContentBlock
-            {
-                BlockType = b.BlockType,
-                SortOrder = b.SortOrder,
-                DataJson = b.DataJson
-            }).ToList()
+            MetaDescription = page.MetaDescription
         };
         _db.Pages.Add(translation);
+        await _db.SaveChangesAsync();
+
+        // Clone the block tree, PRESERVING the parent/child hierarchy (nested cards/columns/groups):
+        // pass 1 creates every block, pass 2 remaps each ParentId to the newly-created parent.
+        var map = new Dictionary<int, ContentBlock>();
+        foreach (var b in page.Blocks.OrderBy(b => b.SortOrder))
+        {
+            var nb = new ContentBlock { PageId = translation.Id, BlockType = b.BlockType, SortOrder = b.SortOrder, DataJson = b.DataJson };
+            _db.ContentBlocks.Add(nb);
+            map[b.Id] = nb;
+        }
+        await _db.SaveChangesAsync();
+        foreach (var b in page.Blocks)
+            if (b.ParentId is int pid && map.TryGetValue(pid, out var parent) && map.TryGetValue(b.Id, out var child))
+                child.ParentId = parent.Id;
         await _db.SaveChangesAsync();
 
         TempData["Flash"] = "Übersetzung erstellt.";

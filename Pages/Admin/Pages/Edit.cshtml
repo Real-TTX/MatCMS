@@ -216,6 +216,7 @@
                                         <a class="b-open" asp-page="Edit" asp-route-id="@t.Id">
                                             <span class="b-info"><span class="b-type">@t.Title</span></span>
                                         </a>
+                                        <a class="btn btn-sm btn-ghost" asp-page="Diff" asp-route-id="@Model.Current.Id" asp-route-other="@t.Id" title="Diese Übersetzung mit @t.Locale vergleichen">⇄ Vergleichen</a>
                                     }
                                 </div>
                             }

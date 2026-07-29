@@ -27,7 +27,7 @@ public class Localizer
     /// the default (root URLs); every other entry is served under a "/{culture}" prefix. Adding a truly
     /// new language = add its code here (+ optional Resources/&lt;c&gt;.json for the admin UI).
     /// </summary>
-    public static readonly string[] SupportedCultures = [DefaultCulture, "en", "fr", "it", "es", "hr", "nl", "pl"];
+    public static readonly string[] SupportedCultures = [DefaultCulture, "en", "fr", "it", "es", "hr", "sk", "nl", "pl"];
 
     /// <summary>Routable cultures other than the default (served under a URL prefix).</summary>
     public static readonly IReadOnlyList<string> NonDefaultCultures =
@@ -37,7 +37,7 @@ public class Localizer
     public static readonly IReadOnlyDictionary<string, string> DisplayNames = new Dictionary<string, string>
     {
         ["de"] = "Deutsch", ["en"] = "English", ["fr"] = "Français", ["it"] = "Italiano",
-        ["es"] = "Español", ["hr"] = "Hrvatski", ["nl"] = "Nederlands", ["pl"] = "Polski"
+        ["es"] = "Español", ["hr"] = "Hrvatski", ["sk"] = "Slovenčina", ["nl"] = "Nederlands", ["pl"] = "Polski"
     };
 
     public static string DisplayName(string code) =>

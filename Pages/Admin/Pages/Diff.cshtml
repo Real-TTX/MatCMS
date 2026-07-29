@@ -1,0 +1,81 @@
+@page "{id:int}"
+@using MatCMS.Services
+@model MatCMS.Pages.Admin.Pages.DiffModel
+@{
+    ViewData["Title"] = "Übersetzung vergleichen";
+    string Loc(string c) => Localizer.DisplayName(c) + " (" + c + ")";
+    (string label, string cls) Status(string s) => s switch
+    {
+        "same" => ("identisch – evtl. noch nicht übersetzt", "d-same"),
+        "diff" => ("übersetzt / geändert", "d-diff"),
+        "missing" => ("fehlt in Übersetzung", "d-missing"),
+        "extra" => ("nur in Übersetzung", "d-extra"),
+        "struct" => ("Struktur weicht ab", "d-struct"),
+        _ => ("leer", "d-empty")
+    };
+}
+<div class="page-head">
+    <h1>Übersetzung vergleichen</h1>
+    <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@Model.Right.Id">Zurück zur Übersetzung</a>
+</div>
+
+<div class="card">
+    <div class="d-heads">
+        <div><span class="badge badge-on mono">@Model.Left.Locale</span> <strong>@Model.Left.Title</strong> <span class="muted">– Quelle (@Loc(Model.Left.Locale))</span></div>
+        <div class="d-arrow">→</div>
+        <div><span class="badge badge-on mono">@Model.Right.Locale</span> <strong>@Model.Right.Title</strong> <span class="muted">– Übersetzung (@Loc(Model.Right.Locale))</span></div>
+    </div>
+    <div class="d-summary">
+        <span class="d-pill d-diff">@Model.DiffCount übersetzt/geändert</span>
+        <span class="d-pill d-same">@Model.SameCount identisch</span>
+        <span class="d-pill d-missing">@Model.MissingCount fehlen</span>
+        <span class="d-pill d-extra">@Model.ExtraCount zusätzlich</span>
+    </div>
+
+    <table class="data d-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>@Loc(Model.Left.Locale)</th>
+                <th>@Loc(Model.Right.Locale)</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in Model.Rows)
+            {
+                var st = Status(row.Status);
+                <tr class="@st.cls">
+                    <td class="mono">@row.Index<div class="muted d-type">@(row.LeftType ?? row.RightType)</div></td>
+                    <td>@(string.IsNullOrWhiteSpace(row.LeftText) ? "—" : row.LeftText)</td>
+                    <td>@(string.IsNullOrWhiteSpace(row.RightText) ? "—" : row.RightText)</td>
+                    <td><span class="badge d-badge">@st.label</span></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    @if (Model.Rows.Count == 0)
+    {
+        <p class="muted">Keine Blöcke zum Vergleichen.</p>
+    }
+</div>
+
+@section Scripts {
+    <style>
+        .d-heads { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; }
+        .d-arrow { color: var(--muted, #6b7078); font-size: 20px; }
+        .d-summary { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+        .d-pill { font-size: 12.5px; padding: 3px 11px; border-radius: 999px; border: 1px solid var(--line, #e2e4e8); }
+        .d-table td { vertical-align: top; font-size: 13.5px; line-height: 1.5; }
+        .d-table td:nth-child(2), .d-table td:nth-child(3) { max-width: 420px; }
+        .d-type { font-size: 11px; text-transform: uppercase; letter-spacing: .03em; margin-top: 2px; }
+        .d-badge { font-size: 11px; }
+        /* row tints */
+        .d-diff    { background: #eefaf0; } .d-pill.d-diff    { background: #eefaf0; border-color: #bfe6c8; }
+        .d-same    { background: #fff8e6; } .d-pill.d-same    { background: #fff8e6; border-color: #f0dca0; }
+        .d-missing { background: #fdeeee; } .d-pill.d-missing { background: #fdeeee; border-color: #f0bcbc; }
+        .d-extra   { background: #eef3fb; } .d-pill.d-extra   { background: #eef3fb; border-color: #c3d5ee; }
+        .d-struct  { background: #fdf1e7; }
+        .d-empty   { color: var(--muted, #6b7078); }
+    </style>
+}

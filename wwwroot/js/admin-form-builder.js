@@ -55,6 +55,39 @@
         output.value = JSON.stringify(read());
     });
 
+    // ---------- Live preview: re-render the whole (unsaved) form on every edit ----------
+    (function () {
+        var tokenEl = document.querySelector('input[name="__RequestVerificationToken"]');
+        var seed = document.getElementById("form-elements");
+        if (!frame || !tokenEl || !seed) return;
+        var draft = safeParse(seed.textContent, []) || [];
+        var selId = el && el.id;
+        var t;
+        function push() {
+            var cur = read();
+            for (var i = 0; i < draft.length; i++) {
+                if (draft[i] && draft[i].id === selId) { draft[i] = cur; break; }
+            }
+            clearTimeout(t);
+            t = setTimeout(function () {
+                var body = new URLSearchParams();
+                body.set("__RequestVerificationToken", tokenEl.value);
+                body.set("Draft", JSON.stringify(draft));
+                fetch(location.pathname + "?handler=RenderPreview", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/x-www-form-urlencoded", "RequestVerificationToken": tokenEl.value },
+                    body: body.toString(),
+                    credentials: "same-origin"
+                })
+                    .then(function (r) { return r.ok ? r.text() : null; })
+                    .then(function (html) { if (html != null) postFrame({ type: "mat-render", html: html }); })
+                    .catch(function () { });
+            }, 200);
+        }
+        editor.addEventListener("input", push);
+        editor.addEventListener("change", push);
+    })();
+
     // -----------------------------------------------------------------
     // Builds the settings UI for one element and returns a read() closure.
     // -----------------------------------------------------------------

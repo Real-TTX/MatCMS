@@ -43,6 +43,8 @@
             <script id="element-data" type="application/json">@Html.Raw(Model.ElementJsonData.Replace("</", "<\\/"))</script>
             <script id="available-fields" type="application/json">@Html.Raw(Model.AvailableFieldsJson.Replace("</", "<\\/"))</script>
             <script id="element-type" type="application/json">"@sel.Type"</script>
+            @* All elements as the client draft — the live preview re-renders this on every edit. *@
+            <script id="form-elements" type="application/json">@Html.Raw(FormDefinition.Serialize(Model.Elements).Replace("</", "<\\/"))</script>
         }
         else
         {

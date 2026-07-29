@@ -204,6 +204,9 @@
             }, true);
             window.addEventListener("message", function (e) {
                 var d = e.data || {};
+                // Live preview: swap in freshly-rendered draft HTML. The click bridge above is bound to
+                // document (delegated), so it keeps working on the new content without re-running.
+                if (d.type === "mat-render" && typeof d.html === "string") { document.body.innerHTML = d.html; return; }
                 if (d.type === "mat-scroll-element" && d.id) {
                     var el = root.querySelector("[data-el='" + d.id + "']");
                     if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });

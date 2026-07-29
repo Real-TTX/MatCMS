@@ -24,6 +24,8 @@ public class EditModel : PageModel
     [BindProperty] public FormMetaInput Meta { get; set; } = new();
     [BindProperty] public string ElementJson { get; set; } = "";
     [BindProperty] public SettingsInput Settings { get; set; } = new();
+    /// <summary>The unsaved draft definition (all elements as JSON) posted by the live-preview push.</summary>
+    [BindProperty] public string? Draft { get; set; }
 
     /// <summary>All users — offered as selectable notification recipients (those with an e-mail).</summary>
     public List<User> AllUsers { get; private set; } = new();
@@ -160,6 +162,25 @@ public class EditModel : PageModel
         await _db.SaveChangesAsync();
         TempData["Flash"] = "Element gelöscht.";
         return RedirectToPage(new { id });
+    }
+
+    /// <summary>Live preview: render the current (unsaved) DRAFT definition to form HTML — no DB write.
+    /// The builder posts the whole draft on every field change and swaps the preview iframe content.</summary>
+    public IActionResult OnPostRenderPreview(int id)
+    {
+        List<FormElement> els;
+        try { els = FormDefinition.Parse(string.IsNullOrWhiteSpace(Draft) ? "[]" : Draft!); }
+        catch { els = new(); }
+        var model = new FormRenderModel
+        {
+            FormId = id,
+            Slug = "preview",
+            Name = "",
+            Elements = els,
+            Preview = true,
+            Builder = false
+        };
+        return Partial("Blocks/_FormRender", model);
     }
 
     public async Task<IActionResult> OnPostReorderAsync(int id, string[] order)

@@ -72,15 +72,14 @@
     background: none; border: none; text-align: left; cursor: pointer; font-family: inherit;
 }
 .admin-nav-foot a:hover, .admin-nav-foot .linklike:hover { color: var(--black); }
-/* "Website ansehen" + "Ausloggen" as two full-width buttons, stacked (the sidebar is too narrow for
-   two long labels side by side — stacking keeps each label on one line, no truncation). */
-.admin-foot-actions { display: flex; flex-direction: column; gap: 6px; margin-bottom: 4px; }
-.admin-foot-actions form { margin: 0; display: flex; }
+/* "Website" + "Ausloggen" as two equal buttons side by side. */
+.admin-foot-actions { display: flex; gap: 6px; margin-bottom: 4px; }
+.admin-foot-actions form { flex: 1; margin: 0; display: flex; }
 .admin-foot-actions .admin-foot-btn {
-    width: 100%; display: flex; align-items: center; justify-content: center; gap: 7px;
+    flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;
     white-space: nowrap; line-height: 1.2;
     text-decoration: none; color: #4a4f57; font-size: 13px; font-family: inherit;
-    background: #f3f4f6; border: 1px solid #e2e4e8; border-radius: 8px; padding: 8px 10px; cursor: pointer;
+    background: #f3f4f6; border: 1px solid #e2e4e8; border-radius: 8px; padding: 8px 8px; cursor: pointer;
 }
 .admin-foot-actions .admin-foot-btn:hover { color: var(--black); background: #e9ebef; border-color: #d3d6db; }
 /* Engine name + running version, pinned at the very bottom under the logout button. */

@@ -760,7 +760,7 @@ table.data .btn { white-space: nowrap; }
 .le-versions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
 .le-ver-lbl { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted, #6b7078); }
 .le-verselect {
-    flex: 1 1 auto; min-width: 120px; padding: 5px 10px; border-radius: 8px; font-size: 13px;
+    flex: 1 1 100%; width: 100%; padding: 6px 10px; border-radius: 8px; font-size: 13px;
     border: 1px solid var(--line, #e2e4e8); background: #fff; color: var(--ink, #1a1a1a); cursor: pointer;
 }
 .le-verselect:hover, .le-verselect:focus { border-color: var(--accent, #2563eb); outline: none; }

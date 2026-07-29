@@ -99,8 +99,7 @@
                     var versions = Model.Translations
                         .OrderBy(p => Array.IndexOf(MatCMS.Services.Localizer.SupportedCultures.ToArray(), p.Locale)).ToList();
                     <div class="le-versions">
-                        <label class="le-ver-lbl" for="le-verselect">@T["editor.language"]</label>
-                        <select id="le-verselect" class="le-verselect" onchange="if(this.value){window.location.href=this.value;}">
+                        <select id="le-verselect" class="le-verselect" aria-label="@T["editor.language"]" onchange="if(this.value){window.location.href=this.value;}">
                             @foreach (var v in versions)
                             {
                                 var isCur = v.Id == Model.Current.Id;

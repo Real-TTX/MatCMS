@@ -37,19 +37,7 @@
                 var gid = "g" + p.Id;
                 var search = p.Title + " " + string.Join(" ", g.Versions.Select(v => v.Locale + " " + v.Url));
                 <tr data-search="@search">
-                    <td>
-                        <div class="pg-title">
-                            @if (multi)
-                            {
-                                <button type="button" class="pg-toggle" data-pg-toggle="@gid" aria-expanded="false" title="Sprachversionen"></button>
-                            }
-                            else
-                            {
-                                <span class="pg-toggle-spacer"></span>
-                            }
-                            <strong>@p.Title</strong>
-                        </div>
-                    </td>
+                    <td><strong>@p.Title</strong></td>
                     <td>
                         <span class="badge badge-on mono">@primaryVer.Locale.ToUpperInvariant()</span>
                         <span class="muted" style="font-size:12px;">@Localizer.DisplayName(primaryVer.Locale) · Original</span>
@@ -109,32 +97,7 @@
 </div>
 
 <style>
-    .pg-title { display: flex; align-items: center; gap: 8px; }
-    .pg-toggle {
-        width: 20px; height: 20px; flex: none; padding: 0; cursor: pointer; border: 0; background: none;
-        color: var(--muted, #6b7078); border-radius: 5px; font-size: 11px; line-height: 1;
-    }
-    .pg-toggle::before { content: "\25B8"; display: inline-block; transition: transform .12s ease; }
-    .pg-toggle[aria-expanded="true"]::before { transform: rotate(90deg); }
-    .pg-toggle:hover { background: #eef1f6; color: var(--black, #111); }
-    .pg-toggle-spacer { display: inline-block; width: 20px; flex: none; }
-    /* Child version rows: collapsed by default (class, not [hidden], so list-search can't force them open). */
-    tr.pg-child:not(.pg-open) { display: none; }
+    /* Language versions are always shown as indented child rows (no collapse). */
     tr.pg-child > td:first-child { text-align: right; color: var(--muted, #6b7078); padding-left: 28px; }
     tr.pg-child { background: #fafbfc; }
 </style>
-
-@section Scripts {
-    <script>
-        document.querySelectorAll('[data-pg-toggle]').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                var gid = btn.getAttribute('data-pg-toggle');
-                var open = btn.getAttribute('aria-expanded') === 'true';
-                document.querySelectorAll('tr.pg-child[data-pg-child="' + gid + '"]').forEach(function (row) {
-                    row.classList.toggle('pg-open', !open);
-                });
-                btn.setAttribute('aria-expanded', open ? 'false' : 'true');
-            });
-        });
-    </script>
-}

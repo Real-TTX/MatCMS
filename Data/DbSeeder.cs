@@ -121,6 +121,21 @@ public static class DbSeeder
             reviewRow.Description = reviewSeed.Description;
         }
 
+        // Bundled Google-reviews plugin: a block that shows Google Places reviews. Upsert by Key so the
+        // code stays current across engine updates; the admin's config (Place-ID/API-Key) is preserved.
+        var gReviewSeed = BuildGoogleReviewsPlugin();
+        var gReviewRow = await db.Plugins.FirstOrDefaultAsync(p => p.Key == gReviewSeed.Key);
+        if (gReviewRow is null)
+        {
+            db.Plugins.Add(gReviewSeed);
+        }
+        else
+        {
+            gReviewRow.Code = gReviewSeed.Code;
+            gReviewRow.Version = gReviewSeed.Version;
+            gReviewRow.Description = gReviewSeed.Description;
+        }
+
         if (!await db.Forms.AnyAsync())
         {
             db.Forms.Add(new Form
@@ -591,6 +606,148 @@ public static class DbSeeder
     /// submission form (name + message + 1–5 stars), a public POST endpoint at /plugin/bewertungen,
     /// and an admin moderation page. Reviews are stored per "store" key in SiteSettings
     /// (plugin.reviews.{store}); set the plugin config "autoPublish"=true to skip moderation.</summary>
+    /// <summary>Bundled Google-reviews plugin: a public block that fetches Google Places reviews
+    /// (Place-ID + API-Key set under the plugin's Konfiguration) and renders them as cards, with a
+    /// cached response (SiteSettings) refreshed every few hours so page renders don't hit the API each
+    /// time. Shows a friendly hint until it is configured.</summary>
+    private static Plugin BuildGoogleReviewsPlugin() => new()
+    {
+        Name = "Google Bewertungen",
+        Key = "google-reviews",
+        Version = "1.0",
+        Description = "Zeigt Google-Rezensionen (Places API) als Block an. Place-ID + API-Key unter „Konfiguration\" hinterlegen.",
+        Enabled = true,
+        ConfigJson = "{\"placeId\":\"\",\"apiKey\":\"\",\"maxReviews\":\"6\",\"minRating\":\"0\",\"refreshHours\":\"12\"}",
+        Code = """
+            using System.Text;
+            using System.Net.Http;
+            using System.Text.Json.Nodes;
+
+            string Enc(string s) => System.Net.WebUtility.HtmlEncode(s ?? "");
+            string CacheKey(string pid) {
+                var s = new string((pid ?? "").Where(c => (c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')).ToArray());
+                if (s.Length > 40) s = s.Substring(0, 40);
+                return "plugin.googlereviews." + s;
+            }
+            string Stars(int r) {
+                r = r < 0 ? 0 : (r > 5 ? 5 : r);
+                var sb = new StringBuilder("<span class='matg-stars' aria-label='" + r + " von 5'>");
+                for (int i = 1; i <= 5; i++) sb.Append(i <= r ? "<span class='on'>★</span>" : "<span class='off'>☆</span>");
+                sb.Append("</span>");
+                return sb.ToString();
+            }
+
+            AddHeadHtml("<style>" +
+              ".matg{max-width:var(--max,1140px);margin:0 auto;padding:0 24px;}" +
+              ".matg-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:0 0 20px;}" +
+              ".matg-head h2{margin:0;}" +
+              ".matg-overall{display:flex;align-items:center;gap:8px;font-size:15px;color:#4a4137;}" +
+              ".matg-overall b{font-size:22px;color:#1a1512;}" +
+              ".matg-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px;}" +
+              ".matg-card{background:#fff;border:1px solid #e7ded0;border-radius:12px;padding:18px 18px 16px;box-shadow:0 2px 10px rgba(20,16,14,.05);}" +
+              ".matg-top{display:flex;align-items:center;gap:12px;margin-bottom:8px;}" +
+              ".matg-av{width:40px;height:40px;border-radius:50%;object-fit:cover;background:#eee;flex:none;}" +
+              ".matg-who{font-weight:700;font-size:14px;color:#1a1512;}" +
+              ".matg-when{font-size:12px;color:#8a7f72;}" +
+              ".matg-stars{font-size:15px;letter-spacing:1px;white-space:nowrap;}.matg-stars .on{color:#e7b41c;}.matg-stars .off{color:#dcd2c2;}" +
+              ".matg-text{margin:8px 0 0;font-size:14px;line-height:1.6;color:#3a342e;}" +
+              ".matg-attr{margin:18px 0 0;font-size:12px;color:#8a7f72;}" +
+              ".matg-empty{color:#8a7f72;font-style:italic;padding:16px 0;}" +
+              "</style>");
+
+            AddBlock("googlereviews", "Google Bewertungen", "Zeigt Google-Rezensionen (Places API) als Karten.", req =>
+            {
+                try
+                {
+                    string heading = "Das sagen unsere Gäste";
+                    try { var d = JsonNode.Parse(req.Data) as JsonObject; if (d != null && d["heading"] != null) { var h = d["heading"].GetValue<string>(); if (!string.IsNullOrWhiteSpace(h)) heading = h; } } catch {}
+
+                    var placeId = (Config("placeId") ?? "").Trim();
+                    var apiKey = (Config("apiKey") ?? "").Trim();
+                    int maxReviews = int.TryParse(Config("maxReviews"), out var mrv) && mrv > 0 ? mrv : 6;
+                    int minRating = int.TryParse(Config("minRating"), out var mnr) ? mnr : 0;
+                    int refreshHours = int.TryParse(Config("refreshHours"), out var rfh) && rfh > 0 ? rfh : 12;
+
+                    if (placeId.Length == 0 || apiKey.Length == 0)
+                        return "<div class='matg'><div class='matg-empty'>Google-Bewertungen: Bitte Place-ID und API-Key in den Plugin-Einstellungen hinterlegen.</div></div>";
+
+                    var db = req.Service<AppDbContext>();
+                    var ckey = CacheKey(placeId);
+                    var row = db.SiteSettings.FirstOrDefault(x => x.Key == ckey);
+                    JsonObject data = null;
+                    DateTime at = DateTime.MinValue;
+                    if (row != null && !string.IsNullOrWhiteSpace(row.Value)) {
+                        try {
+                            var c = JsonNode.Parse(row.Value) as JsonObject;
+                            if (c != null) {
+                                DateTime.TryParse(c["at"]?.GetValue<string>(), null, System.Globalization.DateTimeStyles.RoundtripKind, out at);
+                                var b = c["body"]?.GetValue<string>();
+                                if (!string.IsNullOrWhiteSpace(b)) data = (JsonNode.Parse(b) as JsonObject)?["result"] as JsonObject;
+                            }
+                        } catch {}
+                    }
+                    bool stale = data == null || (DateTime.UtcNow - at).TotalHours >= refreshHours;
+                    if (stale) {
+                        try {
+                            var http = req.Service<IHttpClientFactory>().CreateClient();
+                            http.Timeout = TimeSpan.FromSeconds(6);
+                            var url = "https://maps.googleapis.com/maps/api/place/details/json?place_id=" + Uri.EscapeDataString(placeId)
+                                    + "&fields=rating,user_ratings_total,reviews&language=de&reviews_sort=newest&key=" + Uri.EscapeDataString(apiKey);
+                            var body = http.GetStringAsync(url).GetAwaiter().GetResult();
+                            var parsed = JsonNode.Parse(body) as JsonObject;
+                            var status = parsed?["status"]?.GetValue<string>() ?? "";
+                            if (status == "OK" && parsed?["result"] is JsonObject res) {
+                                data = res;
+                                var save = new JsonObject { ["at"] = DateTime.UtcNow.ToString("o"), ["body"] = body };
+                                if (row == null) db.SiteSettings.Add(new SiteSetting { Key = ckey, Value = save.ToJsonString() });
+                                else row.Value = save.ToJsonString();
+                                db.SaveChanges();
+                            } else { req.Log("Google Reviews API: " + status); }
+                        } catch (Exception ex) { req.Log("Google Reviews Fehler: " + ex.Message); }
+                    }
+
+                    if (data == null)
+                        return "<div class='matg'><div class='matg-empty'>Google-Bewertungen konnten nicht geladen werden.</div></div>";
+
+                    double overall = 0; try { if (data["rating"] != null) overall = data["rating"].GetValue<double>(); } catch {}
+                    int total = 0; try { if (data["user_ratings_total"] != null) total = data["user_ratings_total"].GetValue<int>(); } catch {}
+                    var reviews = data["reviews"] as JsonArray ?? new JsonArray();
+
+                    var sb = new StringBuilder("<div class='matg'>");
+                    sb.Append("<div class='matg-head'>");
+                    if (!string.IsNullOrWhiteSpace(heading)) sb.Append("<h2>").Append(Enc(heading)).Append("</h2>");
+                    if (overall > 0) sb.Append("<div class='matg-overall'>").Append(Stars((int)Math.Round(overall)))
+                        .Append("<b>").Append(overall.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)).Append("</b><span>(").Append(total).Append(")</span></div>");
+                    sb.Append("</div><div class='matg-list'>");
+
+                    int shown = 0;
+                    foreach (var rvNode in reviews) {
+                        var o = rvNode as JsonObject; if (o == null) continue;
+                        int rr = 0; try { if (o["rating"] != null) rr = o["rating"].GetValue<int>(); } catch {}
+                        if (rr < minRating) continue;
+                        if (shown >= maxReviews) break;
+                        shown++;
+                        var who = o["author_name"]?.GetValue<string>() ?? "";
+                        var when = o["relative_time_description"]?.GetValue<string>() ?? "";
+                        var txt = o["text"]?.GetValue<string>() ?? "";
+                        var photo = o["profile_photo_url"]?.GetValue<string>() ?? "";
+                        sb.Append("<div class='matg-card'><div class='matg-top'>");
+                        if (!string.IsNullOrWhiteSpace(photo)) sb.Append("<img class='matg-av' src='").Append(Enc(photo)).Append("' alt='' referrerpolicy='no-referrer'>");
+                        sb.Append("<div><div class='matg-who'>").Append(Enc(who)).Append("</div><div class='matg-when'>").Append(Enc(when)).Append("</div></div></div>");
+                        sb.Append(Stars(rr));
+                        if (!string.IsNullOrWhiteSpace(txt)) sb.Append("<p class='matg-text'>").Append(Enc(txt)).Append("</p>");
+                        sb.Append("</div>");
+                    }
+                    sb.Append("</div>");
+                    if (shown == 0) sb.Append("<div class='matg-empty'>Noch keine Bewertungen.</div>");
+                    sb.Append("<div class='matg-attr'>Bewertungen von Google</div></div>");
+                    return sb.ToString();
+                }
+                catch (Exception ex) { return "<div class='matg'><div class='matg-empty'>Google-Bewertungen: " + System.Net.WebUtility.HtmlEncode(ex.Message) + "</div></div>"; }
+            });
+            """
+    };
+
     private static Plugin BuildReviewPlugin() => new()
     {
         Name = ReviewPluginName,

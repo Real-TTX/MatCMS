@@ -121,6 +121,13 @@
 
   "lang.de": "Deutsch",
   "lang.en": "English",
+  "lang.fr": "Français",
+  "lang.it": "Italiano",
+  "lang.es": "Español",
+  "lang.hr": "Hrvatski",
+  "lang.sk": "Slovenčina",
+  "lang.nl": "Nederlands",
+  "lang.pl": "Polski",
 
   "login.pageTitle": "Anmeldung",
   "login.heading": "Admin-Anmeldung",

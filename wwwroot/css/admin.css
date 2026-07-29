@@ -740,17 +740,17 @@ table.data .btn { white-space: nowrap; }
 [data-list].list-view-tiles [data-list-table] { display: none; }
 @media (max-width: 640px) { .list-search { min-width: 0; flex: 1 1 auto; } }
 
-/* ===== Page version switcher (language versions) in the block editor header ===== */
-.le-versions { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
-.le-ver {
-    display: inline-block; padding: 3px 11px; border-radius: 999px; font-size: 12px;
-    font-weight: 600; letter-spacing: .03em; text-decoration: none; cursor: pointer;
-    border: 1px solid var(--line, #e2e4e8); background: #fff; color: var(--muted, #6b7078);
-    line-height: 1.6;
+/* ===== Page version switcher (language versions) — dropdown in the block editor header ===== */
+.le-versions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
+.le-ver-lbl { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted, #6b7078); }
+.le-verselect {
+    flex: 1 1 auto; min-width: 120px; padding: 5px 10px; border-radius: 8px; font-size: 13px;
+    border: 1px solid var(--line, #e2e4e8); background: #fff; color: var(--ink, #1a1a1a); cursor: pointer;
 }
-.le-ver:hover { border-color: var(--accent, #2563eb); color: var(--accent, #2563eb); }
-.le-ver.is-current {
-    border-color: var(--accent, #2563eb); background: var(--accent, #2563eb); color: #fff; cursor: default;
-}
+.le-verselect:hover, .le-verselect:focus { border-color: var(--accent, #2563eb); outline: none; }
 .le-ver-addform { display: inline; margin: 0; padding: 0; }
-.le-ver-add { border-style: dashed; background: transparent; }
+.le-ver-add {
+    display: inline-block; padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: 600;
+    border: 1px dashed var(--line, #cdd2da); background: transparent; color: var(--muted, #6b7078); cursor: pointer;
+}
+.le-ver-add:hover { border-color: var(--accent, #2563eb); color: var(--accent, #2563eb); }

@@ -90,24 +90,23 @@
                 <div class="le-title">@Model.Current.Title</div>
                 @if (Model.SupportedLocales.Count > 1)
                 {
-                    var allVers = Model.Translations.Append(Model.Current)
+                    @* Language versions of this page. Model.Translations already includes the current
+                       page, so we iterate it directly (no Append → no duplicate current-locale entry). *@
+                    var versions = Model.Translations
                         .OrderBy(p => Array.IndexOf(MatCMS.Services.Localizer.SupportedCultures.ToArray(), p.Locale)).ToList();
-                    <div class="le-versions" role="tablist" aria-label="Sprachversionen">
-                        @foreach (var v in allVers)
-                        {
-                            if (v.Id == Model.Current.Id)
+                    <div class="le-versions">
+                        <label class="le-ver-lbl" for="le-verselect">Sprache</label>
+                        <select id="le-verselect" class="le-verselect" onchange="if(this.value){window.location.href=this.value;}">
+                            @foreach (var v in versions)
                             {
-                                <span class="le-ver is-current" aria-current="true" title="@MatCMS.Services.Localizer.DisplayName(v.Locale)">@v.Locale.ToUpperInvariant()</span>
+                                var isCur = v.Id == Model.Current.Id;
+                                <option value="@Url.Page("Edit", new { id = v.Id })" selected="@(isCur ? "selected" : null)">@v.Locale.ToUpperInvariant() — @MatCMS.Services.Localizer.DisplayName(v.Locale)@(isCur ? " ✓" : "")</option>
                             }
-                            else
-                            {
-                                <a class="le-ver" asp-page="Edit" asp-route-id="@v.Id" title="Zu @MatCMS.Services.Localizer.DisplayName(v.Locale) wechseln">@v.Locale.ToUpperInvariant()</a>
-                            }
-                        }
+                        </select>
                         @foreach (var loc in Model.MissingLocales)
                         {
                             <form method="post" asp-page-handler="CreateTranslation" asp-route-id="@Model.Current.Id" asp-route-locale="@loc" class="le-ver-addform">
-                                <button type="submit" class="le-ver le-ver-add" title="@MatCMS.Services.Localizer.DisplayName(loc) hinzufügen (Inhalt wird kopiert)">+ @loc.ToUpperInvariant()</button>
+                                <button type="submit" class="le-ver-add" title="@MatCMS.Services.Localizer.DisplayName(loc) hinzufügen (Inhalt wird kopiert)">+ @loc.ToUpperInvariant()</button>
                             </form>
                         }
                     </div>

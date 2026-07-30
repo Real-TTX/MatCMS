@@ -70,7 +70,7 @@
         @if (showFilter && filterTags.Count > 0)
         {
             <div class="posts-filter">
-                <a class="pfilter @(string.IsNullOrEmpty(activeTag) ? "active" : "")" href="@TagUrl("")">Alle</a>
+                <a class="pfilter @(string.IsNullOrEmpty(activeTag) ? "active" : "")" href="@TagUrl("")">@T["posts.filterAll"]</a>
                 @foreach (var t in filterTags)
                 {
                     <a class="pfilter @(string.Equals(activeTag, t, StringComparison.OrdinalIgnoreCase) ? "active" : "")" href="@TagUrl(t)">@t</a>
@@ -80,7 +80,7 @@
 
         @if (posts.Count == 0)
         {
-            <p class="muted">Keine Beiträge gefunden.</p>
+            <p class="muted">@T["posts.noneFound"]</p>
         }
         else if (isBlog)
         {
@@ -105,7 +105,7 @@
                             </div>
                         }
                         <div class="rich blog-post__body">@Html.Raw(p.ContentHtml)</div>
-                        <a class="blog-post__more" href="/blog/@p.Slug">Zum Beitrag →</a>
+                        <a class="blog-post__more" href="/blog/@p.Slug">@T["posts.toPost"]</a>
                     </article>
                 }
             </div>
@@ -137,7 +137,7 @@
                                 {
                                     <p class="post-card__excerpt">@p.Excerpt</p>
                                 }
-                                <span class="post-card__more">Weiterlesen →</span>
+                                <span class="post-card__more">@T["posts.readMore"]</span>
                             </div>
                         </a>
                     </article>
@@ -147,10 +147,10 @@
 
         @if (totalPages > 1)
         {
-            <nav class="posts-pager" aria-label="Seiten">
+            <nav class="posts-pager" aria-label="@T["posts.pagerNav"]">
                 @if (pageNum > 1)
                 {
-                    <a class="pager-btn" href="@PageUrl(pageNum - 1)" rel="prev">‹ Zurück</a>
+                    <a class="pager-btn" href="@PageUrl(pageNum - 1)" rel="prev">@T["posts.pagerPrev"]</a>
                 }
                 @for (var i = 1; i <= totalPages; i++)
                 {
@@ -158,7 +158,7 @@
                 }
                 @if (pageNum < totalPages)
                 {
-                    <a class="pager-btn" href="@PageUrl(pageNum + 1)" rel="next">Weiter ›</a>
+                    <a class="pager-btn" href="@PageUrl(pageNum + 1)" rel="next">@T["posts.pagerNext"]</a>
                 }
             </nav>
         }

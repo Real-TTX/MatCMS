@@ -30,7 +30,7 @@
     var attHtml = "";
     if (Model.Attachments.Count > 0)
     {
-        var ab = new System.Text.StringBuilder("<div class=\"post-attachments\"><h3>Anhänge</h3><ul class=\"att-list\">");
+        var ab = new System.Text.StringBuilder($"<div class=\"post-attachments\"><h3>{Enc(T["posts.attachmentsHeading"])}</h3><ul class=\"att-list\">");
         foreach (var a in Model.Attachments)
         {
             var url = Enc(a.Url);

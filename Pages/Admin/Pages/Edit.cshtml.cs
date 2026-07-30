@@ -477,7 +477,7 @@ public class EditModel : PageModel
             label = _t[f.Label],
             type = f.Type,
             placeholder = f.Placeholder,
-            help = f.Help,
+            help = f.Help is null ? null : _t[f.Help],   // translation key when one is used; raw text passes through unchanged
             @default = f.Default,
             options,
             showWhen = f.ShowWhenField is null ? null : new { field = f.ShowWhenField, value = f.ShowWhenValue },

@@ -1,7 +1,7 @@
 @page "{id:int}"
 @model MatCMS.Pages.Admin.Templates.CustomizeModel
 @{
-    ViewData["Title"] = "Template-Edit";
+    ViewData["Title"] = T["templates.edit"];
     string V(string id) => Model.Values.TryGetValue(id, out var v) ? v : "";
 }
 <div class="page-head">

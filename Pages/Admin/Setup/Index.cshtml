@@ -2,12 +2,12 @@
 @model MatCMS.Pages.Admin.Setup.IndexModel
 @using MatCMS.Services
 @{
-    ViewData["Title"] = "Einrichtung";
+    ViewData["Title"] = T["setup.title"];
     string SmtpV(string k) => Model.Smtp.TryGetValue(k, out var v) ? v : "";
 }
 <div class="page-head">
-    <h1>Einrichtungs-Assistent</h1>
-    <a class="btn btn-sm btn-ghost" asp-page="/Admin/Index">Überspringen</a>
+    <h1>@T["setup.heading"]</h1>
+    <a class="btn btn-sm btn-ghost" asp-page="/Admin/Index">@T["setup.skip"]</a>
 </div>
 
 @if (!string.IsNullOrWhiteSpace(Model.Error))
@@ -17,33 +17,33 @@
 
 <div class="card">
     <ol class="wiz-steps" id="wiz-steps">
-        <li class="active">Admin-Konto</li>
+        <li class="active">@T["setup.stepAccount"]</li>
         <li>Theme</li>
         <li>SMTP</li>
-        <li>Erste Seite</li>
+        <li>@T["setup.stepFirstPage"]</li>
     </ol>
 
     <form method="post" id="wiz-form">
         <div class="wiz-panel" data-panel="0">
-            <h2>1 · Admin-Konto</h2>
-            <p class="muted">Legen Sie Ihre Zugangsdaten fest. Die E-Mail-Adresse ist Ihr Login.</p>
+            <h2>@T["setup.account"]</h2>
+            <p class="muted">@T["setup.accountIntro"]</p>
             <div class="form-field">
-                <label for="AdminEmail">E-Mail-Adresse</label>
+                <label for="AdminEmail">@T["login.username"]</label>
                 <input id="AdminEmail" name="AdminEmail" type="email" value="@Model.AdminEmail" placeholder="name@example.com" required />
             </div>
             <div class="form-field">
-                <label for="AdminName">Anzeigename</label>
-                <input id="AdminName" name="AdminName" value="@Model.AdminName" placeholder="Ihr Name" />
+                <label for="AdminName">@T["users.displayName"]</label>
+                <input id="AdminName" name="AdminName" value="@Model.AdminName" placeholder="@T["setup.namePlaceholder"]" />
             </div>
             <div class="form-field">
-                <label for="AdminPassword">Neues Passwort</label>
-                <input id="AdminPassword" name="AdminPassword" type="password" placeholder="Leer lassen = unverändert" />
+                <label for="AdminPassword">@T["users.newPassword"]</label>
+                <input id="AdminPassword" name="AdminPassword" type="password" placeholder="@T["setup.passUnchanged"]" />
             </div>
         </div>
 
         <div class="wiz-panel" data-panel="1" hidden>
-            <h2>2 · Theme</h2>
-            <p class="muted">Wählen Sie das Erscheinungsbild. Später jederzeit unter „Templates" änderbar.</p>
+            <h2>@T["setup.theme"]</h2>
+            <p class="muted">@T["setup.themeIntro"]</p>
             <div class="wiz-themes">
                 @foreach (var t in Model.Themes)
                 {
@@ -61,31 +61,31 @@
         </div>
 
         <div class="wiz-panel" data-panel="2" hidden>
-            <h2>3 · E-Mail (SMTP)</h2>
-            <p class="muted">Für Formular-Benachrichtigungen. Kann übersprungen und später ausgefüllt werden.</p>
+            <h2>@T["setup.smtp"]</h2>
+            <p class="muted">@T["setup.smtpIntro"]</p>
             <div class="form-grid">
-                <div class="form-field"><label>Server (Host)</label><input name="Smtp[@SettingKeys.SmtpHost]" value="@SmtpV(SettingKeys.SmtpHost)" placeholder="smtp.example.com" /></div>
-                <div class="form-field"><label>Port</label><input name="Smtp[@SettingKeys.SmtpPort]" value="@SmtpV(SettingKeys.SmtpPort)" placeholder="587" inputmode="numeric" /></div>
-                <div class="form-field"><label>Benutzername</label><input name="Smtp[@SettingKeys.SmtpUser]" value="@SmtpV(SettingKeys.SmtpUser)" autocomplete="off" /></div>
-                <div class="form-field"><label>Passwort</label><input type="password" name="Smtp[@SettingKeys.SmtpPassword]" value="@SmtpV(SettingKeys.SmtpPassword)" autocomplete="new-password" /></div>
-                <div class="form-field"><label>Absender-Adresse</label><input name="Smtp[@SettingKeys.SmtpFromEmail]" value="@SmtpV(SettingKeys.SmtpFromEmail)" placeholder="noreply@example.com" /></div>
-                <div class="form-field"><label>Absender-Name</label><input name="Smtp[@SettingKeys.SmtpFromName]" value="@SmtpV(SettingKeys.SmtpFromName)" /></div>
+                <div class="form-field"><label>@T["settings.smtpHost"]</label><input name="Smtp[@SettingKeys.SmtpHost]" value="@SmtpV(SettingKeys.SmtpHost)" placeholder="smtp.example.com" /></div>
+                <div class="form-field"><label>@T["settings.smtpPort"]</label><input name="Smtp[@SettingKeys.SmtpPort]" value="@SmtpV(SettingKeys.SmtpPort)" placeholder="587" inputmode="numeric" /></div>
+                <div class="form-field"><label>@T["settings.smtpUser"]</label><input name="Smtp[@SettingKeys.SmtpUser]" value="@SmtpV(SettingKeys.SmtpUser)" autocomplete="off" /></div>
+                <div class="form-field"><label>@T["settings.smtpPassword"]</label><input type="password" name="Smtp[@SettingKeys.SmtpPassword]" value="@SmtpV(SettingKeys.SmtpPassword)" autocomplete="new-password" /></div>
+                <div class="form-field"><label>@T["settings.smtpFromEmail"]</label><input name="Smtp[@SettingKeys.SmtpFromEmail]" value="@SmtpV(SettingKeys.SmtpFromEmail)" placeholder="noreply@example.com" /></div>
+                <div class="form-field"><label>@T["settings.smtpFromName"]</label><input name="Smtp[@SettingKeys.SmtpFromName]" value="@SmtpV(SettingKeys.SmtpFromName)" /></div>
             </div>
         </div>
 
         <div class="wiz-panel" data-panel="3" hidden>
-            <h2>4 · Erste Seite</h2>
-            <p class="muted">Optional eine erste Seite anlegen. Leer lassen zum Überspringen.</p>
+            <h2>@T["setup.firstPage"]</h2>
+            <p class="muted">@T["setup.firstPageIntro"]</p>
             <div class="form-field">
-                <label for="PageTitle">Seitentitel</label>
-                <input id="PageTitle" name="PageTitle" value="@Model.PageTitle" placeholder="z. B. Über uns" />
+                <label for="PageTitle">@T["setup.pageTitle"]</label>
+                <input id="PageTitle" name="PageTitle" value="@Model.PageTitle" placeholder="@T["setup.pageTitlePlaceholder"]" />
             </div>
         </div>
 
         <div class="wiz-actions">
-            <button type="button" class="btn btn-ghost" id="wiz-back" hidden>Zurück</button>
-            <button type="button" class="btn" id="wiz-next">Weiter</button>
-            <button type="submit" class="btn" id="wiz-finish" hidden>Fertigstellen</button>
+            <button type="button" class="btn btn-ghost" id="wiz-back" hidden>@T["action.back"]</button>
+            <button type="button" class="btn" id="wiz-next">@T["setup.next"]</button>
+            <button type="submit" class="btn" id="wiz-finish" hidden>@T["setup.finish"]</button>
         </div>
     </form>
 </div>

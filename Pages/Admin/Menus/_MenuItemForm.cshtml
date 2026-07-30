@@ -26,15 +26,15 @@
     @if (Model.ParentOptions.Count > 0)
     {
         <div class="form-field">
-            <label for="mi-parent">Übergeordneter Eintrag</label>
+            <label for="mi-parent">@T["menus.parentLabel"]</label>
             <select id="mi-parent" name="ParentId">
-                <option value="">— Hauptebene —</option>
+                <option value="">@T["menus.parentTop"]</option>
                 @foreach (var p in Model.ParentOptions)
                 {
                     <option value="@p.Id" selected="@(Model.ParentId == p.Id ? "selected" : null)">@p.Label</option>
                 }
             </select>
-            <div class="help">Leer = Hauptmenü. Ausgewählt = erscheint als Untermenü (Dropdown) dieses Eintrags.</div>
+            <div class="help">@T["menus.parentHelp"]</div>
         </div>
     }
     <partial name="_IconPicker" model="Model.Icon" />

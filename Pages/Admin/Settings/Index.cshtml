@@ -160,8 +160,8 @@
             <div class="form-field">
                 <label>XML-Sitemap</label>
                 <select name="Values[@SettingKeys.SitemapEnabled]">
-                    <option value="true" selected="@(V(SettingKeys.SitemapEnabled) != "false")">Aktiviert</option>
-                    <option value="false" selected="@(V(SettingKeys.SitemapEnabled) == "false")">Deaktiviert</option>
+                    <option value="true" selected="@(V(SettingKeys.SitemapEnabled) != "false")">@T["settings.sitemapOn"]</option>
+                    <option value="false" selected="@(V(SettingKeys.SitemapEnabled) == "false")">@T["settings.sitemapOff"]</option>
                 </select>
                 <div class="help">Stellt <code>/sitemap.xml</code> (alle veröffentlichten Seiten) und eine darauf verweisende <code>/robots.txt</code> bereit — für Suchmaschinen (Google Search Console usw.). Standardmäßig aktiv.</div>
             </div>
@@ -203,28 +203,28 @@
     <form method="post" asp-page-handler="Languages" id="lang-form">
         <div class="card">
             <div class="page-head" style="margin-bottom:14px;">
-                <h2 style="margin:0;">Sprachen</h2>
+                <h2 style="margin:0;">@T["settings.langHeading"]</h2>
                 <div class="list-toolbar">
-                    <button type="button" class="btn btn-sm" id="lang-add">+ Sprache</button>
+                    <button type="button" class="btn btn-sm" id="lang-add">@T["settings.langAdd"]</button>
                 </div>
             </div>
             <table class="data">
-                <thead><tr><th>Sprache</th><th>Code</th><th>URL</th><th></th></tr></thead>
+                <thead><tr><th>@T["editor.language"]</th><th>@T["settings.langCode"]</th><th>@T["pages.colUrl"]</th><th></th></tr></thead>
                 <tbody id="lang-rows"></tbody>
             </table>
             <div id="lang-hidden"></div>
-            <p class="help" style="margin-top:12px;">Standard = Wurzel-URLs (<code>/</code>). Standardwechsel wirkt nach Neustart.</p>
-            <div style="margin-top:8px;"><button type="submit" class="btn">Speichern</button></div>
+            <p class="help" style="margin-top:12px;">@Html.Raw(T["settings.langHelp"])</p>
+            <div style="margin-top:8px;"><button type="submit" class="btn">@T["action.save"]</button></div>
         </div>
     </form>
 
     <dialog id="lang-dialog" class="mat-dialog">
         <form method="dialog">
-            <h3 style="margin:0 0 12px;">Sprache hinzufügen</h3>
+            <h3 style="margin:0 0 12px;">@T["settings.langDialogTitle"]</h3>
             <select id="lang-dialog-select" style="width:100%;"></select>
             <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
-                <button class="btn btn-ghost btn-sm" value="cancel">Abbrechen</button>
-                <button class="btn btn-sm" value="add" id="lang-dialog-ok">Hinzufügen</button>
+                <button class="btn btn-ghost btn-sm" value="cancel">@T["action.cancel"]</button>
+                <button class="btn btn-sm" value="add" id="lang-dialog-ok">@T["action.add"]</button>
             </div>
         </form>
     </dialog>
@@ -247,18 +247,18 @@
                     var isDef = code === def;
                     var url = isDef ? "/" : "/" + code + "/";
                     tr.innerHTML =
-                        '<td><strong>' + NAMES[code] + '</strong>' + (isDef ? ' <span class="badge badge-on">Standard</span>' : '') + '</td>' +
+                        '<td><strong>' + NAMES[code] + '</strong>' + (isDef ? ' <span class="badge badge-on">@T["settings.langDefaultBadge"]</span>' : '') + '</td>' +
                         '<td><span class="mono">' + code + '</span></td>' +
                         '<td><span class="mono muted">' + url + '</span></td>' +
                         '<td class="actions"></td>';
                     var act = tr.querySelector(".actions");
                     if (!isDef) {
                         var mk = document.createElement("button");
-                        mk.type = "button"; mk.className = "btn btn-sm btn-ghost"; mk.textContent = "Als Standard";
+                        mk.type = "button"; mk.className = "btn btn-sm btn-ghost"; mk.textContent = "@T["settings.langSetDefault"]";
                         mk.onclick = function () { def = code; render(); };
                         act.appendChild(mk);
                         var rm = document.createElement("button");
-                        rm.type = "button"; rm.className = "btn btn-sm btn-danger btn-icon"; rm.title = "Entfernen"; rm.textContent = "✕";
+                        rm.type = "button"; rm.className = "btn btn-sm btn-danger btn-icon"; rm.title = "@T["settings.langRemove"]"; rm.textContent = "✕";
                         rm.onclick = function () { active = active.filter(function (c) { return c !== code; }); render(); };
                         act.appendChild(rm);
                     }
@@ -276,7 +276,7 @@
                     if (active.includes(code)) return;
                     var o = document.createElement("option"); o.value = code; o.textContent = NAMES[code] + " (" + code + ")"; dsel.appendChild(o);
                 });
-                if (!dsel.options.length) { alert("Alle verfügbaren Sprachen sind bereits aktiv."); return; }
+                if (!dsel.options.length) { alert("@T["settings.langAllActive"]"); return; }
                 if (typeof dialog.showModal === "function") dialog.showModal(); else dialog.setAttribute("open", "");
             };
             document.getElementById("lang-dialog-ok").onclick = function () {

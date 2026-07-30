@@ -80,7 +80,7 @@
 </div>
 
     <table class="data" data-list-table>
-        <thead><tr><th>Datei</th><th>Typ</th><th>Größe</th><th>Tags</th></tr></thead>
+        <thead><tr><th>@T["media.colFile"]</th><th>@T["media.colType"]</th><th>@T["media.colSize"]</th><th>@T["media.tags"]</th></tr></thead>
         <tbody>
             @foreach (var m in Model.Items)
             {
@@ -224,7 +224,7 @@
                     el.className = 'tag-chip-item';
                     el.textContent = tag;
                     var x = document.createElement('button');
-                    x.type = 'button'; x.className = 'tag-x'; x.setAttribute('aria-label', 'entfernen'); x.textContent = '×';
+                    x.type = 'button'; x.className = 'tag-x'; x.setAttribute('aria-label', '@T["posts.tagRemove"]'); x.textContent = '×';
                     x.addEventListener('click', function () { removeTag(tag); tagEntry.focus(); });
                     el.appendChild(x);
                     tagBox.insertBefore(el, tagEntry);

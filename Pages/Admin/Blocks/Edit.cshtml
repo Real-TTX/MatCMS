@@ -1,7 +1,7 @@
 @page "{id:int}"
 @model MatCMS.Pages.Admin.Blocks.EditModel
 @{
-    ViewData["Title"] = "Block bearbeiten";
+    ViewData["Title"] = T["blocks.editTitle"];
 }
 <div class="page-head">
     <h1 class="with-icon">
@@ -10,7 +10,7 @@
         </span>
         @Model.Definition.Name
     </h1>
-    <a class="btn btn-sm btn-ghost" asp-page="/Admin/Pages/Edit" asp-route-id="@Model.PageId">Zurück zur Seite „@Model.PageTitle“</a>
+    <a class="btn btn-sm btn-ghost" asp-page="/Admin/Pages/Edit" asp-route-id="@Model.PageId">@T["blocks.backToPage", Model.PageTitle]</a>
 </div>
 <p class="muted">@Model.Definition.Description</p>
 
@@ -19,8 +19,8 @@
         <input type="hidden" name="DataJson" id="DataJson" />
         <div id="block-editor"></div>
         <div class="editor-actions">
-            <button type="submit" class="btn">Speichern</button>
-            <a class="btn btn-ghost" asp-page="/Admin/Pages/Edit" asp-route-id="@Model.PageId">Abbrechen</a>
+            <button type="submit" class="btn">@T["action.save"]</button>
+            <a class="btn btn-ghost" asp-page="/Admin/Pages/Edit" asp-route-id="@Model.PageId">@T["action.cancel"]</a>
         </div>
     </form>
 </div>

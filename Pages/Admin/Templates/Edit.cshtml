@@ -35,32 +35,32 @@
         new {
             name = "body.html", mode = "htmlmixed", insertDefault = StarterBody, baseline = "",
             tokens = new[] {
-                new { t = "{{content}}", l = "Seiteninhalt (Pflicht fürs Custom-Layout)" },
-                new { t = "{{logo}}", l = "Logo-Bild" },
-                new { t = "{{site_name}}", l = "Seitenname" },
-                new { t = "{{footer_text}}", l = "Footer-Text" },
-                new { t = "{{year}}", l = "Aktuelles Jahr" },
-                new { t = "{{menu:primary}}", l = "Menü (Slot)" },
-                new { t = "{{#menu:primary}}…{{/menu:primary}}", l = "Menü-Schleife ({{label}}/{{url}}/{{icon}})" },
-                new { t = "{{param:id}}", l = "Template-Parameter" },
-                new { t = "{{languages}}", l = "Sprachauswahl" },
+                new { t = "{{content}}", l = T["templates.tokContent"] },
+                new { t = "{{logo}}", l = T["templates.tokLogo"] },
+                new { t = "{{site_name}}", l = T["templates.tokSiteName"] },
+                new { t = "{{footer_text}}", l = T["templates.tokFooterText"] },
+                new { t = "{{year}}", l = T["templates.tokYear"] },
+                new { t = "{{menu:primary}}", l = T["templates.tokMenu"] },
+                new { t = "{{#menu:primary}}…{{/menu:primary}}", l = T["templates.tokMenuLoop"] },
+                new { t = "{{param:id}}", l = T["templates.tokParam"] },
+                new { t = "{{languages}}", l = T["templates.tokLanguages"] },
             }
         },
         new {
             name = "article.html", mode = "htmlmixed", insertDefault = Model.DefaultPostPart, baseline = Model.DefaultPostPart,
             tokens = new[] {
-                new { t = "{{post_image}}", l = "Titelbild" },
-                new { t = "{{post_date}}", l = "Datum" },
-                new { t = "{{post_title}}", l = "Überschrift" },
-                new { t = "{{post_excerpt}}", l = "Teaser" },
-                new { t = "{{post_body}}", l = "Beitragstext" },
-                new { t = "{{post_tags}}", l = "Tags" },
-                new { t = "{{post_attachments}}", l = "Anhänge" },
+                new { t = "{{post_image}}", l = T["templates.tok.image"] },
+                new { t = "{{post_date}}", l = T["templates.tok.date"] },
+                new { t = "{{post_title}}", l = T["templates.tok.title"] },
+                new { t = "{{post_excerpt}}", l = T["templates.tok.excerpt"] },
+                new { t = "{{post_body}}", l = T["templates.tok.body"] },
+                new { t = "{{post_tags}}", l = T["templates.tok.tags"] },
+                new { t = "{{post_attachments}}", l = T["templates.tok.attachments"] },
             }
         },
         new {
             name = "styles.css", mode = "css", insertDefault = "", baseline = "",
-            tokens = new[] { new { t = "{{param:id}}", l = "Template-Parameter" } }
+            tokens = new[] { new { t = "{{param:id}}", l = T["templates.tokParam"] } }
         },
         new {
             name = "script.js", mode = "javascript", insertDefault = "", baseline = "",

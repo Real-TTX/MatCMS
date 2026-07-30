@@ -710,5 +710,20 @@
   "posts.linkPrompt": "Link-Adresse (URL):",
   "posts.tagEntryPlaceholder": "Tag …",
   "posts.addTag": "Tag hinzufügen",
-  "posts.tagRemove": "entfernen"
+  "posts.tagRemove": "entfernen",
+
+  "diff.title": "Übersetzungen vergleichen",
+  "diff.back": "Zurück zum Editor",
+  "diff.source": "Quelle",
+  "diff.block": "Block",
+  "diff.translated": "übersetzt",
+  "diff.identical": "identisch",
+  "diff.missing": "fehlt",
+  "diff.identicalHint": "identisch zur Quelle – evtl. noch nicht übersetzt",
+  "diff.missingHint": "in dieser Sprache nicht vorhanden",
+  "diff.noBlocks": "Keine weiteren Sprachversionen zum Vergleichen. Lege im Editor eine Übersetzung an.",
+  "diff.legend": "Legende",
+  "diff.legendIns": "nur in Übersetzung (neu/übersetzt)",
+  "diff.legendDel": "nur in Quelle (ersetzt)",
+  "diff.legendPlain": "wortgleich zur Quelle"
 }

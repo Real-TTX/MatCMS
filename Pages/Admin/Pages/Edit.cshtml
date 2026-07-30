@@ -226,6 +226,10 @@
                         <summary>@T["editor.translations"]</summary>
                         <div class="form-grid">
                             <div class="le-section-label">@T["editor.translationsExisting"]</div>
+                            @if (Model.Translations.Count > 1)
+                            {
+                                <a class="btn btn-sm btn-ghost" asp-page="Diff" asp-route-id="@Model.Current.Id" style="margin-bottom:8px;">⇄ @T["diff.title"]</a>
+                            }
                             @foreach (var t in Model.Translations)
                             {
                                 <div class="block-item">
@@ -239,7 +243,6 @@
                                         <a class="b-open" asp-page="Edit" asp-route-id="@t.Id">
                                             <span class="b-info"><span class="b-type">@t.Title</span></span>
                                         </a>
-                                        <a class="btn btn-sm btn-ghost" asp-page="Diff" asp-route-id="@Model.Current.Id" asp-route-other="@t.Id" title="Diese Übersetzung mit @t.Locale vergleichen">⇄ Vergleichen</a>
                                     }
                                 </div>
                             }

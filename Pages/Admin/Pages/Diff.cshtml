@@ -2,80 +2,117 @@
 @using MatCMS.Services
 @model MatCMS.Pages.Admin.Pages.DiffModel
 @{
-    ViewData["Title"] = "Übersetzung vergleichen";
+    ViewData["Title"] = T["diff.title"];
     string Loc(string c) => Localizer.DisplayName(c) + " (" + c + ")";
-    (string label, string cls) Status(string s) => s switch
+    string CellClass(string s) => s switch
     {
-        "same" => ("identisch – evtl. noch nicht übersetzt", "d-same"),
-        "diff" => ("übersetzt / geändert", "d-diff"),
-        "missing" => ("fehlt in Übersetzung", "d-missing"),
-        "extra" => ("nur in Übersetzung", "d-extra"),
-        "struct" => ("Struktur weicht ab", "d-struct"),
-        _ => ("leer", "d-empty")
+        "identical" => "d-identical",
+        "translated" => "d-translated",
+        "struct" => "d-struct",
+        "missing" => "d-missing",
+        _ => "d-empty"
     };
 }
 <div class="page-head">
-    <h1>Übersetzung vergleichen</h1>
-    <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@Model.Right.Id">Zurück zur Übersetzung</a>
+    <h1>@T["diff.title"]</h1>
+    <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@Model.Source.Id">@T["diff.back"]</a>
 </div>
 
-<div class="card">
-    <div class="d-heads">
-        <div><span class="badge badge-on mono">@Model.Left.Locale</span> <strong>@Model.Left.Title</strong> <span class="muted">– Quelle (@Loc(Model.Left.Locale))</span></div>
-        <div class="d-arrow">→</div>
-        <div><span class="badge badge-on mono">@Model.Right.Locale</span> <strong>@Model.Right.Title</strong> <span class="muted">– Übersetzung (@Loc(Model.Right.Locale))</span></div>
-    </div>
-    <div class="d-summary">
-        <span class="d-pill d-diff">@Model.DiffCount übersetzt/geändert</span>
-        <span class="d-pill d-same">@Model.SameCount identisch</span>
-        <span class="d-pill d-missing">@Model.MissingCount fehlen</span>
-        <span class="d-pill d-extra">@Model.ExtraCount zusätzlich</span>
-    </div>
+@if (Model.Locales.Count == 0)
+{
+    <div class="card"><p class="muted">@T["diff.noBlocks"]</p></div>
+}
+else
+{
+    <div class="card">
+        <div class="d-heads">
+            <span class="badge badge-on mono">@Model.Source.Locale</span>
+            <strong>@Model.Source.Title</strong>
+            <span class="muted">– @T["diff.source"] (@Loc(Model.Source.Locale))</span>
+        </div>
 
-    <table class="data d-table">
-        <thead>
-            <tr>
-                <th>#</th>
-                <th>@Loc(Model.Left.Locale)</th>
-                <th>@Loc(Model.Right.Locale)</th>
-                <th>Status</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var row in Model.Rows)
+        <div class="d-summary">
+            @foreach (var loc in Model.Locales)
             {
-                var st = Status(row.Status);
-                <tr class="@st.cls">
-                    <td class="mono">@row.Index<div class="muted d-type">@(row.LeftType ?? row.RightType)</div></td>
-                    <td>@(string.IsNullOrWhiteSpace(row.LeftText) ? "—" : row.LeftText)</td>
-                    <td>@(string.IsNullOrWhiteSpace(row.RightText) ? "—" : row.RightText)</td>
-                    <td><span class="badge d-badge">@st.label</span></td>
-                </tr>
+                var c = Model.Totals[loc];
+                <div class="d-sumcard">
+                    <span class="badge badge-off mono">@loc.ToUpperInvariant()</span>
+                    <span class="d-pill d-translated">@c.Translated @T["diff.translated"]</span>
+                    <span class="d-pill d-identical">@c.Identical @T["diff.identical"]</span>
+                    <span class="d-pill d-missing">@c.Missing @T["diff.missing"]</span>
+                </div>
             }
-        </tbody>
-    </table>
-    @if (Model.Rows.Count == 0)
-    {
-        <p class="muted">Keine Blöcke zum Vergleichen.</p>
-    }
-</div>
+        </div>
+
+        <div class="d-legend">
+            <span class="muted">@T["diff.legend"]:</span>
+            <span class="wd"><ins>@T["diff.legendIns"]</ins></span>
+            <span class="wd"><del>@T["diff.legendDel"]</del></span>
+            <span>@T["diff.legendPlain"]</span>
+        </div>
+
+        <div class="d-scroll">
+            <table class="data d-table">
+                <thead>
+                    <tr>
+                        <th style="width:1%;">#</th>
+                        <th>@Loc(Model.Source.Locale) · @T["diff.source"]</th>
+                        @foreach (var loc in Model.Locales)
+                        {
+                            <th>@Loc(loc)</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in Model.Rows)
+                    {
+                        <tr>
+                            <td class="mono">@row.Index<div class="muted d-type">@row.BlockType</div></td>
+                            <td class="d-src">@(string.IsNullOrWhiteSpace(row.SourceText) ? "—" : row.SourceText)</td>
+                            @foreach (var cell in row.Cells)
+                            {
+                                <td class="wd @CellClass(cell.Status)"
+                                    title="@(cell.Status == "identical" ? T["diff.identicalHint"] : cell.Status == "missing" ? T["diff.missingHint"] : "")">
+                                    @if (cell.Status == "missing")
+                                    {
+                                        <span class="muted">—</span>
+                                    }
+                                    else
+                                    {
+                                        @Html.Raw(cell.DiffHtml)
+                                    }
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
 
 @section Scripts {
     <style>
-        .d-heads { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; }
-        .d-arrow { color: var(--muted, #6b7078); font-size: 20px; }
-        .d-summary { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
-        .d-pill { font-size: 12.5px; padding: 3px 11px; border-radius: 999px; border: 1px solid var(--line, #e2e4e8); }
-        .d-table td { vertical-align: top; font-size: 13.5px; line-height: 1.5; }
-        .d-table td:nth-child(2), .d-table td:nth-child(3) { max-width: 420px; }
-        .d-type { font-size: 11px; text-transform: uppercase; letter-spacing: .03em; margin-top: 2px; }
-        .d-badge { font-size: 11px; }
-        /* row tints */
-        .d-diff    { background: #eefaf0; } .d-pill.d-diff    { background: #eefaf0; border-color: #bfe6c8; }
-        .d-same    { background: #fff8e6; } .d-pill.d-same    { background: #fff8e6; border-color: #f0dca0; }
-        .d-missing { background: #fdeeee; } .d-pill.d-missing { background: #fdeeee; border-color: #f0bcbc; }
-        .d-extra   { background: #eef3fb; } .d-pill.d-extra   { background: #eef3fb; border-color: #c3d5ee; }
-        .d-struct  { background: #fdf1e7; }
-        .d-empty   { color: var(--muted, #6b7078); }
+        .d-heads { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+        .d-summary { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; }
+        .d-sumcard { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--line, #e2e4e8); border-radius: 10px; background: #fff; }
+        .d-pill { font-size: 12px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line, #e2e4e8); }
+        .d-pill.d-translated { background: #e6f7ea; border-color: #bfe6c8; color: #1a7f37; }
+        .d-pill.d-identical { background: #fff8e6; border-color: #f0dca0; color: #9a6b00; }
+        .d-pill.d-missing { background: #fdeeee; border-color: #f0bcbc; color: #cf222e; }
+        .d-legend { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; font-size: 12.5px; }
+        .d-scroll { overflow-x: auto; }
+        .d-table { width: 100%; }
+        .d-table td, .d-table th { vertical-align: top; font-size: 13.5px; line-height: 1.55; }
+        .d-table td.d-src, .d-table td.wd { max-width: 340px; }
+        .d-type { font-size: 10.5px; text-transform: uppercase; letter-spacing: .03em; margin-top: 2px; }
+        /* Git-style word diff */
+        .wd ins { background: #e6f7ea; color: #1a7f37; text-decoration: none; border-radius: 3px; padding: 0 2px; }
+        .wd del { background: #ffeef0; color: #cf222e; text-decoration: line-through; border-radius: 3px; padding: 0 2px; }
+        /* cell tints by status */
+        .d-identical { background: #fffdf5; }
+        .d-translated { background: #fbfefb; }
+        .d-missing { background: #fdf4f4; }
+        .d-struct { background: #fdf1e7; }
     </style>
 }

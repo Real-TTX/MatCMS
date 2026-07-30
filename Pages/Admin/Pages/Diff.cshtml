@@ -102,9 +102,10 @@ else
         .d-pill.d-missing { background: #fdeeee; border-color: #f0bcbc; color: #cf222e; }
         .d-legend { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; font-size: 12.5px; }
         .d-scroll { overflow-x: auto; }
-        .d-table { width: 100%; }
-        .d-table td, .d-table th { vertical-align: top; font-size: 13.5px; line-height: 1.55; }
-        .d-table td.d-src, .d-table td.wd { max-width: 340px; }
+        /* Fixed layout so columns share the width evenly and long text WRAPS instead of overflowing. */
+        .d-table { width: 100%; table-layout: fixed; min-width: 760px; }
+        .d-table td, .d-table th { vertical-align: top; font-size: 13.5px; line-height: 1.55; overflow-wrap: anywhere; word-break: break-word; }
+        .d-table th:first-child, .d-table td:first-child { width: 34px; }
         .d-type { font-size: 10.5px; text-transform: uppercase; letter-spacing: .03em; margin-top: 2px; }
         /* Git-style word diff */
         .wd ins { background: #e6f7ea; color: #1a7f37; text-decoration: none; border-radius: 3px; padding: 0 2px; }

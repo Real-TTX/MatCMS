@@ -1,14 +1,17 @@
-using System.Net;
-using System.Net.Mail;
 using MatCMS.Data;
+using MailKit.Net.Smtp;
+using MailKit.Security;
 using Microsoft.EntityFrameworkCore;
+using MimeKit;
 
 namespace MatCMS.Services;
 
 /// <summary>
 /// Sends e-mail via the SMTP server configured under Settings → SMTP (stored in SiteSettings).
-/// Uses the built-in <see cref="SmtpClient"/> — no external dependency. Never throws to the caller;
-/// failures come back as (false, error) so a form submission is never lost because mail is down.
+/// Uses MailKit so BOTH connection modes work: implicit SSL/TLS (SMTPS, port 465, e.g. IONOS) and
+/// STARTTLS (port 587/25). The built-in System.Net.Mail.SmtpClient can't do implicit SSL, which is
+/// why IONOS on 465 failed. Never throws to the caller; failures come back as (false, error) so a
+/// form submission is never lost because mail is down.
 /// </summary>
 public class EmailService
 {
@@ -69,28 +72,29 @@ public class EmailService
 
         try
         {
-            using var msg = new MailMessage
-            {
-                From = new MailAddress(cfg.FromEmail, string.IsNullOrWhiteSpace(cfg.FromName) ? cfg.FromEmail : cfg.FromName),
-                Subject = subject,
-                Body = body,
-                IsBodyHtml = false
-            };
+            var msg = new MimeMessage();
+            msg.From.Add(new MailboxAddress(string.IsNullOrWhiteSpace(cfg.FromName) ? cfg.FromEmail : cfg.FromName, cfg.FromEmail));
             foreach (var r in recipients)
-                try { msg.To.Add(r); } catch { /* skip malformed address */ }
+                try { msg.To.Add(MailboxAddress.Parse(r)); } catch { /* skip malformed address */ }
             if (msg.To.Count == 0) return (false, "Keine gültige Empfängeradresse.");
             if (!string.IsNullOrWhiteSpace(replyTo))
-                try { msg.ReplyToList.Add(replyTo); } catch { /* ignore bad reply-to */ }
+                try { msg.ReplyTo.Add(MailboxAddress.Parse(replyTo)); } catch { /* ignore bad reply-to */ }
+            msg.Subject = subject;
+            msg.Body = new TextPart("plain") { Text = body };
 
-            using var client = new SmtpClient(cfg.Host, cfg.Port)
-            {
-                EnableSsl = cfg.Ssl,
-                DeliveryMethod = SmtpDeliveryMethod.Network
-            };
+            // Pick the right TLS mode: port 465 = implicit SSL on connect; otherwise STARTTLS (opportunistic
+            // when the SSL switch is off, so a plain server still works). This is what makes IONOS:465 work.
+            var secure = cfg.Port == 465
+                ? SecureSocketOptions.SslOnConnect
+                : cfg.Ssl ? SecureSocketOptions.StartTls : SecureSocketOptions.StartTlsWhenAvailable;
+
+            using var client = new SmtpClient();
+            client.Timeout = 20_000; // 20s, so a wrong host/port fails fast instead of hanging the request
+            await client.ConnectAsync(cfg.Host, cfg.Port, secure);
             if (!string.IsNullOrWhiteSpace(cfg.User))
-                client.Credentials = new NetworkCredential(cfg.User, cfg.Password);
-
-            await client.SendMailAsync(msg);
+                await client.AuthenticateAsync(cfg.User, cfg.Password);
+            await client.SendAsync(msg);
+            await client.DisconnectAsync(true);
             return (true, null);
         }
         catch (Exception ex)

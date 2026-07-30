@@ -28,6 +28,9 @@
     <PackageReference Include="Microsoft.Extensions.Identity.Core" Version="10.0.*" />
     <!-- Roslyn C# scripting: runs admin-authored plugin code at runtime. -->
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.*" />
+    <!-- MailKit: proper SMTP (implicit SSL port 465 AND STARTTLS port 587). The built-in
+         System.Net.Mail.SmtpClient can't do implicit SSL, which breaks IONOS/others on 465. -->
+    <PackageReference Include="MailKit" Version="4.*" />
     <!-- Override the transitive (vulnerable) SQLitePCLRaw 2.1.11 with the current 3.0.x bundle. -->
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.*" />
   </ItemGroup>

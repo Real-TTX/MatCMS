@@ -14,6 +14,7 @@
     <button type="button" class="tab" data-tab="smtp">@T["settings.tabSmtp"]</button>
     <button type="button" class="tab" data-tab="errors">@T["settings.tabErrors"]</button>
     <button type="button" class="tab" data-tab="code">Code &amp; Tracking</button>
+    <button type="button" class="tab" data-tab="maintenance">@T["settings.maint.tab"]</button>
     <button type="button" class="tab" data-tab="languages">Sprachen</button>
 </div>
 
@@ -191,6 +192,41 @@
             </div>
 
             <div><button type="submit" class="btn">Speichern</button></div>
+        </div>
+    </form>
+</div>
+
+@* ============ WARTUNG (Maintenance mode) ============ *@
+<div class="tab-panel" data-panel="maintenance" hidden>
+    <form method="post" asp-page-handler="Maintenance">
+        <div class="card">
+            <h2>@T["settings.maint.heading"]</h2>
+            <p class="muted">@T["settings.maint.intro"]</p>
+
+            <div class="form-field">
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:600;">
+                    <input type="checkbox" name="Values[@SettingKeys.MaintenanceEnabled]" value="1" checked="@(V(SettingKeys.MaintenanceEnabled) == "1")" />
+                    <span>@T["settings.maint.enabledLabel"]</span>
+                </label>
+                <div class="help">@T["settings.maint.enabledHelp"]</div>
+            </div>
+
+            <div class="form-field">
+                <label>@T["settings.maint.titleLabel"]</label>
+                <input name="Values[@SettingKeys.MaintenanceTitle]" value="@V(SettingKeys.MaintenanceTitle)" placeholder="@T["maintenance.defaultTitle"]" />
+            </div>
+
+            <div class="form-field">
+                <label>@T["settings.maint.messageLabel"]</label>
+                <textarea name="Values[@SettingKeys.MaintenanceMessage]" rows="3" placeholder="@T["maintenance.defaultMessage"]">@V(SettingKeys.MaintenanceMessage)</textarea>
+            </div>
+
+            <div class="help">@Html.Raw(T["settings.maint.overrideHelp"])</div>
+
+            <div class="form-actions" style="margin-top:14px;">
+                <button type="submit" class="btn">@T["settings.save"]</button>
+                <a class="btn btn-ghost" href="/admin/maintenance/preview" target="_blank" rel="noopener">@T["settings.maint.preview"]</a>
+            </div>
         </div>
     </form>
 </div>

@@ -235,7 +235,48 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// --- Maintenance mode -----------------------------------------------------
+// When enabled (Settings → Wartung), public visitors get a themed maintenance page (HTTP 503). Admins
+// and the admin/login/status/language paths always pass through so the site stays manageable while
+// "down". Static assets are already served by UseStaticFiles earlier, so they never reach here.
+app.Use(async (ctx, next) =>
+{
+    var p = ctx.Request.Path.Value ?? "/";
+    var exempt =
+        ctx.User?.IsInRole("Admin") == true ||
+        p.StartsWith("/admin", StringComparison.OrdinalIgnoreCase) ||
+        p.StartsWith("/login", StringComparison.OrdinalIgnoreCase) ||
+        p.StartsWith("/logout", StringComparison.OrdinalIgnoreCase) ||
+        p.StartsWith("/_status", StringComparison.OrdinalIgnoreCase) ||
+        p.StartsWith("/set-language", StringComparison.OrdinalIgnoreCase);
+    if (exempt)
+    {
+        await next();
+        return;
+    }
+
+    var site = ctx.RequestServices.GetRequiredService<SiteContext>();
+    if (!site.MaintenanceEnabled)
+    {
+        await next();
+        return;
+    }
+
+    var t = ctx.RequestServices.GetRequiredService<Localizer>();
+    var html = MaintenancePage.Render(site, t);
+    ctx.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+    ctx.Response.Headers["Retry-After"] = "3600";
+    // Setting Content-Type here also stops the earlier StatusCodePages re-execute from hijacking the 503.
+    ctx.Response.ContentType = "text/html; charset=utf-8";
+    await ctx.Response.WriteAsync(html);
+});
+
 app.MapRazorPages();
+
+// Admin-only preview of the maintenance page (admins bypass the middleware, so this lets them see it).
+app.MapGet("/admin/maintenance/preview", (SiteContext site, Localizer t) =>
+    Results.Content(MaintenancePage.Render(site, t), "text/html; charset=utf-8"))
+    .RequireAuthorization("Admin");
 
 // Language switcher: sets the culture cookie and redirects back to a safe, local URL.
 // Values arrive as form fields (posted by the switcher), read them directly to avoid

@@ -34,7 +34,7 @@ public class IndexModel : PageModel
     public async Task OnGetAsync()
     {
         var existing = await _db.SiteSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
-        foreach (var key in SettingKeys.All.Concat(SettingKeys.Smtp).Concat(SettingKeys.Errors).Concat(SettingKeys.Code))
+        foreach (var key in SettingKeys.All.Concat(SettingKeys.Smtp).Concat(SettingKeys.Errors).Concat(SettingKeys.Code).Concat(SettingKeys.Maintenance))
             Values[key] = existing.TryGetValue(key, out var v) ? v : "";
         CurrentActive = Localizer.ParseActive(existing.TryGetValue(SettingKeys.Languages, out var lv) ? lv : "")
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -107,6 +107,16 @@ public class IndexModel : PageModel
         await SaveKeysAsync(SettingKeys.Code);
         TempData["Flash"] = "Code / Tracking gespeichert.";
         return RedirectToPage(new { tab = "code" });
+    }
+
+    public async Task<IActionResult> OnPostMaintenanceAsync()
+    {
+        // The checkbox only posts a value when ticked → SaveKeysAsync writes "" for the unticked case.
+        await SaveKeysAsync(SettingKeys.Maintenance);
+        TempData["Flash"] = Values.TryGetValue(SettingKeys.MaintenanceEnabled, out var on) && on == "1"
+            ? "Wartungsmodus ist AKTIV — Besucher sehen die Wartungsseite."
+            : "Wartungsmodus gespeichert (aus).";
+        return RedirectToPage(new { tab = "maintenance" });
     }
 
     /// <summary>Sends a test e-mail using the values currently entered (no need to save first).</summary>

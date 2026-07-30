@@ -27,8 +27,13 @@ public static class TemplateSchema
     /// <summary>Part key: the blog detail page ("/blog/{slug}").</summary>
     public const string PartPost = "post";
 
+    /// <summary>Part key: the maintenance / "coming soon" page (served site-wide when maintenance mode
+    /// is on). Unlike <see cref="PartPost"/> this is a FULL standalone HTML document (it is served on its
+    /// own, not wrapped in the site layout).</summary>
+    public const string PartMaintenance = "maintenance";
+
     /// <summary>All known part keys (whitelist for the editor + import sanitising).</summary>
-    public static readonly IReadOnlyList<string> KnownParts = new[] { PartPost };
+    public static readonly IReadOnlyList<string> KnownParts = new[] { PartPost, PartMaintenance };
 
     private static readonly JsonSerializerOptions WriteOpts = new()
     {
@@ -39,6 +44,11 @@ public static class TemplateSchema
     // encoded where needed), so a single non-recursive pass is both safe and sufficient.
     private static readonly Regex PostTokenRx =
         new(@"\{\{(post_[a-zA-Z_]+)\}\}", RegexOptions.Compiled);
+
+    // Generic {{token}} matcher (letters/digits/underscore) for parts whose token set isn't a single
+    // prefix — e.g. the maintenance page mixes theme-colour, text and site tokens.
+    private static readonly Regex TokenRx =
+        new(@"\{\{([a-zA-Z0-9_]+)\}\}", RegexOptions.Compiled);
 
     /// <summary>
     /// Built-in default layout for the blog detail page. Faithful to the original fixed markup, so a
@@ -60,10 +70,73 @@ public static class TemplateSchema
         </article>
         """;
 
+    /// <summary>
+    /// Built-in default for the maintenance page: a full, standalone HTML document styled from the
+    /// active template's colours + fonts (all supplied as {{tokens}} by the renderer). The admin can
+    /// override it per template (file "maintenance.html"); the title/badge/message tokens come from the
+    /// Settings → Wartung fields, so the text is editable without touching the template.
+    /// Available tokens: {{lang}} {{site_name}} {{favicon}} {{logo}} {{maint_badge}} {{maint_title}}
+    /// {{maint_message}} {{year}} and the theme tokens {{accent}} {{accent_dark}} {{accent_soft}}
+    /// {{bg}} {{ink}} {{heading_color}} {{hairline}} {{heading_font}} {{body_font}} {{fonts_href}}.
+    /// </summary>
+    public const string DefaultMaintenancePart =
+        """
+        <!doctype html>
+        <html lang="{{lang}}">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <meta name="robots" content="noindex" />
+          <title>{{maint_title}} – {{site_name}}</title>
+          {{favicon}}
+          <link rel="preconnect" href="https://fonts.googleapis.com">
+          <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+          <link href="{{fonts_href}}" rel="stylesheet">
+          <style>
+            :root{
+              --accent:{{accent}}; --accent-dark:{{accent_dark}}; --accent-soft:{{accent_soft}};
+              --bg:{{bg}}; --ink:{{ink}}; --heading:{{heading_color}}; --hairline:{{hairline}};
+              --head-font:'{{heading_font}}',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+              --body-font:'{{body_font}}',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+            }
+            *{box-sizing:border-box}
+            html,body{height:100%}
+            body{margin:0;font-family:var(--body-font);color:var(--ink);line-height:1.6;
+              background:radial-gradient(1100px 560px at 50% -8%, var(--accent-soft), var(--bg) 62%);
+              display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+            .m-card{max-width:560px;width:100%;text-align:center;background:var(--bg);
+              border:1px solid var(--hairline);border-radius:20px;padding:52px 40px;
+              box-shadow:0 30px 80px rgba(0,0,0,.12)}
+            .m-logo{max-height:66px;width:auto;margin:0 auto 30px;display:block}
+            .m-badge{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.09em;
+              text-transform:uppercase;color:var(--accent);background:var(--accent-soft);
+              padding:6px 15px;border-radius:999px;margin-bottom:22px}
+            h1{font-family:var(--head-font);color:var(--heading);margin:0 0 14px;
+              font-size:clamp(1.6rem,4vw,2.3rem);line-height:1.2}
+            p{margin:0 auto;max-width:46ch;font-size:1.06rem;opacity:.85}
+            .m-rule{height:4px;width:66px;border-radius:999px;margin:30px auto 0;
+              background:linear-gradient(90deg,var(--accent),var(--accent-dark))}
+            .m-foot{margin-top:34px;font-size:13px;opacity:.55}
+          </style>
+        </head>
+        <body>
+          <main class="m-card">
+            {{logo}}
+            <span class="m-badge">{{maint_badge}}</span>
+            <h1>{{maint_title}}</h1>
+            <p>{{maint_message}}</p>
+            <div class="m-rule"></div>
+            <p class="m-foot">© {{year}} {{site_name}}</p>
+          </main>
+        </body>
+        </html>
+        """;
+
     /// <summary>Default layout for a given part key (empty for unknown keys).</summary>
     public static string DefaultFor(string key) => key switch
     {
         PartPost => DefaultPostPart,
+        PartMaintenance => DefaultMaintenancePart,
         _ => ""
     };
 
@@ -110,6 +183,16 @@ public static class TemplateSchema
     {
         if (string.IsNullOrEmpty(partHtml)) return "";
         return PostTokenRx.Replace(partHtml,
+            m => tokens.TryGetValue(m.Groups[1].Value, out var v) ? v ?? "" : "");
+    }
+
+    /// <summary>Replace any <c>{{token}}</c> with a precomputed value (unknown tokens → empty). Like
+    /// <see cref="RenderPost"/> but not limited to the <c>post_</c> prefix; used for the maintenance page.
+    /// Single pass — inserted values are never re-scanned.</summary>
+    public static string RenderTokens(string partHtml, IReadOnlyDictionary<string, string> tokens)
+    {
+        if (string.IsNullOrEmpty(partHtml)) return "";
+        return TokenRx.Replace(partHtml,
             m => tokens.TryGetValue(m.Groups[1].Value, out var v) ? v ?? "" : "");
     }
 

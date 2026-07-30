@@ -34,6 +34,13 @@ public static class SettingKeys
     // "1" once the setup wizard has been completed (drives the dashboard prompt).
     public const string SetupComplete = "setup.complete";
 
+    // Maintenance / "coming soon" mode (Settings → Wartung). When on, public visitors get a themed
+    // maintenance page (HTTP 503); admins bypass it. Title/message are editable here; the standard page
+    // uses the active template's colours and can be overridden via its "maintenance.html" layout part.
+    public const string MaintenanceEnabled = "maintenance.enabled"; // "1" = on
+    public const string MaintenanceTitle = "maintenance.title";
+    public const string MaintenanceMessage = "maintenance.message";
+
     // Custom code / tracking (own tab under Settings). Raw HTML injected site-wide.
     public const string CodeHead = "code.head";           // before </head>
     public const string CodeBodyStart = "code.bodyStart"; // right after <body>
@@ -68,4 +75,7 @@ public static class SettingKeys
 
     /// <summary>Custom-code / tracking keys (managed on the Settings → Code tab).</summary>
     public static readonly string[] Code = [AnalyticsGa4, CodeHead, CodeBodyStart, CodeBodyEnd];
+
+    /// <summary>Maintenance-mode keys (managed on the Settings → Wartung tab).</summary>
+    public static readonly string[] Maintenance = [MaintenanceEnabled, MaintenanceTitle, MaintenanceMessage];
 }

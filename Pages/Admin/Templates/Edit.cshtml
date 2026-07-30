@@ -9,6 +9,8 @@
     //      hidden <textarea> order and the FILES JS array below. ----
     var postValue = Model.Parts.TryGetValue("post", out var pp) && !string.IsNullOrWhiteSpace(pp)
         ? pp : Model.DefaultPostPart;
+    var maintenanceValue = Model.Parts.TryGetValue("maintenance", out var mp) && !string.IsNullOrWhiteSpace(mp)
+        ? mp : Model.DefaultMaintenancePart;
 
     // Starter for body.html ("Standard einfügen"). body.html is EMPTY by default (built-in layout);
     // this is only inserted on demand.
@@ -66,6 +68,18 @@
             name = "script.js", mode = "javascript", insertDefault = "", baseline = "",
             tokens = new object[0]
         },
+        new {
+            name = "maintenance.html", mode = "htmlmixed", insertDefault = Model.DefaultMaintenancePart, baseline = Model.DefaultMaintenancePart,
+            tokens = new[] {
+                new { t = "{{maint_title}}", l = T["templates.tok.maintTitle"] },
+                new { t = "{{maint_message}}", l = T["templates.tok.maintMessage"] },
+                new { t = "{{maint_badge}}", l = T["templates.tok.maintBadge"] },
+                new { t = "{{logo}}", l = T["templates.tokLogo"] },
+                new { t = "{{site_name}}", l = T["templates.tokSiteName"] },
+                new { t = "{{accent}}", l = T["templates.tok.accent"] },
+                new { t = "{{year}}", l = T["templates.tokYear"] },
+            }
+        },
     };
     var filesJson = System.Text.Json.JsonSerializer.Serialize(filesMeta);
 
@@ -75,6 +89,7 @@
         new { Name = "article.html", Ext = "html", Desc = T["tplfiles.article.desc"], Custom = Model.Parts.ContainsKey("post") },
         new { Name = "styles.css", Ext = "css",  Desc = T["tplfiles.styles.desc"],  Custom = !string.IsNullOrWhiteSpace(Model.CustomCss) },
         new { Name = "script.js",  Ext = "js",   Desc = T["tplfiles.script.desc"],  Custom = !string.IsNullOrWhiteSpace(Model.CustomJs) },
+        new { Name = "maintenance.html", Ext = "html", Desc = T["tplfiles.maintenance.desc"], Custom = Model.Parts.ContainsKey("maintenance") },
     };
 }
 <div class="page-head">
@@ -233,6 +248,7 @@
             <textarea class="tpl-file-store" data-idx="1" name="Parts[post]" hidden>@postValue</textarea>
             <textarea class="tpl-file-store" data-idx="2" name="CustomCss" hidden>@Model.CustomCss</textarea>
             <textarea class="tpl-file-store" data-idx="3" name="CustomJs" hidden>@Model.CustomJs</textarea>
+            <textarea class="tpl-file-store" data-idx="4" name="Parts[maintenance]" hidden>@maintenanceValue</textarea>
         </div>
 
         @* ============ MENÜS ============ *@

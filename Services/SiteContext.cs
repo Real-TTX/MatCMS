@@ -218,6 +218,15 @@ public class SiteContext
     /// <summary>GA4 Measurement-ID (e.g. "G-XXXXXXX"); empty = no analytics.</summary>
     public string AnalyticsGa4 => Get(SettingKeys.AnalyticsGa4);
 
+    // --- Maintenance mode (Settings → Wartung) ---
+    /// <summary>When true, public visitors get the maintenance page (503); admins bypass it.</summary>
+    public bool MaintenanceEnabled =>
+        Get(SettingKeys.MaintenanceEnabled).Trim().ToLowerInvariant() is "1" or "true" or "on" or "yes";
+    /// <summary>Admin-set maintenance heading (empty = use the localized default).</summary>
+    public string MaintenanceTitle => Get(SettingKeys.MaintenanceTitle);
+    /// <summary>Admin-set maintenance message (empty = use the localized default).</summary>
+    public string MaintenanceMessage => Get(SettingKeys.MaintenanceMessage);
+
     /// <summary>When true, /sitemap.xml (+ a referencing /robots.txt) is served. On by default; only
     /// an explicit "false" disables it.</summary>
     public bool SitemapEnabled => !string.Equals(Get(SettingKeys.SitemapEnabled, "true"), "false", StringComparison.OrdinalIgnoreCase);

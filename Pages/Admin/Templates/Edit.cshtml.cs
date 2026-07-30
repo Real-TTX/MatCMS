@@ -44,6 +44,8 @@ public class EditModel : PageModel
     public int CurrentSchemaVersion => TemplateSchema.Current;
     /// <summary>Built-in default for the blog-detail part, used to prefill/reset the editor.</summary>
     public string DefaultPostPart => TemplateSchema.DefaultPostPart;
+    /// <summary>Built-in default for the maintenance page ("maintenance.html"), used to prefill/reset.</summary>
+    public string DefaultMaintenancePart => TemplateSchema.DefaultMaintenancePart;
 
     // Menu slots referenced by the layout + the menus available to map them to.
     public List<string> MenuSlots { get; private set; } = new();

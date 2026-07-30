@@ -25,7 +25,7 @@
             <div class="form-field">
                 <label>URL</label>
                 <input name="Values[@SettingKeys.CanonicalUrl]" value="@V(SettingKeys.CanonicalUrl)" placeholder="https://www.beispiel.de" spellcheck="false" />
-                <div class="help">Öffentliche Basis-URL der Website (für Sitemap, <code>robots.txt</code> und kanonische Links). Hinter einem HTTPS-Reverse-Proxy hier die echte <code>https://</code>-Adresse eintragen.</div>
+                <div class="help">@Html.Raw(T["settings.canonicalHelp"])</div>
             </div>
             <div class="form-field">
                 <label>@T["settings.siteName"]</label>
@@ -38,7 +38,7 @@
                     <div class="image-controls">
                         <input name="Values[@SettingKeys.LogoUrl]" value="@V(SettingKeys.LogoUrl)" placeholder="@T["settings.logoPlaceholder"]" data-url />
                         <div style="margin-top:8px;">
-                            <button type="button" class="btn btn-ghost btn-sm" data-lib-btn>Bild wählen</button>
+                            <button type="button" class="btn btn-ghost btn-sm" data-lib-btn>@T["settings.pickImage"]</button>
                         </div>
                     </div>
                 </div>
@@ -50,7 +50,7 @@
                     <div class="image-controls">
                         <input name="Values[@SettingKeys.FaviconUrl]" value="@V(SettingKeys.FaviconUrl)" placeholder="@T["settings.faviconPlaceholder"]" data-url />
                         <div style="margin-top:8px;">
-                            <button type="button" class="btn btn-ghost btn-sm" data-lib-btn>Bild wählen</button>
+                            <button type="button" class="btn btn-ghost btn-sm" data-lib-btn>@T["settings.pickImage"]</button>
                         </div>
                         <div class="help">@T["settings.faviconHelp"]</div>
                     </div>
@@ -163,31 +163,31 @@
                     <option value="true" selected="@(V(SettingKeys.SitemapEnabled) != "false")">@T["settings.sitemapOn"]</option>
                     <option value="false" selected="@(V(SettingKeys.SitemapEnabled) == "false")">@T["settings.sitemapOff"]</option>
                 </select>
-                <div class="help">Stellt <code>/sitemap.xml</code> (alle veröffentlichten Seiten) und eine darauf verweisende <code>/robots.txt</code> bereit — für Suchmaschinen (Google Search Console usw.). Standardmäßig aktiv.</div>
+                <div class="help">@Html.Raw(T["settings.sitemapHelp"])</div>
             </div>
 
             <div class="form-field">
                 <label>Google Analytics (GA4) Mess-ID</label>
                 <input name="Values[@SettingKeys.AnalyticsGa4]" value="@V(SettingKeys.AnalyticsGa4)" placeholder="G-XXXXXXXXXX" spellcheck="false" />
-                <div class="help">Nur die Mess-ID eintragen (beginnt mit „G-"). Der passende gtag.js-Snippet wird automatisch im &lt;head&gt; erzeugt. Für andere Tools das Feld leer lassen und den Code unten einfügen.</div>
+                <div class="help">@Html.Raw(T["settings.ga4Help"])</div>
             </div>
 
             <div class="form-field">
                 <label>Code im &lt;head&gt;</label>
                 <textarea name="Values[@SettingKeys.CodeHead]" rows="5" spellcheck="false" class="code-area" placeholder="&lt;!-- z.B. Verifizierungs-Meta-Tags, Consent-Tool --&gt;">@V(SettingKeys.CodeHead)</textarea>
-                <div class="help">Wird direkt vor &lt;/head&gt; eingefügt.</div>
+                <div class="help">@Html.Raw(T["settings.codeHeadHelp"])</div>
             </div>
 
             <div class="form-field">
                 <label>Code nach &lt;body&gt; (Anfang)</label>
                 <textarea name="Values[@SettingKeys.CodeBodyStart]" rows="4" spellcheck="false" class="code-area" placeholder="&lt;!-- z.B. Google Tag Manager (noscript) --&gt;">@V(SettingKeys.CodeBodyStart)</textarea>
-                <div class="help">Wird direkt nach dem öffnenden &lt;body&gt;-Tag eingefügt.</div>
+                <div class="help">@Html.Raw(T["settings.codeBodyStartHelp"])</div>
             </div>
 
             <div class="form-field">
                 <label>Code vor &lt;/body&gt; (Ende)</label>
                 <textarea name="Values[@SettingKeys.CodeBodyEnd]" rows="4" spellcheck="false" class="code-area" placeholder="&lt;!-- z.B. Chat-Widget, weitere Tracker --&gt;">@V(SettingKeys.CodeBodyEnd)</textarea>
-                <div class="help">Wird direkt vor &lt;/body&gt; eingefügt.</div>
+                <div class="help">@Html.Raw(T["settings.codeBodyEndHelp"])</div>
             </div>
 
             <div><button type="submit" class="btn">Speichern</button></div>

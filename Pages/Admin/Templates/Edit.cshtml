@@ -190,7 +190,7 @@
                     <div class="optcolor" data-optcolor>
                         <input type="color" class="optcolor-pick" value="@(string.IsNullOrWhiteSpace(Model.HeaderBackground) ? "#ffffff" : Model.HeaderBackground)" aria-label="@T["templates.headerBg"]" />
                         <input type="text" id="HeaderBackground" name="HeaderBackground" class="optcolor-hex" value="@Model.HeaderBackground" placeholder="@T["templates.optionalColor"]" spellcheck="false" />
-                        <button type="button" class="optcolor-clear" title="Leeren" aria-label="Leeren">×</button>
+                        <button type="button" class="optcolor-clear" title="@T["action.clear"]" aria-label="@T["action.clear"]">×</button>
                     </div>
                 </div>
                 <div class="form-field">
@@ -198,7 +198,7 @@
                     <div class="optcolor" data-optcolor>
                         <input type="color" class="optcolor-pick" value="@(string.IsNullOrWhiteSpace(Model.HeaderTextColor) ? "#111111" : Model.HeaderTextColor)" aria-label="@T["templates.headerText"]" />
                         <input type="text" id="HeaderTextColor" name="HeaderTextColor" class="optcolor-hex" value="@Model.HeaderTextColor" placeholder="@T["templates.optionalColor"]" spellcheck="false" />
-                        <button type="button" class="optcolor-clear" title="Leeren" aria-label="Leeren">×</button>
+                        <button type="button" class="optcolor-clear" title="@T["action.clear"]" aria-label="@T["action.clear"]">×</button>
                     </div>
                 </div>
                 <div class="form-field">
@@ -282,10 +282,10 @@
 
         @* ============ PARAMETER (designer-published) ============ *@
         <div class="tab-panel form-grid" data-panel="advanced" data-group="params" hidden>
-            <h3 class="form-section">Parameter (für Nutzer)</h3>
-            <div class="help">Parameter, die ein Nutzer dieses Templates unter „Anpassen" einstellen kann — ohne das Template zu bearbeiten. Im Template verwendbar als <code>{{param:id}}</code> (in <code>styles.css</code> oder <code>body.html</code>). Die ID wird aus dem Label erzeugt.</div>
+            <h3 class="form-section">@T["templates.paramsUsers"]</h3>
+            <div class="help">@Html.Raw(T["templates.paramsHelp"])</div>
             <div id="param-rows" data-params="@Model.ParametersJson"></div>
-            <div style="margin-top:8px;"><button type="button" class="btn btn-sm btn-ghost" id="param-add">＋ Parameter</button></div>
+            <div style="margin-top:8px;"><button type="button" class="btn btn-sm btn-ghost" id="param-add">@T["templates.paramAddBtn"]</button></div>
             <input type="hidden" name="ParametersJson" id="ParametersJson" />
         </div>
 
@@ -367,9 +367,9 @@
             var panels = document.querySelectorAll('.tab-panel');
             var hint = document.querySelector('[data-group-hint]');
             var HINTS = {
-                designer: 'Aussehen: Farben, Schrift, Layout und Header.',
-                files: 'Die Layout-Dateien des Templates (HTML/CSS/JS) – anklicken zum Bearbeiten im Editor.',
-                params: 'Technik: Menü-Zuordnung (Mapping) und die Parameter für Nutzer.'
+                designer: '@T["templates.tabHintDesigner"]',
+                files: '@T["templates.tabHintFiles"]',
+                params: '@T["templates.tabHintParams"]'
             };
             function show(name) {
                 if (name !== 'params' && name !== 'files') name = 'designer';

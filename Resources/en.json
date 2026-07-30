@@ -774,5 +774,19 @@
   "templates.tokMenu": "Menu (slot)",
   "templates.tokMenuLoop": "Menu loop ({{label}}/{{url}}/{{icon}})",
   "templates.tokParam": "Template parameter",
-  "templates.tokLanguages": "Language selector"
+  "templates.tokLanguages": "Language selector",
+  "action.clear": "Clear",
+  "settings.pickImage": "Choose image",
+  "settings.canonicalHelp": "Public base URL of the site (for the sitemap, <code>robots.txt</code> and canonical links). Behind an HTTPS reverse proxy, enter the real <code>https://</code> address here.",
+  "settings.sitemapHelp": "Serves <code>/sitemap.xml</code> (all published pages) and a <code>/robots.txt</code> pointing to it — for search engines (Google Search Console etc.). Enabled by default.",
+  "settings.ga4Help": "Enter only the measurement ID (starts with “G-”). The matching gtag.js snippet is generated automatically in the &lt;head&gt;. For other tools, leave this empty and add the code below.",
+  "settings.codeHeadHelp": "Inserted right before &lt;/head&gt;.",
+  "settings.codeBodyStartHelp": "Inserted right after the opening &lt;body&gt; tag.",
+  "settings.codeBodyEndHelp": "Inserted right before &lt;/body&gt;.",
+  "templates.paramsUsers": "Parameters (for users)",
+  "templates.paramAddBtn": "＋ Parameter",
+  "templates.tabHintDesigner": "Appearance: colors, typography, layout and header.",
+  "templates.tabHintFiles": "The template's layout files (HTML/CSS/JS) — click to edit in the editor.",
+  "templates.tabHintParams": "Technical: menu mapping and the parameters for users.",
+  "templates.paramsHelp": "Parameters a user of this template can set under “Customize” — without editing the template. Usable in the template as <code>{{param:id}}</code> (in <code>styles.css</code> or <code>body.html</code>). The ID is generated from the label."
 }

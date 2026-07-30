@@ -774,5 +774,19 @@
   "templates.tokMenu": "Menü (Slot)",
   "templates.tokMenuLoop": "Menü-Schleife ({{label}}/{{url}}/{{icon}})",
   "templates.tokParam": "Template-Parameter",
-  "templates.tokLanguages": "Sprachauswahl"
+  "templates.tokLanguages": "Sprachauswahl",
+  "action.clear": "Leeren",
+  "settings.pickImage": "Bild wählen",
+  "settings.canonicalHelp": "Öffentliche Basis-URL der Website (für Sitemap, <code>robots.txt</code> und kanonische Links). Hinter einem HTTPS-Reverse-Proxy hier die echte <code>https://</code>-Adresse eintragen.",
+  "settings.sitemapHelp": "Stellt <code>/sitemap.xml</code> (alle veröffentlichten Seiten) und eine darauf verweisende <code>/robots.txt</code> bereit — für Suchmaschinen (Google Search Console usw.). Standardmäßig aktiv.",
+  "settings.ga4Help": "Nur die Mess-ID eintragen (beginnt mit „G-“). Der passende gtag.js-Snippet wird automatisch im &lt;head&gt; erzeugt. Für andere Tools das Feld leer lassen und den Code unten einfügen.",
+  "settings.codeHeadHelp": "Wird direkt vor &lt;/head&gt; eingefügt.",
+  "settings.codeBodyStartHelp": "Wird direkt nach dem öffnenden &lt;body&gt;-Tag eingefügt.",
+  "settings.codeBodyEndHelp": "Wird direkt vor &lt;/body&gt; eingefügt.",
+  "templates.paramsUsers": "Parameter (für Nutzer)",
+  "templates.paramAddBtn": "＋ Parameter",
+  "templates.tabHintDesigner": "Aussehen: Farben, Schrift, Layout und Header.",
+  "templates.tabHintFiles": "Die Layout-Dateien des Templates (HTML/CSS/JS) – anklicken zum Bearbeiten im Editor.",
+  "templates.tabHintParams": "Technik: Menü-Zuordnung (Mapping) und die Parameter für Nutzer.",
+  "templates.paramsHelp": "Parameter, die ein Nutzer dieses Templates unter „Anpassen“ einstellen kann — ohne das Template zu bearbeiten. Im Template verwendbar als <code>{{param:id}}</code> (in <code>styles.css</code> oder <code>body.html</code>). Die ID wird aus dem Label erzeugt."
 }

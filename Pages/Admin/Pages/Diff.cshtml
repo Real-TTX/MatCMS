@@ -104,8 +104,11 @@ else
         .d-scroll { overflow-x: auto; }
         /* Fixed layout so columns share the width evenly and long text WRAPS instead of overflowing. */
         .d-table { width: 100%; table-layout: fixed; min-width: 760px; }
-        .d-table td, .d-table th { vertical-align: top; font-size: 13.5px; line-height: 1.55; overflow-wrap: anywhere; word-break: break-word; }
+        .d-table td, .d-table th { vertical-align: top; font-size: 13.5px; line-height: 1.55; overflow-wrap: anywhere; word-break: break-word; white-space: normal; }
         .d-table th:first-child, .d-table td:first-child { width: 34px; }
+        /* Override the shared .data rule (table.data td:last-child { width:1%; white-space:nowrap }, meant
+           for an actions column) — here the last column is a language column and MUST wrap. */
+        table.data.d-table td:last-child, table.data.d-table th:last-child { width: auto; white-space: normal; }
         .d-type { font-size: 10.5px; text-transform: uppercase; letter-spacing: .03em; margin-top: 2px; }
         /* Git-style word diff */
         .wd ins { background: #e6f7ea; color: #1a7f37; text-decoration: none; border-radius: 3px; padding: 0 2px; }

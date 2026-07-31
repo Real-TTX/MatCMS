@@ -409,6 +409,8 @@ public class BlockRegistry
             ChildOnly = true,
             Fields =
             [
+                new BlockField { Id = "icon", Label = "block.card.f.icon", Type = FieldType.Text,
+                    Help = "block.card.f.icon.help" },
                 new BlockField { Id = "image", Label = "block.f.image", Type = FieldType.Image },
                 new BlockField { Id = "title", Label = "block.f.title", Type = FieldType.Text },
                 new BlockField { Id = "tags", Label = "block.card.f.tags", Type = FieldType.Text,

@@ -1,5 +1,6 @@
 @model MatCMS.Content.BlockData
 @{
+    var icon = Model.Str("icon");
     var image = Model.Str("image");
     var title = Model.Str("title");
     var text = Model.Str("text");
@@ -25,6 +26,10 @@
         <div class="feat-card__img" style="background-image:url('@src')"></div>
     }
     <div class="feat-card__body">
+        @if (!string.IsNullOrWhiteSpace(icon))
+        {
+            <div class="feat-card__icon" aria-hidden="true">@icon</div>
+        }
         @if (!string.IsNullOrWhiteSpace(title))
         {
             <h3>@title</h3>

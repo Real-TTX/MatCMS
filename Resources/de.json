@@ -579,6 +579,8 @@
   "block.card.name": "Karte",
   "block.card.desc": "Einzelne Karte: Bild, Name, Merkmale, Beschreibung, Details, Button",
   "block.card.f.tags": "Merkmale (Chips)",
+  "block.card.f.icon": "Icon (Emoji)",
+  "block.card.f.icon.help": "Ein einzelnes Zeichen oder Emoji (z. B. ⌨️, 🚗, 🏖️). Leer = kein Icon.",
   "block.card.f.features": "Detail-Kacheln",
   "block.section.name": "Bereich (Container)",
   "block.section.desc": "Gruppiert mehrere Inhalts-Blöcke – als Stapel oder Spalten, mit optionalem Hintergrund",

@@ -170,7 +170,7 @@ public class SiteContext
     private Template? _activeTemplate;
     private bool _templateLoaded;
 
-    /// <summary>The active template, or a sensible FeuSys default if none is configured.</summary>
+    /// <summary>The active template, or a sensible default if none is configured.</summary>
     public Template ActiveTemplate
     {
         get
@@ -192,7 +192,7 @@ public class SiteContext
             }
             return _activeTemplate ?? new Template
             {
-                Name = "FeuSys",
+                Name = "Standard",
                 IsActive = true,
                 AccentColor = "#de7e11",
                 HeadingFont = "Geologica",
@@ -202,11 +202,11 @@ public class SiteContext
         }
     }
 
-    public string SiteName => Get(SettingKeys.SiteName, "FEUSYS");
+    public string SiteName => Get(SettingKeys.SiteName, "MatCMS");
     public string LogoUrl => Get(SettingKeys.LogoUrl, "/img/logo.svg");
     /// <summary>Favicon URL; falls back to the site logo when no separate favicon is configured.</summary>
     public string FaviconUrl => Get(SettingKeys.FaviconUrl, LogoUrl);
-    public string FooterText => Get(SettingKeys.FooterText, "© FEUSYS");
+    public string FooterText => Get(SettingKeys.FooterText, "© MatCMS");
 
     // --- Custom code / tracking (Settings → Code) ---
     /// <summary>Raw HTML injected right before &lt;/head&gt;.</summary>

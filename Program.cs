@@ -23,8 +23,31 @@ string[] supportedCultures = Localizer.SupportedCultures;
 var dataDir = Path.Combine(builder.Environment.ContentRootPath, "appdata");
 Directory.CreateDirectory(dataDir);
 
+// Legacy DB rename: earlier versions named the SQLite file "feusys.db". Rename on the way up so
+// existing volumes keep working without a manual step. Only runs when the new name doesn't exist
+// yet — never overwrites current data. Journals (-shm/-wal/-journal) travel with it.
+{
+    var oldDb = Path.Combine(dataDir, "feusys.db");
+    var newDb = Path.Combine(dataDir, "matcms.db");
+    if (!File.Exists(newDb) && File.Exists(oldDb))
+    {
+        try
+        {
+            File.Move(oldDb, newDb);
+            foreach (var suffix in new[] { "-shm", "-wal", "-journal" })
+            {
+                var oldSide = oldDb + suffix;
+                var newSide = newDb + suffix;
+                if (File.Exists(oldSide) && !File.Exists(newSide)) File.Move(oldSide, newSide);
+            }
+        }
+        catch { /* If the rename fails (locked / permissions), EnsureCreated will create a fresh
+                   matcms.db and no data is lost — the old file stays put until the operator fixes it. */ }
+    }
+}
+
 var connectionString = builder.Configuration.GetConnectionString("Default")
-    ?? "Data Source=appdata/feusys.db";
+    ?? "Data Source=appdata/matcms.db";
 
 builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite(connectionString));
 

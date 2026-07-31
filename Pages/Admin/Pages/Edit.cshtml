@@ -112,7 +112,7 @@
                         @foreach (var loc in Model.MissingLocales)
                         {
                             <form method="post" asp-page-handler="CreateTranslation" asp-route-id="@Model.Current.Id" asp-route-locale="@loc" class="le-ver-addform">
-                                <button type="submit" class="le-ver-add" title="@MatCMS.Services.Localizer.DisplayName(loc) hinzufügen (Inhalt wird kopiert)">+ @loc.ToUpperInvariant()</button>
+                                <button type="submit" class="le-ver-add" title="@T["editor.addVersionTitle", MatCMS.Services.Localizer.DisplayName(loc)]">+ @loc.ToUpperInvariant()</button>
                             </form>
                         }
                     </div>

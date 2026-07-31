@@ -113,9 +113,9 @@
         <input type="hidden" name="Id" value="@Model.Id" />
 
         <div class="tabs" role="tablist">
-            <button type="button" class="tab active" data-tab="designer">🎨 Designer</button>
+            <button type="button" class="tab active" data-tab="designer">🎨 @T["templates.tabDesigner"]</button>
             <button type="button" class="tab" data-tab="files">📁 @T["tplfiles.tab"]</button>
-            <button type="button" class="tab" data-tab="params">⚙️ Parameter</button>
+            <button type="button" class="tab" data-tab="params">⚙️ @T["templates.tabParameters"]</button>
         </div>
         <p class="help" data-group-hint></p>
 
@@ -501,7 +501,7 @@
             var hidden = document.getElementById('ParametersJson');
             if (!rows || !addBtn || !hidden) return;
             var form = hidden.closest('form');
-            var TYPES = [['text', 'Text'], ['select', 'Auswahl'], ['color', 'Farbe'], ['number', 'Zahl'], ['bool', 'Ja/Nein']];
+            var TYPES = [['text', '@T["templates.ptype.text"]'], ['select', '@T["templates.ptype.select"]'], ['color', '@T["templates.ptype.color"]'], ['number', '@T["templates.ptype.number"]'], ['bool', '@T["templates.ptype.bool"]']];
             function slug(s) {
                 return (s || '').trim().toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue')
                     .replace(/ß/g, 'ss').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
@@ -512,8 +512,8 @@
                 var label = document.createElement('input'); label.type = 'text'; label.placeholder = 'Label'; label.className = 'pr-label fr-label'; label.value = p.label || '';
                 var type = document.createElement('select'); type.className = 'pr-type';
                 TYPES.forEach(function (t) { var o = document.createElement('option'); o.value = t[0]; o.textContent = t[1]; if ((p.type || 'text') === t[0]) o.selected = true; type.appendChild(o); });
-                var opts = document.createElement('input'); opts.type = 'text'; opts.placeholder = 'Optionen (Komma)'; opts.className = 'pr-options fr-label'; opts.value = p.options || '';
-                var def = document.createElement('input'); def.type = 'text'; def.placeholder = 'Standard'; def.className = 'pr-default fr-label'; def.value = p['default'] || '';
+                var opts = document.createElement('input'); opts.type = 'text'; opts.placeholder = '@T["templates.optionsPlaceholder"]'; opts.className = 'pr-options fr-label'; opts.value = p.options || '';
+                var def = document.createElement('input'); def.type = 'text'; def.placeholder = '@T["templates.defaultPlaceholder"]'; def.className = 'pr-default fr-label'; def.value = p['default'] || '';
                 var rm = document.createElement('button'); rm.type = 'button'; rm.className = 'btn btn-sm btn-danger btn-icon'; rm.innerHTML = '<i class="ti ti-trash" aria-hidden="true"></i>';
                 rm.addEventListener('click', function () { row.remove(); });
                 function syncOpts() { opts.style.display = type.value === 'select' ? '' : 'none'; }

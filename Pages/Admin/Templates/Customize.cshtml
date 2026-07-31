@@ -5,15 +5,15 @@
     string V(string id) => Model.Values.TryGetValue(id, out var v) ? v : "";
 }
 <div class="page-head">
-    <h1>Edit – @Model.Current.Name</h1>
+    <h1>@T["templates.customizeHeading"] – @Model.Current.Name</h1>
     <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
 </div>
 
 <div class="card">
-    <p class="help">Hier passt du die vom Designer bereitgestellten Einstellungen dieses Templates an — ohne das Template selbst zu bearbeiten.</p>
+    <p class="help">@T["templates.customizeHelp"]</p>
     @if (Model.Params.Count == 0)
     {
-        <p class="muted">Dieses Template stellt keine Einstellungen zum Anpassen bereit.</p>
+        <p class="muted">@T["templates.customizeEmpty"]</p>
     }
     else
     {
@@ -39,7 +39,7 @@
                             <input type="number" name="Val[@p.Id]" value="@V(p.Id)" />
                             break;
                         case "bool":
-                            <label class="check"><input type="checkbox" name="Val[@p.Id]" value="true" @(V(p.Id) == "true" ? "checked" : "") /> aktiv</label>
+                            <label class="check"><input type="checkbox" name="Val[@p.Id]" value="true" @(V(p.Id) == "true" ? "checked" : "") /> @T["templates.paramActive"]</label>
                             break;
                         default:
                             <input type="text" name="Val[@p.Id]" value="@V(p.Id)" />
@@ -48,7 +48,7 @@
                     <div class="help mono">{{param:@p.Id}}</div>
                 </div>
             }
-            <div><button type="submit" class="btn">Speichern</button></div>
+            <div><button type="submit" class="btn">@T["action.save"]</button></div>
         </form>
     }
 </div>

@@ -13,9 +13,9 @@
     <button type="button" class="tab active" data-tab="general">@T["settings.tabGeneral"]</button>
     <button type="button" class="tab" data-tab="smtp">@T["settings.tabSmtp"]</button>
     <button type="button" class="tab" data-tab="errors">@T["settings.tabErrors"]</button>
-    <button type="button" class="tab" data-tab="code">Code &amp; Tracking</button>
+    <button type="button" class="tab" data-tab="code">@T["settings.tabCode"]</button>
     <button type="button" class="tab" data-tab="maintenance">@T["settings.maint.tab"]</button>
-    <button type="button" class="tab" data-tab="languages">Sprachen</button>
+    <button type="button" class="tab" data-tab="languages">@T["settings.tabLanguages"]</button>
 </div>
 
 @* ============ GENERAL ============ *@
@@ -25,7 +25,7 @@
             <h2>@T["settings.general"]</h2>
             <div class="form-field">
                 <label>URL</label>
-                <input name="Values[@SettingKeys.CanonicalUrl]" value="@V(SettingKeys.CanonicalUrl)" placeholder="https://www.beispiel.de" spellcheck="false" />
+                <input name="Values[@SettingKeys.CanonicalUrl]" value="@V(SettingKeys.CanonicalUrl)" placeholder="@T["settings.canonicalPlaceholder"]" spellcheck="false" />
                 <div class="help">@Html.Raw(T["settings.canonicalHelp"])</div>
             </div>
             <div class="form-field">
@@ -155,8 +155,8 @@
 <div class="tab-panel" data-panel="code" hidden>
     <form method="post" asp-page-handler="Code">
         <div class="card">
-            <h2>Code &amp; Tracking</h2>
-            <p class="muted">Eigener HTML-/Script-Code, der auf allen Seiten eingebunden wird — z.&nbsp;B. Google&nbsp;Analytics, Matomo, Meta-Pixel oder ein Consent-Tool. Wird nur hier im Admin verwaltet.</p>
+            <h2>@T["settings.codeHeading"]</h2>
+            <p class="muted">@T["settings.codeIntro"]</p>
 
             <div class="form-field">
                 <label>XML-Sitemap</label>
@@ -168,30 +168,30 @@
             </div>
 
             <div class="form-field">
-                <label>Google Analytics (GA4) Mess-ID</label>
+                <label>@T["settings.ga4Label"]</label>
                 <input name="Values[@SettingKeys.AnalyticsGa4]" value="@V(SettingKeys.AnalyticsGa4)" placeholder="G-XXXXXXXXXX" spellcheck="false" />
                 <div class="help">@Html.Raw(T["settings.ga4Help"])</div>
             </div>
 
             <div class="form-field">
-                <label>Code im &lt;head&gt;</label>
-                <textarea name="Values[@SettingKeys.CodeHead]" rows="5" spellcheck="false" class="code-area" placeholder="&lt;!-- z.B. Verifizierungs-Meta-Tags, Consent-Tool --&gt;">@V(SettingKeys.CodeHead)</textarea>
+                <label>@T["settings.codeHeadLabel"]</label>
+                <textarea name="Values[@SettingKeys.CodeHead]" rows="5" spellcheck="false" class="code-area" placeholder="@T["settings.codeHeadPlaceholder"]">@V(SettingKeys.CodeHead)</textarea>
                 <div class="help">@Html.Raw(T["settings.codeHeadHelp"])</div>
             </div>
 
             <div class="form-field">
-                <label>Code nach &lt;body&gt; (Anfang)</label>
-                <textarea name="Values[@SettingKeys.CodeBodyStart]" rows="4" spellcheck="false" class="code-area" placeholder="&lt;!-- z.B. Google Tag Manager (noscript) --&gt;">@V(SettingKeys.CodeBodyStart)</textarea>
+                <label>@T["settings.codeBodyStartLabel"]</label>
+                <textarea name="Values[@SettingKeys.CodeBodyStart]" rows="4" spellcheck="false" class="code-area" placeholder="@T["settings.codeBodyStartPlaceholder"]">@V(SettingKeys.CodeBodyStart)</textarea>
                 <div class="help">@Html.Raw(T["settings.codeBodyStartHelp"])</div>
             </div>
 
             <div class="form-field">
-                <label>Code vor &lt;/body&gt; (Ende)</label>
-                <textarea name="Values[@SettingKeys.CodeBodyEnd]" rows="4" spellcheck="false" class="code-area" placeholder="&lt;!-- z.B. Chat-Widget, weitere Tracker --&gt;">@V(SettingKeys.CodeBodyEnd)</textarea>
+                <label>@T["settings.codeBodyEndLabel"]</label>
+                <textarea name="Values[@SettingKeys.CodeBodyEnd]" rows="4" spellcheck="false" class="code-area" placeholder="@T["settings.codeBodyEndPlaceholder"]">@V(SettingKeys.CodeBodyEnd)</textarea>
                 <div class="help">@Html.Raw(T["settings.codeBodyEndHelp"])</div>
             </div>
 
-            <div><button type="submit" class="btn">Speichern</button></div>
+            <div><button type="submit" class="btn">@T["action.save"]</button></div>
         </div>
     </form>
 </div>

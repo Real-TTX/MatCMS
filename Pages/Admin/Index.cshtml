@@ -7,10 +7,10 @@
 <div class="page-head">
     <h1>@T["dashboard.title"]</h1>
     <div class="dash-actions" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-        <span class="muted">Willkommen, <strong>@dashUser</strong></span>
-        <a class="btn btn-sm" href="/" target="_blank" rel="noopener"><i class="ti ti-external-link" aria-hidden="true"></i> Website aufrufen</a>
+        <span class="muted">@T["dashboard.welcome"] <strong>@dashUser</strong></span>
+        <a class="btn btn-sm" href="/" target="_blank" rel="noopener"><i class="ti ti-external-link" aria-hidden="true"></i> @T["dashboard.viewSite"]</a>
         <form method="post" asp-page="/Logout" class="inline-form" style="margin:0;">
-            <button type="submit" class="btn btn-sm btn-ghost"><i class="ti ti-logout" aria-hidden="true"></i> Ausloggen</button>
+            <button type="submit" class="btn btn-sm btn-ghost"><i class="ti ti-logout" aria-hidden="true"></i> @T["nav.logout"]</button>
         </form>
     </div>
 </div>
@@ -19,9 +19,9 @@
 {
     <div class="alert alert-info setup-banner">
         <div>
-            <strong>Willkommen!</strong> Richten Sie Admin-Konto, Theme, E-Mail und erste Seite in wenigen Schritten ein.
+            @Html.Raw(T["dashboard.setupBanner"])
         </div>
-        <a class="btn btn-sm" asp-page="/Admin/Setup/Index">Einrichtung starten</a>
+        <a class="btn btn-sm" asp-page="/Admin/Setup/Index">@T["dashboard.setupStart"]</a>
     </div>
 }
 

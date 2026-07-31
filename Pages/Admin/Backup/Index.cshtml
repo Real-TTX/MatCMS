@@ -256,7 +256,7 @@
                     .then(function (r) { return r.json(); })
                     .then(function (j) {
                         out.hidden = false;
-                        if (!j.ok) { out.className = 'inspect-result err'; out.textContent = j.error || 'Fehler'; return; }
+                        if (!j.ok) { out.className = 'inspect-result err'; out.textContent = j.error || '@T["common.error"]'; return; }
                         var i = j.info;
                         var tpls = (i.templateNames && i.templateNames.length) ? i.templateNames.join(', ') : '';
                         var html = '<div class="inspect-title">@T["backup.contents"]</div><ul class="inspect-list">';
@@ -272,7 +272,7 @@
                         out.className = 'inspect-result ok';
                         out.innerHTML = html;
                     })
-                    .catch(function () { out.hidden = false; out.className = 'inspect-result err'; out.textContent = 'Fehler'; })
+                    .catch(function () { out.hidden = false; out.className = 'inspect-result err'; out.textContent = '@T["common.error"]'; })
                     .finally(function () { inspectBtn.disabled = false; inspectBtn.textContent = '@T["backup.inspect"]'; });
             });
         })();

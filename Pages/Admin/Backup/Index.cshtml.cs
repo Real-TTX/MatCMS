@@ -121,6 +121,10 @@ public class IndexModel : PageModel
         }
     }
 
+    // Kestrel's default 30 MB body cap causes multi-gallery backups to 400 mid-upload. Bump only
+    // for this specific handler so the rest of the app keeps the safer default.
+    [RequestSizeLimit(200L * 1024 * 1024)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 200L * 1024 * 1024)]
     public async Task<IActionResult> OnPostImportAsync()
     {
         if (!Confirm)

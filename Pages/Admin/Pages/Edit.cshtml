@@ -3,7 +3,10 @@
 @{
     ViewData["Title"] = T["editor.title"];
     var blocks = Model.Current.Blocks.Where(b => b.ParentId == null).OrderBy(b => b.SortOrder).ToList();
-    var url = Model.Current.Slug == "home" ? "/" : "/" + Model.Current.Slug;
+    // Preview must load the page IN ITS OWN LOCALE (…/en/slug), not the prefix-less default URL —
+    // otherwise switching the version selector shows the editor for the right page but the German
+    // preview. LocalizedUrl adds the "/{locale}" prefix for non-default locales (default = root URLs).
+    var url = MatCMS.Services.SiteContext.LocalizedUrl(Model.Current.Locale, Model.Current.Slug);
     var previewUrl = url + (url.Contains('?') ? "&" : "?") + "editor=1";
     var editing = Model.SelectedBlock is not null && Model.SelectedDef is not null;
 }

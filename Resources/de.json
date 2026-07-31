@@ -860,5 +860,18 @@
   "forms.notifyPlaceholder": "beispiel@domain.de, weitere@domain.de",
   "media.viewTiles": "Kacheln",
   "media.viewTable": "Tabelle",
-  "common.error": "Fehler"
+  "common.error": "Fehler",
+  "forms.el.daterange.name": "Zeitraum",
+  "forms.el.daterange.desc": "Zeitraum-Auswahl mit Kalender (z. B. Anreise – Abreise).",
+  "dp.today": "Heute",
+  "dp.clear": "Löschen",
+  "dp.cancel": "Abbrechen",
+  "dp.ok": "Übernehmen",
+  "dp.prevMonth": "Vorheriger Monat",
+  "dp.nextMonth": "Nächster Monat",
+  "dp.to": "bis",
+  "dp.placeholder": "Datum wählen",
+  "dp.placeholderRange": "Zeitraum wählen",
+  "dp.startLabel": "Anreise",
+  "dp.endLabel": "Abreise"
 }

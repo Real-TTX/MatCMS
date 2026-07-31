@@ -57,7 +57,7 @@ public static class FormDefinition
 
     /// <summary>Element types that render an actual input and hold a value.</summary>
     public static bool IsInput(string? type) =>
-        type is "text" or "textarea" or "date" or "number" or "phone" or "email" or "select";
+        type is "text" or "textarea" or "date" or "daterange" or "number" or "phone" or "email" or "select";
 
     public static List<FormElement> Parse(string? json)
     {

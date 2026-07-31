@@ -860,5 +860,18 @@
   "forms.notifyPlaceholder": "example@domain.com, another@domain.com",
   "media.viewTiles": "Tiles",
   "media.viewTable": "Table",
-  "common.error": "Error"
+  "common.error": "Error",
+  "forms.el.daterange.name": "Date range",
+  "forms.el.daterange.desc": "Range picker with calendar (e.g. check-in – check-out).",
+  "dp.today": "Today",
+  "dp.clear": "Clear",
+  "dp.cancel": "Cancel",
+  "dp.ok": "Apply",
+  "dp.prevMonth": "Previous month",
+  "dp.nextMonth": "Next month",
+  "dp.to": "to",
+  "dp.placeholder": "Select date",
+  "dp.placeholderRange": "Select range",
+  "dp.startLabel": "Check-in",
+  "dp.endLabel": "Check-out"
 }

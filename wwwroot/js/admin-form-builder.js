@@ -3,11 +3,11 @@
 (function () {
     "use strict";
 
-    var INPUT_TYPES = ["text", "textarea", "date", "number", "phone", "email", "select"];
-    var CHILD_TYPES = ["title", "description", "text", "textarea", "date", "number", "phone", "email", "select"];
+    var INPUT_TYPES = ["text", "textarea", "date", "daterange", "number", "phone", "email", "select"];
+    var CHILD_TYPES = ["title", "description", "text", "textarea", "date", "daterange", "number", "phone", "email", "select"];
     var TYPE_LABELS = {
         title: "Überschrift", description: "Beschreibung", text: "Textfeld", textarea: "Textfeld (mehrzeilig)",
-        date: "Datum", number: "Zahl", phone: "Telefon", email: "E-Mail",
+        date: "Datum", daterange: "Zeitraum", number: "Zahl", phone: "Telefon", email: "E-Mail",
         select: "Auswahl", group: "Gruppe"
     };
     var OP_LABELS = { eq: "ist gleich", neq: "ist ungleich", contains: "enthält", filled: "ist ausgefüllt" };

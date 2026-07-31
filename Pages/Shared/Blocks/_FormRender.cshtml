@@ -1,8 +1,26 @@
 @using MatCMS.Content
 @using Microsoft.AspNetCore.Html
+@inject MatCMS.Services.Localizer T
 @model MatCMS.Content.FormRenderModel
 @{
     var containerId = "form-" + Model.Slug;
+
+    // Localized labels for the shared custom datepicker (single + range). Set via a global window var
+    // so the JS file needs no C#/@T awareness. The "||=" guard keeps multiple forms on one page safe.
+    var dpI18nJson = System.Text.Json.JsonSerializer.Serialize(new
+    {
+        today = T["dp.today"].ToString(),
+        clear = T["dp.clear"].ToString(),
+        cancel = T["dp.cancel"].ToString(),
+        ok = T["dp.ok"].ToString(),
+        prev = T["dp.prevMonth"].ToString(),
+        next = T["dp.nextMonth"].ToString(),
+        to = T["dp.to"].ToString(),
+        placeholder = T["dp.placeholder"].ToString(),
+        placeholderRange = T["dp.placeholderRange"].ToString(),
+        startLabel = T["dp.startLabel"].ToString(),
+        endLabel = T["dp.endLabel"].ToString()
+    });
 
     // Renders a single input element (text/date/number/phone/email/select).
     Func<FormElement, IHtmlContent> renderInput = null!;
@@ -44,6 +62,33 @@
             sb.Append(reqAttr).Append(disAttr).Append('>');
             sb.Append(System.Net.WebUtility.HtmlEncode(val));
             sb.Append("</textarea>");
+        }
+        else if (el.Type == "date" || el.Type == "daterange")
+        {
+            // Custom picker: value stays ISO ("YYYY-MM-DD" or "YYYY-MM-DD..YYYY-MM-DD") on the hidden
+            // input so server-side validation/notification is unchanged; the visible button carries the
+            // locale-formatted display, populated by mat-datepicker.js (open + close = single dialog).
+            var isRange = el.Type == "daterange";
+            var placeholder = !string.IsNullOrWhiteSpace(el.Placeholder)
+                ? el.Placeholder
+                : (isRange ? T["dp.placeholderRange"].ToString() : T["dp.placeholder"].ToString());
+            var mode = isRange ? "range" : "single";
+            sb.Append("<div class=\"mat-dp\" data-dp-mode=\"").Append(mode).Append("\">");
+            sb.Append("<button type=\"button\" class=\"mat-dp-btn-trigger\" data-dp-btn").Append(disAttr).Append(">");
+            sb.Append("<span class=\"mat-dp-display mat-dp-placeholder\" data-dp-display data-placeholder=\"")
+              .Append(System.Net.WebUtility.HtmlEncode(placeholder)).Append("\">")
+              .Append(System.Net.WebUtility.HtmlEncode(placeholder))
+              .Append("</span>");
+            sb.Append("<span class=\"mat-dp-icon\" aria-hidden=\"true\">")
+              .Append("<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\">")
+              .Append("<rect x=\"3\" y=\"5\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M3 9h18\"/><path d=\"M8 3v4\"/><path d=\"M16 3v4\"/>")
+              .Append("</svg></span>");
+            sb.Append("</button>");
+            sb.Append("<input type=\"hidden\" id=\"fld_").Append(el.Id).Append("\" name=\"").Append(el.Id).Append("\" value=\"")
+              .Append(System.Net.WebUtility.HtmlEncode(val)).Append("\" data-dp-input");
+            if (el.Required) sb.Append(" data-required=\"1\"");
+            sb.Append(" />");
+            sb.Append("</div>");
         }
         else if (el.Type == "select")
         {
@@ -109,6 +154,9 @@
         }
     };
 }
+<link rel="stylesheet" href="~/css/mat-datepicker.css" asp-append-version="true" />
+<script>window.matDpI18n = window.matDpI18n || @Html.Raw(dpI18nJson);</script>
+<script src="~/js/mat-datepicker.js" asp-append-version="true" defer></script>
 <section class="contact-block form-block" id="@containerId" data-form-slug="@Model.Slug">
     <div class="container">
         <div class="contact-wrap">

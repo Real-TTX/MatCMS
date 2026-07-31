@@ -1,0 +1,165 @@
+/* Custom date picker for form fields.
+   Value in the hidden <input> stays ISO (YYYY-MM-DD) so server-side stays untouched;
+   only the trigger button shows a locale-formatted date. Mobile: dialog fills the viewport. */
+.mat-dp { display: block; width: 100%; }
+
+.mat-dp-btn-trigger {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--line, #d5d5d5);
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    min-height: 42px;
+}
+.mat-dp-btn-trigger:hover { border-color: var(--accent, #888); }
+.mat-dp-btn-trigger:focus-visible { outline: 2px solid var(--accent, #2563eb); outline-offset: -1px; }
+.mat-dp-btn-trigger[disabled] { opacity: .55; cursor: not-allowed; background: #f7f7f7; }
+
+.mat-dp-display { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mat-dp-placeholder { color: #999; }
+.mat-dp-icon { flex: 0 0 auto; display: inline-flex; opacity: .55; }
+.mat-dp-icon svg { width: 18px; height: 18px; }
+
+/* Dialog */
+.mat-dp-dialog {
+    border: 0;
+    padding: 0;
+    border-radius: 14px;
+    max-width: 360px;
+    width: 100%;
+    background: #fff;
+    color: inherit;
+    box-shadow: 0 30px 80px rgba(0,0,0,.22);
+    overflow: hidden;
+}
+.mat-dp-dialog::backdrop { background: rgba(0,0,0,.4); }
+
+.mat-dp-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 14px;
+    border-bottom: 1px solid #ececec;
+}
+.mat-dp-title {
+    flex: 1;
+    text-align: center;
+    font-weight: 600;
+    font-size: 15px;
+    text-transform: capitalize;
+}
+.mat-dp-nav {
+    border: 0;
+    background: transparent;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 6px 12px;
+    border-radius: 8px;
+    color: inherit;
+}
+.mat-dp-nav:hover { background: #f2f2f2; }
+
+.mat-dp-weekdays,
+.mat-dp-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+.mat-dp-weekdays {
+    padding: 8px 10px 4px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: #888;
+    text-align: center;
+}
+.mat-dp-weekdays span { padding: 4px 0; }
+.mat-dp-grid { padding: 4px 10px 10px; gap: 2px; }
+
+.mat-dp-day {
+    aspect-ratio: 1 / 1;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 8px;
+    font-size: 14px;
+    font: inherit;
+    color: inherit;
+    padding: 0;
+    min-height: 36px;
+}
+.mat-dp-day:hover:not(:disabled) { background: #f0f0f0; }
+.mat-dp-day.mat-dp-empty { visibility: hidden; }
+.mat-dp-day.mat-dp-today { box-shadow: inset 0 0 0 1px var(--accent, #2563eb); }
+.mat-dp-day.mat-dp-selected {
+    background: var(--accent, #2563eb);
+    color: #fff;
+    font-weight: 600;
+}
+.mat-dp-day.mat-dp-selected.mat-dp-today { box-shadow: none; }
+
+/* Range mode: days between start and end are lightly tinted; endpoints stay solid. */
+.mat-dp-day.mat-dp-in-range {
+    background: color-mix(in srgb, var(--accent, #2563eb) 14%, transparent);
+    border-radius: 0;
+}
+/* Fallback if color-mix() is unsupported. */
+@supports not (background: color-mix(in srgb, red 10%, transparent)) {
+    .mat-dp-day.mat-dp-in-range { background: rgba(37, 99, 235, .14); }
+}
+.mat-dp-day.mat-dp-range-start { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.mat-dp-day.mat-dp-range-end { border-top-left-radius: 0; border-bottom-left-radius: 0; }
+/* When start and end are the same day, keep the full pill shape. */
+.mat-dp-day.mat-dp-range-start.mat-dp-range-end { border-radius: 8px; }
+
+.mat-dp-foot {
+    display: flex;
+    gap: 6px;
+    padding: 10px 12px;
+    border-top: 1px solid #ececec;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.mat-dp-spacer { flex: 1; }
+.mat-dp-btn {
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font-size: 14px;
+    font: inherit;
+    background: transparent;
+    color: inherit;
+}
+.mat-dp-btn-ghost:hover { background: #f2f2f2; }
+.mat-dp-btn-primary {
+    background: var(--accent, #2563eb);
+    color: #fff;
+    border-color: var(--accent, #2563eb);
+    font-weight: 600;
+}
+.mat-dp-btn-primary:hover { filter: brightness(1.05); }
+
+/* Mobile: dialog fills the screen. */
+@media (max-width: 600px) {
+    .mat-dp-dialog {
+        max-width: none;
+        width: 100vw;
+        height: 100vh;
+        max-height: none;
+        border-radius: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+    }
+    .mat-dp-head { padding: 14px 16px; }
+    .mat-dp-title { font-size: 17px; }
+    .mat-dp-grid { padding: 10px 12px; flex: 1; align-content: start; }
+    .mat-dp-day { font-size: 16px; min-height: 44px; }
+    .mat-dp-foot { padding: 14px 16px; padding-bottom: max(14px, env(safe-area-inset-bottom)); }
+    .mat-dp-btn { min-height: 44px; padding: 10px 16px; }
+}

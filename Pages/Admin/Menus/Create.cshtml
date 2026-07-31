@@ -5,6 +5,7 @@
     var vm = new MatCMS.Pages.Admin.Menus.MenuItemFormVm
     {
         Menu = Model.Menu,
+        Locale = Model.Locale,
         Label = Model.Label,
         Url = Model.Url,
         Icon = Model.Icon,
@@ -19,10 +20,16 @@
     };
 }
 <div class="page-head">
-    <h1>@T["menus.new"]</h1>
+    <h1>
+        @T["menus.new"]
+        @if (!string.IsNullOrEmpty(Model.Locale))
+        {
+            <span class="badge badge-on mono" style="margin-left:8px;font-size:12px;vertical-align:middle;">@MatCMS.Services.Localizer.DisplayName(Model.Locale) (@Model.Locale.ToUpperInvariant())</span>
+        }
+    </h1>
     @if (Model.MenuId is int backId)
     {
-        <a class="btn btn-sm btn-ghost" asp-page="EditMenu" asp-route-id="@backId">@T["action.back"]</a>
+        <a class="btn btn-sm btn-ghost" asp-page="EditMenu" asp-route-id="@backId" asp-route-locale="@Model.Locale">@T["action.back"]</a>
     }
     else
     {

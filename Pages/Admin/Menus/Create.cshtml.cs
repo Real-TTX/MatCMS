@@ -13,11 +13,16 @@ public class CreateModel : PageModel
     public CreateModel(AppDbContext db) => _db = db;
 
     [BindProperty] public string Menu { get; set; } = "header";
+    [BindProperty] public string? Locale { get; set; }
     [BindProperty] public string? Label { get; set; }
     [BindProperty] public string? Url { get; set; }
     [BindProperty] public string? Icon { get; set; }
     [BindProperty] public bool OpenInNewTab { get; set; }
     [BindProperty] public int? ParentId { get; set; }
+
+    /// <summary>The resolved content language the new item is created in (route/hidden value, else default).</summary>
+    public string TargetLocale =>
+        MatCMS.Services.Localizer.IsSupported(Locale) ? Locale!.Trim().ToLowerInvariant() : MatCMS.Services.Localizer.DefaultCulture;
 
     public List<PageEntity> Pages { get; private set; } = new();
     public List<Menu> Menus { get; private set; } = new();
@@ -25,10 +30,11 @@ public class CreateModel : PageModel
     public int? MenuId { get; private set; }
     public string? Error { get; private set; }
 
-    public async Task OnGetAsync(string? menu)
+    public async Task OnGetAsync(string? menu, string? locale)
     {
         await LoadListsAsync();
         if (!string.IsNullOrEmpty(menu) && Menus.Any(m => m.Key == menu)) Menu = menu;
+        if (MatCMS.Services.Localizer.IsSupported(locale)) Locale = locale;
         MenuId = Menus.FirstOrDefault(m => m.Key == Menu)?.Id;
         await LoadParentOptionsAsync();
     }
@@ -63,12 +69,12 @@ public class CreateModel : PageModel
             OpenInNewTab = OpenInNewTab,
             ParentId = parent?.Id,
             SortOrder = max + 1,
-            Locale = MatCMS.Services.Localizer.DefaultCulture
+            Locale = TargetLocale
         });
         await _db.SaveChangesAsync();
 
         TempData["Flash"] = "Menüpunkt hinzugefügt.";
-        return MenuId is int mid ? RedirectToPage("EditMenu", new { id = mid }) : RedirectToPage("Index");
+        return MenuId is int mid ? RedirectToPage("EditMenu", new { id = mid, locale = TargetLocale }) : RedirectToPage("Index");
     }
 
     private async Task LoadListsAsync()
@@ -77,9 +83,9 @@ public class CreateModel : PageModel
         Menus = await _db.Menus.OrderBy(m => m.SortOrder).ThenBy(m => m.Id).ToListAsync();
     }
 
-    // New items are created in the default locale → offer that locale's top-level items as parents.
+    // Offer the target locale's top-level items as parents (a new item nests only under its own language).
     private async Task LoadParentOptionsAsync() =>
         ParentOptions = await _db.MenuItems
-            .Where(m => m.Menu == Menu && m.Locale == MatCMS.Services.Localizer.DefaultCulture && m.ParentId == null)
+            .Where(m => m.Menu == Menu && m.Locale == TargetLocale && m.ParentId == null)
             .OrderBy(m => m.SortOrder).ThenBy(m => m.Id).ToListAsync();
 }

@@ -4,6 +4,9 @@ namespace MatCMS.Pages.Admin.Menus;
 public class MenuItemFormVm
 {
     public string Menu { get; set; } = "";
+    /// <summary>Content language the new item belongs to (Create only; carried through as a hidden field
+    /// so a validation re-render keeps it). Edit leaves the existing item's locale untouched.</summary>
+    public string? Locale { get; set; }
     public string? Label { get; set; }
     public string? Url { get; set; }
     public string? Icon { get; set; }

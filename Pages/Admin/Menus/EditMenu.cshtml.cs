@@ -9,7 +9,8 @@ namespace MatCMS.Pages.Admin.Menus;
 public class EditMenuModel : PageModel
 {
     private readonly AppDbContext _db;
-    public EditMenuModel(AppDbContext db) => _db = db;
+    private readonly MatCMS.Services.SiteContext _site;
+    public EditMenuModel(AppDbContext db, MatCMS.Services.SiteContext site) { _db = db; _site = site; }
 
     public Menu Current { get; private set; } = default!;
     public List<MenuItem> Items { get; private set; } = new();
@@ -20,17 +21,40 @@ public class EditMenuModel : PageModel
     [BindProperty] public string? Name { get; set; }
     public string? Error { get; private set; }
 
-    public async Task<IActionResult> OnGetAsync(int id)
+    /// <summary>The language whose items are currently shown/edited (first-level selector).</summary>
+    public string SelectedLocale { get; private set; } = MatCMS.Services.Localizer.DefaultCulture;
+    /// <summary>Languages offered in the dropdown: the site's active languages plus any language that
+    /// already has items in this menu (so imported translations are never hidden). Default first.</summary>
+    public IReadOnlyList<string> AvailableLocales { get; private set; } = new List<string>();
+
+    public async Task<IActionResult> OnGetAsync(int id, string? locale)
     {
         var m = await _db.Menus.FindAsync(id);
         if (m is null) return RedirectToPage("Index");
         Current = m;
         Name = m.Name;
-        await LoadItemsAsync(m.Key);
+        await BuildLocalesAsync(m.Key, locale);
+        await LoadItemsAsync(m.Key, SelectedLocale);
         return Page();
     }
 
-    public async Task<IActionResult> OnPostAsync(int id)
+    /// <summary>Resolve the language dropdown options + the currently selected language.</summary>
+    private async Task BuildLocalesAsync(string key, string? requested)
+    {
+        var present = await _db.MenuItems.Where(x => x.Menu == key)
+            .Select(x => x.Locale).Distinct().ToListAsync();
+        var set = new HashSet<string>(_site.ActiveLocales, StringComparer.OrdinalIgnoreCase)
+        {
+            MatCMS.Services.Localizer.DefaultCulture
+        };
+        foreach (var p in present) if (!string.IsNullOrWhiteSpace(p)) set.Add(p);
+        AvailableLocales = MatCMS.Services.Localizer.SupportedCultures.Where(set.Contains).ToList();
+        SelectedLocale = !string.IsNullOrWhiteSpace(requested) && set.Contains(requested)
+            ? AvailableLocales.First(c => string.Equals(c, requested, StringComparison.OrdinalIgnoreCase))
+            : MatCMS.Services.Localizer.DefaultCulture;
+    }
+
+    public async Task<IActionResult> OnPostAsync(int id, string? locale)
     {
         var m = await _db.Menus.FindAsync(id);
         if (m is null) return RedirectToPage("Index");
@@ -40,13 +64,14 @@ public class EditMenuModel : PageModel
         if (string.IsNullOrWhiteSpace(name))
         {
             Error = "Bitte einen Namen angeben.";
-            await LoadItemsAsync(m.Key);
+            await BuildLocalesAsync(m.Key, locale);
+            await LoadItemsAsync(m.Key, SelectedLocale);
             return Page();
         }
         m.Name = name;
         await _db.SaveChangesAsync();
         TempData["Flash"] = "Menü gespeichert.";
-        return RedirectToPage(new { id });
+        return RedirectToPage(new { id, locale });
     }
 
     public async Task<IActionResult> OnPostDeleteAsync(int id)
@@ -66,7 +91,7 @@ public class EditMenuModel : PageModel
         return RedirectToPage("Index");
     }
 
-    public async Task<IActionResult> OnPostDeleteItemAsync(int id, int itemId)
+    public async Task<IActionResult> OnPostDeleteItemAsync(int id, int itemId, string? locale)
     {
         var item = await _db.MenuItems.FindAsync(itemId);
         if (item is not null)
@@ -75,10 +100,10 @@ public class EditMenuModel : PageModel
             await _db.SaveChangesAsync();
             TempData["Flash"] = "Menüpunkt gelöscht.";
         }
-        return RedirectToPage(new { id });
+        return RedirectToPage(new { id, locale });
     }
 
-    public async Task<IActionResult> OnPostReorderAsync(int id, string menu, int[] order)
+    public async Task<IActionResult> OnPostReorderAsync(int id, string menu, int[] order, string? locale)
     {
         var items = await _db.MenuItems.Where(m => m.Menu == menu).ToListAsync();
         if (order is { Length: > 0 })
@@ -91,12 +116,12 @@ public class EditMenuModel : PageModel
             }
             await _db.SaveChangesAsync();
         }
-        return RedirectToPage(new { id });
+        return RedirectToPage(new { id, locale });
     }
 
-    private async Task LoadItemsAsync(string key)
+    private async Task LoadItemsAsync(string key, string locale)
     {
-        Items = await _db.MenuItems.Where(m => m.Menu == key)
+        Items = await _db.MenuItems.Where(m => m.Menu == key && m.Locale == locale)
             .OrderBy(m => m.SortOrder).ThenBy(m => m.Id).ToListAsync();
 
         // Flatten the tree (parent → children) with a depth for indentation.

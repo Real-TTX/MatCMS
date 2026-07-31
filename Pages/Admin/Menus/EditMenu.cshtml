@@ -10,6 +10,21 @@
 
 <div class="card">
     <h2>@T["menus.entries"]</h2>
+
+    @* First level = language: pick which language's items to view/edit (multi-language sites only). *@
+    @if (Model.AvailableLocales.Count > 1)
+    {
+        <div class="menu-lang-bar" style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+            <label for="menu-lang" class="muted" style="margin:0;">@T["editor.language"]:</label>
+            <select id="menu-lang" class="menu-lang-select" style="max-width:280px;" onchange="if(this.value)location.href=this.value;" aria-label="@T["editor.language"]">
+                @foreach (var loc in Model.AvailableLocales)
+                {
+                    <option value="@Url.Page("EditMenu", new { id = Model.Current.Id, locale = loc })" selected="@(loc == Model.SelectedLocale ? "selected" : null)">@MatCMS.Services.Localizer.DisplayName(loc) (@loc.ToUpperInvariant())</option>
+                }
+            </select>
+        </div>
+    }
+
     @if (Model.Items.Count == 0)
     {
         <p class="muted">@T["menus.noItems"]</p>
@@ -28,23 +43,23 @@
                     <span class="b-icon"><i class="ti ti-@MatCMS.Content.MenuIcons.Resolve(it.Icon)" aria-hidden="true"></i></span>
                 }
                 <div class="b-info">
-                    <div class="b-type">@it.Label <span class="badge badge-off mono" style="font-size:10px;">@it.Locale</span></div>
+                    <div class="b-type">@it.Label</div>
                     <div class="b-sum">@it.Url@(it.OpenInNewTab ? " · " + T["menus.newTab"] : "")</div>
                 </div>
                 <div class="actions">
                     <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@it.Id">@T["action.edit"]</a>
-                    <form class="inline-form" method="post" asp-page-handler="DeleteItem" asp-route-id="@Model.Current.Id" asp-route-itemId="@it.Id" onsubmit="return confirm('@T["menus.confirmDelete", it.Label]');">
+                    <form class="inline-form" method="post" asp-page-handler="DeleteItem" asp-route-id="@Model.Current.Id" asp-route-itemId="@it.Id" asp-route-locale="@Model.SelectedLocale" onsubmit="return confirm('@T["menus.confirmDelete", it.Label]');">
                         <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
                     </form>
                 </div>
             </div>
         }
     </div>
-    <form id="reorder-items" method="post" asp-page-handler="Reorder" asp-route-id="@Model.Current.Id" asp-route-menu="@Model.Current.Key" style="display:none;">
+    <form id="reorder-items" method="post" asp-page-handler="Reorder" asp-route-id="@Model.Current.Id" asp-route-menu="@Model.Current.Key" asp-route-locale="@Model.SelectedLocale" style="display:none;">
         <div data-order-inputs></div>
     </form>
     <div class="list-actions">
-        <a class="btn" asp-page="Create" asp-route-menu="@Model.Current.Key">@T["menus.addItem"]</a>
+        <a class="btn" asp-page="Create" asp-route-menu="@Model.Current.Key" asp-route-locale="@Model.SelectedLocale">@T["menus.addItem"]</a>
     </div>
 </div>
 
@@ -54,7 +69,7 @@
     {
         <div class="alert alert-error">@Model.Error</div>
     }
-    <form method="post" class="form-grid">
+    <form method="post" class="form-grid" asp-route-locale="@Model.SelectedLocale">
         <div class="form-row">
             <div class="form-field">
                 <label for="Name">@T["menus.menuName"]</label>

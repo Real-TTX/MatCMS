@@ -23,6 +23,8 @@ public class EditModel : PageModel
     public List<Menu> Menus { get; private set; } = new();
     public List<MenuItem> ParentOptions { get; private set; } = new();
     public int? MenuId { get; private set; }
+    /// <summary>The edited item's content language — used to return to the right language tab.</summary>
+    public string ItemLocale { get; private set; } = MatCMS.Services.Localizer.DefaultCulture;
     public string? Error { get; private set; }
 
     public async Task<IActionResult> OnGetAsync(int id)
@@ -36,6 +38,7 @@ public class EditModel : PageModel
         Icon = item.Icon;
         OpenInNewTab = item.OpenInNewTab;
         ParentId = item.ParentId;
+        ItemLocale = item.Locale;
         await LoadListsAsync();
         MenuId = Menus.FirstOrDefault(m => m.Key == Menu)?.Id;
         await LoadParentOptionsAsync(item);
@@ -46,6 +49,7 @@ public class EditModel : PageModel
     {
         var item = await _db.MenuItems.FindAsync(id);
         if (item is null) return NotFound();
+        ItemLocale = item.Locale;
 
         await LoadListsAsync();
         var label = (Label ?? "").Trim();
@@ -70,7 +74,7 @@ public class EditModel : PageModel
         await _db.SaveChangesAsync();
 
         TempData["Flash"] = "Menüpunkt gespeichert.";
-        return MenuId is int mid ? RedirectToPage("EditMenu", new { id = mid }) : RedirectToPage("Index");
+        return MenuId is int mid ? RedirectToPage("EditMenu", new { id = mid, locale = item.Locale }) : RedirectToPage("Index");
     }
 
     private async Task LoadListsAsync()

@@ -1,5 +1,9 @@
 @model MatCMS.Pages.Admin.Menus.MenuItemFormVm
 <form method="post" class="form-grid">
+    @if (!string.IsNullOrEmpty(Model.Locale))
+    {
+        <input type="hidden" name="Locale" value="@Model.Locale" />
+    }
     <div class="form-row">
         <div class="form-field">
             <label for="Menu">@T["menus.menu"]</label>

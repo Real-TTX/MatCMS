@@ -199,7 +199,8 @@
                             <td class="mono">@b.Name</td>
                             <td>@Fmt(b.SizeBytes)</td>
                             <td>@b.ModifiedUtc.ToLocalTime().ToString("g")</td>
-                            <td class="actions">
+                            <td>
+                              <div class="actions">
                                 <a class="btn btn-sm btn-ghost" asp-page-handler="Download" asp-route-name="@b.Name">↓</a>
                                 <form method="post" asp-page-handler="RestoreStored" asp-route-name="@b.Name" class="inline-form"
                                       onsubmit="return confirm('@T["backup.restoreStoredConfirm"]');">
@@ -209,6 +210,7 @@
                                       onsubmit="return confirm('@T["backup.deleteConfirm"]');">
                                     <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
                                 </form>
+                              </div>
                             </td>
                         </tr>
                     }

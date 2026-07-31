@@ -307,6 +307,8 @@
   "forms.el.description.desc": "An explanatory paragraph.",
   "forms.el.text.name": "Text field",
   "forms.el.text.desc": "Single-line input for free text.",
+  "forms.el.textarea.name": "Text area (multiline)",
+  "forms.el.textarea.desc": "Multiline text field for longer input (e.g. a message).",
   "forms.el.date.name": "Date",
   "forms.el.date.desc": "Date picker.",
   "forms.el.number.name": "Number",

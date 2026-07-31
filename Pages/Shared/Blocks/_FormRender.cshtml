@@ -36,7 +36,16 @@
 
         var reqAttr = el.Required ? " required data-required=\"1\"" : "";
         var disAttr = Model.Preview ? " disabled" : "";
-        if (el.Type == "select")
+        if (el.Type == "textarea")
+        {
+            sb.Append("<textarea id=\"fld_").Append(el.Id).Append("\" name=\"").Append(el.Id).Append("\" rows=\"5\"");
+            if (!string.IsNullOrWhiteSpace(el.Placeholder))
+                sb.Append(" placeholder=\"").Append(System.Net.WebUtility.HtmlEncode(el.Placeholder)).Append('"');
+            sb.Append(reqAttr).Append(disAttr).Append('>');
+            sb.Append(System.Net.WebUtility.HtmlEncode(val));
+            sb.Append("</textarea>");
+        }
+        else if (el.Type == "select")
         {
             sb.Append("<select id=\"fld_").Append(el.Id).Append("\" name=\"").Append(el.Id).Append('"').Append(reqAttr).Append(disAttr).Append('>');
             sb.Append("<option value=\"\">– Bitte auswählen –</option>");

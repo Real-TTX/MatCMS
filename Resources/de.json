@@ -307,6 +307,8 @@
   "forms.el.description.desc": "Ein erklärender Textabsatz.",
   "forms.el.text.name": "Textfeld",
   "forms.el.text.desc": "Einzeiliges Eingabefeld für freien Text.",
+  "forms.el.textarea.name": "Textfeld (mehrzeilig)",
+  "forms.el.textarea.desc": "Mehrzeiliges Textfeld für längere Eingaben (z. B. Nachricht).",
   "forms.el.date.name": "Datum",
   "forms.el.date.desc": "Datumsauswahl.",
   "forms.el.number.name": "Zahl",

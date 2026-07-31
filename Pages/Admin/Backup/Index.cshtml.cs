@@ -7,6 +7,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace MatCMS.Pages.Admin.Backup;
 
+// Kestrel's default 30 MB body cap makes multi-gallery backups fail as HTTP 400 mid-upload — the
+// browser keeps streaming until done and only then sees the reject, which looks like an endless
+// restore. Razor Pages ignores these filter attributes on handler METHODS, so they must sit on the
+// PageModel CLASS (applies to all handlers of this page; only Import ever receives large bodies).
+[RequestSizeLimit(200L * 1024 * 1024)]
+[RequestFormLimits(MultipartBodyLengthLimit = 200L * 1024 * 1024)]
 public class IndexModel : PageModel
 {
     private readonly ContentTransferService _transfer;
@@ -121,10 +127,6 @@ public class IndexModel : PageModel
         }
     }
 
-    // Kestrel's default 30 MB body cap causes multi-gallery backups to 400 mid-upload. Bump only
-    // for this specific handler so the rest of the app keeps the safer default.
-    [RequestSizeLimit(200L * 1024 * 1024)]
-    [RequestFormLimits(MultipartBodyLengthLimit = 200L * 1024 * 1024)]
     public async Task<IActionResult> OnPostImportAsync()
     {
         if (!Confirm)

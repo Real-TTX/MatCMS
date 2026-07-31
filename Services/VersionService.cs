@@ -75,22 +75,43 @@ public class VersionService
             using var tokDoc = JsonDocument.Parse(await tokRes.Content.ReadAsStringAsync(ct));
             var token = tokDoc.RootElement.TryGetProperty("token", out var t) ? t.GetString() : null;
 
-            // 2) List image tags.
-            var req = new HttpRequestMessage(HttpMethod.Get, $"https://ghcr.io/v2/{Owner}/{Repo}/tags/list");
-            if (!string.IsNullOrEmpty(token))
-                req.Headers.Authorization = new("Bearer", token);
-            using var tagRes = await client.SendAsync(req, ct);
-            if (!tagRes.IsSuccessStatusCode)
-                return new(current, null, false, $"Registry: HTTP {(int)tagRes.StatusCode}");
+            // 2) List ALL image tags. GHCR returns the tag list in creation order and PAGINATES it via a
+            //    "Link: <…>; rel=\"next\"" header. Without following that header we only ever see the
+            //    first (oldest) page, so the computed "latest" is stale and the check wrongly reports
+            //    "up to date". Follow the Link header until it's gone (page cap as a safety net).
+            var tags = new List<string>();
+            var next = $"https://ghcr.io/v2/{Owner}/{Repo}/tags/list?n=100";
+            for (var page = 0; page < 20 && next is not null; page++)
+            {
+                var req = new HttpRequestMessage(HttpMethod.Get, next);
+                if (!string.IsNullOrEmpty(token))
+                    req.Headers.Authorization = new("Bearer", token);
+                using var tagRes = await client.SendAsync(req, ct);
+                if (!tagRes.IsSuccessStatusCode)
+                    return new(current, null, false, $"Registry: HTTP {(int)tagRes.StatusCode}");
 
-            using var tagDoc = JsonDocument.Parse(await tagRes.Content.ReadAsStringAsync(ct));
-            if (!tagDoc.RootElement.TryGetProperty("tags", out var tagsEl) || tagsEl.ValueKind != JsonValueKind.Array)
+                using var tagDoc = JsonDocument.Parse(await tagRes.Content.ReadAsStringAsync(ct));
+                if (tagDoc.RootElement.TryGetProperty("tags", out var tagsEl) && tagsEl.ValueKind == JsonValueKind.Array)
+                    tags.AddRange(tagsEl.EnumerateArray().Select(e => e.GetString()).Where(s => !string.IsNullOrEmpty(s))!);
+
+                // Next page: "Link: </v2/…/tags/list?last=…&n=…>; rel=\"next\"" (relative path → prefix host).
+                next = null;
+                if (tagRes.Headers.TryGetValues("Link", out var links))
+                {
+                    var m = Regex.Match(string.Join(",", links), @"<([^>]+)>\s*;\s*rel=""next""");
+                    if (m.Success)
+                    {
+                        var u = m.Groups[1].Value;
+                        next = u.StartsWith("http") ? u : $"https://ghcr.io{u}";
+                    }
+                }
+            }
+
+            if (tags.Count == 0)
                 return new(current, null, false, "Keine Tags gefunden.");
 
-            var versioned = tagsEl.EnumerateArray()
-                .Select(e => e.GetString())
-                .Where(s => !string.IsNullOrEmpty(s))
-                .Select(s => (tag: s!, ver: ParseVer(s!)))
+            var versioned = tags
+                .Select(s => (tag: s, ver: ParseVer(s)))
                 .Where(x => x.ver is not null)
                 .Select(x => (x.tag, v: x.ver!.Value))
                 .OrderByDescending(x => x.v, Comparer<(int, int, int)>.Create(Cmp))

@@ -131,6 +131,41 @@ public static class LayoutRenderer
         return sb.ToString();
     }
 
+    /// <summary>
+    /// The FALLBACK language switcher: a closed dropdown showing the current language code; clicking
+    /// it opens the list (toggled by wwwroot/js/lang-switch.js, styled in site.css). Used only when
+    /// the layout does not place its own switcher — both in the built-in default header and as the
+    /// floating top-right overlay on custom layouts without a <c>{{languages}}</c> placeholder.
+    /// </summary>
+    public static string RenderLangDropdown(IReadOnlyList<LangLink> langs, bool overlay = false)
+    {
+        if (langs.Count < 2) return "";
+        var current = langs.FirstOrDefault(l => l.IsCurrent) ?? langs[0];
+        string Enc(string s) => WebUtility.HtmlEncode(s);
+
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"mat-lang").Append(overlay ? " mat-lang--overlay" : "")
+          .Append("\" data-mat-lang role=\"navigation\" aria-label=\"Language\">");
+        sb.Append("<button type=\"button\" class=\"mat-lang-btn\" aria-haspopup=\"true\" aria-expanded=\"false\">")
+          .Append("<span class=\"mat-lang-cur\">").Append(Enc(current.Locale.ToUpperInvariant())).Append("</span>")
+          .Append("<svg class=\"mat-lang-chev\" viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" ")
+          .Append("stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\">")
+          .Append("<path d=\"M6 9l6 6 6-6\"/></svg>")
+          .Append("</button>");
+        sb.Append("<div class=\"mat-lang-menu\" hidden>");
+        foreach (var l in langs)
+        {
+            sb.Append($"<a href=\"{Enc(l.Url)}\" hreflang=\"{Enc(l.Locale)}\"")
+              .Append(l.IsCurrent ? " class=\"is-current\" aria-current=\"true\"" : "")
+              .Append('>')
+              .Append(Enc(MatCMS.Services.Localizer.DisplayName(l.Locale)))
+              .Append(" <span class=\"mat-lang-code\">").Append(Enc(l.Locale.ToUpperInvariant())).Append("</span>")
+              .Append("</a>");
+        }
+        sb.Append("</div></div>");
+        return sb.ToString();
+    }
+
     /// <summary>Parse the stored slot→menu map.</summary>
     public static Dictionary<string, string> ParseMap(string? json)
     {

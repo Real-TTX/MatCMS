@@ -147,6 +147,84 @@ h1, h2, h3, h4 {
 .lang-switch a:hover { color: var(--ink); }
 .lang-switch a.lang-current { color: var(--accent); }
 
+/* Fallback language switcher (.mat-lang): closed dropdown, opens on click. Rendered only when the
+   layout does not define its own switcher — in the default header (top right, vertically centered
+   in the menu row) and, for custom layouts, as a fixed top-right overlay. */
+.mat-lang {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    align-self: center;
+    margin-left: 18px;
+}
+.mat-lang-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--line, #e2e4e8);
+    background: #fff;
+    border-radius: 999px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--ink, #222);
+}
+.mat-lang-btn:hover { border-color: var(--accent); color: var(--accent); }
+.mat-lang-chev { transition: transform .18s ease; }
+.mat-lang.open .mat-lang-chev { transform: rotate(180deg); }
+.mat-lang-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 190px;
+    background: #fff;
+    border: 1px solid var(--line, #e2e4e8);
+    border-radius: 12px;
+    box-shadow: 0 14px 38px rgba(0, 0, 0, .14);
+    padding: 6px;
+    z-index: 1200;
+}
+.mat-lang-menu a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-size: 14px;
+    color: var(--ink, #222);
+    white-space: nowrap;
+}
+.mat-lang-menu a::after { display: none; }
+.mat-lang-menu a:hover { background: var(--bg-alt, #f4f5f7); }
+.mat-lang-menu a.is-current { color: var(--accent); font-weight: 700; }
+.mat-lang-code {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    color: var(--muted, #6b7280);
+}
+
+/* Custom layouts without a {{languages}} placeholder: same dropdown, floating top right. */
+.mat-lang--overlay {
+    position: fixed;
+    top: 14px;
+    right: 14px;
+    z-index: 1300;
+    margin: 0;
+}
+.mat-lang--overlay .mat-lang-btn {
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .14);
+    backdrop-filter: blur(6px);
+    background: rgba(255, 255, 255, .94);
+}
+
 /* Mobile nav toggle */
 .nav-toggle, .nav-toggle-label { display: none; }
 
@@ -606,6 +684,9 @@ h1, h2, h3, h4 {
     .main-nav a::after { display: none; }
     .nav-toggle:checked ~ .main-nav { display: flex; }
     .lang-switch { padding: 12px 0 0; margin: 0; border-left: none; }
+    /* Fallback dropdown inside the collapsed mobile nav: own row, menu opens in-flow (no clipping). */
+    .mat-lang { margin: 12px 0 0; align-self: flex-start; }
+    .mat-lang-menu { position: static; margin-top: 8px; box-shadow: none; }
 
     .columns-grid.cols-2,
     .columns-grid.cols-3,

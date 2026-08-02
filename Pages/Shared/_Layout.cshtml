@@ -96,19 +96,8 @@
             && (tpl.LayoutHtml.Contains("{{#languages}}") || tpl.LayoutHtml.Contains("{{languages}}"));
         if (!hasLangPlaceholder && custLangs.Count > 1)
         {
-            var ov = new System.Text.StringBuilder(
-                "<div class=\"mat-lang-overlay\" role=\"navigation\" aria-label=\"Sprache\" " +
-                "style=\"position:fixed;top:12px;right:12px;z-index:1000;display:flex;gap:4px;" +
-                "background:rgba(255,255,255,.92);backdrop-filter:blur(6px);border:1px solid rgba(0,0,0,.1);" +
-                "border-radius:999px;padding:4px 6px;box-shadow:0 4px 14px rgba(0,0,0,.14);" +
-                "font:600 13px/1 system-ui,sans-serif;\">");
-            foreach (var l in custLangs)
-                ov.Append($"<a href=\"{Enc(l.Url)}\" hreflang=\"{Enc(l.Locale)}\" " +
-                          $"style=\"text-decoration:none;padding:5px 9px;border-radius:999px;" +
-                          $"{(l.IsCurrent ? "background:#111;color:#fff;" : "color:#333;")}\">" +
-                          $"{Enc(l.Locale.ToUpperInvariant())}</a>");
-            ov.Append("</div>");
-            customBody += ov.ToString();
+            // Closed dropdown, fixed top right (opens on click; toggled by lang-switch.js).
+            customBody += MatCMS.Content.LayoutRenderer.RenderLangDropdown(custLangs, overlay: true);
         }
     }
 }
@@ -223,13 +212,9 @@ else
                 }
                 @if (langLinks.Count > 1)
                 {
-                    <span class="lang-switch" aria-label="@T["nav.language"]">
-                        @foreach (var l in langLinks)
-                        {
-                            <a href="@l.Url" hreflang="@l.Locale" class="@(l.IsCurrent ? "lang-current" : null)"
-                               aria-current="@(l.IsCurrent ? "true" : null)">@l.Locale.ToUpperInvariant()</a>
-                        }
-                    </span>
+                    @* Fallback switcher (no layout-defined one): closed dropdown, opens on click. *@
+                    @Html.Raw(MatCMS.Content.LayoutRenderer.RenderLangDropdown(
+                        langLinks.Select(l => new MatCMS.Content.LayoutRenderer.LangLink(l.Locale, l.Url, l.IsCurrent)).ToList()))
                 }
             </nav>
         </div>
@@ -257,6 +242,7 @@ else
 
     <script src="~/js/gallery.js" asp-append-version="true"></script>
     <script src="~/js/carousel.js" asp-append-version="true"></script>
+    <script src="~/js/lang-switch.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
     @if (!string.IsNullOrWhiteSpace(tpl.CustomJs))
     {

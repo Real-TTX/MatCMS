@@ -34,7 +34,7 @@ public class IndexModel : PageModel
     public async Task OnGetAsync()
     {
         var existing = await _db.SiteSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
-        foreach (var key in SettingKeys.All.Concat(SettingKeys.Smtp).Concat(SettingKeys.Errors).Concat(SettingKeys.Code).Concat(SettingKeys.Maintenance))
+        foreach (var key in SettingKeys.All.Concat(SettingKeys.Smtp).Concat(SettingKeys.Errors).Concat(SettingKeys.Code).Concat(SettingKeys.Maintenance).Concat(SettingKeys.Translate))
             Values[key] = existing.TryGetValue(key, out var v) ? v : "";
         CurrentActive = Localizer.ParseActive(existing.TryGetValue(SettingKeys.Languages, out var lv) ? lv : "")
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -107,6 +107,13 @@ public class IndexModel : PageModel
         await SaveKeysAsync(SettingKeys.Code);
         TempData["Flash"] = "Code / Tracking gespeichert.";
         return RedirectToPage(new { tab = "code" });
+    }
+
+    public async Task<IActionResult> OnPostTranslateAsync()
+    {
+        await SaveKeysAsync(SettingKeys.Translate);
+        TempData["Flash"] = "Übersetzungsdienst gespeichert.";
+        return RedirectToPage(new { tab = "languages" });
     }
 
     public async Task<IActionResult> OnPostMaintenanceAsync()

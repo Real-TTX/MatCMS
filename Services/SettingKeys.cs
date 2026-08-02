@@ -24,6 +24,13 @@ public static class SettingKeys
     // startup (Localizer.SetDefaultCulture) → a change needs an app restart. Managed under Settings → Sprachen.
     public const string DefaultLanguage = "i18n.default";
 
+    // Machine translation (Settings → Sprachen): provider "deepl" | "libretranslate" | "" (off).
+    // DeepL free keys end in ":fx" (api-free.deepl.com); LibreTranslate needs a reachable URL
+    // (self-hosted container or public instance), key optional.
+    public const string TranslateProvider = "translate.provider";
+    public const string TranslateApiKey = "translate.apiKey";
+    public const string TranslateUrl = "translate.url";
+
     // SEO: "true" serves /sitemap.xml (+ a /robots.txt that references it); anything else = off.
     public const string SitemapEnabled = "sitemap.enabled";
 
@@ -78,4 +85,7 @@ public static class SettingKeys
 
     /// <summary>Maintenance-mode keys (managed on the Settings → Wartung tab).</summary>
     public static readonly string[] Maintenance = [MaintenanceEnabled, MaintenanceTitle, MaintenanceMessage];
+
+    /// <summary>Machine-translation keys (managed on the Settings → Sprachen tab).</summary>
+    public static readonly string[] Translate = [TranslateProvider, TranslateApiKey, TranslateUrl];
 }

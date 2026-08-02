@@ -875,5 +875,16 @@
   "dp.placeholder": "Datum wählen",
   "dp.placeholderRange": "Zeitraum wählen",
   "dp.startLabel": "Anreise",
-  "dp.endLabel": "Abreise"
+  "dp.endLabel": "Abreise",
+  "editor.autoTranslate": "Automatisch übersetzen",
+  "editor.autoTranslateTitle": "Alle Texte dieser Version maschinell aus der Standardsprache übersetzen",
+  "editor.autoTranslateConfirm": "Alle Texte dieser Version werden aus der Standardsprache neu übersetzt und ÜBERSCHRIEBEN. Fortfahren?",
+  "settings.translate.heading": "Maschinelle Übersetzung",
+  "settings.translate.intro": "Für den ⚡-Button im Seiten-Editor (Version automatisch aus der Standardsprache übersetzen). DeepL: kostenloser API-Schlüssel mit 500.000 Zeichen/Monat (Schlüssel endet auf „:fx“). LibreTranslate: eigene Instanz (z. B. Docker-Container) — kostenlos und ohne Limit.",
+  "settings.translate.provider": "Anbieter",
+  "settings.translate.off": "— Aus —",
+  "settings.translate.apiKey": "API-Schlüssel",
+  "settings.translate.apiKeyHelp": "DeepL: erforderlich. LibreTranslate: nur falls die Instanz einen Schlüssel verlangt.",
+  "settings.translate.url": "Server-URL (nur LibreTranslate)",
+  "settings.translate.urlHelp": "z. B. http://libretranslate:5000 (Container im selben Docker-Netz) oder eine öffentliche Instanz."
 }

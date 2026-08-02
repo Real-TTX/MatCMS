@@ -210,12 +210,16 @@ h1, h2, h3, h4 {
     letter-spacing: .06em;
     color: var(--muted, #6b7280);
 }
+.mat-lang-name { display: inline-flex; align-items: center; gap: 9px; }
+.mat-lang-flag { border-radius: 2px; box-shadow: 0 0 0 1px rgba(0, 0, 0, .08); flex: 0 0 auto; display: block; }
 
-/* Custom layouts without a {{languages}} placeholder: same dropdown, floating top right. */
+/* Custom layouts without a {{languages}} placeholder: same dropdown, floating top right.
+   top: 24px puts the button's center at ~38px — level with the menu row of typical 70–90px
+   headers, so it reads as part of the navigation instead of hovering above it. */
 .mat-lang--overlay {
     position: fixed;
-    top: 14px;
-    right: 14px;
+    top: 24px;
+    right: 18px;
     z-index: 1300;
     margin: 0;
 }

@@ -93,7 +93,8 @@
         // Overlay fallback: if the template doesn't place a {{#languages}}/{{languages}} switcher itself,
         // inject a small floating one so a multilingual site always has a language selector.
         var hasLangPlaceholder = tpl.LayoutHtml is not null
-            && (tpl.LayoutHtml.Contains("{{#languages}}") || tpl.LayoutHtml.Contains("{{languages}}"));
+            && (tpl.LayoutHtml.Contains("{{#languages}}") || tpl.LayoutHtml.Contains("{{languages}}")
+                || tpl.LayoutHtml.Contains("{{languages:dropdown}}") || tpl.LayoutHtml.Contains("{{languages:flags}}"));
         if (!hasLangPlaceholder && custLangs.Count > 1)
         {
             // Closed dropdown, fixed top right (opens on click; toggled by lang-switch.js).

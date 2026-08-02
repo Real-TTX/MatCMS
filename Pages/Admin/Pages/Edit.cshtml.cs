@@ -18,13 +18,18 @@ public class EditModel : PageModel
 {
     private readonly AppDbContext _db;
     private readonly Localizer _t;
+    private readonly TranslationService _translator;
 
-    public EditModel(AppDbContext db, BlockRegistry registry, Localizer t)
+    public EditModel(AppDbContext db, BlockRegistry registry, Localizer t, TranslationService translator)
     {
         _db = db;
         Registry = registry;
         _t = t;
+        _translator = translator;
     }
+
+    /// <summary>True when a machine-translation provider is configured (shows the auto-translate button).</summary>
+    public bool TranslatorConfigured { get; private set; }
 
     public BlockRegistry Registry { get; }
     public PageEntity Current { get; private set; } = default!;
@@ -72,6 +77,7 @@ public class EditModel : PageModel
         if (page is null) return NotFound();
 
         Current = page;
+        TranslatorConfigured = (await _translator.GetConfigAsync()).IsConfigured;
         BlocksJson = JsonSerializer.Serialize(
             page.Blocks.OrderBy(b => b.SortOrder).Select(b => new
             {
@@ -191,6 +197,129 @@ public class EditModel : PageModel
 
     // Creates a translation of this page in another locale (same TranslationGroup), copying its
     // blocks as a starting point. The new page is a draft and opens in the editor.
+    /// <summary>
+    /// Machine-translates THIS (non-default-locale) version from its default-locale sibling: every
+    /// translatable text field of every source block is translated and written into this page's
+    /// blocks (matched in tree order, same block type), plus Title/MetaDescription. Overwrites the
+    /// texts of this version — intended to produce a fresh MT draft right after "create translation";
+    /// the editor/diff remain the place to polish it.
+    /// </summary>
+    public async Task<IActionResult> OnPostAutoTranslateAsync(int id)
+    {
+        var page = await Load(id);
+        if (page is null) return NotFound();
+
+        if (page.Locale == Localizer.DefaultCulture)
+        {
+            TempData["FlashError"] = "Die Standardsprache ist die Quelle – bitte eine Übersetzungs-Version öffnen.";
+            return RedirectToPage(new { id });
+        }
+        var source = string.IsNullOrWhiteSpace(page.TranslationGroup) ? null
+            : await _db.Pages.Include(p => p.Blocks).AsNoTracking()
+                .FirstOrDefaultAsync(p => p.TranslationGroup == page.TranslationGroup
+                                       && p.Locale == Localizer.DefaultCulture);
+        if (source is null)
+        {
+            TempData["FlashError"] = "Keine Quellversion in der Standardsprache gefunden.";
+            return RedirectToPage(new { id });
+        }
+
+        // Machine settings, not content — never send these to the translator (same list as the diff).
+        var skipKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "align", "width", "layout", "columns", "imageHeight", "size", "display",
+            "showFilter", "source", "perPage", "limit", "form", "tag", "tags",
+            "_width", "_spaceTop", "_spaceBottom", "buttonStyle", "icon",
+            "imageSide", "bg", "fg", "position", "variant", "style"
+        };
+        static bool Translatable(string s) =>
+            s.Length > 1 && s.Any(char.IsLetter) && !s.StartsWith("/") && !s.StartsWith("http");
+
+        // Collect all texts first (two batches: plain and HTML-bearing), remembering write-back slots.
+        var plainTexts = new List<string>(); var htmlTexts = new List<string>();
+        var slots = new List<(JsonObject Obj, string Prop, bool Html, int Index)>();
+        var roots = new List<(ContentBlock Target, JsonNode Root)>();
+
+        void Collect(JsonNode? node)
+        {
+            switch (node)
+            {
+                case JsonObject obj:
+                    foreach (var p in obj.ToList())
+                    {
+                        if (skipKeys.Contains(p.Key)) continue;
+                        if (p.Value is JsonValue v && v.TryGetValue<string>(out var s) && Translatable(s))
+                        {
+                            var isHtml = s.Contains('<');
+                            var list = isHtml ? htmlTexts : plainTexts;
+                            slots.Add((obj, p.Key, isHtml, list.Count));
+                            list.Add(s);
+                        }
+                        else Collect(p.Value);
+                    }
+                    break;
+                case JsonArray arr:
+                    foreach (var it in arr) Collect(it);
+                    break;
+            }
+        }
+
+        // Match source→target blocks in tree order; only same-type pairs are translated.
+        static List<ContentBlock> Flat(ICollection<ContentBlock> blocks)
+        {
+            var result = new List<ContentBlock>();
+            void Add(int? parentId)
+            {
+                foreach (var b in blocks.Where(x => x.ParentId == parentId).OrderBy(x => x.SortOrder).ThenBy(x => x.Id))
+                { result.Add(b); Add(b.Id); }
+            }
+            Add(null);
+            return result;
+        }
+        var srcFlat = Flat(source.Blocks);
+        var dstFlat = Flat(page.Blocks);
+        for (var i = 0; i < Math.Min(srcFlat.Count, dstFlat.Count); i++)
+        {
+            if (!string.Equals(srcFlat[i].BlockType, dstFlat[i].BlockType, StringComparison.Ordinal)) continue;
+            JsonNode? root;
+            try { root = JsonNode.Parse(string.IsNullOrWhiteSpace(srcFlat[i].DataJson) ? "{}" : srcFlat[i].DataJson); }
+            catch { continue; }
+            if (root is null) continue;
+            roots.Add((dstFlat[i], root));
+            Collect(root);
+        }
+
+        // Page meta rides along in the plain batch.
+        var titleIdx = -1; var metaIdx = -1;
+        if (Translatable(source.Title)) { titleIdx = plainTexts.Count; plainTexts.Add(source.Title); }
+        if (!string.IsNullOrWhiteSpace(source.MetaDescription) && Translatable(source.MetaDescription!))
+        { metaIdx = plainTexts.Count; plainTexts.Add(source.MetaDescription!); }
+
+        if (plainTexts.Count == 0 && htmlTexts.Count == 0)
+        {
+            TempData["FlashError"] = "Keine übersetzbaren Texte gefunden.";
+            return RedirectToPage(new { id });
+        }
+
+        var (okP, resP, errP) = await _translator.TranslateAsync(plainTexts, source.Locale, page.Locale, html: false);
+        if (!okP) { TempData["FlashError"] = $"Übersetzung fehlgeschlagen: {errP}"; return RedirectToPage(new { id }); }
+        var (okH, resH, errH) = await _translator.TranslateAsync(htmlTexts, source.Locale, page.Locale, html: true);
+        if (!okH) { TempData["FlashError"] = $"Übersetzung fehlgeschlagen: {errH}"; return RedirectToPage(new { id }); }
+
+        // Write back into the source-derived JSON trees, then persist them as THIS page's block data.
+        foreach (var (obj, prop, isHtml, index) in slots)
+            obj[prop] = isHtml ? resH[index] : resP[index];
+        foreach (var (target, root) in roots)
+            target.DataJson = root.ToJsonString(new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
+        if (titleIdx >= 0) page.Title = resP[titleIdx];
+        if (metaIdx >= 0) page.MetaDescription = resP[metaIdx];
+        page.UpdatedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync();
+        TempData["Flash"] = $"Automatisch übersetzt: {slots.Count} Feld(er) aus {source.Locale.ToUpperInvariant()} → {page.Locale.ToUpperInvariant()}.";
+        return RedirectToPage(new { id });
+    }
+
     public async Task<IActionResult> OnPostCreateTranslationAsync(int id, string locale)
     {
         var page = await _db.Pages.Include(p => p.Blocks).FirstOrDefaultAsync(p => p.Id == id);

@@ -875,5 +875,16 @@
   "dp.placeholder": "Select date",
   "dp.placeholderRange": "Select range",
   "dp.startLabel": "Check-in",
-  "dp.endLabel": "Check-out"
+  "dp.endLabel": "Check-out",
+  "editor.autoTranslate": "Auto-translate",
+  "editor.autoTranslateTitle": "Machine-translate all texts of this version from the default language",
+  "editor.autoTranslateConfirm": "All texts of this version will be re-translated from the default language and OVERWRITTEN. Continue?",
+  "settings.translate.heading": "Machine translation",
+  "settings.translate.intro": "Powers the ⚡ button in the page editor (auto-translate a version from the default language). DeepL: free API key with 500,000 chars/month (key ends in “:fx”). LibreTranslate: your own instance (e.g. Docker container) — free and unlimited.",
+  "settings.translate.provider": "Provider",
+  "settings.translate.off": "— Off —",
+  "settings.translate.apiKey": "API key",
+  "settings.translate.apiKeyHelp": "DeepL: required. LibreTranslate: only if your instance requires a key.",
+  "settings.translate.url": "Server URL (LibreTranslate only)",
+  "settings.translate.urlHelp": "e.g. http://libretranslate:5000 (container on the same Docker network) or a public instance."
 }

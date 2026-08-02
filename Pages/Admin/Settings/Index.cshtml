@@ -254,6 +254,35 @@
         </div>
     </form>
 
+    @* ---- Maschinelle Übersetzung (für den ⚡-Button im Seiten-Editor) ---- *@
+    <form method="post" asp-page-handler="Translate">
+        <div class="card" style="margin-top:18px;">
+            <h2>@T["settings.translate.heading"]</h2>
+            <p class="muted">@T["settings.translate.intro"]</p>
+            <div class="form-grid">
+                <div class="form-field">
+                    <label>@T["settings.translate.provider"]</label>
+                    <select name="Values[@SettingKeys.TranslateProvider]" id="tr-provider">
+                        <option value="" selected="@(V(SettingKeys.TranslateProvider) == "")">@T["settings.translate.off"]</option>
+                        <option value="deepl" selected="@(V(SettingKeys.TranslateProvider) == "deepl")">DeepL</option>
+                        <option value="libretranslate" selected="@(V(SettingKeys.TranslateProvider) == "libretranslate")">LibreTranslate</option>
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label>@T["settings.translate.apiKey"]</label>
+                    <input type="password" name="Values[@SettingKeys.TranslateApiKey]" value="@V(SettingKeys.TranslateApiKey)" autocomplete="new-password" spellcheck="false" />
+                    <div class="help">@T["settings.translate.apiKeyHelp"]</div>
+                </div>
+                <div class="form-field">
+                    <label>@T["settings.translate.url"]</label>
+                    <input name="Values[@SettingKeys.TranslateUrl]" value="@V(SettingKeys.TranslateUrl)" placeholder="http://libretranslate:5000" spellcheck="false" />
+                    <div class="help">@T["settings.translate.urlHelp"]</div>
+                </div>
+            </div>
+            <div><button type="submit" class="btn">@T["action.save"]</button></div>
+        </div>
+    </form>
+
     <dialog id="lang-dialog" class="mat-dialog">
         <form method="dialog">
             <h3 style="margin:0 0 12px;">@T["settings.langDialogTitle"]</h3>

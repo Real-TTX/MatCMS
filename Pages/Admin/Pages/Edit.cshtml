@@ -115,6 +115,13 @@
                                 <button type="submit" class="le-ver-add" title="@T["editor.addVersionTitle", MatCMS.Services.Localizer.DisplayName(loc)]">+ @loc.ToUpperInvariant()</button>
                             </form>
                         }
+                        @if (Model.TranslatorConfigured && Model.Current.Locale != MatCMS.Services.Localizer.DefaultCulture)
+                        {
+                            <form method="post" asp-page-handler="AutoTranslate" asp-route-id="@Model.Current.Id" class="le-ver-addform"
+                                  onsubmit="return confirm('@T["editor.autoTranslateConfirm"]');">
+                                <button type="submit" class="le-ver-add" title="@T["editor.autoTranslateTitle"]">⚡ @T["editor.autoTranslate"]</button>
+                            </form>
+                        }
                     </div>
                 }
                 <div class="le-section-label">@T["editor.blocks"]</div>

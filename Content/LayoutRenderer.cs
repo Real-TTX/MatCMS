@@ -60,6 +60,11 @@ public static class LayoutRenderer
             foreach (var l in langs) sb.Append(RenderLang(inner, l));
             return sb.ToString();
         });
+        // Dropdown variants a template can place anywhere (both render empty on single-language
+        // sites). Replaced BEFORE the plain {{languages}} token (exact-match Replace would not touch
+        // them, but keeping the order explicit avoids surprises).
+        html = html.Replace("{{languages:flags}}", langs.Count > 1 ? RenderLangDropdown(langs, flags: true) : "");
+        html = html.Replace("{{languages:dropdown}}", langs.Count > 1 ? RenderLangDropdown(langs) : "");
         html = html.Replace("{{languages}}", langs.Count > 1 ? DefaultLangs(langs) : "");
 
         // 3) Global placeholders — everything except {{content}} first, then the page content last
@@ -137,7 +142,7 @@ public static class LayoutRenderer
     /// the layout does not place its own switcher — both in the built-in default header and as the
     /// floating top-right overlay on custom layouts without a <c>{{languages}}</c> placeholder.
     /// </summary>
-    public static string RenderLangDropdown(IReadOnlyList<LangLink> langs, bool overlay = false)
+    public static string RenderLangDropdown(IReadOnlyList<LangLink> langs, bool overlay = false, bool flags = false)
     {
         if (langs.Count < 2) return "";
         var current = langs.FirstOrDefault(l => l.IsCurrent) ?? langs[0];
@@ -146,8 +151,9 @@ public static class LayoutRenderer
         var sb = new StringBuilder();
         sb.Append("<div class=\"mat-lang").Append(overlay ? " mat-lang--overlay" : "")
           .Append("\" data-mat-lang role=\"navigation\" aria-label=\"Language\">");
-        sb.Append("<button type=\"button\" class=\"mat-lang-btn\" aria-haspopup=\"true\" aria-expanded=\"false\">")
-          .Append("<span class=\"mat-lang-cur\">").Append(Enc(current.Locale.ToUpperInvariant())).Append("</span>")
+        sb.Append("<button type=\"button\" class=\"mat-lang-btn\" aria-haspopup=\"true\" aria-expanded=\"false\">");
+        if (flags) sb.Append(FlagSvg(current.Locale));
+        sb.Append("<span class=\"mat-lang-cur\">").Append(Enc(current.Locale.ToUpperInvariant())).Append("</span>")
           .Append("<svg class=\"mat-lang-chev\" viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" ")
           .Append("stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\">")
           .Append("<path d=\"M6 9l6 6 6-6\"/></svg>")
@@ -157,13 +163,38 @@ public static class LayoutRenderer
         {
             sb.Append($"<a href=\"{Enc(l.Url)}\" hreflang=\"{Enc(l.Locale)}\"")
               .Append(l.IsCurrent ? " class=\"is-current\" aria-current=\"true\"" : "")
-              .Append('>')
-              .Append(Enc(MatCMS.Services.Localizer.DisplayName(l.Locale)))
-              .Append(" <span class=\"mat-lang-code\">").Append(Enc(l.Locale.ToUpperInvariant())).Append("</span>")
+              .Append('>');
+            sb.Append("<span class=\"mat-lang-name\">");
+            if (flags) sb.Append(FlagSvg(l.Locale));
+            sb.Append(Enc(MatCMS.Services.Localizer.DisplayName(l.Locale))).Append("</span>");
+            sb.Append("<span class=\"mat-lang-code\">").Append(Enc(l.Locale.ToUpperInvariant())).Append("</span>")
               .Append("</a>");
         }
         sb.Append("</div></div>");
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// Tiny inline SVG flags (24×16) for the supported locales. Inline SVG instead of emoji flags
+    /// because Windows browsers don't render emoji flags (they fall back to bare letter pairs), and
+    /// instead of an image CDN so pages stay self-contained. Slightly simplified heraldry at 16 px.
+    /// </summary>
+    public static string FlagSvg(string locale)
+    {
+        var body = locale.ToLowerInvariant() switch
+        {
+            "de" => "<rect width='24' height='5.33' y='0' fill='#000'/><rect width='24' height='5.33' y='5.33' fill='#DD0000'/><rect width='24' height='5.34' y='10.66' fill='#FFCE00'/>",
+            "en" => "<rect width='24' height='16' fill='#012169'/><path d='M0 0l24 16M24 0L0 16' stroke='#fff' stroke-width='3.2'/><path d='M0 0l24 16M24 0L0 16' stroke='#C8102E' stroke-width='1.6'/><path d='M12 0v16M0 8h24' stroke='#fff' stroke-width='5'/><path d='M12 0v16M0 8h24' stroke='#C8102E' stroke-width='3'/>",
+            "hr" => "<rect width='24' height='5.33' fill='#FF0000'/><rect width='24' height='5.33' y='5.33' fill='#fff'/><rect width='24' height='5.34' y='10.66' fill='#171796'/><g><rect x='9.6' y='4.4' width='1.6' height='1.6' fill='#FF0000'/><rect x='12.8' y='4.4' width='1.6' height='1.6' fill='#FF0000'/><rect x='11.2' y='4.4' width='1.6' height='1.6' fill='#fff'/><rect x='9.6' y='6' width='1.6' height='1.6' fill='#fff'/><rect x='11.2' y='6' width='1.6' height='1.6' fill='#FF0000'/><rect x='12.8' y='6' width='1.6' height='1.6' fill='#fff'/><rect x='10.4' y='7.6' width='1.6' height='1.6' fill='#FF0000'/><rect x='12' y='7.6' width='1.6' height='1.6' fill='#fff'/></g>",
+            "sk" => "<rect width='24' height='5.33' fill='#fff'/><rect width='24' height='5.33' y='5.33' fill='#0B4EA2'/><rect width='24' height='5.34' y='10.66' fill='#EE1C25'/><path d='M7 4.5h4.4v4.2c0 1.9-1.3 2.9-2.2 3.3-.9-.4-2.2-1.4-2.2-3.3z' fill='#EE1C25' stroke='#fff' stroke-width='.5'/><path d='M8.6 6h1.2v1h1v1.1h-1v2h-1.2v-2h-1V7h1z' fill='#fff'/>",
+            "fr" => "<rect width='8' height='16' fill='#002395'/><rect width='8' height='16' x='8' fill='#fff'/><rect width='8' height='16' x='16' fill='#ED2939'/>",
+            "it" => "<rect width='8' height='16' fill='#009246'/><rect width='8' height='16' x='8' fill='#fff'/><rect width='8' height='16' x='16' fill='#CE2B37'/>",
+            "es" => "<rect width='24' height='16' fill='#AA151B'/><rect width='24' height='8' y='4' fill='#F1BF00'/>",
+            "nl" => "<rect width='24' height='5.33' fill='#AE1C28'/><rect width='24' height='5.33' y='5.33' fill='#fff'/><rect width='24' height='5.34' y='10.66' fill='#21468B'/>",
+            "pl" => "<rect width='24' height='8' fill='#fff'/><rect width='24' height='8' y='8' fill='#DC143C'/>",
+            _ => "<rect width='24' height='16' fill='#ccc'/>"
+        };
+        return "<svg class=\"mat-lang-flag\" viewBox=\"0 0 24 16\" width=\"21\" height=\"14\" aria-hidden=\"true\">" + body + "</svg>";
     }
 
     /// <summary>Parse the stored slot→menu map.</summary>

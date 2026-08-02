@@ -756,6 +756,8 @@
   "diff.missing": "missing",
   "diff.identicalHint": "identical to the source — perhaps not translated yet",
   "diff.missingHint": "not present in this language",
+  "diff.extra": "extra",
+  "diff.extraHint": "only present in this language — not in the source",
   "diff.noBlocks": "No other language versions to compare. Create a translation in the editor.",
   "diff.legend": "Legend",
   "diff.legendIns": "only in translation (new/translated)",

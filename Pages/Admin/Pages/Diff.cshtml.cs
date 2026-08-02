@@ -29,7 +29,7 @@ public class DiffModel : PageModel
     /// <summary>Per-locale tallies for the summary bar (locale → counts).</summary>
     public Dictionary<string, Counts> Totals { get; private set; } = new();
 
-    public sealed class Counts { public int Translated, Identical, Missing; }
+    public sealed class Counts { public int Translated, Identical, Missing, Extra; }
 
     /// <summary>One translation's cell in a block row.</summary>
     public record Cell(string Locale, string DiffHtml, string Status);
@@ -56,21 +56,30 @@ public class DiffModel : PageModel
 
         var src = Flatten(Source.Blocks);
         var flat = translations.ToDictionary(p => p.Locale, p => Flatten(p.Blocks));
-        var max = new[] { src.Count }.Concat(flat.Values.Select(v => v.Count)).Max();
 
-        for (var i = 0; i < max; i++)
+        // Align every translation to the source by BLOCK TYPE (not by raw position): this way a block
+        // that is missing — or one added only in a translation — is detected wherever it sits, instead
+        // of shifting every following block out of alignment (which the old index-based pairing did).
+        var matched = new Dictionary<string, ContentBlock?[]>();   // loc → per-source-index match (null = missing)
+        var extras = new Dictionary<string, List<ContentBlock>>(); // loc → translation-only blocks (no source)
+        foreach (var loc in Locales)
         {
-            var sb = i < src.Count ? src[i] : null;
-            var sText = sb is null ? "" : TextOf(sb.DataJson);
+            var (m, ex) = Align(src, flat[loc]);
+            matched[loc] = m; extras[loc] = ex;
+        }
+
+        // One row per SOURCE block, its translations aligned side by side.
+        for (var i = 0; i < src.Count; i++)
+        {
+            var sb = src[i];
+            var sText = TextOf(sb.DataJson);
             var cells = new List<Cell>();
             foreach (var loc in Locales)
             {
-                var tb = i < flat[loc].Count ? flat[loc][i] : null;
+                var tb = matched[loc][i];
                 var tText = tb is null ? "" : TextOf(tb.DataJson);
                 string status; string html;
                 if (tb is null) { status = "missing"; html = ""; Totals[loc].Missing++; }
-                else if (sb is not null && !string.Equals(sb.BlockType, tb.BlockType, StringComparison.Ordinal))
-                { status = "struct"; html = WordDiff(sText, tText); Totals[loc].Translated++; }
                 else if (string.Equals(sText.Trim(), tText.Trim(), StringComparison.Ordinal))
                 {
                     status = sText.Trim().Length == 0 ? "empty" : "identical";
@@ -80,9 +89,54 @@ public class DiffModel : PageModel
                 else { status = "translated"; html = WordDiff(sText, tText); Totals[loc].Translated++; }
                 cells.Add(new Cell(loc, html, status));
             }
-            Rows.Add(new Row(i + 1, sb?.BlockType, sText, cells));
+            Rows.Add(new Row(i + 1, sb.BlockType, sText, cells));
+        }
+
+        // Extra rows: blocks that exist ONLY in a translation (no source counterpart). Each gets its own
+        // row — content in its own language column, the source column shows "—", other languages blank.
+        var extraNo = src.Count;
+        foreach (var loc in Locales)
+        {
+            foreach (var eb in extras[loc])
+            {
+                Totals[loc].Extra++;
+                var eText = TextOf(eb.DataJson);
+                var cells = Locales.Select(l => l == loc
+                    ? new Cell(l, WebUtility.HtmlEncode(eText), "extra")
+                    : new Cell(l, "", "na")).ToList();
+                Rows.Add(new Row(++extraNo, eb.BlockType, "", cells));
+            }
         }
         return Page();
+    }
+
+    // Aligns a translation's block list to the source by BlockType using an LCS, so a block missing or
+    // added anywhere (not just at the tail) is detected. Returns, per source index, the matched
+    // translation block (or null = missing), plus the translation-only blocks (extras) in order.
+    private static (ContentBlock?[] matched, List<ContentBlock> extras) Align(
+        List<ContentBlock> src, List<ContentBlock> tgt)
+    {
+        int n = src.Count, m = tgt.Count;
+        var dp = new int[n + 1, m + 1];
+        for (int i = n - 1; i >= 0; i--)
+            for (int j = m - 1; j >= 0; j--)
+                dp[i, j] = string.Equals(src[i].BlockType, tgt[j].BlockType, StringComparison.Ordinal)
+                    ? dp[i + 1, j + 1] + 1
+                    : Math.Max(dp[i + 1, j], dp[i, j + 1]);
+
+        var matched = new ContentBlock?[n];
+        var extras = new List<ContentBlock>();
+        int x = 0, y = 0;
+        while (x < n && y < m)
+        {
+            if (string.Equals(src[x].BlockType, tgt[y].BlockType, StringComparison.Ordinal))
+            { matched[x] = tgt[y]; x++; y++; }
+            else if (dp[x + 1, y] >= dp[x, y + 1]) { matched[x] = null; x++; }  // source-only → missing
+            else { extras.Add(tgt[y]); y++; }                                   // translation-only → extra
+        }
+        while (x < n) { matched[x] = null; x++; }                               // trailing source → missing
+        while (y < m) { extras.Add(tgt[y]); y++; }                              // trailing target → extra
+        return (matched, extras);
     }
 
     // ---- Git-style word-level diff: renders `target` vs `source` with <del>/<ins>/plain spans. ----

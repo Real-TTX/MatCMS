@@ -10,6 +10,8 @@
         "translated" => "d-translated",
         "struct" => "d-struct",
         "missing" => "d-missing",
+        "extra" => "d-extra",
+        "na" => "d-na",
         _ => "d-empty"
     };
 }
@@ -40,6 +42,10 @@ else
                     <span class="d-pill d-translated">@c.Translated @T["diff.translated"]</span>
                     <span class="d-pill d-identical">@c.Identical @T["diff.identical"]</span>
                     <span class="d-pill d-missing">@c.Missing @T["diff.missing"]</span>
+                    @if (c.Extra > 0)
+                    {
+                        <span class="d-pill d-extra-pill">@c.Extra @T["diff.extra"]</span>
+                    }
                 </div>
             }
         </div>
@@ -49,6 +55,8 @@ else
             <span class="wd"><ins>@T["diff.legendIns"]</ins></span>
             <span class="wd"><del>@T["diff.legendDel"]</del></span>
             <span>@T["diff.legendPlain"]</span>
+            <span class="d-flag d-flag-missing">@T["diff.missing"]</span>
+            <span class="d-flag d-flag-extra">@T["diff.extra"]</span>
         </div>
 
         <div class="d-scroll">
@@ -66,16 +74,30 @@ else
                 <tbody>
                     @foreach (var row in Model.Rows)
                     {
-                        <tr>
+                        var rowMissing = row.Cells.Any(c => c.Status == "missing");
+                        var rowExtra = row.Cells.Any(c => c.Status == "extra");
+                        <tr class="@(rowMissing ? "d-row-missing" : rowExtra ? "d-row-extra" : "")">
                             <td class="mono">@row.Index<div class="muted d-type">@row.BlockType</div></td>
                             <td class="d-src">@(string.IsNullOrWhiteSpace(row.SourceText) ? "—" : row.SourceText)</td>
                             @foreach (var cell in row.Cells)
                             {
                                 <td class="wd @CellClass(cell.Status)"
-                                    title="@(cell.Status == "identical" ? T["diff.identicalHint"] : cell.Status == "missing" ? T["diff.missingHint"] : "")">
+                                    title="@(cell.Status == "identical" ? T["diff.identicalHint"] : cell.Status == "missing" ? T["diff.missingHint"] : cell.Status == "extra" ? T["diff.extraHint"] : "")">
                                     @if (cell.Status == "missing")
                                     {
-                                        <span class="muted">—</span>
+                                        <span class="d-flag d-flag-missing">✗ @T["diff.missing"]</span>
+                                    }
+                                    else if (cell.Status == "extra")
+                                    {
+                                        <span class="d-flag d-flag-extra">＋ @T["diff.extra"]</span>
+                                        @if (!string.IsNullOrWhiteSpace(cell.DiffHtml))
+                                        {
+                                            <div class="d-extra-text">@Html.Raw(cell.DiffHtml)</div>
+                                        }
+                                    }
+                                    else if (cell.Status == "na")
+                                    {
+                                        <span class="muted">·</span>
                                     }
                                     else
                                     {
@@ -100,6 +122,13 @@ else
         .d-pill.d-translated { background: #e6f7ea; border-color: #bfe6c8; color: #1a7f37; }
         .d-pill.d-identical { background: #fff8e6; border-color: #f0dca0; color: #9a6b00; }
         .d-pill.d-missing { background: #fdeeee; border-color: #f0bcbc; color: #cf222e; }
+        .d-pill.d-extra-pill { background: #eaf3ff; border-color: #b6d7ff; color: #0969da; }
+        /* Prominent inline flags for a missing / translation-only block (legend + cells). */
+        .d-flag { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600;
+                  padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+        .d-flag-missing { background: #fdeeee; border: 1px solid #f0bcbc; color: #cf222e; }
+        .d-flag-extra { background: #eaf3ff; border: 1px solid #b6d7ff; color: #0969da; }
+        .d-extra-text { margin-top: 6px; }
         .d-legend { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; font-size: 12.5px; }
         .d-scroll { overflow-x: auto; }
         /* Fixed layout so columns share the width evenly and long text WRAPS instead of overflowing. */
@@ -121,5 +150,10 @@ else
         .d-translated { background: #fbfefb; }
         .d-missing { background: #fdf4f4; }
         .d-struct { background: #fdf1e7; }
+        .d-extra { background: #f3f9ff; }
+        .d-na { background: #fafafa; }
+        /* Whole-row emphasis when a block is missing (red edge) or only in a translation (blue edge). */
+        tr.d-row-missing td:first-child { box-shadow: inset 3px 0 0 #cf222e; }
+        tr.d-row-extra td:first-child { box-shadow: inset 3px 0 0 #0969da; }
     </style>
 }

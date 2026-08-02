@@ -86,6 +86,14 @@ public class DiffModel : PageModel
     }
 
     // ---- Git-style word-level diff: renders `target` vs `source` with <del>/<ins>/plain spans. ----
+    // Only useful when the texts actually SHARE words (partially translated / copied content): there
+    // the diff highlights exactly what still equals the source. A proper translation into another
+    // language shares almost nothing — interleaving every word as <del>de</del> <ins>en</ins> is pure
+    // noise. So below a similarity threshold we show the plain target text instead.
+    // 0.5: proper translations sharing many proper nouns (place/brand names) still stay below this;
+    // genuinely half-translated content sits well above it.
+    private const double DiffSimilarityThreshold = 0.5;
+
     private static string WordDiff(string source, string target)
     {
         var a = source.Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -96,6 +104,11 @@ public class DiffModel : PageModel
         for (int i = n - 1; i >= 0; i--)
             for (int j = m - 1; j >= 0; j--)
                 dp[i, j] = a[i] == b[j] ? dp[i + 1, j + 1] + 1 : Math.Max(dp[i + 1, j], dp[i, j + 1]);
+
+        // Similarity = shared-word ratio. Fully different texts (real translations) render plainly.
+        var maxLen = Math.Max(n, m);
+        if (maxLen > 0 && (double)dp[0, 0] / maxLen < DiffSimilarityThreshold)
+            return WebUtility.HtmlEncode(target);
 
         var sb = new StringBuilder();
         int x = 0, y = 0;
@@ -135,17 +148,28 @@ public class DiffModel : PageModel
         {
             using var doc = JsonDocument.Parse(dataJson);
             var parts = new List<string>();
+            // Layout/config properties hold enum-ish values ("left", "normal", "3") — machine
+            // settings, not translatable text. They'd only pollute the comparison.
+            var skipKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "align", "width", "layout", "columns", "imageHeight", "size", "display",
+                "showFilter", "source", "perPage", "limit", "form", "tag", "tags",
+                "_width", "_spaceTop", "_spaceBottom", "buttonStyle", "icon",
+                "imageSide", "bg", "fg", "position", "variant", "style"
+            };
             void Walk(JsonElement e)
             {
                 switch (e.ValueKind)
                 {
                     case JsonValueKind.String:
-                        var s = (e.GetString() ?? "").Trim();
+                        var s = StripHtml((e.GetString() ?? "").Trim());
                         if (s.Length > 1 && s.Any(char.IsLetter) && !s.StartsWith("/") && !s.StartsWith("http"))
                             parts.Add(s);
                         break;
                     case JsonValueKind.Object:
-                        foreach (var p in e.EnumerateObject()) Walk(p.Value);
+                        foreach (var p in e.EnumerateObject())
+                            if (!skipKeys.Contains(p.Name))
+                                Walk(p.Value);
                         break;
                     case JsonValueKind.Array:
                         foreach (var it in e.EnumerateArray()) Walk(it);
@@ -156,5 +180,15 @@ public class DiffModel : PageModel
             return string.Join(" · ", parts);
         }
         catch { return ""; }
+    }
+
+    // Rich-text fields carry raw HTML (<p>, <br> …). Tags are markup, not translatable text — they
+    // only pollute the word diff ("<p>Die" ≠ "<p>Villa"). Strip them and collapse the whitespace.
+    private static string StripHtml(string s)
+    {
+        if (s.IndexOf('<') < 0) return s;
+        var stripped = System.Text.RegularExpressions.Regex.Replace(s, "<[^>]+>", " ");
+        stripped = WebUtility.HtmlDecode(stripped);
+        return System.Text.RegularExpressions.Regex.Replace(stripped, @"\s+", " ").Trim();
     }
 }

@@ -104,7 +104,11 @@ public sealed class AdminUi
 public class PluginRegistry
 {
     public sealed record AdminMenuEntry(string Label, string Url, string Icon);
-    public sealed record PluginBlock(string Type, string Name, string Description, Func<PluginRequest, string> Render);
+    public sealed record PluginBlock(string Type, string Name, string Description, Func<PluginRequest, string> Render)
+    {
+        /// <summary>Editable fields shown in the block editor (empty = none). Declared via AddBlock's fieldsJson.</summary>
+        public List<MatCMS.Content.BlockField> Fields { get; init; } = new();
+    }
 
     private readonly object _lock = new();
     public List<AdminMenuEntry> AdminMenu { get; } = new();
@@ -287,9 +291,67 @@ public class PluginContext
 
     /// <summary>Register a content block. The render callback gets the block's data + request services.</summary>
     public void AddBlock(string type, string name, string description, Func<PluginRequest, string> render)
+        => AddBlock(type, name, description, render, null);
+
+    /// <summary>
+    /// Register a content block with editable fields shown in the block editor. <paramref name="fieldsJson"/>
+    /// is a JSON array of field definitions: <c>[{ "id", "label", "type", "placeholder", "help", "default",
+    /// "options":[{"value","label"}] }]</c>. Supported types: text, textarea, richtext, image, url, select, list.
+    /// </summary>
+    public void AddBlock(string type, string name, string description, Func<PluginRequest, string> render, string? fieldsJson)
     {
-        if (!string.IsNullOrWhiteSpace(type)) _registry.Blocks.Add(new(type, name ?? type, description ?? "", render));
+        if (!string.IsNullOrWhiteSpace(type))
+            _registry.Blocks.Add(new(type, name ?? type, description ?? "", render) { Fields = ParseBlockFields(fieldsJson) });
     }
+
+    private static List<MatCMS.Content.BlockField> ParseBlockFields(string? json)
+    {
+        var list = new List<MatCMS.Content.BlockField>();
+        if (string.IsNullOrWhiteSpace(json)) return list;
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind != System.Text.Json.JsonValueKind.Array) return list;
+            foreach (var el in doc.RootElement.EnumerateArray())
+            {
+                if (el.ValueKind != System.Text.Json.JsonValueKind.Object) continue;
+                string S(string k) => el.TryGetProperty(k, out var v) && v.ValueKind == System.Text.Json.JsonValueKind.String ? (v.GetString() ?? "") : "";
+                var id = S("id");
+                if (string.IsNullOrWhiteSpace(id)) continue;
+                var f = new MatCMS.Content.BlockField
+                {
+                    Id = id,
+                    Label = string.IsNullOrWhiteSpace(S("label")) ? id : S("label"),
+                    Type = ParseFieldType(S("type")),
+                    Placeholder = string.IsNullOrWhiteSpace(S("placeholder")) ? null : S("placeholder"),
+                    Help = string.IsNullOrWhiteSpace(S("help")) ? null : S("help"),
+                    Default = string.IsNullOrWhiteSpace(S("default")) ? null : S("default")
+                };
+                if (el.TryGetProperty("options", out var opts) && opts.ValueKind == System.Text.Json.JsonValueKind.Array)
+                    foreach (var o in opts.EnumerateArray())
+                    {
+                        if (o.ValueKind != System.Text.Json.JsonValueKind.Object) continue;
+                        var ov = o.TryGetProperty("value", out var vv) ? (vv.GetString() ?? "") : "";
+                        var ol = o.TryGetProperty("label", out var ll) ? (ll.GetString() ?? ov) : ov;
+                        f.Options.Add(new MatCMS.Content.SelectOption(ov, ol));
+                    }
+                list.Add(f);
+            }
+        }
+        catch { }
+        return list;
+    }
+
+    private static MatCMS.Content.FieldType ParseFieldType(string? t) => (t ?? "").Trim().ToLowerInvariant() switch
+    {
+        "textarea" => MatCMS.Content.FieldType.Textarea,
+        "richtext" => MatCMS.Content.FieldType.RichText,
+        "image" => MatCMS.Content.FieldType.Image,
+        "url" => MatCMS.Content.FieldType.Url,
+        "select" => MatCMS.Content.FieldType.Select,
+        "list" => MatCMS.Content.FieldType.List,
+        _ => MatCMS.Content.FieldType.Text
+    };
 
     /// <summary>Resolve a framework service, e.g. <c>Service&lt;AppDbContext&gt;()</c>.</summary>
     public T? Service<T>() => Services.GetService(typeof(T)) is T t ? t : default;

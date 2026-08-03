@@ -615,7 +615,7 @@ public static class DbSeeder
     {
         Name = "Google Bewertungen",
         Key = "google-reviews",
-        Version = "1.2",
+        Version = "1.3",
         Description = "Zeigt Google-Rezensionen als Block – in drei Modi: manuell (ohne Key), Google-Embed (kostenloser Key) oder Places-API (Key + Billing). Einstellungen unter „Google Bewertungen\".",
         Enabled = true,
         ConfigJson = "{\"mode\":\"manual\",\"placeId\":\"\",\"apiKey\":\"\",\"embedKey\":\"\",\"maxReviews\":\"6\",\"minRating\":\"0\",\"refreshHours\":\"12\"}",
@@ -678,9 +678,14 @@ public static class DbSeeder
                 sb.Append("</div>");
                 return sb.ToString();
             }
-            string Wrap(string heading, double overall, int total, string cards, bool hasCards) {
+            string HeadStyle(string font) {
+                if (string.IsNullOrWhiteSpace(font)) return "";
+                var ok = new string(font.Where(c => char.IsLetterOrDigit(c) || c==' ' || c==',' || c=='-' || c=='\'' || c=='.').ToArray());
+                return ok.Length == 0 ? "" : " style=\"font-family:" + ok + "\"";
+            }
+            string Wrap(string heading, string headingFont, double overall, int total, string cards, bool hasCards) {
                 var sb = new StringBuilder("<div class='matg'><div class='matg-head'>");
-                if (!string.IsNullOrWhiteSpace(heading)) sb.Append("<h2>").Append(Enc(heading)).Append("</h2>");
+                if (!string.IsNullOrWhiteSpace(heading)) sb.Append("<h2").Append(HeadStyle(headingFont)).Append(">").Append(Enc(heading)).Append("</h2>");
                 if (overall > 0) sb.Append("<div class='matg-overall'>").Append(Stars((int)Math.Round(overall)))
                     .Append("<b>").Append(overall.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)).Append("</b>")
                     .Append(total > 0 ? "<span>(" + total + ")</span>" : "").Append("</div>");
@@ -819,12 +824,33 @@ public static class DbSeeder
                 return sb.ToString();
             });
 
+            var blockFields = new JsonArray {
+                new JsonObject { ["id"] = "heading", ["label"] = "Überschrift", ["type"] = "text", ["placeholder"] = "z. B. Das sagen unsere Gäste", ["help"] = "Leer lassen = keine Überschrift anzeigen." },
+                new JsonObject { ["id"] = "headingFont", ["label"] = "Überschrift-Schriftart", ["type"] = "select", ["help"] = "Schriftart nur für die Überschrift.",
+                    ["options"] = new JsonArray {
+                        new JsonObject { ["value"] = "", ["label"] = "Standard (Theme)" },
+                        new JsonObject { ["value"] = "'Roboto Slab', serif", ["label"] = "Roboto Slab (Serif)" },
+                        new JsonObject { ["value"] = "'Manrope', sans-serif", ["label"] = "Manrope (Sans-Serif)" },
+                        new JsonObject { ["value"] = "Georgia, serif", ["label"] = "Georgia (Serif)" },
+                        new JsonObject { ["value"] = "Arial, Helvetica, sans-serif", ["label"] = "Arial (Sans-Serif)" },
+                        new JsonObject { ["value"] = "'Courier New', monospace", ["label"] = "Monospace" }
+                    } }
+            }.ToJsonString();
+
             AddBlock("googlereviews", "Google Bewertungen", "Zeigt Google-Rezensionen als Karten (manuell / Embed / Places-API).", req =>
             {
                 try
                 {
-                    string heading = "Das sagen unsere Gäste";
-                    try { var d = JsonNode.Parse(req.Data) as JsonObject; if (d != null && d["heading"] != null) { var h = d["heading"].GetValue<string>(); if (!string.IsNullOrWhiteSpace(h)) heading = h; } } catch {}
+                    // No default heading: empty = the heading is simply not shown (per-block "heading" field).
+                    string heading = "";
+                    string headingFont = "";
+                    try {
+                        var d = JsonNode.Parse(req.Data) as JsonObject;
+                        if (d != null) {
+                            if (d["heading"] != null) { var h = d["heading"].GetValue<string>(); if (!string.IsNullOrWhiteSpace(h)) heading = h; }
+                            if (d["headingFont"] != null) { var hf = d["headingFont"].GetValue<string>(); if (!string.IsNullOrWhiteSpace(hf)) headingFont = hf; }
+                        }
+                    } catch {}
 
                     var mode = GetCfg(req, "mode").Trim().ToLowerInvariant();
                     var placeId = GetCfg(req, "placeId").Trim();
@@ -850,7 +876,7 @@ public static class DbSeeder
                         }
                         if (cnt == 0)
                             return "<div class='matg'><div class='matg-empty'>Google-Bewertungen: Bitte unter Plugins → Google Bewertungen Bewertungen eintragen.</div></div>";
-                        return Wrap(heading, cnt > 0 ? sum / cnt : 0, cnt, cards.ToString(), shown > 0);
+                        return Wrap(heading, headingFont, cnt > 0 ? sum / cnt : 0, cnt, cards.ToString(), shown > 0);
                     }
 
                     // ---- Embed mode: Google Maps Embed API iframe (free key, no billing) ----
@@ -861,7 +887,7 @@ public static class DbSeeder
                             return "<div class='matg'><div class='matg-empty'>Google-Bewertungen: Bitte unter Plugins → Google Bewertungen Place-ID und Embed-Key hinterlegen.</div></div>";
                         var src = "https://www.google.com/maps/embed/v1/place?key=" + Uri.EscapeDataString(ek) + "&q=place_id:" + Uri.EscapeDataString(placeId) + "&language=de";
                         var sb2 = new StringBuilder("<div class='matg'>");
-                        if (!string.IsNullOrWhiteSpace(heading)) sb2.Append("<div class='matg-head'><h2>").Append(Enc(heading)).Append("</h2></div>");
+                        if (!string.IsNullOrWhiteSpace(heading)) sb2.Append("<div class='matg-head'><h2").Append(HeadStyle(headingFont)).Append(">").Append(Enc(heading)).Append("</h2></div>");
                         sb2.Append("<iframe class='matg-embed' loading='lazy' referrerpolicy='no-referrer-when-downgrade' src='").Append(Enc(src)).Append("'></iframe>");
                         sb2.Append("<div class='matg-attr'>Bewertungen von Google</div></div>");
                         return sb2.ToString();
@@ -923,10 +949,10 @@ public static class DbSeeder
                         shownApi++;
                         cardsApi.Append(Card(o["author_name"]?.GetValue<string>() ?? "", o["relative_time_description"]?.GetValue<string>() ?? "", rr, o["text"]?.GetValue<string>() ?? "", o["profile_photo_url"]?.GetValue<string>() ?? ""));
                     }
-                    return Wrap(heading, overall, total, cardsApi.ToString(), shownApi > 0);
+                    return Wrap(heading, headingFont, overall, total, cardsApi.ToString(), shownApi > 0);
                 }
                 catch (Exception ex) { return "<div class='matg'><div class='matg-empty'>Google-Bewertungen: " + System.Net.WebUtility.HtmlEncode(ex.Message) + "</div></div>"; }
-            });
+            }, blockFields);
             """
     };
 

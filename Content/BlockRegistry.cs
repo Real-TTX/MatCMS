@@ -47,7 +47,8 @@ public class BlockRegistry
                 Description = pb.Description,
                 Svg = SvgPlugin,
                 Partial = "(plugin)",
-                PluginRender = pb.Render
+                PluginRender = pb.Render,
+                Fields = pb.Fields   // editable fields the plugin declared (empty = none)
             });
         }
         return list;

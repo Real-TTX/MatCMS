@@ -1,15 +1,62 @@
-# MatCMS – Lightweight block-based CMS
+# MatCMS – leichtgewichtiges, block-basiertes CMS
 
-**MatCMS** ist ein leichtgewichtiges, block-basiertes CMS (WordPress-Alternative) mit
-**block-basiertem Editor** (im Stil von Shopify-Sections), Menü- und Template-Verwaltung
-sowie **Backup & Restore**. Der Standard-Seed ist generisch (plain MatCMS); eine konkrete
-Website (z. B. FeuSys) wird per **Backup-Import** unter *Admin → Backup* eingespielt.
+**MatCMS** ist ein schlankes, selbst-gehostetes CMS als WordPress-Alternative: ein
+**block-basierter Seiten-Editor** (im Stil von Shopify-Sections) mit Live-Vorschau,
+Templates, Menüs, Mediathek, Formularen, Blog/Beiträgen, Mehrsprachigkeit, einem
+**Plugin-System** sowie vollständigem **Backup & Restore**.
+
+Der Standard-Seed ist generisch (leeres MatCMS mit Einrichtungs-Assistent). Eine
+konkrete Website wird als **Backup-ZIP** unter *Admin → Backup → Wiederherstellen*
+eingespielt – so laufen beliebig viele Instanzen auf demselben Image.
 
 - **Framework:** ASP.NET Core 10 (Razor Pages), C#
 - **Datenbank:** SQLite (via EF Core) – eine Datei, kein extra DB-Container
 - **Auth:** Cookie-basiert, Login **nur** über `/login` (Standard: `admin` / `admin`)
-- **Port:** intern `8080` (Basis-Image-Default), gemappt auf Host `9101`
-- **Docker:** ASP.NET-Core-Basis-Image, einfaches `docker-compose`, Basis-Images werden immer neu gezogen
+- **Ports:** intern `8080` (Basis-Image-Default), gemappt auf Host `9101`
+- **Persistenz:** ein Docker-Volume `matcms-data` → `/app/appdata` (DB, Keys, Backups, Uploads)
+
+---
+
+## Funktionsumfang
+
+- **Block-Editor** – Seiten als geordnete Block-Liste; Auswahl/Bearbeiten in der
+  Seitenleiste, Einfügen zwischen Blöcken per Hover, **Live-Vorschau rechts**
+  (persistiert erst beim Speichern). Blöcke können **hierarchisch/verschachtelt**
+  sein (z. B. Spalten, Karten, Galerie).
+- **Block-Typen** – u. a. Hero, Rich-Text, Spalten, Leistungs-/Service-Raster,
+  Karten (mit Icon), Vergleichskarten, Galerie (Mediathek- oder Tag-Quelle),
+  Carousel/Slider, Akkordeon/FAQ, Zitat, Bild-Text, Logostrip, CTA, Formular,
+  Beiträge (Blog), Bild, Abstand, roher HTML-Block.
+- **Komponenten** – eigene, wiederverwendbare Blöcke aus Feldern zusammenklicken
+  (getrennt von den System-Blöcken).
+- **Templates** – Designer (Farben, Fonts, Header/Buttons) getrennt von
+  Layout/Parameter-Mapping; Seiten-Layouts („Parts"), Schema-Versionierung mit
+  Auto-Konvertierung, sowie ein **Datei-Editor (CodeMirror)** für Layout-HTML/CSS/JS.
+- **Menüs** – mehrere Menüs (Header, Footer, Toolbar …) mit **Submenüs/Dropdowns**
+  und Icons; Zuordnung ins Template per Mapping.
+- **Mediathek** – Upload von **Bildern und Dateien**, Tags, Mehrfachauswahl; ein
+  einheitlicher Bildauswahl-Dialog (Upload + Mediathek) überall.
+- **Formulare** – Formular-Builder wie der Block-Editor: Felder (Text, Mehrzeilig,
+  E-Mail, Telefon, Auswahl, Datum, **Zeitraum/Datepicker**), Gruppen, **Conditions**,
+  Vorbefüllung per Query-Parameter, konfigurierbare Erfolgsmeldung und
+  **E-Mail-Benachrichtigung**; Einsendungen unter *Anfragen*.
+- **Beiträge / Blog** – Beiträge mit Tags, **Veröffentlichungs-Scheduling**
+  (erst ab Datum sichtbar) und Beiträge-Block mit Blog-Modus, Tag-Filter & Paging.
+- **Mehrsprachigkeit (i18n)** – mehrsprachige Inhalte mit Sprach-Umschalter,
+  gruppierte Seiten-Versionen + On-Page-Umschalter, **Diff-Tool** (Original vs.
+  Übersetzung, fehlende/zusätzliche Blöcke werden markiert) und **Auto-Übersetzung**
+  (DeepL Free oder LibreTranslate).
+- **Plugins** – Installieren, Export/Import, Update/Migrate; pro Plugin eigener
+  Asset-Ordner; Plugins können Admin-Seiten, öffentliche Endpunkte **und
+  Content-Blöcke mit eigenen Editor-Feldern** registrieren. Mitgeliefert:
+  *Google-Bewertungen* (manuell / Embed / Places-API) und ein *Bewertungs-Plugin*.
+- **Einstellungen** – Logo/Favicon, Seitenname, Footer, SMTP (mit **Test-Mail**),
+  Fehler-/404-Seiten, Sitemap + robots.txt, Custom-Code / Google Analytics,
+  **Wartungsmodus** (themebare „Coming soon"-Seite).
+- **Backup & Restore** – granularer Export/Import (Seiten, Templates, Formulare,
+  Menüs, Einstellungen, Medien, optional Benutzer) als ZIP, plus **geplante
+  Backups**.
+- **Einrichtungs-Assistent** – Step-Wizard beim ersten Start.
 
 ---
 
@@ -33,12 +80,13 @@ Alternativ das mitgelieferte Skript:
 Nützliche Befehle:
 
 ```bash
-docker compose logs -f      # Logs ansehen
-docker compose down         # stoppen (Daten bleiben im Volume erhalten)
+docker compose logs -f       # Logs ansehen
+docker compose down          # stoppen (Daten bleiben im Volume erhalten)
 docker compose up -d --build # neu bauen & starten
+docker compose down -v       # ZURÜCKSETZEN (löscht das Volume: DB, Uploads, Backups)
 ```
 
-### „Always Repull“ / immer aktuell
+### „Always Repull" / immer aktuell
 
 - In `docker-compose.yml` ist `build.pull: true` gesetzt – bei jedem `--build`
   werden die Basis-Images (`sdk:10.0`, `aspnet:10.0`) **neu gezogen**.
@@ -50,29 +98,26 @@ docker compose up -d --build # neu bauen & starten
 ## CI/CD & Versionierung
 
 Zwei GitHub-Actions-Workflows bauen das Docker-Image und pushen es in die
-**GitHub Container Registry (GHCR)** unter
-`ghcr.io/<owner>/matcms` (der `<owner>` wird kleingeschrieben).
+**GitHub Container Registry (GHCR)** unter `ghcr.io/<owner>/matcms`
+(der `<owner>` wird kleingeschrieben).
 
-| Branch / Kontext | Workflow                       | Version                                   | `:latest`? |
-|------------------|--------------------------------|-------------------------------------------|:----------:|
-| `main` (Release) | `.github/workflows/release.yml`| `MAJOR.MINOR.<build>-<datetime>`          | ja         |
-| `dev` (Nightly)  | `.github/workflows/dev.yml`    | `nightly-<build>-<datetime>`              | nein       |
-| lokal            | (Dockerfile-Default)           | `local-<datetime>` (manuell empfohlen)    | –          |
+| Branch / Kontext | Workflow                        | Version                                | `:latest`? |
+|------------------|---------------------------------|----------------------------------------|:----------:|
+| `main` (Release) | `.github/workflows/release.yml` | `MAJOR.MINOR.<build>-<datetime>`       | ja         |
+| `dev` (Nightly)  | `.github/workflows/dev.yml`     | `nightly-<build>-<datetime>`           | nein       |
+| lokal            | (Dockerfile-Default)            | `local-<datetime>` (manuell empfohlen) | –          |
 
 - `MAJOR.MINOR` kommt aus der Datei **`VERSION`** im Repo-Wurzelverzeichnis
   (Default `1.0`).
 - `<build>` = `github.run_number` (fortlaufende Lauf-Nummer der Action).
-- `<datetime>` = UTC-Zeitstempel `yyyyMMddHHmmss` (`date -u +%Y%m%d%H%M%S`).
+- `<datetime>` = UTC-Zeitstempel `yyyyMMddHHmmss`.
 - Der Login an GHCR erfolgt mit `${{ github.actor }}` und dem automatischen
-  `${{ secrets.GITHUB_TOKEN }}`; die Workflows brauchen dafür
-  `permissions: packages: write, contents: read`.
+  `${{ secrets.GITHUB_TOKEN }}` (Workflows brauchen `permissions: packages: write`).
 - Die berechnete Version wird als Build-Arg **`APP_VERSION`** an den Docker-Build
-  übergeben und im Image als `InformationalVersion` hinterlegt.
+  übergeben und im Image als `InformationalVersion` hinterlegt. Die
+  In-App-Update-Prüfung vergleicht damit gegen die neuesten GHCR-Tags.
 
 ### Lokaler Build mit Version
-
-Der Dockerfile-Default für `APP_VERSION` ist `local`. Für einen sauberen lokalen
-Zeitstempel:
 
 ```bash
 docker build -t matcms:local \
@@ -80,8 +125,7 @@ docker build -t matcms:local \
 ```
 
 Ohne `--build-arg` wird schlicht `local` verwendet. `InformationalVersion` ist ein
-freier String, daher bricht der Build auch bei nicht-numerischen Versionen
-(`nightly-…`, `local-…`) nicht.
+freier String, daher bricht der Build auch bei nicht-numerischen Versionen nicht.
 
 ---
 
@@ -100,61 +144,40 @@ dotnet restore
 dotnet watch run
 ```
 
-Läuft ebenfalls auf **http://localhost:9101** und aktualisiert sich bei
-Code- und Ansichts-Änderungen automatisch.
+Läuft ebenfalls auf **http://localhost:9101** und aktualisiert sich bei Code- und
+Ansichts-Änderungen automatisch.
 
 ---
 
-## Das CMS bedienen
+## Neuen Block-Typ ergänzen
 
-Nach dem Login unter `/login` stehen im Admin-Menü zur Verfügung:
+Ein neuer eingebauter Block-Typ wird in `Content/BlockRegistry.cs` mit seinem
+**Feld-Schema** definiert; das passende Render-Partial liegt unter
+`Pages/Shared/Blocks/_<Name>.cshtml`. Der Editor baut das Eingabeformular
+automatisch aus dem Schema (Textfelder, Auswahl, Bild-Picker, Listen …).
 
-| Bereich          | Zweck                                                                 |
-|------------------|-----------------------------------------------------------------------|
-| **Seiten**       | Seiten anlegen/löschen, **Blöcke** hinzufügen, bearbeiten, verschieben |
-| **Anfragen**     | Einsendungen aus dem Kontaktformular                                   |
-| **Benutzer**     | Benutzer anlegen, Passwörter zurücksetzen, löschen                    |
-| **Einstellungen**| Logo, Seitenname, Header-Links, Footer-Text                           |
-
-### Seiten & Blöcke
-
-Jede Seite ist eine **geordnete Liste von Blöcken**. Über *Seiten → Bearbeiten*
-lassen sich Blöcke hinzufügen (Auswahl aus der Block-Palette), per ▲/▼ verschieben,
-bearbeiten oder löschen. Das Layout/CSS bleibt dabei fix – nur die Inhalte ändern sich.
-
-Verfügbare Block-Typen:
-
-- **Hero / Kopfbereich** – große Überschrift, optionales Hintergrundbild, Button
-- **Textabschnitt** – Überschrift + formatierter Text (Rich-Text-Editor)
-- **Spalten** – 2–3 Spalten mit Titel + Text
-- **Leistungs-Raster** – Kachel-Raster (z. B. die 8 Leistungen der Startseite)
-- **Call-to-Action** – hervorgehobene Aussage mit Button
-- **Kontaktformular** – rendert das Formular; Einsendungen erscheinen unter *Anfragen*
-- **Bild** – einzelnes Bild mit Upload-Möglichkeit
-
-Ein neuer Block-Typ lässt sich hinzufügen, indem man ihn in
-`Content/BlockRegistry.cs` definiert und ein passendes Partial unter
-`Pages/Shared/Blocks/_<Name>.cshtml` anlegt – der Editor baut das Eingabeformular
-automatisch aus dem Feld-Schema.
+Alternativ liefern **Plugins** eigene Blöcke: `AddBlock(type, name, desc, render,
+fieldsJson)` – das JSON-Feld-Schema erscheint dann genauso im Block-Editor wie bei
+eingebauten Blöcken.
 
 ---
 
 ## Wichtige Sicherheitshinweise
 
 - **Standard-Zugang `admin` / `admin` nach dem ersten Start ändern** – unter
-  *Benutzer → Bearbeiten* ein neues Passwort setzen (und/oder einen neuen
-  Admin-Benutzer anlegen und `admin` löschen).
+  *Benutzer* ein neues Passwort setzen (und/oder einen neuen Admin anlegen und
+  `admin` löschen).
 - Für den öffentlichen Betrieb sollte die App **hinter einem Reverse-Proxy mit
-  HTTPS** (z. B. nginx/Traefik/Caddy) laufen. Der Container spricht intern HTTP auf **8080**
-  (ASP.NET-Basis-Image-Default); der Host-Port **9101** wird nur über das Compose-Mapping gesetzt.
-- **Login-Schutz:** `/login` ist pro Client-IP ratenbegrenzt (10 Versuche/Minute).
-  Hinter einem Reverse-Proxy sollte `ForwardedHeaders` aktiviert werden, damit die
-  echte Client-IP (statt der Proxy-IP) zählt.
+  HTTPS** (nginx/Traefik/Caddy) laufen. Der Container spricht intern HTTP auf
+  **8080**; der Host-Port **9101** kommt nur aus dem Compose-Mapping.
+- **Login-Schutz:** `/login` ist pro Client-IP ratenbegrenzt. Hinter einem
+  Reverse-Proxy `ForwardedHeaders` aktivieren, damit die echte Client-IP zählt.
 - Rich-Text-/HTML-Inhalte werden nur von angemeldeten Admins erstellt und im
-  Frontend bewusst unverändert (als HTML) ausgegeben – jeder Account hat aktuell
-  die Rolle *Admin* und gilt damit als vertrauenswürdig. Wird später eine
-  eingeschränkte Redakteurs-Rolle eingeführt, sollte dieser HTML-Inhalt vor der
-  Ausgabe bereinigt werden (z. B. mit einem HTML-Sanitizer).
+  Frontend bewusst als HTML ausgegeben. Wird später eine eingeschränkte
+  Redakteurs-Rolle eingeführt, sollte dieser HTML-Inhalt vor der Ausgabe mit einem
+  HTML-Sanitizer bereinigt werden.
+- **Plugins führen serverseitig C#-Code aus** (Roslyn-Scripting) – nur vertrauens-
+  würdige Plugins installieren.
 
 ---
 
@@ -162,28 +185,33 @@ automatisch aus dem Feld-Schema.
 
 ```
 MatCMS/
-├─ Program.cs                  # Startup, DI, Auth, Routing, Upload-Endpoint
-├─ Content/                    # Block-System (Definitionen, Felder, JSON-Reader)
-├─ Data/                       # EF Core DbContext + Seed-Daten (feusys-Inhalte)
-├─ Models/                     # Entities (Page, ContentBlock, User, …)
-├─ Services/                   # AuthService, SiteContext, SettingKeys
+├─ Program.cs                  # Startup, DI, Auth, Routing, Middleware (Wartung), Upload-Endpoint
+├─ Content/                    # Block-System (Registry, Felder, Layout-Renderer, Templates)
+├─ Data/                       # EF Core DbContext + DbSeeder (generischer Seed + gebündelte Plugins)
+├─ Models/                     # Entities (Page, ContentBlock, Post, Form, Menu, Template, Plugin, User, …)
+├─ Services/                   # Auth, SiteContext, Backup, Email, Translation, Version, PluginRuntime, …
+├─ Resources/                  # i18n-Strings der Admin-UI (de.json / en.json)
 ├─ Pages/
-│  ├─ View.cshtml              # Öffentlicher Seiten-Renderer  (Route "/{slug?}")
+│  ├─ View.cshtml              # Öffentlicher Seiten-Renderer (Route "/{slug?}")
 │  ├─ Login / Logout / Error
 │  ├─ Shared/                  # Layouts + Block-Render-Partials
-│  └─ Admin/                   # Admin-Bereich (Dashboard, Seiten, Blöcke, …)
-├─ wwwroot/                    # CSS, JS (Block-Editor), Logo
+│  └─ Admin/                   # Admin-Bereich (Seiten, Beiträge, Menüs, Medien, Formulare, Templates,
+│                              #   Plugins, Backup, Einstellungen, Übersetzungs-Diff, …)
+├─ wwwroot/                    # CSS, JS (Block-/Formular-Editor, Datepicker), Assets
 ├─ Dockerfile / docker-compose.yml
-└─ appdata/                    # Laufzeitdaten: SQLite-DB + Keys (Docker-Volume, gitignored)
+├─ VERSION                     # MAJOR.MINOR für die CI-Versionierung
+└─ appdata/                    # Laufzeitdaten: SQLite-DB, Keys, Backups, Uploads (Volume, gitignored)
 ```
 
 ### Daten & Persistenz
 
-- SQLite-DB und Data-Protection-Keys liegen unter `appdata/` (im Docker-Volume
-  `feusys-data`). Uploads liegen im Volume `feusys-uploads`
-  (`wwwroot/uploads`). Beide bleiben über Neustarts hinweg erhalten.
-- Das Schema wird beim Start automatisch angelegt (`EnsureCreated`) und mit den
-  feusys-Inhalten (Start, Über uns, Kontakt, Partner, Produkte, Impressum,
-  Datenschutz, AGB) befüllt – nur, wenn die DB noch leer ist.
-- **Zurücksetzen:** Volume löschen mit `docker compose down -v` (setzt Inhalte,
-  Benutzer und Anfragen auf den Auslieferungszustand zurück).
+- SQLite-DB (`appdata/matcms.db`), Data-Protection-Keys, geplante Backups und
+  Uploads liegen alle im **einen** Docker-Volume `matcms-data` (`/app/appdata`) und
+  bleiben über Neustarts erhalten.
+- Das Schema wird beim Start automatisch angelegt (`EnsureCreated`). **Hinweis:**
+  Bei Schema-Änderungen am Modell muss das Volume zurückgesetzt werden
+  (`docker compose down -v`), da ohne EF-Migrationen gearbeitet wird.
+- Der Seeder befüllt eine leere DB generisch und hält die **gebündelten Plugins**
+  aktuell (Code/Version), ohne deren Admin-Konfiguration zu überschreiben.
+- **Zurücksetzen:** `docker compose down -v` löscht Inhalte, Benutzer, Anfragen,
+  Uploads und Backups und setzt alles auf den Auslieferungszustand zurück.

@@ -291,22 +291,52 @@
                         <h2>@T["editor.addBlockModal"]</h2>
                         <button type="button" class="modal-close" id="add-block-close" aria-label="@T["editor.close"]">✕</button>
                     </div>
-                    <div class="modal-body">
-                        <div class="picker">
-                            @foreach (var def in Model.Registry.All.Where(d => !d.ChildOnly))
-                            {
-                                <form method="post" asp-page-handler="AddBlock" asp-route-id="@Model.Current.Id" asp-route-type="@def.Type">
-                                    <input type="hidden" name="position" class="add-position" value="" />
-                                    <button type="submit" class="tile">
-                                        <span class="t-icon">
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">@Html.Raw(def.Svg)</svg>
-                                        </span>
-                                        <span class="t-name">@T[def.Name]</span>
-                                        <span class="t-desc">@T[def.Description]</span>
-                                    </button>
-                                </form>
-                            }
+                    <div class="modal-body bpick">
+                        @{
+                            var pdefs = Model.Registry.All.Where(d => !d.ChildOnly).ToList();
+                            var catOrder = new[] { "layout", "text", "media", "design", "form", "embed", "plugins", "custom" };
+                            var present = catOrder.Where(k => pdefs.Any(d => d.Category == k)).ToList();
+                        }
+                        <div class="bpick-search">
+                            <svg class="bpick-sico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+                            <input type="search" id="bpick-search" placeholder="@T["editor.searchBlocks"]" autocomplete="off" />
                         </div>
+                        <div class="bpick-layout">
+                            <aside class="bpick-cats">
+                                <button type="button" class="bpick-cat is-active" data-cat="all">@T["blockcat.all"]<span class="bpick-n">@pdefs.Count</span></button>
+                                @foreach (var k in present)
+                                {
+                                    <button type="button" class="bpick-cat" data-cat="@k">@T["blockcat." + k]<span class="bpick-n">@pdefs.Count(d => d.Category == k)</span></button>
+                                }
+                            </aside>
+                            <div class="bpick-main">
+                                @foreach (var k in present)
+                                {
+                                    <section class="bpick-group" data-group="@k">
+                                        <div class="bpick-grouphead">@T["blockcat." + k]</div>
+                                        <div class="bpick-grid">
+                                            @foreach (var def in pdefs.Where(d => d.Category == k))
+                                            {
+                                                <form method="post" asp-page-handler="AddBlock" asp-route-id="@Model.Current.Id" asp-route-type="@def.Type">
+                                                    <input type="hidden" name="position" class="add-position" value="" />
+                                                    <button type="submit" class="tile" data-cat="@def.Category"
+                                                            data-name="@(((string)T[def.Name]).ToLowerInvariant())"
+                                                            data-desc="@(((string)T[def.Description]).ToLowerInvariant())">
+                                                        <span class="t-icon">
+                                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">@Html.Raw(def.Svg)</svg>
+                                                        </span>
+                                                        <span class="t-name">@T[def.Name]</span>
+                                                        <span class="t-desc">@T[def.Description]</span>
+                                                    </button>
+                                                </form>
+                                            }
+                                        </div>
+                                    </section>
+                                }
+                                <p class="bpick-empty" hidden>@T["editor.noBlocksFound"]</p>
+                            </div>
+                        </div>
+                        <div class="bpick-foot muted">@T["editor.slashHint"]</div>
                     </div>
                 </div>
             </div>
@@ -328,4 +358,30 @@
     <script src="~/js/admin-sortable.js" asp-append-version="true"></script>
     <script src="~/js/admin-blocks.js" asp-append-version="true"></script>
     <script src="~/js/admin-page-editor.js" asp-append-version="true"></script>
+    <style>
+        /* Categorised block picker */
+        #add-block-modal .modal { width: min(1040px, 94vw); max-width: 94vw; }
+        .bpick { display: flex; flex-direction: column; gap: 14px; }
+        .bpick-search { position: relative; }
+        .bpick-search input { width: 100%; padding: 11px 14px 11px 40px; border-radius: 10px;
+            border: 1px solid rgba(128,128,128,.28); background: rgba(128,128,128,.08); color: inherit; font-size: 14px; }
+        .bpick-search input:focus { outline: none; border-color: var(--accent, #2b6cff); }
+        .bpick-sico { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; opacity: .5; }
+        .bpick-layout { display: grid; grid-template-columns: 190px 1fr; gap: 16px; align-items: start; }
+        @@media (max-width: 680px) { .bpick-layout { grid-template-columns: 1fr; } .bpick-cats { flex-direction: row; overflow-x: auto; border-right: none; } }
+        .bpick-cats { display: flex; flex-direction: column; gap: 2px; border-right: 1px solid rgba(128,128,128,.2); padding-right: 8px; }
+        .bpick-cat { display: flex; align-items: center; justify-content: space-between; gap: 8px; white-space: nowrap;
+            text-align: left; padding: 9px 12px; border-radius: 8px; border: none; background: none; color: inherit; cursor: pointer; font-size: 13.5px; }
+        .bpick-cat:hover { background: rgba(128,128,128,.14); }
+        .bpick-cat.is-active { background: var(--accent, #2b6cff); color: #fff; }
+        .bpick-n { font-size: 11.5px; opacity: .75; background: rgba(128,128,128,.22); padding: 1px 8px; border-radius: 999px; }
+        .bpick-cat.is-active .bpick-n { background: rgba(255,255,255,.25); opacity: 1; color: #fff; }
+        .bpick-main { max-height: 60vh; overflow-y: auto; padding-right: 4px; }
+        .bpick-grouphead { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; opacity: .55; margin: 4px 0 10px; }
+        .bpick-group + .bpick-group .bpick-grouphead { margin-top: 20px; }
+        .bpick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
+        .bpick-grid form { margin: 0; }
+        .bpick-empty { text-align: center; opacity: .6; padding: 34px 0; }
+        .bpick-foot { font-size: 12.5px; opacity: .6; border-top: 1px solid rgba(128,128,128,.2); padding-top: 10px; }
+    </style>
 }

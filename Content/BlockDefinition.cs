@@ -6,6 +6,10 @@ public class BlockDefinition
     public string Name { get; set; } = "";
     public string Description { get; set; } = "";
 
+    /// <summary>Picker category key (localised in the view via "blockcat.&lt;key&gt;"): "layout", "text",
+    /// "media", "design", "form". Components default to "custom", plugin blocks to "plugins".</summary>
+    public string Category { get; set; } = "design";
+
     /// <summary>Inner SVG markup (paths/rects) for a 0 0 24 24 stroke icon.</summary>
     public string Svg { get; set; } = "";
 

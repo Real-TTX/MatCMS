@@ -31,12 +31,30 @@ public class BlockRegistry
     /// <summary>All block definitions: built-in blocks, user-defined components, and plugin blocks.</summary>
     public IReadOnlyList<BlockDefinition> All => _all ??= BuildAll();
 
+    /// <summary>Picker category per built-in block type (localised as "blockcat.&lt;value&gt;" in the view).
+    /// Components → "custom", plugin blocks → "plugins" (set below). Unlisted types default to "design".</summary>
+    private static readonly Dictionary<string, string> CategoryByType = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["section"] = "layout", ["columns"] = "layout", ["column"] = "layout", ["spacer"] = "layout",
+        ["richtext"] = "text", ["quote"] = "text", ["faq"] = "text", ["accordion"] = "text",
+        ["image"] = "media", ["gallery"] = "media", ["logostrip"] = "media",
+        ["hero"] = "design", ["cta"] = "design", ["cards"] = "design", ["card"] = "design",
+        ["leistungen"] = "design", ["leistung"] = "design", ["servicegrid"] = "design",
+        ["service"] = "design", ["imagetext"] = "design", ["posts"] = "design",
+        ["form"] = "form",
+        ["html"] = "embed"
+    };
+    private static string CatOf(string type) => CategoryByType.TryGetValue(type, out var c) ? c : "design";
+
     private IReadOnlyList<BlockDefinition> BuildAll()
     {
         var list = new List<BlockDefinition>(Builtin);
+        foreach (var d in list) d.Category = CatOf(d.Type);          // built-ins
         foreach (var c in _db.Components.OrderBy(c => c.Name).ToList())
         {
-            list.Add(ComponentDefinition.FromComponent(c));
+            var cd = ComponentDefinition.FromComponent(c);
+            cd.Category = "custom";                                   // user-defined components
+            list.Add(cd);
         }
         foreach (var pb in _plugins.Blocks)
         {
@@ -48,7 +66,8 @@ public class BlockRegistry
                 Svg = SvgPlugin,
                 Partial = "(plugin)",
                 PluginRender = pb.Render,
-                Fields = pb.Fields   // editable fields the plugin declared (empty = none)
+                Fields = pb.Fields,   // editable fields the plugin declared (empty = none)
+                Category = "plugins"  // plugin-provided blocks
             });
         }
         return list;

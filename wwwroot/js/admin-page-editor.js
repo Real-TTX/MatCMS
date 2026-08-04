@@ -3,21 +3,65 @@
 (function () {
     "use strict";
 
-    // ---------- Add-block modal ----------
+    // ---------- Add-block modal (categorised picker + search) ----------
     var modal = document.getElementById("add-block-modal");
     var openBtn = document.getElementById("add-block-btn");
     var closeBtn = document.getElementById("add-block-close");
+    var search = modal ? modal.querySelector("#bpick-search") : null;
+    var catBtns = modal ? modal.querySelectorAll(".bpick-cat") : [];
+    var groups = modal ? modal.querySelectorAll(".bpick-group") : [];
+    var emptyMsg = modal ? modal.querySelector(".bpick-empty") : null;
+    var activeCat = "all";
+
+    // Filter tiles by the active category + the search text; hide empty groups; show "nothing found".
+    function applyFilter() {
+        var q = ((search && search.value) || "").trim().toLowerCase();
+        var anyVisible = false;
+        groups.forEach(function (g) {
+            var groupVisible = false;
+            g.querySelectorAll(".tile").forEach(function (t) {
+                var okCat = activeCat === "all" || t.getAttribute("data-cat") === activeCat;
+                var okText = !q
+                    || (t.getAttribute("data-name") || "").indexOf(q) >= 0
+                    || (t.getAttribute("data-desc") || "").indexOf(q) >= 0;
+                var show = okCat && okText;
+                var f = t.closest("form");
+                if (f) f.style.display = show ? "" : "none";
+                if (show) { groupVisible = true; anyVisible = true; }
+            });
+            g.style.display = groupVisible ? "" : "none";
+        });
+        if (emptyMsg) emptyMsg.hidden = anyVisible;
+    }
+    function resetFilter() {
+        if (search) search.value = "";
+        activeCat = "all";
+        catBtns.forEach(function (x, i) { x.classList.toggle("is-active", i === 0); });
+        applyFilter();
+    }
+
     // Open the block picker; `position` = insert index (null = append to the end).
     function openPicker(position) {
         if (!modal) return;
         modal.querySelectorAll(".add-position").forEach(function (i) { i.value = position == null ? "" : String(position); });
         modal.classList.add("open");
+        resetFilter();
+        setTimeout(function () { if (search) search.focus(); }, 30);
     }
     if (modal) {
         if (openBtn) openBtn.addEventListener("click", function () { openPicker(null); });
         if (closeBtn) closeBtn.addEventListener("click", function () { modal.classList.remove("open"); });
         modal.addEventListener("click", function (e) { if (e.target === modal) modal.classList.remove("open"); });
         document.addEventListener("keydown", function (e) { if (e.key === "Escape") modal.classList.remove("open"); });
+        if (search) search.addEventListener("input", applyFilter);
+        catBtns.forEach(function (c) {
+            c.addEventListener("click", function () {
+                catBtns.forEach(function (x) { x.classList.remove("is-active"); });
+                c.classList.add("is-active");
+                activeCat = c.getAttribute("data-cat");
+                applyFilter();
+            });
+        });
     }
 
     // ---------- Live preview linking ----------

@@ -4,16 +4,18 @@
 @{
     ViewData["Title"] = T["diff.title"];
     string Loc(string c) => Localizer.DisplayName(c) + " (" + c + ")";
-    string CellClass(string s) => s switch
+    string CellClass(string s) => "d-" + s;
+    string StatusLabel(string s) => s switch
     {
-        "identical" => "d-identical",
-        "translated" => "d-translated",
-        "struct" => "d-struct",
-        "missing" => "d-missing",
-        "extra" => "d-extra",
-        "na" => "d-na",
-        _ => "d-empty"
+        "translated" => T["diff.translated"],
+        "partial" => T["diff.partial"],
+        "identical" => T["diff.notTranslated"],
+        "missing" => T["diff.missing"],
+        "extra" => T["diff.extra"],
+        "empty" => "—",
+        _ => ""
     };
+    bool HasBar(string s) => s is "translated" or "partial" or "identical";
 }
 <div class="page-head">
     <h1>@T["diff.title"]</h1>
@@ -39,8 +41,13 @@ else
                 var c = Model.Totals[loc];
                 <div class="d-sumcard">
                     <span class="badge badge-off mono">@loc.ToUpperInvariant()</span>
+                    <span class="d-ring" style="--p:@c.Percent"><b>@c.Percent%</b></span>
                     <span class="d-pill d-translated">@c.Translated @T["diff.translated"]</span>
-                    <span class="d-pill d-identical">@c.Identical @T["diff.identical"]</span>
+                    @if (c.Partial > 0)
+                    {
+                        <span class="d-pill d-partial">@c.Partial @T["diff.partial"]</span>
+                    }
+                    <span class="d-pill d-identical">@c.Identical @T["diff.notTranslated"]</span>
                     <span class="d-pill d-missing">@c.Missing @T["diff.missing"]</span>
                     @if (c.Extra > 0)
                     {
@@ -52,15 +59,15 @@ else
 
         <div class="d-legend">
             <span class="muted">@T["diff.legend"]:</span>
-            <span class="wd"><ins>@T["diff.legendIns"]</ins></span>
-            <span class="wd"><del>@T["diff.legendDel"]</del></span>
-            <span>@T["diff.legendPlain"]</span>
+            <span class="d-flag d-flag-translated">@T["diff.translated"]</span>
+            <span class="d-flag d-flag-partial">@T["diff.partial"]</span>
+            <span class="d-flag d-flag-identical">@T["diff.notTranslated"]</span>
             <span class="d-flag d-flag-missing">@T["diff.missing"]</span>
-            <span class="d-flag d-flag-extra">@T["diff.extra"]</span>
+            <span class="muted d-hint">· @T["diff.clickToEdit"]</span>
         </div>
 
         <div class="d-scroll">
-            <table class="data d-table">
+            <table class="data d-table" data-src-page="@Model.Source.Id">
                 <thead>
                     <tr>
                         <th>#</th>
@@ -74,34 +81,32 @@ else
                 <tbody>
                     @foreach (var row in Model.Rows)
                     {
-                        var rowMissing = row.Cells.Any(c => c.Status == "missing");
-                        var rowExtra = row.Cells.Any(c => c.Status == "extra");
-                        <tr class="@(rowMissing ? "d-row-missing" : rowExtra ? "d-row-extra" : "")">
+                        <tr data-src-block="@row.SourceBlockId" data-block-type="@row.BlockType">
                             <td class="mono">@row.Index<div class="muted d-type">@row.BlockType</div></td>
-                            <td class="d-src">@(string.IsNullOrWhiteSpace(row.SourceText) ? "—" : row.SourceText)</td>
+                            <td class="d-src">@(string.IsNullOrWhiteSpace(row.SourcePreview) ? "—" : row.SourcePreview)</td>
                             @foreach (var cell in row.Cells)
                             {
-                                <td class="wd @CellClass(cell.Status)"
-                                    title="@(cell.Status == "identical" ? T["diff.identicalHint"] : cell.Status == "missing" ? T["diff.missingHint"] : cell.Status == "extra" ? T["diff.extraHint"] : "")">
-                                    @if (cell.Status == "missing")
-                                    {
-                                        <span class="d-flag d-flag-missing">✗ @T["diff.missing"]</span>
-                                    }
-                                    else if (cell.Status == "extra")
-                                    {
-                                        <span class="d-flag d-flag-extra">＋ @T["diff.extra"]</span>
-                                        @if (!string.IsNullOrWhiteSpace(cell.DiffHtml))
-                                        {
-                                            <div class="d-extra-text">@Html.Raw(cell.DiffHtml)</div>
-                                        }
-                                    }
-                                    else if (cell.Status == "na")
+                                <td class="d-cell @CellClass(cell.Status)"
+                                    data-loc="@cell.Locale" data-tgt-page="@cell.TargetPageId" data-tgt-block="@cell.TargetBlockId"
+                                    data-status="@cell.Status" data-sim="@cell.Sim"
+                                    title="@T["diff.clickToEdit"]">
+                                    @if (cell.Status == "na")
                                     {
                                         <span class="muted">·</span>
                                     }
                                     else
                                     {
-                                        @Html.Raw(cell.DiffHtml)
+                                        <div class="d-cellhead">
+                                            <span class="d-flag d-flag-@cell.Status">@StatusLabel(cell.Status)</span>
+                                            @if (HasBar(cell.Status))
+                                            {
+                                                <span class="d-simn">@cell.Sim%</span>
+                                            }
+                                        </div>
+                                        @if (HasBar(cell.Status))
+                                        {
+                                            <div class="d-bar"><span style="width:@(cell.Sim)%"></span></div>
+                                        }
                                     }
                                 </td>
                             }
@@ -114,46 +119,83 @@ else
 }
 
 @section Scripts {
+    <script>
+        window.matDiffDefault = "@Model.Source.Locale";
+        window.matDiffI18n = {
+            editTitle: @Html.Raw(System.Text.Json.JsonSerializer.Serialize((string)T["diff.editTitle"])),
+            original: @Html.Raw(System.Text.Json.JsonSerializer.Serialize((string)T["diff.original"])),
+            translation: @Html.Raw(System.Text.Json.JsonSerializer.Serialize((string)T["diff.translation"])),
+            save: @Html.Raw(System.Text.Json.JsonSerializer.Serialize((string)T["diff.save"])),
+            saving: @Html.Raw(System.Text.Json.JsonSerializer.Serialize((string)T["diff.saving"])),
+            saved: @Html.Raw(System.Text.Json.JsonSerializer.Serialize((string)T["diff.saved"])),
+            saveError: @Html.Raw(System.Text.Json.JsonSerializer.Serialize((string)T["diff.saveError"])),
+            cancel: @Html.Raw(System.Text.Json.JsonSerializer.Serialize((string)T["diff.cancel"])),
+            noTarget: @Html.Raw(System.Text.Json.JsonSerializer.Serialize((string)T["diff.noTarget"])),
+            noOriginal: @Html.Raw(System.Text.Json.JsonSerializer.Serialize((string)T["diff.noOriginal"]))
+        };
+    </script>
+    <script src="~/js/admin-blocks.js" asp-append-version="true"></script>
+    <script src="~/js/diff-edit.js" asp-append-version="true"></script>
     <style>
         .d-heads { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
         .d-summary { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; }
-        .d-sumcard { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--line, #e2e4e8); border-radius: 10px; background: #fff; }
+        .d-sumcard { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--line, #e2e4e8); border-radius: 10px; background: #fff; }
         .d-pill { font-size: 12px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line, #e2e4e8); }
         .d-pill.d-translated { background: #e6f7ea; border-color: #bfe6c8; color: #1a7f37; }
-        .d-pill.d-identical { background: #fff8e6; border-color: #f0dca0; color: #9a6b00; }
-        .d-pill.d-missing { background: #fdeeee; border-color: #f0bcbc; color: #cf222e; }
+        .d-pill.d-partial { background: #fff4e5; border-color: #f0cf9a; color: #9a5b00; }
+        .d-pill.d-identical { background: #fdeeee; border-color: #f0bcbc; color: #cf222e; }
+        .d-pill.d-missing { background: #f3f0ff; border-color: #d3c9f5; color: #6b46c1; }
         .d-pill.d-extra-pill { background: #eaf3ff; border-color: #b6d7ff; color: #0969da; }
-        /* Prominent inline flags for a missing / translation-only block (legend + cells). */
-        .d-flag { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600;
-                  padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
-        .d-flag-missing { background: #fdeeee; border: 1px solid #f0bcbc; color: #cf222e; }
-        .d-flag-extra { background: #eaf3ff; border: 1px solid #b6d7ff; color: #0969da; }
-        .d-extra-text { margin-top: 6px; }
-        .d-legend { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; font-size: 12.5px; }
+        /* percentage ring */
+        .d-ring { --p: 0; width: 42px; height: 42px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+                  background: conic-gradient(#1a7f37 calc(var(--p) * 1%), #eceff2 0); flex: none; }
+        .d-ring b { width: 32px; height: 32px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; }
+        .d-legend { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; font-size: 12.5px; }
+        .d-hint { font-style: italic; }
         .d-scroll { overflow-x: auto; }
-        /* Fixed layout so columns share the width evenly and long text WRAPS instead of overflowing. */
         .d-table { width: 100%; table-layout: fixed; min-width: 760px; }
         .d-table td, .d-table th { vertical-align: top; font-size: 13.5px; line-height: 1.55; overflow-wrap: anywhere; word-break: break-word; white-space: normal; }
-        /* First column carries the row number AND the block-type label below it — needs enough width
-           so the block name (e.g. RICHTEXT, GALLERY) stays on one readable line instead of being
-           squeezed to a sliver by table-layout:fixed. */
         .d-table th:first-child, .d-table td:first-child { width: 116px; }
-        /* Override the shared .data rule (table.data td:last-child { width:1%; white-space:nowrap }, meant
-           for an actions column) — here the last column is a language column and MUST wrap. */
         table.data.d-table td:last-child, table.data.d-table th:last-child { width: auto; white-space: normal; }
         .d-type { font-size: 11px; text-transform: uppercase; letter-spacing: .03em; margin-top: 3px; white-space: nowrap; }
-        /* Git-style word diff */
-        .wd ins { background: #e6f7ea; color: #1a7f37; text-decoration: none; border-radius: 3px; padding: 0 2px; }
-        .wd del { background: #ffeef0; color: #cf222e; text-decoration: line-through; border-radius: 3px; padding: 0 2px; }
-        /* cell tints by status */
-        .d-identical { background: #fffdf5; }
-        .d-translated { background: #fbfefb; }
-        .d-missing { background: #fdf4f4; }
-        .d-struct { background: #fdf1e7; }
-        .d-extra { background: #f3f9ff; }
-        .d-na { background: #fafafa; }
-        /* Whole-row emphasis when a block is missing (red edge) or only in a translation (blue edge). */
-        tr.d-row-missing td:first-child { box-shadow: inset 3px 0 0 #cf222e; }
-        tr.d-row-extra td:first-child { box-shadow: inset 3px 0 0 #0969da; }
+        .d-src { color: #3a342e; }
+        /* status flags */
+        .d-flag { display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+        .d-flag-translated { background: #e6f7ea; border: 1px solid #bfe6c8; color: #1a7f37; }
+        .d-flag-partial { background: #fff4e5; border: 1px solid #f0cf9a; color: #9a5b00; }
+        .d-flag-identical { background: #fdeeee; border: 1px solid #f0bcbc; color: #cf222e; }
+        .d-flag-missing { background: #f3f0ff; border: 1px solid #d3c9f5; color: #6b46c1; }
+        .d-flag-extra { background: #eaf3ff; border: 1px solid #b6d7ff; color: #0969da; }
+        /* clickable cells */
+        .d-cell { cursor: pointer; transition: background .12s ease; }
+        .d-cell:hover { background: #f6f8fb; }
+        .d-cell.d-na { cursor: default; background: #fafafa; }
+        .d-cell.d-na:hover { background: #fafafa; }
+        .d-cellhead { display: flex; align-items: center; gap: 8px; }
+        .d-simn { font-size: 11px; color: #6b7280; font-variant-numeric: tabular-nums; }
+        .d-bar { margin-top: 6px; height: 5px; border-radius: 3px; background: #eceff2; overflow: hidden; }
+        .d-bar > span { display: block; height: 100%; background: #1a7f37; }
+        .d-partial .d-bar > span { background: #d9962b; }
+        .d-identical .d-bar > span { background: #cf222e; }
+        .d-cell.d-translated { background: #fbfefb; }
+        .d-cell.d-partial { background: #fffaf1; }
+        .d-cell.d-identical { background: #fdf4f4; }
+        .d-cell.d-missing { background: #f7f5ff; }
+        .d-cell.d-extra { background: #f3f9ff; }
+
+        /* ---- inline edit dialog ---- */
+        .de-dialog { width: min(1040px, 94vw); max-width: 94vw; border: none; border-radius: 14px; padding: 0; box-shadow: 0 30px 80px rgba(0,0,0,.3); }
+        .de-dialog::backdrop { background: rgba(15,18,22,.5); }
+        .de-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line, #e2e4e8); }
+        .de-x { border: none; background: none; font-size: 18px; cursor: pointer; color: #6b7280; }
+        .de-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; max-height: 70vh; overflow: auto; }
+        @@media (max-width: 720px) { .de-grid { grid-template-columns: 1fr; } }
+        .de-col { padding: 16px 18px; }
+        .de-col + .de-col { border-left: 1px solid var(--line, #e2e4e8); }
+        .de-coltitle { font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #6b7280; margin-bottom: 12px; }
+        .de-readonly { opacity: .85; }
+        .de-readonly .field label { color: #6b7280; }
+        .de-foot { display: flex; align-items: center; gap: 10px; justify-content: flex-end; padding: 12px 18px; border-top: 1px solid var(--line, #e2e4e8); }
+        .de-msg { margin-right: auto; color: #6b7280; font-size: 13px; }
     </style>
 }

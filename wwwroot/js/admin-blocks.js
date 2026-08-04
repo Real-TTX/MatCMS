@@ -3,6 +3,39 @@
 (function () {
     "use strict";
 
+    // Reusable, DOM-agnostic builder: renders `schema` into `container` with `data`, wires conditional
+    // visibility, and returns { serialize() }. Used by the in-page block editor below AND by the
+    // translation-compare dialog (diff-edit.js), so both share identical controls (rich text, image
+    // picker, link picker, lists, conditions).
+    function build(container, schema, data) {
+        data = data || {};
+        var collectors = [];
+        (schema || []).forEach(function (field) {
+            var built = buildField(field, data[field.id]);
+            container.appendChild(built.el);
+            collectors.push({ id: field.id, get: built.get, el: built.el, showWhen: field.showWhen });
+        });
+        function applyConditions() {
+            collectors.forEach(function (c) {
+                if (!c.showWhen) return;
+                var src = collectors.filter(function (x) { return x.id === c.showWhen.field; })[0];
+                var match = src && String(src.get()) === String(c.showWhen.value);
+                c.el.style.display = match ? "" : "none";
+            });
+        }
+        container.addEventListener("change", applyConditions);
+        container.addEventListener("input", applyConditions);
+        applyConditions();
+        function serialize() {
+            var obj = {};
+            collectors.forEach(function (c) { obj[c.id] = c.get(); });
+            return obj;
+        }
+        return { serialize: serialize, applyConditions: applyConditions, collectors: collectors };
+    }
+    window.MatBlockFields = { build: build };
+
+    // ---- In-page block editor (only present on the page/post editor) --------------------------------
     var schemaEl = document.getElementById("block-schema");
     var dataEl = document.getElementById("block-data");
     var editor = document.getElementById("block-editor");
@@ -10,34 +43,8 @@
     var output = document.getElementById("DataJson");
     if (!schemaEl || !editor || !form || !output) return;
 
-    var schema = safeParse(schemaEl.textContent, []);
-    var data = safeParse(dataEl ? dataEl.textContent : "{}", {});
-
-    var collectors = [];
-    schema.forEach(function (field) {
-        var built = buildField(field, data[field.id]);
-        editor.appendChild(built.el);
-        collectors.push({ id: field.id, get: built.get, el: built.el, showWhen: field.showWhen });
-    });
-
-    // Conditional field visibility (e.g. the gallery "tags" field only when source = "media").
-    function applyConditions() {
-        collectors.forEach(function (c) {
-            if (!c.showWhen) return;
-            var src = collectors.filter(function (x) { return x.id === c.showWhen.field; })[0];
-            var match = src && String(src.get()) === String(c.showWhen.value);
-            c.el.style.display = match ? "" : "none";
-        });
-    }
-    editor.addEventListener("change", applyConditions);
-    editor.addEventListener("input", applyConditions);
-    applyConditions();
-
-    function serialize() {
-        var obj = {};
-        collectors.forEach(function (c) { obj[c.id] = c.get(); });
-        return obj;
-    }
+    var api = build(editor, safeParse(schemaEl.textContent, []), safeParse(dataEl ? dataEl.textContent : "{}", {}));
+    function serialize() { return api.serialize(); }
 
     form.addEventListener("submit", function () {
         output.value = JSON.stringify(serialize());

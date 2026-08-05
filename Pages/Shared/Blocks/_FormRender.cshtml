@@ -250,6 +250,21 @@
         root.addEventListener("change", apply);
         apply();
 
+        // Enter must not submit the form from a single-line field (that surprised users). A textarea
+        // keeps Enter = newline; buttons still work; the form is submitted only via "Absenden".
+        root.addEventListener("keydown", function (e) {
+            if (e.key !== "Enter" && e.keyCode !== 13) return;
+            var t = e.target;
+            if (!t || !t.tagName) return;
+            var tag = t.tagName.toLowerCase();
+            if (tag === "textarea") return;
+            if (tag === "input") {
+                var type = (t.getAttribute("type") || "text").toLowerCase();
+                if (type === "submit" || type === "button") return;
+                e.preventDefault();
+            }
+        });
+
         @if (Model.Builder)
         {
             <text>

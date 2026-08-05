@@ -5,7 +5,7 @@
 
     // ---------- Add-block modal (categorised picker + search) ----------
     var modal = document.getElementById("add-block-modal");
-    var openBtn = document.getElementById("add-block-btn");
+    var openBtns = document.querySelectorAll(".js-add-block");   // "+ Block" in list mode AND single-block edit
     var closeBtn = document.getElementById("add-block-close");
     var search = modal ? modal.querySelector("#bpick-search") : null;
     var catBtns = modal ? modal.querySelectorAll(".bpick-cat") : [];
@@ -36,7 +36,8 @@
     // Filter tiles by the active category (incl. the "fav"/"recent" pseudo-categories) + search text.
     function applyFilter() {
         var q = ((search && search.value) || "").trim().toLowerCase();
-        var flat = activeCat === "fav" || activeCat === "recent";
+        // Only "Alle" keeps the grouped headings; any specific category (incl. fav/recent) shows a flat list.
+        var flat = activeCat !== "all";
         var main = modal.querySelector(".bpick-main");
         if (main) main.classList.toggle("bpick-flat", flat);
         var anyVisible = false;
@@ -77,7 +78,7 @@
         setTimeout(function () { if (search) search.focus(); }, 30);
     }
     if (modal) {
-        if (openBtn) openBtn.addEventListener("click", function () { openPicker(null); });
+        openBtns.forEach(function (b) { b.addEventListener("click", function () { openPicker(null); }); });
         if (closeBtn) closeBtn.addEventListener("click", function () { modal.classList.remove("open"); });
         modal.addEventListener("click", function (e) { if (e.target === modal) modal.classList.remove("open"); });
         document.addEventListener("keydown", function (e) { if (e.key === "Escape") modal.classList.remove("open"); });

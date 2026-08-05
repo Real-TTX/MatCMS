@@ -40,9 +40,13 @@ else
         /* Insert-between-blocks zones (page-builder style) shown in the preview. */
         .mat-insert { display: block; width: 100%; border: none; background: none; padding: 0; margin: 0; cursor: pointer; position: relative; height: 22px; opacity: 0; transition: opacity .12s ease; z-index: 9997; }
         .mat-insert::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 3px; background: #2563eb; border-radius: 3px; transform: translateY(-50%); }
-        .mat-insert span { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 1; font: 700 11px/1 Inter, sans-serif; background: #2563eb; color: #fff; padding: 4px 14px; border-radius: 999px; white-space: nowrap; box-shadow: 0 2px 8px rgba(37,99,235,.4); }
-        body:hover .mat-insert { opacity: .16; }
+        .mat-insert span { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 1; font: 700 11px/1 Inter, sans-serif; background: #2563eb; color: #fff; padding: 4px 14px; border-radius: 999px; white-space: nowrap; box-shadow: 0 2px 8px rgba(37,99,235,.4); opacity: 0; transition: opacity .12s ease; }
+        /* When the pointer is over the preview, the insert zones become clearly visible (line only);
+           hovering a specific zone lights it up fully and reveals its "+ Block" label. */
+        body:hover .mat-insert { opacity: .45; }
         .mat-insert:hover { opacity: 1; }
+        .mat-insert:hover span { opacity: 1; }
+        .mat-insert span { opacity: 0; }
         @@keyframes matFlash { 0%,100% { background: transparent; } 30% { background: rgba(37,99,235,.10); } }
     </style>
     <script>

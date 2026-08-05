@@ -79,6 +79,7 @@
                     <form class="inline-form le-delete" method="post" asp-page-handler="DeleteBlock" asp-route-id="@Model.Current.Id" asp-route-blockId="@Model.SelectedBlock!.Id" onsubmit="return confirm('@T["editor.confirmDeleteBlock"]');">
                         <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["editor.blockDelete"]" aria-label="@T["editor.blockDelete"]"><i class="ti ti-trash" aria-hidden="true"></i></button>
                     </form>
+                    <button type="button" class="btn btn-sm btn-ghost btn-icon js-add-block" title="@T["editor.addBlock"]" aria-label="@T["editor.addBlock"]"><i class="ti ti-plus" aria-hidden="true"></i></button>
                     <button type="submit" form="block-form" class="btn btn-sm btn-icon le-save" title="@T["action.save"]" aria-label="@T["action.save"]"><i class="ti ti-device-floppy" aria-hidden="true"></i></button>
                     <a class="btn btn-sm btn-ghost btn-icon" asp-page="Edit" asp-route-id="@Model.Current.Id" title="@T["editor.done"]" aria-label="@T["editor.done"]"><i class="ti ti-check" aria-hidden="true"></i></a>
                 </div>
@@ -189,7 +190,7 @@
                 </form>
 
                 <div class="le-add">
-                    <button type="button" class="btn btn-block" id="add-block-btn">@T["editor.addBlock"]</button>
+                    <button type="button" class="btn btn-block js-add-block" id="add-block-btn">@T["editor.addBlock"]</button>
                 </div>
 
                 <details class="le-settings">
@@ -284,8 +285,10 @@
                 }
             </div>
 
-            @* Add-block modal *@
-            <div class="modal-overlay" id="add-block-modal">
+        }
+        @* Add-block modal — available in BOTH the block-list and the single-block-edit view,
+           so the "+ Block" button and the preview insert-zones work in either mode. *@
+        <div class="modal-overlay" id="add-block-modal">
                 <div class="modal" role="dialog" aria-modal="true" aria-label="@T["editor.addBlockModal"]">
                     <div class="modal-head">
                         <h2>@T["editor.addBlockModal"]</h2>
@@ -344,7 +347,6 @@
                     </div>
                 </div>
             </div>
-        }
     </aside>
 
     <main class="le-preview">
@@ -386,7 +388,7 @@
         .bpick-n { font-size: 11.5px; opacity: .75; background: rgba(128,128,128,.22); padding: 1px 8px; border-radius: 999px; }
         .bpick-cat.is-active .bpick-n { background: rgba(255,255,255,.25); opacity: 1; color: #fff; }
         @@media (max-width: 680px) { .bpick-sep { width: 1px; height: auto; margin: 4px 6px; } }
-        .bpick-main { max-height: 60vh; overflow-y: auto; padding-right: 4px; }
+        .bpick-main { max-height: 60vh; overflow-y: auto; padding: 3px 4px 4px 3px; }
         .bpick-grouphead { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; opacity: .55; margin: 0 0 10px; }
         .bpick-group + .bpick-group { margin-top: 14px; }
         .bpick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 10px; grid-auto-rows: 1fr; }

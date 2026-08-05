@@ -13,14 +13,41 @@
     var emptyMsg = modal ? modal.querySelector(".bpick-empty") : null;
     var activeCat = "all";
 
-    // Filter tiles by the active category + the search text; hide empty groups; show "nothing found".
+    // Favourites + recently-used are per-browser (localStorage), keyed by block type.
+    var FAV_KEY = "matBlockFav", REC_KEY = "matBlockRecent";
+    function loadArr(k) { try { return JSON.parse(localStorage.getItem(k) || "[]") || []; } catch (e) { return []; } }
+    function saveArr(k, a) { try { localStorage.setItem(k, JSON.stringify(a)); } catch (e) { } }
+    var favs = loadArr(FAV_KEY), recent = loadArr(REC_KEY);
+    function isFav(t) { return favs.indexOf(t) >= 0; }
+    function toggleFav(t) { var i = favs.indexOf(t); if (i >= 0) favs.splice(i, 1); else favs.push(t); saveArr(FAV_KEY, favs); }
+    function pushRecent(t) { recent = recent.filter(function (x) { return x !== t; }); recent.unshift(t); if (recent.length > 12) recent = recent.slice(0, 12); saveArr(REC_KEY, recent); }
+
+    function updateCounts() {
+        if (!modal) return;
+        var tiles = modal.querySelectorAll(".bpick-grid .tile");
+        var types = [].map.call(tiles, function (t) { return t.getAttribute("data-type"); });
+        var fEl = modal.querySelector('.bpick-n[data-count="fav"]');
+        var rEl = modal.querySelector('.bpick-n[data-count="recent"]');
+        if (fEl) fEl.textContent = favs.filter(function (t) { return types.indexOf(t) >= 0; }).length;
+        if (rEl) rEl.textContent = recent.filter(function (t) { return types.indexOf(t) >= 0; }).length;
+        modal.querySelectorAll(".tile-fav").forEach(function (b) { b.classList.toggle("on", isFav(b.getAttribute("data-type"))); });
+    }
+
+    // Filter tiles by the active category (incl. the "fav"/"recent" pseudo-categories) + search text.
     function applyFilter() {
         var q = ((search && search.value) || "").trim().toLowerCase();
+        var flat = activeCat === "fav" || activeCat === "recent";
+        var main = modal.querySelector(".bpick-main");
+        if (main) main.classList.toggle("bpick-flat", flat);
         var anyVisible = false;
         groups.forEach(function (g) {
             var groupVisible = false;
             g.querySelectorAll(".tile").forEach(function (t) {
-                var okCat = activeCat === "all" || t.getAttribute("data-cat") === activeCat;
+                var type = t.getAttribute("data-type");
+                var okCat = activeCat === "all" ? true
+                    : activeCat === "fav" ? isFav(type)
+                    : activeCat === "recent" ? (recent.indexOf(type) >= 0)
+                    : t.getAttribute("data-cat") === activeCat;
                 var okText = !q
                     || (t.getAttribute("data-name") || "").indexOf(q) >= 0
                     || (t.getAttribute("data-desc") || "").indexOf(q) >= 0;
@@ -36,7 +63,8 @@
     function resetFilter() {
         if (search) search.value = "";
         activeCat = "all";
-        catBtns.forEach(function (x, i) { x.classList.toggle("is-active", i === 0); });
+        catBtns.forEach(function (x) { x.classList.toggle("is-active", x.getAttribute("data-cat") === "all"); });
+        updateCounts();
         applyFilter();
     }
 
@@ -60,6 +88,24 @@
                 c.classList.add("is-active");
                 activeCat = c.getAttribute("data-cat");
                 applyFilter();
+            });
+        });
+        // Star toggles a block as favourite (doesn't submit the add-form).
+        modal.querySelectorAll(".tile-fav").forEach(function (b) {
+            b.addEventListener("click", function (e) {
+                e.preventDefault(); e.stopPropagation();
+                var t = b.getAttribute("data-type");
+                toggleFav(t);
+                b.classList.toggle("on", isFav(t));
+                updateCounts();
+                if (activeCat === "fav") applyFilter();
+            });
+        });
+        // Remember which block was inserted (for the "Verwendet" list) just before the form navigates.
+        modal.querySelectorAll(".bpick-grid form").forEach(function (f) {
+            f.addEventListener("submit", function () {
+                var tile = f.querySelector(".tile");
+                if (tile) pushRecent(tile.getAttribute("data-type"));
             });
         });
     }

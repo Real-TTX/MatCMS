@@ -20,6 +20,11 @@ public class FormElement
     /// <summary>For date/daterange: allow imprecise entries — shows the "± days" flexibility chips.</summary>
     public bool Flex { get; set; }
 
+    /// <summary>For date/daterange: per-field overrides for the picker's button/label texts
+    /// (keys: ok, clear, today, cancel, flexTitle, exact). Empty/missing = use the localized default.
+    /// Stored on the element so they are translatable per language version like any other field text.</summary>
+    public Dictionary<string, string> Texts { get; set; } = new();
+
     public FormCondition? Condition { get; set; }
 
     /// <summary>Options for a <c>select</c> element.</summary>

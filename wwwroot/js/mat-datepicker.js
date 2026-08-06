@@ -190,10 +190,30 @@
         });
     }
 
+    // Apply per-field text overrides (data-dp-t-<key>) to the shared dialog, falling back to the
+    // localized defaults for any key the field doesn't override. Runs on every open() since the
+    // dialog is reused across triggers.
+    function applyTexts(wrap) {
+        function ov(key, def) { var v = wrap.getAttribute('data-dp-t-' + key); return (v != null && v !== '') ? v : def; }
+        var map = [
+            ['[data-dp-ok]', 'ok', T.ok],
+            ['[data-dp-clear]', 'clear', T.clear],
+            ['[data-dp-today]', 'today', T.today],
+            ['[data-dp-cancel]', 'cancel', T.cancel],
+            ['.mat-dp-flex-title', 'flextitle', T.flexTitle],
+            ['[data-flex="0"]', 'exact', T.exact]
+        ];
+        map.forEach(function (m) {
+            var node = dialog.querySelector(m[0]);
+            if (node) node.textContent = ov(m[1], m[2]);
+        });
+    }
+
     function open(trigger) {
         ensureDialog();
         currentTrigger = trigger;
         var wrap = trigger.closest('.mat-dp');
+        applyTexts(wrap);
         isRange = wrap.getAttribute('data-dp-mode') === 'range';
         var input = wrap.querySelector('[data-dp-input]');
         var parsed = parseValue(input.value, isRange);

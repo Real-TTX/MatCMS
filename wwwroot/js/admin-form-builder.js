@@ -204,6 +204,33 @@
         flexWrap.appendChild(flexLabel);
         container.appendChild(flexWrap);
 
+        // Button-Texte des Zeitraum-/Datums-Controls — pro Feld überschreibbar. Leer = lokalisierter
+        // Standard. Werden pro Element gespeichert und sind damit je Sprachversion übersetzbar.
+        var TEXT_KEYS = [
+            { key: "ok", label: "Übernehmen-Button", def: "Übernehmen" },
+            { key: "clear", label: "Löschen-Button", def: "Löschen" },
+            { key: "today", label: "Heute-Button", def: "Heute" },
+            { key: "cancel", label: "Abbrechen-Button", def: "Abbrechen" },
+            { key: "flexTitle", label: "Titel „Flexible Datumsoptionen“", def: "Flexible Datumsoptionen" },
+            { key: "exact", label: "Chip „Genaue Zeitangabe“", def: "Genaue Zeitangabe" }
+        ];
+        var textsData = (data.texts && typeof data.texts === "object") ? data.texts : {};
+        var textsWrap = document.createElement("div"); textsWrap.className = "field dp-texts";
+        var textsHead = document.createElement("div"); textsHead.className = "field-help";
+        textsHead.textContent = "Button-Texte (leer = Standard der jeweiligen Sprache):";
+        textsWrap.appendChild(textsHead);
+        var textInputs = {};
+        TEXT_KEYS.forEach(function (tk) {
+            var row = document.createElement("label"); row.className = "dp-text-row";
+            var cap = document.createElement("span"); cap.className = "dp-text-cap"; cap.textContent = tk.label;
+            var inp = document.createElement("input"); inp.type = "text";
+            inp.value = textsData[tk.key] || ""; inp.placeholder = tk.def;
+            row.appendChild(cap); row.appendChild(inp);
+            textsWrap.appendChild(row);
+            textInputs[tk.key] = inp;
+        });
+        container.appendChild(textsWrap);
+
         // Regex
         var reWrap = fieldWrap("Muster (Regex, optional)");
         var reInput = document.createElement("input");
@@ -242,6 +269,7 @@
             show(reqWrap, isInput(t));
             show(reWrap, t === "text" || t === "phone" || t === "email" || t === "number");
             show(flexWrap, t === "date" || t === "daterange");
+            show(textsWrap, t === "date" || t === "daterange");
             show(optsCtl.node, isSelectLike(t));
             optsCtl.setRich(t === "richselect");
         }
@@ -254,7 +282,12 @@
             if (t !== "title") out.help = helpInput.value;
             if (isInput(t)) out.required = reqInput.checked;
             if (t === "text" || t === "phone" || t === "email" || t === "number") out.regex = reInput.value;
-            if (t === "date" || t === "daterange") out.flex = flexInput.checked;
+            if (t === "date" || t === "daterange") {
+                out.flex = flexInput.checked;
+                var texts = {};
+                TEXT_KEYS.forEach(function (tk) { var v = (textInputs[tk.key].value || "").trim(); if (v) texts[tk.key] = v; });
+                out.texts = texts;
+            }
             if (isSelectLike(t)) out.options = optsCtl.get();
             if (groupCtl) out.fields = groupCtl.get();
             if (condCtl) { var c = condCtl.get(); if (c) out.condition = c; }

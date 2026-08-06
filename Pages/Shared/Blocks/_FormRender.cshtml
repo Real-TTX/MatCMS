@@ -73,7 +73,19 @@
                 ? el.Placeholder
                 : (isRange ? T["dp.placeholderRange"].ToString() : T["dp.placeholder"].ToString());
             var mode = isRange ? "range" : "single";
-            sb.Append("<div class=\"mat-dp\" data-dp-mode=\"").Append(mode).Append('"').Append(el.Flex ? " data-dp-flex=\"1\"" : "").Append(">");
+            sb.Append("<div class=\"mat-dp\" data-dp-mode=\"").Append(mode).Append('"').Append(el.Flex ? " data-dp-flex=\"1\"" : "");
+            // Per-field text overrides for the picker buttons/labels — rendered as data-dp-t-<key>.
+            // mat-datepicker.js applies these per trigger, falling back to the localized defaults.
+            if (el.Texts is not null)
+            {
+                foreach (var key in new[] { "ok", "clear", "today", "cancel", "flexTitle", "exact" })
+                {
+                    if (el.Texts.TryGetValue(key, out var tv) && !string.IsNullOrWhiteSpace(tv))
+                        sb.Append(" data-dp-t-").Append(key.ToLowerInvariant()).Append("=\"")
+                          .Append(System.Net.WebUtility.HtmlEncode(tv)).Append('"');
+                }
+            }
+            sb.Append(">");
             sb.Append("<button type=\"button\" class=\"mat-input mat-dp-btn-trigger\" data-dp-btn").Append(disAttr).Append(">");
             sb.Append("<span class=\"mat-dp-display mat-dp-placeholder\" data-dp-display data-placeholder=\"")
               .Append(System.Net.WebUtility.HtmlEncode(placeholder)).Append("\">")

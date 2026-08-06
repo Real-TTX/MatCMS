@@ -178,24 +178,42 @@ textarea.mat-input { min-height: 120px; resize: vertical; }
     .mat-dp-months .mat-dp-month:nth-child(2) { display: none; }
 }
 
-/* Mobile: dialog fills the screen, the month grid grows to fill. */
+/* Mobile: render as a bottom sheet. The calendar area scrolls; the footer (Clear/Apply) is pinned
+   and always visible. Height uses dvh so the mobile address bar can't push the footer off-screen
+   (the old 100vh caused the "cut off at the bottom" bug). */
 @media (max-width: 600px) {
     .mat-dp-dialog {
-        max-width: none;
-        width: 100vw;
-        height: 100vh;
-        max-height: none;
-        border-radius: 0;
+        position: fixed;
+        inset: auto 0 0 0;                 /* pin to the bottom of the viewport */
         margin: 0;
+        width: 100%;
+        max-width: none;
+        max-height: 92vh;
+        max-height: 92dvh;                 /* excludes the browser chrome → footer stays visible */
+        border-radius: 16px 16px 0 0;
         display: flex;
         flex-direction: column;
+        overflow: hidden;
     }
-    .mat-dp-body { flex: 1; align-items: stretch; padding: 12px 10px 4px; }
-    .mat-dp-months { flex: 1; }
+    /* Scrollable calendar region. */
+    .mat-dp-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        align-items: flex-start;
+        padding: 14px 10px 6px;
+    }
     .mat-dp-month { display: flex; flex-direction: column; }
     .mat-dp-mtitle { font-size: 17px; }
-    .mat-dp-grid { flex: 1; align-content: start; padding: 8px 2px; }
-    .mat-dp-day { font-size: 16px; min-height: 44px; }
-    .mat-dp-foot { padding: 14px 16px; padding-bottom: max(14px, env(safe-area-inset-bottom)); }
+    .mat-dp-grid { padding: 8px 2px; }
+    .mat-dp-day { font-size: 16px; min-height: 42px; }
+    /* Flex chips + footer never shrink and never scroll away. */
+    .mat-dp-flex { flex: 0 0 auto; }
+    .mat-dp-foot {
+        flex: 0 0 auto;
+        padding: 14px 16px;
+        padding-bottom: max(14px, env(safe-area-inset-bottom));
+    }
     .mat-dp-btn { min-height: 44px; padding: 10px 16px; }
 }

@@ -63,12 +63,17 @@
 
     // --- Dialog (built once, reused for every trigger) ------------------------------------------
 
-    var dialog, monthsEl, flexEl, currentTrigger, viewDate, selection, isRange, hoverDate, flex;
+    var overlay, dialog, monthsEl, flexEl, currentTrigger, viewDate, selection, isRange, hoverDate, flex;
     var WD_FMT = new Intl.DateTimeFormat(LOCALE, { weekday: 'short' });   // Monday-first header labels
 
     function ensureDialog() {
         if (dialog) return;
-        dialog = document.createElement('dialog');
+        // Plain <div> overlay + panel (same robust mechanism as the rich-select) — NOT a native
+        // <dialog>/showModal, whose top-layer/backdrop behaviour is flaky on mobile browsers.
+        overlay = document.createElement('div');
+        overlay.className = 'mat-dp-overlay';
+        overlay.hidden = true;
+        dialog = document.createElement('div');
         dialog.className = 'mat-dp-dialog';
         dialog.innerHTML =
             // Mobile-only header: a title + ✕ close so the sheet is always easy to dismiss
@@ -96,13 +101,15 @@
                 + '<button type="button" class="mat-dp-btn mat-dp-btn-ghost" data-dp-cancel>' + T.cancel + '</button>'
                 + '<button type="button" class="mat-dp-btn mat-dp-btn-primary" data-dp-ok>' + T.ok + '</button>'
             + '</div>';
-        document.body.appendChild(dialog);
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
         monthsEl = dialog.querySelector('[data-dp-months]');
         flexEl = dialog.querySelector('[data-dp-flex]');
 
+        // Tap on the dim area outside the panel = cancel & close.
+        overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+
         dialog.addEventListener('click', function (e) {
-            // Click on the backdrop (outside the dialog content) = cancel & close.
-            if (e.target === dialog) { close(); return; }
             var t = e.target.closest('button');
             if (!t || !dialog.contains(t)) return;
             if (t.matches('[data-dp-prev]')) { viewDate.setMonth(viewDate.getMonth() - 1); render(); }
@@ -145,7 +152,8 @@
             if (selection.start && !selection.end) paint();
         });
         monthsEl.addEventListener('mouseleave', function () { if (hoverDate) { hoverDate = null; paint(); } });
-        dialog.addEventListener('close', function () { currentTrigger = null; hoverDate = null; });
+        // Escape closes (native <dialog> used to do this for free).
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
     }
 
     // One month panel: title + Monday-first weekday header + 6×7 day grid.
@@ -251,10 +259,14 @@
         viewDate = stripTime(parsed.start || new Date());
         render();
         paintFlex();
-        if (typeof dialog.showModal === 'function') dialog.showModal();
-        else dialog.setAttribute('open', '');
+        overlay.hidden = false;
     }
-    function close() { if (dialog && dialog.open) dialog.close(); }
+    function close() {
+        if (!overlay || overlay.hidden) return;
+        overlay.hidden = true;
+        currentTrigger = null;
+        hoverDate = null;
+    }
 
     function apply() {
         if (!currentTrigger) return;

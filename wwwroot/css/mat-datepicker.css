@@ -46,7 +46,21 @@ textarea.mat-input { min-height: 120px; resize: vertical; }
 }
 .mat-dp-close:hover { background: #f2f2f2; }
 
-/* Dialog */
+/* Overlay: full-screen dim that holds + centres the panel (same approach as the rich-select, so it
+   behaves identically on mobile). z-index sits above the floating language selector (1300). */
+.mat-dp-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    background: rgba(0, 0, 0, .4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+.mat-dp-overlay[hidden] { display: none; }
+
+/* Dialog panel */
 .mat-dp-dialog {
     border: 0;
     padding: 0;
@@ -57,8 +71,10 @@ textarea.mat-input { min-height: 120px; resize: vertical; }
     color: inherit;
     box-shadow: 0 30px 80px rgba(0,0,0,.22);
     overflow: hidden;
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
 }
-.mat-dp-dialog::backdrop { background: rgba(0,0,0,.4); }
 
 /* Body holds the prev/next arrows and one or two month panels side by side. */
 .mat-dp-body {
@@ -190,18 +206,14 @@ textarea.mat-input { min-height: 120px; resize: vertical; }
 /* Mobile: full-screen dialog with a fixed header (title + ✕), a scrollable calendar and a pinned
    footer. dvh keeps the footer above the browser chrome. */
 @media (max-width: 600px) {
+    .mat-dp-overlay { padding: 0; }        /* full screen, no gutter */
     .mat-dp-dialog {
-        position: fixed;
-        inset: 0;                          /* full screen */
-        margin: 0;
         width: 100%;
         max-width: none;
         height: 100vh;
         height: 100dvh;
         max-height: none;
         border-radius: 0;
-        display: flex;
-        flex-direction: column;
         overflow: hidden;
     }
     /* Header with the ✕ close, pinned at the top. */

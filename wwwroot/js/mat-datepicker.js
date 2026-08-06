@@ -75,7 +75,7 @@
             // (hidden on desktop via CSS). data-dp-cancel reuses the "close without applying" handler.
             '<div class="mat-dp-head">'
                 + '<span class="mat-dp-title" data-dp-title></span>'
-                + '<button type="button" class="mat-dp-close" data-dp-cancel aria-label="' + T.cancel + '">✕</button>'
+                + '<button type="button" class="mat-dp-close" data-dp-close aria-label="' + T.cancel + '">✕</button>'
             + '</div>'
             + '<div class="mat-dp-body">'
                 + '<button type="button" class="mat-dp-nav mat-dp-nav-prev" data-dp-prev aria-label="' + T.prev + '">‹</button>'
@@ -109,7 +109,7 @@
             else if (t.matches('[data-dp-next]')) { viewDate.setMonth(viewDate.getMonth() + 1); render(); }
             else if (t.matches('[data-dp-today]')) { viewDate = stripTime(new Date()); render(); }
             else if (t.matches('[data-dp-clear]')) { selection = { start: null, end: null }; apply(); close(); }
-            else if (t.matches('[data-dp-cancel]')) { close(); }
+            else if (t.matches('[data-dp-cancel]') || t.matches('[data-dp-close]')) { close(); }
             else if (t.matches('[data-dp-ok]')) {
                 // For range mode, only apply when both endpoints are set — otherwise treat as cancel.
                 if (isRange && selection.start && !selection.end) { close(); return; }

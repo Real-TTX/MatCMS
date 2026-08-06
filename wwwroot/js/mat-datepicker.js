@@ -52,20 +52,19 @@
 
     // --- Dialog (built once, reused for every trigger) ------------------------------------------
 
-    var dialog, monthLabel, weekdaysEl, gridEl, currentTrigger, viewDate, selection, isRange;
+    var dialog, monthsEl, currentTrigger, viewDate, selection, isRange, hoverDate;
+    var WD_FMT = new Intl.DateTimeFormat(LOCALE, { weekday: 'short' });   // Monday-first header labels
 
     function ensureDialog() {
         if (dialog) return;
         dialog = document.createElement('dialog');
         dialog.className = 'mat-dp-dialog';
         dialog.innerHTML =
-            '<div class="mat-dp-head">'
-                + '<button type="button" class="mat-dp-nav" data-dp-prev aria-label="' + T.prev + '">‹</button>'
-                + '<span class="mat-dp-title" data-dp-title></span>'
-                + '<button type="button" class="mat-dp-nav" data-dp-next aria-label="' + T.next + '">›</button>'
+            '<div class="mat-dp-body">'
+                + '<button type="button" class="mat-dp-nav mat-dp-nav-prev" data-dp-prev aria-label="' + T.prev + '">‹</button>'
+                + '<div class="mat-dp-months" data-dp-months></div>'
+                + '<button type="button" class="mat-dp-nav mat-dp-nav-next" data-dp-next aria-label="' + T.next + '">›</button>'
             + '</div>'
-            + '<div class="mat-dp-weekdays" data-dp-wd></div>'
-            + '<div class="mat-dp-grid" data-dp-grid></div>'
             + '<div class="mat-dp-foot">'
                 + '<button type="button" class="mat-dp-btn mat-dp-btn-ghost" data-dp-clear>' + T.clear + '</button>'
                 + '<button type="button" class="mat-dp-btn mat-dp-btn-ghost" data-dp-today>' + T.today + '</button>'
@@ -74,18 +73,7 @@
                 + '<button type="button" class="mat-dp-btn mat-dp-btn-primary" data-dp-ok>' + T.ok + '</button>'
             + '</div>';
         document.body.appendChild(dialog);
-        monthLabel = dialog.querySelector('[data-dp-title]');
-        weekdaysEl = dialog.querySelector('[data-dp-wd]');
-        gridEl = dialog.querySelector('[data-dp-grid]');
-
-        // Monday-first weekday header (reference date 2023-01-02 is a Monday).
-        var wdFmt = new Intl.DateTimeFormat(LOCALE, { weekday: 'short' });
-        for (var i = 0; i < 7; i++) {
-            var d = new Date(2023, 0, 2 + i);
-            var cell = document.createElement('span');
-            cell.textContent = wdFmt.format(d);
-            weekdaysEl.appendChild(cell);
-        }
+        monthsEl = dialog.querySelector('[data-dp-months]');
 
         dialog.addEventListener('click', function (e) {
             var t = e.target.closest('button');
@@ -100,63 +88,79 @@
                 if (isRange && selection.start && !selection.end) { close(); return; }
                 apply(); close();
             }
-            else if (t.matches('.mat-dp-day')) {
+            else if (t.matches('.mat-dp-day') && t.hasAttribute('data-d')) {
                 var d = new Date(+t.getAttribute('data-y'), +t.getAttribute('data-m'), +t.getAttribute('data-d'));
-                if (!isRange) { selection = { start: d, end: null }; render(); return; }
-                // Range selection: 1st click sets start (clears end); 2nd click sets end (or restarts if
-                // clicked date is before start); 3rd click restarts.
-                if (!selection.start || (selection.start && selection.end)) {
-                    selection = { start: d, end: null };
-                } else if (d < selection.start) {
-                    selection = { start: d, end: null };
-                } else if (sameDay(d, selection.start)) {
-                    selection = { start: d, end: null };
-                } else {
-                    selection.end = d;
-                }
-                render();
+                if (!isRange) { selection = { start: d, end: null }; paint(); return; }
+                // Range: 1st click = start (clears end); 2nd = end (or restart if before/equal start); 3rd restarts.
+                if (!selection.start || (selection.start && selection.end)) selection = { start: d, end: null };
+                else if (d < selection.start || sameDay(d, selection.start)) selection = { start: d, end: null };
+                else selection.end = d;
+                hoverDate = null;
+                paint();
             }
         });
-        dialog.addEventListener('close', function () { currentTrigger = null; });
+        // Hover preview: while a start is picked, hovering a later day previews the whole range.
+        monthsEl.addEventListener('mouseover', function (e) {
+            if (!isRange) return;
+            var t = e.target.closest('.mat-dp-day');
+            if (!t || !t.hasAttribute('data-d')) return;
+            hoverDate = new Date(+t.getAttribute('data-y'), +t.getAttribute('data-m'), +t.getAttribute('data-d'));
+            if (selection.start && !selection.end) paint();
+        });
+        monthsEl.addEventListener('mouseleave', function () { if (hoverDate) { hoverDate = null; paint(); } });
+        dialog.addEventListener('close', function () { currentTrigger = null; hoverDate = null; });
+    }
+
+    // One month panel: title + Monday-first weekday header + 6×7 day grid.
+    function buildMonth(y, m) {
+        var panel = document.createElement('div');
+        panel.className = 'mat-dp-month';
+        var title = document.createElement('div');
+        title.className = 'mat-dp-mtitle';
+        title.textContent = FMT_MONTH.format(new Date(y, m, 1));
+        panel.appendChild(title);
+        var wd = document.createElement('div');
+        wd.className = 'mat-dp-weekdays';
+        for (var i = 0; i < 7; i++) { var s = document.createElement('span'); s.textContent = WD_FMT.format(new Date(2023, 0, 2 + i)); wd.appendChild(s); }
+        panel.appendChild(wd);
+        var grid = document.createElement('div');
+        grid.className = 'mat-dp-grid';
+        var startCol = (new Date(y, m, 1).getDay() + 6) % 7; // Monday=0
+        var daysInMonth = new Date(y, m + 1, 0).getDate();
+        for (var j = 0; j < 42; j++) {
+            var dayNum = j - startCol + 1;
+            var btn = document.createElement('button');
+            btn.type = 'button'; btn.className = 'mat-dp-day';
+            if (dayNum < 1 || dayNum > daysInMonth) { btn.classList.add('mat-dp-empty'); btn.disabled = true; }
+            else { btn.textContent = dayNum; btn.setAttribute('data-y', y); btn.setAttribute('data-m', m); btn.setAttribute('data-d', dayNum); }
+            grid.appendChild(btn);
+        }
+        panel.appendChild(grid);
+        return panel;
     }
 
     function render() {
+        monthsEl.innerHTML = '';
         var y = viewDate.getFullYear(), m = viewDate.getMonth();
-        var title = FMT_MONTH.format(new Date(y, m, 1));
-        monthLabel.textContent = title;
+        monthsEl.appendChild(buildMonth(y, m));
+        if (isRange) { var n = new Date(y, m + 1, 1); monthsEl.appendChild(buildMonth(n.getFullYear(), n.getMonth())); }
+        paint();
+    }
 
-        var first = new Date(y, m, 1);
-        var startCol = (first.getDay() + 6) % 7; // Monday=0
-        var daysInMonth = new Date(y, m + 1, 0).getDate();
+    // Repaint selection/range classes on the existing cells (used on select + hover — no rebuild).
+    function paint() {
         var today = stripTime(new Date());
-
-        gridEl.innerHTML = '';
-        for (var i = 0; i < 42; i++) {
-            var dayNum = i - startCol + 1;
-            var btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'mat-dp-day';
-            if (dayNum < 1 || dayNum > daysInMonth) {
-                btn.classList.add('mat-dp-empty');
-                btn.disabled = true;
-                btn.textContent = '';
-            } else {
-                var cellDate = new Date(y, m, dayNum);
-                btn.textContent = dayNum;
-                btn.setAttribute('data-y', y); btn.setAttribute('data-m', m); btn.setAttribute('data-d', dayNum);
-                if (sameDay(cellDate, today)) btn.classList.add('mat-dp-today');
-
-                if (isRange) {
-                    var s = selection.start, e = selection.end;
-                    if (s && sameDay(cellDate, s)) btn.classList.add('mat-dp-selected', 'mat-dp-range-start');
-                    if (e && sameDay(cellDate, e)) btn.classList.add('mat-dp-selected', 'mat-dp-range-end');
-                    if (s && e && cellDate > s && cellDate < e) btn.classList.add('mat-dp-in-range');
-                } else if (selection.start && sameDay(cellDate, selection.start)) {
-                    btn.classList.add('mat-dp-selected');
-                }
-            }
-            gridEl.appendChild(btn);
-        }
+        var s = selection.start, e = selection.end;
+        var hi = (isRange && s && !e && hoverDate && hoverDate > s) ? hoverDate : e; // tentative end while hovering
+        monthsEl.querySelectorAll('.mat-dp-day[data-d]').forEach(function (btn) {
+            var c = new Date(+btn.getAttribute('data-y'), +btn.getAttribute('data-m'), +btn.getAttribute('data-d'));
+            btn.classList.remove('mat-dp-selected', 'mat-dp-range-start', 'mat-dp-range-end', 'mat-dp-in-range', 'mat-dp-today');
+            if (sameDay(c, today)) btn.classList.add('mat-dp-today');
+            if (!isRange) { if (s && sameDay(c, s)) btn.classList.add('mat-dp-selected'); return; }
+            if (s && sameDay(c, s)) btn.classList.add('mat-dp-selected', 'mat-dp-range-start');
+            if (hi && sameDay(c, hi)) btn.classList.add('mat-dp-selected', 'mat-dp-range-end');
+            if (s && hi && c > s && c < hi) btn.classList.add('mat-dp-in-range');
+        });
     }
 
     function open(trigger) {

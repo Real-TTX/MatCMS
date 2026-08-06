@@ -1,26 +1,36 @@
 /* Custom date picker for form fields.
    Value in the hidden <input> stays ISO (YYYY-MM-DD) so server-side stays untouched;
    only the trigger button shows a locale-formatted date. Mobile: dialog fills the viewport. */
-.mat-dp { display: block; width: 100%; }
-
-.mat-dp-btn-trigger {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+/* ---------------------------------------------------------------------------------------------
+   Shared base class for EVERY form control (text/email/number inputs, <select>, <textarea>, and the
+   custom date / rich-select triggers). One class so a template can style all fields uniformly and
+   set --field-radius / --field-bg once. Element-specific rules should extend, not replace, this.
+   --------------------------------------------------------------------------------------------- */
+.mat-input {
     width: 100%;
+    box-sizing: border-box;
+    min-height: 42px;
     padding: 10px 12px;
     border: 1px solid var(--line, #d5d5d5);
-    border-radius: 8px;
-    background: #fff;
-    cursor: pointer;
-    text-align: left;
-    font: inherit;
+    border-radius: var(--field-radius, 8px);
+    background: var(--field-bg, #fff);
     color: inherit;
-    min-height: 42px;
+    font: inherit;
+    line-height: 1.4;
 }
-.mat-dp-btn-trigger:hover { border-color: var(--accent, #888); }
-.mat-dp-btn-trigger:focus-visible { outline: 2px solid var(--accent, #2563eb); outline-offset: -1px; }
-.mat-dp-btn-trigger[disabled] { opacity: .55; cursor: not-allowed; background: #f7f7f7; }
+.mat-input:focus, .mat-input:focus-visible {
+    outline: none;
+    border-color: var(--accent, #2563eb);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, .18);
+}
+.mat-input:disabled, .mat-input[disabled] { opacity: .55; background: #f7f7f7; cursor: not-allowed; }
+textarea.mat-input { min-height: 120px; resize: vertical; }
+
+.mat-dp { display: block; width: 100%; }
+
+/* Date trigger inherits the .mat-input base (border, radius, padding, bg); here only its layout. */
+.mat-dp-btn-trigger { display: flex; align-items: center; gap: 10px; cursor: pointer; text-align: left; }
+.mat-dp-btn-trigger[disabled] { cursor: not-allowed; }
 
 .mat-dp-display { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mat-dp-placeholder { color: #999; }

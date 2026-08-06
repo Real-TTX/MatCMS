@@ -56,7 +56,7 @@
         var disAttr = Model.Preview ? " disabled" : "";
         if (el.Type == "textarea")
         {
-            sb.Append("<textarea id=\"fld_").Append(el.Id).Append("\" name=\"").Append(el.Id).Append("\" rows=\"5\"");
+            sb.Append("<textarea class=\"mat-input\" id=\"fld_").Append(el.Id).Append("\" name=\"").Append(el.Id).Append("\" rows=\"5\"");
             if (!string.IsNullOrWhiteSpace(el.Placeholder))
                 sb.Append(" placeholder=\"").Append(System.Net.WebUtility.HtmlEncode(el.Placeholder)).Append('"');
             sb.Append(reqAttr).Append(disAttr).Append('>');
@@ -74,7 +74,7 @@
                 : (isRange ? T["dp.placeholderRange"].ToString() : T["dp.placeholder"].ToString());
             var mode = isRange ? "range" : "single";
             sb.Append("<div class=\"mat-dp\" data-dp-mode=\"").Append(mode).Append("\">");
-            sb.Append("<button type=\"button\" class=\"mat-dp-btn-trigger\" data-dp-btn").Append(disAttr).Append(">");
+            sb.Append("<button type=\"button\" class=\"mat-input mat-dp-btn-trigger\" data-dp-btn").Append(disAttr).Append(">");
             sb.Append("<span class=\"mat-dp-display mat-dp-placeholder\" data-dp-display data-placeholder=\"")
               .Append(System.Net.WebUtility.HtmlEncode(placeholder)).Append("\">")
               .Append(System.Net.WebUtility.HtmlEncode(placeholder))
@@ -92,7 +92,7 @@
         }
         else if (el.Type == "select")
         {
-            sb.Append("<select id=\"fld_").Append(el.Id).Append("\" name=\"").Append(el.Id).Append('"').Append(reqAttr).Append(disAttr).Append('>');
+            sb.Append("<select class=\"mat-input\" id=\"fld_").Append(el.Id).Append("\" name=\"").Append(el.Id).Append('"').Append(reqAttr).Append(disAttr).Append('>');
             sb.Append("<option value=\"\">– Bitte auswählen –</option>");
             foreach (var o in el.Options)
             {
@@ -104,7 +104,7 @@
         }
         else
         {
-            sb.Append("<input type=\"").Append(htmlType).Append("\" id=\"fld_").Append(el.Id).Append("\" name=\"").Append(el.Id).Append('"');
+            sb.Append("<input class=\"mat-input\" type=\"").Append(htmlType).Append("\" id=\"fld_").Append(el.Id).Append("\" name=\"").Append(el.Id).Append('"');
             sb.Append(" value=\"").Append(System.Net.WebUtility.HtmlEncode(val)).Append('"');
             if (!string.IsNullOrWhiteSpace(el.Placeholder))
                 sb.Append(" placeholder=\"").Append(System.Net.WebUtility.HtmlEncode(el.Placeholder)).Append('"');

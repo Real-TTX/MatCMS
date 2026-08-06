@@ -469,9 +469,9 @@ h1, h2, h3, h4 {
     margin-bottom: 8px;
 }
 
-.form-field input,
-.form-field select,
-.form-field textarea {
+/* Every form control shares the .mat-input base class (input, select, textarea, and the custom
+   date / rich-select triggers), so this one rule styles them all identically. */
+.form-field .mat-input {
     width: 100%;
     padding: 14px 16px;
     border: 1px solid #cfcfcf;
@@ -483,14 +483,13 @@ h1, h2, h3, h4 {
     transition: border-color .18s ease;
 }
 
-.form-field input:focus,
-.form-field select:focus,
-.form-field textarea:focus {
+.form-field .mat-input:focus {
     outline: none;
     border-color: var(--black);
+    box-shadow: none;
 }
 
-.form-field textarea { min-height: 150px; resize: vertical; }
+.form-field textarea.mat-input { min-height: 150px; resize: vertical; }
 
 .alert { padding: 14px 18px; margin-bottom: 24px; font-size: 15px; border: 1px solid; }
 .alert-success { background: #f0f7f0; border-color: #b7d7b7; color: #24631f; }

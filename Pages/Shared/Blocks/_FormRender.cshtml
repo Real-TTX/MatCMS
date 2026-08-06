@@ -121,6 +121,13 @@
             if (el.Required) sb.Append(" data-required=\"1\"");
             sb.Append(" data-placeholder=\"").Append(E(ph)).Append("\">");
             sb.Append("<div class=\"mat-rs-menu\" data-rs-menu hidden>");
+            // Mobile: the menu is presented as a bottom-sheet dialog with a title + close (✕) header
+            // (hidden on desktop, where the menu stays an inline dropdown).
+            sb.Append("<div class=\"mat-rs-sheet-head\"><span class=\"mat-rs-sheet-title\">")
+              .Append(E(string.IsNullOrWhiteSpace(el.Label) ? ph : el.Label)).Append("</span>")
+              .Append("<button type=\"button\" class=\"mat-rs-close\" data-rs-close aria-label=\"")
+              .Append(E((string)T["form.close"])).Append("\">✕</button></div>");
+            sb.Append("<div class=\"mat-rs-scroll\">");
             foreach (var o in el.Options)
             {
                 var isSel = selOpt != null && ReferenceEquals(o, selOpt);
@@ -136,6 +143,7 @@
                 }
                 sb.Append("</span></button>");
             }
+            sb.Append("</div>");   // .mat-rs-scroll
             sb.Append("</div></div>");
         }
         else if (el.Type == "select")

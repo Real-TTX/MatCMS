@@ -95,6 +95,8 @@
         flexEl = dialog.querySelector('[data-dp-flex]');
 
         dialog.addEventListener('click', function (e) {
+            // Click on the backdrop (outside the dialog content) = cancel & close.
+            if (e.target === dialog) { close(); return; }
             var t = e.target.closest('button');
             if (!t || !dialog.contains(t)) return;
             if (t.matches('[data-dp-prev]')) { viewDate.setMonth(viewDate.getMonth() - 1); render(); }
@@ -110,13 +112,22 @@
             else if (t.matches('.mat-dp-chip')) { flex = +t.getAttribute('data-flex') || 0; paintFlex(); }
             else if (t.matches('.mat-dp-day') && t.hasAttribute('data-d')) {
                 var d = new Date(+t.getAttribute('data-y'), +t.getAttribute('data-m'), +t.getAttribute('data-d'));
-                if (!isRange) { selection = { start: d, end: null }; paint(); return; }
+                // Auto-confirm on pick unless the flexible-date options are shown (then the user still
+                // needs to choose ± days and press Übernehmen). flexEl.hidden === true ⇒ no flex.
+                var autoClose = flexEl && flexEl.hidden;
+                if (!isRange) {
+                    selection = { start: d, end: null }; paint();
+                    if (autoClose) { apply(); close(); }
+                    return;
+                }
                 // Range: 1st click = start (clears end); 2nd = end (or restart if before/equal start); 3rd restarts.
                 if (!selection.start || (selection.start && selection.end)) selection = { start: d, end: null };
                 else if (d < selection.start || sameDay(d, selection.start)) selection = { start: d, end: null };
                 else selection.end = d;
                 hoverDate = null;
                 paint();
+                // A completed range auto-confirms (booking-style) when there are no flex options.
+                if (autoClose && selection.start && selection.end) { apply(); close(); }
             }
         });
         // Hover preview: while a start is picked, hovering a later day previews the whole range.

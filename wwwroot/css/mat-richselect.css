@@ -12,8 +12,19 @@
 .mat-rs-menu {
     position: absolute; z-index: 50; left: 0; right: 0; top: calc(100% + 4px);
     background: #fff; border: 1px solid var(--line, #d5d5d5); border-radius: 10px;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, .16); max-height: 340px; overflow: auto; padding: 6px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, .16);
 }
+/* Scroll region holds the options; on desktop it caps the dropdown height. */
+.mat-rs-scroll { max-height: 340px; overflow: auto; padding: 6px; }
+/* Bottom-sheet header (title + ✕) — desktop hides it; mobile shows it. */
+.mat-rs-sheet-head { display: none; }
+.mat-rs-close {
+    border: 0; background: none; cursor: pointer; font-size: 22px; line-height: 1;
+    color: inherit; padding: 4px 8px; border-radius: 8px; flex: none;
+}
+.mat-rs-close:hover { background: rgba(0, 0, 0, .06); }
+/* Shared full-screen dim behind the mobile sheet. */
+.mat-rs-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .45); z-index: 1000; }
 .mat-rs-opt {
     display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
     background: none; border: 0; border-radius: 8px; padding: 10px; cursor: pointer; font: inherit; color: inherit;
@@ -26,3 +37,29 @@
 .mat-rs-opt-desc { font-size: 13px; color: #666; line-height: 1.4; }
 .mat-rs-opt-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 3px; }
 .mat-rs-tag { font-size: 11px; font-weight: 600; background: rgba(0, 0, 0, .06); color: #444; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+
+/* Mobile: present the dropdown as a bottom-sheet dialog with a header + ✕ close (like the datepicker).
+   The wrapper gets .mat-rs-modal via JS while open; a shared .mat-rs-backdrop dims the page behind it. */
+@media (max-width: 600px) {
+    .mat-rs-modal .mat-rs-menu {
+        position: fixed; inset: auto 0 0 0; top: auto;
+        z-index: 1001; left: 0; right: 0;
+        max-height: 85vh; max-height: 85dvh;
+        border: 0; border-radius: 16px 16px 0 0;
+        box-shadow: 0 -12px 40px rgba(0, 0, 0, .28);
+        display: flex; flex-direction: column; overflow: hidden;
+    }
+    .mat-rs-modal .mat-rs-sheet-head {
+        display: flex; align-items: center; justify-content: space-between; gap: 10px;
+        padding: 14px 10px 12px 16px; border-bottom: 1px solid #ececec; flex: 0 0 auto;
+    }
+    .mat-rs-sheet-title { font-weight: 600; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mat-rs-modal .mat-rs-scroll {
+        max-height: none; flex: 1 1 auto; min-height: 0;
+        padding: 6px 6px max(10px, env(safe-area-inset-bottom));
+        -webkit-overflow-scrolling: touch;
+    }
+    /* Bigger, more tappable option rows. */
+    .mat-rs-modal .mat-rs-opt { padding: 14px; }
+    .mat-rs-modal .mat-rs-opt-img { width: 64px; height: 64px; }
+}

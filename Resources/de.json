@@ -919,6 +919,7 @@
   "dp.startLabel": "Anreise",
   "dp.endLabel": "Abreise",
   "form.submit": "Absenden",
+  "form.close": "Schließen",
   "form.selectPlaceholder": "– Bitte auswählen –",
   "form.noFields": "Dieses Formular hat noch keine Felder.",
   "form.notFound": "Kein Formular ausgewählt oder Formular nicht gefunden.",

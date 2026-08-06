@@ -919,6 +919,7 @@
   "dp.startLabel": "Check-in",
   "dp.endLabel": "Check-out",
   "form.submit": "Send",
+  "form.close": "Close",
   "form.selectPlaceholder": "– Please select –",
   "form.noFields": "This form has no fields yet.",
   "form.notFound": "No form selected or form not found.",

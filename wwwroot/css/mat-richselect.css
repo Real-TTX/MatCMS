@@ -1,0 +1,28 @@
+/* Rich select (form field type "richselect"): a custom dropdown whose options show an image, a title,
+   a description and small tags. The trigger reuses the shared .mat-input base for a consistent look. */
+.mat-rs { position: relative; }
+
+.mat-rs-trigger { display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; }
+.mat-rs-current { display: flex; align-items: center; gap: 10px; min-width: 0; overflow: hidden; }
+.mat-rs-placeholder { color: #999; }
+.mat-rs-cur-img { width: 28px; height: 28px; border-radius: 6px; background: #eee center/cover no-repeat; flex: none; }
+.mat-rs-cur-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mat-rs-chev { flex: none; opacity: .6; font-size: 12px; }
+
+.mat-rs-menu {
+    position: absolute; z-index: 50; left: 0; right: 0; top: calc(100% + 4px);
+    background: #fff; border: 1px solid var(--line, #d5d5d5); border-radius: 10px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, .16); max-height: 340px; overflow: auto; padding: 6px;
+}
+.mat-rs-opt {
+    display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+    background: none; border: 0; border-radius: 8px; padding: 10px; cursor: pointer; font: inherit; color: inherit;
+}
+.mat-rs-opt:hover { background: rgba(0, 0, 0, .05); }
+.mat-rs-opt[aria-selected="true"] { background: rgba(37, 99, 235, .1); }
+.mat-rs-opt-img { width: 56px; height: 56px; border-radius: 8px; background: #eee center/cover no-repeat; flex: none; }
+.mat-rs-opt-body { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.mat-rs-opt-title { font-weight: 600; }
+.mat-rs-opt-desc { font-size: 13px; color: #666; line-height: 1.4; }
+.mat-rs-opt-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 3px; }
+.mat-rs-tag { font-size: 11px; font-weight: 600; background: rgba(0, 0, 0, .06); color: #444; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }

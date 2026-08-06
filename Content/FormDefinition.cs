@@ -38,8 +38,13 @@ public class FormCondition
 
 public class FormOption
 {
-    public string Value { get; set; } = "";
-    public string Label { get; set; } = "";
+    public string Value { get; set; } = "";   // the stored key (e.g. "Apartment 1")
+    public string Label { get; set; } = "";   // the visible title (required)
+
+    // Extras for the rich-select control ("richselect"): image, description, small tags (e.g. "45 m²").
+    public string? Image { get; set; }
+    public string? Description { get; set; }
+    public List<string> Tags { get; set; } = new();
 }
 
 /// <summary>Serialization helpers + validation logic shared by the public block,
@@ -57,7 +62,7 @@ public static class FormDefinition
 
     /// <summary>Element types that render an actual input and hold a value.</summary>
     public static bool IsInput(string? type) =>
-        type is "text" or "textarea" or "date" or "daterange" or "number" or "phone" or "email" or "select";
+        type is "text" or "textarea" or "date" or "daterange" or "number" or "phone" or "email" or "select" or "richselect";
 
     public static List<FormElement> Parse(string? json)
     {

@@ -3,13 +3,14 @@
 (function () {
     "use strict";
 
-    var INPUT_TYPES = ["text", "textarea", "date", "daterange", "number", "phone", "email", "select"];
-    var CHILD_TYPES = ["title", "description", "text", "textarea", "date", "daterange", "number", "phone", "email", "select"];
+    var INPUT_TYPES = ["text", "textarea", "date", "daterange", "number", "phone", "email", "select", "richselect"];
+    var CHILD_TYPES = ["title", "description", "text", "textarea", "date", "daterange", "number", "phone", "email", "select", "richselect"];
     var TYPE_LABELS = {
         title: "Überschrift", description: "Beschreibung", text: "Textfeld", textarea: "Textfeld (mehrzeilig)",
         date: "Datum", daterange: "Zeitraum", number: "Zahl", phone: "Telefon", email: "E-Mail",
-        select: "Auswahl", group: "Gruppe"
+        select: "Auswahl", richselect: "Auswahl mit Bild", group: "Gruppe"
     };
+    function isSelectLike(t) { return t === "select" || t === "richselect"; }
     var OP_LABELS = { eq: "ist gleich", neq: "ist ungleich", contains: "enthält", filled: "ist ausgefüllt" };
 
     function isInput(t) { return INPUT_TYPES.indexOf(t) >= 0; }
@@ -179,22 +180,23 @@
 
         function refresh() {
             var t = typeGetter();
-            show(phWrap, isInput(t) && t !== "select");
+            show(phWrap, isInput(t) && !isSelectLike(t));
             show(helpWrap, t !== "title");
             show(reqWrap, isInput(t));
             show(reWrap, t === "text" || t === "phone" || t === "email" || t === "number");
-            show(optsCtl.node, t === "select");
+            show(optsCtl.node, isSelectLike(t));
+            optsCtl.setRich(t === "richselect");
         }
 
         function read() {
             var t = typeGetter();
             var out = { type: t, label: labelInput.value };
             if (data.id) out.id = data.id;
-            if (isInput(t) && t !== "select") out.placeholder = phInput.value;
+            if (isInput(t) && !isSelectLike(t)) out.placeholder = phInput.value;
             if (t !== "title") out.help = helpInput.value;
             if (isInput(t)) out.required = reqInput.checked;
             if (t === "text" || t === "phone" || t === "email" || t === "number") out.regex = reInput.value;
-            if (t === "select") out.options = optsCtl.get();
+            if (isSelectLike(t)) out.options = optsCtl.get();
             if (groupCtl) out.fields = groupCtl.get();
             if (condCtl) { var c = condCtl.get(); if (c) out.condition = c; }
             return out;
@@ -212,12 +214,42 @@
 
         function addRow(o) {
             o = o || {};
-            var row = document.createElement("div"); row.className = "opt-row";
-            var val = document.createElement("input"); val.type = "text"; val.placeholder = "Wert"; val.value = o.value || "";
-            var lab = document.createElement("input"); lab.type = "text"; lab.placeholder = "Anzeigetext"; lab.value = o.label || "";
+            var row = document.createElement("div"); row.className = "opt-row2";
+            var top = document.createElement("div"); top.className = "opt-top";
+            var val = document.createElement("input"); val.type = "text"; val.placeholder = "Schlüssel (Wert)"; val.value = o.value || "";
+            var lab = document.createElement("input"); lab.type = "text"; lab.placeholder = "Titel"; lab.value = o.label || "";
             var del = iconBtn("✕");
-            row.appendChild(val); row.appendChild(lab); row.appendChild(del);
-            var entry = { element: row, get: function () { return { value: val.value.trim(), label: lab.value.trim() }; } };
+            top.appendChild(val); top.appendChild(lab); top.appendChild(del);
+            row.appendChild(top);
+
+            // Rich extras (image, description, tags) — shown only for the "Auswahl mit Bild" type.
+            var rich = document.createElement("div"); rich.className = "opt-rich";
+            var imgRow = document.createElement("div"); imgRow.className = "opt-img-row";
+            var imgPrev = document.createElement("span"); imgPrev.className = "opt-img-prev";
+            if (o.image) imgPrev.style.backgroundImage = "url('" + o.image + "')";
+            var imgVal = document.createElement("input"); imgVal.type = "text"; imgVal.placeholder = "/uploads/… oder URL"; imgVal.value = o.image || "";
+            imgVal.addEventListener("input", function () { imgPrev.style.backgroundImage = imgVal.value ? "url('" + imgVal.value + "')" : ""; });
+            var imgBtn = document.createElement("button"); imgBtn.type = "button"; imgBtn.className = "btn btn-ghost btn-sm"; imgBtn.textContent = "Bild";
+            imgBtn.addEventListener("click", function () { if (window.openMediaPicker) window.openMediaPicker(function (u) { imgVal.value = u; imgPrev.style.backgroundImage = "url('" + u + "')"; }); });
+            imgRow.appendChild(imgPrev); imgRow.appendChild(imgVal); imgRow.appendChild(imgBtn);
+            rich.appendChild(imgRow);
+            var desc = document.createElement("input"); desc.type = "text"; desc.className = "opt-desc"; desc.placeholder = "Beschreibung"; desc.value = o.description || "";
+            rich.appendChild(desc);
+            var tags = document.createElement("input"); tags.type = "text"; tags.className = "opt-tags"; tags.placeholder = "Tags (Komma), z. B. 45 m², 2 Personen"; tags.value = (o.tags || []).join(", ");
+            rich.appendChild(tags);
+            row.appendChild(rich);
+
+            var entry = {
+                element: row,
+                get: function () {
+                    var out = { value: val.value.trim(), label: lab.value.trim() };
+                    if (imgVal.value.trim()) out.image = imgVal.value.trim();
+                    if (desc.value.trim()) out.description = desc.value.trim();
+                    var tl = tags.value.split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+                    if (tl.length) out.tags = tl;
+                    return out;
+                }
+            };
             del.addEventListener("click", function () { row.remove(); });
             rows.push(entry); listEl.appendChild(row);
         }
@@ -231,6 +263,7 @@
 
         return {
             node: wrap,
+            setRich: function (on) { wrap.classList.toggle("opts-rich", !!on); },
             get: function () {
                 var result = [];
                 Array.prototype.slice.call(listEl.children).forEach(function (child) {
@@ -346,7 +379,7 @@
             return null;
         }
         function isSelectSource() {
-            var f = sourceField(); return !!(f && f.type === "select" && f.options && f.options.length);
+            var f = sourceField(); return !!(f && isSelectLike(f.type) && f.options && f.options.length);
         }
         function populateSelect(prefer) {
             var f = sourceField(); if (!(f && f.options)) return;

@@ -670,6 +670,14 @@ table.data .btn { white-space: nowrap; }
 
 /* ---- Form builder ---- */
 .opt-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: center; }
+/* Rich-select options editor (title/key row + optional image/description/tags for "Auswahl mit Bild") */
+.opt-row2 { border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+.opt-top { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: center; }
+.opt-rich { display: none; margin-top: 8px; gap: 6px; }
+.opts-rich .opt-rich { display: grid; }
+.opt-img-row { display: flex; gap: 8px; align-items: center; }
+.opt-img-row input { flex: 1; }
+.opt-img-prev { width: 40px; height: 40px; border-radius: 6px; border: 1px solid var(--line); background: #f0f0f0 center/cover no-repeat; flex: none; }
 .cond-field .cond-box { display: grid; grid-template-columns: 1fr; gap: 8px; }
 .cond-field .cond-box select, .cond-field .cond-box input { width: 100%; }
 .field.cond-field { border-top: 1px dashed var(--line); padding-top: 14px; }

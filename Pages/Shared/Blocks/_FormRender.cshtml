@@ -90,6 +90,42 @@
             sb.Append(" />");
             sb.Append("</div>");
         }
+        else if (el.Type == "richselect")
+        {
+            System.Func<string, string> E = s => System.Net.WebUtility.HtmlEncode(s ?? "");
+            var selOpt = el.Options.FirstOrDefault(o => string.Equals(o.Value, val, StringComparison.Ordinal));
+            var ph = string.IsNullOrWhiteSpace(el.Placeholder) ? "– Bitte auswählen –" : el.Placeholder;
+            sb.Append("<div class=\"mat-rs\" data-rs>");
+            sb.Append("<button type=\"button\" class=\"mat-input mat-rs-trigger\" data-rs-btn").Append(disAttr).Append(">");
+            sb.Append("<span class=\"mat-rs-current").Append(selOpt == null ? " mat-rs-placeholder" : "").Append("\" data-rs-current>");
+            if (selOpt != null)
+            {
+                if (!string.IsNullOrWhiteSpace(selOpt.Image)) sb.Append("<span class=\"mat-rs-cur-img\" style=\"background-image:url('").Append(E(selOpt.Image)).Append("')\"></span>");
+                sb.Append("<span class=\"mat-rs-cur-title\">").Append(E(selOpt.Label)).Append("</span>");
+            }
+            else { sb.Append(E(ph)); }
+            sb.Append("</span><span class=\"mat-rs-chev\" aria-hidden=\"true\">▾</span></button>");
+            sb.Append("<input type=\"hidden\" id=\"fld_").Append(el.Id).Append("\" name=\"").Append(el.Id).Append("\" value=\"").Append(E(val)).Append("\" data-rs-input");
+            if (el.Required) sb.Append(" data-required=\"1\"");
+            sb.Append(" data-placeholder=\"").Append(E(ph)).Append("\">");
+            sb.Append("<div class=\"mat-rs-menu\" data-rs-menu hidden>");
+            foreach (var o in el.Options)
+            {
+                var isSel = selOpt != null && ReferenceEquals(o, selOpt);
+                sb.Append("<button type=\"button\" class=\"mat-rs-opt\" data-rs-opt data-value=\"").Append(E(o.Value)).Append("\"").Append(isSel ? " aria-selected=\"true\"" : "").Append(">");
+                if (!string.IsNullOrWhiteSpace(o.Image)) sb.Append("<span class=\"mat-rs-opt-img\" style=\"background-image:url('").Append(E(o.Image)).Append("')\"></span>");
+                sb.Append("<span class=\"mat-rs-opt-body\"><span class=\"mat-rs-opt-title\">").Append(E(string.IsNullOrWhiteSpace(o.Label) ? o.Value : o.Label)).Append("</span>");
+                if (!string.IsNullOrWhiteSpace(o.Description)) sb.Append("<span class=\"mat-rs-opt-desc\">").Append(E(o.Description)).Append("</span>");
+                if (o.Tags != null && o.Tags.Any(tg => !string.IsNullOrWhiteSpace(tg)))
+                {
+                    sb.Append("<span class=\"mat-rs-opt-tags\">");
+                    foreach (var tg in o.Tags) if (!string.IsNullOrWhiteSpace(tg)) sb.Append("<span class=\"mat-rs-tag\">").Append(E(tg)).Append("</span>");
+                    sb.Append("</span>");
+                }
+                sb.Append("</span></button>");
+            }
+            sb.Append("</div></div>");
+        }
         else if (el.Type == "select")
         {
             sb.Append("<select class=\"mat-input\" id=\"fld_").Append(el.Id).Append("\" name=\"").Append(el.Id).Append('"').Append(reqAttr).Append(disAttr).Append('>');
@@ -157,6 +193,8 @@
 <link rel="stylesheet" href="~/css/mat-datepicker.css" asp-append-version="true" />
 <script>window.matDpI18n = window.matDpI18n || @Html.Raw(dpI18nJson);</script>
 <script src="~/js/mat-datepicker.js" asp-append-version="true" defer></script>
+<link rel="stylesheet" href="~/css/mat-richselect.css" asp-append-version="true" />
+<script src="~/js/mat-richselect.js" asp-append-version="true" defer></script>
 <section class="contact-block form-block" id="@containerId" data-form-slug="@Model.Slug">
     <div class="container">
         <div class="contact-wrap">

@@ -469,9 +469,14 @@ h1, h2, h3, h4 {
     margin-bottom: 8px;
 }
 
-/* Every form control shares the .mat-input base class (input, select, textarea, and the custom
-   date / rich-select triggers), so this one rule styles them all identically. */
-.form-field .mat-input {
+/* Every form control shares this look: form-builder controls carry the .mat-input base class (incl.
+   the custom date / rich-select <button> triggers), and plain inputs/selects/textareas (e.g. the
+   login form) are matched by element so they get the same styling without needing the class.
+   Checkboxes/radios/hidden are excluded so they keep their native size. */
+.form-field .mat-input,
+.form-field input:not([type=checkbox]):not([type=radio]):not([type=hidden]),
+.form-field select,
+.form-field textarea {
     width: 100%;
     padding: 14px 16px;
     border: 1px solid #cfcfcf;
@@ -483,13 +488,17 @@ h1, h2, h3, h4 {
     transition: border-color .18s ease;
 }
 
-.form-field .mat-input:focus {
+.form-field .mat-input:focus,
+.form-field input:not([type=checkbox]):not([type=radio]):not([type=hidden]):focus,
+.form-field select:focus,
+.form-field textarea:focus {
     outline: none;
     border-color: var(--black);
     box-shadow: none;
 }
 
-.form-field textarea.mat-input { min-height: 150px; resize: vertical; }
+.form-field textarea.mat-input,
+.form-field textarea { min-height: 150px; resize: vertical; }
 
 .alert { padding: 14px 18px; margin-bottom: 24px; font-size: 15px; border: 1px solid; }
 .alert-success { background: #f0f7f0; border-color: #b7d7b7; color: #24631f; }

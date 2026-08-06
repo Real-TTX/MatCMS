@@ -174,6 +174,7 @@
 
         // Placeholder
         var phWrap = fieldWrap("Platzhalter");
+        var phLabel = phWrap.querySelector("label");
         var phInput = document.createElement("input");
         phInput.type = "text"; phInput.value = data.placeholder || "";
         phWrap.appendChild(phInput);
@@ -264,7 +265,9 @@
 
         function refresh() {
             var t = typeGetter();
-            show(phWrap, isInput(t) && !isSelectLike(t));
+            show(phWrap, isInput(t));
+            // For selects the placeholder is the empty-option / prompt text ("– Bitte auswählen –").
+            if (phLabel) phLabel.textContent = isSelectLike(t) ? "Auswahl-Platzhalter" : "Platzhalter";
             show(helpWrap, t !== "title");
             show(reqWrap, isInput(t));
             show(reWrap, t === "text" || t === "phone" || t === "email" || t === "number");
@@ -278,7 +281,7 @@
             var t = typeGetter();
             var out = { type: t, label: labelInput.value };
             if (data.id) out.id = data.id;
-            if (isInput(t) && !isSelectLike(t)) out.placeholder = phInput.value;
+            if (isInput(t)) out.placeholder = phInput.value;
             if (t !== "title") out.help = helpInput.value;
             if (isInput(t)) out.required = reqInput.checked;
             if (t === "text" || t === "phone" || t === "email" || t === "number") out.regex = reInput.value;

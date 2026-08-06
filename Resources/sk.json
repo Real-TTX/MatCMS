@@ -1,0 +1,17 @@
+{
+  "dp.today": "Dnes",
+  "dp.clear": "Vymazať",
+  "dp.cancel": "Zrušiť",
+  "dp.ok": "Použiť",
+  "dp.prevMonth": "Predchádzajúci mesiac",
+  "dp.nextMonth": "Nasledujúci mesiac",
+  "dp.to": "do",
+  "dp.placeholder": "Vyberte dátum",
+  "dp.placeholderRange": "Vyberte obdobie",
+  "dp.startLabel": "Príchod",
+  "dp.endLabel": "Odchod",
+  "form.submit": "Odoslať",
+  "form.selectPlaceholder": "– Vyberte –",
+  "form.noFields": "Tento formulár zatiaľ nemá polia.",
+  "form.notFound": "Nie je vybraný formulár alebo sa formulár nenašiel."
+}

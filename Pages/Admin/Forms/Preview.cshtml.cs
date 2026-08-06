@@ -23,6 +23,7 @@ public class PreviewModel : PageModel
             Slug = form.Slug,
             Name = form.Name,
             Elements = FormDefinition.Parse(form.DefinitionJson),
+            SubmitLabel = form.SubmitLabel,
             Preview = true,
             Builder = builder
         };

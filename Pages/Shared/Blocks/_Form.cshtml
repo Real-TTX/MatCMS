@@ -2,6 +2,7 @@
 @using Microsoft.EntityFrameworkCore
 @model MatCMS.Content.BlockData
 @inject MatCMS.Data.AppDbContext Db
+@inject MatCMS.Services.Localizer T
 @{
     var slug = Model.Str("form");
     var form = string.IsNullOrWhiteSpace(slug)
@@ -13,7 +14,7 @@
     if (User.IsInRole("Admin"))
     {
         <section class="contact-block"><div class="container"><div class="contact-wrap">
-            <p class="muted text-center">Kein Formular ausgewählt oder Formular nicht gefunden.</p>
+            <p class="muted text-center">@T["form.notFound"]</p>
         </div></div></section>
     }
 }
@@ -26,6 +27,7 @@ else
         Name = form.Name,
         Heading = Model.Str("heading"),
         Intro = Model.Str("intro"),
+        SubmitLabel = form.SubmitLabel,
         Elements = FormDefinition.Parse(form.DefinitionJson),
         Success = TempData["FormSuccess_" + form.Slug] as string,
         Errors = ParseList(TempData["FormErrors_" + form.Slug] as string),

@@ -39,6 +39,7 @@ public class EditModel : PageModel
     public class SettingsInput
     {
         public string SuccessMessage { get; set; } = "";
+        public string SubmitLabel { get; set; } = "";
         public bool NotifyEnabled { get; set; }
         public List<int> NotifyUserIds { get; set; } = new();
         public string NotifyEmails { get; set; } = "";
@@ -75,6 +76,7 @@ public class EditModel : PageModel
         Settings = new SettingsInput
         {
             SuccessMessage = form.SuccessMessage ?? "",
+            SubmitLabel = form.SubmitLabel ?? "",
             NotifyEnabled = form.NotifyEnabled,
             NotifyUserIds = notify.UserIds,
             NotifyEmails = string.Join("\n", notify.Emails)
@@ -180,6 +182,7 @@ public class EditModel : PageModel
             Slug = "preview",
             Name = "",
             Elements = els,
+            SubmitLabel = _db.Forms.AsNoTracking().Where(f => f.Id == id).Select(f => f.SubmitLabel).FirstOrDefault(),
             Preview = true,
             Builder = false
         };
@@ -238,6 +241,7 @@ public class EditModel : PageModel
         if (form is null) return NotFound();
 
         form.SuccessMessage = string.IsNullOrWhiteSpace(Settings.SuccessMessage) ? null : Settings.SuccessMessage.Trim();
+        form.SubmitLabel = string.IsNullOrWhiteSpace(Settings.SubmitLabel) ? null : Settings.SubmitLabel.Trim();
         form.NotifyEnabled = Settings.NotifyEnabled;
         form.NotifyJson = new FormNotify
         {

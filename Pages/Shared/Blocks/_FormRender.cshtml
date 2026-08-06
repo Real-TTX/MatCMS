@@ -106,7 +106,7 @@
         {
             System.Func<string, string> E = s => System.Net.WebUtility.HtmlEncode(s ?? "");
             var selOpt = el.Options.FirstOrDefault(o => string.Equals(o.Value, val, StringComparison.Ordinal));
-            var ph = string.IsNullOrWhiteSpace(el.Placeholder) ? "– Bitte auswählen –" : el.Placeholder;
+            var ph = string.IsNullOrWhiteSpace(el.Placeholder) ? T["form.selectPlaceholder"].ToString() : el.Placeholder;
             sb.Append("<div class=\"mat-rs\" data-rs>");
             sb.Append("<button type=\"button\" class=\"mat-input mat-rs-trigger\" data-rs-btn").Append(disAttr).Append(">");
             sb.Append("<span class=\"mat-rs-current").Append(selOpt == null ? " mat-rs-placeholder" : "").Append("\" data-rs-current>");
@@ -141,7 +141,8 @@
         else if (el.Type == "select")
         {
             sb.Append("<select class=\"mat-input\" id=\"fld_").Append(el.Id).Append("\" name=\"").Append(el.Id).Append('"').Append(reqAttr).Append(disAttr).Append('>');
-            sb.Append("<option value=\"\">– Bitte auswählen –</option>");
+            var selPh = string.IsNullOrWhiteSpace(el.Placeholder) ? T["form.selectPlaceholder"].ToString() : el.Placeholder;
+            sb.Append("<option value=\"\">").Append(System.Net.WebUtility.HtmlEncode(selPh)).Append("</option>");
             foreach (var o in el.Options)
             {
                 var sel = string.Equals(o.Value, val, StringComparison.Ordinal) ? " selected" : "";
@@ -227,9 +228,12 @@
                 <div class="alert alert-error">@string.Join(" ", Model.Errors)</div>
             }
 
+            @{
+                var submitLabel = !string.IsNullOrWhiteSpace(Model.SubmitLabel) ? Model.SubmitLabel! : T["form.submit"].ToString();
+            }
             @if (Model.Elements.Count == 0)
             {
-                <p class="muted text-center">Dieses Formular hat noch keine Felder.</p>
+                <p class="muted text-center">@T["form.noFields"]</p>
             }
             else if (Model.Preview)
             {
@@ -238,7 +242,7 @@
                     {
                         @renderElement(el)
                     }
-                    <button type="submit" class="btn" disabled>Absenden</button>
+                    <button type="submit" class="btn" disabled>@submitLabel</button>
                 </form>
             }
             else
@@ -254,7 +258,7 @@
                     {
                         @renderElement(el)
                     }
-                    <button type="submit" class="btn">Absenden</button>
+                    <button type="submit" class="btn">@submitLabel</button>
                 </form>
             }
         </div>

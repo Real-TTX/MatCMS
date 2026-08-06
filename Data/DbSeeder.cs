@@ -295,6 +295,7 @@ public static class DbSeeder
     {
         await AddColumnIfMissingAsync(db, "Users", "Email", "TEXT");
         await AddColumnIfMissingAsync(db, "Forms", "SuccessMessage", "TEXT");
+        await AddColumnIfMissingAsync(db, "Forms", "SubmitLabel", "TEXT");
         await AddColumnIfMissingAsync(db, "Forms", "NotifyEnabled", "INTEGER NOT NULL DEFAULT 0");
         await AddColumnIfMissingAsync(db, "Forms", "NotifyJson", "TEXT NOT NULL DEFAULT ''");
         await AddColumnIfMissingAsync(db, "Media", "SortOrder", "INTEGER NOT NULL DEFAULT 0");

@@ -233,7 +233,8 @@ public class ContentTransferService
             dto.Forms = forms.Select(f => new FormDto
             {
                 Name = f.Name, Slug = f.Slug, DefinitionJson = f.DefinitionJson, CreatedAt = f.CreatedAt,
-                SuccessMessage = f.SuccessMessage, NotifyEnabled = f.NotifyEnabled, NotifyJson = f.NotifyJson
+                SuccessMessage = f.SuccessMessage, SubmitLabel = f.SubmitLabel,
+                NotifyEnabled = f.NotifyEnabled, NotifyJson = f.NotifyJson
             }).ToList();
 
             var idToSlug = forms.ToDictionary(f => f.Id, f => f.Slug);
@@ -598,6 +599,7 @@ public class ContentTransferService
                 row.Name = string.IsNullOrWhiteSpace(f.Name) ? (string.IsNullOrWhiteSpace(row.Name) ? "Formular" : row.Name) : f.Name!;
                 row.DefinitionJson = string.IsNullOrWhiteSpace(f.DefinitionJson) ? "[]" : f.DefinitionJson!;
                 row.SuccessMessage = f.SuccessMessage;
+                row.SubmitLabel = f.SubmitLabel;
                 row.NotifyEnabled = f.NotifyEnabled;
                 row.NotifyJson = f.NotifyJson ?? "";
                 if (row.CreatedAt == default) row.CreatedAt = f.CreatedAt == default ? DateTime.UtcNow : f.CreatedAt;
@@ -642,6 +644,7 @@ public class ContentTransferService
                     Slug = f.Slug!,
                     DefinitionJson = string.IsNullOrWhiteSpace(f.DefinitionJson) ? "[]" : f.DefinitionJson!,
                     SuccessMessage = f.SuccessMessage,
+                    SubmitLabel = f.SubmitLabel,
                     NotifyEnabled = f.NotifyEnabled,
                     NotifyJson = f.NotifyJson ?? "",
                     CreatedAt = f.CreatedAt == default ? DateTime.UtcNow : f.CreatedAt
@@ -951,6 +954,7 @@ public class ContentTransferService
         public string? Slug { get; set; }
         public string? DefinitionJson { get; set; }
         public string? SuccessMessage { get; set; }
+        public string? SubmitLabel { get; set; }
         public bool NotifyEnabled { get; set; }
         public string? NotifyJson { get; set; }
         public DateTime CreatedAt { get; set; }

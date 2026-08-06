@@ -8,6 +8,9 @@ public class FormRenderModel
     public string Name { get; set; } = "";
     public string? Heading { get; set; }
     public string? Intro { get; set; }
+
+    /// <summary>Custom submit-button label (empty = localized default).</summary>
+    public string? SubmitLabel { get; set; }
     public List<FormElement> Elements { get; set; } = new();
 
     /// <summary>Preview mode: render a non-submitting form (used in the builder iframe).</summary>

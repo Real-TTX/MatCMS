@@ -21,6 +21,9 @@ public class Form
     /// <summary>Custom confirmation message shown after a successful submission (empty = default text).</summary>
     public string? SuccessMessage { get; set; }
 
+    /// <summary>Custom label for the submit button (empty = localized default "Absenden").</summary>
+    public string? SubmitLabel { get; set; }
+
     /// <summary>When true, a notification e-mail is sent on each submission (needs SMTP configured).</summary>
     public bool NotifyEnabled { get; set; }
 

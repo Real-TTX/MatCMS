@@ -112,6 +112,11 @@
                             <div class="help">@T["forms.successHelp"]</div>
                         </div>
                         <div class="form-field">
+                            <label>@T["forms.submitLabel"]</label>
+                            <input type="text" name="Settings.SubmitLabel" value="@Model.Settings.SubmitLabel" placeholder="@T["form.submit"]" />
+                            <div class="help">@T["forms.submitLabelHelp"]</div>
+                        </div>
+                        <div class="form-field">
                             <label class="check">
                                 <input type="checkbox" name="Settings.NotifyEnabled" value="true" @(Model.Settings.NotifyEnabled ? "checked" : "") />
                                 <span>@T["forms.notifyEnable"]</span>

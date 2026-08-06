@@ -1,0 +1,17 @@
+{
+  "dp.today": "Danas",
+  "dp.clear": "Obriši",
+  "dp.cancel": "Odustani",
+  "dp.ok": "Primijeni",
+  "dp.prevMonth": "Prethodni mjesec",
+  "dp.nextMonth": "Sljedeći mjesec",
+  "dp.to": "do",
+  "dp.placeholder": "Odaberi datum",
+  "dp.placeholderRange": "Odaberi razdoblje",
+  "dp.startLabel": "Dolazak",
+  "dp.endLabel": "Odlazak",
+  "form.submit": "Pošalji",
+  "form.selectPlaceholder": "– Odaberite –",
+  "form.noFields": "Ovaj obrazac još nema polja.",
+  "form.notFound": "Nije odabran obrazac ili obrazac nije pronađen."
+}

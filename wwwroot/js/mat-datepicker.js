@@ -11,12 +11,17 @@
     var LOCALE = LOCALE_MAP[LANG] || 'de-DE';
 
     var I18N_DEFAULTS = {
-        de: { today: 'Heute', clear: 'Löschen', cancel: 'Abbrechen', ok: 'Übernehmen', prev: 'Vorheriger Monat', next: 'Nächster Monat', to: 'bis', placeholder: 'Datum wählen', placeholderRange: 'Zeitraum wählen', startLabel: 'Anreise', endLabel: 'Abreise' },
-        en: { today: 'Today', clear: 'Clear', cancel: 'Cancel', ok: 'Apply', prev: 'Previous month', next: 'Next month', to: 'to', placeholder: 'Select date', placeholderRange: 'Select range', startLabel: 'Check-in', endLabel: 'Check-out' },
-        hr: { today: 'Danas', clear: 'Obriši', cancel: 'Odustani', ok: 'Primijeni', prev: 'Prethodni mjesec', next: 'Sljedeći mjesec', to: 'do', placeholder: 'Odaberi datum', placeholderRange: 'Odaberi razdoblje', startLabel: 'Dolazak', endLabel: 'Odlazak' },
-        sk: { today: 'Dnes', clear: 'Vymazať', cancel: 'Zrušiť', ok: 'Použiť', prev: 'Predchádzajúci mesiac', next: 'Nasledujúci mesiac', to: 'do', placeholder: 'Vyberte dátum', placeholderRange: 'Vyberte obdobie', startLabel: 'Príchod', endLabel: 'Odchod' }
+        de: { today: 'Heute', clear: 'Löschen', cancel: 'Abbrechen', ok: 'Übernehmen', prev: 'Vorheriger Monat', next: 'Nächster Monat', to: 'bis', placeholder: 'Datum wählen', placeholderRange: 'Zeitraum wählen', startLabel: 'Anreise', endLabel: 'Abreise', exact: 'Genaue Zeitangabe', day: 'Tag', days: 'Tage', flexTitle: 'Flexible Datumsoptionen' },
+        en: { today: 'Today', clear: 'Clear', cancel: 'Cancel', ok: 'Apply', prev: 'Previous month', next: 'Next month', to: 'to', placeholder: 'Select date', placeholderRange: 'Select range', startLabel: 'Check-in', endLabel: 'Check-out', exact: 'Exact date', day: 'day', days: 'days', flexTitle: 'Flexible date options' },
+        hr: { today: 'Danas', clear: 'Obriši', cancel: 'Odustani', ok: 'Primijeni', prev: 'Prethodni mjesec', next: 'Sljedeći mjesec', to: 'do', placeholder: 'Odaberi datum', placeholderRange: 'Odaberi razdoblje', startLabel: 'Dolazak', endLabel: 'Odlazak', exact: 'Točan datum', day: 'dan', days: 'dana', flexTitle: 'Fleksibilni datumi' },
+        sk: { today: 'Dnes', clear: 'Vymazať', cancel: 'Zrušiť', ok: 'Použiť', prev: 'Predchádzajúci mesiac', next: 'Nasledujúci mesiac', to: 'do', placeholder: 'Vyberte dátum', placeholderRange: 'Vyberte obdobie', startLabel: 'Príchod', endLabel: 'Odchod', exact: 'Presný dátum', day: 'deň', days: 'dní', flexTitle: 'Flexibilné dátumy' }
     };
-    var T = (window.matDpI18n && typeof window.matDpI18n === 'object') ? window.matDpI18n : (I18N_DEFAULTS[LANG] || I18N_DEFAULTS.de);
+    var FLEX_PRESETS = [1, 2, 3, 7];
+    function flexLabel(n) { return '± ' + n + ' ' + (n === 1 ? T.day : T.days); }
+    function flexSuffix(n) { return n > 0 ? ' (' + flexLabel(n) + ')' : ''; }
+    // Server-provided labels (matDpI18n) override the built-ins, but defaults fill any missing keys
+    // (e.g. the flexibility labels added later) so nothing renders as "undefined".
+    var T = Object.assign({}, I18N_DEFAULTS[LANG] || I18N_DEFAULTS.de, (window.matDpI18n && typeof window.matDpI18n === 'object') ? window.matDpI18n : {});
 
     var FMT_DISPLAY = new Intl.DateTimeFormat(LOCALE, { year: 'numeric', month: '2-digit', day: '2-digit' });
     var FMT_MONTH = new Intl.DateTimeFormat(LOCALE, { month: 'long', year: 'numeric' });
@@ -32,27 +37,33 @@
     function stripTime(d) { var x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
     function sameDay(a, b) { return a && b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
 
-    // Split "YYYY-MM-DD..YYYY-MM-DD" or single "YYYY-MM-DD" into [start, end?] Dates or nulls.
+    // Split "YYYY-MM-DD..YYYY-MM-DD" / single "YYYY-MM-DD", with an optional "~N" flexibility suffix
+    // (± N days), into { start, end?, flex }.
     function parseValue(raw, isRange) {
         raw = (raw || '').trim();
-        if (!raw) return { start: null, end: null };
+        var fm = raw.match(/~(\d+)$/);
+        var flex = fm ? parseInt(fm[1], 10) : 0;
+        raw = raw.replace(/~\d+$/, '');
+        if (!raw) return { start: null, end: null, flex: flex };
         if (isRange) {
             var parts = raw.split('..');
-            return { start: parseIso(parts[0] || ''), end: parseIso(parts[1] || '') };
+            return { start: parseIso(parts[0] || ''), end: parseIso(parts[1] || ''), flex: flex };
         }
-        return { start: parseIso(raw), end: null };
+        return { start: parseIso(raw), end: null, flex: flex };
     }
 
-    function displayFor(sel, isRange) {
+    function displayFor(sel, isRange, flex) {
         if (!sel.start) return '';
-        if (!isRange) return fmt(sel.start);
-        if (!sel.end) return fmt(sel.start) + ' – …';
-        return fmt(sel.start) + ' – ' + fmt(sel.end);
+        var base;
+        if (!isRange) base = fmt(sel.start);
+        else if (!sel.end) base = fmt(sel.start) + ' – …';
+        else base = fmt(sel.start) + ' – ' + fmt(sel.end);
+        return base + flexSuffix(flex || 0);
     }
 
     // --- Dialog (built once, reused for every trigger) ------------------------------------------
 
-    var dialog, monthsEl, currentTrigger, viewDate, selection, isRange, hoverDate;
+    var dialog, monthsEl, flexEl, currentTrigger, viewDate, selection, isRange, hoverDate, flex;
     var WD_FMT = new Intl.DateTimeFormat(LOCALE, { weekday: 'short' });   // Monday-first header labels
 
     function ensureDialog() {
@@ -65,6 +76,13 @@
                 + '<div class="mat-dp-months" data-dp-months></div>'
                 + '<button type="button" class="mat-dp-nav mat-dp-nav-next" data-dp-next aria-label="' + T.next + '">›</button>'
             + '</div>'
+            + '<div class="mat-dp-flex" data-dp-flex>'
+                + '<div class="mat-dp-flex-title">' + T.flexTitle + '</div>'
+                + '<div class="mat-dp-flex-chips">'
+                    + '<button type="button" class="mat-dp-chip" data-flex="0">' + T.exact + '</button>'
+                    + FLEX_PRESETS.map(function (n) { return '<button type="button" class="mat-dp-chip" data-flex="' + n + '">' + flexLabel(n) + '</button>'; }).join('')
+                + '</div>'
+            + '</div>'
             + '<div class="mat-dp-foot">'
                 + '<button type="button" class="mat-dp-btn mat-dp-btn-ghost" data-dp-clear>' + T.clear + '</button>'
                 + '<button type="button" class="mat-dp-btn mat-dp-btn-ghost" data-dp-today>' + T.today + '</button>'
@@ -74,6 +92,7 @@
             + '</div>';
         document.body.appendChild(dialog);
         monthsEl = dialog.querySelector('[data-dp-months]');
+        flexEl = dialog.querySelector('[data-dp-flex]');
 
         dialog.addEventListener('click', function (e) {
             var t = e.target.closest('button');
@@ -88,6 +107,7 @@
                 if (isRange && selection.start && !selection.end) { close(); return; }
                 apply(); close();
             }
+            else if (t.matches('.mat-dp-chip')) { flex = +t.getAttribute('data-flex') || 0; paintFlex(); }
             else if (t.matches('.mat-dp-day') && t.hasAttribute('data-d')) {
                 var d = new Date(+t.getAttribute('data-y'), +t.getAttribute('data-m'), +t.getAttribute('data-d'));
                 if (!isRange) { selection = { start: d, end: null }; paint(); return; }
@@ -139,6 +159,13 @@
         return panel;
     }
 
+    function paintFlex() {
+        if (!flexEl) return;
+        flexEl.querySelectorAll('.mat-dp-chip').forEach(function (c) {
+            c.classList.toggle('is-active', (+c.getAttribute('data-flex') || 0) === (flex || 0));
+        });
+    }
+
     function render() {
         monthsEl.innerHTML = '';
         var y = viewDate.getFullYear(), m = viewDate.getMonth();
@@ -171,8 +198,10 @@
         var input = wrap.querySelector('[data-dp-input]');
         var parsed = parseValue(input.value, isRange);
         selection = { start: parsed.start, end: parsed.end };
+        flex = parsed.flex || 0;
         viewDate = stripTime(parsed.start || new Date());
         render();
+        paintFlex();
         if (typeof dialog.showModal === 'function') dialog.showModal();
         else dialog.setAttribute('open', '');
     }
@@ -191,8 +220,9 @@
         } else if (selection.start) {
             value = iso(selection.start);
         }
+        if (value && flex > 0) value += '~' + flex;   // encode ± flexibility (server keeps the raw string)
         input.value = value;
-        var displayText = displayFor(selection, isRange);
+        var displayText = displayFor(selection, isRange, flex);
         if (displayText) { display.textContent = displayText; display.classList.remove('mat-dp-placeholder'); }
         else { display.textContent = placeholder; display.classList.add('mat-dp-placeholder'); }
         // Notify the outer form (validation + conditional visibility).
@@ -210,7 +240,7 @@
         if (!input || !display) return;
         var isR = wrap.getAttribute('data-dp-mode') === 'range';
         var parsed = parseValue(input.value, isR);
-        var text = displayFor(parsed, isR);
+        var text = displayFor(parsed, isR, parsed.flex);
         if (text) { display.textContent = text; display.classList.remove('mat-dp-placeholder'); }
     }
     function initAll(root) {

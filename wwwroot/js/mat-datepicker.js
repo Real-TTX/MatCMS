@@ -98,7 +98,6 @@
                 + '<button type="button" class="mat-dp-btn mat-dp-btn-ghost" data-dp-clear>' + T.clear + '</button>'
                 + '<button type="button" class="mat-dp-btn mat-dp-btn-ghost" data-dp-today>' + T.today + '</button>'
                 + '<span class="mat-dp-spacer"></span>'
-                + '<button type="button" class="mat-dp-btn mat-dp-btn-ghost" data-dp-cancel>' + T.cancel + '</button>'
                 + '<button type="button" class="mat-dp-btn mat-dp-btn-primary" data-dp-ok>' + T.ok + '</button>'
             + '</div>';
         overlay.appendChild(dialog);
@@ -116,7 +115,7 @@
             else if (t.matches('[data-dp-next]')) { viewDate.setMonth(viewDate.getMonth() + 1); render(); }
             else if (t.matches('[data-dp-today]')) { viewDate = stripTime(new Date()); render(); }
             else if (t.matches('[data-dp-clear]')) { selection = { start: null, end: null }; apply(); close(); }
-            else if (t.matches('[data-dp-cancel]') || t.matches('[data-dp-close]')) { close(); }
+            else if (t.matches('[data-dp-close]')) { close(); }
             else if (t.matches('[data-dp-ok]')) {
                 // For range mode, only apply when both endpoints are set — otherwise treat as cancel.
                 if (isRange && selection.start && !selection.end) { close(); return; }
@@ -224,7 +223,6 @@
             ['[data-dp-ok]', 'ok', T.ok],
             ['[data-dp-clear]', 'clear', T.clear],
             ['[data-dp-today]', 'today', T.today],
-            ['[data-dp-cancel]', 'cancel', T.cancel],
             ['.mat-dp-flex-title', 'flextitle', T.flexTitle],
             ['[data-flex="0"]', 'exact', T.exact]
         ];

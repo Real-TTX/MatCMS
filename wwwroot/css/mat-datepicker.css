@@ -37,9 +37,13 @@ textarea.mat-input { min-height: 120px; resize: vertical; }
 .mat-dp-icon { flex: 0 0 auto; display: inline-flex; opacity: .55; }
 .mat-dp-icon svg { width: 18px; height: 18px; }
 
-/* Mobile-only sheet header (title + ✕). Hidden on desktop. */
-.mat-dp-head { display: none; }
-.mat-dp-title { font-weight: 600; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Header (title + ✕) — shown on desktop AND mobile, so the picker always has an explicit close
+   (there is no separate Cancel button). */
+.mat-dp-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 12px 10px 12px 16px; border-bottom: 1px solid #ececec; flex: 0 0 auto;
+}
+.mat-dp-title { font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mat-dp-close {
     border: 0; background: none; cursor: pointer; font-size: 22px; line-height: 1;
     color: inherit; padding: 4px 8px; border-radius: 8px; flex: none;

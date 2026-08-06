@@ -280,7 +280,9 @@ public class EditModel : PageModel
         el.Type ??= "text";
         if (el.Condition is not null && !el.Condition.IsSet) el.Condition = null;
 
-        if (el.Type != "select") el.Options = new();
+        // Options belong to select AND richselect (the rich variant also carries image/description/tags).
+        static bool SelectLike(string? t) => t is "select" or "richselect";
+        if (!SelectLike(el.Type)) el.Options = new();
         else el.Options = el.Options.Where(o => !string.IsNullOrWhiteSpace(o.Value)).ToList();
 
         if (el.Type == "group")
@@ -290,7 +292,7 @@ public class EditModel : PageModel
                 if (string.IsNullOrWhiteSpace(child.Id)) child.Id = GenId();
                 if (child.Type == "group") child.Type = "text"; // no nested groups
                 child.Condition = child.Condition is not null && child.Condition.IsSet ? child.Condition : null;
-                if (child.Type != "select") child.Options = new();
+                if (!SelectLike(child.Type)) child.Options = new();
                 else child.Options = child.Options.Where(o => !string.IsNullOrWhiteSpace(o.Value)).ToList();
                 child.Fields = new();
             }

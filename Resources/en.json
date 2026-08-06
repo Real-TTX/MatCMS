@@ -334,6 +334,8 @@
   "forms.el.email.desc": "Field for an email address.",
   "forms.el.select.name": "Select",
   "forms.el.select.desc": "Dropdown with predefined options.",
+  "forms.el.richselect.name": "Image select",
+  "forms.el.richselect.desc": "Dropdown with image, title, description & tags.",
   "forms.el.group.name": "Group",
   "forms.el.group.desc": "Groups several fields into one block.",
 

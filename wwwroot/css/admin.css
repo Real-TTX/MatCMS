@@ -678,6 +678,12 @@ table.data .btn { white-space: nowrap; }
 .opt-img-row { display: flex; gap: 8px; align-items: center; }
 .opt-img-row input { flex: 1; }
 .opt-img-prev { width: 40px; height: 40px; border-radius: 6px; border: 1px solid var(--line); background: #f0f0f0 center/cover no-repeat; flex: none; }
+/* Tag chips in the rich-select options editor */
+.opt-tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; border: 1px solid var(--line); border-radius: 8px; padding: 6px; }
+.tag-chip { display: inline-flex; align-items: center; gap: 4px; background: rgba(43,108,255,.1); color: var(--accent, #2b6cff); border-radius: 999px; padding: 3px 4px 3px 10px; font-size: 13px; }
+.tag-chip-x { border: none; background: none; cursor: pointer; color: inherit; font-size: 11px; line-height: 1; padding: 2px 4px; border-radius: 50%; }
+.tag-chip-x:hover { background: rgba(0,0,0,.12); }
+.tag-chip-input { border: none; outline: none; flex: 1; min-width: 90px; background: none; font: inherit; padding: 4px; }
 .cond-field .cond-box { display: grid; grid-template-columns: 1fr; gap: 8px; }
 .cond-field .cond-box select, .cond-field .cond-box input { width: 100%; }
 .field.cond-field { border-top: 1px dashed var(--line); padding-top: 14px; }

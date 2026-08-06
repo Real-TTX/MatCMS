@@ -147,6 +147,15 @@
         reqWrap.appendChild(reqLabel);
         container.appendChild(reqWrap);
 
+        // Ungenaue Zeitangaben (± Tage) — nur für Datum/Zeitraum. Schaltet die Flex-Chips im Picker frei.
+        var flexWrap = document.createElement("div"); flexWrap.className = "field";
+        var flexLabel = document.createElement("label"); flexLabel.className = "check";
+        var flexInput = document.createElement("input"); flexInput.type = "checkbox"; flexInput.checked = !!data.flex;
+        flexLabel.appendChild(flexInput);
+        flexLabel.appendChild(document.createTextNode(" Ungenaue Zeitangaben zulassen (± Tage)"));
+        flexWrap.appendChild(flexLabel);
+        container.appendChild(flexWrap);
+
         // Regex
         var reWrap = fieldWrap("Muster (Regex, optional)");
         var reInput = document.createElement("input");
@@ -184,6 +193,7 @@
             show(helpWrap, t !== "title");
             show(reqWrap, isInput(t));
             show(reWrap, t === "text" || t === "phone" || t === "email" || t === "number");
+            show(flexWrap, t === "date" || t === "daterange");
             show(optsCtl.node, isSelectLike(t));
             optsCtl.setRich(t === "richselect");
         }
@@ -196,6 +206,7 @@
             if (t !== "title") out.help = helpInput.value;
             if (isInput(t)) out.required = reqInput.checked;
             if (t === "text" || t === "phone" || t === "email" || t === "number") out.regex = reInput.value;
+            if (t === "date" || t === "daterange") out.flex = flexInput.checked;
             if (isSelectLike(t)) out.options = optsCtl.get();
             if (groupCtl) out.fields = groupCtl.get();
             if (condCtl) { var c = condCtl.get(); if (c) out.condition = c; }
@@ -205,7 +216,34 @@
         return read;
     }
 
-    // ---- Options editor (for select) ----
+    // ---- Tag chips input (for rich-select option tags) ----
+    function buildTagChips(initial) {
+        var node = document.createElement("div"); node.className = "opt-tags";
+        var chips = [];
+        var inp = document.createElement("input"); inp.type = "text"; inp.className = "tag-chip-input"; inp.placeholder = "Tag + Enter";
+        function addChip(text) {
+            text = (text || "").trim();
+            if (!text || chips.indexOf(text) >= 0) return;
+            chips.push(text);
+            var c = document.createElement("span"); c.className = "tag-chip"; c.appendChild(document.createTextNode(text));
+            var x = document.createElement("button"); x.type = "button"; x.className = "tag-chip-x"; x.textContent = "✕";
+            x.addEventListener("click", function () { var i = chips.indexOf(text); if (i >= 0) chips.splice(i, 1); c.remove(); });
+            c.appendChild(x); node.insertBefore(c, inp);
+        }
+        inp.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addChip(inp.value); inp.value = ""; }
+            else if (e.key === "Backspace" && !inp.value && chips.length) {
+                var last = node.querySelector(".tag-chip:last-of-type");
+                if (last) { var t = last.childNodes[0].nodeValue; var i = chips.indexOf(t); if (i >= 0) chips.splice(i, 1); last.remove(); }
+            }
+        });
+        inp.addEventListener("blur", function () { if (inp.value.trim()) { addChip(inp.value); inp.value = ""; } });
+        node.appendChild(inp);
+        (initial || []).forEach(addChip);
+        return { node: node, get: function () { return chips.slice(); } };
+    }
+
+    // ---- Options editor (for select / richselect) ----
     function buildOptions(options) {
         var wrap = document.createElement("div"); wrap.className = "field";
         var label = document.createElement("label"); label.textContent = "Optionen"; wrap.appendChild(label);
@@ -235,8 +273,8 @@
             rich.appendChild(imgRow);
             var desc = document.createElement("input"); desc.type = "text"; desc.className = "opt-desc"; desc.placeholder = "Beschreibung"; desc.value = o.description || "";
             rich.appendChild(desc);
-            var tags = document.createElement("input"); tags.type = "text"; tags.className = "opt-tags"; tags.placeholder = "Tags (Komma), z. B. 45 m², 2 Personen"; tags.value = (o.tags || []).join(", ");
-            rich.appendChild(tags);
+            var tagsCtl = buildTagChips(o.tags || []);
+            rich.appendChild(tagsCtl.node);
             row.appendChild(rich);
 
             var entry = {
@@ -245,7 +283,7 @@
                     var out = { value: val.value.trim(), label: lab.value.trim() };
                     if (imgVal.value.trim()) out.image = imgVal.value.trim();
                     if (desc.value.trim()) out.description = desc.value.trim();
-                    var tl = tags.value.split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+                    var tl = tagsCtl.get();
                     if (tl.length) out.tags = tl;
                     return out;
                 }

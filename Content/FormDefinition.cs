@@ -16,6 +16,10 @@ public class FormElement
     public string? Help { get; set; }
     public bool Required { get; set; }
     public string? Regex { get; set; }
+
+    /// <summary>For date/daterange: allow imprecise entries — shows the "± days" flexibility chips.</summary>
+    public bool Flex { get; set; }
+
     public FormCondition? Condition { get; set; }
 
     /// <summary>Options for a <c>select</c> element.</summary>

@@ -198,7 +198,10 @@
         var input = wrap.querySelector('[data-dp-input]');
         var parsed = parseValue(input.value, isRange);
         selection = { start: parsed.start, end: parsed.end };
-        flex = parsed.flex || 0;
+        // Flexibility chips only when the field allows imprecise entries (data-dp-flex="1").
+        var allowFlex = wrap.getAttribute('data-dp-flex') === '1';
+        if (flexEl) flexEl.hidden = !allowFlex;
+        flex = allowFlex ? (parsed.flex || 0) : 0;
         viewDate = stripTime(parsed.start || new Date());
         render();
         paintFlex();

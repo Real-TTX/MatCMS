@@ -334,6 +334,8 @@
   "forms.el.email.desc": "Feld für eine E-Mail-Adresse.",
   "forms.el.select.name": "Auswahl",
   "forms.el.select.desc": "Dropdown mit vordefinierten Optionen.",
+  "forms.el.richselect.name": "Auswahl mit Bild",
+  "forms.el.richselect.desc": "Dropdown mit Bild, Titel, Beschreibung & Tags.",
   "forms.el.group.name": "Gruppe",
   "forms.el.group.desc": "Fasst mehrere Felder in einem Block zusammen.",
 

@@ -57,6 +57,7 @@ public class EditModel : PageModel
         ("phone",       @"<path d=""M5 4h4l2 5-3 2a12 12 0 0 0 5 5l2-3 5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2""/>"),
         ("email",       @"<rect x=""3"" y=""5"" width=""18"" height=""14"" rx=""2""/><path d=""M4 7l8 6 8-6""/>"),
         ("select",      @"<rect x=""3"" y=""6"" width=""18"" height=""12"" rx=""2""/><path d=""M8 11l4 3 4-3""/>"),
+        ("richselect",  @"<rect x=""3"" y=""5"" width=""18"" height=""14"" rx=""2""/><rect x=""5"" y=""8"" width=""6"" height=""8"" rx=""1""/><path d=""M13 9h6""/><path d=""M13 13h4""/>"),
         ("group",       @"<rect x=""3"" y=""4"" width=""18"" height=""16"" rx=""2""/><path d=""M3 9h18""/>"),
     ];
 

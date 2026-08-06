@@ -1,4 +1,5 @@
 @model MatCMS.Content.ContainerBlockModel
+@inject MatCMS.Services.Localizer T
 @{
     var heading = Model.Data.Str("heading");
     var intro = Model.Data.Str("intro");
@@ -14,7 +15,7 @@
                 @if (!string.IsNullOrWhiteSpace(intro)) { <p>@intro</p> }
             </div>
         }
-        <div class="cards-wrap @(isCarousel ? "is-carousel" : "")" @(isCarousel ? "data-carousel" : "")>
+        <div class="cards-wrap @(isCarousel ? "is-carousel" : "")" @(isCarousel ? "data-carousel" : "")@(isCarousel ? $" data-prev=\"{System.Net.WebUtility.HtmlEncode((string)T["carousel.prev"])}\" data-next=\"{System.Net.WebUtility.HtmlEncode((string)T["carousel.next"])}\"" : "")>
             <div class="cards-grid cols-@columns">
                 @foreach (var child in Model.Children)
                 {

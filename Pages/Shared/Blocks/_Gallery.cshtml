@@ -1,5 +1,6 @@
 @model MatCMS.Content.BlockData
 @inject MatCMS.Data.AppDbContext Db
+@inject MatCMS.Services.Localizer T
 @using Microsoft.EntityFrameworkCore
 @{
     var heading = Model.Str("heading");
@@ -60,7 +61,7 @@
         @if (showFilter && filterTags.Count > 0)
         {
             <div class="gallery-filter" data-gallery-filter>
-                <button type="button" class="gfilter active" data-tag="">Alle</button>
+                <button type="button" class="gfilter active" data-tag="">@T["gallery.all"]</button>
                 @foreach (var t in filterTags)
                 {
                     <button type="button" class="gfilter" data-tag="@t">@t</button>

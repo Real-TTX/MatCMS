@@ -7,10 +7,13 @@
         if (!track) return;
         if (track.scrollWidth <= track.clientWidth + 4) return; // nothing to scroll
 
+        // Localized aria-labels come from the block (data-prev/data-next); fall back to German.
+        var prevLabel = wrap.getAttribute("data-prev") || "Zurück";
+        var nextLabel = wrap.getAttribute("data-next") || "Weiter";
         var prev = document.createElement("button");
-        prev.type = "button"; prev.className = "carousel-btn prev"; prev.setAttribute("aria-label", "Zurück"); prev.innerHTML = "&#8249;";
+        prev.type = "button"; prev.className = "carousel-btn prev"; prev.setAttribute("aria-label", prevLabel); prev.innerHTML = "&#8249;";
         var next = document.createElement("button");
-        next.type = "button"; next.className = "carousel-btn next"; next.setAttribute("aria-label", "Weiter"); next.innerHTML = "&#8250;";
+        next.type = "button"; next.className = "carousel-btn next"; next.setAttribute("aria-label", nextLabel); next.innerHTML = "&#8250;";
         wrap.appendChild(prev); wrap.appendChild(next);
 
         function step() {

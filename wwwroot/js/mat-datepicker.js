@@ -71,7 +71,13 @@
         dialog = document.createElement('dialog');
         dialog.className = 'mat-dp-dialog';
         dialog.innerHTML =
-            '<div class="mat-dp-body">'
+            // Mobile-only header: a title + ✕ close so the sheet is always easy to dismiss
+            // (hidden on desktop via CSS). data-dp-cancel reuses the "close without applying" handler.
+            '<div class="mat-dp-head">'
+                + '<span class="mat-dp-title" data-dp-title></span>'
+                + '<button type="button" class="mat-dp-close" data-dp-cancel aria-label="' + T.cancel + '">✕</button>'
+            + '</div>'
+            + '<div class="mat-dp-body">'
                 + '<button type="button" class="mat-dp-nav mat-dp-nav-prev" data-dp-prev aria-label="' + T.prev + '">‹</button>'
                 + '<div class="mat-dp-months" data-dp-months></div>'
                 + '<button type="button" class="mat-dp-nav mat-dp-nav-next" data-dp-next aria-label="' + T.next + '">›</button>'
@@ -225,6 +231,15 @@
         currentTrigger = trigger;
         var wrap = trigger.closest('.mat-dp');
         applyTexts(wrap);
+        // Mobile header title = the field's label (falls back to the trigger's placeholder).
+        var titleEl = dialog.querySelector('[data-dp-title]');
+        if (titleEl) {
+            var field = wrap.closest('.form-field');
+            var lbl = field && field.querySelector('label');
+            var disp = wrap.querySelector('[data-dp-display]');
+            titleEl.textContent = (lbl && lbl.textContent.trim())
+                || (disp && disp.getAttribute('data-placeholder')) || '';
+        }
         isRange = wrap.getAttribute('data-dp-mode') === 'range';
         var input = wrap.querySelector('[data-dp-input]');
         var parsed = parseValue(input.value, isRange);

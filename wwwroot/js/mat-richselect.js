@@ -94,4 +94,16 @@
     });
 
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAll(null); });
+
+    // Close an open desktop dropdown when the page scrolls, so the absolutely-positioned menu never
+    // slides over a sticky header. Non-capturing window listener → inner scrolling of the options
+    // list (.mat-rs-scroll) does not bubble here, so it won't self-close. The mobile bottom-sheet
+    // (.mat-rs-modal, position: fixed) is left open.
+    window.addEventListener('scroll', function () {
+        var open = document.querySelector('.mat-rs-menu:not([hidden])');
+        if (open) {
+            var wrap = open.closest('.mat-rs');
+            if (wrap && !wrap.classList.contains('mat-rs-modal')) closeAll(null);
+        }
+    }, { passive: true });
 })();

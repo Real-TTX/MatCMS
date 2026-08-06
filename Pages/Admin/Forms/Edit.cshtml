@@ -157,20 +157,59 @@
                         <h2>@T["forms.addElement"]</h2>
                         <button type="button" class="modal-close" id="add-element-close" aria-label="@T["editor.close"]">✕</button>
                     </div>
-                    <div class="modal-body">
-                        <div class="picker">
-                            @foreach (var t in MatCMS.Pages.Admin.Forms.EditModel.ElementTypes)
+                    <div class="modal-body bpick">
+                        @{
+                            var elCat = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                             {
-                                <form method="post" asp-page-handler="AddElement" asp-route-id="@Model.Current.Id" asp-route-type="@t.Type">
-                                    <button type="submit" class="tile">
-                                        <span class="t-icon">
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">@Html.Raw(t.Svg)</svg>
-                                        </span>
-                                        <span class="t-name">@TypeName(t.Type)</span>
-                                        <span class="t-desc">@T["forms.el." + t.Type + ".desc"]</span>
-                                    </button>
-                                </form>
-                            }
+                                ["title"] = "text", ["description"] = "text", ["text"] = "text", ["textarea"] = "text",
+                                ["number"] = "input", ["phone"] = "input", ["email"] = "input",
+                                ["select"] = "choice", ["richselect"] = "choice",
+                                ["date"] = "date", ["daterange"] = "date",
+                                ["group"] = "layout"
+                            };
+                            string ElCat(string t) => elCat.TryGetValue(t, out var c) ? c : "input";
+                            var elTypes = MatCMS.Pages.Admin.Forms.EditModel.ElementTypes;
+                            var elOrder = new[] { "text", "input", "choice", "date", "layout" };
+                            var elPresent = elOrder.Where(k => elTypes.Any(e => ElCat(e.Type) == k)).ToList();
+                        }
+                        <div class="bpick-search">
+                            <svg class="bpick-sico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+                            <input type="search" id="fpick-search" placeholder="@T["editor.searchBlocks"]" autocomplete="off" />
+                        </div>
+                        <div class="bpick-layout">
+                            <aside class="bpick-cats">
+                                <button type="button" class="bpick-cat is-active" data-cat="all"><span class="bpick-clabel">@T["blockcat.all"]</span><span class="bpick-n">@elTypes.Length</span></button>
+                                @foreach (var k in elPresent)
+                                {
+                                    <button type="button" class="bpick-cat" data-cat="@k"><span class="bpick-clabel">@T["formcat." + k]</span><span class="bpick-n">@elTypes.Count(e => ElCat(e.Type) == k)</span></button>
+                                }
+                            </aside>
+                            <div class="bpick-main">
+                                @foreach (var k in elPresent)
+                                {
+                                    <section class="bpick-group" data-group="@k">
+                                        <div class="bpick-grouphead">@T["formcat." + k]</div>
+                                        <div class="bpick-grid">
+                                            @foreach (var t in elTypes.Where(e => ElCat(e.Type) == k))
+                                            {
+                                                <form method="post" asp-page-handler="AddElement" asp-route-id="@Model.Current.Id" asp-route-type="@t.Type">
+                                                    <button type="submit" class="tile" data-cat="@ElCat(t.Type)"
+                                                            title="@T["forms.el." + t.Type + ".desc"]"
+                                                            data-name="@(((string)TypeName(t.Type)).ToLowerInvariant())"
+                                                            data-desc="@(((string)T["forms.el." + t.Type + ".desc"]).ToLowerInvariant())">
+                                                        <span class="t-icon">
+                                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">@Html.Raw(t.Svg)</svg>
+                                                        </span>
+                                                        <span class="t-name">@TypeName(t.Type)</span>
+                                                        <span class="t-desc">@T["forms.el." + t.Type + ".desc"]</span>
+                                                    </button>
+                                                </form>
+                                            }
+                                        </div>
+                                    </section>
+                                }
+                                <p class="bpick-empty" hidden>@T["editor.noBlocksFound"]</p>
+                            </div>
                         </div>
                     </div>
                 </div>

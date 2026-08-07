@@ -19,6 +19,7 @@
                 <option value="pending">@T["instances.awaitingApproval"]</option>
                 <option value="update">@T["instances.updateAvailable"]</option>
                 <option value="drift">@T["instances.syncPending"]</option>
+                <option value="syncfailed">@T["instances.syncFailed"]</option>
             </select>
             <div class="view-toggle" data-list-viewtoggle>
                 <button type="button" class="vt-btn" data-view="table" title="@T["instances.viewTable"]" aria-label="@T["instances.viewTable"]"><i class="ti ti-list" aria-hidden="true"></i></button>
@@ -35,13 +36,15 @@
         {
             var online = InstanceService.IsOnline(i);
             var drift = MatCMS.Cloud.Pages.Admin.Instances.IndexModel.IsOutOfSync(i);
+            var failed = MatCMS.Cloud.Pages.Admin.Instances.IndexModel.FailedItems(i);
             var update = Model.HasUpdate(i);
             var tags = string.Join(" ", new[]
             {
                 online ? "online" : "offline",
                 i.Status == InstanceStatus.Pending ? "pending" : "",
                 update ? "update" : "",
-                drift ? "drift" : ""
+                drift ? "drift" : "",
+                i.LastSyncError is not null || failed > 0 ? "syncfailed" : ""
             }.Where(t => t.Length > 0));
             <a class="instance-tile" asp-page="Details" asp-route-id="@i.Id"
                data-search="@(i.Name + " " + i.HostName + " " + i.Version + " " + i.Profile?.Name)" data-tags="@tags">
@@ -75,7 +78,11 @@
                         {
                             <span class="badge badge-new">@T["instances.updateAvailable"]</span>
                         }
-                        @if (drift)
+                        @if (i.LastSyncError is not null || failed > 0)
+                        {
+                            <span class="badge badge-err">@T["instances.syncFailed"]</span>
+                        }
+                        else if (drift)
                         {
                             <span class="badge badge-off">@T["instances.syncPending"]</span>
                         }
@@ -102,6 +109,7 @@
             {
                 var online = InstanceService.IsOnline(i);
                 var drift = MatCMS.Cloud.Pages.Admin.Instances.IndexModel.IsOutOfSync(i);
+                var failed = MatCMS.Cloud.Pages.Admin.Instances.IndexModel.FailedItems(i);
                 var update = Model.HasUpdate(i);
                 @* The filter dropdown matches against these tags, so a state that is visible as a
                    badge is also filterable — no separate server round trip. *@
@@ -110,7 +118,8 @@
                     online ? "online" : "offline",
                     i.Status == InstanceStatus.Pending ? "pending" : "",
                     update ? "update" : "",
-                    drift ? "drift" : ""
+                    drift ? "drift" : "",
+                    i.LastSyncError is not null || failed > 0 ? "syncfailed" : ""
                 }.Where(t => t.Length > 0));
                 <tr data-search="@(i.Name + " " + i.HostName + " " + i.Version + " " + i.Profile?.Name)" data-tags="@tags">
                     <td>
@@ -153,6 +162,10 @@
                             @if (i.LastSyncError is not null)
                             {
                                 <span class="badge badge-err" title="@i.LastSyncError">@T["instances.syncFailed"]</span>
+                            }
+                            else if (failed > 0)
+                            {
+                                <span class="badge badge-err">@T["instances.syncFailedItems", failed]</span>
                             }
                             else if (drift)
                             {

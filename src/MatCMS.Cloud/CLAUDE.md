@@ -381,9 +381,11 @@ only another line in the report. A skipped *einmalig* payload reports every item
 contained as `skipped-once`, so the operator can tell it apart from a broken sync. Failures are
 reported **before** the exception is thrown, which is what names the plugin that broke a rollout.
 
-Still open: `ConfigRevision` alone no longer means "in sync" — an instance can sit on the current
-revision with three items skipped — so the *synchron / abweichend* badge should eventually read the
-report instead of just the revision.
+`ConfigRevision` alone no longer means "in sync", so the badge reads the report too:
+`InstanceService.Summarise` counts the outcomes, and a `failed` item shows as *Fehler* even when the
+revision matches and nothing threw — a template named for activation that never arrived fails on its
+own without aborting the apply. Skipped items are not an error (that is what `add`/`once` are for)
+but are shown next to *synchron*, so it never reads as "everything from the profile is here".
 
 ### Update checks & notifications
 

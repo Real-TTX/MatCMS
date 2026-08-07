@@ -50,6 +50,39 @@ public class InstanceService
     public static bool IsOutOfSync(Instance i) =>
         i.Profile is not null && i.AppliedRevision < i.Profile.Revision;
 
+    /// <summary>
+    /// What the instance's last report adds up to. The revision alone stopped being enough to mean
+    /// "in sync" once modes existed: an instance can sit on the current revision with items skipped
+    /// (intentionally, in <c>once</c>/<c>add</c> mode) or failed (not intentionally at all).
+    /// </summary>
+    /// <param name="Skipped">Left alone on purpose — nothing to act on, but worth showing so
+    /// "synchron" does not imply "everything from the profile is there".</param>
+    /// <param name="Failed">Items the instance could not apply. Usually the apply also threw and
+    /// <c>LastSyncError</c> is set, but not always: a template named for activation that never
+    /// arrived fails on its own without aborting anything.</param>
+    public sealed record SyncSummary(int Installed, int Updated, int Skipped, int Failed)
+    {
+        public int Total => Installed + Updated + Skipped + Failed;
+    }
+
+    /// <summary>Never throws — the report is foreign input from an instance that may run a newer or
+    /// a broken build, and a malformed one must not take a listing down.</summary>
+    public static SyncSummary Summarise(string? reportJson)
+    {
+        if (string.IsNullOrWhiteSpace(reportJson)) return new(0, 0, 0, 0);
+
+        List<SyncItemReport>? items;
+        try { items = System.Text.Json.JsonSerializer.Deserialize<List<SyncItemReport>>(reportJson); }
+        catch { return new(0, 0, 0, 0); }
+        if (items is null) return new(0, 0, 0, 0);
+
+        return new(
+            items.Count(x => x.Outcome == "installed"),
+            items.Count(x => x.Outcome == "updated"),
+            items.Count(x => x.Outcome.StartsWith("skipped", StringComparison.Ordinal)),
+            items.Count(x => x.Outcome == "failed"));
+    }
+
     // --- Enrollment ---------------------------------------------------------
 
     public sealed record RegisterResult(Instance? Instance, string? Token, string? Error);

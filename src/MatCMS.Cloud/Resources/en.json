@@ -236,6 +236,8 @@
   "instances.syncFailed": "error",
   "instances.syncRevision": "revision {0}",
   "instances.syncRevisions": "instance {0}, profile {1}",
+  "instances.syncFailedItems": "{0} failed",
+  "instances.syncSkippedItems": "{0} skipped",
   "instances.lastSync": "Last applied",
   "instances.report": "Sync log",
   "instances.reportHint": "What the instance actually did on the last apply — reported by the instance, not computed by the cloud.",

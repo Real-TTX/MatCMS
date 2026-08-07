@@ -236,6 +236,8 @@
   "instances.syncFailed": "Fehler",
   "instances.syncRevision": "Revision {0}",
   "instances.syncRevisions": "Instanz {0}, Profil {1}",
+  "instances.syncFailedItems": "{0} fehlgeschlagen",
+  "instances.syncSkippedItems": "{0} übersprungen",
   "instances.lastSync": "Letzte Anwendung",
   "instances.report": "Sync-Protokoll",
   "instances.reportHint": "Was die Instanz beim letzten Anwenden tatsächlich getan hat — gemeldet von der Instanz, nicht von der Cloud berechnet.",

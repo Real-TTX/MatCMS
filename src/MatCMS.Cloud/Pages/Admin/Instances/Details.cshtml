@@ -201,6 +201,13 @@
                     <span class="badge badge-err">@T["instances.syncFailed"]</span>
                     <span class="muted">@Model.Item.LastSyncError</span>
                 }
+                else if (Model.Summary.Failed > 0)
+                {
+                    @* The revision matched and nothing threw, but items still did not make it —
+                       "synchron" here would be a lie the operator only finds in the log below. *@
+                    <span class="badge badge-err">@T["instances.syncFailedItems", Model.Summary.Failed]</span>
+                    <span class="muted">@T["instances.syncRevision", Model.Item.AppliedRevision]</span>
+                }
                 else if (Model.OutOfSync)
                 {
                     <span class="badge badge-off">@T["instances.syncPending"]</span>
@@ -210,6 +217,10 @@
                 {
                     <span class="badge badge-on">@T["instances.syncOk"]</span>
                     <span class="muted">@T["instances.syncRevision", Model.Item.AppliedRevision]</span>
+                    @if (Model.Summary.Skipped > 0)
+                    {
+                        <span class="muted">— @T["instances.syncSkippedItems", Model.Summary.Skipped]</span>
+                    }
                 }
             </div>
         </div>

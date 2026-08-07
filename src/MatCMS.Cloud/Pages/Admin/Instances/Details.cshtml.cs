@@ -31,6 +31,9 @@ public class DetailsModel : PageModel
     /// an empty list must read as "no information", not as "nothing was applied".</summary>
     public List<SyncItemReport> SyncReport { get; private set; } = new();
 
+    /// <summary>The same report counted up, for the state badge.</summary>
+    public InstanceService.SyncSummary Summary { get; private set; } = new(0, 0, 0, 0);
+
     public bool OutOfSync => InstanceService.IsOutOfSync(Item);
 
     /// <summary>Token shown once after a rotation (never stored in the clear).</summary>
@@ -59,6 +62,7 @@ public class DetailsModel : PageModel
             .ToListAsync();
         Profiles = await _db.Profiles.AsNoTracking().OrderBy(p => p.Name).ToListAsync();
         SyncReport = ParseReport(item.LastSyncReportJson);
+        Summary = InstanceService.Summarise(item.LastSyncReportJson);
         return true;
     }
 

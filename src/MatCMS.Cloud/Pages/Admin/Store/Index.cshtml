@@ -17,11 +17,12 @@
 
 @* ============ PLUGINS ============ *@
 <div class="tab-panel" data-panel="plugins">
-    <div data-list>
+    <div data-list data-list-key="store-plugins" class="list-view-table">
         <div class="page-head">
             <h2>@T["profiles.tabPlugins"]</h2>
             <div class="list-toolbar">
                 <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+                <partial name="_ViewToggle" />
             </div>
         </div>
         @if (Model.Plugins.Count == 0)
@@ -54,6 +55,7 @@
                     }
                 </tbody>
             </table>
+            <partial name="_PayloadTiles" model="Model.PluginTiles" />
             <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
         }
         <div class="list-actions">
@@ -64,11 +66,12 @@
 
 @* ============ TEMPLATES ============ *@
 <div class="tab-panel" data-panel="templates" hidden>
-    <div data-list>
+    <div data-list data-list-key="store-templates" class="list-view-table">
         <div class="page-head">
             <h2>@T["profiles.tabTemplates"]</h2>
             <div class="list-toolbar">
                 <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+                <partial name="_ViewToggle" />
             </div>
         </div>
         @if (Model.Templates.Count == 0)
@@ -101,6 +104,7 @@
                     }
                 </tbody>
             </table>
+            <partial name="_PayloadTiles" model="Model.TemplateTiles" />
             <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
         }
         <div class="list-actions">
@@ -111,11 +115,12 @@
 
 @* ============ COMPONENTS ============ *@
 <div class="tab-panel" data-panel="components" hidden>
-    <div data-list>
+    <div data-list data-list-key="store-components" class="list-view-table">
         <div class="page-head">
             <h2>@T["profiles.tabComponents"]</h2>
             <div class="list-toolbar">
                 <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+                <partial name="_ViewToggle" />
             </div>
         </div>
         @if (Model.Components.Count == 0)
@@ -147,6 +152,7 @@
                     }
                 </tbody>
             </table>
+            <partial name="_PayloadTiles" model="Model.ComponentTiles" />
             <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
         }
         <div class="list-actions">

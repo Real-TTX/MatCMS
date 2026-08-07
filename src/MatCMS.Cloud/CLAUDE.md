@@ -122,6 +122,15 @@ helps), `table.data[data-list-table]` in the middle, `.list-empty[data-list-empt
 `.list-pager[data-list-pager]` after it — and the **create action below** in `.list-actions`.
 `admin-list.js` drives all of it markup-only; no per-page JavaScript.
 
+For the tile half of that, use the two shared partials instead of hand-rolling a grid:
+`_ViewToggle.cshtml` in the toolbar (the wrapper then needs `data-list-key="<page>-<payload>"` so the
+choice is remembered, and `class="list-view-table"` for the default before JS runs) and
+`_PayloadTiles.cshtml` right after the table, fed a `List<PayloadTile>` built from **the same
+sources in the same order** as the table rows. Tiles are for scanning — clicking one opens the
+editor; row actions like *Aus Profil entfernen* stay in the table view. `.payload-tile*` lives in
+`cloud.css`: the admin ships `.tpl-card` (template previews) and `.instance-tile` (live homepages),
+neither of which is a plain name+meta card, so this one grid is its own rather than a misused copy.
+
 **Per-record settings belong on the record's own page**, not as a row action in the list (which is
 why "make default" lives on the profile's General tab).
 

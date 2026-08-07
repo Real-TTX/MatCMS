@@ -1,5 +1,6 @@
 using MatCMS.Cloud.Data;
 using MatCMS.Cloud.Models;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 
@@ -57,4 +58,21 @@ public class IndexModel : PageModel
             .ToDictionaryAsync(x => x.Key, x => x.Count);
 
     public int Uses(Dictionary<int, int> map, int id) => map.TryGetValue(id, out var c) ? c : 0;
+
+    // Tile views. Everything in the store IS global, so no origin badge here — the flag exists for
+    // the profile lists, where own and taken entries sit in one table.
+    public List<Shared.PayloadTile> PluginTiles =>
+        Plugins.Select(p => new Shared.PayloadTile(
+            Url.Page("Plugin", new { id = p.Id })!, p.Name, $"{p.Key} · {p.Version}", false,
+            $"{p.Name} {p.Key} {p.Description}")).ToList();
+
+    public List<Shared.PayloadTile> TemplateTiles =>
+        Templates.Select(t => new Shared.PayloadTile(
+            Url.Page("Template", new { id = t.Id })!, t.Name, $"{t.HeadingFont} / {t.BodyFont}", false,
+            $"{t.Name} {t.Description}", Accent: t.AccentColor)).ToList();
+
+    public List<Shared.PayloadTile> ComponentTiles =>
+        Components.Select(c => new Shared.PayloadTile(
+            Url.Page("Component", new { id = c.Id })!, c.Name, c.Type, false,
+            $"{c.Name} {c.Type} {c.Description}")).ToList();
 }

@@ -11,7 +11,7 @@ public static class CloudProtocol
 {
     /// <summary>Contract version this build speaks. Bump on every change to the payloads below; the
     /// cloud badges an instance reporting an older one as "veraltet".</summary>
-    public const int Version = 3;
+    public const int Version = 4;
 
     /// <summary>Header carrying the instance token.</summary>
     public const string TokenHeader = "X-MatCMS-Instance-Token";
@@ -114,6 +114,10 @@ public sealed class CloudConfig
     public int Revision { get; set; }
     public string? ProfileName { get; set; }
 
+    /// <summary>Which cloud profile this came from. Scopes the "seeded once" marks: after a move to
+    /// another profile the once-mode payloads must be allowed to seed again.</summary>
+    public int ProfileId { get; set; }
+
     /// <summary>Setting key → value. Null = the profile does not sync settings, so don't touch them.</summary>
     public Dictionary<string, string?>? Settings { get; set; }
 
@@ -126,11 +130,14 @@ public sealed class CloudConfig
     /// its own choice; switching a live design is never a side effect of syncing.</summary>
     public string? ActivateTemplate { get; set; }
 
-    /// <summary>False = only add what is missing, true = make this instance match the profile.</summary>
-    public bool OverwriteSettings { get; set; }
-    public bool OverwriteComponents { get; set; }
-    public bool OverwritePlugins { get; set; }
-    public bool OverwriteTemplates { get; set; }
+    /// <summary>Per-payload strategy, as a string: "keep" (make this instance match the profile on
+    /// every revision), "add" (only add what is missing) or "once" (roll out on the first apply and
+    /// never again). Anything unknown is read as "add" — the cautious end.</summary>
+    public string SettingsMode { get; set; } = "keep";
+    public string ComponentsMode { get; set; } = "keep";
+    public string PluginsMode { get; set; } = "keep";
+    public string TemplatesMode { get; set; } = "keep";
+    public string UsersMode { get; set; } = "add";
 }
 
 /// <summary>A theme rolled out to this instance. <c>Name</c> is the identity.</summary>

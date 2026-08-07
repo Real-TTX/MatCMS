@@ -122,6 +122,11 @@ public sealed class InstanceConfig
     public int Revision { get; set; }
     public string? ProfileName { get; set; }
 
+    /// <summary>Which profile this configuration comes from. The instance needs it to scope its
+    /// "already seeded once" marks: moving a site to another profile must let that profile seed
+    /// again, otherwise a once-mode payload would silently never arrive.</summary>
+    public int ProfileId { get; set; }
+
     /// <summary>Setting key → value, applied to the instance's own settings table. Null when the
     /// profile does not sync settings.</summary>
     public Dictionary<string, string?>? Settings { get; set; }
@@ -135,12 +140,14 @@ public sealed class InstanceConfig
     /// own choice alone.</summary>
     public string? ActivateTemplate { get; set; }
 
-    /// <summary>Per-payload conflict strategy. False = only add what is missing, true = make the
-    /// instance match the profile. Users are add-only by design and have no flag.</summary>
-    public bool OverwriteSettings { get; set; }
-    public bool OverwriteComponents { get; set; }
-    public bool OverwritePlugins { get; set; }
-    public bool OverwriteTemplates { get; set; }
+    /// <summary>Per-payload strategy: "keep" | "add" | "once" (see <c>SyncMode</c>). Sent as strings
+    /// on purpose — an instance that does not know a mode yet can fall back to "add" instead of
+    /// misreading a number and overwriting a site.</summary>
+    public string SettingsMode { get; set; } = "keep";
+    public string ComponentsMode { get; set; } = "keep";
+    public string PluginsMode { get; set; } = "keep";
+    public string TemplatesMode { get; set; } = "keep";
+    public string UsersMode { get; set; } = "add";
 }
 
 // --- Catalogue ------------------------------------------------------------

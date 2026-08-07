@@ -15,7 +15,7 @@ public class InstanceService
     /// <summary>Contract version this build speaks. Bump on every change to
     /// <see cref="HeartbeatRequest"/>/<see cref="HeartbeatResponse"/>/<see cref="InstanceConfig"/>;
     /// instances reporting less are badged "veraltet".</summary>
-    public const int CurrentProtocolVersion = 3;
+    public const int CurrentProtocolVersion = 4;
 
     /// <summary>An instance counts as offline after ~2.5 missed beats (60 s cadence).</summary>
     public static readonly TimeSpan OfflineAfter = TimeSpan.FromSeconds(150);

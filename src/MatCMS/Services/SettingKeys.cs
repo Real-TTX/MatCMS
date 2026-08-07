@@ -81,6 +81,12 @@ public static class SettingKeys
     /// heartbeat so it can show what actually happened without deriving anything.</summary>
     public const string CloudSyncReport = "cloud.syncReport";
 
+    /// <summary>Which payloads a "once" profile has already seeded here, as
+    /// <c>&lt;profileId&gt;|settings,users,…</c>. The profile id is part of the value on purpose:
+    /// moving this site to another profile must let that profile seed once as well, and comparing
+    /// the id is cheaper — and harder to get wrong — than clearing the mark on every link change.</summary>
+    public const string CloudSeeded = "cloud.seeded";
+
     // Note: TopBarLink1/2 are intentionally NOT here — the top bar moved to the "toolbar" menu.
     // The constants remain for the one-time migration in DbSeeder.
     public static readonly string[] All =
@@ -111,5 +117,5 @@ public static class SettingKeys
     /// of any generic save path — the token needs encrypting, so CloudService owns these. Also the
     /// deny-list for pushed settings: a profile must never be able to rewrite the cloud link.</summary>
     public static readonly string[] Cloud =
-        [CloudUrl, CloudInstanceId, CloudToken, CloudAppliedRevision, CloudSyncError, CloudSyncReport];
+        [CloudUrl, CloudInstanceId, CloudToken, CloudAppliedRevision, CloudSyncError, CloudSyncReport, CloudSeeded];
 }

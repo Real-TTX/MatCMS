@@ -42,6 +42,46 @@ public class CloudSyncService
     private void Report(string kind, string id, string outcome, string? detail = null) =>
         _report.Add(new CloudSyncItemReport { Kind = kind, Id = id, Outcome = outcome, Detail = detail });
 
+    /// <summary>Names the payloads carry in the seed mark. Stable strings, not enum numbers — the
+    /// mark outlives builds.</summary>
+    private const string PayloadSettings = "settings";
+    private const string PayloadUsers = "users";
+    private const string PayloadComponents = "components";
+    private const string PayloadTemplates = "templates";
+    private const string PayloadPlugins = "plugins";
+
+    /// <summary>What to do with one payload this time round.</summary>
+    /// <param name="Run">False = skip it entirely (a "once" payload already seeded here).</param>
+    /// <param name="Overwrite">Make existing items match the profile, instead of only adding.</param>
+    /// <param name="Seed">Record the payload as seeded once it has been applied without error.</param>
+    private readonly record struct PayloadPlan(bool Run, bool Overwrite, bool Seed);
+
+    /// <summary>
+    /// Turns a profile's mode for one payload into a decision. "once" is the interesting one: the
+    /// FIRST apply is a full rollout — seeding a site with half a configuration because something
+    /// happened to exist there already would be useless — and every apply after it does nothing at
+    /// all. Anything unrecognised is read as "add": a mode this build does not know must not be
+    /// allowed to overwrite a live site.
+    /// </summary>
+    private static PayloadPlan Plan(string payload, string? mode, HashSet<string> seeded) =>
+        (mode ?? "").Trim().ToLowerInvariant() switch
+        {
+            "once" => seeded.Contains(payload) ? new(false, false, false) : new(true, true, true),
+            "keep" => new(true, true, false),
+            _ => new(true, false, false)
+        };
+
+    /// <summary>Lists everything a skipped "once" payload would have contained. The cloud asked what
+    /// happened — "nothing, and here is exactly what that covers" is an answer, silence is not.</summary>
+    private void ReportSkippedOnce(string kind, IEnumerable<string> ids)
+    {
+        foreach (var id in ids)
+        {
+            if (string.IsNullOrWhiteSpace(id)) continue;
+            Report(kind, id.Trim(), "skipped-once", "Einmalige Übernahme ist bereits erfolgt.");
+        }
+    }
+
     /// <summary>
     /// Applies a whole configuration. <paramref name="fetchPlugin"/> downloads one plugin bundle by
     /// key — passed in so this class stays free of HTTP and can be reasoned about (and tested)
@@ -55,20 +95,71 @@ public class CloudSyncService
         _report.Clear();
         try
         {
+            var seeded = await LoadSeededAsync(config.ProfileId, ct);
+            var newlySeeded = new List<string>();
+
             if (config.Settings is not null)
-                applied.Add($"{await ApplySettingsAsync(config.Settings, config.OverwriteSettings, ct)} Einstellungen");
+            {
+                var plan = Plan(PayloadSettings, config.SettingsMode, seeded);
+                if (plan.Run)
+                {
+                    applied.Add($"{await ApplySettingsAsync(config.Settings, plan.Overwrite, ct)} Einstellungen");
+                    if (plan.Seed) newlySeeded.Add(PayloadSettings);
+                }
+                else ReportSkippedOnce("setting", config.Settings.Keys);
+            }
 
             if (config.Users is not null)
-                applied.Add($"{await ApplyUsersAsync(config.Users, ct)} Benutzer");
+            {
+                var plan = Plan(PayloadUsers, config.UsersMode, seeded);
+                if (plan.Run)
+                {
+                    applied.Add($"{await ApplyUsersAsync(config.Users, ct)} Benutzer");
+                    if (plan.Seed) newlySeeded.Add(PayloadUsers);
+                }
+                else ReportSkippedOnce("user", config.Users.Select(u => u.Username));
+            }
 
             if (config.Components is not null)
-                applied.Add($"{await ApplyComponentsAsync(config.Components, config.OverwriteComponents, ct)} Komponenten");
+            {
+                var plan = Plan(PayloadComponents, config.ComponentsMode, seeded);
+                if (plan.Run)
+                {
+                    applied.Add($"{await ApplyComponentsAsync(config.Components, plan.Overwrite, ct)} Komponenten");
+                    if (plan.Seed) newlySeeded.Add(PayloadComponents);
+                }
+                else ReportSkippedOnce("component", config.Components.Select(c => c.Type));
+            }
 
             if (config.Templates is not null)
-                applied.Add($"{await ApplyTemplatesAsync(config.Templates, config.OverwriteTemplates, config.ActivateTemplate, ct)} Templates");
+            {
+                var plan = Plan(PayloadTemplates, config.TemplatesMode, seeded);
+                if (plan.Run)
+                {
+                    applied.Add($"{await ApplyTemplatesAsync(config.Templates, plan.Overwrite, config.ActivateTemplate, ct)} Templates");
+                    if (plan.Seed) newlySeeded.Add(PayloadTemplates);
+                }
+                else ReportSkippedOnce("template", config.Templates.Select(t => t.Name));
+            }
 
             if (config.Plugins is not null)
-                applied.Add($"{await ApplyPluginsAsync(config.Plugins, config.OverwritePlugins, fetchPlugin, ct)} Plugins");
+            {
+                var plan = Plan(PayloadPlugins, config.PluginsMode, seeded);
+                if (plan.Run)
+                {
+                    applied.Add($"{await ApplyPluginsAsync(config.Plugins, plan.Overwrite, fetchPlugin, ct)} Plugins");
+                    if (plan.Seed) newlySeeded.Add(PayloadPlugins);
+                }
+                else ReportSkippedOnce("plugin", config.Plugins.Select(p => p.Key));
+            }
+
+            // Only after everything went through: a payload that threw must be allowed to seed again
+            // on the next attempt, otherwise a single failed rollout would freeze it forever.
+            if (newlySeeded.Count > 0)
+            {
+                seeded.UnionWith(newlySeeded);
+                await SetSeededAsync(config.ProfileId, seeded, ct);
+            }
 
             await SetStateAsync(config.Revision, null, ct);
             _log.LogInformation("Cloud configuration revision {Revision} applied: {Applied}",
@@ -388,6 +479,31 @@ public class CloudSyncService
         catch { return null; }
     }
 
+    /// <summary>
+    /// Which payloads a "once" profile has already seeded here. Scoped to the profile: a mark written
+    /// for profile 3 says nothing about profile 7, so moving this site to another profile lets that
+    /// one seed as well instead of silently rolling out nothing.
+    /// </summary>
+    private async Task<HashSet<string>> LoadSeededAsync(int profileId, CancellationToken ct)
+    {
+        var raw = await _db.SiteSettings.AsNoTracking()
+            .Where(s => s.Key == SettingKeys.CloudSeeded)
+            .Select(s => s.Value).FirstOrDefaultAsync(ct);
+
+        var parts = (raw ?? "").Split('|', 2);
+        if (parts.Length != 2 || !int.TryParse(parts[0], out var storedProfile) || storedProfile != profileId)
+            return new(StringComparer.OrdinalIgnoreCase);
+
+        return parts[1].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private async Task SetSeededAsync(int profileId, IEnumerable<string> payloads, CancellationToken ct)
+    {
+        await UpsertAsync(SettingKeys.CloudSeeded, $"{profileId}|{string.Join(',', payloads)}", ct);
+        await _db.SaveChangesAsync(ct);
+    }
+
     /// <summary>Persisted, not in-memory: the applied revision must survive a restart, otherwise
     /// every container restart re-applies the whole configuration.</summary>
     private async Task SetStateAsync(int revision, string? error, CancellationToken ct)
@@ -404,8 +520,10 @@ public class CloudSyncService
         await UpsertAsync(SettingKeys.CloudAppliedRevision, "0", ct);
         await UpsertAsync(SettingKeys.CloudSyncError, "", ct);
         // The old report describes a configuration from a cloud or profile that no longer applies —
-        // keeping it would show the new cloud a rollout it never made.
+        // keeping it would show the new cloud a rollout it never made. Same for the seed marks: a
+        // different cloud's profile ids mean nothing here.
         await UpsertAsync(SettingKeys.CloudSyncReport, "", ct);
+        await UpsertAsync(SettingKeys.CloudSeeded, "", ct);
         await _db.SaveChangesAsync(ct);
     }
 

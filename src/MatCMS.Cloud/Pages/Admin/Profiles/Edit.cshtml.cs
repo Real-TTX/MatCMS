@@ -57,6 +57,33 @@ public class EditModel : PageModel
     public bool ComponentOverridden(string type) => Components.Any(c => c.Type == type);
     public bool UserOverridden(string username) => Users.Any(u => u.Username == username);
 
+    /// <summary>One row of the strategy form: which payload, which modes it may have, what is set.</summary>
+    public sealed record ModeRow(string Field, string LabelKey, string Value, string[] Options);
+
+    /// <summary>
+    /// The strategy form, driven by data so all five payloads look and behave identically. Users are
+    /// the odd one out: they get no "keep" option, because the cloud never rewrites an existing
+    /// account — offering the choice would promise something the instance refuses to do.
+    /// </summary>
+    public List<ModeRow> Modes =>
+    [
+        new("settingsMode", "profiles.payloadSettings", ProfileService.Wire(Item.SettingsMode), ["keep", "add", "once"]),
+        new("usersMode", "profiles.payloadUsers", ProfileService.Wire(Item.UsersMode), ["add", "once"]),
+        new("pluginsMode", "profiles.payloadPlugins", ProfileService.Wire(Item.PluginsMode), ["keep", "add", "once"]),
+        new("componentsMode", "profiles.payloadComponents", ProfileService.Wire(Item.ComponentsMode), ["keep", "add", "once"]),
+        new("templatesMode", "profiles.payloadTemplates", ProfileService.Wire(Item.TemplatesMode), ["keep", "add", "once"])
+    ];
+
+    /// <summary>Falls back to the stored mode rather than to a default: a form that arrives without
+    /// the field (an older browser cache, a partial post) must not silently reset the strategy.</summary>
+    private static SyncMode ParseMode(string? raw, SyncMode fallback) => (raw ?? "").Trim().ToLowerInvariant() switch
+    {
+        "keep" => SyncMode.Keep,
+        "add" => SyncMode.Add,
+        "once" => SyncMode.Once,
+        _ => fallback
+    };
+
     /// <summary>Settings that get their own SMTP form; everything else shows in the free key/value list.</summary>
     public static readonly string[] SmtpKeys =
     [
@@ -175,7 +202,7 @@ public class EditModel : PageModel
         bool useGlobalSmtp,
         bool autoUpdateLocal, bool notifyOffline, bool notifyUpdate, string? notifyRecipients,
         bool syncSettings, bool syncUsers, bool syncPlugins, bool syncComponents, bool syncTemplates,
-        bool overwriteSettings, bool overwritePlugins, bool overwriteComponents, bool overwriteTemplates,
+        string? settingsMode, string? usersMode, string? pluginsMode, string? componentsMode, string? templatesMode,
         string? activateTemplateName)
     {
         var profile = await _db.Profiles.FindAsync(id);
@@ -194,10 +221,12 @@ public class EditModel : PageModel
         profile.SyncPlugins = syncPlugins;
         profile.SyncComponents = syncComponents;
         profile.SyncTemplates = syncTemplates;
-        profile.OverwriteSettings = overwriteSettings;
-        profile.OverwritePlugins = overwritePlugins;
-        profile.OverwriteComponents = overwriteComponents;
-        profile.OverwriteTemplates = overwriteTemplates;
+        profile.SettingsMode = ParseMode(settingsMode, profile.SettingsMode);
+        profile.PluginsMode = ParseMode(pluginsMode, profile.PluginsMode);
+        profile.ComponentsMode = ParseMode(componentsMode, profile.ComponentsMode);
+        profile.TemplatesMode = ParseMode(templatesMode, profile.TemplatesMode);
+        // Users never offer Keep — add-only is the whole point — so anything but "once" is Add.
+        profile.UsersMode = ParseMode(usersMode, profile.UsersMode) == SyncMode.Once ? SyncMode.Once : SyncMode.Add;
         profile.ActivateTemplateName = string.IsNullOrWhiteSpace(activateTemplateName) ? null : activateTemplateName.Trim();
 
         await _db.SaveChangesAsync();

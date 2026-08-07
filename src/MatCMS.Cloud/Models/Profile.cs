@@ -1,6 +1,27 @@
 namespace MatCMS.Cloud.Models;
 
 /// <summary>
+/// How far a profile keeps reaching into an instance for one payload. The instance decides what this
+/// means in practice — the cloud only states the intent — but the contract is:
+/// <list type="bullet">
+/// <item><see cref="Keep"/> — the instance is made to match the profile on every revision. The
+/// profile owns these items.</item>
+/// <item><see cref="Add"/> — only what is missing is added; anything the site already has is left
+/// exactly as it is, on every revision.</item>
+/// <item><see cref="Once"/> — rolled out on the FIRST apply and never touched again, no matter how
+/// often the profile changes afterwards. For handing a site a starting set it then owns itself.</item>
+/// </list>
+/// <para>The numeric values matter: <c>Keep = 0</c> so profiles migrated from the old
+/// <c>Overwrite* = true</c> flags keep behaving exactly as before.</para>
+/// </summary>
+public enum SyncMode
+{
+    Keep = 0,
+    Add = 1,
+    Once = 2
+}
+
+/// <summary>
 /// A configuration bundle plus the policy that applies to every instance assigned to it.
 /// <para>The <see cref="JoinCode"/> hangs off the PROFILE, not off the cloud: an instance that
 /// enrolls with a profile's code lands in that profile automatically, so rolling out N sites needs
@@ -61,14 +82,17 @@ public class Profile
     public string? ActivateTemplateName { get; set; }
 
     /// <summary>
-    /// Overwrite semantics per payload. Settings/plugins/components default to overwriting (that is
-    /// what "keep in sync" means), users only ADD — silently rewriting local accounts, or worse
-    /// removing them, is how an operator gets locked out of their own site.
+    /// How each payload is rolled out. Defaults to <see cref="SyncMode.Keep"/> — that is what
+    /// "keep in sync" means. Users are the exception: they are add-only whatever the mode says,
+    /// so their mode only chooses between "keep adding" and "seed once", never overwriting.
+    /// Silently rewriting local accounts, or worse removing them, is how an operator gets locked
+    /// out of their own site.
     /// </summary>
-    public bool OverwriteSettings { get; set; } = true;
-    public bool OverwritePlugins { get; set; } = true;
-    public bool OverwriteComponents { get; set; } = true;
-    public bool OverwriteTemplates { get; set; } = true;
+    public SyncMode SettingsMode { get; set; } = SyncMode.Keep;
+    public SyncMode PluginsMode { get; set; } = SyncMode.Keep;
+    public SyncMode ComponentsMode { get; set; } = SyncMode.Keep;
+    public SyncMode TemplatesMode { get; set; } = SyncMode.Keep;
+    public SyncMode UsersMode { get; set; } = SyncMode.Add;
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

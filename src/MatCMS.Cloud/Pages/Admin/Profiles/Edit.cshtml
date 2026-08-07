@@ -226,22 +226,21 @@
 
             <h3 class="form-section">@T["profiles.strategy"]</h3>
             <p class="muted">@T["profiles.strategyHint"]</p>
-            <label class="checkbox-row">
-                <input type="checkbox" name="overwriteSettings" value="true" checked="@(Model.Item.OverwriteSettings ? "checked" : null)" />
-                @T["profiles.overwriteSettings"]
-            </label>
-            <label class="checkbox-row">
-                <input type="checkbox" name="overwritePlugins" value="true" checked="@(Model.Item.OverwritePlugins ? "checked" : null)" />
-                @T["profiles.overwritePlugins"]
-            </label>
-            <label class="checkbox-row">
-                <input type="checkbox" name="overwriteComponents" value="true" checked="@(Model.Item.OverwriteComponents ? "checked" : null)" />
-                @T["profiles.overwriteComponents"]
-            </label>
-            <label class="checkbox-row">
-                <input type="checkbox" name="overwriteTemplates" value="true" checked="@(Model.Item.OverwriteTemplates ? "checked" : null)" />
-                @T["profiles.overwriteTemplates"]
-            </label>
+            @* One mode per payload instead of a single "overwrite" switch: "einmalig" is a third
+               answer that a checkbox cannot give — roll it out now, then let the site own it. *@
+            @foreach (var m in Model.Modes)
+            {
+                <div class="form-field">
+                    <label for="@m.Field">@T[m.LabelKey]</label>
+                    <select id="@m.Field" name="@m.Field">
+                        @foreach (var option in m.Options)
+                        {
+                            <option value="@option" selected="@(m.Value == option ? "selected" : null)">@T[$"profiles.mode.{option}"]</option>
+                        }
+                    </select>
+                    <div class="help">@T[$"profiles.mode.{m.Value}.hint"]</div>
+                </div>
+            }
             <div class="help">@T["profiles.usersAddOnly"]</div>
         </div>
 

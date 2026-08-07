@@ -104,6 +104,15 @@ public class ProfileService
         await _db.SaveChangesAsync();
     }
 
+    /// <summary>The mode as it goes over the wire. Strings, not the enum's numbers: an instance that
+    /// predates a mode falls back to the cautious "add" instead of misreading an unknown number.</summary>
+    public static string Wire(SyncMode mode) => mode switch
+    {
+        SyncMode.Add => "add",
+        SyncMode.Once => "once",
+        _ => "keep"
+    };
+
     /// <summary>Builds the payload an approved instance downloads. Sections the profile does not
     /// sync are left null, which the instance reads as "don't touch this".</summary>
     public async Task<InstanceConfig> BuildConfigAsync(Profile profile, CancellationToken ct = default)
@@ -112,10 +121,12 @@ public class ProfileService
         {
             Revision = profile.Revision,
             ProfileName = profile.Name,
-            OverwriteSettings = profile.OverwriteSettings,
-            OverwriteComponents = profile.OverwriteComponents,
-            OverwritePlugins = profile.OverwritePlugins,
-            OverwriteTemplates = profile.OverwriteTemplates,
+            ProfileId = profile.Id,
+            SettingsMode = Wire(profile.SettingsMode),
+            ComponentsMode = Wire(profile.ComponentsMode),
+            PluginsMode = Wire(profile.PluginsMode),
+            TemplatesMode = Wire(profile.TemplatesMode),
+            UsersMode = Wire(profile.UsersMode),
             // Only meaningful when templates are actually rolled out — otherwise the instance would
             // be told to activate a design it never received.
             ActivateTemplate = profile.SyncTemplates ? profile.ActivateTemplateName : null

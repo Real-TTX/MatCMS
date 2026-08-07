@@ -86,7 +86,7 @@
                     {
                         <tr data-search="@(t.Name + " " + t.Description)">
                             <td>
-                                <strong>@t.Name</strong>
+                                <a asp-page="Template" asp-route-id="@t.Id"><strong>@t.Name</strong></a>
                                 <div class="muted">@t.Description</div>
                             </td>
                             <td><span class="token-chip" style="background:@t.AccentColor;color:#fff;border-color:@t.AccentColor;">@t.AccentColor</span></td>
@@ -94,7 +94,7 @@
                             <td><span class="badge badge-off">@T["store.profileCount", Model.Uses(Model.TemplateUse, t.Id)]</span></td>
                             <td>
                                 <div class="actions">
-                                    <span class="muted">@T["store.editorPending"]</span>
+                                    <a class="btn btn-sm btn-ghost" asp-page="Template" asp-route-id="@t.Id">@T["action.edit"]</a>
                                 </div>
                             </td>
                         </tr>
@@ -104,7 +104,7 @@
             <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
         }
         <div class="list-actions">
-            <span class="muted">@T["store.editorPending"]</span>
+            <a class="btn" asp-page="Template">@T["profiles.templateAdd"]</a>
         </div>
     </div>
 </div>

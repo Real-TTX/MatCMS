@@ -14,6 +14,7 @@
   "store.noComponents": "Noch keine Komponenten im Store.",
   "store.noUsers": "Noch keine Benutzer im Store.",
   "store.noSettings": "Noch keine Einstellungen im Store.",
+  "store.componentDeleteConfirm": "Komponente aus dem Store entfernen? Profile verlieren die Auswahl, auf den Instanzen bleibt sie bestehen.",
   "store.settingIsSecret": "Als Geheimnis behandeln (verschlüsselt speichern)",
   "store.settingIsSecretHint": "Für Passwörter und Schlüssel. Der Wert wird verschlüsselt abgelegt, nie wieder angezeigt und erst beim Ausrollen an die Instanz entschlüsselt.",
   "store.settingDeleteConfirm": "Einstellung aus dem Store entfernen? Profile verlieren die Auswahl, auf den Instanzen bleibt der Wert stehen.",

@@ -1,0 +1,118 @@
+@page "{id:int?}"
+@model MatCMS.Cloud.Pages.Admin.Store.ComponentModel
+@{
+    ViewData["Title"] = Model.IsNew ? T["profiles.addComponent"] : Model.Item.Name;
+    var ec = Model.Item;
+}
+<div class="page-head">
+    <h1>
+        @(Model.IsNew ? T["profiles.addComponent"] : Model.Item.Name)
+        <span class="muted" style="font-size:14px;font-weight:400;"> — @T["store.title"]</span>
+    </h1>
+    <div class="list-toolbar">
+        <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
+    </div>
+</div>
+
+@if (!Model.IsNew && Model.UsedBy.Count > 0)
+{
+    <div class="alert alert-info">
+        @T["store.usedByWarning"] <strong>@string.Join(", ", Model.UsedBy)</strong>
+    </div>
+}
+
+<form method="post" asp-route-id="@(Model.IsNew ? null : (int?)ec.Id)" id="component-form">
+    <div class="card">
+        <h2>@T["profiles.tabComponents"]</h2>
+        <div class="form-grid">
+            <div class="form-row">
+                <div class="form-field">
+                    <label for="ctype">@T["profiles.componentType"]</label>
+                    <input id="ctype" name="type" value="@ec.Type" placeholder="hero-cta" spellcheck="false" required />
+                    <div class="help">@T["profiles.componentTypeHint"]</div>
+                </div>
+                <div class="form-field">
+                    <label for="cname">@T["common.name"]</label>
+                    <input id="cname" name="name" value="@ec.Name" required />
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-field">
+                    <label for="cicon">@T["profiles.componentIcon"]</label>
+                    <input id="cicon" name="icon" value="@ec.Icon" placeholder="photo" />
+                </div>
+                <div class="form-field">
+                    <label for="cdesc">@T["profiles.description"]</label>
+                    <input id="cdesc" name="description" value="@ec.Description" />
+                </div>
+            </div>
+        </div>
+
+        <h3 class="form-section">@T["profiles.componentFields"]</h3>
+        <div id="field-rows" data-fields="@(string.IsNullOrWhiteSpace(ec.FieldsJson) ? "[]" : ec.FieldsJson)"></div>
+        <div><button type="button" class="btn btn-sm btn-ghost" id="add-field">＋ @T["profiles.addField"]</button></div>
+        <input type="hidden" name="fieldsJson" id="FieldsJson" />
+
+        <h3 class="form-section">@T["profiles.componentTemplate"]</h3>
+        <div class="form-field">
+            <textarea id="TemplateHtml" name="templateHtml" rows="12" spellcheck="false" data-code="html">@ec.TemplateHtml</textarea>
+            <div class="help">@T["profiles.placeholderHelp"] <span id="placeholder-hint" class="mono"></span></div>
+        </div>
+    </div>
+
+    <div class="card component-preview" id="cp-card">
+        <div class="cp-head">
+            <h2>@T["profiles.livePreview"]</h2>
+            <button type="button" class="btn btn-sm btn-ghost" id="cp-debug-toggle">@T["profiles.debug"]</button>
+        </div>
+        <div class="help">@T["profiles.sampleData"]</div>
+        <div class="cp-sample" id="cp-sample"></div>
+        <div class="cp-frame-wrap">
+            <iframe id="cp-frame" class="cp-frame" title="@T["profiles.livePreview"]"></iframe>
+        </div>
+        <div class="cp-debug" id="cp-debug" hidden></div>
+    </div>
+
+    <div class="list-actions">
+        <button type="submit" class="btn">@T["settings.save"]</button>
+    </div>
+</form>
+
+@if (!Model.IsNew)
+{
+    <div class="card danger-zone">
+        <h2>@T["instances.dangerZone"]</h2>
+        <div class="actions">
+            <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@ec.Id"
+                  onsubmit="return confirm('@T["store.componentDeleteConfirm"]');">
+                <button type="submit" class="btn btn-sm btn-danger">@T["common.delete"]</button>
+            </form>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <partial name="_CodeEditorAssets" />
+    <script>
+        window.CLOUD_FIELD_TYPES = [
+            ["text", "@T["profiles.fieldText"]"],
+            ["textarea", "@T["profiles.fieldTextarea"]"],
+            ["richtext", "@T["profiles.fieldRichtext"]"],
+            ["image", "@T["profiles.fieldImage"]"],
+            ["url", "@T["profiles.fieldUrl"]"]
+        ];
+        window.CLOUD_CP = {
+            remove: "@T["common.delete"]",
+            dbgPlaceholders: "@T["profiles.dbgPlaceholders"]",
+            dbgUnknown: "@T["profiles.dbgUnknown"]",
+            dbgUnused: "@T["profiles.dbgUnused"]",
+            dbgOutput: "@T["profiles.dbgOutput"]",
+            dbgOk: "@T["profiles.dbgOk"]",
+            dbgEmpty: "@T["profiles.dbgEmpty"]"
+        };
+        // No profile here, so no activated template to borrow a theme from — the preview uses the
+        // neutral defaults baked into component-editor.js.
+        window.CLOUD_PREVIEW_THEME = {};
+    </script>
+    <script src="~/js/component-editor.js" asp-append-version="true"></script>
+}

@@ -133,14 +133,14 @@
                     {
                         <tr data-search="@(c.Name + " " + c.Type + " " + c.Description)">
                             <td>
-                                <strong>@c.Name</strong>
+                                <a asp-page="Component" asp-route-id="@c.Id"><strong>@c.Name</strong></a>
                                 <div class="muted">@c.Description</div>
                             </td>
                             <td class="mono">@c.Type</td>
                             <td><span class="badge badge-off">@T["store.profileCount", Model.Uses(Model.ComponentUse, c.Id)]</span></td>
                             <td>
                                 <div class="actions">
-                                    <span class="muted">@T["store.editorPending"]</span>
+                                    <a class="btn btn-sm btn-ghost" asp-page="Component" asp-route-id="@c.Id">@T["action.edit"]</a>
                                 </div>
                             </td>
                         </tr>
@@ -150,7 +150,7 @@
             <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
         }
         <div class="list-actions">
-            <span class="muted">@T["store.editorPending"]</span>
+            <a class="btn" asp-page="Component">@T["profiles.addComponent"]</a>
         </div>
     </div>
 </div>

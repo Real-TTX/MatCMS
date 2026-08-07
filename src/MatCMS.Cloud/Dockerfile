@@ -4,16 +4,22 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-COPY MatCMS.Cloud.csproj ./
-RUN dotnet restore MatCMS.Cloud.csproj
+# Build context is the REPO ROOT, not the project folder: both applications reference
+# src/MatCMS.Shared (the cloud<->instance contract), and a context scoped to one project
+# cannot see it. Restore the project files first so the NuGet layer is cached independently
+# of the source.
+COPY src/MatCMS.Shared/MatCMS.Shared.csproj src/MatCMS.Shared/
+COPY src/MatCMS.Cloud/MatCMS.Cloud.csproj src/MatCMS.Cloud/
+RUN dotnet restore src/MatCMS.Cloud/MatCMS.Cloud.csproj
 
 # Version passed in by CI (see .github/workflows). Local builds default to "local".
 # We only override InformationalVersion (a free-form string) so the build never
 # breaks even when APP_VERSION has no numeric prefix (e.g. "nightly-...", "local-...").
 ARG APP_VERSION=local
 
-COPY . .
-RUN dotnet publish MatCMS.Cloud.csproj -c Release -o /app/publish /p:UseAppHost=false /p:InformationalVersion=${APP_VERSION}
+COPY src/MatCMS.Shared/ src/MatCMS.Shared/
+COPY src/MatCMS.Cloud/ src/MatCMS.Cloud/
+RUN dotnet publish src/MatCMS.Cloud/MatCMS.Cloud.csproj -c Release -o /app/publish /p:UseAppHost=false /p:InformationalVersion=${APP_VERSION}
 
 # ---- Runtime stage ----
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final

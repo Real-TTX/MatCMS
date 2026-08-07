@@ -1,8 +1,8 @@
 using System.Net.Http.Json;
 using MatCMS.Data;
 using MatCMS.Models;
+using MatCMS.Shared;
 using Microsoft.EntityFrameworkCore;
-
 namespace MatCMS.Services;
 
 /// <summary>
@@ -32,41 +32,12 @@ public class CloudCatalogService
         _log = log;
     }
 
-    public sealed class Catalog
-    {
-        public List<CatalogPlugin> Plugins { get; set; } = new();
-        public List<CatalogTemplate> Templates { get; set; } = new();
-        public List<CatalogComponent> Components { get; set; } = new();
-    }
-
-    public sealed class CatalogPlugin
-    {
-        public string Key { get; set; } = "";
-        public string Name { get; set; } = "";
-        public string Version { get; set; } = "";
-        public string Description { get; set; } = "";
-    }
-
-    public sealed class CatalogTemplate
-    {
-        public string Name { get; set; } = "";
-        public string Description { get; set; } = "";
-        public string AccentColor { get; set; } = "";
-    }
-
-    public sealed class CatalogComponent
-    {
-        public string Type { get; set; } = "";
-        public string Name { get; set; } = "";
-        public string Description { get; set; } = "";
-    }
-
     /// <summary>True when a cloud is connected at all — the browse button only makes sense then.</summary>
     public async Task<bool> IsAvailableAsync() => (await _cloud.GetSettingsAsync()).Configured;
 
     /// <summary>Fetches the catalogue. Never throws — a cloud that is down must not break the
     /// plugins page, it just means there is nothing to browse right now.</summary>
-    public async Task<(Catalog? catalog, string? error)> GetCatalogAsync(CancellationToken ct = default)
+    public async Task<(StoreCatalog? catalog, string? error)> GetCatalogAsync(CancellationToken ct = default)
     {
         var settings = await _cloud.GetSettingsAsync();
         if (!settings.Configured) return (null, "Es ist keine Cloud verbunden.");
@@ -80,7 +51,7 @@ public class CloudCatalogService
                     ? "Die Cloud hat den Zugriff abgelehnt — ist diese Instanz freigegeben?"
                     : $"Die Cloud antwortete mit HTTP {(int)res.StatusCode}.");
 
-            return (await res.Content.ReadFromJsonAsync<Catalog>(ct), null);
+            return (await res.Content.ReadFromJsonAsync<StoreCatalog>(ct), null);
         }
         catch (Exception ex)
         {
@@ -128,7 +99,7 @@ public class CloudCatalogService
             var res = await client.GetAsync($"{settings.Url}/api/store/{settings.InstanceId}/template/{Uri.EscapeDataString(name)}", ct);
             if (!res.IsSuccessStatusCode) return (false, $"Template nicht erhalten (HTTP {(int)res.StatusCode}).");
 
-            var t = await res.Content.ReadFromJsonAsync<CloudConfigTemplate>(ct);
+            var t = await res.Content.ReadFromJsonAsync<ConfigTemplate>(ct);
             if (t is null || string.IsNullOrWhiteSpace(t.Name)) return (false, "Leeres Template erhalten.");
 
             var row = await _db.Templates.FirstOrDefaultAsync(x => x.Name == t.Name, ct);
@@ -188,7 +159,7 @@ public class CloudCatalogService
             var res = await client.GetAsync($"{settings.Url}/api/store/{settings.InstanceId}/component/{Uri.EscapeDataString(type)}", ct);
             if (!res.IsSuccessStatusCode) return (false, $"Komponente nicht erhalten (HTTP {(int)res.StatusCode}).");
 
-            var c = await res.Content.ReadFromJsonAsync<CloudConfigComponent>(ct);
+            var c = await res.Content.ReadFromJsonAsync<ConfigComponent>(ct);
             if (c is null || string.IsNullOrWhiteSpace(c.Type)) return (false, "Leere Komponente erhalten.");
 
             var slug = c.Type.Trim().ToLowerInvariant();

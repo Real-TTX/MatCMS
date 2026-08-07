@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>MatCMS.Shared</RootNamespace>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+  <!-- Deliberately dependency-free: this library is the contract between the CMS and the cloud, and
+       nothing else. No EF, no ASP.NET — a DTO that needs a package is a DTO that has grown into
+       something that belongs in one of the two applications. -->
+
+</Project>

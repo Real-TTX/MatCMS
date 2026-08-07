@@ -2,8 +2,8 @@ using System.Security.Cryptography;
 using System.Text;
 using MatCMS.Cloud.Data;
 using MatCMS.Cloud.Models;
+using MatCMS.Shared;
 using Microsoft.EntityFrameworkCore;
-
 namespace MatCMS.Cloud.Services;
 
 /// <summary>

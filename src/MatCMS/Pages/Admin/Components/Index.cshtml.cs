@@ -1,11 +1,11 @@
-using MatCMS.Services;
 using MatCMS.Content;
 using MatCMS.Data;
 using MatCMS.Models;
-using Microsoft.AspNetCore.Mvc;
+using MatCMS.Services;
+using MatCMS.Shared;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-
 namespace MatCMS.Pages.Admin.Components;
 
 public class IndexModel : PageModel
@@ -19,7 +19,7 @@ public class IndexModel : PageModel
     }
 
     /// <summary>Catalogue of the connected cloud, fetched only on demand (?browse=true).</summary>
-    public CloudCatalogService.Catalog? Catalog { get; private set; }
+    public StoreCatalog? Catalog { get; private set; }
     public bool CloudConnected { get; private set; }
     public string? CatalogError { get; private set; }
 

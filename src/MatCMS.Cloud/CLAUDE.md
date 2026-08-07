@@ -33,9 +33,9 @@ When extending it, copy the sibling repo's patterns rather than inventing new on
 
 ### Instance side (lives in `../MatCMS`, changed in lockstep)
 
-- `Services/CloudProtocol.cs` — the mirror of `Services/InstanceProtocol.cs` here. **Both files must
-  change together**, and `CloudProtocol.Version` / `InstanceService.CurrentProtocolVersion` must be
-  bumped together.
+- The wire contract is **not** here any more: it lives once in `../MatCMS.Shared/CloudProtocol.cs`,
+  referenced by both applications. One `CloudProtocol.Version` to bump;
+  `InstanceService.CurrentProtocolVersion` is only an alias for it.
 - `Services/CloudService.cs` — settings (token stored DataProtection-encrypted under `cloud.*` keys),
   `SendHeartbeatAsync`, `DisconnectAsync`, plus `CloudState` (singleton, what the admin UI reads) and
   `CloudConnectionService` (60 s worker; re-reads settings each cycle so connect/disconnect is live).
@@ -259,7 +259,7 @@ DataProtection), sent as an `X-MatCMS-Instance-Token` header.
   on the heartbeat so they stop asking instead of timing out.
 - Tokens are stored as SHA-256 only, verified with `FixedTimeEquals`, and shown exactly once.
 - **Heartbeat** (~60 s) — *implemented*: `POST /api/instances/{publicId}/heartbeat`, contract in
-  `Services/InstanceProtocol.cs`. Carries app version, protocol version, host name, container id,
+  `../MatCMS.Shared/CloudProtocol.cs`. Carries app version, protocol version, host name, container id,
   image ref and content counts; the response carries the latest release, `UpdateAvailable`,
   `CloudCanUpdate` and (reserved, always empty) `PendingSync`. An instance counts as **offline**
   after `InstanceService.OfflineAfter` (150 s ≈ 2.5 missed beats). Bump

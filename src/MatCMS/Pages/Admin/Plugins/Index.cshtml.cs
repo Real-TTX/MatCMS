@@ -1,9 +1,9 @@
 using MatCMS.Data;
 using MatCMS.Services;
-using Microsoft.AspNetCore.Mvc;
+using MatCMS.Shared;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-
 namespace MatCMS.Pages.Admin.Plugins;
 
 public class IndexModel : PageModel
@@ -24,7 +24,7 @@ public class IndexModel : PageModel
 
     /// <summary>Catalogue of the connected cloud - null while no cloud is connected or it is
     /// unreachable, which is why the browse section only renders when it has something.</summary>
-    public CloudCatalogService.Catalog? Catalog { get; private set; }
+    public StoreCatalog? Catalog { get; private set; }
     public bool CloudConnected { get; private set; }
     public string? CatalogError { get; private set; }
 

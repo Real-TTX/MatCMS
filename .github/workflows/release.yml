@@ -7,6 +7,8 @@ on:
     branches: [main]
     paths:
       - "src/MatCMS/**"
+      # The shared contract is compiled into both images, so a change to it must rebuild this one.
+      - "src/MatCMS.Shared/**"
       - ".github/workflows/release.yml"
   workflow_dispatch:
 
@@ -52,7 +54,8 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: ./src/MatCMS
+          # Repo root: the build needs src/MatCMS.Shared next to the project.
+          context: .
           file: ./src/MatCMS/Dockerfile
           push: true
           build-args: |

@@ -1,10 +1,10 @@
 using MatCMS.Cloud.Data;
 using MatCMS.Cloud.Models;
 using MatCMS.Cloud.Services;
-using Microsoft.AspNetCore.Mvc;
+using MatCMS.Shared;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-
 namespace MatCMS.Cloud.Pages.Admin.Instances;
 
 public class DetailsModel : PageModel

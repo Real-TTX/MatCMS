@@ -1,0 +1,19 @@
+# Both images build with the REPO ROOT as context (they need src/MatCMS.Shared), so the ignore list
+# has to live here — the per-project .dockerignore files no longer apply. Without this, every build
+# would upload .git, both appdata volumes and all bin/obj trees as build context.
+**/bin/
+**/obj/
+**/publish/
+**/appdata/
+**/wwwroot/uploads/
+.git/
+.gitignore
+.github/
+.vs/
+.idea/
+.claude/
+**/*.user
+**/Dockerfile
+**/docker-compose*.yml
+**/*.md
+**/run-*.ps1

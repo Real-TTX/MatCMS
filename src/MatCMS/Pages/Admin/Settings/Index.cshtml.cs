@@ -1,10 +1,10 @@
 using MatCMS.Data;
 using MatCMS.Models;
 using MatCMS.Services;
-using Microsoft.AspNetCore.Mvc;
+using MatCMS.Shared;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-
 namespace MatCMS.Pages.Admin.Settings;
 
 public class IndexModel : PageModel
@@ -31,7 +31,7 @@ public class IndexModel : PageModel
 
     /// <summary>What the last rollout from the cloud actually did here, item by item — the same log
     /// the cloud is sent, shown to this site's own admin.</summary>
-    public List<CloudSyncItemReport> SyncReport { get; private set; } = new();
+    public List<SyncItemReport> SyncReport { get; private set; } = new();
 
     [BindProperty] public Dictionary<string, string> Values { get; set; } = new();
 

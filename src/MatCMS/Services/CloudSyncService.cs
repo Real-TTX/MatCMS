@@ -1,7 +1,7 @@
 using MatCMS.Data;
 using MatCMS.Models;
+using MatCMS.Shared;
 using Microsoft.EntityFrameworkCore;
-
 namespace MatCMS.Services;
 
 /// <summary>
@@ -33,14 +33,14 @@ public class CloudSyncService
     }
 
     public sealed record SyncResult(bool Ok, int Revision, string? Error, List<string> Applied,
-        List<CloudSyncItemReport> Report);
+        List<SyncItemReport> Report);
 
     /// <summary>What this apply did, item by item. Collected while applying and reported to the cloud
     /// on the next heartbeat — the cloud derives nothing, it only keeps the record.</summary>
-    private readonly List<CloudSyncItemReport> _report = new();
+    private readonly List<SyncItemReport> _report = new();
 
     private void Report(string kind, string id, string outcome, string? detail = null) =>
-        _report.Add(new CloudSyncItemReport { Kind = kind, Id = id, Outcome = outcome, Detail = detail });
+        _report.Add(new SyncItemReport { Kind = kind, Id = id, Outcome = outcome, Detail = detail });
 
     /// <summary>Names the payloads carry in the seed mark. Stable strings, not enum numbers — the
     /// mark outlives builds.</summary>
@@ -88,7 +88,7 @@ public class CloudSyncService
     /// without a cloud.
     /// </summary>
     public async Task<SyncResult> ApplyAsync(
-        CloudConfig config, Func<string, CancellationToken, Task<byte[]?>> fetchPlugin,
+        InstanceConfig config, Func<string, CancellationToken, Task<byte[]?>> fetchPlugin,
         CancellationToken ct = default)
     {
         var applied = new List<string>();
@@ -222,7 +222,7 @@ public class CloudSyncService
 
     /// <summary>Add-only by design: an existing account is left exactly as it is, including its
     /// password. The cloud can hand out new logins, never take one over.</summary>
-    private async Task<int> ApplyUsersAsync(List<CloudConfigUser> users, CancellationToken ct)
+    private async Task<int> ApplyUsersAsync(List<ConfigUser> users, CancellationToken ct)
     {
         var count = 0;
         foreach (var u in users)
@@ -255,7 +255,7 @@ public class CloudSyncService
     // --- Components ---------------------------------------------------------
 
     private async Task<int> ApplyComponentsAsync(
-        List<CloudConfigComponent> components, bool overwrite, CancellationToken ct)
+        List<ConfigComponent> components, bool overwrite, CancellationToken ct)
     {
         var count = 0;
         foreach (var c in components)
@@ -312,7 +312,7 @@ public class CloudSyncService
     /// </list>
     /// </summary>
     private async Task<int> ApplyTemplatesAsync(
-        List<CloudConfigTemplate> templates, bool overwrite, string? activate, CancellationToken ct)
+        List<ConfigTemplate> templates, bool overwrite, string? activate, CancellationToken ct)
     {
         var count = 0;
         foreach (var t in templates)
@@ -394,7 +394,7 @@ public class CloudSyncService
     /// plugin code runs server-side, so it takes a human on the instance to switch it on.</para>
     /// </summary>
     private async Task<int> ApplyPluginsAsync(
-        List<CloudConfigPlugin> plugins, bool overwrite,
+        List<ConfigPlugin> plugins, bool overwrite,
         Func<string, CancellationToken, Task<byte[]?>> fetchPlugin, CancellationToken ct)
     {
         var count = 0;
@@ -469,13 +469,13 @@ public class CloudSyncService
     }
 
     /// <summary>The stored report, for the heartbeat. Empty when nothing has been applied yet.</summary>
-    public async Task<List<CloudSyncItemReport>?> LastReportAsync(CancellationToken ct = default)
+    public async Task<List<SyncItemReport>?> LastReportAsync(CancellationToken ct = default)
     {
         var raw = await _db.SiteSettings.AsNoTracking()
             .Where(s => s.Key == SettingKeys.CloudSyncReport)
             .Select(s => s.Value).FirstOrDefaultAsync(ct);
         if (string.IsNullOrWhiteSpace(raw)) return null;
-        try { return System.Text.Json.JsonSerializer.Deserialize<List<CloudSyncItemReport>>(raw); }
+        try { return System.Text.Json.JsonSerializer.Deserialize<List<SyncItemReport>>(raw); }
         catch { return null; }
     }
 

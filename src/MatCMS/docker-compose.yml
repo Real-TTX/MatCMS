@@ -1,7 +1,10 @@
 services:
   web:
     build:
-      context: .
+      # Repo root, because the build needs src/MatCMS.Shared as well. "docker compose up"
+      # still works from THIS folder — the context is resolved relative to this file.
+      context: ../..
+      dockerfile: src/MatCMS/Dockerfile
       # Always repull the base images (sdk/aspnet:10.0) when building -> "Always Repull".
       pull: true
     image: matcms:latest

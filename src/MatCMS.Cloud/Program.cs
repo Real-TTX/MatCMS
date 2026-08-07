@@ -2,12 +2,12 @@ using System.Globalization;
 using System.Threading.RateLimiting;
 using MatCMS.Cloud.Data;
 using MatCMS.Cloud.Services;
+using MatCMS.Shared;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
-
 var builder = WebApplication.CreateBuilder(args);
 
 // --- Storage locations (persisted via Docker volume at /app/appdata) ---
@@ -191,7 +191,7 @@ app.MapPost("/api/instances/register", async (
 app.MapPost("/api/instances/{publicId}/heartbeat", async (
     HttpContext ctx, string publicId, HeartbeatRequest beat, InstanceService instances) =>
 {
-    var token = ctx.Request.Headers[InstanceProtocol.TokenHeader].ToString();
+    var token = ctx.Request.Headers[CloudProtocol.TokenHeader].ToString();
     var instance = await instances.AuthenticateAsync(publicId, token);
     if (instance is null) return Results.Unauthorized();
     // A rejected instance is told so explicitly rather than being left to time out, so it can stop
@@ -208,7 +208,7 @@ app.MapPost("/api/instances/{publicId}/heartbeat", async (
 app.MapGet("/api/instances/{publicId}/config", async (
     HttpContext ctx, string publicId, InstanceService instances, ProfileService profiles) =>
 {
-    var token = ctx.Request.Headers[InstanceProtocol.TokenHeader].ToString();
+    var token = ctx.Request.Headers[CloudProtocol.TokenHeader].ToString();
     var instance = await instances.AuthenticateAsync(publicId, token);
     if (instance is null) return Results.Unauthorized();
     if (instance.Status != MatCMS.Cloud.Models.InstanceStatus.Approved)
@@ -224,7 +224,7 @@ app.MapGet("/api/instances/{publicId}/config", async (
 app.MapGet("/api/instances/{publicId}/plugin/{key}", async (
     HttpContext ctx, string publicId, string key, InstanceService instances, AppDbContext db) =>
 {
-    var token = ctx.Request.Headers[InstanceProtocol.TokenHeader].ToString();
+    var token = ctx.Request.Headers[CloudProtocol.TokenHeader].ToString();
     var instance = await instances.AuthenticateAsync(publicId, token);
     if (instance is null) return Results.Unauthorized();
     if (instance.Status != MatCMS.Cloud.Models.InstanceStatus.Approved || instance.Profile is null)
@@ -250,7 +250,7 @@ app.MapGet("/api/instances/{publicId}/plugin/{key}", async (
 app.MapPost("/api/instances/{publicId}/disconnect", async (
     HttpContext ctx, string publicId, InstanceService instances, AppDbContext db) =>
 {
-    var token = ctx.Request.Headers[InstanceProtocol.TokenHeader].ToString();
+    var token = ctx.Request.Headers[CloudProtocol.TokenHeader].ToString();
     var instance = await instances.AuthenticateAsync(publicId, token);
     if (instance is null) return Results.Unauthorized();
 
@@ -272,7 +272,7 @@ app.MapPost("/api/instances/{publicId}/disconnect", async (
 static async Task<MatCMS.Cloud.Models.Instance?> CatalogCallerAsync(
     HttpContext ctx, string publicId, InstanceService instances)
 {
-    var token = ctx.Request.Headers[InstanceProtocol.TokenHeader].ToString();
+    var token = ctx.Request.Headers[CloudProtocol.TokenHeader].ToString();
     var instance = await instances.AuthenticateAsync(publicId, token);
     return instance?.Status == MatCMS.Cloud.Models.InstanceStatus.Approved ? instance : null;
 }

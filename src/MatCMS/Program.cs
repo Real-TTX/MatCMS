@@ -3,12 +3,12 @@ using System.Threading.RateLimiting;
 using MatCMS.Content;
 using MatCMS.Data;
 using MatCMS.Services;
+using MatCMS.Shared;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
-
 var builder = WebApplication.CreateBuilder(args);
 
 // --- Localization ---------------------------------------------------------
@@ -413,7 +413,7 @@ app.MapMethods("/plugin/{key}", new[] { "GET", "POST" }, async (HttpContext ctx,
 // exactly like a login, so this cannot be used to take over a site by anyone who isn't already an
 // admin here. Anonymous by necessity (there is no cloud session yet), rate-limited like /login.
 app.MapPost("/api/cloud/link", async (
-    HttpContext ctx, MatCMS.Services.CloudLinkRequest request,
+    HttpContext ctx, MatCMS.Shared.LinkRequest request,
     MatCMS.Services.AuthService auth, MatCMS.Services.CloudService cloud) =>
 {
     if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password)

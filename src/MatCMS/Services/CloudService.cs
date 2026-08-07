@@ -1,9 +1,9 @@
 using System.Net.Http.Json;
 using MatCMS.Data;
 using MatCMS.Models;
+using MatCMS.Shared;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
-
 namespace MatCMS.Services;
 
 /// <summary>
@@ -125,7 +125,7 @@ public class CloudService
         try
         {
             var beat = await BuildBeatAsync(ct);
-            var request = new CloudRegisterRequest
+            var request = new RegisterRequest
             {
                 JoinCode = joinCode.Trim(),
                 ProtocolVersion = CloudProtocol.Version,
@@ -147,7 +147,7 @@ public class CloudService
                     ? "Der Join-Code wurde von der Cloud abgelehnt."
                     : $"Die Cloud antwortete mit HTTP {(int)res.StatusCode}.");
 
-            var answer = await res.Content.ReadFromJsonAsync<CloudRegisterResponse>(ct);
+            var answer = await res.Content.ReadFromJsonAsync<RegisterResponse>(ct);
             if (answer is null || string.IsNullOrWhiteSpace(answer.InstanceId) || string.IsNullOrWhiteSpace(answer.Token))
                 return (false, "Die Cloud hat keine gültigen Verbindungsdaten geliefert.");
 
@@ -270,7 +270,7 @@ public class CloudService
                 return;
             }
 
-            var answer = await res.Content.ReadFromJsonAsync<CloudHeartbeatResponse>(ct);
+            var answer = await res.Content.ReadFromJsonAsync<HeartbeatResponse>(ct);
             _state.Connected = true;
             _state.LastError = null;
             _state.Status = answer?.Status;
@@ -316,7 +316,7 @@ public class CloudService
             return new(false, 0, error, [], []);
         }
 
-        var config = await res.Content.ReadFromJsonAsync<CloudConfig>(ct);
+        var config = await res.Content.ReadFromJsonAsync<InstanceConfig>(ct);
         if (config is null) return new(false, 0, "Leere Konfiguration erhalten.", [], []);
 
         var result = await _sync.ApplyAsync(config,
@@ -335,7 +335,7 @@ public class CloudService
         return res.IsSuccessStatusCode ? await res.Content.ReadAsByteArrayAsync(ct) : null;
     }
 
-    private async Task<CloudHeartbeatRequest> BuildBeatAsync(CancellationToken ct)
+    private async Task<HeartbeatRequest> BuildBeatAsync(CancellationToken ct)
     {
         // The public URL has no fallback outside a request (the heartbeat runs on a timer), so an
         // unconfigured canonical URL simply travels as null and the cloud shows no "open site" link.
@@ -343,7 +343,7 @@ public class CloudService
             .Where(s => s.Key == SettingKeys.CanonicalUrl)
             .Select(s => s.Value).FirstOrDefaultAsync(ct);
 
-        return new CloudHeartbeatRequest
+        return new HeartbeatRequest
         {
             ProtocolVersion = CloudProtocol.Version,
             Version = _version.Current,

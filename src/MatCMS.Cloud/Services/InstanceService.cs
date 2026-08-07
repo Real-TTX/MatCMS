@@ -2,8 +2,8 @@ using System.Security.Cryptography;
 using System.Text;
 using MatCMS.Cloud.Data;
 using MatCMS.Cloud.Models;
+using MatCMS.Shared;
 using Microsoft.EntityFrameworkCore;
-
 namespace MatCMS.Cloud.Services;
 
 /// <summary>
@@ -12,10 +12,10 @@ namespace MatCMS.Cloud.Services;
 /// </summary>
 public class InstanceService
 {
-    /// <summary>Contract version this build speaks. Bump on every change to
-    /// <see cref="HeartbeatRequest"/>/<see cref="HeartbeatResponse"/>/<see cref="InstanceConfig"/>;
-    /// instances reporting less are badged "veraltet".</summary>
-    public const int CurrentProtocolVersion = 4;
+    /// <summary>Contract version this build speaks; instances reporting less are badged "veraltet".
+    /// Defined once in <c>MatCMS.Shared</c> — this alias only keeps the cloud-side call sites
+    /// readable, so there is no second number to bump.</summary>
+    public const int CurrentProtocolVersion = CloudProtocol.Version;
 
     /// <summary>An instance counts as offline after ~2.5 missed beats (60 s cadence).</summary>
     public static readonly TimeSpan OfflineAfter = TimeSpan.FromSeconds(150);

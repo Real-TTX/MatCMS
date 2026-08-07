@@ -71,10 +71,10 @@
                     <button type="submit" class="admin-foot-btn">🚪 @T["nav.logout"]</button>
                 </form>
             </div>
-            <div class="admin-cms-foot">
+            <a class="admin-cms-foot" asp-page="/Admin/About/Index" title="@T["about.title"]">
                 <span class="cms">MatCMS.Cloud</span>
                 <span class="admin-version">v@(Version.Current)</span>
-            </div>
+            </a>
         </div>
     </aside>
     <div class="admin-backdrop" data-admin-backdrop></div>

@@ -1,0 +1,86 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.About.IndexModel
+@{
+    ViewData["Title"] = T["about.title"];
+}
+<div class="page-head">
+    <h1>@T["about.title"]</h1>
+    <div class="list-toolbar">
+        <a class="btn btn-sm" asp-page="Index" asp-route-check="true">@T["about.checkUpdates"]</a>
+    </div>
+</div>
+
+<div class="card">
+    <h2>@T["about.thisCloud"]</h2>
+    <div class="kv">
+        <div class="kv-label">@T["about.runningVersion"]</div>
+        <div class="kv-value mono">@Model.Current</div>
+    </div>
+    <div class="kv">
+        <div class="kv-label">@T["about.image"]</div>
+        <div class="kv-value mono">@Model.ImageRef</div>
+    </div>
+    @if (Model.Check is not null)
+    {
+        <div class="kv">
+            <div class="kv-label">@T["about.latest"]</div>
+            <div class="kv-value">
+                @if (Model.Check.Error is not null)
+                {
+                    <span class="badge badge-err">@Model.Check.Error</span>
+                }
+                else if (Model.Check.UpdateAvailable)
+                {
+                    <span class="badge badge-new">@T["about.updateAvailable", Model.Check.Latest ?? "?"]</span>
+                }
+                else
+                {
+                    <span class="badge badge-on">@T["about.upToDate"]</span>
+                    <span class="muted mono">@Model.Check.Latest</span>
+                }
+            </div>
+        </div>
+    }
+    <div class="help">@T["about.updateVia"]</div>
+    <div class="code-block"><code>@Model.UpdateCommand</code></div>
+</div>
+
+<div class="card">
+    <h2>@T["about.instanceImage"]</h2>
+    <p class="muted">@T["about.instanceImageHint"]</p>
+    <div class="kv">
+        <div class="kv-label">@T["about.image"]</div>
+        <div class="kv-value mono">@Model.InstanceImageRef</div>
+    </div>
+    <div class="kv">
+        <div class="kv-label">@T["dashboard.latestRelease"]</div>
+        <div class="kv-value mono">@(Model.InstanceLatest ?? T["common.unknown"])</div>
+    </div>
+    <div class="kv">
+        <div class="kv-label">@T["dashboard.lastCheck"]</div>
+        <div class="kv-value muted">
+            @(Model.InstanceChecked is null ? T["common.never"] : Model.InstanceChecked.Value.ToString("dd.MM.yyyy HH:mm") + " UTC")
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>@T["settings.docker"]</h2>
+    <div class="kv">
+        <div class="kv-label">@T["common.status"]</div>
+        <div class="kv-value">
+            @if (!Model.DockerConfigured)
+            {
+                <span class="badge badge-off">@T["settings.dockerOff"]</span>
+            }
+            else if (Model.DockerReachable)
+            {
+                <span class="badge badge-on">@T["settings.dockerOk"]</span>
+            }
+            else
+            {
+                <span class="badge badge-err">@T["settings.dockerUnreachable"]</span>
+            }
+        </div>
+    </div>
+</div>

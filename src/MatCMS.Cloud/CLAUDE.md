@@ -310,11 +310,11 @@ Payload formats reuse what MatCMS already ships — do not invent new ones:
 
 | Payload | Format / identity | Conflict strategy |
 | --- | --- | --- |
-| **Settings** | key/value against `SettingKeys` (SMTP block + free-form keys) | overwrite (default) or add-missing |
-| **Users** | username + **password hash** (hashed once in the cloud, plaintext never stored) | **add-only, always** |
-| **Plugins** | the exact `PluginPackager.Export` ZIP; `Plugin.Key` is the identity, a same-key import updates in place and runs the plugin's `Migrate` | overwrite (default) or add-missing |
-| **Components** | `Type` is the identity | overwrite (default) or add-missing |
-| **Templates** | `Name` is the identity (same as MatCMS's backup/restore); the JSON that MatCMS's template editor exports (`?handler=ExportJson`) imports straight into a profile | overwrite (default) or add-missing |
+| **Settings** | key/value against `SettingKeys` (SMTP block + free-form keys) | `keep` / `add` / `once` |
+| **Users** | username + **password hash** (hashed once in the cloud, plaintext never stored) | **add-only, always** — only `add` / `once` |
+| **Plugins** | the exact `PluginPackager.Export` ZIP; `Plugin.Key` is the identity, a same-key import updates in place and runs the plugin's `Migrate` | `keep` / `add` / `once` |
+| **Components** | `Type` is the identity | `keep` / `add` / `once` |
+| **Templates** | `Name` is the identity (same as MatCMS's backup/restore); the JSON that MatCMS's template editor exports (`?handler=ExportJson`) imports straight into a profile | `keep` / `add` / `once` |
 
 Two things templates do **not** do, on purpose. `Profile.ActivateTemplateName` names the one template
 that becomes the live design — empty means "roll them out, the site decides", because switching a
@@ -337,39 +337,52 @@ Two guards worth keeping: the instance refuses pushed settings whose key is in `
 (otherwise one profile could rewrite an instance's cloud link), and imported plugins stay **disabled**
 because plugin code runs server-side.
 
-### Next: three sync modes and a report back (designed, not built)
+### Sync modes and the report back
 
-Today a payload is either overwritten or only added when missing. That misses the case the operator
-actually wants most often: **roll this out once to get the site started, then leave it alone.**
+`Profile` carries one `SyncMode` per payload (`SettingsMode`, `UsersMode`, `PluginsMode`,
+`ComponentsMode`, `TemplatesMode`) instead of the old `Overwrite*` booleans:
 
-Replace the two booleans (`Overwrite*`) with one mode per payload:
+| Mode | Wire value | Meaning | What the instance does |
+| --- | --- | --- | --- |
+| **Synchron halten** | `keep` | keep in line with the profile | applies every revision, overwriting |
+| **Nur ergänzen** | `add` | create what is missing | applies every revision, add-only |
+| **Einmalig übernehmen** | `once` | seed once, never touch again | first apply is a FULL rollout, every later one does nothing |
 
-| Mode | Meaning | How the instance decides |
-| --- | --- | --- |
-| **Einmalig** | seed once, never touch again | apply only if this profile/item has not been applied here before |
-| **Ergänzen** | create what is missing | apply only when the identity does not exist locally |
-| **Synchron halten** | keep in line with the profile | apply every time (today's overwrite) |
+Modes travel as **strings**, not as the enum's numbers: an instance that predates a mode falls back to
+`add` (the cautious end) instead of misreading a number and overwriting a live site. `SyncMode.Keep`
+is deliberately `0` so profiles migrated from `Overwrite* = true` behave exactly as before. Users
+never offer `keep` — add-only is unconditional, so the UI must not promise something the instance
+refuses to do.
 
-*Einmalig* is the only one that needs memory, and it must live **on the instance**: whether something
-was already seeded here is a fact about this site, not about the profile. A `cloud.seeded` setting
-holding the identities already applied is enough — it survives restarts and costs one row.
+*Einmalig* is the only mode that needs memory, and it lives **on the instance**: whether something was
+already seeded here is a fact about this site, not about the profile. `cloud.seeded` holds
+`<profileId>|settings,users,…`. The profile id is part of the value on purpose — moving a site to
+another profile must let that profile seed once as well. The mark is only written **after** the whole
+apply succeeded, so a payload that threw is allowed to seed again on the next attempt instead of
+freezing forever. `CloudSyncService.ResetAsync` clears it along with the applied revision.
 
-**The report is what makes this usable.** The heartbeat already carries `AppliedRevision` and
-`SyncError`; extend it to a per-item outcome the instance produces while applying:
+The first *einmalig* apply overwrites: seeding a site with half a configuration because something
+happened to exist there already would be useless.
+
+**The report is what makes this usable.** Every beat carries `SyncReport` — a `SyncItemReport` per
+item, produced by the instance while applying:
 
 ```
-installed | updated | skipped-exists | skipped-once | failed(reason)
+kind: setting|user|component|template|plugin
+outcome: installed | updated | skipped-exists | skipped-once | failed
 ```
 
-The cloud stores that verbatim against the instance and renders it on the detail page. It computes
-nothing: the instance is the only party that knows whether a component already existed or a plugin
-import failed, so it says so, and the cloud is a record keeper. That is also why this scales — adding
-a payload type later needs no cloud-side logic, only a new outcome line.
+The cloud stores it verbatim in `Instance.LastSyncReportJson` and renders it on the instance detail
+page (Konfiguration tab); the instance shows the same table on its own Einstellungen → Cloud tab. The
+cloud **computes nothing**: only the instance knows whether a component already existed or a plugin
+import failed. That is also why this scales — adding a payload type later needs no cloud-side logic,
+only another line in the report. A skipped *einmalig* payload reports every item it would have
+contained as `skipped-once`, so the operator can tell it apart from a broken sync. Failures are
+reported **before** the exception is thrown, which is what names the plugin that broke a rollout.
 
-Two consequences worth keeping in mind when building it: `ConfigRevision` alone stops being enough to
-mean "in sync" (an instance can be on the current revision with three items skipped), so the badge
-needs to read the report; and *Einmalig* must be reported as `skipped-once` rather than silently
-doing nothing, otherwise the operator cannot tell it apart from a broken sync.
+Still open: `ConfigRevision` alone no longer means "in sync" — an instance can sit on the current
+revision with three items skipped — so the *synchron / abweichend* badge should eventually read the
+report instead of just the revision.
 
 ### Update checks & notifications
 

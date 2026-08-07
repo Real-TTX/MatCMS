@@ -1,0 +1,32 @@
+@model List<MatCMS.Cloud.Pages.Shared.PayloadTile>
+@inject MatCMS.Cloud.Services.Localizer T
+@*
+    Tile view for a payload list. Sits next to the [data-list-table] inside the same [data-list];
+    admin-list.js shows exactly one of the two and remembers the choice per data-list-key.
+*@
+<div class="payload-tiles" data-list-tiles>
+    @foreach (var tile in Model)
+    {
+        <a class="payload-tile" href="@tile.Href" data-search="@tile.Search">
+            @if (!string.IsNullOrWhiteSpace(tile.Accent))
+            {
+                <span class="payload-tile-strip" style="background:@tile.Accent;"></span>
+            }
+            <span class="payload-tile-head">
+                <strong>@tile.Title</strong>
+                @if (tile.IsGlobal)
+                {
+                    <span class="badge badge-off">@T["profiles.fromStore"]</span>
+                }
+                @if (!string.IsNullOrWhiteSpace(tile.NoteKey))
+                {
+                    <span class="badge badge-new">@T[tile.NoteKey]</span>
+                }
+            </span>
+            @if (!string.IsNullOrWhiteSpace(tile.Sub))
+            {
+                <span class="payload-tile-sub muted">@tile.Sub</span>
+            }
+        </a>
+    }
+</div>

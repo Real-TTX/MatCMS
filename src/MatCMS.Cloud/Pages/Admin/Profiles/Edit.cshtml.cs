@@ -65,6 +65,54 @@ public class EditModel : PageModel
     public List<StoreComponent> ChosenStoreComponents => StoreComponents.Where(c => SelectedComponents.Contains(c.Id)).ToList();
     public List<Models.User> ChosenGlobalUsers => GlobalUsers.Where(u => SelectedUsers.Contains(u.Id)).ToList();
 
+    // Tile views. Built from the SAME two sources as the tables above and in the same order, so
+    // switching the view never changes what is listed — only how it looks.
+    public List<Shared.PayloadTile> UserTiles =>
+    [
+        .. ChosenGlobalUsers.Select(u => new Shared.PayloadTile(
+            Url.Page("/Admin/Users/Edit", new { id = u.Id })!, u.Username, u.Email ?? "", true,
+            $"{u.Username} {u.Email} {u.DisplayName}",
+            NoteKey: UserOverridden(u.Username) ? "profiles.overriddenLocally" : null)),
+        .. Users.Select(u => new Shared.PayloadTile(
+            Url.Page("User", new { profileId = Item.Id, id = u.Id })!, u.Username, u.Email ?? "", false,
+            $"{u.Username} {u.Email} {u.DisplayName}"))
+    ];
+
+    public List<Shared.PayloadTile> PluginTiles =>
+    [
+        .. ChosenStorePlugins.Select(p => new Shared.PayloadTile(
+            Url.Page("/Admin/Store/Plugin", new { id = p.Id })!, p.Name, $"{p.Key} · {p.Version}", true,
+            $"{p.Name} {p.Key} {p.Description}",
+            NoteKey: PluginOverridden(p.Key) ? "profiles.overriddenLocally" : null)),
+        .. Plugins.Select(p => new Shared.PayloadTile(
+            Url.Page("Plugin", new { profileId = Item.Id, id = p.Id })!, p.Name, $"{p.Key} · {p.Version}", false,
+            $"{p.Name} {p.Key} {p.Description}"))
+    ];
+
+    public List<Shared.PayloadTile> ComponentTiles =>
+    [
+        .. ChosenStoreComponents.Select(c => new Shared.PayloadTile(
+            Url.Page("/Admin/Store/Component", new { id = c.Id })!, c.Name, c.Type, true,
+            $"{c.Name} {c.Type} {c.Description}",
+            NoteKey: ComponentOverridden(c.Type) ? "profiles.overriddenLocally" : null)),
+        .. Components.Select(c => new Shared.PayloadTile(
+            Url.Page("Component", new { profileId = Item.Id, id = c.Id })!, c.Name, c.Type, false,
+            $"{c.Name} {c.Type} {c.Description}"))
+    ];
+
+    public List<Shared.PayloadTile> TemplateTiles =>
+    [
+        .. ChosenStoreTemplates.Select(t => new Shared.PayloadTile(
+            Url.Page("/Admin/Store/Template", new { id = t.Id })!, t.Name, t.Description ?? "", true,
+            t.Name, Accent: t.AccentColor,
+            NoteKey: TemplateOverridden(t.Name) ? "profiles.overriddenLocally" : null)),
+        .. Templates.Select(t => new Shared.PayloadTile(
+            Url.Page("Template", new { profileId = Item.Id, id = t.Id })!, t.Name,
+            $"{t.HeadingFont} / {t.BodyFont}", false,
+            $"{t.Name} {t.HeadingFont} {t.BodyFont}", Accent: t.AccentColor,
+            NoteKey: Item.ActivateTemplateName == t.Name ? "profiles.templateActive" : null))
+    ];
+
     public StorePicker PluginPicker => new(Item.Id, "plugins",
         StorePlugins.Where(p => !SelectedPlugins.Contains(p.Id))
             .Select(p => new PickerItem(p.Id, p.Name, $"{p.Key} {p.Version}")).ToList());

@@ -115,3 +115,26 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
 /* ============ Destructive actions ============ */
 .card.danger-zone { border-color: #f3c9c4; }
 .card.danger-zone h2 { color: #b42318; }
+
+/* ============ Payload tiles ============ */
+/* The tile view of a profile's users/plugins/components/templates. The admin ships .tpl-card for
+   template previews and .instance-tile for live homepages — neither fits a plain "name + meta"
+   card, so this is its own small grid rather than a misused copy of one of them. */
+.payload-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+.payload-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 16px;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color .12s, box-shadow .12s;
+}
+.payload-tile:hover { border-color: var(--accent); box-shadow: 0 4px 18px rgba(0, 0, 0, .07); }
+/* Colour strip for templates: the accent is the one thing you recognise a theme by at a glance. */
+.payload-tile-strip { display: block; height: 6px; border-radius: 3px; margin-bottom: 8px; }
+.payload-tile-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.payload-tile-sub { font-size: 12px; overflow-wrap: anywhere; }

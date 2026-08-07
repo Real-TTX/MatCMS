@@ -260,11 +260,12 @@
 
 @* ============ USERS ============ *@
 <div class="tab-panel" data-panel="users" hidden>
-    <div data-list>
+    <div data-list data-list-key="profile-users" class="list-view-table">
         <div class="page-head">
             <h2>@T["profiles.tabUsers"]</h2>
             <div class="list-toolbar">
                 <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+                <partial name="_ViewToggle" />
             </div>
         </div>
         <p class="muted">@T["profiles.usersHint"]</p>
@@ -322,6 +323,7 @@
                     }
                 </tbody>
             </table>
+            <partial name="_PayloadTiles" model="Model.UserTiles" />
             <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
         }
         <div class="list-actions">
@@ -334,11 +336,12 @@
 
 @* ============ PLUGINS ============ *@
 <div class="tab-panel" data-panel="plugins" hidden>
-    <div data-list>
+    <div data-list data-list-key="profile-plugins" class="list-view-table">
         <div class="page-head">
             <h2>@T["profiles.tabPlugins"]</h2>
             <div class="list-toolbar">
                 <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+                <partial name="_ViewToggle" />
             </div>
         </div>
         <p class="muted">@T["profiles.pluginsHint"]</p>
@@ -397,6 +400,7 @@
                     }
                 </tbody>
             </table>
+            <partial name="_PayloadTiles" model="Model.PluginTiles" />
             <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
         }
         <div class="list-actions">
@@ -409,11 +413,12 @@
 
 @* ============ COMPONENTS ============ *@
 <div class="tab-panel" data-panel="components" hidden>
-    <div data-list>
+    <div data-list data-list-key="profile-components" class="list-view-table">
         <div class="page-head">
             <h2>@T["profiles.tabComponents"]</h2>
             <div class="list-toolbar">
                 <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+                <partial name="_ViewToggle" />
             </div>
         </div>
         <p class="muted">@T["profiles.componentsHint"]</p>
@@ -470,6 +475,7 @@
                     }
                 </tbody>
             </table>
+            <partial name="_PayloadTiles" model="Model.ComponentTiles" />
             <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
         }
         <div class="list-actions">
@@ -482,11 +488,12 @@
 
 @* ============ TEMPLATES ============ *@
 <div class="tab-panel" data-panel="templates" hidden>
-    <div data-list>
+    <div data-list data-list-key="profile-templates" class="list-view-table">
         <div class="page-head">
             <h2>@T["profiles.tabTemplates"]</h2>
             <div class="list-toolbar">
                 <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+                <partial name="_ViewToggle" />
             </div>
         </div>
         <p class="muted">@T["profiles.templatesHint"]</p>
@@ -549,6 +556,7 @@
                     }
                 </tbody>
             </table>
+            <partial name="_PayloadTiles" model="Model.TemplateTiles" />
             <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
         }
         <div class="list-actions">

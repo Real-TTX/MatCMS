@@ -1,0 +1,9 @@
+@inject MatCMS.Cloud.Services.Localizer T
+@*
+    List/tiles switch for the toolbar. Same markup and icons as the instances list — admin-list.js
+    picks it up via [data-list-viewtoggle] and remembers the choice per data-list-key.
+*@
+<div class="view-toggle" data-list-viewtoggle>
+    <button type="button" class="vt-btn" data-view="table" title="@T["instances.viewTable"]" aria-label="@T["instances.viewTable"]"><i class="ti ti-list" aria-hidden="true"></i></button>
+    <button type="button" class="vt-btn" data-view="tiles" title="@T["instances.viewTiles"]" aria-label="@T["instances.viewTiles"]"><i class="ti ti-layout-grid" aria-hidden="true"></i></button>
+</div>

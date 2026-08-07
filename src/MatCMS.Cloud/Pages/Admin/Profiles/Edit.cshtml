@@ -1,0 +1,459 @@
+@page "{id:int}"
+@model MatCMS.Cloud.Pages.Admin.Profiles.EditModel
+@{
+    ViewData["Title"] = Model.Item.Name;
+}
+<div class="page-head">
+    <h1>@Model.Item.Name</h1>
+    <div class="list-toolbar">
+        <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
+    </div>
+</div>
+
+<div class="tabs" role="tablist">
+    <button type="button" class="tab active" data-tab="general">@T["profiles.tabGeneral"]</button>
+    <button type="button" class="tab" data-tab="settings">@T["profiles.tabSettings"]</button>
+    <button type="button" class="tab" data-tab="users">@T["profiles.tabUsers"]</button>
+    <button type="button" class="tab" data-tab="plugins">@T["profiles.tabPlugins"]</button>
+    <button type="button" class="tab" data-tab="components">@T["profiles.tabComponents"]</button>
+    <button type="button" class="tab" data-tab="templates">@T["profiles.tabTemplates"]</button>
+</div>
+
+@* ============ GENERAL ============ *@
+<div class="tab-panel" data-panel="general">
+    <div class="card">
+        <h2>@T["profiles.enrollment"]</h2>
+        <div class="kv">
+            <div class="kv-label">@T["profiles.joinCode"]</div>
+            <div class="kv-value"><span class="mono is-secret">@Model.Item.JoinCode</span></div>
+        </div>
+        <div class="kv">
+            <div class="kv-label">@T["profiles.revision"]</div>
+            <div class="kv-value"><span class="mono">@Model.Item.Revision</span> <span class="muted">— @T["profiles.revisionHint"]</span></div>
+        </div>
+        <div class="kv">
+            <div class="kv-label">@T["profiles.instances"]</div>
+            <div class="kv-value">
+                @if (Model.Instances.Count == 0)
+                {
+                    <span class="muted">—</span>
+                }
+                else
+                {
+                    <div class="actions">
+                        @foreach (var i in Model.Instances)
+                        {
+                            <a class="btn btn-sm btn-ghost" asp-page="/Admin/Instances/Details" asp-route-id="@i.Id">@i.Name</a>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+        <div class="list-actions">
+            <form class="inline-form" method="post" asp-page-handler="RotateCode" asp-route-id="@Model.Item.Id"
+                  onsubmit="return confirm('@T["profiles.rotateConfirm"]');">
+                <button type="submit" class="btn btn-ghost">@T["profiles.rotateCode"]</button>
+            </form>
+        </div>
+    </div>
+
+    <form method="post" asp-page-handler="General" asp-route-id="@Model.Item.Id">
+        <div class="card">
+            <h2>@T["profiles.tabGeneral"]</h2>
+            <div class="form-field">
+                <label for="name">@T["common.name"]</label>
+                <input id="name" name="name" value="@Model.Item.Name" required />
+            </div>
+            <div class="form-field">
+                <label for="description">@T["profiles.description"]</label>
+                <textarea id="description" name="description" rows="2">@Model.Item.Description</textarea>
+            </div>
+            <label class="checkbox-row">
+                <input type="checkbox" name="autoApprove" value="true" checked="@(Model.Item.AutoApprove ? "checked" : null)" />
+                @T["profiles.autoApproveLabel"]
+            </label>
+            <div class="help">@T["profiles.autoApproveHint"]</div>
+            <label class="checkbox-row">
+                <input type="checkbox" name="isDefault" value="true" checked="@(Model.Item.IsDefault ? "checked" : null)"
+                       disabled="@(Model.Item.IsDefault ? "disabled" : null)" />
+                @T["profiles.isDefaultLabel"]
+            </label>
+            <div class="help">@T["profiles.isDefaultHint"]</div>
+        </div>
+
+        <div class="card">
+            <h2>@T["profiles.policy"]</h2>
+            <label class="checkbox-row">
+                <input type="checkbox" name="notifyOffline" value="true" checked="@(Model.Item.NotifyOffline ? "checked" : null)" />
+                @T["settings.notifyOffline"]
+            </label>
+            <label class="checkbox-row">
+                <input type="checkbox" name="notifyUpdate" value="true" checked="@(Model.Item.NotifyUpdate ? "checked" : null)" />
+                @T["settings.notifyUpdate"]
+            </label>
+            <label class="checkbox-row">
+                <input type="checkbox" name="autoUpdateLocal" value="true" checked="@(Model.Item.AutoUpdateLocal ? "checked" : null)" />
+                @T["settings.autoUpdateLocal"]
+            </label>
+            <div class="form-field">
+                <label for="notifyRecipients">@T["settings.recipients"]</label>
+                <input id="notifyRecipients" name="notifyRecipients" value="@Model.Item.NotifyRecipients" placeholder="@T["profiles.recipientsFallback"]" />
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>@T["profiles.payloads"]</h2>
+            <p class="muted">@T["profiles.payloadsHint"]</p>
+            <label class="checkbox-row">
+                <input type="checkbox" name="syncSettings" value="true" checked="@(Model.Item.SyncSettings ? "checked" : null)" />
+                @T["profiles.payloadSettings"]
+            </label>
+            <label class="checkbox-row">
+                <input type="checkbox" name="syncUsers" value="true" checked="@(Model.Item.SyncUsers ? "checked" : null)" />
+                @T["profiles.payloadUsers"]
+            </label>
+            <label class="checkbox-row">
+                <input type="checkbox" name="syncPlugins" value="true" checked="@(Model.Item.SyncPlugins ? "checked" : null)" />
+                @T["profiles.payloadPlugins"]
+            </label>
+            <label class="checkbox-row">
+                <input type="checkbox" name="syncComponents" value="true" checked="@(Model.Item.SyncComponents ? "checked" : null)" />
+                @T["profiles.payloadComponents"]
+            </label>
+            <label class="checkbox-row">
+                <input type="checkbox" name="syncTemplates" value="true" checked="@(Model.Item.SyncTemplates ? "checked" : null)" />
+                @T["profiles.payloadTemplates"]
+            </label>
+
+            <div class="form-field" style="margin-top:12px;">
+                <label for="activateTemplateName">@T["profiles.activateTemplate"]</label>
+                <select id="activateTemplateName" name="activateTemplateName">
+                    <option value="">@T["profiles.activateNone"]</option>
+                    @foreach (var t in Model.Templates)
+                    {
+                        <option value="@t.Name" selected="@(Model.Item.ActivateTemplateName == t.Name ? "selected" : null)">@t.Name</option>
+                    }
+                </select>
+                <div class="help">@T["profiles.activateTemplateHint"]</div>
+            </div>
+
+            <h3 class="form-section">@T["profiles.strategy"]</h3>
+            <p class="muted">@T["profiles.strategyHint"]</p>
+            <label class="checkbox-row">
+                <input type="checkbox" name="overwriteSettings" value="true" checked="@(Model.Item.OverwriteSettings ? "checked" : null)" />
+                @T["profiles.overwriteSettings"]
+            </label>
+            <label class="checkbox-row">
+                <input type="checkbox" name="overwritePlugins" value="true" checked="@(Model.Item.OverwritePlugins ? "checked" : null)" />
+                @T["profiles.overwritePlugins"]
+            </label>
+            <label class="checkbox-row">
+                <input type="checkbox" name="overwriteComponents" value="true" checked="@(Model.Item.OverwriteComponents ? "checked" : null)" />
+                @T["profiles.overwriteComponents"]
+            </label>
+            <label class="checkbox-row">
+                <input type="checkbox" name="overwriteTemplates" value="true" checked="@(Model.Item.OverwriteTemplates ? "checked" : null)" />
+                @T["profiles.overwriteTemplates"]
+            </label>
+            <div class="help">@T["profiles.usersAddOnly"]</div>
+        </div>
+
+        <div class="list-actions">
+            <button type="submit" class="btn">@T["settings.save"]</button>
+        </div>
+    </form>
+</div>
+
+@* ============ SETTINGS ============ *@
+<div class="tab-panel" data-panel="settings" hidden>
+    <form method="post" asp-page-handler="Smtp" asp-route-id="@Model.Item.Id">
+        <div class="card">
+            <h2>@T["settings.smtp"]</h2>
+            <p class="muted">@T["profiles.smtpHint"]</p>
+            <div class="form-grid">
+                <div class="form-row">
+                    <div class="form-field">
+                        <label for="host">@T["settings.smtpHost"]</label>
+                        <input id="host" name="host" value="@Model.Setting("smtp.host")" spellcheck="false" />
+                    </div>
+                    <div class="form-field">
+                        <label for="port">@T["settings.smtpPort"]</label>
+                        <input id="port" name="port" value="@Model.Setting("smtp.port")" placeholder="587" inputmode="numeric" />
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-field">
+                        <label for="user">@T["settings.smtpUser"]</label>
+                        <input id="user" name="user" value="@Model.Setting("smtp.user")" spellcheck="false" />
+                    </div>
+                    <div class="form-field">
+                        <label for="password">@T["settings.smtpPassword"]</label>
+                        <input id="password" name="password" type="password" placeholder="@T["settings.smtpPasswordKeep"]" autocomplete="new-password" />
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-field">
+                        <label for="fromEmail">@T["settings.smtpFromEmail"]</label>
+                        <input id="fromEmail" name="fromEmail" value="@Model.Setting("smtp.fromEmail")" spellcheck="false" />
+                    </div>
+                    <div class="form-field">
+                        <label for="fromName">@T["settings.smtpFromName"]</label>
+                        <input id="fromName" name="fromName" value="@Model.Setting("smtp.fromName")" />
+                    </div>
+                </div>
+            </div>
+            <label class="checkbox-row">
+                <input type="checkbox" name="ssl" value="true" checked="@(Model.SettingFlag("smtp.ssl") ? "checked" : null)" />
+                @T["settings.smtpSsl"]
+            </label>
+            <div><button type="submit" class="btn">@T["settings.save"]</button></div>
+        </div>
+    </form>
+
+    <div data-list>
+        <div class="page-head">
+            <h2>@T["profiles.otherSettings"]</h2>
+            <div class="list-toolbar">
+                <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+            </div>
+        </div>
+        <p class="muted">@T["profiles.otherSettingsHint"]</p>
+        @if (Model.OtherSettings.Count == 0)
+        {
+            <div class="list-empty">@T["profiles.noSettings"]</div>
+        }
+        else
+        {
+            <table class="data" data-list-table>
+                <thead>
+                    <tr><th>@T["profiles.settingKey"]</th><th>@T["profiles.settingValue"]</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var s in Model.OtherSettings)
+                    {
+                        <tr data-search="@(s.Key + " " + s.Value)">
+                            <td><a asp-page="Setting" asp-route-profileId="@Model.Item.Id" asp-route-id="@s.Id"><span class="mono">@s.Key</span></a></td>
+                            <td class="muted">@s.Value</td>
+                            <td>
+                                <div class="actions">
+                                    <form class="inline-form" method="post" asp-page-handler="DeleteSetting" asp-route-id="@Model.Item.Id" asp-route-settingId="@s.Id">
+                                        <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+        }
+        <div class="list-actions">
+            <a class="btn" asp-page="Setting" asp-route-profileId="@Model.Item.Id">@T["profiles.addSetting"]</a>
+        </div>
+    </div>
+</div>
+
+@* ============ USERS ============ *@
+<div class="tab-panel" data-panel="users" hidden>
+    <div data-list>
+        <div class="page-head">
+            <h2>@T["profiles.tabUsers"]</h2>
+            <div class="list-toolbar">
+                <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+            </div>
+        </div>
+        <p class="muted">@T["profiles.usersHint"]</p>
+        @if (Model.Users.Count == 0)
+        {
+            <div class="list-empty">@T["profiles.noUsers"]</div>
+        }
+        else
+        {
+            <table class="data" data-list-table>
+                <thead>
+                    <tr><th>@T["users.username"]</th><th>@T["users.email"]</th><th>@T["users.displayName"]</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var u in Model.Users)
+                    {
+                        <tr data-search="@(u.Username + " " + u.Email + " " + u.DisplayName)">
+                            <td><a asp-page="User" asp-route-profileId="@Model.Item.Id" asp-route-id="@u.Id"><strong>@u.Username</strong></a></td>
+                            <td class="muted">@(u.Email ?? "—")</td>
+                            <td class="muted">@(u.DisplayName ?? "—")</td>
+                            <td>
+                                <div class="actions">
+                                    <form class="inline-form" method="post" asp-page-handler="DeleteUser" asp-route-id="@Model.Item.Id" asp-route-userId="@u.Id">
+                                        <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+        }
+        <div class="list-actions">
+            <a class="btn" asp-page="User" asp-route-profileId="@Model.Item.Id">@T["profiles.addUser"]</a>
+        </div>
+    </div>
+</div>
+
+@* ============ PLUGINS ============ *@
+<div class="tab-panel" data-panel="plugins" hidden>
+    <div data-list>
+        <div class="page-head">
+            <h2>@T["profiles.tabPlugins"]</h2>
+            <div class="list-toolbar">
+                <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+            </div>
+        </div>
+        <p class="muted">@T["profiles.pluginsHint"]</p>
+        @if (Model.Plugins.Count == 0)
+        {
+            <div class="list-empty">@T["profiles.noPlugins"]</div>
+        }
+        else
+        {
+            <table class="data" data-list-table>
+                <thead>
+                    <tr><th>@T["common.name"]</th><th>@T["profiles.pluginKey"]</th><th>@T["instances.version"]</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in Model.Plugins)
+                    {
+                        <tr data-search="@(p.Name + " " + p.Key + " " + p.Description)">
+                            <td>
+                                <a asp-page="Plugin" asp-route-profileId="@Model.Item.Id" asp-route-id="@p.Id"><strong>@p.Name</strong></a>
+                                <div class="muted">@p.Description</div>
+                            </td>
+                            <td class="mono">@p.Key</td>
+                            <td class="mono">@p.Version</td>
+                            <td>
+                                <div class="actions">
+                                    <a class="btn btn-sm btn-ghost" asp-page="Plugin" asp-route-profileId="@Model.Item.Id" asp-route-id="@p.Id">@T["action.edit"]</a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+        }
+        <div class="list-actions">
+            <a class="btn" asp-page="Plugin" asp-route-profileId="@Model.Item.Id">@T["profiles.addPlugin"]</a>
+        </div>
+    </div>
+</div>
+
+@* ============ COMPONENTS ============ *@
+<div class="tab-panel" data-panel="components" hidden>
+    <div data-list>
+        <div class="page-head">
+            <h2>@T["profiles.tabComponents"]</h2>
+            <div class="list-toolbar">
+                <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+            </div>
+        </div>
+        <p class="muted">@T["profiles.componentsHint"]</p>
+        @if (Model.Components.Count == 0)
+        {
+            <div class="list-empty">@T["profiles.noComponents"]</div>
+        }
+        else
+        {
+            <table class="data" data-list-table>
+                <thead>
+                    <tr><th>@T["common.name"]</th><th>@T["profiles.componentType"]</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in Model.Components)
+                    {
+                        <tr data-search="@(c.Name + " " + c.Type + " " + c.Description)">
+                            <td>
+                                <a asp-page="Component" asp-route-profileId="@Model.Item.Id" asp-route-id="@c.Id"><strong>@c.Name</strong></a>
+                                <div class="muted">@c.Description</div>
+                            </td>
+                            <td class="mono">@c.Type</td>
+                            <td>
+                                <div class="actions">
+                                    <a class="btn btn-sm btn-ghost" asp-page="Component" asp-route-profileId="@Model.Item.Id" asp-route-id="@c.Id">@T["action.edit"]</a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+        }
+        <div class="list-actions">
+            <a class="btn" asp-page="Component" asp-route-profileId="@Model.Item.Id">@T["profiles.addComponent"]</a>
+        </div>
+    </div>
+</div>
+
+@* ============ TEMPLATES ============ *@
+<div class="tab-panel" data-panel="templates" hidden>
+    <div data-list>
+        <div class="page-head">
+            <h2>@T["profiles.tabTemplates"]</h2>
+            <div class="list-toolbar">
+                <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+            </div>
+        </div>
+        <p class="muted">@T["profiles.templatesHint"]</p>
+        @if (Model.Templates.Count == 0)
+        {
+            <div class="list-empty">@T["profiles.noTemplates"]</div>
+        }
+        else
+        {
+            <table class="data" data-list-table>
+                <thead>
+                    <tr><th>@T["common.name"]</th><th>@T["profiles.templateColors"]</th><th>@T["profiles.templateFonts"]</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var t in Model.Templates)
+                    {
+                        <tr data-search="@(t.Name + " " + t.HeadingFont + " " + t.BodyFont)">
+                            <td>
+                                <a asp-page="Template" asp-route-profileId="@Model.Item.Id" asp-route-id="@t.Id"><strong>@t.Name</strong></a>
+                                @if (Model.Item.ActivateTemplateName == t.Name)
+                                {
+                                    <span class="badge badge-on">@T["profiles.templateActive"]</span>
+                                }
+                            </td>
+                            <td><span class="token-chip" style="background:@t.AccentColor;color:#fff;border-color:@t.AccentColor;">@t.AccentColor</span></td>
+                            <td class="muted">@t.HeadingFont / @t.BodyFont</td>
+                            <td>
+                                <div class="actions">
+                                    <a class="btn btn-sm btn-ghost" asp-page="Template" asp-route-profileId="@Model.Item.Id" asp-route-id="@t.Id">@T["action.edit"]</a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+        }
+        <div class="list-actions">
+            <a class="btn" asp-page="Template" asp-route-profileId="@Model.Item.Id">@T["profiles.templateAdd"]</a>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>@T["profiles.templateImport"]</h2>
+        <p class="muted">@T["profiles.templateImportHint"]</p>
+        <form method="post" asp-page-handler="ImportTemplate" asp-route-id="@Model.Item.Id">
+            <div class="form-field">
+                <textarea name="templateJson" rows="6" spellcheck="false" data-code="json" placeholder='{ "Name": "..." }'></textarea>
+            </div>
+            <div><button type="submit" class="btn btn-ghost">@T["profiles.templateImportBtn"]</button></div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_CodeEditorAssets" />
+    <partial name="_TabsScript" />
+}

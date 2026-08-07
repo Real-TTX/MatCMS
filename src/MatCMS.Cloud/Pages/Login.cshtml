@@ -1,0 +1,46 @@
+@page "/login"
+@model MatCMS.Cloud.Pages.LoginModel
+@inject MatCMS.Cloud.Services.CloudContext Cloud
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@T["login.pageTitle"] – @Cloud.CloudName</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Geologica:wght@@500;600;700&family=Inter:wght@@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/cloud.css" asp-append-version="true" />
+    <link rel="icon" href="@Cloud.LogoUrl" />
+</head>
+<body class="login-page">
+    <div class="login-card">
+        <img class="login-logo" src="@Cloud.LogoUrl" alt="@Cloud.CloudName" />
+        <h1>@T["login.heading"]</h1>
+        @if (!string.IsNullOrWhiteSpace(Model.Error))
+        {
+            <div class="alert alert-error">@Model.Error</div>
+        }
+        <form method="post">
+            <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+            <div class="form-field">
+                <label for="Username">@T["login.username"]</label>
+                <input id="Username" name="Username" value="@Model.Username" autofocus required />
+            </div>
+            <div class="form-field">
+                <label for="Password">@T["login.password"]</label>
+                <input id="Password" name="Password" type="password" required />
+            </div>
+            <label class="checkbox-row">
+                <input type="checkbox" name="RememberMe" value="true" /> @T["login.rememberMe"]
+            </label>
+            <button type="submit" class="btn btn-block">@T["login.submit"]</button>
+        </form>
+    </div>
+</body>
+</html>

@@ -1,0 +1,117 @@
+/* Cloud-only additions on top of the shared MatCMS site.css + admin.css.
+   Everything the admin already ships is REUSED, not re-invented: table.data, .actions, .inline-form,
+   .kv/.kv-label/.kv-value, .help, .badge-on/off/err/new, .tabs/.tab-panel, .list-toolbar/.list-search/
+   .list-actions/.list-empty, .form-row/.form-section, .field-row, .cp-* (component preview).
+   Only genuinely new things live here. */
+
+/* ============ Secrets ============ */
+/* A value shown exactly once (pairing token, join code): selectable, wraps, marked as sensitive. */
+.is-secret {
+    display: block;
+    background: #0f1115;
+    color: #e6e6e6;
+    border-radius: 8px;
+    padding: 10px 12px;
+    word-break: break-all;
+    user-select: all;
+}
+
+/* ============ Code editors ============ */
+.CodeMirror {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.55;
+    background: #fbfbfc;
+}
+.CodeMirror-focused { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent); }
+.CodeMirror-gutters { background: #f3f4f6; border-right: 1px solid var(--line); }
+
+/* Live JSON validation under a data-code="json" field. */
+.code-status { font-size: 12px; margin-top: 6px; min-height: 16px; color: var(--muted); }
+.code-status.is-ok { color: #1e7a34; }
+.code-status.is-error { color: #b42318; font-family: ui-monospace, monospace; }
+
+/* Toolbar above a code field (token chips). */
+.code-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px; }
+.code-toolbar .code-hint { font-size: 12px; color: var(--muted); margin-right: 4px; }
+.token-chip {
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+    background: #f1f2f4;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 2px 7px;
+    cursor: pointer;
+}
+.token-chip:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* ============ Live previews ============ */
+/* The theme preview is a whole sample page, so it needs more height than MatCMS's component preview
+   (which shows a single block). Both reuse the admin's .cp-* frame styling. */
+.tpl-preview-card { background: var(--bg-alt); border-style: dashed; margin-bottom: 18px; }
+.tpl-frame { height: 460px; }
+.cp-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+/* A connected site rendered live. Framing works because MatCMS sets no X-Frame-Options; a site the
+   operator cannot reach simply stays blank, which is why the hint next to it matters. */
+.site-frame-wrap { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; }
+.site-frame { display: block; width: 100%; height: 70vh; min-height: 420px; border: 0; }
+
+/* ============ Instance tiles ============ */
+/* Each tile is a scaled-down live homepage: the iframe renders at desktop width and is transformed
+   down, so the preview shows the DESKTOP layout instead of the mobile one a narrow frame would
+   trigger. Pointer events are off so a click hits the tile link, not the page inside. */
+.instance-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; }
+.instance-tile {
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color .12s, box-shadow .12s;
+}
+.instance-tile:hover { border-color: var(--accent); box-shadow: 0 4px 18px rgba(0, 0, 0, .07); }
+.instance-tile-shot { position: relative; height: 190px; overflow: hidden; background: var(--bg-alt); }
+.instance-tile-shot iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1280px;
+    height: 900px;
+    border: 0;
+    transform: scale(.28);
+    transform-origin: 0 0;
+    pointer-events: none;
+}
+.instance-tile-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--muted);
+    font-size: 13px;
+    text-align: center;
+    padding: 0 18px;
+}
+.instance-tile-body { padding: 12px 14px; border-top: 1px solid var(--line); }
+.instance-tile-name { font-weight: 600; margin-bottom: 6px; }
+.instance-tile-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* ============ Editable rows ============ */
+/* A row currently loaded into the form below it. */
+table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff); }
+.editor-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.editor-head .muted { font-size: 13px; }
+
+/* NOTE: colour inputs are NOT styled here. The admin already ships both patterns — .color-field for
+   a required colour and .optcolor for an optional one ("" = inherit, with a clear button) — and an
+   override here silently broke them once. Use the admin's markup and leave its CSS alone. */
+
+/* ============ Destructive actions ============ */
+.card.danger-zone { border-color: #f3c9c4; }
+.card.danger-zone h2 { color: #b42318; }

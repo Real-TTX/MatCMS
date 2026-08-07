@@ -1,0 +1,47 @@
+@page "{profileId:int}/{id:int?}"
+@model MatCMS.Cloud.Pages.Admin.Profiles.SettingModel
+@{
+    ViewData["Title"] = Model.IsNew ? T["profiles.addSetting"] : Model.Item.Key;
+}
+<div class="page-head">
+    <h1>
+        @(Model.IsNew ? T["profiles.addSetting"] : Model.Item.Key)
+        <span class="muted" style="font-size:14px;font-weight:400;"> — @Model.Owner.Name</span>
+    </h1>
+    <div class="list-toolbar">
+        <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@Model.Owner.Id" asp-route-tab="settings">@T["action.back"]</a>
+    </div>
+</div>
+
+<form method="post" asp-route-profileId="@Model.Owner.Id" asp-route-id="@(Model.IsNew ? null : (int?)Model.Item.Id)">
+    <div class="card">
+        <h2>@T["profiles.otherSettings"]</h2>
+        <p class="muted">@T["profiles.otherSettingsHint"]</p>
+        <div class="form-field">
+            <label for="key">@T["profiles.settingKey"]</label>
+            <input id="key" name="key" value="@Model.Item.Key" placeholder="site.canonicalUrl" spellcheck="false" required />
+            <div class="help">@T["profiles.settingKeyHint"]</div>
+        </div>
+        <div class="form-field">
+            <label for="value">@T["profiles.settingValue"]</label>
+            <textarea id="value" name="value" rows="3" spellcheck="false">@Model.Item.Value</textarea>
+        </div>
+    </div>
+
+    <div class="list-actions">
+        <button type="submit" class="btn">@T["settings.save"]</button>
+    </div>
+</form>
+
+@if (!Model.IsNew)
+{
+    <div class="card danger-zone">
+        <h2>@T["instances.dangerZone"]</h2>
+        <div class="actions">
+            <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-profileId="@Model.Owner.Id" asp-route-id="@Model.Item.Id"
+                  onsubmit="return confirm('@T["profiles.settingDeleteConfirm"]');">
+                <button type="submit" class="btn btn-sm btn-danger">@T["common.delete"]</button>
+            </form>
+        </div>
+    </div>
+}

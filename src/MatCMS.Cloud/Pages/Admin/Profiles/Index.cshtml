@@ -1,0 +1,91 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.Profiles.IndexModel
+@{
+    ViewData["Title"] = T["profiles.title"];
+}
+<div data-list>
+    <div class="page-head">
+        <h1>@T["profiles.title"]</h1>
+        <div class="list-toolbar">
+            <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+        </div>
+    </div>
+
+    <p class="muted">@T["profiles.intro"]</p>
+
+    <table class="data" data-list-table>
+        <thead>
+            <tr>
+                <th>@T["common.name"]</th>
+                <th>@T["profiles.joinCode"]</th>
+                <th>@T["profiles.approval"]</th>
+                <th>@T["profiles.payloads"]</th>
+                <th>@T["profiles.instances"]</th>
+                <th>@T["profiles.revision"]</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var p in Model.Items)
+            {
+                <tr data-search="@(p.Name + " " + p.Description + " " + p.JoinCode)">
+                    <td>
+                        <a asp-page="Edit" asp-route-id="@p.Id"><strong>@p.Name</strong></a>
+                        @if (p.IsDefault)
+                        {
+                            <span class="badge badge-new">@T["profiles.default"]</span>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(p.Description))
+                        {
+                            <div class="muted">@p.Description</div>
+                        }
+                    </td>
+                    <td><span class="mono">@p.JoinCode</span></td>
+                    <td>
+                        @if (p.AutoApprove)
+                        {
+                            <span class="badge badge-on">@T["profiles.autoApprove"]</span>
+                        }
+                        else
+                        {
+                            <span class="badge badge-off">@T["profiles.manualApprove"]</span>
+                        }
+                    </td>
+                    <td class="muted">
+                        @{
+                            var parts = new List<string>();
+                            if (p.SyncSettings) { parts.Add(T["profiles.payloadSettings"]); }
+                            if (p.SyncUsers) { parts.Add(T["profiles.payloadUsers"]); }
+                            if (p.SyncPlugins) { parts.Add(T["profiles.payloadPlugins"]); }
+                            if (p.SyncComponents) { parts.Add(T["profiles.payloadComponents"]); }
+                            if (p.SyncTemplates) { parts.Add(T["profiles.payloadTemplates"]); }
+                        }
+                        @(parts.Count == 0 ? T["profiles.payloadNone"] : string.Join(" · ", parts))
+                    </td>
+                    <td>@(Model.InstanceCounts.TryGetValue(p.Id, out var c) ? c : 0)</td>
+                    <td class="muted mono">@p.Revision</td>
+                    <td>
+                        <div class="actions">
+                            <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@p.Id">@T["action.edit"]</a>
+                            <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@p.Id"
+                                  onsubmit="return confirm('@T["profiles.deleteConfirm"]');">
+                                <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+</div>
+
+<div class="list-actions">
+    <form method="post" asp-page-handler="Create" class="inline-form" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+        <div class="form-field" style="margin:0;min-width:240px;">
+            <label for="Name">@T["profiles.newName"]</label>
+            <input id="Name" name="Name" required />
+        </div>
+        <button type="submit" class="btn">@T["profiles.create"]</button>
+    </form>
+</div>

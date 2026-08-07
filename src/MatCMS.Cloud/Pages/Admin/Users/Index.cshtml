@@ -1,0 +1,55 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.Users.IndexModel
+@{
+    ViewData["Title"] = T["users.title"];
+    var me = User.Identity?.Name;
+}
+<div data-list>
+    <div class="page-head">
+        <h1>@T["users.title"]</h1>
+        <div class="list-toolbar">
+            <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+        </div>
+    </div>
+
+    <table class="data" data-list-table>
+        <thead>
+            <tr>
+                <th>@T["users.email"]</th>
+                <th>@T["users.displayName"]</th>
+                <th>@T["users.username"]</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var u in Model.Items)
+            {
+                <tr data-search="@(u.Username + " " + u.Email + " " + u.DisplayName)">
+                    <td>
+                        <strong>@(string.IsNullOrWhiteSpace(u.Email) ? u.Username : u.Email)</strong>
+                        @if (u.Username == me)
+                        {
+                            <span class="badge badge-off">@T["users.you"]</span>
+                        }
+                    </td>
+                    <td class="muted">@(string.IsNullOrWhiteSpace(u.DisplayName) ? "—" : u.DisplayName)</td>
+                    <td class="muted mono">@u.Username</td>
+                    <td>
+                        <div class="actions">
+                            <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@u.Id">@T["action.edit"]</a>
+                            <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@u.Id"
+                                  onsubmit="return confirm('@T["users.deleteConfirm"]');">
+                                <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+</div>
+
+<div class="list-actions">
+    <a class="btn" asp-page="Edit">@T["users.add"]</a>
+</div>

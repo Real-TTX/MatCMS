@@ -1,0 +1,35 @@
+services:
+  web:
+    build:
+      context: .
+      # Always repull the base images (sdk/aspnet:10.0) when building -> "Always Repull".
+      pull: true
+    image: matcms-cloud:latest
+    container_name: matcms-cloud
+    ports:
+      # host 9100 -> container 8080 (ASP.NET base-image default port)
+      - "9100:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      # Docker engine endpoint. Only instances found on THIS daemon count as "local" and can be
+      # updated by the cloud; everything else is "remote" (notify only). Comment the socket mount
+      # below out to run the cloud without any Docker access at all.
+      - MatCmsCloud__Docker__Endpoint=unix:///var/run/docker.sock
+    volumes:
+      # One volume holds everything the app persists: DB and data-protection keys.
+      - matcms-cloud-data:/app/appdata
+      # OPT-IN: mounting the engine socket lets the cloud pull + recreate LOCAL instance containers.
+      # It is a privilege escalation (socket access == root on the host) - remove it if you only
+      # want update notifications. Read-only is enough to DETECT, but not to UPDATE.
+      - /var/run/docker.sock:/var/run/docker.sock
+    # The image runs as the non-root "app" user (inherited from the aspnet base image), but the
+    # socket is mode 660 owned by root:<docker group>. Without this the app gets "permission denied"
+    # and EVERY instance silently stays "remote". Docker Desktop: the socket is root:root -> 0 is
+    # correct. On a Linux host set DOCKER_GID to the socket's group:
+    #   DOCKER_GID=$(stat -c '%g' /var/run/docker.sock) docker compose up -d
+    group_add:
+      - "${DOCKER_GID:-0}"
+    restart: unless-stopped
+
+volumes:
+  matcms-cloud-data:

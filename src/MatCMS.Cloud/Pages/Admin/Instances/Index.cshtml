@@ -1,0 +1,204 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.Instances.IndexModel
+@using MatCMS.Cloud.Models
+@using MatCMS.Cloud.Services
+@{
+    ViewData["Title"] = T["instances.title"];
+}
+@* List convention (same as MatCMS): [data-list] wrapper, toolbar above with search/filter,
+   table.data in the middle, and the create action BELOW in .list-actions. *@
+<div data-list data-list-key="instances" data-list-page-size="25" class="list-view-table">
+    <div class="page-head">
+        <h1>@T["instances.title"]</h1>
+        <div class="list-toolbar">
+            <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+            <select class="list-search" data-list-filter aria-label="@T["instances.filter"]">
+                <option value="">@T["instances.filterAll"]</option>
+                <option value="online">@T["instances.online"]</option>
+                <option value="offline">@T["instances.offline"]</option>
+                <option value="pending">@T["instances.awaitingApproval"]</option>
+                <option value="update">@T["instances.updateAvailable"]</option>
+                <option value="drift">@T["instances.syncPending"]</option>
+            </select>
+            <div class="view-toggle" data-list-viewtoggle>
+                <button type="button" class="vt-btn" data-view="table" title="@T["instances.viewTable"]" aria-label="@T["instances.viewTable"]"><i class="ti ti-list" aria-hidden="true"></i></button>
+                <button type="button" class="vt-btn" data-view="tiles" title="@T["instances.viewTiles"]" aria-label="@T["instances.viewTiles"]"><i class="ti ti-layout-grid" aria-hidden="true"></i></button>
+            </div>
+        </div>
+    </div>
+
+    @* Tile view: each instance shows its live homepage. The iframes are loaded by the operator's
+       browser straight from the sites, so this only renders what they can actually reach — and it is
+       deliberately NOT the default view, because N tiles means N sites being fetched at once. *@
+    <div class="instance-tiles" data-list-tiles>
+        @foreach (var i in Model.Items)
+        {
+            var online = InstanceService.IsOnline(i);
+            var drift = MatCMS.Cloud.Pages.Admin.Instances.IndexModel.IsOutOfSync(i);
+            var update = Model.HasUpdate(i);
+            var tags = string.Join(" ", new[]
+            {
+                online ? "online" : "offline",
+                i.Status == InstanceStatus.Pending ? "pending" : "",
+                update ? "update" : "",
+                drift ? "drift" : ""
+            }.Where(t => t.Length > 0));
+            <a class="instance-tile" asp-page="Details" asp-route-id="@i.Id"
+               data-search="@(i.Name + " " + i.HostName + " " + i.Version + " " + i.Profile?.Name)" data-tags="@tags">
+                <div class="instance-tile-shot">
+                    @if (string.IsNullOrWhiteSpace(i.PreviewUrl))
+                    {
+                        <div class="instance-tile-empty">@T["instances.previewNoUrlShort"]</div>
+                    }
+                    else
+                    {
+                        <iframe src="@i.PreviewUrl" title="@i.Name" loading="lazy" tabindex="-1" scrolling="no"
+                                referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts"></iframe>
+                    }
+                </div>
+                <div class="instance-tile-body">
+                    <div class="instance-tile-name">@i.Name</div>
+                    <div class="instance-tile-meta">
+                        @if (i.Status == InstanceStatus.Pending)
+                        {
+                            <span class="badge badge-new">@T["instances.awaitingApproval"]</span>
+                        }
+                        else if (online)
+                        {
+                            <span class="badge badge-on">@T["instances.online"]</span>
+                        }
+                        else
+                        {
+                            <span class="badge badge-err">@T["instances.offline"]</span>
+                        }
+                        @if (update)
+                        {
+                            <span class="badge badge-new">@T["instances.updateAvailable"]</span>
+                        }
+                        @if (drift)
+                        {
+                            <span class="badge badge-off">@T["instances.syncPending"]</span>
+                        }
+                    </div>
+                </div>
+            </a>
+        }
+    </div>
+
+    <table class="data" data-list-table>
+        <thead>
+            <tr>
+                <th>@T["common.name"]</th>
+                <th>@T["common.status"]</th>
+                <th>@T["profiles.title"]</th>
+                <th>@T["instances.hosting"]</th>
+                <th>@T["instances.version"]</th>
+                <th>@T["instances.lastHeartbeat"]</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var i in Model.Items)
+            {
+                var online = InstanceService.IsOnline(i);
+                var drift = MatCMS.Cloud.Pages.Admin.Instances.IndexModel.IsOutOfSync(i);
+                var update = Model.HasUpdate(i);
+                @* The filter dropdown matches against these tags, so a state that is visible as a
+                   badge is also filterable — no separate server round trip. *@
+                var tags = string.Join(" ", new[]
+                {
+                    online ? "online" : "offline",
+                    i.Status == InstanceStatus.Pending ? "pending" : "",
+                    update ? "update" : "",
+                    drift ? "drift" : ""
+                }.Where(t => t.Length > 0));
+                <tr data-search="@(i.Name + " " + i.HostName + " " + i.Version + " " + i.Profile?.Name)" data-tags="@tags">
+                    <td>
+                        <a asp-page="Details" asp-route-id="@i.Id"><strong>@i.Name</strong></a>
+                        @if (InstanceService.IsOutdatedProtocol(i))
+                        {
+                            <span class="badge badge-off" title="@T["instances.outdatedProtocolHint"]">@T["instances.outdatedProtocol"]</span>
+                        }
+                    </td>
+                    <td>
+                        @if (i.Status == InstanceStatus.Rejected)
+                        {
+                            <span class="badge badge-err">@T["instances.rejected"]</span>
+                        }
+                        else if (i.Status == InstanceStatus.Pending)
+                        {
+                            <span class="badge badge-new">@T["instances.awaitingApproval"]</span>
+                        }
+                        else if (!i.HasConnected)
+                        {
+                            <span class="badge badge-off">@T["instances.pending"]</span>
+                        }
+                        else if (online)
+                        {
+                            <span class="badge badge-on">@T["instances.online"]</span>
+                        }
+                        else
+                        {
+                            <span class="badge badge-err">@T["instances.offline"]</span>
+                        }
+                    </td>
+                    <td>
+                        @if (i.Profile is null)
+                        {
+                            <span class="muted">—</span>
+                        }
+                        else
+                        {
+                            <a asp-page="/Admin/Profiles/Edit" asp-route-id="@i.Profile.Id">@i.Profile.Name</a>
+                            @if (i.LastSyncError is not null)
+                            {
+                                <span class="badge badge-err" title="@i.LastSyncError">@T["instances.syncFailed"]</span>
+                            }
+                            else if (drift)
+                            {
+                                <span class="badge badge-off">@T["instances.syncPending"]</span>
+                            }
+                        }
+                    </td>
+                    <td>
+                        @if (i.Hosting == InstanceHosting.Local)
+                        {
+                            <span class="badge badge-on" title="@i.LocalContainerName">@T["instances.local"]</span>
+                        }
+                        else if (i.Hosting == InstanceHosting.Remote)
+                        {
+                            <span class="badge badge-off">@T["instances.remote"]</span>
+                        }
+                        else
+                        {
+                            <span class="muted">—</span>
+                        }
+                    </td>
+                    <td class="mono">
+                        @(i.Version ?? "—")
+                        @if (update)
+                        {
+                            <span class="badge badge-new" title="@Model.LatestVersion">@T["instances.updateAvailable"]</span>
+                        }
+                    </td>
+                    <td class="muted">@(i.LastHeartbeatUtc?.ToString("dd.MM.yyyy HH:mm") ?? "—")</td>
+                    <td>
+                        <div class="actions">
+                            <a class="btn btn-sm btn-ghost" asp-page="Details" asp-route-id="@i.Id">@T["common.details"]</a>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+    @if (Model.Items.Count == 0)
+    {
+        <div class="list-empty">@T["instances.empty"]</div>
+    }
+    <div class="list-pager" data-list-pager></div>
+</div>
+
+<div class="list-actions">
+    <a class="btn" asp-page="Create">@T["instances.add"]</a>
+</div>

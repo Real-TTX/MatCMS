@@ -1,0 +1,330 @@
+@page "{id:int}"
+@model MatCMS.Cloud.Pages.Admin.Instances.DetailsModel
+@using MatCMS.Cloud.Models
+@using MatCMS.Cloud.Services
+@{
+    ViewData["Title"] = Model.Item.Name;
+}
+<div class="page-head">
+    <h1>@Model.Item.Name</h1>
+    <div class="list-toolbar">
+        @if (!string.IsNullOrWhiteSpace(Model.Item.PreviewUrl))
+        {
+            <a class="btn btn-sm btn-ghost" href="@Model.Item.PreviewUrl" target="_blank" rel="noopener">
+                <i class="ti ti-external-link" aria-hidden="true"></i> @T["instances.openSite"]
+            </a>
+        }
+        <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
+    </div>
+</div>
+
+@if (Model.Item.Status == InstanceStatus.Pending)
+{
+    <div class="alert alert-info">
+        <strong>@T["instances.approvalTitle"]</strong> @T["instances.approvalHint"]
+        <div style="margin-top:10px;display:flex;gap:8px;">
+            <form class="inline-form" method="post" asp-page-handler="Approve" asp-route-id="@Model.Item.Id">
+                <button type="submit" class="btn btn-sm">@T["instances.approve"]</button>
+            </form>
+            <form class="inline-form" method="post" asp-page-handler="Reject" asp-route-id="@Model.Item.Id">
+                <button type="submit" class="btn btn-sm btn-ghost">@T["instances.reject"]</button>
+            </form>
+        </div>
+    </div>
+}
+
+<div class="tabs" role="tablist">
+    <button type="button" class="tab active" data-tab="overview">@T["instances.tabOverview"]</button>
+    <button type="button" class="tab" data-tab="preview">@T["instances.tabPreview"]</button>
+    <button type="button" class="tab" data-tab="config">@T["instances.tabConfig"]</button>
+    <button type="button" class="tab" data-tab="events">@T["instances.tabEvents"]</button>
+    <button type="button" class="tab" data-tab="settings">@T["instances.tabSettings"]</button>
+</div>
+
+@* ============ OVERVIEW ============ *@
+<div class="tab-panel" data-panel="overview">
+    <div class="card">
+        <h2>@T["instances.state"]</h2>
+        <div class="kv">
+            <div class="kv-label">@T["common.status"]</div>
+            <div class="kv-value">
+                @if (!Model.Item.HasConnected)
+                {
+                    <span class="badge badge-off">@T["instances.pending"]</span>
+                    <span class="muted">@T["instances.pendingHint"]</span>
+                }
+                else if (Model.Item.Status == InstanceStatus.Rejected)
+                {
+                    <span class="badge badge-err">@T["instances.rejected"]</span>
+                }
+                else if (Model.Online)
+                {
+                    <span class="badge badge-on">@T["instances.online"]</span>
+                }
+                else
+                {
+                    <span class="badge badge-err">@T["instances.offline"]</span>
+                }
+            </div>
+        </div>
+        <div class="kv">
+            <div class="kv-label">@T["instances.hosting"]</div>
+            <div class="kv-value">
+                @if (Model.Item.Hosting == InstanceHosting.Local)
+                {
+                    <span class="badge badge-on">@T["instances.local"]</span>
+                    <span class="muted mono">@Model.Item.LocalContainerName</span>
+                }
+                else if (Model.Item.Hosting == InstanceHosting.Remote)
+                {
+                    <span class="badge badge-off">@T["instances.remote"]</span>
+                    <span class="muted">@T["instances.remoteHint"]</span>
+                }
+                else
+                {
+                    <span class="muted">@T["common.unknown"]</span>
+                }
+            </div>
+        </div>
+        <div class="kv">
+            <div class="kv-label">@T["instances.version"]</div>
+            <div class="kv-value">
+                <span class="mono">@(Model.Item.Version ?? "—")</span>
+                @if (Model.HasUpdate)
+                {
+                    <span class="badge badge-new">@T["instances.updateTo", Model.LatestVersion ?? "?"]</span>
+                }
+            </div>
+        </div>
+        <div class="kv">
+            <div class="kv-label">@T["instances.lastHeartbeat"]</div>
+            <div class="kv-value muted">@(Model.Item.LastHeartbeatUtc?.ToString("dd.MM.yyyy HH:mm:ss") ?? "—") UTC</div>
+        </div>
+        <div class="kv">
+            <div class="kv-label">@T["instances.host"]</div>
+            <div class="kv-value muted mono">@(Model.Item.HostName ?? "—")</div>
+        </div>
+        <div class="kv">
+            <div class="kv-label">@T["instances.container"]</div>
+            <div class="kv-value muted mono">@(Model.Item.ContainerId ?? "—")</div>
+        </div>
+        <div class="kv">
+            <div class="kv-label">@T["instances.image"]</div>
+            <div class="kv-value muted mono">@(Model.Item.ImageRef ?? "—")</div>
+        </div>
+        <div class="kv">
+            <div class="kv-label">@T["instances.instanceId"]</div>
+            <div class="kv-value muted mono">@Model.Item.PublicId</div>
+        </div>
+        <div class="kv">
+            <div class="kv-label">@T["instances.content"]</div>
+            <div class="kv-value muted">@T["instances.contentCounts", Model.Item.PageCount, Model.Item.PluginCount, Model.Item.UserCount]</div>
+        </div>
+
+        @if (Model.HasUpdate && Model.CanCloudUpdate)
+        {
+            <div class="list-actions">
+                <form class="inline-form" method="post" asp-page-handler="Update" asp-route-id="@Model.Item.Id"
+                      onsubmit="return confirm('@T["instances.updateConfirm"]');">
+                    <button type="submit" class="btn"><i class="ti ti-refresh" aria-hidden="true"></i> @T["instances.updateNow"]</button>
+                </form>
+            </div>
+        }
+        else if (Model.HasUpdate)
+        {
+            <div class="alert alert-info" style="margin-top:16px;">
+                @T["instances.updateRemote"] <code>docker compose pull &amp;&amp; docker compose up -d</code>
+            </div>
+        }
+    </div>
+</div>
+
+@* ============ PREVIEW ============ *@
+<div class="tab-panel" data-panel="preview" hidden>
+    <div class="card">
+        <div class="cp-head">
+            <h2>@T["instances.tabPreview"]</h2>
+            @if (!string.IsNullOrWhiteSpace(Model.Item.PreviewUrl))
+            {
+                <span class="muted mono">@Model.Item.PreviewUrl</span>
+                @if (Model.Item.PreviewIsGuessed)
+                {
+                    <span class="badge badge-off" title="@T["instances.previewGuessedHint"]">@T["instances.previewGuessed"]</span>
+                }
+            }
+        </div>
+        @if (string.IsNullOrWhiteSpace(Model.Item.PreviewUrl))
+        {
+            <p class="muted">@T["instances.previewNoUrl"]</p>
+        }
+        else
+        {
+            @* The browser loads the site directly from the instance, so this only works where the
+               operator can reach it. A site that refuses framing or is unreachable leaves the frame
+               blank — hence the explicit hint and the "open in a tab" fallback. *@
+            <div class="site-frame-wrap">
+                <iframe class="site-frame" src="@Model.Item.PreviewUrl" title="@Model.Item.Name"
+                        loading="lazy" referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts"></iframe>
+            </div>
+            <div class="help">@T["instances.previewHint"]</div>
+        }
+    </div>
+</div>
+
+@* ============ CONFIG ============ *@
+<div class="tab-panel" data-panel="config" hidden>
+    <div class="card">
+        <h2>@T["instances.configuration"]</h2>
+        <form method="post" asp-page-handler="AssignProfile" asp-route-id="@Model.Item.Id">
+            <div class="form-field">
+                <label for="profileId">@T["profiles.title"]</label>
+                <select id="profileId" name="profileId">
+                    <option value="">@T["enroll.noProfile"]</option>
+                    @foreach (var p in Model.Profiles)
+                    {
+                        <option value="@p.Id" selected="@(Model.Item.ProfileId == p.Id ? "selected" : null)">@p.Name</option>
+                    }
+                </select>
+            </div>
+            <div><button type="submit" class="btn">@T["instances.assignProfile"]</button></div>
+        </form>
+
+        <div class="kv" style="margin-top:18px;">
+            <div class="kv-label">@T["instances.syncState"]</div>
+            <div class="kv-value">
+                @if (Model.Item.Profile is null)
+                {
+                    <span class="muted">@T["instances.noProfileHint"]</span>
+                }
+                else if (Model.Item.LastSyncError is not null)
+                {
+                    <span class="badge badge-err">@T["instances.syncFailed"]</span>
+                    <span class="muted">@Model.Item.LastSyncError</span>
+                }
+                else if (Model.OutOfSync)
+                {
+                    <span class="badge badge-off">@T["instances.syncPending"]</span>
+                    <span class="muted">@T["instances.syncRevisions", Model.Item.AppliedRevision, Model.Item.Profile.Revision]</span>
+                }
+                else
+                {
+                    <span class="badge badge-on">@T["instances.syncOk"]</span>
+                    <span class="muted">@T["instances.syncRevision", Model.Item.AppliedRevision]</span>
+                }
+            </div>
+        </div>
+        <div class="kv">
+            <div class="kv-label">@T["instances.lastSync"]</div>
+            <div class="kv-value muted">@(Model.Item.LastSyncUtc?.ToString("dd.MM.yyyy HH:mm:ss") ?? "—")</div>
+        </div>
+    </div>
+</div>
+
+@* ============ EVENTS ============ *@
+<div class="tab-panel" data-panel="events" hidden>
+    <div data-list>
+        <div class="page-head">
+            <h2>@T["instances.events"]</h2>
+            <div class="list-toolbar">
+                <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+            </div>
+        </div>
+        @if (Model.Events.Count == 0)
+        {
+            <div class="list-empty">@T["dashboard.noEvents"]</div>
+        }
+        else
+        {
+            <table class="data" data-list-table>
+                <thead>
+                    <tr><th style="width:170px;">@T["common.time"]</th><th>@T["common.event"]</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var e in Model.Events)
+                    {
+                        <tr data-search="@e.Message">
+                            <td class="muted mono">@e.CreatedAt.ToString("dd.MM.yyyy HH:mm")</td>
+                            <td>@e.Message</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+        }
+    </div>
+</div>
+
+@* ============ SETTINGS ============ *@
+<div class="tab-panel" data-panel="settings" hidden>
+    @if (Model.NewToken is not null)
+    {
+        <div class="card">
+            <h2>@T["instances.newToken"]</h2>
+            <div class="alert alert-info">@T["instances.tokenOnce"]</div>
+            <p class="mono is-secret">@Model.NewToken</p>
+        </div>
+    }
+
+    <form method="post" asp-page-handler="Save" asp-route-id="@Model.Item.Id">
+        <div class="card">
+            <h2>@T["instances.settings"]</h2>
+            <div class="form-field">
+                <label for="name">@T["common.name"]</label>
+                <input id="name" name="name" value="@Model.Item.Name" required />
+            </div>
+            <div class="form-field">
+                <label for="url">@T["instances.url"]</label>
+                <input id="url" name="url" value="@Model.Item.Url" placeholder="https://beispiel.de" spellcheck="false" />
+                <div class="help">@T["instances.urlHint"]</div>
+            </div>
+            <div class="form-field">
+                <label for="notes">@T["instances.notes"]</label>
+                <textarea id="notes" name="notes" rows="3">@Model.Item.Notes</textarea>
+            </div>
+            <div><button type="submit" class="btn">@T["settings.save"]</button></div>
+        </div>
+    </form>
+
+    <div class="card danger-zone">
+        <h2>@T["instances.dangerZone"]</h2>
+        <div class="actions">
+            @if (Model.Item.Status == InstanceStatus.Approved)
+            {
+                <form class="inline-form" method="post" asp-page-handler="Reject" asp-route-id="@Model.Item.Id"
+                      onsubmit="return confirm('@T["instances.rejectConfirm"]');">
+                    <button type="submit" class="btn btn-sm btn-ghost">@T["instances.reject"]</button>
+                </form>
+            }
+            else if (Model.Item.Status == InstanceStatus.Rejected)
+            {
+                <form class="inline-form" method="post" asp-page-handler="Approve" asp-route-id="@Model.Item.Id">
+                    <button type="submit" class="btn btn-sm btn-ghost">@T["instances.approve"]</button>
+                </form>
+            }
+            <form class="inline-form" method="post" asp-page-handler="Rotate" asp-route-id="@Model.Item.Id"
+                  onsubmit="return confirm('@T["instances.rotateConfirm"]');">
+                <button type="submit" class="btn btn-sm btn-ghost">@T["instances.rotateToken"]</button>
+            </form>
+            <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@Model.Item.Id"
+                  onsubmit="return confirm('@T["instances.deleteConfirm"]');">
+                <button type="submit" class="btn btn-sm btn-danger">@T["common.delete"]</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            var tabs = document.querySelectorAll('.tab');
+            var panels = document.querySelectorAll('.tab-panel');
+            function show(name) {
+                tabs.forEach(function (t) { t.classList.toggle('active', t.dataset.tab === name); });
+                panels.forEach(function (p) { p.hidden = p.dataset.panel !== name; });
+            }
+            tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.tab); }); });
+            var want = new URLSearchParams(location.search).get('tab');
+            if (want) show(want);
+        })();
+    </script>
+}

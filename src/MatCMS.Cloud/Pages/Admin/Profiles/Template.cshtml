@@ -1,0 +1,225 @@
+@page "{profileId:int}/{id:int?}"
+@model MatCMS.Cloud.Pages.Admin.Profiles.TemplateModel
+@{
+    ViewData["Title"] = Model.IsNew ? T["profiles.templateAdd"] : Model.Item.Name;
+    var et = Model.Item;
+}
+<div class="page-head">
+    <h1>
+        @(Model.IsNew ? T["profiles.templateAdd"] : Model.Item.Name)
+        <span class="muted" style="font-size:14px;font-weight:400;"> — @Model.Owner.Name</span>
+    </h1>
+    <div class="list-toolbar">
+        @if (!Model.IsNew)
+        {
+            <a class="btn btn-sm btn-ghost" asp-page="Template" asp-page-handler="Export"
+               asp-route-profileId="@Model.Owner.Id" asp-route-id="@et.Id">
+                <i class="ti ti-download" aria-hidden="true"></i> @T["templates.exportJson"]
+            </a>
+        }
+        <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@Model.Owner.Id" asp-route-tab="templates">@T["action.back"]</a>
+    </div>
+</div>
+
+<form method="post" asp-route-profileId="@Model.Owner.Id" asp-route-id="@(Model.IsNew ? null : (int?)et.Id)" id="template-form">
+    <div class="card tpl-preview-card">
+        <div class="cp-head">
+            <h2 style="margin:0;">@T["profiles.livePreview"]</h2>
+            <span class="muted">@T["profiles.templatePreviewHint"]</span>
+        </div>
+        <div class="cp-frame-wrap">
+            <iframe id="tpl-frame" class="cp-frame tpl-frame" title="@T["profiles.livePreview"]"></iframe>
+        </div>
+    </div>
+
+    <div class="tabs" role="tablist">
+        <button type="button" class="tab active" data-tab="designer">@T["profiles.tplTabDesigner"]</button>
+        <button type="button" class="tab" data-tab="layout">@T["profiles.tplTabLayout"]</button>
+        <button type="button" class="tab" data-tab="params">@T["profiles.tplTabParams"]</button>
+    </div>
+
+    @* ============ DESIGNER ============ *@
+    <div class="tab-panel" data-panel="designer">
+        <div class="card">
+            <h2>@T["profiles.tplTabDesigner"]</h2>
+            <div class="form-field">
+                <label for="tname">@T["common.name"]</label>
+                <input id="tname" name="name" value="@et.Name" required />
+                <div class="help">@T["profiles.templateNameHint"]</div>
+            </div>
+
+            <h3 class="form-section">@T["profiles.templateColors"]</h3>
+            @* Required colours use MatCMS's .color-field: the colour input IS the posted value.
+               Optional ones use [data-optcolor], where the TEXT field is posted and may be empty
+               ("inherit") — with a clear button, because a colour input cannot express "unset". *@
+            <div class="form-grid">
+                @{
+                    var required = new (string Field, string Label, string Value, string Fallback)[]
+                    {
+                        ("accentColor", T["profiles.tplAccent"], et.AccentColor, "#de7e11"),
+                        ("headingColor", T["profiles.tplHeading"], et.HeadingColor, "#010101"),
+                        ("textColor", T["profiles.tplText"], et.TextColor, "#1a1a1a"),
+                        ("backgroundColor", T["profiles.tplBackground"], et.BackgroundColor, "#ffffff"),
+                        ("altBackground", T["profiles.tplAltBackground"], et.AltBackground, "#f6f7f9")
+                    };
+                }
+                @foreach (var c in required)
+                {
+                    <div class="form-field">
+                        <label for="@c.Field">@c.Label</label>
+                        <div class="color-field">
+                            <input id="@c.Field" name="@c.Field" type="color" value="@(string.IsNullOrWhiteSpace(c.Value) ? c.Fallback : c.Value)" />
+                            <input type="text" class="hex" aria-label="@c.Label" spellcheck="false" />
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div class="form-grid">
+                @{
+                    var optional = new (string Field, string Label, string Value, string PickerFallback)[]
+                    {
+                        ("secondaryColor", T["profiles.tplSecondary"], et.SecondaryColor, "#ffffff"),
+                        ("headerBackground", T["profiles.tplHeaderBg"], et.HeaderBackground, "#ffffff"),
+                        ("headerTextColor", T["profiles.tplHeaderText"], et.HeaderTextColor, "#111111")
+                    };
+                }
+                @foreach (var c in optional)
+                {
+                    <div class="form-field">
+                        <label for="@c.Field">@c.Label</label>
+                        <div class="optcolor" data-optcolor>
+                            <input type="color" class="optcolor-pick" value="@(string.IsNullOrWhiteSpace(c.Value) ? c.PickerFallback : c.Value)" aria-label="@c.Label" />
+                            <input type="text" id="@c.Field" name="@c.Field" class="optcolor-hex" value="@c.Value" placeholder="@T["profiles.tplInherit"]" spellcheck="false" />
+                            <button type="button" class="optcolor-clear" title="@T["action.clear"]" aria-label="@T["action.clear"]">×</button>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <h3 class="form-section">@T["profiles.templateFonts"]</h3>
+            <div class="form-grid">
+                <div class="form-field">
+                    <label for="headingFont">@T["profiles.tplHeadingFont"]</label>
+                    <input id="headingFont" name="headingFont" value="@et.HeadingFont" />
+                </div>
+                <div class="form-field">
+                    <label for="bodyFont">@T["profiles.tplBodyFont"]</label>
+                    <input id="bodyFont" name="bodyFont" value="@et.BodyFont" />
+                </div>
+                <div class="form-field">
+                    <label for="buttonStyle">@T["profiles.tplButtonStyle"]</label>
+                    <select id="buttonStyle" name="buttonStyle">
+                        <option value="solid" selected="@(et.ButtonStyle != "outline" ? "selected" : null)">solid</option>
+                        <option value="outline" selected="@(et.ButtonStyle == "outline" ? "selected" : null)">outline</option>
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label for="containerWidth">@T["profiles.tplContainerWidth"]</label>
+                    <input id="containerWidth" name="containerWidth" value="@et.ContainerWidth" inputmode="numeric" />
+                </div>
+                <div class="form-field">
+                    <label for="buttonRadius">@T["profiles.tplButtonRadius"]</label>
+                    <input id="buttonRadius" name="buttonRadius" value="@et.ButtonRadius" inputmode="numeric" />
+                </div>
+                <div class="form-field">
+                    <label for="headerPadding">@T["profiles.tplHeaderPadding"]</label>
+                    <input id="headerPadding" name="headerPadding" value="@et.HeaderPadding" inputmode="numeric" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ============ LAYOUT & CODE ============ *@
+    <div class="tab-panel" data-panel="layout" hidden>
+        <div class="card">
+            <h2>@T["profiles.tplLayoutHtml"]</h2>
+            <div class="form-field">
+                <div class="code-toolbar">
+                    <span class="code-hint">@T["profiles.tplTokens"]</span>
+                    @foreach (var token in new[] { "{{content}}", "{{nav}}", "{{logo}}", "{{footer}}", "{{menu:main}}", "{{param:id}}" })
+                    {
+                        <button type="button" class="token-chip" data-insert="@token" data-target="layoutHtml">@token</button>
+                    }
+                </div>
+                <textarea id="layoutHtml" name="layoutHtml" rows="16" spellcheck="false" data-code="html">@et.LayoutHtml</textarea>
+                <div class="help">@T["profiles.tplLayoutHint"]</div>
+            </div>
+        </div>
+        <div class="card">
+            <h2>@T["profiles.tplCustomCss"]</h2>
+            <div class="form-field">
+                <textarea id="customCss" name="customCss" rows="14" spellcheck="false" data-code="css">@et.CustomCss</textarea>
+            </div>
+        </div>
+        <div class="card">
+            <h2>@T["profiles.tplCustomJs"]</h2>
+            <div class="form-field">
+                <textarea id="customJs" name="customJs" rows="10" spellcheck="false" data-code="js">@et.CustomJs</textarea>
+            </div>
+        </div>
+    </div>
+
+    @* ============ PARAMETERS ============ *@
+    <div class="tab-panel" data-panel="params" hidden>
+        <div class="card">
+            <h2>@T["profiles.tplParameters"]</h2>
+            <div class="form-field">
+                <textarea id="parametersJson" name="parametersJson" rows="10" spellcheck="false" data-code="json">@et.ParametersJson</textarea>
+                <div class="help">@T["profiles.tplParametersHint"]</div>
+            </div>
+        </div>
+        <div class="card">
+            <h2>@T["profiles.tplMenuMap"]</h2>
+            <div class="form-field">
+                <textarea id="menuMapJson" name="menuMapJson" rows="6" spellcheck="false" data-code="json">@et.MenuMapJson</textarea>
+                <div class="help">@T["profiles.tplMenuMapHint"]</div>
+            </div>
+        </div>
+        <div class="card">
+            <h2>@T["profiles.tplParts"]</h2>
+            <div class="form-field">
+                <textarea id="partsJson" name="partsJson" rows="12" spellcheck="false" data-code="json">@et.PartsJson</textarea>
+                <div class="help">@T["profiles.tplPartsHint"]</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="list-actions">
+        <button type="submit" class="btn">@T["settings.save"]</button>
+    </div>
+</form>
+
+@if (!Model.IsNew)
+{
+    <div class="card danger-zone">
+        <h2>@T["instances.dangerZone"]</h2>
+        <div class="actions">
+            <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-profileId="@Model.Owner.Id" asp-route-id="@et.Id"
+                  onsubmit="return confirm('@T["profiles.templateDeleteConfirm"]');">
+                <button type="submit" class="btn btn-sm btn-danger">@T["common.delete"]</button>
+            </form>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <partial name="_CodeEditorAssets" />
+    <script>
+        window.CLOUD_TPL_PREVIEW = {
+            brand: "@T["profiles.previewBrand"]",
+            navHome: "@T["profiles.previewNavHome"]",
+            navAbout: "@T["profiles.previewNavAbout"]",
+            navContact: "@T["profiles.previewNavContact"]",
+            heroTitle: "@T["profiles.previewHeroTitle"]",
+            heroText: "@T["profiles.previewHeroText"]",
+            cta: "@T["profiles.previewCta"]",
+            cta2: "@T["profiles.previewCta2"]",
+            card: "@T["profiles.previewCard"]",
+            cardText: "@T["profiles.previewCardText"]"
+        };
+    </script>
+    <partial name="_ColorFields" />
+    <script src="~/js/template-preview.js" asp-append-version="true"></script>
+    <partial name="_TabsScript" />
+}

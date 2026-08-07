@@ -5,6 +5,9 @@ name: Release (main)
 on:
   push:
     branches: [main]
+    paths:
+      - "src/MatCMS/**"
+      - ".github/workflows/release.yml"
   workflow_dispatch:
 
 permissions:
@@ -25,8 +28,8 @@ jobs:
         id: ver
         run: |
           MAJOR_MINOR="1.0"
-          if [ -f VERSION ]; then
-            MAJOR_MINOR="$(tr -d ' \t\r\n' < VERSION)"
+          if [ -f src/MatCMS/VERSION ]; then
+            MAJOR_MINOR="$(tr -d ' \t\r\n' < src/MatCMS/VERSION)"
           fi
           [ -n "$MAJOR_MINOR" ] || MAJOR_MINOR="1.0"
           BUILD="${{ github.run_number }}"
@@ -49,8 +52,8 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: ./Dockerfile
+          context: ./src/MatCMS
+          file: ./src/MatCMS/Dockerfile
           push: true
           build-args: |
             APP_VERSION=${{ steps.ver.outputs.version }}

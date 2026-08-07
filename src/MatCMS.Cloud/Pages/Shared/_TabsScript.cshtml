@@ -1,0 +1,15 @@
+@* The admin's tab behaviour, identical to MatCMS's settings page: click switches panels and
+   ?tab=<name> deep-links one. Shared so every tabbed page behaves the same. *@
+<script>
+    (function () {
+        var tabs = document.querySelectorAll('.tab');
+        var panels = document.querySelectorAll('.tab-panel');
+        function show(name) {
+            tabs.forEach(function (t) { t.classList.toggle('active', t.dataset.tab === name); });
+            panels.forEach(function (p) { p.hidden = p.dataset.panel !== name; });
+        }
+        tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.tab); }); });
+        var want = new URLSearchParams(location.search).get('tab');
+        if (want) show(want);
+    })();
+</script>

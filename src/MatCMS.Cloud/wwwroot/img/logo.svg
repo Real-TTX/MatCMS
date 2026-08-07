@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 232 66" role="img" aria-label="MatCMS Cloud – Control Plane für MatCMS-Instanzen">
+  <!-- Same wordmark as MatCMS (identical font stack, size, weight and colours) so the two products
+       read as one family. "Cloud" takes the tagline slot underneath, in the accent colour. -->
+  <text x="0" y="42" font-family="'Arial Black', 'Arial Bold', Arial, sans-serif" font-size="48" font-weight="900" letter-spacing="0.5">
+    <tspan fill="#010101">Mat</tspan><tspan fill="#2563eb">CMS</tspan>
+  </text>
+  <text x="3" y="61" font-family="Arial, sans-serif" font-size="9.6" font-weight="700" letter-spacing="0.1">
+    <tspan fill="#2563eb">CLOUD</tspan><tspan fill="#1a1a1a"> · Control Plane</tspan>
+  </text>
+</svg>

@@ -1,0 +1,175 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.Settings.IndexModel
+@using MatCMS.Cloud.Services
+@{
+    ViewData["Title"] = T["settings.title"];
+}
+<div class="page-head">
+    <h1>@T["settings.title"]</h1>
+</div>
+
+<div class="tabs" role="tablist">
+    <button type="button" class="tab active" data-tab="general">@T["settings.tabGeneral"]</button>
+    <button type="button" class="tab" data-tab="notifications">@T["settings.tabNotifications"]</button>
+    <button type="button" class="tab" data-tab="smtp">@T["settings.tabSmtp"]</button>
+    <button type="button" class="tab" data-tab="docker">@T["settings.tabDocker"]</button>
+</div>
+
+@* ============ GENERAL ============ *@
+<div class="tab-panel" data-panel="general">
+    <form method="post" asp-page-handler="General">
+        <div class="card">
+            <h2>@T["settings.general"]</h2>
+            <div class="form-field">
+                <label>@T["settings.cloudName"]</label>
+                <input name="cloudName" value="@Model.Get(SettingKeys.CloudName)" />
+            </div>
+            <div class="form-field">
+                <label>URL</label>
+                <input name="canonicalUrl" value="@Model.Get(SettingKeys.CanonicalUrl)" placeholder="https://cloud.beispiel.de" spellcheck="false" />
+                <div class="help">@T["settings.canonicalUrlHint"]</div>
+            </div>
+            <div><button type="submit" class="btn">@T["settings.save"]</button></div>
+        </div>
+    </form>
+</div>
+
+@* ============ NOTIFICATIONS ============ *@
+<div class="tab-panel" data-panel="notifications" hidden>
+    <form method="post" asp-page-handler="Notifications">
+        <div class="card">
+            <h2>@T["settings.notifications"]</h2>
+            <p class="muted">@T["settings.notificationsIntro"]</p>
+            <div class="form-field">
+                <label>@T["settings.recipients"]</label>
+                <input name="recipients" value="@Model.Get(SettingKeys.NotifyRecipients)" placeholder="ops@@beispiel.de, admin@@beispiel.de" />
+                <div class="help">@T["settings.recipientsHint"]</div>
+            </div>
+            <label class="checkbox-row">
+                <input type="checkbox" name="notifyOffline" value="true" checked="@(Model.Flag(SettingKeys.NotifyOffline) ? "checked" : null)" />
+                @T["settings.notifyOffline"]
+            </label>
+            <label class="checkbox-row">
+                <input type="checkbox" name="notifyUpdate" value="true" checked="@(Model.Flag(SettingKeys.NotifyUpdate) ? "checked" : null)" />
+                @T["settings.notifyUpdate"]
+            </label>
+            <label class="checkbox-row">
+                <input type="checkbox" name="autoUpdateLocal" value="true" checked="@(Model.Flag(SettingKeys.AutoUpdateLocal) ? "checked" : null)" />
+                @T["settings.autoUpdateLocal"]
+            </label>
+            <div class="help">@T["settings.autoUpdateLocalHint"]</div>
+            <div style="margin-top:14px;"><button type="submit" class="btn">@T["settings.save"]</button></div>
+        </div>
+    </form>
+</div>
+
+@* ============ SMTP ============ *@
+<div class="tab-panel" data-panel="smtp" hidden>
+    <form method="post" asp-page-handler="Smtp">
+        <div class="card">
+            <h2>@T["settings.smtpHeading"]</h2>
+            <p class="muted">@T["settings.smtpIntro"]</p>
+            <div class="form-grid">
+                <div class="form-row">
+                    <div class="form-field">
+                        <label>@T["settings.smtpHost"]</label>
+                        <input name="host" value="@Model.Get(SettingKeys.SmtpHost)" spellcheck="false" />
+                    </div>
+                    <div class="form-field">
+                        <label>@T["settings.smtpPort"]</label>
+                        <input name="port" value="@Model.Get(SettingKeys.SmtpPort)" placeholder="587" inputmode="numeric" />
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-field">
+                        <label>@T["settings.smtpUser"]</label>
+                        <input name="user" value="@Model.Get(SettingKeys.SmtpUser)" spellcheck="false" />
+                    </div>
+                    <div class="form-field">
+                        <label>@T["settings.smtpPassword"]</label>
+                        <input name="password" type="password" autocomplete="new-password" placeholder="@T["settings.smtpPasswordKeep"]" />
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-field">
+                        <label>@T["settings.smtpFromEmail"]</label>
+                        <input name="fromEmail" value="@Model.Get(SettingKeys.SmtpFromEmail)" spellcheck="false" />
+                    </div>
+                    <div class="form-field">
+                        <label>@T["settings.smtpFromName"]</label>
+                        <input name="fromName" value="@Model.Get(SettingKeys.SmtpFromName)" />
+                    </div>
+                </div>
+            </div>
+            <label class="checkbox-row">
+                <input type="checkbox" name="ssl" value="true" checked="@(Model.Flag(SettingKeys.SmtpSsl) ? "checked" : null)" />
+                @T["settings.smtpSsl"]
+            </label>
+            <div><button type="submit" class="btn">@T["settings.save"]</button></div>
+        </div>
+    </form>
+
+    <div class="card">
+        <h2>@T["settings.smtpTest"]</h2>
+        <form method="post" asp-page-handler="SmtpTest">
+            <div class="form-field">
+                <label>@T["settings.smtpTestTo"]</label>
+                <input name="testTo" type="email" placeholder="test@@beispiel.de" spellcheck="false" />
+                <div class="help">@T["settings.smtpTestHint"]</div>
+            </div>
+            <div><button type="submit" class="btn btn-ghost">@T["settings.smtpTestSend"]</button></div>
+        </form>
+    </div>
+</div>
+
+@* ============ DOCKER ============ *@
+<div class="tab-panel" data-panel="docker" hidden>
+    <div class="card">
+        <h2>@T["settings.docker"]</h2>
+        <p class="muted">@T["settings.dockerHint"]</p>
+        <div class="kv">
+            <div class="kv-label">@T["common.status"]</div>
+            <div class="kv-value">
+                @if (!Model.DockerConfigured)
+                {
+                    <span class="badge badge-off">@T["settings.dockerOff"]</span>
+                }
+                else if (Model.DockerReachable)
+                {
+                    <span class="badge badge-on">@T["settings.dockerOk"]</span>
+                }
+                else
+                {
+                    <span class="badge badge-err">@T["settings.dockerUnreachable"]</span>
+                }
+            </div>
+        </div>
+        <div class="kv">
+            <div class="kv-label">@T["settings.dockerEndpoint"]</div>
+            <div class="kv-value mono">MatCmsCloud__Docker__Endpoint</div>
+        </div>
+        <div class="kv">
+            <div class="kv-label">@T["settings.dockerLocalCount"]</div>
+            <div class="kv-value">@Model.LocalCount</div>
+        </div>
+        <div class="help">@T["settings.dockerConfigHint"]</div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Tabs — identical to MatCMS's settings page, including the ?tab=<name> deep link that every
+        // handler redirects back to.
+        (function () {
+            var tabs = document.querySelectorAll('.tab');
+            var panels = document.querySelectorAll('.tab-panel');
+            function show(name) {
+                tabs.forEach(function (t) { t.classList.toggle('active', t.dataset.tab === name); });
+                panels.forEach(function (p) { p.hidden = p.dataset.panel !== name; });
+            }
+            tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.tab); }); });
+            var want = new URLSearchParams(location.search).get('tab');
+            if (want) show(want);
+        })();
+    </script>
+}

@@ -1,0 +1,140 @@
+@inject MatCMS.Cloud.Services.CloudContext Cloud
+@inject MatCMS.Cloud.Services.VersionService Version
+@inject Microsoft.Extensions.Options.IOptions<Microsoft.AspNetCore.Builder.RequestLocalizationOptions> LocOptions
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment Env
+@{
+    var title = ViewData["Title"] as string ?? "Admin";
+    string Active(string path) =>
+        Context.Request.Path.StartsWithSegments(path, StringComparison.OrdinalIgnoreCase) ? "active" : "";
+    var displayName = User.FindFirst("DisplayName")?.Value ?? User.Identity?.Name ?? "Admin";
+
+    // Only offer cultures that actually have a translation file (Resources/<lang>.json).
+    var allUiCultures = LocOptions.Value.SupportedUICultures ?? new System.Collections.Generic.List<System.Globalization.CultureInfo>();
+    string _uiLang(System.Globalization.CultureInfo c) => c.Name.Split('-', 2)[0];
+    var cultures = allUiCultures.Where(c => System.IO.File.Exists(
+        System.IO.Path.Combine(Env.ContentRootPath, "Resources", _uiLang(c) + ".json"))).ToList();
+    // Use Name (not TwoLetterISOLanguageName): under InvariantGlobalization the latter collapses to "iv".
+    var currentCulture = System.Globalization.CultureInfo.CurrentUICulture.Name.Split('-', 2)[0];
+    if (string.IsNullOrEmpty(currentCulture)) currentCulture = MatCMS.Cloud.Services.Localizer.FallbackCulture;
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+}
+<!DOCTYPE html>
+<html lang="@currentCulture">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@title – @Cloud.CloudName</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Geologica:wght@@500;600;700&family=Inter:wght@@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/lib/tabler-icons/tabler-icons.min.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/cloud.css" asp-append-version="true" />
+    <link rel="icon" href="@Cloud.LogoUrl" />
+</head>
+<body class="admin">
+    <aside class="admin-sidebar">
+        <div class="admin-brand">
+            <a class="admin-brand-link" asp-page="/Admin/Index" title="@Cloud.CloudName">
+                <img class="admin-logo" src="@Cloud.LogoUrl" alt="@Cloud.CloudName" />
+            </a>
+        </div>
+        <nav class="admin-nav">
+            <a class="@Active("/admin/instances")" asp-page="/Admin/Instances/Index">🖥️ @T["nav.instances"]</a>
+            <a class="@Active("/admin/profiles")" asp-page="/Admin/Profiles/Index">🧩 @T["nav.profiles"]</a>
+            <div class="admin-nav-sep" role="separator"></div>
+            <a class="@Active("/admin/settings")" asp-page="/Admin/Settings/Index">⚙️ @T["nav.settings"]</a>
+            <a class="@Active("/admin/users")" asp-page="/Admin/Users/Index">👤 @T["nav.users"]</a>
+        </nav>
+        <div class="admin-nav-foot">
+            <div class="admin-foot-actions">
+                @if (cultures.Count > 1)
+                {
+                    <div class="admin-foot-lang" data-lang>
+                        <button type="button" class="admin-foot-btn" data-lang-toggle aria-haspopup="true" aria-expanded="false" title="@T["admin.language"]">@currentCulture.ToUpperInvariant()</button>
+                        <div class="admin-foot-lang-menu" data-lang-menu hidden>
+                            @foreach (var c in cultures)
+                            {
+                                var lc = _uiLang(c);
+                                <form method="post" action="/set-language">
+                                    <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                    <input type="hidden" name="culture" value="@lc" />
+                                    <button type="submit" class="admin-lang-opt@(lc == currentCulture ? " is-current" : "")">@MatCMS.Cloud.Services.Localizer.DisplayName(lc) <span class="muted mono">@lc.ToUpperInvariant()</span></button>
+                                </form>
+                            }
+                        </div>
+                    </div>
+                }
+                <form method="post" asp-page="/Logout" class="admin-foot-logout">
+                    <button type="submit" class="admin-foot-btn">🚪 @T["nav.logout"]</button>
+                </form>
+            </div>
+            <div class="admin-cms-foot">
+                <span class="cms">MatCMS.Cloud</span>
+                <span class="admin-version">v@(Version.Current)</span>
+            </div>
+        </div>
+    </aside>
+    <div class="admin-backdrop" data-admin-backdrop></div>
+
+    <div class="admin-main">
+        <header class="admin-topbar">
+            <button type="button" class="admin-menu-toggle" data-admin-toggle aria-label="@T["nav.menu"]" aria-expanded="false">
+                <span></span><span></span><span></span>
+            </button>
+            <div class="admin-topbar-title">@title</div>
+            <div class="admin-topbar-right"></div>
+        </header>
+
+        <main class="admin-content">
+            @if (TempData["Flash"] is string flash && !string.IsNullOrWhiteSpace(flash))
+            {
+                <div class="alert alert-success">@flash</div>
+            }
+            @if (TempData["FlashError"] is string flashError && !string.IsNullOrWhiteSpace(flashError))
+            {
+                <div class="alert alert-error">@flashError</div>
+            }
+            @RenderBody()
+        </main>
+    </div>
+
+    <script>
+        // Mobile admin menu: off-canvas drawer toggle.
+        (function () {
+            var body = document.body;
+            var toggle = document.querySelector('[data-admin-toggle]');
+            var backdrop = document.querySelector('[data-admin-backdrop]');
+            function setOpen(open) {
+                body.classList.toggle('nav-open', open);
+                if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            }
+            if (toggle) toggle.addEventListener('click', function () { setOpen(!body.classList.contains('nav-open')); });
+            if (backdrop) backdrop.addEventListener('click', function () { setOpen(false); });
+            document.querySelectorAll('.admin-sidebar a').forEach(function (a) {
+                a.addEventListener('click', function () { setOpen(false); });
+            });
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') setOpen(false); });
+        })();
+
+        // Language dropdown in the sidebar footer (the "EN"/"DE" button).
+        (function () {
+            var wrap = document.querySelector('[data-lang]');
+            if (!wrap) return;
+            var btn = wrap.querySelector('[data-lang-toggle]');
+            var menu = wrap.querySelector('[data-lang-menu]');
+            function close() { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); }
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                var open = menu.hidden;
+                menu.hidden = !open; btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            });
+            document.addEventListener('click', function (e) { if (!wrap.contains(e.target)) close(); });
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+        })();
+    </script>
+    <script src="~/js/admin-list.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

@@ -1,13 +1,13 @@
-name: Dev (nightly)
+name: Cloud Release (main)
 
-# dev = DEV build.
-# Version: "nightly-<run_number>-<utc yyyyMMddHHmmss>"  (no :latest tag)
+# main = RELEASE build.
+# Version: "MAJOR.MINOR.<run_number>-<utc yyyyMMddHHmmss>"  +  ":latest"
 on:
   push:
-    branches: [dev]
+    branches: [main]
     paths:
-      - "src/MatCMS/**"
-      - ".github/workflows/dev.yml"
+      - "src/MatCMS.Cloud/**"
+      - ".github/workflows/cloud-release.yml"
   workflow_dispatch:
 
 permissions:
@@ -15,7 +15,7 @@ permissions:
   packages: write
 
 env:
-  IMAGE_NAME: matcms
+  IMAGE_NAME: matcms-cloud
 
 jobs:
   build-and-push:
@@ -27,9 +27,14 @@ jobs:
       - name: Compute version
         id: ver
         run: |
+          MAJOR_MINOR="1.0"
+          if [ -f src/MatCMS.Cloud/VERSION ]; then
+            MAJOR_MINOR="$(tr -d ' \t\r\n' < src/MatCMS.Cloud/VERSION)"
+          fi
+          [ -n "$MAJOR_MINOR" ] || MAJOR_MINOR="1.0"
           BUILD="${{ github.run_number }}"
           DATETIME="$(date -u +%Y%m%d%H%M%S)"
-          VERSION="nightly-${BUILD}-${DATETIME}"
+          VERSION="${MAJOR_MINOR}.${BUILD}-${DATETIME}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "Computed version: ${VERSION}"
 
@@ -47,10 +52,11 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: ./src/MatCMS
-          file: ./src/MatCMS/Dockerfile
+          context: ./src/MatCMS.Cloud
+          file: ./src/MatCMS.Cloud/Dockerfile
           push: true
           build-args: |
             APP_VERSION=${{ steps.ver.outputs.version }}
           tags: |
             ghcr.io/${{ steps.owner.outputs.owner }}/${{ env.IMAGE_NAME }}:${{ steps.ver.outputs.version }}
+            ghcr.io/${{ steps.owner.outputs.owner }}/${{ env.IMAGE_NAME }}:latest

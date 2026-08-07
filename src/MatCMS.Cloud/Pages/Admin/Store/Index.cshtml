@@ -1,0 +1,250 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.Store.IndexModel
+@{
+    ViewData["Title"] = T["store.title"];
+}
+<div class="page-head">
+    <h1>@T["store.title"]</h1>
+</div>
+
+<p class="muted">@T["store.intro"]</p>
+
+<div class="tabs" role="tablist">
+    <button type="button" class="tab active" data-tab="plugins">@T["profiles.tabPlugins"]</button>
+    <button type="button" class="tab" data-tab="templates">@T["profiles.tabTemplates"]</button>
+    <button type="button" class="tab" data-tab="components">@T["profiles.tabComponents"]</button>
+    <button type="button" class="tab" data-tab="users">@T["profiles.tabUsers"]</button>
+    <button type="button" class="tab" data-tab="settings">@T["profiles.tabSettings"]</button>
+</div>
+
+@* ============ PLUGINS ============ *@
+<div class="tab-panel" data-panel="plugins">
+    <div data-list>
+        <div class="page-head">
+            <h2>@T["profiles.tabPlugins"]</h2>
+            <div class="list-toolbar">
+                <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+            </div>
+        </div>
+        @if (Model.Plugins.Count == 0)
+        {
+            <div class="list-empty">@T["store.noPlugins"]</div>
+        }
+        else
+        {
+            <table class="data" data-list-table>
+                <thead>
+                    <tr><th>@T["common.name"]</th><th>@T["profiles.pluginKey"]</th><th>@T["instances.version"]</th><th>@T["store.usedBy"]</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in Model.Plugins)
+                    {
+                        <tr data-search="@(p.Name + " " + p.Key + " " + p.Description)">
+                            <td>
+                                <a asp-page="Plugin" asp-route-id="@p.Id"><strong>@p.Name</strong></a>
+                                <div class="muted">@p.Description</div>
+                            </td>
+                            <td class="mono">@p.Key</td>
+                            <td class="mono">@p.Version</td>
+                            <td><span class="badge badge-off">@T["store.profileCount", Model.Uses(Model.PluginUse, p.Id)]</span></td>
+                            <td>
+                                <div class="actions">
+                                    <a class="btn btn-sm btn-ghost" asp-page="Plugin" asp-route-id="@p.Id">@T["action.edit"]</a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+        }
+        <div class="list-actions">
+            <a class="btn" asp-page="Plugin">@T["profiles.addPlugin"]</a>
+        </div>
+    </div>
+</div>
+
+@* ============ TEMPLATES ============ *@
+<div class="tab-panel" data-panel="templates" hidden>
+    <div data-list>
+        <div class="page-head">
+            <h2>@T["profiles.tabTemplates"]</h2>
+            <div class="list-toolbar">
+                <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+            </div>
+        </div>
+        @if (Model.Templates.Count == 0)
+        {
+            <div class="list-empty">@T["store.noTemplates"]</div>
+        }
+        else
+        {
+            <table class="data" data-list-table>
+                <thead>
+                    <tr><th>@T["common.name"]</th><th>@T["profiles.templateColors"]</th><th>@T["profiles.templateFonts"]</th><th>@T["store.usedBy"]</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var t in Model.Templates)
+                    {
+                        <tr data-search="@(t.Name + " " + t.Description)">
+                            <td>
+                                <a asp-page="Template" asp-route-id="@t.Id"><strong>@t.Name</strong></a>
+                                <div class="muted">@t.Description</div>
+                            </td>
+                            <td><span class="token-chip" style="background:@t.AccentColor;color:#fff;border-color:@t.AccentColor;">@t.AccentColor</span></td>
+                            <td class="muted">@t.HeadingFont / @t.BodyFont</td>
+                            <td><span class="badge badge-off">@T["store.profileCount", Model.Uses(Model.TemplateUse, t.Id)]</span></td>
+                            <td>
+                                <div class="actions">
+                                    <a class="btn btn-sm btn-ghost" asp-page="Template" asp-route-id="@t.Id">@T["action.edit"]</a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+        }
+        <div class="list-actions">
+            <a class="btn" asp-page="Template">@T["profiles.templateAdd"]</a>
+        </div>
+    </div>
+</div>
+
+@* ============ COMPONENTS ============ *@
+<div class="tab-panel" data-panel="components" hidden>
+    <div data-list>
+        <div class="page-head">
+            <h2>@T["profiles.tabComponents"]</h2>
+            <div class="list-toolbar">
+                <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+            </div>
+        </div>
+        @if (Model.Components.Count == 0)
+        {
+            <div class="list-empty">@T["store.noComponents"]</div>
+        }
+        else
+        {
+            <table class="data" data-list-table>
+                <thead>
+                    <tr><th>@T["common.name"]</th><th>@T["profiles.componentType"]</th><th>@T["store.usedBy"]</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in Model.Components)
+                    {
+                        <tr data-search="@(c.Name + " " + c.Type + " " + c.Description)">
+                            <td>
+                                <a asp-page="Component" asp-route-id="@c.Id"><strong>@c.Name</strong></a>
+                                <div class="muted">@c.Description</div>
+                            </td>
+                            <td class="mono">@c.Type</td>
+                            <td><span class="badge badge-off">@T["store.profileCount", Model.Uses(Model.ComponentUse, c.Id)]</span></td>
+                            <td>
+                                <div class="actions">
+                                    <a class="btn btn-sm btn-ghost" asp-page="Component" asp-route-id="@c.Id">@T["action.edit"]</a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+        }
+        <div class="list-actions">
+            <a class="btn" asp-page="Component">@T["profiles.addComponent"]</a>
+        </div>
+    </div>
+</div>
+
+@* ============ USERS ============ *@
+<div class="tab-panel" data-panel="users" hidden>
+    <div data-list>
+        <div class="page-head">
+            <h2>@T["profiles.tabUsers"]</h2>
+            <div class="list-toolbar">
+                <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+            </div>
+        </div>
+        <p class="muted">@T["store.usersHint"]</p>
+        @if (Model.Users.Count == 0)
+        {
+            <div class="list-empty">@T["store.noUsers"]</div>
+        }
+        else
+        {
+            <table class="data" data-list-table>
+                <thead>
+                    <tr><th>@T["users.username"]</th><th>@T["users.email"]</th><th>@T["users.displayName"]</th><th>@T["store.usedBy"]</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var u in Model.Users)
+                    {
+                        <tr data-search="@(u.Username + " " + u.Email + " " + u.DisplayName)">
+                            <td><a asp-page="User" asp-route-id="@u.Id"><strong>@u.Username</strong></a></td>
+                            <td class="muted">@(u.Email ?? "—")</td>
+                            <td class="muted">@(u.DisplayName ?? "—")</td>
+                            <td><span class="badge badge-off">@T["store.profileCount", Model.Uses(Model.UserUse, u.Id)]</span></td>
+                            <td>
+                                <div class="actions">
+                                    <a class="btn btn-sm btn-ghost" asp-page="User" asp-route-id="@u.Id">@T["action.edit"]</a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+        }
+        <div class="list-actions">
+            <a class="btn" asp-page="User">@T["profiles.addUser"]</a>
+        </div>
+    </div>
+</div>
+
+@* ============ SETTINGS ============ *@
+<div class="tab-panel" data-panel="settings" hidden>
+    <div data-list>
+        <div class="page-head">
+            <h2>@T["profiles.tabSettings"]</h2>
+            <div class="list-toolbar">
+                <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+            </div>
+        </div>
+        @if (Model.Settings.Count == 0)
+        {
+            <div class="list-empty">@T["store.noSettings"]</div>
+        }
+        else
+        {
+            <table class="data" data-list-table>
+                <thead>
+                    <tr><th>@T["profiles.settingKey"]</th><th>@T["profiles.settingValue"]</th><th>@T["store.usedBy"]</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var s in Model.Settings)
+                    {
+                        <tr data-search="@(s.Key + " " + s.Value)">
+                            <td><a asp-page="Setting" asp-route-id="@s.Id"><span class="mono">@s.Key</span></a></td>
+                            <td class="muted">@(s.IsSecret ? "••••••" : s.Value)</td>
+                            <td><span class="badge badge-off">@T["store.profileCount", Model.Uses(Model.SettingUse, s.Id)]</span></td>
+                            <td>
+                                <div class="actions">
+                                    <a class="btn btn-sm btn-ghost" asp-page="Setting" asp-route-id="@s.Id">@T["action.edit"]</a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+        }
+        <div class="list-actions">
+            <a class="btn" asp-page="Setting">@T["profiles.addSetting"]</a>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_TabsScript" />
+}

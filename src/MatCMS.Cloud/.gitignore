@@ -9,15 +9,9 @@ appdata/
 *.db-shm
 *.db-wal
 
-# User uploads
-wwwroot/uploads/
-
 # IDE / OS
 .vs/
 .idea/
 *.user
 .DS_Store
 Thumbs.db
-
-# Runtime data of any project in src/
-src/*/appdata/

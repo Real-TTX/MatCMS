@@ -1,0 +1,36 @@
+@page "{id:int?}"
+@model MatCMS.Cloud.Pages.Admin.Users.EditModel
+@{
+    ViewData["Title"] = Model.IsNew ? T["users.add"] : T["users.edit"];
+}
+<div class="page-head">
+    <h1>@ViewData["Title"]</h1>
+    <a class="btn btn-ghost" asp-page="Index">@T["common.back"]</a>
+</div>
+
+<div class="card">
+    @if (!string.IsNullOrWhiteSpace(Model.Error))
+    {
+        <div class="alert alert-error">@Model.Error</div>
+    }
+    <form method="post">
+        <div class="form-field">
+            <label for="Username">@T["users.username"]</label>
+            <input id="Username" name="Username" value="@Model.Username" required />
+        </div>
+        <div class="form-field">
+            <label for="Email">@T["users.email"]</label>
+            <input id="Email" name="Email" type="email" value="@Model.Email" />
+            <p class="muted">@T["users.emailHint"]</p>
+        </div>
+        <div class="form-field">
+            <label for="DisplayName">@T["users.displayName"]</label>
+            <input id="DisplayName" name="DisplayName" value="@Model.DisplayName" />
+        </div>
+        <div class="form-field">
+            <label for="Password">@T["users.password"]</label>
+            <input id="Password" name="Password" type="password" placeholder="@(Model.IsNew ? "" : T["users.passwordKeep"])" />
+        </div>
+        <button type="submit" class="btn">@T["common.save"]</button>
+    </form>
+</div>

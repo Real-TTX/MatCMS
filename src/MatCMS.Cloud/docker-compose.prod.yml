@@ -1,0 +1,27 @@
+services:
+  web:
+    image: ghcr.io/real-ttx/matcms-cloud:latest
+    pull_policy: always
+    ports:
+      - 9100:8080
+    environment:
+      - MatCmsCloud__Docker__Endpoint=unix:///var/run/docker.sock
+    volumes:
+      - matcms-cloud-data:/app/appdata
+      # Remove this line to run notify-only (no cloud-side update execution).
+      - /var/run/docker.sock:/var/run/docker.sock
+    # The app runs as non-root; the socket is mode 660. Without a matching group the app gets
+    # "permission denied" and every instance silently stays "remote".
+    #   DOCKER_GID=$(stat -c '%g' /var/run/docker.sock) docker compose -f docker-compose.prod.yml up -d
+    group_add:
+      - "${DOCKER_GID:-0}"
+    networks:
+      - main
+    restart: unless-stopped
+
+networks:
+  main:
+    external: true
+
+volumes:
+  matcms-cloud-data:

@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>MatCMS.Cloud</RootNamespace>
+    <AssemblyName>MatCMS.Cloud</AssemblyName>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Invariant globalization keeps the image small & formatting stable, but we still want to
+         create named CultureInfo objects (de/en) for RequestLocalization. -->
+    <PredefinedCulturesOnly>false</PredefinedCulturesOnly>
+    <!-- Default assembly version. InformationalVersion is supplied at build time
+         via -p:InformationalVersion=<APP_VERSION> (see Dockerfile / GitHub Actions). -->
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Localization resource files (Resources/<culture>.json) must ship to output & publish.
+         Use Update (not Include): the Web SDK already globs JSON as Content by default. -->
+    <Content Update="Resources\**\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Floating 10.0.* so restores/rebuilds always pick up the latest patch ("immer aktuell"). -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.*" />
+    <PackageReference Include="Microsoft.Extensions.Identity.Core" Version="10.0.*" />
+    <!-- MailKit: proper SMTP (implicit SSL port 465 AND STARTTLS port 587). The built-in
+         System.Net.Mail.SmtpClient can't do implicit SSL, which breaks IONOS/others on 465. -->
+    <PackageReference Include="MailKit" Version="4.*" />
+    <!-- Talks to the mounted Docker engine socket: identifies LOCAL instances and pulls/recreates
+         their containers on update. Optional at runtime - without a socket every instance is remote. -->
+    <PackageReference Include="Docker.DotNet" Version="3.125.*" />
+    <!-- Override the transitive (vulnerable) SQLitePCLRaw 2.1.11 with the current 3.0.x bundle. -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.*" />
+  </ItemGroup>
+
+</Project>

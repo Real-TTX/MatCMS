@@ -1,0 +1,112 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.IndexModel
+@using MatCMS.Cloud.Services
+@{
+    ViewData["Title"] = T["dashboard.title"];
+    var dashUser = User.FindFirst("DisplayName")?.Value ?? User.Identity?.Name ?? "Admin";
+}
+<div class="page-head">
+    <h1>@T["dashboard.title"]</h1>
+    <div class="list-toolbar">
+        <span class="muted">@T["dashboard.welcome"] <strong>@dashUser</strong></span>
+    </div>
+</div>
+
+<div class="stat-grid">
+    <a class="stat" asp-page="/Admin/Instances/Index">
+        <div class="n">@Model.Instances.Count</div>
+        <div class="l">@T["dashboard.instances"]</div>
+    </a>
+    <a class="stat" asp-page="/Admin/Instances/Index">
+        <div class="n">@Model.OnlineCount</div>
+        <div class="l">@T["dashboard.online"]</div>
+    </a>
+    <a class="stat" asp-page="/Admin/Instances/Index">
+        <div class="n">@Model.OfflineCount</div>
+        <div class="l">@T["dashboard.offline"]</div>
+    </a>
+    <a class="stat" asp-page="/Admin/Instances/Index">
+        <div class="n">@Model.UpdateCount</div>
+        <div class="l">@T["dashboard.updates"]</div>
+    </a>
+</div>
+
+<div class="card">
+    <h2>@T["dashboard.releaseTitle"]</h2>
+    <p class="muted">@T["dashboard.releaseText"] <code>@ReleaseWatcher.ImageRef</code></p>
+    <div class="kv">
+        <div class="kv-label">@T["dashboard.latestRelease"]</div>
+        <div class="kv-value mono">@(Model.LatestVersion ?? T["common.unknown"])</div>
+    </div>
+    <div class="kv">
+        <div class="kv-label">@T["dashboard.lastCheck"]</div>
+        <div class="kv-value muted">
+            @(Model.LastReleaseCheck is null ? T["common.never"] : Model.LastReleaseCheck.Value.ToString("dd.MM.yyyy HH:mm") + " UTC")
+        </div>
+    </div>
+    @if (!string.IsNullOrWhiteSpace(Model.ReleaseError))
+    {
+        <div class="kv">
+            <div class="kv-label">@T["common.error"]</div>
+            <div class="kv-value"><span class="badge badge-err">@Model.ReleaseError</span></div>
+        </div>
+    }
+    <div class="kv">
+        <div class="kv-label">@T["dashboard.dockerAccess"]</div>
+        <div class="kv-value">
+            @if (!Model.DockerConfigured)
+            {
+                <span class="badge badge-off">@T["dashboard.dockerOff"]</span>
+            }
+            else if (Model.DockerReachable)
+            {
+                <span class="badge badge-on">@T["dashboard.dockerOk"]</span>
+                <span class="muted">@T["dashboard.dockerLocalCount", Model.LocalCount]</span>
+            }
+            else
+            {
+                <span class="badge badge-err">@T["dashboard.dockerUnreachable"]</span>
+            }
+        </div>
+    </div>
+</div>
+
+<div data-list>
+    <div class="page-head">
+        <h2>@T["dashboard.recentEvents"]</h2>
+        <div class="list-toolbar">
+            <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+        </div>
+    </div>
+    @if (Model.RecentEvents.Count == 0)
+    {
+        <div class="list-empty">@T["dashboard.noEvents"]</div>
+    }
+    else
+    {
+        <table class="data" data-list-table>
+            <thead>
+                <tr>
+                    <th style="width:150px;">@T["common.time"]</th>
+                    <th style="width:200px;">@T["common.instance"]</th>
+                    <th>@T["common.event"]</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var e in Model.RecentEvents)
+                {
+                    <tr data-search="@((e.Instance?.Name ?? "") + " " + e.Message)">
+                        <td class="muted mono">@e.CreatedAt.ToString("dd.MM.yyyy HH:mm")</td>
+                        <td>@(e.Instance?.Name ?? "—")</td>
+                        <td>@e.Message</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+    }
+</div>
+
+<div class="list-actions">
+    <a class="btn" asp-page="/Admin/Instances/Create">@T["instances.add"]</a>
+</div>

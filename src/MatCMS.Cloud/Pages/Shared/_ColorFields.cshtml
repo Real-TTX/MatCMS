@@ -1,0 +1,45 @@
+@* Colour widgets, taken verbatim from MatCMS's template editor. There are TWO patterns and mixing
+   them is what broke this before:
+
+   .color-field  — a REQUIRED colour. The <input type="color"> carries the name, so it is the posted
+                   value; the .hex text input only mirrors it. There is no empty state.
+
+   [data-optcolor] — an OPTIONAL colour ("" = inherit). Here the TEXT field carries the name, the
+                   swatch is unnamed, and a clear button puts it back to empty — which a colour input
+                   can never represent on its own. *@
+<script>
+    document.querySelectorAll('.color-field').forEach(function (cf) {
+        var color = cf.querySelector('input[type=color]');
+        var hex = cf.querySelector('.hex');
+        if (!color || !hex) return;
+        hex.value = color.value;
+        color.addEventListener('input', function () { hex.value = color.value; });
+        hex.addEventListener('input', function () {
+            var v = hex.value.trim();
+            if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v)) color.value = v;
+        });
+    });
+
+    document.querySelectorAll('[data-optcolor]').forEach(function (oc) {
+        var pick = oc.querySelector('.optcolor-pick');
+        var hex = oc.querySelector('.optcolor-hex');
+        var clear = oc.querySelector('.optcolor-clear');
+        if (!pick || !hex) return;
+        function reflectEmpty() { oc.classList.toggle('is-empty', hex.value.trim() === ''); }
+        pick.addEventListener('input', function () { hex.value = pick.value; reflectEmpty(); });
+        hex.addEventListener('input', function () {
+            var v = hex.value.trim();
+            if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v)) pick.value = v;
+            reflectEmpty();
+        });
+        if (clear) clear.addEventListener('click', function () {
+            hex.value = '';
+            reflectEmpty();
+            // Tell the page the value changed — a live preview listening on the form would otherwise
+            // never learn about a clear, because a click is not an input event.
+            hex.dispatchEvent(new Event('input', { bubbles: true }));
+            hex.focus();
+        });
+        reflectEmpty();
+    });
+</script>

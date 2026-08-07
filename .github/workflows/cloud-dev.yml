@@ -1,4 +1,4 @@
-name: Dev (nightly)
+name: Cloud Dev (nightly)
 
 # dev = DEV build.
 # Version: "nightly-<run_number>-<utc yyyyMMddHHmmss>"  (no :latest tag)
@@ -6,8 +6,8 @@ on:
   push:
     branches: [dev]
     paths:
-      - "src/MatCMS/**"
-      - ".github/workflows/dev.yml"
+      - "src/MatCMS.Cloud/**"
+      - ".github/workflows/cloud-dev.yml"
   workflow_dispatch:
 
 permissions:
@@ -15,7 +15,7 @@ permissions:
   packages: write
 
 env:
-  IMAGE_NAME: matcms
+  IMAGE_NAME: matcms-cloud
 
 jobs:
   build-and-push:
@@ -47,8 +47,8 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: ./src/MatCMS
-          file: ./src/MatCMS/Dockerfile
+          context: ./src/MatCMS.Cloud
+          file: ./src/MatCMS.Cloud/Dockerfile
           push: true
           build-args: |
             APP_VERSION=${{ steps.ver.outputs.version }}

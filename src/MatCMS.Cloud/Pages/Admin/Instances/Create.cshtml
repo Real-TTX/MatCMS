@@ -1,0 +1,99 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.Instances.CreateModel
+@{
+    ViewData["Title"] = T["instances.add"];
+}
+<div class="page-head">
+    <h1>@T["instances.add"]</h1>
+    <a class="btn btn-ghost" asp-page="Index">@T["common.back"]</a>
+</div>
+
+<div class="card">
+    <h2>@T["enroll.joinTitle"]</h2>
+    <p class="muted">@T["enroll.joinIntro"]</p>
+
+    @if (Model.Profiles.Count == 0)
+    {
+        <p class="muted">@T["enroll.noProfiles"] <a asp-page="/Admin/Profiles/Index">@T["nav.profiles"]</a></p>
+    }
+    else
+    {
+        <div class="kv">
+            <div class="kv-label">@T["instances.cloudUrl"]</div>
+            <div class="kv-value mono">@Model.CloudUrl</div>
+        </div>
+        <table class="data" style="margin-top:14px;">
+            <thead>
+                <tr>
+                    <th>@T["profiles.title"]</th>
+                    <th>@T["profiles.joinCode"]</th>
+                    <th>@T["profiles.approval"]</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in Model.Profiles)
+                {
+                    <tr>
+                        <td>
+                            <a asp-page="/Admin/Profiles/Edit" asp-route-id="@p.Id"><strong>@p.Name</strong></a>
+                            @if (p.IsDefault)
+                            {
+                                <span class="badge badge-off">@T["profiles.default"]</span>
+                            }
+                        </td>
+                        <td class="mono">@p.JoinCode</td>
+                        <td>
+                            @if (p.AutoApprove)
+                            {
+                                <span class="badge badge-on">@T["profiles.autoApprove"]</span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-new">@T["profiles.manualApprove"]</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+<div class="card">
+    <h2>@T["enroll.adoptTitle"]</h2>
+    <p class="muted">@T["enroll.adoptIntro"]</p>
+
+    @if (!string.IsNullOrWhiteSpace(Model.Error))
+    {
+        <div class="alert alert-error">@Model.Error</div>
+    }
+
+    <form method="post" asp-page-handler="Adopt">
+        <div class="form-field">
+            <label for="InstanceUrl">@T["enroll.instanceUrl"]</label>
+            <input id="InstanceUrl" name="InstanceUrl" value="@Model.InstanceUrl" placeholder="https://kunde.example.com" spellcheck="false" />
+        </div>
+        <div class="form-grid">
+            <div class="form-field">
+                <label for="Username">@T["enroll.adminUser"]</label>
+                <input id="Username" name="Username" value="@Model.Username" autocomplete="off" />
+            </div>
+            <div class="form-field">
+                <label for="Password">@T["enroll.adminPassword"]</label>
+                <input id="Password" name="Password" type="password" autocomplete="new-password" />
+            </div>
+        </div>
+        <div class="form-field">
+            <label for="ProfileId">@T["enroll.assignProfile"]</label>
+            <select id="ProfileId" name="ProfileId">
+                <option value="">@T["enroll.noProfile"]</option>
+                @foreach (var p in Model.Profiles)
+                {
+                    <option value="@p.Id" selected="@(Model.ProfileId == p.Id ? "selected" : null)">@p.Name</option>
+                }
+            </select>
+        </div>
+        <div class="help muted">@T["enroll.credentialsHint"]</div>
+        <button type="submit" class="btn">@T["enroll.adopt"]</button>
+    </form>
+</div>

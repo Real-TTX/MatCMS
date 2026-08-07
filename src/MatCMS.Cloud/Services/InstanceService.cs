@@ -1,0 +1,305 @@
+using System.Security.Cryptography;
+using System.Text;
+using MatCMS.Cloud.Data;
+using MatCMS.Cloud.Models;
+using Microsoft.EntityFrameworkCore;
+
+namespace MatCMS.Cloud.Services;
+
+/// <summary>
+/// Enrollment, authentication and heartbeat handling for connected MatCMS installations — plus the
+/// local/remote classification that decides whether the cloud may update an instance itself.
+/// </summary>
+public class InstanceService
+{
+    /// <summary>Contract version this build speaks. Bump on every change to
+    /// <see cref="HeartbeatRequest"/>/<see cref="HeartbeatResponse"/>/<see cref="InstanceConfig"/>;
+    /// instances reporting less are badged "veraltet".</summary>
+    public const int CurrentProtocolVersion = 3;
+
+    /// <summary>An instance counts as offline after ~2.5 missed beats (60 s cadence).</summary>
+    public static readonly TimeSpan OfflineAfter = TimeSpan.FromSeconds(150);
+
+    /// <summary>Label for an instance that has not told us its site name yet. Treated as "unset", so
+    /// a later heartbeat carrying a real name replaces it.</summary>
+    public const string PlaceholderName = "Neue Instanz";
+
+    private readonly AppDbContext _db;
+    private readonly DockerHostService _docker;
+    private readonly ReleaseWatcher _releases;
+    private readonly ProfileService _profiles;
+
+    public InstanceService(AppDbContext db, DockerHostService docker, ReleaseWatcher releases, ProfileService profiles)
+    {
+        _db = db;
+        _docker = docker;
+        _releases = releases;
+        _profiles = profiles;
+    }
+
+    public static bool IsOnline(Instance i) =>
+        i.LastHeartbeatUtc is not null && DateTime.UtcNow - i.LastHeartbeatUtc.Value <= OfflineAfter;
+
+    /// <summary>An instance that has connected but speaks an older contract than this build.</summary>
+    public static bool IsOutdatedProtocol(Instance i) =>
+        i.HasConnected && i.ProtocolVersion < CurrentProtocolVersion;
+
+    public bool IsUpdateAvailable(Instance i) => _releases.IsUpdateAvailableFor(i.Version);
+
+    /// <summary>True while the instance has not applied its profile's current revision.</summary>
+    public static bool IsOutOfSync(Instance i) =>
+        i.Profile is not null && i.AppliedRevision < i.Profile.Revision;
+
+    // --- Enrollment ---------------------------------------------------------
+
+    public sealed record RegisterResult(Instance? Instance, string? Token, string? Error);
+
+    /// <summary>
+    /// Instance-initiated enrollment: the instance presents a profile's join code and gets an id +
+    /// token back. This is the direction that works behind NAT — nothing has to reach the site.
+    /// <para>An unknown code is refused outright, so knowing the cloud URL alone is not enough to
+    /// create records here.</para>
+    /// </summary>
+    public async Task<RegisterResult> RegisterAsync(RegisterRequest request, CancellationToken ct = default)
+    {
+        var profile = await _profiles.FindByJoinCodeAsync(request.JoinCode);
+        if (profile is null) return new(null, null, "Ungültiger Join-Code.");
+
+        var token = NewToken();
+        var instance = new Instance
+        {
+            PublicId = NewPublicId(),
+            TokenHash = HashToken(token),
+            Name = string.IsNullOrWhiteSpace(request.SiteName) ? PlaceholderName : request.SiteName!.Trim(),
+            Url = string.IsNullOrWhiteSpace(request.Url) ? null : request.Url!.Trim(),
+            ProfileId = profile.Id,
+            Status = profile.AutoApprove ? InstanceStatus.Approved : InstanceStatus.Pending,
+            ProtocolVersion = request.ProtocolVersion,
+            Version = Trim(request.Version),
+            HostName = Trim(request.HostName),
+            ContainerId = Trim(request.ContainerId),
+            ImageRef = Trim(request.ImageRef)
+        };
+
+        _db.Instances.Add(instance);
+        await _db.SaveChangesAsync(ct);
+
+        await ClassifyAsync(instance, ct);
+        Log(instance, InstanceEventKind.Connected,
+            instance.Status == InstanceStatus.Approved
+                ? $"Instanz hat sich über Profil \"{profile.Name}\" angemeldet und wurde automatisch angenommen."
+                : $"Instanz hat sich über Profil \"{profile.Name}\" angemeldet und wartet auf Freigabe.");
+        await _db.SaveChangesAsync(ct);
+
+        return new(instance, token, null);
+    }
+
+    /// <summary>
+    /// Cloud-initiated adoption: the operator supplies an existing instance's URL and one of ITS
+    /// admin accounts. We mint the credentials here and hand them over; the instance verifies the
+    /// account against its own user table before accepting. Returns the instance and the raw token
+    /// so the caller can perform the handover.
+    /// </summary>
+    public async Task<(Instance instance, string token)> CreateForAdoptionAsync(string name, int? profileId)
+    {
+        var token = NewToken();
+        var instance = new Instance
+        {
+            PublicId = NewPublicId(),
+            TokenHash = HashToken(token),
+            Name = string.IsNullOrWhiteSpace(name) ? PlaceholderName : name.Trim(),
+            ProfileId = profileId,
+            Status = InstanceStatus.Approved
+        };
+        _db.Instances.Add(instance);
+        await _db.SaveChangesAsync();
+        return (instance, token);
+    }
+
+    /// <summary>Issues a fresh token for an existing instance (the old one stops working at once).</summary>
+    public async Task<string> RotateTokenAsync(Instance instance)
+    {
+        var token = NewToken();
+        instance.TokenHash = HashToken(token);
+        await _db.SaveChangesAsync();
+        return token;
+    }
+
+    public async Task SetStatusAsync(Instance instance, InstanceStatus status)
+    {
+        if (instance.Status == status) return;
+        instance.Status = status;
+        Log(instance, status switch
+        {
+            InstanceStatus.Approved => InstanceEventKind.Approved,
+            InstanceStatus.Rejected => InstanceEventKind.Rejected,
+            _ => InstanceEventKind.Connected
+        }, status switch
+        {
+            InstanceStatus.Approved => "Instanz freigegeben.",
+            InstanceStatus.Rejected => "Instanz abgelehnt — Heartbeats werden zurückgewiesen.",
+            _ => "Instanz wartet auf Freigabe."
+        });
+        await _db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Resolves an instance from the public id + bearer token. The hash comparison is
+    /// length-constant (<see cref="CryptographicOperations.FixedTimeEquals"/>) so a wrong token
+    /// cannot be found byte by byte through timing. The profile is included because every caller
+    /// needs it (policy, revision, config).
+    /// </summary>
+    public async Task<Instance?> AuthenticateAsync(string? publicId, string? token)
+    {
+        if (string.IsNullOrWhiteSpace(publicId) || string.IsNullOrWhiteSpace(token)) return null;
+
+        var instance = await _db.Instances.Include(i => i.Profile)
+            .FirstOrDefaultAsync(i => i.PublicId == publicId);
+        if (instance is null) return null;
+
+        var expected = Encoding.UTF8.GetBytes(instance.TokenHash);
+        var actual = Encoding.UTF8.GetBytes(HashToken(token));
+        return expected.Length == actual.Length && CryptographicOperations.FixedTimeEquals(expected, actual)
+            ? instance
+            : null;
+    }
+
+    // --- Heartbeat ----------------------------------------------------------
+
+    /// <summary>Applies a heartbeat: stores what was reported, re-classifies local/remote, records
+    /// the sync state and builds the response.</summary>
+    public async Task<HeartbeatResponse> RecordHeartbeatAsync(
+        Instance instance, HeartbeatRequest beat, CancellationToken ct = default)
+    {
+        var wasOffline = !IsOnline(instance);
+        var firstEver = !instance.HasConnected;
+
+        instance.LastHeartbeatUtc = DateTime.UtcNow;
+        instance.ProtocolVersion = beat.ProtocolVersion;
+        instance.Version = Trim(beat.Version);
+        instance.HostName = Trim(beat.HostName);
+        instance.ContainerId = Trim(beat.ContainerId);
+        instance.ImageRef = Trim(beat.ImageRef);
+        instance.PageCount = beat.PageCount;
+        instance.PluginCount = beat.PluginCount;
+        instance.UserCount = beat.UserCount;
+        if (!string.IsNullOrWhiteSpace(beat.Url)) instance.Url = beat.Url!.Trim();
+        // The reported site name only SEEDS the label — never overwrite a name an operator has set
+        // here. The placeholder counts as "not set yet", so an instance that enrolled before its
+        // site name was configured still picks it up instead of staying "Neue Instanz" forever.
+        if ((firstEver || instance.Name == PlaceholderName) && !string.IsNullOrWhiteSpace(beat.SiteName))
+            instance.Name = beat.SiteName!.Trim();
+
+        RecordSyncReport(instance, beat);
+        await ClassifyAsync(instance, ct);
+
+        if (firstEver)
+            Log(instance, InstanceEventKind.Connected, $"Instanz verbunden ({instance.Version ?? "?"}).");
+        else if (wasOffline)
+            Log(instance, InstanceEventKind.Recovered, "Instanz meldet sich wieder.");
+
+        // A new beat ends the outage, so the dead-man switch may fire again next time.
+        instance.OfflineNotified = false;
+
+        await _db.SaveChangesAsync(ct);
+
+        return new HeartbeatResponse
+        {
+            ProtocolVersion = CurrentProtocolVersion,
+            Status = instance.Status.ToString(),
+            LatestVersion = _releases.LatestVersion,
+            UpdateAvailable = IsUpdateAvailable(instance),
+            CloudCanUpdate = instance.Hosting == InstanceHosting.Local,
+            DisplayName = instance.Name,
+            ProfileName = instance.Profile?.Name,
+            // A pending instance is told 0 so it never even asks for configuration.
+            ConfigRevision = instance.Status == InstanceStatus.Approved ? instance.Profile?.Revision ?? 0 : 0
+        };
+    }
+
+    /// <summary>Folds the instance's self-reported sync outcome into its record and logs the
+    /// transitions — a sync that starts failing, and one that recovers, are both worth an entry.</summary>
+    private void RecordSyncReport(Instance instance, HeartbeatRequest beat)
+    {
+        var previousRevision = instance.AppliedRevision;
+        var previousError = instance.LastSyncError;
+
+        instance.AppliedRevision = beat.AppliedRevision;
+        instance.LastSyncError = string.IsNullOrWhiteSpace(beat.SyncError) ? null : beat.SyncError!.Trim();
+        if (beat.AppliedRevision != previousRevision || instance.LastSyncError != previousError)
+            instance.LastSyncUtc = DateTime.UtcNow;
+
+        if (instance.LastSyncError is not null && instance.LastSyncError != previousError)
+            Log(instance, InstanceEventKind.SyncFailed, $"Konfiguration konnte nicht angewendet werden: {instance.LastSyncError}");
+        else if (previousError is not null && instance.LastSyncError is null)
+            Log(instance, InstanceEventKind.SyncApplied, $"Konfiguration angewendet (Revision {beat.AppliedRevision}).");
+        else if (beat.AppliedRevision > previousRevision && previousRevision > 0)
+            Log(instance, InstanceEventKind.SyncApplied, $"Konfiguration angewendet (Revision {beat.AppliedRevision}).");
+    }
+
+    /// <summary>
+    /// Decides local vs. remote by looking the reported container up on OUR daemon. Re-run on every
+    /// heartbeat on purpose: a site that moves to another host must fall back to remote instead of
+    /// leaving the cloud pointing at a container that is now something else entirely.
+    /// </summary>
+    public async Task ClassifyAsync(Instance instance, CancellationToken ct = default)
+    {
+        var before = instance.Hosting;
+
+        var container = await _docker.FindContainerAsync(instance.ContainerId, ct);
+        if (container is null)
+        {
+            instance.Hosting = InstanceHosting.Remote;
+            instance.LocalContainerName = null;
+            instance.LocalPort = null;
+        }
+        else
+        {
+            instance.Hosting = InstanceHosting.Local;
+            instance.LocalContainerName = container.Name;
+            instance.LocalPort = container.PublishedPort;
+        }
+
+        if (before != InstanceHosting.Unknown && before != instance.Hosting)
+            Log(instance, InstanceEventKind.HostingChanged,
+                $"Hosting-Erkennung geändert: {Describe(before)} → {Describe(instance.Hosting)}.");
+    }
+
+    public static string Describe(InstanceHosting hosting) => hosting switch
+    {
+        InstanceHosting.Local => "lokal",
+        InstanceHosting.Remote => "remote",
+        _ => "unbekannt"
+    };
+
+    // --- Events -------------------------------------------------------------
+
+    /// <summary>Adds an event to the change tracker (the caller saves). <paramref name="notified"/>
+    /// pre-marks events that must never produce a mail.</summary>
+    public void Log(Instance instance, InstanceEventKind kind, string message, bool notified = false)
+    {
+        _db.InstanceEvents.Add(new InstanceEvent
+        {
+            InstanceId = instance.Id,
+            Instance = instance,
+            Kind = kind,
+            Message = message,
+            Notified = notified
+        });
+    }
+
+    // --- Token helpers ------------------------------------------------------
+
+    /// <summary>URL-safe random id (no ambiguity, not enumerable).</summary>
+    private static string NewPublicId() => Base64Url(RandomNumberGenerator.GetBytes(12));
+
+    private static string NewToken() => Base64Url(RandomNumberGenerator.GetBytes(32));
+
+    public static string HashToken(string token) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))).ToLowerInvariant();
+
+    private static string Base64Url(byte[] bytes) =>
+        Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+    private static string? Trim(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+}

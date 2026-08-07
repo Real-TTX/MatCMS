@@ -41,6 +41,13 @@ public class Profile
 
     // --- Which payloads this profile pushes ---------------------------------
     public bool SyncSettings { get; set; }
+
+    /// <summary>
+    /// Roll the cloud's OWN SMTP configuration (Einstellungen → SMTP) out to this profile's
+    /// instances. There is no store copy of it — the global settings are the source, and the
+    /// profile's own <c>ProfileSetting</c> rows still override individual keys on top.
+    /// </summary>
+    public bool UseGlobalSmtp { get; set; }
     public bool SyncUsers { get; set; }
     public bool SyncPlugins { get; set; }
     public bool SyncComponents { get; set; }

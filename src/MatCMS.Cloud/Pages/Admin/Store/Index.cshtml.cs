@@ -18,16 +18,12 @@ public class IndexModel : PageModel
     public List<StorePlugin> Plugins { get; private set; } = new();
     public List<StoreTemplate> Templates { get; private set; } = new();
     public List<StoreComponent> Components { get; private set; } = new();
-    public List<StoreUser> Users { get; private set; } = new();
-    public List<StoreSetting> Settings { get; private set; } = new();
 
     /// <summary>How many profiles use each entry — an operator changing something shared should see
     /// how far it reaches before they save.</summary>
     public Dictionary<int, int> PluginUse { get; private set; } = new();
     public Dictionary<int, int> TemplateUse { get; private set; } = new();
     public Dictionary<int, int> ComponentUse { get; private set; } = new();
-    public Dictionary<int, int> UserUse { get; private set; } = new();
-    public Dictionary<int, int> SettingUse { get; private set; } = new();
 
     public async Task OnGetAsync()
     {
@@ -50,14 +46,10 @@ public class IndexModel : PageModel
             .OrderBy(t => t.Name).ToListAsync();
 
         Components = await _db.StoreComponents.AsNoTracking().OrderBy(c => c.Name).ToListAsync();
-        Users = await _db.StoreUsers.AsNoTracking().OrderBy(u => u.Username).ToListAsync();
-        Settings = await _db.StoreSettings.AsNoTracking().OrderBy(s => s.Key).ToListAsync();
 
         PluginUse = await CountAsync(_db.ProfileStorePlugins.Select(x => x.StorePluginId));
         TemplateUse = await CountAsync(_db.ProfileStoreTemplates.Select(x => x.StoreTemplateId));
         ComponentUse = await CountAsync(_db.ProfileStoreComponents.Select(x => x.StoreComponentId));
-        UserUse = await CountAsync(_db.ProfileStoreUsers.Select(x => x.StoreUserId));
-        SettingUse = await CountAsync(_db.ProfileStoreSettings.Select(x => x.StoreSettingId));
     }
 
     private static async Task<Dictionary<int, int>> CountAsync(IQueryable<int> ids) =>

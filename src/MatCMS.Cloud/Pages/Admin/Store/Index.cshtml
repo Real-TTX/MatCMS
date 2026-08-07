@@ -13,8 +13,6 @@
     <button type="button" class="tab active" data-tab="plugins">@T["profiles.tabPlugins"]</button>
     <button type="button" class="tab" data-tab="templates">@T["profiles.tabTemplates"]</button>
     <button type="button" class="tab" data-tab="components">@T["profiles.tabComponents"]</button>
-    <button type="button" class="tab" data-tab="users">@T["profiles.tabUsers"]</button>
-    <button type="button" class="tab" data-tab="settings">@T["profiles.tabSettings"]</button>
 </div>
 
 @* ============ PLUGINS ============ *@
@@ -153,96 +151,6 @@
         }
         <div class="list-actions">
             <span class="muted">@T["store.editorPending"]</span>
-        </div>
-    </div>
-</div>
-
-@* ============ USERS ============ *@
-<div class="tab-panel" data-panel="users" hidden>
-    <div data-list>
-        <div class="page-head">
-            <h2>@T["profiles.tabUsers"]</h2>
-            <div class="list-toolbar">
-                <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
-            </div>
-        </div>
-        <p class="muted">@T["store.usersHint"]</p>
-        @if (Model.Users.Count == 0)
-        {
-            <div class="list-empty">@T["store.noUsers"]</div>
-        }
-        else
-        {
-            <table class="data" data-list-table>
-                <thead>
-                    <tr><th>@T["users.username"]</th><th>@T["users.email"]</th><th>@T["users.displayName"]</th><th>@T["store.usedBy"]</th><th></th></tr>
-                </thead>
-                <tbody>
-                    @foreach (var u in Model.Users)
-                    {
-                        <tr data-search="@(u.Username + " " + u.Email + " " + u.DisplayName)">
-                            <td><a asp-page="User" asp-route-id="@u.Id"><strong>@u.Username</strong></a></td>
-                            <td class="muted">@(u.Email ?? "—")</td>
-                            <td class="muted">@(u.DisplayName ?? "—")</td>
-                            <td><span class="badge badge-off">@T["store.profileCount", Model.Uses(Model.UserUse, u.Id)]</span></td>
-                            <td>
-                                <div class="actions">
-                                    <span class="muted">@T["store.editorPending"]</span>
-                                </div>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-            <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
-        }
-        <div class="list-actions">
-            <a class="btn" asp-page="User">@T["profiles.addUser"]</a>
-        </div>
-    </div>
-</div>
-
-@* ============ SETTINGS ============ *@
-<div class="tab-panel" data-panel="settings" hidden>
-    <div data-list>
-        <div class="page-head">
-            <h2>@T["profiles.tabSettings"]</h2>
-            <div class="list-toolbar">
-                <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
-            </div>
-        </div>
-        @if (Model.Settings.Count == 0)
-        {
-            <div class="list-empty">@T["store.noSettings"]</div>
-        }
-        else
-        {
-            <table class="data" data-list-table>
-                <thead>
-                    <tr><th>@T["profiles.settingKey"]</th><th>@T["profiles.settingValue"]</th><th>@T["store.usedBy"]</th><th></th></tr>
-                </thead>
-                <tbody>
-                    @foreach (var s in Model.Settings)
-                    {
-                        @* The value is deliberately NOT in data-search for a secret: the search
-                           index sits in the DOM, and a stored password has no business being there. *@
-                        <tr data-search="@(s.IsSecret ? s.Key : s.Key + " " + s.Value)">
-                            <td><a asp-page="Setting" asp-route-id="@s.Id"><span class="mono">@s.Key</span></a></td>
-                            <td class="muted">@(s.IsSecret ? "••••••" : s.Value)</td>
-                            <td><span class="badge badge-off">@T["store.profileCount", Model.Uses(Model.SettingUse, s.Id)]</span></td>
-                            <td>
-                                <div class="actions">
-                                    <a class="btn btn-sm btn-ghost" asp-page="Setting" asp-route-id="@s.Id">@T["action.edit"]</a>
-                                </div>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-            <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
-        }
-        <div class="list-actions">
-            <a class="btn" asp-page="Setting">@T["profiles.addSetting"]</a>
         </div>
     </div>
 </div>

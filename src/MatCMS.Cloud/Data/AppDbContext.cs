@@ -23,13 +23,10 @@ public class AppDbContext : DbContext
     public DbSet<StorePlugin> StorePlugins => Set<StorePlugin>();
     public DbSet<StoreTemplate> StoreTemplates => Set<StoreTemplate>();
     public DbSet<StoreComponent> StoreComponents => Set<StoreComponent>();
-    public DbSet<StoreUser> StoreUsers => Set<StoreUser>();
-    public DbSet<StoreSetting> StoreSettings => Set<StoreSetting>();
     public DbSet<ProfileStorePlugin> ProfileStorePlugins => Set<ProfileStorePlugin>();
     public DbSet<ProfileStoreTemplate> ProfileStoreTemplates => Set<ProfileStoreTemplate>();
     public DbSet<ProfileStoreComponent> ProfileStoreComponents => Set<ProfileStoreComponent>();
-    public DbSet<ProfileStoreUser> ProfileStoreUsers => Set<ProfileStoreUser>();
-    public DbSet<ProfileStoreSetting> ProfileStoreSettings => Set<ProfileStoreSetting>();
+    public DbSet<ProfileGlobalUser> ProfileGlobalUsers => Set<ProfileGlobalUser>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -81,16 +78,13 @@ public class AppDbContext : DbContext
         b.Entity<StorePlugin>().HasIndex(p => p.Key).IsUnique();
         b.Entity<StoreTemplate>().HasIndex(t => t.Name).IsUnique();
         b.Entity<StoreComponent>().HasIndex(c => c.Type).IsUnique();
-        b.Entity<StoreUser>().HasIndex(u => u.Username).IsUnique();
-        b.Entity<StoreSetting>().HasIndex(s => s.Key).IsUnique();
 
         // Selections cascade from both sides: deleting a profile or a store entry only removes the
         // link, never the other end.
         b.Entity<ProfileStorePlugin>().HasIndex(x => new { x.ProfileId, x.StorePluginId }).IsUnique();
         b.Entity<ProfileStoreTemplate>().HasIndex(x => new { x.ProfileId, x.StoreTemplateId }).IsUnique();
         b.Entity<ProfileStoreComponent>().HasIndex(x => new { x.ProfileId, x.StoreComponentId }).IsUnique();
-        b.Entity<ProfileStoreUser>().HasIndex(x => new { x.ProfileId, x.StoreUserId }).IsUnique();
-        b.Entity<ProfileStoreSetting>().HasIndex(x => new { x.ProfileId, x.StoreSettingId }).IsUnique();
+        b.Entity<ProfileGlobalUser>().HasIndex(x => new { x.ProfileId, x.UserId }).IsUnique();
 
         foreach (var link in new Action[]
         {
@@ -100,10 +94,8 @@ public class AppDbContext : DbContext
                     b.Entity<ProfileStoreTemplate>().HasOne(x => x.StoreTemplate).WithMany().HasForeignKey(x => x.StoreTemplateId).OnDelete(DeleteBehavior.Cascade); },
             () => { b.Entity<ProfileStoreComponent>().HasOne(x => x.Profile).WithMany().HasForeignKey(x => x.ProfileId).OnDelete(DeleteBehavior.Cascade);
                     b.Entity<ProfileStoreComponent>().HasOne(x => x.StoreComponent).WithMany().HasForeignKey(x => x.StoreComponentId).OnDelete(DeleteBehavior.Cascade); },
-            () => { b.Entity<ProfileStoreUser>().HasOne(x => x.Profile).WithMany().HasForeignKey(x => x.ProfileId).OnDelete(DeleteBehavior.Cascade);
-                    b.Entity<ProfileStoreUser>().HasOne(x => x.StoreUser).WithMany().HasForeignKey(x => x.StoreUserId).OnDelete(DeleteBehavior.Cascade); },
-            () => { b.Entity<ProfileStoreSetting>().HasOne(x => x.Profile).WithMany().HasForeignKey(x => x.ProfileId).OnDelete(DeleteBehavior.Cascade);
-                    b.Entity<ProfileStoreSetting>().HasOne(x => x.StoreSetting).WithMany().HasForeignKey(x => x.StoreSettingId).OnDelete(DeleteBehavior.Cascade); }
+            () => { b.Entity<ProfileGlobalUser>().HasOne(x => x.Profile).WithMany().HasForeignKey(x => x.ProfileId).OnDelete(DeleteBehavior.Cascade);
+                    b.Entity<ProfileGlobalUser>().HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade); }
         }) link();
     }
 }

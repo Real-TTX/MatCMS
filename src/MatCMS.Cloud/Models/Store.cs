@@ -76,29 +76,6 @@ public class StoreComponent
     public string TemplateHtml { get; set; } = "";
 }
 
-/// <summary>
-/// An account in the store — the practical case being the operator's own admin login, rolled out to
-/// every site they run. <see cref="Username"/> is the identity; the password is hashed once here and
-/// the plaintext never stored.
-/// </summary>
-public class StoreUser
-{
-    public int Id { get; set; }
-    public string Username { get; set; } = "";
-    public string? Email { get; set; }
-    public string? DisplayName { get; set; }
-    public string PasswordHash { get; set; } = "";
-    public string Role { get; set; } = "Admin";
-}
-
-/// <summary>A setting in the store, keyed by a MatCMS setting key.</summary>
-public class StoreSetting
-{
-    public int Id { get; set; }
-    public string Key { get; set; } = "";
-    public string? Value { get; set; }
-    public bool IsSecret { get; set; }
-}
 
 // --- Selection: which store entries a profile rolls out ----------------------
 // Plain join rows rather than a many-to-many navigation, so a selection can be added or removed
@@ -131,20 +108,17 @@ public class ProfileStoreComponent
     public StoreComponent? StoreComponent { get; set; }
 }
 
-public class ProfileStoreUser
-{
-    public int Id { get; set; }
-    public int ProfileId { get; set; }
-    public Profile? Profile { get; set; }
-    public int StoreUserId { get; set; }
-    public StoreUser? StoreUser { get; set; }
-}
 
-public class ProfileStoreSetting
+/// <summary>
+/// Assigns one of the cloud's OWN users (Admin → Benutzer) to a profile, so the account is rolled
+/// out to that profile's instances. There is no store table for users on purpose: they already exist
+/// here, and a catalogue an instance can browse must never contain accounts.
+/// </summary>
+public class ProfileGlobalUser
 {
     public int Id { get; set; }
     public int ProfileId { get; set; }
     public Profile? Profile { get; set; }
-    public int StoreSettingId { get; set; }
-    public StoreSetting? StoreSetting { get; set; }
+    public int UserId { get; set; }
+    public User? User { get; set; }
 }

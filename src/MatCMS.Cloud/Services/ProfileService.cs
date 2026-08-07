@@ -129,13 +129,17 @@ public class ProfileService
         {
             // Secrets are stored encrypted and only decrypted here, on the way to the instance over
             // its authenticated channel — they are never held in the clear at rest.
-            var settings = (await _db.ProfileStoreSettings.AsNoTracking()
-                    .Where(x => x.ProfileId == profile.Id)
-                    .Select(x => x.StoreSetting!)
-                    .ToListAsync(ct))
-                .ToDictionary(s => s.Key, s => s.IsSecret ? _secrets.Unprotect(s.Value) : s.Value,
-                    StringComparer.OrdinalIgnoreCase);
+            var settings = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
 
+            // Global first: the cloud's own SMTP configuration, if this profile passes it on.
+            if (profile.UseGlobalSmtp)
+            {
+                var smtpKeys = SettingKeys.Smtp;
+                foreach (var row in await _db.CloudSettings.AsNoTracking().Where(s => smtpKeys.Contains(s.Key)).ToListAsync(ct))
+                    settings[row.Key] = row.Value;
+            }
+
+            // The profile's own rows on top — that is the override.
             foreach (var local in await _db.ProfileSettings.AsNoTracking().Where(s => s.ProfileId == profile.Id).ToListAsync(ct))
                 settings[local.Key] = local.IsSecret ? _secrets.Unprotect(local.Value) : local.Value;
 
@@ -144,9 +148,11 @@ public class ProfileService
 
         if (profile.SyncUsers)
         {
-            var users = await _db.ProfileStoreUsers.AsNoTracking()
+            // Global first: the cloud's own accounts that were assigned to this profile. Same hash
+            // format as MatCMS uses, so the account works on the instance as it does here.
+            var users = await _db.ProfileGlobalUsers.AsNoTracking()
                 .Where(x => x.ProfileId == profile.Id)
-                .Select(x => x.StoreUser!)
+                .Select(x => x.User!)
                 .ToDictionaryAsync(u => u.Username, u => new ConfigUser
                 {
                     Username = u.Username, Email = u.Email, DisplayName = u.DisplayName,

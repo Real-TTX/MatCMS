@@ -131,12 +131,15 @@ builder.Services.AddRazorPages(options =>
 
 var app = builder.Build();
 
-// --- Create schema + seed default data on startup ---
-// No EF migrations (same as MatCMS): a model change needs `docker compose down -v`.
+// --- Bring the schema up to date + seed default data on startup ---
+// EF MIGRATIONS, deliberately unlike MatCMS. The cloud stores instance links: a schema change that
+// drops the database costs every connected site its token and forces a re-enrol. That happened four
+// times while this was built on EnsureCreated — with real customer sites it is not an option.
+// Adding a table now means `dotnet ef migrations add <Name>` and nothing else.
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.EnsureCreated();
+    db.Database.Migrate();
     await DbSeeder.SeedAsync(scope.ServiceProvider);
 }
 

@@ -88,7 +88,7 @@
                     {
                         <tr data-search="@(t.Name + " " + t.Description)">
                             <td>
-                                <a asp-page="Template" asp-route-id="@t.Id"><strong>@t.Name</strong></a>
+                                <strong>@t.Name</strong>
                                 <div class="muted">@t.Description</div>
                             </td>
                             <td><span class="token-chip" style="background:@t.AccentColor;color:#fff;border-color:@t.AccentColor;">@t.AccentColor</span></td>
@@ -96,7 +96,7 @@
                             <td><span class="badge badge-off">@T["store.profileCount", Model.Uses(Model.TemplateUse, t.Id)]</span></td>
                             <td>
                                 <div class="actions">
-                                    <a class="btn btn-sm btn-ghost" asp-page="Template" asp-route-id="@t.Id">@T["action.edit"]</a>
+                                    <span class="muted">@T["store.editorPending"]</span>
                                 </div>
                             </td>
                         </tr>
@@ -106,7 +106,7 @@
             <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
         }
         <div class="list-actions">
-            <a class="btn" asp-page="Template">@T["profiles.templateAdd"]</a>
+            <span class="muted">@T["store.editorPending"]</span>
         </div>
     </div>
 </div>
@@ -135,14 +135,14 @@
                     {
                         <tr data-search="@(c.Name + " " + c.Type + " " + c.Description)">
                             <td>
-                                <a asp-page="Component" asp-route-id="@c.Id"><strong>@c.Name</strong></a>
+                                <strong>@c.Name</strong>
                                 <div class="muted">@c.Description</div>
                             </td>
                             <td class="mono">@c.Type</td>
                             <td><span class="badge badge-off">@T["store.profileCount", Model.Uses(Model.ComponentUse, c.Id)]</span></td>
                             <td>
                                 <div class="actions">
-                                    <a class="btn btn-sm btn-ghost" asp-page="Component" asp-route-id="@c.Id">@T["action.edit"]</a>
+                                    <span class="muted">@T["store.editorPending"]</span>
                                 </div>
                             </td>
                         </tr>
@@ -152,7 +152,7 @@
             <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
         }
         <div class="list-actions">
-            <a class="btn" asp-page="Component">@T["profiles.addComponent"]</a>
+            <span class="muted">@T["store.editorPending"]</span>
         </div>
     </div>
 </div>
@@ -181,13 +181,13 @@
                     @foreach (var u in Model.Users)
                     {
                         <tr data-search="@(u.Username + " " + u.Email + " " + u.DisplayName)">
-                            <td><a asp-page="User" asp-route-id="@u.Id"><strong>@u.Username</strong></a></td>
+                            <td><strong>@u.Username</strong></td>
                             <td class="muted">@(u.Email ?? "—")</td>
                             <td class="muted">@(u.DisplayName ?? "—")</td>
                             <td><span class="badge badge-off">@T["store.profileCount", Model.Uses(Model.UserUse, u.Id)]</span></td>
                             <td>
                                 <div class="actions">
-                                    <a class="btn btn-sm btn-ghost" asp-page="User" asp-route-id="@u.Id">@T["action.edit"]</a>
+                                    <span class="muted">@T["store.editorPending"]</span>
                                 </div>
                             </td>
                         </tr>
@@ -197,7 +197,7 @@
             <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
         }
         <div class="list-actions">
-            <a class="btn" asp-page="User">@T["profiles.addUser"]</a>
+            <span class="muted">@T["store.editorPending"]</span>
         </div>
     </div>
 </div>
@@ -227,12 +227,12 @@
                         @* The value is deliberately NOT in data-search for a secret: the search
                            index sits in the DOM, and a stored password has no business being there. *@
                         <tr data-search="@(s.IsSecret ? s.Key : s.Key + " " + s.Value)">
-                            <td><a asp-page="Setting" asp-route-id="@s.Id"><span class="mono">@s.Key</span></a></td>
+                            <td><span class="mono">@s.Key</span></td>
                             <td class="muted">@(s.IsSecret ? "••••••" : s.Value)</td>
                             <td><span class="badge badge-off">@T["store.profileCount", Model.Uses(Model.SettingUse, s.Id)]</span></td>
                             <td>
                                 <div class="actions">
-                                    <a class="btn btn-sm btn-ghost" asp-page="Setting" asp-route-id="@s.Id">@T["action.edit"]</a>
+                                    <span class="muted">@T["store.editorPending"]</span>
                                 </div>
                             </td>
                         </tr>
@@ -242,7 +242,7 @@
             <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
         }
         <div class="list-actions">
-            <a class="btn" asp-page="Setting">@T["profiles.addSetting"]</a>
+            <span class="muted">@T["store.editorPending"]</span>
         </div>
     </div>
 </div>

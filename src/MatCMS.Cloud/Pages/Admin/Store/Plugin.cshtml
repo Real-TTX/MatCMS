@@ -1,0 +1,114 @@
+@page "{id:int?}"
+@model MatCMS.Cloud.Pages.Admin.Store.PluginModel
+@{
+    ViewData["Title"] = Model.IsNew ? T["profiles.addPlugin"] : Model.Item.Name;
+}
+<div class="page-head">
+    <h1>
+        @(Model.IsNew ? T["profiles.addPlugin"] : Model.Item.Name)
+        <span class="muted" style="font-size:14px;font-weight:400;"> — @T["store.title"]</span>
+    </h1>
+    <div class="list-toolbar">
+        @if (!Model.IsNew)
+        {
+            <a class="btn btn-sm btn-ghost" asp-page="Plugin" asp-page-handler="Download" asp-route-id="@Model.Item.Id">
+                <i class="ti ti-download" aria-hidden="true"></i> @T["profiles.pluginDownload"]
+            </a>
+        }
+        <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
+    </div>
+</div>
+
+@if (!Model.IsNew && Model.UsedBy.Count > 0)
+{
+    @* An edit here reaches every profile that selected this entry — say so before it is saved, not
+       after. *@
+    <div class="alert alert-info">
+        @T["store.usedByWarning"] <strong>@string.Join(", ", Model.UsedBy)</strong>
+    </div>
+}
+
+@* A plugin is created by uploading a bundle, not by typing one. *@
+<form method="post" asp-page-handler="Upload" asp-route-id="@(Model.IsNew ? null : (int?)Model.Item.Id)" enctype="multipart/form-data">
+    <div class="card">
+        <h2>@(Model.IsNew ? T["profiles.addPlugin"] : T["profiles.pluginReplace"])</h2>
+        <div class="form-field">
+            <label for="bundle">@T["profiles.pluginUpload"]</label>
+            <input id="bundle" name="bundle" type="file" accept=".zip" required />
+            <div class="help">@T["profiles.pluginUploadHint"]</div>
+        </div>
+        <div><button type="submit" class="btn@(Model.IsNew ? "" : " btn-ghost")">@T["profiles.pluginUploadBtn"]</button></div>
+    </div>
+</form>
+
+@if (!Model.IsNew)
+{
+    <form method="post" asp-route-id="@Model.Item.Id">
+        <div class="card">
+            <h2>@T["profiles.pluginEdit"]</h2>
+            <p class="muted">@T["profiles.pluginEditHint"]</p>
+            <div class="form-grid">
+                <div class="form-row">
+                    <div class="form-field">
+                        <label for="pname">@T["common.name"]</label>
+                        <input id="pname" name="name" value="@Model.Item.Name" required />
+                    </div>
+                    <div class="form-field">
+                        <label for="pversion">@T["instances.version"]</label>
+                        <input id="pversion" name="version" value="@Model.Item.Version" placeholder="1.0" spellcheck="false" />
+                        <div class="help">@T["profiles.pluginVersionHint"]</div>
+                    </div>
+                </div>
+            </div>
+            <div class="form-field">
+                <label for="pdesc">@T["profiles.description"]</label>
+                <input id="pdesc" name="description" value="@Model.Item.Description" />
+            </div>
+            <div class="kv">
+                <div class="kv-label">@T["profiles.pluginKey"]</div>
+                <div class="kv-value mono">@Model.Item.Key</div>
+            </div>
+            @if (Model.Assets.Count > 0)
+            {
+                <div class="kv">
+                    <div class="kv-label">@T["profiles.pluginAssets"]</div>
+                    <div class="kv-value">
+                        <div class="code-toolbar">
+                            @foreach (var asset in Model.Assets)
+                            {
+                                <span class="token-chip">@asset</span>
+                            }
+                        </div>
+                        <div class="help">@T["profiles.pluginAssetsHint"]</div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="card">
+            <h2>@T["profiles.pluginCode"]</h2>
+            <div class="form-field">
+                <textarea id="pcode" name="code" rows="24" spellcheck="false" data-code="js">@Model.Code</textarea>
+                <div class="help">@T["profiles.pluginCodeHint"]</div>
+            </div>
+        </div>
+
+        <div class="list-actions">
+            <button type="submit" class="btn">@T["settings.save"]</button>
+        </div>
+    </form>
+
+    <div class="card danger-zone">
+        <h2>@T["instances.dangerZone"]</h2>
+        <div class="actions">
+            <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@Model.Item.Id"
+                  onsubmit="return confirm('@T["store.pluginDeleteConfirm"]');">
+                <button type="submit" class="btn btn-sm btn-danger">@T["common.delete"]</button>
+            </form>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <partial name="_CodeEditorAssets" />
+}

@@ -218,6 +218,65 @@
             <div class="kv-value muted">@(Model.Item.LastSyncUtc?.ToString("dd.MM.yyyy HH:mm:ss") ?? "—")</div>
         </div>
     </div>
+
+    @* The instance is the only side that knows what actually happened — whether a component already
+       existed, whether a plugin import blew up. It says so, we show it verbatim. *@
+    <div class="card">
+        <div data-list>
+            <div class="page-head">
+                <h2>@T["instances.report"]</h2>
+                @if (Model.SyncReport.Count > 0)
+                {
+                    <div class="list-toolbar">
+                        <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+                    </div>
+                }
+            </div>
+            <p class="help">@T["instances.reportHint"]</p>
+            @if (Model.SyncReport.Count == 0)
+            {
+                <div class="list-empty">@T["instances.reportNone"]</div>
+            }
+            else
+            {
+                <table class="data" data-list-table>
+                    <thead>
+                        <tr>
+                            <th style="width:130px;">@T["instances.reportKind"]</th>
+                            <th>@T["instances.reportId"]</th>
+                            <th style="width:150px;">@T["instances.reportOutcome"]</th>
+                            <th>@T["instances.reportDetail"]</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in Model.SyncReport)
+                        {
+                            @* Unknown kinds/outcomes fall back to the raw string: a newer instance may
+                               report something this cloud has no label for, and hiding it would be worse
+                               than showing it untranslated. *@
+                            var kindKey = $"instances.kind.{r.Kind}";
+                            var outcomeKey = $"instances.outcome.{r.Outcome}";
+                            var kind = T[kindKey] == kindKey ? r.Kind : T[kindKey];
+                            var outcome = T[outcomeKey] == outcomeKey ? r.Outcome : T[outcomeKey];
+                            var badge = r.Outcome switch
+                            {
+                                "installed" or "updated" => "badge-on",
+                                "failed" => "badge-err",
+                                _ => "badge-off"
+                            };
+                            <tr data-search="@r.Kind @r.Id @r.Outcome @r.Detail">
+                                <td class="muted">@kind</td>
+                                <td class="mono">@r.Id</td>
+                                <td><span class="badge @badge">@outcome</span></td>
+                                <td class="muted">@r.Detail</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+            }
+        </div>
+    </div>
 </div>
 
 @* ============ EVENTS ============ *@

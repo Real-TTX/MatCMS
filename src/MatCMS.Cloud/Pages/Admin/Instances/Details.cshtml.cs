@@ -26,6 +26,11 @@ public class DetailsModel : PageModel
     public List<InstanceEvent> Events { get; private set; } = new();
     public List<Profile> Profiles { get; private set; } = new();
 
+    /// <summary>What the instance said it did with the last configuration, item by item. The cloud
+    /// derives nothing from it — an instance that predates the report simply sends none, which is why
+    /// an empty list must read as "no information", not as "nothing was applied".</summary>
+    public List<SyncItemReport> SyncReport { get; private set; } = new();
+
     public bool OutOfSync => InstanceService.IsOutOfSync(Item);
 
     /// <summary>Token shown once after a rotation (never stored in the clear).</summary>
@@ -53,7 +58,17 @@ public class DetailsModel : PageModel
             .Take(50)
             .ToListAsync();
         Profiles = await _db.Profiles.AsNoTracking().OrderBy(p => p.Name).ToListAsync();
+        SyncReport = ParseReport(item.LastSyncReportJson);
         return true;
+    }
+
+    /// <summary>Never throws: the report is foreign input from an instance that may run a newer or
+    /// broken build, and a malformed one must not take the whole details page down.</summary>
+    private static List<SyncItemReport> ParseReport(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return new();
+        try { return System.Text.Json.JsonSerializer.Deserialize<List<SyncItemReport>>(json) ?? new(); }
+        catch { return new(); }
     }
 
     public async Task<IActionResult> OnPostApproveAsync(int id)

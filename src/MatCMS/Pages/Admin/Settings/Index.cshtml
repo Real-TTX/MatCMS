@@ -118,13 +118,62 @@
                     }
                 </div>
             </div>
-            <div style="margin-top:14px;">
-                <form method="post" asp-page-handler="CloudSync" style="margin:0;">
+            <div class="actions" style="margin-top:14px;">
+                <form method="post" asp-page-handler="CloudPreview" class="inline-form">
+                    <button type="submit" class="btn btn-ghost">@T["settings.cloudPreview"]</button>
+                </form>
+                <form method="post" asp-page-handler="CloudSync" class="inline-form">
                     <button type="submit" class="btn btn-ghost">@T["settings.cloudSyncNow"]</button>
                 </form>
             </div>
         }
     </div>
+
+    @* Shown only right after a "Vorschau" click. Same table as the log below, because it is the same
+       data — what WOULD happen, produced by the same code that would do it. *@
+    @if (Model.Preview is not null)
+    {
+        <div class="card">
+            <h2>@T["settings.cloudPreviewTitle"]</h2>
+            <p class="help">@T["settings.cloudPreviewHint"]</p>
+            @if (Model.Preview.Count == 0)
+            {
+                <div class="list-empty">@T["settings.cloudPreviewNothing"]</div>
+            }
+            else
+            {
+                <table class="data">
+                    <thead>
+                        <tr>
+                            <th style="width:130px;">@T["settings.cloudReportKind"]</th>
+                            <th>@T["settings.cloudReportId"]</th>
+                            <th style="width:150px;">@T["settings.cloudReportOutcome"]</th>
+                            <th>@T["settings.cloudReportDetail"]</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in Model.Preview)
+                        {
+                            var kindKey = $"settings.cloudKind.{r.Kind}";
+                            var outcomeKey = $"settings.cloudOutcome.{r.Outcome}";
+                            var badge = r.Outcome switch
+                            {
+                                "installed" or "updated" => "badge-on",
+                                "failed" => "badge-err",
+                                _ => "badge-off"
+                            };
+                            <tr>
+                                <td class="muted">@(T[kindKey] == kindKey ? r.Kind : T[kindKey])</td>
+                                <td class="mono">@r.Id</td>
+                                <td><span class="badge @badge">@(T[outcomeKey] == outcomeKey ? r.Outcome : T[outcomeKey])</span></td>
+                                <td class="muted">@r.Detail</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    }
 
     @* The same log the cloud sees, shown here as well: it is this site's admin who has to know what
        a rollout changed underneath them, and they should not have to ask the cloud operator. *@

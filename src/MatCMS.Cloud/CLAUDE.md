@@ -25,8 +25,7 @@ poll; local/remote classification; cloud-side container updates with rollback; t
 notification watchdog; and the **profile sync engine** rolling out settings, users, plugins,
 components and templates. The instance side lives in `../MatCMS` — see *Instance side* below.
 
-**Not built yet:** a preview of what a sync would change before applying it, and the per-apply
-history. `docker-compose.prod.yml` still declares an `external` network `main` that does not exist on
+**Not built yet:** a per-apply history (only the LAST report is kept, per instance). `docker-compose.prod.yml` still declares an `external` network `main` that does not exist on
 every host.
 
 When extending it, copy the sibling repo's patterns rather than inventing new ones.
@@ -52,13 +51,14 @@ When extending it, copy the sibling repo's patterns rather than inventing new on
   `OnPostCloudConnect` (join code) / `CloudManual` / `CloudSync` / `CloudTest` / `CloudDisconnect`).
   Connecting sends a heartbeat immediately so the operator gets a verdict instead of waiting a minute.
 
-### Schema changes hurt — by design
+### Schema changes: migrations, not a wipe
 
-Both apps use `EnsureCreated()` with no EF migrations (MatCMS's rule, inherited deliberately). Adding
-a table therefore means `docker compose down -v` on the cloud, which **drops every instance link** —
-connected instances then get 401 and must re-enroll. This bit once during development already. While
-the schema is still moving fast, expect it; if it becomes painful, that is the moment to argue for
-migrations rather than working around it.
+The cloud uses **EF migrations** (`Data/Migrations/`, `db.Database.Migrate()` at startup) — it was
+switched over after `EnsureCreated()` forced `docker compose down -v` four times, each of which
+**dropped every instance link** and made connected instances re-enroll. A model change here means
+`dotnet ef migrations add <Name>` and nothing else. Check what EF generated before committing: for the
+sync-mode change it guessed a column rename that would have cross-wired AND inverted four columns.
+MatCMS itself still uses `EnsureCreated()`.
 
 ## Sibling repositories (same parent folder `C:\Users\Matthias\Desktop\Development`)
 
@@ -80,9 +80,9 @@ Matmon.Cloud's `src/`-layout or PostgreSQL.
 - **Flat repo root project**: `MatCMS.Cloud.csproj` at the root (no `src/`), `RootNamespace`
   `MatCMS.Cloud`, folders `Program.cs`, `Data/`, `Models/`, `Services/`, `Pages/`, `Resources/`,
   `wwwroot/`.
-- **SQLite via EF Core**, one file at `appdata/matcmscloud.db`. **No EF migrations** —
-  `db.Database.EnsureCreated()` + a `DbSeeder` at startup, exactly like MatCMS. Consequence: a model
-  change needs `docker compose down -v` (say so in the README).
+- **SQLite via EF Core**, one file at `appdata/matcmscloud.db`, plus a `DbSeeder` at startup. This
+  is the one place the cloud deliberately diverges from MatCMS: it runs **EF migrations**
+  (`db.Database.Migrate()`), because losing every instance link on each model change was untenable.
 - **Cookie auth** (`matcmscloud.auth`, 7 days sliding), login only via `/login`, `Admin` policy,
   `AuthorizeFolder("/Admin", "Admin")`, DataProtection keys persisted to `appdata/keys`, per-IP
   rate limit on `/login` (10/min) — copy the `Program.cs` blocks from MatCMS.
@@ -389,6 +389,17 @@ import failed. That is also why this scales — adding a payload type later need
 only another line in the report. A skipped *einmalig* payload reports every item it would have
 contained as `skipped-once`, so the operator can tell it apart from a broken sync. Failures are
 reported **before** the exception is thrown, which is what names the plugin that broke a rollout.
+
+### Preview before applying
+
+The instance offers **Vorschau** next to *Konfiguration jetzt anwenden* (Einstellungen → Cloud). It
+fetches the config and runs `CloudSyncService.PreviewAsync`, which is **the same code as the real
+apply** with every write suppressed (`_dryRun`) — a second "what would change" implementation would
+drift from the one that actually changes things, and a preview that lies is worse than none. Plugin
+bundles are not downloaded for it: the decision only needs the two version strings. Two details that
+only matter in a dry run: the change tracker is cleared afterwards so nothing modified leaks into the
+next save on that scoped `DbContext`, and a template named for activation counts as present when
+**this same run** would install it, otherwise the preview would report a spurious failure.
 
 `ConfigRevision` alone no longer means "in sync", so the badge reads the report too:
 `InstanceService.Summarise` counts the outcomes, and a `failed` item shows as *Fehler* even when the

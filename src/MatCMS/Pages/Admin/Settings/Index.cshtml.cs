@@ -33,6 +33,10 @@ public class IndexModel : PageModel
     /// the cloud is sent, shown to this site's own admin.</summary>
     public List<SyncItemReport> SyncReport { get; private set; } = new();
 
+    /// <summary>Result of a "Vorschau" click, surviving the PRG redirect in TempData. Null unless the
+    /// operator just asked for one — the preview is a question, not a state of the site.</summary>
+    public List<SyncItemReport>? Preview { get; private set; }
+
     [BindProperty] public Dictionary<string, string> Values { get; set; } = new();
 
     /// <summary>Checked non-default language codes (Sprachen tab).</summary>
@@ -66,6 +70,14 @@ public class IndexModel : PageModel
             .OrderBy(p => p.Title).ToListAsync();
         Cloud = await _cloud.GetSettingsAsync();
         if (Cloud.Configured) SyncReport = await _sync.LastReportAsync() ?? new();
+
+        if (TempData["CloudPreview"] is string previewJson)
+        {
+            // Never throws: this is our own JSON, but a stale cookie from an older build must not
+            // take the settings page down.
+            try { Preview = System.Text.Json.JsonSerializer.Deserialize<List<SyncItemReport>>(previewJson); }
+            catch { Preview = null; }
+        }
     }
 
     // --- MatCMS.Cloud link (Cloud tab) --------------------------------------
@@ -105,6 +117,24 @@ public class IndexModel : PageModel
             TempData["Flash"] = "Mit der Cloud verbunden.";
         else
             TempData["FlashError"] = $"Verbindung fehlgeschlagen: {CloudState.LastError}";
+        return RedirectToPage(new { tab = "cloud" });
+    }
+
+    /// <summary>Shows what the next apply would change, without changing anything. Carried through
+    /// the redirect as JSON in TempData so the page keeps its PRG shape.</summary>
+    public async Task<IActionResult> OnPostCloudPreviewAsync()
+    {
+        var result = await _cloud.PreviewAsync(HttpContext.RequestAborted);
+        if (!result.Ok)
+        {
+            TempData["FlashError"] = $"Vorschau nicht möglich: {result.Error}";
+            return RedirectToPage(new { tab = "cloud" });
+        }
+
+        TempData["CloudPreview"] = System.Text.Json.JsonSerializer.Serialize(result.Report);
+        TempData["Flash"] = result.Report.Count == 0
+            ? "Es gibt nichts anzuwenden — die Instanz ist auf dem Stand des Profils."
+            : $"Vorschau für Revision {result.Revision}: {result.Report.Count} Objekte.";
         return RedirectToPage(new { tab = "cloud" });
     }
 

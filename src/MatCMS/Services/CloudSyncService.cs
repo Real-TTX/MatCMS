@@ -39,6 +39,14 @@ public class CloudSyncService
     /// on the next heartbeat — the cloud derives nothing, it only keeps the record.</summary>
     private readonly List<SyncItemReport> _report = new();
 
+    /// <summary>
+    /// Set for the duration of a preview run. Every write in this class is guarded by it, so the
+    /// preview and the real apply take the exact same decisions through the exact same code — the
+    /// only difference is whether anything is persisted. Safe as instance state because the service
+    /// is scoped and one run never overlaps another on the same <c>DbContext</c>.
+    /// </summary>
+    private bool _dryRun;
+
     private void Report(string kind, string id, string outcome, string? detail = null) =>
         _report.Add(new SyncItemReport { Kind = kind, Id = id, Outcome = outcome, Detail = detail });
 
@@ -87,12 +95,27 @@ public class CloudSyncService
     /// key — passed in so this class stays free of HTTP and can be reasoned about (and tested)
     /// without a cloud.
     /// </summary>
-    public async Task<SyncResult> ApplyAsync(
+    public Task<SyncResult> ApplyAsync(
         InstanceConfig config, Func<string, CancellationToken, Task<byte[]?>> fetchPlugin,
-        CancellationToken ct = default)
+        CancellationToken ct = default) => RunAsync(config, fetchPlugin, dryRun: false, ct);
+
+    /// <summary>
+    /// Works out what an apply WOULD do, without touching anything. Runs the exact same code with
+    /// every write suppressed — a separate "what would change" implementation would drift from the
+    /// real one, and a preview that lies is worse than no preview.
+    /// <para>Plugin bundles are not downloaded here: the decision only needs the installed version
+    /// against the offered one, and a preview must not pull megabytes.</para>
+    /// </summary>
+    public Task<SyncResult> PreviewAsync(InstanceConfig config, CancellationToken ct = default) =>
+        RunAsync(config, (_, _) => Task.FromResult<byte[]?>(null), dryRun: true, ct);
+
+    private async Task<SyncResult> RunAsync(
+        InstanceConfig config, Func<string, CancellationToken, Task<byte[]?>> fetchPlugin,
+        bool dryRun, CancellationToken ct)
     {
         var applied = new List<string>();
         _report.Clear();
+        _dryRun = dryRun;
         try
         {
             var seeded = await LoadSeededAsync(config.ProfileId, ct);
@@ -153,6 +176,15 @@ public class CloudSyncService
                 else ReportSkippedOnce("plugin", config.Plugins.Select(p => p.Key));
             }
 
+            if (dryRun)
+            {
+                // Nothing was written, so there is no state to record — and the change tracker is
+                // cleared because a preview must not leave modified entities behind for whatever
+                // saves next on this scoped DbContext.
+                _db.ChangeTracker.Clear();
+                return new(true, config.Revision, null, applied, _report);
+            }
+
             // Only after everything went through: a payload that threw must be allowed to seed again
             // on the next attempt, otherwise a single failed rollout would freeze it forever.
             if (newlySeeded.Count > 0)
@@ -169,13 +201,24 @@ public class CloudSyncService
         }
         catch (Exception ex)
         {
+            var message = ex.Message.Length > 500 ? ex.Message[..500] : ex.Message;
+            if (dryRun)
+            {
+                _db.ChangeTracker.Clear();
+                _log.LogInformation(ex, "Previewing the cloud configuration failed");
+                return new(false, config.Revision, message, applied, _report);
+            }
+
             // Keep the previously applied revision: a failed apply must not look like a successful
             // one, and the cloud shows the error verbatim.
-            var message = ex.Message.Length > 500 ? ex.Message[..500] : ex.Message;
             await SetStateAsync(await AppliedRevisionAsync(ct), message, ct);
             _log.LogWarning(ex, "Applying cloud configuration failed");
             await SetReportAsync(ct);
             return new(false, config.Revision, message, applied, _report);
+        }
+        finally
+        {
+            _dryRun = false;
         }
     }
 
@@ -196,7 +239,7 @@ public class CloudSyncService
             var row = await _db.SiteSettings.FirstOrDefaultAsync(s => s.Key == key, ct);
             if (row is null)
             {
-                _db.SiteSettings.Add(new SiteSetting { Key = key, Value = value ?? "" });
+                if (!_dryRun) _db.SiteSettings.Add(new SiteSetting { Key = key, Value = value ?? "" });
                 Report("setting", key, "installed");
                 count++;
             }
@@ -206,7 +249,7 @@ public class CloudSyncService
                 // reporting it as one would make every revision look like it touched the whole site.
                 if (row.Value != (value ?? "")) { Report("setting", key, "updated"); count++; }
                 else Report("setting", key, "skipped-exists", "Wert ist bereits gesetzt");
-                row.Value = value ?? "";
+                if (!_dryRun) row.Value = value ?? "";
             }
             else
             {
@@ -214,7 +257,7 @@ public class CloudSyncService
             }
         }
 
-        await _db.SaveChangesAsync(ct);
+        await SaveAsync(ct);
         return count;
     }
 
@@ -236,19 +279,22 @@ public class CloudSyncService
                 continue;
             }
 
-            _db.Users.Add(new User
+            if (!_dryRun)
             {
-                Username = name,
-                Email = u.Email,
-                DisplayName = u.DisplayName,
-                PasswordHash = u.PasswordHash,
-                Role = string.IsNullOrWhiteSpace(u.Role) ? "Admin" : u.Role
-            });
+                _db.Users.Add(new User
+                {
+                    Username = name,
+                    Email = u.Email,
+                    DisplayName = u.DisplayName,
+                    PasswordHash = u.PasswordHash,
+                    Role = string.IsNullOrWhiteSpace(u.Role) ? "Admin" : u.Role
+                });
+            }
             Report("user", name, "installed");
             count++;
         }
 
-        await _db.SaveChangesAsync(ct);
+        await SaveAsync(ct);
         return count;
     }
 
@@ -266,25 +312,31 @@ public class CloudSyncService
             var row = await _db.Components.FirstOrDefaultAsync(x => x.Type == type, ct);
             if (row is null)
             {
-                _db.Components.Add(new Component
+                if (!_dryRun)
                 {
-                    Type = type,
-                    Name = c.Name,
-                    Description = c.Description,
-                    Icon = c.Icon,
-                    FieldsJson = string.IsNullOrWhiteSpace(c.FieldsJson) ? "[]" : c.FieldsJson,
-                    TemplateHtml = c.TemplateHtml
-                });
+                    _db.Components.Add(new Component
+                    {
+                        Type = type,
+                        Name = c.Name,
+                        Description = c.Description,
+                        Icon = c.Icon,
+                        FieldsJson = string.IsNullOrWhiteSpace(c.FieldsJson) ? "[]" : c.FieldsJson,
+                        TemplateHtml = c.TemplateHtml
+                    });
+                }
                 Report("component", type, "installed");
                 count++;
             }
             else if (overwrite)
             {
-                row.Name = c.Name;
-                row.Description = c.Description;
-                row.Icon = c.Icon;
-                row.FieldsJson = string.IsNullOrWhiteSpace(c.FieldsJson) ? "[]" : c.FieldsJson;
-                row.TemplateHtml = c.TemplateHtml;
+                if (!_dryRun)
+                {
+                    row.Name = c.Name;
+                    row.Description = c.Description;
+                    row.Icon = c.Icon;
+                    row.FieldsJson = string.IsNullOrWhiteSpace(c.FieldsJson) ? "[]" : c.FieldsJson;
+                    row.TemplateHtml = c.TemplateHtml;
+                }
                 Report("component", type, "updated");
                 count++;
             }
@@ -294,7 +346,7 @@ public class CloudSyncService
             }
         }
 
-        await _db.SaveChangesAsync(ct);
+        await SaveAsync(ct);
         return count;
     }
 
@@ -315,6 +367,11 @@ public class CloudSyncService
         List<ConfigTemplate> templates, bool overwrite, string? activate, CancellationToken ct)
     {
         var count = 0;
+        // Names this run puts on the instance. Needed for the activation check below: during a
+        // preview nothing is written yet, so a template that WOULD be installed here must not be
+        // reported as "missing" a few lines later.
+        var rolledOut = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var t in templates)
         {
             var name = (t.Name ?? "").Trim();
@@ -322,62 +379,75 @@ public class CloudSyncService
 
             var row = await _db.Templates.FirstOrDefaultAsync(x => x.Name == name, ct);
             var isNew = row is null;
-            if (row is null)
-            {
-                row = new Template { Name = name };
-                _db.Templates.Add(row);
-            }
-            else if (!overwrite)
+            if (!isNew && !overwrite)
             {
                 Report("template", name, "skipped-exists");
                 continue;
             }
 
-            row.AccentColor = t.AccentColor;
-            row.SecondaryColor = t.SecondaryColor;
-            row.HeadingFont = t.HeadingFont;
-            row.BodyFont = t.BodyFont;
-            row.ButtonStyle = t.ButtonStyle;
-            row.HeadingColor = t.HeadingColor;
-            row.TextColor = t.TextColor;
-            row.BackgroundColor = t.BackgroundColor;
-            row.AltBackground = t.AltBackground;
-            row.ContainerWidth = t.ContainerWidth;
-            row.ButtonRadius = t.ButtonRadius;
-            row.HeaderBackground = t.HeaderBackground;
-            row.HeaderTextColor = t.HeaderTextColor;
-            row.HeaderPadding = t.HeaderPadding;
-            row.CustomCss = t.CustomCss;
-            row.CustomJs = t.CustomJs;
-            row.LayoutHtml = t.LayoutHtml;
-            row.MenuMapJson = string.IsNullOrWhiteSpace(t.MenuMapJson) ? "{}" : t.MenuMapJson;
-            row.ParametersJson = string.IsNullOrWhiteSpace(t.ParametersJson) ? "[]" : t.ParametersJson;
-            row.SchemaVersion = t.SchemaVersion <= 0 ? 1 : t.SchemaVersion;
-            row.PartsJson = string.IsNullOrWhiteSpace(t.PartsJson) ? "{}" : t.PartsJson;
-            if (isNew)
-                row.ParamValuesJson = string.IsNullOrWhiteSpace(t.ParamValuesJson) ? "{}" : t.ParamValuesJson;
+            if (!_dryRun)
+            {
+                if (row is null)
+                {
+                    row = new Template { Name = name };
+                    _db.Templates.Add(row);
+                }
 
+                row.AccentColor = t.AccentColor;
+                row.SecondaryColor = t.SecondaryColor;
+                row.HeadingFont = t.HeadingFont;
+                row.BodyFont = t.BodyFont;
+                row.ButtonStyle = t.ButtonStyle;
+                row.HeadingColor = t.HeadingColor;
+                row.TextColor = t.TextColor;
+                row.BackgroundColor = t.BackgroundColor;
+                row.AltBackground = t.AltBackground;
+                row.ContainerWidth = t.ContainerWidth;
+                row.ButtonRadius = t.ButtonRadius;
+                row.HeaderBackground = t.HeaderBackground;
+                row.HeaderTextColor = t.HeaderTextColor;
+                row.HeaderPadding = t.HeaderPadding;
+                row.CustomCss = t.CustomCss;
+                row.CustomJs = t.CustomJs;
+                row.LayoutHtml = t.LayoutHtml;
+                row.MenuMapJson = string.IsNullOrWhiteSpace(t.MenuMapJson) ? "{}" : t.MenuMapJson;
+                row.ParametersJson = string.IsNullOrWhiteSpace(t.ParametersJson) ? "[]" : t.ParametersJson;
+                row.SchemaVersion = t.SchemaVersion <= 0 ? 1 : t.SchemaVersion;
+                row.PartsJson = string.IsNullOrWhiteSpace(t.PartsJson) ? "{}" : t.PartsJson;
+                if (isNew)
+                    row.ParamValuesJson = string.IsNullOrWhiteSpace(t.ParamValuesJson) ? "{}" : t.ParamValuesJson;
+            }
+
+            rolledOut.Add(name);
             Report("template", name, isNew ? "installed" : "updated");
             count++;
         }
 
-        await _db.SaveChangesAsync(ct);
+        await SaveAsync(ct);
 
         // Activation is a separate step: exactly one template is active, so this both sets the named
-        // one and clears the rest. An unknown name is ignored rather than leaving the site with no
+        // one and clears the rest. An unknown name is reported rather than leaving the site with no
         // active design at all.
         var wanted = (activate ?? "").Trim();
         if (wanted.Length > 0)
         {
             var target = await _db.Templates.FirstOrDefaultAsync(x => x.Name == wanted, ct);
-            if (target is null)
+            if (target is null && !rolledOut.Contains(wanted))
                 Report("template", wanted, "failed", "Soll aktiviert werden, ist hier aber nicht vorhanden.");
+            else if (target is null)
+            {
+                // Preview only: it arrives with this very rollout, so activation would succeed.
+                Report("template", wanted, "updated", "Als aktives Design gesetzt");
+            }
             else if (!target.IsActive)
             {
-                foreach (var other in await _db.Templates.Where(x => x.IsActive).ToListAsync(ct))
-                    other.IsActive = false;
-                target.IsActive = true;
-                await _db.SaveChangesAsync(ct);
+                if (!_dryRun)
+                {
+                    foreach (var other in await _db.Templates.Where(x => x.IsActive).ToListAsync(ct))
+                        other.IsActive = false;
+                    target.IsActive = true;
+                    await SaveAsync(ct);
+                }
                 Report("template", wanted, "updated", "Als aktives Design gesetzt");
             }
         }
@@ -416,6 +486,16 @@ public class CloudSyncService
                     Report("plugin", key, "skipped-exists", $"Version {installed.Version} bereits installiert");
                     continue; // same version — nothing to do
                 }
+            }
+
+            if (_dryRun)
+            {
+                // No download in a preview: the decision above already needed nothing but the two
+                // version strings, and pulling megabytes to answer "what would change" is not on.
+                Report("plugin", key, installed is null ? "installed" : "updated",
+                    installed is null ? $"Version {p.Version}" : $"Version {installed.Version} → {p.Version}");
+                count++;
+                continue;
             }
 
             var bundle = await fetchPlugin(key, ct);
@@ -457,6 +537,15 @@ public class CloudSyncService
             .Where(s => s.Key == SettingKeys.CloudSyncError)
             .Select(s => s.Value).FirstOrDefaultAsync(ct);
         return string.IsNullOrWhiteSpace(raw) ? null : raw;
+    }
+
+    /// <summary>Saves — unless this is a preview, where nothing was changed to begin with. Every
+    /// write path in this class goes through here or through an explicit <c>_dryRun</c> check, which
+    /// is what makes "preview" and "apply" the same code.</summary>
+    private async Task SaveAsync(CancellationToken ct)
+    {
+        if (_dryRun) return;
+        await _db.SaveChangesAsync(ct);
     }
 
     /// <summary>Persists the report so the next heartbeat can carry it even if the apply happened

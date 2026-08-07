@@ -328,6 +328,27 @@ public class CloudService
         return result;
     }
 
+    /// <summary>Fetches the configuration and reports what applying it WOULD do — nothing is written
+    /// and no state is touched, so this stays safe to click on a live site.</summary>
+    public async Task<CloudSyncService.SyncResult> PreviewAsync(CancellationToken ct = default)
+    {
+        var settings = await GetSettingsAsync();
+        if (!settings.Configured)
+            return new(false, 0, "Keine Cloud-Verbindung konfiguriert.", [], []);
+
+        var client = CreateClient(settings);
+        var res = await client.GetAsync($"{settings.Url}/api/instances/{settings.InstanceId}/config", ct);
+        if (!res.IsSuccessStatusCode)
+            return new(false, 0, res.StatusCode == System.Net.HttpStatusCode.Forbidden
+                ? "Die Instanz ist in der Cloud noch nicht freigegeben."
+                : $"Konfiguration konnte nicht geladen werden (HTTP {(int)res.StatusCode}).", [], []);
+
+        var config = await res.Content.ReadFromJsonAsync<InstanceConfig>(ct);
+        if (config is null) return new(false, 0, "Leere Konfiguration erhalten.", [], []);
+
+        return await _sync.PreviewAsync(config, ct);
+    }
+
     private async Task<byte[]?> FetchPluginAsync(CloudSettings settings, string key, CancellationToken ct)
     {
         var client = CreateClient(settings);

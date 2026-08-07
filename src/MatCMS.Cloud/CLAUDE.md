@@ -264,6 +264,29 @@ DataProtection), sent as an `X-MatCMS-Instance-Token` header.
 container identity) is in place on both sides; the **sync applier** on the instance still has to be
 written when the sync engine lands here.
 
+### Global vs. profile-local — the rule
+
+**A profile consists of global information and may additionally have its own.** There are two
+different kinds of "global", and conflating them was a mistake that had to be corrected:
+
+| Global thing | Where it lives | Assignable to a profile | In the instance-facing catalogue |
+| --- | --- | --- | --- |
+| **Templates, plugins, components** | the **Store** (`Store*` tables, *Admin → Store*) | yes | **yes** — this is what "Weiter durchsuchen…" browses |
+| **Users** | the cloud's **existing** `Users` table (*Admin → Benutzer*) | yes | **never** |
+| **SMTP / settings** | the cloud's **existing** `CloudSettings` (*Admin → Einstellungen → SMTP*) | yes | **never** |
+
+The store is a **catalogue**: things you shop for and install. Users and SMTP are shared
+configuration — you assign them, you do not browse them. That is why they must never appear in the
+catalogue API an instance can query, and why they need no store tables of their own.
+
+> **Correction to fix (this is currently wrong in the code):** `StoreUser`, `StoreSetting`,
+> `ProfileStoreUser` and `ProfileStoreSetting` duplicate what already exists. Replace them with
+> links from a profile to the existing `Users` rows and to the global SMTP settings, drop the
+> Users/Settings tabs from *Admin → Store*, and delete `Pages/Admin/Store/User.*` and
+> `Pages/Admin/Store/Setting.*`. `ProfileService.BuildConfigAsync` then resolves users and settings
+> from the global tables plus the profile's own, with the profile's own winning — the same
+> precedence that already applies to the store payloads.
+
 ### Profiles and the sync engine
 
 A **profile** is a configuration bundle plus the policy for every instance assigned to it

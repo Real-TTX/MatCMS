@@ -337,6 +337,40 @@ Two guards worth keeping: the instance refuses pushed settings whose key is in `
 (otherwise one profile could rewrite an instance's cloud link), and imported plugins stay **disabled**
 because plugin code runs server-side.
 
+### Next: three sync modes and a report back (designed, not built)
+
+Today a payload is either overwritten or only added when missing. That misses the case the operator
+actually wants most often: **roll this out once to get the site started, then leave it alone.**
+
+Replace the two booleans (`Overwrite*`) with one mode per payload:
+
+| Mode | Meaning | How the instance decides |
+| --- | --- | --- |
+| **Einmalig** | seed once, never touch again | apply only if this profile/item has not been applied here before |
+| **Ergänzen** | create what is missing | apply only when the identity does not exist locally |
+| **Synchron halten** | keep in line with the profile | apply every time (today's overwrite) |
+
+*Einmalig* is the only one that needs memory, and it must live **on the instance**: whether something
+was already seeded here is a fact about this site, not about the profile. A `cloud.seeded` setting
+holding the identities already applied is enough — it survives restarts and costs one row.
+
+**The report is what makes this usable.** The heartbeat already carries `AppliedRevision` and
+`SyncError`; extend it to a per-item outcome the instance produces while applying:
+
+```
+installed | updated | skipped-exists | skipped-once | failed(reason)
+```
+
+The cloud stores that verbatim against the instance and renders it on the detail page. It computes
+nothing: the instance is the only party that knows whether a component already existed or a plugin
+import failed, so it says so, and the cloud is a record keeper. That is also why this scales — adding
+a payload type later needs no cloud-side logic, only a new outcome line.
+
+Two consequences worth keeping in mind when building it: `ConfigRevision` alone stops being enough to
+mean "in sync" (an instance can be on the current revision with three items skipped), so the badge
+needs to read the report; and *Einmalig* must be reported as `skipped-once` rather than silently
+doing nothing, otherwise the operator cannot tell it apart from a broken sync.
+
 ### Update checks & notifications
 
 - `GhcrClient` lists all tags of a public GHCR package. It follows the `Link: …; rel="next"`

@@ -139,6 +139,40 @@ public sealed class InstanceConfig
     public bool OverwriteTemplates { get; set; }
 }
 
+// --- Catalogue ------------------------------------------------------------
+// What an approved instance sees when it browses the store itself ("Weiter durchsuchen…" in MatCMS),
+// independent of any profile. Deliberately only the three catalogue types: users and settings are
+// shared configuration, not something a site shops for, and must never be listed here.
+
+public sealed class StoreCatalog
+{
+    public List<CatalogPlugin> Plugins { get; set; } = new();
+    public List<CatalogTemplate> Templates { get; set; } = new();
+    public List<CatalogComponent> Components { get; set; } = new();
+}
+
+public sealed class CatalogPlugin
+{
+    public string Key { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string Version { get; set; } = "";
+    public string Description { get; set; } = "";
+}
+
+public sealed class CatalogTemplate
+{
+    public string Name { get; set; } = "";
+    public string Description { get; set; } = "";
+    public string AccentColor { get; set; } = "";
+}
+
+public sealed class CatalogComponent
+{
+    public string Type { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string Description { get; set; } = "";
+}
+
 /// <summary>A theme rolled out to the instance. <c>Name</c> is the identity; whether it becomes the
 /// live design is decided once by <see cref="InstanceConfig.ActivateTemplate"/>.</summary>
 public sealed class ConfigTemplate

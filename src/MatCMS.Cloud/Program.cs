@@ -262,6 +262,91 @@ app.MapPost("/api/instances/{publicId}/disconnect", async (
     return Results.Ok();
 }).RequireRateLimiting("instanceApi");
 
+// --- Catalogue ------------------------------------------------------------
+// The store, browsable by an approved instance itself ("Weiter durchsuchen…" in MatCMS). This is the
+// direct Store → instance path, with no profile involved: a site can pull a plugin, template or
+// component on demand. Users and settings are deliberately NOT here — they are shared configuration,
+// and listing accounts to every connected site would be indefensible.
+
+// Resolves and authorises the caller for every catalogue route.
+static async Task<MatCMS.Cloud.Models.Instance?> CatalogCallerAsync(
+    HttpContext ctx, string publicId, InstanceService instances)
+{
+    var token = ctx.Request.Headers[InstanceProtocol.TokenHeader].ToString();
+    var instance = await instances.AuthenticateAsync(publicId, token);
+    return instance?.Status == MatCMS.Cloud.Models.InstanceStatus.Approved ? instance : null;
+}
+
+app.MapGet("/api/store/{publicId}/catalog", async (
+    HttpContext ctx, string publicId, InstanceService instances, AppDbContext db) =>
+{
+    if (await CatalogCallerAsync(ctx, publicId, instances) is null) return Results.Unauthorized();
+
+    return Results.Ok(new StoreCatalog
+    {
+        Plugins = await db.StorePlugins.AsNoTracking()
+            .Select(p => new CatalogPlugin { Key = p.Key, Name = p.Name, Version = p.Version, Description = p.Description })
+            .OrderBy(p => p.Name).ToListAsync(),
+        Templates = await db.StoreTemplates.AsNoTracking()
+            .Select(t => new CatalogTemplate { Name = t.Name, Description = t.Description, AccentColor = t.AccentColor })
+            .OrderBy(t => t.Name).ToListAsync(),
+        Components = await db.StoreComponents.AsNoTracking()
+            .Select(c => new CatalogComponent { Type = c.Type, Name = c.Name, Description = c.Description })
+            .OrderBy(c => c.Name).ToListAsync()
+    });
+}).RequireRateLimiting("instanceApi");
+
+app.MapGet("/api/store/{publicId}/plugin/{key}", async (
+    HttpContext ctx, string publicId, string key, InstanceService instances, AppDbContext db) =>
+{
+    if (await CatalogCallerAsync(ctx, publicId, instances) is null) return Results.Unauthorized();
+
+    var plugin = await db.StorePlugins.AsNoTracking().FirstOrDefaultAsync(p => p.Key == key);
+    return plugin is null || plugin.Bundle.Length == 0
+        ? Results.NotFound()
+        : Results.File(plugin.Bundle, "application/zip", $"{plugin.Key}.zip");
+}).RequireRateLimiting("instanceApi");
+
+app.MapGet("/api/store/{publicId}/template/{name}", async (
+    HttpContext ctx, string publicId, string name, InstanceService instances, AppDbContext db) =>
+{
+    if (await CatalogCallerAsync(ctx, publicId, instances) is null) return Results.Unauthorized();
+
+    var t = await db.StoreTemplates.AsNoTracking().FirstOrDefaultAsync(x => x.Name == name);
+    if (t is null) return Results.NotFound();
+
+    // Same shape the profile sync delivers, so the instance applies it through one code path.
+    return Results.Ok(new ConfigTemplate
+    {
+        Name = t.Name,
+        AccentColor = t.AccentColor, SecondaryColor = t.SecondaryColor,
+        HeadingFont = t.HeadingFont, BodyFont = t.BodyFont, ButtonStyle = t.ButtonStyle,
+        HeadingColor = t.HeadingColor, TextColor = t.TextColor,
+        BackgroundColor = t.BackgroundColor, AltBackground = t.AltBackground,
+        ContainerWidth = t.ContainerWidth, ButtonRadius = t.ButtonRadius,
+        HeaderBackground = t.HeaderBackground, HeaderTextColor = t.HeaderTextColor,
+        HeaderPadding = t.HeaderPadding, CustomCss = t.CustomCss, CustomJs = t.CustomJs,
+        LayoutHtml = t.LayoutHtml, MenuMapJson = t.MenuMapJson,
+        ParametersJson = t.ParametersJson, ParamValuesJson = t.ParamValuesJson,
+        SchemaVersion = t.SchemaVersion, PartsJson = t.PartsJson
+    });
+}).RequireRateLimiting("instanceApi");
+
+app.MapGet("/api/store/{publicId}/component/{type}", async (
+    HttpContext ctx, string publicId, string type, InstanceService instances, AppDbContext db) =>
+{
+    if (await CatalogCallerAsync(ctx, publicId, instances) is null) return Results.Unauthorized();
+
+    var c = await db.StoreComponents.AsNoTracking().FirstOrDefaultAsync(x => x.Type == type);
+    return c is null
+        ? Results.NotFound()
+        : Results.Ok(new ConfigComponent
+        {
+            Type = c.Type, Name = c.Name, Description = c.Description,
+            Icon = c.Icon, FieldsJson = c.FieldsJson, TemplateHtml = c.TemplateHtml
+        });
+}).RequireRateLimiting("instanceApi");
+
 // Language switcher: sets the culture cookie and redirects back to a safe, local URL.
 app.MapPost("/set-language", async (HttpContext ctx) =>
 {

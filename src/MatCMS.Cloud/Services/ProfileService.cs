@@ -13,8 +13,13 @@ namespace MatCMS.Cloud.Services;
 public class ProfileService
 {
     private readonly AppDbContext _db;
+    private readonly SecretProtector _secrets;
 
-    public ProfileService(AppDbContext db) => _db = db;
+    public ProfileService(AppDbContext db, SecretProtector secrets)
+    {
+        _db = db;
+        _secrets = secrets;
+    }
 
     /// <summary>
     /// Human-typeable join code: uppercase, grouped, and drawn from an alphabet without the
@@ -122,13 +127,17 @@ public class ProfileService
         // (setting key, username, component type, template name, plugin key) and not on a row id.
         if (profile.SyncSettings)
         {
-            var settings = await _db.ProfileStoreSettings.AsNoTracking()
-                .Where(x => x.ProfileId == profile.Id)
-                .Select(x => x.StoreSetting!)
-                .ToDictionaryAsync(s => s.Key, s => s.Value, StringComparer.OrdinalIgnoreCase, ct);
+            // Secrets are stored encrypted and only decrypted here, on the way to the instance over
+            // its authenticated channel — they are never held in the clear at rest.
+            var settings = (await _db.ProfileStoreSettings.AsNoTracking()
+                    .Where(x => x.ProfileId == profile.Id)
+                    .Select(x => x.StoreSetting!)
+                    .ToListAsync(ct))
+                .ToDictionary(s => s.Key, s => s.IsSecret ? _secrets.Unprotect(s.Value) : s.Value,
+                    StringComparer.OrdinalIgnoreCase);
 
             foreach (var local in await _db.ProfileSettings.AsNoTracking().Where(s => s.ProfileId == profile.Id).ToListAsync(ct))
-                settings[local.Key] = local.Value;
+                settings[local.Key] = local.IsSecret ? _secrets.Unprotect(local.Value) : local.Value;
 
             config.Settings = settings;
         }

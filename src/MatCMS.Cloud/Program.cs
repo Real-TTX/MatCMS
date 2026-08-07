@@ -78,6 +78,7 @@ builder.Services.AddScoped<CloudContext>();
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<InstanceService>();
 builder.Services.AddScoped<ProfileService>();
+builder.Services.AddSingleton<SecretProtector>();
 builder.Services.AddScoped<AdoptionService>();
 builder.Services.AddScoped<VersionService>();
 

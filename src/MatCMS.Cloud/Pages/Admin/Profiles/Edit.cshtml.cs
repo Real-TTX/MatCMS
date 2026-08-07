@@ -21,12 +21,14 @@ public class EditModel : PageModel
     private readonly AppDbContext _db;
     private readonly ProfileService _profiles;
     private readonly AuthService _auth;
+    private readonly SecretProtector _secrets;
 
-    public EditModel(AppDbContext db, ProfileService profiles, AuthService auth)
+    public EditModel(AppDbContext db, ProfileService profiles, AuthService auth, SecretProtector secrets)
     {
         _db = db;
         _profiles = profiles;
         _auth = auth;
+        _secrets = secrets;
     }
 
     public Profile Item { get; private set; } = new();
@@ -149,8 +151,10 @@ public class EditModel : PageModel
         await UpsertSettingAsync(id, "smtp.host", host?.Trim());
         await UpsertSettingAsync(id, "smtp.port", port?.Trim());
         await UpsertSettingAsync(id, "smtp.user", user?.Trim());
+        // Encrypted before it ever reaches the database. An empty field keeps the stored value, so
+        // saving the form does not wipe the secret.
         if (!string.IsNullOrEmpty(password))
-            await UpsertSettingAsync(id, "smtp.password", password, secret: true);
+            await UpsertSettingAsync(id, "smtp.password", _secrets.Protect(password), secret: true);
         await UpsertSettingAsync(id, "smtp.fromEmail", fromEmail?.Trim());
         await UpsertSettingAsync(id, "smtp.fromName", fromName?.Trim());
         await UpsertSettingAsync(id, "smtp.ssl", ssl ? "1" : "0");

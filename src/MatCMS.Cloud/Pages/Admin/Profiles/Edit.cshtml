@@ -231,7 +231,7 @@
                 <tbody>
                     @foreach (var s in Model.OtherSettings)
                     {
-                        <tr data-search="@(s.Key + " " + s.Value)">
+                        <tr data-search="@(s.IsSecret ? s.Key : s.Key + " " + s.Value)">
                             <td><a asp-page="Setting" asp-route-profileId="@Model.Item.Id" asp-route-id="@s.Id"><span class="mono">@s.Key</span></a></td>
                             <td class="muted">@s.Value</td>
                             <td>

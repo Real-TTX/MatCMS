@@ -224,7 +224,9 @@
                 <tbody>
                     @foreach (var s in Model.Settings)
                     {
-                        <tr data-search="@(s.Key + " " + s.Value)">
+                        @* The value is deliberately NOT in data-search for a secret: the search
+                           index sits in the DOM, and a stored password has no business being there. *@
+                        <tr data-search="@(s.IsSecret ? s.Key : s.Key + " " + s.Value)">
                             <td><a asp-page="Setting" asp-route-id="@s.Id"><span class="mono">@s.Key</span></a></td>
                             <td class="muted">@(s.IsSecret ? "••••••" : s.Value)</td>
                             <td><span class="badge badge-off">@T["store.profileCount", Model.Uses(Model.SettingUse, s.Id)]</span></td>

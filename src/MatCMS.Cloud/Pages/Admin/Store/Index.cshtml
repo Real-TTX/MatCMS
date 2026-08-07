@@ -181,7 +181,7 @@
                     @foreach (var u in Model.Users)
                     {
                         <tr data-search="@(u.Username + " " + u.Email + " " + u.DisplayName)">
-                            <td><strong>@u.Username</strong></td>
+                            <td><a asp-page="User" asp-route-id="@u.Id"><strong>@u.Username</strong></a></td>
                             <td class="muted">@(u.Email ?? "—")</td>
                             <td class="muted">@(u.DisplayName ?? "—")</td>
                             <td><span class="badge badge-off">@T["store.profileCount", Model.Uses(Model.UserUse, u.Id)]</span></td>
@@ -197,7 +197,7 @@
             <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
         }
         <div class="list-actions">
-            <span class="muted">@T["store.editorPending"]</span>
+            <a class="btn" asp-page="User">@T["profiles.addUser"]</a>
         </div>
     </div>
 </div>

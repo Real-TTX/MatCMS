@@ -14,6 +14,7 @@
   "store.noComponents": "No components in the store yet.",
   "store.noUsers": "No users in the store yet.",
   "store.noSettings": "No settings in the store yet.",
+  "store.userDeleteConfirm": "Remove this user from the store? Profiles lose the selection; accounts already rolled out stay on the instances.",
   "store.pluginDeleteConfirm": "Remove this plugin from the store? Profiles lose the selection; it stays on the instances.",
 
   "profiles.title": "Profiles",

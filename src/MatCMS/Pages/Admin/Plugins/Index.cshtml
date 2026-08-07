@@ -57,6 +57,10 @@
     }
     <div class="list-actions">
         <a class="btn" asp-page="Create">@T["plugins.new"]</a>
+        @if (Model.CloudConnected)
+        {
+            <a class="btn btn-ghost" asp-page="Index" asp-route-browse="true">@T["plugins.browseCloud"]</a>
+        }
         <form method="post" asp-page-handler="Import" enctype="multipart/form-data" class="asset-upload" style="margin:0;">
             <input type="file" name="file" accept=".zip" required />
             <button type="submit" class="btn btn-ghost">Plugin importieren (ZIP)</button>
@@ -64,3 +68,58 @@
     </div>
     <p class="help">Ein Bündel mit gleichem Schlüssel <em>aktualisiert</em> ein vorhandenes Plugin; ein neues wird deaktiviert importiert.</p>
 </div>
+
+@* ============ Katalog der verbundenen Cloud ============ *@
+@* Nur auf Anforderung geladen (?browse=true), damit die Plugin-Seite nicht bei jedem Aufruf auf
+   einen entfernten Dienst wartet. *@
+@if (Model.Catalog is not null || Model.CatalogError is not null)
+{
+    <div class="card">
+        <h2>@T["plugins.cloudCatalog"]</h2>
+        @if (Model.CatalogError is not null)
+        {
+            <div class="alert alert-error">@Model.CatalogError</div>
+        }
+        else if (Model.Catalog!.Plugins.Count == 0)
+        {
+            <p class="muted">@T["plugins.cloudEmpty"]</p>
+        }
+        else
+        {
+            <p class="muted">@T["plugins.cloudIntro"]</p>
+            <table class="data">
+                <thead>
+                    <tr><th>@T["plugins.name"]</th><th>@T["about.version"]</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in Model.Catalog.Plugins)
+                    {
+                        var installed = Model.Items.FirstOrDefault(i => i.Key == p.Key);
+                        <tr>
+                            <td>
+                                <strong>@p.Name</strong>
+                                <div class="muted">@p.Description</div>
+                            </td>
+                            <td class="mono">
+                                @p.Version
+                                @if (installed is not null)
+                                {
+                                    <span class="badge badge-off">@T["plugins.cloudInstalled", installed.Version]</span>
+                                }
+                            </td>
+                            <td>
+                                <div class="actions">
+                                    <form class="inline-form" method="post" asp-page-handler="InstallFromCloud" asp-route-key="@p.Key">
+                                        <button type="submit" class="btn btn-sm">
+                                            @(installed is null ? T["plugins.cloudInstall"] : T["plugins.cloudUpdate"])
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+}

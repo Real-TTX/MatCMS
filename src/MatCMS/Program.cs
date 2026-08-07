@@ -144,6 +144,7 @@ builder.Services.AddScoped<PluginRunner>();
 builder.Services.AddSingleton<CloudState>();
 builder.Services.AddScoped<CloudService>();
 builder.Services.AddScoped<CloudSyncService>();
+builder.Services.AddScoped<CloudCatalogService>();
 builder.Services.AddHostedService<CloudConnectionService>();
 
 // Basic brute-force protection for the login endpoint (per client IP).

@@ -12,16 +12,37 @@ public class IndexModel : PageModel
     private readonly PluginRegistry _registry;
     private readonly PluginRunner _runner;
     private readonly IWebHostEnvironment _env;
-    public IndexModel(AppDbContext db, PluginRegistry registry, PluginRunner runner, IWebHostEnvironment env)
+    private readonly CloudCatalogService _catalog;
+    public IndexModel(AppDbContext db, PluginRegistry registry, PluginRunner runner, IWebHostEnvironment env, CloudCatalogService catalog)
     {
-        _db = db; _registry = registry; _runner = runner; _env = env;
+        _db = db;
+        _catalog = catalog; _registry = registry; _runner = runner; _env = env;
     }
 
     public List<MatCMS.Models.Plugin> Items { get; private set; } = new();
     public IReadOnlyDictionary<int, string> Errors => _registry.Errors;
 
-    public async Task OnGetAsync() =>
+    /// <summary>Catalogue of the connected cloud - null while no cloud is connected or it is
+    /// unreachable, which is why the browse section only renders when it has something.</summary>
+    public CloudCatalogService.Catalog? Catalog { get; private set; }
+    public bool CloudConnected { get; private set; }
+    public string? CatalogError { get; private set; }
+
+    public async Task OnGetAsync(bool browse = false)
+    {
         Items = await _db.Plugins.OrderBy(p => p.Name).ToListAsync();
+        CloudConnected = await _catalog.IsAvailableAsync();
+        // Only fetched on demand: the plugins page must not wait on a remote call every time it opens.
+        if (browse && CloudConnected)
+            (Catalog, CatalogError) = await _catalog.GetCatalogAsync(HttpContext.RequestAborted);
+    }
+
+    public async Task<IActionResult> OnPostInstallFromCloudAsync(string key)
+    {
+        var (ok, message) = await _catalog.InstallPluginAsync(key, HttpContext.RequestAborted);
+        TempData[ok ? "Flash" : "FlashError"] = message;
+        return RedirectToPage(new { browse = true });
+    }
 
     public async Task<IActionResult> OnPostImportAsync(IFormFile? file)
     {

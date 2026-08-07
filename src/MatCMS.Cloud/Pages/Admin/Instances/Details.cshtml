@@ -230,6 +230,69 @@
         </div>
     </div>
 
+    @* Every completed apply, newest first. Appended only when the instance reports a NEW run, so a
+       repeated heartbeat does not fill this with duplicates. *@
+    @if (Model.Runs.Count > 0)
+    {
+        <div class="card">
+            <div data-list data-list-key="instance-runs">
+                <div class="page-head">
+                    <h2>@T["instances.runs"]</h2>
+                    <div class="list-toolbar">
+                        <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+                    </div>
+                </div>
+                <p class="help">@T["instances.runsHint", MatCMS.Cloud.Models.InstanceSyncRun.KeepPerInstance]</p>
+                <table class="data" data-list-table>
+                    <thead>
+                        <tr>
+                            <th style="width:170px;">@T["common.time"]</th>
+                            <th style="width:100px;">@T["profiles.revision"]</th>
+                            <th>@T["instances.runOutcome"]</th>
+                            <th>@T["instances.syncFailed"]</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var run in Model.Runs)
+                        {
+                            <tr data-search="@(run.Revision + " " + run.Error)">
+                                <td class="muted mono">@run.RanAt.ToString("dd.MM.yyyy HH:mm:ss")</td>
+                                <td class="mono">@run.Revision</td>
+                                <td>
+                                    @if (run.Total == 0)
+                                    {
+                                        <span class="muted">@T["instances.runNothing"]</span>
+                                    }
+                                    else
+                                    {
+                                        @if (run.Installed > 0)
+                                        {
+                                            <span class="badge badge-on">@T["instances.runInstalled", run.Installed]</span>
+                                        }
+                                        @if (run.Updated > 0)
+                                        {
+                                            <span class="badge badge-on">@T["instances.runUpdated", run.Updated]</span>
+                                        }
+                                        @if (run.Skipped > 0)
+                                        {
+                                            <span class="badge badge-off">@T["instances.syncSkippedItems", run.Skipped]</span>
+                                        }
+                                        @if (run.Failed > 0)
+                                        {
+                                            <span class="badge badge-err">@T["instances.syncFailedItems", run.Failed]</span>
+                                        }
+                                    }
+                                </td>
+                                <td class="muted">@run.Error</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+            </div>
+        </div>
+    }
+
     @* The instance is the only side that knows what actually happened — whether a component already
        existed, whether a plugin import blew up. It says so, we show it verbatim. *@
     <div class="card">

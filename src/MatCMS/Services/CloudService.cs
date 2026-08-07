@@ -384,7 +384,8 @@ public class CloudService
             UserCount = await _db.Users.CountAsync(ct),
             AppliedRevision = await _sync.AppliedRevisionAsync(ct),
             SyncError = await _sync.LastErrorAsync(ct),
-            SyncReport = await _sync.LastReportAsync(ct)
+            SyncReport = await _sync.LastReportAsync(ct),
+            SyncRunAt = await _sync.LastRunAtAsync(ct)
         };
     }
 

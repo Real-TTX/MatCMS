@@ -87,6 +87,10 @@ public static class SettingKeys
     /// the id is cheaper — and harder to get wrong — than clearing the mark on every link change.</summary>
     public const string CloudSeeded = "cloud.seeded";
 
+    /// <summary>When the last apply finished (round-trip UTC). Sent on the heartbeat so the cloud can
+    /// tell a NEW run from the same report being repeated every minute.</summary>
+    public const string CloudSyncRunAt = "cloud.syncRunAt";
+
     // Note: TopBarLink1/2 are intentionally NOT here — the top bar moved to the "toolbar" menu.
     // The constants remain for the one-time migration in DbSeeder.
     public static readonly string[] All =
@@ -117,5 +121,5 @@ public static class SettingKeys
     /// of any generic save path — the token needs encrypting, so CloudService owns these. Also the
     /// deny-list for pushed settings: a profile must never be able to rewrite the cloud link.</summary>
     public static readonly string[] Cloud =
-        [CloudUrl, CloudInstanceId, CloudToken, CloudAppliedRevision, CloudSyncError, CloudSyncReport, CloudSeeded];
+        [CloudUrl, CloudInstanceId, CloudToken, CloudAppliedRevision, CloudSyncError, CloudSyncReport, CloudSeeded, CloudSyncRunAt];
 }

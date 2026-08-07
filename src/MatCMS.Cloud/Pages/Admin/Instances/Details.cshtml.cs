@@ -34,6 +34,9 @@ public class DetailsModel : PageModel
     /// <summary>The same report counted up, for the state badge.</summary>
     public InstanceService.SyncSummary Summary { get; private set; } = new(0, 0, 0, 0);
 
+    /// <summary>Completed applies, newest first — one row per run as the instance reported it.</summary>
+    public List<InstanceSyncRun> Runs { get; private set; } = new();
+
     public bool OutOfSync => InstanceService.IsOutOfSync(Item);
 
     /// <summary>Token shown once after a rotation (never stored in the clear).</summary>
@@ -63,6 +66,17 @@ public class DetailsModel : PageModel
         Profiles = await _db.Profiles.AsNoTracking().OrderBy(p => p.Name).ToListAsync();
         SyncReport = ParseReport(item.LastSyncReportJson);
         Summary = InstanceService.Summarise(item.LastSyncReportJson);
+        // The report body is not loaded for the listing — the counts are denormalised on the row
+        // precisely so a history of 50 runs does not drag 50 JSON blobs through memory.
+        Runs = await _db.InstanceSyncRuns.AsNoTracking()
+            .Where(r => r.InstanceId == id)
+            .OrderByDescending(r => r.RanAt)
+            .Select(r => new InstanceSyncRun
+            {
+                Id = r.Id, RanAt = r.RanAt, Revision = r.Revision, Error = r.Error,
+                Installed = r.Installed, Updated = r.Updated, Skipped = r.Skipped, Failed = r.Failed
+            })
+            .ToListAsync();
         return true;
     }
 

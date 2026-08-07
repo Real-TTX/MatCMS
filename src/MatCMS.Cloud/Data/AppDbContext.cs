@@ -10,6 +10,7 @@ public class AppDbContext : DbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<Instance> Instances => Set<Instance>();
     public DbSet<InstanceEvent> InstanceEvents => Set<InstanceEvent>();
+    public DbSet<InstanceSyncRun> InstanceSyncRuns => Set<InstanceSyncRun>();
     public DbSet<CloudSetting> CloudSettings => Set<CloudSetting>();
 
     public DbSet<Profile> Profiles => Set<Profile>();

@@ -554,7 +554,21 @@ public class CloudSyncService
     {
         await UpsertAsync(SettingKeys.CloudSyncReport,
             System.Text.Json.JsonSerializer.Serialize(_report), ct);
+        // Stamped per RUN, not per report: the same report rides on every heartbeat until the next
+        // apply, so this is what lets the cloud tell a new run from a repeat — including a re-apply
+        // that happened to produce exactly the same outcomes.
+        await UpsertAsync(SettingKeys.CloudSyncRunAt, DateTime.UtcNow.ToString("O"), ct);
         await _db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>When the last apply finished, for the heartbeat. Null when nothing ran yet.</summary>
+    public async Task<DateTime?> LastRunAtAsync(CancellationToken ct = default)
+    {
+        var raw = await _db.SiteSettings.AsNoTracking()
+            .Where(s => s.Key == SettingKeys.CloudSyncRunAt)
+            .Select(s => s.Value).FirstOrDefaultAsync(ct);
+        return DateTime.TryParse(raw, null, System.Globalization.DateTimeStyles.RoundtripKind, out var v)
+            ? v : null;
     }
 
     /// <summary>The stored report, for the heartbeat. Empty when nothing has been applied yet.</summary>

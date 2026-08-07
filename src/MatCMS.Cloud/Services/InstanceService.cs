@@ -271,6 +271,44 @@ public class InstanceService
             Log(instance, InstanceEventKind.SyncApplied, $"Konfiguration angewendet (Revision {beat.AppliedRevision}).");
         else if (beat.AppliedRevision > previousRevision && previousRevision > 0)
             Log(instance, InstanceEventKind.SyncApplied, $"Konfiguration angewendet (Revision {beat.AppliedRevision}).");
+
+        RecordSyncRun(instance, beat);
+    }
+
+    /// <summary>
+    /// Appends the run to the history — but only when the instance says it IS a new run. The same
+    /// report rides on every beat until the next apply, so appending on "the report changed" would
+    /// both miss a re-apply with identical outcomes and risk duplicating one. An instance that
+    /// predates <c>SyncRunAt</c> simply contributes no history rather than a wrong one.
+    /// </summary>
+    private void RecordSyncRun(Instance instance, HeartbeatRequest beat)
+    {
+        if (beat.SyncRunAt is null || beat.SyncRunAt == instance.LastSyncRunAt) return;
+
+        instance.LastSyncRunAt = beat.SyncRunAt;
+
+        var report = beat.SyncReport ?? new List<SyncItemReport>();
+        _db.InstanceSyncRuns.Add(new InstanceSyncRun
+        {
+            InstanceId = instance.Id,
+            RanAt = beat.SyncRunAt.Value,
+            Revision = beat.AppliedRevision,
+            Error = instance.LastSyncError,
+            ReportJson = System.Text.Json.JsonSerializer.Serialize(report),
+            Installed = report.Count(x => x.Outcome == "installed"),
+            Updated = report.Count(x => x.Outcome == "updated"),
+            Skipped = report.Count(x => x.Outcome.StartsWith("skipped", StringComparison.Ordinal)),
+            Failed = report.Count(x => x.Outcome == "failed")
+        });
+
+        // Prune here rather than in a background job: this table only ever grows on a heartbeat, so
+        // this is the one place that knows it needs trimming.
+        var stale = _db.InstanceSyncRuns
+            .Where(r => r.InstanceId == instance.Id)
+            .OrderByDescending(r => r.RanAt)
+            .Skip(InstanceSyncRun.KeepPerInstance)
+            .ToList();
+        if (stale.Count > 0) _db.InstanceSyncRuns.RemoveRange(stale);
     }
 
     /// <summary>

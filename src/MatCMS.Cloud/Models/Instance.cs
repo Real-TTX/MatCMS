@@ -69,6 +69,11 @@ public class Instance
     /// one — which is NOT the same as "nothing happened".</summary>
     public string? LastSyncReportJson { get; set; }
 
+    /// <summary>The instance-reported timestamp of the last apply we already recorded. Compared
+    /// against the heartbeat to decide whether a report is a NEW run or the same one being repeated
+    /// every minute.</summary>
+    public DateTime? LastSyncRunAt { get; set; }
+
     public DateTime? LastSyncUtc { get; set; }
 
     /// <summary>Public URL of the site, for the "open" link. Reported by the instance, editable.</summary>

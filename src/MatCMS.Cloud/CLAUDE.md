@@ -25,7 +25,7 @@ poll; local/remote classification; cloud-side container updates with rollback; t
 notification watchdog; and the **profile sync engine** rolling out settings, users, plugins,
 components and templates. The instance side lives in `../MatCMS` — see *Instance side* below.
 
-**Not built yet:** a per-apply history (only the LAST report is kept, per instance). `docker-compose.prod.yml` still declares an `external` network `main` that does not exist on
+**Not built yet:** nothing on the sync path — see the backlog at the end for what is left. `docker-compose.prod.yml` still declares an `external` network `main` that does not exist on
 every host.
 
 When extending it, copy the sibling repo's patterns rather than inventing new ones.
@@ -389,6 +389,17 @@ import failed. That is also why this scales — adding a payload type later need
 only another line in the report. A skipped *einmalig* payload reports every item it would have
 contained as `skipped-once`, so the operator can tell it apart from a broken sync. Failures are
 reported **before** the exception is thrown, which is what names the plugin that broke a rollout.
+
+### Apply history
+
+`InstanceSyncRun` keeps one row per completed apply (time as the INSTANCE reported it, revision,
+error, the full report JSON, plus denormalised counts so a listing does not parse 50 blobs). It is
+appended **only when `HeartbeatRequest.SyncRunAt` differs from `Instance.LastSyncRunAt`** — the same
+report rides on every beat until the next apply, so appending on "the report changed" would both
+duplicate runs and miss a re-apply whose outcome happened to be identical. Pruned to
+`InstanceSyncRun.KeepPerInstance` (50) on write, because that is the only moment the table grows.
+An instance older than protocol 5 sends no timestamp and contributes no history rather than a wrong
+one.
 
 ### Preview before applying
 

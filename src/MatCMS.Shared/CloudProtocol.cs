@@ -15,7 +15,7 @@ public static class CloudProtocol
     /// <summary>Contract version. Bump on <b>every</b> change to the payloads in this file: the cloud
     /// badges an instance reporting an older one as "veraltet", and both sides read this constant, so
     /// one edit covers both.</summary>
-    public const int Version = 4;
+    public const int Version = 5;
 
     /// <summary>Header carrying the instance's bearer token.</summary>
     public const string TokenHeader = "X-MatCMS-Instance-Token";
@@ -101,6 +101,13 @@ public sealed class HeartbeatRequest
     /// <summary>What the last apply did, item by item. Empty from an instance that predates the
     /// report, which is why the cloud must treat it as "no information", not "nothing happened".</summary>
     public List<SyncItemReport>? SyncReport { get; set; }
+
+    /// <summary>
+    /// When the instance finished that apply (UTC). The same report rides on every beat until the
+    /// next apply, so this is what tells the cloud "this is a NEW run" — without it, a re-apply that
+    /// happened to produce an identical report would silently vanish from the history.
+    /// </summary>
+    public DateTime? SyncRunAt { get; set; }
 }
 
 /// <summary>The cloud's answer. Pull-based: it only ever TELLS the instance what is pending; the

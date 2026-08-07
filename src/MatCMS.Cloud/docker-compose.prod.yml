@@ -20,6 +20,9 @@ services:
     restart: unless-stopped
 
 networks:
+  # Shared reverse-proxy network. It is NOT created by this file - a host that does not have it
+  # yet fails with "network main declared as external, but could not be found". Create it once:
+  #   docker network create main
   main:
     external: true
 

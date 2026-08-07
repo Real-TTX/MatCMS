@@ -17,6 +17,88 @@
     <button type="button" class="tab" data-tab="plugins">@T["profiles.tabPlugins"]</button>
     <button type="button" class="tab" data-tab="components">@T["profiles.tabComponents"]</button>
     <button type="button" class="tab" data-tab="templates">@T["profiles.tabTemplates"]</button>
+    <button type="button" class="tab" data-tab="global">@T["profiles.tabGlobal"]</button>
+</div>
+
+@* ============ GLOBAL ============ *@
+@* What this profile takes from the global side. Store entries are taken by REFERENCE: change the
+   entry in the store and every profile that ticked it rolls out the new version. *@
+<div class="tab-panel" data-panel="global" hidden>
+    <form method="post" asp-page-handler="Selections" asp-route-id="@Model.Item.Id">
+        <div class="card">
+            <h2>@T["profiles.tabGlobal"]</h2>
+            <p class="muted">@T["profiles.globalIntro"]</p>
+
+            <h3 class="form-section">@T["profiles.tabPlugins"]</h3>
+            @if (Model.StorePlugins.Count == 0)
+            {
+                <div class="list-empty">@T["store.noPlugins"]</div>
+            }
+            @foreach (var p in Model.StorePlugins)
+            {
+                <label class="checkbox-row">
+                    <input type="checkbox" name="storePlugins" value="@p.Id" checked="@(Model.SelectedPlugins.Contains(p.Id) ? "checked" : null)" />
+                    @p.Name <span class="muted mono">@p.Key @p.Version</span>
+                    @if (Model.PluginOverridden(p.Key))
+                    {
+                        <span class="badge badge-new">@T["profiles.overriddenLocally"]</span>
+                    }
+                </label>
+            }
+
+            <h3 class="form-section">@T["profiles.tabTemplates"]</h3>
+            @if (Model.StoreTemplates.Count == 0)
+            {
+                <div class="list-empty">@T["store.noTemplates"]</div>
+            }
+            @foreach (var t in Model.StoreTemplates)
+            {
+                <label class="checkbox-row">
+                    <input type="checkbox" name="storeTemplates" value="@t.Id" checked="@(Model.SelectedTemplates.Contains(t.Id) ? "checked" : null)" />
+                    @t.Name
+                    @if (Model.TemplateOverridden(t.Name))
+                    {
+                        <span class="badge badge-new">@T["profiles.overriddenLocally"]</span>
+                    }
+                </label>
+            }
+
+            <h3 class="form-section">@T["profiles.tabComponents"]</h3>
+            @if (Model.StoreComponents.Count == 0)
+            {
+                <div class="list-empty">@T["store.noComponents"]</div>
+            }
+            @foreach (var c in Model.StoreComponents)
+            {
+                <label class="checkbox-row">
+                    <input type="checkbox" name="storeComponents" value="@c.Id" checked="@(Model.SelectedComponents.Contains(c.Id) ? "checked" : null)" />
+                    @c.Name <span class="muted mono">@c.Type</span>
+                    @if (Model.ComponentOverridden(c.Type))
+                    {
+                        <span class="badge badge-new">@T["profiles.overriddenLocally"]</span>
+                    }
+                </label>
+            }
+
+            <h3 class="form-section">@T["profiles.tabUsers"]</h3>
+            <div class="help">@T["profiles.globalUsersHint"]</div>
+            @foreach (var u in Model.GlobalUsers)
+            {
+                <label class="checkbox-row">
+                    <input type="checkbox" name="globalUsers" value="@u.Id" checked="@(Model.SelectedUsers.Contains(u.Id) ? "checked" : null)" />
+                    @u.Username <span class="muted">@u.Email</span>
+                    @if (Model.UserOverridden(u.Username))
+                    {
+                        <span class="badge badge-new">@T["profiles.overriddenLocally"]</span>
+                    }
+                </label>
+            }
+
+            <div class="list-actions">
+                <button type="submit" class="btn">@T["settings.save"]</button>
+            </div>
+        </div>
+    </form>
 </div>
 
 @* ============ GENERAL ============ *@
@@ -104,6 +186,11 @@
         <div class="card">
             <h2>@T["profiles.payloads"]</h2>
             <p class="muted">@T["profiles.payloadsHint"]</p>
+            <label class="checkbox-row">
+                <input type="checkbox" name="useGlobalSmtp" value="true" checked="@(Model.Item.UseGlobalSmtp ? "checked" : null)" />
+                @T["profiles.useGlobalSmtp"]
+            </label>
+            <div class="help">@T["profiles.useGlobalSmtpHint"]</div>
             <label class="checkbox-row">
                 <input type="checkbox" name="syncSettings" value="true" checked="@(Model.Item.SyncSettings ? "checked" : null)" />
                 @T["profiles.payloadSettings"]

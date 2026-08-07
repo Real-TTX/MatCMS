@@ -39,6 +39,24 @@ public class EditModel : PageModel
     public List<ProfileTemplate> Templates { get; private set; } = new();
     public List<Instance> Instances { get; private set; } = new();
 
+    // --- What is available globally, and what this profile has taken from it ------------------
+    public List<StorePlugin> StorePlugins { get; private set; } = new();
+    public List<StoreTemplate> StoreTemplates { get; private set; } = new();
+    public List<StoreComponent> StoreComponents { get; private set; } = new();
+    public List<Models.User> GlobalUsers { get; private set; } = new();
+
+    public HashSet<int> SelectedPlugins { get; private set; } = new();
+    public HashSet<int> SelectedTemplates { get; private set; } = new();
+    public HashSet<int> SelectedComponents { get; private set; } = new();
+    public HashSet<int> SelectedUsers { get; private set; } = new();
+
+    /// <summary>True when the profile also defines its own item of that identity — the selection is
+    /// then overridden locally, and the UI says so instead of leaving the operator to work it out.</summary>
+    public bool PluginOverridden(string key) => Plugins.Any(p => p.Key == key);
+    public bool TemplateOverridden(string name) => Templates.Any(t => t.Name == name);
+    public bool ComponentOverridden(string type) => Components.Any(c => c.Type == type);
+    public bool UserOverridden(string username) => Users.Any(u => u.Username == username);
+
     /// <summary>Settings that get their own SMTP form; everything else shows in the free key/value list.</summary>
     public static readonly string[] SmtpKeys =
     [
@@ -86,13 +104,75 @@ public class EditModel : PageModel
             })
             .OrderBy(t => t.Name).ToListAsync();
         Instances = await _db.Instances.AsNoTracking().Where(i => i.ProfileId == id).OrderBy(i => i.Name).ToListAsync();
+
+        // Bundles and template bodies are never loaded here — the picker only needs identities.
+        StorePlugins = await _db.StorePlugins.AsNoTracking()
+            .Select(p => new StorePlugin { Id = p.Id, Key = p.Key, Name = p.Name, Version = p.Version, Description = p.Description })
+            .OrderBy(p => p.Name).ToListAsync();
+        StoreTemplates = await _db.StoreTemplates.AsNoTracking()
+            .Select(t => new StoreTemplate { Id = t.Id, Name = t.Name, Description = t.Description, AccentColor = t.AccentColor })
+            .OrderBy(t => t.Name).ToListAsync();
+        StoreComponents = await _db.StoreComponents.AsNoTracking()
+            .Select(c => new StoreComponent { Id = c.Id, Type = c.Type, Name = c.Name, Description = c.Description })
+            .OrderBy(c => c.Name).ToListAsync();
+        GlobalUsers = await _db.Users.AsNoTracking().OrderBy(u => u.Username).ToListAsync();
+
+        SelectedPlugins = (await _db.ProfileStorePlugins.AsNoTracking().Where(x => x.ProfileId == id).Select(x => x.StorePluginId).ToListAsync()).ToHashSet();
+        SelectedTemplates = (await _db.ProfileStoreTemplates.AsNoTracking().Where(x => x.ProfileId == id).Select(x => x.StoreTemplateId).ToListAsync()).ToHashSet();
+        SelectedComponents = (await _db.ProfileStoreComponents.AsNoTracking().Where(x => x.ProfileId == id).Select(x => x.StoreComponentId).ToListAsync()).ToHashSet();
+        SelectedUsers = (await _db.ProfileGlobalUsers.AsNoTracking().Where(x => x.ProfileId == id).Select(x => x.UserId).ToListAsync()).ToHashSet();
         return true;
+    }
+
+    /// <summary>
+    /// Saves what this profile takes from the global side: store entries by reference, and the
+    /// cloud's own user accounts. Written as a full replace of the selection — the form posts every
+    /// ticked box, so anything absent was unticked.
+    /// </summary>
+    public async Task<IActionResult> OnPostSelectionsAsync(
+        int id, int[]? storePlugins, int[]? storeTemplates, int[]? storeComponents, int[]? globalUsers)
+    {
+        var profile = await _db.Profiles.FindAsync(id);
+        if (profile is null) return RedirectToPage("Index");
+
+        await ReplaceAsync(_db.ProfileStorePlugins, x => x.ProfileId == id, storePlugins,
+            pid => new ProfileStorePlugin { ProfileId = id, StorePluginId = pid }, x => x.StorePluginId);
+        await ReplaceAsync(_db.ProfileStoreTemplates, x => x.ProfileId == id, storeTemplates,
+            tid => new ProfileStoreTemplate { ProfileId = id, StoreTemplateId = tid }, x => x.StoreTemplateId);
+        await ReplaceAsync(_db.ProfileStoreComponents, x => x.ProfileId == id, storeComponents,
+            cid => new ProfileStoreComponent { ProfileId = id, StoreComponentId = cid }, x => x.StoreComponentId);
+        await ReplaceAsync(_db.ProfileGlobalUsers, x => x.ProfileId == id, globalUsers,
+            uid => new ProfileGlobalUser { ProfileId = id, UserId = uid }, x => x.UserId);
+
+        await _db.SaveChangesAsync();
+        await _profiles.TouchAsync(id);
+        TempData["Flash"] = "Auswahl gespeichert.";
+        return RedirectToPage(new { id, tab = "global" });
+    }
+
+    /// <summary>Replaces a profile's selection of one kind: drop what is no longer ticked, add what
+    /// is new, leave the rest alone so unchanged rows keep their identity.</summary>
+    private async Task ReplaceAsync<TLink>(
+        Microsoft.EntityFrameworkCore.DbSet<TLink> set,
+        System.Linq.Expressions.Expression<Func<TLink, bool>> mine,
+        int[]? wanted, Func<int, TLink> create, Func<TLink, int> targetId) where TLink : class
+    {
+        var chosen = (wanted ?? []).ToHashSet();
+        var current = await set.Where(mine).ToListAsync();
+
+        foreach (var row in current.Where(r => !chosen.Contains(targetId(r))))
+            set.Remove(row);
+
+        var existing = current.Select(targetId).ToHashSet();
+        foreach (var add in chosen.Where(c => !existing.Contains(c)))
+            set.Add(create(add));
     }
 
     // --- General + policy ---------------------------------------------------
 
     public async Task<IActionResult> OnPostGeneralAsync(
         int id, string name, string? description, bool autoApprove, bool isDefault,
+        bool useGlobalSmtp,
         bool autoUpdateLocal, bool notifyOffline, bool notifyUpdate, string? notifyRecipients,
         bool syncSettings, bool syncUsers, bool syncPlugins, bool syncComponents, bool syncTemplates,
         bool overwriteSettings, bool overwritePlugins, bool overwriteComponents, bool overwriteTemplates,
@@ -108,6 +188,7 @@ public class EditModel : PageModel
         profile.NotifyOffline = notifyOffline;
         profile.NotifyUpdate = notifyUpdate;
         profile.NotifyRecipients = string.IsNullOrWhiteSpace(notifyRecipients) ? null : notifyRecipients.Trim();
+        profile.UseGlobalSmtp = useGlobalSmtp;
         profile.SyncSettings = syncSettings;
         profile.SyncUsers = syncUsers;
         profile.SyncPlugins = syncPlugins;

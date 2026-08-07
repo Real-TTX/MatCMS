@@ -226,6 +226,9 @@ public class InstanceService
 
         instance.AppliedRevision = beat.AppliedRevision;
         instance.LastSyncError = string.IsNullOrWhiteSpace(beat.SyncError) ? null : beat.SyncError!.Trim();
+        // Stored verbatim as the instance sent it — the cloud renders it, nothing more.
+        if (beat.SyncReport is not null)
+            instance.LastSyncReportJson = System.Text.Json.JsonSerializer.Serialize(beat.SyncReport);
         if (beat.AppliedRevision != previousRevision || instance.LastSyncError != previousError)
             instance.LastSyncUtc = DateTime.UtcNow;
 

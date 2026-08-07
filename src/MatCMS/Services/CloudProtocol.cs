@@ -80,6 +80,9 @@ public sealed class CloudHeartbeatRequest
 
     /// <summary>Why the last apply failed, if it did.</summary>
     public string? SyncError { get; set; }
+
+    /// <summary>What the last apply did, item by item.</summary>
+    public List<CloudSyncItemReport>? SyncReport { get; set; }
 }
 
 /// <summary>The cloud's answer.</summary>
@@ -187,4 +190,20 @@ public sealed class CloudConfigPlugin
     public string Key { get; set; } = "";
     public string Name { get; set; } = "";
     public string Version { get; set; } = "";
+}
+
+/// <summary>What we did with one item while applying a configuration. Mirrors
+/// <c>MatCMS.Cloud/Services/InstanceProtocol.cs</c> — both change together.</summary>
+public sealed class CloudSyncItemReport
+{
+    /// <summary>"setting" | "user" | "component" | "template" | "plugin".</summary>
+    public string Kind { get; set; } = "";
+
+    /// <summary>The identity here: setting key, username, component type, template name, plugin key.</summary>
+    public string Id { get; set; } = "";
+
+    /// <summary>"installed" | "updated" | "skipped-exists" | "skipped-once" | "failed".</summary>
+    public string Outcome { get; set; } = "";
+
+    public string? Detail { get; set; }
 }

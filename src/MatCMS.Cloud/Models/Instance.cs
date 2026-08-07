@@ -64,6 +64,11 @@ public class Instance
     /// when the last attempt succeeded.</summary>
     public string? LastSyncError { get; set; }
 
+    /// <summary>The instance's own account of the last apply, item by item, as JSON. Stored verbatim:
+    /// the cloud only keeps the record, it never derives it. Null means the instance has not reported
+    /// one — which is NOT the same as "nothing happened".</summary>
+    public string? LastSyncReportJson { get; set; }
+
     public DateTime? LastSyncUtc { get; set; }
 
     /// <summary>Public URL of the site, for the "open" link. Reported by the instance, editable.</summary>

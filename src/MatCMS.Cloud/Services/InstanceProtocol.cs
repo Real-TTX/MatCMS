@@ -76,6 +76,10 @@ public sealed class HeartbeatRequest
 
     /// <summary>Why the last apply failed, if it did. Surfaced verbatim in the cloud UI.</summary>
     public string? SyncError { get; set; }
+
+    /// <summary>What the last apply did, item by item. Empty from an instance that predates the
+    /// report, which is why the cloud must treat it as "no information", not as "nothing happened".</summary>
+    public List<SyncItemReport>? SyncReport { get; set; }
 }
 
 /// <summary>The cloud's answer. Pull-based: we only ever TELL the instance what is pending; the
@@ -231,4 +235,26 @@ public sealed class ConfigPlugin
     public string Key { get; set; } = "";
     public string Name { get; set; } = "";
     public string Version { get; set; } = "";
+}
+
+/// <summary>
+/// What the instance did with one item while applying a configuration. The cloud computes none of
+/// this — only the instance knows whether a component already existed or a plugin import failed, so
+/// it says so and the cloud is a record keeper. Adding a payload type later needs no cloud-side
+/// logic, just another line in the report.
+/// </summary>
+public sealed class SyncItemReport
+{
+    /// <summary>"setting" | "user" | "component" | "template" | "plugin".</summary>
+    public string Kind { get; set; } = "";
+
+    /// <summary>The identity on the instance: setting key, username, component type, template name,
+    /// plugin key.</summary>
+    public string Id { get; set; } = "";
+
+    /// <summary>"installed" | "updated" | "skipped-exists" | "skipped-once" | "failed".</summary>
+    public string Outcome { get; set; } = "";
+
+    /// <summary>Why it failed, or why it was skipped when that is not obvious. Shown verbatim.</summary>
+    public string? Detail { get; set; }
 }

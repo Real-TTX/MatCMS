@@ -126,6 +126,53 @@
         }
     </div>
 
+    @* The same log the cloud sees, shown here as well: it is this site's admin who has to know what
+       a rollout changed underneath them, and they should not have to ask the cloud operator. *@
+    @if (Model.Cloud.Configured && Model.SyncReport.Count > 0)
+    {
+        <div class="card">
+            <div data-list>
+                <div class="page-head">
+                    <h2>@T["settings.cloudReport"]</h2>
+                    <div class="list-toolbar">
+                        <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+                    </div>
+                </div>
+                <p class="help">@T["settings.cloudReportHint"]</p>
+                <table class="data" data-list-table>
+                    <thead>
+                        <tr>
+                            <th style="width:130px;">@T["settings.cloudReportKind"]</th>
+                            <th>@T["settings.cloudReportId"]</th>
+                            <th style="width:150px;">@T["settings.cloudReportOutcome"]</th>
+                            <th>@T["settings.cloudReportDetail"]</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in Model.SyncReport)
+                        {
+                            var kindKey = $"settings.cloudKind.{r.Kind}";
+                            var outcomeKey = $"settings.cloudOutcome.{r.Outcome}";
+                            var badge = r.Outcome switch
+                            {
+                                "installed" or "updated" => "badge-on",
+                                "failed" => "badge-err",
+                                _ => "badge-off"
+                            };
+                            <tr data-search="@r.Kind @r.Id @r.Outcome @r.Detail">
+                                <td class="muted">@(T[kindKey] == kindKey ? r.Kind : T[kindKey])</td>
+                                <td class="mono">@r.Id</td>
+                                <td><span class="badge @badge">@(T[outcomeKey] == outcomeKey ? r.Outcome : T[outcomeKey])</span></td>
+                                <td class="muted">@r.Detail</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+            </div>
+        </div>
+    }
+
     <div class="card">
         <h2>@T["settings.cloudLink"]</h2>
         <p class="muted">@T["settings.cloudJoinHelp"]</p>

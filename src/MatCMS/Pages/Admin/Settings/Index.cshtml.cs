@@ -12,13 +12,15 @@ public class IndexModel : PageModel
     private readonly AppDbContext _db;
     private readonly EmailService _email;
     private readonly CloudService _cloud;
+    private readonly CloudSyncService _sync;
     public CloudState CloudState { get; }
 
-    public IndexModel(AppDbContext db, EmailService email, CloudService cloud, CloudState cloudState)
+    public IndexModel(AppDbContext db, EmailService email, CloudService cloud, CloudSyncService sync, CloudState cloudState)
     {
         _db = db;
         _email = email;
         _cloud = cloud;
+        _sync = sync;
         CloudState = cloudState;
     }
 
@@ -26,6 +28,10 @@ public class IndexModel : PageModel
     /// is stored — so it cannot be read out of the page source.</summary>
     public CloudService.CloudSettings Cloud { get; private set; } = new("", "", "");
     public bool CloudHasToken => !string.IsNullOrEmpty(Cloud.Token);
+
+    /// <summary>What the last rollout from the cloud actually did here, item by item — the same log
+    /// the cloud is sent, shown to this site's own admin.</summary>
+    public List<CloudSyncItemReport> SyncReport { get; private set; } = new();
 
     [BindProperty] public Dictionary<string, string> Values { get; set; } = new();
 
@@ -59,6 +65,7 @@ public class IndexModel : PageModel
             .Where(p => p.Locale == Localizer.DefaultCulture)
             .OrderBy(p => p.Title).ToListAsync();
         Cloud = await _cloud.GetSettingsAsync();
+        if (Cloud.Configured) SyncReport = await _sync.LastReportAsync() ?? new();
     }
 
     // --- MatCMS.Cloud link (Cloud tab) --------------------------------------

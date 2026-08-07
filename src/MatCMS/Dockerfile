@@ -9,6 +9,7 @@ WORKDIR /src
 # cannot see it. Restore the project files first so the NuGet layer is cached independently
 # of the source.
 COPY src/MatCMS.Shared/MatCMS.Shared.csproj src/MatCMS.Shared/
+COPY src/MatCMS.Shared.Web/MatCMS.Shared.Web.csproj src/MatCMS.Shared.Web/
 COPY src/MatCMS/MatCMS.csproj src/MatCMS/
 RUN dotnet restore src/MatCMS/MatCMS.csproj
 
@@ -18,6 +19,7 @@ RUN dotnet restore src/MatCMS/MatCMS.csproj
 ARG APP_VERSION=local
 
 COPY src/MatCMS.Shared/ src/MatCMS.Shared/
+COPY src/MatCMS.Shared.Web/ src/MatCMS.Shared.Web/
 COPY src/MatCMS/ src/MatCMS/
 RUN dotnet publish src/MatCMS/MatCMS.csproj -c Release -o /app/publish /p:UseAppHost=false /p:InformationalVersion=${APP_VERSION}
 

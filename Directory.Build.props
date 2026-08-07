@@ -1,0 +1,11 @@
+<Project>
+
+  <PropertyGroup>
+    <!-- A ProjectReference whose .csproj is missing is only a WARNING in MSBuild (MSB9008). That
+         cost us once: a Dockerfile that did not copy src/MatCMS.Shared.Web built "successfully" and
+         produced an image with no admin CSS at all. Promote it to an error so a build context that
+         is missing a project can never ship again. -->
+    <MSBuildWarningsAsErrors>$(MSBuildWarningsAsErrors);MSB9008</MSBuildWarningsAsErrors>
+  </PropertyGroup>
+
+</Project>

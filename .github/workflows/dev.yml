@@ -7,8 +7,9 @@ on:
     branches: [dev]
     paths:
       - "src/MatCMS/**"
-      # The shared contract is compiled into both images, so a change to it must rebuild this one.
+      # The shared projects are compiled into both images, so a change to either must rebuild this one.
       - "src/MatCMS.Shared/**"
+      - "src/MatCMS.Shared.Web/**"
       - ".github/workflows/dev.yml"
   workflow_dispatch:
 

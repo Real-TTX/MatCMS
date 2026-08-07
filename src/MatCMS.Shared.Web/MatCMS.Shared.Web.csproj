@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>MatCMS.Shared.Web</RootNamespace>
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- A Razor Class Library does not get the ASP.NET shared framework by itself, and the compiled
+         partial in Pages/Shared needs it. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <!-- The admin shell, shared instead of copied. These files used to live twice, byte-identical, in
+       MatCMS and MatCMS.Cloud, kept in step by hand and a `diff`. Consuming apps reach the assets at
+       ~/_content/MatCMS.Shared.Web/… and the partial by name, as usual.
+
+       What belongs here: anything both admins must render IDENTICALLY. What does not: anything
+       product-specific — cloud.css stays in the cloud, the CMS's public-site scripts stay in the CMS. -->
+
+</Project>

@@ -97,9 +97,10 @@ Matmon.Cloud's `src/`-layout or PostgreSQL.
 
 ### The admin must look and work exactly like MatCMS's
 
-These files are **byte-identical copies** and must stay that way — check with `diff` after touching
-any of them, and mirror a change into both repos: `wwwroot/css/site.css`, `wwwroot/css/admin.css`,
-`wwwroot/js/admin-list.js`, `wwwroot/js/code-editor.js`'s CodeMirror bundle, `Pages/Shared/_IconTrash.cshtml`.
+These files live **once**, in `../MatCMS.Shared.Web` (a Razor Class Library both apps reference):
+`css/site.css`, `css/admin.css`, `js/admin-list.js`, the CodeMirror and Tabler-Icons bundles and
+`Pages/Shared/_IconTrash.cshtml`. They are referenced as `~/_content/MatCMS.Shared.Web/…`; the
+partial resolves by name. They used to be byte-identical copies kept in step by hand.
 Cloud-only rules go in `cloud.css`, and only for things the admin genuinely does not have yet.
 
 **Use the admin's own classes. Do not invent parallel ones** (this was got wrong once and had to be

@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="src/MatCMS.Shared/MatCMS.Shared.csproj" />
+  <Project Path="src/MatCMS.Shared.Web/MatCMS.Shared.Web.csproj" />
   <Project Path="src/MatCMS/MatCMS.csproj" />
   <Project Path="src/MatCMS.Cloud/MatCMS.Cloud.csproj" />
 </Solution>

@@ -30,33 +30,42 @@ together by hand:
    two applications.
 2. **The plugin bundle format** — `PluginPackager` on the instance, `StoreBundle` in the cloud. Still
    two implementations; the format is the contract.
-3. **The admin UI.** `site.css`, `admin.css`, `admin-list.js`, the CodeMirror bundle and
-   `_IconTrash.cshtml` are **byte-identical copies**. Check with `diff` after touching any of them
-   and change both. Moving these into a Razor Class Library is the remaining step — the CMS must keep
-   working with no cloud in sight, so its assets cannot simply move into a cloud-shaped library.
+3. **The admin UI** — now **`src/MatCMS.Shared.Web`**, a Razor Class Library holding `site.css`,
+   `admin.css`, `admin-list.js`, the CodeMirror and Tabler-Icons bundles and `_IconTrash.cshtml`.
+   They used to be byte-identical copies kept in step by hand and a `diff`. Both apps reach them at
+   `~/_content/MatCMS.Shared.Web/…`; the partial resolves by name as usual. Product-specific assets
+   stay put: `cloud.css` in the cloud, the CMS's public-site scripts in the CMS.
 
 ## Layout
 
 ```
-MatCMS.slnx                      # dotnet build MatCMS.slnx builds all three
+MatCMS.slnx                      # dotnet build MatCMS.slnx builds all four
 .dockerignore                    # applies to BOTH images (context is the repo root)
 .github/workflows/
   release.yml  dev.yml           # → matcms        (paths: src/MatCMS/** + src/MatCMS.Shared/**)
   cloud-release.yml  cloud-dev.yml  # → matcms-cloud (paths: src/MatCMS.Cloud/** + …Shared/**)
+Directory.Build.props            # promotes MSB9008 (missing ProjectReference) to an error
 src/MatCMS.Shared/               # the cloud↔instance contract, referenced by both
+src/MatCMS.Shared.Web/           # the shared admin shell (RCL): css, admin-list.js, vendor libs
 src/MatCMS/                      # each app keeps its own Dockerfile, compose,
 src/MatCMS.Cloud/                #   run-*.ps1, VERSION and appdata/ volume
 ```
 
 `docker compose up -d --build` inside either app folder still works — but the **build context is the
-repo root** (`context: ../..` + `dockerfile: src/<app>/Dockerfile`), because the image needs
-`src/MatCMS.Shared` next to the project. That is also why the `.dockerignore` lives at the root: a
+repo root** (`context: ../..` + `dockerfile: src/<app>/Dockerfile`), because the image needs the two
+shared projects next to the app. That is also why the `.dockerignore` lives at the root: a
 per-project one no longer applies, and without it every build would upload `.git`, both `appdata`
 volumes and all `bin/obj` trees as context.
 
 The **`paths:` filters on the workflows** keep the monorepo cheap: a CMS change never rebuilds the
-cloud image, and vice versa. `src/MatCMS.Shared/**` is listed in **all four** — the contract is
-compiled into both images, so a change there must rebuild both.
+cloud image, and vice versa. `src/MatCMS.Shared/**` and `src/MatCMS.Shared.Web/**` are listed in
+**all four** — both are compiled into both images, so a change there must rebuild both.
+
+**A missing `ProjectReference` is only an MSBuild WARNING (MSB9008).** A Dockerfile that forgot to
+copy `src/MatCMS.Shared.Web` therefore built "successfully" and produced an image whose admin had no
+CSS at all — the app ran, every page was unstyled. `Directory.Build.props` promotes that warning to
+an error; do not remove it. When a project is added, both `COPY` lines (csproj first for the restore
+layer, then the folder) go into **both** Dockerfiles.
 
 ## Conventions
 

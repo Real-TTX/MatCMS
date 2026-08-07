@@ -43,6 +43,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MatCMS.Shared\MatCMS.Shared.csproj" />
+    <ProjectReference Include="..\MatCMS.Shared.Web\MatCMS.Shared.Web.csproj" />
   </ItemGroup>
 
 </Project>

@@ -279,13 +279,14 @@ The store is a **catalogue**: things you shop for and install. Users and SMTP ar
 configuration — you assign them, you do not browse them. That is why they must never appear in the
 catalogue API an instance can query, and why they need no store tables of their own.
 
-> **Correction to fix (this is currently wrong in the code):** `StoreUser`, `StoreSetting`,
-> `ProfileStoreUser` and `ProfileStoreSetting` duplicate what already exists. Replace them with
-> links from a profile to the existing `Users` rows and to the global SMTP settings, drop the
-> Users/Settings tabs from *Admin → Store*, and delete `Pages/Admin/Store/User.*` and
-> `Pages/Admin/Store/Setting.*`. `ProfileService.BuildConfigAsync` then resolves users and settings
-> from the global tables plus the profile's own, with the profile's own winning — the same
-> precedence that already applies to the store payloads.
+There is **no separate "Global" tab** on a profile. The operator thinks in "templates this profile
+rolls out", not in where a row is stored, so each payload tab shows **one list** containing both the
+profile's own items and the ones it takes from the store, with a *Global* / *eigenes* badge in the
+Herkunft column. Below the list, next to *Erstellen* / *Importieren*, sits **Aus Global hinzufügen**,
+which opens `_StorePicker.cshtml` (the admin's own `.modal-overlay`) listing only what is not in the
+profile yet. Adding is **additive** (`OnPostAddFromStore`), removing is the row action
+(`OnPostRemoveFromStore`) — never a full-replace form, which would silently drop selections when a
+form is posted without the operator ever having opened that section.
 
 ### Profiles and the sync engine
 

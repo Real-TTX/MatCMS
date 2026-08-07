@@ -57,6 +57,30 @@ public class EditModel : PageModel
     public bool ComponentOverridden(string type) => Components.Any(c => c.Type == type);
     public bool UserOverridden(string username) => Users.Any(u => u.Username == username);
 
+    // Each payload list shows the profile's OWN items and the ones it takes from the global store in
+    // one place — the operator thinks in "templates this profile rolls out", not in where a row is
+    // stored. What is left over is what the "Aus Global hinzufügen" picker offers.
+    public List<StorePlugin> ChosenStorePlugins => StorePlugins.Where(p => SelectedPlugins.Contains(p.Id)).ToList();
+    public List<StoreTemplate> ChosenStoreTemplates => StoreTemplates.Where(t => SelectedTemplates.Contains(t.Id)).ToList();
+    public List<StoreComponent> ChosenStoreComponents => StoreComponents.Where(c => SelectedComponents.Contains(c.Id)).ToList();
+    public List<Models.User> ChosenGlobalUsers => GlobalUsers.Where(u => SelectedUsers.Contains(u.Id)).ToList();
+
+    public StorePicker PluginPicker => new(Item.Id, "plugins",
+        StorePlugins.Where(p => !SelectedPlugins.Contains(p.Id))
+            .Select(p => new PickerItem(p.Id, p.Name, $"{p.Key} {p.Version}")).ToList());
+
+    public StorePicker TemplatePicker => new(Item.Id, "templates",
+        StoreTemplates.Where(t => !SelectedTemplates.Contains(t.Id))
+            .Select(t => new PickerItem(t.Id, t.Name, t.Description ?? "")).ToList());
+
+    public StorePicker ComponentPicker => new(Item.Id, "components",
+        StoreComponents.Where(c => !SelectedComponents.Contains(c.Id))
+            .Select(c => new PickerItem(c.Id, c.Name, c.Type)).ToList());
+
+    public StorePicker UserPicker => new(Item.Id, "users",
+        GlobalUsers.Where(u => !SelectedUsers.Contains(u.Id))
+            .Select(u => new PickerItem(u.Id, u.Username, u.Email ?? "")).ToList());
+
     /// <summary>One row of the strategy form: which payload, which modes it may have, what is set.</summary>
     public sealed record ModeRow(string Field, string LabelKey, string Value, string[] Options);
 
@@ -152,47 +176,86 @@ public class EditModel : PageModel
     }
 
     /// <summary>
-    /// Saves what this profile takes from the global side: store entries by reference, and the
-    /// cloud's own user accounts. Written as a full replace of the selection — the form posts every
-    /// ticked box, so anything absent was unticked.
+    /// Takes entries from the global store into this profile. Additive on purpose: the operator picks
+    /// from a list of what is NOT in the profile yet and adds it, exactly like creating one — removing
+    /// is the row action on the list, not the absence of a tick in a form they may never have opened.
     /// </summary>
-    public async Task<IActionResult> OnPostSelectionsAsync(
-        int id, int[]? storePlugins, int[]? storeTemplates, int[]? storeComponents, int[]? globalUsers)
+    public async Task<IActionResult> OnPostAddFromStoreAsync(int id, string kind, int[]? ids)
     {
         var profile = await _db.Profiles.FindAsync(id);
         if (profile is null) return RedirectToPage("Index");
 
-        await ReplaceAsync(_db.ProfileStorePlugins, x => x.ProfileId == id, storePlugins,
-            pid => new ProfileStorePlugin { ProfileId = id, StorePluginId = pid }, x => x.StorePluginId);
-        await ReplaceAsync(_db.ProfileStoreTemplates, x => x.ProfileId == id, storeTemplates,
-            tid => new ProfileStoreTemplate { ProfileId = id, StoreTemplateId = tid }, x => x.StoreTemplateId);
-        await ReplaceAsync(_db.ProfileStoreComponents, x => x.ProfileId == id, storeComponents,
-            cid => new ProfileStoreComponent { ProfileId = id, StoreComponentId = cid }, x => x.StoreComponentId);
-        await ReplaceAsync(_db.ProfileGlobalUsers, x => x.ProfileId == id, globalUsers,
-            uid => new ProfileGlobalUser { ProfileId = id, UserId = uid }, x => x.UserId);
+        var wanted = (ids ?? []).Distinct().ToList();
+        if (wanted.Count == 0)
+        {
+            TempData["FlashError"] = "Nichts ausgewählt.";
+            return RedirectToPage(new { id, tab = kind });
+        }
+
+        var added = kind switch
+        {
+            "plugins" => await AddAsync(_db.ProfileStorePlugins, x => x.ProfileId == id, x => x.StorePluginId,
+                wanted, sid => new ProfileStorePlugin { ProfileId = id, StorePluginId = sid }),
+            "templates" => await AddAsync(_db.ProfileStoreTemplates, x => x.ProfileId == id, x => x.StoreTemplateId,
+                wanted, sid => new ProfileStoreTemplate { ProfileId = id, StoreTemplateId = sid }),
+            "components" => await AddAsync(_db.ProfileStoreComponents, x => x.ProfileId == id, x => x.StoreComponentId,
+                wanted, sid => new ProfileStoreComponent { ProfileId = id, StoreComponentId = sid }),
+            "users" => await AddAsync(_db.ProfileGlobalUsers, x => x.ProfileId == id, x => x.UserId,
+                wanted, sid => new ProfileGlobalUser { ProfileId = id, UserId = sid }),
+            _ => 0
+        };
+
+        if (added > 0)
+        {
+            await _db.SaveChangesAsync();
+            await _profiles.TouchAsync(id);
+        }
+        TempData["Flash"] = $"{added} aus dem Store übernommen.";
+        return RedirectToPage(new { id, tab = kind });
+    }
+
+    /// <summary>Drops one global entry from this profile. The entry itself stays in the store, and
+    /// anything already rolled out stays on the instances — this only stops future rollouts.</summary>
+    public async Task<IActionResult> OnPostRemoveFromStoreAsync(int id, string kind, int storeId)
+    {
+        var profile = await _db.Profiles.FindAsync(id);
+        if (profile is null) return RedirectToPage("Index");
+
+        switch (kind)
+        {
+            case "plugins":
+                _db.ProfileStorePlugins.RemoveRange(_db.ProfileStorePlugins.Where(x => x.ProfileId == id && x.StorePluginId == storeId));
+                break;
+            case "templates":
+                _db.ProfileStoreTemplates.RemoveRange(_db.ProfileStoreTemplates.Where(x => x.ProfileId == id && x.StoreTemplateId == storeId));
+                break;
+            case "components":
+                _db.ProfileStoreComponents.RemoveRange(_db.ProfileStoreComponents.Where(x => x.ProfileId == id && x.StoreComponentId == storeId));
+                break;
+            case "users":
+                _db.ProfileGlobalUsers.RemoveRange(_db.ProfileGlobalUsers.Where(x => x.ProfileId == id && x.UserId == storeId));
+                break;
+            default:
+                return RedirectToPage(new { id });
+        }
 
         await _db.SaveChangesAsync();
         await _profiles.TouchAsync(id);
-        TempData["Flash"] = "Auswahl gespeichert.";
-        return RedirectToPage(new { id, tab = "global" });
+        TempData["Flash"] = "Aus dem Profil entfernt.";
+        return RedirectToPage(new { id, tab = kind });
     }
 
-    /// <summary>Replaces a profile's selection of one kind: drop what is no longer ticked, add what
-    /// is new, leave the rest alone so unchanged rows keep their identity.</summary>
-    private async Task ReplaceAsync<TLink>(
+    /// <summary>Adds the links that are not there yet and reports how many. Re-adding something the
+    /// profile already has is a no-op, not a duplicate row.</summary>
+    private async Task<int> AddAsync<TLink>(
         Microsoft.EntityFrameworkCore.DbSet<TLink> set,
         System.Linq.Expressions.Expression<Func<TLink, bool>> mine,
-        int[]? wanted, Func<int, TLink> create, Func<TLink, int> targetId) where TLink : class
+        Func<TLink, int> targetId, List<int> wanted, Func<int, TLink> create) where TLink : class
     {
-        var chosen = (wanted ?? []).ToHashSet();
-        var current = await set.Where(mine).ToListAsync();
-
-        foreach (var row in current.Where(r => !chosen.Contains(targetId(r))))
-            set.Remove(row);
-
-        var existing = current.Select(targetId).ToHashSet();
-        foreach (var add in chosen.Where(c => !existing.Contains(c)))
-            set.Add(create(add));
+        var existing = (await set.Where(mine).ToListAsync()).Select(targetId).ToHashSet();
+        var fresh = wanted.Where(w => !existing.Contains(w)).ToList();
+        foreach (var add in fresh) set.Add(create(add));
+        return fresh.Count;
     }
 
     // --- General + policy ---------------------------------------------------

@@ -1,0 +1,45 @@
+@model MatCMS.Cloud.Pages.Admin.Profiles.StorePicker
+@inject MatCMS.Cloud.Services.Localizer T
+@*
+    The "Aus Global hinzufügen" dialog for one payload. Uses the admin's own .modal-overlay/.modal
+    classes — never invent a parallel one. Opened by any button carrying
+    data-store-picker="<kind>"; the script lives once at the bottom of Edit.cshtml.
+*@
+<div class="modal-overlay" id="picker-@Model.Kind" data-store-picker-dialog="@Model.Kind">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="picker-@(Model.Kind)-title">
+        <div class="modal-head">
+            <h2 id="picker-@(Model.Kind)-title">@T["profiles.addFromStore"]</h2>
+            <button type="button" class="modal-close" data-store-picker-close aria-label="@T["action.close"]">✕</button>
+        </div>
+        <form method="post" asp-page-handler="AddFromStore" asp-route-id="@Model.ProfileId" asp-route-kind="@Model.Kind">
+            <div class="modal-body">
+                @if (Model.Items.Count == 0)
+                {
+                    <div class="list-empty">@T["profiles.storeEmpty"]</div>
+                }
+                else
+                {
+                    <p class="muted">@T["profiles.addFromStoreHint"]</p>
+                    @foreach (var item in Model.Items)
+                    {
+                        <label class="checkbox-row">
+                            <input type="checkbox" name="ids" value="@item.Id" />
+                            @item.Label
+                            @if (!string.IsNullOrWhiteSpace(item.Sub))
+                            {
+                                <span class="muted mono">@item.Sub</span>
+                            }
+                        </label>
+                    }
+                }
+            </div>
+            <div class="modal-foot">
+                @if (Model.Items.Count > 0)
+                {
+                    <button type="submit" class="btn">@T["profiles.addFromStoreBtn"]</button>
+                }
+                <button type="button" class="btn btn-ghost" data-store-picker-close>@T["action.cancel"]</button>
+            </div>
+        </form>
+    </div>
+</div>

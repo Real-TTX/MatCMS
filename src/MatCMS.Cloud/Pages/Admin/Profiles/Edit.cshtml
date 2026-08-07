@@ -17,89 +17,8 @@
     <button type="button" class="tab" data-tab="plugins">@T["profiles.tabPlugins"]</button>
     <button type="button" class="tab" data-tab="components">@T["profiles.tabComponents"]</button>
     <button type="button" class="tab" data-tab="templates">@T["profiles.tabTemplates"]</button>
-    <button type="button" class="tab" data-tab="global">@T["profiles.tabGlobal"]</button>
 </div>
 
-@* ============ GLOBAL ============ *@
-@* What this profile takes from the global side. Store entries are taken by REFERENCE: change the
-   entry in the store and every profile that ticked it rolls out the new version. *@
-<div class="tab-panel" data-panel="global" hidden>
-    <form method="post" asp-page-handler="Selections" asp-route-id="@Model.Item.Id">
-        <div class="card">
-            <h2>@T["profiles.tabGlobal"]</h2>
-            <p class="muted">@T["profiles.globalIntro"]</p>
-
-            <h3 class="form-section">@T["profiles.tabPlugins"]</h3>
-            @if (Model.StorePlugins.Count == 0)
-            {
-                <div class="list-empty">@T["store.noPlugins"]</div>
-            }
-            @foreach (var p in Model.StorePlugins)
-            {
-                <label class="checkbox-row">
-                    <input type="checkbox" name="storePlugins" value="@p.Id" checked="@(Model.SelectedPlugins.Contains(p.Id) ? "checked" : null)" />
-                    @p.Name <span class="muted mono">@p.Key @p.Version</span>
-                    @if (Model.PluginOverridden(p.Key))
-                    {
-                        <span class="badge badge-new">@T["profiles.overriddenLocally"]</span>
-                    }
-                </label>
-            }
-
-            <h3 class="form-section">@T["profiles.tabTemplates"]</h3>
-            @if (Model.StoreTemplates.Count == 0)
-            {
-                <div class="list-empty">@T["store.noTemplates"]</div>
-            }
-            @foreach (var t in Model.StoreTemplates)
-            {
-                <label class="checkbox-row">
-                    <input type="checkbox" name="storeTemplates" value="@t.Id" checked="@(Model.SelectedTemplates.Contains(t.Id) ? "checked" : null)" />
-                    @t.Name
-                    @if (Model.TemplateOverridden(t.Name))
-                    {
-                        <span class="badge badge-new">@T["profiles.overriddenLocally"]</span>
-                    }
-                </label>
-            }
-
-            <h3 class="form-section">@T["profiles.tabComponents"]</h3>
-            @if (Model.StoreComponents.Count == 0)
-            {
-                <div class="list-empty">@T["store.noComponents"]</div>
-            }
-            @foreach (var c in Model.StoreComponents)
-            {
-                <label class="checkbox-row">
-                    <input type="checkbox" name="storeComponents" value="@c.Id" checked="@(Model.SelectedComponents.Contains(c.Id) ? "checked" : null)" />
-                    @c.Name <span class="muted mono">@c.Type</span>
-                    @if (Model.ComponentOverridden(c.Type))
-                    {
-                        <span class="badge badge-new">@T["profiles.overriddenLocally"]</span>
-                    }
-                </label>
-            }
-
-            <h3 class="form-section">@T["profiles.tabUsers"]</h3>
-            <div class="help">@T["profiles.globalUsersHint"]</div>
-            @foreach (var u in Model.GlobalUsers)
-            {
-                <label class="checkbox-row">
-                    <input type="checkbox" name="globalUsers" value="@u.Id" checked="@(Model.SelectedUsers.Contains(u.Id) ? "checked" : null)" />
-                    @u.Username <span class="muted">@u.Email</span>
-                    @if (Model.UserOverridden(u.Username))
-                    {
-                        <span class="badge badge-new">@T["profiles.overriddenLocally"]</span>
-                    }
-                </label>
-            }
-
-            <div class="list-actions">
-                <button type="submit" class="btn">@T["settings.save"]</button>
-            </div>
-        </div>
-    </form>
-</div>
 
 @* ============ GENERAL ============ *@
 <div class="tab-panel" data-panel="general">
@@ -349,7 +268,7 @@
             </div>
         </div>
         <p class="muted">@T["profiles.usersHint"]</p>
-        @if (Model.Users.Count == 0)
+        @if (Model.Users.Count == 0 && Model.ChosenGlobalUsers.Count == 0)
         {
             <div class="list-empty">@T["profiles.noUsers"]</div>
         }
@@ -357,13 +276,39 @@
         {
             <table class="data" data-list-table>
                 <thead>
-                    <tr><th>@T["users.username"]</th><th>@T["users.email"]</th><th>@T["users.displayName"]</th><th></th></tr>
+                    <tr><th>@T["users.username"]</th><th>@T["common.origin"]</th><th>@T["users.email"]</th><th>@T["users.displayName"]</th><th></th></tr>
                 </thead>
                 <tbody>
+                    @* Global accounts the profile also rolls out — the cloud's own users, taken by
+                       reference so a password change in the store reaches every profile. *@
+                    @foreach (var u in Model.ChosenGlobalUsers)
+                    {
+                        <tr data-search="@(u.Username + " " + u.Email + " " + u.DisplayName)">
+                            <td>
+                                <a asp-page="/Admin/Users/Edit" asp-route-id="@u.Id"><strong>@u.Username</strong></a>
+                                @if (Model.UserOverridden(u.Username))
+                                {
+                                    <span class="badge badge-new">@T["profiles.overriddenLocally"]</span>
+                                }
+                            </td>
+                            <td><span class="badge badge-off">@T["profiles.fromStore"]</span></td>
+                            <td class="muted">@(u.Email ?? "—")</td>
+                            <td class="muted">@(u.DisplayName ?? "—")</td>
+                            <td>
+                                <div class="actions">
+                                    <form method="post" asp-page-handler="RemoveFromStore" asp-route-id="@Model.Item.Id" asp-route-kind="users" class="inline-form">
+                                        <input type="hidden" name="storeId" value="@u.Id" />
+                                        <button type="submit" class="btn btn-sm btn-ghost">@T["profiles.removeFromProfile"]</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
                     @foreach (var u in Model.Users)
                     {
                         <tr data-search="@(u.Username + " " + u.Email + " " + u.DisplayName)">
                             <td><a asp-page="User" asp-route-profileId="@Model.Item.Id" asp-route-id="@u.Id"><strong>@u.Username</strong></a></td>
+                            <td><span class="muted">@T["profiles.ownItem"]</span></td>
                             <td class="muted">@(u.Email ?? "—")</td>
                             <td class="muted">@(u.DisplayName ?? "—")</td>
                             <td>
@@ -381,8 +326,10 @@
         }
         <div class="list-actions">
             <a class="btn" asp-page="User" asp-route-profileId="@Model.Item.Id">@T["profiles.addUser"]</a>
+            <button type="button" class="btn btn-ghost" data-store-picker="users">@T["profiles.addFromStore"]</button>
         </div>
     </div>
+    <partial name="_StorePicker" model="Model.UserPicker" />
 </div>
 
 @* ============ PLUGINS ============ *@
@@ -395,7 +342,7 @@
             </div>
         </div>
         <p class="muted">@T["profiles.pluginsHint"]</p>
-        @if (Model.Plugins.Count == 0)
+        @if (Model.Plugins.Count == 0 && Model.ChosenStorePlugins.Count == 0)
         {
             <div class="list-empty">@T["profiles.noPlugins"]</div>
         }
@@ -403,9 +350,34 @@
         {
             <table class="data" data-list-table>
                 <thead>
-                    <tr><th>@T["common.name"]</th><th>@T["profiles.pluginKey"]</th><th>@T["instances.version"]</th><th></th></tr>
+                    <tr><th>@T["common.name"]</th><th>@T["common.origin"]</th><th>@T["profiles.pluginKey"]</th><th>@T["instances.version"]</th><th></th></tr>
                 </thead>
                 <tbody>
+                    @foreach (var p in Model.ChosenStorePlugins)
+                    {
+                        <tr data-search="@(p.Name + " " + p.Key + " " + p.Description)">
+                            <td>
+                                <a asp-page="/Admin/Store/Plugin" asp-route-id="@p.Id"><strong>@p.Name</strong></a>
+                                <div class="muted">@p.Description</div>
+                                @if (Model.PluginOverridden(p.Key))
+                                {
+                                    <span class="badge badge-new">@T["profiles.overriddenLocally"]</span>
+                                }
+                            </td>
+                            <td><span class="badge badge-off">@T["profiles.fromStore"]</span></td>
+                            <td class="mono">@p.Key</td>
+                            <td class="mono">@p.Version</td>
+                            <td>
+                                <div class="actions">
+                                    <a class="btn btn-sm btn-ghost" asp-page="/Admin/Store/Plugin" asp-route-id="@p.Id">@T["action.edit"]</a>
+                                    <form method="post" asp-page-handler="RemoveFromStore" asp-route-id="@Model.Item.Id" asp-route-kind="plugins" class="inline-form">
+                                        <input type="hidden" name="storeId" value="@p.Id" />
+                                        <button type="submit" class="btn btn-sm btn-ghost">@T["profiles.removeFromProfile"]</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
                     @foreach (var p in Model.Plugins)
                     {
                         <tr data-search="@(p.Name + " " + p.Key + " " + p.Description)">
@@ -413,6 +385,7 @@
                                 <a asp-page="Plugin" asp-route-profileId="@Model.Item.Id" asp-route-id="@p.Id"><strong>@p.Name</strong></a>
                                 <div class="muted">@p.Description</div>
                             </td>
+                            <td><span class="muted">@T["profiles.ownItem"]</span></td>
                             <td class="mono">@p.Key</td>
                             <td class="mono">@p.Version</td>
                             <td>
@@ -428,8 +401,10 @@
         }
         <div class="list-actions">
             <a class="btn" asp-page="Plugin" asp-route-profileId="@Model.Item.Id">@T["profiles.addPlugin"]</a>
+            <button type="button" class="btn btn-ghost" data-store-picker="plugins">@T["profiles.addFromStore"]</button>
         </div>
     </div>
+    <partial name="_StorePicker" model="Model.PluginPicker" />
 </div>
 
 @* ============ COMPONENTS ============ *@
@@ -442,7 +417,7 @@
             </div>
         </div>
         <p class="muted">@T["profiles.componentsHint"]</p>
-        @if (Model.Components.Count == 0)
+        @if (Model.Components.Count == 0 && Model.ChosenStoreComponents.Count == 0)
         {
             <div class="list-empty">@T["profiles.noComponents"]</div>
         }
@@ -450,9 +425,33 @@
         {
             <table class="data" data-list-table>
                 <thead>
-                    <tr><th>@T["common.name"]</th><th>@T["profiles.componentType"]</th><th></th></tr>
+                    <tr><th>@T["common.name"]</th><th>@T["common.origin"]</th><th>@T["profiles.componentType"]</th><th></th></tr>
                 </thead>
                 <tbody>
+                    @foreach (var c in Model.ChosenStoreComponents)
+                    {
+                        <tr data-search="@(c.Name + " " + c.Type + " " + c.Description)">
+                            <td>
+                                <a asp-page="/Admin/Store/Component" asp-route-id="@c.Id"><strong>@c.Name</strong></a>
+                                <div class="muted">@c.Description</div>
+                                @if (Model.ComponentOverridden(c.Type))
+                                {
+                                    <span class="badge badge-new">@T["profiles.overriddenLocally"]</span>
+                                }
+                            </td>
+                            <td><span class="badge badge-off">@T["profiles.fromStore"]</span></td>
+                            <td class="mono">@c.Type</td>
+                            <td>
+                                <div class="actions">
+                                    <a class="btn btn-sm btn-ghost" asp-page="/Admin/Store/Component" asp-route-id="@c.Id">@T["action.edit"]</a>
+                                    <form method="post" asp-page-handler="RemoveFromStore" asp-route-id="@Model.Item.Id" asp-route-kind="components" class="inline-form">
+                                        <input type="hidden" name="storeId" value="@c.Id" />
+                                        <button type="submit" class="btn btn-sm btn-ghost">@T["profiles.removeFromProfile"]</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
                     @foreach (var c in Model.Components)
                     {
                         <tr data-search="@(c.Name + " " + c.Type + " " + c.Description)">
@@ -460,6 +459,7 @@
                                 <a asp-page="Component" asp-route-profileId="@Model.Item.Id" asp-route-id="@c.Id"><strong>@c.Name</strong></a>
                                 <div class="muted">@c.Description</div>
                             </td>
+                            <td><span class="muted">@T["profiles.ownItem"]</span></td>
                             <td class="mono">@c.Type</td>
                             <td>
                                 <div class="actions">
@@ -474,8 +474,10 @@
         }
         <div class="list-actions">
             <a class="btn" asp-page="Component" asp-route-profileId="@Model.Item.Id">@T["profiles.addComponent"]</a>
+            <button type="button" class="btn btn-ghost" data-store-picker="components">@T["profiles.addFromStore"]</button>
         </div>
     </div>
+    <partial name="_StorePicker" model="Model.ComponentPicker" />
 </div>
 
 @* ============ TEMPLATES ============ *@
@@ -488,7 +490,7 @@
             </div>
         </div>
         <p class="muted">@T["profiles.templatesHint"]</p>
-        @if (Model.Templates.Count == 0)
+        @if (Model.Templates.Count == 0 && Model.ChosenStoreTemplates.Count == 0)
         {
             <div class="list-empty">@T["profiles.noTemplates"]</div>
         }
@@ -496,9 +498,35 @@
         {
             <table class="data" data-list-table>
                 <thead>
-                    <tr><th>@T["common.name"]</th><th>@T["profiles.templateColors"]</th><th>@T["profiles.templateFonts"]</th><th></th></tr>
+                    <tr><th>@T["common.name"]</th><th>@T["common.origin"]</th><th>@T["profiles.templateColors"]</th><th>@T["profiles.templateFonts"]</th><th></th></tr>
                 </thead>
                 <tbody>
+                    @* Global entries first: they are taken by REFERENCE, so editing them happens in
+                       the store and reaches every profile that took them. *@
+                    @foreach (var t in Model.ChosenStoreTemplates)
+                    {
+                        <tr data-search="@t.Name">
+                            <td>
+                                <a asp-page="/Admin/Store/Template" asp-route-id="@t.Id"><strong>@t.Name</strong></a>
+                                @if (Model.TemplateOverridden(t.Name))
+                                {
+                                    <span class="badge badge-new">@T["profiles.overriddenLocally"]</span>
+                                }
+                            </td>
+                            <td><span class="badge badge-off">@T["profiles.fromStore"]</span></td>
+                            <td><span class="token-chip" style="background:@t.AccentColor;color:#fff;border-color:@t.AccentColor;">@t.AccentColor</span></td>
+                            <td class="muted">—</td>
+                            <td>
+                                <div class="actions">
+                                    <a class="btn btn-sm btn-ghost" asp-page="/Admin/Store/Template" asp-route-id="@t.Id">@T["action.edit"]</a>
+                                    <form method="post" asp-page-handler="RemoveFromStore" asp-route-id="@Model.Item.Id" asp-route-kind="templates" class="inline-form">
+                                        <input type="hidden" name="storeId" value="@t.Id" />
+                                        <button type="submit" class="btn btn-sm btn-ghost">@T["profiles.removeFromProfile"]</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
                     @foreach (var t in Model.Templates)
                     {
                         <tr data-search="@(t.Name + " " + t.HeadingFont + " " + t.BodyFont)">
@@ -509,6 +537,7 @@
                                     <span class="badge badge-on">@T["profiles.templateActive"]</span>
                                 }
                             </td>
+                            <td><span class="muted">@T["profiles.ownItem"]</span></td>
                             <td><span class="token-chip" style="background:@t.AccentColor;color:#fff;border-color:@t.AccentColor;">@t.AccentColor</span></td>
                             <td class="muted">@t.HeadingFont / @t.BodyFont</td>
                             <td>
@@ -524,8 +553,10 @@
         }
         <div class="list-actions">
             <a class="btn" asp-page="Template" asp-route-profileId="@Model.Item.Id">@T["profiles.templateAdd"]</a>
+            <button type="button" class="btn btn-ghost" data-store-picker="templates">@T["profiles.addFromStore"]</button>
         </div>
     </div>
+    <partial name="_StorePicker" model="Model.TemplatePicker" />
 
     <div class="card">
         <h2>@T["profiles.templateImport"]</h2>
@@ -542,4 +573,30 @@
 @section Scripts {
     <partial name="_CodeEditorAssets" />
     <partial name="_TabsScript" />
+    <script>
+        // "Aus Global hinzufügen": one dialog per payload, opened by the button next to Erstellen.
+        (function () {
+            function close(dialog) { dialog.classList.remove('open'); }
+
+            document.querySelectorAll('[data-store-picker]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var dialog = document.querySelector('[data-store-picker-dialog="' + btn.dataset.storePicker + '"]');
+                    if (dialog) dialog.classList.add('open');
+                });
+            });
+
+            document.querySelectorAll('[data-store-picker-dialog]').forEach(function (dialog) {
+                dialog.querySelectorAll('[data-store-picker-close]').forEach(function (btn) {
+                    btn.addEventListener('click', function () { close(dialog); });
+                });
+                // Clicking the backdrop closes; clicking inside the dialog must not.
+                dialog.addEventListener('click', function (e) { if (e.target === dialog) close(dialog); });
+            });
+
+            document.addEventListener('keydown', function (e) {
+                if (e.key !== 'Escape') return;
+                document.querySelectorAll('[data-store-picker-dialog].open').forEach(close);
+            });
+        })();
+    </script>
 }

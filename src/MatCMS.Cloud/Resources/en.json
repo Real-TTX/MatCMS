@@ -14,6 +14,9 @@
   "store.noComponents": "No components in the store yet.",
   "store.noUsers": "No users in the store yet.",
   "store.noSettings": "No settings in the store yet.",
+  "store.settingIsSecret": "Treat as a secret (store encrypted)",
+  "store.settingIsSecretHint": "For passwords and keys. The value is stored encrypted, never shown again, and only decrypted on its way to the instance.",
+  "store.settingDeleteConfirm": "Remove this setting from the store? Profiles lose the selection; the value stays on the instances.",
   "store.userDeleteConfirm": "Remove this user from the store? Profiles lose the selection; accounts already rolled out stay on the instances.",
   "store.pluginDeleteConfirm": "Remove this plugin from the store? Profiles lose the selection; it stays on the instances.",
 

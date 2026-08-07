@@ -227,12 +227,12 @@
                         @* The value is deliberately NOT in data-search for a secret: the search
                            index sits in the DOM, and a stored password has no business being there. *@
                         <tr data-search="@(s.IsSecret ? s.Key : s.Key + " " + s.Value)">
-                            <td><span class="mono">@s.Key</span></td>
+                            <td><a asp-page="Setting" asp-route-id="@s.Id"><span class="mono">@s.Key</span></a></td>
                             <td class="muted">@(s.IsSecret ? "••••••" : s.Value)</td>
                             <td><span class="badge badge-off">@T["store.profileCount", Model.Uses(Model.SettingUse, s.Id)]</span></td>
                             <td>
                                 <div class="actions">
-                                    <span class="muted">@T["store.editorPending"]</span>
+                                    <a class="btn btn-sm btn-ghost" asp-page="Setting" asp-route-id="@s.Id">@T["action.edit"]</a>
                                 </div>
                             </td>
                         </tr>
@@ -242,7 +242,7 @@
             <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
         }
         <div class="list-actions">
-            <span class="muted">@T["store.editorPending"]</span>
+            <a class="btn" asp-page="Setting">@T["profiles.addSetting"]</a>
         </div>
     </div>
 </div>

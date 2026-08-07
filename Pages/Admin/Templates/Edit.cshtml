@@ -97,7 +97,12 @@
         @T["templates.edit"]
         <span class="badge" title="@T["templates.versionHint"]" style="margin-left:8px;vertical-align:middle;font-size:12px;">@T["templates.version"] V@(Model.SchemaVersion)</span>
     </h1>
-    <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
+    <div style="display:flex;gap:8px;align-items:center;">
+        <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-page-handler="ExportJson" asp-route-id="@Model.Id">
+            <i class="ti ti-download" aria-hidden="true"></i> @T["templates.exportJson"]
+        </a>
+        <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
+    </div>
 </div>
 
 <div class="card">

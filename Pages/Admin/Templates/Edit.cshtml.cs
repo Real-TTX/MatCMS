@@ -84,6 +84,33 @@ public class EditModel : PageModel
         return Page();
     }
 
+    /// <summary>
+    /// Exports the template as plain JSON. This is the hand-off format for MatCMS.Cloud profiles:
+    /// design a theme once on a real site, export it here, paste it into the cloud profile and roll
+    /// it out. Deliberately JSON and not the backup ZIP — a template is one row, not an archive.
+    /// <para><c>IsActive</c> is excluded: which design a site runs is a per-site decision.</para>
+    /// </summary>
+    public async Task<IActionResult> OnGetExportJsonAsync(int id)
+    {
+        var t = await _db.Templates.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
+        if (t is null) return RedirectToPage("Index");
+
+        var payload = new
+        {
+            t.Name,
+            t.AccentColor, t.SecondaryColor, t.HeadingFont, t.BodyFont, t.ButtonStyle,
+            t.HeadingColor, t.TextColor, t.BackgroundColor, t.AltBackground,
+            t.ContainerWidth, t.ButtonRadius, t.HeaderBackground, t.HeaderTextColor, t.HeaderPadding,
+            t.CustomCss, t.CustomJs, t.LayoutHtml,
+            t.MenuMapJson, t.ParametersJson, t.ParamValuesJson,
+            t.SchemaVersion, t.PartsJson
+        };
+
+        var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
+        var slug = MatCMS.Services.BackupManager.FileSlug(t.Name);
+        return File(System.Text.Encoding.UTF8.GetBytes(json), "application/json", $"template-{slug}.json");
+    }
+
     public async Task<IActionResult> OnPostAsync()
     {
         var t = await _db.Templates.FindAsync(Id);

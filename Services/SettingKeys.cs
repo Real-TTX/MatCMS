@@ -63,6 +63,20 @@ public static class SettingKeys
     public const string SmtpFromName = "smtp.fromName";
     public const string SmtpSsl = "smtp.ssl";
 
+    // MatCMS.Cloud link (Settings → Cloud). The cloud watches versions, notifies, and — when this
+    // instance runs on ITS Docker host — can perform updates. Empty URL/id/token = fully offline.
+    // The token is stored DataProtection-ENCRYPTED (see CloudService), never in the clear.
+    public const string CloudUrl = "cloud.url";
+    public const string CloudInstanceId = "cloud.instanceId";
+    public const string CloudToken = "cloud.token";
+
+    /// <summary>Profile revision this instance last applied successfully. Persisted (not in-memory)
+    /// so a restart does not re-apply the whole configuration.</summary>
+    public const string CloudAppliedRevision = "cloud.appliedRevision";
+
+    /// <summary>Why the last apply failed; empty when it succeeded. Reported back on every heartbeat.</summary>
+    public const string CloudSyncError = "cloud.syncError";
+
     // Note: TopBarLink1/2 are intentionally NOT here — the top bar moved to the "toolbar" menu.
     // The constants remain for the one-time migration in DbSeeder.
     public static readonly string[] All =
@@ -88,4 +102,10 @@ public static class SettingKeys
 
     /// <summary>Machine-translation keys (managed on the Settings → Sprachen tab).</summary>
     public static readonly string[] Translate = [TranslateProvider, TranslateApiKey, TranslateUrl];
+
+    /// <summary>MatCMS.Cloud link keys (managed on the Settings → Cloud tab). Deliberately NOT part
+    /// of any generic save path — the token needs encrypting, so CloudService owns these. Also the
+    /// deny-list for pushed settings: a profile must never be able to rewrite the cloud link.</summary>
+    public static readonly string[] Cloud =
+        [CloudUrl, CloudInstanceId, CloudToken, CloudAppliedRevision, CloudSyncError];
 }

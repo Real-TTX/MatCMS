@@ -139,6 +139,13 @@ builder.Services.AddScoped<TranslationService>();
 builder.Services.AddSingleton<PluginRegistry>();
 builder.Services.AddScoped<PluginRunner>();
 
+// MatCMS.Cloud link: state is a singleton (the admin UI reads the last result), the worker sends an
+// outbound heartbeat once a minute. Unconfigured = the service does nothing at all.
+builder.Services.AddSingleton<CloudState>();
+builder.Services.AddScoped<CloudService>();
+builder.Services.AddScoped<CloudSyncService>();
+builder.Services.AddHostedService<CloudConnectionService>();
+
 // Basic brute-force protection for the login endpoint (per client IP).
 // Behind a reverse proxy, enable ForwardedHeaders so the real client IP is used.
 builder.Services.AddRateLimiter(options =>
@@ -164,6 +171,18 @@ builder.Services.AddRateLimiter(options =>
 
     // Anonymous public plugin endpoints (/plugin/{key}) — throttle per client IP so a visitor-facing
     // write endpoint (e.g. review submission) can't be hammered to bloat storage.
+    // Cloud-initiated adoption (/api/cloud/link) takes admin credentials, so it is a login endpoint
+    // in all but name and gets the same treatment: a tight per-IP budget.
+    options.AddPolicy("cloudLink", ctx =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+
     options.AddPolicy("publicPlugin", ctx =>
         RateLimitPartition.GetFixedWindowLimiter(
             ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
@@ -246,6 +265,17 @@ app.UseStaticFiles(new StaticFileOptions
     RequestPath = "/plugin-assets",
     OnPrepareResponse = ctx =>
         ctx.Context.Response.Headers["X-Content-Type-Options"] = "nosniff"
+});
+
+// Remember the address this site is actually reached at. A site with no canonical URL configured
+// otherwise has no address to report to MatCMS.Cloud, which then cannot link to it or preview it.
+// Cheap: an in-memory string, written only when it changes.
+app.Use(async (ctx, next) =>
+{
+    var state = ctx.RequestServices.GetRequiredService<MatCMS.Services.CloudState>();
+    var seen = $"{ctx.Request.Scheme}://{ctx.Request.Host}";
+    if (state.ObservedBaseUrl != seen) state.ObservedBaseUrl = seen;
+    await next();
 });
 
 // Set CultureInfo.Current(UI)Culture per request (cookie / Accept-Language / default "de").
@@ -375,6 +405,39 @@ app.MapMethods("/plugin/{key}", new[] { "GET", "POST" }, async (HttpContext ctx,
     }
     return Results.Content(html, "text/html; charset=utf-8");
 }).RequireRateLimiting("publicPlugin");
+
+// --- Cloud-initiated adoption ---------------------------------------------
+// The ONE inbound call in the cloud link: a MatCMS.Cloud hands over the connection, authenticating
+// with an ADMIN ACCOUNT OF THIS INSTANCE. The credentials are verified against our own user table
+// exactly like a login, so this cannot be used to take over a site by anyone who isn't already an
+// admin here. Anonymous by necessity (there is no cloud session yet), rate-limited like /login.
+app.MapPost("/api/cloud/link", async (
+    HttpContext ctx, MatCMS.Services.CloudLinkRequest request,
+    MatCMS.Services.AuthService auth, MatCMS.Services.CloudService cloud) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password)
+        || string.IsNullOrWhiteSpace(request.CloudUrl) || string.IsNullOrWhiteSpace(request.InstanceId)
+        || string.IsNullOrWhiteSpace(request.Token))
+        return Results.BadRequest(new { error = "Unvollständige Anfrage." });
+
+    var user = await auth.ValidateAsync(request.Username, request.Password);
+    if (user is null || user.Role != "Admin")
+        return Results.Unauthorized();
+
+    await cloud.AcceptLinkAsync(request.CloudUrl, request.InstanceId, request.Token, ctx.RequestAborted);
+
+    // Hand back what the cloud needs to label us straight away, so its instance list is populated
+    // before our first scheduled heartbeat.
+    var site = ctx.RequestServices.GetRequiredService<MatCMS.Services.SiteContext>();
+    var version = ctx.RequestServices.GetRequiredService<MatCMS.Services.VersionService>();
+    return Results.Ok(new
+    {
+        siteName = site.SiteName,
+        version = version.Current,
+        containerId = MatCMS.Services.ContainerIdentity.Current,
+        url = site.CanonicalBaseUrl(ctx.Request)
+    });
+}).RequireRateLimiting("cloudLink");
 
 // Simple image upload endpoint used by the block editor / settings / media library (admin only).
 app.MapPost("/admin/api/upload", async (HttpRequest request, IWebHostEnvironment env, MatCMS.Data.AppDbContext db) =>

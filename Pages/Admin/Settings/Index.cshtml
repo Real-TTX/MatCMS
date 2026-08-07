@@ -16,6 +16,166 @@
     <button type="button" class="tab" data-tab="code">@T["settings.tabCode"]</button>
     <button type="button" class="tab" data-tab="maintenance">@T["settings.maint.tab"]</button>
     <button type="button" class="tab" data-tab="languages">@T["settings.tabLanguages"]</button>
+    <button type="button" class="tab" data-tab="cloud">@T["settings.tabCloud"]</button>
+</div>
+
+@* ============ CLOUD ============ *@
+<div class="tab-panel" data-panel="cloud" hidden>
+    <div class="card">
+        <h2>@T["settings.cloudHeading"]</h2>
+        <p class="muted">@T["settings.cloudIntro"]</p>
+
+        @if (Model.Cloud.Configured)
+        {
+            <div class="kv">
+                <div class="kv-label">@T["settings.cloudStatus"]</div>
+                <div class="kv-value">
+                    @if (Model.CloudState.Connected && Model.CloudState.IsPending)
+                    {
+                        <span class="badge badge-off">@T["settings.cloudAwaitingApproval"]</span>
+                        <span class="muted">@T["settings.cloudAwaitingApprovalHint"]</span>
+                    }
+                    else if (Model.CloudState.Connected)
+                    {
+                        <span class="badge badge-on">@T["settings.cloudConnected"]</span>
+                    }
+                    else if (Model.CloudState.LastAttemptUtc is null)
+                    {
+                        <span class="badge badge-off">@T["settings.cloudPending"]</span>
+                    }
+                    else
+                    {
+                        <span class="badge badge-err">@T["settings.cloudFailed"]</span>
+                        <span class="muted">@Model.CloudState.LastError</span>
+                    }
+                </div>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(Model.CloudState.DisplayName))
+            {
+                <div class="kv">
+                    <div class="kv-label">@T["settings.cloudName"]</div>
+                    <div class="kv-value">@Model.CloudState.DisplayName</div>
+                </div>
+            }
+            <div class="kv">
+                <div class="kv-label">@T["settings.cloudLastBeat"]</div>
+                <div class="kv-value">@(Model.CloudState.LastAttemptUtc?.ToString("yyyy-MM-dd HH:mm:ss") ?? "—") UTC</div>
+            </div>
+            <div class="kv">
+                <div class="kv-label">@T["settings.cloudLatest"]</div>
+                <div class="kv-value">
+                    @(Model.CloudState.LatestVersion ?? "—")
+                    @if (Model.CloudState.UpdateAvailable)
+                    {
+                        <span class="badge badge-new">@T["settings.cloudUpdateAvailable"]</span>
+                    }
+                </div>
+            </div>
+            <div class="kv">
+                <div class="kv-label">@T["settings.cloudCanUpdate"]</div>
+                <div class="kv-value">
+                    @if (Model.CloudState.CloudCanUpdate)
+                    {
+                        <span class="badge badge-on">@T["settings.cloudLocal"]</span>
+                        <span class="muted">@T["settings.cloudLocalHelp"]</span>
+                    }
+                    else
+                    {
+                        <span class="badge badge-off">@T["settings.cloudRemote"]</span>
+                        <span class="muted">@T["settings.cloudRemoteHelp"]</span>
+                    }
+                </div>
+            </div>
+            <div class="kv">
+                <div class="kv-label">@T["settings.cloudContainerId"]</div>
+                <div class="kv-value mono">@(MatCMS.Services.ContainerIdentity.Current ?? T["settings.cloudNoContainer"])</div>
+            </div>
+            <div class="kv">
+                <div class="kv-label">@T["settings.cloudProfile"]</div>
+                <div class="kv-value">@(Model.CloudState.ProfileName ?? T["settings.cloudNoProfile"])</div>
+            </div>
+            <div class="kv">
+                <div class="kv-label">@T["settings.cloudConfigState"]</div>
+                <div class="kv-value">
+                    @if (Model.CloudState.ConfigRevision == 0)
+                    {
+                        <span class="muted">@T["settings.cloudNoConfig"]</span>
+                    }
+                    else if (!string.IsNullOrWhiteSpace(Model.CloudState.SyncError))
+                    {
+                        <span class="badge badge-err">@T["settings.cloudSyncFailed"]</span>
+                        <span class="muted">@Model.CloudState.SyncError</span>
+                    }
+                    else if (Model.CloudState.OutOfSync)
+                    {
+                        <span class="badge badge-off">@T["settings.cloudSyncPending"]</span>
+                        <span class="muted">@T["settings.cloudSyncRevisions", Model.CloudState.AppliedRevision, Model.CloudState.ConfigRevision]</span>
+                    }
+                    else
+                    {
+                        <span class="badge badge-on">@T["settings.cloudSyncOk"]</span>
+                        <span class="muted">@T["settings.cloudSyncRevision", Model.CloudState.AppliedRevision]</span>
+                    }
+                </div>
+            </div>
+            <div style="margin-top:14px;">
+                <form method="post" asp-page-handler="CloudSync" style="margin:0;">
+                    <button type="submit" class="btn btn-ghost">@T["settings.cloudSyncNow"]</button>
+                </form>
+            </div>
+        }
+    </div>
+
+    <div class="card">
+        <h2>@T["settings.cloudLink"]</h2>
+        <p class="muted">@T["settings.cloudJoinHelp"]</p>
+        <form method="post" asp-page-handler="CloudConnect">
+            <div class="form-field">
+                <label>@T["settings.cloudUrl"]</label>
+                <input name="cloudUrl" value="@Model.Cloud.Url" placeholder="https://cloud.example.com" spellcheck="false" />
+            </div>
+            <div class="form-field">
+                <label>@T["settings.cloudJoinCode"]</label>
+                <input name="joinCode" placeholder="XXXX-XXXX-XXXX" spellcheck="false" autocomplete="off" />
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                <button type="submit" class="btn">@T["settings.cloudConnect"]</button>
+            </div>
+        </form>
+
+        <details style="margin-top:18px;">
+            <summary class="muted">@T["settings.cloudManual"]</summary>
+            <form method="post" asp-page-handler="CloudManual" style="margin-top:12px;">
+                <div class="form-field">
+                    <label>@T["settings.cloudUrl"]</label>
+                    <input name="cloudUrl" value="@Model.Cloud.Url" placeholder="https://cloud.example.com" spellcheck="false" />
+                </div>
+                <div class="form-field">
+                    <label>@T["settings.cloudInstanceId"]</label>
+                    <input name="cloudInstanceId" value="@Model.Cloud.InstanceId" spellcheck="false" />
+                </div>
+                <div class="form-field">
+                    <label>@T["settings.cloudToken"]</label>
+                    <input name="cloudToken" type="password" autocomplete="new-password"
+                           placeholder="@(Model.CloudHasToken ? T["settings.cloudTokenKeep"] : "")" />
+                    <div class="help">@T["settings.cloudTokenHelp"]</div>
+                </div>
+                <button type="submit" class="btn btn-ghost">@T["settings.cloudConnect"]</button>
+            </form>
+        </details>
+        @if (Model.Cloud.Configured)
+        {
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;">
+                <form method="post" asp-page-handler="CloudTest" style="margin:0;">
+                    <button type="submit" class="btn btn-ghost">@T["settings.cloudTest"]</button>
+                </form>
+                <form method="post" asp-page-handler="CloudDisconnect" style="margin:0;"
+                      onsubmit="return confirm('@T["settings.cloudDisconnectConfirm"]');">
+                    <button type="submit" class="btn btn-ghost">@T["settings.cloudDisconnect"]</button>
+                </form>
+            </div>
+        }
+    </div>
 </div>
 
 @* ============ GENERAL ============ *@

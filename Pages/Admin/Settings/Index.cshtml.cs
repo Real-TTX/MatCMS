@@ -11,7 +11,21 @@ public class IndexModel : PageModel
 {
     private readonly AppDbContext _db;
     private readonly EmailService _email;
-    public IndexModel(AppDbContext db, EmailService email) { _db = db; _email = email; }
+    private readonly CloudService _cloud;
+    public CloudState CloudState { get; }
+
+    public IndexModel(AppDbContext db, EmailService email, CloudService cloud, CloudState cloudState)
+    {
+        _db = db;
+        _email = email;
+        _cloud = cloud;
+        CloudState = cloudState;
+    }
+
+    /// <summary>Current cloud link (Cloud tab). The token is never rendered back — only whether one
+    /// is stored — so it cannot be read out of the page source.</summary>
+    public CloudService.CloudSettings Cloud { get; private set; } = new("", "", "");
+    public bool CloudHasToken => !string.IsNullOrEmpty(Cloud.Token);
 
     [BindProperty] public Dictionary<string, string> Values { get; set; } = new();
 
@@ -44,6 +58,78 @@ public class IndexModel : PageModel
         AllPages = await _db.Pages.AsNoTracking()
             .Where(p => p.Locale == Localizer.DefaultCulture)
             .OrderBy(p => p.Title).ToListAsync();
+        Cloud = await _cloud.GetSettingsAsync();
+    }
+
+    // --- MatCMS.Cloud link (Cloud tab) --------------------------------------
+    // Not routed through SaveKeysAsync: the token must be encrypted, and connecting should give
+    // immediate feedback instead of leaving the operator to wait for the next minute's heartbeat.
+
+    /// <summary>Enrollment with a profile's join code — the normal way in. Cloud-URL + code, and the
+    /// instance fetches its own id and token.</summary>
+    public async Task<IActionResult> OnPostCloudConnectAsync(string? cloudUrl, string? joinCode)
+    {
+        var (ok, error) = await _cloud.RegisterAsync(cloudUrl, joinCode, HttpContext.RequestAborted);
+        if (!ok)
+        {
+            TempData["FlashError"] = $"Verbindung fehlgeschlagen: {error}";
+            return RedirectToPage(new { tab = "cloud" });
+        }
+
+        TempData["Flash"] = CloudState.IsPending
+            ? "Verbunden. Die Instanz wartet nun auf die Freigabe in der Cloud."
+            : "Mit der Cloud verbunden.";
+        return RedirectToPage(new { tab = "cloud" });
+    }
+
+    /// <summary>Advanced path: paste an id + token that were issued elsewhere.</summary>
+    public async Task<IActionResult> OnPostCloudManualAsync(string? cloudUrl, string? cloudInstanceId, string? cloudToken)
+    {
+        if (string.IsNullOrWhiteSpace(cloudUrl) || string.IsNullOrWhiteSpace(cloudInstanceId))
+        {
+            TempData["FlashError"] = "Cloud-URL und Instanz-ID sind erforderlich.";
+            return RedirectToPage(new { tab = "cloud" });
+        }
+
+        await _cloud.SaveSettingsAsync(cloudUrl, cloudInstanceId, cloudToken);
+        await _cloud.SendHeartbeatAsync(HttpContext.RequestAborted);
+
+        if (CloudState.Connected)
+            TempData["Flash"] = "Mit der Cloud verbunden.";
+        else
+            TempData["FlashError"] = $"Verbindung fehlgeschlagen: {CloudState.LastError}";
+        return RedirectToPage(new { tab = "cloud" });
+    }
+
+    /// <summary>Pulls and applies the profile configuration immediately instead of waiting for the
+    /// next heartbeat.</summary>
+    public async Task<IActionResult> OnPostCloudSyncAsync()
+    {
+        var result = await _cloud.PullAndApplyAsync(ct: HttpContext.RequestAborted);
+        if (result.Ok)
+            TempData["Flash"] = result.Applied.Count == 0
+                ? $"Konfiguration angewendet (Revision {result.Revision})."
+                : $"Konfiguration angewendet (Revision {result.Revision}): {string.Join(", ", result.Applied)}.";
+        else
+            TempData["FlashError"] = $"Konfiguration konnte nicht angewendet werden: {result.Error}";
+        return RedirectToPage(new { tab = "cloud" });
+    }
+
+    public async Task<IActionResult> OnPostCloudTestAsync()
+    {
+        await _cloud.SendHeartbeatAsync(HttpContext.RequestAborted);
+        if (CloudState.Connected)
+            TempData["Flash"] = "Heartbeat erfolgreich gesendet.";
+        else
+            TempData["FlashError"] = $"Heartbeat fehlgeschlagen: {CloudState.LastError}";
+        return RedirectToPage(new { tab = "cloud" });
+    }
+
+    public async Task<IActionResult> OnPostCloudDisconnectAsync()
+    {
+        await _cloud.DisconnectAsync(HttpContext.RequestAborted);
+        TempData["Flash"] = "Verbindung zur Cloud getrennt.";
+        return RedirectToPage(new { tab = "cloud" });
     }
 
     public async Task<IActionResult> OnPostLanguagesAsync()

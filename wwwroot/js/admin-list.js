@@ -8,6 +8,9 @@
         var pager = root.querySelector('[data-list-pager]');
         var emptyEl = root.querySelector('[data-list-empty]');
         var toggle = root.querySelector('[data-list-viewtoggle]');
+        // Optional tag filter: a <select data-list-filter> whose value must appear in a row's
+        // data-tags. Lets a list offer "only offline" / "only outdated" without a server round trip.
+        var filter = root.querySelector('[data-list-filter]');
         var key = root.getAttribute('data-list-key');   // localStorage suffix for the chosen view
         var page = 0;
 
@@ -20,7 +23,13 @@
         function apply() {
             var all = items();
             var q = ((search && search.value) || '').trim().toLowerCase();
-            var matched = all.filter(function (el) { return !q || hay(el).indexOf(q) !== -1; });
+            var tag = ((filter && filter.value) || '').trim().toLowerCase();
+            var matched = all.filter(function (el) {
+                if (q && hay(el).indexOf(q) === -1) return false;
+                if (!tag) return true;
+                var tags = (el.getAttribute('data-tags') || '').toLowerCase().split(/\s+/);
+                return tags.indexOf(tag) !== -1;
+            });
             var pages = pageSize ? Math.max(1, Math.ceil(matched.length / pageSize)) : 1;
             if (page >= pages) page = pages - 1;
             if (page < 0) page = 0;
@@ -53,6 +62,7 @@
         }
 
         if (search) search.addEventListener('input', function () { page = 0; apply(); });
+        if (filter) filter.addEventListener('change', function () { page = 0; apply(); });
         if (toggle) {
             var saved = key && (function () { try { return localStorage.getItem('matcms.list.' + key); } catch (e) { return null; } })();
             setView(saved || (root.classList.contains('list-view-table') ? 'table' : 'tiles'));

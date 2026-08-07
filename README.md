@@ -32,6 +32,8 @@ eingespielt – so laufen beliebig viele Instanzen auf demselben Image.
 - **Templates** – Designer (Farben, Fonts, Header/Buttons) getrennt von
   Layout/Parameter-Mapping; Seiten-Layouts („Parts"), Schema-Versionierung mit
   Auto-Konvertierung, sowie ein **Datei-Editor (CodeMirror)** für Layout-HTML/CSS/JS.
+  Ein Template lässt sich als **JSON exportieren** – das ist das Übergabeformat für
+  MatCMS.Cloud-Profile: einmal bauen, überall ausrollen.
 - **Menüs** – mehrere Menüs (Header, Footer, Toolbar …) mit **Submenüs/Dropdowns**
   und Icons; Zuordnung ins Template per Mapping.
 - **Mediathek** – Upload von **Bildern und Dateien**, Tags, Mehrfachauswahl; ein
@@ -56,6 +58,15 @@ eingespielt – so laufen beliebig viele Instanzen auf demselben Image.
 - **Backup & Restore** – granularer Export/Import (Seiten, Templates, Formulare,
   Menüs, Einstellungen, Medien, optional Benutzer) als ZIP, plus **geplante
   Backups**.
+- **Cloud-Anbindung** – optionale Verbindung zu einer **MatCMS.Cloud** (*Einstellungen →
+  Cloud*): Anmeldung per **Join-Code** (oder Adoption von der Cloud aus), danach
+  minütlicher ausgehender Heartbeat. Die Cloud überwacht zentral die Versionen,
+  benachrichtigt bei Updates/Ausfällen, kann die Instanz aktualisieren, wenn sie auf
+  demselben Docker-Host läuft, und rollt **Profil-Konfiguration** aus (SMTP/
+  Einstellungen, Benutzer, Plugins, Komponenten, Templates). Kein eingehender Port nötig; der
+  Token wird verschlüsselt gespeichert. Benutzer werden dabei nur ergänzt, nie
+  überschrieben, und ausgerollte Plugins bleiben deaktiviert, bis sie hier
+  freigeschaltet werden.
 - **Einrichtungs-Assistent** – Step-Wizard beim ersten Start.
 
 ---
@@ -189,7 +200,9 @@ MatCMS/
 ├─ Content/                    # Block-System (Registry, Felder, Layout-Renderer, Templates)
 ├─ Data/                       # EF Core DbContext + DbSeeder (generischer Seed + gebündelte Plugins)
 ├─ Models/                     # Entities (Page, ContentBlock, Post, Form, Menu, Template, Plugin, User, …)
-├─ Services/                   # Auth, SiteContext, Backup, Email, Translation, Version, PluginRuntime, …
+├─ Services/                   # Auth, SiteContext, Backup, Email, Translation, Version, PluginRuntime,
+│                              #   CloudService/CloudSyncService/CloudProtocol/ContainerIdentity
+│                              #   (MatCMS.Cloud-Link + Konfigurations-Sync), …
 ├─ Resources/                  # i18n-Strings der Admin-UI (de.json / en.json)
 ├─ Pages/
 │  ├─ View.cshtml              # Öffentlicher Seiten-Renderer (Route "/{slug?}")

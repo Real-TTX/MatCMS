@@ -52,6 +52,10 @@
         }
         <div class="list-actions">
             <a class="btn" asp-page="Create">@T["components.new"]</a>
+            @if (Model.CloudConnected)
+            {
+                <a class="btn btn-ghost" asp-page="Index" asp-route-browse="true">@T["plugins.browseCloud"]</a>
+            }
         </div>
     </div>
 </div>
@@ -102,4 +106,46 @@
             if (want) show(want);
         })();
     </script>
+}
+
+@* Katalog der verbundenen Cloud — nur auf Anforderung geladen (?browse=true). *@
+@if (Model.Catalog is not null || Model.CatalogError is not null)
+{
+    <div class="card">
+        <h2>@T["plugins.cloudCatalog"]</h2>
+        @if (Model.CatalogError is not null)
+        {
+            <div class="alert alert-error">@Model.CatalogError</div>
+        }
+        else if (Model.Catalog!.Components.Count == 0)
+        {
+            <p class="muted">@T["components.cloudEmpty"]</p>
+        }
+        else
+        {
+            <p class="muted">@T["components.cloudIntro"]</p>
+            <table class="data">
+                <tbody>
+                    @foreach (var c in Model.Catalog.Components)
+                    {
+                        var installed = Model.Items.Any(i => i.Type == c.Type);
+                        <tr>
+                            <td>
+                                <strong>@c.Name</strong>
+                                <div class="muted">@c.Description</div>
+                            </td>
+                            <td class="mono">@c.Type</td>
+                            <td>
+                                <div class="actions">
+                                    <form class="inline-form" method="post" asp-page-handler="InstallFromCloud" asp-route-type="@c.Type">
+                                        <button type="submit" class="btn btn-sm">@(installed ? T["plugins.cloudUpdate"] : T["plugins.cloudInstall"])</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
 }

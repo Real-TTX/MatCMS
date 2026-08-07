@@ -1,3 +1,4 @@
+using MatCMS.Services;
 using MatCMS.Data;
 using MatCMS.Models;
 using Microsoft.AspNetCore.Mvc;
@@ -9,15 +10,35 @@ namespace MatCMS.Pages.Admin.Templates;
 public class IndexModel : PageModel
 {
     private readonly AppDbContext _db;
-    public IndexModel(AppDbContext db) => _db = db;
+    private readonly CloudCatalogService _catalog;
+    public IndexModel(AppDbContext db, CloudCatalogService catalog)
+    {
+        _db = db;
+        _catalog = catalog;
+    }
+
+    /// <summary>Catalogue of the connected cloud, fetched only on demand (?browse=true).</summary>
+    public CloudCatalogService.Catalog? Catalog { get; private set; }
+    public bool CloudConnected { get; private set; }
+    public string? CatalogError { get; private set; }
+
+    public async Task<IActionResult> OnPostInstallFromCloudAsync(string name)
+    {
+        var (ok, message) = await _catalog.InstallTemplateAsync(name, HttpContext.RequestAborted);
+        TempData[ok ? "Flash" : "FlashError"] = message;
+        return RedirectToPage(new { browse = true });
+    }
 
     public List<Template> Items { get; private set; } = new();
 
-    public async Task OnGetAsync()
+    public async Task OnGetAsync(bool browse = false)
     {
         Items = await _db.Templates
             .OrderByDescending(t => t.IsActive).ThenBy(t => t.Name)
             .ToListAsync();
+        CloudConnected = await _catalog.IsAvailableAsync();
+        if (browse && CloudConnected)
+            (Catalog, CatalogError) = await _catalog.GetCatalogAsync(HttpContext.RequestAborted);
     }
 
     public async Task<IActionResult> OnPostActivateAsync(int id)

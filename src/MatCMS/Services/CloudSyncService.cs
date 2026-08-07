@@ -32,7 +32,15 @@ public class CloudSyncService
         _log = log;
     }
 
-    public sealed record SyncResult(bool Ok, int Revision, string? Error, List<string> Applied);
+    public sealed record SyncResult(bool Ok, int Revision, string? Error, List<string> Applied,
+        List<CloudSyncItemReport> Report);
+
+    /// <summary>What this apply did, item by item. Collected while applying and reported to the cloud
+    /// on the next heartbeat — the cloud derives nothing, it only keeps the record.</summary>
+    private readonly List<CloudSyncItemReport> _report = new();
+
+    private void Report(string kind, string id, string outcome, string? detail = null) =>
+        _report.Add(new CloudSyncItemReport { Kind = kind, Id = id, Outcome = outcome, Detail = detail });
 
     /// <summary>
     /// Applies a whole configuration. <paramref name="fetchPlugin"/> downloads one plugin bundle by
@@ -44,6 +52,7 @@ public class CloudSyncService
         CancellationToken ct = default)
     {
         var applied = new List<string>();
+        _report.Clear();
         try
         {
             if (config.Settings is not null)
@@ -64,7 +73,8 @@ public class CloudSyncService
             await SetStateAsync(config.Revision, null, ct);
             _log.LogInformation("Cloud configuration revision {Revision} applied: {Applied}",
                 config.Revision, string.Join(", ", applied));
-            return new(true, config.Revision, null, applied);
+            await SetReportAsync(ct);
+            return new(true, config.Revision, null, applied, _report);
         }
         catch (Exception ex)
         {
@@ -73,7 +83,8 @@ public class CloudSyncService
             var message = ex.Message.Length > 500 ? ex.Message[..500] : ex.Message;
             await SetStateAsync(await AppliedRevisionAsync(ct), message, ct);
             _log.LogWarning(ex, "Applying cloud configuration failed");
-            return new(false, config.Revision, message, applied);
+            await SetReportAsync(ct);
+            return new(false, config.Revision, message, applied, _report);
         }
     }
 
@@ -95,12 +106,20 @@ public class CloudSyncService
             if (row is null)
             {
                 _db.SiteSettings.Add(new SiteSetting { Key = key, Value = value ?? "" });
+                Report("setting", key, "installed");
                 count++;
             }
             else if (overwrite || string.IsNullOrEmpty(row.Value))
             {
-                if (row.Value != (value ?? "")) count++;
+                // Only a real change counts — re-sending an identical value is not an update, and
+                // reporting it as one would make every revision look like it touched the whole site.
+                if (row.Value != (value ?? "")) { Report("setting", key, "updated"); count++; }
+                else Report("setting", key, "skipped-exists", "Wert ist bereits gesetzt");
                 row.Value = value ?? "";
+            }
+            else
+            {
+                Report("setting", key, "skipped-exists", "Eigener Wert bleibt erhalten");
             }
         }
 
@@ -120,7 +139,11 @@ public class CloudSyncService
             var name = (u.Username ?? "").Trim();
             if (name.Length == 0 || string.IsNullOrWhiteSpace(u.PasswordHash)) continue;
 
-            if (await _db.Users.AnyAsync(x => x.Username == name, ct)) continue;
+            if (await _db.Users.AnyAsync(x => x.Username == name, ct))
+            {
+                Report("user", name, "skipped-exists");
+                continue;
+            }
 
             _db.Users.Add(new User
             {
@@ -130,6 +153,7 @@ public class CloudSyncService
                 PasswordHash = u.PasswordHash,
                 Role = string.IsNullOrWhiteSpace(u.Role) ? "Admin" : u.Role
             });
+            Report("user", name, "installed");
             count++;
         }
 
@@ -160,6 +184,7 @@ public class CloudSyncService
                     FieldsJson = string.IsNullOrWhiteSpace(c.FieldsJson) ? "[]" : c.FieldsJson,
                     TemplateHtml = c.TemplateHtml
                 });
+                Report("component", type, "installed");
                 count++;
             }
             else if (overwrite)
@@ -169,7 +194,12 @@ public class CloudSyncService
                 row.Icon = c.Icon;
                 row.FieldsJson = string.IsNullOrWhiteSpace(c.FieldsJson) ? "[]" : c.FieldsJson;
                 row.TemplateHtml = c.TemplateHtml;
+                Report("component", type, "updated");
                 count++;
+            }
+            else
+            {
+                Report("component", type, "skipped-exists");
             }
         }
 
@@ -206,7 +236,11 @@ public class CloudSyncService
                 row = new Template { Name = name };
                 _db.Templates.Add(row);
             }
-            else if (!overwrite) continue;
+            else if (!overwrite)
+            {
+                Report("template", name, "skipped-exists");
+                continue;
+            }
 
             row.AccentColor = t.AccentColor;
             row.SecondaryColor = t.SecondaryColor;
@@ -232,6 +266,7 @@ public class CloudSyncService
             if (isNew)
                 row.ParamValuesJson = string.IsNullOrWhiteSpace(t.ParamValuesJson) ? "{}" : t.ParamValuesJson;
 
+            Report("template", name, isNew ? "installed" : "updated");
             count++;
         }
 
@@ -244,12 +279,15 @@ public class CloudSyncService
         if (wanted.Length > 0)
         {
             var target = await _db.Templates.FirstOrDefaultAsync(x => x.Name == wanted, ct);
-            if (target is not null && !target.IsActive)
+            if (target is null)
+                Report("template", wanted, "failed", "Soll aktiviert werden, ist hier aber nicht vorhanden.");
+            else if (!target.IsActive)
             {
                 foreach (var other in await _db.Templates.Where(x => x.IsActive).ToListAsync(ct))
                     other.IsActive = false;
                 target.IsActive = true;
                 await _db.SaveChangesAsync(ct);
+                Report("template", wanted, "updated", "Als aktives Design gesetzt");
             }
         }
 
@@ -277,19 +315,35 @@ public class CloudSyncService
             var installed = await _db.Plugins.FirstOrDefaultAsync(x => x.Key == key, ct);
             if (installed is not null)
             {
-                if (!overwrite) continue;
+                if (!overwrite)
+                {
+                    Report("plugin", key, "skipped-exists", $"Version {installed.Version}");
+                    continue;
+                }
                 if (string.Equals(installed.Version ?? "", p.Version ?? "", StringComparison.OrdinalIgnoreCase))
+                {
+                    Report("plugin", key, "skipped-exists", $"Version {installed.Version} bereits installiert");
                     continue; // same version — nothing to do
+                }
             }
 
             var bundle = await fetchPlugin(key, ct);
             if (bundle is null || bundle.Length == 0)
+            {
+                // Reported BEFORE the throw: the apply aborts here, and the report is what tells the
+                // cloud which plugin broke it — the error message alone would only say that one did.
+                Report("plugin", key, "failed", "Paket konnte nicht geladen werden.");
                 throw new InvalidOperationException($"Plugin-Paket '{key}' konnte nicht geladen werden.");
+            }
 
             using var ms = new MemoryStream(bundle);
-            var (plugin, _, error) = await PluginPackager.ImportAsync(ms, _env, _db);
+            var (plugin, updated, error) = await PluginPackager.ImportAsync(ms, _env, _db);
             if (plugin is null)
+            {
+                Report("plugin", key, "failed", error ?? "Import fehlgeschlagen.");
                 throw new InvalidOperationException($"Plugin '{key}': {error ?? "Import fehlgeschlagen."}");
+            }
+            Report("plugin", key, updated ? "updated" : "installed", $"Version {plugin.Version}");
             count++;
         }
 
@@ -314,6 +368,26 @@ public class CloudSyncService
         return string.IsNullOrWhiteSpace(raw) ? null : raw;
     }
 
+    /// <summary>Persists the report so the next heartbeat can carry it even if the apply happened
+    /// minutes earlier or the container restarted in between.</summary>
+    private async Task SetReportAsync(CancellationToken ct)
+    {
+        await UpsertAsync(SettingKeys.CloudSyncReport,
+            System.Text.Json.JsonSerializer.Serialize(_report), ct);
+        await _db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>The stored report, for the heartbeat. Empty when nothing has been applied yet.</summary>
+    public async Task<List<CloudSyncItemReport>?> LastReportAsync(CancellationToken ct = default)
+    {
+        var raw = await _db.SiteSettings.AsNoTracking()
+            .Where(s => s.Key == SettingKeys.CloudSyncReport)
+            .Select(s => s.Value).FirstOrDefaultAsync(ct);
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        try { return System.Text.Json.JsonSerializer.Deserialize<List<CloudSyncItemReport>>(raw); }
+        catch { return null; }
+    }
+
     /// <summary>Persisted, not in-memory: the applied revision must survive a restart, otherwise
     /// every container restart re-applies the whole configuration.</summary>
     private async Task SetStateAsync(int revision, string? error, CancellationToken ct)
@@ -329,6 +403,9 @@ public class CloudSyncService
     {
         await UpsertAsync(SettingKeys.CloudAppliedRevision, "0", ct);
         await UpsertAsync(SettingKeys.CloudSyncError, "", ct);
+        // The old report describes a configuration from a cloud or profile that no longer applies —
+        // keeping it would show the new cloud a rollout it never made.
+        await UpsertAsync(SettingKeys.CloudSyncReport, "", ct);
         await _db.SaveChangesAsync(ct);
     }
 

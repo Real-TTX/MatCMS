@@ -303,7 +303,7 @@ public class CloudService
     {
         settings ??= await GetSettingsAsync();
         if (!settings.Configured)
-            return new(false, 0, "Keine Cloud-Verbindung konfiguriert.", []);
+            return new(false, 0, "Keine Cloud-Verbindung konfiguriert.", [], []);
 
         var client = CreateClient(settings);
         var res = await client.GetAsync($"{settings.Url}/api/instances/{settings.InstanceId}/config", ct);
@@ -313,11 +313,11 @@ public class CloudService
                 ? "Die Instanz ist in der Cloud noch nicht freigegeben."
                 : $"Konfiguration konnte nicht geladen werden (HTTP {(int)res.StatusCode}).";
             _state.SyncError = error;
-            return new(false, 0, error, []);
+            return new(false, 0, error, [], []);
         }
 
         var config = await res.Content.ReadFromJsonAsync<CloudConfig>(ct);
-        if (config is null) return new(false, 0, "Leere Konfiguration erhalten.", []);
+        if (config is null) return new(false, 0, "Leere Konfiguration erhalten.", [], []);
 
         var result = await _sync.ApplyAsync(config,
             (key, token) => FetchPluginAsync(settings, key, token), ct);
@@ -362,7 +362,8 @@ public class CloudService
             PluginCount = await _db.Plugins.CountAsync(ct),
             UserCount = await _db.Users.CountAsync(ct),
             AppliedRevision = await _sync.AppliedRevisionAsync(ct),
-            SyncError = await _sync.LastErrorAsync(ct)
+            SyncError = await _sync.LastErrorAsync(ct),
+            SyncReport = await _sync.LastReportAsync(ct)
         };
     }
 

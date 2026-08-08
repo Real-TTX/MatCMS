@@ -393,6 +393,26 @@ reported **before** the exception is thrown, which is what names the plugin that
 
 ### Apply history
 
+### Applying part of a preview
+
+The preview table has a checkbox per item that would actually change (skipped items get none —
+ticking one would promise an action that does nothing). *Ausgewählte übernehmen* posts those
+`kind:id` keys, `CloudService.ApplySelectionAsync` narrows the fetched `InstanceConfig` down to them
+and hands it to the SAME applier, so every item is still decided by the one piece of code that
+decides it everywhere else. A payload nobody picked from becomes null — "don't touch this".
+
+Two rules make this coherent rather than confusing:
+
+- **The applied revision does not move.** Only a subset arrived, so the instance stays *abweichend*
+  and the next heartbeat brings the remainder. Claiming the revision would strand the rest forever.
+- **Nothing is marked as seeded.** A `once` payload applied in part must not be frozen, or the items
+  left out would never arrive.
+
+The run still writes its report and run stamp, so a partial apply appears in the history like any
+other — logged as "Selected items of revision N applied".
+
+### Apply history
+
 `InstanceSyncRun` keeps one row per completed apply (time as the INSTANCE reported it, revision,
 error, the full report JSON, plus denormalised counts so a listing does not parse 50 blobs). It is
 appended **only when `HeartbeatRequest.SyncRunAt` differs from `Instance.LastSyncRunAt`** — the same

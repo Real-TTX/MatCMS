@@ -886,3 +886,39 @@ table.data .btn { white-space: nowrap; }
 .store-card-sub { font-size: 12px; color: var(--muted, #6b7078); overflow-wrap: anywhere; }
 .store-card-text { font-size: 13px; color: var(--muted, #6b7078); }
 .store-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
+
+
+/* ============ Template file editor ============ */
+/* The pseudo-file list and its CodeMirror modal. Shared because the CMS and the cloud offer the
+   same editor (see _TemplateFiles.cshtml); it used to sit inline in the CMS template page. */
+.tpl-files { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.tpl-file { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left;
+    background: #fff; border: 1px solid var(--line, #e2e4e8); border-radius: 10px; padding: 12px 14px; cursor: pointer; font: inherit; }
+.tpl-file:hover { border-color: var(--accent); box-shadow: 0 2px 10px rgba(0,0,0,.05); }
+.tpl-file-ext { flex: none; width: 46px; height: 46px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center;
+    font-family: var(--font-head, sans-serif); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #fff; }
+.ext-html { background: #e44d26; } .ext-css { background: #2965f1; } .ext-js { background: #b8a316; }
+.tpl-file-main { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.tpl-file-name { font-size: 15px; display: flex; align-items: center; gap: 8px; }
+.tpl-file-name code { font-size: 14px; }
+.tpl-file-badge { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #8a8f98; background: #f1f2f4; border-radius: 999px; padding: 2px 9px; }
+.tpl-file-badge.on { color: #fff; background: var(--accent); }
+.tpl-file-desc { font-size: 12.5px; color: #6b7078; }
+.tpl-file-open { flex: none; color: var(--accent); font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; }
+
+/* Modal */
+.cm-modal { position: fixed; inset: 0; z-index: 3000; background: rgba(17,19,24,.55); display: flex; align-items: stretch; justify-content: center; padding: 3vh 2vw; }
+.cm-modal[hidden] { display: none; }
+.cm-modal-dialog { background: #fff; border-radius: 12px; width: min(1100px, 100%); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 24px 70px rgba(0,0,0,.4); }
+.cm-modal-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--line, #e2e4e8); }
+.cm-modal-file { font-size: 15px; display: inline-flex; align-items: center; gap: 8px; }
+.cm-modal-file code { font-size: 14px; }
+.cm-modal-close { border: 0; background: none; font-size: 20px; line-height: 1; cursor: pointer; color: #6b7078; padding: 4px 8px; border-radius: 6px; }
+.cm-modal-close:hover { background: #f1f2f4; color: #111; }
+.cm-modal-editor { flex: 1; min-height: 0; overflow: hidden; }
+.cm-modal-editor .CodeMirror { height: 100%; font-size: 13.5px; line-height: 1.5; }
+.cm-modal-tokens { padding: 8px 14px; border-top: 1px solid var(--line, #eee); display: flex; flex-wrap: wrap; align-items: center; gap: 6px; max-height: 92px; overflow-y: auto; }
+.cm-tokens-label { font-size: 12px; color: #6b7078; margin-right: 4px; }
+.cm-token { font-family: var(--mono, monospace); font-size: 12px; background: #f1f2f4; border: 1px solid #e2e4e8; border-radius: 6px; padding: 2px 7px; cursor: pointer; }
+.cm-token:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.cm-modal-foot { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line, #e2e4e8); background: #fafbfc; }

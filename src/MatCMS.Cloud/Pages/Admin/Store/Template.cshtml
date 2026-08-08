@@ -3,6 +3,47 @@
 @{
     ViewData["Title"] = Model.IsNew ? T["profiles.templateAdd"] : Model.Item.Name;
     var et = Model.Item;
+
+    // Same pseudo-files as the CMS; only the field names are this page's own.
+    var bodyTokens = new[]
+    {
+        new TemplateToken("{{content}}", T["templates.tokContent"]),
+        new TemplateToken("{{logo}}", T["templates.tokLogo"]),
+        new TemplateToken("{{site_name}}", T["templates.tokSiteName"]),
+        new TemplateToken("{{footer_text}}", T["templates.tokFooterText"]),
+        new TemplateToken("{{year}}", T["templates.tokYear"]),
+        new TemplateToken("{{menu:primary}}", T["templates.tokMenu"]),
+        new TemplateToken("{{param:id}}", T["templates.tokParam"]),
+    };
+    var postTokens = new[]
+    {
+        new TemplateToken("{{post_image}}", T["templates.tok.image"]),
+        new TemplateToken("{{post_date}}", T["templates.tok.date"]),
+        new TemplateToken("{{post_title}}", T["templates.tok.title"]),
+        new TemplateToken("{{post_excerpt}}", T["templates.tok.excerpt"]),
+        new TemplateToken("{{post_body}}", T["templates.tok.body"]),
+    };
+    var paramToken = new[] { new TemplateToken("{{param:id}}", T["templates.tokParam"]) };
+
+    var templateFiles = new TemplateFiles(
+        T["tplfiles.intro"],
+        new[]
+        {
+            new TemplateFile("body.html", "html", T["tplfiles.body.desc"], "layoutHtml", et.LayoutHtml,
+                "htmlmixed", bodyTokens),
+            new TemplateFile("article.html", "html", T["tplfiles.article.desc"], "Parts[post]", Model.Part("post"),
+                "htmlmixed", postTokens),
+            new TemplateFile("styles.css", "css", T["tplfiles.styles.desc"], "customCss", et.CustomCss,
+                "css", paramToken),
+            new TemplateFile("script.js", "js", T["tplfiles.script.desc"], "customJs", et.CustomJs,
+                "javascript", System.Array.Empty<TemplateToken>()),
+            new TemplateFile("maintenance.html", "html", T["tplfiles.maintenance.desc"], "Parts[maintenance]", Model.Part("maintenance"),
+                "htmlmixed", paramToken),
+        },
+        new TemplateFileLabels(
+            T["tplfiles.edit"], T["tplfiles.tokens"], T["tplfiles.insertDefault"],
+            T["tplfiles.apply"], T["tplfiles.cancel"],
+            T["tplfiles.badgeCustom"], T["tplfiles.badgeEmpty"]));
 }
 <div class="page-head">
     <h1>
@@ -157,32 +198,10 @@
 
     <div class="tab-panel" data-panel="layout" hidden>
         <div class="card">
-            <h2>@T["profiles.tplLayoutHtml"]</h2>
-            <div class="form-field">
-                <div class="code-toolbar">
-                    <span class="code-hint">@T["profiles.tplTokens"]</span>
-                    @foreach (var token in new[] { "{{content}}", "{{nav}}", "{{logo}}", "{{footer}}", "{{menu:main}}", "{{param:id}}" })
-                    {
-                        <button type="button" class="token-chip" data-insert="@token" data-target="layoutHtml">@token</button>
-                    }
-                </div>
-                <textarea id="layoutHtml" name="layoutHtml" rows="16" spellcheck="false" data-code="html">@et.LayoutHtml</textarea>
-                <div class="help">@T["profiles.tplLayoutHint"]</div>
-            </div>
-        </div>
-        <div class="card">
-            <h2>@T["profiles.tplCustomCss"]</h2>
-            <div class="form-field">
-                <textarea id="customCss" name="customCss" rows="14" spellcheck="false" data-code="css">@et.CustomCss</textarea>
-            </div>
-        </div>
-        <div class="card">
-            <h2>@T["profiles.tplCustomJs"]</h2>
-            <div class="form-field">
-                <textarea id="customJs" name="customJs" rows="10" spellcheck="false" data-code="js">@et.CustomJs</textarea>
-            </div>
+            <partial name="_TemplateFiles" model="templateFiles" />
         </div>
     </div>
+
 
     <div class="tab-panel" data-panel="params" hidden>
         <div class="card">
@@ -197,13 +216,6 @@
             <div class="form-field">
                 <textarea id="menuMapJson" name="menuMapJson" rows="6" spellcheck="false" data-code="json">@et.MenuMapJson</textarea>
                 <div class="help">@T["profiles.tplMenuMapHint"]</div>
-            </div>
-        </div>
-        <div class="card">
-            <h2>@T["profiles.tplParts"]</h2>
-            <div class="form-field">
-                <textarea id="partsJson" name="partsJson" rows="12" spellcheck="false" data-code="json">@et.PartsJson</textarea>
-                <div class="help">@T["profiles.tplPartsHint"]</div>
             </div>
         </div>
     </div>

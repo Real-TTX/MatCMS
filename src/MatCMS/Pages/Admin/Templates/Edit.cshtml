@@ -32,65 +32,51 @@
         "</footer>";
 
     // Per-file metadata for the client editor (mode/insert-default/"baseline"=value counting as unset/tokens).
-    var filesMeta = new object[]
+    // The pseudo-files this template is edited as. Shape and wording live in the shared partial;
+    // only WHICH fields they post as is a property of this page.
+    var bodyTokens = new[]
     {
-        new {
-            name = "body.html", mode = "htmlmixed", insertDefault = StarterBody, baseline = "",
-            tokens = new[] {
-                new { t = "{{content}}", l = T["templates.tokContent"] },
-                new { t = "{{logo}}", l = T["templates.tokLogo"] },
-                new { t = "{{site_name}}", l = T["templates.tokSiteName"] },
-                new { t = "{{footer_text}}", l = T["templates.tokFooterText"] },
-                new { t = "{{year}}", l = T["templates.tokYear"] },
-                new { t = "{{menu:primary}}", l = T["templates.tokMenu"] },
-                new { t = "{{#menu:primary}}…{{/menu:primary}}", l = T["templates.tokMenuLoop"] },
-                new { t = "{{param:id}}", l = T["templates.tokParam"] },
-                new { t = "{{languages}}", l = T["templates.tokLanguages"] },
-            }
-        },
-        new {
-            name = "article.html", mode = "htmlmixed", insertDefault = Model.DefaultPostPart, baseline = Model.DefaultPostPart,
-            tokens = new[] {
-                new { t = "{{post_image}}", l = T["templates.tok.image"] },
-                new { t = "{{post_date}}", l = T["templates.tok.date"] },
-                new { t = "{{post_title}}", l = T["templates.tok.title"] },
-                new { t = "{{post_excerpt}}", l = T["templates.tok.excerpt"] },
-                new { t = "{{post_body}}", l = T["templates.tok.body"] },
-                new { t = "{{post_tags}}", l = T["templates.tok.tags"] },
-                new { t = "{{post_attachments}}", l = T["templates.tok.attachments"] },
-            }
-        },
-        new {
-            name = "styles.css", mode = "css", insertDefault = "", baseline = "",
-            tokens = new[] { new { t = "{{param:id}}", l = T["templates.tokParam"] } }
-        },
-        new {
-            name = "script.js", mode = "javascript", insertDefault = "", baseline = "",
-            tokens = new object[0]
-        },
-        new {
-            name = "maintenance.html", mode = "htmlmixed", insertDefault = Model.DefaultMaintenancePart, baseline = Model.DefaultMaintenancePart,
-            tokens = new[] {
-                new { t = "{{maint_title}}", l = T["templates.tok.maintTitle"] },
-                new { t = "{{maint_message}}", l = T["templates.tok.maintMessage"] },
-                new { t = "{{maint_badge}}", l = T["templates.tok.maintBadge"] },
-                new { t = "{{logo}}", l = T["templates.tokLogo"] },
-                new { t = "{{site_name}}", l = T["templates.tokSiteName"] },
-                new { t = "{{accent}}", l = T["templates.tok.accent"] },
-                new { t = "{{year}}", l = T["templates.tokYear"] },
-            }
-        },
+        new TemplateToken("{{content}}", T["templates.tokContent"]),
+        new TemplateToken("{{logo}}", T["templates.tokLogo"]),
+        new TemplateToken("{{site_name}}", T["templates.tokSiteName"]),
+        new TemplateToken("{{footer_text}}", T["templates.tokFooterText"]),
+        new TemplateToken("{{year}}", T["templates.tokYear"]),
+        new TemplateToken("{{menu:primary}}", T["templates.tokMenu"]),
+        new TemplateToken("{{#menu:primary}}…{{/menu:primary}}", T["templates.tokMenuLoop"]),
+        new TemplateToken("{{param:id}}", T["templates.tokParam"]),
+        new TemplateToken("{{languages}}", T["templates.tokLanguages"]),
     };
-    var filesJson = System.Text.Json.JsonSerializer.Serialize(filesMeta);
+    var postTokens = new[]
+    {
+        new TemplateToken("{{post_image}}", T["templates.tok.image"]),
+        new TemplateToken("{{post_date}}", T["templates.tok.date"]),
+        new TemplateToken("{{post_title}}", T["templates.tok.title"]),
+        new TemplateToken("{{post_excerpt}}", T["templates.tok.excerpt"]),
+        new TemplateToken("{{post_body}}", T["templates.tok.body"]),
+        new TemplateToken("{{post_tags}}", T["templates.tok.tags"]),
+        new TemplateToken("{{post_attachments}}", T["templates.tok.attachments"]),
+    };
+    var paramToken = new[] { new TemplateToken("{{param:id}}", T["templates.tokParam"]) };
 
-    var fileRows = new[]
-    {
-        new { Name = "body.html", Ext = "html", Desc = T["tplfiles.body.desc"],    Custom = !string.IsNullOrWhiteSpace(Model.LayoutHtml) },
-        new { Name = "article.html", Ext = "html", Desc = T["tplfiles.article.desc"], Custom = Model.Parts.ContainsKey("post") },
-        new { Name = "styles.css", Ext = "css",  Desc = T["tplfiles.styles.desc"],  Custom = !string.IsNullOrWhiteSpace(Model.CustomCss) },
-        new { Name = "script.js",  Ext = "js",   Desc = T["tplfiles.script.desc"],  Custom = !string.IsNullOrWhiteSpace(Model.CustomJs) },
-        new { Name = "maintenance.html", Ext = "html", Desc = T["tplfiles.maintenance.desc"], Custom = Model.Parts.ContainsKey("maintenance") },
-    };
+    var templateFiles = new TemplateFiles(
+        T["tplfiles.intro"],
+        new[]
+        {
+            new TemplateFile("body.html", "html", T["tplfiles.body.desc"], "LayoutHtml", Model.LayoutHtml,
+                "htmlmixed", bodyTokens, InsertDefault: StarterBody),
+            new TemplateFile("article.html", "html", T["tplfiles.article.desc"], "Parts[post]", postValue,
+                "htmlmixed", postTokens, InsertDefault: Model.DefaultPostPart, Baseline: Model.DefaultPostPart),
+            new TemplateFile("styles.css", "css", T["tplfiles.styles.desc"], "CustomCss", Model.CustomCss,
+                "css", paramToken),
+            new TemplateFile("script.js", "js", T["tplfiles.script.desc"], "CustomJs", Model.CustomJs,
+                "javascript", System.Array.Empty<TemplateToken>()),
+            new TemplateFile("maintenance.html", "html", T["tplfiles.maintenance.desc"], "Parts[maintenance]", maintenanceValue,
+                "htmlmixed", paramToken, InsertDefault: Model.DefaultMaintenancePart, Baseline: Model.DefaultMaintenancePart),
+        },
+        new TemplateFileLabels(
+            T["tplfiles.edit"], T["tplfiles.tokens"], T["tplfiles.insertDefault"],
+            T["tplfiles.apply"], T["tplfiles.cancel"],
+            T["tplfiles.badgeCustom"], T["tplfiles.badgeEmpty"]));
 }
 <div class="page-head">
     <h1>
@@ -230,30 +216,7 @@
 
         @* ============ DATEIEN (unified template files) ============ *@
         <div class="tab-panel" data-panel="files" data-group="files" hidden>
-            <div class="help">@Html.Raw(T["tplfiles.intro"])</div>
-            <div class="tpl-files">
-                @for (var i = 0; i < fileRows.Length; i++)
-                {
-                    var f = fileRows[i];
-                    <button type="button" class="tpl-file" data-file-idx="@i">
-                        <span class="tpl-file-ext ext-@f.Ext">@f.Ext</span>
-                        <span class="tpl-file-main">
-                            <span class="tpl-file-name"><code>@f.Name</code>
-                                <span class="tpl-file-badge @(f.Custom ? "on" : "")">@(f.Custom ? T["tplfiles.badgeCustom"] : T["tplfiles.badgeEmpty"])</span>
-                            </span>
-                            <span class="tpl-file-desc">@f.Desc</span>
-                        </span>
-                        <span class="tpl-file-open"><i class="ti ti-code" aria-hidden="true"></i> @T["tplfiles.edit"]</span>
-                    </button>
-                }
-            </div>
-
-            @* Hidden stores — these are what the form actually submits. Order matches fileRows/FILES. *@
-            <textarea class="tpl-file-store" data-idx="0" name="LayoutHtml" hidden>@Model.LayoutHtml</textarea>
-            <textarea class="tpl-file-store" data-idx="1" name="Parts[post]" hidden>@postValue</textarea>
-            <textarea class="tpl-file-store" data-idx="2" name="CustomCss" hidden>@Model.CustomCss</textarea>
-            <textarea class="tpl-file-store" data-idx="3" name="CustomJs" hidden>@Model.CustomJs</textarea>
-            <textarea class="tpl-file-store" data-idx="4" name="Parts[maintenance]" hidden>@maintenanceValue</textarea>
+            <partial name="_TemplateFiles" model="templateFiles" />
         </div>
 
         @* ============ MENÜS ============ *@
@@ -316,62 +279,10 @@
     </form>
 </div>
 
-@* ============ IDE-style file editor modal ============ *@
-<div class="cm-modal" id="file-editor" hidden>
-    <div class="cm-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="cm-file-name">
-        <div class="cm-modal-head">
-            <span class="cm-modal-file"><i class="ti ti-file-code" aria-hidden="true"></i> <code id="cm-file-name"></code></span>
-            <button type="button" class="cm-modal-close" id="cm-close" title="@T["tplfiles.cancel"]" aria-label="@T["tplfiles.cancel"]">✕</button>
-        </div>
-        <div class="cm-modal-editor" id="cm-host"></div>
-        <div class="cm-modal-tokens">
-            <span class="cm-tokens-label">@T["tplfiles.tokens"]</span>
-            <span id="cm-tokens"></span>
-        </div>
-        <div class="cm-modal-foot">
-            <button type="button" class="btn btn-sm btn-ghost" id="cm-insert-default" hidden>@T["tplfiles.insertDefault"]</button>
-            <span style="flex:1;"></span>
-            <button type="button" class="btn btn-sm btn-ghost" id="cm-cancel">@T["tplfiles.cancel"]</button>
-            <button type="button" class="btn btn-sm" id="cm-apply">@T["tplfiles.apply"]</button>
-        </div>
-    </div>
-</div>
-
 @section Scripts {
     <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/lib/codemirror/codemirror.min.css" asp-append-version="true" />
     <style>
         /* File list */
-        .tpl-files { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
-        .tpl-file { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left;
-            background: #fff; border: 1px solid var(--line, #e2e4e8); border-radius: 10px; padding: 12px 14px; cursor: pointer; font: inherit; }
-        .tpl-file:hover { border-color: var(--accent); box-shadow: 0 2px 10px rgba(0,0,0,.05); }
-        .tpl-file-ext { flex: none; width: 46px; height: 46px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center;
-            font-family: var(--font-head, sans-serif); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #fff; }
-        .ext-html { background: #e44d26; } .ext-css { background: #2965f1; } .ext-js { background: #b8a316; }
-        .tpl-file-main { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
-        .tpl-file-name { font-size: 15px; display: flex; align-items: center; gap: 8px; }
-        .tpl-file-name code { font-size: 14px; }
-        .tpl-file-badge { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #8a8f98; background: #f1f2f4; border-radius: 999px; padding: 2px 9px; }
-        .tpl-file-badge.on { color: #fff; background: var(--accent); }
-        .tpl-file-desc { font-size: 12.5px; color: #6b7078; }
-        .tpl-file-open { flex: none; color: var(--accent); font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; }
-
-        /* Modal */
-        .cm-modal { position: fixed; inset: 0; z-index: 3000; background: rgba(17,19,24,.55); display: flex; align-items: stretch; justify-content: center; padding: 3vh 2vw; }
-        .cm-modal[hidden] { display: none; }
-        .cm-modal-dialog { background: #fff; border-radius: 12px; width: min(1100px, 100%); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 24px 70px rgba(0,0,0,.4); }
-        .cm-modal-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--line, #e2e4e8); }
-        .cm-modal-file { font-size: 15px; display: inline-flex; align-items: center; gap: 8px; }
-        .cm-modal-file code { font-size: 14px; }
-        .cm-modal-close { border: 0; background: none; font-size: 20px; line-height: 1; cursor: pointer; color: #6b7078; padding: 4px 8px; border-radius: 6px; }
-        .cm-modal-close:hover { background: #f1f2f4; color: #111; }
-        .cm-modal-editor { flex: 1; min-height: 0; overflow: hidden; }
-        .cm-modal-editor .CodeMirror { height: 100%; font-size: 13.5px; line-height: 1.5; }
-        .cm-modal-tokens { padding: 8px 14px; border-top: 1px solid var(--line, #eee); display: flex; flex-wrap: wrap; align-items: center; gap: 6px; max-height: 92px; overflow-y: auto; }
-        .cm-tokens-label { font-size: 12px; color: #6b7078; margin-right: 4px; }
-        .cm-token { font-family: var(--mono, monospace); font-size: 12px; background: #f1f2f4; border: 1px solid #e2e4e8; border-radius: 6px; padding: 2px 7px; cursor: pointer; }
-        .cm-token:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
-        .cm-modal-foot { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line, #e2e4e8); background: #fafbfc; }
     </style>
     <script src="~/_content/MatCMS.Shared.Web/lib/codemirror/codemirror.min.js" asp-append-version="true"></script>
     <script src="~/_content/MatCMS.Shared.Web/lib/codemirror/mode/xml.min.js" asp-append-version="true"></script>
@@ -400,73 +311,6 @@
             }
             tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.tab); }); });
             show(new URLSearchParams(location.search).get('tab'));
-        })();
-
-        // ---- Unified file editor (CodeMirror IDE modal) ----
-        (function () {
-            var FILES = @Html.Raw(filesJson);
-            var stores = Array.prototype.slice.call(document.querySelectorAll('.tpl-file-store'));
-            var rows = Array.prototype.slice.call(document.querySelectorAll('.tpl-file'));
-            var modal = document.getElementById('file-editor');
-            var host = document.getElementById('cm-host');
-            var nameEl = document.getElementById('cm-file-name');
-            var tokEl = document.getElementById('cm-tokens');
-            var insDefBtn = document.getElementById('cm-insert-default');
-            var cm = null, cur = -1;
-
-            function ensureCm() {
-                if (cm) return cm;
-                cm = CodeMirror(host, {
-                    lineNumbers: true, autoCloseBrackets: true, matchBrackets: true, styleActiveLine: true,
-                    indentUnit: 2, tabSize: 2, lineWrapping: false,
-                    extraKeys: { Tab: function (c) { c.replaceSelection('  '); } }
-                });
-                return cm;
-            }
-            function norm(s) { return (s || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n'); }
-            function updateBadge(idx) {
-                var meta = FILES[idx], v = norm(stores[idx].value).trim();
-                var custom = v !== '' && v !== norm(meta.baseline).trim();
-                var b = rows[idx].querySelector('.tpl-file-badge');
-                if (b) { b.classList.toggle('on', custom); b.textContent = custom ? '@T["tplfiles.badgeCustom"]' : '@T["tplfiles.badgeEmpty"]'; }
-            }
-            function open(idx) {
-                cur = idx; var meta = FILES[idx];
-                nameEl.textContent = meta.name;
-                tokEl.innerHTML = '';
-                (meta.tokens || []).forEach(function (tk) {
-                    var s = document.createElement('button');
-                    s.type = 'button'; s.className = 'cm-token'; s.textContent = tk.t; s.title = tk.l;
-                    s.addEventListener('click', function () { cm.replaceSelection(tk.t); cm.focus(); });
-                    tokEl.appendChild(s);
-                });
-                insDefBtn.hidden = !meta.insertDefault;
-                modal.hidden = false;
-                ensureCm();
-                cm.setOption('mode', meta.mode);
-                cm.setValue(stores[idx].value || '');
-                cm.clearHistory();
-                setTimeout(function () { cm.refresh(); cm.focus(); cm.setCursor(0, 0); }, 10);
-            }
-            function close() { modal.hidden = true; cur = -1; }
-            function apply() {
-                if (cur < 0) return;
-                stores[cur].value = cm.getValue();
-                updateBadge(cur);
-                close();
-            }
-
-            rows.forEach(function (r) { r.addEventListener('click', function () { open(parseInt(r.dataset.fileIdx, 10)); }); });
-            document.getElementById('cm-apply').addEventListener('click', apply);
-            document.getElementById('cm-cancel').addEventListener('click', close);
-            document.getElementById('cm-close').addEventListener('click', close);
-            insDefBtn.addEventListener('click', function () { if (cur >= 0) cm.setValue(FILES[cur].insertDefault || ''); cm.focus(); });
-            modal.addEventListener('click', function (e) { if (e.target === modal) close(); });
-            document.addEventListener('keydown', function (e) {
-                if (modal.hidden) return;
-                if (e.key === 'Escape') close();
-                else if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'Enter')) { e.preventDefault(); apply(); }
-            });
         })();
 
         // Keep each color swatch and its hex text field in sync.

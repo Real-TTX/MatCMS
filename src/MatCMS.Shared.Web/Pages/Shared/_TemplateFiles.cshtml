@@ -1,0 +1,143 @@
+@model MatCMS.Shared.Web.TemplateFiles
+@*
+    The template editor's "Dateien" tab: a list of pseudo-files, the hidden fields the surrounding
+    form actually posts, and one CodeMirror modal that edits whichever file was clicked.
+
+    Shared by the CMS and the cloud so a theme is authored the same way in both. The pages differ
+    only in what their files post as (LayoutHtml, Parts[post], …), which is why FieldName is part of
+    the model rather than baked in here.
+
+    Requires the CodeMirror assets on the page (see _CodeEditorAssets / the template editor's own
+    script section) — this partial only assumes `CodeMirror` is defined by the time it runs.
+*@
+@{
+    var files = Model.Files;
+    var meta = files.Select(f => new
+    {
+        name = f.Name,
+        mode = f.Mode,
+        insertDefault = f.InsertDefault,
+        baseline = f.Baseline,
+        tokens = f.Tokens.Select(t => new { t = t.T, l = t.L })
+    }).ToArray();
+    var metaJson = System.Text.Json.JsonSerializer.Serialize(meta);
+}
+
+<div class="help">@Html.Raw(Model.Intro)</div>
+<div class="tpl-files">
+    @for (var i = 0; i < files.Count; i++)
+    {
+        var f = files[i];
+        var custom = !string.IsNullOrWhiteSpace(f.Value)
+                     && (f.Value ?? "").Replace("\r\n", "\n").Trim() != (f.Baseline ?? "").Replace("\r\n", "\n").Trim();
+        <button type="button" class="tpl-file" data-file-idx="@i">
+            <span class="tpl-file-ext ext-@f.Ext">@f.Ext</span>
+            <span class="tpl-file-main">
+                <span class="tpl-file-name">
+                    <code>@f.Name</code>
+                    <span class="tpl-file-badge @(custom ? "on" : "")">@(custom ? Model.Labels.BadgeCustom : Model.Labels.BadgeEmpty)</span>
+                </span>
+                <span class="tpl-file-desc">@f.Description</span>
+            </span>
+            <span class="tpl-file-open"><i class="ti ti-code" aria-hidden="true"></i> @Model.Labels.Edit</span>
+        </button>
+    }
+</div>
+
+@* The hidden stores are what the form submits — the modal only ever writes back into these. *@
+@for (var i = 0; i < files.Count; i++)
+{
+    <textarea class="tpl-file-store" data-idx="@i" name="@files[i].FieldName" hidden>@files[i].Value</textarea>
+}
+
+<div class="cm-modal" id="file-editor" hidden>
+    <div class="cm-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="cm-file-name">
+        <div class="cm-modal-head">
+            <span class="cm-modal-file"><i class="ti ti-file-code" aria-hidden="true"></i> <code id="cm-file-name"></code></span>
+            <button type="button" class="cm-modal-close" id="cm-close" title="@Model.Labels.Cancel" aria-label="@Model.Labels.Cancel">✕</button>
+        </div>
+        <div class="cm-modal-editor" id="cm-host"></div>
+        <div class="cm-modal-tokens">
+            <span class="cm-tokens-label">@Model.Labels.Tokens</span>
+            <span id="cm-tokens"></span>
+        </div>
+        <div class="cm-modal-foot">
+            <button type="button" class="btn btn-sm btn-ghost" id="cm-insert-default" hidden>@Model.Labels.InsertDefault</button>
+            <span style="flex:1;"></span>
+            <button type="button" class="btn btn-sm btn-ghost" id="cm-cancel">@Model.Labels.Cancel</button>
+            <button type="button" class="btn btn-sm" id="cm-apply">@Model.Labels.Apply</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function () {
+        var FILES = @Html.Raw(metaJson);
+        var LBL = { custom: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Labels.BadgeCustom)), empty: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Labels.BadgeEmpty)) };
+        var stores = Array.prototype.slice.call(document.querySelectorAll('.tpl-file-store'));
+        var rows = Array.prototype.slice.call(document.querySelectorAll('.tpl-file'));
+        var modal = document.getElementById('file-editor');
+        var host = document.getElementById('cm-host');
+        var nameEl = document.getElementById('cm-file-name');
+        var tokEl = document.getElementById('cm-tokens');
+        var insDefBtn = document.getElementById('cm-insert-default');
+        if (!modal || !host || rows.length === 0) return;
+        var cm = null, cur = -1;
+
+        function ensureCm() {
+            if (cm) return cm;
+            cm = CodeMirror(host, {
+                lineNumbers: true, autoCloseBrackets: true, matchBrackets: true, styleActiveLine: true,
+                indentUnit: 2, tabSize: 2, lineWrapping: false,
+                extraKeys: { Tab: function (c) { c.replaceSelection('  '); } }
+            });
+            return cm;
+        }
+        function norm(s) { return (s || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n'); }
+        function updateBadge(idx) {
+            var m = FILES[idx], v = norm(stores[idx].value).trim();
+            var custom = v !== '' && v !== norm(m.baseline).trim();
+            var b = rows[idx].querySelector('.tpl-file-badge');
+            if (b) { b.classList.toggle('on', custom); b.textContent = custom ? LBL.custom : LBL.empty; }
+        }
+        function open(idx) {
+            cur = idx;
+            var m = FILES[idx];
+            nameEl.textContent = m.name;
+            tokEl.innerHTML = '';
+            (m.tokens || []).forEach(function (tk) {
+                var s = document.createElement('button');
+                s.type = 'button'; s.className = 'cm-token'; s.textContent = tk.t; s.title = tk.l;
+                s.addEventListener('click', function () { cm.replaceSelection(tk.t); cm.focus(); });
+                tokEl.appendChild(s);
+            });
+            insDefBtn.hidden = !m.insertDefault;
+            modal.hidden = false;
+            ensureCm();
+            cm.setOption('mode', m.mode);
+            cm.setValue(stores[idx].value || '');
+            cm.clearHistory();
+            // After the modal becomes visible, or CodeMirror measures a hidden element as zero-height.
+            setTimeout(function () { cm.refresh(); cm.focus(); cm.setCursor(0, 0); }, 10);
+        }
+        function close() { modal.hidden = true; cur = -1; }
+        function apply() {
+            if (cur < 0) return;
+            stores[cur].value = cm.getValue();
+            updateBadge(cur);
+            close();
+        }
+
+        rows.forEach(function (r) { r.addEventListener('click', function () { open(parseInt(r.dataset.fileIdx, 10)); }); });
+        document.getElementById('cm-apply').addEventListener('click', apply);
+        document.getElementById('cm-cancel').addEventListener('click', close);
+        document.getElementById('cm-close').addEventListener('click', close);
+        insDefBtn.addEventListener('click', function () { if (cur >= 0) cm.setValue(FILES[cur].insertDefault || ''); cm.focus(); });
+        modal.addEventListener('click', function (e) { if (e.target === modal) close(); });
+        document.addEventListener('keydown', function (e) {
+            if (modal.hidden) return;
+            if (e.key === 'Escape') close();
+            else if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'Enter')) { e.preventDefault(); apply(); }
+        });
+    })();
+</script>

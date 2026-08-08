@@ -26,6 +26,29 @@ public class TemplateModel : PageModel
 
     public StoreTemplate Item { get; private set; } = new();
     public bool IsNew => Item.Id == 0;
+
+    /// <summary>The template parts as the file editor posts them (Parts[post], Parts[maintenance]).
+    /// A bound PROPERTY, not a handler parameter: dictionary binding needs the model prefix, which is
+    /// what MatCMS does too.</summary>
+    [BindProperty] public Dictionary<string, string> Parts { get; set; } = new();
+
+    /// <summary>What is stored on the row, for rendering the editor.</summary>
+    /// <summary>What is stored on the row, for rendering the editor. Never throws: a template
+    /// imported with a broken parts blob must still open.</summary>
+    public Dictionary<string, string> StoredParts
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(Item.PartsJson)) return new();
+            try
+            {
+                return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(Item.PartsJson) ?? new();
+            }
+            catch { return new(); }
+        }
+    }
+
+    public string Part(string key) => StoredParts.TryGetValue(key, out var v) ? v : "";
     public List<string> UsedBy { get; private set; } = new();
 
     public async Task<IActionResult> OnGetAsync(int? id)
@@ -46,7 +69,7 @@ public class TemplateModel : PageModel
         string? headingColor, string? textColor, string? backgroundColor, string? altBackground,
         string? containerWidth, string? buttonRadius, string? headerBackground, string? headerTextColor,
         string? headerPadding, string? customCss, string? customJs, string? layoutHtml,
-        string? menuMapJson, string? parametersJson, string? partsJson)
+        string? menuMapJson, string? parametersJson)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -58,7 +81,8 @@ public class TemplateModel : PageModel
         // the sync, where it is far harder to trace back to this form.
         foreach (var (label, json) in new[]
         {
-            ("Menü-Zuordnung", menuMapJson), ("Parameter", parametersJson), ("Layout-Teile", partsJson)
+            // Parts are no longer a raw JSON field — the file editor posts them one by one.
+            ("Menü-Zuordnung", menuMapJson), ("Parameter", parametersJson)
         })
         {
             if (string.IsNullOrWhiteSpace(json)) continue;
@@ -110,7 +134,11 @@ public class TemplateModel : PageModel
         row.LayoutHtml = layoutHtml ?? "";
         row.MenuMapJson = Or(menuMapJson, "{}");
         row.ParametersJson = Or(parametersJson, "[]");
-        row.PartsJson = Or(partsJson, "{}");
+        // The editor posts the template parts as parts[post] / parts[maintenance]; empty ones are
+        // dropped so "no override" stays absent rather than being stored as an empty string.
+        var kept = Parts.Where(kv => !string.IsNullOrWhiteSpace(kv.Value))
+            .ToDictionary(kv => kv.Key, kv => kv.Value);
+        row.PartsJson = System.Text.Json.JsonSerializer.Serialize(kept);
 
         await _db.SaveChangesAsync();
         await TouchUsersAsync(row.Id);

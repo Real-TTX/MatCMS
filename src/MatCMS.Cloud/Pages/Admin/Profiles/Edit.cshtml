@@ -37,10 +37,16 @@
             @* Only the count plus a way in: a profile with twenty instances would otherwise turn this
                row into a wall of buttons, and the instance list already knows how to show them. *@
             <div class="kv-value">
-                <span class="mono">@Model.Instances.Count</span>
-                @if (Model.Instances.Count > 0)
+                @if (Model.Instances.Count == 0)
                 {
-                    <a class="btn btn-sm btn-ghost" asp-page="/Admin/Instances" asp-route-profile="@Model.Item.Id">@T["profiles.showInstances"]</a>
+                    <span class="mono">0</span>
+                }
+                else
+                {
+                    @* The number itself leads to the filtered list too — clicking the count is the
+                       first thing anyone tries. *@
+                    <a class="mono" asp-page="/Admin/Instances/Index" asp-route-profile="@Model.Item.Id">@Model.Instances.Count</a>
+                    <a class="btn btn-sm btn-ghost" asp-page="/Admin/Instances/Index" asp-route-profile="@Model.Item.Id">@T["profiles.showInstances"]</a>
                 }
             </div>
         </div>

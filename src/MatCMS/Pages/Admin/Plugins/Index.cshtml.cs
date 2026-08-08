@@ -28,6 +28,21 @@ public class IndexModel : PageModel
     public bool CloudConnected { get; private set; }
     public string? CatalogError { get; private set; }
 
+    /// <summary>The catalogue shaped for the store dialog. Built here rather than in the view so the
+    /// "already installed?" lookup stays out of the markup.</summary>
+    public Shared.StoreDialog StoreDialog => new(
+        TitleKey: "plugins.cloudCatalog",
+        IntroKey: "plugins.cloudIntro",
+        RouteName: "key",
+        Items: (Catalog?.Plugins ?? []).Select(p => new Shared.StoreItem(
+            Title: p.Name,
+            Sub: p.Key,
+            Description: p.Description,
+            RouteValue: p.Key,
+            InstalledVersion: Items.FirstOrDefault(i => i.Key == p.Key)?.Version,
+            Version: p.Version)).ToList(),
+        Error: CatalogError);
+
     public async Task OnGetAsync(bool browse = false)
     {
         Items = await _db.Plugins.OrderBy(p => p.Name).ToListAsync();

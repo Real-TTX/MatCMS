@@ -44,44 +44,8 @@
     <a class="btn" asp-page="Create">@T["templates.create"]</a>
 </div>
 
-@* Katalog der verbundenen Cloud — nur auf Anforderung geladen (?browse=true). *@
+@* The cloud catalogue opens as a store dialog, not as a card under the list — see _StoreDialog. *@
 @if (Model.Catalog is not null || Model.CatalogError is not null)
 {
-    <div class="card">
-        <h2>@T["plugins.cloudCatalog"]</h2>
-        @if (Model.CatalogError is not null)
-        {
-            <div class="alert alert-error">@Model.CatalogError</div>
-        }
-        else if (Model.Catalog!.Templates.Count == 0)
-        {
-            <p class="muted">@T["templates.cloudEmpty"]</p>
-        }
-        else
-        {
-            <p class="muted">@T["templates.cloudIntro"]</p>
-            <table class="data">
-                <tbody>
-                    @foreach (var t in Model.Catalog.Templates)
-                    {
-                        var installed = Model.Items.Any(i => i.Name == t.Name);
-                        <tr>
-                            <td>
-                                <strong>@t.Name</strong>
-                                <div class="muted">@t.Description</div>
-                            </td>
-                            <td><span class="badge" style="background:@t.AccentColor;color:#fff;">@t.AccentColor</span></td>
-                            <td>
-                                <div class="actions">
-                                    <form class="inline-form" method="post" asp-page-handler="InstallFromCloud" asp-route-name="@t.Name">
-                                        <button type="submit" class="btn btn-sm">@(installed ? T["plugins.cloudUpdate"] : T["plugins.cloudInstall"])</button>
-                                    </form>
-                                </div>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        }
-    </div>
+    <partial name="_StoreDialog" model="Model.StoreDialog" />
 }

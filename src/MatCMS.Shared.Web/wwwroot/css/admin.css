@@ -857,3 +857,30 @@ table.data .btn { white-space: nowrap; }
 
 .admin-foot-lang-menu[hidden]{display:none!important}
 .pg-versions[hidden]{display:none!important}
+
+/* ============ Cloud store dialog ============ */
+/* Browsing what you could install is a different activity from managing what you already have, so
+   the catalogue opens as a dialog instead of hanging under the list. Lives in the shared admin sheet
+   because it is admin chrome — the cloud's own store browsing gets the same look for free. */
+.modal-store { max-width: 900px; width: 100%; }
+.modal-store .modal-body { max-height: 70vh; overflow-y: auto; }
+.store-search { margin: 4px 0 14px; }
+.store-search .list-search { width: 100%; }
+.store-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+.store-card {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    border: 1px solid var(--line, #d9dce1);
+    border-radius: 10px;
+    padding: 14px 16px;
+    background: #fff;
+    transition: border-color .12s, box-shadow .12s;
+}
+.store-card:hover { border-color: var(--accent); box-shadow: 0 4px 18px rgba(0, 0, 0, .07); }
+/* Accent strip: for a template the colour is what you recognise it by before reading the name. */
+.store-card-strip { display: block; height: 6px; border-radius: 3px; margin-bottom: 8px; }
+.store-card-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.store-card-sub { font-size: 12px; color: var(--muted, #6b7078); overflow-wrap: anywhere; }
+.store-card-text { font-size: 13px; color: var(--muted, #6b7078); }
+.store-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }

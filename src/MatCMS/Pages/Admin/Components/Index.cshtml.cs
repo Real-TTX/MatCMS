@@ -23,6 +23,20 @@ public class IndexModel : PageModel
     public bool CloudConnected { get; private set; }
     public string? CatalogError { get; private set; }
 
+    /// <summary>The catalogue shaped for the store dialog. Built here rather than in the view so
+    /// the "already installed?" lookup stays out of the markup.</summary>
+    public Shared.StoreDialog StoreDialog => new(
+        TitleKey: "components.cloudCatalog",
+        IntroKey: "components.cloudIntro",
+        RouteName: "type",
+        Items: (Catalog?.Components ?? []).Select(c => new Shared.StoreItem(
+            Title: c.Name,
+            Sub: c.Type,
+            Description: c.Description,
+            RouteValue: c.Type,
+            InstalledVersion: Items.Any(i => i.Type == c.Type) ? "" : null)).ToList(),
+        Error: CatalogError);
+
     public async Task<IActionResult> OnPostInstallFromCloudAsync(string type)
     {
         var (ok, message) = await _catalog.InstallComponentAsync(type, HttpContext.RequestAborted);

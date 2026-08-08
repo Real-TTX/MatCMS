@@ -1,0 +1,114 @@
+@model MatCMS.Pages.Shared.StoreDialog
+@*
+    The cloud catalogue as a store, in a dialog rather than appended under the list — browsing what
+    you could install is a different activity from managing what you already have, and hanging it
+    below the page made it look like part of the inventory.
+
+    Opens by itself when the page was loaded with ?browse=true, because that IS the request to browse.
+    Uses the admin's own .modal-overlay/.modal; only the card grid inside is new.
+*@
+<div class="modal-overlay store-overlay" id="store-dialog">
+    <div class="modal modal-store" role="dialog" aria-modal="true" aria-labelledby="store-title">
+        <div class="modal-head">
+            <h2 id="store-title">@T[Model.TitleKey]</h2>
+            <button type="button" class="modal-close" data-store-close aria-label="@T["action.close"]">✕</button>
+        </div>
+        <div class="modal-body">
+            @if (Model.Error is not null)
+            {
+                <div class="alert alert-error">@Model.Error</div>
+            }
+            else if (Model.Items.Count == 0)
+            {
+                <p class="muted">@T[Model.IntroKey]</p>
+                <div class="list-empty">@T["store.dialogEmpty"]</div>
+            }
+            else
+            {
+                <p class="muted">@T[Model.IntroKey]</p>
+                <div class="store-search">
+                    <input type="search" class="list-search" id="store-search"
+                           placeholder="@T["store.dialogSearch"]" aria-label="@T["store.dialogSearch"]" autocomplete="off" />
+                </div>
+                <div class="store-grid" id="store-grid">
+                    @foreach (var item in Model.Items)
+                    {
+                        <div class="store-card" data-store-search="@($"{item.Title} {item.Sub} {item.Description}")">
+                            @if (!string.IsNullOrWhiteSpace(item.Accent))
+                            {
+                                <span class="store-card-strip" style="background:@item.Accent;"></span>
+                            }
+                            <div class="store-card-head">
+                                <strong>@item.Title</strong>
+                                @if (item.InstalledVersion is not null)
+                                {
+                                    <span class="badge badge-off">@T["store.dialogInstalled"]</span>
+                                }
+                            </div>
+                            <div class="store-card-sub mono">@item.Sub</div>
+                            @if (!string.IsNullOrWhiteSpace(item.Description))
+                            {
+                                <div class="store-card-text">@item.Description</div>
+                            }
+                            <div class="store-card-foot">
+                                @if (!string.IsNullOrWhiteSpace(item.Version))
+                                {
+                                    <span class="muted mono">@item.Version</span>
+                                }
+                                <form method="post" asp-page-handler="InstallFromCloud"
+                                      asp-all-route-data="@(new Dictionary<string, string> { [Model.RouteName] = item.RouteValue })">
+                                    <button type="submit" class="btn btn-sm">
+                                        @(item.InstalledVersion is null ? T["store.dialogInstall"] : T["store.dialogUpdate"])
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    }
+                </div>
+                <div class="list-empty" id="store-noresults" hidden>@T["list.noResults"]</div>
+            }
+        </div>
+        <div class="modal-foot">
+            <button type="button" class="btn btn-ghost" data-store-close>@T["action.close"]</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function () {
+        var dialog = document.getElementById('store-dialog');
+        if (!dialog) return;
+
+        // The page was loaded because somebody asked to browse — so show it straight away.
+        dialog.classList.add('open');
+
+        function close() {
+            dialog.classList.remove('open');
+            // Drop ?browse=true so a reload (or the back button) does not reopen it.
+            var url = new URL(window.location.href);
+            url.searchParams.delete('browse');
+            window.history.replaceState({}, '', url);
+        }
+
+        dialog.querySelectorAll('[data-store-close]').forEach(function (b) { b.addEventListener('click', close); });
+        dialog.addEventListener('click', function (e) { if (e.target === dialog) close(); });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && dialog.classList.contains('open')) close(); });
+
+        var search = document.getElementById('store-search');
+        var grid = document.getElementById('store-grid');
+        var none = document.getElementById('store-noresults');
+        if (search && grid) {
+            search.addEventListener('input', function () {
+                var q = search.value.trim().toLowerCase();
+                var shown = 0;
+                grid.querySelectorAll('.store-card').forEach(function (card) {
+                    var hit = !q || (card.getAttribute('data-store-search') || '').toLowerCase().indexOf(q) !== -1;
+                    card.hidden = !hit;
+                    if (hit) shown++;
+                });
+                if (none) none.hidden = shown !== 0;
+            });
+            search.focus();
+        }
+    })();
+</script>

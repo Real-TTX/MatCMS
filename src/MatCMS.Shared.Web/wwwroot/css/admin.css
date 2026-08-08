@@ -284,9 +284,9 @@ textarea.cp-sample-inp { resize: vertical; min-height: 0; }
 .link-field .link-field-btn .ti { font-size: 18px; }
 
 /* Optional color widget: swatch + hex text (may be empty) + clear button. */
-.optcolor { display: flex; align-items: center; gap: 8px; }
+.optcolor { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .optcolor .optcolor-pick { flex: 0 0 auto; width: 40px; height: 34px; padding: 2px; border: 1px solid var(--line, #d9dce1); border-radius: 6px; cursor: pointer; background: #fff; }
-.optcolor .optcolor-hex { flex: 1 1 auto; min-width: 0; }
+.optcolor .optcolor-hex { flex: 1 1 auto; min-width: 120px; font-family: var(--font-mono, ui-monospace, monospace); }
 .optcolor .optcolor-clear { flex: 0 0 auto; width: 30px; height: 30px; border: 1px solid var(--line, #d9dce1); background: #fff; border-radius: 6px; cursor: pointer; color: #6b7280; font-size: 18px; line-height: 1; }
 .optcolor .optcolor-clear:hover { background: #f3f4f6; color: #111; }
 .optcolor.is-empty .optcolor-pick { opacity: .4; }
@@ -320,12 +320,14 @@ textarea.code-area { width: 100%; box-sizing: border-box; font-family: ui-monosp
 
 /* Color picker fields (template editor): visible swatch + editable hex */
 .color-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 18px; }
-.color-field { display: flex; align-items: center; gap: 10px; }
+.color-field { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .color-field input[type=color] { width: 54px; min-width: 54px; height: 44px; padding: 4px; border: 1px solid #cfcfcf; border-radius: 8px; background: #fff; cursor: pointer; }
 .color-field input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
 .color-field input[type=color]::-webkit-color-swatch { border: 1px solid rgba(0,0,0,.12); border-radius: 5px; }
 .color-field input[type=color]::-moz-color-swatch { border: 1px solid rgba(0,0,0,.12); border-radius: 5px; }
-.color-field .hex { flex: 1; text-transform: uppercase; font-family: var(--font-mono, ui-monospace, monospace); }
+/* Grows with the field, but never below what a hex code needs: a box too narrow to show
+   "#2F7D95" looks broken, and one stretched across the whole row looks like a stray element. */
+.color-field .hex { flex: 1 1 auto; min-width: 120px; text-transform: uppercase; font-family: var(--font-mono, ui-monospace, monospace); }
 
 /* Form section sub-heading + code textareas (template editor) */
 .form-section { margin: 22px 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border-bottom: 1px solid var(--line); padding-bottom: 6px; }

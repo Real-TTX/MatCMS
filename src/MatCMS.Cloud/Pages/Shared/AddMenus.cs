@@ -40,4 +40,26 @@ public static class AddMenus
     /// <summary>An option that opens another step instead of going anywhere.</summary>
     public static AddOption StepTo(string title, string sub, string stepId)
         => new(title, sub, Data: new Dictionary<string, string> { ["add-menu"] = stepId });
+
+    /// <summary>Step one for settings: WHICH setting.</summary>
+    /// <param name="hasSmtp">True hides the SMTP branch — it is already in the profile, and offering
+    /// to add it again would be an option that does nothing.</param>
+    public static AddMenu Settings(Localizer t, string customUrl, bool hasSmtp)
+    {
+        var options = new List<AddOption>();
+        if (!hasSmtp)
+            options.Add(StepTo(t["settings.smtp"], t["add.smtpHint"], "settings-smtp"));
+        options.Add(new AddOption(t["profiles.addSetting"], t["add.customSettingHint"], customUrl));
+        return new AddMenu("settings", t["add.button"], t["add.whichSetting"], t["action.close"], options);
+    }
+
+    /// <summary>Step two for SMTP: WHERE FROM. Both answers land on the mail page — one with the
+    /// global values filled in, one with the profile's own — because a configuration that is about to
+    /// be rolled out to live sites should be seen before it is saved, not applied by a menu click.</summary>
+    public static AddMenu SmtpSource(Localizer t, string globalUrl, string ownUrl) =>
+        Step(t, "settings-smtp", t["add.smtpSource"],
+        [
+            new AddOption(t["add.fromGlobal"], t["add.smtpGlobalHint"], globalUrl),
+            new AddOption(t["add.smtpOwn"], t["add.smtpOwnHint"], ownUrl),
+        ]);
 }

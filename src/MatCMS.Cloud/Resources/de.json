@@ -479,5 +479,16 @@
   "import.componentHint": "Das JSON aus MatCMS unter Komponenten → Komponente öffnen → „Als JSON exportieren“ hier einfügen. Eine Komponente mit gleichem Typ wird überschrieben.",
   "import.userTitle": "Benutzer importieren",
   "import.userHint": "JSON mit Benutzername, E-Mail und Passwort-Hash. Das Klartext-Passwort wird nirgends gespeichert und ist deshalb auch nicht Teil des Imports.",
-  "import.btn": "JSON importieren"
+  "import.btn": "JSON importieren",
+
+  "add.whichSetting": "Welche Einstellung?",
+  "add.smtpHint": "Mailversand für die Instanzen dieses Profils.",
+  "add.customSettingHint": "Ein freies Schlüssel/Wert-Paar.",
+  "add.smtpSource": "Woher kommen die Werte?",
+  "add.smtpGlobalHint": "Die SMTP-Daten der Cloud verwenden — Änderungen dort gelten dann auch hier.",
+  "add.smtpOwn": "Eigene SMTP-Daten",
+  "add.smtpOwnHint": "Nur für dieses Profil, unabhängig von der globalen Konfiguration.",
+  "profiles.smtpFromGlobal": "Aus Global",
+  "profiles.smtpOwn": "Eigene Konfiguration",
+  "profiles.smtpRemoveConfirm": "SMTP nicht mehr ausrollen? Die eingetragenen Werte bleiben erhalten, auf den Instanzen bleibt die Konfiguration stehen."
 }

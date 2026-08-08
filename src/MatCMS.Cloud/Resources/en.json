@@ -479,5 +479,16 @@
   "import.componentHint": "Paste the JSON from MatCMS under Components → open component → “Export as JSON”. A component with the same type is overwritten.",
   "import.userTitle": "Import user",
   "import.userHint": "JSON with username, e-mail and password hash. The plaintext password is stored nowhere and is therefore not part of the import.",
-  "import.btn": "Import JSON"
+  "import.btn": "Import JSON",
+
+  "add.whichSetting": "Which setting?",
+  "add.smtpHint": "Mail delivery for this profile’s instances.",
+  "add.customSettingHint": "A free key/value pair.",
+  "add.smtpSource": "Where do the values come from?",
+  "add.smtpGlobalHint": "Use the cloud’s SMTP configuration — changes there then apply here too.",
+  "add.smtpOwn": "Own SMTP configuration",
+  "add.smtpOwnHint": "For this profile only, independent of the global configuration.",
+  "profiles.smtpFromGlobal": "From global",
+  "profiles.smtpOwn": "Own configuration",
+  "profiles.smtpRemoveConfirm": "Stop rolling SMTP out? The values are kept, and instances keep the configuration they have."
 }

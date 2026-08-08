@@ -164,78 +164,8 @@
 
 @* ============ SETTINGS ============ *@
 <div class="tab-panel" data-panel="settings" hidden>
-    <form method="post" asp-page-handler="Smtp" asp-route-id="@Model.Item.Id">
-        <div class="card">
-            <h2>@T["settings.smtp"]</h2>
-
-            @* A settings group has to be switched ON before it may overwrite anything on a live site.
-               Off = the fields stay hidden AND the values are neither saved nor rolled out, so a site's
-               own mail configuration is never replaced just because somebody once typed in here. *@
-            <label class="checkbox-row">
-                <input type="checkbox" name="syncSmtp" value="true" data-group-toggle="smtp"
-                       checked="@(Model.Item.SyncSmtp ? "checked" : null)" />
-                @T["profiles.smtpEnable"]
-            </label>
-            <div class="help">@T["profiles.smtpEnableHint"]</div>
-
-            <div data-group="smtp" hidden="@(Model.Item.SyncSmtp ? null : "hidden")">
-            <label class="checkbox-row">
-                <input type="checkbox" name="useGlobalSmtp" value="true" checked="@(Model.Item.UseGlobalSmtp ? "checked" : null)" />
-                @T["profiles.useGlobalSmtp"]
-            </label>
-            <div class="help">@T["profiles.useGlobalSmtpHint"]</div>
-            <div class="form-grid">
-                <div class="form-row">
-                    <div class="form-field">
-                        <label for="host">@T["settings.smtpHost"]</label>
-                        <input id="host" name="host" value="@Model.SmtpField("smtp.host")" readonly="@(Model.Item.UseGlobalSmtp ? "readonly" : null)" data-smtp-own spellcheck="false" />
-                    </div>
-                    <div class="form-field">
-                        <label for="port">@T["settings.smtpPort"]</label>
-                        <input id="port" name="port" value="@Model.SmtpField("smtp.port")" readonly="@(Model.Item.UseGlobalSmtp ? "readonly" : null)" data-smtp-own placeholder="587" inputmode="numeric" />
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-field">
-                        <label for="user">@T["settings.smtpUser"]</label>
-                        <input id="user" name="user" value="@Model.SmtpField("smtp.user")" readonly="@(Model.Item.UseGlobalSmtp ? "readonly" : null)" data-smtp-own spellcheck="false" />
-                    </div>
-                    <div class="form-field">
-                        <label for="password">@T["settings.smtpPassword"]</label>
-                        <input id="password" name="password" type="password" placeholder="@T["settings.smtpPasswordKeep"]" autocomplete="new-password" readonly="@(Model.Item.UseGlobalSmtp ? "readonly" : null)" data-smtp-own />
-                        @* Without this a stored password could only ever be replaced, never removed. *@
-                        @if (!string.IsNullOrEmpty(Model.Setting("smtp.password")))
-                        {
-                            <label class="checkbox-row">
-                                <input type="checkbox" name="clearPassword" value="true" />
-                                @T["settings.smtpPasswordClear"]
-                            </label>
-                        }
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-field">
-                        <label for="fromEmail">@T["settings.smtpFromEmail"]</label>
-                        <input id="fromEmail" name="fromEmail" value="@Model.SmtpField("smtp.fromEmail")" readonly="@(Model.Item.UseGlobalSmtp ? "readonly" : null)" data-smtp-own spellcheck="false" />
-                    </div>
-                    <div class="form-field">
-                        <label for="fromName">@T["settings.smtpFromName"]</label>
-                        <input id="fromName" name="fromName" value="@Model.SmtpField("smtp.fromName")" readonly="@(Model.Item.UseGlobalSmtp ? "readonly" : null)" data-smtp-own />
-                    </div>
-                </div>
-            </div>
-            <label class="checkbox-row">
-                <input type="checkbox" name="ssl" value="true" checked="@(Model.SettingFlag("smtp.ssl") ? "checked" : null)" />
-                @T["settings.smtpSsl"]
-            </label>
-            </div>
-            <div><button type="submit" class="btn">@T["settings.save"]</button></div>
-        </div>
-    </form>
-
     <div data-list>
         <div class="page-head">
-            <h2>@T["profiles.otherSettings"]</h2>
             <div class="list-toolbar">
                 <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
             </div>
@@ -245,7 +175,25 @@
                 <tr><th>@T["profiles.settingKey"]</th><th>@T["profiles.settingValue"]</th><th></th></tr>
             </thead>
             <tbody>
-                @if (Model.OtherSettings.Count == 0)
+                @* SMTP is a payload like any other, so it is a row here rather than a form
+                   permanently open above the list. Its value column says where the values come
+                   from, because that is what an operator scanning this list wants to know. *@
+                @if (Model.Item.SyncSmtp)
+                {
+                    <tr data-search="smtp mail e-mail">
+                        <td><a asp-page="Smtp" asp-route-profileId="@Model.Item.Id"><span class="mono">smtp.*</span></a></td>
+                        <td class="muted">@(Model.Item.UseGlobalSmtp ? T["profiles.smtpFromGlobal"] : T["profiles.smtpOwn"])</td>
+                        <td>
+                            <div class="actions">
+                                <form class="inline-form" method="post" asp-page="Smtp" asp-page-handler="Remove" asp-route-profileId="@Model.Item.Id"
+                                      onsubmit="return confirm('@T["profiles.smtpRemoveConfirm"]');">
+                                    <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["profiles.removeFromProfile"]" aria-label="@T["profiles.removeFromProfile"]"><partial name="_IconTrash" /></button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+                @if (Model.OtherSettings.Count == 0 && !Model.Item.SyncSmtp)
                 {
                     <partial name="_EmptyRow" model='@T["profiles.noSettings"]' />
                 }
@@ -269,10 +217,12 @@
             </tbody>
         </table>
         <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
-        <div class="list-actions">
-            <a class="btn" asp-page="Setting" asp-route-profileId="@Model.Item.Id">@T["profiles.addSetting"]</a>
-        </div>
+        @* Two steps, because "which setting" and "where from" are two questions. Only SMTP has a
+           global side to take from — free key/value settings exist nowhere but in the profile, so
+           asking them the second question would offer an option that cannot be answered. *@
+        <partial name="_AddMenu" model='AddMenus.Settings(T, Url.Page("Setting", new { profileId = Model.Item.Id })!, Model.Item.SyncSmtp)' />
     </div>
+    <partial name="_AddMenu" model='AddMenus.SmtpSource(T, Url.Page("Smtp", new { profileId = Model.Item.Id, source = "global" })!, Url.Page("Smtp", new { profileId = Model.Item.Id, source = "own" })!)' />
 </div>
 
 @* ============ USERS ============ *@
@@ -607,26 +557,6 @@
     <partial name="_CodeEditorAssets" />
     <partial name="_TabsScript" />
     <script>
-        // A settings group shows its fields only while its checkbox is ticked. Server-rendered from
-        // the stored flag, so it is already right before this runs.
-        (function () {
-            // "Globale SMTP verwenden" sperrt die eigenen Felder sofort, nicht erst nach dem Speichern.
-            var globalBox = document.querySelector('input[name="useGlobalSmtp"]');
-            if (globalBox) {
-                globalBox.addEventListener("change", function () {
-                    document.querySelectorAll("[data-smtp-own]").forEach(function (el) {
-                        el.readOnly = globalBox.checked;
-                    });
-                });
-            }
-
-            document.querySelectorAll("[data-group-toggle]").forEach(function (box) {
-                var body = document.querySelector("[data-group=\"" + box.dataset.groupToggle + "\"]");
-                if (!body) return;
-                box.addEventListener("change", function () { body.hidden = !box.checked; });
-            });
-        })();
-
         // "Aus Global hinzufügen": one dialog per payload, opened by the button next to Erstellen.
         (function () {
             function close(dialog) { dialog.classList.remove('open'); }

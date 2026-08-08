@@ -55,7 +55,15 @@ public class IndexModel : PageModel
     public IReadOnlyList<string> RoutableLanguages => Localizer.SupportedCultures;
     public HashSet<string> CurrentActive { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
 
-    public async Task OnGetAsync()
+    /// <summary>
+    /// Runs the preview on the GET rather than round-tripping its result through TempData. TempData
+    /// here is cookie-backed (no session is registered), and a profile with a few dozen items
+    /// produces a report far past the cookie limit — it would be split across many cookies that then
+    /// ride on every following request, or silently truncate to an empty table under a flash message
+    /// promising 40 items. A preview writes nothing, so re-running it on a GET is free of side
+    /// effects and reloading the page simply refreshes it.
+    /// </summary>
+    public async Task OnGetAsync(bool preview = false)
     {
         var existing = await _db.SiteSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
         foreach (var key in SettingKeys.All.Concat(SettingKeys.Smtp).Concat(SettingKeys.Errors).Concat(SettingKeys.Code).Concat(SettingKeys.Maintenance).Concat(SettingKeys.Translate))
@@ -71,12 +79,11 @@ public class IndexModel : PageModel
         Cloud = await _cloud.GetSettingsAsync();
         if (Cloud.Configured) SyncReport = await _sync.LastReportAsync() ?? new();
 
-        if (TempData["CloudPreview"] is string previewJson)
+        if (preview && Cloud.Configured)
         {
-            // Never throws: this is our own JSON, but a stale cookie from an older build must not
-            // take the settings page down.
-            try { Preview = System.Text.Json.JsonSerializer.Deserialize<List<SyncItemReport>>(previewJson); }
-            catch { Preview = null; }
+            var result = await _cloud.PreviewAsync(HttpContext.RequestAborted);
+            if (result.Ok) Preview = result.Report;
+            else TempData["FlashError"] = $"Vorschau nicht möglich: {result.Error}";
         }
     }
 
@@ -120,23 +127,9 @@ public class IndexModel : PageModel
         return RedirectToPage(new { tab = "cloud" });
     }
 
-    /// <summary>Shows what the next apply would change, without changing anything. Carried through
-    /// the redirect as JSON in TempData so the page keeps its PRG shape.</summary>
-    public async Task<IActionResult> OnPostCloudPreviewAsync()
-    {
-        var result = await _cloud.PreviewAsync(HttpContext.RequestAborted);
-        if (!result.Ok)
-        {
-            TempData["FlashError"] = $"Vorschau nicht möglich: {result.Error}";
-            return RedirectToPage(new { tab = "cloud" });
-        }
-
-        TempData["CloudPreview"] = System.Text.Json.JsonSerializer.Serialize(result.Report);
-        TempData["Flash"] = result.Report.Count == 0
-            ? "Es gibt nichts anzuwenden — die Instanz ist auf dem Stand des Profils."
-            : $"Vorschau für Revision {result.Revision}: {result.Report.Count} Objekte.";
-        return RedirectToPage(new { tab = "cloud" });
-    }
+    /// <summary>Asks for a preview. The work happens in <c>OnGetAsync(preview: true)</c> — see there
+    /// for why the result is not carried through the redirect.</summary>
+    public IActionResult OnPostCloudPreview() => RedirectToPage(new { tab = "cloud", preview = true });
 
     /// <summary>Pulls and applies the profile configuration immediately instead of waiting for the
     /// next heartbeat.</summary>

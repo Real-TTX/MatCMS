@@ -85,6 +85,14 @@ public class ComponentModel : PageModel
             row = new ProfileComponent { ProfileId = profileId };
             _db.ProfileComponents.Add(row);
         }
+        // Renaming onto an identity another row already holds violates the unique index, which
+        // surfaces as an unhandled DbUpdateException — a 500 instead of "that type is taken".
+        else if (row.Type != slug
+                 && await _db.ProfileComponents.AnyAsync(c => c.ProfileId == profileId && c.Type == slug && c.Id != row.Id))
+        {
+            TempData["FlashError"] = $"Der Typ \"{slug}\" wird in diesem Profil bereits verwendet.";
+            return RedirectToPage(new { profileId, id });
+        }
 
         row.Type = slug;
         row.Name = name.Trim();

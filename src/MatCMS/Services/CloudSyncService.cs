@@ -119,7 +119,18 @@ public class CloudSyncService
         try
         {
             var seeded = await LoadSeededAsync(config.ProfileId, ct);
-            var newlySeeded = new List<string>();
+
+            // Marked the moment a payload has gone through, NOT at the end of the run. Deferring it
+            // meant a later payload throwing (a plugin bundle that will not download, say) discarded
+            // the marks of the payloads that had already succeeded — so the next attempt ran their
+            // FIRST-apply path again and a "once" payload overwrote the site's own values, every 60 s,
+            // for as long as the failure lasted.
+            async Task MarkSeededAsync(string payload)
+            {
+                if (_dryRun) return;
+                seeded.Add(payload);
+                await SetSeededAsync(config.ProfileId, seeded, ct);
+            }
 
             if (config.Settings is not null)
             {
@@ -127,7 +138,7 @@ public class CloudSyncService
                 if (plan.Run)
                 {
                     applied.Add($"{await ApplySettingsAsync(config.Settings, plan.Overwrite, ct)} Einstellungen");
-                    if (plan.Seed) newlySeeded.Add(PayloadSettings);
+                    if (plan.Seed) await MarkSeededAsync(PayloadSettings);
                 }
                 else ReportSkippedOnce("setting", config.Settings.Keys);
             }
@@ -138,7 +149,7 @@ public class CloudSyncService
                 if (plan.Run)
                 {
                     applied.Add($"{await ApplyUsersAsync(config.Users, ct)} Benutzer");
-                    if (plan.Seed) newlySeeded.Add(PayloadUsers);
+                    if (plan.Seed) await MarkSeededAsync(PayloadUsers);
                 }
                 else ReportSkippedOnce("user", config.Users.Select(u => u.Username));
             }
@@ -149,7 +160,7 @@ public class CloudSyncService
                 if (plan.Run)
                 {
                     applied.Add($"{await ApplyComponentsAsync(config.Components, plan.Overwrite, ct)} Komponenten");
-                    if (plan.Seed) newlySeeded.Add(PayloadComponents);
+                    if (plan.Seed) await MarkSeededAsync(PayloadComponents);
                 }
                 else ReportSkippedOnce("component", config.Components.Select(c => c.Type));
             }
@@ -160,7 +171,7 @@ public class CloudSyncService
                 if (plan.Run)
                 {
                     applied.Add($"{await ApplyTemplatesAsync(config.Templates, plan.Overwrite, config.ActivateTemplate, ct)} Templates");
-                    if (plan.Seed) newlySeeded.Add(PayloadTemplates);
+                    if (plan.Seed) await MarkSeededAsync(PayloadTemplates);
                 }
                 else ReportSkippedOnce("template", config.Templates.Select(t => t.Name));
             }
@@ -171,7 +182,7 @@ public class CloudSyncService
                 if (plan.Run)
                 {
                     applied.Add($"{await ApplyPluginsAsync(config.Plugins, plan.Overwrite, fetchPlugin, ct)} Plugins");
-                    if (plan.Seed) newlySeeded.Add(PayloadPlugins);
+                    if (plan.Seed) await MarkSeededAsync(PayloadPlugins);
                 }
                 else ReportSkippedOnce("plugin", config.Plugins.Select(p => p.Key));
             }
@@ -183,14 +194,6 @@ public class CloudSyncService
                 // saves next on this scoped DbContext.
                 _db.ChangeTracker.Clear();
                 return new(true, config.Revision, null, applied, _report);
-            }
-
-            // Only after everything went through: a payload that threw must be allowed to seed again
-            // on the next attempt, otherwise a single failed rollout would freeze it forever.
-            if (newlySeeded.Count > 0)
-            {
-                seeded.UnionWith(newlySeeded);
-                await SetSeededAsync(config.ProfileId, seeded, ct);
             }
 
             await SetStateAsync(config.Revision, null, ct);

@@ -66,6 +66,14 @@ public class UserModel : PageModel
             row = new ProfileUser { ProfileId = profileId };
             _db.ProfileUsers.Add(row);
         }
+        // Renaming onto an identity another row already holds violates the unique index, which
+        // surfaces as an unhandled DbUpdateException — a 500 instead of a readable message.
+        else if (row.Username != name
+                 && await _db.ProfileUsers.AnyAsync(t => t.ProfileId == profileId && t.Username == name && t.Id != row.Id))
+        {
+            TempData["FlashError"] = $"Der Benutzername \"{name}\" wird bereits verwendet.";
+            return RedirectToPage(new { profileId, id });
+        }
 
         row.Username = name;
         row.Email = email?.Trim();

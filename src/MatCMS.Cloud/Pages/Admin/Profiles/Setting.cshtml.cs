@@ -55,6 +55,14 @@ public class SettingModel : PageModel
             row = new ProfileSetting { ProfileId = profileId };
             _db.ProfileSettings.Add(row);
         }
+        // Renaming onto an identity another row already holds violates the unique index, which
+        // surfaces as an unhandled DbUpdateException — a 500 instead of a readable message.
+        else if (row.Key != trimmed
+                 && await _db.ProfileSettings.AnyAsync(t => t.ProfileId == profileId && t.Key == trimmed && t.Id != row.Id))
+        {
+            TempData["FlashError"] = $"Der Schlüssel \"{trimmed}\" wird bereits verwendet.";
+            return RedirectToPage(new { profileId, id });
+        }
 
         row.Key = trimmed;
         row.Value = value;

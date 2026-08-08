@@ -188,11 +188,25 @@ public class CloudService
     /// the stored one, so re-saving the URL does not wipe the credential.</summary>
     public async Task SaveSettingsAsync(string? url, string? instanceId, string? token)
     {
+        var previous = await GetSettingsAsync();
         var keep = string.IsNullOrWhiteSpace(token);
-        await UpsertAsync(SettingKeys.CloudUrl, (url ?? "").Trim().TrimEnd('/'));
-        await UpsertAsync(SettingKeys.CloudInstanceId, (instanceId ?? "").Trim());
+        var newUrl = (url ?? "").Trim().TrimEnd('/');
+        var newId = (instanceId ?? "").Trim();
+
+        await UpsertAsync(SettingKeys.CloudUrl, newUrl);
+        await UpsertAsync(SettingKeys.CloudInstanceId, newId);
         if (!keep) await UpsertAsync(SettingKeys.CloudToken, Protect(token!.Trim()));
         await _db.SaveChangesAsync();
+
+        // Pointing at a different cloud or a different instance record makes the applied revision and
+        // the "seeded once" marks meaningless: two clouds' revision numbers and profile ids are
+        // unrelated counters. Without this, a new cloud whose profile happens to sit on the same
+        // revision would never be pulled at all, and the UI would report "synchron".
+        if (!string.Equals(previous.Url, newUrl, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(previous.InstanceId, newId, StringComparison.Ordinal))
+        {
+            await _sync.ResetAsync();
+        }
     }
 
     /// <summary>Tells the cloud we are leaving (best effort) and clears the local link, so the cloud
@@ -305,18 +319,32 @@ public class CloudService
         if (!settings.Configured)
             return new(false, 0, "Keine Cloud-Verbindung konfiguriert.", [], []);
 
-        var client = CreateClient(settings);
-        var res = await client.GetAsync($"{settings.Url}/api/instances/{settings.InstanceId}/config", ct);
-        if (!res.IsSuccessStatusCode)
+        InstanceConfig? config;
+        try
         {
-            var error = res.StatusCode == System.Net.HttpStatusCode.Forbidden
-                ? "Die Instanz ist in der Cloud noch nicht freigegeben."
-                : $"Konfiguration konnte nicht geladen werden (HTTP {(int)res.StatusCode}).";
+            var client = CreateClient(settings);
+            var res = await client.GetAsync($"{settings.Url}/api/instances/{settings.InstanceId}/config", ct);
+            if (!res.IsSuccessStatusCode)
+            {
+                var error = res.StatusCode == System.Net.HttpStatusCode.Forbidden
+                    ? "Die Instanz ist in der Cloud noch nicht freigegeben."
+                    : $"Konfiguration konnte nicht geladen werden (HTTP {(int)res.StatusCode}).";
+                _state.SyncError = error;
+                return new(false, 0, error, [], []);
+            }
+
+            config = await res.Content.ReadFromJsonAsync<InstanceConfig>(ct);
+        }
+        catch (Exception ex)
+        {
+            // An unreachable cloud is a normal condition, not a 500: the admin clicked "apply now"
+            // and must get a flash message like every other handler on that page.
+            _log.LogInformation(ex, "Fetching the cloud configuration failed");
+            var error = $"Die Cloud war nicht erreichbar: {ex.Message}";
             _state.SyncError = error;
             return new(false, 0, error, [], []);
         }
 
-        var config = await res.Content.ReadFromJsonAsync<InstanceConfig>(ct);
         if (config is null) return new(false, 0, "Leere Konfiguration erhalten.", [], []);
 
         var result = await _sync.ApplyAsync(config,
@@ -336,14 +364,24 @@ public class CloudService
         if (!settings.Configured)
             return new(false, 0, "Keine Cloud-Verbindung konfiguriert.", [], []);
 
-        var client = CreateClient(settings);
-        var res = await client.GetAsync($"{settings.Url}/api/instances/{settings.InstanceId}/config", ct);
-        if (!res.IsSuccessStatusCode)
-            return new(false, 0, res.StatusCode == System.Net.HttpStatusCode.Forbidden
-                ? "Die Instanz ist in der Cloud noch nicht freigegeben."
-                : $"Konfiguration konnte nicht geladen werden (HTTP {(int)res.StatusCode}).", [], []);
+        InstanceConfig? config;
+        try
+        {
+            var client = CreateClient(settings);
+            var res = await client.GetAsync($"{settings.Url}/api/instances/{settings.InstanceId}/config", ct);
+            if (!res.IsSuccessStatusCode)
+                return new(false, 0, res.StatusCode == System.Net.HttpStatusCode.Forbidden
+                    ? "Die Instanz ist in der Cloud noch nicht freigegeben."
+                    : $"Konfiguration konnte nicht geladen werden (HTTP {(int)res.StatusCode}).", [], []);
 
-        var config = await res.Content.ReadFromJsonAsync<InstanceConfig>(ct);
+            config = await res.Content.ReadFromJsonAsync<InstanceConfig>(ct);
+        }
+        catch (Exception ex)
+        {
+            _log.LogInformation(ex, "Fetching the cloud configuration for a preview failed");
+            return new(false, 0, $"Die Cloud war nicht erreichbar: {ex.Message}", [], []);
+        }
+
         if (config is null) return new(false, 0, "Leere Konfiguration erhalten.", [], []);
 
         return await _sync.PreviewAsync(config, ct);

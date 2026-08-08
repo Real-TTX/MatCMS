@@ -268,16 +268,6 @@ app.UseStaticFiles(new StaticFileOptions
         ctx.Context.Response.Headers["X-Content-Type-Options"] = "nosniff"
 });
 
-// Remember the address this site is actually reached at. A site with no canonical URL configured
-// otherwise has no address to report to MatCMS.Cloud, which then cannot link to it or preview it.
-// Cheap: an in-memory string, written only when it changes.
-app.Use(async (ctx, next) =>
-{
-    var state = ctx.RequestServices.GetRequiredService<MatCMS.Services.CloudState>();
-    var seen = $"{ctx.Request.Scheme}://{ctx.Request.Host}";
-    if (state.ObservedBaseUrl != seen) state.ObservedBaseUrl = seen;
-    await next();
-});
 
 // Set CultureInfo.Current(UI)Culture per request (cookie / Accept-Language / default "de").
 app.UseRequestLocalization(app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<RequestLocalizationOptions>>().Value);
@@ -289,6 +279,25 @@ app.UseRouting();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Remember the address this site is actually reached at. A site with no canonical URL configured
+// otherwise has no address to report to MatCMS.Cloud, which then cannot link to it or preview it.
+// Cheap: an in-memory string, written only when it changes.
+//
+// ONLY from an authenticated admin request. Request.Host is whatever the client sent, and with
+// AllowedHosts "*" that is anything at all — an anonymous visitor sending "Host: attacker.example"
+// would otherwise become the URL the cloud stores, links to, and frames in its admin. Requiring an
+// admin session means the value can only be set by someone who is already logged in here.
+app.Use(async (ctx, next) =>
+{
+    if (ctx.User?.Identity?.IsAuthenticated == true)
+    {
+        var state = ctx.RequestServices.GetRequiredService<MatCMS.Services.CloudState>();
+        var seen = $"{ctx.Request.Scheme}://{ctx.Request.Host}";
+        if (state.ObservedBaseUrl != seen) state.ObservedBaseUrl = seen;
+    }
+    await next();
+});
 
 // --- Maintenance mode -----------------------------------------------------
 // When enabled (Settings → Wartung), public visitors get a themed maintenance page (HTTP 503). Admins

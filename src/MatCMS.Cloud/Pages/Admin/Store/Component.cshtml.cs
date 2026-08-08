@@ -69,6 +69,14 @@ public class ComponentModel : PageModel
             row = new StoreComponent();
             _db.StoreComponents.Add(row);
         }
+        // Renaming onto an identity another row already holds violates the unique index, which
+        // surfaces as an unhandled DbUpdateException — a 500 instead of a readable message.
+        else if (row.Type != slug
+                 && await _db.StoreComponents.AnyAsync(t => t.Type == slug && t.Id != row.Id))
+        {
+            TempData["FlashError"] = $"Der Typ \"{slug}\" wird bereits verwendet.";
+            return RedirectToPage(new { id });
+        }
 
         row.Type = slug;
         row.Name = name.Trim();

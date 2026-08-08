@@ -113,6 +113,22 @@ public class ProfileService
         _ => "keep"
     };
 
+    /// <summary>
+    /// Keys store rows by the identity the INSTANCE uses, case-insensitively — and deliberately
+    /// "last one wins" rather than <c>ToDictionary</c>'s throw. The uniqueness behind these names is
+    /// a SQLite index with BINARY collation, which is case-SENSITIVE: a store can genuinely hold
+    /// both "Alpha" and "alpha". With a throwing dictionary that combination would fail every
+    /// <c>/config</c> request for every instance on any profile that selected both, permanently, and
+    /// nothing on the instance side would say why.
+    /// </summary>
+    private static Dictionary<string, TValue> Index<TRow, TValue>(
+        IEnumerable<TRow> rows, Func<TRow, string> key, Func<TRow, TValue> value)
+    {
+        var map = new Dictionary<string, TValue>(StringComparer.OrdinalIgnoreCase);
+        foreach (var row in rows) map[key(row)] = value(row);
+        return map;
+    }
+
     /// <summary>Builds the payload an approved instance downloads. Sections the profile does not
     /// sync are left null, which the instance reads as "don't touch this".</summary>
     public async Task<InstanceConfig> BuildConfigAsync(Profile profile, CancellationToken ct = default)
@@ -147,7 +163,7 @@ public class ProfileService
             {
                 var smtpKeys = SettingKeys.Smtp;
                 foreach (var row in await _db.CloudSettings.AsNoTracking().Where(s => smtpKeys.Contains(s.Key)).ToListAsync(ct))
-                    settings[row.Key] = row.Value;
+                    settings[row.Key] = _secrets.Unprotect(row.Value);
             }
 
             // The profile's own rows on top — that is the override.
@@ -161,14 +177,15 @@ public class ProfileService
         {
             // Global first: the cloud's own accounts that were assigned to this profile. Same hash
             // format as MatCMS uses, so the account works on the instance as it does here.
-            var users = await _db.ProfileGlobalUsers.AsNoTracking()
+            var globalUsers = await _db.ProfileGlobalUsers.AsNoTracking()
                 .Where(x => x.ProfileId == profile.Id)
                 .Select(x => x.User!)
-                .ToDictionaryAsync(u => u.Username, u => new ConfigUser
+                .ToListAsync(ct);
+            var users = Index(globalUsers, u => u.Username, u => new ConfigUser
                 {
                     Username = u.Username, Email = u.Email, DisplayName = u.DisplayName,
                     PasswordHash = u.PasswordHash, Role = u.Role
-                }, StringComparer.OrdinalIgnoreCase, ct);
+                });
 
             foreach (var local in await _db.ProfileUsers.AsNoTracking().Where(u => u.ProfileId == profile.Id).ToListAsync(ct))
                 users[local.Username] = new ConfigUser
@@ -182,14 +199,15 @@ public class ProfileService
 
         if (profile.SyncComponents)
         {
-            var components = await _db.ProfileStoreComponents.AsNoTracking()
+            var storeComponents = await _db.ProfileStoreComponents.AsNoTracking()
                 .Where(x => x.ProfileId == profile.Id)
                 .Select(x => x.StoreComponent!)
-                .ToDictionaryAsync(c => c.Type, c => new ConfigComponent
+                .ToListAsync(ct);
+            var components = Index(storeComponents, c => c.Type, c => new ConfigComponent
                 {
                     Type = c.Type, Name = c.Name, Description = c.Description,
                     Icon = c.Icon, FieldsJson = c.FieldsJson, TemplateHtml = c.TemplateHtml
-                }, StringComparer.OrdinalIgnoreCase, ct);
+                });
 
             foreach (var local in await _db.ProfileComponents.AsNoTracking().Where(c => c.ProfileId == profile.Id).ToListAsync(ct))
                 components[local.Type] = new ConfigComponent
@@ -203,10 +221,11 @@ public class ProfileService
 
         if (profile.SyncTemplates)
         {
-            var templates = await _db.ProfileStoreTemplates.AsNoTracking()
+            var storeTemplates = await _db.ProfileStoreTemplates.AsNoTracking()
                 .Where(x => x.ProfileId == profile.Id)
                 .Select(x => x.StoreTemplate!)
-                .ToDictionaryAsync(t => t.Name, t => new ConfigTemplate
+                .ToListAsync(ct);
+            var templates = Index(storeTemplates, t => t.Name, t => new ConfigTemplate
                 {
                     Name = t.Name,
                     AccentColor = t.AccentColor, SecondaryColor = t.SecondaryColor,
@@ -219,7 +238,7 @@ public class ProfileService
                     LayoutHtml = t.LayoutHtml, MenuMapJson = t.MenuMapJson,
                     ParametersJson = t.ParametersJson, ParamValuesJson = t.ParamValuesJson,
                     SchemaVersion = t.SchemaVersion, PartsJson = t.PartsJson
-                }, StringComparer.OrdinalIgnoreCase, ct);
+                });
 
             foreach (var local in await _db.ProfileTemplates.AsNoTracking().Where(t => t.ProfileId == profile.Id).ToListAsync(ct))
                 templates[local.Name] = new ConfigTemplate
@@ -244,11 +263,11 @@ public class ProfileService
         {
             // Metadata only — the bundles are fetched one by one, and only for plugins whose version
             // actually differs from what the instance already has.
-            var plugins = await _db.ProfileStorePlugins.AsNoTracking()
+            var storePlugins = await _db.ProfileStorePlugins.AsNoTracking()
                 .Where(x => x.ProfileId == profile.Id)
                 .Select(x => x.StorePlugin!)
-                .ToDictionaryAsync(p => p.Key, p => new ConfigPlugin { Key = p.Key, Name = p.Name, Version = p.Version },
-                    StringComparer.OrdinalIgnoreCase, ct);
+                .ToListAsync(ct);
+            var plugins = Index(storePlugins, p => p.Key, p => new ConfigPlugin { Key = p.Key, Name = p.Name, Version = p.Version });
 
             foreach (var local in await _db.ProfilePlugins.AsNoTracking()
                          .Where(p => p.ProfileId == profile.Id)

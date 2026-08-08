@@ -17,13 +17,15 @@ public class IndexModel : PageModel
     private readonly CloudContext _cloud;
     private readonly EmailService _mail;
     private readonly DockerHostService _docker;
+    private readonly SecretProtector _secrets;
 
-    public IndexModel(AppDbContext db, CloudContext cloud, EmailService mail, DockerHostService docker)
+    public IndexModel(AppDbContext db, CloudContext cloud, EmailService mail, DockerHostService docker, SecretProtector secrets)
     {
         _db = db;
         _cloud = cloud;
         _mail = mail;
         _docker = docker;
+        _secrets = secrets;
     }
 
     public string Get(string key) => _cloud.Get(key) ?? "";
@@ -76,9 +78,12 @@ public class IndexModel : PageModel
             [SettingKeys.SmtpHost] = host?.Trim(),
             [SettingKeys.SmtpPort] = port?.Trim(),
             [SettingKeys.SmtpUser] = user?.Trim(),
-            // An empty password field keeps the stored one — so saving the form does not wipe the
-            // secret just because the browser rendered it blank.
-            [SettingKeys.SmtpPassword] = string.IsNullOrEmpty(password) ? Get(SettingKeys.SmtpPassword) : password,
+            // An empty password field keeps the stored one VERBATIM — so saving the form neither
+            // wipes the secret because the browser rendered it blank, nor encrypts an already
+            // encrypted value a second time. Only a newly entered password is protected.
+            [SettingKeys.SmtpPassword] = string.IsNullOrEmpty(password)
+                ? Get(SettingKeys.SmtpPassword)
+                : _secrets.Protect(password),
             [SettingKeys.SmtpFromEmail] = fromEmail?.Trim(),
             [SettingKeys.SmtpFromName] = fromName?.Trim(),
             [SettingKeys.SmtpSsl] = ssl ? "1" : "0"

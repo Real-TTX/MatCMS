@@ -91,6 +91,14 @@ public class TemplateModel : PageModel
             row = new ProfileTemplate { ProfileId = profileId };
             _db.ProfileTemplates.Add(row);
         }
+        // Renaming onto an identity another row already holds violates the unique index, which
+        // surfaces as an unhandled DbUpdateException — a 500 instead of a readable message.
+        else if (row.Name != trimmed
+                 && await _db.ProfileTemplates.AnyAsync(t => t.ProfileId == profileId && t.Name == trimmed && t.Id != row.Id))
+        {
+            TempData["FlashError"] = $"Der Name \"{trimmed}\" wird bereits verwendet.";
+            return RedirectToPage(new { profileId, id });
+        }
 
         row.Name = trimmed;
         row.AccentColor = Or(accentColor, "#de7e11");

@@ -18,11 +18,13 @@ namespace MatCMS.Cloud.Services;
 public class EmailService
 {
     private readonly AppDbContext _db;
+    private readonly SecretProtector _secrets;
     private readonly ILogger<EmailService> _log;
 
-    public EmailService(AppDbContext db, ILogger<EmailService> log)
+    public EmailService(AppDbContext db, SecretProtector secrets, ILogger<EmailService> log)
     {
         _db = db;
+        _secrets = secrets;
         _log = log;
     }
 
@@ -45,7 +47,9 @@ public class EmailService
         var ssl = G(SettingKeys.SmtpSsl).Trim().ToLowerInvariant();
 
         return new SmtpConfig(
-            G(SettingKeys.SmtpHost).Trim(), port, G(SettingKeys.SmtpUser), G(SettingKeys.SmtpPassword),
+            G(SettingKeys.SmtpHost).Trim(), port, G(SettingKeys.SmtpUser),
+            // Stored encrypted (SecretProtector); an unmarked legacy value passes through unchanged.
+            _secrets.Unprotect(G(SettingKeys.SmtpPassword)) ?? "",
             G(SettingKeys.SmtpFromEmail).Trim(), G(SettingKeys.SmtpFromName).Trim(),
             ssl is "true" or "on" or "1" or "yes");
     }

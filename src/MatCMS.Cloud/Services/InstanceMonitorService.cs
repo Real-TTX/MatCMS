@@ -120,9 +120,14 @@ public class InstanceMonitorService : BackgroundService
             }
 
             // --- 3) auto-update (local only, opt-in) ------------------------
+            // Attempted ONCE per available version. "Update available" stays true until the instance
+            // has restarted and reported its new version, so without the mark this would re-run the
+            // update — and mail about every failure — on every 60 s tick, forever.
             if (autoUpdate && instance.Hosting == InstanceHosting.Local
-                && instance.ContainerId is not null && instances.IsUpdateAvailable(instance))
+                && instance.ContainerId is not null && instances.IsUpdateAvailable(instance)
+                && instance.AutoUpdateAttemptedVersion != latest)
             {
+                instance.AutoUpdateAttemptedVersion = latest;
                 instances.Log(instance, InstanceEventKind.UpdateStarted,
                     $"Automatisches Update auf {latest} gestartet.", notified: true);
                 await db.SaveChangesAsync(ct);
@@ -132,7 +137,10 @@ public class InstanceMonitorService : BackgroundService
                     result.Ok ? InstanceEventKind.UpdateSucceeded : InstanceEventKind.UpdateFailed,
                     result.Message, notified: true);
 
-                if (!result.Ok)
+                // Cleared on success so the next release is attempted again; kept on failure so a
+                // broken update is reported once and then left to a human.
+                if (result.Ok) instance.AutoUpdateAttemptedVersion = null;
+                else
                     pending.Add((
                         $"[MatCMS.Cloud] Update von {instance.Name} fehlgeschlagen",
                         $"Das automatische Update ist fehlgeschlagen:\r\n\r\n{result.Message}",

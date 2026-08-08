@@ -1,3 +1,4 @@
+using MatCMS.Shared;
 using System.Net.Http.Json;
 using MatCMS.Cloud.Data;
 using MatCMS.Cloud.Models;
@@ -31,10 +32,6 @@ public class AdoptionService
         _cloud = cloud;
         _log = log;
     }
-
-    /// <summary>What the instance's /api/cloud/link endpoint expects.</summary>
-    private sealed record LinkRequest(
-        string Username, string Password, string CloudUrl, string InstanceId, string Token);
 
     /// <summary>What it answers with, so the cloud can label the instance straight away.</summary>
     private sealed record LinkResponse(string? SiteName, string? Version, string? ContainerId, string? Url);
@@ -70,7 +67,13 @@ public class AdoptionService
             client.DefaultRequestHeaders.UserAgent.ParseAdd("MatCMS-Cloud");
 
             var res = await client.PostAsJsonAsync($"{url}/api/cloud/link",
-                new LinkRequest(username.Trim(), password, cloudUrl, instance.PublicId, token), ct);
+                // The shared contract type, not a local copy: a field added to LinkRequest must
+                // actually be sent, and a private record with the same shape would silently not.
+                new LinkRequest
+                {
+                    Username = username.Trim(), Password = password, CloudUrl = cloudUrl,
+                    InstanceId = instance.PublicId, Token = token
+                }, ct);
 
             if (!res.IsSuccessStatusCode)
             {

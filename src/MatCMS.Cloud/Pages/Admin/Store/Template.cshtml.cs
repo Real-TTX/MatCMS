@@ -80,6 +80,14 @@ public class TemplateModel : PageModel
             row = new StoreTemplate();
             _db.StoreTemplates.Add(row);
         }
+        // Renaming onto an identity another row already holds violates the unique index, which
+        // surfaces as an unhandled DbUpdateException — a 500 instead of a readable message.
+        else if (row.Name != trimmed
+                 && await _db.StoreTemplates.AnyAsync(t => t.Name == trimmed && t.Id != row.Id))
+        {
+            TempData["FlashError"] = $"Der Name \"{trimmed}\" wird bereits verwendet.";
+            return RedirectToPage(new { id });
+        }
 
         row.Name = trimmed;
         row.Description = description?.Trim() ?? "";

@@ -139,6 +139,15 @@ public class Instance
     /// same available release.</summary>
     public string? UpdateNotifiedVersion { get; set; }
 
+    /// <summary>
+    /// The version an automatic update was last ATTEMPTED for. Same idea as
+    /// <see cref="UpdateNotifiedVersion"/>, and just as necessary: "update available" only becomes
+    /// false once the instance has restarted AND reported its new version, so without this the
+    /// watchdog would re-run the update — and mail about a failure — every 60 s forever. Cleared on
+    /// a successful update so a later release is attempted again.
+    /// </summary>
+    public string? AutoUpdateAttemptedVersion { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     /// <summary>True once the instance has ever checked in.</summary>

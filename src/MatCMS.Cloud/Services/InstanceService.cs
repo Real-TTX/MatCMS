@@ -223,7 +223,7 @@ public class InstanceService
         if ((firstEver || instance.Name == PlaceholderName) && !string.IsNullOrWhiteSpace(beat.SiteName))
             instance.Name = beat.SiteName!.Trim();
 
-        RecordSyncReport(instance, beat);
+        await RecordSyncReportAsync(instance, beat, ct);
         await ClassifyAsync(instance, ct);
 
         if (firstEver)
@@ -252,7 +252,7 @@ public class InstanceService
 
     /// <summary>Folds the instance's self-reported sync outcome into its record and logs the
     /// transitions — a sync that starts failing, and one that recovers, are both worth an entry.</summary>
-    private void RecordSyncReport(Instance instance, HeartbeatRequest beat)
+    private async Task RecordSyncReportAsync(Instance instance, HeartbeatRequest beat, CancellationToken ct)
     {
         var previousRevision = instance.AppliedRevision;
         var previousError = instance.LastSyncError;
@@ -272,7 +272,7 @@ public class InstanceService
         else if (beat.AppliedRevision > previousRevision && previousRevision > 0)
             Log(instance, InstanceEventKind.SyncApplied, $"Konfiguration angewendet (Revision {beat.AppliedRevision}).");
 
-        RecordSyncRun(instance, beat);
+        await RecordSyncRunAsync(instance, beat, ct);
     }
 
     /// <summary>
@@ -281,7 +281,7 @@ public class InstanceService
     /// both miss a re-apply with identical outcomes and risk duplicating one. An instance that
     /// predates <c>SyncRunAt</c> simply contributes no history rather than a wrong one.
     /// </summary>
-    private void RecordSyncRun(Instance instance, HeartbeatRequest beat)
+    private async Task RecordSyncRunAsync(Instance instance, HeartbeatRequest beat, CancellationToken ct)
     {
         if (beat.SyncRunAt is null || beat.SyncRunAt == instance.LastSyncRunAt) return;
 
@@ -303,11 +303,13 @@ public class InstanceService
 
         // Prune here rather than in a background job: this table only ever grows on a heartbeat, so
         // this is the one place that knows it needs trimming.
-        var stale = _db.InstanceSyncRuns
+        // KeepPerInstance - 1, because the row added just above is not saved yet and therefore not
+        // in this query: skipping the full count would leave one more than the limit.
+        var stale = await _db.InstanceSyncRuns
             .Where(r => r.InstanceId == instance.Id)
             .OrderByDescending(r => r.RanAt)
-            .Skip(InstanceSyncRun.KeepPerInstance)
-            .ToList();
+            .Skip(InstanceSyncRun.KeepPerInstance - 1)
+            .ToListAsync(ct);
         if (stale.Count > 0) _db.InstanceSyncRuns.RemoveRange(stale);
     }
 

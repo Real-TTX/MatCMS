@@ -39,7 +39,8 @@ together by hand:
    editor does not surface survive a save. A shared typed manifest class would quietly drop exactly
    those — do not "finish the job" by adding one.
 3. **The admin UI** — now **`src/MatCMS.Shared.Web`**, a Razor Class Library holding `site.css`,
-   `admin.css`, `admin-list.js`, the CodeMirror and Tabler-Icons bundles and `_IconTrash.cshtml`.
+   `admin.css`, `admin-list.js`, the CodeMirror and Tabler-Icons bundles, `_IconTrash.cshtml`,
+   `_EmptyRow.cshtml` (the "no records" row) and `_TemplateFiles.cshtml` (the template file editor).
    They used to be byte-identical copies kept in step by hand and a `diff`. Both apps reach them at
    `~/_content/MatCMS.Shared.Web/…`; the partial resolves by name as usual. Product-specific assets
    stay put: `cloud.css` in the cloud, the CMS's public-site scripts in the CMS.

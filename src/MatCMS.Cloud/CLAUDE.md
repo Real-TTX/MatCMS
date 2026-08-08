@@ -125,6 +125,17 @@ helps), `table.data[data-list-table]` in the middle, `.list-empty[data-list-empt
 `.list-pager[data-list-pager]` after it — and the **create action below** in `.list-actions`.
 `admin-list.js` drives all of it markup-only; no per-page JavaScript.
 
+**An empty list still shows its header.** The "no records" message is a ROW inside the table
+(`_EmptyRow.cshtml` in `MatCMS.Shared.Web`, italic and muted), never a lone sentence where the table
+would be: a list you cannot see the columns of tells you nothing about what belongs in it. The row
+uses `colspan="99"` on purpose, so the partial never needs to know how wide the table is and adding
+a column cannot break the empty state. `[data-list-empty]` stays separate — that one is the
+*search found nothing* message, which is a different thing.
+
+**Creating a record happens on its own page**, reached by the button in `.list-actions` — never an
+inline form in the list. The create page asks only for what is needed to exist; everything else is
+edited on the record afterwards.
+
 For the tile half of that, use the two shared partials instead of hand-rolling a grid:
 `_ViewToggle.cshtml` in the toolbar (the wrapper then needs `data-list-key="<page>-<payload>"` so the
 choice is remembered, and `class="list-view-table"` for the default before JS runs) and
@@ -163,10 +174,24 @@ show the result, not just the values.
   One rule carried over deliberately: an existing field keeps its `id` when its label is renamed,
   because the id is what `{{placeholder}}` refers to and re-slugging it would break blocks already
   placed on live sites.
+- The template editor's **files tab is shared**: `MatCMS.Shared.Web/Pages/Shared/_TemplateFiles.cshtml`
+  renders the pseudo-file list (`body.html`, `article.html`, `styles.css`, `script.js`,
+  `maintenance.html`), the hidden fields the form posts, and the CodeMirror modal — for the CMS and
+  the cloud alike. The pages differ only in what their files post as, which is why `FieldName` is on
+  the model. The partial takes its wording as strings, not `@T[…]`: a shared view cannot reference
+  either application's `Localizer` type, though the resource keys (`tplfiles.*`) are identical in both.
 - `wwwroot/js/template-preview.js` has no MatCMS counterpart (its designer shows values, not the
   result). It renders a sample page — header, hero, buttons, cards — from the form's current values,
   uses the template's own `LayoutHtml` when it contains `{{content}}`, and marks unresolved `{{token}}`s
-  in red so a broken layout is visible here rather than on a customer's homepage.
+  in red so a broken layout is visible here rather than on a customer's homepage. Menus are filled
+  with **sample entries** for both forms the CMS renders (`{{menu:slot}}` and the
+  `{{#menu:slot}}…{{/menu:slot}}` loop) — deterministic per slot, not random, because a preview that
+  reshuffles on every keystroke is unusable.
+- **Template thumbnails** in the tile views come from `Pages/Admin/TemplatePreview.cshtml`: a bare,
+  layout-less page that feeds a STORED template's values to that same script. Deliberately not a
+  second renderer — the tile and the editor could otherwise disagree about what a template looks
+  like. The frame renders at desktop width and is scaled down, so the thumbnail shows the desktop
+  layout rather than the mobile one a narrow frame would trigger.
 - The component preview borrows the theme of the template the profile activates
   (`CLOUD_PREVIEW_THEME`), so a block is judged in the design it will actually live in.
 - **Instance previews** embed the live site (`Instance.PreviewUrl`). Two sources feed it, in order:
@@ -302,6 +327,14 @@ different kinds of "global", and conflating them was a mistake that had to be co
 The store is a **catalogue**: things you shop for and install. Users and SMTP are shared
 configuration — you assign them, you do not browse them. That is why they must never appear in the
 catalogue API an instance can query, and why they need no store tables of their own.
+
+On the instance, "Weiter durchsuchen…" opens that catalogue as a **store dialog**
+(`MatCMS/Pages/Shared/_StoreDialog.cshtml`): a card grid with its own search and an install button
+per entry, not a card appended under the list — browsing what you *could* install is a different
+activity from managing what you already have, and hanging it below made it read as inventory. One
+partial serves plugins, templates and components; they differ only in the route parameter their
+`InstallFromCloud` handler expects. Closing it strips `?browse=true` from the URL so a reload does
+not reopen it.
 
 There is **no separate "Global" tab** on a profile. The operator thinks in "templates this profile
 rolls out", not in where a row is stored, so each payload tab shows **one list** containing both the

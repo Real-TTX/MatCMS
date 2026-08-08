@@ -32,7 +32,6 @@ public class TemplateModel : PageModel
     /// what MatCMS does too.</summary>
     [BindProperty] public Dictionary<string, string> Parts { get; set; } = new();
 
-    /// <summary>What is stored on the row, for rendering the editor.</summary>
     /// <summary>What is stored on the row, for rendering the editor. Never throws: a template
     /// imported with a broken parts blob must still open.</summary>
     public Dictionary<string, string> StoredParts

@@ -95,7 +95,7 @@
                         <label for="@c.Field">@c.Label</label>
                         <div class="color-field">
                             <input id="@c.Field" name="@c.Field" type="color" value="@(string.IsNullOrWhiteSpace(c.Value) ? c.Fallback : c.Value)" />
-                            <input type="text" class="hex" aria-label="@c.Label" spellcheck="false" />
+                            <input type="text" class="hex" value="@(string.IsNullOrWhiteSpace(c.Value) ? c.Fallback : c.Value)" aria-label="@c.Label" spellcheck="false" />
                         </div>
                     </div>
                 }

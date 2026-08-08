@@ -1,0 +1,12 @@
+@model string
+@*
+    The "no records" state of a list, INSIDE the table so the header stays visible: an empty list
+    should still show what its columns are, not collapse into a lone sentence.
+
+    colspan="99" rather than the real column count on purpose — the row spans whatever the table
+    happens to have, so this partial never needs to know, and adding a column to a list can never
+    leave its empty state visually broken. Browsers clamp an oversized colspan to the actual width.
+*@
+<tr class="list-empty-row">
+    <td colspan="99">@Model</td>
+</tr>

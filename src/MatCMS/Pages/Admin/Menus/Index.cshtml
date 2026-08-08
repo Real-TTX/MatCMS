@@ -22,6 +22,10 @@
             </tr>
         </thead>
         <tbody>
+            @if (Model.Menus.Count == 0)
+            {
+                <partial name="_EmptyRow" model='@T["list.empty"]' />
+            }
             @foreach (var menu in Model.Menus)
             {
                 var count = Model.Counts.TryGetValue(menu.Key, out var c) ? c : 0;

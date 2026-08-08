@@ -315,22 +315,22 @@
                 }
             </div>
             <p class="help">@T["instances.reportHint"]</p>
-            @if (Model.SyncReport.Count == 0)
-            {
-                <div class="list-empty">@T["instances.reportNone"]</div>
-            }
-            else
-            {
-                <table class="data" data-list-table>
-                    <thead>
-                        <tr>
-                            <th style="width:130px;">@T["instances.reportKind"]</th>
-                            <th>@T["instances.reportId"]</th>
-                            <th style="width:150px;">@T["instances.reportOutcome"]</th>
-                            <th>@T["instances.reportDetail"]</th>
-                        </tr>
-                    </thead>
-                    <tbody>
+            <table class="data" data-list-table>
+                <thead>
+                    <tr>
+                        <th style="width:130px;">@T["instances.reportKind"]</th>
+                        <th>@T["instances.reportId"]</th>
+                        <th style="width:150px;">@T["instances.reportOutcome"]</th>
+                        <th>@T["instances.reportDetail"]</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.SyncReport.Count == 0)
+                    {
+                        <partial name="_EmptyRow" model='@T["instances.reportNone"]' />
+                    }
+                    else
+                    {
                         @foreach (var r in Model.SyncReport)
                         {
                             @* Unknown kinds/outcomes fall back to the raw string: a newer instance may
@@ -353,10 +353,10 @@
                                 <td class="muted">@r.Detail</td>
                             </tr>
                         }
-                    </tbody>
-                </table>
-                <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
-            }
+                    }
+                </tbody>
+            </table>
+            <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
         </div>
     </div>
 </div>
@@ -370,17 +370,17 @@
                 <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
             </div>
         </div>
-        @if (Model.Events.Count == 0)
-        {
-            <div class="list-empty">@T["dashboard.noEvents"]</div>
-        }
-        else
-        {
-            <table class="data" data-list-table>
-                <thead>
-                    <tr><th style="width:170px;">@T["common.time"]</th><th>@T["common.event"]</th></tr>
-                </thead>
-                <tbody>
+        <table class="data" data-list-table>
+            <thead>
+                <tr><th style="width:170px;">@T["common.time"]</th><th>@T["common.event"]</th></tr>
+            </thead>
+            <tbody>
+                @if (Model.Events.Count == 0)
+                {
+                    <partial name="_EmptyRow" model='@T["dashboard.noEvents"]' />
+                }
+                else
+                {
                     @foreach (var e in Model.Events)
                     {
                         <tr data-search="@e.Message">
@@ -388,10 +388,10 @@
                             <td>@e.Message</td>
                         </tr>
                     }
-                </tbody>
-            </table>
-            <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
-        }
+                }
+            </tbody>
+        </table>
+        <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
     </div>
 </div>
 

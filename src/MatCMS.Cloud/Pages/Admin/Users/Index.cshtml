@@ -22,6 +22,10 @@
             </tr>
         </thead>
         <tbody>
+            @if (Model.Items.Count == 0)
+            {
+                <partial name="_EmptyRow" model='@T["list.empty"]' />
+            }
             @foreach (var u in Model.Items)
             {
                 <tr data-search="@(u.Username + " " + u.Email + " " + u.DisplayName)">

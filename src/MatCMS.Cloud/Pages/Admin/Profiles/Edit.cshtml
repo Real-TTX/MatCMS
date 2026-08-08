@@ -244,17 +244,17 @@
             </div>
         </div>
         <p class="muted">@T["profiles.otherSettingsHint"]</p>
-        @if (Model.OtherSettings.Count == 0)
-        {
-            <div class="list-empty">@T["profiles.noSettings"]</div>
-        }
-        else
-        {
-            <table class="data" data-list-table>
-                <thead>
-                    <tr><th>@T["profiles.settingKey"]</th><th>@T["profiles.settingValue"]</th><th></th></tr>
-                </thead>
-                <tbody>
+        <table class="data" data-list-table>
+            <thead>
+                <tr><th>@T["profiles.settingKey"]</th><th>@T["profiles.settingValue"]</th><th></th></tr>
+            </thead>
+            <tbody>
+                @if (Model.OtherSettings.Count == 0)
+                {
+                    <partial name="_EmptyRow" model='@T["profiles.noSettings"]' />
+                }
+                else
+                {
                     @foreach (var s in Model.OtherSettings)
                     {
                         <tr data-search="@(s.IsSecret ? s.Key : s.Key + " " + s.Value)">
@@ -269,10 +269,10 @@
                             </td>
                         </tr>
                     }
-                </tbody>
-            </table>
-            <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
-        }
+                }
+            </tbody>
+        </table>
+        <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
         <div class="list-actions">
             <a class="btn" asp-page="Setting" asp-route-profileId="@Model.Item.Id">@T["profiles.addSetting"]</a>
         </div>
@@ -290,17 +290,17 @@
             </div>
         </div>
         <p class="muted">@T["profiles.usersHint"]</p>
-        @if (Model.Users.Count == 0 && Model.ChosenGlobalUsers.Count == 0)
-        {
-            <div class="list-empty">@T["profiles.noUsers"]</div>
-        }
-        else
-        {
-            <table class="data" data-list-table>
-                <thead>
-                    <tr><th>@T["users.username"]</th><th>@T["common.origin"]</th><th>@T["users.email"]</th><th>@T["users.displayName"]</th><th></th></tr>
-                </thead>
-                <tbody>
+        <table class="data" data-list-table>
+            <thead>
+                <tr><th>@T["users.username"]</th><th>@T["common.origin"]</th><th>@T["users.email"]</th><th>@T["users.displayName"]</th><th></th></tr>
+            </thead>
+            <tbody>
+                @if (Model.Users.Count == 0 && Model.ChosenGlobalUsers.Count == 0)
+                {
+                    <partial name="_EmptyRow" model='@T["profiles.noUsers"]' />
+                }
+                else
+                {
                     @* Global accounts the profile also rolls out — the cloud's own users, taken by
                        reference so a password change in the store reaches every profile. *@
                     @foreach (var u in Model.ChosenGlobalUsers)
@@ -342,11 +342,11 @@
                             </td>
                         </tr>
                     }
-                </tbody>
-            </table>
-            <partial name="_PayloadTiles" model="Model.UserTiles" />
-            <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
-        }
+                }
+            </tbody>
+        </table>
+        <partial name="_PayloadTiles" model="Model.UserTiles" />
+        <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
         <div class="list-actions">
             <a class="btn" asp-page="User" asp-route-profileId="@Model.Item.Id">@T["profiles.addUser"]</a>
             <button type="button" class="btn btn-ghost" data-store-picker="users">@T["profiles.addFromStore"]</button>
@@ -366,17 +366,17 @@
             </div>
         </div>
         <p class="muted">@T["profiles.pluginsHint"]</p>
-        @if (Model.Plugins.Count == 0 && Model.ChosenStorePlugins.Count == 0)
-        {
-            <div class="list-empty">@T["profiles.noPlugins"]</div>
-        }
-        else
-        {
-            <table class="data" data-list-table>
-                <thead>
-                    <tr><th>@T["common.name"]</th><th>@T["common.origin"]</th><th>@T["profiles.pluginKey"]</th><th>@T["instances.version"]</th><th></th></tr>
-                </thead>
-                <tbody>
+        <table class="data" data-list-table>
+            <thead>
+                <tr><th>@T["common.name"]</th><th>@T["common.origin"]</th><th>@T["profiles.pluginKey"]</th><th>@T["instances.version"]</th><th></th></tr>
+            </thead>
+            <tbody>
+                @if (Model.Plugins.Count == 0 && Model.ChosenStorePlugins.Count == 0)
+                {
+                    <partial name="_EmptyRow" model='@T["profiles.noPlugins"]' />
+                }
+                else
+                {
                     @foreach (var p in Model.ChosenStorePlugins)
                     {
                         <tr data-search="@(p.Name + " " + p.Key + " " + p.Description)">
@@ -419,11 +419,11 @@
                             </td>
                         </tr>
                     }
-                </tbody>
-            </table>
-            <partial name="_PayloadTiles" model="Model.PluginTiles" />
-            <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
-        }
+                }
+            </tbody>
+        </table>
+        <partial name="_PayloadTiles" model="Model.PluginTiles" />
+        <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
         <div class="list-actions">
             <a class="btn" asp-page="Plugin" asp-route-profileId="@Model.Item.Id">@T["profiles.addPlugin"]</a>
             <button type="button" class="btn btn-ghost" data-store-picker="plugins">@T["profiles.addFromStore"]</button>
@@ -443,17 +443,17 @@
             </div>
         </div>
         <p class="muted">@T["profiles.componentsHint"]</p>
-        @if (Model.Components.Count == 0 && Model.ChosenStoreComponents.Count == 0)
-        {
-            <div class="list-empty">@T["profiles.noComponents"]</div>
-        }
-        else
-        {
-            <table class="data" data-list-table>
-                <thead>
-                    <tr><th>@T["common.name"]</th><th>@T["common.origin"]</th><th>@T["profiles.componentType"]</th><th></th></tr>
-                </thead>
-                <tbody>
+        <table class="data" data-list-table>
+            <thead>
+                <tr><th>@T["common.name"]</th><th>@T["common.origin"]</th><th>@T["profiles.componentType"]</th><th></th></tr>
+            </thead>
+            <tbody>
+                @if (Model.Components.Count == 0 && Model.ChosenStoreComponents.Count == 0)
+                {
+                    <partial name="_EmptyRow" model='@T["profiles.noComponents"]' />
+                }
+                else
+                {
                     @foreach (var c in Model.ChosenStoreComponents)
                     {
                         <tr data-search="@(c.Name + " " + c.Type + " " + c.Description)">
@@ -494,11 +494,11 @@
                             </td>
                         </tr>
                     }
-                </tbody>
-            </table>
-            <partial name="_PayloadTiles" model="Model.ComponentTiles" />
-            <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
-        }
+                }
+            </tbody>
+        </table>
+        <partial name="_PayloadTiles" model="Model.ComponentTiles" />
+        <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
         <div class="list-actions">
             <a class="btn" asp-page="Component" asp-route-profileId="@Model.Item.Id">@T["profiles.addComponent"]</a>
             <button type="button" class="btn btn-ghost" data-store-picker="components">@T["profiles.addFromStore"]</button>
@@ -518,17 +518,17 @@
             </div>
         </div>
         <p class="muted">@T["profiles.templatesHint"]</p>
-        @if (Model.Templates.Count == 0 && Model.ChosenStoreTemplates.Count == 0)
-        {
-            <div class="list-empty">@T["profiles.noTemplates"]</div>
-        }
-        else
-        {
-            <table class="data" data-list-table>
-                <thead>
-                    <tr><th>@T["common.name"]</th><th>@T["common.origin"]</th><th>@T["profiles.templateColors"]</th><th>@T["profiles.templateFonts"]</th><th></th></tr>
-                </thead>
-                <tbody>
+        <table class="data" data-list-table>
+            <thead>
+                <tr><th>@T["common.name"]</th><th>@T["common.origin"]</th><th>@T["profiles.templateColors"]</th><th>@T["profiles.templateFonts"]</th><th></th></tr>
+            </thead>
+            <tbody>
+                @if (Model.Templates.Count == 0 && Model.ChosenStoreTemplates.Count == 0)
+                {
+                    <partial name="_EmptyRow" model='@T["profiles.noTemplates"]' />
+                }
+                else
+                {
                     @* Global entries first: they are taken by REFERENCE, so editing them happens in
                        the store and reaches every profile that took them. *@
                     @foreach (var t in Model.ChosenStoreTemplates)
@@ -575,11 +575,11 @@
                             </td>
                         </tr>
                     }
-                </tbody>
-            </table>
-            <partial name="_PayloadTiles" model="Model.TemplateTiles" />
-            <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
-        }
+                }
+            </tbody>
+        </table>
+        <partial name="_PayloadTiles" model="Model.TemplateTiles" />
+        <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
         <div class="list-actions">
             <a class="btn" asp-page="Template" asp-route-profileId="@Model.Item.Id">@T["profiles.templateAdd"]</a>
             <button type="button" class="btn btn-ghost" data-store-picker="templates">@T["profiles.addFromStore"]</button>

@@ -78,21 +78,21 @@
             <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
         </div>
     </div>
-    @if (Model.RecentEvents.Count == 0)
-    {
-        <div class="list-empty">@T["dashboard.noEvents"]</div>
-    }
-    else
-    {
-        <table class="data" data-list-table>
-            <thead>
-                <tr>
-                    <th style="width:150px;">@T["common.time"]</th>
-                    <th style="width:200px;">@T["common.instance"]</th>
-                    <th>@T["common.event"]</th>
-                </tr>
-            </thead>
-            <tbody>
+    <table class="data" data-list-table>
+        <thead>
+            <tr>
+                <th style="width:150px;">@T["common.time"]</th>
+                <th style="width:200px;">@T["common.instance"]</th>
+                <th>@T["common.event"]</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.RecentEvents.Count == 0)
+            {
+                <partial name="_EmptyRow" model='@T["dashboard.noEvents"]' />
+            }
+            else
+            {
                 @foreach (var e in Model.RecentEvents)
                 {
                     <tr data-search="@((e.Instance?.Name ?? "") + " " + e.Message)">
@@ -101,10 +101,10 @@
                         <td>@e.Message</td>
                     </tr>
                 }
-            </tbody>
-        </table>
-        <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
-    }
+            }
+        </tbody>
+    </table>
+    <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
 </div>
 
 <div class="list-actions">

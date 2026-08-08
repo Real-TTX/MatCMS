@@ -24,6 +24,10 @@
             <tbody>
                 @if (Model.Items.Count == 0)
                 {
+                    <partial name="_EmptyRow" model='@T["list.empty"]' />
+                }
+                @if (Model.Items.Count == 0)
+                {
                     <tr><td colspan="4" class="muted" style="text-align:center;padding:22px;">@T["forms.none"]</td></tr>
                 }
                 @foreach (var r in Model.Items)

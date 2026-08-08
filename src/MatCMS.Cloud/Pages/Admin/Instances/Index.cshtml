@@ -117,6 +117,10 @@
             </tr>
         </thead>
         <tbody>
+            @if (Model.Items.Count == 0)
+            {
+                <partial name="_EmptyRow" model='@T["instances.empty"]' />
+            }
             @foreach (var i in Model.Items)
             {
                 var online = InstanceService.IsOnline(i);
@@ -217,10 +221,6 @@
         </tbody>
     </table>
     <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
-    @if (Model.Items.Count == 0)
-    {
-        <div class="list-empty">@T["instances.empty"]</div>
-    }
     <div class="list-pager" data-list-pager></div>
 </div>
 

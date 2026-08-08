@@ -727,6 +727,7 @@
 
   "action.search": "Search…",
   "list.noResults": "No matches.",
+  "list.empty": "No data yet.",
   "menus.colName": "Name",
   "menus.colKey": "Key",
 

@@ -818,6 +818,9 @@ table.data .btn { white-space: nowrap; }
 .list-search { height: 34px; min-width: 200px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 13.5px; background: #fff; }
 .list-search:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent); }
 .list-empty { color: var(--muted, #6b7078); padding: 16px 2px; }
+/* Same message, but as a row inside the table so the header stays visible. Italic marks it as
+   a state rather than data. */
+.list-empty-row td { color: var(--muted, #6b7078); font-style: italic; padding: 18px 12px; text-align: center; }
 .list-pager { display: flex; gap: 6px; margin-top: 16px; flex-wrap: wrap; }
 .pager-btn { min-width: 34px; height: 34px; padding: 0 10px; border: 1px solid var(--line); background: #fff; border-radius: 8px; cursor: pointer; font: inherit; font-size: 13px; color: var(--ink); }
 .pager-btn:hover { border-color: var(--accent); }

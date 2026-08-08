@@ -136,27 +136,27 @@
         <div class="card">
             <h2>@T["settings.cloudPreviewTitle"]</h2>
             <p class="help">@T["settings.cloudPreviewHint"]</p>
-            @if (Model.Preview.Count == 0)
-            {
-                <div class="list-empty">@T["settings.cloudPreviewNothing"]</div>
-            }
-            else
-            {
-                @* Only items that would actually change are selectable. Something already skipped has
-                   nothing to apply, and offering a tick for it would promise an action that does
-                   nothing. *@
-                <form method="post" asp-page-handler="CloudApplySelection">
-                    <table class="data">
-                        <thead>
-                            <tr>
-                                <th style="width:36px;"><input type="checkbox" id="prev-all" aria-label="@T["settings.cloudSelectAll"]" /></th>
-                                <th style="width:130px;">@T["settings.cloudReportKind"]</th>
-                                <th>@T["settings.cloudReportId"]</th>
-                                <th style="width:150px;">@T["settings.cloudReportOutcome"]</th>
-                                <th>@T["settings.cloudReportDetail"]</th>
-                            </tr>
-                        </thead>
-                        <tbody>
+            @* Only items that would actually change are selectable. Something already skipped has
+               nothing to apply, and offering a tick for it would promise an action that does
+               nothing. *@
+            <form method="post" asp-page-handler="CloudApplySelection">
+                <table class="data">
+                    <thead>
+                        <tr>
+                            <th style="width:36px;"><input type="checkbox" id="prev-all" aria-label="@T["settings.cloudSelectAll"]" /></th>
+                            <th style="width:130px;">@T["settings.cloudReportKind"]</th>
+                            <th>@T["settings.cloudReportId"]</th>
+                            <th style="width:150px;">@T["settings.cloudReportOutcome"]</th>
+                            <th>@T["settings.cloudReportDetail"]</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Preview.Count == 0)
+                        {
+                            <partial name="_EmptyRow" model='@T["settings.cloudPreviewNothing"]' />
+                        }
+                        else
+                        {
                             @foreach (var r in Model.Preview)
                             {
                                 var kindKey = $"settings.cloudKind.{r.Kind}";
@@ -181,17 +181,17 @@
                                     <td class="muted">@r.Detail</td>
                                 </tr>
                             }
-                        </tbody>
-                    </table>
-                    @if (Model.Preview.Any(r => r.Outcome is "installed" or "updated"))
-                    {
-                        <div class="list-actions">
-                            <button type="submit" class="btn">@T["settings.cloudApplySelected"]</button>
-                        </div>
-                        <div class="help">@T["settings.cloudApplySelectedHint"]</div>
-                    }
-                </form>
-            }
+                        }
+                    </tbody>
+                </table>
+                @if (Model.Preview.Any(r => r.Outcome is "installed" or "updated"))
+                {
+                    <div class="list-actions">
+                        <button type="submit" class="btn">@T["settings.cloudApplySelected"]</button>
+                    </div>
+                    <div class="help">@T["settings.cloudApplySelectedHint"]</div>
+                }
+            </form>
         </div>
     }
 

@@ -115,8 +115,6 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
    override here silently broke them once. Use the admin's markup and leave its CSS alone. */
 
 /* ============ Destructive actions ============ */
-.card.danger-zone { border-color: #f3c9c4; }
-.card.danger-zone h2 { color: #b42318; }
 
 /* ============ Payload tiles ============ */
 /* The tile view of a profile's users/plugins/components/templates. The admin ships .tpl-card for
@@ -164,29 +162,3 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
     transform-origin: 0 0;
     pointer-events: none;
 }
-
-/* ---- Hinzufügen dialog -------------------------------------------------------------------------
-   The three ways to add something, as equally-weighted choices. Deliberately not a <select> or a row
-   of small buttons: each one leads somewhere different (a picker, a page, a form), and the operator
-   picks by reading what happens, not by recognising a verb. */
-.add-options { display: flex; flex-direction: column; gap: 10px; }
-
-.add-option {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    width: 100%;
-    text-align: left;
-    background: #fff;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    padding: 14px 16px;
-    text-decoration: none;
-    color: inherit;
-    font: inherit;
-    cursor: pointer;
-    transition: border-color .12s, box-shadow .12s;
-}
-.add-option:hover { border-color: var(--accent); box-shadow: 0 4px 18px rgba(0, 0, 0, .07); }
-.add-option-title { font-weight: 600; }
-.add-option-sub { font-size: 13px; color: var(--muted); }

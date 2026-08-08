@@ -1,0 +1,61 @@
+@using Microsoft.AspNetCore.Html
+@model MatCMS.Shared.Web.AddMenu
+@*
+    One "Hinzufügen" button under a list, and a dialog behind it offering the ways there are. Uses the
+    admin's own .modal-overlay/.modal — never invent a parallel one. The behaviour lives in
+    admin-list.js, so a page adds this partial and needs no script of its own.
+
+    An option that imports only REVEALS the page's own import form rather than carrying one: the
+    formats differ per payload (template JSON, component JSON, a plugin ZIP), and a shared partial
+    that had to know all of them would have to be edited again for every payload added later.
+*@
+@functions {
+    // Razor has no attribute splatting, so the free-form data-* attributes are built by hand. The KEY
+    // is a code constant and goes in raw; the VALUE is escaped like any other model string.
+    static IHtmlContent DataAttrs(MatCMS.Shared.Web.AddOption o)
+    {
+        var b = new HtmlContentBuilder();
+        if (o.Data is null) return b;
+        foreach (var d in o.Data)
+            b.AppendHtml(" data-").AppendHtml(d.Key).AppendHtml("=\"").Append(d.Value).AppendHtml("\"");
+        return b;
+    }
+}
+@if (Model.WithButton)
+{
+    <div class="list-actions">
+        <button type="button" class="btn" data-add-menu="@Model.Id">@Model.ButtonLabel</button>
+    </div>
+}
+
+<div class="modal-overlay" data-add-menu-dialog="@Model.Id">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="add-@(Model.Id)-title">
+        <div class="modal-head">
+            <h2 id="add-@(Model.Id)-title">@Model.DialogTitle</h2>
+            <button type="button" class="modal-close" data-add-menu-close aria-label="@Model.CloseLabel">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="add-options">
+                @foreach (var o in Model.Options)
+                {
+                    @* Links close the dialog too: navigating away otherwise leaves it open behind the
+                       new page, and going back then lands on a page with a dialog nobody opened. *@
+                    if (o.Href is null)
+                    {
+                        <button type="button" class="add-option" data-add-menu-close @DataAttrs(o)>
+                            <span class="add-option-title">@o.Title</span>
+                            <span class="add-option-sub">@o.Sub</span>
+                        </button>
+                    }
+                    else
+                    {
+                        <a class="add-option" href="@o.Href" data-add-menu-close @DataAttrs(o)>
+                            <span class="add-option-title">@o.Title</span>
+                            <span class="add-option-sub">@o.Sub</span>
+                        </a>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+</div>

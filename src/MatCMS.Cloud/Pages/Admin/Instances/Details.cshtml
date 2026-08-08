@@ -406,7 +406,7 @@
         </div>
     }
 
-    <form method="post" asp-page-handler="Save" asp-route-id="@Model.Item.Id">
+    <form method="post" asp-page-handler="Save" asp-route-id="@Model.Item.Id" id="instance-form">
         <div class="card">
             <h2>@T["instances.settings"]</h2>
             <div class="form-field">
@@ -422,35 +422,33 @@
                 <label for="notes">@T["instances.notes"]</label>
                 <textarea id="notes" name="notes" rows="3">@Model.Item.Notes</textarea>
             </div>
-            <div><button type="submit" class="btn">@T["settings.save"]</button></div>
         </div>
     </form>
 
-    <div class="card danger-zone">
-        <h2>@T["instances.dangerZone"]</h2>
-        <div class="actions">
-            @if (Model.Item.Status == InstanceStatus.Approved)
-            {
-                <form class="inline-form" method="post" asp-page-handler="Reject" asp-route-id="@Model.Item.Id"
-                      onsubmit="return confirm('@T["instances.rejectConfirm"]');">
-                    <button type="submit" class="btn btn-sm btn-ghost">@T["instances.reject"]</button>
-                </form>
-            }
-            else if (Model.Item.Status == InstanceStatus.Rejected)
-            {
-                <form class="inline-form" method="post" asp-page-handler="Approve" asp-route-id="@Model.Item.Id">
-                    <button type="submit" class="btn btn-sm btn-ghost">@T["instances.approve"]</button>
-                </form>
-            }
-            <form class="inline-form" method="post" asp-page-handler="Rotate" asp-route-id="@Model.Item.Id"
-                  onsubmit="return confirm('@T["instances.rotateConfirm"]');">
-                <button type="submit" class="btn btn-sm btn-ghost">@T["instances.rotateToken"]</button>
+    @* Every action for this instance on one line, positive before negative. *@
+    <div class="form-actions">
+        <button type="submit" class="btn" form="instance-form">@T["settings.save"]</button>
+        @if (Model.Item.Status == InstanceStatus.Approved)
+        {
+            <form class="inline-form" method="post" asp-page-handler="Reject" asp-route-id="@Model.Item.Id"
+                  onsubmit="return confirm('@T["instances.rejectConfirm"]');">
+                <button type="submit" class="btn btn-ghost">@T["instances.reject"]</button>
             </form>
-            <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@Model.Item.Id"
-                  onsubmit="return confirm('@T["instances.deleteConfirm"]');">
-                <button type="submit" class="btn btn-sm btn-danger">@T["common.delete"]</button>
+        }
+        else if (Model.Item.Status == InstanceStatus.Rejected)
+        {
+            <form class="inline-form" method="post" asp-page-handler="Approve" asp-route-id="@Model.Item.Id">
+                <button type="submit" class="btn btn-ghost">@T["instances.approve"]</button>
             </form>
-        </div>
+        }
+        <form class="inline-form" method="post" asp-page-handler="Rotate" asp-route-id="@Model.Item.Id"
+              onsubmit="return confirm('@T["instances.rotateConfirm"]');">
+            <button type="submit" class="btn btn-ghost">@T["instances.rotateToken"]</button>
+        </form>
+        <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@Model.Item.Id"
+              onsubmit="return confirm('@T["instances.deleteConfirm"]');">
+            <button type="submit" class="btn btn-danger">@T["common.delete"]</button>
+        </form>
     </div>
 </div>
 

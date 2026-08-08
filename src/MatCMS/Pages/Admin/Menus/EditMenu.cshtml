@@ -69,7 +69,7 @@
     {
         <div class="alert alert-error">@Model.Error</div>
     }
-    <form method="post" class="form-grid" asp-route-locale="@Model.SelectedLocale">
+    <form method="post" class="form-grid" id="menu-form" asp-route-locale="@Model.SelectedLocale">
         <div class="form-row">
             <div class="form-field">
                 <label for="Name">@T["menus.menuName"]</label>
@@ -80,20 +80,22 @@
                 <input value="@Model.Current.Key" class="mono" readonly />
             </div>
         </div>
-        <div><button type="submit" class="btn">@T["action.save"]</button></div>
     </form>
 </div>
 
-@if (!Model.Current.BuiltIn)
-{
-    <div class="card">
-        <h2>@T["menus.deleteMenu"]</h2>
-        <form method="post" asp-page-handler="Delete" asp-route-id="@Model.Current.Id" onsubmit="return confirm('@T["menus.confirmDeleteMenu"]');">
+@* Save and delete on one line, positive before negative. The save button sits outside its form and
+   reaches it by id, because the delete is a form of its own and the two cannot nest. *@
+<div class="form-actions">
+    <button type="submit" class="btn" form="menu-form">@T["action.save"]</button>
+    @if (!Model.Current.BuiltIn)
+    {
+        <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@Model.Current.Id"
+              onsubmit="return confirm('@T["menus.confirmDeleteMenu"]');">
             <button type="submit" class="btn btn-danger">@T["menus.deleteMenu"]</button>
         </form>
-    </div>
-}
-else
+    }
+</div>
+@if (Model.Current.BuiltIn)
 {
     <p class="muted">@T["menus.builtinNote"]</p>
 }

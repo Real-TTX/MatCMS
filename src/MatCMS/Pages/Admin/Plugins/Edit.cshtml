@@ -20,7 +20,7 @@
     {
         <div class="alert alert-error"><strong>@T["plugins.runError"]:</strong> <span class="mono">@Model.RunError</span></div>
     }
-    <form method="post" class="form-grid">
+    <form method="post" class="form-grid" id="plugin-form">
         <div class="form-row">
             <div class="form-field">
                 <label for="Name">@T["plugins.name"]</label>
@@ -54,7 +54,16 @@
         <div style="margin-top:8px;"><button type="button" class="btn btn-sm btn-ghost" id="cfg-add">＋ Feld</button></div>
         <input type="hidden" name="ConfigJson" id="ConfigJson" />
 
-        <div><button type="submit" class="btn">@T["action.save"]</button></div>
+    </form>
+</div>
+
+@* Save and delete on one line, positive before negative. The save button sits outside its form and
+   reaches it by id, because the delete is a form of its own and the two cannot nest. *@
+<div class="form-actions">
+    <button type="submit" class="btn" form="plugin-form">@T["action.save"]</button>
+    <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@Model.Current.Id"
+          onsubmit="return confirm('@T["plugins.confirmDelete"]');">
+        <button type="submit" class="btn btn-danger">@T["plugins.deletePlugin"]</button>
     </form>
 </div>
 
@@ -112,13 +121,6 @@
     {
         <pre class="plugin-log">@string.Join("\n", Model.Log.Reverse())</pre>
     }
-</div>
-
-<div class="card">
-    <h2>@T["plugins.deletePlugin"]</h2>
-    <form method="post" asp-page-handler="Delete" asp-route-id="@Model.Current.Id" onsubmit="return confirm('@T["plugins.confirmDelete"]');">
-        <button type="submit" class="btn btn-danger">@T["plugins.deletePlugin"]</button>
-    </form>
 </div>
 
 @section Scripts {

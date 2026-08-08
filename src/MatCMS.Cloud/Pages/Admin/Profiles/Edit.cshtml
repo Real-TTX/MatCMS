@@ -342,7 +342,7 @@
         </table>
         <partial name="_PayloadTiles" model="Model.UserTiles" />
         <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
-        <partial name="_AddMenu" model='new AddMenu("users", Url.Page("User", new { profileId = Model.Item.Id })!, "add.createUser", "users", "import-user")' />
+        <partial name="_AddMenu" model='AddMenus.Payload(T, "users", Url.Page("User", new { profileId = Model.Item.Id })!, "add.createUser", "users", "import-user")' />
     </div>
     <partial name="_StorePicker" model="Model.UserPicker" />
 
@@ -428,7 +428,7 @@
         <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
         @* No import option: for a plugin the create page IS the bundle upload, so a third entry would
            only be a second name for the same destination. *@
-        <partial name="_AddMenu" model='new AddMenu("plugins", Url.Page("Plugin", new { profileId = Model.Item.Id })!, "add.createPlugin", "plugins")' />
+        <partial name="_AddMenu" model='AddMenus.Payload(T, "plugins", Url.Page("Plugin", new { profileId = Model.Item.Id })!, "add.createPlugin", "plugins")' />
     </div>
     <partial name="_StorePicker" model="Model.PluginPicker" />
 </div>
@@ -499,7 +499,7 @@
         </table>
         <partial name="_PayloadTiles" model="Model.ComponentTiles" />
         <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
-        <partial name="_AddMenu" model='new AddMenu("components", Url.Page("Component", new { profileId = Model.Item.Id })!, "add.createComponent", "components", "import-component")' />
+        <partial name="_AddMenu" model='AddMenus.Payload(T, "components", Url.Page("Component", new { profileId = Model.Item.Id })!, "add.createComponent", "components", "import-component")' />
     </div>
     <partial name="_StorePicker" model="Model.ComponentPicker" />
 
@@ -587,7 +587,7 @@
         </table>
         <partial name="_PayloadTiles" model="Model.TemplateTiles" />
         <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
-        <partial name="_AddMenu" model='new AddMenu("templates", Url.Page("Template", new { profileId = Model.Item.Id })!, "add.createTemplate", "templates", "import-template")' />
+        <partial name="_AddMenu" model='AddMenus.Payload(T, "templates", Url.Page("Template", new { profileId = Model.Item.Id })!, "add.createTemplate", "templates", "import-template")' />
     </div>
     <partial name="_StorePicker" model="Model.TemplatePicker" />
 
@@ -606,7 +606,6 @@
 @section Scripts {
     <partial name="_CodeEditorAssets" />
     <partial name="_TabsScript" />
-    <partial name="_AddMenuScript" />
     <script>
         // A settings group shows its fields only while its checkbox is ticked. Server-rendered from
         // the stored flag, so it is already right before this runs.

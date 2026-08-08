@@ -66,23 +66,22 @@
         <div class="cp-debug" id="cp-debug" hidden></div>
     </div>
 
-    <div class="list-actions">
-        <button type="submit" class="btn">@T["settings.save"]</button>
-    </div>
 </form>
 
-@if (!Model.IsNew)
-{
-    <div class="card danger-zone">
-        <h2>@T["instances.dangerZone"]</h2>
-        <div class="actions">
-            <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-profileId="@Model.Owner.Id" asp-route-id="@ec.Id"
-                  onsubmit="return confirm('@T["profiles.componentDeleteConfirm"]');">
-                <button type="submit" class="btn btn-sm btn-danger">@T["common.delete"]</button>
-            </form>
-        </div>
-    </div>
-}
+@* Save and delete on one line, positive before negative: what to do with this record is
+   one decision, and burying the destructive half in a card further down made it read as a separate
+   page. The delete keeps its confirm, which is what actually guards it. *@
+<div class="form-actions">
+    <button type="submit" class="btn" form="component-form">@T["settings.save"]</button>
+    @if (!Model.IsNew)
+    {
+        <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-profileId="@Model.Owner.Id" asp-route-id="@ec.Id"
+            onsubmit="return confirm('@T["profiles.componentDeleteConfirm"]');">
+            <button type="submit" class="btn btn-danger">@T["common.delete"]</button>
+        </form>
+    }
+</div>
+
 
 @section Scripts {
     <partial name="_CodeEditorAssets" />

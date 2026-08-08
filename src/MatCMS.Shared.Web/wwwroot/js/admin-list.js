@@ -73,3 +73,46 @@
         apply();
     });
 })();
+
+// ---- "Hinzufügen" dialogs --------------------------------------------------------------------
+// Markup-only, like the list driver above: a page renders _AddMenu and needs no script of its own.
+// An option may open ANOTHER dialog (data-add-menu on the option itself) — that is how a question
+// gets a second step, and it needs no extra code because both halves already exist here.
+(function () {
+    function close(dialog) { dialog.classList.remove('open'); }
+
+    document.addEventListener('click', function (e) {
+        var opener = e.target.closest('[data-add-menu]');
+        var closer = e.target.closest('[data-add-menu-close]');
+        // Order matters: an option that opens step two is BOTH, and closing first would otherwise
+        // leave the caller's dialog on top of the one it just opened.
+        if (closer) {
+            var owner = closer.closest('[data-add-menu-dialog]');
+            if (owner) close(owner);
+        }
+        if (opener) {
+            var next = document.querySelector('[data-add-menu-dialog="' + opener.getAttribute('data-add-menu') + '"]');
+            if (next) next.classList.add('open');
+        }
+        // Clicking the backdrop closes; clicking inside the dialog must not.
+        if (e.target.matches('[data-add-menu-dialog]')) close(e.target);
+
+        // The import forms sit collapsed under their list until asked for. Scrolled to and focused,
+        // because unhiding a form somewhere below the fold looks like nothing happened at all.
+        var imp = e.target.closest('[data-add-import]');
+        if (imp) {
+            var target = document.getElementById(imp.getAttribute('data-add-import'));
+            if (target) {
+                target.hidden = false;
+                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                var field = target.querySelector('textarea, input:not([type=hidden])');
+                if (field) field.focus({ preventScroll: true });
+            }
+        }
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape') return;
+        document.querySelectorAll('[data-add-menu-dialog].open').forEach(close);
+    });
+})();

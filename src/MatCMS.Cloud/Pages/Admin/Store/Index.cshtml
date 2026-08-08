@@ -59,7 +59,7 @@
         <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
         @* Same dialog as a profile's, minus "Aus Global" — this IS the global side. No import for a
            plugin either: its create page is the bundle upload. *@
-        <partial name="_AddMenu" model='new AddMenu("store-plugins", Url.Page("Plugin")!, "add.createPlugin")' />
+        <partial name="_AddMenu" model='AddMenus.Payload(T, "store-plugins", Url.Page("Plugin")!, "add.createPlugin")' />
     </div>
 </div>
 
@@ -106,7 +106,7 @@
         </table>
         <partial name="_PayloadTiles" model="Model.TemplateTiles" />
         <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
-        <partial name="_AddMenu" model='new AddMenu("store-templates", Url.Page("Template")!, "add.createTemplate", null, "import-store-template")' />
+        <partial name="_AddMenu" model='AddMenus.Payload(T, "store-templates", Url.Page("Template")!, "add.createTemplate", null, "import-store-template")' />
     </div>
 
     @* Posts to the Template page's own Import handler rather than a copy of it here — one parser for
@@ -165,7 +165,7 @@
         </table>
         <partial name="_PayloadTiles" model="Model.ComponentTiles" />
         <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
-        <partial name="_AddMenu" model='new AddMenu("store-components", Url.Page("Component")!, "add.createComponent", null, "import-store-component")' />
+        <partial name="_AddMenu" model='AddMenus.Payload(T, "store-components", Url.Page("Component")!, "add.createComponent", null, "import-store-component")' />
     </div>
 
     <div class="card" id="import-store-component" hidden>
@@ -183,5 +183,4 @@
 @section Scripts {
     <partial name="_CodeEditorAssets" />
     <partial name="_TabsScript" />
-    <partial name="_AddMenuScript" />
 }

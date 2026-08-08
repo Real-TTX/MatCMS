@@ -69,7 +69,8 @@ public class IndexModel : PageModel
     public List<Shared.PayloadTile> TemplateTiles =>
         Templates.Select(t => new Shared.PayloadTile(
             Url.Page("Template", new { id = t.Id })!, t.Name, $"{t.HeadingFont} / {t.BodyFont}", false,
-            $"{t.Name} {t.Description}", Accent: t.AccentColor)).ToList();
+            $"{t.Name} {t.Description}", Accent: t.AccentColor,
+            PreviewUrl: Url.Page("/Admin/TemplatePreview", new { kind = "store", id = t.Id }))).ToList();
 
     public List<Shared.PayloadTile> ComponentTiles =>
         Components.Select(c => new Shared.PayloadTile(

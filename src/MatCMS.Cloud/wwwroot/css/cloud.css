@@ -140,3 +140,27 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
 .payload-tile-strip { display: block; height: 6px; border-radius: 3px; margin-bottom: 8px; }
 .payload-tile-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 .payload-tile-sub { font-size: 12px; overflow-wrap: anywhere; }
+
+/* Rendered template thumbnail inside a payload tile. The preview page renders at desktop width and
+   is scaled down, so the tile shows the DESKTOP layout instead of the mobile one a narrow frame
+   would trigger. Pointer events off so a click hits the tile link, not the page inside. */
+.payload-tile-shot {
+    display: block;
+    position: relative;
+    height: 150px;
+    margin: -14px -16px 10px;
+    border-bottom: 1px solid var(--line);
+    border-radius: 10px 10px 0 0;
+    overflow: hidden;
+    background: var(--bg-alt);
+}
+.payload-tile-shot iframe {
+    position: absolute;
+    top: 0; left: 0;
+    width: 1180px;
+    height: 780px;
+    border: 0;
+    transform: scale(.26);
+    transform-origin: 0 0;
+    pointer-events: none;
+}

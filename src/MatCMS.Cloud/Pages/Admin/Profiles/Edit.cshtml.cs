@@ -105,12 +105,14 @@ public class EditModel : PageModel
         .. ChosenStoreTemplates.Select(t => new Shared.PayloadTile(
             Url.Page("/Admin/Store/Template", new { id = t.Id })!, t.Name, t.Description ?? "", true,
             t.Name, Accent: t.AccentColor,
-            NoteKey: TemplateOverridden(t.Name) ? "profiles.overriddenLocally" : null)),
+            NoteKey: TemplateOverridden(t.Name) ? "profiles.overriddenLocally" : null,
+            PreviewUrl: Url.Page("/Admin/TemplatePreview", new { kind = "store", id = t.Id }))),
         .. Templates.Select(t => new Shared.PayloadTile(
             Url.Page("Template", new { profileId = Item.Id, id = t.Id })!, t.Name,
             $"{t.HeadingFont} / {t.BodyFont}", false,
             $"{t.Name} {t.HeadingFont} {t.BodyFont}", Accent: t.AccentColor,
-            NoteKey: Item.ActivateTemplateName == t.Name ? "profiles.templateActive" : null))
+            NoteKey: Item.ActivateTemplateName == t.Name ? "profiles.templateActive" : null,
+            PreviewUrl: Url.Page("/Admin/TemplatePreview", new { kind = "profile", id = t.Id })))
     ];
 
     public StorePicker PluginPicker => new(Item.Id, "plugins",

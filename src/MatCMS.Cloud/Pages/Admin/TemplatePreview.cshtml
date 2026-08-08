@@ -1,0 +1,59 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.TemplatePreviewModel
+@{
+    Layout = null;
+    var t = Model.Item;
+}
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=1180" />
+    <title>@t.Name</title>
+    <style>
+        html, body { margin: 0; height: 100%; overflow: hidden; background: #fff; }
+        #tpl-frame { width: 100%; height: 100%; border: 0; display: block; }
+    </style>
+</head>
+<body>
+    @* The preview script reads the form by element id, exactly as it does in the editor — that is the
+       point: the tile and the editor must never disagree about what a template looks like. Hidden
+       inputs, because nothing here is meant to be edited. *@
+    <form id="template-form" hidden>
+        <input id="accentColor" value="@t.AccentColor" />
+        <input id="secondaryColor" value="@t.SecondaryColor" />
+        <input id="headingColor" value="@t.HeadingColor" />
+        <input id="textColor" value="@t.TextColor" />
+        <input id="backgroundColor" value="@t.BackgroundColor" />
+        <input id="altBackground" value="@t.AltBackground" />
+        <input id="headerBackground" value="@t.HeaderBackground" />
+        <input id="headerTextColor" value="@t.HeaderTextColor" />
+        <input id="headingFont" value="@t.HeadingFont" />
+        <input id="bodyFont" value="@t.BodyFont" />
+        <input id="containerWidth" value="@t.ContainerWidth" />
+        <input id="buttonRadius" value="@t.ButtonRadius" />
+        <input id="headerPadding" value="@t.HeaderPadding" />
+        <input id="buttonStyle" value="@t.ButtonStyle" />
+        <textarea id="customCss">@t.CustomCss</textarea>
+        <textarea id="layoutHtml">@t.LayoutHtml</textarea>
+    </form>
+
+    <iframe id="tpl-frame" title="@t.Name"></iframe>
+
+    <script>
+        window.CLOUD_TPL_PREVIEW = {
+            brand: "@T["profiles.previewBrand"]",
+            navHome: "@T["profiles.previewNavHome"]",
+            navAbout: "@T["profiles.previewNavAbout"]",
+            navContact: "@T["profiles.previewNavContact"]",
+            heroTitle: "@T["profiles.previewHeroTitle"]",
+            heroText: "@T["profiles.previewHeroText"]",
+            cta: "@T["profiles.previewCta"]",
+            cta2: "@T["profiles.previewCta2"]",
+            card: "@T["profiles.previewCard"]",
+            cardText: "@T["profiles.previewCardText"]"
+        };
+    </script>
+    <script src="~/js/template-preview.js" asp-append-version="true"></script>
+</body>
+</html>

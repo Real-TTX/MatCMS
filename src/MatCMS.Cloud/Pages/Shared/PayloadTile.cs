@@ -12,8 +12,10 @@ namespace MatCMS.Cloud.Pages.Shared;
 /// <param name="Search">What the list's live search matches against; mirrors the table row's
 /// <c>data-search</c> so both views filter identically.</param>
 /// <param name="Accent">Optional colour strip (templates). Null = no strip.</param>
+/// <param name="PreviewUrl">Optional URL of a rendered preview, framed at the top of the tile. For
+/// templates this beats a colour swatch: what a theme looks like is the thing being chosen.</param>
 /// <param name="NoteKey">Optional extra badge, as a RESOURCE KEY — user-facing text belongs in
 /// <c>Resources/*.json</c>, never in a page model.</param>
 public sealed record PayloadTile(
     string Href, string Title, string Sub, bool IsGlobal, string Search,
-    string? Accent = null, string? NoteKey = null);
+    string? Accent = null, string? NoteKey = null, string? PreviewUrl = null);

@@ -119,7 +119,7 @@
             <h3 class="form-section">@T["profiles.templateColors"]</h3>
             @* Required colours use .color-field (the colour input IS the posted value); optional ones
                use [data-optcolor], where the text field is posted and may be empty ("inherit"). *@
-            <div class="form-grid">
+            <div class="color-grid">
                 @{
                     var required = new (string Field, string Label, string Value, string Fallback)[]
                     {
@@ -141,7 +141,7 @@
                     </div>
                 }
             </div>
-            <div class="form-grid">
+            <div class="color-grid">
                 @{
                     var optional = new (string Field, string Label, string Value, string Pick)[]
                     {

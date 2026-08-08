@@ -8,7 +8,14 @@
     @foreach (var tile in Model)
     {
         <a class="payload-tile" href="@tile.Href" data-search="@tile.Search">
-            @if (!string.IsNullOrWhiteSpace(tile.Accent))
+            @* A rendered thumbnail where there is one; the colour strip is the fallback. *@
+            @if (!string.IsNullOrWhiteSpace(tile.PreviewUrl))
+            {
+                <span class="payload-tile-shot">
+                    <iframe src="@tile.PreviewUrl" title="@tile.Title" loading="lazy" tabindex="-1" scrolling="no"></iframe>
+                </span>
+            }
+            else if (!string.IsNullOrWhiteSpace(tile.Accent))
             {
                 <span class="payload-tile-strip" style="background:@tile.Accent;"></span>
             }

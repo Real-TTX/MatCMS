@@ -32,11 +32,54 @@
         });
     }
 
+    // ---- Sample menus -------------------------------------------------------
+    // A theme is judged by how its navigation looks, so every {{menu:slot}} is filled with real
+    // entries instead of being marked as unresolved. Deterministic per slot rather than random: the
+    // preview must not reshuffle on every keystroke, but two different slots should look different.
+    var MENU_POOL = ["Start", "Über uns", "Leistungen", "Referenzen", "Blog", "Kontakt", "Team", "Preise", "Impressum", "Datenschutz"];
+
+    function slotSeed(slot) {
+        var n = 0;
+        for (var i = 0; i < slot.length; i++) { n = (n * 31 + slot.charCodeAt(i)) % 9973; }
+        return n;
+    }
+
+    function sampleItems(slot) {
+        var seed = slotSeed(slot);
+        var count = 3 + (seed % 3);              // 3 to 5 entries
+        var items = [];
+        for (var i = 0; i < count; i++) { items.push(MENU_POOL[(seed + i * 3) % MENU_POOL.length]); }
+        return items;
+    }
+
+    function sampleMenu(slot) {
+        return '<nav class="tp-nav">' + sampleItems(slot).map(function (label) {
+            return '<a href="#">' + esc(label) + '</a>';
+        }).join("") + '</nav>';
+    }
+
+    // Both menu forms the CMS renders: the plain {{menu:slot}} and the per-item loop
+    // {{#menu:slot}} … {{label}}/{{url}}/{{icon}}/{{target}} … {{/menu:slot}}. A layout authored here
+    // therefore behaves the same way once it is on an instance.
+    function expandMenus(html) {
+        var loop = new RegExp("\\{\\{#menu:([a-zA-Z0-9_-]+)\\}\\}([\\s\\S]*?)\\{\\{/menu:\\1\\}\\}", "g");
+        html = html.replace(loop, function (m, slot, inner) {
+            return sampleItems(slot).map(function (label) {
+                return inner
+                    .replace(/\{\{label\}\}/g, esc(label))
+                    .replace(/\{\{url\}\}/g, "#")
+                    .replace(/\{\{icon\}\}/g, "")
+                    .replace(/\{\{target\}\}/g, "");
+            }).join("");
+        });
+        return html.replace(/\{\{menu:([a-zA-Z0-9_-]+)\}\}/g, function (m, slot) { return sampleMenu(slot); });
+    }
+
     function samplePage(t) {
         return '' +
             '<header class="tp-header"><div class="tp-wrap tp-header-in">' +
             '<strong class="tp-logo">' + esc(L.brand || "Beispielseite") + '</strong>' +
-            '<nav class="tp-nav"><a href="#">' + esc(L.navHome || "Start") + '</a><a href="#">' + esc(L.navAbout || "Über uns") + '</a><a href="#">' + esc(L.navContact || "Kontakt") + '</a></nav>' +
+            sampleMenu("primary") +
             '</div></header>' +
             '<section class="tp-hero"><div class="tp-wrap">' +
             '<h1>' + esc(L.heroTitle || "Überschrift im Template-Stil") + '</h1>' +
@@ -69,9 +112,12 @@
         var layout = val("layoutHtml", "");
 
         var body = layout.indexOf("{{content}}") !== -1
-            ? layout.split("{{content}}").join(samplePage())
+            ? expandMenus(layout.split("{{content}}").join(samplePage()))
                    .replace(/\{\{logo\}\}/g, esc(L.brand || "Beispielseite"))
-                   .replace(/\{\{nav\}\}/g, '<nav class="tp-nav"><a href="#">' + esc(L.navHome || "Start") + '</a></nav>')
+                   .replace(/\{\{nav\}\}/g, sampleMenu("primary"))
+                   .replace(/\{\{site_name\}\}/g, esc(L.brand || "Beispielseite"))
+                   .replace(/\{\{footer_text\}\}/g, esc(L.brand || "Beispielseite"))
+                   .replace(/\{\{year\}\}/g, String(new Date().getFullYear()))
                    .replace(/\{\{footer\}\}/g, '<footer class="tp-foot">© ' + esc(L.brand || "Beispielseite") + '</footer>')
                    // Any remaining {{token}} is shown as a visible marker instead of raw braces, so
                    // an unresolved placeholder is obvious at a glance.

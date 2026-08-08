@@ -378,26 +378,37 @@ public class CloudService
         if (config is null) return new(false, 0, error, [], []);
 
         var wanted = selection.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        bool Picked(string kind, string? id) => wanted.Contains($"{kind}:{id}");
+
+        // Ids must be normalised exactly as the applier reports them, or a value that only differs in
+        // whitespace is previewed as "component:hero", posted back as "component:hero", and then
+        // looked up as "component: hero " — silently dropping the item the operator ticked.
+        bool Picked(string kind, string? id) => wanted.Contains($"{kind}:{(id ?? "").Trim()}");
+        bool PickedComponent(string? type) =>
+            wanted.Contains($"component:{(type ?? "").Trim().ToLowerInvariant()}");
 
         config.Settings = config.Settings?
             .Where(kv => Picked("setting", kv.Key))
             .ToDictionary(kv => kv.Key, kv => kv.Value);
         config.Users = config.Users?.Where(u => Picked("user", u.Username)).ToList();
-        config.Components = config.Components?.Where(c => Picked("component", c.Type)).ToList();
+        config.Components = config.Components?.Where(c => PickedComponent(c.Type)).ToList();
         config.Templates = config.Templates?.Where(t => Picked("template", t.Name)).ToList();
         config.Plugins = config.Plugins?.Where(p => Picked("plugin", p.Key)).ToList();
 
-        // Switching the live design only happens when that template was ticked as well — the preview
-        // lists it as its own row, so leaving it unticked has to mean "roll it out, don't activate".
-        if (!string.IsNullOrWhiteSpace(config.ActivateTemplate) && !Picked("template", config.ActivateTemplate))
-            config.ActivateTemplate = null;
+        // Switching the live design is its own row with its own kind ("activate"), so it is ticked —
+        // or not — independently of rolling that template out.
+        var activate = !string.IsNullOrWhiteSpace(config.ActivateTemplate)
+                       && Picked("activate", config.ActivateTemplate);
+        if (!activate) config.ActivateTemplate = null;
 
-        // A payload nobody picked from is "not synced" rather than "synced as empty".
+        // A payload nobody picked from is "not synced" rather than "synced as empty" — EXCEPT for
+        // templates when an activation was ticked: the applier performs the switch inside
+        // ApplyTemplatesAsync, which it skips entirely for a null section. An empty list makes it run
+        // with nothing to roll out and still activate.
         if (config.Settings?.Count == 0) config.Settings = null;
         if (config.Users?.Count == 0) config.Users = null;
         if (config.Components?.Count == 0) config.Components = null;
-        if (config.Templates?.Count == 0) config.Templates = null;
+        if (config.Templates?.Count == 0 && !activate) config.Templates = null;
+        if (activate) config.Templates ??= [];
         if (config.Plugins?.Count == 0) config.Plugins = null;
 
         var result = await _sync.ApplySelectionAsync(config,

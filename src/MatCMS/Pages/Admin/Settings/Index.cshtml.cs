@@ -143,11 +143,20 @@ public class IndexModel : PageModel
         var result = await _cloud.ApplySelectionAsync(picked, HttpContext.RequestAborted);
 
         if (!result.Ok)
+        {
             TempData["FlashError"] = $"Konnte nicht angewendet werden: {result.Error}";
-        else
-            TempData["Flash"] = $"{result.Report.Count(r => r.Outcome is "installed" or "updated")} von "
-                + $"{picked.Length} Objekten übernommen. Der Rest des Profils folgt beim nächsten Abgleich.";
+            return RedirectToPage(new { tab = "cloud" });
+        }
 
+        // Counted against the SELECTION, not against the report: the report can carry rows nobody
+        // ticked, and a ticked item can come back "skipped-exists" when the site changed between the
+        // preview and the click. Comparing the two lists straight would print "4 von 3 übernommen".
+        var chosen = picked.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var done = result.Report.Count(r =>
+            r.Outcome is "installed" or "updated" && chosen.Contains($"{r.Kind}:{r.Id}"));
+
+        TempData["Flash"] = $"{done} von {picked.Length} ausgewählten Objekten übernommen. "
+            + "Der Rest des Profils folgt beim nächsten Abgleich.";
         return RedirectToPage(new { tab = "cloud" });
     }
 

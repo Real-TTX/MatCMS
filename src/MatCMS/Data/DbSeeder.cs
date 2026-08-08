@@ -24,9 +24,11 @@ public static class DbSeeder
         var db = sp.GetRequiredService<AppDbContext>();
         var auth = sp.GetRequiredService<AuthService>();
 
-        // Bring an existing DB up to the current schema before any EF query touches the new columns
-        // (EnsureCreated never ALTERs an existing table, so added columns must be patched in here).
-        await MigrateSchemaAsync(db);
+        // Legacy patcher for databases created before EF migrations existed here. Runs AFTER the
+        // baseline in Program.cs, which is what makes that baseline safe: a drifted EnsureCreated()
+        // database gets its missing columns back even though the initial migration was recorded
+        // without running. FROZEN — new columns belong in a migration, never in here.
+        await PatchLegacySchemaAsync(db);
         await BackfillPluginKeysAsync(db);
         await BackfillLanguagesAsync(db);
 
@@ -286,12 +288,15 @@ public static class DbSeeder
     }
 
     /// <summary>
-    /// Idempotently adds columns introduced after the DB was first created. EnsureCreated() never
-    /// alters an existing table, so new model columns must be patched in with ALTER TABLE. Runs before
-    /// any EF query so reads of the new columns don't fail on an older database. A fresh DB already has
-    /// the columns (created from the model), so each ALTER is a no-op there (duplicate-column ignored).
+    /// Idempotently adds columns that were introduced while this project still used
+    /// <c>EnsureCreated()</c>, which never ALTERs an existing table. It is <b>frozen history</b>: the
+    /// project has moved to EF migrations (see <c>EnsureSchemaCurrentAsync</c> in Program.cs) and a
+    /// new column must go into a migration instead.
+    /// <para>Do not extend it, and mind that it runs AFTER the migrations: a future migration that
+    /// DROPS or renames one of the columns listed here would have it silently re-added on the next
+    /// start. Remove the corresponding line here in the same commit.</para>
     /// </summary>
-    private static async Task MigrateSchemaAsync(AppDbContext db)
+    private static async Task PatchLegacySchemaAsync(AppDbContext db)
     {
         await AddColumnIfMissingAsync(db, "Users", "Email", "TEXT");
         await AddColumnIfMissingAsync(db, "Forms", "SuccessMessage", "TEXT");

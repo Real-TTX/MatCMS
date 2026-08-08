@@ -218,7 +218,7 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await MigrateSchemaAsync(db, scope.ServiceProvider.GetRequiredService<ILoggerFactory>());
+    await EnsureSchemaCurrentAsync(db, scope.ServiceProvider.GetRequiredService<ILoggerFactory>());
     await DbSeeder.SeedAsync(scope.ServiceProvider);
     // Run enabled plugins once at startup so their registrations are available.
     await scope.ServiceProvider.GetRequiredService<PluginRunner>().RunAllAsync();
@@ -572,7 +572,7 @@ app.Run();
 /// <para>This is what ends the old "a model change needs <c>docker compose down -v</c>" rule, which
 /// on a CMS meant throwing away the customer's content to add a column.</para>
 /// </summary>
-static async Task MigrateSchemaAsync(AppDbContext db, ILoggerFactory loggerFactory)
+static async Task EnsureSchemaCurrentAsync(AppDbContext db, ILoggerFactory loggerFactory)
 {
     var log = loggerFactory.CreateLogger("Schema");
     var applied = (await db.Database.GetAppliedMigrationsAsync()).ToList();

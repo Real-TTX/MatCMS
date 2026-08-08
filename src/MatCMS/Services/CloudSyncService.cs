@@ -56,6 +56,14 @@ public class CloudSyncService
     private const string PayloadUsers = "users";
     private const string PayloadComponents = "components";
     private const string PayloadTemplates = "templates";
+
+    /// <summary>
+    /// Report kind for "make this the live design". Deliberately NOT "template": rolling a theme out
+    /// and switching the site to it are two separate decisions, and while they shared a kind they
+    /// also shared a <c>kind:id</c> key — so unticking the activation in a preview could not stop it,
+    /// because the rollout row of the same template re-selected it.
+    /// </summary>
+    private const string PayloadActivate = "activate";
     private const string PayloadPlugins = "plugins";
 
     /// <summary>What to do with one payload this time round.</summary>
@@ -217,6 +225,12 @@ public class CloudSyncService
             {
                 // Report and run stamp yes (the cloud must see what happened), applied revision no:
                 // only a subset arrived, so the instance is genuinely still out of sync.
+                //
+                // The stored ERROR is cleared even so. It travels on the same heartbeat as the fresh
+                // run stamp, and the cloud files a run under the error it reads there — so leaving an
+                // older failure in place would record this successful partial apply as failed, and
+                // flip the instance's own badge back to "Sync fehlgeschlagen" a minute later.
+                await SetStateAsync(await AppliedRevisionAsync(ct), null, ct);
                 await SetReportAsync(ct);
                 _log.LogInformation("Selected items of revision {Revision} applied: {Applied}",
                     config.Revision, string.Join(", ", applied));
@@ -463,11 +477,11 @@ public class CloudSyncService
         {
             var target = await _db.Templates.FirstOrDefaultAsync(x => x.Name == wanted, ct);
             if (target is null && !rolledOut.Contains(wanted))
-                Report("template", wanted, "failed", "Soll aktiviert werden, ist hier aber nicht vorhanden.");
+                Report(PayloadActivate, wanted, "failed", "Soll aktiviert werden, ist hier aber nicht vorhanden.");
             else if (target is null)
             {
                 // Preview only: it arrives with this very rollout, so activation would succeed.
-                Report("template", wanted, "updated", "Als aktives Design gesetzt");
+                Report(PayloadActivate, wanted, "updated", "Als aktives Design gesetzt");
             }
             else if (!target.IsActive)
             {
@@ -478,7 +492,7 @@ public class CloudSyncService
                     target.IsActive = true;
                     await SaveAsync(ct);
                 }
-                Report("template", wanted, "updated", "Als aktives Design gesetzt");
+                Report(PayloadActivate, wanted, "updated", "Als aktives Design gesetzt");
             }
         }
 

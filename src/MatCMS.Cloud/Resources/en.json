@@ -248,6 +248,7 @@
   "instances.kind.component": "Component",
   "instances.kind.template": "Template",
   "instances.kind.plugin": "Plugin",
+  "instances.kind.activate": "Activate design",
   "instances.outcome.installed": "installed",
   "instances.outcome.updated": "updated",
   "instances.outcome.skipped-exists": "skipped",

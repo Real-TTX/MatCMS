@@ -24,7 +24,10 @@
 
   <ItemGroup>
     <!-- Floating 10.0.* so restores/rebuilds always pick up the latest patch ("immer aktuell"). -->
-    <!-- Design-time only (PrivateAssets), for `dotnet ef migrations add`. Ships nothing at runtime. -->
+    <!-- For `dotnet ef migrations add`. PrivateAssets keeps it out of `dotnet publish`, so it is NOT
+         in the image (verified: /app holds only the four Roslyn scripting DLLs the plugin runner
+         needs). It DOES land in the local bin/ build output, together with the CodeAnalysis
+         Workspaces assemblies it drags in — that is the tooling working as intended, not a leak. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.*">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>

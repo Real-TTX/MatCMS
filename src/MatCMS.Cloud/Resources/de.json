@@ -248,6 +248,7 @@
   "instances.kind.component": "Komponente",
   "instances.kind.template": "Template",
   "instances.kind.plugin": "Plugin",
+  "instances.kind.activate": "Design aktivieren",
   "instances.outcome.installed": "installiert",
   "instances.outcome.updated": "aktualisiert",
   "instances.outcome.skipped-exists": "übersprungen",

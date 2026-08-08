@@ -356,6 +356,82 @@ public class CloudService
         return result;
     }
 
+    /// <summary>
+    /// Applies only the items an operator ticked in the preview. <paramref name="selection"/> holds
+    /// <c>kind:id</c> keys exactly as the preview report produced them.
+    /// <para>The configuration is narrowed down FIRST and then run through the normal applier, so the
+    /// decision for each item is still made by the one piece of code that makes it everywhere else.
+    /// A payload with nothing selected becomes null — which the applier reads as "don't touch this",
+    /// the same as a profile that does not sync it.</para>
+    /// </summary>
+    public async Task<CloudSyncService.SyncResult> ApplySelectionAsync(
+        IReadOnlyCollection<string> selection, CancellationToken ct = default)
+    {
+        if (selection.Count == 0)
+            return new(false, 0, "Es war nichts ausgewählt.", [], []);
+
+        var settings = await GetSettingsAsync();
+        if (!settings.Configured)
+            return new(false, 0, "Keine Cloud-Verbindung konfiguriert.", [], []);
+
+        var (config, error) = await FetchConfigAsync(settings, ct);
+        if (config is null) return new(false, 0, error, [], []);
+
+        var wanted = selection.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        bool Picked(string kind, string? id) => wanted.Contains($"{kind}:{id}");
+
+        config.Settings = config.Settings?
+            .Where(kv => Picked("setting", kv.Key))
+            .ToDictionary(kv => kv.Key, kv => kv.Value);
+        config.Users = config.Users?.Where(u => Picked("user", u.Username)).ToList();
+        config.Components = config.Components?.Where(c => Picked("component", c.Type)).ToList();
+        config.Templates = config.Templates?.Where(t => Picked("template", t.Name)).ToList();
+        config.Plugins = config.Plugins?.Where(p => Picked("plugin", p.Key)).ToList();
+
+        // Switching the live design only happens when that template was ticked as well — the preview
+        // lists it as its own row, so leaving it unticked has to mean "roll it out, don't activate".
+        if (!string.IsNullOrWhiteSpace(config.ActivateTemplate) && !Picked("template", config.ActivateTemplate))
+            config.ActivateTemplate = null;
+
+        // A payload nobody picked from is "not synced" rather than "synced as empty".
+        if (config.Settings?.Count == 0) config.Settings = null;
+        if (config.Users?.Count == 0) config.Users = null;
+        if (config.Components?.Count == 0) config.Components = null;
+        if (config.Templates?.Count == 0) config.Templates = null;
+        if (config.Plugins?.Count == 0) config.Plugins = null;
+
+        var result = await _sync.ApplySelectionAsync(config,
+            (key, token) => FetchPluginAsync(settings, key, token), ct);
+
+        _state.SyncError = result.Error;
+        _state.LastSyncUtc = DateTime.UtcNow;
+        return result;
+    }
+
+    /// <summary>Fetches the profile configuration. Never throws: an unreachable cloud is a normal
+    /// condition and every caller here turns it into a message, not a 500.</summary>
+    private async Task<(InstanceConfig? config, string? error)> FetchConfigAsync(
+        CloudSettings settings, CancellationToken ct)
+    {
+        try
+        {
+            var client = CreateClient(settings);
+            var res = await client.GetAsync($"{settings.Url}/api/instances/{settings.InstanceId}/config", ct);
+            if (!res.IsSuccessStatusCode)
+                return (null, res.StatusCode == System.Net.HttpStatusCode.Forbidden
+                    ? "Die Instanz ist in der Cloud noch nicht freigegeben."
+                    : $"Konfiguration konnte nicht geladen werden (HTTP {(int)res.StatusCode}).");
+
+            var config = await res.Content.ReadFromJsonAsync<InstanceConfig>(ct);
+            return config is null ? (null, "Leere Konfiguration erhalten.") : (config, null);
+        }
+        catch (Exception ex)
+        {
+            _log.LogInformation(ex, "Fetching the cloud configuration failed");
+            return (null, $"Die Cloud war nicht erreichbar: {ex.Message}");
+        }
+    }
+
     /// <summary>Fetches the configuration and reports what applying it WOULD do — nothing is written
     /// and no state is touched, so this stays safe to click on a live site.</summary>
     public async Task<CloudSyncService.SyncResult> PreviewAsync(CancellationToken ct = default)
@@ -364,25 +440,8 @@ public class CloudService
         if (!settings.Configured)
             return new(false, 0, "Keine Cloud-Verbindung konfiguriert.", [], []);
 
-        InstanceConfig? config;
-        try
-        {
-            var client = CreateClient(settings);
-            var res = await client.GetAsync($"{settings.Url}/api/instances/{settings.InstanceId}/config", ct);
-            if (!res.IsSuccessStatusCode)
-                return new(false, 0, res.StatusCode == System.Net.HttpStatusCode.Forbidden
-                    ? "Die Instanz ist in der Cloud noch nicht freigegeben."
-                    : $"Konfiguration konnte nicht geladen werden (HTTP {(int)res.StatusCode}).", [], []);
-
-            config = await res.Content.ReadFromJsonAsync<InstanceConfig>(ct);
-        }
-        catch (Exception ex)
-        {
-            _log.LogInformation(ex, "Fetching the cloud configuration for a preview failed");
-            return new(false, 0, $"Die Cloud war nicht erreichbar: {ex.Message}", [], []);
-        }
-
-        if (config is null) return new(false, 0, "Leere Konfiguration erhalten.", [], []);
+        var (config, error) = await FetchConfigAsync(settings, ct);
+        if (config is null) return new(false, 0, error, [], []);
 
         return await _sync.PreviewAsync(config, ct);
     }

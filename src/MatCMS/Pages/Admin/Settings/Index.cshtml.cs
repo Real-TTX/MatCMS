@@ -131,6 +131,26 @@ public class IndexModel : PageModel
     /// for why the result is not carried through the redirect.</summary>
     public IActionResult OnPostCloudPreview() => RedirectToPage(new { tab = "cloud", preview = true });
 
+    /// <summary>
+    /// Applies only the items ticked in the preview. The applied revision deliberately does NOT move
+    /// (see <c>CloudSyncService.ApplySelectionAsync</c>): a subset arrived, so the instance stays out
+    /// of sync and the rest still follows on the next heartbeat — which is what the operator sees in
+    /// the state line, instead of a green "synchron" that would be untrue.
+    /// </summary>
+    public async Task<IActionResult> OnPostCloudApplySelectionAsync(string[]? selection)
+    {
+        var picked = selection ?? [];
+        var result = await _cloud.ApplySelectionAsync(picked, HttpContext.RequestAborted);
+
+        if (!result.Ok)
+            TempData["FlashError"] = $"Konnte nicht angewendet werden: {result.Error}";
+        else
+            TempData["Flash"] = $"{result.Report.Count(r => r.Outcome is "installed" or "updated")} von "
+                + $"{picked.Length} Objekten übernommen. Der Rest des Profils folgt beim nächsten Abgleich.";
+
+        return RedirectToPage(new { tab = "cloud" });
+    }
+
     /// <summary>Pulls and applies the profile configuration immediately instead of waiting for the
     /// next heartbeat.</summary>
     public async Task<IActionResult> OnPostCloudSyncAsync()

@@ -109,9 +109,24 @@ public class CloudSyncService
     public Task<SyncResult> PreviewAsync(InstanceConfig config, CancellationToken ct = default) =>
         RunAsync(config, (_, _) => Task.FromResult<byte[]?>(null), dryRun: true, ct);
 
+    /// <summary>
+    /// Applies a configuration that has already been narrowed down to the items an operator picked
+    /// out of a preview. Same code as a full apply, with two deliberate differences:
+    /// <list type="bullet">
+    /// <item>The applied revision is <b>not</b> advanced. Only part of the profile arrived, so
+    /// claiming to be on that revision would stop the rest from ever being pulled — the instance
+    /// stays "abweichend" and the next heartbeat brings the remainder, which is the honest state.</item>
+    /// <item>Nothing is marked as seeded. A "once" payload that was applied in part must not be
+    /// frozen; the items left out would never arrive.</item>
+    /// </list>
+    /// </summary>
+    public Task<SyncResult> ApplySelectionAsync(
+        InstanceConfig config, Func<string, CancellationToken, Task<byte[]?>> fetchPlugin,
+        CancellationToken ct = default) => RunAsync(config, fetchPlugin, dryRun: false, ct, partial: true);
+
     private async Task<SyncResult> RunAsync(
         InstanceConfig config, Func<string, CancellationToken, Task<byte[]?>> fetchPlugin,
-        bool dryRun, CancellationToken ct)
+        bool dryRun, CancellationToken ct, bool partial = false)
     {
         var applied = new List<string>();
         _report.Clear();
@@ -127,7 +142,9 @@ public class CloudSyncService
             // for as long as the failure lasted.
             async Task MarkSeededAsync(string payload)
             {
-                if (_dryRun) return;
+                // "partial" too: a payload applied only in part must not be frozen — the items
+                // left out of the selection would then never arrive.
+                if (_dryRun || partial) return;
                 seeded.Add(payload);
                 await SetSeededAsync(config.ProfileId, seeded, ct);
             }
@@ -193,6 +210,16 @@ public class CloudSyncService
                 // cleared because a preview must not leave modified entities behind for whatever
                 // saves next on this scoped DbContext.
                 _db.ChangeTracker.Clear();
+                return new(true, config.Revision, null, applied, _report);
+            }
+
+            if (partial)
+            {
+                // Report and run stamp yes (the cloud must see what happened), applied revision no:
+                // only a subset arrived, so the instance is genuinely still out of sync.
+                await SetReportAsync(ct);
+                _log.LogInformation("Selected items of revision {Revision} applied: {Applied}",
+                    config.Revision, string.Join(", ", applied));
                 return new(true, config.Revision, null, applied, _report);
             }
 

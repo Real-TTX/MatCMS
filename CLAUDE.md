@@ -28,8 +28,12 @@ together by hand:
    together; there is nothing left to keep in step. The library is deliberately dependency-free (no
    EF, no ASP.NET): a DTO that needs a package has grown into something that belongs in one of the
    two applications.
-2. **The plugin bundle format** — `PluginPackager` on the instance, `StoreBundle` in the cloud. Still
-   two implementations; the format is the contract.
+2. **The plugin bundle format** — the container shape (manifest entry name, asset folder, size and
+   count guards, allowed asset types) is `src/MatCMS.Shared/PluginBundle.cs`. The two READERS stay
+   separate on purpose: the CMS imports into itself (EF, file system, plugin migration), while the
+   cloud only stores and re-packs bundles and edits the manifest **field by field** so properties its
+   editor does not surface survive a save. A shared typed manifest class would quietly drop exactly
+   those — do not "finish the job" by adding one.
 3. **The admin UI** — now **`src/MatCMS.Shared.Web`**, a Razor Class Library holding `site.css`,
    `admin.css`, `admin-list.js`, the CodeMirror and Tabler-Icons bundles and `_IconTrash.cshtml`.
    They used to be byte-identical copies kept in step by hand and a `diff`. Both apps reach them at

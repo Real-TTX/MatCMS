@@ -1,0 +1,42 @@
+@*
+    Drives every "Hinzufügen" dialog on the page, plus the import forms they reveal. Markup-only, like
+    admin-list.js: a page adds a <partial name="_AddMenu" /> and needs no script of its own.
+*@
+<script>
+    (function () {
+        function close(dialog) { dialog.classList.remove('open'); }
+
+        document.querySelectorAll('[data-add-menu]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var dialog = document.querySelector('[data-add-menu-dialog="' + btn.dataset.addMenu + '"]');
+                if (dialog) dialog.classList.add('open');
+            });
+        });
+
+        document.querySelectorAll('[data-add-menu-dialog]').forEach(function (dialog) {
+            dialog.querySelectorAll('[data-add-menu-close]').forEach(function (btn) {
+                btn.addEventListener('click', function () { close(dialog); });
+            });
+            // Clicking the backdrop closes; clicking inside the dialog must not.
+            dialog.addEventListener('click', function (e) { if (e.target === dialog) close(dialog); });
+        });
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'Escape') return;
+            document.querySelectorAll('[data-add-menu-dialog].open').forEach(close);
+        });
+
+        // The import forms sit collapsed under their list until asked for. Scrolled to and focused,
+        // because unhiding a form somewhere below the fold looks like nothing happened at all.
+        document.querySelectorAll('[data-add-import]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var target = document.getElementById(btn.dataset.addImport);
+                if (!target) return;
+                target.hidden = false;
+                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                var field = target.querySelector('textarea, input:not([type=hidden])');
+                if (field) field.focus({ preventScroll: true });
+            });
+        });
+    })();
+</script>

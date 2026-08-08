@@ -463,5 +463,21 @@
   "users.displayName": "Display name",
   "users.password": "Password",
   "users.passwordKeep": "leave unchanged",
-  "users.deleteConfirm": "Really delete this user?"
+  "users.deleteConfirm": "Really delete this user?",
+
+  "add.button": "Add",
+  "add.fromGlobal": "Take from global",
+  "add.fromGlobalHint": "Pick an existing entry from the global store.",
+  "add.createHint": "Create one from scratch.",
+  "add.import": "Import",
+  "add.importHint": "Paste an exported entry as JSON.",
+  "add.createUser": "Create own user",
+  "add.createPlugin": "Create own plugin",
+  "add.createComponent": "Create own component",
+  "add.createTemplate": "Create own template",
+  "import.componentTitle": "Import component",
+  "import.componentHint": "Paste the JSON from MatCMS under Components → open component → “Export as JSON”. A component with the same type is overwritten.",
+  "import.userTitle": "Import user",
+  "import.userHint": "JSON with username, e-mail and password hash. The plaintext password is stored nowhere and is therefore not part of the import.",
+  "import.btn": "Import JSON"
 }

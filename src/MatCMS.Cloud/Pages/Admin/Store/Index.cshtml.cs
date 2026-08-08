@@ -76,4 +76,41 @@ public class IndexModel : PageModel
         Components.Select(c => new Shared.PayloadTile(
             Url.Page("Component", new { id = c.Id })!, c.Name, c.Type, false,
             $"{c.Name} {c.Type} {c.Description}")).ToList(), "store.noComponents");
+
+    /// <summary>Imports a component into the store. <c>Type</c> is the identity, so re-importing
+    /// updates the entry every profile that selected it already points at.</summary>
+    public async Task<IActionResult> OnPostImportComponentAsync(string? componentJson)
+    {
+        using var doc = Services.JsonImport.TryParse(componentJson);
+        if (doc is null)
+        {
+            TempData["FlashError"] = "Bitte gültiges Komponenten-JSON einfügen.";
+            return RedirectToPage(new { tab = "components" });
+        }
+
+        var root = doc.RootElement;
+        var type = Services.JsonImport.Text(root, "Type").Trim().ToLowerInvariant();
+        var name = Services.JsonImport.Text(root, "Name").Trim();
+        if (type.Length == 0 || name.Length == 0)
+        {
+            TempData["FlashError"] = "Im JSON fehlen Typ oder Name.";
+            return RedirectToPage(new { tab = "components" });
+        }
+
+        var row = await _db.StoreComponents.FirstOrDefaultAsync(c => c.Type == type);
+        if (row is null)
+        {
+            row = new StoreComponent { Type = type };
+            _db.StoreComponents.Add(row);
+        }
+        row.Name = name;
+        row.Description = Services.JsonImport.Text(root, "Description");
+        row.Icon = Services.JsonImport.Text(root, "Icon");
+        row.FieldsJson = Services.JsonImport.Raw(root, "FieldsJson", "[]");
+        row.TemplateHtml = Services.JsonImport.Text(root, "TemplateHtml");
+
+        await _db.SaveChangesAsync();
+        TempData["Flash"] = $"Komponente \"{row.Name}\" in den Store importiert.";
+        return RedirectToPage(new { tab = "components" });
+    }
 }

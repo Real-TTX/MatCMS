@@ -463,5 +463,21 @@
   "users.displayName": "Anzeigename",
   "users.password": "Passwort",
   "users.passwordKeep": "unverändert lassen",
-  "users.deleteConfirm": "Benutzer wirklich löschen?"
+  "users.deleteConfirm": "Benutzer wirklich löschen?",
+
+  "add.button": "Hinzufügen",
+  "add.fromGlobal": "Aus Global übernehmen",
+  "add.fromGlobalHint": "Einen vorhandenen Eintrag aus dem globalen Store auswählen.",
+  "add.createHint": "Von Grund auf neu anlegen.",
+  "add.import": "Importieren",
+  "add.importHint": "Einen exportierten Eintrag als JSON einfügen.",
+  "add.createUser": "Eigenen Benutzer anlegen",
+  "add.createPlugin": "Eigenes Plugin anlegen",
+  "add.createComponent": "Eigene Komponente anlegen",
+  "add.createTemplate": "Eigenes Template anlegen",
+  "import.componentTitle": "Komponente importieren",
+  "import.componentHint": "Das JSON aus MatCMS unter Komponenten → Komponente öffnen → „Als JSON exportieren“ hier einfügen. Eine Komponente mit gleichem Typ wird überschrieben.",
+  "import.userTitle": "Benutzer importieren",
+  "import.userHint": "JSON mit Benutzername, E-Mail und Passwort-Hash. Das Klartext-Passwort wird nirgends gespeichert und ist deshalb auch nicht Teil des Imports.",
+  "import.btn": "JSON importieren"
 }

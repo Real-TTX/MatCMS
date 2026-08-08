@@ -1,0 +1,44 @@
+@model MatCMS.Cloud.Pages.Shared.AddMenu
+@inject MatCMS.Cloud.Services.Localizer T
+@*
+    One "Hinzufügen" button under a list, and a dialog behind it offering the ways there are. Uses the
+    admin's own .modal-overlay/.modal — never invent a parallel one.
+
+    The import option only REVEALS the page's own import form rather than carrying one: the formats
+    differ per payload (template JSON, component JSON, a plugin ZIP), and a partial that had to know
+    all of them would have to be edited again for every payload added later.
+*@
+<div class="list-actions">
+    <button type="button" class="btn" data-add-menu="@Model.Id">@T["add.button"]</button>
+</div>
+
+<div class="modal-overlay" data-add-menu-dialog="@Model.Id">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="add-@(Model.Id)-title">
+        <div class="modal-head">
+            <h2 id="add-@(Model.Id)-title">@T["add.button"]</h2>
+            <button type="button" class="modal-close" data-add-menu-close aria-label="@T["action.close"]">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="add-options">
+                @if (Model.StorePickerKind is { Length: > 0 } kind)
+                {
+                    <button type="button" class="add-option" data-add-menu-close data-store-picker="@kind">
+                        <span class="add-option-title">@T["add.fromGlobal"]</span>
+                        <span class="add-option-sub">@T["add.fromGlobalHint"]</span>
+                    </button>
+                }
+                <a class="add-option" href="@Model.CreateUrl">
+                    <span class="add-option-title">@T[Model.CreateLabelKey]</span>
+                    <span class="add-option-sub">@T["add.createHint"]</span>
+                </a>
+                @if (Model.ImportTargetId is { Length: > 0 } target)
+                {
+                    <button type="button" class="add-option" data-add-menu-close data-add-import="@target">
+                        <span class="add-option-title">@T["add.import"]</span>
+                        <span class="add-option-sub">@T["add.importHint"]</span>
+                    </button>
+                }
+            </div>
+        </div>
+    </div>
+</div>

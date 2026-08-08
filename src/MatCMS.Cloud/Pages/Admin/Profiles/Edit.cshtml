@@ -342,12 +342,20 @@
         </table>
         <partial name="_PayloadTiles" model="Model.UserTiles" />
         <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
-        <div class="list-actions">
-            <a class="btn" asp-page="User" asp-route-profileId="@Model.Item.Id">@T["profiles.addUser"]</a>
-            <button type="button" class="btn btn-ghost" data-store-picker="users">@T["profiles.addFromStore"]</button>
-        </div>
+        <partial name="_AddMenu" model='new AddMenu("users", Url.Page("User", new { profileId = Model.Item.Id })!, "add.createUser", "users", "import-user")' />
     </div>
     <partial name="_StorePicker" model="Model.UserPicker" />
+
+    <div class="card" id="import-user" hidden>
+        <h2>@T["import.userTitle"]</h2>
+        <p class="muted">@T["import.userHint"]</p>
+        <form method="post" asp-page-handler="ImportUser" asp-route-id="@Model.Item.Id">
+            <div class="form-field">
+                <textarea name="userJson" rows="6" spellcheck="false" data-code="json" placeholder='{ "Username": "..." }'></textarea>
+            </div>
+            <div><button type="submit" class="btn btn-ghost">@T["import.btn"]</button></div>
+        </form>
+    </div>
 </div>
 
 @* ============ PLUGINS ============ *@
@@ -418,10 +426,9 @@
         </table>
         <partial name="_PayloadTiles" model="Model.PluginTiles" />
         <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
-        <div class="list-actions">
-            <a class="btn" asp-page="Plugin" asp-route-profileId="@Model.Item.Id">@T["profiles.addPlugin"]</a>
-            <button type="button" class="btn btn-ghost" data-store-picker="plugins">@T["profiles.addFromStore"]</button>
-        </div>
+        @* No import option: for a plugin the create page IS the bundle upload, so a third entry would
+           only be a second name for the same destination. *@
+        <partial name="_AddMenu" model='new AddMenu("plugins", Url.Page("Plugin", new { profileId = Model.Item.Id })!, "add.createPlugin", "plugins")' />
     </div>
     <partial name="_StorePicker" model="Model.PluginPicker" />
 </div>
@@ -492,12 +499,20 @@
         </table>
         <partial name="_PayloadTiles" model="Model.ComponentTiles" />
         <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
-        <div class="list-actions">
-            <a class="btn" asp-page="Component" asp-route-profileId="@Model.Item.Id">@T["profiles.addComponent"]</a>
-            <button type="button" class="btn btn-ghost" data-store-picker="components">@T["profiles.addFromStore"]</button>
-        </div>
+        <partial name="_AddMenu" model='new AddMenu("components", Url.Page("Component", new { profileId = Model.Item.Id })!, "add.createComponent", "components", "import-component")' />
     </div>
     <partial name="_StorePicker" model="Model.ComponentPicker" />
+
+    <div class="card" id="import-component" hidden>
+        <h2>@T["import.componentTitle"]</h2>
+        <p class="muted">@T["import.componentHint"]</p>
+        <form method="post" asp-page-handler="ImportComponent" asp-route-id="@Model.Item.Id">
+            <div class="form-field">
+                <textarea name="componentJson" rows="6" spellcheck="false" data-code="json" placeholder='{ "Type": "..." }'></textarea>
+            </div>
+            <div><button type="submit" class="btn btn-ghost">@T["import.btn"]</button></div>
+        </form>
+    </div>
 </div>
 
 @* ============ TEMPLATES ============ *@
@@ -572,14 +587,11 @@
         </table>
         <partial name="_PayloadTiles" model="Model.TemplateTiles" />
         <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
-        <div class="list-actions">
-            <a class="btn" asp-page="Template" asp-route-profileId="@Model.Item.Id">@T["profiles.templateAdd"]</a>
-            <button type="button" class="btn btn-ghost" data-store-picker="templates">@T["profiles.addFromStore"]</button>
-        </div>
+        <partial name="_AddMenu" model='new AddMenu("templates", Url.Page("Template", new { profileId = Model.Item.Id })!, "add.createTemplate", "templates", "import-template")' />
     </div>
     <partial name="_StorePicker" model="Model.TemplatePicker" />
 
-    <div class="card">
+    <div class="card" id="import-template" hidden>
         <h2>@T["profiles.templateImport"]</h2>
         <p class="muted">@T["profiles.templateImportHint"]</p>
         <form method="post" asp-page-handler="ImportTemplate" asp-route-id="@Model.Item.Id">
@@ -594,6 +606,7 @@
 @section Scripts {
     <partial name="_CodeEditorAssets" />
     <partial name="_TabsScript" />
+    <partial name="_AddMenuScript" />
     <script>
         // A settings group shows its fields only while its checkbox is ticked. Server-rendered from
         // the stored flag, so it is already right before this runs.

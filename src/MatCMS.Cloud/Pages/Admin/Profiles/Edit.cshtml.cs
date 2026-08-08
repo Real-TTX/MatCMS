@@ -504,22 +504,8 @@ public class EditModel : PageModel
         {
             using var doc = JsonDocument.Parse(templateJson);
             var root = doc.RootElement;
-            string S(string prop, string fallback = "")
-            {
-                foreach (var candidate in new[] { prop, char.ToLowerInvariant(prop[0]) + prop[1..] })
-                    if (root.TryGetProperty(candidate, out var v) && v.ValueKind == JsonValueKind.String)
-                        return v.GetString() ?? fallback;
-                return fallback;
-            }
-            int I(string prop, int fallback)
-            {
-                foreach (var candidate in new[] { prop, char.ToLowerInvariant(prop[0]) + prop[1..] })
-                    if (root.TryGetProperty(candidate, out var v) && v.ValueKind == JsonValueKind.Number)
-                        return v.GetInt32();
-                return fallback;
-            }
 
-            var name = S("Name").Trim();
+            var name = JsonImport.Text(root, "Name").Trim();
             if (name.Length == 0)
             {
                 TempData["FlashError"] = "Im JSON fehlt der Name.";
@@ -529,28 +515,28 @@ public class EditModel : PageModel
             parsed = new ProfileTemplate
             {
                 Name = name,
-                AccentColor = S("AccentColor", "#de7e11"),
-                SecondaryColor = S("SecondaryColor"),
-                HeadingFont = S("HeadingFont", "Geologica"),
-                BodyFont = S("BodyFont", "Inter"),
-                ButtonStyle = S("ButtonStyle", "solid"),
-                HeadingColor = S("HeadingColor", "#010101"),
-                TextColor = S("TextColor", "#1a1a1a"),
-                BackgroundColor = S("BackgroundColor", "#ffffff"),
-                AltBackground = S("AltBackground", "#f6f7f9"),
-                ContainerWidth = S("ContainerWidth", "1180"),
-                ButtonRadius = S("ButtonRadius", "0"),
-                HeaderBackground = S("HeaderBackground"),
-                HeaderTextColor = S("HeaderTextColor"),
-                HeaderPadding = S("HeaderPadding", "16"),
-                CustomCss = S("CustomCss"),
-                CustomJs = S("CustomJs"),
-                LayoutHtml = S("LayoutHtml"),
-                MenuMapJson = S("MenuMapJson", "{}"),
-                ParametersJson = S("ParametersJson", "[]"),
-                ParamValuesJson = S("ParamValuesJson", "{}"),
-                SchemaVersion = I("SchemaVersion", 1),
-                PartsJson = S("PartsJson", "{}")
+                AccentColor = JsonImport.Text(root, "AccentColor", "#de7e11"),
+                SecondaryColor = JsonImport.Text(root, "SecondaryColor"),
+                HeadingFont = JsonImport.Text(root, "HeadingFont", "Geologica"),
+                BodyFont = JsonImport.Text(root, "BodyFont", "Inter"),
+                ButtonStyle = JsonImport.Text(root, "ButtonStyle", "solid"),
+                HeadingColor = JsonImport.Text(root, "HeadingColor", "#010101"),
+                TextColor = JsonImport.Text(root, "TextColor", "#1a1a1a"),
+                BackgroundColor = JsonImport.Text(root, "BackgroundColor", "#ffffff"),
+                AltBackground = JsonImport.Text(root, "AltBackground", "#f6f7f9"),
+                ContainerWidth = JsonImport.Text(root, "ContainerWidth", "1180"),
+                ButtonRadius = JsonImport.Text(root, "ButtonRadius", "0"),
+                HeaderBackground = JsonImport.Text(root, "HeaderBackground"),
+                HeaderTextColor = JsonImport.Text(root, "HeaderTextColor"),
+                HeaderPadding = JsonImport.Text(root, "HeaderPadding", "16"),
+                CustomCss = JsonImport.Text(root, "CustomCss"),
+                CustomJs = JsonImport.Text(root, "CustomJs"),
+                LayoutHtml = JsonImport.Text(root, "LayoutHtml"),
+                MenuMapJson = JsonImport.Raw(root, "MenuMapJson", "{}"),
+                ParametersJson = JsonImport.Raw(root, "ParametersJson", "[]"),
+                ParamValuesJson = JsonImport.Raw(root, "ParamValuesJson", "{}"),
+                SchemaVersion = JsonImport.Int(root, "SchemaVersion", 1),
+                PartsJson = JsonImport.Raw(root, "PartsJson", "{}")
             };
         }
         catch (Exception ex)
@@ -576,5 +562,87 @@ public class EditModel : PageModel
         await _profiles.TouchAsync(id);
         TempData["Flash"] = $"Template \"{parsed.Name}\" importiert.";
         return RedirectToPage(new { id, tab = "templates" });
+    }
+
+    /// <summary>
+    /// Imports a component from the JSON a component editor exports. Same shape on both sides, so a
+    /// component built on an instance can be pasted straight into a profile.
+    /// <para>The TYPE is the identity: importing one that already exists updates it in place rather
+    /// than creating a second row the sync would then fight over.</para>
+    /// </summary>
+    public async Task<IActionResult> OnPostImportComponentAsync(int id, string? componentJson)
+    {
+        using var doc = Services.JsonImport.TryParse(componentJson);
+        if (doc is null)
+        {
+            TempData["FlashError"] = "Bitte gültiges Komponenten-JSON einfügen.";
+            return RedirectToPage(new { id, tab = "components" });
+        }
+
+        var root = doc.RootElement;
+        var type = Services.JsonImport.Text(root, "Type").Trim().ToLowerInvariant();
+        var name = Services.JsonImport.Text(root, "Name").Trim();
+        if (type.Length == 0 || name.Length == 0)
+        {
+            TempData["FlashError"] = "Im JSON fehlen Typ oder Name.";
+            return RedirectToPage(new { id, tab = "components" });
+        }
+
+        var row = await _db.ProfileComponents.FirstOrDefaultAsync(c => c.ProfileId == id && c.Type == type);
+        if (row is null)
+        {
+            row = new ProfileComponent { ProfileId = id, Type = type };
+            _db.ProfileComponents.Add(row);
+        }
+        row.Name = name;
+        row.Description = Services.JsonImport.Text(root, "Description");
+        row.Icon = Services.JsonImport.Text(root, "Icon");
+        row.FieldsJson = Services.JsonImport.Raw(root, "FieldsJson", "[]");
+        row.TemplateHtml = Services.JsonImport.Text(root, "TemplateHtml");
+
+        await _db.SaveChangesAsync();
+        await _profiles.TouchAsync(id);
+        TempData["Flash"] = $"Komponente \"{row.Name}\" importiert.";
+        return RedirectToPage(new { id, tab = "components" });
+    }
+
+    /// <summary>
+    /// Imports a user from JSON. The password arrives as a HASH — the same value the sync carries, so
+    /// an account can be moved between profiles without anybody handling the plaintext. A JSON
+    /// without one is refused rather than creating an account nobody can log into.
+    /// </summary>
+    public async Task<IActionResult> OnPostImportUserAsync(int id, string? userJson)
+    {
+        using var doc = Services.JsonImport.TryParse(userJson);
+        if (doc is null)
+        {
+            TempData["FlashError"] = "Bitte gültiges Benutzer-JSON einfügen.";
+            return RedirectToPage(new { id, tab = "users" });
+        }
+
+        var root = doc.RootElement;
+        var username = Services.JsonImport.Text(root, "Username").Trim();
+        var hash = Services.JsonImport.Text(root, "PasswordHash").Trim();
+        if (username.Length == 0 || hash.Length == 0)
+        {
+            TempData["FlashError"] = "Im JSON fehlen Benutzername oder Passwort-Hash.";
+            return RedirectToPage(new { id, tab = "users" });
+        }
+
+        var row = await _db.ProfileUsers.FirstOrDefaultAsync(u => u.ProfileId == id && u.Username == username);
+        if (row is null)
+        {
+            row = new ProfileUser { ProfileId = id, Username = username };
+            _db.ProfileUsers.Add(row);
+        }
+        row.Email = Services.JsonImport.Text(root, "Email");
+        row.DisplayName = Services.JsonImport.Text(root, "DisplayName");
+        row.PasswordHash = hash;
+        row.Role = Services.JsonImport.Text(root, "Role", "Admin");
+
+        await _db.SaveChangesAsync();
+        await _profiles.TouchAsync(id);
+        TempData["Flash"] = $"Benutzer \"{row.Username}\" importiert.";
+        return RedirectToPage(new { id, tab = "users" });
     }
 }

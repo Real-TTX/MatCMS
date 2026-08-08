@@ -160,22 +160,8 @@ public class TemplateModel : PageModel
         {
             using var doc = JsonDocument.Parse(templateJson);
             var root = doc.RootElement;
-            string S(string prop, string fallback = "")
-            {
-                foreach (var candidate in new[] { prop, char.ToLowerInvariant(prop[0]) + prop[1..] })
-                    if (root.TryGetProperty(candidate, out var v) && v.ValueKind == JsonValueKind.String)
-                        return v.GetString() ?? fallback;
-                return fallback;
-            }
-            int I(string prop, int fallback)
-            {
-                foreach (var candidate in new[] { prop, char.ToLowerInvariant(prop[0]) + prop[1..] })
-                    if (root.TryGetProperty(candidate, out var v) && v.ValueKind == JsonValueKind.Number)
-                        return v.GetInt32();
-                return fallback;
-            }
 
-            var name = S("Name").Trim();
+            var name = JsonImport.Text(root, "Name").Trim();
             if (name.Length == 0)
             {
                 TempData["FlashError"] = "Im JSON fehlt der Name.";
@@ -185,28 +171,28 @@ public class TemplateModel : PageModel
             parsed = new StoreTemplate
             {
                 Name = name,
-                AccentColor = S("AccentColor", "#de7e11"),
-                SecondaryColor = S("SecondaryColor"),
-                HeadingFont = S("HeadingFont", "Geologica"),
-                BodyFont = S("BodyFont", "Inter"),
-                ButtonStyle = S("ButtonStyle", "solid"),
-                HeadingColor = S("HeadingColor", "#010101"),
-                TextColor = S("TextColor", "#1a1a1a"),
-                BackgroundColor = S("BackgroundColor", "#ffffff"),
-                AltBackground = S("AltBackground", "#f6f7f9"),
-                ContainerWidth = S("ContainerWidth", "1180"),
-                ButtonRadius = S("ButtonRadius", "0"),
-                HeaderBackground = S("HeaderBackground"),
-                HeaderTextColor = S("HeaderTextColor"),
-                HeaderPadding = S("HeaderPadding", "16"),
-                CustomCss = S("CustomCss"),
-                CustomJs = S("CustomJs"),
-                LayoutHtml = S("LayoutHtml"),
-                MenuMapJson = S("MenuMapJson", "{}"),
-                ParametersJson = S("ParametersJson", "[]"),
-                ParamValuesJson = S("ParamValuesJson", "{}"),
-                SchemaVersion = I("SchemaVersion", 1),
-                PartsJson = S("PartsJson", "{}")
+                AccentColor = JsonImport.Text(root, "AccentColor", "#de7e11"),
+                SecondaryColor = JsonImport.Text(root, "SecondaryColor"),
+                HeadingFont = JsonImport.Text(root, "HeadingFont", "Geologica"),
+                BodyFont = JsonImport.Text(root, "BodyFont", "Inter"),
+                ButtonStyle = JsonImport.Text(root, "ButtonStyle", "solid"),
+                HeadingColor = JsonImport.Text(root, "HeadingColor", "#010101"),
+                TextColor = JsonImport.Text(root, "TextColor", "#1a1a1a"),
+                BackgroundColor = JsonImport.Text(root, "BackgroundColor", "#ffffff"),
+                AltBackground = JsonImport.Text(root, "AltBackground", "#f6f7f9"),
+                ContainerWidth = JsonImport.Text(root, "ContainerWidth", "1180"),
+                ButtonRadius = JsonImport.Text(root, "ButtonRadius", "0"),
+                HeaderBackground = JsonImport.Text(root, "HeaderBackground"),
+                HeaderTextColor = JsonImport.Text(root, "HeaderTextColor"),
+                HeaderPadding = JsonImport.Text(root, "HeaderPadding", "16"),
+                CustomCss = JsonImport.Text(root, "CustomCss"),
+                CustomJs = JsonImport.Text(root, "CustomJs"),
+                LayoutHtml = JsonImport.Text(root, "LayoutHtml"),
+                MenuMapJson = JsonImport.Raw(root, "MenuMapJson", "{}"),
+                ParametersJson = JsonImport.Raw(root, "ParametersJson", "[]"),
+                ParamValuesJson = JsonImport.Raw(root, "ParamValuesJson", "{}"),
+                SchemaVersion = JsonImport.Int(root, "SchemaVersion", 1),
+                PartsJson = JsonImport.Raw(root, "PartsJson", "{}")
             };
         }
         catch (Exception ex)

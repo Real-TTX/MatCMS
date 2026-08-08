@@ -57,9 +57,9 @@
         </table>
         <partial name="_PayloadTiles" model="Model.PluginTiles" />
         <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
-        <div class="list-actions">
-            <a class="btn" asp-page="Plugin">@T["profiles.addPlugin"]</a>
-        </div>
+        @* Same dialog as a profile's, minus "Aus Global" — this IS the global side. No import for a
+           plugin either: its create page is the bundle upload. *@
+        <partial name="_AddMenu" model='new AddMenu("store-plugins", Url.Page("Plugin")!, "add.createPlugin")' />
     </div>
 </div>
 
@@ -106,9 +106,20 @@
         </table>
         <partial name="_PayloadTiles" model="Model.TemplateTiles" />
         <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
-        <div class="list-actions">
-            <a class="btn" asp-page="Template">@T["profiles.templateAdd"]</a>
-        </div>
+        <partial name="_AddMenu" model='new AddMenu("store-templates", Url.Page("Template")!, "add.createTemplate", null, "import-store-template")' />
+    </div>
+
+    @* Posts to the Template page's own Import handler rather than a copy of it here — one parser for
+       the store's templates, and it lands the operator on the imported template afterwards. *@
+    <div class="card" id="import-store-template" hidden>
+        <h2>@T["profiles.templateImport"]</h2>
+        <p class="muted">@T["profiles.templateImportHint"]</p>
+        <form method="post" asp-page="Template" asp-page-handler="Import">
+            <div class="form-field">
+                <textarea name="templateJson" rows="6" spellcheck="false" data-code="json" placeholder='{ "Name": "..." }'></textarea>
+            </div>
+            <div><button type="submit" class="btn btn-ghost">@T["import.btn"]</button></div>
+        </form>
     </div>
 </div>
 
@@ -154,12 +165,23 @@
         </table>
         <partial name="_PayloadTiles" model="Model.ComponentTiles" />
         <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
-        <div class="list-actions">
-            <a class="btn" asp-page="Component">@T["profiles.addComponent"]</a>
-        </div>
+        <partial name="_AddMenu" model='new AddMenu("store-components", Url.Page("Component")!, "add.createComponent", null, "import-store-component")' />
+    </div>
+
+    <div class="card" id="import-store-component" hidden>
+        <h2>@T["import.componentTitle"]</h2>
+        <p class="muted">@T["import.componentHint"]</p>
+        <form method="post" asp-page-handler="ImportComponent">
+            <div class="form-field">
+                <textarea name="componentJson" rows="6" spellcheck="false" data-code="json" placeholder='{ "Type": "..." }'></textarea>
+            </div>
+            <div><button type="submit" class="btn btn-ghost">@T["import.btn"]</button></div>
+        </form>
     </div>
 </div>
 
 @section Scripts {
+    <partial name="_CodeEditorAssets" />
     <partial name="_TabsScript" />
+    <partial name="_AddMenuScript" />
 }

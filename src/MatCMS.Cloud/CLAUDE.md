@@ -58,7 +58,9 @@ switched over after `EnsureCreated()` forced `docker compose down -v` four times
 **dropped every instance link** and made connected instances re-enroll. A model change here means
 `dotnet ef migrations add <Name>` and nothing else. Check what EF generated before committing: for the
 sync-mode change it guessed a column rename that would have cross-wired AND inverted four columns.
-MatCMS went the same way (see its `MigrateSchemaAsync` for the baseline of pre-migrations databases).
+MatCMS went the same way (see its `EnsureSchemaCurrentAsync` for the baseline of pre-migrations
+databases, and `DbSeeder.PatchLegacySchemaAsync` for the frozen ALTER-TABLE patcher that makes that
+baseline safe).
 
 ## Sibling repositories (same parent folder `C:\Users\Matthias\Desktop\Development`)
 

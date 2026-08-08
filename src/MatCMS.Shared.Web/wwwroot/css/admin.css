@@ -131,6 +131,8 @@ body.nav-open .admin-menu-toggle span:nth-child(3) { transform: translateY(-6px)
 .admin-content { padding: 32px; max-width: 1500px; width: 100%; }
 /* Keep single text inputs readable on wide screens (lists/tables still use full width). */
 .card .form-field > input:not([type=color]),
+.card .form-field > .color-field,
+.card .form-field > .optcolor,
 .card .form-field > select { max-width: 760px; }
 
 /* ============ Cards / tables / buttons ============ */
@@ -284,12 +286,61 @@ textarea.cp-sample-inp { resize: vertical; min-height: 0; }
 .link-field .link-field-btn .ti { font-size: 18px; }
 
 /* Optional color widget: swatch + hex text (may be empty) + clear button. */
-.optcolor { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; }
-.optcolor .optcolor-pick { flex: 0 0 auto; width: 40px; height: 34px; padding: 2px; border: 1px solid var(--line, #d9dce1); border-radius: 6px; cursor: pointer; background: #fff; }
-.optcolor .optcolor-hex { flex: 0 0 auto; width: 152px; font-family: var(--font-mono, ui-monospace, monospace); }
-.optcolor .optcolor-clear { flex: 0 0 auto; width: 30px; height: 30px; border: 1px solid var(--line, #d9dce1); background: #fff; border-radius: 6px; cursor: pointer; color: #6b7280; font-size: 18px; line-height: 1; }
-.optcolor .optcolor-clear:hover { background: #f3f4f6; color: #111; }
-.optcolor.is-empty .optcolor-pick { opacity: .4; }
+/* Same box as .color-field, plus a clear button — an optional colour may be empty ("inherit"), */
+/* which a colour input cannot express on its own. */
+.optcolor {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 14px 16px;
+    border: 1px solid #cfcfcf;
+    background: #fff;
+    transition: border-color .18s ease;
+}
+.optcolor:focus-within { border-color: var(--black, #111); }
+.optcolor .optcolor-pick {
+    flex: 0 0 auto;
+    width: 22px !important;
+    height: 22px !important;
+    min-width: 22px !important;
+    padding: 0 !important;
+    border: 1px solid rgba(0, 0, 0, .18) !important;
+    border-radius: 3px;
+    background: none !important;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+}
+.optcolor .optcolor-pick::-webkit-color-swatch-wrapper { padding: 0; }
+.optcolor .optcolor-pick::-webkit-color-swatch { border: 0; border-radius: 2px; }
+.optcolor .optcolor-pick::-moz-color-swatch { border: 0; border-radius: 2px; }
+.optcolor .optcolor-hex {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: auto !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: none !important;
+    font-size: 16px;
+    font-family: var(--font-mono, ui-monospace, monospace);
+}
+.optcolor .optcolor-hex:focus { outline: none; border: 0; }
+.optcolor .optcolor-clear {
+    flex: 0 0 auto;
+    width: 22px;
+    height: 22px;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    color: #9aa0a6;
+    font-size: 18px;
+    line-height: 1;
+    padding: 0;
+}
+.optcolor .optcolor-clear:hover { color: #111; }
+/* Dimmed swatch = no value set, so the colour shown is only the fallback. */
+.optcolor.is-empty .optcolor-pick { opacity: .35; }
 
 /* Plugin asset (library) file manager. */
 .asset-upload { display: flex; gap: 8px; align-items: center; margin: 10px 0 14px; flex-wrap: wrap; }
@@ -320,15 +371,57 @@ textarea.code-area { width: 100%; box-sizing: border-box; font-family: ui-monosp
 
 /* Color picker fields (template editor): visible swatch + editable hex */
 .color-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 18px; }
-/* inline-flex, damit das Widget so breit ist wie sein Inhalt: in einem vollbreiten Formularfeld
-   sonst über die ganze Zeile gezogen — und dann bei wenig Platz zweizeilig. */
-.color-field { display: inline-flex; align-items: center; gap: 10px; max-width: 100%; }
-.color-field input[type=color] { width: 54px; min-width: 54px; height: 44px; padding: 4px; border: 1px solid #cfcfcf; border-radius: 8px; background: #fff; cursor: pointer; }
+/* The colour widget IS an input box: same border, padding and height as every other field, with a
+   small swatch sitting INSIDE it at the front and the hex code next to it. Two separate controls
+   side by side never lined up with the rest of a form — different heights, two borders, its own
+   width. Here the box is the only thing with a border; the two inputs inside are stripped bare. */
+.color-field {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 14px 16px;
+    border: 1px solid #cfcfcf;
+    background: #fff;
+    transition: border-color .18s ease;
+}
+/* Focus lives on the box, so clicking into the hex field highlights the whole control. */
+.color-field:focus-within { border-color: var(--black, #111); }
+
+/* The swatch: a plain square, no chrome of its own. Clicking it opens the native picker. */
+/* !important because site.css styles fields with .form-field input:not(…):not(…):not(…), which is
+   more specific than anything writable here without contortions. Only the two inputs INSIDE the box
+   need it; the box itself does not. */
+.color-field input[type=color] {
+    flex: 0 0 auto;
+    width: 22px !important;
+    height: 22px !important;
+    min-width: 22px !important;
+    padding: 0 !important;
+    border: 1px solid rgba(0, 0, 0, .18) !important;
+    border-radius: 3px;
+    background: none !important;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+}
 .color-field input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
-.color-field input[type=color]::-webkit-color-swatch { border: 1px solid rgba(0,0,0,.12); border-radius: 5px; }
-.color-field input[type=color]::-moz-color-swatch { border: 1px solid rgba(0,0,0,.12); border-radius: 5px; }
-/* Wide enough for "#2F7D95" and no wider — a box stretched across the row reads as a stray element. */
-.color-field .hex { flex: 0 0 auto; width: 132px; text-transform: uppercase; font-family: var(--font-mono, ui-monospace, monospace); }
+.color-field input[type=color]::-webkit-color-swatch { border: 0; border-radius: 2px; }
+.color-field input[type=color]::-moz-color-swatch { border: 0; border-radius: 2px; }
+
+/* The hex field fills the rest and carries no border of its own — the box already has one. */
+.color-field .hex {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: auto !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: none !important;
+    font-size: 16px;
+    text-transform: uppercase;
+    font-family: var(--font-mono, ui-monospace, monospace);
+}
+.color-field .hex:focus { outline: none; border: 0; }
 
 /* Form section sub-heading + code textareas (template editor) */
 .form-section { margin: 22px 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border-bottom: 1px solid var(--line); padding-bottom: 6px; }

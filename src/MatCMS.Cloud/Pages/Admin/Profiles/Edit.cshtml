@@ -106,11 +106,6 @@
             <h2>@T["profiles.payloads"]</h2>
             <p class="muted">@T["profiles.payloadsHint"]</p>
             <label class="checkbox-row">
-                <input type="checkbox" name="useGlobalSmtp" value="true" checked="@(Model.Item.UseGlobalSmtp ? "checked" : null)" />
-                @T["profiles.useGlobalSmtp"]
-            </label>
-            <div class="help">@T["profiles.useGlobalSmtpHint"]</div>
-            <label class="checkbox-row">
                 <input type="checkbox" name="syncSettings" value="true" checked="@(Model.Item.SyncSettings ? "checked" : null)" />
                 @T["profiles.payloadSettings"]
             </label>
@@ -175,6 +170,23 @@
         <div class="card">
             <h2>@T["settings.smtp"]</h2>
             <p class="muted">@T["profiles.smtpHint"]</p>
+
+            @* A settings group has to be switched ON before it may overwrite anything on a live site.
+               Off = the fields stay hidden AND the values are neither saved nor rolled out, so a site's
+               own mail configuration is never replaced just because somebody once typed in here. *@
+            <label class="checkbox-row">
+                <input type="checkbox" name="syncSmtp" value="true" data-group-toggle="smtp"
+                       checked="@(Model.Item.SyncSmtp ? "checked" : null)" />
+                @T["profiles.smtpEnable"]
+            </label>
+            <div class="help">@T["profiles.smtpEnableHint"]</div>
+
+            <div data-group="smtp" hidden="@(Model.Item.SyncSmtp ? null : "hidden")">
+            <label class="checkbox-row">
+                <input type="checkbox" name="useGlobalSmtp" value="true" checked="@(Model.Item.UseGlobalSmtp ? "checked" : null)" />
+                @T["profiles.useGlobalSmtp"]
+            </label>
+            <div class="help">@T["profiles.useGlobalSmtpHint"]</div>
             <div class="form-grid">
                 <div class="form-row">
                     <div class="form-field">
@@ -194,6 +206,14 @@
                     <div class="form-field">
                         <label for="password">@T["settings.smtpPassword"]</label>
                         <input id="password" name="password" type="password" placeholder="@T["settings.smtpPasswordKeep"]" autocomplete="new-password" />
+                        @* Without this a stored password could only ever be replaced, never removed. *@
+                        @if (!string.IsNullOrEmpty(Model.Setting("smtp.password")))
+                        {
+                            <label class="checkbox-row">
+                                <input type="checkbox" name="clearPassword" value="true" />
+                                @T["settings.smtpPasswordClear"]
+                            </label>
+                        }
                     </div>
                 </div>
                 <div class="form-row">
@@ -211,6 +231,7 @@
                 <input type="checkbox" name="ssl" value="true" checked="@(Model.SettingFlag("smtp.ssl") ? "checked" : null)" />
                 @T["settings.smtpSsl"]
             </label>
+            </div>
             <div><button type="submit" class="btn">@T["settings.save"]</button></div>
         </div>
     </form>
@@ -582,6 +603,16 @@
     <partial name="_CodeEditorAssets" />
     <partial name="_TabsScript" />
     <script>
+        // A settings group shows its fields only while its checkbox is ticked. Server-rendered from
+        // the stored flag, so it is already right before this runs.
+        (function () {
+            document.querySelectorAll("[data-group-toggle]").forEach(function (box) {
+                var body = document.querySelector("[data-group=\"" + box.dataset.groupToggle + "\"]");
+                if (!body) return;
+                box.addEventListener("change", function () { body.hidden = !box.checked; });
+            });
+        })();
+
         // "Aus Global hinzufügen": one dialog per payload, opened by the button next to Erstellen.
         (function () {
             function close(dialog) { dialog.classList.remove('open'); }

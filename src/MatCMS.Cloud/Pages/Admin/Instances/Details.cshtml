@@ -186,7 +186,15 @@
                     }
                 </select>
             </div>
-            <div><button type="submit" class="btn">@T["instances.assignProfile"]</button></div>
+            @* Straight into the profile that decides what this instance receives — otherwise it is
+               "remember the name, go to Profile, find it in the list". *@
+            <div class="actions">
+                <button type="submit" class="btn">@T["instances.assignProfile"]</button>
+                @if (Model.Item.Profile is not null)
+                {
+                    <a class="btn btn-ghost" asp-page="/Admin/Profiles/Edit" asp-route-id="@Model.Item.Profile.Id">@T["instances.manageProfile"]</a>
+                }
+            </div>
         </form>
 
         <div class="kv" style="margin-top:18px;">

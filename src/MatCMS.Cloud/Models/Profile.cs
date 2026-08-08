@@ -69,6 +69,14 @@ public class Profile
     /// profile's own <c>ProfileSetting</c> rows still override individual keys on top.
     /// </summary>
     public bool UseGlobalSmtp { get; set; }
+
+    /// <summary>
+    /// Whether this profile rolls out SMTP at all. Off = the instance's own mail configuration is
+    /// left alone, whatever is stored here — a settings group has to be ticked ON before it may
+    /// overwrite anything on a live site, rather than silently shipping because a field was filled in
+    /// once. The stored values survive an untick; only the rollout stops.
+    /// </summary>
+    public bool SyncSmtp { get; set; }
     public bool SyncUsers { get; set; }
     public bool SyncPlugins { get; set; }
     public bool SyncComponents { get; set; }

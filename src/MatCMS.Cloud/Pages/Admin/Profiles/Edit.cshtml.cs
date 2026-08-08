@@ -310,7 +310,6 @@ public class EditModel : PageModel
 
     public async Task<IActionResult> OnPostGeneralAsync(
         int id, string name, string? description, bool autoApprove, bool isDefault,
-        bool useGlobalSmtp,
         bool autoUpdateLocal, bool notifyOffline, bool notifyUpdate, string? notifyRecipients,
         bool syncSettings, bool syncUsers, bool syncPlugins, bool syncComponents, bool syncTemplates,
         string? settingsMode, string? usersMode, string? pluginsMode, string? componentsMode, string? templatesMode,
@@ -326,7 +325,6 @@ public class EditModel : PageModel
         profile.NotifyOffline = notifyOffline;
         profile.NotifyUpdate = notifyUpdate;
         profile.NotifyRecipients = string.IsNullOrWhiteSpace(notifyRecipients) ? null : notifyRecipients.Trim();
-        profile.UseGlobalSmtp = useGlobalSmtp;
         profile.SyncSettings = syncSettings;
         profile.SyncUsers = syncUsers;
         profile.SyncPlugins = syncPlugins;
@@ -364,9 +362,27 @@ public class EditModel : PageModel
     // --- Settings payload ---------------------------------------------------
 
     public async Task<IActionResult> OnPostSmtpAsync(
-        int id, string? host, string? port, string? user, string? password,
+        int id, bool syncSmtp, bool useGlobalSmtp, bool clearPassword,
+        string? host, string? port, string? user, string? password,
         string? fromEmail, string? fromName, bool ssl)
     {
+        var profile = await _db.Profiles.FindAsync(id);
+        if (profile is null) return RedirectToPage("Index");
+
+        profile.SyncSmtp = syncSmtp;
+        profile.UseGlobalSmtp = syncSmtp && useGlobalSmtp;
+
+        // With the group switched off the fields are hidden, and hidden inputs still post — empty.
+        // Writing them would wipe values the operator only meant to stop rolling out, so the switch
+        // alone is saved and everything below is left as it stands.
+        if (!syncSmtp)
+        {
+            await _db.SaveChangesAsync();
+            await _profiles.TouchAsync(id);
+            TempData["Flash"] = "SMTP wird von diesem Profil nicht ausgerollt.";
+            return RedirectToPage(new { id, tab = "settings" });
+        }
+
         // An empty password keeps the stored one — the field is rendered blank on purpose, so saving
         // the form must not wipe the secret.
         await UpsertSettingAsync(id, "smtp.host", host?.Trim());
@@ -374,7 +390,9 @@ public class EditModel : PageModel
         await UpsertSettingAsync(id, "smtp.user", user?.Trim());
         // Encrypted before it ever reaches the database. An empty field keeps the stored value, so
         // saving the form does not wipe the secret.
-        if (!string.IsNullOrEmpty(password))
+        if (clearPassword)
+            await UpsertSettingAsync(id, "smtp.password", "", secret: true);
+        else if (!string.IsNullOrEmpty(password))
             await UpsertSettingAsync(id, "smtp.password", _secrets.Protect(password), secret: true);
         await UpsertSettingAsync(id, "smtp.fromEmail", fromEmail?.Trim());
         await UpsertSettingAsync(id, "smtp.fromName", fromName?.Trim());

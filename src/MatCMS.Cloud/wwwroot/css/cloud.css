@@ -99,7 +99,9 @@
     padding: 0 18px;
 }
 .instance-tile-body { padding: 12px 14px; border-top: 1px solid var(--line); }
-.instance-tile-name { font-weight: 600; margin-bottom: 6px; }
+.instance-tile-name { font-weight: 600; margin-bottom: 2px; }
+/* Assigned profile, right under the name: it decides what the instance receives. */
+.instance-tile-sub { font-size: 12px; margin-bottom: 6px; }
 .instance-tile-meta { display: flex; flex-wrap: wrap; gap: 6px; }
 
 /* ============ Editable rows ============ */

@@ -274,6 +274,18 @@ DataProtection), sent as an `X-MatCMS-Instance-Token` header.
 container identity) is in place on both sides; the **sync applier** on the instance still has to be
 written when the sync engine lands here.
 
+### A settings group has to be switched on
+
+`Profile.SyncSmtp` gates the whole SMTP block: off, the fields are hidden and the keys are left out
+of the rolled-out settings — including the global ones — so an instance keeps its own mail
+configuration. **The stored values survive an untick**; only the rollout stops, and the save handler
+skips writing them precisely because hidden inputs still post (empty), which would otherwise wipe
+what the operator only meant to stop sending.
+
+That is the pattern for any settings GROUP added later: a checkbox that reveals its fields, nothing
+rolled out until it is ticked. Free key/value settings need none — each row is already an explicit,
+individually deletable decision.
+
 ### Global vs. profile-local — the rule
 
 **A profile consists of global information and may additionally have its own.** There are two

@@ -61,6 +61,18 @@
                 </div>
                 <div class="instance-tile-body">
                     <div class="instance-tile-name">@i.Name</div>
+                    @* Which profile an instance is on is the first thing you want to know when
+                       scanning the tiles — it decides what it receives. *@
+                    <div class="instance-tile-sub muted">
+                        @if (i.Profile is null)
+                        {
+                            <span>@T["enroll.noProfile"]</span>
+                        }
+                        else
+                        {
+                            <span>@i.Profile.Name</span>
+                        }
+                    </div>
                     <div class="instance-tile-meta">
                         @if (i.Status == InstanceStatus.Pending)
                         {

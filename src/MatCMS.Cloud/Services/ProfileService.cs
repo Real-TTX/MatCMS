@@ -129,6 +129,10 @@ public class ProfileService
         return map;
     }
 
+    /// <summary>True for the keys that make up the SMTP settings group.</summary>
+    public static bool IsSmtpKey(string key) =>
+        key.StartsWith("smtp.", StringComparison.OrdinalIgnoreCase);
+
     /// <summary>Builds the payload an approved instance downloads. Sections the profile does not
     /// sync are left null, which the instance reads as "don't touch this".</summary>
     public async Task<InstanceConfig> BuildConfigAsync(Profile profile, CancellationToken ct = default)
@@ -159,16 +163,21 @@ public class ProfileService
             var settings = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
 
             // Global first: the cloud's own SMTP configuration, if this profile passes it on.
-            if (profile.UseGlobalSmtp)
+            if (profile.SyncSmtp && profile.UseGlobalSmtp)
             {
                 var smtpKeys = SettingKeys.Smtp;
                 foreach (var row in await _db.CloudSettings.AsNoTracking().Where(s => smtpKeys.Contains(s.Key)).ToListAsync(ct))
                     settings[row.Key] = _secrets.Unprotect(row.Value);
             }
 
-            // The profile's own rows on top — that is the override.
+            // The profile's own rows on top — that is the override. SMTP is skipped unless the group
+            // is ticked ON: values stay stored here so unticking loses nothing, but a group nobody
+            // switched on must not overwrite a live site's mail configuration.
             foreach (var local in await _db.ProfileSettings.AsNoTracking().Where(s => s.ProfileId == profile.Id).ToListAsync(ct))
+            {
+                if (!profile.SyncSmtp && IsSmtpKey(local.Key)) continue;
                 settings[local.Key] = local.IsSecret ? _secrets.Unprotect(local.Value) : local.Value;
+            }
 
             config.Settings = settings;
         }

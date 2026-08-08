@@ -19,3 +19,14 @@ namespace MatCMS.Cloud.Pages.Shared;
 public sealed record PayloadTile(
     string Href, string Title, string Sub, bool IsGlobal, string Search,
     string? Accent = null, string? NoteKey = null, string? PreviewUrl = null);
+
+/// <summary>
+/// What <c>_PayloadTiles.cshtml</c> renders: the tiles plus what to say when there are none.
+/// The empty text is needed here as well as in the table row, because the two views are mutually
+/// exclusive — in tile view the table (and its empty row) is hidden, so a list with no records
+/// would otherwise be a blank area with no explanation.
+/// </summary>
+/// <param name="Items">The tiles, in display order.</param>
+/// <param name="EmptyKey">Resource key for the "no records" message — the SAME key the table row
+/// uses, so both views word it identically.</param>
+public sealed record PayloadTileList(List<PayloadTile> Items, string EmptyKey);

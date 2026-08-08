@@ -61,19 +61,19 @@ public class IndexModel : PageModel
 
     // Tile views. Everything in the store IS global, so no origin badge here — the flag exists for
     // the profile lists, where own and taken entries sit in one table.
-    public List<Shared.PayloadTile> PluginTiles =>
+    public Shared.PayloadTileList PluginTiles => new(
         Plugins.Select(p => new Shared.PayloadTile(
             Url.Page("Plugin", new { id = p.Id })!, p.Name, $"{p.Key} · {p.Version}", false,
-            $"{p.Name} {p.Key} {p.Description}")).ToList();
+            $"{p.Name} {p.Key} {p.Description}")).ToList(), "store.noPlugins");
 
-    public List<Shared.PayloadTile> TemplateTiles =>
+    public Shared.PayloadTileList TemplateTiles => new(
         Templates.Select(t => new Shared.PayloadTile(
             Url.Page("Template", new { id = t.Id })!, t.Name, $"{t.HeadingFont} / {t.BodyFont}", false,
             $"{t.Name} {t.Description}", Accent: t.AccentColor,
-            PreviewUrl: Url.Page("/Admin/TemplatePreview", new { kind = "store", id = t.Id }))).ToList();
+            PreviewUrl: Url.Page("/Admin/TemplatePreview", new { kind = "store", id = t.Id }))).ToList(), "store.noTemplates");
 
-    public List<Shared.PayloadTile> ComponentTiles =>
+    public Shared.PayloadTileList ComponentTiles => new(
         Components.Select(c => new Shared.PayloadTile(
             Url.Page("Component", new { id = c.Id })!, c.Name, c.Type, false,
-            $"{c.Name} {c.Type} {c.Description}")).ToList();
+            $"{c.Name} {c.Type} {c.Description}")).ToList(), "store.noComponents");
 }

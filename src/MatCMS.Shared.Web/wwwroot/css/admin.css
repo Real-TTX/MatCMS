@@ -881,6 +881,9 @@ table.data .btn { white-space: nowrap; }
     transition: border-color .12s, box-shadow .12s;
 }
 .store-card:hover { border-color: var(--accent); box-shadow: 0 4px 18px rgba(0, 0, 0, .07); }
+/* display:flex on the class beats the browser default for [hidden], so the dialog search could
+   not hide anything without this. Same trap the tab panels and modals already guard against. */
+.store-card[hidden] { display: none !important; }
 /* Accent strip: for a template the colour is what you recognise it by before reading the name. */
 .store-card-strip { display: block; height: 6px; border-radius: 3px; margin-bottom: 8px; }
 .store-card-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }

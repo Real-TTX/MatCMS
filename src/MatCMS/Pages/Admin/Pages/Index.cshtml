@@ -26,11 +26,7 @@
         <tbody>
             @if (Model.Groups.Count == 0)
             {
-                <partial name="_EmptyRow" model='@T["list.empty"]' />
-            }
-            @if (Model.Groups.Count == 0)
-            {
-                <tr><td colspan="5" class="muted" style="text-align:center;padding:22px;">@T["pages.none"]</td></tr>
+                <partial name="_EmptyRow" model='@T["pages.none"]' />
             }
             @foreach (var g in Model.Groups)
             {

@@ -1,11 +1,15 @@
-@model List<MatCMS.Cloud.Pages.Shared.PayloadTile>
+@model MatCMS.Cloud.Pages.Shared.PayloadTileList
 @inject MatCMS.Cloud.Services.Localizer T
 @*
     Tile view for a payload list. Sits next to the [data-list-table] inside the same [data-list];
     admin-list.js shows exactly one of the two and remembers the choice per data-list-key.
 *@
 <div class="payload-tiles" data-list-tiles>
-    @foreach (var tile in Model)
+    @if (Model.Items.Count == 0)
+    {
+        <div class="list-empty payload-tiles-empty">@T[Model.EmptyKey]</div>
+    }
+    @foreach (var tile in Model.Items)
     {
         <a class="payload-tile" href="@tile.Href" data-search="@tile.Search">
             @* A rendered thumbnail where there is one; the colour strip is the fallback. *@

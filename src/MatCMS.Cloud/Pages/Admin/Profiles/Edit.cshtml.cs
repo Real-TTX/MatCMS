@@ -67,7 +67,7 @@ public class EditModel : PageModel
 
     // Tile views. Built from the SAME two sources as the tables above and in the same order, so
     // switching the view never changes what is listed — only how it looks.
-    public List<Shared.PayloadTile> UserTiles =>
+    public Shared.PayloadTileList UserTiles => new(
     [
         .. ChosenGlobalUsers.Select(u => new Shared.PayloadTile(
             Url.Page("/Admin/Users/Edit", new { id = u.Id })!, u.Username, u.Email ?? "", true,
@@ -76,9 +76,9 @@ public class EditModel : PageModel
         .. Users.Select(u => new Shared.PayloadTile(
             Url.Page("User", new { profileId = Item.Id, id = u.Id })!, u.Username, u.Email ?? "", false,
             $"{u.Username} {u.Email} {u.DisplayName}"))
-    ];
+    ], "profiles.noUsers");
 
-    public List<Shared.PayloadTile> PluginTiles =>
+    public Shared.PayloadTileList PluginTiles => new(
     [
         .. ChosenStorePlugins.Select(p => new Shared.PayloadTile(
             Url.Page("/Admin/Store/Plugin", new { id = p.Id })!, p.Name, $"{p.Key} · {p.Version}", true,
@@ -87,9 +87,9 @@ public class EditModel : PageModel
         .. Plugins.Select(p => new Shared.PayloadTile(
             Url.Page("Plugin", new { profileId = Item.Id, id = p.Id })!, p.Name, $"{p.Key} · {p.Version}", false,
             $"{p.Name} {p.Key} {p.Description}"))
-    ];
+    ], "profiles.noPlugins");
 
-    public List<Shared.PayloadTile> ComponentTiles =>
+    public Shared.PayloadTileList ComponentTiles => new(
     [
         .. ChosenStoreComponents.Select(c => new Shared.PayloadTile(
             Url.Page("/Admin/Store/Component", new { id = c.Id })!, c.Name, c.Type, true,
@@ -98,9 +98,9 @@ public class EditModel : PageModel
         .. Components.Select(c => new Shared.PayloadTile(
             Url.Page("Component", new { profileId = Item.Id, id = c.Id })!, c.Name, c.Type, false,
             $"{c.Name} {c.Type} {c.Description}"))
-    ];
+    ], "profiles.noComponents");
 
-    public List<Shared.PayloadTile> TemplateTiles =>
+    public Shared.PayloadTileList TemplateTiles => new(
     [
         .. ChosenStoreTemplates.Select(t => new Shared.PayloadTile(
             Url.Page("/Admin/Store/Template", new { id = t.Id })!, t.Name, t.Description ?? "", true,
@@ -113,7 +113,7 @@ public class EditModel : PageModel
             $"{t.Name} {t.HeadingFont} {t.BodyFont}", Accent: t.AccentColor,
             NoteKey: Item.ActivateTemplateName == t.Name ? "profiles.templateActive" : null,
             PreviewUrl: Url.Page("/Admin/TemplatePreview", new { kind = "profile", id = t.Id })))
-    ];
+    ], "profiles.noTemplates");
 
     public StorePicker PluginPicker => new(Item.Id, "plugins",
         StorePlugins.Where(p => !SelectedPlugins.Contains(p.Id))
@@ -372,11 +372,13 @@ public class EditModel : PageModel
         if (profile is null) return RedirectToPage("Index");
 
         profile.SyncSmtp = syncSmtp;
-        profile.UseGlobalSmtp = syncSmtp && useGlobalSmtp;
 
         // With the group switched off the fields are hidden, and hidden inputs still post — empty.
         // Writing them would wipe values the operator only meant to stop rolling out, so the switch
-        // alone is saved and everything below is left as it stands.
+        // alone is saved and everything below is left as it stands. That INCLUDES UseGlobalSmtp: it
+        // is the one value with no rendered field to re-post it, so overwriting it here would lose
+        // it for good and quietly stop the global mail configuration from being rolled out when the
+        // group is switched back on.
         if (!syncSmtp)
         {
             await _db.SaveChangesAsync();
@@ -384,6 +386,8 @@ public class EditModel : PageModel
             TempData["Flash"] = "SMTP wird von diesem Profil nicht ausgerollt.";
             return RedirectToPage(new { id, tab = "settings" });
         }
+
+        profile.UseGlobalSmtp = useGlobalSmtp;
 
         // An empty password keeps the stored one — the field is rendered blank on purpose, so saving
         // the form must not wipe the secret.

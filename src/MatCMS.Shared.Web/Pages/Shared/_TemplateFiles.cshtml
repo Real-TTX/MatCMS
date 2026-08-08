@@ -47,7 +47,10 @@
 @* The hidden stores are what the form submits — the modal only ever writes back into these. *@
 @for (var i = 0; i < files.Count; i++)
 {
-    <textarea class="tpl-file-store" data-idx="@i" name="@files[i].FieldName" hidden>@files[i].Value</textarea>
+    @* The id matters, not just the name: the cloud's live preview reads the form by element id
+       (val("layoutHtml"), val("customCss") …). Without it the preview silently falls back to the
+       generic sample page and never shows the template's own layout. *@
+    <textarea class="tpl-file-store" data-idx="@i" id="@files[i].FieldName" name="@files[i].FieldName" hidden>@files[i].Value</textarea>
 }
 
 <div class="cm-modal" id="file-editor" hidden>
@@ -124,6 +127,9 @@
         function apply() {
             if (cur < 0) return;
             stores[cur].value = cm.getValue();
+            // Setting .value fires nothing, so a live preview listening on the form would never
+            // learn that a file changed. Say so explicitly.
+            stores[cur].dispatchEvent(new Event('input', { bubbles: true }));
             updateBadge(cur);
             close();
         }

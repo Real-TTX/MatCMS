@@ -1,0 +1,29 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.Profiles.CreateModel
+@{
+    ViewData["Title"] = T["profiles.create"];
+}
+<div class="page-head">
+    <h1>@T["profiles.create"]</h1>
+    <div class="list-toolbar">
+        <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
+    </div>
+</div>
+
+<form method="post">
+    <div class="card">
+        <p class="muted">@T["profiles.createIntro"]</p>
+        <div class="form-field">
+            <label for="Name">@T["common.name"]</label>
+            <input id="Name" name="Name" value="@Model.Name" required autofocus />
+        </div>
+        <div class="form-field">
+            <label for="Description">@T["profiles.description"]</label>
+            <textarea id="Description" name="Description" rows="2">@Model.Description</textarea>
+        </div>
+    </div>
+
+    <div class="list-actions">
+        <button type="submit" class="btn">@T["profiles.create"]</button>
+    </div>
+</form>

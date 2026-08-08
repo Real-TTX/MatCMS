@@ -85,11 +85,5 @@
 </div>
 
 <div class="list-actions">
-    <form method="post" asp-page-handler="Create" class="inline-form" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
-        <div class="form-field" style="margin:0;min-width:240px;">
-            <label for="Name">@T["profiles.newName"]</label>
-            <input id="Name" name="Name" required />
-        </div>
-        <button type="submit" class="btn">@T["profiles.create"]</button>
-    </form>
+    <a class="btn" asp-page="Create">@T["profiles.create"]</a>
 </div>

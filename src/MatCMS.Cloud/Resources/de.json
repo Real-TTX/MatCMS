@@ -27,8 +27,8 @@
 
   "profiles.title": "Profile",
   "profiles.intro": "Ein Profil bündelt Konfiguration und Regeln. Instanzen, die sich mit dem Join-Code eines Profils anmelden, landen automatisch darin und erhalten dessen Einstellungen.",
-  "profiles.newName": "Name des neuen Profils",
   "profiles.create": "Profil anlegen",
+  "profiles.createIntro": "Name und Beschreibung genügen. Join-Code, Inhalte und Verhalten legst du danach im Profil selbst fest.",
   "profiles.default": "Standard",
   "profiles.deleteConfirm": "Profil wirklich löschen? Zugeordnete Instanzen bleiben bestehen, erhalten aber keine Konfiguration mehr.",
   "profiles.description": "Beschreibung",

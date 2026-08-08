@@ -23,8 +23,6 @@ public class IndexModel : PageModel
     /// <summary>Instance count per profile — an operator deleting a profile should see what it costs.</summary>
     public Dictionary<int, int> InstanceCounts { get; private set; } = new();
 
-    [BindProperty] public string Name { get; set; } = "";
-
     public async Task OnGetAsync() => await LoadAsync();
 
     private async Task LoadAsync()
@@ -35,24 +33,6 @@ public class IndexModel : PageModel
             .GroupBy(i => i.ProfileId!.Value)
             .Select(g => new { g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.Key, x => x.Count);
-    }
-
-    public async Task<IActionResult> OnPostCreateAsync()
-    {
-        if (string.IsNullOrWhiteSpace(Name))
-        {
-            TempData["FlashError"] = "Bitte einen Namen angeben.";
-            return RedirectToPage();
-        }
-
-        if (await _db.Profiles.AnyAsync(p => p.Name == Name.Trim()))
-        {
-            TempData["FlashError"] = "Ein Profil mit diesem Namen existiert bereits.";
-            return RedirectToPage();
-        }
-
-        var profile = await _profiles.CreateAsync(Name);
-        return RedirectToPage("Edit", new { id = profile.Id });
     }
 
     public async Task<IActionResult> OnPostDeleteAsync(int id)

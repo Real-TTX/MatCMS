@@ -391,8 +391,6 @@ only another line in the report. A skipped *einmalig* payload reports every item
 contained as `skipped-once`, so the operator can tell it apart from a broken sync. Failures are
 reported **before** the exception is thrown, which is what names the plugin that broke a rollout.
 
-### Apply history
-
 ### Applying part of a preview
 
 The preview table has a checkbox per item that would actually change (skipped items get none —

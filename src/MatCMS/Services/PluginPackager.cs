@@ -30,14 +30,15 @@ public static class PluginPackager
         PropertyNameCaseInsensitive = true
     };
 
+    // The format itself — entry names, limits, allowed asset types — lives in MatCMS.Shared, because
+    // the cloud reads and re-packs the same zips and the two must not drift apart.
     /// <summary>Asset file types a bundle may carry. SVG excluded (same-origin stored-XSS vector).</summary>
-    public static readonly string[] AllowedAssetExt =
-        [".js", ".mjs", ".css", ".json", ".map", ".woff", ".woff2", ".ttf", ".eot", ".png", ".jpg", ".jpeg", ".gif", ".webp"];
+    public static readonly string[] AllowedAssetExt = MatCMS.Shared.PluginBundle.AllowedAssetExt;
 
-    private const long MaxAssetBytes = 5 * 1024 * 1024;   // per file
-    private const long MaxTotalBytes = 25 * 1024 * 1024;  // all assets combined (zip-bomb guard)
-    private const int MaxAssetFiles = 200;                // per bundle (zip-bomb guard)
-    private const long MaxMetaBytes = 1 * 1024 * 1024;    // plugin.json
+    private const long MaxAssetBytes = MatCMS.Shared.PluginBundle.MaxAssetBytes;
+    private const long MaxTotalBytes = MatCMS.Shared.PluginBundle.MaxTotalBytes;
+    private const int MaxAssetFiles = MatCMS.Shared.PluginBundle.MaxAssetFiles;
+    private const long MaxMetaBytes = MatCMS.Shared.PluginBundle.MaxManifestBytes;
 
     /// <summary>Builds a ZIP bundle (plugin.json + assets/…) for the given plugin.</summary>
     public static byte[] Export(Models.Plugin p, IWebHostEnvironment env)
@@ -46,7 +47,7 @@ public static class PluginPackager
         using var ms = new MemoryStream();
         using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
         {
-            var metaEntry = zip.CreateEntry("plugin.json");
+            var metaEntry = zip.CreateEntry(MatCMS.Shared.PluginBundle.ManifestEntry);
             using (var w = new StreamWriter(metaEntry.Open(), new UTF8Encoding(false)))
                 w.Write(JsonSerializer.Serialize(meta, JsonOpts));
 
@@ -55,7 +56,7 @@ public static class PluginPackager
             {
                 foreach (var f in Directory.GetFiles(dir))
                 {
-                    var entry = zip.CreateEntry("assets/" + Path.GetFileName(f));
+                    var entry = zip.CreateEntry(MatCMS.Shared.PluginBundle.AssetFolder + Path.GetFileName(f));
                     using var es = entry.Open();
                     using var fs = File.OpenRead(f);
                     fs.CopyTo(es);
@@ -88,7 +89,7 @@ public static class PluginPackager
         using (zip)
         {
             ZipArchiveEntry? metaEntry;
-            try { metaEntry = zip.GetEntry("plugin.json"); }
+            try { metaEntry = zip.GetEntry(MatCMS.Shared.PluginBundle.ManifestEntry); }
             catch { return (null, false, "Datei ist kein gültiges ZIP-Paket."); }
             if (metaEntry is null) return (null, false, "Ungültiges Paket: plugin.json fehlt.");
             if (metaEntry.Length > MaxMetaBytes) return (null, false, "Ungültiges Paket: plugin.json zu groß.");
@@ -122,7 +123,7 @@ public static class PluginPackager
                 foreach (var e in zip.Entries)
                 {
                     var norm = e.FullName.Replace('\\', '/');
-                    if (!norm.StartsWith("assets/", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (!norm.StartsWith(MatCMS.Shared.PluginBundle.AssetFolder, StringComparison.OrdinalIgnoreCase)) continue;
                     if (norm.EndsWith("/")) continue;                 // directory entry
                     if (e.Length <= 0 || e.Length > MaxAssetBytes) continue;
                     if (++count > MaxAssetFiles) break;

@@ -1,3 +1,4 @@
+using MatCMS.Shared;
 using System.IO.Compression;
 using System.Text.Json;
 using MatCMS.Cloud.Data;
@@ -106,7 +107,7 @@ public class PluginModel : PageModel
         {
             using var ms = new MemoryStream(zipBytes);
             using var zip = new ZipArchive(ms, ZipArchiveMode.Read);
-            var entry = zip.GetEntry("plugin.json");
+            var entry = zip.GetEntry(PluginBundle.ManifestEntry);
             if (entry is null || entry.Length > 1024 * 1024) return null;
 
             using var reader = new StreamReader(entry.Open());
@@ -206,7 +207,7 @@ public class PluginModel : PageModel
                 if (entry.FullName.StartsWith("assets/", StringComparison.OrdinalIgnoreCase) && entry.Length > 0)
                     assets.Add(entry.FullName["assets/".Length..]);
 
-            var meta = zip.GetEntry("plugin.json");
+            var meta = zip.GetEntry(PluginBundle.ManifestEntry);
             if (meta is null) return new("", assets);
 
             using var reader = new StreamReader(meta.Open());
@@ -231,7 +232,7 @@ public class PluginModel : PageModel
             // Start from the existing plugin.json so fields this editor does not surface (Format and
             // anything a future MatCMS adds) survive the round trip.
             var meta = new Dictionary<string, object?>(StringComparer.Ordinal);
-            var metaEntry = zip.GetEntry("plugin.json");
+            var metaEntry = zip.GetEntry(PluginBundle.ManifestEntry);
             if (metaEntry is not null)
             {
                 using var reader = new StreamReader(metaEntry.Open());
@@ -257,13 +258,13 @@ public class PluginModel : PageModel
             using var target = new MemoryStream();
             using (var outZip = new ZipArchive(target, ZipArchiveMode.Create, leaveOpen: true))
             {
-                var json = outZip.CreateEntry("plugin.json");
+                var json = outZip.CreateEntry(PluginBundle.ManifestEntry);
                 using (var writer = new StreamWriter(json.Open()))
                     writer.Write(JsonSerializer.Serialize(meta, new JsonSerializerOptions { WriteIndented = true }));
 
                 foreach (var entry in zip.Entries)
                 {
-                    if (entry.FullName.Equals("plugin.json", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (entry.FullName.Equals(PluginBundle.ManifestEntry, StringComparison.OrdinalIgnoreCase)) continue;
                     if (entry.Length == 0 && entry.FullName.EndsWith('/')) continue;
 
                     var copy = outZip.CreateEntry(entry.FullName);

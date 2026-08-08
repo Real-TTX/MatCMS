@@ -21,3 +21,6 @@ Thumbs.db
 
 # Runtime data of any project in src/
 src/*/appdata/
+
+# Scratch files left behind by tooling (review diffs etc.)
+*.diff.tmp

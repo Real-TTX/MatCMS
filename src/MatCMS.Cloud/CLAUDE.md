@@ -58,7 +58,7 @@ switched over after `EnsureCreated()` forced `docker compose down -v` four times
 **dropped every instance link** and made connected instances re-enroll. A model change here means
 `dotnet ef migrations add <Name>` and nothing else. Check what EF generated before committing: for the
 sync-mode change it guessed a column rename that would have cross-wired AND inverted four columns.
-MatCMS itself still uses `EnsureCreated()`.
+MatCMS went the same way (see its `MigrateSchemaAsync` for the baseline of pre-migrations databases).
 
 ## Sibling repositories (same parent folder `C:\Users\Matthias\Desktop\Development`)
 
@@ -200,7 +200,7 @@ docker compose up -d --build     # → http://localhost:9100   (admin login /log
 ./run-docker.ps1                 # same, with the friendly output
 docker compose logs -f
 docker compose down              # stop, keep the volume
-docker compose down -v           # RESET (drops DB, keys, uploads) — needed after a model change
+docker compose down -v           # RESET (drops DB, keys, uploads) — NOT needed for a model change any more
 ```
 
 Local hot-reload loop (.NET SDK 10 required):

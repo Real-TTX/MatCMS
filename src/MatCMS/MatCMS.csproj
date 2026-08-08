@@ -24,10 +24,18 @@
 
   <ItemGroup>
     <!-- Floating 10.0.* so restores/rebuilds always pick up the latest patch ("immer aktuell"). -->
+    <!-- Design-time only (PrivateAssets), for `dotnet ef migrations add`. Ships nothing at runtime. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.*">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.*" />
     <PackageReference Include="Microsoft.Extensions.Identity.Core" Version="10.0.*" />
-    <!-- Roslyn C# scripting: runs admin-authored plugin code at runtime. -->
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.*" />
+    <!-- Roslyn C# scripting: runs admin-authored plugin code at runtime. Held at 5.0.*, the Roslyn
+         that ships with .NET 10: EntityFrameworkCore.Design pulls CodeAnalysis 5.0.0, and mixing it
+         with a 4.x scripting package is a hard NU1107 version conflict. Roslyn assemblies must move
+         together. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="5.0.*" />
     <!-- MailKit: proper SMTP (implicit SSL port 465 AND STARTTLS port 587). The built-in
          System.Net.Mail.SmtpClient can't do implicit SSL, which breaks IONOS/others on 465. -->
     <PackageReference Include="MailKit" Version="4.*" />

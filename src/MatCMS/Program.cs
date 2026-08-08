@@ -214,11 +214,11 @@ builder.Services.AddRazorPages(options =>
 
 var app = builder.Build();
 
-// --- Create schema + seed default data on startup ---
+// --- Create/upgrade schema + seed default data on startup ---
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.EnsureCreated();
+    await MigrateSchemaAsync(db, scope.ServiceProvider.GetRequiredService<ILoggerFactory>());
     await DbSeeder.SeedAsync(scope.ServiceProvider);
     // Run enabled plugins once at startup so their registrations are available.
     await scope.ServiceProvider.GetRequiredService<PluginRunner>().RunAllAsync();
@@ -561,3 +561,45 @@ app.MapGet("/robots.txt", (HttpContext ctx, MatCMS.Services.SiteContext site) =>
 });
 
 app.Run();
+
+/// <summary>
+/// Brings the schema up to date with EF migrations — including databases created by the earlier
+/// <c>EnsureCreated()</c>, which have no <c>__EFMigrationsHistory</c> table at all.
+/// <para>Those are <b>baselined</b>: the history table is created and the initial migration is
+/// recorded as applied WITHOUT running it, because the tables it would create are already there.
+/// Running it would fail on "table already exists" and leave a live site down. Only migrations added
+/// after the switch then actually execute.</para>
+/// <para>This is what ends the old "a model change needs <c>docker compose down -v</c>" rule, which
+/// on a CMS meant throwing away the customer's content to add a column.</para>
+/// </summary>
+static async Task MigrateSchemaAsync(AppDbContext db, ILoggerFactory loggerFactory)
+{
+    var log = loggerFactory.CreateLogger("Schema");
+    var applied = (await db.Database.GetAppliedMigrationsAsync()).ToList();
+
+    if (applied.Count == 0)
+    {
+        // "Has tables" distinguishes a pre-migrations database from a genuinely empty one. Only the
+        // former needs the baseline; the latter is created by Migrate() below in the normal way.
+        var creator = Microsoft.EntityFrameworkCore.Infrastructure.AccessorExtensions.GetService<Microsoft.EntityFrameworkCore.Storage.IRelationalDatabaseCreator>(db.Database);
+        if (await creator.HasTablesAsync())
+        {
+            var initial = db.Database.GetMigrations().FirstOrDefault();
+            if (initial is not null)
+            {
+                var history = Microsoft.EntityFrameworkCore.Infrastructure.AccessorExtensions.GetService<Microsoft.EntityFrameworkCore.Migrations.IHistoryRepository>(db.Database);
+                await db.Database.ExecuteSqlRawAsync(history.GetCreateIfNotExistsScript());
+                await db.Database.ExecuteSqlRawAsync(history.GetInsertScript(
+                    new Microsoft.EntityFrameworkCore.Migrations.HistoryRow(
+                        initial, Microsoft.EntityFrameworkCore.Infrastructure.ProductInfo.GetVersion())));
+                log.LogInformation("Existing database baselined at migration {Migration}.", initial);
+            }
+        }
+    }
+
+    var pending = (await db.Database.GetPendingMigrationsAsync()).ToList();
+    if (pending.Count > 0)
+        log.LogInformation("Applying {Count} migration(s): {Migrations}", pending.Count, string.Join(", ", pending));
+
+    await db.Database.MigrateAsync();
+}

@@ -15,8 +15,12 @@ lockstep:
   9100. **Its own `CLAUDE.md` lives in `src/MatCMS.Cloud/` and is the detailed one** — read it before
   touching anything cloud-side.
 
-Both: Razor Pages, SQLite via EF Core with `EnsureCreated()` (no migrations — a model change needs
-`docker compose down -v`), cookie auth, Docker-first, no SPA framework and no npm build step.
+Both: Razor Pages, SQLite via EF Core with **EF migrations** applied at startup, cookie auth,
+Docker-first, no SPA framework and no npm build step. A model change means
+`dotnet ef migrations add <Name>` — never `docker compose down -v`, which on the CMS would throw away
+the customer's content and on the cloud every instance link. Databases created by the older
+`EnsureCreated()` are **baselined** on first start (history table written, the initial migration
+recorded without running it) and upgrade normally from there.
 
 ## Why they live together
 

@@ -44,6 +44,7 @@
   "profiles.revision": "Revision",
   "profiles.revisionHint": "zählt bei jeder Änderung hoch; Instanzen holen sich daraufhin die neue Konfiguration",
   "profiles.instances": "Instanzen",
+  "profiles.showInstances": "Instanzen anzeigen",
   "profiles.policy": "Regeln",
   "profiles.recipientsFallback": "leer = globale Empfänger",
   "profiles.payloads": "Inhalte",

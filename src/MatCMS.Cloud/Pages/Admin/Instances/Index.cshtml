@@ -21,6 +21,13 @@
                 <option value="drift">@T["instances.syncPending"]</option>
                 <option value="syncfailed">@T["instances.syncFailed"]</option>
             </select>
+            @if (Model.FilteredProfile is not null)
+            {
+                @* Says what the list is narrowed to and offers the way out; without it a filtered
+                   list is indistinguishable from an empty cloud. *@
+                <span class="badge badge-off">@Model.FilteredProfile.Name</span>
+                <a class="btn btn-sm btn-ghost" asp-page="Index">@T["instances.filterAll"]</a>
+            }
             <div class="view-toggle" data-list-viewtoggle>
                 <button type="button" class="vt-btn" data-view="table" title="@T["instances.viewTable"]" aria-label="@T["instances.viewTable"]"><i class="ti ti-list" aria-hidden="true"></i></button>
                 <button type="button" class="vt-btn" data-view="tiles" title="@T["instances.viewTiles"]" aria-label="@T["instances.viewTiles"]"><i class="ti ti-layout-grid" aria-hidden="true"></i></button>

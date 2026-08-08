@@ -147,6 +147,10 @@ body.nav-open .admin-menu-toggle span:nth-child(3) { transform: translateY(-6px)
 .admin-content .page-head > h1 { display: none; }
 .admin-content .page-head:not(:has(> :not(h1))) { display: none; margin: 0; }
 
+/* Same for the <h2> above a list: the tab or the page title already names it, so repeating it right
+   in front of the toolbar says nothing. Scoped to [data-list] so section headings elsewhere stay. */
+.admin-content [data-list] > .page-head > h2 { display: none; }
+
 /* Clickable list rows (menu list) */
 .block-item-link { text-decoration: none; color: inherit; cursor: pointer; }
 .block-item-link:hover { border-color: var(--accent); }
@@ -911,6 +915,20 @@ table.data .btn { white-space: nowrap; }
 /* ===== List toolbar + client-side search / paging / view-toggle (admin index pages) ===== */
 .list-toolbar { flex: 1 1 auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .list-toolbar .list-search { margin-right: auto; }   /* pushes toggle + primary button to the right */
+
+/* The toolbar of a LIST is a framed bar: search, filter and the view toggle always live together in
+   it, so it reads as one control surface above the records rather than three loose widgets. Scoped
+   to [data-list] on purpose — the same class carries the plain back/action buttons in the page head
+   of a detail or create page, and those must not end up in a box. */
+[data-list] .page-head .list-toolbar {
+    border: 1px solid var(--line);
+    background: #fff;
+    padding: 10px 12px;
+}
+[data-list] .page-head .list-toolbar .list-search { min-width: 200px; }
+/* The bar already frames them, so the controls inside drop their own heavy border. */
+[data-list] .page-head .list-toolbar .list-search,
+[data-list] .page-head .list-toolbar select.list-search { border-color: var(--line); }
 .list-search { height: 34px; min-width: 200px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 13.5px; background: #fff; }
 .list-search:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent); }
 .list-empty { color: var(--muted, #6b7078); padding: 16px 2px; }

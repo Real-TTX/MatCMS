@@ -166,6 +166,17 @@ public class EditModel : PageModel
 
     public string Setting(string key) => Settings.FirstOrDefault(s => s.Key == key)?.Value ?? "";
 
+    /// <summary>The cloud's own SMTP values. Shown read-only in the profile form while "use the
+    /// global configuration" is ticked, so the operator sees what would actually be rolled out
+    /// instead of a set of empty boxes.</summary>
+    public Dictionary<string, string?> GlobalSmtp { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public string Global(string key) => GlobalSmtp.TryGetValue(key, out var v) ? (v ?? "") : "";
+
+    /// <summary>What the form shows for an SMTP key: the global value while the global configuration
+    /// is in use, the profile's own otherwise.</summary>
+    public string SmtpField(string key) => Item.UseGlobalSmtp ? Global(key) : Setting(key);
+
     public bool SettingFlag(string key) =>
         Setting(key).Trim().ToLowerInvariant() is "1" or "true" or "on" or "yes";
 
@@ -222,6 +233,10 @@ public class EditModel : PageModel
         SelectedTemplates = (await _db.ProfileStoreTemplates.AsNoTracking().Where(x => x.ProfileId == id).Select(x => x.StoreTemplateId).ToListAsync()).ToHashSet();
         SelectedComponents = (await _db.ProfileStoreComponents.AsNoTracking().Where(x => x.ProfileId == id).Select(x => x.StoreComponentId).ToListAsync()).ToHashSet();
         SelectedUsers = (await _db.ProfileGlobalUsers.AsNoTracking().Where(x => x.ProfileId == id).Select(x => x.UserId).ToListAsync()).ToHashSet();
+
+        var smtpKeys = SettingKeys.Smtp;
+        GlobalSmtp = await _db.CloudSettings.AsNoTracking().Where(x => smtpKeys.Contains(x.Key))
+            .ToDictionaryAsync(x => x.Key, x => x.Value, StringComparer.OrdinalIgnoreCase);
         return true;
     }
 
@@ -388,6 +403,18 @@ public class EditModel : PageModel
         }
 
         profile.UseGlobalSmtp = useGlobalSmtp;
+
+        // With the global configuration in use the fields are shown READ-ONLY, filled with the global
+        // values — so what posts back is the global data, not this profile's. Writing it would
+        // quietly copy the global values into the profile and they would stop following the global
+        // ones. The profile's own values stay untouched and reappear the moment the box is unticked.
+        if (useGlobalSmtp)
+        {
+            await _db.SaveChangesAsync();
+            await _profiles.TouchAsync(id);
+            TempData["Flash"] = "Globale SMTP-Einstellungen werden ausgerollt.";
+            return RedirectToPage(new { id, tab = "settings" });
+        }
 
         // An empty password keeps the stored one — the field is rendered blank on purpose, so saving
         // the form must not wipe the secret.

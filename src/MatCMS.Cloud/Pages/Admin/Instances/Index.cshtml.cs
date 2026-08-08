@@ -23,9 +23,21 @@ public class IndexModel : PageModel
 
     public bool HasUpdate(Instance i) => _releases.IsUpdateAvailableFor(i.Version);
 
-    public async Task OnGetAsync()
+    /// <summary>Profile the list is narrowed to, or null for all. Set from the profile page, which
+    /// links here instead of listing its instances itself.</summary>
+    public Profile? FilteredProfile { get; private set; }
+
+    public async Task OnGetAsync(int? profile = null)
     {
-        Items = await _db.Instances.AsNoTracking().Include(i => i.Profile).OrderBy(i => i.Name).ToListAsync();
+        var query = _db.Instances.AsNoTracking().Include(i => i.Profile).AsQueryable();
+        if (profile is int pid)
+        {
+            FilteredProfile = await _db.Profiles.AsNoTracking().FirstOrDefaultAsync(p => p.Id == pid);
+            // An unknown id narrows to nothing rather than silently showing everything — otherwise a
+            // stale link would look like the profile has every instance.
+            query = query.Where(i => i.ProfileId == pid);
+        }
+        Items = await query.OrderBy(i => i.Name).ToListAsync();
     }
 
     public static bool IsOutOfSync(Instance i) => InstanceService.IsOutOfSync(i);

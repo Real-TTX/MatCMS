@@ -44,6 +44,7 @@
   "profiles.revision": "Revision",
   "profiles.revisionHint": "bumped on every change; instances pull the new configuration when it moves",
   "profiles.instances": "Instances",
+  "profiles.showInstances": "Show instances",
   "profiles.policy": "Rules",
   "profiles.recipientsFallback": "empty = global recipients",
   "profiles.payloads": "Contents",

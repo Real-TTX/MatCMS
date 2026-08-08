@@ -175,7 +175,9 @@ public class ProfileService
             // switched on must not overwrite a live site's mail configuration.
             foreach (var local in await _db.ProfileSettings.AsNoTracking().Where(s => s.ProfileId == profile.Id).ToListAsync(ct))
             {
-                if (!profile.SyncSmtp && IsSmtpKey(local.Key)) continue;
+                // Skipped when the global configuration is in use: it is either the global values
+                // or the profile's own, never a half-merge — that is what the read-only form promises.
+                if (IsSmtpKey(local.Key) && (!profile.SyncSmtp || profile.UseGlobalSmtp)) continue;
                 settings[local.Key] = local.IsSecret ? _secrets.Unprotect(local.Value) : local.Value;
             }
 

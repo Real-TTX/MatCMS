@@ -30,23 +30,17 @@
         </div>
         <div class="kv">
             <div class="kv-label">@T["profiles.revision"]</div>
-            <div class="kv-value"><span class="mono">@Model.Item.Revision</span> <span class="muted">— @T["profiles.revisionHint"]</span></div>
+            <div class="kv-value"><span class="mono">@Model.Item.Revision</span></div>
         </div>
         <div class="kv">
             <div class="kv-label">@T["profiles.instances"]</div>
+            @* Only the count plus a way in: a profile with twenty instances would otherwise turn this
+               row into a wall of buttons, and the instance list already knows how to show them. *@
             <div class="kv-value">
-                @if (Model.Instances.Count == 0)
+                <span class="mono">@Model.Instances.Count</span>
+                @if (Model.Instances.Count > 0)
                 {
-                    <span class="muted">—</span>
-                }
-                else
-                {
-                    <div class="actions">
-                        @foreach (var i in Model.Instances)
-                        {
-                            <a class="btn btn-sm btn-ghost" asp-page="/Admin/Instances/Details" asp-route-id="@i.Id">@i.Name</a>
-                        }
-                    </div>
+                    <a class="btn btn-sm btn-ghost" asp-page="/Admin/Instances" asp-route-profile="@Model.Item.Id">@T["profiles.showInstances"]</a>
                 }
             </div>
         </div>
@@ -104,7 +98,6 @@
 
         <div class="card">
             <h2>@T["profiles.payloads"]</h2>
-            <p class="muted">@T["profiles.payloadsHint"]</p>
             <label class="checkbox-row">
                 <input type="checkbox" name="syncSettings" value="true" checked="@(Model.Item.SyncSettings ? "checked" : null)" />
                 @T["profiles.payloadSettings"]
@@ -139,7 +132,6 @@
             </div>
 
             <h3 class="form-section">@T["profiles.strategy"]</h3>
-            <p class="muted">@T["profiles.strategyHint"]</p>
             @* One mode per payload instead of a single "overwrite" switch: "einmalig" is a third
                answer that a checkbox cannot give — roll it out now, then let the site own it. *@
             @foreach (var m in Model.Modes)
@@ -169,7 +161,6 @@
     <form method="post" asp-page-handler="Smtp" asp-route-id="@Model.Item.Id">
         <div class="card">
             <h2>@T["settings.smtp"]</h2>
-            <p class="muted">@T["profiles.smtpHint"]</p>
 
             @* A settings group has to be switched ON before it may overwrite anything on a live site.
                Off = the fields stay hidden AND the values are neither saved nor rolled out, so a site's
@@ -191,21 +182,21 @@
                 <div class="form-row">
                     <div class="form-field">
                         <label for="host">@T["settings.smtpHost"]</label>
-                        <input id="host" name="host" value="@Model.Setting("smtp.host")" spellcheck="false" />
+                        <input id="host" name="host" value="@Model.SmtpField("smtp.host")" readonly="@(Model.Item.UseGlobalSmtp ? "readonly" : null)" data-smtp-own spellcheck="false" />
                     </div>
                     <div class="form-field">
                         <label for="port">@T["settings.smtpPort"]</label>
-                        <input id="port" name="port" value="@Model.Setting("smtp.port")" placeholder="587" inputmode="numeric" />
+                        <input id="port" name="port" value="@Model.SmtpField("smtp.port")" readonly="@(Model.Item.UseGlobalSmtp ? "readonly" : null)" data-smtp-own placeholder="587" inputmode="numeric" />
                     </div>
                 </div>
                 <div class="form-row">
                     <div class="form-field">
                         <label for="user">@T["settings.smtpUser"]</label>
-                        <input id="user" name="user" value="@Model.Setting("smtp.user")" spellcheck="false" />
+                        <input id="user" name="user" value="@Model.SmtpField("smtp.user")" readonly="@(Model.Item.UseGlobalSmtp ? "readonly" : null)" data-smtp-own spellcheck="false" />
                     </div>
                     <div class="form-field">
                         <label for="password">@T["settings.smtpPassword"]</label>
-                        <input id="password" name="password" type="password" placeholder="@T["settings.smtpPasswordKeep"]" autocomplete="new-password" />
+                        <input id="password" name="password" type="password" placeholder="@T["settings.smtpPasswordKeep"]" autocomplete="new-password" readonly="@(Model.Item.UseGlobalSmtp ? "readonly" : null)" data-smtp-own />
                         @* Without this a stored password could only ever be replaced, never removed. *@
                         @if (!string.IsNullOrEmpty(Model.Setting("smtp.password")))
                         {
@@ -219,11 +210,11 @@
                 <div class="form-row">
                     <div class="form-field">
                         <label for="fromEmail">@T["settings.smtpFromEmail"]</label>
-                        <input id="fromEmail" name="fromEmail" value="@Model.Setting("smtp.fromEmail")" spellcheck="false" />
+                        <input id="fromEmail" name="fromEmail" value="@Model.SmtpField("smtp.fromEmail")" readonly="@(Model.Item.UseGlobalSmtp ? "readonly" : null)" data-smtp-own spellcheck="false" />
                     </div>
                     <div class="form-field">
                         <label for="fromName">@T["settings.smtpFromName"]</label>
-                        <input id="fromName" name="fromName" value="@Model.Setting("smtp.fromName")" />
+                        <input id="fromName" name="fromName" value="@Model.SmtpField("smtp.fromName")" readonly="@(Model.Item.UseGlobalSmtp ? "readonly" : null)" data-smtp-own />
                     </div>
                 </div>
             </div>
@@ -243,7 +234,6 @@
                 <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
             </div>
         </div>
-        <p class="muted">@T["profiles.otherSettingsHint"]</p>
         <table class="data" data-list-table>
             <thead>
                 <tr><th>@T["profiles.settingKey"]</th><th>@T["profiles.settingValue"]</th><th></th></tr>
@@ -289,7 +279,6 @@
                 <partial name="_ViewToggle" />
             </div>
         </div>
-        <p class="muted">@T["profiles.usersHint"]</p>
         <table class="data" data-list-table>
             <thead>
                 <tr><th>@T["users.username"]</th><th>@T["common.origin"]</th><th>@T["users.email"]</th><th>@T["users.displayName"]</th><th></th></tr>
@@ -365,7 +354,6 @@
                 <partial name="_ViewToggle" />
             </div>
         </div>
-        <p class="muted">@T["profiles.pluginsHint"]</p>
         <table class="data" data-list-table>
             <thead>
                 <tr><th>@T["common.name"]</th><th>@T["common.origin"]</th><th>@T["profiles.pluginKey"]</th><th>@T["instances.version"]</th><th></th></tr>
@@ -442,7 +430,6 @@
                 <partial name="_ViewToggle" />
             </div>
         </div>
-        <p class="muted">@T["profiles.componentsHint"]</p>
         <table class="data" data-list-table>
             <thead>
                 <tr><th>@T["common.name"]</th><th>@T["common.origin"]</th><th>@T["profiles.componentType"]</th><th></th></tr>
@@ -517,7 +504,6 @@
                 <partial name="_ViewToggle" />
             </div>
         </div>
-        <p class="muted">@T["profiles.templatesHint"]</p>
         <table class="data" data-list-table>
             <thead>
                 <tr><th>@T["common.name"]</th><th>@T["common.origin"]</th><th>@T["profiles.templateColors"]</th><th>@T["profiles.templateFonts"]</th><th></th></tr>
@@ -606,6 +592,16 @@
         // A settings group shows its fields only while its checkbox is ticked. Server-rendered from
         // the stored flag, so it is already right before this runs.
         (function () {
+            // "Globale SMTP verwenden" sperrt die eigenen Felder sofort, nicht erst nach dem Speichern.
+            var globalBox = document.querySelector('input[name="useGlobalSmtp"]');
+            if (globalBox) {
+                globalBox.addEventListener("change", function () {
+                    document.querySelectorAll("[data-smtp-own]").forEach(function (el) {
+                        el.readOnly = globalBox.checked;
+                    });
+                });
+            }
+
             document.querySelectorAll("[data-group-toggle]").forEach(function (box) {
                 var body = document.querySelector("[data-group=\"" + box.dataset.groupToggle + "\"]");
                 if (!body) return;

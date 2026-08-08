@@ -75,7 +75,9 @@ public class IndexModel : PageModel
     public Shared.PayloadTileList ComponentTiles => new(
         Components.Select(c => new Shared.PayloadTile(
             Url.Page("Component", new { id = c.Id })!, c.Name, c.Type, false,
-            $"{c.Name} {c.Type} {c.Description}")).ToList(), "store.noComponents");
+            $"{c.Name} {c.Type} {c.Description}",
+            PreviewUrl: Url.Page("/Admin/ComponentPreview", new { kind = "store", id = c.Id }))).ToList(),
+        "store.noComponents");
 
     /// <summary>Imports a component into the store. <c>Type</c> is the identity, so re-importing
     /// updates the entry every profile that selected it already points at.</summary>

@@ -1,0 +1,59 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.ComponentPreviewModel
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=1180" />
+    <title>@Model.Name</title>
+    <style>
+        html, body { margin: 0; height: 100%; overflow: hidden; background: #fff; }
+        #cp-frame { width: 100%; height: 100%; border: 0; display: block; }
+        /* The designer's own furniture has no place in a thumbnail — but the script needs the elements
+           to exist, so they are hidden rather than left out. */
+        #component-form { display: none; }
+    </style>
+</head>
+<body>
+    @* component-editor.js bootstraps from these exact ids, which is the point: the tile and the editor
+       run the same renderer and cannot disagree about what a component looks like. *@
+    <form id="component-form">
+        <div id="field-rows" data-fields="@Model.FieldsJson"></div>
+        <input type="hidden" id="FieldsJson" />
+        <textarea id="TemplateHtml">@Model.TemplateHtml</textarea>
+        <div id="cp-sample"></div>
+    </form>
+
+    <iframe id="cp-frame" title="@Model.Name"></iframe>
+
+    <script>
+        // The field TYPES have to be here even though no select is ever seen: the renderer reads the
+        // type back off the row to decide whether a value is escaped (text) or inserted as HTML
+        // (richtext). Without them every field would collapse to "text" and a rich-text block would
+        // render as visible markup.
+        window.CLOUD_FIELD_TYPES = [
+            ["text", "@T["profiles.fieldText"]"],
+            ["textarea", "@T["profiles.fieldTextarea"]"],
+            ["richtext", "@T["profiles.fieldRichtext"]"],
+            ["image", "@T["profiles.fieldImage"]"],
+            ["url", "@T["profiles.fieldUrl"]"]
+        ];
+        window.CLOUD_PREVIEW_THEME = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(new
+        {
+            accent = Model.PreviewTheme?.AccentColor,
+            heading = Model.PreviewTheme?.HeadingColor,
+            text = Model.PreviewTheme?.TextColor,
+            background = Model.PreviewTheme?.BackgroundColor,
+            altBackground = Model.PreviewTheme?.AltBackground,
+            containerWidth = Model.PreviewTheme?.ContainerWidth,
+            buttonRadius = Model.PreviewTheme?.ButtonRadius,
+            headingFont = Model.PreviewTheme?.HeadingFont,
+            bodyFont = Model.PreviewTheme?.BodyFont
+        }));
+    </script>
+    <script src="~/js/component-editor.js" asp-append-version="true"></script>
+</body>
+</html>

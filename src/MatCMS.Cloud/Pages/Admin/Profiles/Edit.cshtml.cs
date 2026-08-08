@@ -94,10 +94,12 @@ public class EditModel : PageModel
         .. ChosenStoreComponents.Select(c => new Shared.PayloadTile(
             Url.Page("/Admin/Store/Component", new { id = c.Id })!, c.Name, c.Type, true,
             $"{c.Name} {c.Type} {c.Description}",
-            NoteKey: ComponentOverridden(c.Type) ? "profiles.overriddenLocally" : null)),
+            NoteKey: ComponentOverridden(c.Type) ? "profiles.overriddenLocally" : null,
+            PreviewUrl: Url.Page("/Admin/ComponentPreview", new { kind = "store", id = c.Id }))),
         .. Components.Select(c => new Shared.PayloadTile(
             Url.Page("Component", new { profileId = Item.Id, id = c.Id })!, c.Name, c.Type, false,
-            $"{c.Name} {c.Type} {c.Description}"))
+            $"{c.Name} {c.Type} {c.Description}",
+            PreviewUrl: Url.Page("/Admin/ComponentPreview", new { kind = "profile", id = c.Id })))
     ], "profiles.noComponents");
 
     public Shared.PayloadTileList TemplateTiles => new(

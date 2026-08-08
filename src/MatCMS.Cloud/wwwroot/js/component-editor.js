@@ -140,7 +140,9 @@
         // one, so a component is judged against the design it will actually live in.
         var theme = window.CLOUD_PREVIEW_THEME || {};
         frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8">' +
-            '<link rel="stylesheet" href="/css/site.css">' +
+            // The public-site stylesheet moved into the shared Razor Class Library; the old /css/site.css
+            // 404s here, which left every component preview unstyled apart from the variables below.
+            '<link rel="stylesheet" href="/_content/MatCMS.Shared.Web/css/site.css">' +
             '<style>:root{' +
             '--accent:' + (theme.accent || "#2563eb") + ';' +
             '--accent-dark:' + (theme.accent || "#2563eb") + ';' +

@@ -416,6 +416,7 @@
   "settings.smtpUser": "Benutzer",
   "settings.smtpPassword": "Passwort",
   "settings.smtpPasswordKeep": "unverändert lassen",
+  "settings.smtpPasswordClear": "Gespeichertes Passwort entfernen",
   "settings.smtpFromEmail": "Absender-Adresse",
   "settings.smtpFromName": "Absender-Name",
   "settings.smtpSsl": "SSL/TLS erzwingen (Port 465 nutzt immer implizites SSL)",

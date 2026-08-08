@@ -70,7 +70,7 @@ public class IndexModel : PageModel
     }
 
     public async Task<IActionResult> OnPostSmtpAsync(
-        string? host, string? port, string? user, string? password,
+        string? host, string? port, string? user, string? password, bool clearPassword,
         string? fromEmail, string? fromName, bool ssl)
     {
         await _cloud.SaveAsync(new Dictionary<string, string?>
@@ -80,9 +80,11 @@ public class IndexModel : PageModel
             [SettingKeys.SmtpUser] = user?.Trim(),
             // An empty password field keeps the stored one VERBATIM — so saving the form neither
             // wipes the secret because the browser rendered it blank, nor encrypts an already
-            // encrypted value a second time. Only a newly entered password is protected.
-            [SettingKeys.SmtpPassword] = string.IsNullOrEmpty(password)
-                ? Get(SettingKeys.SmtpPassword)
+            // encrypted value a second time. Only a newly entered password is protected, and only
+            // the explicit "remove" tick can empty it (a blank field alone must not, or a careless
+            // save of the other fields would silently break sending).
+            [SettingKeys.SmtpPassword] = clearPassword ? ""
+                : string.IsNullOrEmpty(password) ? Get(SettingKeys.SmtpPassword)
                 : _secrets.Protect(password),
             [SettingKeys.SmtpFromEmail] = fromEmail?.Trim(),
             [SettingKeys.SmtpFromName] = fromName?.Trim(),

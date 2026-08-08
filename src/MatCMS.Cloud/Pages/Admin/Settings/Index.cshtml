@@ -88,6 +88,15 @@
                     <div class="form-field">
                         <label>@T["settings.smtpPassword"]</label>
                         <input name="password" type="password" autocomplete="new-password" placeholder="@T["settings.smtpPasswordKeep"]" />
+                        @* An empty field means "keep", so without this there is no way to get rid of a
+                           stored password at all — the operator could only ever replace it. *@
+                        @if (!string.IsNullOrEmpty(Model.Get(SettingKeys.SmtpPassword)))
+                        {
+                            <label class="checkbox-row">
+                                <input type="checkbox" name="clearPassword" value="true" />
+                                @T["settings.smtpPasswordClear"]
+                            </label>
+                        }
                     </div>
                 </div>
                 <div class="form-row">

@@ -21,9 +21,13 @@ public class SiteModel : PageModel
 
     public Instance Item { get; private set; } = new();
 
-    /// <summary>Everything the switcher can reach: approved instances that actually have an address.
-    /// One without a URL would switch to a blank frame, which reads as a broken page rather than as
-    /// "this instance never reported where it lives".</summary>
+    /// <summary>
+    /// Everything the switcher lists: ALL instances, not only the reachable ones.
+    /// <para>Offline is exactly when an operator goes looking — leaving those out means the control
+    /// is missing the entries you opened it for, and it silently misrepresents the fleet as smaller
+    /// than it is. Each entry says what state it is in instead; one without an address goes to its
+    /// detail page rather than to a blank frame.</para>
+    /// </summary>
     public List<Instance> Switchable { get; private set; } = [];
 
     public async Task<IActionResult> OnGetAsync(int id)
@@ -33,16 +37,10 @@ public class SiteModel : PageModel
         if (item is null) return RedirectToPage("Index");
         Item = item;
 
-        Switchable = (await _db.Instances.AsNoTracking()
-                .Where(i => i.Status == InstanceStatus.Approved)
-                .OrderBy(i => i.Name).ToListAsync())
-            .Where(i => !string.IsNullOrWhiteSpace(i.PreviewUrl))
-            .ToList();
-
-        // The instance being viewed belongs in its own switcher even if it is pending or has only a
-        // guessed address — otherwise the control would show a different site than the frame does.
-        if (Switchable.All(i => i.Id != item.Id))
-            Switchable.Insert(0, item);
+        // Rejected ones stay out: they were refused, so they are not something to switch between.
+        Switchable = await _db.Instances.AsNoTracking()
+            .Where(i => i.Status != InstanceStatus.Rejected || i.Id == id)
+            .OrderBy(i => i.Name).ToListAsync();
 
         return Page();
     }

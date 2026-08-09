@@ -18,18 +18,51 @@
         <div class="inst-picker-menu" data-inst-menu hidden role="listbox" aria-label="@T["instances.title"]">
             @foreach (var i in Model.Switchable)
             {
-                <a class="inst-picker-item@(i.Id == Model.Item.Id ? " is-current" : "")" role="option"
-                   aria-selected="@(i.Id == Model.Item.Id ? "true" : "false")"
-                   href="@Url.Page("Site", new { id = i.Id })">
+                var online = MatCMS.Cloud.Services.InstanceService.IsOnline(i);
+                var hasUrl = !string.IsNullOrWhiteSpace(i.PreviewUrl);
+                @* An instance with no address has nothing to frame, so it leads to its detail page —
+                   that is where you find out why it never reported one. *@
+                <a class="inst-picker-item@(i.Id == Model.Item.Id ? " is-current" : "")@(online ? "" : " is-offline")"
+                   role="option" aria-selected="@(i.Id == Model.Item.Id ? "true" : "false")"
+                   href="@(hasUrl ? Url.Page("Site", new { id = i.Id }) : Url.Page("Details", new { id = i.Id }))">
                     <span class="inst-picker-shot">
-                        @* data-src, not src: opening this page must not fetch every customer site at
-                           once. The frames are filled the first time the menu is opened. *@
-                        <iframe data-src="@i.PreviewUrl" title="@i.Name" tabindex="-1" scrolling="no"
-                                referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts"></iframe>
+                        @if (hasUrl)
+                        {
+                            @* data-src, not src: opening this page must not fetch every customer site
+                               at once. The frames are filled the first time the menu is opened. *@
+                            <iframe data-src="@i.PreviewUrl" title="@i.Name" tabindex="-1" scrolling="no"
+                                    referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts"></iframe>
+                        }
+                        else
+                        {
+                            <span class="inst-picker-noshot"><i class="ti ti-world-off" aria-hidden="true"></i></span>
+                        }
                     </span>
                     <span class="inst-picker-meta">
                         <strong>@i.Name</strong>
-                        <span class="muted mono">@i.PreviewUrl</span>
+                        <span class="muted mono">@(hasUrl ? i.PreviewUrl : T["instances.previewNoUrlShort"])</span>
+                    </span>
+                    @* The state belongs on the entry, not in a filter: offline is exactly when
+                       somebody goes looking, and a list that hides those answers the wrong question. *@
+                    <span class="inst-picker-state">
+                        @if (i.Status == MatCMS.Cloud.Models.InstanceStatus.Pending)
+                        {
+                            <span class="badge badge-new">@T["instances.awaitingApproval"]</span>
+                        }
+                        else if (!i.HasConnected)
+                        {
+                            @* Never showed up is not the same as went quiet — the list makes that
+                               distinction too, and it decides where you go looking. *@
+                            <span class="badge badge-off">@T["instances.pending"]</span>
+                        }
+                        else if (online)
+                        {
+                            <span class="badge badge-on">@T["instances.online"]</span>
+                        }
+                        else
+                        {
+                            <span class="badge badge-err">@T["instances.offline"]</span>
+                        }
                     </span>
                 </a>
             }

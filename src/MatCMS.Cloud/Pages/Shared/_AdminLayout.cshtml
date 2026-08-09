@@ -84,8 +84,18 @@
             <button type="button" class="admin-menu-toggle" data-admin-toggle aria-label="@T["nav.menu"]" aria-expanded="false">
                 <span></span><span></span><span></span>
             </button>
-            <div class="admin-topbar-title">@title</div>
-            <div class="admin-topbar-right"></div>
+            @* A page may put its own controls up here instead of a title — the embedded site view
+               turns this bar into the instance switcher plus its actions, so the frame below can
+               have the whole rest of the window. *@
+            @if (IsSectionDefined("TopbarTitle"))
+            {
+                @await RenderSectionAsync("TopbarTitle")
+            }
+            else
+            {
+                <div class="admin-topbar-title">@title</div>
+            }
+            <div class="admin-topbar-right">@await RenderSectionAsync("TopbarActions", required: false)</div>
         </header>
 
         <main class="admin-content">

@@ -144,12 +144,29 @@
                     drift ? "drift" : "",
                     i.LastSyncError is not null || failed > 0 ? "syncfailed" : ""
                 }.Where(t => t.Length > 0));
-                <tr data-search="@(i.Name + " " + i.HostName + " " + i.Version + " " + i.Profile?.Name)" data-tags="@tags">
+                <tr data-search="@(i.Name + " " + i.HostName + " " + i.Version + " " + i.Profile?.Name + " " + i.PreviewUrl)" data-tags="@tags">
                     <td>
                         <a asp-page="Details" asp-route-id="@i.Id"><strong>@i.Name</strong></a>
                         @if (InstanceService.IsOutdatedProtocol(i))
                         {
                             <span class="badge badge-off" title="@T["instances.outdatedProtocolHint"]">@T["instances.outdatedProtocol"]</span>
+                        }
+                        @* The address, under the name: it is what tells two similarly named instances
+                           apart, and a guessed one is marked so nobody reads a port mapping as a
+                           configured URL. *@
+                        @if (string.IsNullOrWhiteSpace(i.PreviewUrl))
+                        {
+                            <div class="muted">@T["instances.previewNoUrlShort"]</div>
+                        }
+                        else
+                        {
+                            <div class="instance-url muted mono">
+                                @i.PreviewUrl
+                                @if (i.PreviewIsGuessed)
+                                {
+                                    <span class="badge badge-off">@T["instances.previewGuessed"]</span>
+                                }
+                            </div>
                         }
                     </td>
                     <td>
@@ -220,6 +237,13 @@
                     <td class="muted">@(i.LastHeartbeatUtc?.ToString("dd.MM.yyyy HH:mm") ?? "—")</td>
                     <td>
                         <div class="actions">
+                            @if (!string.IsNullOrWhiteSpace(i.PreviewUrl))
+                            {
+                                <a class="btn btn-sm btn-ghost" asp-page="Site" asp-route-id="@i.Id"
+                                   title="@T["instances.openEmbedded"]" aria-label="@T["instances.openEmbedded"]"><i class="ti ti-browser" aria-hidden="true"></i></a>
+                                <a class="btn btn-sm btn-ghost" href="@i.PreviewUrl" target="_blank" rel="noopener"
+                                   title="@T["instances.openSite"]" aria-label="@T["instances.openSite"]"><i class="ti ti-external-link" aria-hidden="true"></i></a>
+                            }
                             <a class="btn btn-sm btn-ghost" asp-page="Details" asp-route-id="@i.Id">@T["common.details"]</a>
                         </div>
                     </td>

@@ -1,0 +1,80 @@
+@page "{id:int}"
+@model MatCMS.Cloud.Pages.Admin.Instances.SiteModel
+@{
+    ViewData["Title"] = Model.Item.Name;
+}
+
+@section TopbarTitle {
+    @* The switcher stands where the page title normally does: on this page the instance IS the title,
+       and being able to step to the next one without going back to the list is the reason to stay in
+       the cloud rather than opening a tab. *@
+    <div class="site-embed-switch">
+        <select data-site-switch aria-label="@T["instances.title"]">
+            @foreach (var i in Model.Switchable)
+            {
+                <option value="@Url.Page("Site", new { id = i.Id })" selected="@(i.Id == Model.Item.Id ? "selected" : null)">@i.Name</option>
+            }
+        </select>
+    </div>
+}
+
+@section TopbarActions {
+    <div class="site-embed-actions">
+        <a class="btn btn-sm btn-ghost" asp-page="Details" asp-route-id="@Model.Item.Id">
+            <i class="ti ti-pencil" aria-hidden="true"></i> @T["action.edit"]
+        </a>
+        @if (!string.IsNullOrWhiteSpace(Model.Item.PreviewUrl))
+        {
+            <button type="button" class="btn btn-sm btn-ghost" data-site-reload title="@T["instances.reload"]" aria-label="@T["instances.reload"]">
+                <i class="ti ti-refresh" aria-hidden="true"></i>
+            </button>
+            <a class="btn btn-sm btn-ghost" href="@Model.Item.PreviewUrl" target="_blank" rel="noopener"
+               title="@T["instances.openSite"]" aria-label="@T["instances.openSite"]">
+                <i class="ti ti-external-link" aria-hidden="true"></i>
+            </a>
+        }
+    </div>
+}
+
+@if (string.IsNullOrWhiteSpace(Model.Item.PreviewUrl))
+{
+    <div class="site-embed-note">
+        <div class="alert alert-info">@T["instances.previewNoUrl"]</div>
+    </div>
+}
+else
+{
+    @if (Model.Item.PreviewIsGuessed)
+    {
+        <div class="site-embed-hint muted">
+            <i class="ti ti-info-circle" aria-hidden="true"></i>
+            @T["instances.previewGuessedHint"] <span class="mono">@Model.Item.PreviewUrl</span>
+        </div>
+    }
+    @* A site may refuse to be framed (X-Frame-Options / frame-ancestors). Cross-origin there is no
+       honest way to detect that, so instead of pretending to, the bar simply always offers the tab —
+       and this line says what an empty frame means. *@
+    <div class="site-embed">
+        <iframe class="site-embed-frame" data-site-frame src="@Model.Item.PreviewUrl" title="@Model.Item.Name"
+                referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>
+        <div class="site-embed-fallback muted">
+            @T["instances.embedBlocked"]
+            <a href="@Model.Item.PreviewUrl" target="_blank" rel="noopener">@T["instances.openSite"]</a>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script>
+        (function () {
+            var sel = document.querySelector('[data-site-switch]');
+            if (sel) sel.addEventListener('change', function () { if (sel.value) location.href = sel.value; });
+
+            var frame = document.querySelector('[data-site-frame]');
+            var reload = document.querySelector('[data-site-reload]');
+            // Re-assigning src rather than calling contentWindow.location.reload(): the frame is
+            // cross-origin, so reaching into it throws.
+            if (frame && reload) reload.addEventListener('click', function () { frame.src = frame.src; });
+        })();
+    </script>
+}

@@ -10,8 +10,13 @@
     <div class="list-toolbar">
         @if (!string.IsNullOrWhiteSpace(Model.Item.PreviewUrl))
         {
-            <a class="btn btn-sm btn-ghost" href="@Model.Item.PreviewUrl" target="_blank" rel="noopener">
-                <i class="ti ti-external-link" aria-hidden="true"></i> @T["instances.openSite"]
+            @* Two ways, side by side: framed here for looking, a tab for working. *@
+            <a class="btn btn-sm btn-ghost" asp-page="Site" asp-route-id="@Model.Item.Id">
+                <i class="ti ti-browser" aria-hidden="true"></i> @T["instances.openEmbedded"]
+            </a>
+            <a class="btn btn-sm btn-ghost" href="@Model.Item.PreviewUrl" target="_blank" rel="noopener"
+               title="@T["instances.openSite"]" aria-label="@T["instances.openSite"]">
+                <i class="ti ti-external-link" aria-hidden="true"></i>
             </a>
         }
         <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>

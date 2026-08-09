@@ -492,5 +492,9 @@
   "profiles.smtpOwn": "Own configuration",
   "profiles.smtpRemoveConfirm": "Stop rolling SMTP out? The values are kept, and instances keep the configuration they have.",
 
-  "components.exportJson": "Export as JSON"
+  "components.exportJson": "Export as JSON",
+
+  "instances.openEmbedded": "View site",
+  "instances.reload": "Reload",
+  "instances.embedBlocked": "This site does not allow embedding."
 }

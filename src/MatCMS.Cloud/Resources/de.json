@@ -492,5 +492,9 @@
   "profiles.smtpOwn": "Eigene Konfiguration",
   "profiles.smtpRemoveConfirm": "SMTP nicht mehr ausrollen? Die eingetragenen Werte bleiben erhalten, auf den Instanzen bleibt die Konfiguration stehen.",
 
-  "components.exportJson": "Als JSON exportieren"
+  "components.exportJson": "Als JSON exportieren",
+
+  "instances.openEmbedded": "Website ansehen",
+  "instances.reload": "Neu laden",
+  "instances.embedBlocked": "Diese Seite erlaubt keine Einbettung."
 }

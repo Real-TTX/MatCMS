@@ -92,9 +92,17 @@
                 @* The brand keeps its place and its background — losing the navigation should not
                    feel like leaving the product. It is the same block the sidebar shows, moved into
                    the only bar this page has. *@
-                <a class="admin-topbar-brand" asp-page="/Admin/Index" title="@Cloud.CloudName">
-                    <img class="admin-logo" src="@Cloud.LogoUrl" alt="@Cloud.CloudName" />
-                </a>
+                <div class="admin-topbar-brand">
+                    @* Deliberately the SAME markup and classes as the sidebar's brand, inside a
+                       block that repeats the sidebar's own width, background and padding — so the
+                       logo lands on exactly the same pixels and nothing in that corner moves when a
+                       page drops the menu. *@
+                    <div class="admin-brand">
+                        <a class="admin-brand-link" asp-page="/Admin/Index" title="@Cloud.CloudName">
+                            <img class="admin-logo" src="@Cloud.LogoUrl" alt="@Cloud.CloudName" />
+                        </a>
+                    </div>
+                </div>
             }
             <button type="button" class="admin-menu-toggle" data-admin-toggle aria-label="@T["nav.menu"]" aria-expanded="false">
                 <span></span><span></span><span></span>

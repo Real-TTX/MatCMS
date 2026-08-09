@@ -4,6 +4,11 @@
    .list-actions/.list-empty, .form-row/.form-section, .field-row, .cp-* (component preview).
    Only genuinely new things live here. */
 
+/* Height of the top bar, in one place so the shell with the menu and the shell without it cannot
+   drift apart. It is what the normal bar already measures: 18px padding + 33px title line box
+   (20px x line-height 1.65) + 18px padding. */
+:root { --topbar-h: 69px; }
+
 /* ============ Secrets ============ */
 /* A value shown exactly once (pairing token, join code): selectable, wraps, marked as sensitive. */
 .is-secret {
@@ -163,12 +168,41 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
     pointer-events: none;
 }
 
+/* ---- Bare shell: a page that wants the whole window --------------------------------------------
+   No sidebar and no hamburger — the page carries the only bar there is. The grid loses its first
+   column rather than hiding the aside in place, or the content would start 250px in from an empty
+   gutter. */
+.admin.admin-bare { grid-template-columns: 1fr; }
+.admin.admin-bare .admin-menu-toggle { display: none; }
+
+/* The top bar is the SAME height with and without the menu, so switching between the two moves
+   nothing below it. 69px is what the normal bar already measures: 18 + 33 + 18, where 33 is the
+   title's line box (20px x 1.65). As a minimum for every page, as a fixed height for the bare one —
+   whose contents are buttons and would otherwise land a few pixels short. */
+.admin-topbar { min-height: var(--topbar-h, 69px); }
+.admin-bare .admin-topbar { height: var(--topbar-h, 69px); position: relative; padding-left: 282px; }
+
+/* The brand keeps its place, its background and its exact geometry: this block repeats the
+   sidebar's width, colour, right border and padding, and the markup inside is the sidebar's own
+   .admin-brand — so the logo sits on the same pixels either way.
+   Absolutely positioned so it cannot influence the bar's height, and one pixel past the bottom so
+   it covers the bar's border there: in the normal shell the sidebar continues below that line, and
+   those pixels are grey, not a border. */
+.admin-topbar-brand {
+    position: absolute; top: 0; left: 0; bottom: -1px; width: 250px;
+    background: #edeff2;
+    border-right: 1px solid var(--line);
+    padding: 14px 14px 0;
+    overflow: hidden;
+}
+.admin-topbar-brand .admin-brand { margin-bottom: 0; }
+
 /* ---- Instance site, embedded in the shell ------------------------------------------------------
    Same trick the admin already uses for its live editor: the content area gives up its padding so
-   the frame can have the window, and the height is the viewport minus the topbar. */
+   the frame can have the window. The 1px is the bar's own bottom border. */
 .admin-content:has(.site-embed) { padding: 0; max-width: none; }
 
-.site-embed { position: relative; height: calc(100vh - 66px); background: var(--bg-alt, #f6f7f9); }
+.site-embed { position: relative; height: calc(100dvh - var(--topbar-h, 69px) - 1px); background: var(--bg-alt, #f6f7f9); }
 .site-embed-frame { position: relative; z-index: 1; width: 100%; height: 100%; border: 0; display: block; background: #fff; }
 
 /* Sits BEHIND the frame, so it is what remains visible when a site refuses to be framed. A blank
@@ -184,26 +218,14 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
 .site-embed-actions { display: flex; align-items: center; gap: 8px; }
 
 .site-embed-hint { display: flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 13px; border-bottom: 1px solid var(--line); background: #fff; }
-.admin-content:has(.site-embed-hint) .site-embed { height: calc(100vh - 66px - 34px); }
+.admin-content:has(.site-embed-hint) .site-embed { height: calc(100dvh - var(--topbar-h, 69px) - 1px - 34px); }
 .site-embed-note { padding: 32px; }
 
-.instance-url { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; margin-top: 2px; }
-
-/* A page that wants the whole window: no sidebar, no hamburger — just the bar it puts up top
-   itself. The grid loses its first column rather than hiding the aside in place, or the content
-   would start 250px in from an empty gutter. */
-.admin.admin-bare { grid-template-columns: 1fr; }
-.admin.admin-bare .admin-sidebar,
-.admin.admin-bare .admin-backdrop,
-.admin.admin-bare .admin-menu-toggle { display: none; }
-
-/* The brand block, moved out of the sidebar into the bar: same background, same width, so the
-   top-left corner of the window looks the same as on every other page. */
-.admin-topbar-brand {
-    display: flex; align-items: center; justify-content: center;
-    align-self: stretch; flex: 0 0 auto;
-    width: 250px; margin: -18px 32px -18px -32px; padding: 0 14px;
-    background: #edeff2; border-right: 1px solid var(--line);
+@media (max-width: 860px) {
+    /* The brand block would eat most of a phone screen; it shrinks to the logo and the bar reflows. */
+    .admin-bare .admin-topbar { padding-left: 16px; height: auto; }
+    .admin-topbar-brand { position: static; width: auto; bottom: auto; border-right: 0; background: none; padding: 0 12px 0 0; }
 }
-.admin-topbar-brand .admin-logo { max-height: 30px; width: auto; }
-@media (max-width: 860px) { .admin-topbar-brand { width: auto; margin-right: 16px; padding: 0 16px; } }
+
+/* The address under an instance's name in the list. */
+.instance-url { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; margin-top: 2px; }

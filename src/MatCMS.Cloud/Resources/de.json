@@ -496,6 +496,5 @@
   "instances.openEmbedded": "Website ansehen",
   "instances.reload": "Neu laden",
   "instances.embedBlocked": "Diese Seite erlaubt keine Einbettung.",
-
-  "instances.filterAllInstances": "Alle Instanzen"
+  "instances.filterAllProfiles": "Alle Profile"
 }

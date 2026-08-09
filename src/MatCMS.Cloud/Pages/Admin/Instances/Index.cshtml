@@ -21,23 +21,20 @@
                 <option value="drift">@T["instances.syncPending"]</option>
                 <option value="syncfailed">@T["instances.syncFailed"]</option>
             </select>
-            @* One instance out of the list. Server-side, so it narrows the tile view too — there it
-               also means only that one site gets loaded instead of all of them. *@
-            <select class="list-search" data-instance-filter aria-label="@T["instances.title"]">
-                <option value="@Url.Page("Index", new { profile = Model.FilteredProfile?.Id })">@T["instances.filterAllInstances"]</option>
-                @foreach (var inst in Model.AllInstances)
+            @* By profile — which profile an instance is on decides what it receives, so it is the
+               one thing worth narrowing a fleet by. Server-side, so it narrows the tile view too,
+               where it also means fewer sites being fetched at once.
+
+               This replaces the badge that used to say what the list was narrowed to: the dropdown
+               says it AND can undo it, which the badge could only do through a second button. *@
+            <select class="list-search" data-profile-filter aria-label="@T["profiles.title"]">
+                <option value="@Url.Page("Index")">@T["instances.filterAllProfiles"]</option>
+                @foreach (var p in Model.AllProfiles)
                 {
-                    <option value="@Url.Page("Index", new { profile = Model.FilteredProfile?.Id, instance = inst.Id })"
-                            selected="@(Model.FilteredInstance == inst.Id ? "selected" : null)">@inst.Name</option>
+                    <option value="@Url.Page("Index", new { profile = p.Id })"
+                            selected="@(Model.FilteredProfile?.Id == p.Id ? "selected" : null)">@p.Name</option>
                 }
             </select>
-            @if (Model.FilteredProfile is not null)
-            {
-                @* Says what the list is narrowed to and offers the way out; without it a filtered
-                   list is indistinguishable from an empty cloud. *@
-                <span class="badge badge-off">@Model.FilteredProfile.Name</span>
-                <a class="btn btn-sm btn-ghost" asp-page="Index">@T["instances.filterAll"]</a>
-            }
             <div class="view-toggle" data-list-viewtoggle>
                 <button type="button" class="vt-btn" data-view="table" title="@T["instances.viewTable"]" aria-label="@T["instances.viewTable"]"><i class="ti ti-list" aria-hidden="true"></i></button>
                 <button type="button" class="vt-btn" data-view="tiles" title="@T["instances.viewTiles"]" aria-label="@T["instances.viewTiles"]"><i class="ti ti-layout-grid" aria-hidden="true"></i></button>
@@ -272,7 +269,7 @@
 @section Scripts {
     <script>
         (function () {
-            var sel = document.querySelector('[data-instance-filter]');
+            var sel = document.querySelector('[data-profile-filter]');
             if (sel) sel.addEventListener('change', function () { if (sel.value) location.href = sel.value; });
         })();
     </script>

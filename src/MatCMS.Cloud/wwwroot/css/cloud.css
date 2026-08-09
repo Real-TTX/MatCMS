@@ -284,3 +284,13 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
 /* Pushed to the far end: closing is the one action that leaves, so it does not sit among the ones
    that stay. */
 .site-embed-actions .inst-close { margin-left: 10px; }
+
+/* A key/value row whose value carries its own action: the two sit on ONE line, the action right
+   behind the value it acts on. Otherwise the buttons collect at the bottom of the card and you have
+   to work out which row each belongs to. */
+.kv-value:has(.btn), .kv-value:has(.inline-form) {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+/* The secret block is display:block so it can stand alone elsewhere; next to a button it must not
+   claim the whole row. */
+.kv-value:has(.btn) .is-secret, .kv-value:has(.inline-form) .is-secret { flex: 0 1 auto; min-width: 0; }

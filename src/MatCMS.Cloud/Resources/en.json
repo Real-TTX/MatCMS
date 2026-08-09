@@ -496,6 +496,5 @@
   "instances.openEmbedded": "View site",
   "instances.reload": "Reload",
   "instances.embedBlocked": "This site does not allow embedding.",
-
-  "instances.filterAllInstances": "All instances"
+  "instances.filterAllProfiles": "All profiles"
 }

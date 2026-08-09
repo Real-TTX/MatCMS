@@ -26,7 +26,15 @@
         <h2>@T["profiles.enrollment"]</h2>
         <div class="kv">
             <div class="kv-label">@T["profiles.joinCode"]</div>
-            <div class="kv-value"><span class="mono is-secret">@Model.Item.JoinCode</span></div>
+            @* The action sits on the value it acts on, like "Instanzen anzeigen" does on the count —
+               a row of buttons under the card makes you look for what each one belongs to. *@
+            <div class="kv-value">
+                <span class="mono is-secret">@Model.Item.JoinCode</span>
+                <form class="inline-form" method="post" asp-page-handler="RotateCode" asp-route-id="@Model.Item.Id"
+                      onsubmit="return confirm('@T["profiles.rotateConfirm"]');">
+                    <button type="submit" class="btn btn-sm btn-ghost">@T["profiles.rotateCode"]</button>
+                </form>
+            </div>
         </div>
         <div class="kv">
             <div class="kv-label">@T["profiles.revision"]</div>
@@ -49,12 +57,6 @@
                     <a class="btn btn-sm btn-ghost" asp-page="/Admin/Instances/Index" asp-route-profile="@Model.Item.Id">@T["profiles.showInstances"]</a>
                 }
             </div>
-        </div>
-        <div class="list-actions">
-            <form class="inline-form" method="post" asp-page-handler="RotateCode" asp-route-id="@Model.Item.Id"
-                  onsubmit="return confirm('@T["profiles.rotateConfirm"]');">
-                <button type="submit" class="btn btn-ghost">@T["profiles.rotateCode"]</button>
-            </form>
         </div>
     </div>
 

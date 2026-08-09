@@ -19,9 +19,7 @@
                 <i class="ti ti-external-link" aria-hidden="true"></i>
             </a>
         }
-        @* Back to the list with this instance already selected — arriving from an instance
-           should not throw away which one you were looking at. *@
-        <a class="btn btn-sm btn-ghost" asp-page="Index" asp-route-instance="@Model.Item.Id">@T["action.back"]</a>
+        <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
     </div>
 </div>
 

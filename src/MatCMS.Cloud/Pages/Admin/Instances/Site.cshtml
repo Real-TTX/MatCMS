@@ -52,9 +52,9 @@
                 <i class="ti ti-external-link" aria-hidden="true"></i>
             </a>
         }
-        @* Back to the list, with this instance already selected — closing a view should return you
-           to where you came from, not to an unfiltered start. *@
-        <a class="btn btn-sm btn-ghost inst-close" asp-page="Index" asp-route-instance="@Model.Item.Id"
+        @* Back to the list, narrowed to this instance's profile — closing a view should return you
+           near where you came from, not to an unfiltered start. *@
+        <a class="btn btn-sm btn-ghost inst-close" asp-page="Index" asp-route-profile="@Model.Item.ProfileId"
            title="@T["action.close"]" aria-label="@T["action.close"]">
             <i class="ti ti-x" aria-hidden="true"></i>
         </a>

@@ -58,6 +58,32 @@ public class EmailService
         IEnumerable<string> to, string subject, string body, string? replyTo = null)
         => await SendCoreAsync(await GetConfigAsync(), to, subject, body, replyTo);
 
+    /// <summary>
+    /// Sends one of the declared mails, using the site's stored template for it.
+    /// <para>Returns (false, …) when the template is switched off — a caller that only wants to
+    /// notify somebody treats that like any other "not sent", and the operator's switch is the one
+    /// place that decides it.</para>
+    /// <para>A key with no stored row falls back to the built-in text rather than sending nothing:
+    /// a database that predates a new mail must not swallow it.</para>
+    /// </summary>
+    public async Task<(bool ok, string? error)> SendTemplateAsync(
+        string key, IEnumerable<string> to, IReadOnlyDictionary<string, string> values, string? replyTo = null)
+    {
+        var row = await _db.MailTemplates.AsNoTracking().FirstOrDefaultAsync(t => t.Key == key);
+        if (row is not null && !row.Enabled) return (false, "Diese Benachrichtigung ist deaktiviert.");
+
+        var def = MailTemplates.Find(key);
+        var subject = row?.Subject ?? def?.Subject;
+        var body = row?.Body ?? def?.Body;
+        if (string.IsNullOrWhiteSpace(subject) && string.IsNullOrWhiteSpace(body))
+            return (false, $"Für „{key}“ ist keine Vorlage hinterlegt.");
+
+        return await SendAsync(to,
+            MailTemplates.Render(subject ?? "", values),
+            MailTemplates.Render(body ?? "", values),
+            replyTo);
+    }
+
     /// <summary>Sends a test e-mail with an explicit (possibly unsaved) config — used by the SMTP test button.</summary>
     public async Task<(bool ok, string? error)> SendTestAsync(SmtpConfig cfg, string to)
         => await SendCoreAsync(cfg, new[] { to },

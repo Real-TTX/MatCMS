@@ -1035,5 +1035,23 @@
   "components.exportJson": "Als JSON exportieren",
   "plugins.importZip": "Plugin importieren",
   "plugins.importZipHint": "Ein Bündel mit gleichem Schlüssel aktualisiert ein vorhandenes Plugin; ein neues wird deaktiviert importiert, weil Plugin-Code serverseitig läuft.",
-  "plugins.importZipBtn": "ZIP importieren"
+  "plugins.importZipBtn": "ZIP importieren",
+
+  "nav.mailtemplates": "Mail-Vorlagen",
+  "mailtpl.title": "Mail-Vorlagen",
+  "mailtpl.none": "Noch keine Vorlagen vorhanden.",
+  "mailtpl.subject": "Betreff",
+  "mailtpl.body": "Text",
+  "mailtpl.enabled": "aktiv",
+  "mailtpl.disabled": "aus",
+  "mailtpl.enabledLabel": "Diese Benachrichtigung versenden",
+  "mailtpl.enabledHint": "Aus bedeutet: die Mail wird gar nicht erst verschickt. Die Vorlage bleibt erhalten.",
+  "mailtpl.placeholders": "Platzhalter",
+  "mailtpl.placeholdersHint": "Klicken fügt den Platzhalter an der Cursorposition ein — im Betreff oder im Text, je nachdem, wo du zuletzt warst.",
+  "mailtpl.unknownKey": "Zu diesem Schlüssel gibt es im Code keine Definition mehr, es werden also keine Platzhalter gefüllt:",
+  "mailtpl.noSmtp": "Für diese Website ist kein Mailversand eingerichtet. Die Vorlagen lassen sich bearbeiten, verschickt wird aber nichts.",
+  "mailtpl.test": "Testmail",
+  "mailtpl.testHint": "Verschickt die gespeicherte Vorlage mit Beispielwerten, damit sich der Text als Mail beurteilen lässt und nicht als Formularfeld.",
+  "mailtpl.testTo": "Empfänger",
+  "mailtpl.testSend": "Senden"
 }

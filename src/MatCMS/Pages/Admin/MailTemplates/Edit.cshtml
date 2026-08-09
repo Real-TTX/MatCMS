@@ -1,0 +1,96 @@
+@page "{id:int}"
+@model MatCMS.Pages.Admin.MailTemplates.EditModel
+@{
+    ViewData["Title"] = Model.Current.Name;
+}
+<div class="page-head">
+    <h1>@Model.Current.Name</h1>
+    <div class="list-toolbar">
+        <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
+    </div>
+</div>
+
+<div class="card">
+    @if (!string.IsNullOrWhiteSpace(Model.Error))
+    {
+        <div class="alert alert-error">@Model.Error</div>
+    }
+    <p class="muted">@Model.Current.Description</p>
+
+    <form method="post" class="form-grid" id="mailtpl-form" asp-route-id="@Model.Current.Id">
+        <label class="checkbox-row">
+            <input type="checkbox" name="Enabled" value="true" checked="@(Model.Enabled ? "checked" : null)" />
+            @T["mailtpl.enabledLabel"]
+        </label>
+        <div class="help">@T["mailtpl.enabledHint"]</div>
+
+        <div class="form-field">
+            <label for="Subject">@T["mailtpl.subject"]</label>
+            <input id="Subject" name="Subject" value="@Model.Subject" required />
+        </div>
+        <div class="form-field">
+            <label for="Body">@T["mailtpl.body"]</label>
+            <textarea id="Body" name="Body" rows="14" class="code" spellcheck="false">@Model.Body</textarea>
+        </div>
+
+        @if (Model.Definition is { Placeholders.Count: > 0 })
+        {
+            @* The list comes from the code that fills them in — the only honest source for what an
+               operator is allowed to write. Clicking one inserts it at the cursor. *@
+            <div class="form-field">
+                <label>@T["mailtpl.placeholders"]</label>
+                <div class="code-toolbar">
+                    @foreach (var p in Model.Definition.Placeholders)
+                    {
+                        <button type="button" class="token-chip" data-insert="{{@p.Token}}" title="@p.Description">{{@p.Token}}</button>
+                    }
+                </div>
+                <div class="help">@T["mailtpl.placeholdersHint"]</div>
+            </div>
+        }
+        else
+        {
+            <div class="help">@T["mailtpl.unknownKey"] <span class="mono">@Model.Current.Key</span></div>
+        }
+    </form>
+</div>
+
+<div class="card">
+    <h2>@T["mailtpl.test"]</h2>
+    <p class="muted">@T["mailtpl.testHint"]</p>
+    <form method="post" asp-page-handler="Test" asp-route-id="@Model.Current.Id">
+        <div class="form-field">
+            <label for="testTo">@T["mailtpl.testTo"]</label>
+            <input id="testTo" name="testTo" type="email" placeholder="test@@beispiel.de" spellcheck="false" />
+        </div>
+        <div class="form-actions"><button type="submit" class="btn btn-ghost">@T["mailtpl.testSend"]</button></div>
+    </form>
+</div>
+
+<div class="form-actions">
+    <button type="submit" class="btn" form="mailtpl-form">@T["action.save"]</button>
+</div>
+
+@section Scripts {
+    <script>
+        // Placeholder chips insert at the cursor of whichever field was last focused, so the same
+        // token can go into the subject or the body without two sets of buttons.
+        (function () {
+            var last = document.getElementById('Body');
+            ['Subject', 'Body'].forEach(function (id) {
+                var el = document.getElementById(id);
+                if (el) el.addEventListener('focus', function () { last = el; });
+            });
+            document.querySelectorAll('[data-insert]').forEach(function (chip) {
+                chip.addEventListener('click', function () {
+                    if (!last) return;
+                    var token = chip.getAttribute('data-insert');
+                    var start = last.selectionStart, end = last.selectionEnd;
+                    last.value = last.value.slice(0, start) + token + last.value.slice(end);
+                    last.focus();
+                    last.selectionStart = last.selectionEnd = start + token.length;
+                });
+            });
+        })();
+    </script>
+}

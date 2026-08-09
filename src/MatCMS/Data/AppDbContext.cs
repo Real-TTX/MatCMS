@@ -19,6 +19,7 @@ public class AppDbContext : DbContext
     public DbSet<FormSubmission> FormSubmissions => Set<FormSubmission>();
     public DbSet<Media> Media => Set<Media>();
     public DbSet<Component> Components => Set<Component>();
+    public DbSet<MailTemplate> MailTemplates => Set<MailTemplate>();
     public DbSet<Plugin> Plugins => Set<Plugin>();
     public DbSet<Post> Posts => Set<Post>();
 
@@ -33,6 +34,7 @@ public class AppDbContext : DbContext
         b.Entity<SiteSetting>().HasIndex(s => s.Key).IsUnique();
         b.Entity<Form>().HasIndex(f => f.Slug).IsUnique();
         b.Entity<Component>().HasIndex(c => c.Type).IsUnique();
+        b.Entity<MailTemplate>().HasIndex(m => m.Key).IsUnique();
         b.Entity<Menu>().HasIndex(m => m.Key).IsUnique();
 
         b.Entity<ContentBlock>()

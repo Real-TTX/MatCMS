@@ -1,0 +1,61 @@
+@page
+@model MatCMS.Pages.Admin.MailTemplates.IndexModel
+@{
+    ViewData["Title"] = T["mailtpl.title"];
+}
+<div data-list>
+    <div class="page-head">
+        <h1>@T["mailtpl.title"]</h1>
+        <div class="list-toolbar">
+            <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+        </div>
+    </div>
+
+    @if (!Model.MailConfigured)
+    {
+        @* Said once, here, rather than on every template: tuning the wording of mails that cannot
+           leave the building is time spent on nothing. *@
+        <div class="alert alert-info">@T["mailtpl.noSmtp"]</div>
+    }
+
+    <table class="data" data-list-table>
+        <thead>
+            <tr>
+                <th>@T["common.name"]</th>
+                <th>@T["mailtpl.subject"]</th>
+                <th>@T["common.status"]</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Items.Count == 0)
+            {
+                <partial name="_EmptyRow" model='@T["mailtpl.none"]' />
+            }
+            else
+            {
+                @foreach (var t in Model.Items)
+                {
+                    <tr data-search="@(t.Name + " " + t.Key + " " + t.Subject)">
+                        <td>
+                            <a asp-page="Edit" asp-route-id="@t.Id"><strong>@t.Name</strong></a>
+                            <div class="muted">@t.Description</div>
+                        </td>
+                        <td class="muted">@t.Subject</td>
+                        <td>
+                            @if (t.Enabled)
+                            {
+                                <span class="badge badge-on">@T["mailtpl.enabled"]</span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-off">@T["mailtpl.disabled"]</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+    <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+    @* No create action: which mails exist is decided by the code that sends them. *@
+</div>

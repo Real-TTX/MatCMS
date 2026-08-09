@@ -1035,5 +1035,23 @@
   "components.exportJson": "Export as JSON",
   "plugins.importZip": "Import plugin",
   "plugins.importZipHint": "A bundle with the same key updates an existing plugin; a new one is imported disabled, because plugin code runs server-side.",
-  "plugins.importZipBtn": "Import ZIP"
+  "plugins.importZipBtn": "Import ZIP",
+
+  "nav.mailtemplates": "Mail templates",
+  "mailtpl.title": "Mail templates",
+  "mailtpl.none": "No templates yet.",
+  "mailtpl.subject": "Subject",
+  "mailtpl.body": "Body",
+  "mailtpl.enabled": "on",
+  "mailtpl.disabled": "off",
+  "mailtpl.enabledLabel": "Send this notification",
+  "mailtpl.enabledHint": "Off means the mail is not sent at all. The template is kept.",
+  "mailtpl.placeholders": "Placeholders",
+  "mailtpl.placeholdersHint": "Clicking inserts the placeholder at the cursor — in the subject or the body, whichever you were in last.",
+  "mailtpl.unknownKey": "The code no longer declares this key, so no placeholders will be filled:",
+  "mailtpl.noSmtp": "No mail delivery is configured for this site. Templates can be edited, but nothing will be sent.",
+  "mailtpl.test": "Test mail",
+  "mailtpl.testHint": "Sends the saved template with example values, so the wording can be judged as mail rather than as a form field.",
+  "mailtpl.testTo": "Recipient",
+  "mailtpl.testSend": "Send"
 }

@@ -13,12 +13,14 @@ public class ViewModel : PageModel
 {
     private readonly AppDbContext _db;
     private readonly EmailService _email;
+    private readonly SiteContext _site;
 
-    public ViewModel(AppDbContext db, BlockRegistry registry, EmailService email)
+    public ViewModel(AppDbContext db, BlockRegistry registry, EmailService email, SiteContext site)
     {
         _db = db;
         Registry = registry;
         _email = email;
+        _site = site;
     }
 
     public BlockRegistry Registry { get; }
@@ -138,18 +140,28 @@ public class ViewModel : PageModel
             }
             if (recipients.Count == 0) return;
 
-            var body = new System.Text.StringBuilder();
-            body.AppendLine($"Neue Einsendung über das Formular „{form.Name}“:");
-            body.AppendLine(new string('-', 44));
+            // The wording lives in an editable template now (Admin → Mail-Vorlagen); this only
+            // supplies what goes into it. The answers arrive as ONE placeholder rather than one per
+            // field, because a form's fields are whatever its author made them — a template cannot
+            // name them in advance.
+            var fields = new System.Text.StringBuilder();
             foreach (var (label, value) in answered)
-                body.AppendLine($"{label}: {(string.IsNullOrWhiteSpace(value) ? "—" : value)}");
+                fields.AppendLine($"{label}: {(string.IsNullOrWhiteSpace(value) ? "—" : value)}");
 
             // Reply straight to the visitor if the form captured an e-mail address.
             var replyTo = inputs.FirstOrDefault(e => e.Type == "email") is { Id: var eid }
                           && values.TryGetValue(eid, out var ev) && !string.IsNullOrWhiteSpace(ev)
                 ? ev.Trim() : null;
 
-            await _email.SendAsync(recipients, $"Neue Einsendung: {form.Name}", body.ToString(), replyTo);
+            await _email.SendTemplateAsync(MatCMS.Services.MailTemplates.FormSubmission, recipients,
+                new Dictionary<string, string>
+                {
+                    ["form_name"] = form.Name,
+                    ["fields"] = fields.ToString().TrimEnd(),
+                    ["site_name"] = _site.SiteName,
+                    ["date"] = DateTime.Now.ToString("dd.MM.yyyy HH:mm"),
+                },
+                replyTo);
         }
         catch
         {

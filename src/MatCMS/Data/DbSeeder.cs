@@ -96,6 +96,19 @@ public static class DbSeeder
         await EnsureThemeAsync(db, TechThemeName, BuildTechTemplate);
         await EnsureThemeAsync(db, ArtThemeName, BuildArtTemplate);
 
+        // Every declared mail gets its row, so the editor has something to show and a site can
+        // change the wording without a release. Existing rows are LEFT ALONE — this runs on every
+        // start, and re-seeding would throw away what an operator wrote.
+        foreach (var def in MatCMS.Services.MailTemplates.All)
+        {
+            if (await db.MailTemplates.AnyAsync(t => t.Key == def.Key)) continue;
+            db.MailTemplates.Add(new MailTemplate
+            {
+                Key = def.Key, Name = def.Name, Description = def.Description,
+                Subject = def.Subject, Body = def.Body
+            });
+        }
+
         // A ready-made example component so the component designer has something to look at.
         if (!await db.Components.AnyAsync(c => c.Type == ExampleComponentType))
         {

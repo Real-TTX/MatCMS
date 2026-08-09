@@ -180,7 +180,7 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
    title's line box (20px x 1.65). As a minimum for every page, as a fixed height for the bare one —
    whose contents are buttons and would otherwise land a few pixels short. */
 .admin-topbar { min-height: var(--topbar-h, 69px); }
-.admin-bare .admin-topbar { height: var(--topbar-h, 69px); position: relative; padding-left: 282px; }
+.admin-bare .admin-topbar { height: var(--topbar-h, 69px); position: relative; padding: 0 32px 0 282px; }
 
 /* The brand keeps its place, its background and its exact geometry: this block repeats the
    sidebar's width, colour, right border and padding, and the markup inside is the sidebar's own
@@ -213,8 +213,6 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
     padding: 24px; text-align: center; font-size: 14px;
 }
 
-.site-embed-switch { min-width: 0; }
-.site-embed-switch select { max-width: 320px; font-family: var(--font-head); font-weight: 600; }
 .site-embed-actions { display: flex; align-items: center; gap: 8px; }
 
 .site-embed-hint { display: flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 13px; border-bottom: 1px solid var(--line); background: #fff; }
@@ -229,3 +227,60 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
 
 /* The address under an instance's name in the list. */
 .instance-url { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; margin-top: 2px; }
+
+/* ---- Instance picker ---------------------------------------------------------------------------
+   A native <select> cannot show a picture, and the picture is what actually tells two customer
+   sites apart — their names all look alike. The thumbnails are live frames, filled on first open
+   so drawing this menu does not fetch every site on every page view. */
+.inst-picker { position: relative; min-width: 0; }
+
+.inst-picker-btn {
+    display: flex; align-items: center; gap: 10px;
+    height: 44px; max-width: 340px; padding: 0 14px;
+    background: #fff; border: 1px solid var(--line); border-radius: 10px;
+    font: inherit; font-family: var(--font-head); font-weight: 600; font-size: 16px;
+    color: inherit; cursor: pointer;
+    transition: border-color .12s;
+}
+.inst-picker-btn:hover { border-color: var(--accent); }
+.inst-picker-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inst-picker-caret { font-size: 15px; color: var(--muted); flex: 0 0 auto; margin-left: auto; }
+
+.inst-picker-menu {
+    position: absolute; top: calc(100% + 6px); left: 0; z-index: 40;
+    width: 340px; max-height: 70vh; overflow-y: auto;
+    background: #fff; border: 1px solid var(--line); border-radius: 12px;
+    box-shadow: 0 18px 44px rgba(0, 0, 0, .16);
+    padding: 6px;
+}
+.inst-picker-menu[hidden] { display: none; }
+
+.inst-picker-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 8px; border-radius: 9px;
+    text-decoration: none; color: inherit;
+}
+.inst-picker-item:hover { background: var(--bg-alt, #f6f7f9); }
+.inst-picker-item.is-current { background: var(--bg-alt, #f6f7f9); outline: 1px solid var(--line); }
+
+/* Same scaled-down desktop frame the tiles use: a site rendered at phone width is a different
+   design, and the thumbnail should show the one the operator means. */
+.inst-picker-shot {
+    position: relative; flex: 0 0 auto;
+    width: 84px; height: 56px; overflow: hidden;
+    border: 1px solid var(--line); border-radius: 6px; background: var(--bg-alt, #f6f7f9);
+}
+.inst-picker-shot iframe {
+    position: absolute; top: 0; left: 0;
+    width: 1180px; height: 787px; border: 0;
+    transform: scale(.0712); transform-origin: 0 0;
+    pointer-events: none;
+}
+
+.inst-picker-meta { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.inst-picker-meta strong { font-size: 14px; }
+.inst-picker-meta span { font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Pushed to the far end: closing is the one action that leaves, so it does not sit among the ones
+   that stay. */
+.site-embed-actions .inst-close { margin-left: 10px; }

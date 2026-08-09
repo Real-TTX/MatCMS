@@ -10,13 +10,30 @@
     @* The switcher stands where the page title normally does: on this page the instance IS the title,
        and being able to step to the next one without going back to the list is the reason to stay in
        the cloud rather than opening a tab. *@
-    <div class="site-embed-switch">
-        <select data-site-switch aria-label="@T["instances.title"]">
+    <div class="inst-picker" data-inst-picker>
+        <button type="button" class="inst-picker-btn" data-inst-toggle aria-haspopup="listbox" aria-expanded="false">
+            <span class="inst-picker-name">@Model.Item.Name</span>
+            <i class="ti ti-chevron-down inst-picker-caret" aria-hidden="true"></i>
+        </button>
+        <div class="inst-picker-menu" data-inst-menu hidden role="listbox" aria-label="@T["instances.title"]">
             @foreach (var i in Model.Switchable)
             {
-                <option value="@Url.Page("Site", new { id = i.Id })" selected="@(i.Id == Model.Item.Id ? "selected" : null)">@i.Name</option>
+                <a class="inst-picker-item@(i.Id == Model.Item.Id ? " is-current" : "")" role="option"
+                   aria-selected="@(i.Id == Model.Item.Id ? "true" : "false")"
+                   href="@Url.Page("Site", new { id = i.Id })">
+                    <span class="inst-picker-shot">
+                        @* data-src, not src: opening this page must not fetch every customer site at
+                           once. The frames are filled the first time the menu is opened. *@
+                        <iframe data-src="@i.PreviewUrl" title="@i.Name" tabindex="-1" scrolling="no"
+                                referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts"></iframe>
+                    </span>
+                    <span class="inst-picker-meta">
+                        <strong>@i.Name</strong>
+                        <span class="muted mono">@i.PreviewUrl</span>
+                    </span>
+                </a>
             }
-        </select>
+        </div>
     </div>
 }
 
@@ -35,6 +52,12 @@
                 <i class="ti ti-external-link" aria-hidden="true"></i>
             </a>
         }
+        @* Back to the list, with this instance already selected — closing a view should return you
+           to where you came from, not to an unfiltered start. *@
+        <a class="btn btn-sm btn-ghost inst-close" asp-page="Index" asp-route-instance="@Model.Item.Id"
+           title="@T["action.close"]" aria-label="@T["action.close"]">
+            <i class="ti ti-x" aria-hidden="true"></i>
+        </a>
     </div>
 }
 
@@ -69,8 +92,28 @@ else
 @section Scripts {
     <script>
         (function () {
-            var sel = document.querySelector('[data-site-switch]');
-            if (sel) sel.addEventListener('change', function () { if (sel.value) location.href = sel.value; });
+            var picker = document.querySelector('[data-inst-picker]');
+            var toggle = picker && picker.querySelector('[data-inst-toggle]');
+            var menu = picker && picker.querySelector('[data-inst-menu]');
+            var loaded = false;
+            function open(on) {
+                if (!menu) return;
+                menu.hidden = !on;
+                toggle.setAttribute('aria-expanded', on ? 'true' : 'false');
+                // First open fills the thumbnails. Doing it on page load would fetch every customer
+                // site just to draw a menu nobody may open.
+                if (on && !loaded) {
+                    loaded = true;
+                    menu.querySelectorAll('iframe[data-src]').forEach(function (fr) {
+                        fr.src = fr.getAttribute('data-src');
+                    });
+                }
+            }
+            if (toggle) toggle.addEventListener('click', function () { open(menu.hidden); });
+            document.addEventListener('click', function (e) {
+                if (picker && !picker.contains(e.target)) open(false);
+            });
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') open(false); });
 
             var frame = document.querySelector('[data-site-frame]');
             var reload = document.querySelector('[data-site-reload]');

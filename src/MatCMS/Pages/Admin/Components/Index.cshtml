@@ -50,13 +50,18 @@
                 }
             </div>
         }
-        <div class="list-actions">
-            <a class="btn" asp-page="Create">@T["components.new"]</a>
-            @if (Model.CloudConnected)
-            {
-                <a class="btn btn-ghost" asp-page="Index" asp-route-browse="true">@T["plugins.browseCloud"]</a>
-            }
-        </div>
+        <partial name="_AddMenu" model='AddMenus.Payload(T, "components", Url.Page("Create")!, "components.new", Model.CloudConnected ? Url.Page("Index", new { browse = true }) : null, "import-component")' />
+    </div>
+
+    <div class="card" id="import-component" hidden>
+        <h2>@T["components.importJson"]</h2>
+        <p class="muted">@T["components.importJsonHint"]</p>
+        <form method="post" asp-page-handler="Import">
+            <div class="form-field">
+                <textarea name="componentJson" rows="6" spellcheck="false" placeholder='{ "Type": "..." }'></textarea>
+            </div>
+            <div class="form-actions"><button type="submit" class="btn">@T["templates.importBtn"]</button></div>
+        </form>
     </div>
 </div>
 

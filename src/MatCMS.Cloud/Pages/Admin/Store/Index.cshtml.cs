@@ -1,3 +1,4 @@
+using MatCMS.Shared;
 using MatCMS.Cloud.Data;
 using MatCMS.Cloud.Models;
 using Microsoft.AspNetCore.Mvc;
@@ -83,7 +84,7 @@ public class IndexModel : PageModel
     /// updates the entry every profile that selected it already points at.</summary>
     public async Task<IActionResult> OnPostImportComponentAsync(string? componentJson)
     {
-        using var doc = Services.JsonImport.TryParse(componentJson);
+        using var doc = JsonImport.TryParse(componentJson);
         if (doc is null)
         {
             TempData["FlashError"] = "Bitte gültiges Komponenten-JSON einfügen.";
@@ -91,8 +92,8 @@ public class IndexModel : PageModel
         }
 
         var root = doc.RootElement;
-        var type = Services.JsonImport.Text(root, "Type").Trim().ToLowerInvariant();
-        var name = Services.JsonImport.Text(root, "Name").Trim();
+        var type = JsonImport.Text(root, "Type").Trim().ToLowerInvariant();
+        var name = JsonImport.Text(root, "Name").Trim();
         if (type.Length == 0 || name.Length == 0)
         {
             TempData["FlashError"] = "Im JSON fehlen Typ oder Name.";
@@ -106,10 +107,10 @@ public class IndexModel : PageModel
             _db.StoreComponents.Add(row);
         }
         row.Name = name;
-        row.Description = Services.JsonImport.Text(root, "Description");
-        row.Icon = Services.JsonImport.Text(root, "Icon");
-        row.FieldsJson = Services.JsonImport.Raw(root, "FieldsJson", "[]");
-        row.TemplateHtml = Services.JsonImport.Text(root, "TemplateHtml");
+        row.Description = JsonImport.Text(root, "Description");
+        row.Icon = JsonImport.Text(root, "Icon");
+        row.FieldsJson = JsonImport.Raw(root, "FieldsJson", "[]");
+        row.TemplateHtml = JsonImport.Text(root, "TemplateHtml");
 
         await _db.SaveChangesAsync();
         TempData["Flash"] = $"Komponente \"{row.Name}\" in den Store importiert.";

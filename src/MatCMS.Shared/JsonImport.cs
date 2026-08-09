@@ -1,12 +1,16 @@
 using System.Text.Json;
 
-namespace MatCMS.Cloud.Services;
+namespace MatCMS.Shared;
 
 /// <summary>
 /// Reading the JSON blobs the editors export. Every import path needs the same two things: parse
 /// without throwing at the operator, and look properties up regardless of whether the producer wrote
 /// <c>Name</c> or <c>name</c> — MatCMS's exports are PascalCase, hand-written JSON usually is not,
 /// and refusing one of them would be arbitrary.
+/// <para>It lives here rather than in either application because both ends read the SAME payloads:
+/// a template exported on a site is imported into a cloud profile, and a component built in a
+/// profile is imported back onto a site. Two readers would eventually disagree about what the
+/// format allows.</para>
 /// </summary>
 public static class JsonImport
 {

@@ -40,8 +40,17 @@
     }
 </div>
 
-<div class="list-actions">
-    <a class="btn" asp-page="Create">@T["templates.create"]</a>
+<partial name="_AddMenu" model='AddMenus.Payload(T, "templates", Url.Page("Create")!, "templates.create", Model.CloudConnected ? Url.Page("Index", new { browse = true }) : null, "import-template")' />
+
+<div class="card" id="import-template" hidden>
+    <h2>@T["templates.importJson"]</h2>
+    <p class="muted">@T["templates.importJsonHint"]</p>
+    <form method="post" asp-page-handler="Import">
+        <div class="form-field">
+            <textarea name="templateJson" rows="6" spellcheck="false" placeholder='{ "Name": "..." }'></textarea>
+        </div>
+        <div class="form-actions"><button type="submit" class="btn">@T["templates.importBtn"]</button></div>
+    </form>
 </div>
 
 @* The cloud catalogue opens as a store dialog, not as a card under the list — see _StoreDialog. *@

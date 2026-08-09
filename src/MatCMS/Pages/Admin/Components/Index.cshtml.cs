@@ -69,4 +69,45 @@ public class IndexModel : PageModel
         }
         return RedirectToPage();
     }
+
+    /// <summary>
+    /// Takes the JSON a component editor exports — this one or a cloud profile's. The TYPE is the
+    /// identity, because that is what a {{placeholder}} block on an existing page refers to:
+    /// importing a type that already exists has to update it, or the blocks already placed would
+    /// point at the older of two components.
+    /// </summary>
+    public async Task<IActionResult> OnPostImportAsync(string? componentJson)
+    {
+        using var doc = JsonImport.TryParse(componentJson);
+        if (doc is null)
+        {
+            TempData["FlashError"] = "Bitte gültiges Komponenten-JSON einfügen.";
+            return RedirectToPage();
+        }
+
+        var root = doc.RootElement;
+        var type = JsonImport.Text(root, "Type").Trim().ToLowerInvariant();
+        var name = JsonImport.Text(root, "Name").Trim();
+        if (type.Length == 0 || name.Length == 0)
+        {
+            TempData["FlashError"] = "Im JSON fehlen Typ oder Name.";
+            return RedirectToPage();
+        }
+
+        var row = await _db.Components.FirstOrDefaultAsync(c => c.Type == type);
+        if (row is null)
+        {
+            row = new Component { Type = type };
+            _db.Components.Add(row);
+        }
+        row.Name = name;
+        row.Description = JsonImport.Text(root, "Description");
+        row.Icon = JsonImport.Text(root, "Icon");
+        row.FieldsJson = JsonImport.Raw(root, "FieldsJson", "[]");
+        row.TemplateHtml = JsonImport.Text(root, "TemplateHtml");
+
+        await _db.SaveChangesAsync();
+        TempData["Flash"] = $"Komponente \"{row.Name}\" importiert.";
+        return RedirectToPage();
+    }
 }

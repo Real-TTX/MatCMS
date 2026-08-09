@@ -4,6 +4,7 @@ using MatCMS.Data;
 using MatCMS.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.EntityFrameworkCore;
 
 namespace MatCMS.Pages.Admin.Components;
 
@@ -92,5 +93,22 @@ public class EditModel : PageModel
         s = s.Trim().ToLowerInvariant()
             .Replace("ä", "ae").Replace("ö", "oe").Replace("ü", "ue").Replace("ß", "ss");
         return Regex.Replace(s, "[^a-z0-9]+", "_").Trim('_');
+    }
+
+    /// <summary>
+    /// Exports the component as plain JSON — the hand-off format in both directions: paste it into
+    /// a MatCMS.Cloud profile to roll it out, or into another site's Komponenten list. Deliberately
+    /// the same shape the importers read, and deliberately not the backup ZIP: a component is one
+    /// row, not an archive.
+    /// </summary>
+    public async Task<IActionResult> OnGetExportJsonAsync(int id)
+    {
+        var c = await _db.Components.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
+        if (c is null) return RedirectToPage("Index");
+
+        var payload = new { c.Type, c.Name, c.Description, c.Icon, c.FieldsJson, c.TemplateHtml };
+        var json = System.Text.Json.JsonSerializer.Serialize(payload, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+        var slug = MatCMS.Services.BackupManager.FileSlug(c.Type);
+        return File(System.Text.Encoding.UTF8.GetBytes(json), "application/json", $"component-{slug}.json");
     }
 }

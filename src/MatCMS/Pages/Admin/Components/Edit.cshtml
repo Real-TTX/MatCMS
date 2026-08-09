@@ -5,7 +5,12 @@
 }
 <div class="page-head">
     <h1>@T["components.edit"]</h1>
-    <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
+    <div style="display:flex;gap:8px;align-items:center;">
+        <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-page-handler="ExportJson" asp-route-id="@Model.Current.Id">
+            <i class="ti ti-download" aria-hidden="true"></i> @T["components.exportJson"]
+        </a>
+        <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
+    </div>
 </div>
 
 <div class="card">

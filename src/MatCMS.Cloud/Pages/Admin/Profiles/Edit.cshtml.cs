@@ -1,3 +1,4 @@
+using MatCMS.Shared;
 using System.Text.Json;
 using MatCMS.Cloud.Data;
 using MatCMS.Cloud.Models;
@@ -483,7 +484,7 @@ public class EditModel : PageModel
     /// </summary>
     public async Task<IActionResult> OnPostImportComponentAsync(int id, string? componentJson)
     {
-        using var doc = Services.JsonImport.TryParse(componentJson);
+        using var doc = JsonImport.TryParse(componentJson);
         if (doc is null)
         {
             TempData["FlashError"] = "Bitte gültiges Komponenten-JSON einfügen.";
@@ -491,8 +492,8 @@ public class EditModel : PageModel
         }
 
         var root = doc.RootElement;
-        var type = Services.JsonImport.Text(root, "Type").Trim().ToLowerInvariant();
-        var name = Services.JsonImport.Text(root, "Name").Trim();
+        var type = JsonImport.Text(root, "Type").Trim().ToLowerInvariant();
+        var name = JsonImport.Text(root, "Name").Trim();
         if (type.Length == 0 || name.Length == 0)
         {
             TempData["FlashError"] = "Im JSON fehlen Typ oder Name.";
@@ -506,10 +507,10 @@ public class EditModel : PageModel
             _db.ProfileComponents.Add(row);
         }
         row.Name = name;
-        row.Description = Services.JsonImport.Text(root, "Description");
-        row.Icon = Services.JsonImport.Text(root, "Icon");
-        row.FieldsJson = Services.JsonImport.Raw(root, "FieldsJson", "[]");
-        row.TemplateHtml = Services.JsonImport.Text(root, "TemplateHtml");
+        row.Description = JsonImport.Text(root, "Description");
+        row.Icon = JsonImport.Text(root, "Icon");
+        row.FieldsJson = JsonImport.Raw(root, "FieldsJson", "[]");
+        row.TemplateHtml = JsonImport.Text(root, "TemplateHtml");
 
         await _db.SaveChangesAsync();
         await _profiles.TouchAsync(id);
@@ -524,7 +525,7 @@ public class EditModel : PageModel
     /// </summary>
     public async Task<IActionResult> OnPostImportUserAsync(int id, string? userJson)
     {
-        using var doc = Services.JsonImport.TryParse(userJson);
+        using var doc = JsonImport.TryParse(userJson);
         if (doc is null)
         {
             TempData["FlashError"] = "Bitte gültiges Benutzer-JSON einfügen.";
@@ -532,8 +533,8 @@ public class EditModel : PageModel
         }
 
         var root = doc.RootElement;
-        var username = Services.JsonImport.Text(root, "Username").Trim();
-        var hash = Services.JsonImport.Text(root, "PasswordHash").Trim();
+        var username = JsonImport.Text(root, "Username").Trim();
+        var hash = JsonImport.Text(root, "PasswordHash").Trim();
         if (username.Length == 0 || hash.Length == 0)
         {
             TempData["FlashError"] = "Im JSON fehlen Benutzername oder Passwort-Hash.";
@@ -546,10 +547,10 @@ public class EditModel : PageModel
             row = new ProfileUser { ProfileId = id, Username = username };
             _db.ProfileUsers.Add(row);
         }
-        row.Email = Services.JsonImport.Text(root, "Email");
-        row.DisplayName = Services.JsonImport.Text(root, "DisplayName");
+        row.Email = JsonImport.Text(root, "Email");
+        row.DisplayName = JsonImport.Text(root, "DisplayName");
         row.PasswordHash = hash;
-        row.Role = Services.JsonImport.Text(root, "Role", "Admin");
+        row.Role = JsonImport.Text(root, "Role", "Admin");
 
         await _db.SaveChangesAsync();
         await _profiles.TouchAsync(id);

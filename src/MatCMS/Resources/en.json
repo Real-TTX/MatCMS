@@ -1019,5 +1019,21 @@
   "settings.translate.apiKey": "API key",
   "settings.translate.apiKeyHelp": "DeepL: required. LibreTranslate: only if your instance requires a key.",
   "settings.translate.url": "Server URL (LibreTranslate only)",
-  "settings.translate.urlHelp": "e.g. http://libretranslate:5000 (container on the same Docker network) or a public instance."
+  "settings.translate.urlHelp": "e.g. http://libretranslate:5000 (container on the same Docker network) or a public instance.",
+
+  "add.button": "Add",
+  "add.fromCloud": "From the cloud",
+  "add.fromCloudHint": "Browse the connected cloud’s catalogue and install from it.",
+  "add.createHint": "Create one from scratch.",
+  "add.import": "Import",
+  "add.importHint": "Paste an exported entry.",
+  "templates.importJson": "Import template",
+  "templates.importJsonHint": "Paste the JSON from a template editor — this site, another MatCMS installation, or a cloud profile. A template with the same name is overwritten.",
+  "templates.importBtn": "Import JSON",
+  "components.importJson": "Import component",
+  "components.importJsonHint": "Paste the JSON from a component editor. A component with the same type is overwritten — blocks on existing pages keep pointing at it.",
+  "components.exportJson": "Export as JSON",
+  "plugins.importZip": "Import plugin",
+  "plugins.importZipHint": "A bundle with the same key updates an existing plugin; a new one is imported disabled, because plugin code runs server-side.",
+  "plugins.importZipBtn": "Import ZIP"
 }

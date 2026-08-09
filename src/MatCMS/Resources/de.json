@@ -1019,5 +1019,21 @@
   "settings.translate.apiKey": "API-Schlüssel",
   "settings.translate.apiKeyHelp": "DeepL: erforderlich. LibreTranslate: nur falls die Instanz einen Schlüssel verlangt.",
   "settings.translate.url": "Server-URL (nur LibreTranslate)",
-  "settings.translate.urlHelp": "z. B. http://libretranslate:5000 (Container im selben Docker-Netz) oder eine öffentliche Instanz."
+  "settings.translate.urlHelp": "z. B. http://libretranslate:5000 (Container im selben Docker-Netz) oder eine öffentliche Instanz.",
+
+  "add.button": "Hinzufügen",
+  "add.fromCloud": "Aus der Cloud",
+  "add.fromCloudHint": "Den Katalog der verbundenen Cloud durchsuchen und übernehmen.",
+  "add.createHint": "Von Grund auf neu anlegen.",
+  "add.import": "Importieren",
+  "add.importHint": "Einen exportierten Eintrag einfügen.",
+  "templates.importJson": "Template importieren",
+  "templates.importJsonHint": "Das JSON aus einem Template-Editor hier einfügen — von dieser Seite, einer anderen MatCMS-Installation oder aus einem Cloud-Profil. Ein gleichnamiges Template wird überschrieben.",
+  "templates.importBtn": "JSON importieren",
+  "components.importJson": "Komponente importieren",
+  "components.importJsonHint": "Das JSON aus einem Komponenten-Editor hier einfügen. Eine Komponente mit gleichem Typ wird überschrieben — Blöcke auf bestehenden Seiten zeigen weiter auf sie.",
+  "components.exportJson": "Als JSON exportieren",
+  "plugins.importZip": "Plugin importieren",
+  "plugins.importZipHint": "Ein Bündel mit gleichem Schlüssel aktualisiert ein vorhandenes Plugin; ein neues wird deaktiviert importiert, weil Plugin-Code serverseitig läuft.",
+  "plugins.importZipBtn": "ZIP importieren"
 }

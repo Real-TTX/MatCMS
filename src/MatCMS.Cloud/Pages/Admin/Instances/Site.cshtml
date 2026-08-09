@@ -2,6 +2,8 @@
 @model MatCMS.Cloud.Pages.Admin.Instances.SiteModel
 @{
     ViewData["Title"] = Model.Item.Name;
+    // No sidebar: the site gets the window, and this page carries its own bar.
+    ViewData["NoSidebar"] = true;
 }
 
 @section TopbarTitle {

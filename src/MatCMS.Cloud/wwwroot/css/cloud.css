@@ -188,3 +188,22 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
 .site-embed-note { padding: 32px; }
 
 .instance-url { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; margin-top: 2px; }
+
+/* A page that wants the whole window: no sidebar, no hamburger — just the bar it puts up top
+   itself. The grid loses its first column rather than hiding the aside in place, or the content
+   would start 250px in from an empty gutter. */
+.admin.admin-bare { grid-template-columns: 1fr; }
+.admin.admin-bare .admin-sidebar,
+.admin.admin-bare .admin-backdrop,
+.admin.admin-bare .admin-menu-toggle { display: none; }
+
+/* The brand block, moved out of the sidebar into the bar: same background, same width, so the
+   top-left corner of the window looks the same as on every other page. */
+.admin-topbar-brand {
+    display: flex; align-items: center; justify-content: center;
+    align-self: stretch; flex: 0 0 auto;
+    width: 250px; margin: -18px 32px -18px -32px; padding: 0 14px;
+    background: #edeff2; border-right: 1px solid var(--line);
+}
+.admin-topbar-brand .admin-logo { max-height: 30px; width: auto; }
+@media (max-width: 860px) { .admin-topbar-brand { width: auto; margin-right: 16px; padding: 0 16px; } }

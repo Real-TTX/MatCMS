@@ -27,7 +27,7 @@
 
   "profiles.title": "Profiles",
   "profiles.intro": "A profile bundles configuration and rules. Instances that enroll with a profile's join code land in it automatically and receive its settings.",
-  "profiles.create": "Create profile",
+  "profiles.create": "Create",
   "profiles.createIntro": "Name and description are enough. Join code, contents and behaviour are set on the profile itself afterwards.",
   "profiles.default": "default",
   "profiles.deleteConfirm": "Really delete this profile? Assigned instances keep running but stop receiving configuration.",
@@ -379,7 +379,7 @@
   "dashboard.noEvents": "No events yet.",
 
   "instances.title": "Instances",
-  "instances.add": "Add instance",
+  "instances.add": "Add",
   "instances.empty": "No instance connected yet. Create one and paste its id and token into MatCMS.",
   "instances.hosting": "Hosting",
   "instances.version": "Version",
@@ -455,11 +455,10 @@
   "settings.smtpTest": "Send test",
 
   "users.title": "Users",
-  "users.add": "Add user",
+  "users.add": "Create",
   "users.edit": "Edit user",
   "users.username": "Username",
   "users.email": "E-mail",
-  "users.emailHint": "Used as the login and as the default notification recipient.",
   "users.displayName": "Display name",
   "users.password": "Password",
   "users.passwordKeep": "leave unchanged",
@@ -471,10 +470,10 @@
   "add.createHint": "Create one from scratch.",
   "add.import": "Import",
   "add.importHint": "Paste an exported entry as JSON.",
-  "add.createUser": "Create own user",
-  "add.createPlugin": "Create own plugin",
-  "add.createComponent": "Create own component",
-  "add.createTemplate": "Create own template",
+  "add.createUser": "Create your own",
+  "add.createPlugin": "Create your own",
+  "add.createComponent": "Create your own",
+  "add.createTemplate": "Create your own",
   "import.componentTitle": "Import component",
   "import.componentHint": "Paste the JSON from MatCMS under Components → open component → “Export as JSON”. A component with the same type is overwritten.",
   "import.userTitle": "Import user",
@@ -496,5 +495,7 @@
 
   "instances.openEmbedded": "View site",
   "instances.reload": "Reload",
-  "instances.embedBlocked": "This site does not allow embedding."
+  "instances.embedBlocked": "This site does not allow embedding.",
+
+  "instances.filterAllInstances": "All instances"
 }

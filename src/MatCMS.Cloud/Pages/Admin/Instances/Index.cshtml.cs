@@ -27,9 +27,23 @@ public class IndexModel : PageModel
     /// links here instead of listing its instances itself.</summary>
     public Profile? FilteredProfile { get; private set; }
 
-    public async Task OnGetAsync(int? profile = null)
+    /// <summary>Id the instance dropdown is set to, or null for all.</summary>
+    public int? FilteredInstance { get; private set; }
+
+    /// <summary>Everything the dropdown offers — the UNFILTERED list, so the control can always take
+    /// you somewhere else instead of only ever narrowing further.</summary>
+    public List<Instance> AllInstances { get; private set; } = new();
+
+    public async Task OnGetAsync(int? profile = null, int? instance = null)
     {
+        AllInstances = await _db.Instances.AsNoTracking().OrderBy(i => i.Name).ToListAsync();
+
         var query = _db.Instances.AsNoTracking().Include(i => i.Profile).AsQueryable();
+        if (instance is int iid && AllInstances.Any(i => i.Id == iid))
+        {
+            FilteredInstance = iid;
+            query = query.Where(i => i.Id == iid);
+        }
         if (profile is int pid)
         {
             FilteredProfile = await _db.Profiles.AsNoTracking().FirstOrDefaultAsync(p => p.Id == pid);

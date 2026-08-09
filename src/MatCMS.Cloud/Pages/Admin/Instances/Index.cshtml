@@ -21,6 +21,16 @@
                 <option value="drift">@T["instances.syncPending"]</option>
                 <option value="syncfailed">@T["instances.syncFailed"]</option>
             </select>
+            @* One instance out of the list. Server-side, so it narrows the tile view too — there it
+               also means only that one site gets loaded instead of all of them. *@
+            <select class="list-search" data-instance-filter aria-label="@T["instances.title"]">
+                <option value="@Url.Page("Index", new { profile = Model.FilteredProfile?.Id })">@T["instances.filterAllInstances"]</option>
+                @foreach (var inst in Model.AllInstances)
+                {
+                    <option value="@Url.Page("Index", new { profile = Model.FilteredProfile?.Id, instance = inst.Id })"
+                            selected="@(Model.FilteredInstance == inst.Id ? "selected" : null)">@inst.Name</option>
+                }
+            </select>
             @if (Model.FilteredProfile is not null)
             {
                 @* Says what the list is narrowed to and offers the way out; without it a filtered
@@ -258,3 +268,12 @@
 <div class="list-actions">
     <a class="btn" asp-page="Create">@T["instances.add"]</a>
 </div>
+
+@section Scripts {
+    <script>
+        (function () {
+            var sel = document.querySelector('[data-instance-filter]');
+            if (sel) sel.addEventListener('change', function () { if (sel.value) location.href = sel.value; });
+        })();
+    </script>
+}

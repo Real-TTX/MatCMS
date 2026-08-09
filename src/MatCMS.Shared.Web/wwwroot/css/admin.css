@@ -435,8 +435,11 @@ textarea.code { font-family: var(--font-mono, ui-monospace, monospace); font-siz
 /* About / system page */
 .kv { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
 .kv:last-of-type { border-bottom: none; }
-.kv-label { min-width: 160px; color: var(--muted); }
-.kv-value { font-weight: 600; }
+/* Fixed basis, not min-width: with a minimum a longer label pushes only ITS row, and the values
+   end up at a different place in every block. */
+.kv-label { flex: 0 0 200px; color: var(--muted); }
+@media (max-width: 620px) { .kv { flex-direction: column; gap: 2px; } .kv-label { flex: none; } }
+.kv-value { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
 .code-block { background: #0f1115; color: #e6e6e6; border-radius: 8px; padding: 12px 14px; overflow-x: auto; margin: 8px 0 0; }
 .code-block code { font-family: var(--font-mono, ui-monospace, monospace); font-size: 13px; }
 .update-result { margin-left: 12px; font-weight: 600; }

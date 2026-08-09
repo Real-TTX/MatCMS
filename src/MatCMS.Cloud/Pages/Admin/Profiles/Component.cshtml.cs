@@ -119,4 +119,27 @@ public class ComponentModel : PageModel
         }
         return RedirectToPage("Edit", new { id = profileId, tab = "components" });
     }
+
+    /// <summary>
+    /// Exports the component as plain JSON — the same shape every importer on both sides reads, so a
+    /// block designed here can be pasted onto a site or into another profile without the sync.
+    /// </summary>
+    public async Task<IActionResult> OnGetExportAsync(int profileId, int id)
+    {
+        var c = await _db.ProfileComponents.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == id && x.ProfileId == profileId);
+        if (c is null) return RedirectToPage("Edit", new { id = profileId, tab = "components" });
+
+        return ExportFile(c.Type, new { c.Type, c.Name, c.Description, c.Icon, c.FieldsJson, c.TemplateHtml });
+    }
+
+    /// <summary>One JSON download, named after the identity the importers match on.</summary>
+    private IActionResult ExportFile(string type, object payload)
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(payload,
+            new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+        var slug = new string(type.ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray()).Trim('-');
+        return File(System.Text.Encoding.UTF8.GetBytes(json), "application/json; charset=utf-8", $"component-{slug}.json");
+    }
+
 }

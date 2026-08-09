@@ -108,7 +108,7 @@ public class EditModel : PageModel
 
         var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
         var slug = MatCMS.Services.BackupManager.FileSlug(t.Name);
-        return File(System.Text.Encoding.UTF8.GetBytes(json), "application/json", $"template-{slug}.json");
+        return File(System.Text.Encoding.UTF8.GetBytes(json), "application/json; charset=utf-8", $"template-{slug}.json");
     }
 
     public async Task<IActionResult> OnPostAsync()

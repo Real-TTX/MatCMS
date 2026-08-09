@@ -10,6 +10,13 @@
         <span class="muted" style="font-size:14px;font-weight:400;"> — @Model.Owner.Name</span>
     </h1>
     <div class="list-toolbar">
+        @if (!Model.IsNew)
+        {
+            <a class="btn btn-sm btn-ghost" asp-page="Component" asp-page-handler="Export"
+               asp-route-profileId="@Model.Owner.Id" asp-route-id="@ec.Id">
+                <i class="ti ti-download" aria-hidden="true"></i> @T["components.exportJson"]
+            </a>
+        }
         <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@Model.Owner.Id" asp-route-tab="components">@T["action.back"]</a>
     </div>
 </div>

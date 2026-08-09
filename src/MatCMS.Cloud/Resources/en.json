@@ -490,5 +490,7 @@
   "add.smtpOwnHint": "For this profile only, independent of the global configuration.",
   "profiles.smtpFromGlobal": "From global",
   "profiles.smtpOwn": "Own configuration",
-  "profiles.smtpRemoveConfirm": "Stop rolling SMTP out? The values are kept, and instances keep the configuration they have."
+  "profiles.smtpRemoveConfirm": "Stop rolling SMTP out? The values are kept, and instances keep the configuration they have.",
+
+  "components.exportJson": "Export as JSON"
 }

@@ -490,5 +490,7 @@
   "add.smtpOwnHint": "Nur für dieses Profil, unabhängig von der globalen Konfiguration.",
   "profiles.smtpFromGlobal": "Aus Global",
   "profiles.smtpOwn": "Eigene Konfiguration",
-  "profiles.smtpRemoveConfirm": "SMTP nicht mehr ausrollen? Die eingetragenen Werte bleiben erhalten, auf den Instanzen bleibt die Konfiguration stehen."
+  "profiles.smtpRemoveConfirm": "SMTP nicht mehr ausrollen? Die eingetragenen Werte bleiben erhalten, auf den Instanzen bleibt die Konfiguration stehen.",
+
+  "components.exportJson": "Als JSON exportieren"
 }

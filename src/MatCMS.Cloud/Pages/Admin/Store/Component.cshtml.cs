@@ -113,4 +113,21 @@ public class ComponentModel : PageModel
             .Where(x => x.StoreComponentId == storeComponentId).Select(x => x.ProfileId).Distinct().ToListAsync();
         foreach (var profileId in profileIds) await _profiles.TouchAsync(profileId);
     }
+
+    /// <summary>
+    /// Exports the component as plain JSON — the same shape every importer on both sides reads, so a
+    /// block from the catalogue can be pasted onto a site without going through a profile.
+    /// </summary>
+    public async Task<IActionResult> OnGetExportAsync(int id)
+    {
+        var c = await _db.StoreComponents.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
+        if (c is null) return RedirectToPage("Index");
+
+        var payload = new { c.Type, c.Name, c.Description, c.Icon, c.FieldsJson, c.TemplateHtml };
+        var json = System.Text.Json.JsonSerializer.Serialize(payload,
+            new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+        var slug = new string(c.Type.ToLowerInvariant().Select(ch => char.IsLetterOrDigit(ch) ? ch : '-').ToArray()).Trim('-');
+        return File(System.Text.Encoding.UTF8.GetBytes(json), "application/json; charset=utf-8", $"component-{slug}.json");
+    }
+
 }

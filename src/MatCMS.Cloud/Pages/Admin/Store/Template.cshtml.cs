@@ -237,7 +237,7 @@ public class TemplateModel : PageModel
 
         var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
         var slug = new string(t.Name.ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray()).Trim('-');
-        return File(System.Text.Encoding.UTF8.GetBytes(json), "application/json", $"template-{slug}.json");
+        return File(System.Text.Encoding.UTF8.GetBytes(json), "application/json; charset=utf-8", $"template-{slug}.json");
     }
 
     public async Task<IActionResult> OnPostDeleteAsync(int id)

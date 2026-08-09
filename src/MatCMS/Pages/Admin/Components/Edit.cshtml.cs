@@ -109,6 +109,6 @@ public class EditModel : PageModel
         var payload = new { c.Type, c.Name, c.Description, c.Icon, c.FieldsJson, c.TemplateHtml };
         var json = System.Text.Json.JsonSerializer.Serialize(payload, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
         var slug = MatCMS.Services.BackupManager.FileSlug(c.Type);
-        return File(System.Text.Encoding.UTF8.GetBytes(json), "application/json", $"component-{slug}.json");
+        return File(System.Text.Encoding.UTF8.GetBytes(json), "application/json; charset=utf-8", $"component-{slug}.json");
     }
 }

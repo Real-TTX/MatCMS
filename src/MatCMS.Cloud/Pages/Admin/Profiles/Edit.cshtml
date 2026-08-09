@@ -32,7 +32,7 @@
                 <span class="mono is-secret">@Model.Item.JoinCode</span>
                 <form class="inline-form" method="post" asp-page-handler="RotateCode" asp-route-id="@Model.Item.Id"
                       onsubmit="return confirm('@T["profiles.rotateConfirm"]');">
-                    <button type="submit" class="linklike">@T["profiles.rotateCode"]</button>
+                    <button type="submit" class="btn btn-sm btn-ghost">@T["profiles.rotateCode"]</button>
                 </form>
             </div>
         </div>
@@ -54,7 +54,7 @@
                     @* The number itself leads to the filtered list too — clicking the count is the
                        first thing anyone tries. *@
                     <a class="mono" asp-page="/Admin/Instances/Index" asp-route-profile="@Model.Item.Id">@Model.Instances.Count</a>
-                    <a asp-page="/Admin/Instances/Index" asp-route-profile="@Model.Item.Id">@T["profiles.showInstances"]</a>
+                    <a class="btn btn-sm btn-ghost" asp-page="/Admin/Instances/Index" asp-route-profile="@Model.Item.Id">@T["profiles.showInstances"]</a>
                 }
             </div>
         </div>

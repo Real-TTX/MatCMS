@@ -290,7 +290,13 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
    to work out which row each belongs to. */
 .kv-value:has(.btn), .kv-value:has(.inline-form) {
     display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    /* The value has to claim the rest of the row, otherwise there is no right edge to push the
+       action to — a kv-value is content-sized by default. */
+    flex: 1;
 }
+/* The action sits at the right edge of the row, so the actions of all rows line up in one column
+   instead of starting wherever their value happens to end. */
+.kv-value > .btn:last-child, .kv-value > .inline-form:last-child { margin-left: auto; }
 /* The secret block is display:block so it can stand alone elsewhere; next to a button it must not
    claim the whole row. */
 .kv-value:has(.btn) .is-secret, .kv-value:has(.inline-form) .is-secret { flex: 0 1 auto; min-width: 0; }

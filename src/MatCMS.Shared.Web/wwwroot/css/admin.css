@@ -433,17 +433,6 @@ textarea.code-area { width: 100%; box-sizing: border-box; font-family: ui-monosp
 textarea.code { font-family: var(--font-mono, ui-monospace, monospace); font-size: 13px; line-height: 1.5; white-space: pre; overflow-wrap: normal; }
 
 /* About / system page */
-/* A button that reads as a LINK. Some actions have to be a <form> because they POST — rotating a
-   join code, for instance — but sitting inside a sentence or behind a value they are links, not
-   controls to press. The sidebar footer has its own .linklike look and keeps it: a more specific
-   selector already covers it. */
-.linklike {
-    background: none; border: 0; padding: 0; margin: 0;
-    font: inherit; color: inherit; cursor: pointer;
-    text-decoration: underline; text-underline-offset: 2px;
-}
-.linklike:hover { text-decoration-thickness: 2px; }
-
 .kv { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
 .kv:last-of-type { border-bottom: none; }
 /* Fixed basis, not min-width: with a minimum a longer label pushes only ITS row, and the values

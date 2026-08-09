@@ -163,7 +163,7 @@ public class ProfileService
             var settings = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
 
             // Global first: the cloud's own SMTP configuration, if this profile passes it on.
-            if (profile.SyncSmtp && profile.UseGlobalSmtp)
+            if (profile.SyncSmtp && profile.MailSource == MailSources.Global)
             {
                 var smtpKeys = SettingKeys.Smtp;
                 foreach (var row in await _db.CloudSettings.AsNoTracking().Where(s => smtpKeys.Contains(s.Key)).ToListAsync(ct))
@@ -175,14 +175,22 @@ public class ProfileService
             // switched on must not overwrite a live site's mail configuration.
             foreach (var local in await _db.ProfileSettings.AsNoTracking().Where(s => s.ProfileId == profile.Id).ToListAsync(ct))
             {
-                // Skipped when the global configuration is in use: it is either the global values
-                // or the profile's own, never a half-merge — that is what the read-only form promises.
-                if (IsSmtpKey(local.Key) && (!profile.SyncSmtp || profile.UseGlobalSmtp)) continue;
+                // Skipped unless the profile's OWN values are the source: it is either the
+                // global values or this profile's, never a half-merge — that is what the read-only
+                // form promises. With the relay there is nothing to roll out at all, because the
+                // instance will not be sending anything itself.
+                if (IsSmtpKey(local.Key) && (!profile.SyncSmtp || profile.MailSource != MailSources.Own)) continue;
                 settings[local.Key] = local.IsSecret ? _secrets.Unprotect(local.Value) : local.Value;
             }
 
             config.Settings = settings;
         }
+
+        // How the instance should send. Only when this profile actually decides mail delivery —
+        // otherwise the site keeps doing whatever it was doing, which is the whole point of the
+        // group switch.
+        if (profile.SyncSmtp && profile.MailSource == MailSources.Cloud)
+            config.MailTransport = "cloud";
 
         if (profile.SyncUsers)
         {

@@ -56,10 +56,14 @@ public static class AddMenus
     /// <summary>Step two for SMTP: WHERE FROM. Both answers land on the mail page — one with the
     /// global values filled in, one with the profile's own — because a configuration that is about to
     /// be rolled out to live sites should be seen before it is saved, not applied by a menu click.</summary>
-    public static AddMenu SmtpSource(Localizer t, string globalUrl, string ownUrl) =>
+    public static AddMenu SmtpSource(Localizer t, string globalUrl, string ownUrl, string cloudUrl) =>
         Step(t, "settings-smtp", t["add.smtpSource"],
         [
             new AddOption(t["add.fromGlobal"], t["add.smtpGlobalHint"], globalUrl),
             new AddOption(t["add.smtpOwn"], t["add.smtpOwnHint"], ownUrl),
+            // The third answer is not a source of SMTP values at all: the instances stop sending and
+            // the cloud does it for them. It belongs in this question because it answers the same
+            // one — how does mail leave this profile's sites.
+            new AddOption(t["profiles.mailViaCloud"], t["profiles.mailViaCloudHint"], cloudUrl),
         ]);
 }

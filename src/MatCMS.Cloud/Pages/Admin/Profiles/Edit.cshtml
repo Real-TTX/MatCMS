@@ -184,7 +184,10 @@
                 {
                     <tr data-search="smtp mail e-mail">
                         <td><a asp-page="Smtp" asp-route-profileId="@Model.Item.Id"><span class="mono">smtp.*</span></a></td>
-                        <td class="muted">@(Model.Item.UseGlobalSmtp ? T["profiles.smtpFromGlobal"] : T["profiles.smtpOwn"])</td>
+                        <td class="muted">@T[Model.Item.MailSource switch {
+                            MailSources.Global => "profiles.smtpFromGlobal",
+                            MailSources.Cloud => "profiles.smtpViaCloud",
+                            _ => "profiles.smtpOwn" }]</td>
                         <td>
                             <div class="actions">
                                 <form class="inline-form" method="post" asp-page="Smtp" asp-page-handler="Remove" asp-route-profileId="@Model.Item.Id"
@@ -224,7 +227,7 @@
            asking them the second question would offer an option that cannot be answered. *@
         <partial name="_AddMenu" model='AddMenus.Settings(T, Url.Page("Setting", new { profileId = Model.Item.Id })!, Model.Item.SyncSmtp)' />
     </div>
-    <partial name="_AddMenu" model='AddMenus.SmtpSource(T, Url.Page("Smtp", new { profileId = Model.Item.Id, source = "global" })!, Url.Page("Smtp", new { profileId = Model.Item.Id, source = "own" })!)' />
+    <partial name="_AddMenu" model='AddMenus.SmtpSource(T, Url.Page("Smtp", new { profileId = Model.Item.Id, source = "global" })!, Url.Page("Smtp", new { profileId = Model.Item.Id, source = "own" })!, Url.Page("Smtp", new { profileId = Model.Item.Id, source = "cloud" })!)' />
 </div>
 
 @* ============ USERS ============ *@

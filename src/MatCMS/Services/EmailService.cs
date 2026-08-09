@@ -20,10 +20,15 @@ public class EmailService
 {
     private readonly AppDbContext _db;
     private readonly ILogger<EmailService> _log;
+    private readonly IServiceProvider _services;
 
-    public EmailService(AppDbContext db, ILogger<EmailService> log)
+    // CloudService is resolved on demand rather than injected: it is only needed when a profile
+    // switched this site to the relay, and taking it as a constructor dependency would tie every
+    // page that sends a mail to the whole cloud stack.
+    public EmailService(AppDbContext db, IServiceProvider services, ILogger<EmailService> log)
     {
         _db = db;
+        _services = services;
         _log = log;
     }
 
@@ -51,12 +56,38 @@ public class EmailService
             ssl is "true" or "on" or "1" or "yes");
     }
 
-    public async Task<bool> IsConfiguredAsync() => (await GetConfigAsync()).IsConfigured;
+    /// <summary>Whether this site can send mail at all — by SMTP of its own, or because the cloud
+    /// does it. Asked by the UI before it tells an operator that nothing will be delivered.</summary>
+    public async Task<bool> IsConfiguredAsync() =>
+        await UseCloudRelayAsync() || (await GetConfigAsync()).IsConfigured;
 
-    /// <summary>Sends a plain-text mail using the saved SMTP config. Returns (ok, error); never throws.</summary>
+    /// <summary>
+    /// Sends a plain-text mail. Returns (ok, error); never throws.
+    /// <para>Which way it goes out is not the caller's business: when a profile switched this site to
+    /// the cloud relay, the message is handed over there instead of being sent from here. Everything
+    /// that sends mail therefore keeps working unchanged when an operator flips that switch.</para>
+    /// </summary>
     public async Task<(bool ok, string? error)> SendAsync(
         IEnumerable<string> to, string subject, string body, string? replyTo = null)
-        => await SendCoreAsync(await GetConfigAsync(), to, subject, body, replyTo);
+    {
+        if (await UseCloudRelayAsync())
+        {
+            var cloud = _services.GetService<CloudService>();
+            if (cloud is not null) return await cloud.SendMailAsync(to, subject, body, replyTo);
+            // Should not happen — but falling through to SMTP is better than silently sending
+            // nothing, and an unconfigured SMTP will say so plainly.
+            _log.LogWarning("Mail transport is 'cloud' but the cloud service is unavailable; falling back to SMTP.");
+        }
+        return await SendCoreAsync(await GetConfigAsync(), to, subject, body, replyTo);
+    }
+
+    /// <summary>True when a profile told this site to hand its mail to the cloud.</summary>
+    public async Task<bool> UseCloudRelayAsync()
+    {
+        var row = await _db.SiteSettings.AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Key == SettingKeys.MailTransport);
+        return string.Equals(row?.Value?.Trim(), "cloud", StringComparison.OrdinalIgnoreCase);
+    }
 
     /// <summary>
     /// Sends one of the declared mails, using the site's stored template for it.

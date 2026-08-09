@@ -497,6 +497,49 @@ public class CloudService
         };
     }
 
+    /// <summary>
+    /// Hands one message to the cloud for delivery. Used when the profile said this site does not
+    /// send mail itself.
+    /// <para>"Queued" is the answer to hope for and it does NOT mean delivered: the cloud spools
+    /// the message and a worker sends it. That is the point — a visitor's form submission must not
+    /// wait on somebody else's SMTP server, and a delivery that fails is then retried rather than
+    /// lost. There is no sender field: the cloud sends with its own address and only takes the
+    /// reply-to from here.</para>
+    /// </summary>
+    public async Task<(bool ok, string? error)> SendMailAsync(
+        IEnumerable<string> to, string subject, string body, string? replyTo, CancellationToken ct = default)
+    {
+        var settings = await GetSettingsAsync();
+        if (!settings.Configured) return (false, "Diese Website ist mit keiner Cloud verbunden.");
+
+        try
+        {
+            var client = CreateClient(settings);
+            var payload = new MailRequest
+            {
+                To = to.Where(a => !string.IsNullOrWhiteSpace(a)).Select(a => a.Trim()).ToList(),
+                Subject = subject,
+                Body = body,
+                ReplyTo = replyTo,
+            };
+            using var res = await client.PostAsJsonAsync(
+                $"{settings.Url}/api/instances/{settings.InstanceId}/mail", payload, ct);
+
+            if (!res.IsSuccessStatusCode)
+                return (false, $"Die Cloud hat die Nachricht abgelehnt (HTTP {(int)res.StatusCode}).");
+
+            var answer = await res.Content.ReadFromJsonAsync<MailResponse>(cancellationToken: ct);
+            if (answer is null) return (false, "Die Cloud hat nicht geantwortet.");
+            return (answer.Queued, answer.Queued ? null : answer.Error ?? "Unbekannter Grund.");
+        }
+        catch (Exception ex)
+        {
+            // Never thrown at the caller: a mail problem must not break what the visitor was doing.
+            _log.LogWarning(ex, "Handing mail to the cloud failed");
+            return (false, ex.Message);
+        }
+    }
+
     private HttpClient CreateClient(CloudSettings settings)
     {
         var client = _http.CreateClient();

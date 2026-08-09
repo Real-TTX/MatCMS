@@ -36,7 +36,12 @@ public class SmtpModel : PageModel
     /// <summary>What a field shows: the global value while the global configuration is in use, the
     /// profile's own otherwise. Read-only in the first case, so the operator sees what would
     /// actually be rolled out instead of a set of empty boxes.</summary>
-    public string Field(string key) => Owner.UseGlobalSmtp ? Global(key) : Setting(key);
+    public string Field(string key) => Owner.MailSource == MailSources.Global ? Global(key) : Setting(key);
+
+    /// <summary>Whether the SMTP fields are the operator's to fill. Only the profile's own values
+    /// are: the global ones belong to the cloud's settings, and with the relay nothing is rolled out
+    /// at all because the instance stops sending for itself.</summary>
+    public bool FieldsEditable => Owner.MailSource == MailSources.Own;
 
     public bool Flag(string key) => Setting(key).Trim().ToLowerInvariant() is "1" or "true" or "on" or "yes";
 
@@ -44,16 +49,16 @@ public class SmtpModel : PageModel
     /// it, and nothing is in effect until it is saved.</summary>
     public bool IsNew { get; private set; }
 
-    /// <param name="source">"global" or "own", from the add dialog's second step. It only PRESELECTS
-    /// where the values come from; nothing is rolled out until the operator saves. Answering a menu
-    /// must not silently change what a live site's mail configuration is.</param>
+    /// <param name="source">"global", "own" or "cloud", from the add dialog's second step. It only
+    /// PRESELECTS where mail comes from; nothing is in effect until the operator saves. Answering a
+    /// menu must not silently change how a live site sends its mail.</param>
     public async Task<IActionResult> OnGetAsync(int profileId, string? source)
     {
         if (!await LoadAsync(profileId)) return RedirectToPage("Index");
 
         IsNew = !Owner.SyncSmtp;
         if (IsNew && source is not null)
-            Owner.UseGlobalSmtp = string.Equals(source, "global", StringComparison.OrdinalIgnoreCase);
+            Owner.MailSource = MailSources.Normalise(source);
         return Page();
     }
 
@@ -70,23 +75,33 @@ public class SmtpModel : PageModel
     }
 
     public async Task<IActionResult> OnPostAsync(
-        int profileId, bool useGlobalSmtp, bool clearPassword,
+        int profileId, string? mailSource, bool clearPassword,
         string? host, string? port, string? user, string? password,
         string? fromEmail, string? fromName, bool ssl)
     {
         var profile = await _db.Profiles.FindAsync(profileId);
         if (profile is null) return RedirectToPage("Index");
 
-        // Being on this page at all means the profile rolls SMTP out; the switch that decides THAT
-        // lives in the add dialog and in the row's delete, not in a checkbox halfway down a form.
+        // Being on this page at all means the profile decides mail delivery; the switch that decides
+        // THAT lives in the add dialog and in the row's delete, not in a checkbox halfway down a form.
         profile.SyncSmtp = true;
-        profile.UseGlobalSmtp = useGlobalSmtp;
+        profile.MailSource = MailSources.Normalise(mailSource);
+
+        // The relay rolls no SMTP values out at all — the instances stop sending for themselves, so
+        // there is nothing for them to send WITH.
+        if (profile.MailSource == MailSources.Cloud)
+        {
+            await _db.SaveChangesAsync();
+            await _profiles.TouchAsync(profileId);
+            TempData["Flash"] = "Mail läuft künftig über die Cloud.";
+            return RedirectToPage("Edit", new { id = profileId, tab = "settings" });
+        }
 
         // With the global configuration in use the fields are shown READ-ONLY, filled with the global
         // values — so what posts back is the global data, not this profile's. Writing it would
         // quietly copy the global values into the profile and they would stop following the global
         // ones. The profile's own values stay untouched and reappear the moment it is switched over.
-        if (useGlobalSmtp)
+        if (profile.MailSource == MailSources.Global)
         {
             await _db.SaveChangesAsync();
             await _profiles.TouchAsync(profileId);

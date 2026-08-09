@@ -95,7 +95,13 @@ public class EditModel : PageModel
             Services.MailTemplates.Render(t.Subject, values),
             Services.MailTemplates.Render(t.Body, values));
 
-        if (ok) TempData["Flash"] = $"Testmail an {testTo.Trim()} gesendet.";
+        // Wording follows what actually happened: through the relay the message is ACCEPTED, not
+        // delivered — the cloud spools it and sends it moments later. Saying "sent" would be a small
+        // lie that turns into a support question the first time a queue backs up.
+        if (ok)
+            TempData["Flash"] = await _email.UseCloudRelayAsync()
+                ? $"Testmail an {testTo.Trim()} an die Cloud übergeben — sie stellt sie zu."
+                : $"Testmail an {testTo.Trim()} gesendet.";
         else TempData["FlashError"] = $"Testmail fehlgeschlagen: {error}";
         return RedirectToPage(new { id });
     }

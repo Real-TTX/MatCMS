@@ -78,6 +78,7 @@ builder.Services.AddScoped<CloudContext>();
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<InstanceService>();
 builder.Services.AddScoped<ProfileService>();
+builder.Services.AddScoped<MailSpool>();
 builder.Services.AddSingleton<SecretProtector>();
 builder.Services.AddScoped<AdoptionService>();
 builder.Services.AddScoped<VersionService>();
@@ -88,6 +89,7 @@ builder.Services.AddSingleton<ReleaseWatcher>();
 builder.Services.AddSingleton<DockerHostService>();
 builder.Services.AddHostedService<ReleaseWatcherService>();
 builder.Services.AddHostedService<InstanceMonitorService>();
+builder.Services.AddHostedService<MailSpoolService>();
 
 // Basic brute-force protection for the login endpoint (per client IP).
 // Behind a reverse proxy, enable ForwardedHeaders so the real client IP is used.
@@ -260,6 +262,29 @@ app.MapPost("/api/instances/{publicId}/disconnect", async (
         "Verbindung von der Instanz getrennt.", notified: true);
     await db.SaveChangesAsync();
     return Results.Ok();
+}).RequireRateLimiting("instanceApi");
+
+// --- Mail relay -----------------------------------------------------------
+// A profile can decide that its instances do not send mail themselves but hand it here. The cloud
+// SPOOLS every message and a worker delivers it: the instance is never left waiting on a foreign
+// SMTP server while a visitor's form submission hangs, and a delivery that fails at 3am is
+// something to retry rather than something lost.
+//
+// There is no sender field in the request on purpose — the cloud sends with its own address, so no
+// instance can claim to be somebody else and the cloud domain's SPF/DKIM always match.
+app.MapPost("/api/instances/{publicId}/mail", async (
+    HttpContext ctx, string publicId, MailRequest req, InstanceService instances, MailSpool spool) =>
+{
+    var token = ctx.Request.Headers[CloudProtocol.TokenHeader].ToString();
+    var instance = await instances.AuthenticateAsync(publicId, token);
+    if (instance is null) return Results.Unauthorized();
+    if (instance.Status != MatCMS.Cloud.Models.InstanceStatus.Approved)
+        return Results.Json(new { error = "Instanz ist nicht freigegeben." }, statusCode: StatusCodes.Status403Forbidden);
+
+    var result = await spool.EnqueueAsync(instance, req, ctx.RequestAborted);
+    // A refusal is a 200 with Queued=false, not an error status: the instance has to TELL its
+    // operator why the mail did not go out, and a bare 4xx gives it nothing to say.
+    return Results.Ok(new MailResponse { Queued = result.Queued, Error = result.Error });
 }).RequireRateLimiting("instanceApi");
 
 // --- Catalogue ------------------------------------------------------------

@@ -15,7 +15,7 @@ public static class CloudProtocol
     /// <summary>Contract version. Bump on <b>every</b> change to the payloads in this file: the cloud
     /// badges an instance reporting an older one as "veraltet", and both sides read this constant, so
     /// one edit covers both.</summary>
-    public const int Version = 5;
+    public const int Version = 6;
 
     /// <summary>Header carrying the instance's bearer token.</summary>
     public const string TokenHeader = "X-MatCMS-Instance-Token";
@@ -178,6 +178,42 @@ public sealed class InstanceConfig
     public string PluginsMode { get; set; } = "keep";
     public string TemplatesMode { get; set; } = "keep";
     public string UsersMode { get; set; } = "add";
+
+    /// <summary>
+    /// How the instance should SEND mail: "smtp" (its own or the rolled-out configuration) or
+    /// "cloud" (hand the message to the cloud, which queues and delivers it).
+    /// <para>A string, like the modes above, and for the same reason: an instance that predates the
+    /// relay must fall back to sending it itself rather than misreading a number and quietly
+    /// dropping every notification a site produces.</para>
+    /// </summary>
+    public string MailTransport { get; set; } = "smtp";
+}
+
+/// <summary>
+/// One message an instance hands to the cloud for delivery (POST /api/instances/{id}/mail).
+/// <para>There is no sender field on purpose. The cloud sends with ITS OWN address, so an instance
+/// cannot claim to be somebody else and the cloud domain's SPF/DKIM always match. What the
+/// instance may steer is where a reply goes.</para>
+/// <para>Subject and body arrive already rendered: the instance owns its templates, the cloud only
+/// carries the result.</para>
+/// </summary>
+public sealed class MailRequest
+{
+    public List<string> To { get; set; } = new();
+    public string Subject { get; set; } = "";
+    public string Body { get; set; } = "";
+    public string? ReplyTo { get; set; }
+}
+
+/// <summary>
+/// What the cloud answers. <c>Queued</c> means accepted for delivery — NOT delivered: the cloud
+/// spools every message and a worker sends it, so the instance is not left waiting on a foreign
+/// SMTP server and a failed attempt can be retried instead of being lost.
+/// </summary>
+public sealed class MailResponse
+{
+    public bool Queued { get; set; }
+    public string? Error { get; set; }
 }
 
 /// <summary>A theme rolled out to the instance. <c>Name</c> is the identity; whether it becomes the

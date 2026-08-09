@@ -496,5 +496,23 @@
   "instances.openEmbedded": "View site",
   "instances.reload": "Reload",
   "instances.embedBlocked": "This site does not allow embedding.",
-  "instances.filterAllProfiles": "All profiles"
+  "instances.filterAllProfiles": "All profiles",
+
+  "profiles.mailSource": "How do the instances send mail?",
+  "profiles.mailViaCloud": "Send through the cloud",
+  "profiles.mailViaCloudHint": "The instances do not send at all — every message goes to the cloud, which spools it and delivers it with its own sender address. No SMTP credentials on the instances.",
+  "profiles.smtpViaCloud": "Through the cloud",
+  "spool.title": "Mail queue",
+  "spool.none": "This instance has not handed over a message yet.",
+  "spool.queued": "waiting",
+  "spool.sent": "delivered",
+  "spool.failed": "given up",
+  "spool.subject": "Subject",
+  "spool.recipients": "Recipients",
+  "spool.attempts": "Attempts",
+  "spool.queuedAt": "Received",
+  "spool.retry": "Try again",
+  "spool.retryAll": "Retry all given up",
+  "spool.hint": "Messages from this instance sent through the cloud. A failed delivery is retried with a growing delay; after eight attempts it counts as given up and can be put back in the queue by hand here.",
+  "spool.noSmtp": "This cloud has no mail delivery of its own configured — everything will sit in the queue."
 }

@@ -13,13 +13,15 @@ public class DetailsModel : PageModel
     private readonly InstanceService _instances;
     private readonly ReleaseWatcher _releases;
     private readonly DockerHostService _docker;
+    private readonly EmailService _email;
 
-    public DetailsModel(AppDbContext db, InstanceService instances, ReleaseWatcher releases, DockerHostService docker)
+    public DetailsModel(AppDbContext db, InstanceService instances, ReleaseWatcher releases, DockerHostService docker, EmailService email)
     {
         _db = db;
         _instances = instances;
         _releases = releases;
         _docker = docker;
+        _email = email;
     }
 
     public Instance Item { get; private set; } = new();
@@ -36,6 +38,19 @@ public class DetailsModel : PageModel
 
     /// <summary>Completed applies, newest first — one row per run as the instance reported it.</summary>
     public List<InstanceSyncRun> Runs { get; private set; } = new();
+
+    /// <summary>What this instance handed to the cloud for delivery, newest first. Bodies are left
+    /// in the database: the list wants subject, recipients and outcome, and a page that dragged
+    /// every message body through memory to show none of them would be pure waste.</summary>
+    public List<SpooledMail> Spool { get; private set; } = new();
+
+    /// <summary>True when this instance's profile actually routes mail through the cloud — the tab
+    /// then explains itself instead of showing an empty table nobody asked for.</summary>
+    public bool UsesRelay => Item.Profile is { SyncSmtp: true } p && p.MailSource == MailSources.Cloud;
+
+    /// <summary>Whether the cloud can send at all. Without it everything simply queues, and saying so
+    /// once beats letting an operator wonder why nothing moves.</summary>
+    public bool CloudMailConfigured { get; private set; }
 
     public bool OutOfSync => InstanceService.IsOutOfSync(Item);
 
@@ -64,6 +79,18 @@ public class DetailsModel : PageModel
             .Take(50)
             .ToListAsync();
         Profiles = await _db.Profiles.AsNoTracking().OrderBy(p => p.Name).ToListAsync();
+        Spool = await _db.SpooledMails.AsNoTracking()
+            .Where(m => m.InstanceId == id)
+            .OrderByDescending(m => m.Id)
+            .Take(50)
+            .Select(m => new SpooledMail
+            {
+                Id = m.Id, QueuedAt = m.QueuedAt, Recipients = m.Recipients, Subject = m.Subject,
+                Status = m.Status, Attempts = m.Attempts, NextAttemptAt = m.NextAttemptAt,
+                SentAt = m.SentAt, LastError = m.LastError
+            })
+            .ToListAsync();
+        CloudMailConfigured = await _email.IsConfiguredAsync();
         SyncReport = ParseReport(item.LastSyncReportJson);
         Summary = InstanceService.Summarise(item.LastSyncReportJson);
         // The report body is not loaded for the listing — the counts are denormalised on the row
@@ -197,4 +224,29 @@ public class DetailsModel : PageModel
         TempData["Flash"] = $"Instanz \"{item.Name}\" entfernt.";
         return RedirectToPage("Index");
     }
+    /// <summary>
+    /// Puts given-up messages back in the queue. An operator who just fixed the mail server wants the
+    /// backlog delivered, not a clean slate — so the attempt counter is reset and the worker picks
+    /// them up on its next pass.
+    /// </summary>
+    public async Task<IActionResult> OnPostRetryMailAsync(int id, int? mailId)
+    {
+        var query = _db.SpooledMails.Where(m => m.InstanceId == id && m.Status == SpoolStatus.Failed);
+        if (mailId is int one) query = query.Where(m => m.Id == one);
+
+        var rows = await query.ToListAsync();
+        foreach (var m in rows)
+        {
+            m.Status = SpoolStatus.Queued;
+            m.Attempts = 0;
+            m.NextAttemptAt = DateTime.UtcNow;
+        }
+        await _db.SaveChangesAsync();
+
+        TempData["Flash"] = rows.Count == 0
+            ? "Nichts erneut zu versuchen."
+            : $"{rows.Count} Nachricht(en) zurück in die Warteschlange.";
+        return RedirectToPage(new { id, tab = "mail" });
+    }
+
 }

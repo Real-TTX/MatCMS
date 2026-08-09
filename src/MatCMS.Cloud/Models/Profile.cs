@@ -1,5 +1,27 @@
 namespace MatCMS.Cloud.Models;
 
+/// <summary>How a profile's instances send mail. Strings on the wire and in the database, so a
+/// value nobody knows yet degrades to something safe instead of to a wrong number.</summary>
+public static class MailSources
+{
+    /// <summary>The cloud's own SMTP settings are rolled out to the instances.</summary>
+    public const string Global = "global";
+
+    /// <summary>The profile carries its own SMTP values.</summary>
+    public const string Own = "own";
+
+    /// <summary>The instances send nothing themselves: each message goes to the cloud, which spools
+    /// and delivers it with its OWN sender address.</summary>
+    public const string Cloud = "cloud";
+
+    public static string Normalise(string? v) => v?.Trim().ToLowerInvariant() switch
+    {
+        Global => Global,
+        Cloud => Cloud,
+        _ => Own,
+    };
+}
+
 /// <summary>
 /// How far a profile keeps reaching into an instance for one payload. The instance decides what this
 /// means in practice — the cloud only states the intent — but the contract is:
@@ -64,11 +86,15 @@ public class Profile
     public bool SyncSettings { get; set; }
 
     /// <summary>
-    /// Roll the cloud's OWN SMTP configuration (Einstellungen → SMTP) out to this profile's
-    /// instances. There is no store copy of it — the global settings are the source, and the
-    /// profile's own <c>ProfileSetting</c> rows still override individual keys on top.
+    /// WHERE the mail configuration comes from — <see cref="MailSources"/>: the cloud's own SMTP
+    /// settings, this profile's own values, or the cloud's relay (the instance hands each message
+    /// over and the cloud spools and delivers it).
+    /// <para>A string rather than the old <c>UseGlobalSmtp</c> boolean, for the same reason the sync
+    /// modes are strings: there turned out to be a third answer, and a boolean can only ever give
+    /// two. An unknown value is read as "own", the answer that changes nothing about how a site
+    /// already sends.</para>
     /// </summary>
-    public bool UseGlobalSmtp { get; set; }
+    public string MailSource { get; set; } = MailSources.Own;
 
     /// <summary>
     /// Whether this profile rolls out SMTP at all. Off = the instance's own mail configuration is

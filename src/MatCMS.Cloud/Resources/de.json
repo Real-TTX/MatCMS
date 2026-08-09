@@ -496,5 +496,23 @@
   "instances.openEmbedded": "Website ansehen",
   "instances.reload": "Neu laden",
   "instances.embedBlocked": "Diese Seite erlaubt keine Einbettung.",
-  "instances.filterAllProfiles": "Alle Profile"
+  "instances.filterAllProfiles": "Alle Profile",
+
+  "profiles.mailSource": "Wie versenden die Instanzen Mail?",
+  "profiles.mailViaCloud": "Über die Cloud versenden",
+  "profiles.mailViaCloudHint": "Die Instanzen versenden gar nicht selbst — jede Nachricht geht an die Cloud, die sie zwischenspeichert und mit ihrer eigenen Absenderadresse zustellt. Kein SMTP-Zugang auf den Instanzen nötig.",
+  "profiles.smtpViaCloud": "Über die Cloud",
+  "spool.title": "Mail-Warteschlange",
+  "spool.none": "Diese Instanz hat noch keine Nachricht übergeben.",
+  "spool.queued": "wartet",
+  "spool.sent": "zugestellt",
+  "spool.failed": "aufgegeben",
+  "spool.subject": "Betreff",
+  "spool.recipients": "Empfänger",
+  "spool.attempts": "Versuche",
+  "spool.queuedAt": "Eingegangen",
+  "spool.retry": "Erneut versuchen",
+  "spool.retryAll": "Alle aufgegebenen erneut versuchen",
+  "spool.hint": "Nachrichten dieser Instanz, die über die Cloud verschickt werden. Ein fehlgeschlagener Versand wird mit wachsendem Abstand wiederholt; nach acht Versuchen gilt er als aufgegeben und kann hier von Hand zurück in die Warteschlange.",
+  "spool.noSmtp": "Diese Cloud hat selbst keinen Mailversand eingerichtet — es bleibt alles in der Warteschlange stehen."
 }

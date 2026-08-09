@@ -43,6 +43,7 @@
     <button type="button" class="tab" data-tab="preview">@T["instances.tabPreview"]</button>
     <button type="button" class="tab" data-tab="config">@T["instances.tabConfig"]</button>
     <button type="button" class="tab" data-tab="events">@T["instances.tabEvents"]</button>
+    <button type="button" class="tab" data-tab="mail">@T["spool.title"]</button>
     <button type="button" class="tab" data-tab="settings">@T["instances.tabSettings"]</button>
 </div>
 
@@ -367,6 +368,92 @@
 </div>
 
 @* ============ EVENTS ============ *@
+<div class="tab-panel" data-panel="mail" hidden>
+    <div data-list>
+        <div class="page-head">
+            <h2>@T["spool.title"]</h2>
+        </div>
+
+        <p class="muted">@T["spool.hint"]</p>
+        @if (Model.UsesRelay && !Model.CloudMailConfigured)
+        {
+            @* Said here rather than left to be discovered: with no SMTP on the cloud the queue only
+               ever grows, and nothing about the list itself would explain why. *@
+            <div class="alert alert-info">@T["spool.noSmtp"]</div>
+        }
+
+        <table class="data" data-list-table>
+            <thead>
+                <tr>
+                    <th>@T["spool.subject"]</th>
+                    <th>@T["spool.recipients"]</th>
+                    <th>@T["spool.queuedAt"]</th>
+                    <th>@T["common.status"]</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Spool.Count == 0)
+                {
+                    <partial name="_EmptyRow" model='@T["spool.none"]' />
+                }
+                else
+                {
+                    @foreach (var m in Model.Spool)
+                    {
+                        <tr data-search="@(m.Subject + " " + m.Recipients)">
+                            <td>@m.Subject</td>
+                            <td class="muted">@m.Recipients.Replace("\n", ", ")</td>
+                            <td class="muted">@m.QueuedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                            <td>
+                                @switch (m.Status)
+                                {
+                                    case SpoolStatus.Sent:
+                                        <span class="badge badge-on">@T["spool.sent"]</span>
+                                        break;
+                                    case SpoolStatus.Failed:
+                                        <span class="badge badge-err" title="@m.LastError">@T["spool.failed"]</span>
+                                        break;
+                                    default:
+                                        <span class="badge badge-new">@T["spool.queued"]</span>
+                                        break;
+                                }
+                                @* The attempt count only says something once there has been more than
+                                   one — on a first-try delivery it is noise. *@
+                                @if (m.Attempts > 1)
+                                {
+                                    <span class="muted">@T["spool.attempts"]: @m.Attempts</span>
+                                }
+                            </td>
+                            <td>
+                                <div class="actions">
+                                    @if (m.Status == SpoolStatus.Failed)
+                                    {
+                                        <form class="inline-form" method="post" asp-page-handler="RetryMail"
+                                              asp-route-id="@Model.Item.Id" asp-route-mailId="@m.Id">
+                                            <button type="submit" class="btn btn-sm btn-ghost">@T["spool.retry"]</button>
+                                        </form>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+        <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+
+        @if (Model.Spool.Any(m => m.Status == SpoolStatus.Failed))
+        {
+            <div class="list-actions">
+                <form class="inline-form" method="post" asp-page-handler="RetryMail" asp-route-id="@Model.Item.Id">
+                    <button type="submit" class="btn btn-ghost">@T["spool.retryAll"]</button>
+                </form>
+            </div>
+        }
+    </div>
+</div>
+
 <div class="tab-panel" data-panel="events" hidden>
     <div data-list>
         <div class="page-head">

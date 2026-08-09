@@ -17,33 +17,49 @@
     <div class="card">
         <h2>@T["settings.smtp"]</h2>
 
-        @* Where the values come from is the one decision this page starts with, so it sits at the
-           top: everything below either follows the global configuration or belongs to this profile. *@
-        <label class="checkbox-row">
-            <input type="checkbox" name="useGlobalSmtp" value="true" checked="@(Model.Owner.UseGlobalSmtp ? "checked" : null)" />
-            @T["profiles.useGlobalSmtp"]
-        </label>
-        <div class="help">@T["profiles.useGlobalSmtpHint"]</div>
+        @* How mail leaves the instances is the one decision this page starts with, so it sits at the
+           top: everything below only applies to one of the three answers. *@
+        <div class="form-field">
+            <label>@T["profiles.mailSource"]</label>
+            <label class="checkbox-row">
+                <input type="radio" name="mailSource" value="@MailSources.Global" data-mail-source
+                       checked="@(Model.Owner.MailSource == MailSources.Global ? "checked" : null)" />
+                @T["add.fromGlobal"]
+            </label>
+            <div class="help">@T["profiles.useGlobalSmtpHint"]</div>
+            <label class="checkbox-row">
+                <input type="radio" name="mailSource" value="@MailSources.Own" data-mail-source
+                       checked="@(Model.Owner.MailSource == MailSources.Own ? "checked" : null)" />
+                @T["add.smtpOwn"]
+            </label>
+            <div class="help">@T["add.smtpOwnHint"]</div>
+            <label class="checkbox-row">
+                <input type="radio" name="mailSource" value="@MailSources.Cloud" data-mail-source
+                       checked="@(Model.Owner.MailSource == MailSources.Cloud ? "checked" : null)" />
+                @T["profiles.mailViaCloud"]
+            </label>
+            <div class="help">@T["profiles.mailViaCloudHint"]</div>
+        </div>
 
-        <div class="form-grid">
+        <div class="form-grid" data-smtp-block hidden="@(Model.Owner.MailSource == MailSources.Cloud ? "hidden" : null)">
             <div class="form-row">
                 <div class="form-field">
                     <label for="host">@T["settings.smtpHost"]</label>
-                    <input id="host" name="host" value="@Model.Field("smtp.host")" readonly="@(Model.Owner.UseGlobalSmtp ? "readonly" : null)" data-smtp-own spellcheck="false" />
+                    <input id="host" name="host" value="@Model.Field("smtp.host")" readonly="@(Model.FieldsEditable ? null : "readonly")" data-smtp-own spellcheck="false" />
                 </div>
                 <div class="form-field">
                     <label for="port">@T["settings.smtpPort"]</label>
-                    <input id="port" name="port" value="@Model.Field("smtp.port")" readonly="@(Model.Owner.UseGlobalSmtp ? "readonly" : null)" data-smtp-own placeholder="587" inputmode="numeric" />
+                    <input id="port" name="port" value="@Model.Field("smtp.port")" readonly="@(Model.FieldsEditable ? null : "readonly")" data-smtp-own placeholder="587" inputmode="numeric" />
                 </div>
             </div>
             <div class="form-row">
                 <div class="form-field">
                     <label for="user">@T["settings.smtpUser"]</label>
-                    <input id="user" name="user" value="@Model.Field("smtp.user")" readonly="@(Model.Owner.UseGlobalSmtp ? "readonly" : null)" data-smtp-own spellcheck="false" />
+                    <input id="user" name="user" value="@Model.Field("smtp.user")" readonly="@(Model.FieldsEditable ? null : "readonly")" data-smtp-own spellcheck="false" />
                 </div>
                 <div class="form-field">
                     <label for="password">@T["settings.smtpPassword"]</label>
-                    <input id="password" name="password" type="password" placeholder="@T["settings.smtpPasswordKeep"]" autocomplete="new-password" readonly="@(Model.Owner.UseGlobalSmtp ? "readonly" : null)" data-smtp-own />
+                    <input id="password" name="password" type="password" placeholder="@T["settings.smtpPasswordKeep"]" autocomplete="new-password" readonly="@(Model.FieldsEditable ? null : "readonly")" data-smtp-own />
                     @* Without this a stored password could only ever be replaced, never removed. *@
                     @if (!string.IsNullOrEmpty(Model.Setting("smtp.password")))
                     {
@@ -57,15 +73,15 @@
             <div class="form-row">
                 <div class="form-field">
                     <label for="fromEmail">@T["settings.smtpFromEmail"]</label>
-                    <input id="fromEmail" name="fromEmail" value="@Model.Field("smtp.fromEmail")" readonly="@(Model.Owner.UseGlobalSmtp ? "readonly" : null)" data-smtp-own spellcheck="false" />
+                    <input id="fromEmail" name="fromEmail" value="@Model.Field("smtp.fromEmail")" readonly="@(Model.FieldsEditable ? null : "readonly")" data-smtp-own spellcheck="false" />
                 </div>
                 <div class="form-field">
                     <label for="fromName">@T["settings.smtpFromName"]</label>
-                    <input id="fromName" name="fromName" value="@Model.Field("smtp.fromName")" readonly="@(Model.Owner.UseGlobalSmtp ? "readonly" : null)" data-smtp-own />
+                    <input id="fromName" name="fromName" value="@Model.Field("smtp.fromName")" readonly="@(Model.FieldsEditable ? null : "readonly")" data-smtp-own />
                 </div>
             </div>
         </div>
-        <label class="checkbox-row">
+        <label class="checkbox-row" data-smtp-block hidden="@(Model.Owner.MailSource == MailSources.Cloud ? "hidden" : null)">
             <input type="checkbox" name="ssl" value="true" checked="@(Model.Flag("smtp.ssl") ? "checked" : null)" />
             @T["settings.smtpSsl"]
         </label>
@@ -87,11 +103,12 @@
 
 @section Scripts {
     <script>
-        // Ticking "use the global configuration" locks the profile's own fields at once, not only
-        // after saving — and fills them with what would actually be rolled out.
+        // Picking a source takes effect at once, not only after saving: the fields lock, fill with
+        // what would actually be rolled out, or disappear entirely for the relay.
         (function () {
-            var box = document.querySelector('input[name=useGlobalSmtp]');
-            if (!box) return;
+            var radios = Array.prototype.slice.call(document.querySelectorAll('[data-mail-source]'));
+            if (!radios.length) return;
+            var blocks = Array.prototype.slice.call(document.querySelectorAll('[data-smtp-block]'));
             var own = Array.prototype.slice.call(document.querySelectorAll('[data-smtp-own]'));
             var global = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(new
             {
@@ -111,14 +128,17 @@
                 fromEmail = Model.Setting("smtp.fromEmail"),
                 fromName = Model.Setting("smtp.fromName")
             }));
-            box.addEventListener('change', function () {
-                var src = box.checked ? global : mine;
+            function apply() {
+                var chosen = (radios.filter(function (r) { return r.checked; })[0] || {}).value || 'own';
+                blocks.forEach(function (b) { b.hidden = chosen === 'cloud'; });
+                var src = chosen === 'global' ? global : mine;
                 own.forEach(function (el) {
-                    el.readOnly = box.checked;
+                    el.readOnly = chosen !== 'own';
                     if (el.type === 'password') { el.value = ''; return; }
                     if (Object.prototype.hasOwnProperty.call(src, el.id)) el.value = src[el.id];
                 });
-            });
+            }
+            radios.forEach(function (r) { r.addEventListener('change', apply); });
         })();
     </script>
 }

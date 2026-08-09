@@ -168,6 +168,34 @@ public class CloudSyncService
                 else ReportSkippedOnce("setting", config.Settings.Keys);
             }
 
+            // How this site sends mail is not one of the free settings and does not follow their
+            // mode: it is a decision about delivery, and applying it late or partially would mean
+            // notifications going out the old way without anybody saying so.
+            //
+            // Unlike every other payload this one IS reset when the profile stops deciding — the
+            // config then says "smtp" and the site sends for itself again. That looks like a
+            // violation of "nothing is removed because the profile no longer lists it", and it is
+            // the deliberate exception: a site left pointing at a relay that no longer accepts it
+            // would fail every mail with a message only the cloud can explain, whereas falling back
+            // to its own SMTP leaves it in a state its own operator can see and fix. Both stop mail
+            // if nothing is configured; only one of them says so on the site itself.
+            {
+                var transport = string.Equals(config.MailTransport, "cloud", StringComparison.OrdinalIgnoreCase)
+                    ? "cloud" : "smtp";
+                var row = await _db.SiteSettings.FirstOrDefaultAsync(s => s.Key == SettingKeys.MailTransport, ct);
+                if (row is null)
+                {
+                    if (!_dryRun) _db.SiteSettings.Add(new SiteSetting { Key = SettingKeys.MailTransport, Value = transport });
+                    Report("setting", SettingKeys.MailTransport, "installed", transport);
+                }
+                else if (row.Value != transport)
+                {
+                    if (!_dryRun) row.Value = transport;
+                    Report("setting", SettingKeys.MailTransport, "updated", transport);
+                }
+                await SaveAsync(ct);
+            }
+
             if (config.Users is not null)
             {
                 var plan = Plan(PayloadUsers, config.UsersMode, seeded);

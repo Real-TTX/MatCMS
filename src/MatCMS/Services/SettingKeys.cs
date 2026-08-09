@@ -55,6 +55,11 @@ public static class SettingKeys
     public const string AnalyticsGa4 = "analytics.ga4";   // GA4 Measurement-ID (G-XXXXXXX) → auto-snippet
 
     // SMTP / e-mail settings (own tab under Settings; kept out of `All` so each form saves only its own keys).
+    /// <summary>How this site sends mail: "smtp" (itself) or "cloud" (hand each message to the
+    /// connected cloud, which spools and delivers it). Written by the cloud sync when a profile
+    /// decides it; absent means smtp, which is what every site did before the relay existed.</summary>
+    public const string MailTransport = "mail.transport";
+
     public const string SmtpHost = "smtp.host";
     public const string SmtpPort = "smtp.port";
     public const string SmtpUser = "smtp.user";

@@ -107,6 +107,7 @@ public class Profile
     public bool SyncPlugins { get; set; }
     public bool SyncComponents { get; set; }
     public bool SyncTemplates { get; set; }
+    public bool SyncMailTemplates { get; set; }
 
     /// <summary>
     /// Name of the template that should be the ACTIVE design on every assigned instance. Empty means
@@ -126,6 +127,7 @@ public class Profile
     public SyncMode PluginsMode { get; set; } = SyncMode.Keep;
     public SyncMode ComponentsMode { get; set; } = SyncMode.Keep;
     public SyncMode TemplatesMode { get; set; } = SyncMode.Keep;
+    public SyncMode MailTemplatesMode { get; set; } = SyncMode.Keep;
     public SyncMode UsersMode { get; set; } = SyncMode.Add;
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
@@ -241,4 +243,20 @@ public class ProfileComponent
     public string Icon { get; set; } = "";
     public string FieldsJson { get; set; } = "[]";
     public string TemplateHtml { get; set; } = "";
+}
+
+/// <summary>Wording for one kind of mail, rolled out to the profile's instances. <see cref="Key"/>
+/// is the identity, the same one MatCMS uses when it asks for a mail to send.</summary>
+public class ProfileMailTemplate
+{
+    public int Id { get; set; }
+    public int ProfileId { get; set; }
+    public Profile? Profile { get; set; }
+
+    public string Key { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string Description { get; set; } = "";
+    public string Subject { get; set; } = "";
+    public string Body { get; set; } = "";
+    public bool Enabled { get; set; } = true;
 }

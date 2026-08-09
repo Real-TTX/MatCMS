@@ -19,15 +19,18 @@ public class AppDbContext : DbContext
     public DbSet<ProfileUser> ProfileUsers => Set<ProfileUser>();
     public DbSet<ProfilePlugin> ProfilePlugins => Set<ProfilePlugin>();
     public DbSet<ProfileComponent> ProfileComponents => Set<ProfileComponent>();
+    public DbSet<ProfileMailTemplate> ProfileMailTemplates => Set<ProfileMailTemplate>();
     public DbSet<ProfileTemplate> ProfileTemplates => Set<ProfileTemplate>();
 
     // The global store plus the per-profile selections out of it.
     public DbSet<StorePlugin> StorePlugins => Set<StorePlugin>();
     public DbSet<StoreTemplate> StoreTemplates => Set<StoreTemplate>();
     public DbSet<StoreComponent> StoreComponents => Set<StoreComponent>();
+    public DbSet<StoreMailTemplate> StoreMailTemplates => Set<StoreMailTemplate>();
     public DbSet<ProfileStorePlugin> ProfileStorePlugins => Set<ProfileStorePlugin>();
     public DbSet<ProfileStoreTemplate> ProfileStoreTemplates => Set<ProfileStoreTemplate>();
     public DbSet<ProfileStoreComponent> ProfileStoreComponents => Set<ProfileStoreComponent>();
+    public DbSet<ProfileStoreMailTemplate> ProfileStoreMailTemplates => Set<ProfileStoreMailTemplate>();
     public DbSet<ProfileGlobalUser> ProfileGlobalUsers => Set<ProfileGlobalUser>();
 
     protected override void OnModelCreating(ModelBuilder b)

@@ -514,5 +514,26 @@
   "spool.retry": "Erneut versuchen",
   "spool.retryAll": "Alle aufgegebenen erneut versuchen",
   "spool.hint": "Nachrichten dieser Instanz, die über die Cloud verschickt werden. Ein fehlgeschlagener Versand wird mit wachsendem Abstand wiederholt; nach acht Versuchen gilt er als aufgegeben und kann hier von Hand zurück in die Warteschlange.",
-  "spool.noSmtp": "Diese Cloud hat selbst keinen Mailversand eingerichtet — es bleibt alles in der Warteschlange stehen."
+  "spool.noSmtp": "Diese Cloud hat selbst keinen Mailversand eingerichtet — es bleibt alles in der Warteschlange stehen.",
+
+  "profiles.tabMailTemplates": "Mail-Vorlagen",
+  "profiles.payloadMailTemplates": "Mail-Vorlagen",
+  "profiles.noMailTemplates": "Dieses Profil rollt noch keine Mail-Vorlagen aus.",
+  "profiles.origin": "Herkunft",
+  "profiles.own": "eigene",
+  "store.noMailTemplates": "Noch keine Mail-Vorlagen im Store.",
+  "mailtpl.title": "Mail-Vorlage",
+  "mailtpl.add": "Mail-Vorlage",
+  "mailtpl.key": "Schlüssel",
+  "mailtpl.keyHint": "Benennt, WELCHE Mail das ist — z. B. form.submission. Die Instanz ordnet die Vorlage darüber zu; ein Schlüssel, den sie nicht kennt, wird gespeichert und nie verwendet.",
+  "mailtpl.subject": "Betreff",
+  "mailtpl.body": "Text",
+  "mailtpl.bodyHint": "Platzhalter in doppelten geschweiften Klammern, z. B. {{form_name}}. Welche es gibt, hängt von der Mail ab und steht im Editor der Instanz.",
+  "mailtpl.enabledLabel": "Diese Benachrichtigung versenden",
+  "mailtpl.disabled": "aus",
+  "mailtpl.enabledHint": "Aus bedeutet: die Instanz verschickt diese Mail nicht. Die Vorlage bleibt erhalten.",
+  "mailtpl.import": "Mail-Vorlage importieren",
+  "mailtpl.importHint": "Das JSON aus einem Mail-Vorlagen-Editor hier einfügen. Eine Vorlage mit gleichem Schlüssel wird überschrieben.",
+  "mailtpl.deleteConfirm": "Vorlage aus dem Store entfernen? Profile verlieren die Auswahl, auf den Instanzen bleibt der Text stehen.",
+  "mailtpl.removeConfirm": "Vorlage aus dem Profil entfernen? Auf den Instanzen bleibt der Text stehen."
 }

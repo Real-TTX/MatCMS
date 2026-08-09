@@ -1053,5 +1053,9 @@
   "mailtpl.test": "Testmail",
   "mailtpl.testHint": "Verschickt die gespeicherte Vorlage mit Beispielwerten, damit sich der Text als Mail beurteilen lässt und nicht als Formularfeld.",
   "mailtpl.testTo": "Empfänger",
-  "mailtpl.testSend": "Senden"
+  "mailtpl.testSend": "Senden",
+
+  "mailtpl.unused": "nicht verwendet",
+  "mailtpl.unknownKeyShort": "Diese Version verschickt keine Mail mit diesem Schlüssel — der Text wird nie benutzt.",
+  "mailtpl.deleteUnknownConfirm": "Vorlage löschen? Sie gehört zu keiner Mail, die diese Version verschickt."
 }

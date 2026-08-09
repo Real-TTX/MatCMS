@@ -12,6 +12,7 @@
     <button type="button" class="tab active" data-tab="plugins">@T["profiles.tabPlugins"]</button>
     <button type="button" class="tab" data-tab="templates">@T["profiles.tabTemplates"]</button>
     <button type="button" class="tab" data-tab="components">@T["profiles.tabComponents"]</button>
+    <button type="button" class="tab" data-tab="mailtemplates">@T["profiles.tabMailTemplates"]</button>
 </div>
 
 @* ============ PLUGINS ============ *@
@@ -180,6 +181,66 @@
     </div>
 </div>
 
+
+@* ============ MAIL-VORLAGEN ============ *@
+<div class="tab-panel" data-panel="mailtemplates" hidden>
+    <div data-list>
+        <div class="page-head">
+            <h2>@T["profiles.tabMailTemplates"]</h2>
+            <div class="list-toolbar">
+                <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+            </div>
+        </div>
+        <table class="data" data-list-table>
+            <thead>
+                <tr><th>@T["common.name"]</th><th>@T["mailtpl.key"]</th><th>@T["mailtpl.subject"]</th><th>@T["store.usedBy"]</th><th></th></tr>
+            </thead>
+            <tbody>
+                @if (Model.MailTemplates.Count == 0)
+                {
+                    <partial name="_EmptyRow" model='@T["store.noMailTemplates"]' />
+                }
+                else
+                {
+                    @foreach (var m in Model.MailTemplates)
+                    {
+                        <tr data-search="@(m.Name + " " + m.Key + " " + m.Subject)">
+                            <td>
+                                <a asp-page="MailTemplate" asp-route-id="@m.Id"><strong>@m.Name</strong></a>
+                                <div class="muted">@m.Description</div>
+                            </td>
+                            <td class="mono">@m.Key</td>
+                            <td class="muted">@m.Subject</td>
+                            <td><span class="badge badge-off">@T["store.profileCount", Model.Uses(Model.MailTemplateUse, m.Id)]</span></td>
+                            <td>
+                                <div class="actions">
+                                    @if (!m.Enabled)
+                                    {
+                                        <span class="badge badge-off">@T["mailtpl.disabled"]</span>
+                                    }
+                                    <a class="btn btn-sm btn-ghost" asp-page="MailTemplate" asp-route-id="@m.Id">@T["action.edit"]</a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+        <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+        <partial name="_AddMenu" model='AddMenus.Payload(T, "store-mailtemplates", Url.Page("MailTemplate")!, "mailtpl.add", null, "import-store-mail")' />
+    </div>
+
+    <div class="card" id="import-store-mail" hidden>
+        <h2>@T["mailtpl.import"]</h2>
+        <p class="muted">@T["mailtpl.importHint"]</p>
+        <form method="post" asp-page-handler="ImportMailTemplate">
+            <div class="form-field">
+                <textarea name="mailJson" rows="6" spellcheck="false" data-code="json" placeholder='{ "Key": "form.submission" }'></textarea>
+            </div>
+            <div><button type="submit" class="btn btn-ghost">@T["import.btn"]</button></div>
+        </form>
+    </div>
+</div>
 @section Scripts {
     <partial name="_CodeEditorAssets" />
     <partial name="_TabsScript" />

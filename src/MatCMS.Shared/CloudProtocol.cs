@@ -15,7 +15,7 @@ public static class CloudProtocol
     /// <summary>Contract version. Bump on <b>every</b> change to the payloads in this file: the cloud
     /// badges an instance reporting an older one as "veraltet", and both sides read this constant, so
     /// one edit covers both.</summary>
-    public const int Version = 6;
+    public const int Version = 7;
 
     /// <summary>Header carrying the instance's bearer token.</summary>
     public const string TokenHeader = "X-MatCMS-Instance-Token";
@@ -164,6 +164,7 @@ public sealed class InstanceConfig
     public List<ConfigComponent>? Components { get; set; }
     public List<ConfigPlugin>? Plugins { get; set; }
     public List<ConfigTemplate>? Templates { get; set; }
+    public List<ConfigMailTemplate>? MailTemplates { get; set; }
 
     /// <summary>Name of the template that should become the ACTIVE design. Empty = leave the site's
     /// own choice alone.</summary>
@@ -178,6 +179,7 @@ public sealed class InstanceConfig
     public string PluginsMode { get; set; } = "keep";
     public string TemplatesMode { get; set; } = "keep";
     public string UsersMode { get; set; } = "add";
+    public string MailTemplatesMode { get; set; } = "keep";
 
     /// <summary>
     /// How the instance should SEND mail: "smtp" (its own or the rolled-out configuration) or
@@ -214,6 +216,23 @@ public sealed class MailResponse
 {
     public bool Queued { get; set; }
     public string? Error { get; set; }
+}
+
+/// <summary>
+/// The wording of one kind of mail. <c>Key</c> is the identity — it names WHAT the mail is, and it
+/// is the same key the CMS asks for when it sends one.
+/// <para>Only wording travels. Which mails a site can send is decided by the CMS that sends them,
+/// so a key the instance does not know is stored and simply never used — the alternative, refusing
+/// it, would break rollout the moment the two sides differ by one release.</para>
+/// </summary>
+public sealed class ConfigMailTemplate
+{
+    public string Key { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string Description { get; set; } = "";
+    public string Subject { get; set; } = "";
+    public string Body { get; set; } = "";
+    public bool Enabled { get; set; } = true;
 }
 
 /// <summary>A theme rolled out to the instance. <c>Name</c> is the identity; whether it becomes the

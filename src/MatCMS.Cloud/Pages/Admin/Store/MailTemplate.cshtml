@@ -1,0 +1,72 @@
+@page "{id:int?}"
+@model MatCMS.Cloud.Pages.Admin.Store.MailTemplateModel
+@{
+    ViewData["Title"] = Model.IsNew ? T["mailtpl.add"] : Model.Item.Name;
+    var m = Model.Item;
+}
+<div class="page-head">
+    <h1>@(Model.IsNew ? T["mailtpl.add"] : Model.Item.Name)</h1>
+    <div class="list-toolbar">
+        @if (!Model.IsNew)
+        {
+            <a class="btn btn-sm btn-ghost" asp-page="MailTemplate" asp-page-handler="Export" asp-route-id="@m.Id">
+                <i class="ti ti-download" aria-hidden="true"></i> @T["components.exportJson"]
+            </a>
+        }
+        <a class="btn btn-sm btn-ghost" asp-page="Index" asp-route-tab="mailtemplates">@T["action.back"]</a>
+    </div>
+</div>
+
+<form method="post" asp-route-id="@(Model.IsNew ? null : (int?)m.Id)" id="editor-form">
+    <div class="card">
+        <h2>@T["mailtpl.title"]</h2>
+        <div class="form-row">
+            <div class="form-field">
+                <label for="key">@T["mailtpl.key"]</label>
+                <input id="key" name="key" value="@m.Key" list="mailtpl-keys" required spellcheck="false" class="mono" />
+                @* The known keys are offered, not enforced: a cloud and its instances routinely
+                   differ by a release, and refusing a key this build has not heard of would make
+                   rolling out a new mail impossible until the cloud caught up. *@
+                <datalist id="mailtpl-keys">
+                    <option value="form.submission"></option>
+                </datalist>
+                <div class="help">@T["mailtpl.keyHint"]</div>
+            </div>
+            <div class="form-field">
+                <label for="name">@T["common.name"]</label>
+                <input id="name" name="name" value="@m.Name" />
+            </div>
+        </div>
+        <div class="form-field">
+            <label for="description">@T["profiles.description"]</label>
+            <input id="description" name="description" value="@m.Description" />
+        </div>
+
+        <label class="checkbox-row">
+            <input type="checkbox" name="enabled" value="true" checked="@(m.Enabled ? "checked" : null)" />
+            @T["mailtpl.enabledLabel"]
+        </label>
+        <div class="help">@T["mailtpl.enabledHint"]</div>
+
+        <div class="form-field">
+            <label for="subject">@T["mailtpl.subject"]</label>
+            <input id="subject" name="subject" value="@m.Subject" required />
+        </div>
+        <div class="form-field">
+            <label for="body">@T["mailtpl.body"]</label>
+            <textarea id="body" name="body" rows="14" spellcheck="false" class="mono">@m.Body</textarea>
+            <div class="help">@T["mailtpl.bodyHint"]</div>
+        </div>
+    </div>
+</form>
+
+<div class="form-actions">
+    <button type="submit" class="btn" form="editor-form">@T["settings.save"]</button>
+    @if (!Model.IsNew)
+    {
+        <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@m.Id"
+              onsubmit="return confirm('@T["mailtpl.deleteConfirm"]');">
+            <button type="submit" class="btn btn-danger">@T["common.delete"]</button>
+        </form>
+    }
+</div>

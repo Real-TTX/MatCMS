@@ -1053,5 +1053,9 @@
   "mailtpl.test": "Test mail",
   "mailtpl.testHint": "Sends the saved template with example values, so the wording can be judged as mail rather than as a form field.",
   "mailtpl.testTo": "Recipient",
-  "mailtpl.testSend": "Send"
+  "mailtpl.testSend": "Send",
+
+  "mailtpl.unused": "unused",
+  "mailtpl.unknownKeyShort": "This version sends no mail with this key — the text will never be used.",
+  "mailtpl.deleteUnknownConfirm": "Delete the template? It belongs to no mail this version sends."
 }

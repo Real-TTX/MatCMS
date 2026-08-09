@@ -24,6 +24,7 @@
                 <th>@T["common.name"]</th>
                 <th>@T["mailtpl.subject"]</th>
                 <th>@T["common.status"]</th>
+                <th></th>
             </tr>
         </thead>
         <tbody>
@@ -50,6 +51,22 @@
                             {
                                 <span class="badge badge-off">@T["mailtpl.disabled"]</span>
                             }
+                        </td>
+                        <td>
+                            <div class="actions">
+                                @if (MatCMS.Pages.Admin.MailTemplates.IndexModel.IsUnknown(t))
+                                {
+                                    @* Only for a key nothing in this build sends: such a row can only
+                                       have arrived from a cloud rollout for a mail this version does
+                                       not have, so it is wording that will never be used. A declared
+                                       one stays undeletable — the code still asks for it. *@
+                                    <span class="badge badge-off" title="@T["mailtpl.unknownKeyShort"]">@T["mailtpl.unused"]</span>
+                                    <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@t.Id"
+                                          onsubmit="return confirm('@T["mailtpl.deleteUnknownConfirm"]');">
+                                        <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
+                                    </form>
+                                }
+                            </div>
                         </td>
                     </tr>
                 }

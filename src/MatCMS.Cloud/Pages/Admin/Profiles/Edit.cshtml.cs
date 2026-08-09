@@ -36,17 +36,20 @@ public class EditModel : PageModel
     public List<ProfilePlugin> Plugins { get; private set; } = new();
     public List<ProfileComponent> Components { get; private set; } = new();
     public List<ProfileTemplate> Templates { get; private set; } = new();
+    public List<ProfileMailTemplate> MailTemplates { get; private set; } = new();
     public List<Instance> Instances { get; private set; } = new();
 
     // --- What is available globally, and what this profile has taken from it ------------------
     public List<StorePlugin> StorePlugins { get; private set; } = new();
     public List<StoreTemplate> StoreTemplates { get; private set; } = new();
     public List<StoreComponent> StoreComponents { get; private set; } = new();
+    public List<StoreMailTemplate> StoreMailTemplates { get; private set; } = new();
     public List<Models.User> GlobalUsers { get; private set; } = new();
 
     public HashSet<int> SelectedPlugins { get; private set; } = new();
     public HashSet<int> SelectedTemplates { get; private set; } = new();
     public HashSet<int> SelectedComponents { get; private set; } = new();
+    public HashSet<int> SelectedMailTemplates { get; private set; } = new();
     public HashSet<int> SelectedUsers { get; private set; } = new();
 
     /// <summary>True when the profile also defines its own item of that identity — the selection is
@@ -54,6 +57,7 @@ public class EditModel : PageModel
     public bool PluginOverridden(string key) => Plugins.Any(p => p.Key == key);
     public bool TemplateOverridden(string name) => Templates.Any(t => t.Name == name);
     public bool ComponentOverridden(string type) => Components.Any(c => c.Type == type);
+    public bool MailTemplateOverridden(string key) => MailTemplates.Any(m => m.Key == key);
     public bool UserOverridden(string username) => Users.Any(u => u.Username == username);
 
     // Each payload list shows the profile's OWN items and the ones it takes from the global store in
@@ -62,6 +66,7 @@ public class EditModel : PageModel
     public List<StorePlugin> ChosenStorePlugins => StorePlugins.Where(p => SelectedPlugins.Contains(p.Id)).ToList();
     public List<StoreTemplate> ChosenStoreTemplates => StoreTemplates.Where(t => SelectedTemplates.Contains(t.Id)).ToList();
     public List<StoreComponent> ChosenStoreComponents => StoreComponents.Where(c => SelectedComponents.Contains(c.Id)).ToList();
+    public List<StoreMailTemplate> ChosenStoreMailTemplates => StoreMailTemplates.Where(m => SelectedMailTemplates.Contains(m.Id)).ToList();
     public List<Models.User> ChosenGlobalUsers => GlobalUsers.Where(u => SelectedUsers.Contains(u.Id)).ToList();
 
     // Tile views. Built from the SAME two sources as the tables above and in the same order, so
@@ -124,6 +129,10 @@ public class EditModel : PageModel
         StoreTemplates.Where(t => !SelectedTemplates.Contains(t.Id))
             .Select(t => new PickerItem(t.Id, t.Name, t.Description ?? "")).ToList());
 
+    public StorePicker MailTemplatePicker => new(Item.Id, "mailtemplates",
+        StoreMailTemplates.Where(m => !SelectedMailTemplates.Contains(m.Id))
+            .Select(m => new PickerItem(m.Id, m.Name, m.Key)).ToList());
+
     public StorePicker ComponentPicker => new(Item.Id, "components",
         StoreComponents.Where(c => !SelectedComponents.Contains(c.Id))
             .Select(c => new PickerItem(c.Id, c.Name, c.Type)).ToList());
@@ -146,7 +155,8 @@ public class EditModel : PageModel
         new("usersMode", "profiles.payloadUsers", ProfileService.Wire(Item.UsersMode), ["add", "once"]),
         new("pluginsMode", "profiles.payloadPlugins", ProfileService.Wire(Item.PluginsMode), ["keep", "add", "once"]),
         new("componentsMode", "profiles.payloadComponents", ProfileService.Wire(Item.ComponentsMode), ["keep", "add", "once"]),
-        new("templatesMode", "profiles.payloadTemplates", ProfileService.Wire(Item.TemplatesMode), ["keep", "add", "once"])
+        new("templatesMode", "profiles.payloadTemplates", ProfileService.Wire(Item.TemplatesMode), ["keep", "add", "once"]),
+        new("mailTemplatesMode", "profiles.payloadMailTemplates", ProfileService.Wire(Item.MailTemplatesMode), ["keep", "add", "once"])
     ];
 
     /// <summary>Falls back to the stored mode rather than to a default: a form that arrives without
@@ -195,6 +205,7 @@ public class EditModel : PageModel
             .OrderBy(p => p.Name).ToListAsync();
         Components = await _db.ProfileComponents.AsNoTracking().Where(c => c.ProfileId == id).OrderBy(c => c.Name).ToListAsync();
         // Same reasoning: a template carries a lot of text, the listing only needs its identity.
+        MailTemplates = await _db.ProfileMailTemplates.AsNoTracking().Where(m => m.ProfileId == id).OrderBy(m => m.Key).ToListAsync();
         Templates = await _db.ProfileTemplates.AsNoTracking().Where(t => t.ProfileId == id)
             .Select(t => new ProfileTemplate
             {
@@ -214,11 +225,15 @@ public class EditModel : PageModel
         StoreComponents = await _db.StoreComponents.AsNoTracking()
             .Select(c => new StoreComponent { Id = c.Id, Type = c.Type, Name = c.Name, Description = c.Description })
             .OrderBy(c => c.Name).ToListAsync();
+        StoreMailTemplates = await _db.StoreMailTemplates.AsNoTracking()
+            .Select(m => new StoreMailTemplate { Id = m.Id, Key = m.Key, Name = m.Name, Description = m.Description, Subject = m.Subject, Enabled = m.Enabled })
+            .OrderBy(m => m.Key).ToListAsync();
         GlobalUsers = await _db.Users.AsNoTracking().OrderBy(u => u.Username).ToListAsync();
 
         SelectedPlugins = (await _db.ProfileStorePlugins.AsNoTracking().Where(x => x.ProfileId == id).Select(x => x.StorePluginId).ToListAsync()).ToHashSet();
         SelectedTemplates = (await _db.ProfileStoreTemplates.AsNoTracking().Where(x => x.ProfileId == id).Select(x => x.StoreTemplateId).ToListAsync()).ToHashSet();
         SelectedComponents = (await _db.ProfileStoreComponents.AsNoTracking().Where(x => x.ProfileId == id).Select(x => x.StoreComponentId).ToListAsync()).ToHashSet();
+        SelectedMailTemplates = (await _db.ProfileStoreMailTemplates.AsNoTracking().Where(x => x.ProfileId == id).Select(x => x.StoreMailTemplateId).ToListAsync()).ToHashSet();
         SelectedUsers = (await _db.ProfileGlobalUsers.AsNoTracking().Where(x => x.ProfileId == id).Select(x => x.UserId).ToListAsync()).ToHashSet();
 
         return true;
@@ -249,6 +264,8 @@ public class EditModel : PageModel
                 wanted, sid => new ProfileStoreTemplate { ProfileId = id, StoreTemplateId = sid }),
             "components" => await AddAsync(_db.ProfileStoreComponents, x => x.ProfileId == id, x => x.StoreComponentId,
                 wanted, sid => new ProfileStoreComponent { ProfileId = id, StoreComponentId = sid }),
+            "mailtemplates" => await AddAsync(_db.ProfileStoreMailTemplates, x => x.ProfileId == id, x => x.StoreMailTemplateId,
+                wanted, sid => new ProfileStoreMailTemplate { ProfileId = id, StoreMailTemplateId = sid }),
             "users" => await AddAsync(_db.ProfileGlobalUsers, x => x.ProfileId == id, x => x.UserId,
                 wanted, sid => new ProfileGlobalUser { ProfileId = id, UserId = sid }),
             _ => 0
@@ -280,6 +297,9 @@ public class EditModel : PageModel
                 break;
             case "components":
                 _db.ProfileStoreComponents.RemoveRange(_db.ProfileStoreComponents.Where(x => x.ProfileId == id && x.StoreComponentId == storeId));
+                break;
+            case "mailtemplates":
+                _db.ProfileStoreMailTemplates.RemoveRange(_db.ProfileStoreMailTemplates.Where(x => x.ProfileId == id && x.StoreMailTemplateId == storeId));
                 break;
             case "users":
                 _db.ProfileGlobalUsers.RemoveRange(_db.ProfileGlobalUsers.Where(x => x.ProfileId == id && x.UserId == storeId));
@@ -313,7 +333,9 @@ public class EditModel : PageModel
         int id, string name, string? description, bool autoApprove, bool isDefault,
         bool autoUpdateLocal, bool notifyOffline, bool notifyUpdate, string? notifyRecipients,
         bool syncSettings, bool syncUsers, bool syncPlugins, bool syncComponents, bool syncTemplates,
+        bool syncMailTemplates,
         string? settingsMode, string? usersMode, string? pluginsMode, string? componentsMode, string? templatesMode,
+        string? mailTemplatesMode,
         string? activateTemplateName)
     {
         var profile = await _db.Profiles.FindAsync(id);
@@ -331,10 +353,12 @@ public class EditModel : PageModel
         profile.SyncPlugins = syncPlugins;
         profile.SyncComponents = syncComponents;
         profile.SyncTemplates = syncTemplates;
+        profile.SyncMailTemplates = syncMailTemplates;
         profile.SettingsMode = ParseMode(settingsMode, profile.SettingsMode);
         profile.PluginsMode = ParseMode(pluginsMode, profile.PluginsMode);
         profile.ComponentsMode = ParseMode(componentsMode, profile.ComponentsMode);
         profile.TemplatesMode = ParseMode(templatesMode, profile.TemplatesMode);
+        profile.MailTemplatesMode = ParseMode(mailTemplatesMode, profile.MailTemplatesMode);
         // Users never offer Keep — add-only is the whole point — so anything but "once" is Add.
         profile.UsersMode = ParseMode(usersMode, profile.UsersMode) == SyncMode.Once ? SyncMode.Once : SyncMode.Add;
         profile.ActivateTemplateName = string.IsNullOrWhiteSpace(activateTemplateName) ? null : activateTemplateName.Trim();
@@ -556,5 +580,45 @@ public class EditModel : PageModel
         await _profiles.TouchAsync(id);
         TempData["Flash"] = $"Benutzer \"{row.Username}\" importiert.";
         return RedirectToPage(new { id, tab = "users" });
+    }
+
+    /// <summary>Imports mail wording into this profile. The KEY is the identity, so re-importing
+    /// replaces the wording rather than adding a second row the instance would have to choose
+    /// between.</summary>
+    public async Task<IActionResult> OnPostImportMailTemplateAsync(int id, string? mailJson)
+    {
+        using var doc = JsonImport.TryParse(mailJson);
+        if (doc is null)
+        {
+            TempData["FlashError"] = "Bitte gültiges Vorlagen-JSON einfügen.";
+            return RedirectToPage(new { id, tab = "mailtemplates" });
+        }
+
+        var root = doc.RootElement;
+        var key = JsonImport.Text(root, "Key").Trim();
+        var subject = JsonImport.Text(root, "Subject").Trim();
+        if (key.Length == 0 || subject.Length == 0)
+        {
+            TempData["FlashError"] = "Im JSON fehlen Schlüssel oder Betreff.";
+            return RedirectToPage(new { id, tab = "mailtemplates" });
+        }
+
+        var row = await _db.ProfileMailTemplates.FirstOrDefaultAsync(m => m.ProfileId == id && m.Key == key);
+        if (row is null)
+        {
+            row = new ProfileMailTemplate { ProfileId = id, Key = key };
+            _db.ProfileMailTemplates.Add(row);
+        }
+        var name = JsonImport.Text(root, "Name").Trim();
+        row.Name = name.Length > 0 ? name : key;
+        row.Description = JsonImport.Text(root, "Description");
+        row.Subject = subject;
+        row.Body = JsonImport.Text(root, "Body");
+        row.Enabled = !string.Equals(JsonImport.Raw(root, "Enabled", "true"), "false", StringComparison.OrdinalIgnoreCase);
+
+        await _db.SaveChangesAsync();
+        await _profiles.TouchAsync(id);
+        TempData["Flash"] = $"Vorlage \"{row.Name}\" importiert.";
+        return RedirectToPage(new { id, tab = "mailtemplates" });
     }
 }

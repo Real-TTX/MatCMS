@@ -40,4 +40,31 @@ public class IndexModel : PageModel
 
         MailConfigured = await email.IsConfiguredAsync();
     }
+
+    /// <summary>True when nothing in this build sends that key. Such a row can only have arrived from
+    /// a cloud rollout for a mail this version does not have — it is wording that will never be used,
+    /// so unlike a declared template it CAN be deleted.</summary>
+    public static bool IsUnknown(MailTemplate t) => Services.MailTemplates.Find(t.Key) is null;
+
+    /// <summary>
+    /// Removes a row for a key nothing sends. A declared one is deliberately not deletable: the code
+    /// still asks for it, and the seeder would put it back on the next start anyway.
+    /// <para>Without this a rolled-out template for an unknown key could arrive but never leave —
+    /// which is how this gap was found.</para>
+    /// </summary>
+    public async Task<IActionResult> OnPostDeleteAsync(int id)
+    {
+        var row = await _db.MailTemplates.FirstOrDefaultAsync(t => t.Id == id);
+        if (row is null) return RedirectToPage();
+        if (!IsUnknown(row))
+        {
+            TempData["FlashError"] = "Diese Vorlage gehört zu einer Mail, die diese Version verschickt — sie lässt sich abschalten, aber nicht löschen.";
+            return RedirectToPage();
+        }
+
+        _db.MailTemplates.Remove(row);
+        await _db.SaveChangesAsync();
+        TempData["Flash"] = $"„{row.Name}“ gelöscht.";
+        return RedirectToPage();
+    }
 }

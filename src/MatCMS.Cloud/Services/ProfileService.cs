@@ -146,6 +146,7 @@ public class ProfileService
             ComponentsMode = Wire(profile.ComponentsMode),
             PluginsMode = Wire(profile.PluginsMode),
             TemplatesMode = Wire(profile.TemplatesMode),
+            MailTemplatesMode = Wire(profile.MailTemplatesMode),
             UsersMode = Wire(profile.UsersMode),
             // Only meaningful when templates are actually rolled out — otherwise the instance would
             // be told to activate a design it never received.
@@ -236,6 +237,28 @@ public class ProfileService
                 };
 
             config.Components = components.Values.ToList();
+        }
+
+        if (profile.SyncMailTemplates)
+        {
+            var storeMails = await _db.ProfileStoreMailTemplates.AsNoTracking()
+                .Where(x => x.ProfileId == profile.Id)
+                .Select(x => x.StoreMailTemplate!)
+                .ToListAsync(ct);
+            var mails = Index(storeMails, m => m.Key, m => new ConfigMailTemplate
+                {
+                    Key = m.Key, Name = m.Name, Description = m.Description,
+                    Subject = m.Subject, Body = m.Body, Enabled = m.Enabled
+                });
+
+            foreach (var local in await _db.ProfileMailTemplates.AsNoTracking().Where(m => m.ProfileId == profile.Id).ToListAsync(ct))
+                mails[local.Key] = new ConfigMailTemplate
+                {
+                    Key = local.Key, Name = local.Name, Description = local.Description,
+                    Subject = local.Subject, Body = local.Body, Enabled = local.Enabled
+                };
+
+            config.MailTemplates = mails.Values.ToList();
         }
 
         if (profile.SyncTemplates)

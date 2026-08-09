@@ -20,12 +20,14 @@ public class IndexModel : PageModel
     public List<StorePlugin> Plugins { get; private set; } = new();
     public List<StoreTemplate> Templates { get; private set; } = new();
     public List<StoreComponent> Components { get; private set; } = new();
+    public List<StoreMailTemplate> MailTemplates { get; private set; } = new();
 
     /// <summary>How many profiles use each entry — an operator changing something shared should see
     /// how far it reaches before they save.</summary>
     public Dictionary<int, int> PluginUse { get; private set; } = new();
     public Dictionary<int, int> TemplateUse { get; private set; } = new();
     public Dictionary<int, int> ComponentUse { get; private set; } = new();
+    public Dictionary<int, int> MailTemplateUse { get; private set; } = new();
 
     public async Task OnGetAsync()
     {
@@ -48,10 +50,12 @@ public class IndexModel : PageModel
             .OrderBy(t => t.Name).ToListAsync();
 
         Components = await _db.StoreComponents.AsNoTracking().OrderBy(c => c.Name).ToListAsync();
+        MailTemplates = await _db.StoreMailTemplates.AsNoTracking().OrderBy(m => m.Key).ToListAsync();
 
         PluginUse = await CountAsync(_db.ProfileStorePlugins.Select(x => x.StorePluginId));
         TemplateUse = await CountAsync(_db.ProfileStoreTemplates.Select(x => x.StoreTemplateId));
         ComponentUse = await CountAsync(_db.ProfileStoreComponents.Select(x => x.StoreComponentId));
+        MailTemplateUse = await CountAsync(_db.ProfileStoreMailTemplates.Select(x => x.StoreMailTemplateId));
     }
 
     private static async Task<Dictionary<int, int>> CountAsync(IQueryable<int> ids) =>
@@ -115,5 +119,44 @@ public class IndexModel : PageModel
         await _db.SaveChangesAsync();
         TempData["Flash"] = $"Komponente \"{row.Name}\" in den Store importiert.";
         return RedirectToPage(new { tab = "components" });
+    }
+
+    /// <summary>Imports mail wording into the store. The KEY is the identity, so re-importing
+    /// updates the entry every profile that selected it already points at.</summary>
+    public async Task<IActionResult> OnPostImportMailTemplateAsync(string? mailJson)
+    {
+        using var doc = JsonImport.TryParse(mailJson);
+        if (doc is null)
+        {
+            TempData["FlashError"] = "Bitte gültiges Vorlagen-JSON einfügen.";
+            return RedirectToPage(new { tab = "mailtemplates" });
+        }
+
+        var root = doc.RootElement;
+        var key = JsonImport.Text(root, "Key").Trim();
+        var subject = JsonImport.Text(root, "Subject").Trim();
+        if (key.Length == 0 || subject.Length == 0)
+        {
+            TempData["FlashError"] = "Im JSON fehlen Schlüssel oder Betreff.";
+            return RedirectToPage(new { tab = "mailtemplates" });
+        }
+
+        var row = await _db.StoreMailTemplates.FirstOrDefaultAsync(m => m.Key == key);
+        if (row is null)
+        {
+            row = new StoreMailTemplate { Key = key };
+            _db.StoreMailTemplates.Add(row);
+        }
+        var name = JsonImport.Text(root, "Name").Trim();
+        row.Name = name.Length > 0 ? name : key;
+        row.Description = JsonImport.Text(root, "Description");
+        row.Subject = subject;
+        row.Body = JsonImport.Text(root, "Body");
+        // Absent reads as ON: a template nobody said to disable should send.
+        row.Enabled = !string.Equals(JsonImport.Raw(root, "Enabled", "true"), "false", StringComparison.OrdinalIgnoreCase);
+
+        await _db.SaveChangesAsync();
+        TempData["Flash"] = $"Vorlage \"{row.Name}\" in den Store importiert.";
+        return RedirectToPage(new { tab = "mailtemplates" });
     }
 }

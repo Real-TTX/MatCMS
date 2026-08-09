@@ -514,5 +514,26 @@
   "spool.retry": "Try again",
   "spool.retryAll": "Retry all given up",
   "spool.hint": "Messages from this instance sent through the cloud. A failed delivery is retried with a growing delay; after eight attempts it counts as given up and can be put back in the queue by hand here.",
-  "spool.noSmtp": "This cloud has no mail delivery of its own configured — everything will sit in the queue."
+  "spool.noSmtp": "This cloud has no mail delivery of its own configured — everything will sit in the queue.",
+
+  "profiles.tabMailTemplates": "Mail templates",
+  "profiles.payloadMailTemplates": "Mail templates",
+  "profiles.noMailTemplates": "This profile does not roll out any mail templates yet.",
+  "profiles.origin": "Origin",
+  "profiles.own": "own",
+  "store.noMailTemplates": "No mail templates in the store yet.",
+  "mailtpl.title": "Mail template",
+  "mailtpl.add": "Mail template",
+  "mailtpl.key": "Key",
+  "mailtpl.keyHint": "Names WHICH mail this is — e.g. form.submission. The instance matches on it; a key it does not know is stored and never used.",
+  "mailtpl.subject": "Subject",
+  "mailtpl.body": "Body",
+  "mailtpl.bodyHint": "Placeholders in double braces, e.g. {{form_name}}. Which ones exist depends on the mail and is listed in the instance editor.",
+  "mailtpl.enabledLabel": "Send this notification",
+  "mailtpl.disabled": "off",
+  "mailtpl.enabledHint": "Off means the instance does not send this mail. The template is kept.",
+  "mailtpl.import": "Import mail template",
+  "mailtpl.importHint": "Paste the JSON from a mail template editor. A template with the same key is overwritten.",
+  "mailtpl.deleteConfirm": "Remove the template from the store? Profiles lose the selection; instances keep the text.",
+  "mailtpl.removeConfirm": "Remove the template from the profile? Instances keep the text."
 }

@@ -17,6 +17,7 @@
     <button type="button" class="tab" data-tab="plugins">@T["profiles.tabPlugins"]</button>
     <button type="button" class="tab" data-tab="components">@T["profiles.tabComponents"]</button>
     <button type="button" class="tab" data-tab="templates">@T["profiles.tabTemplates"]</button>
+    <button type="button" class="tab" data-tab="mailtemplates">@T["profiles.tabMailTemplates"]</button>
 </div>
 
 
@@ -125,6 +126,10 @@
             <label class="checkbox-row">
                 <input type="checkbox" name="syncTemplates" value="true" checked="@(Model.Item.SyncTemplates ? "checked" : null)" />
                 @T["profiles.payloadTemplates"]
+            </label>
+            <label class="checkbox-row">
+                <input type="checkbox" name="syncMailTemplates" value="true" checked="@(Model.Item.SyncMailTemplates ? "checked" : null)" />
+                @T["profiles.payloadMailTemplates"]
             </label>
 
             <div class="form-field" style="margin-top:12px;">
@@ -558,6 +563,91 @@
     </div>
 </div>
 
+
+@* ============ MAIL-VORLAGEN ============ *@
+<div class="tab-panel" data-panel="mailtemplates" hidden>
+    <div data-list>
+        <div class="page-head">
+            <h2>@T["profiles.tabMailTemplates"]</h2>
+            <div class="list-toolbar">
+                <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+            </div>
+        </div>
+        <table class="data" data-list-table>
+            <thead>
+                <tr><th>@T["common.name"]</th><th>@T["mailtpl.key"]</th><th>@T["profiles.origin"]</th><th>@T["mailtpl.subject"]</th><th></th></tr>
+            </thead>
+            <tbody>
+                @if (Model.ChosenStoreMailTemplates.Count == 0 && Model.MailTemplates.Count == 0)
+                {
+                    <partial name="_EmptyRow" model='@T["profiles.noMailTemplates"]' />
+                }
+                else
+                {
+                    @foreach (var m in Model.ChosenStoreMailTemplates)
+                    {
+                        <tr data-search="@(m.Name + " " + m.Key + " " + m.Subject)">
+                            <td>
+                                <a asp-page="/Admin/Store/MailTemplate" asp-route-id="@m.Id"><strong>@m.Name</strong></a>
+                                @if (Model.MailTemplateOverridden(m.Key))
+                                {
+                                    @* The profile has its own row for the same key, so THAT one wins
+                                       on the instance. Said here, or the list claims to roll out
+                                       something it does not. *@
+                                    <span class="badge badge-new">@T["profiles.overriddenLocally"]</span>
+                                }
+                            </td>
+                            <td class="mono">@m.Key</td>
+                            <td><span class="badge badge-off">@T["profiles.fromStore"]</span></td>
+                            <td class="muted">@m.Subject</td>
+                            <td>
+                                <div class="actions">
+                                    <form class="inline-form" method="post" asp-page-handler="RemoveFromStore" asp-route-id="@Model.Item.Id" asp-route-kind="mailtemplates" asp-route-storeId="@m.Id">
+                                        <button type="submit" class="btn btn-sm btn-ghost">@T["profiles.removeFromProfile"]</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    @foreach (var m in Model.MailTemplates)
+                    {
+                        <tr data-search="@(m.Name + " " + m.Key + " " + m.Subject)">
+                            <td>
+                                <a asp-page="MailTemplate" asp-route-profileId="@Model.Item.Id" asp-route-id="@m.Id"><strong>@m.Name</strong></a>
+                                @if (!m.Enabled)
+                                {
+                                    <span class="badge badge-off">@T["mailtpl.disabled"]</span>
+                                }
+                            </td>
+                            <td class="mono">@m.Key</td>
+                            <td><span class="muted">@T["profiles.own"]</span></td>
+                            <td class="muted">@m.Subject</td>
+                            <td>
+                                <div class="actions">
+                                    <a class="btn btn-sm btn-ghost" asp-page="MailTemplate" asp-route-profileId="@Model.Item.Id" asp-route-id="@m.Id">@T["action.edit"]</a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+        <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+        <partial name="_AddMenu" model='AddMenus.Payload(T, "mailtemplates", Url.Page("MailTemplate", new { profileId = Model.Item.Id })!, "mailtpl.add", "mailtemplates", "import-mail")' />
+    </div>
+    <partial name="_StorePicker" model="Model.MailTemplatePicker" />
+
+    <div class="card" id="import-mail" hidden>
+        <h2>@T["mailtpl.import"]</h2>
+        <p class="muted">@T["mailtpl.importHint"]</p>
+        <form method="post" asp-page-handler="ImportMailTemplate" asp-route-id="@Model.Item.Id">
+            <div class="form-field">
+                <textarea name="mailJson" rows="6" spellcheck="false" data-code="json" placeholder='{ "Key": "form.submission" }'></textarea>
+            </div>
+            <div><button type="submit" class="btn btn-ghost">@T["import.btn"]</button></div>
+        </form>
+    </div>
+</div>
 @section Scripts {
     <partial name="_CodeEditorAssets" />
     <partial name="_TabsScript" />

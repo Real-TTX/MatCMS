@@ -56,6 +56,7 @@ public class CloudSyncService
     private const string PayloadUsers = "users";
     private const string PayloadComponents = "components";
     private const string PayloadTemplates = "templates";
+    private const string PayloadMailTemplates = "mailtemplates";
 
     /// <summary>
     /// Report kind for "make this the live design". Deliberately NOT "template": rolling a theme out
@@ -229,6 +230,17 @@ public class CloudSyncService
                 else ReportSkippedOnce("template", config.Templates.Select(t => t.Name));
             }
 
+            if (config.MailTemplates is not null)
+            {
+                var plan = Plan(PayloadMailTemplates, config.MailTemplatesMode, seeded);
+                if (plan.Run)
+                {
+                    applied.Add($"{await ApplyMailTemplatesAsync(config.MailTemplates, plan.Overwrite, ct)} Mail-Vorlagen");
+                    if (plan.Seed) await MarkSeededAsync(PayloadMailTemplates);
+                }
+                else ReportSkippedOnce("mailtemplate", config.MailTemplates.Select(m => m.Key));
+            }
+
             if (config.Plugins is not null)
             {
                 var plan = Plan(PayloadPlugins, config.PluginsMode, seeded);
@@ -371,6 +383,65 @@ public class CloudSyncService
     }
 
     // --- Components ---------------------------------------------------------
+
+    /// <summary>
+    /// Applies rolled-out mail wording. The KEY is the identity — it is what the code asks for when
+    /// it sends, so a same-key rollout has to replace the wording rather than add a second row.
+    /// <para>A key this build does not know is stored anyway. Which mails a site can send is decided
+    /// by its own code, so an unknown key is simply never used; refusing it instead would break
+    /// rollout the moment the cloud and an instance differ by one release, which is the normal state
+    /// of a fleet.</para>
+    /// </summary>
+    private async Task<int> ApplyMailTemplatesAsync(
+        List<ConfigMailTemplate> mails, bool overwrite, CancellationToken ct)
+    {
+        var count = 0;
+        foreach (var m in mails)
+        {
+            var key = (m.Key ?? "").Trim();
+            if (key.Length == 0) continue;
+
+            var row = await _db.MailTemplates.FirstOrDefaultAsync(x => x.Key == key, ct);
+            if (row is null)
+            {
+                if (!_dryRun)
+                {
+                    _db.MailTemplates.Add(new MailTemplate
+                    {
+                        Key = key,
+                        Name = m.Name,
+                        Description = m.Description,
+                        Subject = m.Subject,
+                        Body = m.Body,
+                        Enabled = m.Enabled,
+                    });
+                }
+                Report("mailtemplate", key, "installed");
+                count++;
+            }
+            else if (overwrite)
+            {
+                if (!_dryRun)
+                {
+                    row.Name = m.Name;
+                    row.Description = m.Description;
+                    row.Subject = m.Subject;
+                    row.Body = m.Body;
+                    row.Enabled = m.Enabled;
+                    row.UpdatedAt = DateTime.UtcNow;
+                }
+                Report("mailtemplate", key, "updated");
+                count++;
+            }
+            else
+            {
+                Report("mailtemplate", key, "skipped-exists", "Eigener Text bleibt erhalten");
+            }
+        }
+
+        await SaveAsync(ct);
+        return count;
+    }
 
     private async Task<int> ApplyComponentsAsync(
         List<ConfigComponent> components, bool overwrite, CancellationToken ct)

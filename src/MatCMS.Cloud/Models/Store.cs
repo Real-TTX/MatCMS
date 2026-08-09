@@ -77,6 +77,23 @@ public class StoreComponent
 }
 
 
+/// <summary>
+/// The text of one kind of mail, in the catalogue. <see cref="Key"/> is the identity — it names
+/// WHAT the mail is (e.g. <c>form.submission</c>) and is what the instance matches on.
+/// <para>Which mails exist is decided by the CMS that sends them, so this table only ever carries
+/// wording for keys MatCMS already knows. A key nobody sends is harmless but dead.</para>
+/// </summary>
+public class StoreMailTemplate
+{
+    public int Id { get; set; }
+    public string Key { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string Description { get; set; } = "";
+    public string Subject { get; set; } = "";
+    public string Body { get; set; } = "";
+    public bool Enabled { get; set; } = true;
+}
+
 // --- Selection: which store entries a profile rolls out ----------------------
 // Plain join rows rather than a many-to-many navigation, so a selection can be added or removed
 // without loading the payload it points at.
@@ -106,6 +123,15 @@ public class ProfileStoreComponent
     public Profile? Profile { get; set; }
     public int StoreComponentId { get; set; }
     public StoreComponent? StoreComponent { get; set; }
+}
+
+public class ProfileStoreMailTemplate
+{
+    public int Id { get; set; }
+    public int ProfileId { get; set; }
+    public Profile? Profile { get; set; }
+    public int StoreMailTemplateId { get; set; }
+    public StoreMailTemplate? StoreMailTemplate { get; set; }
 }
 
 

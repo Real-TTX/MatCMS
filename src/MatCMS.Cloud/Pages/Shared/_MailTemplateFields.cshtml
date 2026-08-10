@@ -1,0 +1,80 @@
+@model MatCMS.Cloud.Pages.Shared.MailTemplateFields
+@inject MatCMS.Cloud.Services.Localizer T
+@*
+    The body of a mail template plus everything that helps write it: the CodeMirror editor, the
+    placeholders the CMS will actually fill, the repeatable blocks, and a rendered preview.
+
+    One partial for the store and the profile, because those two pages differ in nothing but where
+    they save to — and this is exactly the block that must not drift between them, or the cloud would
+    document placeholders that MatCMS does not fill.
+
+    The chip sets for EVERY declared mail are rendered and all but one hidden, switched by the key
+    field. A new entry has no key yet, and a page that can only help after the first save is a page
+    that does not help when it matters.
+*@
+<div class="form-field">
+    <label for="body">@T["mailtpl.body"]</label>
+    @* data-code, like every other code field in this admin: the shared upgrader turns it into
+       CodeMirror and keeps the textarea as the posted value, so a plain form post still works. *@
+    <textarea id="body" name="body" rows="18" spellcheck="false" data-code="html">@Model.Body</textarea>
+    <div class="help">@T["mailtpl.bodyHint"]</div>
+</div>
+
+@foreach (var def in MatCMS.Shared.MailTemplates.All)
+{
+    <div data-mailkey="@def.Key" hidden="@(string.Equals(def.Key, Model.Key, StringComparison.OrdinalIgnoreCase) ? null : "hidden")">
+        @if (def.Placeholders.Count > 0)
+        {
+            <div class="form-field">
+                <label>@T["mailtpl.placeholders"]</label>
+                <div class="code-toolbar">
+                    @foreach (var p in def.Placeholders)
+                    {
+                        <button type="button" class="token-chip" data-insert="{{@p.Token}}" data-target="body" title="@p.Description">{{@p.Token}}</button>
+                    }
+                </div>
+                <div class="help">@T["mailtpl.placeholdersHint"]</div>
+            </div>
+        }
+        @if (def.Loops.Count > 0)
+        {
+            <div class="form-field">
+                <label>@T["mailtpl.loops"]</label>
+                <div class="code-toolbar">
+                    @foreach (var loop in def.Loops)
+                    {
+                        var inner = string.Join(" ", loop.Fields.Select(fl => "{{" + fl.Token + "}}"));
+                        var block = "\n{{#" + loop.Name + "}}\n  " + inner + "\n{{/" + loop.Name + "}}\n";
+                        <button type="button" class="token-chip" data-insert="@block" data-target="body" title="@loop.Description">{{#@loop.Name}}…{{/@loop.Name}}</button>
+                    }
+                </div>
+                <div class="help">@T["mailtpl.loopsHint"]</div>
+                @foreach (var loop in def.Loops)
+                {
+                    <div class="help">
+                        <span class="mono">{{#@loop.Name}}</span> — @loop.Description:
+                        @string.Join(", ", loop.Fields.Select(fl => "{{" + fl.Token + "}} " + fl.Description))
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+
+@* A key this cloud has never heard of. Said plainly rather than shown as an empty chip row: the
+   wording can still be written and rolled out, it just gets no placeholders documented here. *@
+<div class="help" data-mailkey-unknown hidden="@(MatCMS.Shared.MailTemplates.Find(Model.Key) is null && !string.IsNullOrWhiteSpace(Model.Key) ? null : "hidden")">
+    @T["mailtpl.unknownKeyCloud"] <span class="mono" data-mailkey-shown>@Model.Key</span>
+</div>
+
+@* The preview renders SERVER-SIDE, through the same renderer that builds the real mail on the
+   instance — a JavaScript copy would drift, and a preview that lies about what will be sent is worse
+   than none. The form targets the frame, so no page reload and no route of its own. *@
+<div class="form-field">
+    <div class="menu-card-head">
+        <label>@T["mailtpl.preview"]</label>
+        <button type="button" class="btn btn-sm btn-ghost" id="preview-refresh">@T["mailtpl.previewRefresh"]</button>
+    </div>
+    <div class="help">@T["mailtpl.previewHint"]</div>
+    <iframe name="mail-preview" id="mail-preview" class="mail-preview" title="@T["mailtpl.preview"]"></iframe>
+</div>

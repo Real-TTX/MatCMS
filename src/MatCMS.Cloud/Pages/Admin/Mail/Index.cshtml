@@ -1,0 +1,145 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.Mail.IndexModel
+@using MatCMS.Cloud.Models
+@{
+    ViewData["Title"] = T["spool.title"];
+}
+<div data-list data-list-page-size="50">
+    <div class="page-head">
+        <h1>@T["spool.title"]</h1>
+        <div class="list-toolbar">
+            <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+            @* Server-side, both of them: the list is capped at 200 rows, so a client-side filter would
+               only ever narrow the last page rather than the spool. *@
+            <select class="list-search" data-spool-filter aria-label="@T["instances.title"]">
+                <option value="@Url.Page("Index", new { status = Model.FilteredStatus?.ToString().ToLowerInvariant() })">@T["instances.filterAllInstances"]</option>
+                @foreach (var i in Model.Instances)
+                {
+                    <option value="@Url.Page("Index", new { instance = i.Id, status = Model.FilteredStatus?.ToString().ToLowerInvariant() })"
+                            selected="@(Model.FilteredInstance == i.Id ? "selected" : null)">@i.Name</option>
+                }
+            </select>
+            <select class="list-search" data-spool-filter aria-label="@T["common.status"]">
+                <option value="@Url.Page("Index", new { instance = Model.FilteredInstance })">@T["spool.allStatus"]</option>
+                <option value="@Url.Page("Index", new { instance = Model.FilteredInstance, status = "queued" })"
+                        selected="@(Model.FilteredStatus == SpoolStatus.Queued ? "selected" : null)">@T["spool.queued"]</option>
+                <option value="@Url.Page("Index", new { instance = Model.FilteredInstance, status = "failed" })"
+                        selected="@(Model.FilteredStatus == SpoolStatus.Failed ? "selected" : null)">@T["spool.failed"]</option>
+                <option value="@Url.Page("Index", new { instance = Model.FilteredInstance, status = "sent" })"
+                        selected="@(Model.FilteredStatus == SpoolStatus.Sent ? "selected" : null)">@T["spool.sent"]</option>
+            </select>
+        </div>
+    </div>
+
+    @if (!Model.MailConfigured)
+    {
+        @* The first thing to say on a page about a queue that is not moving. *@
+        <div class="alert alert-info">@T["spool.noSmtpCloud"]</div>
+    }
+
+    <div class="bk-cards">
+        <div class="card">
+            <div class="kv-label">@T["spool.queued"]</div>
+            <div class="spool-count">@Model.QueuedCount</div>
+        </div>
+        <div class="card">
+            <div class="kv-label">@T["spool.failed"]</div>
+            <div class="spool-count@(Model.FailedCount > 0 ? " is-bad" : "")">@Model.FailedCount</div>
+        </div>
+        <div class="card">
+            <div class="kv-label">@T["spool.sent"]</div>
+            <div class="spool-count">@Model.SentCount</div>
+        </div>
+    </div>
+
+    <table class="data" data-list-table>
+        <thead>
+            <tr>
+                <th>@T["spool.subject"]</th>
+                <th>@T["instances.title"]</th>
+                <th>@T["spool.recipients"]</th>
+                <th>@T["spool.queuedAt"]</th>
+                <th>@T["common.status"]</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Items.Count == 0)
+            {
+                <partial name="_EmptyRow" model='@T["spool.noneAtAll"]' />
+            }
+            else
+            {
+                @foreach (var m in Model.Items)
+                {
+                    <tr data-search="@(m.Subject + " " + m.Recipients + " " + Model.InstanceName(m.InstanceId))">
+                        <td><a asp-page="/Admin/Instances/Mail" asp-route-id="@m.InstanceId" asp-route-mailId="@m.Id">@m.Subject</a></td>
+                        <td><a asp-page="/Admin/Instances/Details" asp-route-id="@m.InstanceId">@Model.InstanceName(m.InstanceId)</a></td>
+                        <td class="muted">@m.Recipients.Replace("\n", ", ")</td>
+                        <td class="muted">@m.QueuedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                        <td>
+                            @switch (m.Status)
+                            {
+                                case SpoolStatus.Sent:
+                                    <span class="badge badge-on">@T["spool.sent"]</span>
+                                    break;
+                                case SpoolStatus.Failed:
+                                    <span class="badge badge-err" title="@m.LastError">@T["spool.failed"]</span>
+                                    break;
+                                default:
+                                    <span class="badge badge-new">@T["spool.queued"]</span>
+                                    break;
+                            }
+                            @if (m.Attempts > 1)
+                            {
+                                <span class="muted">@T["spool.attempts"]: @m.Attempts</span>
+                            }
+                        </td>
+                        <td>
+                            <div class="actions">
+                                @if (m.Status == SpoolStatus.Failed)
+                                {
+                                    <form class="inline-form" method="post" asp-page-handler="Retry" asp-route-mailId="@m.Id"
+                                          asp-route-instance="@Model.FilteredInstance" asp-route-status="@Model.FilteredStatus?.ToString().ToLowerInvariant()">
+                                        <button type="submit" class="btn btn-sm btn-ghost">@T["spool.retry"]</button>
+                                    </form>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+    <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+    <div class="list-pager" data-list-pager></div>
+
+    <div class="form-actions">
+        @if (Model.FailedCount > 0)
+        {
+            <form class="inline-form" method="post" asp-page-handler="Retry"
+                  asp-route-instance="@Model.FilteredInstance" asp-route-status="@Model.FilteredStatus?.ToString().ToLowerInvariant()">
+                <button type="submit" class="btn">@T["spool.retryAll"]</button>
+            </form>
+        }
+        @if (Model.SentCount + Model.FailedCount > 0)
+        {
+            @* Only what is settled — anything still queued is owed to somebody. *@
+            <form class="inline-form" method="post" asp-page-handler="Clear"
+                  asp-route-instance="@Model.FilteredInstance" asp-route-status="@Model.FilteredStatus?.ToString().ToLowerInvariant()"
+                  onsubmit="return confirm('@T["spool.clearConfirm"]');">
+                <button type="submit" class="btn btn-ghost">@T["spool.clear"]</button>
+            </form>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            document.querySelectorAll('[data-spool-filter]').forEach(function (sel) {
+                sel.addEventListener('change', function () { if (sel.value) location.href = sel.value; });
+            });
+        })();
+    </script>
+}

@@ -58,11 +58,7 @@
             <label for="subject">@T["mailtpl.subject"]</label>
             <input id="subject" name="subject" value="@m.Subject" required />
         </div>
-        <div class="form-field">
-            <label for="body">@T["mailtpl.body"]</label>
-            <textarea id="body" name="body" rows="14" spellcheck="false" class="mono">@m.Body</textarea>
-            <div class="help">@T["mailtpl.bodyHint"]</div>
-        </div>
+        <partial name="_MailTemplateFields" model="new MailTemplateFields(m.Key, m.Body)" />
     </div>
 </form>
 
@@ -76,3 +72,8 @@
         </form>
     }
 </div>
+
+@section Scripts {
+    <partial name="_CodeEditorAssets" />
+    <partial name="_MailTemplateScript" />
+}

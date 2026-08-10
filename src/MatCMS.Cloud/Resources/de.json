@@ -543,5 +543,13 @@
   "spool.replyTo": "Antwort an",
   "spool.lastError": "Letzter Fehler",
   "spool.preview": "Darstellung",
-  "spool.source": "Quelltext"
+  "spool.source": "Quelltext",
+
+  "spool.allStatus": "Alle Zustände",
+  "spool.noneAtAll": "Es hat noch keine Instanz eine Nachricht übergeben.",
+  "spool.clear": "Abgeschlossene entfernen",
+  "spool.clearConfirm": "Alle zugestellten und aufgegebenen Nachrichten entfernen? Wartende bleiben stehen.",
+  "spool.noSmtpCloud": "Diese Cloud hat selbst keinen Mailversand eingerichtet — unter Einstellungen → SMTP eintragen, sonst bleibt alles in der Warteschlange stehen.",
+
+  "mailtpl.unknownKeyCloud": "Diese Cloud kennt keine Mail mit diesem Schlüssel — der Text lässt sich trotzdem schreiben und ausrollen, hier werden nur keine Platzhalter dokumentiert:"
 }

@@ -323,3 +323,7 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
     font-family: var(--font-mono, ui-monospace, monospace); font-size: 13px;
     white-space: pre-wrap; word-break: break-word;
 }
+
+/* The three spool counts. Deliberately big: the number is the whole message. */
+.spool-count { font-size: 30px; font-weight: 700; font-family: var(--font-head); line-height: 1.1; }
+.spool-count.is-bad { color: #b42318; }

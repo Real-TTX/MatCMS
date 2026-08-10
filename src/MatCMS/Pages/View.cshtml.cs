@@ -147,12 +147,12 @@ public class ViewModel : PageModel
             // Which fields exist is decided by whoever built the form, so a template can never name
             // them one by one; it can only be handed the list.
             var fields = new System.Text.StringBuilder();
-            var fieldRows = new List<MatCMS.Services.MailTemplates.Item>();
+            var fieldRows = new List<MatCMS.Shared.MailTemplates.Item>();
             foreach (var (label, value) in answered)
             {
                 var shown = string.IsNullOrWhiteSpace(value) ? "—" : value;
                 fields.AppendLine($"{label}: {shown}");
-                fieldRows.Add(new MatCMS.Services.MailTemplates.Item { ["label"] = label, ["value"] = shown });
+                fieldRows.Add(new MatCMS.Shared.MailTemplates.Item { ["label"] = label, ["value"] = shown });
             }
 
             // Reply straight to the visitor if the form captured an e-mail address.
@@ -160,7 +160,7 @@ public class ViewModel : PageModel
                           && values.TryGetValue(eid, out var ev) && !string.IsNullOrWhiteSpace(ev)
                 ? ev.Trim() : null;
 
-            await _email.SendTemplateAsync(MatCMS.Services.MailTemplates.FormSubmission, recipients,
+            await _email.SendTemplateAsync(MatCMS.Shared.MailTemplates.FormSubmission, recipients,
                 new Dictionary<string, string>
                 {
                     ["form_name"] = form.Name,
@@ -169,7 +169,7 @@ public class ViewModel : PageModel
                     ["date"] = DateTime.Now.ToString("dd.MM.yyyy HH:mm"),
                 },
                 replyTo,
-                new Dictionary<string, IReadOnlyList<MatCMS.Services.MailTemplates.Item>>
+                new Dictionary<string, IReadOnlyList<MatCMS.Shared.MailTemplates.Item>>
                 {
                     ["fields"] = fieldRows,
                 });

@@ -26,19 +26,19 @@ public class IndexModel : PageModel
         // Ordered by the declaration, not by name: that is the order the product thinks in, and it
         // stays stable when somebody renames a template.
         var rows = await _db.MailTemplates.AsNoTracking().ToListAsync();
-        Items = Services.MailTemplates.All
+        Items = MatCMS.Shared.MailTemplates.All
             .Select(d => rows.FirstOrDefault(r => r.Key == d.Key))
             .Where(r => r is not null).Select(r => r!)
             // Anything stored that the code no longer declares still shows, or it would be
             // unreachable but still in the database.
-            .Concat(rows.Where(r => Services.MailTemplates.Find(r.Key) is null).OrderBy(r => r.Key))
+            .Concat(rows.Where(r => MatCMS.Shared.MailTemplates.Find(r.Key) is null).OrderBy(r => r.Key))
             .ToList();
     }
 
     /// <summary>True when nothing in this build sends that key. Such a row can only have arrived from
     /// a cloud rollout for a mail this version does not have — it is wording that will never be used,
     /// so unlike a declared template it CAN be deleted.</summary>
-    public static bool IsUnknown(MailTemplate t) => Services.MailTemplates.Find(t.Key) is null;
+    public static bool IsUnknown(MailTemplate t) => MatCMS.Shared.MailTemplates.Find(t.Key) is null;
 
     /// <summary>
     /// Removes a row for a key nothing sends. A declared one is deliberately not deletable: the code

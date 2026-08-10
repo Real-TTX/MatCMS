@@ -543,5 +543,13 @@
   "spool.replyTo": "Reply to",
   "spool.lastError": "Last error",
   "spool.preview": "Rendered",
-  "spool.source": "Source"
+  "spool.source": "Source",
+
+  "spool.allStatus": "All states",
+  "spool.noneAtAll": "No instance has handed over a message yet.",
+  "spool.clear": "Remove settled",
+  "spool.clearConfirm": "Remove all delivered and given-up messages? Waiting ones are kept.",
+  "spool.noSmtpCloud": "This cloud has no mail delivery of its own — set it under Settings → SMTP, otherwise everything sits in the queue.",
+
+  "mailtpl.unknownKeyCloud": "This cloud knows no mail with that key — the wording can still be written and rolled out, there are just no documented placeholders here:"
 }

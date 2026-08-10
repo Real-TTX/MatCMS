@@ -22,7 +22,7 @@ public class EditModel : PageModel
 
     /// <summary>What the code will actually put in — null when the stored row's key is not declared
     /// (anymore). The editor then says so rather than offering placeholders nobody fills.</summary>
-    public Services.MailTemplates.Definition? Definition { get; private set; }
+    public MatCMS.Shared.MailTemplates.Definition? Definition { get; private set; }
 
     [BindProperty] public string? Subject { get; set; }
     [BindProperty] public string? Body { get; set; }
@@ -42,7 +42,7 @@ public class EditModel : PageModel
     private void Fill(MailTemplate t)
     {
         Current = t;
-        Definition = Services.MailTemplates.Find(t.Key);
+        Definition = MatCMS.Shared.MailTemplates.Find(t.Key);
         Subject = t.Subject;
         Body = t.Body;
         Enabled = t.Enabled;
@@ -95,15 +95,15 @@ public class EditModel : PageModel
             return RedirectToPage(new { id });
         }
 
-        var def = Services.MailTemplates.Find(t.Key);
+        var def = MatCMS.Shared.MailTemplates.Find(t.Key);
         var values = (def?.Placeholders ?? [])
             .ToDictionary(p => p.Token, p => Sample(p.Token), StringComparer.OrdinalIgnoreCase);
 
         var lists = SampleLists(def);
 
         var (ok, error) = await _email.SendAsync([testTo.Trim()],
-            Services.MailTemplates.Render(t.Subject, values, lists),
-            Services.MailTemplates.Render(t.Body, values, lists, t.IsHtml),
+            MatCMS.Shared.MailTemplates.Render(t.Subject, values, lists),
+            MatCMS.Shared.MailTemplates.Render(t.Body, values, lists, t.IsHtml),
             null, t.IsHtml);
 
         // Wording follows what actually happened: through the relay the message is ACCEPTED, not
@@ -131,12 +131,12 @@ public class EditModel : PageModel
         var t = await _db.MailTemplates.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
         if (t is null) return Content("", "text/html; charset=utf-8");
 
-        var def = Services.MailTemplates.Find(t.Key);
+        var def = MatCMS.Shared.MailTemplates.Find(t.Key);
         var values = (def?.Placeholders ?? [])
             .ToDictionary(p => p.Token, p => Sample(p.Token), StringComparer.OrdinalIgnoreCase);
         var lists = SampleLists(def);
 
-        var rendered = Services.MailTemplates.Render(body ?? "", values, lists, isHtml);
+        var rendered = MatCMS.Shared.MailTemplates.Render(body ?? "", values, lists, isHtml);
 
         // A plain-text body is shown as text, or the preview would collapse every line break and
         // suggest a layout the mail does not have.
@@ -154,13 +154,13 @@ public class EditModel : PageModel
 
     /// <summary>Two example passes per loop: one shows the layout, two show what repetition does to
     /// it — which is the thing a table either survives or does not.</summary>
-    private static Dictionary<string, IReadOnlyList<Services.MailTemplates.Item>> SampleLists(
-        Services.MailTemplates.Definition? def) =>
+    private static Dictionary<string, IReadOnlyList<MatCMS.Shared.MailTemplates.Item>> SampleLists(
+        MatCMS.Shared.MailTemplates.Definition? def) =>
         (def?.Loops ?? []).ToDictionary(
             l => l.Name,
-            l => (IReadOnlyList<Services.MailTemplates.Item>)Enumerable.Range(1, 2).Select(n =>
+            l => (IReadOnlyList<MatCMS.Shared.MailTemplates.Item>)Enumerable.Range(1, 2).Select(n =>
             {
-                var item = new Services.MailTemplates.Item();
+                var item = new MatCMS.Shared.MailTemplates.Item();
                 foreach (var fld in l.Fields) item[fld.Token] = SampleLoop(fld.Token, n);
                 return item;
             }).ToList(),

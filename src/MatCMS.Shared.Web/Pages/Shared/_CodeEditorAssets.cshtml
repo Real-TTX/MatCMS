@@ -1,5 +1,6 @@
 @* CodeMirror bundle + the shared upgrader. Included by every page that has a data-code textarea, so
-   the asset list lives in exactly one place. Same files and version as MatCMS ships. *@
+   the asset list lives in exactly one place — for BOTH applications: it used to sit in the cloud
+   only, which meant a data-code field in MatCMS silently stayed a plain textarea. *@
 <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/lib/codemirror/codemirror.min.css" asp-append-version="true" />
 <script src="~/_content/MatCMS.Shared.Web/lib/codemirror/codemirror.min.js" asp-append-version="true"></script>
 <script src="~/_content/MatCMS.Shared.Web/lib/codemirror/mode/xml.min.js" asp-append-version="true"></script>
@@ -9,7 +10,7 @@
 <script src="~/_content/MatCMS.Shared.Web/lib/codemirror/addon/closebrackets.min.js" asp-append-version="true"></script>
 <script src="~/_content/MatCMS.Shared.Web/lib/codemirror/addon/matchbrackets.min.js" asp-append-version="true"></script>
 <script src="~/_content/MatCMS.Shared.Web/lib/codemirror/addon/active-line.min.js" asp-append-version="true"></script>
-<script src="~/js/code-editor.js" asp-append-version="true"></script>
+<script src="~/_content/MatCMS.Shared.Web/js/code-editor.js" asp-append-version="true"></script>
 <script>
     // Token chips: insert at the caret of the CodeMirror bound to [data-target], or append when the
     // editor has never been focused — clicking a token should never silently do nothing.

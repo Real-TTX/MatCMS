@@ -103,12 +103,12 @@ public class EmailService
     public async Task<(bool ok, string? error)> SendTemplateAsync(
         string key, IEnumerable<string> to, IReadOnlyDictionary<string, string> values,
         string? replyTo = null,
-        IReadOnlyDictionary<string, IReadOnlyList<MailTemplates.Item>>? lists = null)
+        IReadOnlyDictionary<string, IReadOnlyList<MatCMS.Shared.MailTemplates.Item>>? lists = null)
     {
         var row = await _db.MailTemplates.AsNoTracking().FirstOrDefaultAsync(t => t.Key == key);
         if (row is not null && !row.Enabled) return (false, "Diese Benachrichtigung ist deaktiviert.");
 
-        var def = MailTemplates.Find(key);
+        var def = MatCMS.Shared.MailTemplates.Find(key);
         var subject = row?.Subject ?? def?.Subject;
         var body = row?.Body ?? def?.Body;
         var isHtml = row?.IsHtml ?? false;
@@ -118,8 +118,8 @@ public class EmailService
         // The subject is never HTML, whatever the body is — a subject line has no markup, and
         // escaping one would put &amp; in somebody's inbox.
         return await SendAsync(to,
-            MailTemplates.Render(subject ?? "", values, lists),
-            MailTemplates.Render(body ?? "", values, lists, isHtml),
+            MatCMS.Shared.MailTemplates.Render(subject ?? "", values, lists),
+            MatCMS.Shared.MailTemplates.Render(body ?? "", values, lists, isHtml),
             replyTo,
             isHtml);
     }
@@ -163,7 +163,7 @@ public class EmailService
             msg.Body = isHtml
                 ? new Multipart("alternative")
                 {
-                    new TextPart("plain") { Text = MailTemplates.HtmlToText(body) },
+                    new TextPart("plain") { Text = MatCMS.Shared.MailTemplates.HtmlToText(body) },
                     new TextPart("html") { Text = body },
                 }
                 : new TextPart("plain") { Text = body };

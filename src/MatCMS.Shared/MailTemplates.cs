@@ -1,7 +1,7 @@
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace MatCMS.Services;
+namespace MatCMS.Shared;
 
 /// <summary>
 /// The mails MatCMS knows how to send, and what may be put into each of them.

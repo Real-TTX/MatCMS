@@ -36,7 +36,7 @@
         </div>
         <div class="form-field">
             <label for="Body">@T["mailtpl.body"]</label>
-            <textarea id="Body" name="Body" rows="16" class="code" spellcheck="false">@Model.Body</textarea>
+            <textarea id="Body" name="Body" rows="18" spellcheck="false" data-code="html">@Model.Body</textarea>
         </div>
 
         @if (Model.Definition is { Placeholders.Count: > 0 })
@@ -48,7 +48,7 @@
                 <div class="code-toolbar">
                     @foreach (var p in Model.Definition.Placeholders)
                     {
-                        <button type="button" class="token-chip" data-insert="{{@p.Token}}" title="@p.Description">{{@p.Token}}</button>
+                        <button type="button" class="token-chip" data-insert="{{@p.Token}}" data-target="Body" title="@p.Description">{{@p.Token}}</button>
                     }
                 </div>
                 <div class="help">@T["mailtpl.placeholdersHint"]</div>
@@ -71,7 +71,7 @@
                     {
                         var inner = string.Join(" ", loop.Fields.Select(fl => "{{" + fl.Token + "}}"));
                         var block = "\n{{#" + loop.Name + "}}\n  " + inner + "\n{{/" + loop.Name + "}}\n";
-                        <button type="button" class="token-chip" data-insert="@block" title="@loop.Description">{{#@loop.Name}}…{{/@loop.Name}}</button>
+                        <button type="button" class="token-chip" data-insert="@block" data-target="Body" title="@loop.Description">{{#@loop.Name}}…{{/@loop.Name}}</button>
                     }
                 </div>
                 <div class="help">@T["mailtpl.loopsHint"]</div>
@@ -122,63 +122,64 @@
 </div>
 
 @section Scripts {
+    @* The same CodeMirror bundle and upgrader the cloud uses — it lives in the shared library now, so
+       a data-code field behaves identically in both admins. It also drives the token chips, which is
+       the only thing that works once the textarea has been upgraded. *@
+    <partial name="_CodeEditorAssets" />
     <script>
-        // Placeholder chips insert at the cursor of whichever field was last focused, so the same
-        // token can go into the subject or the body without two sets of buttons.
         (function () {
-            var last = document.getElementById('Body');
-            ['Subject', 'Body'].forEach(function (id) {
-                var el = document.getElementById(id);
-                if (el) el.addEventListener('focus', function () { last = el; });
-            });
-            document.querySelectorAll('[data-insert]').forEach(function (chip) {
-                chip.addEventListener('click', function () {
-                    if (!last) return;
-                    var token = chip.getAttribute('data-insert');
-                    var start = last.selectionStart, end = last.selectionEnd;
-                    last.value = last.value.slice(0, start) + token + last.value.slice(end);
-                    last.focus();
-                    last.selectionStart = last.selectionEnd = start + token.length;
-                });
-            });
+            var htmlBox = document.getElementById('IsHtml');
+            var body = document.getElementById('Body');
+            if (!body) return;
 
-            // Switching to HTML on a body that is still the plain-text default offers the starting
-            // point from the declaration — the same loops and placeholders that will actually be
-            // filled. Only when nothing has been written yet: overwriting somebody's text because
-            // they ticked a box would be unforgivable.
-            // The preview form carries a copy of what is in the boxes; refreshed on demand and once
-            // at the start, plus shortly after typing stops so it keeps up without a request per
-            // keystroke.
+            // Everything below has to go THROUGH CodeMirror once it has taken the textarea over:
+            // the textarea is then hidden and its value only catches up on save().
+            function cm() { return body.nextElementSibling && body.nextElementSibling.CodeMirror; }
+            function read() { var e = cm(); return e ? e.getValue() : body.value; }
+            function write(v) { var e = cm(); if (e) e.setValue(v); else body.value = v; }
+
             var pForm = document.getElementById('preview-form');
             var pBody = document.getElementById('preview-body');
             var pHtml = document.getElementById('preview-ishtml');
             var refresh = document.getElementById('preview-refresh');
             var timer;
+
+            // The preview form carries a copy of what is in the editor; refreshed on demand, once at
+            // the start, and shortly after typing stops — so it keeps up without a request per
+            // keystroke.
             function preview() {
-                if (!pForm || !body) return;
-                pBody.value = body.value;
-                pHtml.value = document.getElementById('IsHtml').checked ? 'true' : 'false';
+                if (!pForm) return;
+                pBody.value = read();
+                pHtml.value = htmlBox && htmlBox.checked ? 'true' : 'false';
                 pForm.submit();
             }
             function previewSoon() { clearTimeout(timer); timer = setTimeout(preview, 700); }
 
-            var htmlBox = document.getElementById('IsHtml');
-            var body = document.getElementById('Body');
             var starter = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.HtmlStarter));
-            var original = body ? body.value : '';
-            if (htmlBox && body && starter) {
+            var original = read();
+            if (htmlBox && starter) {
+                // Switching to HTML on a body that is still the plain-text default offers the
+                // starting point from the declaration — the same loops and placeholders that will
+                // actually be filled. Only when nothing has been written yet: overwriting somebody's
+                // text because they ticked a box would be unforgivable.
                 htmlBox.addEventListener('change', function () {
                     if (!htmlBox.checked) return;
-                    if (body.value.trim() !== original.trim()) return;   // touched — leave it alone
-                    if (body.value.indexOf('<') >= 0) return;            // already markup
-                    body.value = starter;
+                    var now = read();
+                    if (now.trim() !== original.trim()) return;   // touched — leave it alone
+                    if (now.indexOf('<') >= 0) return;            // already markup
+                    write(starter);
                 });
             }
 
             if (refresh) refresh.addEventListener('click', preview);
-            if (body) body.addEventListener('input', previewSoon);
             if (htmlBox) htmlBox.addEventListener('change', previewSoon);
-            preview();
+            body.addEventListener('input', previewSoon);
+            // CodeMirror does not fire input on the textarea, so hook the editor once it exists.
+            setTimeout(function () {
+                var e = cm();
+                if (e) e.on('change', previewSoon);
+                preview();
+            }, 0);
         })();
     </script>
 }

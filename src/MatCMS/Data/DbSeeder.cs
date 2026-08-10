@@ -99,7 +99,7 @@ public static class DbSeeder
         // Every declared mail gets its row, so the editor has something to show and a site can
         // change the wording without a release. Existing rows are LEFT ALONE — this runs on every
         // start, and re-seeding would throw away what an operator wrote.
-        foreach (var def in MatCMS.Services.MailTemplates.All)
+        foreach (var def in MatCMS.Shared.MailTemplates.All)
         {
             if (await db.MailTemplates.AnyAsync(t => t.Key == def.Key)) continue;
             db.MailTemplates.Add(new MailTemplate

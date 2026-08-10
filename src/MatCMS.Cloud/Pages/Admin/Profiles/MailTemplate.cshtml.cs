@@ -103,4 +103,32 @@ public class MailTemplateModel : PageModel
         var slug = new string(m.Key.ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray()).Trim('-');
         return File(System.Text.Encoding.UTF8.GetBytes(json), "application/json; charset=utf-8", $"mail-{slug}.json");
     }
+
+    /// <summary>
+    /// Renders what is currently in the editor, so the frame beside the fields shows the finished
+    /// mail. Through the SAME renderer the instance uses when it sends — a JavaScript copy would be
+    /// live as you type and would drift, and a preview that lies is worse than none.
+    /// </summary>
+    public IActionResult OnPostPreview(string? body, string? key, bool isHtml)
+    {
+        var def = MatCMS.Shared.MailTemplates.Find(key ?? "");
+        var values = (def?.Placeholders ?? [])
+            .ToDictionary(p => p.Token, p => MailSamples.Scalar(p.Token), StringComparer.OrdinalIgnoreCase);
+        var lists = MailSamples.Lists(def);
+
+        var rendered = MatCMS.Shared.MailTemplates.Render(body ?? "", values, lists, isHtml);
+
+        // A plain-text body is shown as text, or the preview would collapse every line break and
+        // suggest a layout the mail does not have.
+        var html = isHtml
+            ? rendered
+            : "<pre style=\"font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;white-space:pre-wrap;\">"
+              + System.Net.WebUtility.HtmlEncode(rendered) + "</pre>";
+
+        return Content(
+            "<!doctype html><html><head><meta charset=\"utf-8\">"
+            + "<style>body{margin:0;padding:16px;background:#fff;}</style></head><body>"
+            + html + "</body></html>",
+            "text/html; charset=utf-8");
+    }
 }

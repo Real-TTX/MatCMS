@@ -1,0 +1,68 @@
+@*
+    Drives the mail body block: which chip set is shown, and the preview.
+    One script for both editors, because the two pages differ in nothing but where they save to.
+*@
+<script>
+    (function () {
+        var body = document.getElementById('body');
+        var key = document.getElementById('key');
+        if (!body) return;
+
+        // Everything has to go THROUGH CodeMirror once it has taken the textarea over: the textarea
+        // is then hidden and its value only catches up on save().
+        function cm() { return body.nextElementSibling && body.nextElementSibling.CodeMirror; }
+        function read() { var e = cm(); return e ? e.getValue() : body.value; }
+
+        // The chip set follows the key field, so a NEW entry helps as soon as a key is picked
+        // instead of only after the first save.
+        var blocks = Array.prototype.slice.call(document.querySelectorAll('[data-mailkey]'));
+        var unknown = document.querySelector('[data-mailkey-unknown]');
+        var shown = document.querySelector('[data-mailkey-shown]');
+        function syncKey() {
+            var v = (key ? key.value : '').trim().toLowerCase();
+            var hit = false;
+            blocks.forEach(function (b) {
+                var match = b.getAttribute('data-mailkey').toLowerCase() === v;
+                b.hidden = !match;
+                if (match) hit = true;
+            });
+            if (unknown) unknown.hidden = hit || v.length === 0;
+            if (shown) shown.textContent = v;
+        }
+        if (key) key.addEventListener('input', syncKey);
+
+        var frame = document.getElementById('mail-preview');
+        var refresh = document.getElementById('preview-refresh');
+        var timer;
+        function preview() {
+            if (!frame) return;
+            // Built here rather than as markup: the form must not sit inside the editor form, and a
+            // detached one posting into the frame is the smallest way to do that.
+            var f = document.createElement('form');
+            f.method = 'post';
+            f.action = location.pathname + '?handler=Preview';
+            f.target = 'mail-preview';
+            function add(n, v) { var i = document.createElement('input'); i.type = 'hidden'; i.name = n; i.value = v; f.appendChild(i); }
+            add('body', read());
+            add('key', key ? key.value : '');
+            add('isHtml', (document.querySelector('input[name=isHtml]') || {}).checked ? 'true' : 'false');
+            var tok = document.querySelector('input[name=__RequestVerificationToken]');
+            if (tok) add('__RequestVerificationToken', tok.value);
+            document.body.appendChild(f);
+            f.submit();
+            f.remove();
+        }
+        function previewSoon() { clearTimeout(timer); timer = setTimeout(preview, 700); }
+
+        if (refresh) refresh.addEventListener('click', preview);
+        if (key) key.addEventListener('input', previewSoon);
+        var htmlBox = document.querySelector('input[name=isHtml]');
+        if (htmlBox) htmlBox.addEventListener('change', previewSoon);
+        body.addEventListener('input', previewSoon);
+        setTimeout(function () {
+            var e = cm();
+            if (e) e.on('change', previewSoon);
+            preview();
+        }, 0);
+    })();
+</script>

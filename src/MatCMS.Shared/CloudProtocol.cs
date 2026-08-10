@@ -15,7 +15,7 @@ public static class CloudProtocol
     /// <summary>Contract version. Bump on <b>every</b> change to the payloads in this file: the cloud
     /// badges an instance reporting an older one as "veraltet", and both sides read this constant, so
     /// one edit covers both.</summary>
-    public const int Version = 7;
+    public const int Version = 8;
 
     /// <summary>Header carrying the instance's bearer token.</summary>
     public const string TokenHeader = "X-MatCMS-Instance-Token";
@@ -205,6 +205,11 @@ public sealed class MailRequest
     public string Subject { get; set; } = "";
     public string Body { get; set; } = "";
     public string? ReplyTo { get; set; }
+
+    /// <summary>Whether <see cref="Body"/> is HTML. The cloud then sends it as multipart with a
+    /// text alternative it derives itself — the instance already rendered the markup, and deriving
+    /// the fallback where the message is actually built keeps one implementation of it.</summary>
+    public bool IsHtml { get; set; }
 }
 
 /// <summary>
@@ -233,6 +238,9 @@ public sealed class ConfigMailTemplate
     public string Subject { get; set; } = "";
     public string Body { get; set; } = "";
     public bool Enabled { get; set; } = true;
+
+    /// <summary>Whether the body is HTML.</summary>
+    public bool IsHtml { get; set; }
 }
 
 /// <summary>A theme rolled out to the instance. <c>Name</c> is the identity; whether it becomes the

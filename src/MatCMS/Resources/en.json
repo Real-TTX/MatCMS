@@ -1056,5 +1056,14 @@
 
   "mailtpl.unused": "unused",
   "mailtpl.unknownKeyShort": "This version sends no mail with this key — the text will never be used.",
-  "mailtpl.deleteUnknownConfirm": "Delete the template? It belongs to no mail this version sends."
+  "mailtpl.deleteUnknownConfirm": "Delete the template? It belongs to no mail this version sends.",
+
+  "mailtpl.isHtml": "Send as an HTML mail",
+  "mailtpl.isHtmlHint": "The body is then HTML. Both are still sent — an HTML-only message scores worse with spam filters, so MatCMS derives the text version for you. Inserted values are escaped, so nobody can write markup into somebody else’s inbox through a form.",
+  "mailtpl.loops": "Repeated blocks",
+  "mailtpl.loopsHint": "Everything between {{#name}} and {{/name}} is written once per entry — the same notation the template engine uses for menus.",
+
+  "mailtpl.preview": "Preview",
+  "mailtpl.previewRefresh": "Refresh",
+  "mailtpl.previewHint": "Shows the body with example values, rendered by the same code that sends the mail — loops run twice, so it is visible what repetition does to the layout."
 }

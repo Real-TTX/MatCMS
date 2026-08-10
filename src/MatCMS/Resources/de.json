@@ -1056,5 +1056,14 @@
 
   "mailtpl.unused": "nicht verwendet",
   "mailtpl.unknownKeyShort": "Diese Version verschickt keine Mail mit diesem Schlüssel — der Text wird nie benutzt.",
-  "mailtpl.deleteUnknownConfirm": "Vorlage löschen? Sie gehört zu keiner Mail, die diese Version verschickt."
+  "mailtpl.deleteUnknownConfirm": "Vorlage löschen? Sie gehört zu keiner Mail, die diese Version verschickt.",
+
+  "mailtpl.isHtml": "Als HTML-Mail versenden",
+  "mailtpl.isHtmlHint": "Der Text ist dann HTML. Verschickt wird trotzdem beides — eine Nur-HTML-Mail wird von Spamfiltern schlechter bewertet, deshalb erzeugt MatCMS die Textfassung automatisch mit. Eingesetzte Werte werden maskiert, damit niemand über ein Formular Markup in fremde Postfächer schreiben kann.",
+  "mailtpl.loops": "Wiederholte Blöcke",
+  "mailtpl.loopsHint": "Alles zwischen {{#name}} und {{/name}} wird einmal je Eintrag ausgegeben — dieselbe Schreibweise wie bei den Menüs im Template.",
+
+  "mailtpl.preview": "Vorschau",
+  "mailtpl.previewRefresh": "Aktualisieren",
+  "mailtpl.previewHint": "Zeigt den Text mit Beispielwerten, gerendert vom selben Code, der die Mail auch verschickt — Schleifen laufen mit zwei Durchgängen, damit sichtbar wird, was Wiederholung mit dem Layout macht."
 }

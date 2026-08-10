@@ -312,3 +312,14 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
 /* The secret block is display:block so it can stand alone elsewhere; next to a button it must not
    claim the whole row. */
 .kv-value:has(.btn) .is-secret, .kv-value:has(.inline-form) .is-secret { flex: 0 1 auto; min-width: 0; }
+
+/* ---- One spooled message ----------------------------------------------------------------------
+   Rendered and as source, because neither answers the other's question: a layout cannot be judged
+   from escaped tags, and whether a value was escaped cannot be judged from a rendering. */
+.mail-preview { width: 100%; height: 420px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.mail-source {
+    margin: 0; padding: 14px 16px; max-height: 420px; overflow: auto;
+    background: var(--bg-alt, #f6f7f9); border: 1px solid var(--line); border-radius: 8px;
+    font-family: var(--font-mono, ui-monospace, monospace); font-size: 13px;
+    white-space: pre-wrap; word-break: break-word;
+}

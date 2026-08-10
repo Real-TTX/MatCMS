@@ -141,12 +141,19 @@ public class ViewModel : PageModel
             if (recipients.Count == 0) return;
 
             // The wording lives in an editable template now (Admin → Mail-Vorlagen); this only
-            // supplies what goes into it. The answers arrive as ONE placeholder rather than one per
-            // field, because a form's fields are whatever its author made them — a template cannot
-            // name them in advance.
+            // supplies what goes into it. The answers go in twice, on purpose:
+            //   {{fields}}            — the ready-made block, for a plain-text mail
+            //   {{#fields}}…{{/fields}} — one pass per field, so an HTML template can lay them out
+            // Which fields exist is decided by whoever built the form, so a template can never name
+            // them one by one; it can only be handed the list.
             var fields = new System.Text.StringBuilder();
+            var fieldRows = new List<MatCMS.Services.MailTemplates.Item>();
             foreach (var (label, value) in answered)
-                fields.AppendLine($"{label}: {(string.IsNullOrWhiteSpace(value) ? "—" : value)}");
+            {
+                var shown = string.IsNullOrWhiteSpace(value) ? "—" : value;
+                fields.AppendLine($"{label}: {shown}");
+                fieldRows.Add(new MatCMS.Services.MailTemplates.Item { ["label"] = label, ["value"] = shown });
+            }
 
             // Reply straight to the visitor if the form captured an e-mail address.
             var replyTo = inputs.FirstOrDefault(e => e.Type == "email") is { Id: var eid }
@@ -161,7 +168,11 @@ public class ViewModel : PageModel
                     ["site_name"] = _site.SiteName,
                     ["date"] = DateTime.Now.ToString("dd.MM.yyyy HH:mm"),
                 },
-                replyTo);
+                replyTo,
+                new Dictionary<string, IReadOnlyList<MatCMS.Services.MailTemplates.Item>>
+                {
+                    ["fields"] = fieldRows,
+                });
         }
         catch
         {

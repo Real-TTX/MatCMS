@@ -248,14 +248,14 @@ public class ProfileService
             var mails = Index(storeMails, m => m.Key, m => new ConfigMailTemplate
                 {
                     Key = m.Key, Name = m.Name, Description = m.Description,
-                    Subject = m.Subject, Body = m.Body, Enabled = m.Enabled
+                    Subject = m.Subject, Body = m.Body, Enabled = m.Enabled, IsHtml = m.IsHtml
                 });
 
             foreach (var local in await _db.ProfileMailTemplates.AsNoTracking().Where(m => m.ProfileId == profile.Id).ToListAsync(ct))
                 mails[local.Key] = new ConfigMailTemplate
                 {
                     Key = local.Key, Name = local.Name, Description = local.Description,
-                    Subject = local.Subject, Body = local.Body, Enabled = local.Enabled
+                    Subject = local.Subject, Body = local.Body, Enabled = local.Enabled, IsHtml = local.IsHtml
                 };
 
             config.MailTemplates = mails.Values.ToList();

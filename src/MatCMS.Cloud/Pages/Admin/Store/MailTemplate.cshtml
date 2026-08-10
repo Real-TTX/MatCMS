@@ -48,6 +48,12 @@
         </label>
         <div class="help">@T["mailtpl.enabledHint"]</div>
 
+        <label class="checkbox-row">
+            <input type="checkbox" name="isHtml" value="true" checked="@(m.IsHtml ? "checked" : null)" />
+            @T["mailtpl.isHtml"]
+        </label>
+        <div class="help">@T["mailtpl.isHtmlHint"]</div>
+
         <div class="form-field">
             <label for="subject">@T["mailtpl.subject"]</label>
             <input id="subject" name="subject" value="@m.Subject" required />

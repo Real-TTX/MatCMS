@@ -615,6 +615,8 @@ public class EditModel : PageModel
         row.Subject = subject;
         row.Body = JsonImport.Text(root, "Body");
         row.Enabled = !string.Equals(JsonImport.Raw(root, "Enabled", "true"), "false", StringComparison.OrdinalIgnoreCase);
+        // Absent reads as plain text: that is what every template was before the format existed.
+        row.IsHtml = string.Equals(JsonImport.Raw(root, "IsHtml", "false"), "true", StringComparison.OrdinalIgnoreCase);
 
         await _db.SaveChangesAsync();
         await _profiles.TouchAsync(id);

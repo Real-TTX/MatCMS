@@ -402,7 +402,7 @@
                     @foreach (var m in Model.Spool)
                     {
                         <tr data-search="@(m.Subject + " " + m.Recipients)">
-                            <td>@m.Subject</td>
+                            <td><a asp-page="Mail" asp-route-id="@Model.Item.Id" asp-route-mailId="@m.Id">@m.Subject</a></td>
                             <td class="muted">@m.Recipients.Replace("\n", ", ")</td>
                             <td class="muted">@m.QueuedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
                             <td>

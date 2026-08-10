@@ -31,7 +31,7 @@ public class MailTemplateModel : PageModel
     }
 
     public async Task<IActionResult> OnPostAsync(
-        int? id, string? key, string? name, string? description, string? subject, string? body, bool enabled)
+        int? id, string? key, string? name, string? description, string? subject, string? body, bool enabled, bool isHtml)
     {
         var k = (key ?? "").Trim();
         var s = (subject ?? "").Trim();
@@ -63,6 +63,7 @@ public class MailTemplateModel : PageModel
         row.Subject = s;
         row.Body = body ?? "";
         row.Enabled = enabled;
+        row.IsHtml = isHtml;
 
         await _db.SaveChangesAsync();
         TempData["Flash"] = $"„{row.Name}“ gespeichert.";
@@ -91,7 +92,7 @@ public class MailTemplateModel : PageModel
         var m = await _db.StoreMailTemplates.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
         if (m is null) return RedirectToPage("Index");
 
-        var payload = new { m.Key, m.Name, m.Description, m.Subject, m.Body, m.Enabled };
+        var payload = new { m.Key, m.Name, m.Description, m.Subject, m.Body, m.Enabled, m.IsHtml };
         var json = System.Text.Json.JsonSerializer.Serialize(payload,
             new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
         var slug = new string(m.Key.ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray()).Trim('-');

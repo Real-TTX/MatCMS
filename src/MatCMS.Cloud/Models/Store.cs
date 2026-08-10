@@ -92,6 +92,10 @@ public class StoreMailTemplate
     public string Subject { get; set; } = "";
     public string Body { get; set; } = "";
     public bool Enabled { get; set; } = true;
+
+    /// <summary>Whether the body is HTML. Travels with the wording — a layout rolled out as plain
+    /// text would arrive as visible markup.</summary>
+    public bool IsHtml { get; set; }
 }
 
 // --- Selection: which store entries a profile rolls out ----------------------

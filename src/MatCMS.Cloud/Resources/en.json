@@ -535,5 +535,13 @@
   "mailtpl.import": "Import mail template",
   "mailtpl.importHint": "Paste the JSON from a mail template editor. A template with the same key is overwritten.",
   "mailtpl.deleteConfirm": "Remove the template from the store? Profiles lose the selection; instances keep the text.",
-  "mailtpl.removeConfirm": "Remove the template from the profile? Instances keep the text."
+  "mailtpl.removeConfirm": "Remove the template from the profile? Instances keep the text.",
+
+  "mailtpl.isHtml": "Send as an HTML mail",
+  "mailtpl.isHtmlHint": "The body is then HTML. The instance still sends both — an HTML-only message scores worse with spam filters, so the text version is derived from it.",
+
+  "spool.replyTo": "Reply to",
+  "spool.lastError": "Last error",
+  "spool.preview": "Rendered",
+  "spool.source": "Source"
 }

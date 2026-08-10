@@ -414,6 +414,7 @@ public class CloudSyncService
                         Subject = m.Subject,
                         Body = m.Body,
                         Enabled = m.Enabled,
+                        IsHtml = m.IsHtml,
                     });
                 }
                 Report("mailtemplate", key, "installed");
@@ -428,6 +429,7 @@ public class CloudSyncService
                     row.Subject = m.Subject;
                     row.Body = m.Body;
                     row.Enabled = m.Enabled;
+                    row.IsHtml = m.IsHtml;
                     row.UpdatedAt = DateTime.UtcNow;
                 }
                 Report("mailtemplate", key, "updated");

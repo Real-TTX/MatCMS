@@ -38,7 +38,7 @@ public class MailTemplateModel : PageModel
 
     public async Task<IActionResult> OnPostAsync(
         int profileId, int? id, string? key, string? name, string? description,
-        string? subject, string? body, bool enabled)
+        string? subject, string? body, bool enabled, bool isHtml)
     {
         var k = (key ?? "").Trim();
         var s = (subject ?? "").Trim();
@@ -68,6 +68,7 @@ public class MailTemplateModel : PageModel
         row.Subject = s;
         row.Body = body ?? "";
         row.Enabled = enabled;
+        row.IsHtml = isHtml;
 
         await _db.SaveChangesAsync();
         await _profiles.TouchAsync(profileId);
@@ -96,7 +97,7 @@ public class MailTemplateModel : PageModel
             .FirstOrDefaultAsync(x => x.Id == id && x.ProfileId == profileId);
         if (m is null) return RedirectToPage("Edit", new { id = profileId, tab = "mailtemplates" });
 
-        var payload = new { m.Key, m.Name, m.Description, m.Subject, m.Body, m.Enabled };
+        var payload = new { m.Key, m.Name, m.Description, m.Subject, m.Body, m.Enabled, m.IsHtml };
         var json = System.Text.Json.JsonSerializer.Serialize(payload,
             new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
         var slug = new string(m.Key.ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray()).Trim('-');

@@ -154,6 +154,8 @@ public class IndexModel : PageModel
         row.Body = JsonImport.Text(root, "Body");
         // Absent reads as ON: a template nobody said to disable should send.
         row.Enabled = !string.Equals(JsonImport.Raw(root, "Enabled", "true"), "false", StringComparison.OrdinalIgnoreCase);
+        // Absent reads as plain text: that is what every template was before the format existed.
+        row.IsHtml = string.Equals(JsonImport.Raw(root, "IsHtml", "false"), "true", StringComparison.OrdinalIgnoreCase);
 
         await _db.SaveChangesAsync();
         TempData["Flash"] = $"Vorlage \"{row.Name}\" in den Store importiert.";

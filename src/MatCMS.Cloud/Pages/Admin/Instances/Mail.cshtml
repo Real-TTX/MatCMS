@@ -1,0 +1,81 @@
+@page "{id:int}/{mailId:int}"
+@model MatCMS.Cloud.Pages.Admin.Instances.MailModel
+@using MatCMS.Cloud.Models
+@{
+    ViewData["Title"] = Model.Item.Subject;
+}
+<div class="page-head">
+    <h1>
+        @Model.Item.Subject
+        <span class="muted" style="font-size:14px;font-weight:400;"> — @(Model.Owner?.Name)</span>
+    </h1>
+    <div class="list-toolbar">
+        <a class="btn btn-sm btn-ghost" asp-page="Details" asp-route-id="@Model.Item.InstanceId" asp-route-tab="mail">@T["action.back"]</a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="kv">
+        <div class="kv-label">@T["spool.recipients"]</div>
+        <div class="kv-value">@string.Join(", ", Model.Recipients)</div>
+    </div>
+    @if (!string.IsNullOrWhiteSpace(Model.Item.ReplyTo))
+    {
+        <div class="kv">
+            <div class="kv-label">@T["spool.replyTo"]</div>
+            <div class="kv-value">@Model.Item.ReplyTo</div>
+        </div>
+    }
+    <div class="kv">
+        <div class="kv-label">@T["spool.queuedAt"]</div>
+        <div class="kv-value">@Model.Item.QueuedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</div>
+    </div>
+    <div class="kv">
+        <div class="kv-label">@T["common.status"]</div>
+        <div class="kv-value">
+            @switch (Model.Item.Status)
+            {
+                case SpoolStatus.Sent:
+                    <span class="badge badge-on">@T["spool.sent"]</span>
+                    @if (Model.Item.SentAt is DateTime sent)
+                    {
+                        <span class="muted">@sent.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</span>
+                    }
+                    break;
+                case SpoolStatus.Failed:
+                    <span class="badge badge-err">@T["spool.failed"]</span>
+                    break;
+                default:
+                    <span class="badge badge-new">@T["spool.queued"]</span>
+                    break;
+            }
+            @if (Model.Item.Attempts > 0)
+            {
+                <span class="muted">@T["spool.attempts"]: @Model.Item.Attempts</span>
+            }
+        </div>
+    </div>
+    @if (!string.IsNullOrWhiteSpace(Model.Item.LastError))
+    {
+        <div class="kv">
+            <div class="kv-label">@T["spool.lastError"]</div>
+            <div class="kv-value mono">@Model.Item.LastError</div>
+        </div>
+    }
+</div>
+
+@if (Model.LooksHtml)
+{
+    @* Rendered AND as source: a layout cannot be judged from escaped tags, and whether a value was
+       escaped cannot be judged from a rendering. Framed with sandbox and no allow-scripts, because
+       this body came from an instance and is shown to an operator. *@
+    <div class="card">
+        <h2>@T["spool.preview"]</h2>
+        <iframe class="mail-preview" sandbox srcdoc="@Model.Item.Body" title="@Model.Item.Subject"></iframe>
+    </div>
+}
+
+<div class="card">
+    <h2>@T["spool.source"]</h2>
+    <pre class="mail-source">@Model.Item.Body</pre>
+</div>

@@ -24,13 +24,19 @@
         </label>
         <div class="help">@T["mailtpl.enabledHint"]</div>
 
+        <label class="checkbox-row">
+            <input type="checkbox" name="IsHtml" value="true" id="IsHtml" checked="@(Model.IsHtml ? "checked" : null)" />
+            @T["mailtpl.isHtml"]
+        </label>
+        <div class="help">@T["mailtpl.isHtmlHint"]</div>
+
         <div class="form-field">
             <label for="Subject">@T["mailtpl.subject"]</label>
             <input id="Subject" name="Subject" value="@Model.Subject" required />
         </div>
         <div class="form-field">
             <label for="Body">@T["mailtpl.body"]</label>
-            <textarea id="Body" name="Body" rows="14" class="code" spellcheck="false">@Model.Body</textarea>
+            <textarea id="Body" name="Body" rows="16" class="code" spellcheck="false">@Model.Body</textarea>
         </div>
 
         @if (Model.Definition is { Placeholders.Count: > 0 })
@@ -52,7 +58,51 @@
         {
             <div class="help">@T["mailtpl.unknownKey"] <span class="mono">@Model.Current.Key</span></div>
         }
+
+        @if (Model.Definition is { Loops.Count: > 0 })
+        {
+            @* A block is inserted whole, with its inner placeholders already in it: the point of a
+               loop is the markup AROUND the values, and starting from an empty {{#fields}}{{/fields}}
+               means writing that markup blind. *@
+            <div class="form-field">
+                <label>@T["mailtpl.loops"]</label>
+                <div class="code-toolbar">
+                    @foreach (var loop in Model.Definition.Loops)
+                    {
+                        var inner = string.Join(" ", loop.Fields.Select(fl => "{{" + fl.Token + "}}"));
+                        var block = "\n{{#" + loop.Name + "}}\n  " + inner + "\n{{/" + loop.Name + "}}\n";
+                        <button type="button" class="token-chip" data-insert="@block" title="@loop.Description">{{#@loop.Name}}…{{/@loop.Name}}</button>
+                    }
+                </div>
+                <div class="help">@T["mailtpl.loopsHint"]</div>
+                @foreach (var loop in Model.Definition.Loops)
+                {
+                    <div class="help">
+                        <span class="mono">{{#@loop.Name}}</span> — @loop.Description:
+                        @string.Join(", ", loop.Fields.Select(fl => "{{" + fl.Token + "}} " + fl.Description))
+                    </div>
+                }
+            </div>
+        }
     </form>
+</div>
+
+@* The preview renders SERVER-SIDE, through the same code that builds the real mail — a JavaScript
+   copy would be live as you type and would drift, and a preview that lies about what will be sent is
+   worse than none. It takes what is in the boxes, not what is saved, so it answers "what am I
+   writing". The form targets the frame, so no page reload and no route of its own. *@
+<div class="card">
+    <div class="menu-card-head">
+        <h2>@T["mailtpl.preview"]</h2>
+        <button type="button" class="btn btn-sm btn-ghost" id="preview-refresh">@T["mailtpl.previewRefresh"]</button>
+    </div>
+    <p class="muted">@T["mailtpl.previewHint"]</p>
+    <form method="post" asp-page-handler="Preview" asp-route-id="@Model.Current.Id"
+          target="mail-preview" id="preview-form">
+        <input type="hidden" name="body" id="preview-body" />
+        <input type="hidden" name="isHtml" id="preview-ishtml" value="false" />
+    </form>
+    <iframe name="mail-preview" id="mail-preview" class="mail-preview" title="@T["mailtpl.preview"]"></iframe>
 </div>
 
 <div class="card">
@@ -91,6 +141,44 @@
                     last.selectionStart = last.selectionEnd = start + token.length;
                 });
             });
+
+            // Switching to HTML on a body that is still the plain-text default offers the starting
+            // point from the declaration — the same loops and placeholders that will actually be
+            // filled. Only when nothing has been written yet: overwriting somebody's text because
+            // they ticked a box would be unforgivable.
+            // The preview form carries a copy of what is in the boxes; refreshed on demand and once
+            // at the start, plus shortly after typing stops so it keeps up without a request per
+            // keystroke.
+            var pForm = document.getElementById('preview-form');
+            var pBody = document.getElementById('preview-body');
+            var pHtml = document.getElementById('preview-ishtml');
+            var refresh = document.getElementById('preview-refresh');
+            var timer;
+            function preview() {
+                if (!pForm || !body) return;
+                pBody.value = body.value;
+                pHtml.value = document.getElementById('IsHtml').checked ? 'true' : 'false';
+                pForm.submit();
+            }
+            function previewSoon() { clearTimeout(timer); timer = setTimeout(preview, 700); }
+
+            var htmlBox = document.getElementById('IsHtml');
+            var body = document.getElementById('Body');
+            var starter = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.HtmlStarter));
+            var original = body ? body.value : '';
+            if (htmlBox && body && starter) {
+                htmlBox.addEventListener('change', function () {
+                    if (!htmlBox.checked) return;
+                    if (body.value.trim() !== original.trim()) return;   // touched — leave it alone
+                    if (body.value.indexOf('<') >= 0) return;            // already markup
+                    body.value = starter;
+                });
+            }
+
+            if (refresh) refresh.addEventListener('click', preview);
+            if (body) body.addEventListener('input', previewSoon);
+            if (htmlBox) htmlBox.addEventListener('change', previewSoon);
+            preview();
         })();
     </script>
 }

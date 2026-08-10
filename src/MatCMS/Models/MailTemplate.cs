@@ -25,9 +25,20 @@ public class MailTemplate
 
     public string Subject { get; set; } = "";
 
-    /// <summary>Plain-text body. Placeholders are <c>{{name}}</c>, same syntax as everywhere else in
-    /// MatCMS, so nobody has to learn a second one.</summary>
+    /// <summary>The body. Placeholders are <c>{{name}}</c> and repeatable blocks are
+    /// <c>{{#name}}…{{/name}}</c> — the same syntax the template engine uses for menus, so nobody has
+    /// to learn a second one.</summary>
     public string Body { get; set; } = "";
+
+    /// <summary>
+    /// Whether <see cref="Body"/> is HTML.
+    /// <para>An HTML mail is still SENT with a plain-text alternative alongside it, derived from the
+    /// markup: a message with only an HTML part is treated worse by spam filters and is unreadable in
+    /// a client that shows text only. Nobody has to write the notification twice.</para>
+    /// <para>It also decides escaping. Form values come from the public, so in an HTML mail an
+    /// unescaped one would let a visitor put markup into somebody's inbox.</para>
+    /// </summary>
+    public bool IsHtml { get; set; }
 
     /// <summary>
     /// Off means the mail is not sent at all.

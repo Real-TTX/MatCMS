@@ -507,7 +507,8 @@ public class CloudService
     /// reply-to from here.</para>
     /// </summary>
     public async Task<(bool ok, string? error)> SendMailAsync(
-        IEnumerable<string> to, string subject, string body, string? replyTo, CancellationToken ct = default)
+        IEnumerable<string> to, string subject, string body, string? replyTo, bool isHtml = false,
+        CancellationToken ct = default)
     {
         var settings = await GetSettingsAsync();
         if (!settings.Configured) return (false, "Diese Website ist mit keiner Cloud verbunden.");
@@ -521,6 +522,7 @@ public class CloudService
                 Subject = subject,
                 Body = body,
                 ReplyTo = replyTo,
+                IsHtml = isHtml,
             };
             using var res = await client.PostAsJsonAsync(
                 $"{settings.Url}/api/instances/{settings.InstanceId}/mail", payload, ct);

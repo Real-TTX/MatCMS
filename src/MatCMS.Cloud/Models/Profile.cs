@@ -259,4 +259,7 @@ public class ProfileMailTemplate
     public string Subject { get; set; } = "";
     public string Body { get; set; } = "";
     public bool Enabled { get; set; } = true;
+
+    /// <summary>Whether the body is HTML.</summary>
+    public bool IsHtml { get; set; }
 }

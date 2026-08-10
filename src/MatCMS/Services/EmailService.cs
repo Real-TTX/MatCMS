@@ -68,17 +68,17 @@ public class EmailService
     /// that sends mail therefore keeps working unchanged when an operator flips that switch.</para>
     /// </summary>
     public async Task<(bool ok, string? error)> SendAsync(
-        IEnumerable<string> to, string subject, string body, string? replyTo = null)
+        IEnumerable<string> to, string subject, string body, string? replyTo = null, bool isHtml = false)
     {
         if (await UseCloudRelayAsync())
         {
             var cloud = _services.GetService<CloudService>();
-            if (cloud is not null) return await cloud.SendMailAsync(to, subject, body, replyTo);
+            if (cloud is not null) return await cloud.SendMailAsync(to, subject, body, replyTo, isHtml);
             // Should not happen — but falling through to SMTP is better than silently sending
             // nothing, and an unconfigured SMTP will say so plainly.
             _log.LogWarning("Mail transport is 'cloud' but the cloud service is unavailable; falling back to SMTP.");
         }
-        return await SendCoreAsync(await GetConfigAsync(), to, subject, body, replyTo);
+        return await SendCoreAsync(await GetConfigAsync(), to, subject, body, replyTo, isHtml);
     }
 
     /// <summary>True when a profile told this site to hand its mail to the cloud.</summary>
@@ -97,8 +97,13 @@ public class EmailService
     /// <para>A key with no stored row falls back to the built-in text rather than sending nothing:
     /// a database that predates a new mail must not swallow it.</para>
     /// </summary>
+    /// <param name="lists">Repeatable blocks: loop name → one entry per pass. A form's fields arrive
+    /// this way, because which fields exist is decided by whoever built the form and a template
+    /// cannot name them in advance.</param>
     public async Task<(bool ok, string? error)> SendTemplateAsync(
-        string key, IEnumerable<string> to, IReadOnlyDictionary<string, string> values, string? replyTo = null)
+        string key, IEnumerable<string> to, IReadOnlyDictionary<string, string> values,
+        string? replyTo = null,
+        IReadOnlyDictionary<string, IReadOnlyList<MailTemplates.Item>>? lists = null)
     {
         var row = await _db.MailTemplates.AsNoTracking().FirstOrDefaultAsync(t => t.Key == key);
         if (row is not null && !row.Enabled) return (false, "Diese Benachrichtigung ist deaktiviert.");
@@ -106,13 +111,17 @@ public class EmailService
         var def = MailTemplates.Find(key);
         var subject = row?.Subject ?? def?.Subject;
         var body = row?.Body ?? def?.Body;
+        var isHtml = row?.IsHtml ?? false;
         if (string.IsNullOrWhiteSpace(subject) && string.IsNullOrWhiteSpace(body))
             return (false, $"Für „{key}“ ist keine Vorlage hinterlegt.");
 
+        // The subject is never HTML, whatever the body is — a subject line has no markup, and
+        // escaping one would put &amp; in somebody's inbox.
         return await SendAsync(to,
-            MailTemplates.Render(subject ?? "", values),
-            MailTemplates.Render(body ?? "", values),
-            replyTo);
+            MailTemplates.Render(subject ?? "", values, lists),
+            MailTemplates.Render(body ?? "", values, lists, isHtml),
+            replyTo,
+            isHtml);
     }
 
     /// <summary>Sends a test e-mail with an explicit (possibly unsaved) config — used by the SMTP test button.</summary>
@@ -122,7 +131,8 @@ public class EmailService
             "Diese Test-E-Mail bestätigt, dass die SMTP-Einstellungen funktionieren.\r\n\r\n– MatCMS");
 
     private async Task<(bool ok, string? error)> SendCoreAsync(
-        SmtpConfig cfg, IEnumerable<string> to, string subject, string body, string? replyTo = null)
+        SmtpConfig cfg, IEnumerable<string> to, string subject, string body, string? replyTo = null,
+        bool isHtml = false)
     {
         if (!cfg.IsConfigured) return (false, "SMTP ist nicht konfiguriert (Host und Absender-Adresse erforderlich).");
 
@@ -146,7 +156,17 @@ public class EmailService
             if (!string.IsNullOrWhiteSpace(replyTo))
                 try { msg.ReplyTo.Add(MailboxAddress.Parse(replyTo)); } catch { /* ignore bad reply-to */ }
             msg.Subject = subject;
-            msg.Body = new TextPart("plain") { Text = body };
+            // An HTML mail goes out as multipart/alternative with a text version derived from the
+            // markup — never HTML alone. Spam filters score an HTML-only message worse, and a client
+            // set to plain text would show nothing at all. The text part goes FIRST because that is
+            // what the format means: least-preferred first, so a client picks the last it can render.
+            msg.Body = isHtml
+                ? new Multipart("alternative")
+                {
+                    new TextPart("plain") { Text = MailTemplates.HtmlToText(body) },
+                    new TextPart("html") { Text = body },
+                }
+                : new TextPart("plain") { Text = body };
 
             // Pick the right TLS mode: port 465 = implicit SSL on connect; otherwise STARTTLS (opportunistic
             // when the SSL switch is off, so a plain server still works). This is what makes IONOS:465 work.

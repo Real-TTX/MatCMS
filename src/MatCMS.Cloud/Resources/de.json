@@ -514,7 +514,6 @@
   "spool.retry": "Erneut versuchen",
   "spool.retryAll": "Alle aufgegebenen erneut versuchen",
   "spool.hint": "Nachrichten dieser Instanz, die über die Cloud verschickt werden. Ein fehlgeschlagener Versand wird mit wachsendem Abstand wiederholt; nach acht Versuchen gilt er als aufgegeben und kann hier von Hand zurück in die Warteschlange.",
-  "spool.noSmtp": "Diese Cloud hat selbst keinen Mailversand eingerichtet — es bleibt alles in der Warteschlange stehen.",
 
   "profiles.tabMailTemplates": "Mail-Vorlagen",
   "profiles.payloadMailTemplates": "Mail-Vorlagen",
@@ -549,7 +548,6 @@
   "spool.noneAtAll": "Es hat noch keine Instanz eine Nachricht übergeben.",
   "spool.clear": "Abgeschlossene entfernen",
   "spool.clearConfirm": "Alle zugestellten und aufgegebenen Nachrichten entfernen? Wartende bleiben stehen.",
-  "spool.noSmtpCloud": "Diese Cloud hat selbst keinen Mailversand eingerichtet — unter Einstellungen → SMTP eintragen, sonst bleibt alles in der Warteschlange stehen.",
 
   "mailtpl.unknownKeyCloud": "Diese Cloud kennt keine Mail mit diesem Schlüssel — der Text lässt sich trotzdem schreiben und ausrollen, hier werden nur keine Platzhalter dokumentiert:"
 }

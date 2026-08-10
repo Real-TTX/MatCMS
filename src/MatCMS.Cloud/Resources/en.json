@@ -514,7 +514,6 @@
   "spool.retry": "Try again",
   "spool.retryAll": "Retry all given up",
   "spool.hint": "Messages from this instance sent through the cloud. A failed delivery is retried with a growing delay; after eight attempts it counts as given up and can be put back in the queue by hand here.",
-  "spool.noSmtp": "This cloud has no mail delivery of its own configured — everything will sit in the queue.",
 
   "profiles.tabMailTemplates": "Mail templates",
   "profiles.payloadMailTemplates": "Mail templates",
@@ -549,7 +548,6 @@
   "spool.noneAtAll": "No instance has handed over a message yet.",
   "spool.clear": "Remove settled",
   "spool.clearConfirm": "Remove all delivered and given-up messages? Waiting ones are kept.",
-  "spool.noSmtpCloud": "This cloud has no mail delivery of its own — set it under Settings → SMTP, otherwise everything sits in the queue.",
 
   "mailtpl.unknownKeyCloud": "This cloud knows no mail with that key — the wording can still be written and rolled out, there are just no documented placeholders here:"
 }

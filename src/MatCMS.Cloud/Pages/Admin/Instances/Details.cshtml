@@ -375,12 +375,6 @@
         </div>
 
         <p class="muted">@T["spool.hint"]</p>
-        @if (Model.UsesRelay && !Model.CloudMailConfigured)
-        {
-            @* Said here rather than left to be discovered: with no SMTP on the cloud the queue only
-               ever grows, and nothing about the list itself would explain why. *@
-            <div class="alert alert-info">@T["spool.noSmtp"]</div>
-        }
 
         <table class="data" data-list-table>
             <thead>

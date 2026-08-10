@@ -30,10 +30,6 @@ public class IndexModel : PageModel
     public int FailedCount { get; private set; }
     public int SentCount { get; private set; }
 
-    /// <summary>Whether this cloud can send at all. Without it everything simply queues, and that is
-    /// the first thing to say on a page about a queue that is not moving.</summary>
-    public bool MailConfigured { get; private set; }
-
     /// <summary>Instance the list is narrowed to, or null for all.</summary>
     public int? FilteredInstance { get; private set; }
 
@@ -45,7 +41,6 @@ public class IndexModel : PageModel
     public async Task OnGetAsync(int? instance, string? status)
     {
         Instances = await _db.Instances.AsNoTracking().OrderBy(i => i.Name).ToListAsync();
-        MailConfigured = await _email.IsConfiguredAsync();
 
         // The counts are over EVERYTHING, not over the filtered set: they are the overview, and an
         // overview that changes when you narrow the list below it is not one.

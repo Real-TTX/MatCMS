@@ -13,15 +13,13 @@ public class DetailsModel : PageModel
     private readonly InstanceService _instances;
     private readonly ReleaseWatcher _releases;
     private readonly DockerHostService _docker;
-    private readonly EmailService _email;
 
-    public DetailsModel(AppDbContext db, InstanceService instances, ReleaseWatcher releases, DockerHostService docker, EmailService email)
+    public DetailsModel(AppDbContext db, InstanceService instances, ReleaseWatcher releases, DockerHostService docker)
     {
         _db = db;
         _instances = instances;
         _releases = releases;
         _docker = docker;
-        _email = email;
     }
 
     public Instance Item { get; private set; } = new();
@@ -48,9 +46,6 @@ public class DetailsModel : PageModel
     /// then explains itself instead of showing an empty table nobody asked for.</summary>
     public bool UsesRelay => Item.Profile is { SyncSmtp: true } p && p.MailSource == MailSources.Cloud;
 
-    /// <summary>Whether the cloud can send at all. Without it everything simply queues, and saying so
-    /// once beats letting an operator wonder why nothing moves.</summary>
-    public bool CloudMailConfigured { get; private set; }
 
     public bool OutOfSync => InstanceService.IsOutOfSync(Item);
 
@@ -90,7 +85,6 @@ public class DetailsModel : PageModel
                 SentAt = m.SentAt, LastError = m.LastError
             })
             .ToListAsync();
-        CloudMailConfigured = await _email.IsConfiguredAsync();
         SyncReport = ParseReport(item.LastSyncReportJson);
         Summary = InstanceService.Summarise(item.LastSyncReportJson);
         // The report body is not loaded for the listing — the counts are denormalised on the row

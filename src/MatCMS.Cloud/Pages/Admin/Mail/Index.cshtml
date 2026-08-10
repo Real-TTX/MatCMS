@@ -31,12 +31,6 @@
         </div>
     </div>
 
-    @if (!Model.MailConfigured)
-    {
-        @* The first thing to say on a page about a queue that is not moving. *@
-        <div class="alert alert-info">@T["spool.noSmtpCloud"]</div>
-    }
-
     <div class="spool-cards">
         <div class="card">
             <div class="kv-label">@T["spool.queued"]</div>

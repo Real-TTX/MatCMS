@@ -11,13 +11,6 @@
         </div>
     </div>
 
-    @if (!Model.MailConfigured)
-    {
-        @* Said once, here, rather than on every template: tuning the wording of mails that cannot
-           leave the building is time spent on nothing. *@
-        <div class="alert alert-info">@T["mailtpl.noSmtp"]</div>
-    }
-
     <table class="data" data-list-table>
         <thead>
             <tr>

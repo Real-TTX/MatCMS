@@ -21,11 +21,7 @@ public class IndexModel : PageModel
 
     public List<MailTemplate> Items { get; private set; } = new();
 
-    /// <summary>True when no SMTP is configured — the list then says so once at the top instead of
-    /// letting an operator tune wording for mails that cannot leave the building.</summary>
-    public bool MailConfigured { get; private set; }
-
-    public async Task OnGetAsync([FromServices] EmailService email)
+    public async Task OnGetAsync()
     {
         // Ordered by the declaration, not by name: that is the order the product thinks in, and it
         // stays stable when somebody renames a template.
@@ -37,8 +33,6 @@ public class IndexModel : PageModel
             // unreachable but still in the database.
             .Concat(rows.Where(r => Services.MailTemplates.Find(r.Key) is null).OrderBy(r => r.Key))
             .ToList();
-
-        MailConfigured = await email.IsConfiguredAsync();
     }
 
     /// <summary>True when nothing in this build sends that key. Such a row can only have arrived from

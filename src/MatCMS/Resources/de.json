@@ -1049,7 +1049,6 @@
   "mailtpl.placeholders": "Platzhalter",
   "mailtpl.placeholdersHint": "Klicken fügt den Platzhalter an der Cursorposition ein — im Betreff oder im Text, je nachdem, wo du zuletzt warst.",
   "mailtpl.unknownKey": "Zu diesem Schlüssel gibt es im Code keine Definition mehr, es werden also keine Platzhalter gefüllt:",
-  "mailtpl.noSmtp": "Für diese Website ist kein Mailversand eingerichtet. Die Vorlagen lassen sich bearbeiten, verschickt wird aber nichts.",
   "mailtpl.test": "Testmail",
   "mailtpl.testHint": "Verschickt die gespeicherte Vorlage mit Beispielwerten, damit sich der Text als Mail beurteilen lässt und nicht als Formularfeld.",
   "mailtpl.testTo": "Empfänger",

@@ -1049,7 +1049,6 @@
   "mailtpl.placeholders": "Placeholders",
   "mailtpl.placeholdersHint": "Clicking inserts the placeholder at the cursor — in the subject or the body, whichever you were in last.",
   "mailtpl.unknownKey": "The code no longer declares this key, so no placeholders will be filled:",
-  "mailtpl.noSmtp": "No mail delivery is configured for this site. Templates can be edited, but nothing will be sent.",
   "mailtpl.test": "Test mail",
   "mailtpl.testHint": "Sends the saved template with example values, so the wording can be judged as mail rather than as a form field.",
   "mailtpl.testTo": "Recipient",

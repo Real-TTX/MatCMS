@@ -1065,5 +1065,7 @@
 
   "mailtpl.preview": "Preview",
   "mailtpl.previewRefresh": "Refresh",
-  "mailtpl.previewHint": "Shows the body with example values, rendered by the same code that sends the mail — loops run twice, so it is visible what repetition does to the layout."
+  "mailtpl.previewHint": "Shows the body with example values, rendered by the same code that sends the mail — loops run twice, so it is visible what repetition does to the layout.",
+  "mailtpl.name": "Name",
+  "mailtpl.status": "Status"
 }

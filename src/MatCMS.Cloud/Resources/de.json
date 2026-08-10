@@ -549,5 +549,14 @@
   "spool.clear": "Abgeschlossene entfernen",
   "spool.clearConfirm": "Alle zugestellten und aufgegebenen Nachrichten entfernen? Wartende bleiben stehen.",
 
-  "mailtpl.unknownKeyCloud": "Diese Cloud kennt keine Mail mit diesem Schlüssel — der Text lässt sich trotzdem schreiben und ausrollen, hier werden nur keine Platzhalter dokumentiert:"
+  "mailtpl.unknownKeyCloud": "Diese Cloud kennt keine Mail mit diesem Schlüssel — der Text lässt sich trotzdem schreiben und ausrollen, hier werden nur keine Platzhalter dokumentiert:",
+  "instances.filterAllInstances": "Alle Instanzen",
+
+  "mailtpl.loops": "Wiederholte Blöcke",
+  "mailtpl.loopsHint": "Alles zwischen {{#name}} und {{/name}} wird einmal je Eintrag ausgegeben — dieselbe Schreibweise wie bei den Menüs im Template.",
+  "mailtpl.placeholders": "Platzhalter",
+  "mailtpl.placeholdersHint": "Klicken fügt den Platzhalter an der Cursorposition ein — im Betreff oder im Text, je nachdem, wo du zuletzt warst.",
+  "mailtpl.preview": "Vorschau",
+  "mailtpl.previewHint": "Zeigt den Text mit Beispielwerten, gerendert vom selben Code, der die Mail auch verschickt — Schleifen laufen mit zwei Durchgängen, damit sichtbar wird, was Wiederholung mit dem Layout macht.",
+  "mailtpl.previewRefresh": "Aktualisieren"
 }

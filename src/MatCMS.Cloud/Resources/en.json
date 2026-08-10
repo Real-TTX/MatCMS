@@ -549,5 +549,14 @@
   "spool.clear": "Remove settled",
   "spool.clearConfirm": "Remove all delivered and given-up messages? Waiting ones are kept.",
 
-  "mailtpl.unknownKeyCloud": "This cloud knows no mail with that key — the wording can still be written and rolled out, there are just no documented placeholders here:"
+  "mailtpl.unknownKeyCloud": "This cloud knows no mail with that key — the wording can still be written and rolled out, there are just no documented placeholders here:",
+  "instances.filterAllInstances": "All instances",
+
+  "mailtpl.loops": "Repeated blocks",
+  "mailtpl.loopsHint": "Everything between {{#name}} and {{/name}} is written once per entry — the same notation the template engine uses for menus.",
+  "mailtpl.placeholders": "Placeholders",
+  "mailtpl.placeholdersHint": "Clicking inserts the placeholder at the cursor — in the subject or the body, whichever you were in last.",
+  "mailtpl.preview": "Preview",
+  "mailtpl.previewHint": "Shows the body with example values, rendered by the same code that sends the mail — loops run twice, so it is visible what repetition does to the layout.",
+  "mailtpl.previewRefresh": "Refresh"
 }

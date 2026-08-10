@@ -502,7 +502,7 @@
   "profiles.mailViaCloud": "Send through the cloud",
   "profiles.mailViaCloudHint": "The instances do not send at all — every message goes to the cloud, which spools it and delivers it with its own sender address. No SMTP credentials on the instances.",
   "profiles.smtpViaCloud": "Through the cloud",
-  "spool.title": "Mail queue",
+  "spool.title": "Spooler",
   "spool.none": "This instance has not handed over a message yet.",
   "spool.queued": "waiting",
   "spool.sent": "delivered",

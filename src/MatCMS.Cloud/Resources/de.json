@@ -502,7 +502,7 @@
   "profiles.mailViaCloud": "Über die Cloud versenden",
   "profiles.mailViaCloudHint": "Die Instanzen versenden gar nicht selbst — jede Nachricht geht an die Cloud, die sie zwischenspeichert und mit ihrer eigenen Absenderadresse zustellt. Kein SMTP-Zugang auf den Instanzen nötig.",
   "profiles.smtpViaCloud": "Über die Cloud",
-  "spool.title": "Mail-Warteschlange",
+  "spool.title": "Spooler",
   "spool.none": "Diese Instanz hat noch keine Nachricht übergeben.",
   "spool.queued": "wartet",
   "spool.sent": "zugestellt",

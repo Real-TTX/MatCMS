@@ -327,3 +327,7 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
 /* The three spool counts. Deliberately big: the number is the whole message. */
 .spool-count { font-size: 30px; font-weight: 700; font-family: var(--font-head); line-height: 1.1; }
 .spool-count.is-bad { color: #b42318; }
+
+/* The three counts, side by side and equally wide — they are one reading, not three sections. */
+.spool-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.spool-cards .card { margin-bottom: 0; }

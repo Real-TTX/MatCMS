@@ -18,12 +18,17 @@ public class IndexModel : PageModel
     private readonly ContentTransferService _transfer;
     private readonly BackupManager _backups;
     private readonly AppDbContext _db;
+    private readonly CloudService _cloud;
+    private readonly CloudBackupService _cloudBackups;
 
-    public IndexModel(ContentTransferService transfer, BackupManager backups, AppDbContext db)
+    public IndexModel(ContentTransferService transfer, BackupManager backups, AppDbContext db,
+        CloudService cloud, CloudBackupService cloudBackups)
     {
         _transfer = transfer;
         _backups = backups;
         _db = db;
+        _cloud = cloud;
+        _cloudBackups = cloudBackups;
     }
 
     // Which sections to include in the exported backup. The checkboxes render "checked" on GET
@@ -64,6 +69,9 @@ public class IndexModel : PageModel
         AllTemplates = await _db.Templates.AsNoTracking().OrderByDescending(t => t.IsActive).ThenBy(t => t.Name).ToListAsync();
         AllPages = await _db.Pages.AsNoTracking().OrderBy(p => p.Locale).ThenBy(p => p.Title).ToListAsync();
         AllForms = await _db.Forms.AsNoTracking().OrderBy(f => f.Name).ToListAsync();
+        var link = await _cloudBackups.IsEnabledAsync();
+        BackupToCloud = link;
+        CloudConnected = (await _cloud.GetSettingsAsync()).Configured;
         ScheduleConfig = await _backups.GetConfigAsync();
         Schedule = ScheduleConfig; // so asp-for checkboxes reflect the saved schedule
         StoredBackups = _backups.ListStored();
@@ -157,8 +165,21 @@ public class IndexModel : PageModel
 
     // ---- Scheduler ----
 
-    public async Task<IActionResult> OnPostSaveScheduleAsync()
+    /// <summary>Whether a cloud is linked at all — the upload switch is hidden without one.</summary>
+    public bool CloudConnected { get; private set; }
+
+    /// <summary>Whether finished backups are handed to that cloud.</summary>
+    public bool BackupToCloud { get; private set; }
+
+    public async Task<IActionResult> OnPostSaveScheduleAsync(bool backupToCloud)
     {
+        // Its own setting rather than part of the schedule config: the schedule is a file the
+        // backup manager owns, and a site setting is what the cloud can roll out.
+        var row = await _db.SiteSettings.FirstOrDefaultAsync(x => x.Key == SettingKeys.BackupToCloud);
+        if (row is null) _db.SiteSettings.Add(new SiteSetting { Key = SettingKeys.BackupToCloud, Value = backupToCloud ? "1" : "0" });
+        else row.Value = backupToCloud ? "1" : "0";
+        await _db.SaveChangesAsync();
+
         var existing = await _backups.GetConfigAsync();
         Schedule.LastRunUtc = existing.LastRunUtc; // never editable from the form
         // Store granular keys only when a strict subset is selected; "all" is stored as empty (= all).
@@ -222,5 +243,18 @@ public class IndexModel : PageModel
         var ok = _backups.DeleteStored(name);
         TempData[ok ? "Flash" : "FlashError"] = ok ? "Backup gelöscht." : "Backup nicht gefunden.";
         return RedirectToPage(new { tab = "schedule" });
+    }
+
+    /// <summary>
+    /// Pushes one stored backup to the cloud now, without waiting for the next scheduled run.
+    /// <para>Useful on its own — an operator about to change something risky wants the copy up there
+    /// BEFORE they do it, not tonight.</para>
+    /// </summary>
+    public async Task<IActionResult> OnPostUploadToCloudAsync(string name)
+    {
+        var (ok, error) = await _cloudBackups.UploadAsync(name, "manual");
+        if (ok) TempData["Flash"] = $"„{name}“ in die Cloud hochgeladen.";
+        else TempData["FlashError"] = $"Upload fehlgeschlagen: {error}";
+        return RedirectToPage();
     }
 }

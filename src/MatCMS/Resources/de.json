@@ -1075,5 +1075,9 @@
   "settings.mailViaCloud": "über die Cloud",
   "settings.mailViaSmtp": "über eigenes SMTP",
   "settings.mailViaCloudHint": "Ein Cloud-Profil hat festgelegt, dass diese Website nicht selbst versendet: jede Nachricht geht an die Cloud, die sie zwischenspeichert und zustellt. Die SMTP-Felder unten werden dabei nicht benutzt.",
-  "settings.mailViaSmtpHint": "Diese Website verschickt selbst über den unten eingetragenen Server."
+  "settings.mailViaSmtpHint": "Diese Website verschickt selbst über den unten eingetragenen Server.",
+
+  "backup.toCloud": "Backups zusätzlich in die Cloud hochladen",
+  "backup.toCloudHint": "Nach jedem geplanten Backup wird die Datei an die verbundene Cloud übergeben. Die lokale Kopie bleibt, wo sie ist — ein fehlgeschlagener Upload darf ein gelungenes Backup nicht entwerten.",
+  "backup.uploadNow": "In die Cloud"
 }

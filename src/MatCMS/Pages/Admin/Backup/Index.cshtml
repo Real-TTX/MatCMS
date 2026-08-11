@@ -140,6 +140,15 @@
             <label class="check">
                 <input asp-for="Schedule.Enabled" type="checkbox" /> @T["backup.schedEnabled"]
             </label>
+            @* Only shown when a cloud is connected: an upload switch on a site that has nowhere to
+               upload to is a promise nothing can keep. *@
+            @if (Model.CloudConnected)
+            {
+                <label class="check">
+                    <input name="backupToCloud" type="checkbox" value="true" checked="@(Model.BackupToCloud ? "checked" : null)" /> @T["backup.toCloud"]
+                </label>
+                <div class="help">@T["backup.toCloudHint"]</div>
+            }
 
             <div class="form-row" style="margin-top:12px;">
                 <div class="form-field">
@@ -206,6 +215,12 @@
                                       onsubmit="return confirm('@T["backup.restoreStoredConfirm"]');">
                                     <button type="submit" class="btn btn-sm btn-ghost">@T["backup.restoreThis"]</button>
                                 </form>
+                            @if (Model.CloudConnected)
+                            {
+                                <form class="inline-form" method="post" asp-page-handler="UploadToCloud" asp-route-name="@b.Name">
+                                    <button type="submit" class="btn btn-sm btn-ghost">@T["backup.uploadNow"]</button>
+                                </form>
+                            }
                                 <form method="post" asp-page-handler="DeleteStored" asp-route-name="@b.Name" class="inline-form"
                                       onsubmit="return confirm('@T["backup.deleteConfirm"]');">
                                     <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>

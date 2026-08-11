@@ -1,0 +1,144 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.Backups.IndexModel
+@using MatCMS.Cloud.Services
+@{
+    ViewData["Title"] = T["backups.title"];
+}
+<div data-list data-list-page-size="50">
+    <div class="page-head">
+        <h1>@T["backups.title"]</h1>
+        <div class="list-toolbar">
+            <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+            <select class="list-search" data-backup-filter aria-label="@T["instances.title"]">
+                <option value="@Url.Page("Index")">@T["instances.filterAllInstances"]</option>
+                @foreach (var i in Model.Instances)
+                {
+                    <option value="@Url.Page("Index", new { instance = i.Id })"
+                            selected="@(Model.FilteredInstance == i.Id ? "selected" : null)">@i.Name</option>
+                }
+            </select>
+        </div>
+    </div>
+
+    <p class="muted">@T["backups.intro", MatCMS.Cloud.Pages.Admin.Backups.IndexModel.Size(BackupStore.QuotaBytesPerInstance)]</p>
+    @* Said once and plainly rather than left to be discovered: a backup is the whole site. *@
+    <div class="help">@T["backups.notEncrypted"]</div>
+
+    <table class="data" data-list-table>
+        <thead>
+            <tr>
+                <th>@T["backups.file"]</th>
+                <th>@T["instances.title"]</th>
+                <th>@T["backups.created"]</th>
+                <th>@T["backups.size"]</th>
+                <th>@T["common.status"]</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Items.Count == 0)
+            {
+                <partial name="_EmptyRow" model='@T["backups.none"]' />
+            }
+            else
+            {
+                @foreach (var b in Model.Items)
+                {
+                    <tr data-search="@(b.FileName + " " + Model.InstanceName(b.InstanceId))">
+                        <td>
+                            <a asp-page="Index" asp-page-handler="Download" asp-route-id="@b.Id"><strong>@b.FileName</strong></a>
+                            <div class="muted mono">@b.Origin</div>
+                        </td>
+                        <td><a asp-page="/Admin/Instances/Details" asp-route-id="@b.InstanceId">@Model.InstanceName(b.InstanceId)</a></td>
+                        <td class="muted">@b.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                        <td class="muted">@MatCMS.Cloud.Pages.Admin.Backups.IndexModel.Size(b.SizeBytes)</td>
+                        <td>
+                            @if (b.RestorePending)
+                            {
+                                <span class="badge badge-new">@T["backups.restorePending"]</span>
+                            }
+                            else if (b.RestoreError is not null)
+                            {
+                                <span class="badge badge-err" title="@b.RestoreError">@T["backups.restoreFailed"]</span>
+                            }
+                            else if (b.RestoreDoneAt is DateTime done)
+                            {
+                                <span class="badge badge-on" title="@done.ToLocalTime().ToString("dd.MM.yyyy HH:mm")">@T["backups.restored"]</span>
+                            }
+                            else
+                            {
+                                <span class="muted">—</span>
+                            }
+                        </td>
+                        <td>
+                            <div class="actions">
+                                @if (b.RestorePending)
+                                {
+                                    <form class="inline-form" method="post" asp-page-handler="CancelRestore" asp-route-id="@b.Id" asp-route-instance="@Model.FilteredInstance">
+                                        <button type="submit" class="btn btn-sm btn-ghost">@T["backups.cancelRestore"]</button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    @* The one action here that overwrites a live site, so it asks. *@
+                                    <form class="inline-form" method="post" asp-page-handler="Restore" asp-route-id="@b.Id" asp-route-instance="@Model.FilteredInstance"
+                                          onsubmit="return confirm('@T["backups.restoreConfirm"]');">
+                                        <button type="submit" class="btn btn-sm btn-ghost">@T["backups.restore"]</button>
+                                    </form>
+                                }
+                                <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@b.Id" asp-route-instance="@Model.FilteredInstance"
+                                      onsubmit="return confirm('@T["backups.deleteConfirm"]');">
+                                    <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+    <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+    <div class="list-pager" data-list-pager></div>
+
+    <div class="help">@T["backups.total", MatCMS.Cloud.Pages.Admin.Backups.IndexModel.Size(Model.TotalBytes)]</div>
+</div>
+
+@* ---- Orphans -------------------------------------------------------------------------------- *@
+@if (Model.Orphans.Count > 0)
+{
+    <div class="card">
+        <h2>@T["backups.orphans"]</h2>
+        <p class="muted">@T["backups.orphansHint"]</p>
+        <table class="data">
+            <thead>
+                <tr><th>@T["backups.file"]</th><th>@T["backups.orphanKind"]</th><th>@T["backups.size"]</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var o in Model.Orphans)
+                {
+                    <tr>
+                        <td class="mono">@o.Name</td>
+                        <td class="muted">@(o.Kind == "file" ? T["backups.orphanFile"] : T["backups.orphanRow"])</td>
+                        <td class="muted">@MatCMS.Cloud.Pages.Admin.Backups.IndexModel.Size(o.SizeBytes)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <div class="form-actions">
+            <form class="inline-form" method="post" asp-page-handler="CleanOrphans" asp-route-instance="@Model.FilteredInstance"
+                  onsubmit="return confirm('@T["backups.cleanConfirm"]');">
+                <button type="submit" class="btn btn-ghost">@T["backups.clean"]</button>
+            </form>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script>
+        (function () {
+            document.querySelectorAll('[data-backup-filter]').forEach(function (sel) {
+                sel.addEventListener('change', function () { if (sel.value) location.href = sel.value; });
+            });
+        })();
+    </script>
+}

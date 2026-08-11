@@ -79,6 +79,7 @@ builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<InstanceService>();
 builder.Services.AddScoped<ProfileService>();
 builder.Services.AddScoped<MailSpool>();
+builder.Services.AddScoped<BackupStore>();
 builder.Services.AddSingleton<SecretProtector>();
 builder.Services.AddScoped<AdoptionService>();
 builder.Services.AddScoped<VersionService>();
@@ -288,6 +289,84 @@ app.MapPost("/api/instances/{publicId}/mail", async (
     // A refusal is a 200 with Queued=false, not an error status: the instance has to TELL its
     // operator why the mail did not go out, and a bare 4xx gives it nothing to say.
     return Results.Ok(new MailResponse { Queued = result.Queued, Error = result.Error });
+}).RequireRateLimiting("instanceApi");
+
+// --- Backups --------------------------------------------------------------
+// An instance uploads its own backups here and fetches them back when an operator asks for a
+// restore. The cloud stores and hands out bytes; it never restores anything itself, because it
+// cannot reach into a site — the instance does the work and reports what happened.
+
+// Uploaded as the raw request body rather than multipart: there is exactly one file, and multipart
+// would buffer it to a temp file first to give us back the stream we already had.
+app.MapPost("/api/instances/{publicId}/backups", async (
+    HttpContext ctx, string publicId, InstanceService instances, BackupStore store) =>
+{
+    var token = ctx.Request.Headers[CloudProtocol.TokenHeader].ToString();
+    var instance = await instances.AuthenticateAsync(publicId, token);
+    if (instance is null) return Results.Unauthorized();
+    if (instance.Status != MatCMS.Cloud.Models.InstanceStatus.Approved)
+        return Results.Json(new { error = "Instanz ist nicht freigegeben." }, statusCode: StatusCodes.Status403Forbidden);
+
+    // Kestrel caps a request body at 30 MB by default, which a site with media passes long before
+    // it is interesting. The real limit is BackupStore.MaxUploadBytes, enforced while streaming —
+    // one that says WHY it refused instead of dropping the connection mid-upload.
+    var sizeFeature = ctx.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>();
+    if (sizeFeature is { IsReadOnly: false }) sizeFeature.MaxRequestBodySize = null;
+
+    var name = ctx.Request.Headers["X-MatCMS-Backup-Name"].ToString();
+    var origin = ctx.Request.Headers["X-MatCMS-Backup-Origin"].ToString();
+    var createdRaw = ctx.Request.Headers["X-MatCMS-Backup-Created"].ToString();
+    _ = DateTime.TryParse(createdRaw, System.Globalization.CultureInfo.InvariantCulture,
+        System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal,
+        out var created);
+
+    var result = await store.StoreAsync(instance, name, origin, created, ctx.Request.Body, ctx.RequestAborted);
+    // A refusal comes back as 200 with Ok=false so the instance can TELL its operator why the
+    // backup did not make it — a bare 4xx gives it nothing to say.
+    return Results.Ok(new { ok = result.Ok, error = result.Error, id = result.Backup?.Id });
+}).RequireRateLimiting("instanceApi").DisableAntiforgery();
+
+// The instance fetching ITS OWN backup back. Scoped to the caller on purpose: the id alone must
+// never be enough to read another site's data.
+app.MapGet("/api/instances/{publicId}/backups/{id:int}", async (
+    HttpContext ctx, string publicId, int id, InstanceService instances, BackupStore store, AppDbContext db) =>
+{
+    var token = ctx.Request.Headers[CloudProtocol.TokenHeader].ToString();
+    var instance = await instances.AuthenticateAsync(publicId, token);
+    if (instance is null) return Results.Unauthorized();
+
+    var row = await db.CloudBackups.AsNoTracking()
+        .FirstOrDefaultAsync(b => b.Id == id && b.InstanceId == instance.Id);
+    if (row is null) return Results.NotFound();
+
+    var path = store.PathFor(row);
+    if (!File.Exists(path)) return Results.NotFound();
+    // Streamed from disk; enableRangeProcessing so a dropped download can resume instead of
+    // starting a few hundred megabytes over.
+    return Results.File(path, "application/zip", row.FileName, enableRangeProcessing: true);
+}).RequireRateLimiting("instanceApi");
+
+// What the instance made of a restore it was asked for. Recorded, never derived: only the site
+// knows whether its own restore worked.
+app.MapPost("/api/instances/{publicId}/backups/restored", async (
+    HttpContext ctx, string publicId, RestoreReport report, InstanceService instances, AppDbContext db) =>
+{
+    var token = ctx.Request.Headers[CloudProtocol.TokenHeader].ToString();
+    var instance = await instances.AuthenticateAsync(publicId, token);
+    if (instance is null) return Results.Unauthorized();
+
+    var row = await db.CloudBackups.FirstOrDefaultAsync(b => b.Id == report.BackupId && b.InstanceId == instance.Id);
+    if (row is null) return Results.NotFound();
+
+    row.RestoreDoneAt = report.Ok ? DateTime.UtcNow : null;
+    row.RestoreError = report.Ok ? null : (report.Error ?? "Unbekannter Fehler.");
+    instances.Log(instance, report.Ok
+        ? MatCMS.Cloud.Models.InstanceEventKind.BackupRestored
+        : MatCMS.Cloud.Models.InstanceEventKind.BackupRestoreFailed,
+        report.Ok ? $"Backup \"{row.FileName}\" wurde zurückgespielt."
+                  : $"Zurückspielen von \"{row.FileName}\" fehlgeschlagen: {row.RestoreError}");
+    await db.SaveChangesAsync();
+    return Results.Ok();
 }).RequireRateLimiting("instanceApi");
 
 // --- Catalogue ------------------------------------------------------------

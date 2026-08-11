@@ -60,6 +60,10 @@ public static class SettingKeys
     /// decides it; absent means smtp, which is what every site did before the relay existed.</summary>
     public const string MailTransport = "mail.transport";
 
+    /// <summary>Whether finished backups are handed to the connected cloud. Off unless somebody says
+    /// otherwise — uploading a customer's whole site somewhere is a decision, not a default.</summary>
+    public const string BackupToCloud = "backup.toCloud";
+
     public const string SmtpHost = "smtp.host";
     public const string SmtpPort = "smtp.port";
     public const string SmtpUser = "smtp.user";

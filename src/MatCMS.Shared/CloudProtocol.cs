@@ -15,7 +15,7 @@ public static class CloudProtocol
     /// <summary>Contract version. Bump on <b>every</b> change to the payloads in this file: the cloud
     /// badges an instance reporting an older one as "veraltet", and both sides read this constant, so
     /// one edit covers both.</summary>
-    public const int Version = 8;
+    public const int Version = 9;
 
     /// <summary>Header carrying the instance's bearer token.</summary>
     public const string TokenHeader = "X-MatCMS-Instance-Token";
@@ -127,6 +127,11 @@ public sealed class HeartbeatResponse
     /// <summary>True when <see cref="LatestVersion"/> is newer than what the instance reported.</summary>
     public bool UpdateAvailable { get; set; }
 
+    /// <summary>A backup an operator asked to be restored, or null. Null is the normal case, so an
+    /// instance that does not know this field yet simply never restores anything — which is the right
+    /// way for an unknown instruction about overwriting a live site to fail.</summary>
+    public PendingRestore? Restore { get; set; }
+
     /// <summary>True when the cloud can update this instance itself (it found the container on its
     /// own daemon).</summary>
     public bool CloudCanUpdate { get; set; }
@@ -199,6 +204,30 @@ public sealed class InstanceConfig
 /// <para>Subject and body arrive already rendered: the instance owns its templates, the cloud only
 /// carries the result.</para>
 /// </summary>
+/// <summary>
+/// A backup the cloud wants this instance to restore. It rides on the heartbeat because the cloud
+/// never reaches into a site: the instance learns of the request, fetches its own file and does the
+/// work itself — the same pull that carries every other change.
+/// </summary>
+public sealed class PendingRestore
+{
+    public int BackupId { get; set; }
+    public string FileName { get; set; } = "";
+    public long SizeBytes { get; set; }
+
+    /// <summary>SHA-256 of the stored file, so the instance can tell a truncated download from a
+    /// good one BEFORE it overwrites a live site with it.</summary>
+    public string Sha256 { get; set; } = "";
+}
+
+/// <summary>What an instance reports back after attempting a restore it was asked for.</summary>
+public sealed class RestoreReport
+{
+    public int BackupId { get; set; }
+    public bool Ok { get; set; }
+    public string? Error { get; set; }
+}
+
 public sealed class MailRequest
 {
     public List<string> To { get; set; } = new();

@@ -63,6 +63,9 @@ public class CloudService
 {
     private readonly AppDbContext _db;
     private readonly IHttpClientFactory _http;
+    // Resolved on demand, not injected: CloudBackupService depends on THIS class, and taking it as
+    // a constructor dependency would be a cycle the container refuses to build.
+    private readonly IServiceProvider _services;
     private readonly IDataProtector _protector;
     private readonly VersionService _version;
     private readonly CloudSyncService _sync;
@@ -71,12 +74,13 @@ public class CloudService
     private readonly ILogger<CloudService> _log;
 
     public CloudService(
-        AppDbContext db, IHttpClientFactory http, IDataProtectionProvider protection,
+        AppDbContext db, IHttpClientFactory http, IDataProtectionProvider protection, IServiceProvider services,
         VersionService version, CloudSyncService sync, SiteContext site, CloudState state,
         ILogger<CloudService> log)
     {
         _db = db;
         _http = http;
+        _services = services;
         _protector = protection.CreateProtector("MatCMS.CloudToken");
         _version = version;
         _sync = sync;
@@ -301,6 +305,20 @@ public class CloudService
             // cycle, so the next beat already reports the new state.
             if (_state.ConfigRevision > 0 && _state.ConfigRevision != beat.AppliedRevision)
                 await PullAndApplyAsync(settings, ct);
+
+            // A restore somebody asked for in the cloud. Done here rather than on a schedule of its
+            // own because the heartbeat is already the channel through which this site learns what
+            // is wanted of it — and because it means a restore begins within a minute of the click.
+            if (answer?.Restore is { BackupId: > 0 } restore)
+            {
+                var backups = _services.GetService<CloudBackupService>();
+                if (backups is not null)
+                {
+                    _log.LogWarning("Cloud asked for backup {File} to be restored — this overwrites the site.", restore.FileName);
+                    var (ok, error) = await backups.RestoreAsync(restore, ct);
+                    await backups.ReportRestoreAsync(restore.BackupId, ok, error, ct);
+                }
+            }
         }
         catch (Exception ex)
         {

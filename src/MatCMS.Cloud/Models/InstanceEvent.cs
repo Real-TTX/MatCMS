@@ -13,7 +13,13 @@ public enum InstanceEventKind
     Approved = 8,
     Rejected = 9,
     SyncApplied = 10,
-    SyncFailed = 11
+    SyncFailed = 11,
+
+    /// <summary>A backup was restored onto the instance — or the attempt failed. Its own kind
+    /// because it is the one event here that OVERWRITES a live site, and it should be findable as
+    /// such rather than buried among sync entries.</summary>
+    BackupRestored = 12,
+    BackupRestoreFailed = 13
 }
 
 /// <summary>Audit trail per instance: what happened, and whether a notification went out for it.

@@ -1075,5 +1075,9 @@
   "settings.mailViaCloud": "through the cloud",
   "settings.mailViaSmtp": "through its own SMTP",
   "settings.mailViaCloudHint": "A cloud profile decided that this site does not send for itself: every message goes to the cloud, which spools and delivers it. The SMTP fields below are not used.",
-  "settings.mailViaSmtpHint": "This site sends through the server configured below."
+  "settings.mailViaSmtpHint": "This site sends through the server configured below.",
+
+  "backup.toCloud": "Also upload backups to the cloud",
+  "backup.toCloudHint": "After every scheduled backup the file is handed to the connected cloud. The local copy stays where it is — a failed upload must not devalue a successful backup.",
+  "backup.uploadNow": "To the cloud"
 }

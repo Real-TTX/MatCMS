@@ -246,7 +246,12 @@ public class InstanceService
             DisplayName = instance.Name,
             ProfileName = instance.Profile?.Name,
             // A pending instance is told 0 so it never even asks for configuration.
-            ConfigRevision = instance.Status == InstanceStatus.Approved ? instance.Profile?.Revision ?? 0 : 0
+            ConfigRevision = instance.Status == InstanceStatus.Approved ? instance.Profile?.Revision ?? 0 : 0,
+
+            // A backup somebody asked to be restored. Only for an approved instance, and only the
+            // OLDEST outstanding one — asking a site to overwrite itself twice in a row is never
+            // what was meant, and the second request is still there on the next beat.
+            Restore = instance.Status == InstanceStatus.Approved ? await PendingRestoreAsync(instance.Id, ct) : null
         };
     }
 
@@ -378,4 +383,22 @@ public class InstanceService
         Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
     private static string? Trim(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+
+    private async Task<PendingRestore?> PendingRestoreAsync(int instanceId, CancellationToken ct)
+    {
+        var row = await _db.CloudBackups.AsNoTracking()
+            .Where(b => b.InstanceId == instanceId && b.RestoreRequestedAt != null
+                        && b.RestoreDoneAt == null && b.RestoreError == null)
+            .OrderBy(b => b.RestoreRequestedAt)
+            .FirstOrDefaultAsync(ct);
+        if (row is null) return null;
+
+        return new PendingRestore
+        {
+            BackupId = row.Id,
+            FileName = row.FileName,
+            SizeBytes = row.SizeBytes,
+            Sha256 = row.Sha256,
+        };
+    }
 }

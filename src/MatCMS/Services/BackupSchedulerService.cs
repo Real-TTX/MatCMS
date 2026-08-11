@@ -36,6 +36,17 @@ public class BackupSchedulerService : BackgroundService
                 {
                     var name = await mgr.RunAsync(cfg);
                     _log.LogInformation("Scheduled backup written: {Name}", name);
+
+                    // Handed to the cloud right after it was written, if this site was told to.
+                    // A failed upload is logged and nothing more: the backup itself is on disk,
+                    // which is the part that must not depend on somebody else being reachable.
+                    var toCloud = scope.ServiceProvider.GetRequiredService<CloudBackupService>();
+                    if (await toCloud.IsEnabledAsync())
+                    {
+                        var (ok, error) = await toCloud.UploadAsync(name, "auto", stoppingToken);
+                        if (ok) _log.LogInformation("Backup {Name} uploaded to the cloud.", name);
+                        else _log.LogWarning("Uploading backup {Name} to the cloud failed: {Error}", name, error);
+                    }
                 }
             }
             catch (OperationCanceledException) { break; }

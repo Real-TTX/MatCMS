@@ -12,6 +12,7 @@ public class AppDbContext : DbContext
     public DbSet<InstanceEvent> InstanceEvents => Set<InstanceEvent>();
     public DbSet<InstanceSyncRun> InstanceSyncRuns => Set<InstanceSyncRun>();
     public DbSet<SpooledMail> SpooledMails => Set<SpooledMail>();
+    public DbSet<CloudBackup> CloudBackups => Set<CloudBackup>();
     public DbSet<CloudSetting> CloudSettings => Set<CloudSetting>();
 
     public DbSet<Profile> Profiles => Set<Profile>();

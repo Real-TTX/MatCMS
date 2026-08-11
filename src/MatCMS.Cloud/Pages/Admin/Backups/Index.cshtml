@@ -97,8 +97,57 @@
     <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
     <div class="list-pager" data-list-pager></div>
 
-    <div class="help">@T["backups.total", MatCMS.Cloud.Pages.Admin.Backups.IndexModel.Size(Model.TotalBytes), MatCMS.Cloud.Pages.Admin.Backups.IndexModel.Size(Model.QuotaBytes)]</div>
+    <div class="help">@T["backups.total", MatCMS.Cloud.Pages.Admin.Backups.IndexModel.Size(Model.TotalBytes)]</div>
 </div>
+
+@* ---- Belegung je Instanz --------------------------------------------------------------------- *@
+@* The quota is per profile now, so there is no single number to put under the table any more — and
+   the useful question was never "how much may one instance have" but "which one is about to lose its
+   oldest backup". *@
+@if (Model.Instances.Count > 0)
+{
+    <div class="card">
+        <h2>@T["backups.usage"]</h2>
+        <table class="data">
+            <thead>
+                <tr>
+                    <th>@T["instances.title"]</th>
+                    <th>@T["backups.used"]</th>
+                    <th>@T["backups.quota"]</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var i in Model.Instances)
+                {
+                    var used = Model.UsedBy(i.Id);
+                    var quota = Model.QuotaFor(i.Id);
+                    var pct = Model.UsedPercent(i.Id);
+                    <tr>
+                        <td><a asp-page="Index" asp-route-instance="@i.Id">@i.Name</a></td>
+                        <td class="muted">@MatCMS.Cloud.Pages.Admin.Backups.IndexModel.Size(used)</td>
+                        <td class="muted">
+                            @MatCMS.Cloud.Pages.Admin.Backups.IndexModel.Size(quota)
+                            @* Named, not just the profile's name on its own: a profile called
+                               "Standard" would otherwise read as "this is the default value". *@
+                            @if (Model.QuotaSource(i.Id) is string src)
+                            {
+                                <span class="muted"> · @T["backups.quotaFromProfile", src]</span>
+                            }
+                            else
+                            {
+                                <span class="muted"> · @T["backups.quotaDefault"]</span>
+                            }
+                        </td>
+                        <td style="width:200px;">
+                            <div class="quota-bar" title="@pct %"><span style="width:@(pct)%"></span></div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
 
 @* ---- Orphans -------------------------------------------------------------------------------- *@
 @if (Model.Orphans.Count > 0)

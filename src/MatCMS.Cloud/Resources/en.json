@@ -551,7 +551,7 @@
   "backups.file": "File",
   "backups.created": "Created",
   "backups.size": "Size",
-  "backups.total": "Total stored: {0} · allowed per instance: {1}",
+  "backups.total": "Total used: {0}",
   "backups.restore": "Restore",
   "backups.restoreConfirm": "Restore this backup onto the instance? The site’s current state is overwritten. The instance carries it out on its next contact.",
   "backups.restorePending": "waiting for the instance",
@@ -591,5 +591,13 @@
   "backup.settings": "Settings",
   "backup.submissions": "Inquiries (submissions)",
   "backup.formsSection": "Forms",
-  "backup.assets": "Media / logo (uploads)"
+  "backup.assets": "Media / logo (uploads)",
+  "profiles.backupQuota": "Cloud backup storage (GB)",
+  "profiles.backupQuotaHint": "Per instance in this profile. Empty = the cloud default ({0} GB). When an instance is full, the next upload drops its oldest backup.",
+  "backups.usage": "Usage",
+  "backups.used": "Used",
+  "backups.quota": "Allowed",
+  "backups.quotaFromProfile": "from profile \"{0}\"",
+  "backups.quotaDefault": "cloud default",
+  "backups.usedOfQuota": "{0} of {1}"
 }

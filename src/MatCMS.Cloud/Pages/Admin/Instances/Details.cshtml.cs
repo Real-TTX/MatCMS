@@ -13,14 +13,24 @@ public class DetailsModel : PageModel
     private readonly InstanceService _instances;
     private readonly ReleaseWatcher _releases;
     private readonly DockerHostService _docker;
+    private readonly BackupStore _backups;
 
-    public DetailsModel(AppDbContext db, InstanceService instances, ReleaseWatcher releases, DockerHostService docker)
+    public DetailsModel(AppDbContext db, InstanceService instances, ReleaseWatcher releases, DockerHostService docker, BackupStore backups)
     {
         _db = db;
         _instances = instances;
         _releases = releases;
         _docker = docker;
+        _backups = backups;
     }
+
+    /// <summary>What this instance occupies in the cloud, and what it is granted — formatted here
+    /// rather than in the view so the page and the backup overview cannot disagree about a size.</summary>
+    public string BackupUsed { get; private set; } = "0 B";
+    public string BackupQuota { get; private set; } = "—";
+
+    /// <summary>Name of the profile that raised the quota, or null when it is the cloud default.</summary>
+    public string? BackupQuotaFromProfile { get; private set; }
 
     public Instance Item { get; private set; } = new();
     public List<InstanceEvent> Events { get; private set; } = new();
@@ -60,6 +70,13 @@ public class DetailsModel : PageModel
     public async Task<IActionResult> OnGetAsync(int id)
     {
         if (!await LoadAsync(id)) return RedirectToPage("Index");
+
+        var used = await _db.CloudBackups.AsNoTracking()
+            .Where(b => b.InstanceId == id)
+            .SumAsync(b => (long?)b.SizeBytes) ?? 0;
+        BackupUsed = Pages.Admin.Backups.IndexModel.Size(used);
+        BackupQuota = Pages.Admin.Backups.IndexModel.Size(await _backups.QuotaBytesAsync(id));
+        BackupQuotaFromProfile = Item.Profile?.BackupQuotaGb is > 0 ? Item.Profile.Name : null;
         return Page();
     }
 

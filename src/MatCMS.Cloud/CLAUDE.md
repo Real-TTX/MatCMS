@@ -322,6 +322,17 @@ thing), plus `backup.toCloud`. The granular lists inside that format (which page
 written **empty** on purpose: they name items that exist on one site and nowhere else, so
 distributing them would leave every other instance backing up nothing, silently.
 
+**The backup QUOTA is not part of that group and is not rolled out.** `Profile.BackupQuotaGb` (a
+column, empty = the cloud-wide default in *Einstellungen → Allgemein*) is what the CLOUD grants each
+instance in the profile, so one customer can be given more room than another. An instance neither
+needs nor should be told the number: it decides which of its uploads get pushed out again, and that
+belongs to the side holding the disk. It lives with the profile's policy fields rather than on the
+backup group's page for a practical reason too — opening that page switches the rollout ON, so an
+operator who only wanted to grant more space would have started backing up their sites.
+`BackupStore.QuotaBytesAsync(instanceId)` resolves profile → default; an instance with no profile
+falls back to the default, which is a real state (pending, or profile deleted) and must never mean
+"no quota".
+
 `ProfileService.IsGroupKey` is what keeps the two kinds apart. A free key/value row carrying a group
 key would be skipped by the rollout unless that group happened to be on — it would sit in the list
 looking active and never arrive — so `Profiles/Setting` refuses one outright.

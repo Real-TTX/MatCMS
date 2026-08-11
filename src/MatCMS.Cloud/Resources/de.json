@@ -551,7 +551,7 @@
   "backups.file": "Datei",
   "backups.created": "Erstellt",
   "backups.size": "Größe",
-  "backups.total": "Belegt insgesamt: {0} · erlaubt je Instanz: {1}",
+  "backups.total": "Belegt insgesamt: {0}",
   "backups.restore": "Zurückspielen",
   "backups.restoreConfirm": "Dieses Backup auf die Instanz zurückspielen? Der Stand der Website wird dabei überschrieben. Die Instanz führt es beim nächsten Kontakt aus.",
   "backups.restorePending": "wartet auf die Instanz",
@@ -591,5 +591,13 @@
   "backup.settings": "Einstellungen",
   "backup.submissions": "Anfragen (Submissions)",
   "backup.formsSection": "Formulare",
-  "backup.assets": "Medien / Logo (Uploads)"
+  "backup.assets": "Medien / Logo (Uploads)",
+  "profiles.backupQuota": "Cloud-Speicher für Backups (GB)",
+  "profiles.backupQuotaHint": "Je Instanz dieses Profils. Leer = der Standard der Cloud ({0} GB). Ist eine Instanz voll, fällt beim nächsten Upload ihr ältestes Backup weg.",
+  "backups.usage": "Belegung",
+  "backups.used": "Belegt",
+  "backups.quota": "Erlaubt",
+  "backups.quotaFromProfile": "aus Profil „{0}“",
+  "backups.quotaDefault": "Standard der Cloud",
+  "backups.usedOfQuota": "{0} von {1}"
 }

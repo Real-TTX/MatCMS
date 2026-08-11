@@ -92,6 +92,18 @@
                 }
             </div>
         </div>
+        @* Backup usage belongs on the instance too: the overview answers "who is near their limit",
+           this answers "what about this one", which is the question being asked on this page. *@
+        <div class="kv">
+            <div class="kv-label">@T["backups.title"]</div>
+            <div class="kv-value">
+                <a asp-page="/Admin/Backups/Index" asp-route-instance="@Model.Item.Id">@T["backups.usedOfQuota", Model.BackupUsed, Model.BackupQuota]</a>
+                @if (Model.BackupQuotaFromProfile is string qp)
+                {
+                    <span class="muted"> · @T["backups.quotaFromProfile", qp]</span>
+                }
+            </div>
+        </div>
         <div class="kv">
             <div class="kv-label">@T["instances.version"]</div>
             <div class="kv-value">

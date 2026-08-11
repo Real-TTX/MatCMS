@@ -29,15 +29,37 @@ public class BackupStore
     public const int DefaultQuotaGb = 2;
 
     /// <summary>
-    /// The configured quota per instance, in bytes.
+    /// The cloud-wide default quota in GB — what an instance gets when its profile does not say
+    /// otherwise.
     /// <para>Read per call rather than cached: it is asked for once per upload and once per page view,
     /// and a stale value would go on deleting to a limit the operator has already changed.</para>
     /// </summary>
-    public async Task<long> QuotaBytesAsync(CancellationToken ct = default)
+    public async Task<int> DefaultQuotaGbAsync(CancellationToken ct = default)
     {
         var row = await _db.CloudSettings.AsNoTracking()
             .FirstOrDefaultAsync(s => s.Key == SettingKeys.BackupQuotaGb, ct);
-        var gb = int.TryParse(row?.Value, out var v) && v > 0 ? v : DefaultQuotaGb;
+        return int.TryParse(row?.Value, out var v) && v > 0 ? v : DefaultQuotaGb;
+    }
+
+    /// <summary>
+    /// What ONE instance is granted, in bytes: its profile's quota if that profile sets one,
+    /// otherwise the cloud-wide default.
+    /// <para>Per instance rather than one number for everybody, because that is how the disk is
+    /// actually handed out — a customer with a media-heavy site needs more room than a brochure page,
+    /// and raising the limit for everyone to suit one of them is how a control plane runs out of
+    /// disk.</para>
+    /// <para>An instance with no profile falls back to the default. That is a real state (an
+    /// instance can be pending, or its profile deleted) and it must not mean "no quota", which would
+    /// delete every backup it owns.</para>
+    /// </summary>
+    public async Task<long> QuotaBytesAsync(int instanceId, CancellationToken ct = default)
+    {
+        var profileQuota = await _db.Instances.AsNoTracking()
+            .Where(i => i.Id == instanceId)
+            .Select(i => i.Profile != null ? i.Profile.BackupQuotaGb : null)
+            .FirstOrDefaultAsync(ct);
+
+        var gb = profileQuota is int q && q > 0 ? q : await DefaultQuotaGbAsync(ct);
         return (long)gb * 1024 * 1024 * 1024;
     }
 
@@ -145,7 +167,7 @@ public class BackupStore
     /// <see cref="KeepAtLeast"/>: one oversized backup must not take the last other copy with it.</summary>
     public async Task EnforceQuotaAsync(int instanceId, CancellationToken ct = default)
     {
-        var quota = await QuotaBytesAsync(ct);
+        var quota = await QuotaBytesAsync(instanceId, ct);
         var rows = await _db.CloudBackups
             .Where(b => b.InstanceId == instanceId)
             .OrderByDescending(b => b.CreatedAt)

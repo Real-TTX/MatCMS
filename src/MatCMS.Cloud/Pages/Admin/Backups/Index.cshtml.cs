@@ -26,16 +26,39 @@ public class IndexModel : PageModel
 
     public long TotalBytes { get; private set; }
 
-    /// <summary>The configured quota per instance — the number that decides which backups the next
-    /// upload pushes out.</summary>
-    public long QuotaBytes { get; private set; }
+    /// <summary>What each instance is granted, by instance id. Per instance because the profile may
+    /// raise it — one number for everybody stopped being true when quotas moved to the profile.</summary>
+    public Dictionary<int, long> QuotaBytes { get; private set; } = new();
+
     public int? FilteredInstance { get; private set; }
+
+    public long QuotaFor(int instanceId) => QuotaBytes.TryGetValue(instanceId, out var q) ? q : 0;
+
+    /// <summary>Where an instance's quota comes from — the profile that raised it, or nothing when it
+    /// is simply the cloud-wide default. Without this the column shows two different numbers with no
+    /// hint of why, and the operator has to go looking through profiles to find out.</summary>
+    public Dictionary<int, string?> QuotaFrom { get; private set; } = new();
+
+    public string? QuotaSource(int instanceId) => QuotaFrom.TryGetValue(instanceId, out var s) ? s : null;
 
     public string InstanceName(int id) => Instances.FirstOrDefault(i => i.Id == id)?.Name ?? "—";
 
-    /// <summary>Bytes this instance occupies, against its quota — the number that decides which of its
-    /// backups the next upload will push out.</summary>
-    public long UsedBy(int instanceId) => Items.Where(b => b.InstanceId == instanceId).Sum(b => b.SizeBytes);
+    /// <summary>Bytes each instance occupies, against its quota — the number that decides which of its
+    /// backups the next upload will push out.
+    /// <para>Summed over the whole table, NOT over <see cref="Items"/>: that list is filtered, and a
+    /// usage figure that shrinks because somebody picked a filter would be a lie about how full the
+    /// instance is.</para></summary>
+    public Dictionary<int, long> UsedBytes { get; private set; } = new();
+
+    public long UsedBy(int instanceId) => UsedBytes.TryGetValue(instanceId, out var u) ? u : 0;
+
+    /// <summary>Percent of the quota in use, capped at 100 for the bar.</summary>
+    public int UsedPercent(int instanceId)
+    {
+        var quota = QuotaFor(instanceId);
+        if (quota <= 0) return 0;
+        return (int)Math.Min(100, UsedBy(instanceId) * 100 / quota);
+    }
 
     public static string Size(long bytes) => bytes switch
     {
@@ -47,7 +70,7 @@ public class IndexModel : PageModel
 
     public async Task OnGetAsync(int? instance)
     {
-        Instances = await _db.Instances.AsNoTracking().OrderBy(i => i.Name).ToListAsync();
+        Instances = await _db.Instances.AsNoTracking().Include(i => i.Profile).OrderBy(i => i.Name).ToListAsync();
 
         var query = _db.CloudBackups.AsNoTracking().AsQueryable();
         if (instance is int iid && Instances.Any(i => i.Id == iid))
@@ -59,7 +82,18 @@ public class IndexModel : PageModel
 
         // Over everything, not over the filter: it answers "how much disk is this costing me".
         TotalBytes = await _db.CloudBackups.SumAsync(b => (long?)b.SizeBytes) ?? 0;
-        QuotaBytes = await _store.QuotaBytesAsync();
+        // For every instance, not just the filtered one: the overview below lists all of them, and
+        // "who is close to their limit" is the question this page exists to answer.
+        foreach (var i in Instances)
+        {
+            QuotaBytes[i.Id] = await _store.QuotaBytesAsync(i.Id);
+            QuotaFrom[i.Id] = i.Profile?.BackupQuotaGb is > 0 ? i.Profile.Name : null;
+        }
+
+        UsedBytes = await _db.CloudBackups.AsNoTracking()
+            .GroupBy(b => b.InstanceId)
+            .Select(g => new { g.Key, Sum = g.Sum(b => b.SizeBytes) })
+            .ToDictionaryAsync(x => x.Key, x => x.Sum);
         Orphans = await _store.FindOrphansAsync();
     }
 

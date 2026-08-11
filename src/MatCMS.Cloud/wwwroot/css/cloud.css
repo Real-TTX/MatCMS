@@ -331,3 +331,17 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
 /* The three counts, side by side and equally wide — they are one reading, not three sections. */
 .spool-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px; margin-bottom: 24px; }
 .spool-cards .card { margin-bottom: 0; }
+
+/* Quota bar on the backup overview. Its own rule rather than a reused badge: this is a proportion,
+   and the admin ships nothing that shows one. */
+.quota-bar {
+    height: 8px;
+    border-radius: 4px;
+    background: var(--border, #e5e7eb);
+    overflow: hidden;
+}
+.quota-bar > span {
+    display: block;
+    height: 100%;
+    background: var(--accent, #2563eb);
+}

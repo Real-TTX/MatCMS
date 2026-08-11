@@ -100,6 +100,12 @@
                 @T["settings.autoUpdateLocal"]
             </label>
             <div class="form-field">
+                <label for="backupQuotaGb">@T["profiles.backupQuota"]</label>
+                <input id="backupQuotaGb" name="backupQuotaGb" value="@(Model.Item.BackupQuotaGb?.ToString() ?? "")"
+                       placeholder="@Model.GlobalQuotaGb" inputmode="numeric" />
+                <div class="help">@T["profiles.backupQuotaHint", Model.GlobalQuotaGb]</div>
+            </div>
+            <div class="form-field">
                 <label for="notifyRecipients">@T["settings.recipients"]</label>
                 <input id="notifyRecipients" name="notifyRecipients" value="@Model.Item.NotifyRecipients" placeholder="@T["profiles.recipientsFallback"]" />
             </div>

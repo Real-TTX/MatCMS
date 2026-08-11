@@ -22,12 +22,14 @@ public class EditModel : PageModel
     private readonly AppDbContext _db;
     private readonly ProfileService _profiles;
     private readonly AuthService _auth;
+    private readonly BackupStore _backups;
 
-    public EditModel(AppDbContext db, ProfileService profiles, AuthService auth)
+    public EditModel(AppDbContext db, ProfileService profiles, AuthService auth, BackupStore backups)
     {
         _db = db;
         _profiles = profiles;
         _auth = auth;
+        _backups = backups;
     }
 
     public Profile Item { get; private set; } = new();
@@ -184,12 +186,17 @@ public class EditModel : PageModel
     /// group row and as three raw rows underneath, and the raw ones led to the free-setting editor,
     /// which refuses to save a group key. A row that can only be looked at is worse than no row.</para>
     /// </summary>
+    /// <summary>The cloud-wide default, shown as the placeholder so an empty field says what it will
+    /// actually do rather than just being blank.</summary>
+    public int GlobalQuotaGb { get; private set; } = BackupStore.DefaultQuotaGb;
+
     public List<ProfileSetting> OtherSettings =>
         Settings.Where(s => !ProfileService.IsGroupKey(s.Key)).OrderBy(s => s.Key).ToList();
 
     public async Task<IActionResult> OnGetAsync(int id)
     {
         if (!await LoadAsync(id)) return RedirectToPage("Index");
+        GlobalQuotaGb = await _backups.DefaultQuotaGbAsync();
         return Page();
     }
 
@@ -343,7 +350,8 @@ public class EditModel : PageModel
         bool syncMailTemplates,
         string? settingsMode, string? usersMode, string? pluginsMode, string? componentsMode, string? templatesMode,
         string? mailTemplatesMode,
-        string? activateTemplateName)
+        string? activateTemplateName,
+        string? backupQuotaGb = null)
     {
         var profile = await _db.Profiles.FindAsync(id);
         if (profile is null) return RedirectToPage("Index");
@@ -351,6 +359,10 @@ public class EditModel : PageModel
         if (!string.IsNullOrWhiteSpace(name)) profile.Name = name.Trim();
         profile.Description = description?.Trim() ?? "";
         profile.AutoApprove = autoApprove;
+        // Empty means "use the cloud-wide default", so it has to stay distinguishable from a number.
+        // Anything that is not a positive number becomes empty rather than being stored: a zero quota
+        // would delete every backup these instances own on their next upload.
+        profile.BackupQuotaGb = int.TryParse(backupQuotaGb, out var gb) && gb > 0 ? gb : null;
         profile.AutoUpdateLocal = autoUpdateLocal;
         profile.NotifyOffline = notifyOffline;
         profile.NotifyUpdate = notifyUpdate;

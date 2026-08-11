@@ -82,6 +82,21 @@ public class Profile
     /// <summary>Comma-separated. Empty = fall back to the global recipients.</summary>
     public string? NotifyRecipients { get; set; }
 
+    /// <summary>
+    /// How much backup storage the cloud grants each instance in this profile, in GB.
+    /// Null (or empty in the form) falls back to the cloud-wide default.
+    ///
+    /// <para>Deliberately a column on the profile and NOT a rolled-out setting: this is what the
+    /// CLOUD grants, not something a site configures about itself. An instance that could read — let
+    /// alone be told — its own quota would be the wrong shape entirely; the number decides which of
+    /// its uploads get pushed out again, and that decision belongs to the side holding the disk.</para>
+    ///
+    /// <para>It sits with the policy fields rather than on the backup group's page on purpose. That
+    /// page is about what gets rolled out, and opening it switches the rollout ON — an operator who
+    /// only wanted to grant a customer more space would have started backing up their sites.</para>
+    /// </summary>
+    public int? BackupQuotaGb { get; set; }
+
     // --- Which payloads this profile pushes ---------------------------------
     public bool SyncSettings { get; set; }
 

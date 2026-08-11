@@ -29,6 +29,12 @@
                 <input name="canonicalUrl" value="@Model.Get(SettingKeys.CanonicalUrl)" placeholder="https://cloud.beispiel.de" spellcheck="false" />
                 <div class="help">@T["settings.canonicalUrlHint"]</div>
             </div>
+            <div class="form-field">
+                <label>@T["settings.backupQuota"]</label>
+                <input name="backupQuotaGb" value="@Model.Get(MatCMS.Cloud.Services.SettingKeys.BackupQuotaGb)"
+                       placeholder="@MatCMS.Cloud.Services.BackupStore.DefaultQuotaGb" inputmode="numeric" />
+                <div class="help">@T["settings.backupQuotaHint"]</div>
+            </div>
             <div><button type="submit" class="btn">@T["settings.save"]</button></div>
         </div>
     </form>

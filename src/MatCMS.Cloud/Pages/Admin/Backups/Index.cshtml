@@ -20,9 +20,6 @@
         </div>
     </div>
 
-    <p class="muted">@T["backups.intro", MatCMS.Cloud.Pages.Admin.Backups.IndexModel.Size(BackupStore.QuotaBytesPerInstance)]</p>
-    @* Said once and plainly rather than left to be discovered: a backup is the whole site. *@
-    <div class="help">@T["backups.notEncrypted"]</div>
 
     <table class="data" data-list-table>
         <thead>
@@ -100,7 +97,7 @@
     <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
     <div class="list-pager" data-list-pager></div>
 
-    <div class="help">@T["backups.total", MatCMS.Cloud.Pages.Admin.Backups.IndexModel.Size(Model.TotalBytes)]</div>
+    <div class="help">@T["backups.total", MatCMS.Cloud.Pages.Admin.Backups.IndexModel.Size(Model.TotalBytes), MatCMS.Cloud.Pages.Admin.Backups.IndexModel.Size(Model.QuotaBytes)]</div>
 </div>
 
 @* ---- Orphans -------------------------------------------------------------------------------- *@

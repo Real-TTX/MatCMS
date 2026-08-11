@@ -9,6 +9,11 @@ public static class SettingKeys
     /// notification mails and for the pairing instructions. Empty = derived from the request.</summary>
     public const string CanonicalUrl = "cloud.canonicalUrl";
 
+    /// <summary>How many GB of backups ONE instance may occupy. Beyond it the oldest is dropped, so
+    /// this is the number that decides how far back a site can be restored — not a technical limit
+    /// but a policy, which is why it belongs in the settings and not in a constant.</summary>
+    public const string BackupQuotaGb = "backup.quotaGb";
+
     // --- Notifications ------------------------------------------------------
     /// <summary>Where notification mails go (comma-separated). Empty = every cloud user's e-mail.</summary>
     public const string NotifyRecipients = "notify.recipients";

@@ -23,10 +23,23 @@ public class BackupStore
         _db = db; _env = env; _log = log;
     }
 
-    /// <summary>How much one instance may occupy. Over it, the OLDEST backups are dropped until the
-    /// new one fits — a refused upload would be a silent hole in the chain, and a hole is worse than
-    /// a shorter history.</summary>
-    public const long QuotaBytesPerInstance = 2L * 1024 * 1024 * 1024;   // 2 GB
+    /// <summary>Used when nothing is configured. Over the quota the OLDEST backups are dropped until
+    /// the new one fits — a refused upload would be a silent hole in the chain, and a hole is worse
+    /// than a shorter history.</summary>
+    public const int DefaultQuotaGb = 2;
+
+    /// <summary>
+    /// The configured quota per instance, in bytes.
+    /// <para>Read per call rather than cached: it is asked for once per upload and once per page view,
+    /// and a stale value would go on deleting to a limit the operator has already changed.</para>
+    /// </summary>
+    public async Task<long> QuotaBytesAsync(CancellationToken ct = default)
+    {
+        var row = await _db.CloudSettings.AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Key == SettingKeys.BackupQuotaGb, ct);
+        var gb = int.TryParse(row?.Value, out var v) && v > 0 ? v : DefaultQuotaGb;
+        return (long)gb * 1024 * 1024 * 1024;
+    }
 
     /// <summary>A hard ceiling per file, so a broken instance cannot fill the disk with one request.
     /// Well above a normal site with media.</summary>
@@ -132,6 +145,7 @@ public class BackupStore
     /// <see cref="KeepAtLeast"/>: one oversized backup must not take the last other copy with it.</summary>
     public async Task EnforceQuotaAsync(int instanceId, CancellationToken ct = default)
     {
+        var quota = await QuotaBytesAsync(ct);
         var rows = await _db.CloudBackups
             .Where(b => b.InstanceId == instanceId)
             .OrderByDescending(b => b.CreatedAt)
@@ -142,7 +156,7 @@ public class BackupStore
         for (var i = 0; i < rows.Count; i++)
         {
             total += rows[i].SizeBytes;
-            if (total > QuotaBytesPerInstance && i >= KeepAtLeast) doomed.Add(rows[i]);
+            if (total > quota && i >= KeepAtLeast) doomed.Add(rows[i]);
         }
         if (doomed.Count == 0) return;
 

@@ -25,6 +25,10 @@ public class IndexModel : PageModel
     public List<BackupStore.Orphan> Orphans { get; private set; } = new();
 
     public long TotalBytes { get; private set; }
+
+    /// <summary>The configured quota per instance — the number that decides which backups the next
+    /// upload pushes out.</summary>
+    public long QuotaBytes { get; private set; }
     public int? FilteredInstance { get; private set; }
 
     public string InstanceName(int id) => Instances.FirstOrDefault(i => i.Id == id)?.Name ?? "—";
@@ -55,6 +59,7 @@ public class IndexModel : PageModel
 
         // Over everything, not over the filter: it answers "how much disk is this costing me".
         TotalBytes = await _db.CloudBackups.SumAsync(b => (long?)b.SizeBytes) ?? 0;
+        QuotaBytes = await _store.QuotaBytesAsync();
         Orphans = await _store.FindOrphansAsync();
     }
 

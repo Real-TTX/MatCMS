@@ -575,13 +575,11 @@
   "add.translationHint": "Give the instances credentials for machine translation.",
 
   "backups.title": "Backups",
-  "backups.intro": "Backups the instances uploaded here. {0} per instance; beyond that the oldest is dropped — a refused upload would be a silent hole in the chain.",
-  "backups.notEncrypted": "Backups are stored unencrypted in this cloud’s data directory. That is a decision: the encryption keys would live in the same volume, so it would barely help against someone with the disk — it would only add the risk that losing the keys loses every backup. If the volume needs protecting, that belongs at the volume level.",
   "backups.none": "No instance has uploaded a backup yet.",
   "backups.file": "File",
   "backups.created": "Created",
   "backups.size": "Size",
-  "backups.total": "Total stored: {0}",
+  "backups.total": "Total stored: {0} · allowed per instance: {1}",
   "backups.restore": "Restore",
   "backups.restoreConfirm": "Restore this backup onto the instance? The site’s current state is overwritten. The instance carries it out on its next contact.",
   "backups.restorePending": "waiting for the instance",
@@ -595,5 +593,7 @@
   "backups.orphanFile": "file with no row",
   "backups.orphanRow": "row with no file",
   "backups.clean": "Remove orphans",
-  "backups.cleanConfirm": "Remove all orphaned files and rows?"
+  "backups.cleanConfirm": "Remove all orphaned files and rows?",
+  "settings.backupQuota": "Backup quota per instance (GB)",
+  "settings.backupQuotaHint": "Beyond it, that instance’s oldest backup is dropped. Leave empty for the default."
 }

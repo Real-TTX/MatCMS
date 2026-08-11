@@ -1,14 +1,14 @@
 <!-- The viewBox is trimmed to the ink (was 0 0 232 66, with ~8 units of empty air above the caps).
      The admin caps the logo at 40px HEIGHT, so every unit of unused height was shrinking everything
      inside it: the same drawing in a shorter box simply renders larger. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 6 232 58" role="img" aria-label="MatCMS – lightweight block-based CMS">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 6 232 58" role="img" aria-label="MatCMS – the site">
   <text x="0" y="42" font-family="'Arial Black', 'Arial Bold', Arial, sans-serif" font-size="48" font-weight="900" letter-spacing="0.5">
     <tspan fill="#010101">Mat</tspan><tspan fill="#2563eb">CMS</tspan>
   </text>
-  <!-- The tagline was 9.6 against a 48 wordmark — about six pixels once rendered, which is decoration
-       rather than text. textLength pins the line to the wordmark's width instead of leaving it to
-       font metrics, so it can be sized up without ever running past the box, and its ends line up
-       with the M and the S above. -->
+  <!-- Short on purpose: the logo is a mark, not an explanation. textLength is set to the line's own
+       natural width plus even tracking (3 units per gap), NOT to the wordmark's width — pinning
+       eight characters across 228 units would tear them apart. It still guarantees the line can
+       never run past the box, whatever font ends up rendering it. -->
   <text x="2" y="60" font-family="Arial, sans-serif" font-size="16" font-weight="700"
-        textLength="228" lengthAdjust="spacing" fill="#1a1a1a">Lightweight block-based CMS</text>
+        textLength="93" lengthAdjust="spacing" fill="#1a1a1a">THE SITE</text>
 </svg>

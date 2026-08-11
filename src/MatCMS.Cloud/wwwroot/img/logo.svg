@@ -1,18 +1,17 @@
 <!-- The viewBox is trimmed to the ink (was 0 0 232 66, with ~8 units of empty air above the caps).
      The admin caps the logo at 40px HEIGHT, so every unit of unused height was shrinking everything
      inside it: the same drawing in a shorter box simply renders larger. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 6 232 58" role="img" aria-label="MatCMS Cloud – Control Plane für MatCMS-Instanzen">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 6 232 58" role="img" aria-label="MatCMS Cloud – the fleet">
   <!-- Same wordmark as MatCMS (identical font stack, size, weight and colours) so the two products
        read as one family. "Cloud" takes the tagline slot underneath, in the accent colour. -->
   <text x="0" y="42" font-family="'Arial Black', 'Arial Bold', Arial, sans-serif" font-size="48" font-weight="900" letter-spacing="0.5">
     <tspan fill="#010101">Mat</tspan><tspan fill="#2563eb">CMS</tspan>
   </text>
-  <!-- The tagline was 9.6 against a 48 wordmark — about six pixels once rendered, which is decoration
-       rather than text. textLength pins the line to the wordmark's width instead of leaving it to
-       font metrics, so it can be sized up without ever running past the box, and its ends line up
-       with the M and the S above. Kept in step with MatCMS's logo: same size, baseline and width. -->
+  <!-- Short on purpose: the logo is a mark, not an explanation. textLength is the line's own natural
+       width plus even tracking (3 units per gap), the same tracking MatCMS's logo uses — the two
+       lines differ in length because they are different words, but they are set identically. -->
   <text x="2" y="60" font-family="Arial, sans-serif" font-size="16" font-weight="700"
-        textLength="228" lengthAdjust="spacing">
-    <tspan fill="#2563eb">CLOUD</tspan><tspan fill="#1a1a1a"> · Control Plane</tspan>
+        textLength="206" lengthAdjust="spacing">
+    <tspan fill="#2563eb">CLOUD</tspan><tspan fill="#1a1a1a"> · THE FLEET</tspan>
   </text>
 </svg>

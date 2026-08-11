@@ -313,6 +313,27 @@ That is the pattern for any settings GROUP added later: a checkbox that reveals 
 rolled out until it is ticked. Free key/value settings need none — each row is already an explicit,
 individually deletable decision.
 
+There are now four groups, each with its own page and its own switch: **SMTP** (`smtp.*` +
+`MailSource`), **translation** (`translate.*`), **mail templates**, and **backup** (`backup.*`,
+`Profile.SyncBackup` → `Profiles/Backup.cshtml`). The backup group rolls out the schedule as the ONE
+key the instance's own `BackupManager` reads (`backup.schedule`, its JSON format verbatim — two
+models of one format would drift, and the site's backup page and the profile have to mean the same
+thing), plus `backup.toCloud`. The granular lists inside that format (which pages, which forms) are
+written **empty** on purpose: they name items that exist on one site and nowhere else, so
+distributing them would leave every other instance backing up nothing, silently.
+
+`ProfileService.IsGroupKey` is what keeps the two kinds apart. A free key/value row carrying a group
+key would be skipped by the rollout unless that group happened to be on — it would sit in the list
+looking active and never arrive — so `Profiles/Setting` refuses one outright.
+
+**Free settings are picked, not typed.** `Services/InstanceSettingCatalog.cs` lists the keys an
+instance understands, grouped as the CMS's own settings page groups them, and the editor offers them
+as a dropdown (plus "own key" for anything not listed, and minus what the profile already has, which
+would only collide with the unique index). It is a **suggestion list, not a contract**: the strings
+are a copy of the CMS's `SettingKeys` and a stale entry costs a wrong suggestion, nothing more.
+Typing was the wrong shape of question — a typo produced a row that looked perfect here and did
+nothing on the site, because neither side rejects an unknown key.
+
 ### Global vs. profile-local — the rule
 
 **A profile consists of global information and may additionally have its own.** There are two
@@ -391,8 +412,12 @@ between a sync you can trust and one that eats a customer's site:
 3. **A null section is untouched.** "Profile doesn't sync this" and "profile syncs an empty list"
    must never look the same — hence nullable lists in `InstanceConfig`.
 
-Two guards worth keeping: the instance refuses pushed settings whose key is in `SettingKeys.Cloud`
-(otherwise one profile could rewrite an instance's cloud link), and imported plugins stay **disabled**
+Three guards worth keeping: the instance refuses pushed settings whose key is in `SettingKeys.Cloud`
+(otherwise one profile could rewrite an instance's cloud link); a **restore** preserves those same
+keys rather than taking them from the backup (`ContentTransferService.ImportAsync` — a backup carries
+the connection as it was when taken, so restoring one used to rewind the token and drop the site off
+the cloud seconds after a restore the cloud itself had triggered, and a foreign ZIP restored by hand
+would have handed this container another instance's identity); and imported plugins stay **disabled**
 because plugin code runs server-side.
 
 ### Sync modes and the report back

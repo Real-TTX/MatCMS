@@ -18,8 +18,31 @@
         <h2>@T["profiles.otherSettings"]</h2>
         <p class="muted">@T["profiles.otherSettingsHint"]</p>
         <div class="form-field">
-            <label for="key">@T["profiles.settingKey"]</label>
-            <input id="key" name="key" value="@Model.Item.Key" placeholder="site.canonicalUrl" spellcheck="false" required />
+            <label for="keyPick">@T["profiles.settingKey"]</label>
+            @* The settings an instance understands are a known, fixed set — so this is a choice, not a
+               spelling exercise. A typo used to produce a row that looked right here and did nothing on
+               the site, because nothing on either side rejects an unknown key. *@
+            <select id="keyPick" name="keyPick" data-key-pick>
+                @foreach (var group in Model.Available)
+                {
+                    <optgroup label="@group.Name">
+                        @foreach (var e in group.Entries)
+                        {
+                            <option value="@e.Key" selected="@(Model.Item.Key == e.Key ? "selected" : null)"
+                                    title="@e.Hint">@e.Label — @e.Key</option>
+                        }
+                    </optgroup>
+                }
+                <option value="@MatCMS.Cloud.Pages.Admin.Profiles.SettingModel.CustomMarker"
+                        selected="@(Model.IsCustomKey ? "selected" : null)">@T["profiles.settingKeyCustom"]</option>
+            </select>
+            <div class="help" data-key-hint>@Model.Available.SelectMany(g => g.Entries).FirstOrDefault(e => e.Key == Model.Item.Key)?.Hint</div>
+        </div>
+        @* Shown only for "own key". It stays a plain field rather than being disabled, so the form
+           still works with no JavaScript — the server decides which of the two it reads. *@
+        <div class="form-field" data-key-custom hidden="@(Model.IsCustomKey ? null : "hidden")">
+            <label for="customKey">@T["profiles.settingKeyOwn"]</label>
+            <input id="customKey" name="customKey" value="@(Model.IsCustomKey ? Model.Item.Key : "")" placeholder="eigener.schluessel" spellcheck="false" />
             <div class="help">@T["profiles.settingKeyHint"]</div>
         </div>
         <div class="form-field">
@@ -44,3 +67,22 @@
     }
 </div>
 
+@section Scripts {
+    <script>
+        (function () {
+            var pick = document.querySelector('[data-key-pick]');
+            var custom = document.querySelector('[data-key-custom]');
+            var hint = document.querySelector('[data-key-hint]');
+            if (!pick) return;
+            pick.addEventListener('change', function () {
+                var own = pick.value === '@MatCMS.Cloud.Pages.Admin.Profiles.SettingModel.CustomMarker';
+                custom.hidden = !own;
+                if (own) custom.querySelector('input').focus();
+                // The hint belongs to the chosen key, so it travels with the selection instead of
+                // describing whatever happened to be picked first.
+                var opt = pick.options[pick.selectedIndex];
+                hint.textContent = own ? '' : (opt.title || '');
+            });
+        })();
+    </script>
+}

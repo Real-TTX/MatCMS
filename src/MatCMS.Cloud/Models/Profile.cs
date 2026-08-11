@@ -114,6 +114,18 @@ public class Profile
     /// and off underneath pages that are written in them.</para>
     /// </summary>
     public bool SyncTranslation { get; set; }
+
+    /// <summary>
+    /// Whether this profile decides the BACKUP policy of its sites: automatic backups on or off, how
+    /// often, how many to keep, what goes in — and whether the finished file is handed to the cloud.
+    /// <para>Its own group for the usual reason, and one more: "back this site up every night and
+    /// upload it" is the single most consequential thing a profile can switch on remotely. It has to
+    /// be a deliberate act.</para>
+    /// <para>What is deliberately NOT rolled out is the granular selection inside a backup (which
+    /// pages, which forms). Those name items that exist on one site and nowhere else — a profile
+    /// distributing them would leave every other instance backing up nothing.</para>
+    /// </summary>
+    public bool SyncBackup { get; set; }
     public bool SyncUsers { get; set; }
     public bool SyncPlugins { get; set; }
     public bool SyncComponents { get; set; }

@@ -24,7 +24,6 @@
   "store.templateDeleteConfirm": "Template aus dem Store entfernen? Profile verlieren die Auswahl, auf den Instanzen bleibt es bestehen.",
   "store.componentDeleteConfirm": "Komponente aus dem Store entfernen? Profile verlieren die Auswahl, auf den Instanzen bleibt sie bestehen.",
   "store.pluginDeleteConfirm": "Plugin aus dem Store entfernen? Profile verlieren die Auswahl, auf den Instanzen bleibt es bestehen.",
-
   "profiles.title": "Profile",
   "profiles.intro": "Ein Profil bündelt Konfiguration und Regeln. Instanzen, die sich mit dem Join-Code eines Profils anmelden, landen automatisch darin und erhalten dessen Einstellungen.",
   "profiles.create": "Anlegen",
@@ -185,7 +184,6 @@
   "templates.exportJson": "Als JSON exportieren",
   "profiles.fieldTypes": "Feldtypen:",
   "profiles.componentDeleteConfirm": "Komponente aus dem Profil entfernen? Auf den Instanzen bleibt sie bestehen.",
-
   "profiles.tabTemplates": "Templates",
   "profiles.payloadTemplates": "Templates",
   "profiles.templatesHint": "Designs, die auf alle zugeordneten Instanzen ausgerollt werden. Der Name ist die Identität. Am schnellsten geht es, ein fertiges Template in MatCMS zu bauen und hier per JSON zu importieren.",
@@ -226,7 +224,6 @@
   "profiles.tplMenuMap": "Menü-Zuordnung (JSON)",
   "profiles.tplParts": "Layout-Teile je Seitentyp (JSON)",
   "profiles.tplPartsHint": "Objekt der Form { \"post\": \"<html …>\" }. Nicht enthaltene Seitentypen nutzen das eingebaute Layout.",
-
   "enroll.joinTitle": "Weg 1: Die Instanz meldet sich",
   "enroll.joinIntro": "In MatCMS unter Einstellungen → Cloud die Cloud-URL und den Join-Code eintragen. Funktioniert auch, wenn die Instanz von außen nicht erreichbar ist.",
   "enroll.noProfiles": "Es gibt noch kein Profil. Lege zuerst eines an:",
@@ -239,7 +236,6 @@
   "enroll.noProfile": "— kein Profil —",
   "enroll.credentialsHint": "Die Zugangsdaten werden nur für diesen einen Vorgang verwendet und nicht gespeichert.",
   "enroll.adopt": "Instanz verbinden",
-
   "instances.approvalTitle": "Diese Instanz wartet auf Freigabe",
   "instances.approvalHint": "Sie hat sich mit einem gültigen Join-Code gemeldet, erhält aber erst nach der Freigabe Konfiguration.",
   "instances.approve": "Freigeben",
@@ -283,24 +279,20 @@
   "instances.outcome.skipped-exists": "übersprungen",
   "instances.outcome.skipped-once": "nur einmalig",
   "instances.outcome.failed": "fehlgeschlagen",
-
   "nav.settings": "Einstellungen",
   "nav.users": "Benutzer",
   "nav.logout": "Abmelden",
   "nav.menu": "Menü",
   "admin.language": "Sprache",
-
   "login.pageTitle": "Anmelden",
   "login.heading": "Anmelden",
   "login.username": "E-Mail",
   "login.password": "Passwort",
   "login.rememberMe": "Angemeldet bleiben",
   "login.submit": "Anmelden",
-
   "error.title": "Es ist ein Fehler aufgetreten",
   "error.text": "Die Anfrage konnte nicht verarbeitet werden. Details stehen im Container-Log.",
   "error.back": "Zurück zur Übersicht",
-
   "common.name": "Name",
   "common.origin": "Herkunft",
   "common.status": "Status",
@@ -314,7 +306,6 @@
   "action.close": "Schließen",
   "list.noResults": "Keine Treffer.",
   "list.empty": "Keine Daten vorhanden.",
-
   "settings.save": "Speichern",
   "settings.tabGeneral": "Allgemein",
   "settings.tabNotifications": "Benachrichtigungen",
@@ -327,10 +318,8 @@
   "settings.smtpTestHint": "Sendet mit den zuletzt gespeicherten Zugangsdaten — vorher speichern.",
   "settings.dockerLocalCount": "Als lokal erkannt",
   "settings.dockerConfigHint": "Wird über die Umgebungsvariable gesetzt, nicht hier. Ohne gemounteten Socket bleibt jede Instanz remote.",
-
   "profiles.isDefaultLabel": "Standard-Profil",
   "profiles.isDefaultHint": "Fängt Instanzen auf, denen kein anderes Profil zugeordnet werden kann. Genau ein Profil ist Standard — beim Setzen wird es dem bisherigen entzogen.",
-
   "instances.filter": "Filter",
   "instances.filterAll": "Alle",
   "instances.viewTable": "Tabelle",
@@ -359,7 +348,6 @@
   "common.time": "Zeit",
   "common.instance": "Instanz",
   "common.event": "Ereignis",
-
   "dashboard.title": "Übersicht",
   "dashboard.welcome": "Angemeldet als",
   "dashboard.instances": "Instanzen",
@@ -377,7 +365,6 @@
   "dashboard.dockerLocalCount": "{0} Instanz(en) laufen auf diesem Host",
   "dashboard.recentEvents": "Letzte Ereignisse",
   "dashboard.noEvents": "Noch keine Ereignisse.",
-
   "instances.title": "Instanzen",
   "instances.add": "Hinzufügen",
   "instances.empty": "Noch keine Instanz verbunden. Lege eine an und trage Instanz-ID und Token in MatCMS ein.",
@@ -422,7 +409,6 @@
   "instances.rotateToken": "Token neu erzeugen",
   "instances.rotateConfirm": "Neuen Token erzeugen? Die Instanz verliert die Verbindung, bis der neue Token dort eingetragen ist.",
   "instances.deleteConfirm": "Instanz wirklich entfernen? Der Verlauf wird mit gelöscht.",
-
   "settings.title": "Einstellungen",
   "settings.general": "Allgemein",
   "settings.cloudName": "Name dieser Cloud",
@@ -453,7 +439,6 @@
   "settings.smtpSsl": "SSL/TLS erzwingen (Port 465 nutzt immer implizites SSL)",
   "settings.smtpTestTo": "Test-E-Mail an",
   "settings.smtpTest": "Test senden",
-
   "users.title": "Benutzer",
   "users.add": "Anlegen",
   "users.edit": "Benutzer bearbeiten",
@@ -463,7 +448,6 @@
   "users.password": "Passwort",
   "users.passwordKeep": "unverändert lassen",
   "users.deleteConfirm": "Benutzer wirklich löschen?",
-
   "add.button": "Hinzufügen",
   "add.fromGlobal": "Aus Global übernehmen",
   "add.fromGlobalHint": "Einen vorhandenen Eintrag aus dem globalen Store auswählen.",
@@ -479,7 +463,6 @@
   "import.userTitle": "Benutzer importieren",
   "import.userHint": "JSON mit Benutzername, E-Mail und Passwort-Hash. Das Klartext-Passwort wird nirgends gespeichert und ist deshalb auch nicht Teil des Imports.",
   "import.btn": "JSON importieren",
-
   "add.whichSetting": "Welche Einstellung?",
   "add.smtpHint": "Mailversand für die Instanzen dieses Profils.",
   "add.customSettingHint": "Ein freies Schlüssel/Wert-Paar.",
@@ -490,14 +473,11 @@
   "profiles.smtpFromGlobal": "Aus Global",
   "profiles.smtpOwn": "Eigene Konfiguration",
   "profiles.smtpRemoveConfirm": "SMTP nicht mehr ausrollen? Die eingetragenen Werte bleiben erhalten, auf den Instanzen bleibt die Konfiguration stehen.",
-
   "components.exportJson": "Als JSON exportieren",
-
   "instances.openEmbedded": "Website ansehen",
   "instances.reload": "Neu laden",
   "instances.embedBlocked": "Diese Seite erlaubt keine Einbettung.",
   "instances.filterAllProfiles": "Alle Profile",
-
   "profiles.mailSource": "Wie versenden die Instanzen Mail?",
   "profiles.mailViaCloud": "Über die Cloud versenden",
   "profiles.mailViaCloudHint": "Die Instanzen versenden gar nicht selbst — jede Nachricht geht an die Cloud, die sie zwischenspeichert und mit ihrer eigenen Absenderadresse zustellt. Kein SMTP-Zugang auf den Instanzen nötig.",
@@ -514,7 +494,6 @@
   "spool.retry": "Erneut versuchen",
   "spool.retryAll": "Alle aufgegebenen erneut versuchen",
   "spool.hint": "Nachrichten dieser Instanz, die über die Cloud verschickt werden. Ein fehlgeschlagener Versand wird mit wachsendem Abstand wiederholt; nach acht Versuchen gilt er als aufgegeben und kann hier von Hand zurück in die Warteschlange.",
-
   "profiles.tabMailTemplates": "Mail-Vorlagen",
   "profiles.payloadMailTemplates": "Mail-Vorlagen",
   "profiles.noMailTemplates": "Dieses Profil rollt noch keine Mail-Vorlagen aus.",
@@ -535,23 +514,18 @@
   "mailtpl.importHint": "Das JSON aus einem Mail-Vorlagen-Editor hier einfügen. Eine Vorlage mit gleichem Schlüssel wird überschrieben.",
   "mailtpl.deleteConfirm": "Vorlage aus dem Store entfernen? Profile verlieren die Auswahl, auf den Instanzen bleibt der Text stehen.",
   "mailtpl.removeConfirm": "Vorlage aus dem Profil entfernen? Auf den Instanzen bleibt der Text stehen.",
-
   "mailtpl.isHtml": "Als HTML-Mail versenden",
   "mailtpl.isHtmlHint": "Der Text ist dann HTML. Die Instanz verschickt trotzdem beides — eine Nur-HTML-Mail wird von Spamfiltern schlechter bewertet, die Textfassung wird automatisch daraus erzeugt.",
-
   "spool.replyTo": "Antwort an",
   "spool.lastError": "Letzter Fehler",
   "spool.preview": "Darstellung",
   "spool.source": "Quelltext",
-
   "spool.allStatus": "Alle Zustände",
   "spool.noneAtAll": "Es hat noch keine Instanz eine Nachricht übergeben.",
   "spool.clear": "Abgeschlossene entfernen",
   "spool.clearConfirm": "Alle zugestellten und aufgegebenen Nachrichten entfernen? Wartende bleiben stehen.",
-
   "mailtpl.unknownKeyCloud": "Diese Cloud kennt keine Mail mit diesem Schlüssel — der Text lässt sich trotzdem schreiben und ausrollen, hier werden nur keine Platzhalter dokumentiert:",
   "instances.filterAllInstances": "Alle Instanzen",
-
   "mailtpl.loops": "Wiederholte Blöcke",
   "mailtpl.loopsHint": "Alles zwischen {{#name}} und {{/name}} wird einmal je Eintrag ausgegeben — dieselbe Schreibweise wie bei den Menüs im Template.",
   "mailtpl.placeholders": "Platzhalter",
@@ -559,7 +533,6 @@
   "mailtpl.preview": "Vorschau",
   "mailtpl.previewHint": "Zeigt den Text mit Beispielwerten, gerendert vom selben Code, der die Mail auch verschickt — Schleifen laufen mit zwei Durchgängen, damit sichtbar wird, was Wiederholung mit dem Layout macht.",
   "mailtpl.previewRefresh": "Aktualisieren",
-
   "profiles.translation": "Übersetzung",
   "profiles.translationIntro": "Zugangsdaten für die maschinelle Übersetzung. Welche Sprachen eine Website anbietet, gehört bewusst NICHT dazu — das ist eine Entscheidung über Inhalte, und aus der Ferne umgeschaltet würde sie Sprachen unter bereits geschriebenen Seiten an- und ausknipsen.",
   "profiles.translationValue": "Zugang wird ausgerollt",
@@ -573,7 +546,6 @@
   "profiles.translateApiKeyHint": "Verschlüsselt gespeichert. Leer lassen behält den hinterlegten Schlüssel.",
   "profiles.translateApiKeyClear": "Hinterlegten Schlüssel löschen",
   "add.translationHint": "Zugangsdaten für die maschinelle Übersetzung an die Instanzen geben.",
-
   "backups.title": "Backups",
   "backups.none": "Noch keine Instanz hat ein Backup hochgeladen.",
   "backups.file": "Datei",
@@ -595,5 +567,29 @@
   "backups.clean": "Verwaiste entfernen",
   "backups.cleanConfirm": "Alle verwaisten Dateien und Einträge entfernen?",
   "settings.backupQuota": "Backup-Kontingent je Instanz (GB)",
-  "settings.backupQuotaHint": "Wird es mehr, fällt das älteste Backup dieser Instanz weg. Leer lassen für den Standard."
+  "settings.backupQuotaHint": "Wird es mehr, fällt das älteste Backup dieser Instanz weg. Leer lassen für den Standard.",
+  "profiles.backup": "Backup",
+  "profiles.backupValue": "Zeitplan, Inhalt und Übertragung in die Cloud",
+  "profiles.backupSchedule": "Zeitplan",
+  "profiles.backupEnabled": "Automatische Backups",
+  "profiles.backupInterval": "Alle … Stunden",
+  "profiles.backupIntervalHint": "24 = täglich, 168 = wöchentlich",
+  "profiles.backupRetain": "Aufbewahren",
+  "profiles.backupRetainHint": "Wie viele Backups auf der Instanz liegen bleiben",
+  "profiles.backupContent": "Inhalt",
+  "profiles.backupContentHint": "Immer der ganze Bereich — eine Auswahl einzelner Seiten oder Formulare wäre auf jeder anderen Instanz leer.",
+  "profiles.backupCloud": "Übertragung",
+  "profiles.backupToCloud": "Fertige Backups in die Cloud übertragen",
+  "profiles.backupToCloudHint": "Von dort können sie heruntergeladen und zurückgespielt werden.",
+  "profiles.backupRemoveConfirm": "Backup-Einstellungen nicht mehr ausrollen? Auf den Instanzen bleibt alles wie es ist.",
+  "add.backupHint": "Zeitplan, Inhalt und ob die Backups in der Cloud landen",
+  "profiles.settingKeyCustom": "Eigener Schlüssel …",
+  "profiles.settingKeyOwn": "Schlüssel",
+  "backup.templates": "Templates",
+  "backup.pagesSection": "Seiten",
+  "backup.menus": "Menüs",
+  "backup.settings": "Einstellungen",
+  "backup.submissions": "Anfragen (Submissions)",
+  "backup.formsSection": "Formulare",
+  "backup.assets": "Medien / Logo (Uploads)"
 }

@@ -138,6 +138,21 @@ public class ProfileService
     public static bool IsTranslateKey(string key) =>
         key.StartsWith("translate.", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>The backup policy: whether a site backs itself up, how often, and whether the result
+    /// is handed to the cloud. A group like the other two — the pieces only make sense together, and
+    /// "back this site up automatically" must be switched on deliberately, not inherited because a
+    /// field was once filled in.</summary>
+    public static bool IsBackupKey(string key) =>
+        key.StartsWith("backup.", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>True for any key that belongs to a settings GROUP rather than to the free key/value
+    /// rows. Those keys are only rolled out when their own group is switched on, so a free row
+    /// carrying one would sit in the profile looking active and never arrive anywhere — which is why
+    /// the setting editor refuses them outright.</summary>
+    public static bool IsGroupKey(string key) =>
+        IsSmtpKey(key) || IsTranslateKey(key) || IsBackupKey(key)
+        || string.Equals(key, "mail.transport", StringComparison.OrdinalIgnoreCase);
+
     /// <summary>Builds the payload an approved instance downloads. Sections the profile does not
     /// sync are left null, which the instance reads as "don't touch this".</summary>
     public async Task<InstanceConfig> BuildConfigAsync(Profile profile, CancellationToken ct = default)
@@ -169,7 +184,7 @@ public class ProfileService
         // nothing at all unless the umbrella switch happened to be on too, and nothing said so. The
         // profile's Einstellungen tab lists the three as separate things, so they have to behave as
         // separate things.
-        if (profile.SyncSettings || profile.SyncSmtp || profile.SyncTranslation)
+        if (profile.SyncSettings || profile.SyncSmtp || profile.SyncTranslation || profile.SyncBackup)
         {
             // Secrets are stored encrypted and only decrypted here, on the way to the instance over
             // its authenticated channel — they are never held in the clear at rest.
@@ -201,6 +216,13 @@ public class ProfileService
                 else if (IsTranslateKey(local.Key))
                 {
                     if (!profile.SyncTranslation) continue;
+                }
+                // And the backup policy. Same rule again: stored here either way, rolled out only
+                // when its own group is on — otherwise moving a profile's backup settings around
+                // would start writing over what each site decided for itself.
+                else if (IsBackupKey(local.Key))
+                {
+                    if (!profile.SyncBackup) continue;
                 }
                 // Everything else is a free key/value row and belongs to the free-settings switch.
                 else if (!profile.SyncSettings) continue;

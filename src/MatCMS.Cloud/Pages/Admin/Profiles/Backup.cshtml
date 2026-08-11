@@ -1,0 +1,94 @@
+@page "{profileId:int}"
+@model MatCMS.Cloud.Pages.Admin.Profiles.BackupModel
+@{
+    ViewData["Title"] = T["profiles.backup"];
+}
+<div class="page-head">
+    <h1>
+        @T["profiles.backup"]
+        <span class="muted" style="font-size:14px;font-weight:400;"> — @Model.Owner.Name</span>
+    </h1>
+    <div class="list-toolbar">
+        <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@Model.Owner.Id" asp-route-tab="settings">@T["action.back"]</a>
+    </div>
+</div>
+
+<form method="post" asp-route-profileId="@Model.Owner.Id" id="editor-form">
+    <div class="card">
+        <h2>@T["profiles.backupSchedule"]</h2>
+        <label class="checkbox-row">
+            <input type="checkbox" name="enabled" value="true" checked="@(Model.Current.Enabled ? "checked" : null)" />
+            @T["profiles.backupEnabled"]
+        </label>
+        <div class="form-grid">
+            <div class="form-row">
+                <div class="form-field">
+                    <label for="intervalHours">@T["profiles.backupInterval"]</label>
+                    <input id="intervalHours" name="intervalHours" value="@Model.Current.IntervalHours" inputmode="numeric" />
+                    <div class="help">@T["profiles.backupIntervalHint"]</div>
+                </div>
+                <div class="form-field">
+                    <label for="retain">@T["profiles.backupRetain"]</label>
+                    <input id="retain" name="retain" value="@Model.Current.Retain" inputmode="numeric" />
+                    <div class="help">@T["profiles.backupRetainHint"]</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>@T["profiles.backupContent"]</h2>
+        <label class="checkbox-row">
+            <input type="checkbox" name="templates" value="true" checked="@(Model.Current.Templates ? "checked" : null)" />
+            @T["backup.templates"]
+        </label>
+        <label class="checkbox-row">
+            <input type="checkbox" name="pages" value="true" checked="@(Model.Current.Pages ? "checked" : null)" />
+            @T["backup.pagesSection"]
+        </label>
+        <label class="checkbox-row">
+            <input type="checkbox" name="menus" value="true" checked="@(Model.Current.Menus ? "checked" : null)" />
+            @T["backup.menus"]
+        </label>
+        <label class="checkbox-row">
+            <input type="checkbox" name="settings" value="true" checked="@(Model.Current.Settings ? "checked" : null)" />
+            @T["backup.settings"]
+        </label>
+        <label class="checkbox-row">
+            <input type="checkbox" name="submissions" value="true" checked="@(Model.Current.Submissions ? "checked" : null)" />
+            @T["backup.submissions"]
+        </label>
+        <label class="checkbox-row">
+            <input type="checkbox" name="forms" value="true" checked="@(Model.Current.Forms ? "checked" : null)" />
+            @T["backup.formsSection"]
+        </label>
+        <label class="checkbox-row">
+            <input type="checkbox" name="assets" value="true" checked="@(Model.Current.Assets ? "checked" : null)" />
+            @T["backup.assets"]
+        </label>
+        <div class="help">@T["profiles.backupContentHint"]</div>
+    </div>
+
+    <div class="card">
+        <h2>@T["profiles.backupCloud"]</h2>
+        <label class="checkbox-row">
+            <input type="checkbox" name="toCloud" value="true" checked="@(Model.ToCloud ? "checked" : null)" />
+            @T["profiles.backupToCloud"]
+        </label>
+        <div class="help">@T["profiles.backupToCloudHint"]</div>
+    </div>
+
+</form>
+
+@* The remove form sits OUTSIDE the editor, because a form inside a form is not a thing browsers do.
+   `form="editor-form"` puts the save button back where it belongs on screen without nesting. *@
+<div class="form-actions">
+    <button type="submit" class="btn" form="editor-form">@T["settings.save"]</button>
+    @if (!Model.IsNew)
+    {
+        <form class="inline-form" method="post" asp-page-handler="Remove" asp-route-profileId="@Model.Owner.Id"
+              onsubmit="return confirm('@T["profiles.backupRemoveConfirm"]');">
+            <button type="submit" class="btn btn-danger">@T["profiles.removeFromProfile"]</button>
+        </form>
+    }
+</div>

@@ -24,7 +24,6 @@
   "store.templateDeleteConfirm": "Remove this template from the store? Profiles lose the selection; it stays on the instances.",
   "store.componentDeleteConfirm": "Remove this component from the store? Profiles lose the selection; it stays on the instances.",
   "store.pluginDeleteConfirm": "Remove this plugin from the store? Profiles lose the selection; it stays on the instances.",
-
   "profiles.title": "Profiles",
   "profiles.intro": "A profile bundles configuration and rules. Instances that enroll with a profile's join code land in it automatically and receive its settings.",
   "profiles.create": "Create",
@@ -185,7 +184,6 @@
   "templates.exportJson": "Export as JSON",
   "profiles.fieldTypes": "Field types:",
   "profiles.componentDeleteConfirm": "Remove this component from the profile? It stays on the instances.",
-
   "profiles.tabTemplates": "Templates",
   "profiles.payloadTemplates": "Templates",
   "profiles.templatesHint": "Designs rolled out to every assigned instance. The name is the identity. The quickest route is to build the template in MatCMS and import its JSON here.",
@@ -226,7 +224,6 @@
   "profiles.tplMenuMap": "Menu mapping (JSON)",
   "profiles.tplParts": "Layout parts per page type (JSON)",
   "profiles.tplPartsHint": "An object like { \"post\": \"<html …>\" }. Page types not listed use the built-in layout.",
-
   "enroll.joinTitle": "Way 1: the instance enrolls itself",
   "enroll.joinIntro": "In MatCMS under Settings, Cloud enter the cloud URL and the join code. Works even when the instance is unreachable from outside.",
   "enroll.noProfiles": "There is no profile yet. Create one first:",
@@ -239,7 +236,6 @@
   "enroll.noProfile": "— no profile —",
   "enroll.credentialsHint": "The credentials are used for this one handshake only and are not stored.",
   "enroll.adopt": "Connect instance",
-
   "instances.approvalTitle": "This instance is waiting for approval",
   "instances.approvalHint": "It enrolled with a valid join code but receives no configuration until you approve it.",
   "instances.approve": "Approve",
@@ -283,24 +279,20 @@
   "instances.outcome.skipped-exists": "skipped",
   "instances.outcome.skipped-once": "once only",
   "instances.outcome.failed": "failed",
-
   "nav.settings": "Settings",
   "nav.users": "Users",
   "nav.logout": "Sign out",
   "nav.menu": "Menu",
   "admin.language": "Language",
-
   "login.pageTitle": "Sign in",
   "login.heading": "Sign in",
   "login.username": "E-mail",
   "login.password": "Password",
   "login.rememberMe": "Stay signed in",
   "login.submit": "Sign in",
-
   "error.title": "Something went wrong",
   "error.text": "The request could not be processed. Details are in the container log.",
   "error.back": "Back to the overview",
-
   "common.name": "Name",
   "common.origin": "Origin",
   "common.status": "Status",
@@ -314,7 +306,6 @@
   "action.close": "Close",
   "list.noResults": "No matches.",
   "list.empty": "No data yet.",
-
   "settings.save": "Save",
   "settings.tabGeneral": "General",
   "settings.tabNotifications": "Notifications",
@@ -327,10 +318,8 @@
   "settings.smtpTestHint": "Uses the last saved credentials — save first.",
   "settings.dockerLocalCount": "Detected as local",
   "settings.dockerConfigHint": "Set through the environment variable, not here. Without a mounted socket every instance stays remote.",
-
   "profiles.isDefaultLabel": "Default profile",
   "profiles.isDefaultHint": "Catches instances that cannot be resolved to another profile. Exactly one profile is the default — setting it takes the flag off the current one.",
-
   "instances.filter": "Filter",
   "instances.filterAll": "All",
   "instances.viewTable": "Table",
@@ -359,7 +348,6 @@
   "common.time": "Time",
   "common.instance": "Instance",
   "common.event": "Event",
-
   "dashboard.title": "Overview",
   "dashboard.welcome": "Signed in as",
   "dashboard.instances": "Instances",
@@ -377,7 +365,6 @@
   "dashboard.dockerLocalCount": "{0} instance(s) run on this host",
   "dashboard.recentEvents": "Recent events",
   "dashboard.noEvents": "No events yet.",
-
   "instances.title": "Instances",
   "instances.add": "Add",
   "instances.empty": "No instance connected yet. Create one and paste its id and token into MatCMS.",
@@ -422,7 +409,6 @@
   "instances.rotateToken": "Rotate token",
   "instances.rotateConfirm": "Issue a new token? The instance loses the connection until the new token is entered there.",
   "instances.deleteConfirm": "Really remove this instance? Its history is deleted with it.",
-
   "settings.title": "Settings",
   "settings.general": "General",
   "settings.cloudName": "Name of this cloud",
@@ -453,7 +439,6 @@
   "settings.smtpSsl": "Force SSL/TLS (port 465 always uses implicit SSL)",
   "settings.smtpTestTo": "Test e-mail to",
   "settings.smtpTest": "Send test",
-
   "users.title": "Users",
   "users.add": "Create",
   "users.edit": "Edit user",
@@ -463,7 +448,6 @@
   "users.password": "Password",
   "users.passwordKeep": "leave unchanged",
   "users.deleteConfirm": "Really delete this user?",
-
   "add.button": "Add",
   "add.fromGlobal": "Take from global",
   "add.fromGlobalHint": "Pick an existing entry from the global store.",
@@ -479,7 +463,6 @@
   "import.userTitle": "Import user",
   "import.userHint": "JSON with username, e-mail and password hash. The plaintext password is stored nowhere and is therefore not part of the import.",
   "import.btn": "Import JSON",
-
   "add.whichSetting": "Which setting?",
   "add.smtpHint": "Mail delivery for this profile’s instances.",
   "add.customSettingHint": "A free key/value pair.",
@@ -490,14 +473,11 @@
   "profiles.smtpFromGlobal": "From global",
   "profiles.smtpOwn": "Own configuration",
   "profiles.smtpRemoveConfirm": "Stop rolling SMTP out? The values are kept, and instances keep the configuration they have.",
-
   "components.exportJson": "Export as JSON",
-
   "instances.openEmbedded": "View site",
   "instances.reload": "Reload",
   "instances.embedBlocked": "This site does not allow embedding.",
   "instances.filterAllProfiles": "All profiles",
-
   "profiles.mailSource": "How do the instances send mail?",
   "profiles.mailViaCloud": "Send through the cloud",
   "profiles.mailViaCloudHint": "The instances do not send at all — every message goes to the cloud, which spools it and delivers it with its own sender address. No SMTP credentials on the instances.",
@@ -514,7 +494,6 @@
   "spool.retry": "Try again",
   "spool.retryAll": "Retry all given up",
   "spool.hint": "Messages from this instance sent through the cloud. A failed delivery is retried with a growing delay; after eight attempts it counts as given up and can be put back in the queue by hand here.",
-
   "profiles.tabMailTemplates": "Mail templates",
   "profiles.payloadMailTemplates": "Mail templates",
   "profiles.noMailTemplates": "This profile does not roll out any mail templates yet.",
@@ -535,23 +514,18 @@
   "mailtpl.importHint": "Paste the JSON from a mail template editor. A template with the same key is overwritten.",
   "mailtpl.deleteConfirm": "Remove the template from the store? Profiles lose the selection; instances keep the text.",
   "mailtpl.removeConfirm": "Remove the template from the profile? Instances keep the text.",
-
   "mailtpl.isHtml": "Send as an HTML mail",
   "mailtpl.isHtmlHint": "The body is then HTML. The instance still sends both — an HTML-only message scores worse with spam filters, so the text version is derived from it.",
-
   "spool.replyTo": "Reply to",
   "spool.lastError": "Last error",
   "spool.preview": "Rendered",
   "spool.source": "Source",
-
   "spool.allStatus": "All states",
   "spool.noneAtAll": "No instance has handed over a message yet.",
   "spool.clear": "Remove settled",
   "spool.clearConfirm": "Remove all delivered and given-up messages? Waiting ones are kept.",
-
   "mailtpl.unknownKeyCloud": "This cloud knows no mail with that key — the wording can still be written and rolled out, there are just no documented placeholders here:",
   "instances.filterAllInstances": "All instances",
-
   "mailtpl.loops": "Repeated blocks",
   "mailtpl.loopsHint": "Everything between {{#name}} and {{/name}} is written once per entry — the same notation the template engine uses for menus.",
   "mailtpl.placeholders": "Placeholders",
@@ -559,7 +533,6 @@
   "mailtpl.preview": "Preview",
   "mailtpl.previewHint": "Shows the body with example values, rendered by the same code that sends the mail — loops run twice, so it is visible what repetition does to the layout.",
   "mailtpl.previewRefresh": "Refresh",
-
   "profiles.translation": "Translation",
   "profiles.translationIntro": "Credentials for machine translation. Which languages a site offers is deliberately NOT part of it — that is a decision about content, and switching it remotely would turn languages on and off underneath pages already written in them.",
   "profiles.translationValue": "Credentials are rolled out",
@@ -573,7 +546,6 @@
   "profiles.translateApiKeyHint": "Stored encrypted. Leave empty to keep the stored key.",
   "profiles.translateApiKeyClear": "Delete the stored key",
   "add.translationHint": "Give the instances credentials for machine translation.",
-
   "backups.title": "Backups",
   "backups.none": "No instance has uploaded a backup yet.",
   "backups.file": "File",
@@ -595,5 +567,29 @@
   "backups.clean": "Remove orphans",
   "backups.cleanConfirm": "Remove all orphaned files and rows?",
   "settings.backupQuota": "Backup quota per instance (GB)",
-  "settings.backupQuotaHint": "Beyond it, that instance’s oldest backup is dropped. Leave empty for the default."
+  "settings.backupQuotaHint": "Beyond it, that instance’s oldest backup is dropped. Leave empty for the default.",
+  "profiles.backup": "Backup",
+  "profiles.backupValue": "Schedule, contents and cloud upload",
+  "profiles.backupSchedule": "Schedule",
+  "profiles.backupEnabled": "Automatic backups",
+  "profiles.backupInterval": "Every … hours",
+  "profiles.backupIntervalHint": "24 = daily, 168 = weekly",
+  "profiles.backupRetain": "Keep",
+  "profiles.backupRetainHint": "How many backups stay on the instance",
+  "profiles.backupContent": "Contents",
+  "profiles.backupContentHint": "Always the whole section — picking single pages or forms would come up empty on every other instance.",
+  "profiles.backupCloud": "Upload",
+  "profiles.backupToCloud": "Hand finished backups to the cloud",
+  "profiles.backupToCloudHint": "From there they can be downloaded and restored.",
+  "profiles.backupRemoveConfirm": "Stop rolling out the backup settings? Nothing changes on the instances.",
+  "add.backupHint": "Schedule, contents and whether backups land in the cloud",
+  "profiles.settingKeyCustom": "Own key …",
+  "profiles.settingKeyOwn": "Key",
+  "backup.templates": "Templates",
+  "backup.pagesSection": "Pages",
+  "backup.menus": "Menus",
+  "backup.settings": "Settings",
+  "backup.submissions": "Inquiries (submissions)",
+  "backup.formsSection": "Forms",
+  "backup.assets": "Media / logo (uploads)"
 }

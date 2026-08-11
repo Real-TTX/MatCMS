@@ -19,9 +19,26 @@ public class SettingModel : PageModel
         _profiles = profiles;
     }
 
+    /// <summary>Dropdown value that means "I want to type my own key". Not the empty string, so that
+    /// an unanswered dropdown and a deliberate "own key" stay distinguishable.</summary>
+    public const string CustomMarker = "__custom";
+
     public Profile Owner { get; private set; } = new();
     public ProfileSetting Item { get; private set; } = new();
     public bool IsNew => Item.Id == 0;
+
+    /// <summary>
+    /// What may still be picked: the catalogue minus everything this profile already has.
+    /// <para>A key that is already in the list would collide with the unique index and be refused on
+    /// save — offering it means offering an action that can only fail. The row being EDITED keeps its
+    /// own key in the list, or the field would come up empty on its own record.</para>
+    /// </summary>
+    public List<InstanceSettingCatalog.Group> Available { get; private set; } = [];
+
+    /// <summary>True when the stored key is not one the catalogue knows — an older row, or something
+    /// typed by hand. The form then opens on the free-text field instead of silently presenting a
+    /// dropdown that does not contain the value it is showing.</summary>
+    public bool IsCustomKey => !string.IsNullOrEmpty(Item.Key) && InstanceSettingCatalog.Find(Item.Key) is null;
 
     public async Task<IActionResult> OnGetAsync(int profileId, int? id)
     {
@@ -29,16 +46,37 @@ public class SettingModel : PageModel
         if (owner is null) return RedirectToPage("Index");
         Owner = owner;
 
-        if (id is null) return Page();
+        if (id is not null)
+        {
+            var item = await _db.ProfileSettings.AsNoTracking().FirstOrDefaultAsync(s => s.Id == id && s.ProfileId == profileId);
+            if (item is null) return RedirectToPage("Edit", new { id = profileId, tab = "settings" });
+            Item = item;
+        }
 
-        var item = await _db.ProfileSettings.AsNoTracking().FirstOrDefaultAsync(s => s.Id == id && s.ProfileId == profileId);
-        if (item is null) return RedirectToPage("Edit", new { id = profileId, tab = "settings" });
-        Item = item;
+        await BuildChoicesAsync(profileId);
         return Page();
     }
 
-    public async Task<IActionResult> OnPostAsync(int profileId, int? id, string? key, string? value)
+    private async Task BuildChoicesAsync(int profileId)
     {
+        var taken = await _db.ProfileSettings.AsNoTracking()
+            .Where(s => s.ProfileId == profileId && s.Key != Item.Key)
+            .Select(s => s.Key)
+            .ToListAsync();
+        var takenSet = taken.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        Available = InstanceSettingCatalog.Groups
+            .Select(g => new InstanceSettingCatalog.Group(g.Name, g.Entries.Where(e => !takenSet.Contains(e.Key)).ToList()))
+            .Where(g => g.Entries.Count > 0)
+            .ToList();
+    }
+
+    /// <param name="keyPick">The chosen catalogue key, or <c>CustomMarker</c> for "own key".</param>
+    /// <param name="customKey">Only read when the dropdown says so — so a value left in the text
+    /// field cannot override a key the operator picked from the list.</param>
+    public async Task<IActionResult> OnPostAsync(int profileId, int? id, string? keyPick, string? customKey, string? value)
+    {
+        var key = keyPick == CustomMarker || string.IsNullOrWhiteSpace(keyPick) ? customKey : keyPick;
         if (string.IsNullOrWhiteSpace(key))
         {
             TempData["FlashError"] = "Bitte einen Schlüssel angeben.";
@@ -46,6 +84,15 @@ public class SettingModel : PageModel
         }
 
         var trimmed = key.Trim();
+
+        // A key that belongs to a settings group is refused here rather than stored: the rollout skips
+        // those rows unless their group is switched on, so it would sit in the list looking active and
+        // never arrive anywhere.
+        if (ProfileService.IsGroupKey(trimmed))
+        {
+            TempData["FlashError"] = $"\"{trimmed}\" gehört zu einer eigenen Gruppe — bitte über deren Eintrag im Hinzufügen-Menü setzen.";
+            return RedirectToPage(new { profileId, id });
+        }
         var row = id is null
             ? await _db.ProfileSettings.FirstOrDefaultAsync(s => s.ProfileId == profileId && s.Key == trimmed)
             : await _db.ProfileSettings.FirstOrDefaultAsync(s => s.Id == id && s.ProfileId == profileId);

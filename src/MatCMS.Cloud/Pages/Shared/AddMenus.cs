@@ -46,13 +46,15 @@ public static class AddMenus
     /// to add it again would be an option that does nothing.</param>
     /// <param name="translationUrl">Null when the profile already rolls the translation credentials
     /// out — offering to add them again would be an option that does nothing.</param>
-    public static AddMenu Settings(Localizer t, string customUrl, bool hasSmtp, string? translationUrl = null)
+    public static AddMenu Settings(Localizer t, string customUrl, bool hasSmtp, string? translationUrl = null, string? backupUrl = null)
     {
         var options = new List<AddOption>();
         if (!hasSmtp)
             options.Add(StepTo(t["settings.smtp"], t["add.smtpHint"], "settings-smtp"));
         if (translationUrl is { Length: > 0 })
             options.Add(new AddOption(t["profiles.translation"], t["add.translationHint"], translationUrl));
+        if (backupUrl is { Length: > 0 })
+            options.Add(new AddOption(t["profiles.backup"], t["add.backupHint"], backupUrl));
         options.Add(new AddOption(t["profiles.addSetting"], t["add.customSettingHint"], customUrl));
         return new AddMenu("settings", t["add.button"], t["add.whichSetting"], t["action.close"], options);
     }

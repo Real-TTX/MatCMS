@@ -556,10 +556,30 @@ public class ContentTransferService
 
         if (dto.Settings is not null)
         {
+            // The cloud link survives a restore, whatever the backup says.
+            //
+            // Everything under `cloud.*` describes THIS container's connection — its token, which
+            // revision it is on, what it has already seeded once. A backup carries the values from
+            // the moment it was taken, so restoring one used to rewind all of that: a token rotated
+            // since would be replaced by a dead one and the site would drop off the cloud seconds
+            // after a restore the cloud itself had just triggered.
+            //
+            // It also stops a backup from carrying an identity between sites. Restoring another
+            // instance's ZIP by hand would otherwise hand this container that instance's token, and
+            // two sites reporting as the same instance is not a state anything downstream expects.
+            var keep = await _db.SiteSettings
+                .Where(s => SettingKeys.Cloud.Contains(s.Key))
+                .ToDictionaryAsync(s => s.Key, s => s.Value, StringComparer.OrdinalIgnoreCase);
+
             _db.SiteSettings.RemoveRange(_db.SiteSettings);
             await _db.SaveChangesAsync();
             foreach (var s in dto.Settings.Where(s => !string.IsNullOrWhiteSpace(s.Key)))
+            {
+                if (keep.ContainsKey(s.Key!)) continue;
                 _db.SiteSettings.Add(new SiteSetting { Key = s.Key!, Value = s.Value ?? "" });
+            }
+            foreach (var (key, value) in keep)
+                _db.SiteSettings.Add(new SiteSetting { Key = key, Value = value });
             await _db.SaveChangesAsync();
             summary.Add($"{dto.Settings.Count} Einstellungen");
         }

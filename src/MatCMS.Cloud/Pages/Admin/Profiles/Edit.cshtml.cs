@@ -177,8 +177,15 @@ public class EditModel : PageModel
 
     public string Setting(string key) => Settings.FirstOrDefault(s => s.Key == key)?.Value ?? "";
 
+    /// <summary>
+    /// The free key/value rows — everything that is not owned by a settings group.
+    /// <para>Filtered by <see cref="ProfileService.IsGroupKey"/> rather than by a list of SMTP keys,
+    /// which is what it used to be: the translation credentials were showing up BOTH as their own
+    /// group row and as three raw rows underneath, and the raw ones led to the free-setting editor,
+    /// which refuses to save a group key. A row that can only be looked at is worse than no row.</para>
+    /// </summary>
     public List<ProfileSetting> OtherSettings =>
-        Settings.Where(s => !SmtpKeys.Contains(s.Key)).OrderBy(s => s.Key).ToList();
+        Settings.Where(s => !ProfileService.IsGroupKey(s.Key)).OrderBy(s => s.Key).ToList();
 
     public async Task<IActionResult> OnGetAsync(int id)
     {

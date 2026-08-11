@@ -594,7 +594,6 @@
   "backup.assets": "Media / logo (uploads)",
   "profiles.backupQuota": "Cloud backup storage (GB)",
   "profiles.backupQuotaHint": "Per instance in this profile. Empty = the cloud default ({0} GB). When an instance is full, the next upload drops its oldest backup.",
-  "backups.usage": "Usage",
   "backups.used": "Used",
   "backups.quota": "Allowed",
   "backups.quotaFromProfile": "from profile \"{0}\"",
@@ -604,5 +603,11 @@
   "backups.tabList": "Backups",
   "backups.count": "Count",
   "backups.utilisation": "Utilisation",
-  "instances.none": "No instances connected yet."
+  "instances.none": "No instances connected yet.",
+  "backups.last": "Last backup",
+  "backups.agoNow": "just now",
+  "backups.agoMinutes": "{0} min ago",
+  "backups.agoHours": "{0} h ago",
+  "backups.agoDays": "{0} days ago",
+  "backups.manage": "All backups"
 }

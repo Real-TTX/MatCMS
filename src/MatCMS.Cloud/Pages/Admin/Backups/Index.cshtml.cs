@@ -58,6 +58,32 @@ public class IndexModel : PageModel
 
     public int CountFor(int instanceId) => CountBytes.TryGetValue(instanceId, out var c) ? c : 0;
 
+    /// <summary>When each instance last put a backup here. The overview's most load-bearing number:
+    /// a quota that is only half full says nothing about whether anything recent is in it.</summary>
+    public Dictionary<int, DateTime> LastBackup { get; private set; } = new();
+
+    public DateTime? LastBackupFor(int instanceId) =>
+        LastBackup.TryGetValue(instanceId, out var d) ? d : null;
+
+    /// <summary>
+    /// How long ago, as a resource key plus its number — so the wording stays in the resource files
+    /// like every other string, instead of German being baked into the page model.
+    /// <para>Rough on purpose: the question behind the column is "is this current or stale", and an
+    /// exact figure would only invite reading it as precision. Compared in UTC, because that is how
+    /// the times are stored — converting first would make the answer depend on the server's time
+    /// zone.</para>
+    /// </summary>
+    public static (string Key, int Value) Ago(DateTime utc)
+    {
+        var span = DateTime.UtcNow - utc;
+        // Negative means the instance's clock runs ahead of ours. Not worth reporting as anything
+        // other than "just now" — it is a fact about two clocks, not about the backup.
+        if (span < TimeSpan.Zero) return ("backups.agoNow", 0);
+        if (span.TotalMinutes < 60) return ("backups.agoMinutes", (int)span.TotalMinutes);
+        if (span.TotalHours < 48) return ("backups.agoHours", (int)span.TotalHours);
+        return ("backups.agoDays", (int)span.TotalDays);
+    }
+
     /// <summary>
     /// Which tab opens. Decided on the server, not left to the deep-link script: otherwise every
     /// link into the list would paint the overview first and swap a moment later.
@@ -108,10 +134,11 @@ public class IndexModel : PageModel
 
         var perInstance = await _db.CloudBackups.AsNoTracking()
             .GroupBy(b => b.InstanceId)
-            .Select(g => new { g.Key, Sum = g.Sum(b => b.SizeBytes), Count = g.Count() })
+            .Select(g => new { g.Key, Sum = g.Sum(b => b.SizeBytes), Count = g.Count(), Last = g.Max(b => b.CreatedAt) })
             .ToListAsync();
         UsedBytes = perInstance.ToDictionary(x => x.Key, x => x.Sum);
         CountBytes = perInstance.ToDictionary(x => x.Key, x => x.Count);
+        LastBackup = perInstance.ToDictionary(x => x.Key, x => x.Last);
         Orphans = await _store.FindOrphansAsync();
     }
 
@@ -125,34 +152,22 @@ public class IndexModel : PageModel
         return RedirectToPage(new { instance });
     }
 
-    /// <summary>
-    /// Asks the instance to restore this backup. The cloud only marks it — the site picks it up on
-    /// its next heartbeat and does the work itself.
-    /// <para>A previous outcome is cleared, so the request and its result always describe the same
-    /// attempt rather than a new request wearing an old answer.</para>
-    /// </summary>
     public async Task<IActionResult> OnPostRestoreAsync(int id, int? instance)
     {
         var row = await _db.CloudBackups.FirstOrDefaultAsync(b => b.Id == id);
         if (row is null) return RedirectToPage(new { instance });
 
-        row.RestoreRequestedAt = DateTime.UtcNow;
-        row.RestoreDoneAt = null;
-        row.RestoreError = null;
-        await _db.SaveChangesAsync();
-
+        await _store.RequestRestoreAsync(row);
         TempData["Flash"] = $"„{row.FileName}“ wird beim nächsten Kontakt der Instanz zurückgespielt.";
         return RedirectToPage(new { instance });
     }
 
-    /// <summary>Takes back a request the instance has not picked up yet. Nothing to undo once it has.</summary>
     public async Task<IActionResult> OnPostCancelRestoreAsync(int id, int? instance)
     {
         var row = await _db.CloudBackups.FirstOrDefaultAsync(b => b.Id == id);
         if (row is null) return RedirectToPage(new { instance });
 
-        row.RestoreRequestedAt = null;
-        await _db.SaveChangesAsync();
+        await _store.CancelRestoreAsync(row);
         TempData["Flash"] = "Anforderung zurückgenommen.";
         return RedirectToPage(new { instance });
     }

@@ -191,6 +191,29 @@ public class BackupStore
         _log.LogInformation("Backup quota: dropped {Count} old backup(s) for instance {Instance}", doomed.Count, instanceId);
     }
 
+    /// <summary>
+    /// Asks the instance to restore this backup. The cloud only marks it — the site picks it up on
+    /// its next heartbeat and does the work itself.
+    /// <para>A previous outcome is cleared, so the request and its result always describe the same
+    /// attempt rather than a new request wearing an old answer.</para>
+    /// <para>Here rather than on a page because two pages offer it now (the backup list and the
+    /// instance's own tab), and "what marking a restore means" must not become two answers.</para>
+    /// </summary>
+    public async Task RequestRestoreAsync(CloudBackup b, CancellationToken ct = default)
+    {
+        b.RestoreRequestedAt = DateTime.UtcNow;
+        b.RestoreDoneAt = null;
+        b.RestoreError = null;
+        await _db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Takes back a request the instance has not picked up yet. Nothing to undo once it has.</summary>
+    public async Task CancelRestoreAsync(CloudBackup b, CancellationToken ct = default)
+    {
+        b.RestoreRequestedAt = null;
+        await _db.SaveChangesAsync(ct);
+    }
+
     /// <summary>Removes one backup, file and row together.</summary>
     public async Task DeleteAsync(CloudBackup b, CancellationToken ct = default)
     {

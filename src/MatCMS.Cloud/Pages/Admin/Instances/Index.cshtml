@@ -87,6 +87,13 @@
                             <span>@i.Profile.Name</span>
                         }
                     </div>
+                    @* The address, same as the table shows it. Two tiles of the same site under
+                       different names are told apart by nothing else — and the thumbnail above is
+                       exactly the case where two of them look alike. Plain text, not a link: the
+                       whole tile is already one, and a link inside a link is not valid markup. *@
+                    <div class="instance-tile-url mono muted" title="@i.PreviewUrl">
+                        @(string.IsNullOrWhiteSpace(i.PreviewUrl) ? T["instances.previewNoUrlShort"] : i.PreviewUrl.Replace("https://", "").Replace("http://", ""))
+                    </div>
                     <div class="instance-tile-meta">
                         @if (i.Status == InstanceStatus.Pending)
                         {

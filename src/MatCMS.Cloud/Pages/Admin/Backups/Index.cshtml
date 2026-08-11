@@ -19,13 +19,15 @@
 
 @* ============ ÜBERSICHT ============ *@
 <div class="tab-panel" data-panel="overview" hidden="@(Model.ActiveTab == "overview" ? null : "hidden")">
+    @* No heading: the tab is already called Übersicht, and a card that repeats its own tab's name
+       says nothing the operator did not just click. *@
     <div class="card">
-        <h2>@T["backups.usage"]</h2>
         <table class="data">
             <thead>
                 <tr>
                     <th>@T["instances.title"]</th>
                     <th>@T["backups.count"]</th>
+                    <th>@T["backups.last"]</th>
                     <th>@T["backups.used"]</th>
                     <th>@T["backups.quota"]</th>
                     <th>@T["backups.utilisation"]</th>
@@ -42,9 +44,25 @@
                     {
                         var pct = Model.UsedPercent(i.Id);
                         <tr>
-                            @* Straight into the list, filtered — that IS the second stage. *@
-                            <td><a asp-page="Index" asp-route-instance="@i.Id" asp-route-tab="list"><strong>@i.Name</strong></a></td>
+                            @* The second stage is the instance's own backup tab, not a filtered copy
+                               of this list: once you have picked one instance, everything else about
+                               it is one tab away, and a filtered list is a dead end by comparison. *@
+                            <td><a asp-page="/Admin/Instances/Details" asp-route-id="@i.Id" asp-route-tab="backup"><strong>@i.Name</strong></a></td>
                             <td class="muted">@Model.CountFor(i.Id)</td>
+                            <td class="muted">
+                                @if (Model.LastBackupFor(i.Id) is DateTime last)
+                                {
+                                    @last.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                                    @* How long ago matters more than the date itself — a backup from
+                                       March reads as fine until you work out that it is months old. *@
+                                    var ago = MatCMS.Cloud.Pages.Admin.Backups.IndexModel.Ago(last);
+                                    <span class="muted"> · @T[ago.Key, ago.Value]</span>
+                                }
+                                else
+                                {
+                                    <span>—</span>
+                                }
+                            </td>
                             <td class="muted">@size(Model.UsedBy(i.Id))</td>
                             <td class="muted">
                                 @size(Model.QuotaFor(i.Id))

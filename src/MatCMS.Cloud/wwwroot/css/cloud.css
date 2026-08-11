@@ -354,3 +354,13 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
 .quota-pct { flex: 0 0 auto; font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted, #6b7280); }
 .quota-bar.is-high > span { background: #d97706; }
 .quota-bar.is-full > span { background: #dc2626; }
+
+/* The address on an instance tile. Truncated rather than wrapped: a long host name would push the
+   status badges out of line and make a grid of tiles ragged. */
+.instance-tile-url {
+    font-size: 12px;
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

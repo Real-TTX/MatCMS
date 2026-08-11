@@ -32,6 +32,11 @@ public class DetailsModel : PageModel
     /// <summary>Name of the profile that raised the quota, or null when it is the cloud default.</summary>
     public string? BackupQuotaFromProfile { get; private set; }
 
+    public int BackupPercent { get; private set; }
+
+    /// <summary>This instance's backups, newest first.</summary>
+    public List<CloudBackup> Backups { get; private set; } = new();
+
     public Instance Item { get; private set; } = new();
     public List<InstanceEvent> Events { get; private set; } = new();
     public List<Profile> Profiles { get; private set; } = new();
@@ -71,11 +76,16 @@ public class DetailsModel : PageModel
     {
         if (!await LoadAsync(id)) return RedirectToPage("Index");
 
-        var used = await _db.CloudBackups.AsNoTracking()
+        Backups = await _db.CloudBackups.AsNoTracking()
             .Where(b => b.InstanceId == id)
-            .SumAsync(b => (long?)b.SizeBytes) ?? 0;
+            .OrderByDescending(b => b.CreatedAt)
+            .ToListAsync();
+
+        var used = Backups.Sum(b => b.SizeBytes);
+        var quota = await _backups.QuotaBytesAsync(id);
         BackupUsed = Pages.Admin.Backups.IndexModel.Size(used);
-        BackupQuota = Pages.Admin.Backups.IndexModel.Size(await _backups.QuotaBytesAsync(id));
+        BackupQuota = Pages.Admin.Backups.IndexModel.Size(quota);
+        BackupPercent = quota > 0 ? (int)Math.Min(100, used * 100 / quota) : 0;
         BackupQuotaFromProfile = Item.Profile?.BackupQuotaGb is > 0 ? Item.Profile.Name : null;
         return Page();
     }
@@ -125,6 +135,46 @@ public class DetailsModel : PageModel
         if (string.IsNullOrWhiteSpace(json)) return new();
         try { return System.Text.Json.JsonSerializer.Deserialize<List<SyncItemReport>>(json) ?? new(); }
         catch { return new(); }
+    }
+
+    // --- Backups ---------------------------------------------------------------------------------
+    // The same three actions the backup list offers, on the instance itself. They call BackupStore
+    // rather than repeating what a restore mark or a delete means: two pages, one implementation.
+    // Each returns to THIS page's backup tab, because that is where the operator was standing.
+
+    /// <summary>Looks the backup up WITHIN this instance. Taking the id on its own would let a wrong
+    /// or crafted id act on another instance's backup from a page that claims to be about this one.</summary>
+    private Task<CloudBackup?> OwnBackupAsync(int instanceId, int backupId) =>
+        _db.CloudBackups.FirstOrDefaultAsync(b => b.Id == backupId && b.InstanceId == instanceId);
+
+    public async Task<IActionResult> OnPostRestoreAsync(int id, int backupId)
+    {
+        var row = await OwnBackupAsync(id, backupId);
+        if (row is null) return RedirectToPage(new { id, tab = "backup" });
+
+        await _backups.RequestRestoreAsync(row);
+        TempData["Flash"] = $"„{row.FileName}“ wird beim nächsten Kontakt der Instanz zurückgespielt.";
+        return RedirectToPage(new { id, tab = "backup" });
+    }
+
+    public async Task<IActionResult> OnPostCancelRestoreAsync(int id, int backupId)
+    {
+        var row = await OwnBackupAsync(id, backupId);
+        if (row is null) return RedirectToPage(new { id, tab = "backup" });
+
+        await _backups.CancelRestoreAsync(row);
+        TempData["Flash"] = "Anforderung zurückgenommen.";
+        return RedirectToPage(new { id, tab = "backup" });
+    }
+
+    public async Task<IActionResult> OnPostDeleteBackupAsync(int id, int backupId)
+    {
+        var row = await OwnBackupAsync(id, backupId);
+        if (row is null) return RedirectToPage(new { id, tab = "backup" });
+
+        await _backups.DeleteAsync(row);
+        TempData["Flash"] = $"„{row.FileName}“ gelöscht.";
+        return RedirectToPage(new { id, tab = "backup" });
     }
 
     public async Task<IActionResult> OnPostApproveAsync(int id)

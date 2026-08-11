@@ -44,6 +44,7 @@
     <button type="button" class="tab" data-tab="config">@T["instances.tabConfig"]</button>
     <button type="button" class="tab" data-tab="events">@T["instances.tabEvents"]</button>
     <button type="button" class="tab" data-tab="mail">@T["spool.title"]</button>
+    <button type="button" class="tab" data-tab="backup">@T["backups.title"]</button>
     <button type="button" class="tab" data-tab="settings">@T["instances.tabSettings"]</button>
 </div>
 
@@ -457,6 +458,119 @@
                 </form>
             </div>
         }
+    </div>
+</div>
+
+@* ============ BACKUP ============ *@
+<div class="tab-panel" data-panel="backup" hidden>
+    <div data-list>
+        <div class="page-head">
+            <h2>@T["backups.title"]</h2>
+            <div class="list-toolbar">
+                <a class="btn btn-sm btn-ghost" asp-page="/Admin/Backups/Index" asp-route-instance="@Model.Item.Id" asp-route-tab="list">@T["backups.manage"]</a>
+            </div>
+        </div>
+
+        @* The same three numbers the overview shows, because this is where somebody lands after
+           clicking the instance there and the question does not change on the way. *@
+        <div class="kv">
+            <div class="kv-label">@T["backups.used"]</div>
+            <div class="kv-value">
+                @T["backups.usedOfQuota", Model.BackupUsed, Model.BackupQuota]
+                @if (Model.BackupQuotaFromProfile is string quotaProfile)
+                {
+                    <span class="muted"> · @T["backups.quotaFromProfile", quotaProfile]</span>
+                }
+                else
+                {
+                    <span class="muted"> · @T["backups.quotaDefault"]</span>
+                }
+            </div>
+        </div>
+        <div class="kv">
+            <div class="kv-label">@T["backups.utilisation"]</div>
+            <div class="kv-value">
+                <div class="quota-row" style="max-width:320px;">
+                    <div class="quota-bar @(Model.BackupPercent >= 90 ? "is-full" : Model.BackupPercent >= 75 ? "is-high" : null)">
+                        <span style="width:@(Model.BackupPercent)%"></span>
+                    </div>
+                    <span class="quota-pct">@Model.BackupPercent&nbsp;%</span>
+                </div>
+            </div>
+        </div>
+
+        <table class="data" data-list-table style="margin-top:14px;">
+            <thead>
+                <tr>
+                    <th>@T["backups.file"]</th>
+                    <th>@T["backups.created"]</th>
+                    <th>@T["backups.size"]</th>
+                    <th>@T["common.status"]</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Backups.Count == 0)
+                {
+                    <partial name="_EmptyRow" model='@T["backups.none"]' />
+                }
+                else
+                {
+                    @foreach (var b in Model.Backups)
+                    {
+                        <tr data-search="@b.FileName">
+                            <td>
+                                @* Download goes to the backup area's handler — one place that streams
+                                   a file, rather than a second copy of the range-request handling. *@
+                                <a asp-page="/Admin/Backups/Index" asp-page-handler="Download" asp-route-id="@b.Id"><strong>@b.FileName</strong></a>
+                                <div class="muted mono">@b.Origin</div>
+                            </td>
+                            <td class="muted">@b.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                            <td class="muted">@MatCMS.Cloud.Pages.Admin.Backups.IndexModel.Size(b.SizeBytes)</td>
+                            <td>
+                                @if (b.RestorePending)
+                                {
+                                    <span class="badge badge-new">@T["backups.restorePending"]</span>
+                                }
+                                else if (b.RestoreError is not null)
+                                {
+                                    <span class="badge badge-err" title="@b.RestoreError">@T["backups.restoreFailed"]</span>
+                                }
+                                else if (b.RestoreDoneAt is DateTime done)
+                                {
+                                    <span class="badge badge-on" title="@done.ToLocalTime().ToString("dd.MM.yyyy HH:mm")">@T["backups.restored"]</span>
+                                }
+                                else
+                                {
+                                    <span class="muted">—</span>
+                                }
+                            </td>
+                            <td>
+                                <div class="actions">
+                                    @if (b.RestorePending)
+                                    {
+                                        <form class="inline-form" method="post" asp-page-handler="CancelRestore" asp-route-id="@Model.Item.Id" asp-route-backupId="@b.Id">
+                                            <button type="submit" class="btn btn-sm btn-ghost">@T["backups.cancelRestore"]</button>
+                                        </form>
+                                    }
+                                    else
+                                    {
+                                        <form class="inline-form" method="post" asp-page-handler="Restore" asp-route-id="@Model.Item.Id" asp-route-backupId="@b.Id"
+                                              onsubmit="return confirm('@T["backups.restoreConfirm"]');">
+                                            <button type="submit" class="btn btn-sm btn-ghost">@T["backups.restore"]</button>
+                                        </form>
+                                    }
+                                    <form class="inline-form" method="post" asp-page-handler="DeleteBackup" asp-route-id="@Model.Item.Id" asp-route-backupId="@b.Id"
+                                          onsubmit="return confirm('@T["backups.deleteConfirm"]');">
+                                        <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
     </div>
 </div>
 

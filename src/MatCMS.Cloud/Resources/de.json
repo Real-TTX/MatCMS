@@ -594,7 +594,6 @@
   "backup.assets": "Medien / Logo (Uploads)",
   "profiles.backupQuota": "Cloud-Speicher für Backups (GB)",
   "profiles.backupQuotaHint": "Je Instanz dieses Profils. Leer = der Standard der Cloud ({0} GB). Ist eine Instanz voll, fällt beim nächsten Upload ihr ältestes Backup weg.",
-  "backups.usage": "Belegung",
   "backups.used": "Belegt",
   "backups.quota": "Erlaubt",
   "backups.quotaFromProfile": "aus Profil „{0}“",
@@ -604,5 +603,11 @@
   "backups.tabList": "Backups",
   "backups.count": "Anzahl",
   "backups.utilisation": "Auslastung",
-  "instances.none": "Noch keine Instanzen verbunden."
+  "instances.none": "Noch keine Instanzen verbunden.",
+  "backups.last": "Letztes Backup",
+  "backups.agoNow": "gerade eben",
+  "backups.agoMinutes": "vor {0} Min.",
+  "backups.agoHours": "vor {0} Std.",
+  "backups.agoDays": "vor {0} Tagen",
+  "backups.manage": "Alle Backups"
 }

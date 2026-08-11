@@ -558,5 +558,19 @@
   "mailtpl.placeholdersHint": "Klicken fügt den Platzhalter an der Cursorposition ein — im Betreff oder im Text, je nachdem, wo du zuletzt warst.",
   "mailtpl.preview": "Vorschau",
   "mailtpl.previewHint": "Zeigt den Text mit Beispielwerten, gerendert vom selben Code, der die Mail auch verschickt — Schleifen laufen mit zwei Durchgängen, damit sichtbar wird, was Wiederholung mit dem Layout macht.",
-  "mailtpl.previewRefresh": "Aktualisieren"
+  "mailtpl.previewRefresh": "Aktualisieren",
+
+  "profiles.translation": "Übersetzung",
+  "profiles.translationIntro": "Zugangsdaten für die maschinelle Übersetzung. Welche Sprachen eine Website anbietet, gehört bewusst NICHT dazu — das ist eine Entscheidung über Inhalte, und aus der Ferne umgeschaltet würde sie Sprachen unter bereits geschriebenen Seiten an- und ausknipsen.",
+  "profiles.translationValue": "Zugang wird ausgerollt",
+  "profiles.translationRemoveConfirm": "Übersetzungs-Zugang nicht mehr ausrollen? Die eingetragenen Werte bleiben erhalten, auf den Instanzen bleibt der Zugang stehen.",
+  "profiles.translateProvider": "Dienst",
+  "profiles.translateProviderHint": "Leer lassen schaltet die maschinelle Übersetzung auf den Instanzen ab.",
+  "profiles.translateNone": "— keiner —",
+  "profiles.translateUrl": "URL",
+  "profiles.translateUrlHint": "Nur für LibreTranslate: die erreichbare Adresse der eigenen Instanz.",
+  "profiles.translateApiKey": "API-Schlüssel",
+  "profiles.translateApiKeyHint": "Verschlüsselt gespeichert. Leer lassen behält den hinterlegten Schlüssel.",
+  "profiles.translateApiKeyClear": "Hinterlegten Schlüssel löschen",
+  "add.translationHint": "Zugangsdaten für die maschinelle Übersetzung an die Instanzen geben."
 }

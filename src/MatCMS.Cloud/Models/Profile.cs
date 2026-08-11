@@ -103,6 +103,17 @@ public class Profile
     /// once. The stored values survive an untick; only the rollout stops.
     /// </summary>
     public bool SyncSmtp { get; set; }
+
+    /// <summary>
+    /// Whether this profile rolls out the MACHINE TRANSLATION credentials (provider, API key, URL).
+    /// <para>Its own group rather than free key/value rows, for the same reason SMTP has one: these
+    /// are credentials, they belong together, and a group has to be switched ON before it may
+    /// overwrite what a site already has.</para>
+    /// <para>Which LANGUAGES a site offers is deliberately not part of it. That is a decision about
+    /// the site's content, not about an account — rolling it out would silently switch languages on
+    /// and off underneath pages that are written in them.</para>
+    /// </summary>
+    public bool SyncTranslation { get; set; }
     public bool SyncUsers { get; set; }
     public bool SyncPlugins { get; set; }
     public bool SyncComponents { get; set; }

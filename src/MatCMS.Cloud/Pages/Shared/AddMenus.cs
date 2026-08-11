@@ -44,11 +44,15 @@ public static class AddMenus
     /// <summary>Step one for settings: WHICH setting.</summary>
     /// <param name="hasSmtp">True hides the SMTP branch — it is already in the profile, and offering
     /// to add it again would be an option that does nothing.</param>
-    public static AddMenu Settings(Localizer t, string customUrl, bool hasSmtp)
+    /// <param name="translationUrl">Null when the profile already rolls the translation credentials
+    /// out — offering to add them again would be an option that does nothing.</param>
+    public static AddMenu Settings(Localizer t, string customUrl, bool hasSmtp, string? translationUrl = null)
     {
         var options = new List<AddOption>();
         if (!hasSmtp)
             options.Add(StepTo(t["settings.smtp"], t["add.smtpHint"], "settings-smtp"));
+        if (translationUrl is { Length: > 0 })
+            options.Add(new AddOption(t["profiles.translation"], t["add.translationHint"], translationUrl));
         options.Add(new AddOption(t["profiles.addSetting"], t["add.customSettingHint"], customUrl));
         return new AddMenu("settings", t["add.button"], t["add.whichSetting"], t["action.close"], options);
     }

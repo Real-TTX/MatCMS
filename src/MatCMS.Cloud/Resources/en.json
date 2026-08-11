@@ -558,5 +558,19 @@
   "mailtpl.placeholdersHint": "Clicking inserts the placeholder at the cursor — in the subject or the body, whichever you were in last.",
   "mailtpl.preview": "Preview",
   "mailtpl.previewHint": "Shows the body with example values, rendered by the same code that sends the mail — loops run twice, so it is visible what repetition does to the layout.",
-  "mailtpl.previewRefresh": "Refresh"
+  "mailtpl.previewRefresh": "Refresh",
+
+  "profiles.translation": "Translation",
+  "profiles.translationIntro": "Credentials for machine translation. Which languages a site offers is deliberately NOT part of it — that is a decision about content, and switching it remotely would turn languages on and off underneath pages already written in them.",
+  "profiles.translationValue": "Credentials are rolled out",
+  "profiles.translationRemoveConfirm": "Stop rolling out the translation credentials? The values are kept, and instances keep what they have.",
+  "profiles.translateProvider": "Service",
+  "profiles.translateProviderHint": "Leaving it empty switches machine translation off on the instances.",
+  "profiles.translateNone": "— none —",
+  "profiles.translateUrl": "URL",
+  "profiles.translateUrlHint": "LibreTranslate only: the reachable address of your own instance.",
+  "profiles.translateApiKey": "API key",
+  "profiles.translateApiKeyHint": "Stored encrypted. Leave empty to keep the stored key.",
+  "profiles.translateApiKeyClear": "Delete the stored key",
+  "add.translationHint": "Give the instances credentials for machine translation."
 }

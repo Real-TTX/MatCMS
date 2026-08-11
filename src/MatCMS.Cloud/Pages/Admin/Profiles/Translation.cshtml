@@ -1,0 +1,63 @@
+@page "{profileId:int}"
+@model MatCMS.Cloud.Pages.Admin.Profiles.TranslationModel
+@{
+    ViewData["Title"] = T["profiles.translation"];
+}
+<div class="page-head">
+    <h1>
+        @T["profiles.translation"]
+        <span class="muted" style="font-size:14px;font-weight:400;"> — @Model.Owner.Name</span>
+    </h1>
+    <div class="list-toolbar">
+        <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@Model.Owner.Id" asp-route-tab="settings">@T["action.back"]</a>
+    </div>
+</div>
+
+<form method="post" asp-route-profileId="@Model.Owner.Id" id="editor-form">
+    <div class="card">
+        <h2>@T["profiles.translation"]</h2>
+        <p class="muted">@T["profiles.translationIntro"]</p>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="provider">@T["profiles.translateProvider"]</label>
+                <select id="provider" name="provider">
+                    <option value="">@T["profiles.translateNone"]</option>
+                    <option value="deepl" selected="@(Model.Setting(MatCMS.Cloud.Pages.Admin.Profiles.TranslationModel.ProviderKey) == "deepl" ? "selected" : null)">DeepL</option>
+                    <option value="libre" selected="@(Model.Setting(MatCMS.Cloud.Pages.Admin.Profiles.TranslationModel.ProviderKey) == "libre" ? "selected" : null)">LibreTranslate</option>
+                </select>
+                <div class="help">@T["profiles.translateProviderHint"]</div>
+            </div>
+            <div class="form-field">
+                <label for="url">@T["profiles.translateUrl"]</label>
+                <input id="url" name="url" value="@Model.Setting(MatCMS.Cloud.Pages.Admin.Profiles.TranslationModel.UrlKey)" spellcheck="false" placeholder="https://libretranslate.example.org" />
+                <div class="help">@T["profiles.translateUrlHint"]</div>
+            </div>
+        </div>
+
+        <div class="form-field">
+            <label for="apiKey">@T["profiles.translateApiKey"]</label>
+            <input id="apiKey" name="apiKey" type="password" autocomplete="new-password" placeholder="@T["settings.smtpPasswordKeep"]" />
+            @* Without this the stored key could only ever be replaced, never removed. *@
+            @if (!string.IsNullOrEmpty(Model.Setting(MatCMS.Cloud.Pages.Admin.Profiles.TranslationModel.ApiKeyKey)))
+            {
+                <label class="checkbox-row">
+                    <input type="checkbox" name="clearApiKey" value="true" />
+                    @T["profiles.translateApiKeyClear"]
+                </label>
+            }
+            <div class="help">@T["profiles.translateApiKeyHint"]</div>
+        </div>
+    </div>
+</form>
+
+<div class="form-actions">
+    <button type="submit" class="btn" form="editor-form">@T["settings.save"]</button>
+    @if (!Model.IsNew)
+    {
+        <form class="inline-form" method="post" asp-page-handler="Remove" asp-route-profileId="@Model.Owner.Id"
+              onsubmit="return confirm('@T["profiles.translationRemoveConfirm"]');">
+            <button type="submit" class="btn btn-danger">@T["profiles.removeFromProfile"]</button>
+        </form>
+    }
+</div>

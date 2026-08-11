@@ -133,6 +133,11 @@ public class ProfileService
     public static bool IsSmtpKey(string key) =>
         key.StartsWith("smtp.", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>The machine-translation credentials. Prefix-matched like the SMTP block, so a key
+    /// added to the group later needs no change here.</summary>
+    public static bool IsTranslateKey(string key) =>
+        key.StartsWith("translate.", StringComparison.OrdinalIgnoreCase);
+
     /// <summary>Builds the payload an approved instance downloads. Sections the profile does not
     /// sync are left null, which the instance reads as "don't touch this".</summary>
     public async Task<InstanceConfig> BuildConfigAsync(Profile profile, CancellationToken ct = default)
@@ -157,7 +162,14 @@ public class ProfileService
         // then the profile's OWN items on top. A local item with the same identity wins — that is
         // what "override" means here, and it is why the merge is keyed on the instance-side identity
         // (setting key, username, component type, template name, plugin key) and not on a row id.
-        if (profile.SyncSettings)
+        // Three independent groups share one section on the wire: the free key/value rows, the mail
+        // configuration and the translation credentials. Each is governed by its OWN switch.
+        //
+        // It used to hang on SyncSettings alone, which was a trap: ticking "SMTP ausrollen" did
+        // nothing at all unless the umbrella switch happened to be on too, and nothing said so. The
+        // profile's Einstellungen tab lists the three as separate things, so they have to behave as
+        // separate things.
+        if (profile.SyncSettings || profile.SyncSmtp || profile.SyncTranslation)
         {
             // Secrets are stored encrypted and only decrypted here, on the way to the instance over
             // its authenticated channel — they are never held in the clear at rest.
@@ -180,7 +192,19 @@ public class ProfileService
                 // global values or this profile's, never a half-merge — that is what the read-only
                 // form promises. With the relay there is nothing to roll out at all, because the
                 // instance will not be sending anything itself.
-                if (IsSmtpKey(local.Key) && (!profile.SyncSmtp || profile.MailSource != MailSources.Own)) continue;
+                if (IsSmtpKey(local.Key))
+                {
+                    if (!profile.SyncSmtp || profile.MailSource != MailSources.Own) continue;
+                }
+                // Same rule for the translation credentials: stored here either way, rolled out only
+                // when their own group is switched on.
+                else if (IsTranslateKey(local.Key))
+                {
+                    if (!profile.SyncTranslation) continue;
+                }
+                // Everything else is a free key/value row and belongs to the free-settings switch.
+                else if (!profile.SyncSettings) continue;
+
                 settings[local.Key] = local.IsSecret ? _secrets.Unprotect(local.Value) : local.Value;
             }
 

@@ -1067,5 +1067,13 @@
   "mailtpl.previewRefresh": "Aktualisieren",
   "mailtpl.previewHint": "Zeigt den Text mit Beispielwerten, gerendert vom selben Code, der die Mail auch verschickt — Schleifen laufen mit zwei Durchgängen, damit sichtbar wird, was Wiederholung mit dem Layout macht.",
   "mailtpl.name": "Name",
-  "mailtpl.status": "Status"
+  "mailtpl.status": "Status",
+
+  "settings.tabMail": "Mailversand",
+  "settings.mailTransport": "Versandweg",
+  "settings.mailTransportLabel": "Diese Website verschickt",
+  "settings.mailViaCloud": "über die Cloud",
+  "settings.mailViaSmtp": "über eigenes SMTP",
+  "settings.mailViaCloudHint": "Ein Cloud-Profil hat festgelegt, dass diese Website nicht selbst versendet: jede Nachricht geht an die Cloud, die sie zwischenspeichert und zustellt. Die SMTP-Felder unten werden dabei nicht benutzt.",
+  "settings.mailViaSmtpHint": "Diese Website verschickt selbst über den unten eingetragenen Server."
 }

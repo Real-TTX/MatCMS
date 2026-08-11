@@ -11,7 +11,7 @@
 
 <div class="tabs" role="tablist">
     <button type="button" class="tab active" data-tab="general">@T["settings.tabGeneral"]</button>
-    <button type="button" class="tab" data-tab="smtp">@T["settings.tabSmtp"]</button>
+    <button type="button" class="tab" data-tab="smtp">@T["settings.tabMail"]</button>
     <button type="button" class="tab" data-tab="errors">@T["settings.tabErrors"]</button>
     <button type="button" class="tab" data-tab="code">@T["settings.tabCode"]</button>
     <button type="button" class="tab" data-tab="maintenance">@T["settings.maint.tab"]</button>
@@ -349,6 +349,29 @@
 
 @* ============ SMTP ============ *@
 <div class="tab-panel" data-panel="smtp" hidden>
+    @* Which way mail leaves this site, stated before the fields it may not even use. The relay was
+       invisible here until now: an operator could stare at empty SMTP boxes while every mail went
+       out fine through the cloud. *@
+    <div class="card">
+        <h2>@T["settings.mailTransport"]</h2>
+        <div class="kv">
+            <div class="kv-label">@T["settings.mailTransportLabel"]</div>
+            <div class="kv-value">
+                @if (Model.UsesCloudRelay)
+                {
+                    <span class="badge badge-on">@T["settings.mailViaCloud"]</span>
+                }
+                else
+                {
+                    <span class="badge badge-off">@T["settings.mailViaSmtp"]</span>
+                }
+            </div>
+        </div>
+        <div class="help">
+            @(Model.UsesCloudRelay ? T["settings.mailViaCloudHint"] : T["settings.mailViaSmtpHint"])
+        </div>
+    </div>
+
     <form method="post" asp-page-handler="Smtp">
         <div class="card">
             <h2>@T["settings.smtpHeading"]</h2>

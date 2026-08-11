@@ -203,7 +203,24 @@
                         </td>
                     </tr>
                 }
-                @if (Model.OtherSettings.Count == 0 && !Model.Item.SyncSmtp)
+                @* The translation credentials, as one row for the same reason SMTP is one: three values
+                   that only make sense together. *@
+                @if (Model.Item.SyncTranslation)
+                {
+                    <tr data-search="translate übersetzung deepl">
+                        <td><a asp-page="Translation" asp-route-profileId="@Model.Item.Id"><span class="mono">translate.*</span></a></td>
+                        <td class="muted">@T["profiles.translationValue"]</td>
+                        <td>
+                            <div class="actions">
+                                <form class="inline-form" method="post" asp-page="Translation" asp-page-handler="Remove" asp-route-profileId="@Model.Item.Id"
+                                      onsubmit="return confirm('@T["profiles.translationRemoveConfirm"]');">
+                                    <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["profiles.removeFromProfile"]" aria-label="@T["profiles.removeFromProfile"]"><partial name="_IconTrash" /></button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+                @if (Model.OtherSettings.Count == 0 && !Model.Item.SyncSmtp && !Model.Item.SyncTranslation)
                 {
                     <partial name="_EmptyRow" model='@T["profiles.noSettings"]' />
                 }
@@ -230,7 +247,7 @@
         @* Two steps, because "which setting" and "where from" are two questions. Only SMTP has a
            global side to take from — free key/value settings exist nowhere but in the profile, so
            asking them the second question would offer an option that cannot be answered. *@
-        <partial name="_AddMenu" model='AddMenus.Settings(T, Url.Page("Setting", new { profileId = Model.Item.Id })!, Model.Item.SyncSmtp)' />
+        <partial name="_AddMenu" model='AddMenus.Settings(T, Url.Page("Setting", new { profileId = Model.Item.Id })!, Model.Item.SyncSmtp, Model.Item.SyncTranslation ? null : Url.Page("Translation", new { profileId = Model.Item.Id }))' />
     </div>
     <partial name="_AddMenu" model='AddMenus.SmtpSource(T, Url.Page("Smtp", new { profileId = Model.Item.Id, source = "global" })!, Url.Page("Smtp", new { profileId = Model.Item.Id, source = "own" })!, Url.Page("Smtp", new { profileId = Model.Item.Id, source = "cloud" })!)' />
 </div>

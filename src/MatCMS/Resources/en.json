@@ -1067,5 +1067,13 @@
   "mailtpl.previewRefresh": "Refresh",
   "mailtpl.previewHint": "Shows the body with example values, rendered by the same code that sends the mail — loops run twice, so it is visible what repetition does to the layout.",
   "mailtpl.name": "Name",
-  "mailtpl.status": "Status"
+  "mailtpl.status": "Status",
+
+  "settings.tabMail": "Mail delivery",
+  "settings.mailTransport": "Delivery route",
+  "settings.mailTransportLabel": "This site sends",
+  "settings.mailViaCloud": "through the cloud",
+  "settings.mailViaSmtp": "through its own SMTP",
+  "settings.mailViaCloudHint": "A cloud profile decided that this site does not send for itself: every message goes to the cloud, which spools and delivers it. The SMTP fields below are not used.",
+  "settings.mailViaSmtpHint": "This site sends through the server configured below."
 }

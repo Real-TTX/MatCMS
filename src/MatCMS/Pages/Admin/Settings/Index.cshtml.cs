@@ -63,8 +63,14 @@ public class IndexModel : PageModel
     /// promising 40 items. A preview writes nothing, so re-running it on a GET is free of side
     /// effects and reloading the page simply refreshes it.
     /// </summary>
+    /// <summary>True when a cloud profile told this site to hand its mail over instead of sending
+    /// it itself. Shown on the mail tab, because empty SMTP fields on a site whose mail works fine
+    /// are otherwise a puzzle.</summary>
+    public bool UsesCloudRelay { get; private set; }
+
     public async Task OnGetAsync(bool preview = false)
     {
+        UsesCloudRelay = await _email.UseCloudRelayAsync();
         var existing = await _db.SiteSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
         foreach (var key in SettingKeys.All.Concat(SettingKeys.Smtp).Concat(SettingKeys.Errors).Concat(SettingKeys.Code).Concat(SettingKeys.Maintenance).Concat(SettingKeys.Translate))
             Values[key] = existing.TryGetValue(key, out var v) ? v : "";

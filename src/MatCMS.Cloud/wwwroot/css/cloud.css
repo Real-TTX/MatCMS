@@ -345,3 +345,12 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
     height: 100%;
     background: var(--accent, #2563eb);
 }
+
+/* Quota bar on the backup overview. Its own rule rather than a reused badge: this is a proportion,
+   and the admin ships nothing that shows one. The colour steps mark the point where the next upload
+   starts pushing the oldest backup out — the reason anybody reads this column. */
+.quota-row { display: flex; align-items: center; gap: 10px; }
+.quota-row .quota-bar { flex: 1 1 auto; min-width: 80px; }
+.quota-pct { flex: 0 0 auto; font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted, #6b7280); }
+.quota-bar.is-high > span { background: #d97706; }
+.quota-bar.is-full > span { background: #dc2626; }

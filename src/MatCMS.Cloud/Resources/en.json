@@ -599,5 +599,10 @@
   "backups.quota": "Allowed",
   "backups.quotaFromProfile": "from profile \"{0}\"",
   "backups.quotaDefault": "cloud default",
-  "backups.usedOfQuota": "{0} of {1}"
+  "backups.usedOfQuota": "{0} of {1}",
+  "backups.tabOverview": "Overview",
+  "backups.tabList": "Backups",
+  "backups.count": "Count",
+  "backups.utilisation": "Utilisation",
+  "instances.none": "No instances connected yet."
 }

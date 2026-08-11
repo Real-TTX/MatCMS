@@ -50,7 +50,21 @@ public class IndexModel : PageModel
     /// instance is.</para></summary>
     public Dictionary<int, long> UsedBytes { get; private set; } = new();
 
+    /// <summary>How many backups each instance holds — the overview's other honest number: 8 GB in
+    /// one file and 8 GB in forty are not the same situation.</summary>
+    public Dictionary<int, int> CountBytes { get; private set; } = new();
+
     public long UsedBy(int instanceId) => UsedBytes.TryGetValue(instanceId, out var u) ? u : 0;
+
+    public int CountFor(int instanceId) => CountBytes.TryGetValue(instanceId, out var c) ? c : 0;
+
+    /// <summary>
+    /// Which tab opens. Decided on the server, not left to the deep-link script: otherwise every
+    /// link into the list would paint the overview first and swap a moment later.
+    /// <para>Filtering by an instance implies the list even without <c>?tab=</c> — that link comes
+    /// from the overview, or from the instance page, and both mean "show me these backups".</para>
+    /// </summary>
+    public string ActiveTab { get; private set; } = "overview";
 
     /// <summary>Percent of the quota in use, capped at 100 for the bar.</summary>
     public int UsedPercent(int instanceId)
@@ -68,7 +82,7 @@ public class IndexModel : PageModel
         _ => $"{bytes} B",
     };
 
-    public async Task OnGetAsync(int? instance)
+    public async Task OnGetAsync(int? instance, string? tab)
     {
         Instances = await _db.Instances.AsNoTracking().Include(i => i.Profile).OrderBy(i => i.Name).ToListAsync();
 
@@ -80,6 +94,8 @@ public class IndexModel : PageModel
         }
         Items = await query.OrderByDescending(b => b.CreatedAt).ToListAsync();
 
+        ActiveTab = tab == "list" || FilteredInstance is not null ? "list" : "overview";
+
         // Over everything, not over the filter: it answers "how much disk is this costing me".
         TotalBytes = await _db.CloudBackups.SumAsync(b => (long?)b.SizeBytes) ?? 0;
         // For every instance, not just the filtered one: the overview below lists all of them, and
@@ -90,10 +106,12 @@ public class IndexModel : PageModel
             QuotaFrom[i.Id] = i.Profile?.BackupQuotaGb is > 0 ? i.Profile.Name : null;
         }
 
-        UsedBytes = await _db.CloudBackups.AsNoTracking()
+        var perInstance = await _db.CloudBackups.AsNoTracking()
             .GroupBy(b => b.InstanceId)
-            .Select(g => new { g.Key, Sum = g.Sum(b => b.SizeBytes) })
-            .ToDictionaryAsync(x => x.Key, x => x.Sum);
+            .Select(g => new { g.Key, Sum = g.Sum(b => b.SizeBytes), Count = g.Count() })
+            .ToListAsync();
+        UsedBytes = perInstance.ToDictionary(x => x.Key, x => x.Sum);
+        CountBytes = perInstance.ToDictionary(x => x.Key, x => x.Count);
         Orphans = await _store.FindOrphansAsync();
     }
 

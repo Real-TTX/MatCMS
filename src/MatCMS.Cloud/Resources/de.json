@@ -599,5 +599,10 @@
   "backups.quota": "Erlaubt",
   "backups.quotaFromProfile": "aus Profil „{0}“",
   "backups.quotaDefault": "Standard der Cloud",
-  "backups.usedOfQuota": "{0} von {1}"
+  "backups.usedOfQuota": "{0} von {1}",
+  "backups.tabOverview": "Übersicht",
+  "backups.tabList": "Backups",
+  "backups.count": "Anzahl",
+  "backups.utilisation": "Auslastung",
+  "instances.none": "Noch keine Instanzen verbunden."
 }

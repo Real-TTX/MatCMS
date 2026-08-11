@@ -19,9 +19,10 @@
 
 @* ============ ÜBERSICHT ============ *@
 <div class="tab-panel" data-panel="overview" hidden="@(Model.ActiveTab == "overview" ? null : "hidden")">
-    @* No heading: the tab is already called Übersicht, and a card that repeats its own tab's name
-       says nothing the operator did not just click. *@
-    <div class="card">
+    @* No card and no heading. The tab is already called Übersicht, and the list tab next to it puts
+       its table straight on the page — a frame around this one made the two reiters look like two
+       different kinds of page. *@
+    <div>
         <table class="data">
             <thead>
                 <tr>

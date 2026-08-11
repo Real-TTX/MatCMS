@@ -520,6 +520,24 @@ revision matches and nothing threw — a template named for activation that neve
 own without aborting the apply. Skipped items are not an error (that is what `add`/`once` are for)
 but are shown next to *synchron*, so it never reads as "everything from the profile is here".
 
+### Behind a reverse proxy
+
+`UseForwardedHeaders` is enabled in **both** apps, and it has to be configured to do anything in
+Docker: ASP.NET only trusts loopback by default, and a proxy in another container is not loopback.
+Name it with `MatCms:Proxy:Known` / `MatCmsCloud:Proxy:Known` (a comma-separated list of addresses),
+or set `…:Proxy:TrustAll` for a container reachable **only** through its proxy. Trust-all anywhere
+else lets a client set the headers itself and claim any address it likes.
+
+Without it three things go quietly wrong, and the third is the one that gets reported as a bug: the
+login rate limit counts every visitor as one client; `Request.Scheme` is `http`, so the base URL an
+instance reports about itself (`CloudState.ObservedBaseUrl`) comes out as `http://…`; and the cloud
+then stores, links to and **frames** that address — which an https admin refuses as mixed content and
+leaves as a blank rectangle with no explanation anywhere.
+
+`Services/MixedContent.cs` is the second half of that: every place embedding a live instance asks it
+first and says so in words instead of rendering a frame the browser will refuse. It stays useful even
+with the headers configured, because a site may genuinely be http-only.
+
 ### Update checks & notifications
 
 - `GhcrClient` lists all tags of a public GHCR package. It follows the `Link: …; rel="next"`

@@ -67,6 +67,12 @@
                     {
                         <div class="instance-tile-empty">@T["instances.previewNoUrlShort"]</div>
                     }
+                    else if (MatCMS.Cloud.Services.MixedContent.IsBlocked(Model.Request.IsHttps, i.PreviewUrl))
+                    {
+                        @* An https page cannot frame an http one — say so rather than showing the
+                           blank rectangle the browser would leave behind. *@
+                        <div class="instance-tile-empty">@T["instances.previewInsecureShort"]</div>
+                    }
                     else
                     {
                         <iframe src="@i.PreviewUrl" title="@i.Name" loading="lazy" tabindex="-1" scrolling="no"

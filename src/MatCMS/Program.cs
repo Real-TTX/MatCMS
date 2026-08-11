@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.HttpOverrides;
 using System.Globalization;
 using System.Threading.RateLimiting;
 using MatCMS.Content;
@@ -214,6 +215,38 @@ builder.Services.AddRazorPages(options =>
 });
 
 var app = builder.Build();
+
+// --- Behind a reverse proxy ------------------------------------------------
+// Without this the app only ever sees what the proxy speaks to it: http, the proxy's own address,
+// and the internal host name. Three things then go quietly wrong — the rate limit on /login counts
+// every visitor as the same client, and the base URL the site reports about itself comes out as
+// http://, which the cloud stores, links to and FRAMES, so an https admin refuses to show it as
+// mixed content.
+//
+// Trusting these headers is only safe from a proxy nobody can bypass, which is why the default stays
+// ASP.NET's: loopback only. In Docker the proxy is a different container with a private address, so
+// it has to be named — either a specific one via MatCms:Proxy:Known, or the whole private
+// network by setting MatCms:Proxy:TrustAll. Trust-all belongs to a container that is
+// reachable ONLY through its proxy: anywhere else, a client could set the headers itself and claim
+// any address it likes.
+var fwd = new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost
+};
+var knownProxy = (builder.Configuration["MatCms:Proxy:Known"] ?? "").Trim();
+if (bool.TryParse(builder.Configuration["MatCms:Proxy:TrustAll"], out var trustAll) && trustAll)
+{
+    // Clearing both lists is what makes the headers count from ANY hop — see the warning above.
+    fwd.KnownNetworks.Clear();
+    fwd.KnownProxies.Clear();
+}
+else if (knownProxy.Length > 0)
+{
+    foreach (var one in knownProxy.Split(",", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        if (System.Net.IPAddress.TryParse(one, out var ip)) fwd.KnownProxies.Add(ip);
+}
+app.UseForwardedHeaders(fwd);
+
 
 // --- Create/upgrade schema + seed default data on startup ---
 using (var scope = app.Services.CreateScope())

@@ -176,6 +176,15 @@
         {
             <p class="muted">@T["instances.previewNoUrl"]</p>
         }
+        else if (MatCMS.Cloud.Services.MixedContent.IsBlocked(Model.Request.IsHttps, Model.Item.PreviewUrl))
+        {
+            @* Said out loud instead of framed. The browser would refuse an http page inside this
+               https one and leave the frame blank, which reads as "the site is down". *@
+            <p class="muted">@T["instances.previewInsecure"]</p>
+            <div class="actions">
+                <a class="btn btn-sm btn-ghost" href="@Model.Item.PreviewUrl" target="_blank" rel="noopener">@T["instances.openSite"]</a>
+            </div>
+        }
         else
         {
             @* The browser loads the site directly from the instance, so this only works where the

@@ -19,7 +19,12 @@
             @foreach (var i in Model.Switchable)
             {
                 var online = MatCMS.Cloud.Services.InstanceService.IsOnline(i);
-                var hasUrl = !string.IsNullOrWhiteSpace(i.PreviewUrl);
+                @* "Has an address" is not the question here — "can be shown in this page" is. An http
+                   site inside this https one is refused by the browser, so it gets the same treatment
+                   as one with no address at all, including the link going to its detail page instead
+                   of an embed that cannot work. *@
+                var hasUrl = !string.IsNullOrWhiteSpace(i.PreviewUrl)
+                             && !MatCMS.Cloud.Services.MixedContent.IsBlocked(Model.Request.IsHttps, i.PreviewUrl);
                 @* An instance with no address has nothing to frame, so it leads to its detail page —
                    that is where you find out why it never reported one. *@
                 <a class="inst-picker-item@(i.Id == Model.Item.Id ? " is-current" : "")@(online ? "" : " is-offline")"
@@ -113,12 +118,25 @@ else
        honest way to detect that, so instead of pretending to, the bar simply always offers the tab —
        and this line says what an empty frame means. *@
     <div class="site-embed">
-        <iframe class="site-embed-frame" data-site-frame src="@Model.Item.PreviewUrl" title="@Model.Item.Name"
-                referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>
-        <div class="site-embed-fallback muted">
-            @T["instances.embedBlocked"]
-            <a href="@Model.Item.PreviewUrl" target="_blank" rel="noopener">@T["instances.openSite"]</a>
-        </div>
+        @if (MatCMS.Cloud.Services.MixedContent.IsBlocked(Model.Request.IsHttps, Model.Item.PreviewUrl))
+        {
+            @* No frame at all: this one is not "the site might refuse", it is certain. Rendering it
+               anyway would put the general "could not be embedded" note under a blank rectangle and
+               send the operator looking for a fault in their site. *@
+            <div class="site-embed-fallback muted">
+                @T["instances.previewInsecure"]
+                <a href="@Model.Item.PreviewUrl" target="_blank" rel="noopener">@T["instances.openSite"]</a>
+            </div>
+        }
+        else
+        {
+            <iframe class="site-embed-frame" data-site-frame src="@Model.Item.PreviewUrl" title="@Model.Item.Name"
+                    referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>
+            <div class="site-embed-fallback muted">
+                @T["instances.embedBlocked"]
+                <a href="@Model.Item.PreviewUrl" target="_blank" rel="noopener">@T["instances.openSite"]</a>
+            </div>
+        }
     </div>
 }
 

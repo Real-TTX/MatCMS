@@ -609,5 +609,7 @@
   "backups.agoMinutes": "vor {0} Min.",
   "backups.agoHours": "vor {0} Std.",
   "backups.agoDays": "vor {0} Tagen",
-  "backups.manage": "Alle Backups"
+  "backups.manage": "Alle Backups",
+  "instances.previewInsecure": "Diese Website wird über http ausgeliefert und kann in einer https-Seite nicht eingebettet werden. Der Browser blockiert das. Meist liegt es daran, dass die Instanz hinter einem Proxy steht und ihre eigene Adresse als http meldet — dann helfen Forwarded-Header oder eine kanonische URL in den Einstellungen der Website.",
+  "instances.previewInsecureShort": "http — nicht einbettbar"
 }

@@ -85,16 +85,19 @@
             <button type="button" class="btn btn-sm btn-ghost" data-site-reload title="@T["instances.reload"]" aria-label="@T["instances.reload"]">
                 <i class="ti ti-refresh" aria-hidden="true"></i>
             </button>
-            @* Into the site's OWN admin. Looking at a customer's page and then wanting to change
-               something is the next move often enough that hunting for the address is a waste — and
-               the address is derivable, it is the site's URL plus /Admin.
-               A new tab on purpose: this view is the site as visitors see it, and replacing it with a
-               login screen would throw that away. It also needs its own session on the instance,
-               which the cloud has no part in. *@
-            <a class="btn btn-sm btn-ghost" href="@Model.AdminUrl" target="_blank" rel="noopener"
-               title="@T["instances.openAdmin"]" aria-label="@T["instances.openAdmin"]">
-                <i class="ti ti-settings" aria-hidden="true"></i> @T["instances.admin"]
-            </a>
+            @* Into the site's OWN admin, in THIS frame. Looking at a customer's page and then wanting
+               to change something is the next move often enough that hunting for the address is a
+               waste — and the address is derivable, it is the site's URL plus /Admin.
+               A toggle and not a one-way trip, because "look at the page, change something, look
+               again" is one task, and staying inside this view is the whole point of the page.
+               The instance's admin sends no X-Frame-Options, so it may be framed — if a site ever does
+               send one the frame stays blank, which is why the plain link to the site is still here. *@
+            <button type="button" class="btn btn-sm btn-ghost" data-site-admin
+                    data-admin-url="@Model.AdminUrl" data-site-url="@Model.Item.PreviewUrl"
+                    data-label-admin="@T["instances.admin"]" data-label-site="@T["instances.site"]"
+                    title="@T["instances.openAdmin"]">
+                <i class="ti ti-settings" aria-hidden="true"></i> <span data-site-admin-label>@T["instances.admin"]</span>
+            </button>
             <a class="btn btn-sm btn-ghost" href="@Model.Item.PreviewUrl" target="_blank" rel="noopener"
                title="@T["instances.openSite"]" aria-label="@T["instances.openSite"]">
                 <i class="ti ti-external-link" aria-hidden="true"></i>
@@ -181,6 +184,21 @@ else
             // Re-assigning src rather than calling contentWindow.location.reload(): the frame is
             // cross-origin, so reaching into it throws.
             if (frame && reload) reload.addEventListener('click', function () { frame.src = frame.src; });
+
+            // Admin ⇄ Website in the same frame.
+            var adminBtn = document.querySelector('[data-site-admin]');
+            if (frame && adminBtn) {
+                var label = adminBtn.querySelector('[data-site-admin-label]');
+                var onAdmin = false;
+                adminBtn.addEventListener('click', function () {
+                    onAdmin = !onAdmin;
+                    frame.src = onAdmin ? adminBtn.getAttribute('data-admin-url') : adminBtn.getAttribute('data-site-url');
+                    // The label says where the button LEADS, not where you are — a button captioned
+                    // with the current state reads as if pressing it would keep you there.
+                    label.textContent = adminBtn.getAttribute(onAdmin ? 'data-label-site' : 'data-label-admin');
+                    adminBtn.classList.toggle('is-active', onAdmin);
+                });
+            }
         })();
     </script>
 }

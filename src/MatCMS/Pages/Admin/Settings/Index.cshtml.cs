@@ -68,9 +68,21 @@ public class IndexModel : PageModel
     /// are otherwise a puzzle.</summary>
     public bool UsesCloudRelay { get; private set; }
 
+    /// <summary>
+    /// True when this site sends by SMTP and actually has a server to send through. Without it the
+    /// tab could only say SMTP, which on a site with empty fields is not a state — it is a claim
+    /// that mail leaves the building when in fact nothing does. Three answers, and the third one is
+    /// the one worth seeing: Cloud, SMTP, or nothing at all.
+    /// </summary>
+    public bool SmtpConfigured { get; private set; }
+
     public async Task OnGetAsync(bool preview = false)
     {
         UsesCloudRelay = await _email.UseCloudRelayAsync();
+        // The host is the one field without which nothing can be sent — user, password and TLS all
+        // have working defaults, an address to connect to does not.
+        SmtpConfigured = !string.IsNullOrWhiteSpace(
+            (await _db.SiteSettings.AsNoTracking().FirstOrDefaultAsync(x => x.Key == SettingKeys.SmtpHost))?.Value);
         var existing = await _db.SiteSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
         foreach (var key in SettingKeys.All.Concat(SettingKeys.Smtp).Concat(SettingKeys.Errors).Concat(SettingKeys.Code).Concat(SettingKeys.Maintenance).Concat(SettingKeys.Translate))
             Values[key] = existing.TryGetValue(key, out var v) ? v : "";

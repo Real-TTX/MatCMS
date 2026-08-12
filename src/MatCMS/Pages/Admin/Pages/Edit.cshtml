@@ -74,14 +74,18 @@
                     <input type="hidden" name="DataJson" id="DataJson" />
                     <div id="block-editor"></div>
                 </form>
-                @* Compact icon-only action row: delete flush-left, save + done on the right — never wraps. *@
+                @* Compact icon-only action row: delete flush-left, the rest on the right — never wraps.
+                   Every button that LEAVES this block saves it first. The tick used to be a plain link
+                   back and ＋ opened the picker straight away, so both threw the edits away without a
+                   word — and a tick is the last control anybody expects to lose work to.
+                   That also makes a separate save button pointless: it did what ✓ now does, minus
+                   the leaving. *@
                 <div class="le-panel-actions">
                     <form class="inline-form le-delete" method="post" asp-page-handler="DeleteBlock" asp-route-id="@Model.Current.Id" asp-route-blockId="@Model.SelectedBlock!.Id" onsubmit="return confirm('@T["editor.confirmDeleteBlock"]');">
                         <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["editor.blockDelete"]" aria-label="@T["editor.blockDelete"]"><i class="ti ti-trash" aria-hidden="true"></i></button>
                     </form>
-                    <button type="button" class="btn btn-sm btn-ghost btn-icon js-add-block" title="@T["editor.addBlock"]" aria-label="@T["editor.addBlock"]"><i class="ti ti-plus" aria-hidden="true"></i></button>
-                    <button type="submit" form="block-form" class="btn btn-sm btn-icon le-save" title="@T["action.save"]" aria-label="@T["action.save"]"><i class="ti ti-device-floppy" aria-hidden="true"></i></button>
-                    <a class="btn btn-sm btn-ghost btn-icon" asp-page="Edit" asp-route-id="@Model.Current.Id" title="@T["editor.done"]" aria-label="@T["editor.done"]"><i class="ti ti-check" aria-hidden="true"></i></a>
+                    <button type="submit" form="block-form" name="thenAdd" value="true" class="btn btn-sm btn-ghost btn-icon" title="@T["editor.addBlock"]" aria-label="@T["editor.addBlock"]"><i class="ti ti-plus" aria-hidden="true"></i></button>
+                    <button type="submit" form="block-form" name="close" value="true" class="btn btn-sm btn-icon le-save" title="@T["editor.saveAndClose"]" aria-label="@T["editor.saveAndClose"]"><i class="ti ti-check" aria-hidden="true"></i></button>
                 </div>
             </div>
             <script id="block-schema" type="application/json">@Html.Raw(Model.SchemaJson.Replace("</", "<\\/"))</script>
@@ -288,7 +292,7 @@
         }
         @* Add-block modal — available in BOTH the block-list and the single-block-edit view,
            so the "+ Block" button and the preview insert-zones work in either mode. *@
-        <div class="modal-overlay" id="add-block-modal">
+        <div class="modal-overlay" id="add-block-modal" data-autoopen="@(Model.OpenAddPicker ? "1" : null)">
                 <div class="modal" role="dialog" aria-modal="true" aria-label="@T["editor.addBlockModal"]">
                     <div class="modal-head">
                         <h2>@T["editor.addBlockModal"]</h2>

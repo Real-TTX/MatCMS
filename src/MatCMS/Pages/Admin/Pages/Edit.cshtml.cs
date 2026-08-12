@@ -71,8 +71,13 @@ public class EditModel : PageModel
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    public async Task<IActionResult> OnGetAsync(int id, int? block)
+    /// <summary>The picker opens by itself after ＋ saved the block that was open — otherwise the
+    /// save would land the operator back on a closed dialog they had already asked for.</summary>
+    public bool OpenAddPicker { get; private set; }
+
+    public async Task<IActionResult> OnGetAsync(int id, int? block, bool add = false)
     {
+        OpenAddPicker = add;
         var page = await Load(id);
         if (page is null) return NotFound();
 
@@ -132,7 +137,12 @@ public class EditModel : PageModel
         return Page();
     }
 
-    public async Task<IActionResult> OnPostSaveBlockAsync(int id, int blockId)
+    /// <param name="close">Set by the ✓ button: save, then leave the block editor. It used to be a
+    /// plain link back, which threw the edits away — a tick that discards is the one control nobody
+    /// expects to lose work to.</param>
+    /// <param name="thenAdd">Set by ＋ while a block is open: same trap, different button. Saves
+    /// first and reopens with the picker showing.</param>
+    public async Task<IActionResult> OnPostSaveBlockAsync(int id, int blockId, bool close = false, bool thenAdd = false)
     {
         var block = await _db.ContentBlocks.Include(b => b.Page).FirstOrDefaultAsync(b => b.Id == blockId && b.PageId == id);
         if (block is null) return NotFound();
@@ -154,6 +164,8 @@ public class EditModel : PageModel
         await _db.SaveChangesAsync();
 
         TempData["Flash"] = "Block gespeichert.";
+        if (close) return RedirectToPage(new { id });
+        if (thenAdd) return RedirectToPage(new { id, block = blockId, add = true });
         return RedirectToPage(new { id, block = blockId });
     }
 

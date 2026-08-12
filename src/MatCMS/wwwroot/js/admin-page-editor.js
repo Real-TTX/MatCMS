@@ -79,6 +79,9 @@
     }
     if (modal) {
         openBtns.forEach(function (b) { b.addEventListener("click", function () { openPicker(null); }); });
+        // ＋ inside an open block saves it first and comes back here — so the picker has to reopen by
+        // itself, or the save would land on a closed dialog the operator had already asked for.
+        if (modal.getAttribute("data-autoopen") === "1") openPicker(null);
         if (closeBtn) closeBtn.addEventListener("click", function () { modal.classList.remove("open"); });
         modal.addEventListener("click", function (e) { if (e.target === modal) modal.classList.remove("open"); });
         document.addEventListener("keydown", function (e) { if (e.key === "Escape") modal.classList.remove("open"); });

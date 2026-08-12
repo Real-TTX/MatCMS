@@ -7,7 +7,6 @@
   "action.back": "Zurück",
   "action.create": "Erstellen",
   "action.close": "Schließen",
-
   "nav.pages": "Seiten",
   "nav.menus": "Menü",
   "nav.submissions": "Anfragen",
@@ -131,7 +130,6 @@
   "nav.language": "Sprache",
   "admin.loggedInAs": "Angemeldet als",
   "admin.language": "Sprache",
-
   "lang.de": "Deutsch",
   "lang.en": "English",
   "lang.fr": "Français",
@@ -141,7 +139,6 @@
   "lang.sk": "Slovenčina",
   "lang.nl": "Nederlands",
   "lang.pl": "Polski",
-
   "login.pageTitle": "Anmeldung",
   "login.heading": "Admin-Anmeldung",
   "login.username": "E-Mail-Adresse",
@@ -149,7 +146,6 @@
   "login.rememberMe": "Angemeldet bleiben",
   "login.submit": "Anmelden",
   "login.back": "← Zurück zur Website",
-
   "dashboard.title": "Dashboard",
   "dashboard.editPages": "Seiten bearbeiten",
   "dashboard.pages": "Seiten",
@@ -158,7 +154,6 @@
   "dashboard.users": "Benutzer",
   "dashboard.quickstart": "Schnellstart",
   "dashboard.quickstartText": "Bearbeiten Sie Ihre Inhalte über <strong>Seiten</strong>. Jede Seite besteht aus <em>Blöcken</em> (Hero, Text, Spalten, Leistungen, Kontaktformular …), die Sie hinzufügen, bearbeiten, verschieben und löschen können – das Layout bleibt dabei erhalten.",
-
   "pages.title": "Seiten",
   "pages.none": "Noch keine Seiten vorhanden.",
   "pages.colTitle": "Titel",
@@ -173,7 +168,6 @@
   "pages.slugOptional": "Slug (optional)",
   "pages.slugPlaceholder": "wird aus dem Titel erzeugt",
   "pages.createAndEdit": "Anlegen und bearbeiten",
-
   "editor.title": "Editor",
   "editor.allBlocks": "‹ Alle Blöcke",
   "editor.blockDelete": "Löschen",
@@ -225,7 +219,6 @@
   "editor.translationCreate": "Übersetzung erstellen ({0})",
   "editor.translationLink": "Bestehende Seite verknüpfen",
   "editor.translationLinkSubmit": "Verknüpfen",
-
   "menus.title": "Menü",
   "menus.heading": "Menü-Verwaltung",
   "menus.toolbarMenu": "Obere Leiste",
@@ -262,7 +255,6 @@
   "menus.targetPlaceholder": "/kontakt oder https://…",
   "menus.openNewTab": "In neuem Tab öffnen",
   "menus.addSubmit": "Menüpunkt hinzufügen",
-
   "users.title": "Benutzer",
   "users.colUsername": "Benutzername",
   "users.colDisplayName": "Anzeigename",
@@ -285,7 +277,6 @@
   "users.colEmail": "E-Mail",
   "users.newPassword": "Neues Passwort",
   "users.newPasswordPlaceholder": "leer lassen, um es nicht zu ändern",
-
   "submissions.colDate": "Datum",
   "submissions.colData": "Daten",
   "submissions.colStatus": "Status",
@@ -294,7 +285,6 @@
   "submissions.markNew": "Als neu",
   "submissions.markRead": "Gelesen",
   "submissions.confirmDelete": "Anfrage wirklich löschen?",
-
   "forms.title": "Formulare",
   "forms.none": "Noch keine Formulare vorhanden.",
   "forms.colName": "Name",
@@ -358,7 +348,6 @@
   "forms.el.richselect.desc": "Dropdown mit Bild, Titel, Beschreibung & Tags.",
   "forms.el.group.name": "Gruppe",
   "forms.el.group.desc": "Fasst mehrere Felder in einem Block zusammen.",
-
   "settings.title": "Einstellungen",
   "settings.general": "Allgemein",
   "settings.fromLibrary": "Aus Mediathek",
@@ -409,7 +398,6 @@
   "settings.contactEmail": "Kontakt-E-Mail (Empfänger, informativ)",
   "settings.contactEmailHelp": "Wird aktuell nicht zum Versand genutzt – Anfragen erscheinen unter „Anfragen“.",
   "settings.save": "Speichern",
-
   "backup.title": "Backup",
   "backup.heading": "Backup & Restore",
   "backup.createHeading": "Backup erstellen",
@@ -461,7 +449,6 @@
   "backup.restoreThis": "Einspielen",
   "backup.restoreStoredConfirm": "Dieses Backup jetzt einspielen? Enthaltene Bereiche werden überschrieben.",
   "backup.deleteConfirm": "Dieses Backup-Datei löschen?",
-
   "templates.title": "Templates",
   "templates.colName": "Name",
   "templates.colAccent": "Akzentfarbe",
@@ -559,7 +546,6 @@
   "templates.bodyFont": "Fließtext-Schrift",
   "templates.buttonStyle": "Button-Stil",
   "templates.createSubmit": "Anlegen",
-
   "block.f.heading": "Überschrift",
   "block.f.body": "Inhalt",
   "block.f.intro": "Einleitung",
@@ -571,7 +557,6 @@
   "block.f.width": "Breite",
   "block.f.buttonText": "Button-Text",
   "block.f.buttonUrl": "Button-Link",
-
   "block.opt.align.left": "Links",
   "block.opt.align.center": "Zentriert",
   "block.opt.width.normal": "Normal",
@@ -656,7 +641,6 @@
   "block.opt.size.small": "Klein",
   "block.opt.size.medium": "Mittel",
   "block.opt.size.large": "Groß",
-
   "block.hero.name": "Hero (Kopfbereich)",
   "block.hero.desc": "Großer Seitenkopf: Überschrift, optionaler Untertext, Button und Bildband darunter.",
   "block.hero.f.heading": "Überschrift",
@@ -665,58 +649,46 @@
   "block.hero.f.buttonText": "Button-Text",
   "block.hero.f.buttonUrl": "Button-Link",
   "block.hero.f.align": "Ausrichtung",
-
   "block.richtext.name": "Text",
   "block.richtext.desc": "Textabschnitt mit optionaler Überschrift und formatiertem Fließtext (fett, Listen, Links).",
   "block.richtext.f.align": "Ausrichtung",
-
   "block.columns.name": "Spalten",
   "block.columns.desc": "Zwei oder drei nebeneinanderliegende Text-Spalten mit Titel – z. B. für Partner oder Leistungsbereiche.",
   "block.columns.f.columns": "Spaltenanzahl",
   "block.columns.f.items": "Spalten",
   "block.columns.item": "Spalte",
-
   "block.servicegrid.name": "Leistungen (Raster)",
   "block.servicegrid.desc": "Kachel-Raster für Leistungen oder Features, je Kachel Titel und kurze Beschreibung.",
   "block.servicegrid.f.columns": "Spalten (Desktop)",
   "block.servicegrid.f.items": "Leistungen",
   "block.servicegrid.item": "Leistung",
-
   "block.cta.name": "Call-to-Action",
   "block.cta.desc": "Hervorgehobener Aufruf: große Aussage mit optionalem Text und Button (z. B. „Kontaktieren Sie uns“).",
-
   "block.contactform.name": "Kontaktformular",
   "block.contactform.desc": "Formular für Name, E-Mail, Kategorie und Nachricht. Einsendungen erscheinen im Admin unter „Anfragen“.",
   "block.contactform.f.categories": "Kategorien",
-
   "block.form.name": "Formular",
   "block.form.desc": "Bindet ein unter „Formulare“ erstelltes Formular in die Seite ein.",
   "block.form.f.form": "Formular",
-
   "block.image.name": "Bild",
   "block.image.desc": "Einzelnes Bild mit optionaler Bildunterschrift – als Upload oder per URL.",
   "block.image.f.caption": "Bildunterschrift",
-
   "block.accordion.name": "Akkordeon (FAQ)",
   "block.accordion.desc": "Aufklappbare Frage-Antwort-Liste – ideal für häufige Fragen (FAQ).",
   "block.accordion.f.items": "Einträge",
   "block.accordion.item": "Frage",
   "block.accordion.f.question": "Frage",
   "block.accordion.f.answer": "Antwort",
-
   "block.quote.name": "Zitat",
   "block.quote.desc": "Hervorgehobenes Zitat oder Kundenstimme mit optionaler Namensangabe.",
   "block.quote.f.quote": "Zitat",
   "block.quote.f.author": "Autor / Quelle",
-
   "block.imagetext.name": "Bild & Text",
   "block.imagetext.desc": "Bild neben Text – mit Überschrift, formatiertem Fließtext und wählbarer Bildseite.",
   "block.imagetext.f.imageSide": "Bildseite",
-
   "block.spacer.name": "Abstand",
   "block.spacer.desc": "Leerer vertikaler Abstand zwischen zwei Blöcken.",
   "block.spacer.f.size": "Größe",
-
   "block.html.name": "HTML",
   "block.html.desc": "Eigener HTML-Code (Advanced)",
   "block.html.f.html": "HTML",
@@ -726,7 +698,6 @@
   "block.logostrip.item": "Logo",
   "block.logostrip.f.image": "Logo",
   "block.logostrip.f.url": "Link (optional)",
-
   "action.search": "Suchen…",
   "list.noResults": "Keine Treffer.",
   "store.dialogSearch": "Im Store suchen …",
@@ -737,7 +708,6 @@
   "list.empty": "Keine Daten vorhanden.",
   "menus.colName": "Name",
   "menus.colKey": "Schlüssel",
-
   "posts.title": "Beiträge",
   "posts.new": "Erstellen",
   "posts.colDate": "Datum",
@@ -792,7 +762,6 @@
   "posts.pagerPrev": "‹ Zurück",
   "posts.pagerNext": "Weiter ›",
   "posts.attachmentsHeading": "Anhänge",
-
   "diff.title": "Übersetzungen vergleichen",
   "diff.back": "Zurück zum Editor",
   "diff.source": "Quelle",
@@ -822,7 +791,6 @@
   "diff.legendIns": "nur in Übersetzung (neu/übersetzt)",
   "diff.legendDel": "nur in Quelle (ersetzt)",
   "diff.legendPlain": "wortgleich zur Quelle",
-
   "action.add": "Hinzufügen",
   "settings.sitemapOn": "Aktiviert",
   "settings.sitemapOff": "Deaktiviert",
@@ -935,7 +903,8 @@
   "settings.cloudPreviewTitle": "Vorschau: was sich ändern würde",
   "settings.cloudPreviewHint": "Ergebnis eines Probelaufs mit derselben Logik wie beim echten Anwenden — es wurde nichts geändert.",
   "settings.cloudSelectAll": "Alle auswählen",
-  "settings.cloudApplySelected": "Ausgewählte übernehmen",  "settings.cloudApplySelectedHint": "Übernimmt die angehakten Objekte sofort. Abwählen verschiebt nur — es schließt nichts aus: solange die Instanz von der Profil-Revision abweicht, holt der nächste Abgleich (max. 1 Minute) den Rest automatisch nach.",
+  "settings.cloudApplySelected": "Ausgewählte übernehmen",
+  "settings.cloudApplySelectedHint": "Übernimmt die angehakten Objekte sofort. Abwählen verschiebt nur — es schließt nichts aus: solange die Instanz von der Profil-Revision abweicht, holt der nächste Abgleich (max. 1 Minute) den Rest automatisch nach.",
   "settings.cloudPreviewNothing": "Nichts würde sich ändern.",
   "settings.cloudReport": "Was zuletzt übernommen wurde",
   "settings.cloudReportHint": "Ergebnis der letzten Übernahme aus der Cloud. Genau diese Liste geht auch an die Cloud zurück.",
@@ -1020,7 +989,6 @@
   "settings.translate.apiKeyHelp": "DeepL: erforderlich. LibreTranslate: nur falls die Instanz einen Schlüssel verlangt.",
   "settings.translate.url": "Server-URL (nur LibreTranslate)",
   "settings.translate.urlHelp": "z. B. http://libretranslate:5000 (Container im selben Docker-Netz) oder eine öffentliche Instanz.",
-
   "add.button": "Hinzufügen",
   "add.fromCloud": "Aus der Cloud",
   "add.fromCloudHint": "Den Katalog der verbundenen Cloud durchsuchen und übernehmen.",
@@ -1036,7 +1004,6 @@
   "plugins.importZip": "Plugin importieren",
   "plugins.importZipHint": "Ein Bündel mit gleichem Schlüssel aktualisiert ein vorhandenes Plugin; ein neues wird deaktiviert importiert, weil Plugin-Code serverseitig läuft.",
   "plugins.importZipBtn": "ZIP importieren",
-
   "nav.mailtemplates": "Mail-Vorlagen",
   "mailtpl.title": "Mail-Vorlagen",
   "mailtpl.none": "Noch keine Vorlagen vorhanden.",
@@ -1053,22 +1020,18 @@
   "mailtpl.testHint": "Verschickt die gespeicherte Vorlage mit Beispielwerten, damit sich der Text als Mail beurteilen lässt und nicht als Formularfeld.",
   "mailtpl.testTo": "Empfänger",
   "mailtpl.testSend": "Senden",
-
   "mailtpl.unused": "nicht verwendet",
   "mailtpl.unknownKeyShort": "Diese Version verschickt keine Mail mit diesem Schlüssel — der Text wird nie benutzt.",
   "mailtpl.deleteUnknownConfirm": "Vorlage löschen? Sie gehört zu keiner Mail, die diese Version verschickt.",
-
   "mailtpl.isHtml": "Als HTML-Mail versenden",
   "mailtpl.isHtmlHint": "Der Text ist dann HTML. Verschickt wird trotzdem beides — eine Nur-HTML-Mail wird von Spamfiltern schlechter bewertet, deshalb erzeugt MatCMS die Textfassung automatisch mit. Eingesetzte Werte werden maskiert, damit niemand über ein Formular Markup in fremde Postfächer schreiben kann.",
   "mailtpl.loops": "Wiederholte Blöcke",
   "mailtpl.loopsHint": "Alles zwischen {{#name}} und {{/name}} wird einmal je Eintrag ausgegeben — dieselbe Schreibweise wie bei den Menüs im Template.",
-
   "mailtpl.preview": "Vorschau",
   "mailtpl.previewRefresh": "Aktualisieren",
   "mailtpl.previewHint": "Zeigt den Text mit Beispielwerten, gerendert vom selben Code, der die Mail auch verschickt — Schleifen laufen mit zwei Durchgängen, damit sichtbar wird, was Wiederholung mit dem Layout macht.",
   "mailtpl.name": "Name",
   "mailtpl.status": "Status",
-
   "settings.tabMail": "Mailversand",
   "settings.mailTransport": "Versandweg",
   "settings.mailTransportLabel": "Diese Website verschickt",
@@ -1076,8 +1039,10 @@
   "settings.mailViaSmtp": "über eigenes SMTP",
   "settings.mailViaCloudHint": "Ein Cloud-Profil hat festgelegt, dass diese Website nicht selbst versendet: jede Nachricht geht an die Cloud, die sie zwischenspeichert und zustellt. Die SMTP-Felder unten werden dabei nicht benutzt.",
   "settings.mailViaSmtpHint": "Diese Website verschickt selbst über den unten eingetragenen Server.",
-
   "backup.toCloud": "Backups zusätzlich in die Cloud hochladen",
   "backup.toCloudHint": "Nach jedem geplanten Backup wird die Datei an die verbundene Cloud übergeben. Die lokale Kopie bleibt, wo sie ist — ein fehlgeschlagener Upload darf ein gelungenes Backup nicht entwerten.",
-  "backup.uploadNow": "In die Cloud"
+  "backup.uploadNow": "In die Cloud",
+  "editor.saveAndClose": "Speichern und schließen",
+  "settings.mailNone": "Kein Versand",
+  "settings.mailNoneHint": "Diese Website kann derzeit keine E-Mails verschicken: kein SMTP-Server eingetragen und kein Cloud-Versand aktiv. Formular-Benachrichtigungen und Passwort-Mails gehen nicht raus."
 }

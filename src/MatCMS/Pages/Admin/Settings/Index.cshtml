@@ -357,18 +357,26 @@
         <div class="kv">
             <div class="kv-label">@T["settings.mailTransportLabel"]</div>
             <div class="kv-value">
+                @* Three answers, not two. "SMTP" on a site with an empty host was a claim that mail
+                   leaves the building when nothing does — the state worth seeing most is the third. *@
                 @if (Model.UsesCloudRelay)
                 {
                     <span class="badge badge-on">@T["settings.mailViaCloud"]</span>
                 }
+                else if (Model.SmtpConfigured)
+                {
+                    <span class="badge badge-on">@T["settings.mailViaSmtp"]</span>
+                }
                 else
                 {
-                    <span class="badge badge-off">@T["settings.mailViaSmtp"]</span>
+                    <span class="badge badge-err">@T["settings.mailNone"]</span>
                 }
             </div>
         </div>
         <div class="help">
-            @(Model.UsesCloudRelay ? T["settings.mailViaCloudHint"] : T["settings.mailViaSmtpHint"])
+            @(Model.UsesCloudRelay ? T["settings.mailViaCloudHint"]
+              : Model.SmtpConfigured ? T["settings.mailViaSmtpHint"]
+              : T["settings.mailNoneHint"])
         </div>
     </div>
 

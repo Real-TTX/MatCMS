@@ -7,7 +7,6 @@
   "action.back": "Back",
   "action.create": "Create",
   "action.close": "Close",
-
   "nav.pages": "Pages",
   "nav.menus": "Menu",
   "nav.submissions": "Inquiries",
@@ -131,7 +130,6 @@
   "nav.language": "Language",
   "admin.loggedInAs": "Signed in as",
   "admin.language": "Language",
-
   "lang.de": "Deutsch",
   "lang.en": "English",
   "lang.fr": "Français",
@@ -141,7 +139,6 @@
   "lang.sk": "Slovenčina",
   "lang.nl": "Nederlands",
   "lang.pl": "Polski",
-
   "login.pageTitle": "Sign in",
   "login.heading": "Admin sign-in",
   "login.username": "Email address",
@@ -149,7 +146,6 @@
   "login.rememberMe": "Stay signed in",
   "login.submit": "Sign in",
   "login.back": "← Back to the website",
-
   "dashboard.title": "Dashboard",
   "dashboard.editPages": "Edit pages",
   "dashboard.pages": "Pages",
@@ -158,7 +154,6 @@
   "dashboard.users": "Users",
   "dashboard.quickstart": "Quick start",
   "dashboard.quickstartText": "Edit your content under <strong>Pages</strong>. Each page is made of <em>blocks</em> (hero, text, columns, services, contact form …) that you can add, edit, move and delete — the layout stays intact.",
-
   "pages.title": "Pages",
   "pages.none": "No pages yet.",
   "pages.colTitle": "Title",
@@ -173,7 +168,6 @@
   "pages.slugOptional": "Slug (optional)",
   "pages.slugPlaceholder": "generated from the title",
   "pages.createAndEdit": "Create and edit",
-
   "editor.title": "Editor",
   "editor.allBlocks": "‹ All blocks",
   "editor.blockDelete": "Delete",
@@ -225,7 +219,6 @@
   "editor.translationCreate": "Create translation ({0})",
   "editor.translationLink": "Link an existing page",
   "editor.translationLinkSubmit": "Link",
-
   "menus.title": "Menu",
   "menus.heading": "Menu management",
   "menus.toolbarMenu": "Top bar",
@@ -262,7 +255,6 @@
   "menus.targetPlaceholder": "/contact or https://…",
   "menus.openNewTab": "Open in new tab",
   "menus.addSubmit": "Add menu item",
-
   "users.title": "Users",
   "users.colUsername": "Username",
   "users.colDisplayName": "Display name",
@@ -285,7 +277,6 @@
   "users.colEmail": "Email",
   "users.newPassword": "New password",
   "users.newPasswordPlaceholder": "leave empty to keep it unchanged",
-
   "submissions.colDate": "Date",
   "submissions.colData": "Data",
   "submissions.colStatus": "Status",
@@ -294,7 +285,6 @@
   "submissions.markNew": "Mark new",
   "submissions.markRead": "Read",
   "submissions.confirmDelete": "Really delete this inquiry?",
-
   "forms.title": "Forms",
   "forms.none": "No forms yet.",
   "forms.colName": "Name",
@@ -358,7 +348,6 @@
   "forms.el.richselect.desc": "Dropdown with image, title, description & tags.",
   "forms.el.group.name": "Group",
   "forms.el.group.desc": "Groups several fields into one block.",
-
   "settings.title": "Settings",
   "settings.general": "General",
   "settings.fromLibrary": "From Media Library",
@@ -409,7 +398,6 @@
   "settings.contactEmail": "Contact email (recipient, informational)",
   "settings.contactEmailHelp": "Currently not used for sending — inquiries appear under “Inquiries”.",
   "settings.save": "Save",
-
   "backup.title": "Backup",
   "backup.heading": "Backup & Restore",
   "backup.createHeading": "Create backup",
@@ -461,7 +449,6 @@
   "backup.restoreThis": "Restore",
   "backup.restoreStoredConfirm": "Restore this backup now? Included sections will be overwritten.",
   "backup.deleteConfirm": "Delete this backup file?",
-
   "templates.title": "Templates",
   "templates.colName": "Name",
   "templates.colAccent": "Accent color",
@@ -559,7 +546,6 @@
   "templates.bodyFont": "Body font",
   "templates.buttonStyle": "Button style",
   "templates.createSubmit": "Create",
-
   "block.f.heading": "Heading",
   "block.f.body": "Content",
   "block.f.intro": "Intro",
@@ -571,7 +557,6 @@
   "block.f.width": "Width",
   "block.f.buttonText": "Button text",
   "block.f.buttonUrl": "Button link",
-
   "block.opt.align.left": "Left",
   "block.opt.align.center": "Centered",
   "block.opt.width.normal": "Normal",
@@ -656,7 +641,6 @@
   "block.opt.size.small": "Small",
   "block.opt.size.medium": "Medium",
   "block.opt.size.large": "Large",
-
   "block.hero.name": "Hero (header area)",
   "block.hero.desc": "Large page header: heading, optional subtext, button and an image band below.",
   "block.hero.f.heading": "Heading",
@@ -665,58 +649,46 @@
   "block.hero.f.buttonText": "Button text",
   "block.hero.f.buttonUrl": "Button link",
   "block.hero.f.align": "Alignment",
-
   "block.richtext.name": "Text",
   "block.richtext.desc": "Text section with an optional heading and formatted body text (bold, lists, links).",
   "block.richtext.f.align": "Alignment",
-
   "block.columns.name": "Columns",
   "block.columns.desc": "Two or three side-by-side text columns with a title — e.g. for partners or service areas.",
   "block.columns.f.columns": "Number of columns",
   "block.columns.f.items": "Columns",
   "block.columns.item": "Column",
-
   "block.servicegrid.name": "Services (grid)",
   "block.servicegrid.desc": "Tile grid for services or features, each tile with a title and short description.",
   "block.servicegrid.f.columns": "Columns (desktop)",
   "block.servicegrid.f.items": "Services",
   "block.servicegrid.item": "Service",
-
   "block.cta.name": "Call-to-Action",
   "block.cta.desc": "A highlighted call: a big statement with optional text and a button (e.g. “Contact us”).",
-
   "block.contactform.name": "Contact form",
   "block.contactform.desc": "Form for name, email, category and message. Submissions appear in the admin under “Inquiries”.",
   "block.contactform.f.categories": "Categories",
-
   "block.form.name": "Form",
   "block.form.desc": "Embeds a form created under “Forms” into the page.",
   "block.form.f.form": "Form",
-
   "block.image.name": "Image",
   "block.image.desc": "A single image with an optional caption — as an upload or via URL.",
   "block.image.f.caption": "Caption",
-
   "block.accordion.name": "Accordion (FAQ)",
   "block.accordion.desc": "A collapsible question-and-answer list — ideal for frequently asked questions (FAQ).",
   "block.accordion.f.items": "Entries",
   "block.accordion.item": "Question",
   "block.accordion.f.question": "Question",
   "block.accordion.f.answer": "Answer",
-
   "block.quote.name": "Quote",
   "block.quote.desc": "A highlighted quote or testimonial with an optional name.",
   "block.quote.f.quote": "Quote",
   "block.quote.f.author": "Author / source",
-
   "block.imagetext.name": "Image & Text",
   "block.imagetext.desc": "Image next to text — with a heading, formatted body text and a selectable image side.",
   "block.imagetext.f.imageSide": "Image side",
-
   "block.spacer.name": "Spacer",
   "block.spacer.desc": "Empty vertical space between two blocks.",
   "block.spacer.f.size": "Size",
-
   "block.html.name": "HTML",
   "block.html.desc": "Custom HTML code (advanced)",
   "block.html.f.html": "HTML",
@@ -726,7 +698,6 @@
   "block.logostrip.item": "Logo",
   "block.logostrip.f.image": "Logo",
   "block.logostrip.f.url": "Link (optional)",
-
   "action.search": "Search…",
   "list.noResults": "No matches.",
   "store.dialogSearch": "Search the store …",
@@ -737,7 +708,6 @@
   "list.empty": "No data yet.",
   "menus.colName": "Name",
   "menus.colKey": "Key",
-
   "posts.title": "Posts",
   "posts.new": "Create",
   "posts.colDate": "Date",
@@ -792,7 +762,6 @@
   "posts.pagerPrev": "‹ Back",
   "posts.pagerNext": "Next ›",
   "posts.attachmentsHeading": "Attachments",
-
   "diff.title": "Compare translations",
   "diff.back": "Back to the editor",
   "diff.source": "Source",
@@ -822,7 +791,6 @@
   "diff.legendIns": "only in translation (new/translated)",
   "diff.legendDel": "only in source (replaced)",
   "diff.legendPlain": "same word as source",
-
   "action.add": "Add",
   "settings.sitemapOn": "Enabled",
   "settings.sitemapOff": "Disabled",
@@ -935,7 +903,8 @@
   "settings.cloudPreviewTitle": "Preview: what would change",
   "settings.cloudPreviewHint": "Result of a dry run through the exact same logic as a real apply — nothing was changed.",
   "settings.cloudSelectAll": "Select all",
-  "settings.cloudApplySelected": "Apply selected",  "settings.cloudApplySelectedHint": "Applies the ticked items now. Unticking only defers, it does not exclude: while the instance differs from the profile revision, the next sync (within a minute) brings the rest automatically.",
+  "settings.cloudApplySelected": "Apply selected",
+  "settings.cloudApplySelectedHint": "Applies the ticked items now. Unticking only defers, it does not exclude: while the instance differs from the profile revision, the next sync (within a minute) brings the rest automatically.",
   "settings.cloudPreviewNothing": "Nothing would change.",
   "settings.cloudReport": "What was applied last",
   "settings.cloudReportHint": "Result of the last apply from the cloud. This exact list is what the cloud is told as well.",
@@ -1020,7 +989,6 @@
   "settings.translate.apiKeyHelp": "DeepL: required. LibreTranslate: only if your instance requires a key.",
   "settings.translate.url": "Server URL (LibreTranslate only)",
   "settings.translate.urlHelp": "e.g. http://libretranslate:5000 (container on the same Docker network) or a public instance.",
-
   "add.button": "Add",
   "add.fromCloud": "From the cloud",
   "add.fromCloudHint": "Browse the connected cloud’s catalogue and install from it.",
@@ -1036,7 +1004,6 @@
   "plugins.importZip": "Import plugin",
   "plugins.importZipHint": "A bundle with the same key updates an existing plugin; a new one is imported disabled, because plugin code runs server-side.",
   "plugins.importZipBtn": "Import ZIP",
-
   "nav.mailtemplates": "Mail templates",
   "mailtpl.title": "Mail templates",
   "mailtpl.none": "No templates yet.",
@@ -1053,22 +1020,18 @@
   "mailtpl.testHint": "Sends the saved template with example values, so the wording can be judged as mail rather than as a form field.",
   "mailtpl.testTo": "Recipient",
   "mailtpl.testSend": "Send",
-
   "mailtpl.unused": "unused",
   "mailtpl.unknownKeyShort": "This version sends no mail with this key — the text will never be used.",
   "mailtpl.deleteUnknownConfirm": "Delete the template? It belongs to no mail this version sends.",
-
   "mailtpl.isHtml": "Send as an HTML mail",
   "mailtpl.isHtmlHint": "The body is then HTML. Both are still sent — an HTML-only message scores worse with spam filters, so MatCMS derives the text version for you. Inserted values are escaped, so nobody can write markup into somebody else’s inbox through a form.",
   "mailtpl.loops": "Repeated blocks",
   "mailtpl.loopsHint": "Everything between {{#name}} and {{/name}} is written once per entry — the same notation the template engine uses for menus.",
-
   "mailtpl.preview": "Preview",
   "mailtpl.previewRefresh": "Refresh",
   "mailtpl.previewHint": "Shows the body with example values, rendered by the same code that sends the mail — loops run twice, so it is visible what repetition does to the layout.",
   "mailtpl.name": "Name",
   "mailtpl.status": "Status",
-
   "settings.tabMail": "Mail delivery",
   "settings.mailTransport": "Delivery route",
   "settings.mailTransportLabel": "This site sends",
@@ -1076,8 +1039,10 @@
   "settings.mailViaSmtp": "through its own SMTP",
   "settings.mailViaCloudHint": "A cloud profile decided that this site does not send for itself: every message goes to the cloud, which spools and delivers it. The SMTP fields below are not used.",
   "settings.mailViaSmtpHint": "This site sends through the server configured below.",
-
   "backup.toCloud": "Also upload backups to the cloud",
   "backup.toCloudHint": "After every scheduled backup the file is handed to the connected cloud. The local copy stays where it is — a failed upload must not devalue a successful backup.",
-  "backup.uploadNow": "To the cloud"
+  "backup.uploadNow": "To the cloud",
+  "editor.saveAndClose": "Save and close",
+  "settings.mailNone": "No sending",
+  "settings.mailNoneHint": "This site cannot send e-mail: no SMTP server configured and no cloud relay active. Form notifications and password mails will not go out."
 }

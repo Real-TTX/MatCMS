@@ -1078,3 +1078,15 @@ table.data .btn { white-space: nowrap; }
    allow several child types and the sidebar is narrow. */
 .le-add-child { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .le-add-child .add-child { align-self: auto; }
+
+/* Multi-select as tick-able chips. A native <select multiple> needs ctrl-click to add a second
+   entry and drops the rest without a word if you forget — the exact mistake this field prevents. */
+.ms-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ms-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 10px; border: 1px solid var(--border, #e5e7eb); border-radius: 999px;
+    font-size: 13px; cursor: pointer; user-select: none; background: var(--card, #fff);
+}
+.ms-chip:hover { border-color: var(--accent, #2563eb); }
+.ms-chip.on { border-color: var(--accent, #2563eb); background: color-mix(in srgb, var(--accent, #2563eb) 10%, transparent); }
+.ms-chip input { margin: 0; }

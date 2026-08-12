@@ -101,6 +101,44 @@
             });
             wrap.appendChild(sel);
             get = function () { return sel.value; };
+        } else if (type === "multiselect") {
+            // Chips with checkboxes rather than a <select multiple>: a native multi-select needs
+            // ctrl-click to add a second entry and silently drops the rest if you forget, which is
+            // exactly the mistake this field exists to prevent.
+            // The value stays ONE comma-separated string — the format the server already reads, so
+            // a field that used to be a single select keeps everything it ever saved.
+            var chosen = String(value != null ? value : (field.default || ""))
+                .split(",").map(function (x) { return x.trim(); }).filter(Boolean);
+            var ms = document.createElement("div");
+            ms.className = "ms-chips";
+            var boxes = [];
+            (field.options || []).forEach(function (o) {
+                var lab = document.createElement("label");
+                lab.className = "ms-chip";
+                var cb = document.createElement("input");
+                cb.type = "checkbox";
+                cb.value = o.value;
+                // Case-insensitive, because tags are typed by hand elsewhere and "Zimmer" must not
+                // come back unticked because it was saved as "zimmer".
+                cb.checked = chosen.some(function (c) { return c.toLowerCase() === o.value.toLowerCase(); });
+                if (cb.checked) lab.classList.add("on");
+                cb.addEventListener("change", function () { lab.classList.toggle("on", cb.checked); });
+                lab.appendChild(cb);
+                lab.appendChild(document.createTextNode(o.label));
+                ms.appendChild(lab);
+                boxes.push(cb);
+            });
+            if (!boxes.length) {
+                var none = document.createElement("div");
+                none.className = "help";
+                none.textContent = field.emptyHint || "Keine Auswahl vorhanden.";
+                ms.appendChild(none);
+            }
+            wrap.appendChild(ms);
+            get = function () {
+                return boxes.filter(function (b) { return b.checked; })
+                            .map(function (b) { return b.value; }).join(", ");
+            };
         } else if (type === "image") {
             var im = buildImage(value != null ? value : "");
             wrap.appendChild(im.node);

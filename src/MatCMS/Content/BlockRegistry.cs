@@ -377,9 +377,12 @@ public class BlockRegistry
                 new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },
                 new BlockField { Id = "source", Label = "block.gallery.f.source", Type = FieldType.Select, Default = "manual",
                     Options = [ new("manual", "block.gallery.opt.source.manual"), new("media", "block.gallery.opt.source.media") ] },
-                new BlockField { Id = "tags", Label = "block.gallery.f.tags", Type = FieldType.Select, OptionsSource = "mediaTags",
+                // Several tags, not one. The renderer already matched on ANY of a comma-separated
+                // list — only the editor could not express it, so "Zimmer und Aussenanlage" meant
+                // picking one and giving up on the other.
+                new BlockField { Id = "tags", Label = "block.gallery.f.tags", Type = FieldType.MultiSelect, OptionsSource = "mediaTags",
                     ShowWhenField = "source", ShowWhenValue = "media",
-                    Help = "Einen Tag wählen – es werden alle Medien mit diesem Tag angezeigt (leer = alle)." },
+                    Help = "Tags wählen – es werden alle Medien angezeigt, die mindestens einen davon tragen (nichts gewählt = alle)." },
                 new BlockField { Id = "showFilter", Label = "block.gallery.f.showFilter", Type = FieldType.Select, Default = "yes",
                     ShowWhenField = "source", ShowWhenValue = "media",
                     Options = [ new("yes", "block.opt.yesno.yes"), new("no", "block.opt.yesno.no") ],

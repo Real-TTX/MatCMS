@@ -661,7 +661,10 @@ public class EditModel : PageModel
     private async Task<List<SelectOption>> LoadMediaTagOptionsAsync()
     {
         var tagStrings = await _db.Media.AsNoTracking().Select(m => m.Tags).ToListAsync();
-        var options = new List<SelectOption> { new("", "Alle Medien") };
+        // No "all media" entry any more: the only field using this is a multi-select now, where an
+        // empty-valued tick box would be a chip that means "ignore the other ticks". Nothing ticked
+        // already means all, and the field's help text says so.
+        var options = new List<SelectOption>();
         options.AddRange(tagStrings
             .SelectMany(TagUtil.Split)
             .Distinct(StringComparer.OrdinalIgnoreCase)

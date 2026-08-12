@@ -31,13 +31,14 @@
                     <input type="hidden" name="ElementJson" id="ElementJson" />
                     <div id="element-editor"></div>
                 </form>
-                @* Same compact icon action row as the block editor: delete left, save + done right. *@
+                @* Same row as the block editor, and now the same rule: the ✓ SAVES and then leaves.
+                   It used to be a plain link back, so pressing it lost the edits — and a separate save
+                   button then does what the tick does, minus the leaving, so it is gone. *@
                 <div class="le-panel-actions">
                     <form class="inline-form le-delete" method="post" asp-page-handler="DeleteElement" asp-route-id="@Model.Current.Id" asp-route-elementId="@sel.Id" onsubmit="return confirm('@T["forms.confirmDeleteElement"]');">
                         <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["forms.deleteElement"]" aria-label="@T["forms.deleteElement"]"><i class="ti ti-trash" aria-hidden="true"></i></button>
                     </form>
-                    <button type="submit" form="element-form" class="btn btn-sm btn-icon le-save" title="@T["action.save"]" aria-label="@T["action.save"]"><i class="ti ti-device-floppy" aria-hidden="true"></i></button>
-                    <a class="btn btn-sm btn-ghost btn-icon" asp-page="Edit" asp-route-id="@Model.Current.Id" title="@T["editor.done"]" aria-label="@T["editor.done"]"><i class="ti ti-check" aria-hidden="true"></i></a>
+                    <button type="submit" form="element-form" name="close" value="true" class="btn btn-sm btn-icon le-save" title="@T["editor.saveAndClose"]" aria-label="@T["editor.saveAndClose"]"><i class="ti ti-check" aria-hidden="true"></i></button>
                 </div>
             </div>
             <script id="element-data" type="application/json">@Html.Raw(Model.ElementJsonData.Replace("</", "<\\/"))</script>

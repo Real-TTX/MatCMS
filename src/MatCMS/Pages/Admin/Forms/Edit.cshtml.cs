@@ -130,7 +130,10 @@ public class EditModel : PageModel
         return RedirectToPage(new { id, element = el.Id });
     }
 
-    public async Task<IActionResult> OnPostSaveElementAsync(int id, string elementId)
+    /// <param name="close">Set by the ✓ button: save, then leave the element editor. It used to be
+    /// a plain link back, which threw the edits away — the same trap the block editor had, and a tick
+    /// is the last control anybody expects to lose work to.</param>
+    public async Task<IActionResult> OnPostSaveElementAsync(int id, string elementId, bool close = false)
     {
         var form = await _db.Forms.FindAsync(id);
         if (form is null) return NotFound();
@@ -155,7 +158,7 @@ public class EditModel : PageModel
         form.DefinitionJson = FormDefinition.Serialize(elements);
         await _db.SaveChangesAsync();
         TempData["Flash"] = "Element gespeichert.";
-        return RedirectToPage(new { id, element = elementId });
+        return close ? RedirectToPage(new { id }) : RedirectToPage(new { id, element = elementId });
     }
 
     public async Task<IActionResult> OnPostDeleteElementAsync(int id, string elementId)

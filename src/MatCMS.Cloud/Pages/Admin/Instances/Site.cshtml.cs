@@ -21,6 +21,12 @@ public class SiteModel : PageModel
 
     public Instance Item { get; private set; } = new();
 
+    /// <summary>The instance's own admin, derived from the address it reports. Nothing is stored for
+    /// this: a second field would only be one more thing that can disagree with the site's real URL.</summary>
+    public string? AdminUrl => string.IsNullOrWhiteSpace(Item.PreviewUrl)
+        ? null
+        : Item.PreviewUrl!.TrimEnd('/') + "/Admin";
+
     /// <summary>
     /// Everything the switcher lists: ALL instances, not only the reachable ones.
     /// <para>Offline is exactly when an operator goes looking — leaving those out means the control

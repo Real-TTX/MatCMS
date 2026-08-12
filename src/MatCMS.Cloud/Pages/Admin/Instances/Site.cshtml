@@ -85,6 +85,16 @@
             <button type="button" class="btn btn-sm btn-ghost" data-site-reload title="@T["instances.reload"]" aria-label="@T["instances.reload"]">
                 <i class="ti ti-refresh" aria-hidden="true"></i>
             </button>
+            @* Into the site's OWN admin. Looking at a customer's page and then wanting to change
+               something is the next move often enough that hunting for the address is a waste — and
+               the address is derivable, it is the site's URL plus /Admin.
+               A new tab on purpose: this view is the site as visitors see it, and replacing it with a
+               login screen would throw that away. It also needs its own session on the instance,
+               which the cloud has no part in. *@
+            <a class="btn btn-sm btn-ghost" href="@Model.AdminUrl" target="_blank" rel="noopener"
+               title="@T["instances.openAdmin"]" aria-label="@T["instances.openAdmin"]">
+                <i class="ti ti-settings" aria-hidden="true"></i> @T["instances.admin"]
+            </a>
             <a class="btn btn-sm btn-ghost" href="@Model.Item.PreviewUrl" target="_blank" rel="noopener"
                title="@T["instances.openSite"]" aria-label="@T["instances.openSite"]">
                 <i class="ti ti-external-link" aria-hidden="true"></i>

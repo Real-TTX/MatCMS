@@ -611,5 +611,7 @@
   "backups.agoDays": "{0} days ago",
   "backups.manage": "All backups",
   "instances.previewInsecure": "This site is served over http and cannot be embedded in an https page — the browser blocks it. Usually the instance sits behind a proxy and reports its own address as http; forwarded headers or a canonical URL in the site settings fix that.",
-  "instances.previewInsecureShort": "http — cannot embed"
+  "instances.previewInsecureShort": "http — cannot embed",
+  "instances.admin": "Admin",
+  "instances.openAdmin": "Open the site's admin"
 }

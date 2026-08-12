@@ -142,7 +142,13 @@ public class EditModel : PageModel
     /// expects to lose work to.</param>
     /// <param name="thenAdd">Set by ＋ while a block is open: same trap, different button. Saves
     /// first and reopens with the picker showing.</param>
-    public async Task<IActionResult> OnPostSaveBlockAsync(int id, int blockId, bool close = false, bool thenAdd = false)
+    /// <param name="addChildType">Set by the ＋ buttons in the block tree beside the settings: save
+    /// this block, then add a child of that type to <paramref name="addChildParent"/> and open it.
+    /// The tree used to be read-only, so building a container meant going back to the block list for
+    /// every single child.</param>
+    public async Task<IActionResult> OnPostSaveBlockAsync(
+        int id, int blockId, bool close = false, bool thenAdd = false,
+        string? addChildType = null, int? addChildParent = null)
     {
         var block = await _db.ContentBlocks.Include(b => b.Page).FirstOrDefaultAsync(b => b.Id == blockId && b.PageId == id);
         if (block is null) return NotFound();
@@ -166,6 +172,11 @@ public class EditModel : PageModel
         TempData["Flash"] = "Block gespeichert.";
         if (close) return RedirectToPage(new { id });
         if (thenAdd) return RedirectToPage(new { id, block = blockId, add = true });
+        // Handed to the ONE method that creates blocks, rather than a second copy here: it is the
+        // place that checks the parent allows this child type and keeps the sort order contiguous,
+        // and it already opens what it created.
+        if (!string.IsNullOrWhiteSpace(addChildType) && addChildParent is int parent)
+            return await OnPostAddBlockAsync(id, addChildType, parent, null);
         return RedirectToPage(new { id, block = blockId });
     }
 

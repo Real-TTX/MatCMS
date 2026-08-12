@@ -37,7 +37,10 @@
                         ? _all.Where(b => b.ParentId == _root.Id).OrderBy(b => b.SortOrder).ToList()
                         : new List<MatCMS.Models.ContentBlock>();
                 }
-                @if (_root != null && _kids.Count > 0)
+                @* Shown for any container, not only one that already HAS children — an empty container
+                   is exactly when somebody needs the ＋, and hiding the tree there meant the buttons
+                   appeared only once they were no longer the point. *@
+                @if (_root != null)
                 {
                     var _rdef = Model.Registry.Get(_root.BlockType);
                     <div class="le-family">
@@ -63,6 +66,26 @@
                                         </div>
                                     }
                                 </div>
+                                @* Children can be added right here. The tree used to be read-only, so
+                                   building a container meant going back to the block list for every
+                                   single child — with the tree sitting in view the whole time.
+                                   These submit the settings form, so the block being edited is saved
+                                   on the way out like every other button that leaves it. *@
+                                @{ var _rootDef = _rdef; }
+                                @if (_rootDef is not null && _rootDef.AllowedChildren.Any())
+                                {
+                                    <div class="le-add-child">
+                                        @foreach (var _ct in _rootDef.AllowedChildren)
+                                        {
+                                            var _ctDef = Model.Registry.Get(_ct);
+                                            <button type="submit" form="block-form" class="btn btn-sm btn-ghost add-child"
+                                                    name="addChildType" value="@_ct"
+                                                    formaction="@Url.Page("Edit", "SaveBlock", new { id = Model.Current.Id, blockId = Model.SelectedBlock!.Id, addChildParent = _root.Id })">
+                                                ＋ @(_ctDef is not null ? T[_ctDef.Name] : _ct)
+                                            </button>
+                                        }
+                                    </div>
+                                }
                                 <form id="child-reorder-form" method="post" asp-page-handler="Reorder" asp-route-id="@Model.Current.Id" style="display:none;">
                                     <div data-order-inputs></div>
                                 </form>

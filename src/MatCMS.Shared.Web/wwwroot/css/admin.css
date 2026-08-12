@@ -1073,3 +1073,8 @@ table.data .btn { white-space: nowrap; }
 
 /* Mail preview: the finished message, rendered by the server. */
 .mail-preview { width: 100%; height: 420px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+
+/* The ＋ buttons under the block tree in the settings panel. Wrapping, because a container can
+   allow several child types and the sidebar is narrow. */
+.le-add-child { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.le-add-child .add-child { align-self: auto; }

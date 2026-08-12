@@ -1090,3 +1090,19 @@ table.data .btn { white-space: nowrap; }
 .ms-chip:hover { border-color: var(--accent, #2563eb); }
 .ms-chip.on { border-color: var(--accent, #2563eb); background: color-mix(in srgb, var(--accent, #2563eb) 10%, transparent); }
 .ms-chip input { margin: 0; }
+
+/* The multi-select dropdown inside the block editor. Its own stylesheet (mat-richselect.css) dresses
+   it for the PUBLIC site, where fields are rounded and 16px — next to the admin's square 1px fields
+   it read as a foreign control. These few lines pull the trigger back in line with .field above; the
+   menu itself keeps the shared styling, because a dropdown panel looks the same in both places. */
+.field .mat-rs { position: relative; }
+.field .mat-rs-trigger {
+    width: 100%; padding: 11px 13px; border: 1px solid #cfcfcf; border-radius: 0;
+    font-family: inherit; font-size: 15px; background: #fff; color: inherit;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    text-align: left; cursor: pointer; box-sizing: border-box; min-height: 0;
+}
+.field .mat-rs-trigger:focus-visible { outline: 2px solid var(--accent, #2563eb); outline-offset: -2px; }
+.field .mat-rs-current { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.field .mat-rs-placeholder { color: var(--muted, #6b7280); }
+.field .mat-rs-chev { flex: 0 0 auto; color: var(--muted, #6b7280); font-size: 12px; }

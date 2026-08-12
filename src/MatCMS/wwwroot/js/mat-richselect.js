@@ -71,7 +71,12 @@
             if (wrap.hasAttribute('data-rs-multi')) {
                 opt.classList.toggle('on');
                 var chosen = [].slice.call(menu.querySelectorAll('[data-rs-opt].on'));
-                input.value = chosen.map(function (o) { return o.getAttribute('data-value') || ''; }).join(', ');
+                // The separator is configurable because the stored value is read by whatever
+                // consumes the field afterwards — a list joined with ', ' is not the same string as
+                // one joined with '|', and only the field's owner knows which one is expected.
+                var sep = input.getAttribute('data-sep');
+                if (sep === null) sep = ', ';
+                input.value = chosen.map(function (o) { return o.getAttribute('data-value') || ''; }).join(sep);
                 chosen.forEach(function (o) { o.setAttribute('aria-selected', 'true'); });
                 menu.querySelectorAll('[data-rs-opt]:not(.on)').forEach(function (o) { o.removeAttribute('aria-selected'); });
 
@@ -82,7 +87,7 @@
                         ? chosen.map(function (o) {
                             var t = o.querySelector('.mat-rs-opt-title');
                             return t ? t.textContent : o.getAttribute('data-value');
-                          }).join(', ')
+                          }).join(sep)
                         // Beyond two the names stop fitting the closed field, and a truncated list
                         // reads as if the rest were not selected.
                         : (input.getAttribute('data-many') || '{0} gewählt').replace('{0}', chosen.length);

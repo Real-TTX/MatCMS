@@ -182,6 +182,16 @@
         phWrap.appendChild(phInput);
         container.appendChild(phWrap);
 
+        // Separator (multi-select only). What joins the chosen values in the stored string — the
+        // side that reads the submission decides this, not the field, so it has to be settable.
+        var sepWrap = fieldWrap("Trennzeichen");
+        var sepInput = document.createElement("input");
+        sepInput.type = "text";
+        sepInput.value = data.separator != null ? data.separator : "";
+        sepInput.placeholder = ", ";
+        sepWrap.appendChild(sepInput);
+        container.appendChild(sepWrap);
+
         // Help
         var helpWrap = fieldWrap("Hilfetext");
         var helpInput = document.createElement("input");
@@ -268,6 +278,8 @@
         function refresh() {
             var t = typeGetter();
             show(phWrap, isInput(t));
+            // Only the multi-select joins anything, so only it has something to separate.
+            show(sepWrap, t === "multiselect");
             // For selects the placeholder is the empty-option / prompt text ("– Bitte auswählen –").
             if (phLabel) phLabel.textContent = isSelectLike(t) ? "Auswahl-Platzhalter" : "Platzhalter";
             show(helpWrap, t !== "title");
@@ -284,6 +296,8 @@
             var out = { type: t, label: labelInput.value };
             if (data.id) out.id = data.id;
             if (isInput(t)) out.placeholder = phInput.value;
+            // Empty means "use the default", so it is left out rather than stored as "".
+            if (t === "multiselect" && sepInput.value !== "") out.separator = sepInput.value;
             if (t !== "title") out.help = helpInput.value;
             if (isInput(t)) out.required = reqInput.checked;
             if (t === "text" || t === "phone" || t === "email" || t === "number") out.regex = reInput.value;

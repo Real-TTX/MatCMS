@@ -107,8 +107,12 @@
             // mobile that a list of chips could never give.
             // The value stays ONE comma-separated string — the format the server already reads, so a
             // field that used to be a single select keeps everything it ever saved.
+            // Read with the SAME separator it writes with, so a field always recognises its own
+            // stored value. Split on the trimmed form (", " → ",") and trim the parts, otherwise a
+            // value saved without the space would come back as one long unmatched entry.
+            var msSep = field.separator != null && field.separator !== "" ? field.separator : ", ";
             var msChosen = String(value != null ? value : (field.default || ""))
-                .split(",").map(function (x) { return x.trim(); }).filter(Boolean);
+                .split(msSep.trim() || msSep).map(function (x) { return x.trim(); }).filter(Boolean);
             var opts = field.options || [];
             var rs = document.createElement("div");
             rs.className = "mat-rs";
@@ -123,7 +127,7 @@
             var onLabels = opts.filter(function (o) { return isOn(o.value); }).map(function (o) { return o.label; });
             var placeholder = field.placeholder || "Nichts gewählt";
             var head = onLabels.length === 0 ? placeholder
-                     : onLabels.length <= 2 ? onLabels.join(", ")
+                     : onLabels.length <= 2 ? onLabels.join(msSep)
                      : onLabels.length + " gewählt";
 
             var trig = document.createElement("button");
@@ -141,8 +145,9 @@
             hidden.setAttribute("data-rs-input", "");
             hidden.setAttribute("data-placeholder", placeholder);
             hidden.setAttribute("data-many", "{0} gewählt");
+            hidden.setAttribute("data-sep", msSep);
             hidden.value = opts.filter(function (o) { return isOn(o.value); })
-                               .map(function (o) { return o.value; }).join(", ");
+                               .map(function (o) { return o.value; }).join(msSep);
             rs.appendChild(hidden);
 
             var menu = document.createElement("div");

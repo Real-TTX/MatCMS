@@ -108,8 +108,10 @@
             var multi = el.Type == "multiselect";
             // One comma-separated value for both variants, so a field switched between them keeps
             // everything it ever saved and the submission list needs no second format.
+            // Read with the SAME separator it writes with, so the field recognises its own value.
+            var sep = string.IsNullOrEmpty(el.Separator) ? ", " : el.Separator!;
             var chosen = multi
-                ? MatCMS.Content.TagUtil.Split(val).ToList()
+                ? val.Split(sep.Trim().Length > 0 ? sep.Trim() : sep, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList()
                 : new List<string>();
             System.Func<MatCMS.Content.FormOption, bool> isOn = o => multi
                 ? chosen.Contains(o.Value, StringComparer.OrdinalIgnoreCase)
@@ -126,7 +128,7 @@
                 // rest had not been selected.
                 var names = el.Options.Where(o => isOn(o)).Select(o => string.IsNullOrWhiteSpace(o.Label) ? o.Value : o.Label).ToList();
                 sb.Append("<span class=\"mat-rs-cur-title\">")
-                  .Append(E(names.Count <= 2 ? string.Join(", ", names) : names.Count + " gewählt"))
+                  .Append(E(names.Count <= 2 ? string.Join(sep, names) : names.Count + " gewählt"))
                   .Append("</span>");
             }
             else if (selOpt != null)
@@ -138,7 +140,8 @@
             sb.Append("</span><span class=\"mat-rs-chev\" aria-hidden=\"true\">▾</span></button>");
             sb.Append("<input type=\"hidden\" id=\"fld_").Append(el.Id).Append("\" name=\"").Append(el.Id).Append("\" value=\"").Append(E(val)).Append("\" data-rs-input");
             if (el.Required) sb.Append(" data-required=\"1\"");
-            sb.Append(" data-placeholder=\"").Append(E(ph)).Append("\"").Append(multi ? " data-many=\"{0} gewählt\"" : "").Append(">");
+            sb.Append(" data-placeholder=\"").Append(E(ph)).Append("\"")
+              .Append(multi ? " data-many=\"{0} gewählt\" data-sep=\"" + E(sep) + "\"" : "").Append(">");
             sb.Append("<div class=\"mat-rs-menu\" data-rs-menu hidden>");
             // Mobile: the menu is presented as a bottom-sheet dialog with a title + close (✕) header
             // (hidden on desktop, where the menu stays an inline dropdown).

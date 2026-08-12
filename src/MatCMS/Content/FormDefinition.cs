@@ -13,6 +13,15 @@ public class FormElement
     public string Type { get; set; } = "text";
     public string Label { get; set; } = "";
     public string? Placeholder { get; set; }
+
+    /// <summary>
+    /// What separates the selected values in the stored string (multi-select only). Default ", ".
+    /// <para>Configurable because the stored value is read by whatever consumes the field afterwards:
+    /// a list joined with ", " is a different string from one joined with "|", and only the owner of
+    /// the field knows which one the other side expects. Reading uses the SAME separator, so a field
+    /// still recognises what it wrote.</para>
+    /// </summary>
+    public string? Separator { get; set; }
     public string? Help { get; set; }
     public bool Required { get; set; }
     public string? Regex { get; set; }

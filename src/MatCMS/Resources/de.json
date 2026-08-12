@@ -1044,5 +1044,7 @@
   "backup.uploadNow": "In die Cloud",
   "editor.saveAndClose": "Speichern und schließen",
   "settings.mailNone": "Kein Versand",
-  "settings.mailNoneHint": "Diese Website kann derzeit keine E-Mails verschicken: kein SMTP-Server eingetragen und kein Cloud-Versand aktiv. Formular-Benachrichtigungen und Passwort-Mails gehen nicht raus."
+  "settings.mailNoneHint": "Diese Website kann derzeit keine E-Mails verschicken: kein SMTP-Server eingetragen und kein Cloud-Versand aktiv. Formular-Benachrichtigungen und Passwort-Mails gehen nicht raus.",
+  "forms.el.multiselect.name": "Mehrfachauswahl",
+  "forms.el.multiselect.desc": "Dropdown mit Kästchen – mehrere Optionen auf einmal."
 }

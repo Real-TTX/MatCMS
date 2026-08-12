@@ -63,6 +63,42 @@
             var input = wrap.querySelector('[data-rs-input]');
             var cur = wrap.querySelector('[data-rs-current]');
             var menu = wrap.querySelector('[data-rs-menu]');
+
+            // --- Multi-select ---------------------------------------------------------------
+            // One comma-separated value, because that is what the single-select variant and the
+            // server already store — a field can be switched from one to the other without
+            // touching what it saved.
+            if (wrap.hasAttribute('data-rs-multi')) {
+                opt.classList.toggle('on');
+                var chosen = [].slice.call(menu.querySelectorAll('[data-rs-opt].on'));
+                input.value = chosen.map(function (o) { return o.getAttribute('data-value') || ''; }).join(', ');
+                chosen.forEach(function (o) { o.setAttribute('aria-selected', 'true'); });
+                menu.querySelectorAll('[data-rs-opt]:not(.on)').forEach(function (o) { o.removeAttribute('aria-selected'); });
+
+                cur.innerHTML = '';
+                var ph = input.getAttribute('data-placeholder') || '';
+                var label = chosen.length === 0 ? ph
+                    : chosen.length <= 2
+                        ? chosen.map(function (o) {
+                            var t = o.querySelector('.mat-rs-opt-title');
+                            return t ? t.textContent : o.getAttribute('data-value');
+                          }).join(', ')
+                        // Beyond two the names stop fitting the closed field, and a truncated list
+                        // reads as if the rest were not selected.
+                        : (input.getAttribute('data-many') || '{0} gewählt').replace('{0}', chosen.length);
+                var mt = document.createElement('span');
+                mt.className = 'mat-rs-cur-title';
+                mt.textContent = label;
+                cur.appendChild(mt);
+                cur.classList.toggle('mat-rs-placeholder', chosen.length === 0);
+
+                // The menu STAYS open — closing after every tick would make picking three options
+                // three trips, which is the whole reason this field exists.
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+                return;
+            }
+
             input.value = opt.getAttribute('data-value') || '';
             // Rebuild the compact "current" view from the option's image + title.
             var img = opt.querySelector('.mat-rs-opt-img');

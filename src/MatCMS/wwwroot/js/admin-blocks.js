@@ -102,43 +102,90 @@
             wrap.appendChild(sel);
             get = function () { return sel.value; };
         } else if (type === "multiselect") {
-            // Chips with checkboxes rather than a <select multiple>: a native multi-select needs
-            // ctrl-click to add a second entry and silently drops the rest if you forget, which is
-            // exactly the mistake this field exists to prevent.
-            // The value stays ONE comma-separated string — the format the server already reads, so
-            // a field that used to be a single select keeps everything it ever saved.
-            var chosen = String(value != null ? value : (field.default || ""))
+            // The SAME dropdown the public forms use (mat-richselect), not a second one built for the
+            // admin: one component means one behaviour, and it already brings the bottom-sheet on
+            // mobile that a list of chips could never give.
+            // The value stays ONE comma-separated string — the format the server already reads, so a
+            // field that used to be a single select keeps everything it ever saved.
+            var msChosen = String(value != null ? value : (field.default || ""))
                 .split(",").map(function (x) { return x.trim(); }).filter(Boolean);
-            var ms = document.createElement("div");
-            ms.className = "ms-chips";
-            var boxes = [];
-            (field.options || []).forEach(function (o) {
-                var lab = document.createElement("label");
-                lab.className = "ms-chip";
-                var cb = document.createElement("input");
-                cb.type = "checkbox";
-                cb.value = o.value;
-                // Case-insensitive, because tags are typed by hand elsewhere and "Zimmer" must not
-                // come back unticked because it was saved as "zimmer".
-                cb.checked = chosen.some(function (c) { return c.toLowerCase() === o.value.toLowerCase(); });
-                if (cb.checked) lab.classList.add("on");
-                cb.addEventListener("change", function () { lab.classList.toggle("on", cb.checked); });
-                lab.appendChild(cb);
-                lab.appendChild(document.createTextNode(o.label));
-                ms.appendChild(lab);
-                boxes.push(cb);
+            var opts = field.options || [];
+            var rs = document.createElement("div");
+            rs.className = "mat-rs";
+            rs.setAttribute("data-rs", "");
+            rs.setAttribute("data-rs-multi", "");
+
+            function isOn(v) {
+                // Case-insensitive: tags are typed by hand elsewhere, and "Zimmer" must not come back
+                // unticked because the option is spelled "zimmer".
+                return msChosen.some(function (c) { return c.toLowerCase() === String(v).toLowerCase(); });
+            }
+            var onLabels = opts.filter(function (o) { return isOn(o.value); }).map(function (o) { return o.label; });
+            var placeholder = field.placeholder || "Nichts gewählt";
+            var head = onLabels.length === 0 ? placeholder
+                     : onLabels.length <= 2 ? onLabels.join(", ")
+                     : onLabels.length + " gewählt";
+
+            var trig = document.createElement("button");
+            trig.type = "button";                      // never submits the settings form
+            trig.className = "mat-input mat-rs-trigger";
+            trig.setAttribute("data-rs-btn", "");
+            trig.innerHTML = '<span class="mat-rs-current' + (onLabels.length ? '' : ' mat-rs-placeholder') +
+                             '" data-rs-current><span class="mat-rs-cur-title"></span></span>' +
+                             '<span class="mat-rs-chev" aria-hidden="true">▾</span>';
+            trig.querySelector(".mat-rs-cur-title").textContent = head;
+            rs.appendChild(trig);
+
+            var hidden = document.createElement("input");
+            hidden.type = "hidden";
+            hidden.setAttribute("data-rs-input", "");
+            hidden.setAttribute("data-placeholder", placeholder);
+            hidden.setAttribute("data-many", "{0} gewählt");
+            hidden.value = opts.filter(function (o) { return isOn(o.value); })
+                               .map(function (o) { return o.value; }).join(", ");
+            rs.appendChild(hidden);
+
+            var menu = document.createElement("div");
+            menu.className = "mat-rs-menu";
+            menu.hidden = true;
+            menu.setAttribute("data-rs-menu", "");
+            var sheet = document.createElement("div");
+            sheet.className = "mat-rs-sheet-head";
+            sheet.innerHTML = '<span class="mat-rs-sheet-title"></span>' +
+                              '<button type="button" class="mat-rs-close" data-rs-close aria-label="Schließen">✕</button>';
+            sheet.querySelector(".mat-rs-sheet-title").textContent = field.label || "";
+            menu.appendChild(sheet);
+            var scroll = document.createElement("div");
+            scroll.className = "mat-rs-scroll";
+            opts.forEach(function (o) {
+                var ob = document.createElement("button");
+                ob.type = "button";
+                ob.className = "mat-rs-opt" + (isOn(o.value) ? " on" : "");
+                ob.setAttribute("data-rs-opt", "");
+                ob.setAttribute("data-value", o.value);
+                if (isOn(o.value)) ob.setAttribute("aria-selected", "true");
+                var body = document.createElement("span");
+                body.className = "mat-rs-opt-body";
+                var ti = document.createElement("span");
+                ti.className = "mat-rs-opt-title";
+                ti.textContent = o.label;
+                body.appendChild(ti);
+                ob.appendChild(body);
+                scroll.appendChild(ob);
             });
-            if (!boxes.length) {
+            if (!opts.length) {
                 var none = document.createElement("div");
                 none.className = "help";
+                none.style.padding = "10px 14px";
                 none.textContent = field.emptyHint || "Keine Auswahl vorhanden.";
-                ms.appendChild(none);
+                scroll.appendChild(none);
             }
-            wrap.appendChild(ms);
-            get = function () {
-                return boxes.filter(function (b) { return b.checked; })
-                            .map(function (b) { return b.value; }).join(", ");
-            };
+            menu.appendChild(scroll);
+            rs.appendChild(menu);
+            wrap.appendChild(rs);
+            // Read from the hidden input, which mat-richselect keeps up to date — so the editor never
+            // needs its own copy of "what is ticked".
+            get = function () { return hidden.value; };
         } else if (type === "image") {
             var im = buildImage(value != null ? value : "");
             wrap.appendChild(im.node);

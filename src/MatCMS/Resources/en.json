@@ -1044,5 +1044,7 @@
   "backup.uploadNow": "To the cloud",
   "editor.saveAndClose": "Save and close",
   "settings.mailNone": "No sending",
-  "settings.mailNoneHint": "This site cannot send e-mail: no SMTP server configured and no cloud relay active. Form notifications and password mails will not go out."
+  "settings.mailNoneHint": "This site cannot send e-mail: no SMTP server configured and no cloud relay active. Form notifications and password mails will not go out.",
+  "forms.el.multiselect.name": "Multi-select",
+  "forms.el.multiselect.desc": "Dropdown with tick boxes – several options at once."
 }

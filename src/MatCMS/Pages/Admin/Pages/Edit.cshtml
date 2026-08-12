@@ -389,6 +389,10 @@
 
 @section Scripts {
     <script src="~/js/admin-sortable.js" asp-append-version="true"></script>
+    @* The same dropdown the public forms use — multi-select fields in the block editor are built
+       from its markup, so its stylesheet and behaviour have to be here too. *@
+    <link rel="stylesheet" href="~/css/mat-richselect.css" asp-append-version="true" />
+    <script src="~/js/mat-richselect.js" asp-append-version="true"></script>
     <script src="~/js/admin-blocks.js" asp-append-version="true"></script>
     <script src="~/js/admin-page-editor.js" asp-append-version="true"></script>
 }

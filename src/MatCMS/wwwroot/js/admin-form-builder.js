@@ -3,14 +3,16 @@
 (function () {
     "use strict";
 
-    var INPUT_TYPES = ["text", "textarea", "date", "daterange", "number", "phone", "email", "select", "richselect"];
-    var CHILD_TYPES = ["title", "description", "text", "textarea", "date", "daterange", "number", "phone", "email", "select", "richselect"];
+    var INPUT_TYPES = ["text", "textarea", "date", "daterange", "number", "phone", "email", "select", "richselect", "multiselect"];
+    var CHILD_TYPES = ["title", "description", "text", "textarea", "date", "daterange", "number", "phone", "email", "select", "richselect", "multiselect"];
     var TYPE_LABELS = {
         title: "Überschrift", description: "Beschreibung", text: "Textfeld", textarea: "Textfeld (mehrzeilig)",
         date: "Datum", daterange: "Zeitraum", number: "Zahl", phone: "Telefon", email: "E-Mail",
-        select: "Auswahl", richselect: "Auswahl mit Bild", group: "Gruppe"
+        select: "Auswahl", richselect: "Auswahl mit Bild", multiselect: "Mehrfachauswahl", group: "Gruppe"
     };
-    function isSelectLike(t) { return t === "select" || t === "richselect"; }
+    // multiselect counts as select-like: it is the options editor that makes the type usable at
+    // all, and a field you cannot give options to is an empty dropdown.
+    function isSelectLike(t) { return t === "select" || t === "richselect" || t === "multiselect"; }
     var OP_LABELS = { eq: "ist gleich", neq: "ist ungleich", contains: "enthält", filled: "ist ausgefüllt" };
 
     function isInput(t) { return INPUT_TYPES.indexOf(t) >= 0; }

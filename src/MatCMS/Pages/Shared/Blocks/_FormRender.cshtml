@@ -102,15 +102,34 @@
             sb.Append(" />");
             sb.Append("</div>");
         }
-        else if (el.Type == "richselect")
+        else if (el.Type == "richselect" || el.Type == "multiselect")
         {
             System.Func<string, string> E = s => System.Net.WebUtility.HtmlEncode(s ?? "");
-            var selOpt = el.Options.FirstOrDefault(o => string.Equals(o.Value, val, StringComparison.Ordinal));
+            var multi = el.Type == "multiselect";
+            // One comma-separated value for both variants, so a field switched between them keeps
+            // everything it ever saved and the submission list needs no second format.
+            var chosen = multi
+                ? MatCMS.Content.TagUtil.Split(val).ToList()
+                : new List<string>();
+            System.Func<MatCMS.Content.FormOption, bool> isOn = o => multi
+                ? chosen.Contains(o.Value, StringComparer.OrdinalIgnoreCase)
+                : string.Equals(o.Value, val, StringComparison.Ordinal);
+            var selOpt = multi ? null : el.Options.FirstOrDefault(o => string.Equals(o.Value, val, StringComparison.Ordinal));
             var ph = string.IsNullOrWhiteSpace(el.Placeholder) ? T["form.selectPlaceholder"].ToString() : el.Placeholder;
-            sb.Append("<div class=\"mat-rs\" data-rs>");
+            sb.Append("<div class=\"mat-rs\" data-rs").Append(multi ? " data-rs-multi" : "").Append(">");
             sb.Append("<button type=\"button\" class=\"mat-input mat-rs-trigger\" data-rs-btn").Append(disAttr).Append(">");
-            sb.Append("<span class=\"mat-rs-current").Append(selOpt == null ? " mat-rs-placeholder" : "").Append("\" data-rs-current>");
-            if (selOpt != null)
+            var nothingChosen = multi ? chosen.Count == 0 : selOpt == null;
+            sb.Append("<span class=\"mat-rs-current").Append(nothingChosen ? " mat-rs-placeholder" : "").Append("\" data-rs-current>");
+            if (multi && chosen.Count > 0)
+            {
+                // Names while they still fit, a count after that: a truncated list reads as if the
+                // rest had not been selected.
+                var names = el.Options.Where(o => isOn(o)).Select(o => string.IsNullOrWhiteSpace(o.Label) ? o.Value : o.Label).ToList();
+                sb.Append("<span class=\"mat-rs-cur-title\">")
+                  .Append(E(names.Count <= 2 ? string.Join(", ", names) : names.Count + " gewählt"))
+                  .Append("</span>");
+            }
+            else if (selOpt != null)
             {
                 if (!string.IsNullOrWhiteSpace(selOpt.Image)) sb.Append("<span class=\"mat-rs-cur-img\" style=\"background-image:url('").Append(E(selOpt.Image)).Append("')\"></span>");
                 sb.Append("<span class=\"mat-rs-cur-title\">").Append(E(selOpt.Label)).Append("</span>");
@@ -119,7 +138,7 @@
             sb.Append("</span><span class=\"mat-rs-chev\" aria-hidden=\"true\">▾</span></button>");
             sb.Append("<input type=\"hidden\" id=\"fld_").Append(el.Id).Append("\" name=\"").Append(el.Id).Append("\" value=\"").Append(E(val)).Append("\" data-rs-input");
             if (el.Required) sb.Append(" data-required=\"1\"");
-            sb.Append(" data-placeholder=\"").Append(E(ph)).Append("\">");
+            sb.Append(" data-placeholder=\"").Append(E(ph)).Append("\"").Append(multi ? " data-many=\"{0} gewählt\"" : "").Append(">");
             sb.Append("<div class=\"mat-rs-menu\" data-rs-menu hidden>");
             // Mobile: the menu is presented as a bottom-sheet dialog with a title + close (✕) header
             // (hidden on desktop, where the menu stays an inline dropdown).
@@ -130,8 +149,8 @@
             sb.Append("<div class=\"mat-rs-scroll\">");
             foreach (var o in el.Options)
             {
-                var isSel = selOpt != null && ReferenceEquals(o, selOpt);
-                sb.Append("<button type=\"button\" class=\"mat-rs-opt\" data-rs-opt data-value=\"").Append(E(o.Value)).Append("\"").Append(isSel ? " aria-selected=\"true\"" : "").Append(">");
+                var isSel = isOn(o);
+                sb.Append("<button type=\"button\" class=\"mat-rs-opt").Append(isSel && multi ? " on" : "").Append("\" data-rs-opt data-value=\"").Append(E(o.Value)).Append("\"").Append(isSel ? " aria-selected=\"true\"" : "").Append(">");
                 if (!string.IsNullOrWhiteSpace(o.Image)) sb.Append("<span class=\"mat-rs-opt-img\" style=\"background-image:url('").Append(E(o.Image)).Append("')\"></span>");
                 sb.Append("<span class=\"mat-rs-opt-body\"><span class=\"mat-rs-opt-title\">").Append(E(string.IsNullOrWhiteSpace(o.Label) ? o.Value : o.Label)).Append("</span>");
                 if (!string.IsNullOrWhiteSpace(o.Description)) sb.Append("<span class=\"mat-rs-opt-desc\">").Append(E(o.Description)).Append("</span>");

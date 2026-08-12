@@ -59,6 +59,8 @@ public class EditModel : PageModel
         ("email",       @"<rect x=""3"" y=""5"" width=""18"" height=""14"" rx=""2""/><path d=""M4 7l8 6 8-6""/>"),
         ("select",      @"<rect x=""3"" y=""6"" width=""18"" height=""12"" rx=""2""/><path d=""M8 11l4 3 4-3""/>"),
         ("richselect",  @"<rect x=""3"" y=""5"" width=""18"" height=""14"" rx=""2""/><rect x=""5"" y=""8"" width=""6"" height=""8"" rx=""1""/><path d=""M13 9h6""/><path d=""M13 13h4""/>"),
+        // Same dropdown as richselect, several answers at a time.
+        ("multiselect", @"<rect x=""3"" y=""5"" width=""18"" height=""14"" rx=""2""/><path d=""M6 9l1.5 1.5L10 8""/><path d=""M6 15l1.5 1.5L10 14""/><path d=""M13 9h5""/><path d=""M13 15h5""/>"),
         ("group",       @"<rect x=""3"" y=""4"" width=""18"" height=""16"" rx=""2""/><path d=""M3 9h18""/>"),
     ];
 

@@ -364,3 +364,15 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
+/* The framed page's own title, next to the instance switcher. Muted and preceded by a separator,
+   because it is a step BELOW the instance, not a second thing of equal weight. */
+.inst-page-title {
+    color: var(--muted, #6b7280);
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 40vw;
+}
+.inst-page-title::before { content: "A"; margin: 0 8px 0 4px; opacity: .6; }

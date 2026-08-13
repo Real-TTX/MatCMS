@@ -34,6 +34,18 @@
     <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/admin.css" asp-append-version="true" />
     <link rel="icon" href="@Site.FaviconUrl" />
+    @* Embedded in the cloud's instance view: that page already carries a bar with the instance
+       switcher and the actions, so this one would be a second bar saying the same kind of thing.
+       Decided from being FRAMED rather than from a ?embed=1 flag — a flag has to survive every link
+       on every sub-page, and the first one that forgets it puts the bar back halfway through a
+       session. Being in a frame is true for every page without anyone carrying it along.
+       Set in the head and applied by CSS, so the bar is never painted and then removed. *@
+    <script>
+        if (window.self !== window.top) document.documentElement.classList.add('is-embedded');
+    </script>
+    <style>
+        html.is-embedded .admin-topbar { display: none; }
+    </style>
 </head>
 <body class="admin">
     <aside class="admin-sidebar">
@@ -110,6 +122,16 @@
             <div class="admin-topbar-title">@title</div>
             <div class="admin-topbar-right"></div>
         </header>
+        @* The title the hidden bar would have shown is handed to the embedding page instead, so it
+           can put it in ITS bar. Cross-origin, hence postMessage — the cloud cannot read this
+           document, and should not have to. *@
+        <script>
+            if (window.self !== window.top) {
+                try {
+                    window.parent.postMessage({ type: 'mat-admin-title', title: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(title)) }, '*');
+                } catch (e) { }
+            }
+        </script>
 
         <main class="admin-content">
             @if (TempData["Flash"] is string flash && !string.IsNullOrWhiteSpace(flash))

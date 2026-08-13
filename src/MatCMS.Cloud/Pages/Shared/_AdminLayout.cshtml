@@ -109,17 +109,24 @@
             <button type="button" class="admin-menu-toggle" data-admin-toggle aria-label="@T["nav.menu"]" aria-expanded="false">
                 <span></span><span></span><span></span>
             </button>
-            @* A page may put its own controls up here instead of a title — the embedded site view
-               turns this bar into the instance switcher plus its actions, so the frame below can
-               have the whole rest of the window. *@
-            @if (IsSectionDefined("TopbarTitle"))
-            {
-                @await RenderSectionAsync("TopbarTitle")
-            }
-            else
-            {
-                <div class="admin-topbar-title">@title</div>
-            }
+            @* The context switcher, on every page. What you are looking at — the cloud itself or one
+               of its sites — is the same question everywhere, so it is answered in the same place
+               everywhere instead of only on the page that happens to embed a site.
+               ViewData["InstanceId"] names the instance being viewed; absent means the cloud. *@
+            @{ var currentInstanceId = ViewData["InstanceId"] as int?; }
+            <div class="inst-head">
+                <partial name="_ContextPicker" model="currentInstanceId" />
+                @if (ViewData["FrameTitle"] is true)
+                {
+                    @* The framed page announces its own title by postMessage; nothing static here
+                       would ever be right for longer than one click. *@
+                    <span class="inst-page-title" data-frame-title hidden></span>
+                }
+                else
+                {
+                    <div class="admin-topbar-title">@title</div>
+                }
+            </div>
             <div class="admin-topbar-right">@await RenderSectionAsync("TopbarActions", required: false)</div>
         </header>
 

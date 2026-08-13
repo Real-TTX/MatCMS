@@ -81,6 +81,8 @@ builder.Services.AddScoped<InstanceService>();
 builder.Services.AddScoped<ProfileService>();
 builder.Services.AddScoped<MailSpool>();
 builder.Services.AddScoped<BackupStore>();
+// The top-bar switcher needs its list on every admin page, so the layout asks for it directly.
+builder.Services.AddScoped<ContextSwitcher>();
 builder.Services.AddSingleton<SecretProtector>();
 builder.Services.AddScoped<AdoptionService>();
 builder.Services.AddScoped<VersionService>();

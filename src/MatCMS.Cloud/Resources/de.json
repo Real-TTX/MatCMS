@@ -614,5 +614,6 @@
   "instances.previewInsecureShort": "http — nicht einbettbar",
   "instances.admin": "Admin",
   "instances.openAdmin": "Verwaltung der Website öffnen",
-  "instances.site": "Website"
+  "instances.site": "Website",
+  "nav.overview": "Übersicht"
 }

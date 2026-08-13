@@ -614,5 +614,6 @@
   "instances.previewInsecureShort": "http — cannot embed",
   "instances.admin": "Admin",
   "instances.openAdmin": "Open the site's admin",
-  "instances.site": "Site"
+  "instances.site": "Site",
+  "nav.overview": "Overview"
 }

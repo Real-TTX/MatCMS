@@ -380,3 +380,8 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
     text-overflow: ellipsis;
 }
 @media (max-width: 900px) { .inst-page-title { font-size: 17px; } }
+
+/* The cloud's own entry in the switcher. An icon where the others show a thumbnail: it is the page
+   you are already in, not a site to preview. */
+.inst-picker-cloudicon { display: flex; align-items: center; justify-content: center; font-size: 22px; color: var(--muted, #6b7280); }
+.inst-picker-cloud.is-current .inst-picker-cloudicon { color: var(--accent, #2563eb); }

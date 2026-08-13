@@ -4,6 +4,9 @@
 @using MatCMS.Cloud.Services
 @{
     ViewData["Title"] = Model.Item.Name;
+    // So the switcher in the bar shows THIS instance while its detail page is open, instead of
+    // claiming you are looking at the cloud.
+    ViewData["InstanceId"] = Model.Item.Id;
 }
 <div class="page-head">
     <h1>@Model.Item.Name</h1>

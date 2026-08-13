@@ -1,0 +1,82 @@
+@* The context switcher in the top bar, on EVERY admin page.
+   The first entry is the cloud itself, because "which site am I looking at" and "am I looking at the
+   control plane" are the same question — answering them with two separate controls means knowing
+   where you are before you can leave.
+   Model: the id of the instance being viewed, or null while the cloud itself is the context. *@
+@model int?
+@inject MatCMS.Cloud.Services.ContextSwitcher Switcher
+@inject MatCMS.Cloud.Services.CloudContext Cloud
+@inject MatCMS.Cloud.Services.Localizer T
+@{
+    var instances = await Switcher.InstancesAsync();
+    var current = Model is int cid ? instances.FirstOrDefault(i => i.Id == cid) : null;
+    var currentName = current?.Name ?? Cloud.CloudName;
+}
+<div class="inst-picker" data-inst-picker>
+    <button type="button" class="inst-picker-btn" data-inst-toggle aria-haspopup="listbox" aria-expanded="false">
+        <span class="inst-picker-name">@currentName</span>
+        <i class="ti ti-chevron-down inst-picker-caret" aria-hidden="true"></i>
+    </button>
+    <div class="inst-picker-menu" data-inst-menu hidden role="listbox" aria-label="@T["instances.title"]">
+        @* The cloud itself. No thumbnail — it is the page you are already in, not a site to preview. *@
+        <a class="inst-picker-item inst-picker-cloud@(current is null ? " is-current" : "")"
+           role="option" aria-selected="@(current is null ? "true" : "false")"
+           href="@Url.Page("/Admin/Index")">
+            <span class="inst-picker-shot inst-picker-cloudicon"><i class="ti ti-cloud" aria-hidden="true"></i></span>
+            <span class="inst-picker-meta">
+                <strong>@Cloud.CloudName</strong>
+                <span class="muted">@T["nav.overview"]</span>
+            </span>
+        </a>
+        @foreach (var i in instances)
+        {
+            var online = MatCMS.Cloud.Services.InstanceService.IsOnline(i);
+            @* "Has an address" is not the question — "can be shown inside this page" is. An http site
+               in an https admin is refused by the browser, so it is treated like one with no address
+               at all: the link goes to its detail page instead of an embed that cannot work. *@
+            var hasUrl = !string.IsNullOrWhiteSpace(i.PreviewUrl)
+                         && !MatCMS.Cloud.Services.MixedContent.IsBlocked(ViewContext.HttpContext.Request.IsHttps, i.PreviewUrl);
+            <a class="inst-picker-item@(i.Id == Model ? " is-current" : "")@(online ? "" : " is-offline")"
+               role="option" aria-selected="@(i.Id == Model ? "true" : "false")"
+               href="@(hasUrl ? Url.Page("/Admin/Instances/Site", new { id = i.Id }) : Url.Page("/Admin/Instances/Details", new { id = i.Id }))">
+                <span class="inst-picker-shot">
+                    @if (hasUrl)
+                    {
+                        @* data-src, not src: opening a page must not fetch every customer site at once.
+                           The frames are filled the first time the menu is opened. *@
+                        <iframe data-src="@i.PreviewUrl" title="@i.Name" tabindex="-1" scrolling="no"
+                                referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts"></iframe>
+                    }
+                    else
+                    {
+                        <span class="inst-picker-noshot"><i class="ti ti-world-off" aria-hidden="true"></i></span>
+                    }
+                </span>
+                <span class="inst-picker-meta">
+                    <strong>@i.Name</strong>
+                    <span class="muted mono">@(hasUrl ? i.PreviewUrl : T["instances.previewNoUrlShort"])</span>
+                </span>
+                @* The state belongs on the entry, not in a filter: offline is when somebody goes
+                   looking, and a list that hides those answers the wrong question. *@
+                <span class="inst-picker-state">
+                    @if (i.Status == MatCMS.Cloud.Models.InstanceStatus.Pending)
+                    {
+                        <span class="badge badge-new">@T["instances.awaitingApproval"]</span>
+                    }
+                    else if (!i.HasConnected)
+                    {
+                        <span class="badge badge-off">@T["instances.pending"]</span>
+                    }
+                    else if (online)
+                    {
+                        <span class="badge badge-on">@T["instances.online"]</span>
+                    }
+                    else
+                    {
+                        <span class="badge badge-err">@T["instances.offline"]</span>
+                    }
+                </span>
+            </a>
+        }
+    </div>
+</div>

@@ -37,6 +37,10 @@
                         title="@T["instances.openAdmin"]" aria-label="@T["instances.openAdmin"]">
                     <i class="ti ti-settings" aria-hidden="true"></i>
                 </button>
+                <button type="button" class="stool stool-device" data-device-open
+                        title="@T["instances.device"]" aria-label="@T["instances.device"]">
+                    <i class="ti ti-device-imac" aria-hidden="true"></i>
+                </button>
                 <a class="stool stool-new" data-site-newtab href="@Model.Item.PreviewUrl" target="_blank" rel="noopener"
                    title="@T["instances.openSite"]" aria-label="@T["instances.openSite"]">
                     <i class="ti ti-external-link" aria-hidden="true"></i>
@@ -94,6 +98,35 @@ else
     </div>
 }
 
+@* Device sizes. The frame is simply resized — a site's own media queries do the rest, which is what
+   makes this useful and also exactly where it ends: see the note about touch below. *@
+<div class="modal-overlay" id="device-modal" data-device-modal>
+    <div class="modal" role="dialog" aria-modal="true" aria-label="@T["instances.device"]">
+        <div class="modal-head">
+            <h2>@T["instances.device"]</h2>
+            <button type="button" class="modal-close" data-device-close aria-label="@T["action.close"]">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="device-grid">
+                <button type="button" class="device-opt is-active" data-w="0" data-h="0"><i class="ti ti-arrows-maximize"></i><span>@T["instances.deviceFull"]</span><em>100 %</em></button>
+                <button type="button" class="device-opt" data-w="390" data-h="844"><i class="ti ti-device-mobile"></i><span>Smartphone</span><em>390 × 844</em></button>
+                <button type="button" class="device-opt" data-w="430" data-h="932"><i class="ti ti-device-mobile"></i><span>Smartphone L</span><em>430 × 932</em></button>
+                <button type="button" class="device-opt" data-w="820" data-h="1180"><i class="ti ti-device-ipad"></i><span>Tablet</span><em>820 × 1180</em></button>
+                <button type="button" class="device-opt" data-w="1280" data-h="800"><i class="ti ti-device-laptop"></i><span>Laptop</span><em>1280 × 800</em></button>
+                <button type="button" class="device-opt" data-w="1920" data-h="1080"><i class="ti ti-device-desktop"></i><span>Desktop</span><em>1920 × 1080</em></button>
+            </div>
+            <label class="checkbox-row" style="margin-top:14px;">
+                <input type="checkbox" data-device-landscape /> @T["instances.deviceLandscape"]
+            </label>
+            @* Said plainly rather than faked: synthesising touch input into a frame of another origin
+               is not something a page can do — that needs the browser's own developer tools. What the
+               size DOES give you is the site's responsive layout, which is what one usually wants to
+               look at. *@
+            <div class="help">@T["instances.deviceTouchNote"]</div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <script>
         (function () {
@@ -131,6 +164,36 @@ else
             }
 
             // The framed admin hides its own bar and posts its page title here instead.
+            // ---- Geräteansicht ----
+            var dlg = document.querySelector('[data-device-modal]');
+            var embed = document.querySelector('.site-embed');
+            if (dlg && frame && embed) {
+                var land = dlg.querySelector('[data-device-landscape]');
+                var w = 0, h = 0;
+                function apply() {
+                    // 0 means "fill the window" — the frame goes back to being the page.
+                    if (!w) { embed.classList.remove('is-device'); frame.style.width = ''; frame.style.height = ''; return; }
+                    var ww = land.checked ? h : w, hh = land.checked ? w : h;
+                    embed.classList.add('is-device');
+                    frame.style.width = ww + 'px';
+                    frame.style.height = hh + 'px';
+                }
+                document.querySelector('[data-device-open]').addEventListener('click', function () { dlg.classList.add('open'); });
+                dlg.querySelector('[data-device-close]').addEventListener('click', function () { dlg.classList.remove('open'); });
+                dlg.addEventListener('click', function (e) { if (e.target === dlg) dlg.classList.remove('open'); });
+                land.addEventListener('change', apply);
+                dlg.querySelectorAll('.device-opt').forEach(function (b) {
+                    b.addEventListener('click', function () {
+                        dlg.querySelectorAll('.device-opt').forEach(function (x) { x.classList.remove('is-active'); });
+                        b.classList.add('is-active');
+                        w = parseInt(b.getAttribute('data-w'), 10) || 0;
+                        h = parseInt(b.getAttribute('data-h'), 10) || 0;
+                        apply();
+                        dlg.classList.remove('open');
+                    });
+                });
+            }
+
             var crumb = document.querySelector('[data-frame-title]');
             var expectedOrigin = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.SiteOrigin ?? ""));
             window.addEventListener('message', function (e) {

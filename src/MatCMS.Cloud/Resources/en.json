@@ -622,5 +622,9 @@
   "instances.home": "Home",
   "instances.address": "Address",
   "settings.forceHttps": "Treat instance addresses as https",
-  "settings.forceHttpsHint": "For instances behind a TLS-terminating proxy: they report http although they are reachable over https, and an https admin may then neither frame nor link them. Only switch this on if every instance really is on https."
+  "settings.forceHttpsHint": "For instances behind a TLS-terminating proxy: they report http although they are reachable over https, and an https admin may then neither frame nor link them. Only switch this on if every instance really is on https.",
+  "instances.device": "Device view",
+  "instances.deviceFull": "Full window",
+  "instances.deviceLandscape": "Landscape",
+  "instances.deviceTouchNote": "This changes the size — the site responds with its own responsive layout. Real touch input cannot be simulated from here; only the browser's own developer tools can do that."
 }

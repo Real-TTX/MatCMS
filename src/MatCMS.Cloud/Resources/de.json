@@ -622,5 +622,9 @@
   "instances.home": "Startseite",
   "instances.address": "Adresse",
   "settings.forceHttps": "Instanz-Adressen als https behandeln",
-  "settings.forceHttpsHint": "Für Instanzen hinter einem Proxy, der TLS beendet: sie melden sich dann als http, obwohl sie über https erreichbar sind — und eine https-Oberfläche darf sie so weder einbetten noch verlinken. Nur einschalten, wenn wirklich alle Instanzen über https laufen."
+  "settings.forceHttpsHint": "Für Instanzen hinter einem Proxy, der TLS beendet: sie melden sich dann als http, obwohl sie über https erreichbar sind — und eine https-Oberfläche darf sie so weder einbetten noch verlinken. Nur einschalten, wenn wirklich alle Instanzen über https laufen.",
+  "instances.device": "Geräteansicht",
+  "instances.deviceFull": "Ganzes Fenster",
+  "instances.deviceLandscape": "Querformat",
+  "instances.deviceTouchNote": "Gezeigt wird die Größe — die Website reagiert darauf mit ihrem eigenen responsiven Layout. Echte Touch-Eingaben lassen sich von hier aus nicht nachbilden; das kann nur die Entwicklerkonsole des Browsers."
 }

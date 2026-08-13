@@ -494,3 +494,21 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
    nur leerer Kasten, und es soll bei den Knöpfen stehen, zu denen es gehört. Doppelt so breit wie die
    erste Fassung; was dann noch abgeschnitten wird, steht vollständig im Mouse-Over. */
 .site-addr { max-width: 1280px; margin-left: auto; }
+
+/* ---- Geräteansicht ---------------------------------------------------------------------------- */
+.stool-device { color: #db2777; }
+/* Beim Gerät wird der Rahmen zum Gerät: zentriert auf grauem Grund, damit man seine Kanten sieht.
+   Scrollt der Bereich, ist die gewählte Höhe größer als das Fenster — das gehört zur Aussage. */
+.site-embed.is-device { display: flex; align-items: flex-start; justify-content: center; overflow: auto; padding: 24px; }
+.site-embed.is-device .site-embed-frame { flex: 0 0 auto; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 10px 40px rgba(0,0,0,.18); background: #fff; }
+.device-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.device-opt {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 14px 10px; border: 1px solid var(--line); border-radius: 12px;
+    background: #fff; cursor: pointer; font-family: inherit; font-size: 13.5px;
+}
+.device-opt i { font-size: 22px; color: var(--muted, #6b7280); }
+.device-opt em { font-style: normal; font-size: 12px; color: var(--muted, #6b7280); font-variant-numeric: tabular-nums; }
+.device-opt:hover { border-color: var(--accent, #2563eb); }
+.device-opt.is-active { border-color: var(--accent, #2563eb); background: color-mix(in srgb, var(--accent, #2563eb) 8%, transparent); }
+.device-opt.is-active i { color: var(--accent, #2563eb); }

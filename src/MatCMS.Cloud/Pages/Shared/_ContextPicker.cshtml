@@ -11,7 +11,15 @@
     var instances = await Switcher.InstancesAsync();
     var current = Model is int cid ? instances.FirstOrDefault(i => i.Id == cid) : null;
     var currentName = current?.Name ?? Cloud.CloudName;
+    // The two ways to look at ONE instance: the cloud's own view of it (state, config, backups) and
+    // the site itself. Only meaningful once an instance is the context, and only if there is an
+    // address to show — so the toggle appears with it and not before.
+    var canEmbed = current is not null
+                   && !string.IsNullOrWhiteSpace(current.PreviewUrl)
+                   && !MatCMS.Cloud.Services.MixedContent.IsBlocked(ViewContext.HttpContext.Request.IsHttps, current.PreviewUrl);
+    var onSite = ViewContext.RouteData.Values["page"]?.ToString()?.EndsWith("/Site", StringComparison.OrdinalIgnoreCase) == true;
 }
+<div class="inst-ctx">
 <div class="inst-picker" data-inst-picker>
     <button type="button" class="inst-picker-btn" data-inst-toggle aria-haspopup="listbox" aria-expanded="false">
         <span class="inst-picker-name">@currentName</span>
@@ -79,4 +87,21 @@
             </a>
         }
     </div>
+</div>
+
+@* Two views of the same instance, side by side and icon-only: it is a switch between two places,
+   not two commands, and a segmented pair says that in the width of two buttons. *@
+@if (canEmbed)
+{
+    <div class="inst-view-toggle" role="group" aria-label="@T["instances.viewSwitch"]">
+        <a class="ivt-btn@(onSite ? "" : " is-active")" href="@Url.Page("/Admin/Instances/Details", new { id = current!.Id })"
+           title="@T["instances.viewCloud"]" aria-label="@T["instances.viewCloud"]" aria-current="@(onSite ? null : "page")">
+            <i class="ti ti-layout-dashboard" aria-hidden="true"></i>
+        </a>
+        <a class="ivt-btn@(onSite ? " is-active" : "")" href="@Url.Page("/Admin/Instances/Site", new { id = current!.Id })"
+           title="@T["instances.viewSite"]" aria-label="@T["instances.viewSite"]" aria-current="@(onSite ? "page" : null)">
+            <i class="ti ti-browser" aria-hidden="true"></i>
+        </a>
+    </div>
+}
 </div>

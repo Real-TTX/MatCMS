@@ -615,5 +615,8 @@
   "instances.admin": "Admin",
   "instances.openAdmin": "Open the site's admin",
   "instances.site": "Site",
-  "nav.overview": "Overview"
+  "nav.overview": "Overview",
+  "instances.viewSwitch": "View",
+  "instances.viewCloud": "Cloud view",
+  "instances.viewSite": "Site view"
 }

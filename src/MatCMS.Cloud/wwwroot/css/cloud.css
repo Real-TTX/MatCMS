@@ -388,3 +388,25 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
    you are already in, not a site to preview. */
 .inst-picker-cloudicon { display: flex; align-items: center; justify-content: center; font-size: 22px; color: var(--muted, #6b7280); }
 .inst-picker-cloud.is-current .inst-picker-cloudicon { color: var(--accent, #2563eb); }
+
+/* Switcher + view toggle sit together as one control group. */
+.inst-ctx { display: flex; align-items: center; gap: 8px; min-width: 0; }
+
+/* A minimum width so the bar does not resize every time the name changes: without it, stepping from
+   "MatCMS" to "Katalog-Test" moved everything to the right of it. Smaller type than the page title,
+   because the switcher names the CONTEXT and the title names the page — same size read as two
+   competing headings. */
+.inst-picker-btn { min-width: 190px; justify-content: space-between; }
+.inst-picker-name { font-size: 14px; }
+
+/* Two places, one control: a segmented pair, icon-only, so it costs the width of two buttons. */
+.inst-view-toggle { display: inline-flex; flex: 0 0 auto; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; background: #fff; }
+.ivt-btn {
+    display: flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px; color: var(--muted, #6b7280); text-decoration: none; font-size: 17px;
+}
+.ivt-btn + .ivt-btn { border-left: 1px solid var(--line); }
+.ivt-btn:hover { background: #f6f7f9; color: inherit; }
+.ivt-btn.is-active { background: var(--accent, #2563eb); color: #fff; }
+
+@media (max-width: 700px) { .inst-picker-btn { min-width: 0; } }

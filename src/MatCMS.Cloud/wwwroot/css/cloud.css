@@ -7,7 +7,9 @@
 /* Height of the top bar, in one place so the shell with the menu and the shell without it cannot
    drift apart. It is what the normal bar already measures: 18px padding + 33px title line box
    (20px x line-height 1.65) + 18px padding. */
-:root { --topbar-h: 69px; }
+/* 14 (sidebar padding) + 2 + 40 (logo) + 10 (brand padding) + 1 (its border) — the height at which
+   the sidebar draws its line. The bar matches it so the two ends of that line meet. */
+:root { --topbar-h: 67px; }
 
 /* ============ Secrets ============ */
 /* A value shown exactly once (pairing token, join code): selectable, wraps, marked as sensitive. */
@@ -176,11 +178,11 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
 .admin.admin-bare .admin-menu-toggle { display: none; }
 
 /* The top bar is the SAME height with and without the menu, so switching between the two moves
-   nothing below it. 69px is what the normal bar already measures: 18 + 33 + 18, where 33 is the
-   title's line box (20px x 1.65). As a minimum for every page, as a fixed height for the bare one —
-   whose contents are buttons and would otherwise land a few pixels short. */
-.admin-topbar { min-height: var(--topbar-h, 69px); }
-.admin-bare .admin-topbar { height: var(--topbar-h, 69px); position: relative; padding: 0 32px 0 282px; }
+   nothing below it. The number lives in --topbar-h and is derived from where the sidebar draws its
+   line — see there. It used to be reasoned from the title's line box, which is why it drifted every
+   time a taller control moved into this bar. */
+.admin-topbar { min-height: var(--topbar-h); }
+.admin-bare .admin-topbar { height: var(--topbar-h); position: relative; padding: 0 32px 0 282px; }
 
 /* The brand keeps its place, its background and its exact geometry: this block repeats the
    sidebar's width, colour, right border and padding, and the markup inside is the sidebar's own
@@ -189,20 +191,25 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
    it covers the bar's border there: in the normal shell the sidebar continues below that line, and
    those pixels are grey, not a border. */
 .admin-topbar-brand {
-    position: absolute; top: 0; left: 0; bottom: -1px; width: 250px;
+    /* bottom: 0, not -1px. It used to reach one pixel PAST the bar so its grey covered the bar's
+       bottom border — which is why that line stopped 250px from the left instead of running the
+       whole width. */
+    position: absolute; top: 0; left: 0; bottom: 0; width: 250px;
     background: #edeff2;
     border-right: 1px solid var(--line);
     padding: 14px 14px 0;
     overflow: hidden;
 }
-.admin-topbar-brand .admin-brand { margin-bottom: 0; }
+/* One line, not two: in this bar the BAR draws it, across the full width. The brand keeps its own
+   border in the sidebar, where it separates the logo from the navigation below it. */
+.admin-topbar-brand .admin-brand { margin-bottom: 0; border-bottom: 0; padding-bottom: 0; }
 
 /* ---- Instance site, embedded in the shell ------------------------------------------------------
    Same trick the admin already uses for its live editor: the content area gives up its padding so
    the frame can have the window. The 1px is the bar's own bottom border. */
 .admin-content:has(.site-embed) { padding: 0; max-width: none; }
 
-.site-embed { position: relative; height: calc(100dvh - var(--topbar-h, 69px) - 1px); background: var(--bg-alt, #f6f7f9); }
+.site-embed { position: relative; height: calc(100dvh - var(--topbar-h) - 1px); background: var(--bg-alt, #f6f7f9); }
 .site-embed-frame { position: relative; z-index: 1; width: 100%; height: 100%; border: 0; display: block; background: #fff; }
 
 /* Sits BEHIND the frame, so it is what remains visible when a site refuses to be framed. A blank
@@ -216,7 +223,7 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
 .site-embed-actions { display: flex; align-items: center; gap: 8px; }
 
 .site-embed-hint { display: flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 13px; border-bottom: 1px solid var(--line); background: #fff; }
-.admin-content:has(.site-embed-hint) .site-embed { height: calc(100dvh - var(--topbar-h, 69px) - 1px - 34px); }
+.admin-content:has(.site-embed-hint) .site-embed { height: calc(100dvh - var(--topbar-h) - 1px - 34px); }
 .site-embed-note { padding: 32px; }
 
 @media (max-width: 860px) {
@@ -421,7 +428,7 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
 
    The logo gets a fixed height for the same reason — max-height alone leaves it to the image file,
    so a shorter logo would pull the sidebar line up and break the alignment from the other side. */
-.admin-topbar { height: 67px; padding-top: 0; padding-bottom: 0; }
+.admin-topbar { height: var(--topbar-h); padding-top: 0; padding-bottom: 0; }
 .admin-brand .admin-logo { height: 40px; }
 
 /* Comfortably inside 67px, and both controls the same height so the group reads as one row. */

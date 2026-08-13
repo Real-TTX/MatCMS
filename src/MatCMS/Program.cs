@@ -151,6 +151,13 @@ builder.Services.AddHostedService<CloudConnectionService>();
 
 // Basic brute-force protection for the login endpoint (per client IP).
 // Behind a reverse proxy, enable ForwardedHeaders so the real client IP is used.
+// ASP.NET hängt an jede Antwort, die ein Antiforgery-Token rendert, ein X-Frame-Options: SAMEORIGIN.
+// Gedacht gegen Clickjacking, hier aber ein Rundumschlag: er verbietet AUCH der eigenen Cloud, die
+// Website zu zeigen — und zwar genau auf den Seiten mit Formular, allen voran der Anmeldeseite.
+// Abgeschaltet und weiter unten durch eine Regel ersetzt, die dieselbe Gefahr abwehrt, aber die
+// eine erlaubte Einbettung benennt.
+builder.Services.AddAntiforgery(o => o.SuppressXFrameOptionsHeader = true);
+
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -269,6 +276,19 @@ else if (knownProxy.Length > 0)
         if (System.Net.IPAddress.TryParse(one, out var ip)) fwd.KnownProxies.Add(ip);
 }
 app.UseForwardedHeaders(fwd);
+
+// Der Ersatz: frame-ancestors erlaubt die eigene Herkunft und, falls verbunden, die Cloud. Das ist
+// dieselbe Abwehr wie X-Frame-Options, nur benennt sie den einen Fall, den es geben soll, statt
+// pauschal alles zu verbieten. Ohne Cloud-Verbindung bleibt es bei 'self' — also beim alten Schutz.
+app.Use(async (ctx, next) =>
+{
+    var site = ctx.RequestServices.GetRequiredService<MatCMS.Services.SiteContext>();
+    var cloud = site.Get(MatCMS.Services.SettingKeys.CloudUrl);
+    var origin = Uri.TryCreate(cloud, UriKind.Absolute, out var cu) ? cu.GetLeftPart(UriPartial.Authority) : null;
+    ctx.Response.Headers["Content-Security-Policy"] =
+        origin is null ? "frame-ancestors 'self'" : $"frame-ancestors 'self' {origin}";
+    await next();
+});
 
 // The same answer as a SETTING, for a site whose container cannot easily be given the variable —
 // and, more to the point, so a cloud profile can roll it out to a whole fleet at once. Runs right

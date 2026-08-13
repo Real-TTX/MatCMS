@@ -35,6 +35,11 @@
                        placeholder="@MatCMS.Cloud.Services.BackupStore.DefaultQuotaGb" inputmode="numeric" />
                 <div class="help">@T["settings.backupQuotaHint"]</div>
             </div>
+            <label class="checkbox-row">
+                <input type="checkbox" name="forceHttps" value="true" checked="@(Model.Flag(SettingKeys.ForceHttpsUrls) ? "checked" : null)" />
+                @T["settings.forceHttps"]
+            </label>
+            <div class="help">@T["settings.forceHttpsHint"]</div>
             <div><button type="submit" class="btn">@T["settings.save"]</button></div>
         </div>
     </form>

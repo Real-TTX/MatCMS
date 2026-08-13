@@ -44,7 +44,7 @@ public class IndexModel : PageModel
         LocalCount = await _db.Instances.CountAsync(i => i.Hosting == InstanceHosting.Local);
     }
 
-    public async Task<IActionResult> OnPostGeneralAsync(string? cloudName, string? canonicalUrl, string? backupQuotaGb)
+    public async Task<IActionResult> OnPostGeneralAsync(string? cloudName, string? canonicalUrl, string? backupQuotaGb, bool forceHttps)
     {
         await _cloud.SaveAsync(new Dictionary<string, string?>
         {
@@ -52,7 +52,8 @@ public class IndexModel : PageModel
             [SettingKeys.CanonicalUrl] = canonicalUrl?.Trim().TrimEnd('/'),
             // Only a sensible number is stored; anything else is left empty so the default applies
             // rather than a zero quota deleting every backup on the next upload.
-            [SettingKeys.BackupQuotaGb] = int.TryParse(backupQuotaGb, out var gb) && gb > 0 ? gb.ToString() : ""
+            [SettingKeys.BackupQuotaGb] = int.TryParse(backupQuotaGb, out var gb) && gb > 0 ? gb.ToString() : "",
+            [SettingKeys.ForceHttpsUrls] = forceHttps ? "1" : "0"
         });
         TempData["Flash"] = "Einstellungen gespeichert.";
         return RedirectToPage(new { tab = "general" });

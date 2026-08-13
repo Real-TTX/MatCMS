@@ -14,6 +14,15 @@ public static class SettingKeys
     /// but a policy, which is why it belongs in the settings and not in a constant.</summary>
     public const string BackupQuotaGb = "backup.quotaGb";
 
+    /// <summary>
+    /// "My instances are reachable over https, whatever they report."
+    /// <para>An instance behind a TLS-terminating proxy sees only the unencrypted hop and reports
+    /// http. An https cloud may then neither frame nor link it. The proper fix is forwarded headers
+    /// ON THE INSTANCE — but that is one env var per site, and the operator of a fleet already knows
+    /// the answer for all of them at once. This is them saying it here.</para>
+    /// </summary>
+    public const string ForceHttpsUrls = "instances.forceHttps";
+
     // --- Notifications ------------------------------------------------------
     /// <summary>Where notification mails go (comma-separated). Empty = every cloud user's e-mail.</summary>
     public const string NotifyRecipients = "notify.recipients";

@@ -620,5 +620,7 @@
   "instances.viewCloud": "Cloud-Ansicht",
   "instances.viewSite": "Website ansehen",
   "instances.home": "Startseite",
-  "instances.address": "Adresse"
+  "instances.address": "Adresse",
+  "settings.forceHttps": "Instanz-Adressen als https behandeln",
+  "settings.forceHttpsHint": "Für Instanzen hinter einem Proxy, der TLS beendet: sie melden sich dann als http, obwohl sie über https erreichbar sind — und eine https-Oberfläche darf sie so weder einbetten noch verlinken. Nur einschalten, wenn wirklich alle Instanzen über https laufen."
 }

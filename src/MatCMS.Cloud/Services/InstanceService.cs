@@ -28,9 +28,11 @@ public class InstanceService
     private readonly DockerHostService _docker;
     private readonly ReleaseWatcher _releases;
     private readonly ProfileService _profiles;
+    private readonly CloudContext _cloud;
 
-    public InstanceService(AppDbContext db, DockerHostService docker, ReleaseWatcher releases, ProfileService profiles)
+    public InstanceService(AppDbContext db, DockerHostService docker, ReleaseWatcher releases, ProfileService profiles, CloudContext cloud)
     {
+        _cloud = cloud;
         _db = db;
         _docker = docker;
         _releases = releases;
@@ -216,7 +218,10 @@ public class InstanceService
         instance.PageCount = beat.PageCount;
         instance.PluginCount = beat.PluginCount;
         instance.UserCount = beat.UserCount;
-        if (!string.IsNullOrWhiteSpace(beat.Url)) instance.Url = beat.Url!.Trim();
+        // Upgraded on the way IN, so everything downstream — frame, links, the mixed-content guard —
+        // sees one address and cannot disagree about it. Reversible: switch the setting off and the
+        // next heartbeat writes what the instance actually said.
+        if (!string.IsNullOrWhiteSpace(beat.Url)) instance.Url = ForceHttps(beat.Url!.Trim());
         // The reported site name only SEEDS the label — never overwrite a name an operator has set
         // here. The placeholder counts as "not set yet", so an instance that enrolled before its
         // site name was configured still picks it up instead of staying "Neue Instanz" forever.
@@ -401,4 +406,10 @@ public class InstanceService
             Sha256 = row.Sha256,
         };
     }
+    /// <summary>Turns http into https when the operator has said their instances are reachable that
+    /// way. Only the scheme — host, port and path are the instance's to report.</summary>
+    private string ForceHttps(string url) =>
+        _cloud.Flag(SettingKeys.ForceHttpsUrls) && url.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            ? "https://" + url.Substring("http://".Length)
+            : url;
 }

@@ -620,5 +620,7 @@
   "instances.viewCloud": "Cloud view",
   "instances.viewSite": "Site view",
   "instances.home": "Home",
-  "instances.address": "Address"
+  "instances.address": "Address",
+  "settings.forceHttps": "Treat instance addresses as https",
+  "settings.forceHttpsHint": "For instances behind a TLS-terminating proxy: they report http although they are reachable over https, and an https admin may then neither frame nor link them. Only switch this on if every instance really is on https."
 }

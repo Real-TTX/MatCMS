@@ -27,6 +27,17 @@ public class SiteModel : PageModel
     /// <summary>Scheme + host + port of the instance — what its pages report as e.origin when they
     /// message this page. Derived, not stored: it must be the origin of the address actually being
     /// framed, or the check would reject exactly the messages it is meant to let through.</summary>
+    /// <summary>
+    /// Whether this page may put the instance in a frame at all: it needs an address, and an https
+    /// admin may not frame an http one.
+    /// <para>ONE answer for the whole page. The frame asked this and the toolbar did not, so the
+    /// buttons went on offering to load addresses the browser then refused — the console filled with
+    /// mixed-content errors while the page looked merely broken.</para>
+    /// </summary>
+    public bool CanEmbed =>
+        !string.IsNullOrWhiteSpace(Item.PreviewUrl)
+        && !MixedContent.IsBlocked(Request.IsHttps, Item.PreviewUrl);
+
     public string? SiteOrigin =>
         Uri.TryCreate(Item.PreviewUrl, UriKind.Absolute, out var u)
             ? u.GetLeftPart(UriPartial.Authority)

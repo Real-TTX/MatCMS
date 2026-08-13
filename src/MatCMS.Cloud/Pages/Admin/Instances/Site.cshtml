@@ -15,7 +15,7 @@
        one. Icon-only and coloured by function — five labels would not fit beside the switcher, and
        these five are the ones every browser draws without words. *@
     <div class="site-embed-actions">
-        @if (!string.IsNullOrWhiteSpace(Model.Item.PreviewUrl))
+        @if (Model.CanEmbed)
         {
             @* The address. Read-only on purpose: it says where the frame was SENT, and cross-origin
                there is no way to follow where it went from there — an editable box would promise
@@ -72,7 +72,7 @@ else
        honest way to detect that, so instead of pretending to, the bar simply always offers the tab —
        and this line says what an empty frame means. *@
     <div class="site-embed">
-        @if (MatCMS.Cloud.Services.MixedContent.IsBlocked(Model.Request.IsHttps, Model.Item.PreviewUrl))
+        @if (!Model.CanEmbed)
         {
             @* No frame at all: this one is not "the site might refuse", it is certain. Rendering it
                anyway would put the general "could not be embedded" note under a blank rectangle and

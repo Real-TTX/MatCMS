@@ -10,15 +10,12 @@
     @* The switcher stands where the page title normally does: on this page the instance IS the title,
        and being able to step to the next one without going back to the list is the reason to stay in
        the cloud rather than opening a tab. *@
+    <div class="inst-head">
     <div class="inst-picker" data-inst-picker>
         <button type="button" class="inst-picker-btn" data-inst-toggle aria-haspopup="listbox" aria-expanded="false">
             <span class="inst-picker-name">@Model.Item.Name</span>
             <i class="ti ti-chevron-down inst-picker-caret" aria-hidden="true"></i>
         </button>
-        @* Where the instance's own bar would have said it. Filled from the frame by postMessage and
-           empty until something arrives, so the public site — which sends nothing — leaves no stray
-           separator behind. *@
-        <span class="inst-page-title" data-frame-title hidden></span>
         <div class="inst-picker-menu" data-inst-menu hidden role="listbox" aria-label="@T["instances.title"]">
             @foreach (var i in Model.Switchable)
             {
@@ -76,6 +73,11 @@
                 </a>
             }
         </div>
+    </div>
+    @* Beside the switcher, not under it, and at heading size: on this page it IS the page title.
+       Filled from the frame by postMessage; empty until something arrives, so the public site —
+       which sends nothing — leaves nothing behind. *@
+    <span class="inst-page-title" data-frame-title hidden></span>
     </div>
 }
 

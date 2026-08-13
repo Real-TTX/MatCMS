@@ -45,6 +45,10 @@
     </script>
     <style>
         html.is-embedded .admin-topbar { display: none; }
+        /* The brand goes too: the embedding page already shows a logo, and two of them one above the
+           other say nothing the first did not. The navigation below it stays — that is what the
+           sidebar is for. */
+        html.is-embedded .admin-brand { display: none; }
     </style>
 </head>
 <body class="admin">

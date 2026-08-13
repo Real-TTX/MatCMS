@@ -365,14 +365,18 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
     white-space: nowrap;
 }
 
-/* The framed page's own title, next to the instance switcher. Muted and preceded by a separator,
-   because it is a step BELOW the instance, not a second thing of equal weight. */
+/* Switcher and page title on ONE line: the title belongs beside the instance, not under it — under
+   it read as a second row of chrome. Same size and weight as .admin-topbar-title, because on this
+   page it IS the page title; nothing shrinks it and no separator character stands in front of it. */
+.inst-head { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.inst-head .inst-picker { flex: 0 0 auto; }
 .inst-page-title {
-    color: var(--muted, #6b7280);
-    font-size: 14px;
+    font-family: var(--font-head);
+    font-weight: 600;
+    font-size: 20px;
+    min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 40vw;
 }
-.inst-page-title::before { content: "A"; margin: 0 8px 0 4px; opacity: .6; }
+@media (max-width: 900px) { .inst-page-title { font-size: 17px; } }

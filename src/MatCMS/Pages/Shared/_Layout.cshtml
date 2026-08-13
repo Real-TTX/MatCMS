@@ -257,5 +257,13 @@ else
     {
         @Html.Raw(Site.BodyEndCode)
     }
+    @* Framed by the cloud's instance view: tell it which page is showing, so its address bar can
+       follow a click in here. Cross-origin the embedding page cannot read this — but this IS the
+       same software, so it can simply say so. Nothing is sent when not framed. *@
+    <script>
+        if (window.self !== window.top) {
+            try { window.parent.postMessage({ type: 'mat-frame-url', url: location.href }, '*'); } catch (e) { }
+        }
+    </script>
 </body>
 </html>

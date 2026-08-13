@@ -132,7 +132,7 @@
         <script>
             if (window.self !== window.top) {
                 try {
-                    window.parent.postMessage({ type: 'mat-admin-title', title: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(title)) }, '*');
+                    window.parent.postMessage({ type: 'mat-admin-title', url: location.href, title: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(title)) }, '*');
                 } catch (e) { }
             }
         </script>

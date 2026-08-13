@@ -134,10 +134,23 @@ else
             var crumb = document.querySelector('[data-frame-title]');
             window.addEventListener('message', function (e) {
                 var d = e.data || {};
-                if (d.type !== 'mat-admin-title' || !crumb) return;
+                if (d.type !== 'mat-admin-title' && d.type !== 'mat-frame-url') return;
                 // Only from the frame on this page. The listener is on window, so anything embedded
                 // anywhere could otherwise write into this bar.
                 if (!frame || e.source !== frame.contentWindow) return;
+                // The address the frame actually ARRIVED at. Cross-origin this page cannot look it
+                // up — but the instance is the same software, so every page in there says where it
+                // is. That is also the limit: follow a link to a foreign site and nothing is sent,
+                // so the bar keeps showing the last page that did.
+                if (typeof d.url === 'string' && d.url) {
+                    if (addr) addr.value = d.url;
+                    if (newTab) newTab.href = d.url;
+                    var ab = document.querySelector('[data-site-admin]');
+                    // The admin button reflects where the frame IS, not what was last clicked —
+                    // clicking into the admin from inside the site would otherwise leave it unlit.
+                    if (ab) ab.classList.toggle('is-active', d.url.indexOf('/Admin') >= 0);
+                }
+                if (!crumb) return;
                 var txt = String(d.title || '').slice(0, 80);
                 crumb.textContent = txt;
                 crumb.hidden = txt.length === 0;

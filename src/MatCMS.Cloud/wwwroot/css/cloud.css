@@ -434,3 +434,39 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
 /* Comfortably inside 67px, and both controls the same height so the group reads as one row. */
 .inst-picker-btn, .ivt-btn { height: 34px; }
 .ivt-btn { width: 34px; }
+
+/* ---- Browser-like controls over the embedded site ---------------------------------------------- */
+.site-embed-actions { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1 1 auto; justify-content: flex-end; }
+
+/* The address. Grows into whatever is left and disappears when that is not enough — the switcher and
+   the buttons DO something, this only tells, so it is the first thing to give up its place. */
+.site-addr {
+    flex: 1 1 auto; min-width: 0; max-width: 640px;
+    height: 34px; padding: 0 12px;
+    border: 1px solid var(--line); border-radius: 999px;
+    background: #f6f7f9; color: var(--muted, #6b7280);
+    font-family: var(--font-mono, ui-monospace, monospace); font-size: 12.5px;
+    text-overflow: ellipsis; cursor: default;
+}
+.site-addr:focus { outline: none; }
+@media (max-width: 1100px) { .site-addr { display: none; } }
+
+.site-tools { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; }
+
+/* Icon-only, coloured by what they do. Colour on the icon and not a filled button: five filled
+   buttons in a row would read as five demands. */
+.stool {
+    display: flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; border: 0; border-radius: 9px;
+    background: transparent; cursor: pointer; font-size: 18px; text-decoration: none;
+}
+.stool:hover { background: #f0f2f5; }
+.stool-home   { color: #2563eb; }
+.stool-reload { color: #0891b2; }
+.stool-admin  { color: #7c3aed; }
+.stool-new    { color: #059669; }
+.stool-admin.is-active { background: #7c3aed; color: #fff; }
+
+/* Apart from the rest and red: leaving is the one thing here that is not navigation within the site. */
+.stool-close { color: #dc2626; margin-left: 8px; border-left: 1px solid var(--line); border-radius: 0 9px 9px 0; padding-left: 8px; width: 42px; }
+.stool-close:hover { background: #fee2e2; }

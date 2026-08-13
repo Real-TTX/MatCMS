@@ -11,36 +11,42 @@
 }
 
 @section TopbarActions {
+    @* A browser's controls, because that is what this is: an address and the few things you do to
+       one. Icon-only and coloured by function — five labels would not fit beside the switcher, and
+       these five are the ones every browser draws without words. *@
     <div class="site-embed-actions">
-        <a class="btn btn-sm btn-ghost" asp-page="Details" asp-route-id="@Model.Item.Id">
-            <i class="ti ti-pencil" aria-hidden="true"></i> @T["action.edit"]
-        </a>
         @if (!string.IsNullOrWhiteSpace(Model.Item.PreviewUrl))
         {
-            <button type="button" class="btn btn-sm btn-ghost" data-site-reload title="@T["instances.reload"]" aria-label="@T["instances.reload"]">
-                <i class="ti ti-refresh" aria-hidden="true"></i>
-            </button>
-            @* Into the site's OWN admin, in THIS frame. Looking at a customer's page and then wanting
-               to change something is the next move often enough that hunting for the address is a
-               waste — and the address is derivable, it is the site's URL plus /Admin.
-               A toggle and not a one-way trip, because "look at the page, change something, look
-               again" is one task, and staying inside this view is the whole point of the page.
-               The instance's admin sends no X-Frame-Options, so it may be framed — if a site ever does
-               send one the frame stays blank, which is why the plain link to the site is still here. *@
-            <button type="button" class="btn btn-sm btn-ghost" data-site-admin
-                    data-admin-url="@Model.AdminUrl" data-site-url="@Model.Item.PreviewUrl"
-                    data-label-admin="@T["instances.admin"]" data-label-site="@T["instances.site"]"
-                    title="@T["instances.openAdmin"]">
-                <i class="ti ti-settings" aria-hidden="true"></i> <span data-site-admin-label>@T["instances.admin"]</span>
-            </button>
-            <a class="btn btn-sm btn-ghost" href="@Model.Item.PreviewUrl" target="_blank" rel="noopener"
-               title="@T["instances.openSite"]" aria-label="@T["instances.openSite"]">
-                <i class="ti ti-external-link" aria-hidden="true"></i>
-            </a>
+            @* The address. Read-only on purpose: it says where the frame was SENT, and cross-origin
+               there is no way to follow where it went from there — an editable box would promise
+               navigation this page cannot deliver. Hidden when the bar gets narrow; the switcher and
+               the buttons do something, this only tells. *@
+            <input type="text" class="site-addr" data-site-addr readonly tabindex="-1"
+                   value="@Model.Item.PreviewUrl" aria-label="@T["instances.address"]" />
+            <div class="site-tools">
+                <button type="button" class="stool stool-home" data-site-home data-home-url="@Model.Item.PreviewUrl"
+                        title="@T["instances.home"]" aria-label="@T["instances.home"]">
+                    <i class="ti ti-home" aria-hidden="true"></i>
+                </button>
+                <button type="button" class="stool stool-reload" data-site-reload
+                        title="@T["instances.reload"]" aria-label="@T["instances.reload"]">
+                    <i class="ti ti-refresh" aria-hidden="true"></i>
+                </button>
+                <button type="button" class="stool stool-admin" data-site-admin
+                        data-admin-url="@Model.AdminUrl" data-site-url="@Model.Item.PreviewUrl"
+                        title="@T["instances.openAdmin"]" aria-label="@T["instances.openAdmin"]">
+                    <i class="ti ti-settings" aria-hidden="true"></i>
+                </button>
+                <a class="stool stool-new" data-site-newtab href="@Model.Item.PreviewUrl" target="_blank" rel="noopener"
+                   title="@T["instances.openSite"]" aria-label="@T["instances.openSite"]">
+                    <i class="ti ti-external-link" aria-hidden="true"></i>
+                </a>
+            </div>
         }
-        @* Back to the list, narrowed to this instance's profile — closing a view should return you
-           near where you came from, not to an unfiltered start. *@
-        <a class="btn btn-sm btn-ghost inst-close" asp-page="Index" asp-route-profile="@Model.Item.ProfileId"
+        @* Set apart and red: it leaves the page, which is the one thing here that is not navigation
+           WITHIN the site. Not a filled primary button though — this bar has no main action, and
+           making the way out the loudest thing on it would be an odd thing to invite. *@
+        <a class="stool stool-close" asp-page="Index" asp-route-profile="@Model.Item.ProfileId"
            title="@T["action.close"]" aria-label="@T["action.close"]">
             <i class="ti ti-x" aria-hidden="true"></i>
         </a>
@@ -98,20 +104,29 @@ else
             if (frame && reload) reload.addEventListener('click', function () { frame.src = frame.src; });
 
             // Admin ⇄ Website in the same frame.
+            var addr = document.querySelector('[data-site-addr]');
+            var newTab = document.querySelector('[data-site-newtab]');
+            // One place that changes what the frame shows, so the address, the tab link and the
+            // admin button can never describe three different pages.
+            function go(url, isAdmin) {
+                frame.src = url;
+                if (addr) addr.value = url;
+                if (newTab) newTab.href = url;
+                var b = document.querySelector('[data-site-admin]');
+                if (b) b.classList.toggle('is-active', !!isAdmin);
+                if (crumb) { crumb.hidden = true; crumb.textContent = ''; }
+            }
+            var homeBtn = document.querySelector('[data-site-home]');
+            if (frame && homeBtn) homeBtn.addEventListener('click', function () {
+                go(homeBtn.getAttribute('data-home-url'), false);
+            });
+
             var adminBtn = document.querySelector('[data-site-admin]');
             if (frame && adminBtn) {
-                var label = adminBtn.querySelector('[data-site-admin-label]');
                 var onAdmin = false;
                 adminBtn.addEventListener('click', function () {
                     onAdmin = !onAdmin;
-                    frame.src = onAdmin ? adminBtn.getAttribute('data-admin-url') : adminBtn.getAttribute('data-site-url');
-                    // The label says where the button LEADS, not where you are — a button captioned
-                    // with the current state reads as if pressing it would keep you there.
-                    label.textContent = adminBtn.getAttribute(onAdmin ? 'data-label-site' : 'data-label-admin');
-                    adminBtn.classList.toggle('is-active', onAdmin);
-                    // Cleared on every switch: the old page's title must not sit next to the new page
-                    // until that one gets round to announcing itself.
-                    if (crumb) { crumb.hidden = true; crumb.textContent = ''; }
+                    go(adminBtn.getAttribute(onAdmin ? 'data-admin-url' : 'data-site-url'), onAdmin);
                 });
             }
 

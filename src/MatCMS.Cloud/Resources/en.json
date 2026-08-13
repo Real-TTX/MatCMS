@@ -618,5 +618,7 @@
   "nav.overview": "Overview",
   "instances.viewSwitch": "View",
   "instances.viewCloud": "Cloud view",
-  "instances.viewSite": "Site view"
+  "instances.viewSite": "Site view",
+  "instances.home": "Home",
+  "instances.address": "Address"
 }

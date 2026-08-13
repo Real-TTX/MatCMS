@@ -472,3 +472,15 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
 /* Apart from the rest and red: leaving is the one thing here that is not navigation within the site. */
 .stool-close { color: #dc2626; margin-left: 8px; border-left: 1px solid var(--line); border-radius: 0 9px 9px 0; padding-left: 8px; width: 42px; }
 .stool-close:hover { background: #fee2e2; }
+
+/* The address bar could not grow because the block it sits in could not either: .admin-topbar-right
+   had no rule at all, so it sized to its contents and left no free space for a flex child to take.
+   Removing the input's max-width therefore changed nothing.
+   Now the right-hand side takes everything the switcher does not, and the switcher keeps its size —
+   it is the one thing here whose width should not depend on how long an address happens to be. */
+.admin-topbar-right { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; justify-content: flex-end; }
+.inst-head { flex: 0 0 auto; }
+
+/* Every step from the bar down to the input has to be allowed to grow — one link that sizes to its
+   contents stops the whole chain, which is what happened above. */
+.site-embed-actions { flex: 1 1 auto; min-width: 0; }

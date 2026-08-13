@@ -91,29 +91,6 @@ else
 @section Scripts {
     <script>
         (function () {
-            var picker = document.querySelector('[data-inst-picker]');
-            var toggle = picker && picker.querySelector('[data-inst-toggle]');
-            var menu = picker && picker.querySelector('[data-inst-menu]');
-            var loaded = false;
-            function open(on) {
-                if (!menu) return;
-                menu.hidden = !on;
-                toggle.setAttribute('aria-expanded', on ? 'true' : 'false');
-                // First open fills the thumbnails. Doing it on page load would fetch every customer
-                // site just to draw a menu nobody may open.
-                if (on && !loaded) {
-                    loaded = true;
-                    menu.querySelectorAll('iframe[data-src]').forEach(function (fr) {
-                        fr.src = fr.getAttribute('data-src');
-                    });
-                }
-            }
-            if (toggle) toggle.addEventListener('click', function () { open(menu.hidden); });
-            document.addEventListener('click', function (e) {
-                if (picker && !picker.contains(e.target)) open(false);
-            });
-            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') open(false); });
-
             var frame = document.querySelector('[data-site-frame]');
             var reload = document.querySelector('[data-site-reload]');
             // Re-assigning src rather than calling contentWindow.location.reload(): the frame is

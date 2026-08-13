@@ -178,6 +178,8 @@
         })();
     </script>
     <script src="~/_content/MatCMS.Shared.Web/js/admin-list.js" asp-append-version="true"></script>
+    @* Belongs to the switcher in the bar above, so it loads wherever that bar does. *@
+    <script src="~/js/context-picker.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

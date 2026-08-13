@@ -122,8 +122,10 @@
                        would ever be right for longer than one click. *@
                     <span class="inst-page-title" data-frame-title hidden></span>
                 }
-                else
+                else if (ViewData["NoTopbarTitle"] is not true)
                 {
+                    @* Left out where the switcher already names the thing — repeating it beside itself
+                       adds a line of header and no information. *@
                     <div class="admin-topbar-title">@title</div>
                 }
             </div>

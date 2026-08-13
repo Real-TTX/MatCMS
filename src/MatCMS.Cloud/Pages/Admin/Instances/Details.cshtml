@@ -7,6 +7,9 @@
     // So the switcher in the bar shows THIS instance while its detail page is open, instead of
     // claiming you are looking at the cloud.
     ViewData["InstanceId"] = Model.Item.Id;
+    // …and no title beside it: the switcher already says the instance name, the heading below says
+    // it again, and a third copy in between was just a taller header.
+    ViewData["NoTopbarTitle"] = true;
 }
 <div class="page-head">
     <h1>@Model.Item.Name</h1>

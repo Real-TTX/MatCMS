@@ -236,7 +236,10 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
 
 .inst-picker-btn {
     display: flex; align-items: center; gap: 10px;
-    height: 44px; max-width: 340px; padding: 0 14px;
+    /* 36, not the 44 this had when it was the only thing in a bar without a sidebar. As a global
+       element it sets the height of EVERY page's bar, and 44 made all of them taller than they
+       were before the switcher moved up here. */
+    height: 36px; max-width: 340px; padding: 0 12px;
     background: #fff; border: 1px solid var(--line); border-radius: 10px;
     font: inherit; font-family: var(--font-head); font-weight: 600; font-size: 16px;
     color: inherit; cursor: pointer;

@@ -24,6 +24,14 @@ public class SiteModel : PageModel
 
     /// <summary>The instance's own admin, derived from the address it reports. Nothing is stored for
     /// this: a second field would only be one more thing that can disagree with the site's real URL.</summary>
+    /// <summary>Scheme + host + port of the instance — what its pages report as e.origin when they
+    /// message this page. Derived, not stored: it must be the origin of the address actually being
+    /// framed, or the check would reject exactly the messages it is meant to let through.</summary>
+    public string? SiteOrigin =>
+        Uri.TryCreate(Item.PreviewUrl, UriKind.Absolute, out var u)
+            ? u.GetLeftPart(UriPartial.Authority)
+            : null;
+
     public string? AdminUrl => string.IsNullOrWhiteSpace(Item.PreviewUrl)
         ? null
         : Item.PreviewUrl!.TrimEnd('/') + "/Admin";

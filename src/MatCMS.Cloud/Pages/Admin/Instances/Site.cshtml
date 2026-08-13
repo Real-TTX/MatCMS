@@ -132,12 +132,15 @@ else
 
             // The framed admin hides its own bar and posts its page title here instead.
             var crumb = document.querySelector('[data-frame-title]');
+            var expectedOrigin = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.SiteOrigin ?? ""));
             window.addEventListener('message', function (e) {
                 var d = e.data || {};
                 if (d.type !== 'mat-admin-title' && d.type !== 'mat-frame-url') return;
-                // Only from the frame on this page. The listener is on window, so anything embedded
-                // anywhere could otherwise write into this bar.
-                if (!frame || e.source !== frame.contentWindow) return;
+                // Only from the instance this page is showing. Checked by ORIGIN, which is what
+                // postMessage is designed to be checked by — comparing window objects across a
+                // sandboxed, cross-origin frame is the kind of test that fails silently and takes
+                // every message with it.
+                if (e.origin !== expectedOrigin) return;
                 // The address the frame actually ARRIVED at. Cross-origin this page cannot look it
                 // up — but the instance is the same software, so every page in there says where it
                 // is. That is also the limit: follow a link to a foreign site and nothing is sent,

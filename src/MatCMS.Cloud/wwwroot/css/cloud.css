@@ -410,3 +410,20 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
 .ivt-btn.is-active { background: var(--accent, #2563eb); color: #fff; }
 
 @media (max-width: 700px) { .inst-picker-btn { min-width: 0; } }
+
+/* Top bar and sidebar brand end on the SAME line.
+
+   The sidebar puts its logo at 14 (sidebar padding) + 2 (brand padding) + 40 (logo) + 10 (brand
+   padding) and then draws a border: the line sits at 67px. The top bar had padding + whatever its
+   tallest control happened to be, so every control that grew moved that line out of step — first the
+   44px switcher, then the 36px one. Pinning the height ends that: the bar is 67px because the line
+   next to it is, and controls inside it are centred rather than defining it.
+
+   The logo gets a fixed height for the same reason — max-height alone leaves it to the image file,
+   so a shorter logo would pull the sidebar line up and break the alignment from the other side. */
+.admin-topbar { height: 67px; padding-top: 0; padding-bottom: 0; }
+.admin-brand .admin-logo { height: 40px; }
+
+/* Comfortably inside 67px, and both controls the same height so the group reads as one row. */
+.inst-picker-btn, .ivt-btn { height: 34px; }
+.ivt-btn { width: 34px; }

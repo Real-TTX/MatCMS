@@ -152,17 +152,40 @@ var app = builder.Build();
 // any address it likes.
 var fwd = new ForwardedHeadersOptions
 {
-    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost
+    // The SCHEME by default, and nothing else. Getting it wrong is what makes an app behind a proxy
+    // build http:// links on an https site — links a browser then refuses — and nobody should have to
+    // configure their way out of that. Faking it costs an attacker a wrong link; faking the client IP
+    // (XForwardedFor) would hand them the login rate limit, so that one stays opt-in below.
+    ForwardedHeaders = ForwardedHeaders.XForwardedProto
 };
+
+// Trusted from private address space, which is exactly where a reverse proxy in Docker sits. A
+// request arriving straight from the internet carries a public source address and is NOT trusted, so
+// this cannot be used from outside to fake the scheme. Without these the default is loopback only —
+// and a proxy in another container is not loopback, which is why forwarded headers appear to do
+// nothing in every Docker setup until somebody configures them.
+foreach (var net in new[]
+{
+    new Microsoft.AspNetCore.HttpOverrides.IPNetwork(System.Net.IPAddress.Parse("10.0.0.0"), 8),
+    new Microsoft.AspNetCore.HttpOverrides.IPNetwork(System.Net.IPAddress.Parse("172.16.0.0"), 12),
+    new Microsoft.AspNetCore.HttpOverrides.IPNetwork(System.Net.IPAddress.Parse("192.168.0.0"), 16),
+    new Microsoft.AspNetCore.HttpOverrides.IPNetwork(System.Net.IPAddress.Parse("fc00::"), 7),
+})
+{
+    fwd.KnownNetworks.Add(net);
+}
 var knownProxy = (builder.Configuration["MatCmsCloud:Proxy:Known"] ?? "").Trim();
 if (bool.TryParse(builder.Configuration["MatCmsCloud:Proxy:TrustAll"], out var trustAll) && trustAll)
 {
+    // Only now the client address and host as well — that is the part worth a deliberate switch.
+    fwd.ForwardedHeaders |= ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedHost;
     // Clearing both lists is what makes the headers count from ANY hop — see the warning above.
     fwd.KnownNetworks.Clear();
     fwd.KnownProxies.Clear();
 }
 else if (knownProxy.Length > 0)
 {
+    fwd.ForwardedHeaders |= ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedHost;
     foreach (var one in knownProxy.Split(",", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         if (System.Net.IPAddress.TryParse(one, out var ip)) fwd.KnownProxies.Add(ip);
 }

@@ -441,7 +441,9 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
 /* The address. Grows into whatever is left and disappears when that is not enough — the switcher and
    the buttons DO something, this only tells, so it is the first thing to give up its place. */
 .site-addr {
-    flex: 1 1 auto; min-width: 0; max-width: 640px;
+    /* No cap: it takes whatever the switcher and the buttons leave, which is the point of showing an
+       address at all — a truncated one is a riddle. */
+    flex: 1 1 auto; min-width: 0;
     height: 34px; padding: 0 12px;
     border: 1px solid var(--line); border-radius: 999px;
     background: #f6f7f9; color: var(--muted, #6b7280);

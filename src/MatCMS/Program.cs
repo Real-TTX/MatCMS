@@ -247,6 +247,19 @@ else if (knownProxy.Length > 0)
 }
 app.UseForwardedHeaders(fwd);
 
+// The same answer as a SETTING, for a site whose container cannot easily be given the variable —
+// and, more to the point, so a cloud profile can roll it out to a whole fleet at once. Runs right
+// after the forwarded headers and before anything that builds a URL: a redirect written with the
+// wrong scheme is already wrong by the time a page renders.
+// SiteContext is scoped and reads the settings once per request, so this costs no extra query — the
+// page below was going to load them anyway.
+app.Use(async (ctx, next) =>
+{
+    var site = ctx.RequestServices.GetRequiredService<MatCMS.Services.SiteContext>();
+    if (site.Get(MatCMS.Services.SettingKeys.BehindHttpsProxy) == "1") ctx.Request.Scheme = "https";
+    await next();
+});
+
 
 // --- Create/upgrade schema + seed default data on startup ---
 using (var scope = app.Services.CreateScope())

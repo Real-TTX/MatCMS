@@ -39,6 +39,8 @@ public static class InstanceSettingCatalog
             new Entry("FaviconUrl", "Favicon (URL)"),
             new Entry("FooterText", "Fußzeilen-Text"),
             new Entry("ContactRecipient", "Empfänger für Formular-Mails"),
+            new Entry("site.behindHttpsProxy", "Hinter HTTPS-Proxy",
+                "1 = an. Nötig, wenn ein Proxy die Verschlüsselung beendet: sonst baut die Website alle absoluten Adressen mit http und ein https-Browser weist sie ab."),
             new Entry("site.canonicalUrl", "Kanonische URL",
                 "Pro Website verschieden — als Profilwert nur sinnvoll, wenn wirklich alle Instanzen dieselbe Adresse haben."),
         ]),

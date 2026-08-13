@@ -1046,5 +1046,7 @@
   "settings.mailNone": "No sending",
   "settings.mailNoneHint": "This site cannot send e-mail: no SMTP server configured and no cloud relay active. Form notifications and password mails will not go out.",
   "forms.el.multiselect.name": "Multi-select",
-  "forms.el.multiselect.desc": "Dropdown with tick boxes – several options at once."
+  "forms.el.multiselect.desc": "Dropdown with tick boxes – several options at once.",
+  "settings.behindProxy": "Behind an HTTPS proxy",
+  "settings.behindProxyHelp": "Switch on when a reverse proxy terminates TLS and forwards unencrypted to this site. Without it, redirects and absolute links are built with http:// and a browser on an https page refuses them."
 }

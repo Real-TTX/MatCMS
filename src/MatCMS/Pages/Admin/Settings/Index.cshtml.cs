@@ -244,8 +244,11 @@ public class IndexModel : PageModel
         else row.Value = value;
     }
 
-    public async Task<IActionResult> OnPostAsync()
+    /// <param name="behindHttpsProxy">Its own parameter, not a Values entry: a checkbox posts nothing
+    /// when it is off, and a dictionary cannot tell "absent" from "false".</param>
+    public async Task<IActionResult> OnPostAsync(bool behindHttpsProxy = false)
     {
+        Values[SettingKeys.BehindHttpsProxy] = behindHttpsProxy ? "1" : "0";
         await SaveKeysAsync(SettingKeys.All);
         TempData["Flash"] = "Einstellungen gespeichert.";
         return RedirectToPage();

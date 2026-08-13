@@ -304,6 +304,13 @@
                 <input name="Values[@SettingKeys.CanonicalUrl]" value="@V(SettingKeys.CanonicalUrl)" placeholder="@T["settings.canonicalPlaceholder"]" spellcheck="false" />
                 <div class="help">@Html.Raw(T["settings.canonicalHelp"])</div>
             </div>
+            <label class="checkbox-row">
+                @* No hidden "0" companion: Values is a dictionary, and two inputs sharing one key
+                   bind to "0,1" — neither value. Unticking is handled in the handler instead. *@
+                <input type="checkbox" name="@SettingKeys.BehindHttpsProxy" value="1" checked="@(V(SettingKeys.BehindHttpsProxy) == "1" ? "checked" : null)" />
+                @T["settings.behindProxy"]
+            </label>
+            <div class="help">@T["settings.behindProxyHelp"]</div>
             <div class="form-field">
                 <label>@T["settings.siteName"]</label>
                 <input name="Values[@SettingKeys.SiteName]" value="@V(SettingKeys.SiteName)" />

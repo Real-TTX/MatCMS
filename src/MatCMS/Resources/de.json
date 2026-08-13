@@ -1046,5 +1046,7 @@
   "settings.mailNone": "Kein Versand",
   "settings.mailNoneHint": "Diese Website kann derzeit keine E-Mails verschicken: kein SMTP-Server eingetragen und kein Cloud-Versand aktiv. Formular-Benachrichtigungen und Passwort-Mails gehen nicht raus.",
   "forms.el.multiselect.name": "Mehrfachauswahl",
-  "forms.el.multiselect.desc": "Dropdown mit Kästchen – mehrere Optionen auf einmal."
+  "forms.el.multiselect.desc": "Dropdown mit Kästchen – mehrere Optionen auf einmal.",
+  "settings.behindProxy": "Hinter einem HTTPS-Proxy",
+  "settings.behindProxyHelp": "Einschalten, wenn ein Reverse-Proxy die Verschlüsselung beendet und unverschlüsselt an diese Website weiterreicht. Ohne das baut sie Weiterleitungen und absolute Links mit http:// — ein Browser auf einer https-Seite weist die dann ab."
 }

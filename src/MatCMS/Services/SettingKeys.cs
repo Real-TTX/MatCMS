@@ -38,6 +38,18 @@ public static class SettingKeys
     // robots.txt. Empty = derive from the request (only correct when not behind a scheme-changing proxy).
     public const string CanonicalUrl = "site.canonicalUrl";
 
+    /// <summary>
+    /// "This site sits behind a proxy that terminates TLS."
+    /// <para>Without it the app only sees the unencrypted hop to the proxy and builds every absolute
+    /// address it emits — redirects above all — with http://. A browser on an https page then refuses
+    /// them; the cloud's embedded view is where that shows up first, because a redirect to the login
+    /// page turns into blocked mixed content.</para>
+    /// <para>A SETTING and not only the environment variable, because it can then be rolled out from
+    /// a cloud profile to a whole fleet at once — which is how a fleet gets this wrong: everywhere,
+    /// for the same reason, on the same day.</para>
+    /// </summary>
+    public const string BehindHttpsProxy = "site.behindHttpsProxy";
+
     // "1" once the setup wizard has been completed (drives the dashboard prompt).
     public const string SetupComplete = "setup.complete";
 
@@ -104,7 +116,7 @@ public static class SettingKeys
     // The constants remain for the one-time migration in DbSeeder.
     public static readonly string[] All =
     [
-        CanonicalUrl, SiteName, LogoUrl, FaviconUrl,
+        CanonicalUrl, BehindHttpsProxy, SiteName, LogoUrl, FaviconUrl,
         FooterText, ContactRecipient
     ];
 

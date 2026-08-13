@@ -484,3 +484,13 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
 /* Every step from the bar down to the input has to be allowed to grow — one link that sizes to its
    contents stops the whole chain, which is what happened above. */
 .site-embed-actions { flex: 1 1 auto; min-width: 0; }
+
+/* Abstand zwischen Umschalter und Adressleiste. Solange die rechte Seite sich nach ihrem Inhalt
+   bemaß, hielt space-between die beiden auseinander; jetzt füllt sie den Platz und die zwei stoßen
+   aneinander. Der Abstand gehört also an die Leiste selbst, nicht an eines der beiden Teile. */
+.admin-topbar { column-gap: 28px; }
+
+/* Begrenzt und rechtsbündig: auf einem breiten Bildschirm wäre ein Feld über die halbe Leiste hinweg
+   nur leerer Kasten, und es soll bei den Knöpfen stehen, zu denen es gehört. Doppelt so breit wie die
+   erste Fassung; was dann noch abgeschnitten wird, steht vollständig im Mouse-Over. */
+.site-addr { max-width: 1280px; margin-left: auto; }

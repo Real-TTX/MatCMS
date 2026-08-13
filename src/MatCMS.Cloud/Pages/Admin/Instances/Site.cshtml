@@ -22,7 +22,7 @@
                navigation this page cannot deliver. Hidden when the bar gets narrow; the switcher and
                the buttons do something, this only tells. *@
             <input type="text" class="site-addr" data-site-addr readonly tabindex="-1"
-                   value="@Model.Item.PreviewUrl" aria-label="@T["instances.address"]" />
+                   value="@Model.Item.PreviewUrl" title="@Model.Item.PreviewUrl" aria-label="@T["instances.address"]" />
             <div class="site-tools">
                 <button type="button" class="stool stool-home" data-site-home data-home-url="@Model.Item.PreviewUrl"
                         title="@T["instances.home"]" aria-label="@T["instances.home"]">
@@ -110,7 +110,7 @@ else
             // admin button can never describe three different pages.
             function go(url, isAdmin) {
                 frame.src = url;
-                if (addr) addr.value = url;
+                if (addr) { addr.value = url; addr.title = url; }
                 if (newTab) newTab.href = url;
                 var b = document.querySelector('[data-site-admin]');
                 if (b) b.classList.toggle('is-active', !!isAdmin);
@@ -146,7 +146,7 @@ else
                 // is. That is also the limit: follow a link to a foreign site and nothing is sent,
                 // so the bar keeps showing the last page that did.
                 if (typeof d.url === 'string' && d.url) {
-                    if (addr) addr.value = d.url;
+                    if (addr) { addr.value = d.url; addr.title = d.url; }
                     if (newTab) newTab.href = d.url;
                     var ab = document.querySelector('[data-site-admin]');
                     // The admin button reflects where the frame IS, not what was last clicked —

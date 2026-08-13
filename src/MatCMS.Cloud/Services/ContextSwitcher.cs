@@ -28,6 +28,42 @@ public class ContextSwitcher
     /// stay IN: offline is exactly when somebody goes looking, and a list that hides them answers the
     /// wrong question.</para>
     /// </summary>
+    /// <summary>Cookie holding which of the two views the operator last CHOSE.</summary>
+    public const string ViewCookie = "matcmscloud.view";
+
+    public const string ViewSite = "site";
+    public const string ViewCloud = "cloud";
+
+    /// <summary>
+    /// Remembers a chosen view, so stepping to the next instance lands in the same one.
+    ///
+    /// <para>Written only when the view TOGGLE was used — the pages behind it are reached by other
+    /// routes too (a row in the instance list, a link from a backup), and letting those count would
+    /// make the memory follow navigation rather than intent.</para>
+    ///
+    /// <para>A cookie rather than localStorage because the choice decides where the switcher's links
+    /// POINT, and those are built on the server: with the value in the browser only, every menu would
+    /// render the wrong targets and need rewriting after the fact.</para>
+    /// </summary>
+    public static void Remember(HttpContext ctx, string view)
+    {
+        if (view != ViewSite && view != ViewCloud) return;
+        ctx.Response.Cookies.Append(ViewCookie, view, new CookieOptions
+        {
+            HttpOnly = true,                    // nothing in the browser reads it
+            IsEssential = true,                 // a UI preference the operator asked for
+            SameSite = SameSiteMode.Lax,
+            Secure = ctx.Request.IsHttps,
+            Expires = DateTimeOffset.UtcNow.AddYears(1),
+            Path = "/"
+        });
+    }
+
+    /// <summary>Which view to send the switcher's links to. The site is the default: it is what the
+    /// menu did before there was a choice, and it is why somebody opens an instance.</summary>
+    public static string CurrentView(HttpContext ctx) =>
+        ctx.Request.Cookies[ViewCookie] == ViewCloud ? ViewCloud : ViewSite;
+
     public async Task<List<Instance>> InstancesAsync(CancellationToken ct = default) =>
         _cache ??= await _db.Instances.AsNoTracking()
             .Where(i => i.Status != InstanceStatus.Rejected)

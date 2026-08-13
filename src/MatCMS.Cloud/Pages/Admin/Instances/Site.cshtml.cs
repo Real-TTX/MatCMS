@@ -1,5 +1,6 @@
 using MatCMS.Cloud.Data;
 using MatCMS.Cloud.Models;
+using MatCMS.Cloud.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
@@ -36,8 +37,12 @@ public class SiteModel : PageModel
     /// </summary>
     public List<Instance> Switchable { get; private set; } = [];
 
-    public async Task<IActionResult> OnGetAsync(int id)
+    /// <param name="view">Set only by the view toggle. Any other way in here leaves the
+    /// remembered choice alone — otherwise opening one instance from a list would silently
+    /// decide how every later one opens.</param>
+    public async Task<IActionResult> OnGetAsync(int id, string? view = null)
     {
+        if (view is not null) ContextSwitcher.Remember(HttpContext, view);
         var item = await _db.Instances.AsNoTracking().Include(i => i.Profile)
             .FirstOrDefaultAsync(i => i.Id == id);
         if (item is null) return RedirectToPage("Index");

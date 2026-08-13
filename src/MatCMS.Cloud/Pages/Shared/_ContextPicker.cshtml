@@ -18,6 +18,10 @@
                    && !string.IsNullOrWhiteSpace(current.PreviewUrl)
                    && !MatCMS.Cloud.Services.MixedContent.IsBlocked(ViewContext.HttpContext.Request.IsHttps, current.PreviewUrl);
     var onSite = ViewContext.RouteData.Values["page"]?.ToString()?.EndsWith("/Site", StringComparison.OrdinalIgnoreCase) == true;
+    // Where the menu sends you: the view last chosen with the toggle, so stepping to the next
+    // instance keeps the way you were looking at the last one.
+    var preferSite = MatCMS.Cloud.Services.ContextSwitcher.CurrentView(ViewContext.HttpContext)
+                     == MatCMS.Cloud.Services.ContextSwitcher.ViewSite;
 }
 <div class="inst-ctx">
 <div class="inst-picker" data-inst-picker>
@@ -46,7 +50,7 @@
                          && !MatCMS.Cloud.Services.MixedContent.IsBlocked(ViewContext.HttpContext.Request.IsHttps, i.PreviewUrl);
             <a class="inst-picker-item@(i.Id == Model ? " is-current" : "")@(online ? "" : " is-offline")"
                role="option" aria-selected="@(i.Id == Model ? "true" : "false")"
-               href="@(hasUrl ? Url.Page("/Admin/Instances/Site", new { id = i.Id }) : Url.Page("/Admin/Instances/Details", new { id = i.Id }))">
+               href="@(hasUrl && preferSite ? Url.Page("/Admin/Instances/Site", new { id = i.Id }) : Url.Page("/Admin/Instances/Details", new { id = i.Id }))">
                 <span class="inst-picker-shot">
                     @if (hasUrl)
                     {
@@ -94,11 +98,11 @@
 @if (canEmbed)
 {
     <div class="inst-view-toggle" role="group" aria-label="@T["instances.viewSwitch"]">
-        <a class="ivt-btn@(onSite ? "" : " is-active")" href="@Url.Page("/Admin/Instances/Details", new { id = current!.Id })"
+        <a class="ivt-btn@(onSite ? "" : " is-active")" href="@Url.Page("/Admin/Instances/Details", new { id = current!.Id, view = "cloud" })"
            title="@T["instances.viewCloud"]" aria-label="@T["instances.viewCloud"]" aria-current="@(onSite ? null : "page")">
             <i class="ti ti-layout-dashboard" aria-hidden="true"></i>
         </a>
-        <a class="ivt-btn@(onSite ? " is-active" : "")" href="@Url.Page("/Admin/Instances/Site", new { id = current!.Id })"
+        <a class="ivt-btn@(onSite ? " is-active" : "")" href="@Url.Page("/Admin/Instances/Site", new { id = current!.Id, view = "site" })"
            title="@T["instances.viewSite"]" aria-label="@T["instances.viewSite"]" aria-current="@(onSite ? "page" : null)">
             <i class="ti ti-browser" aria-hidden="true"></i>
         </a>

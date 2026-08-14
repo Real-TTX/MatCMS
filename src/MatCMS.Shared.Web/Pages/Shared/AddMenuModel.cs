@@ -11,8 +11,11 @@ namespace MatCMS.Shared.Web;
 /// (<c>"add-import"</c> becomes <c>data-add-import</c>). This is what keeps the partial shared: the
 /// CMS opens its cloud catalogue with a link, the cloud opens its store picker with an attribute its
 /// own script listens for, and neither concept has to be named here.</param>
+/// <param name="Icon">Tabler-Klasse, z. B. "ti-plus". Optional: eine Auswahl mit Symbolen liest sich
+/// auf einen Blick, aber nicht jede Frage hat Antworten, die sich sinnvoll bebildern lassen.</param>
 public sealed record AddOption(
-    string Title, string Sub, string? Href = null, IReadOnlyDictionary<string, string>? Data = null);
+    string Title, string Sub, string? Href = null, IReadOnlyDictionary<string, string>? Data = null,
+    string? Icon = null);
 
 /// <summary>
 /// The single "Hinzufügen" entry point under a list, and the ways it offers.

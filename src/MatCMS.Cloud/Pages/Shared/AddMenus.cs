@@ -59,6 +59,27 @@ public static class AddMenus
         return new AddMenu("settings", t["add.button"], t["add.whichSetting"], t["action.close"], options);
     }
 
+    /// <summary>
+    /// Die drei Wege, wie eine Instanz in die Cloud kommt — an einer Stelle statt auf zwei Knöpfe
+    /// verteilt. Sie unterscheiden sich darin, WER anfängt: die Cloud erzeugt, die Cloud meldet sich
+    /// bei einer laufenden Website, oder die Website meldet sich selbst.
+    /// <para>Der erste Weg fehlt, solange Hosting nicht eingeschaltet ist — ein Angebot, das sicher
+    /// scheitert, gehört nicht in die Auswahl.</para>
+    /// </summary>
+    public static AddMenu Instances(Localizer t, string? newUrl, string adoptUrl, string joinUrl)
+    {
+        // Reihenfolge nach Häufigkeit, nicht nach Aufwand: der Join-Code ist der übliche Weg, das
+        // Anlegen der seltene. Und das Anlegen steht zuletzt, weil es als einziges etwas erzeugt.
+        var options = new List<AddOption>
+        {
+            new(t["enroll.joinTitle"], t["add.instanceJoinHint"], joinUrl, Icon: "ti-key"),
+            new(t["enroll.adoptTitle"], t["add.instanceAdoptHint"], adoptUrl, Icon: "ti-login"),
+        };
+        if (newUrl is { Length: > 0 })
+            options.Add(new AddOption(t["instances.new"], t["add.instanceNewHint"], newUrl, Icon: "ti-cube-plus"));
+        return new AddMenu("instances", t["add.button"], t["add.whichInstance"], t["action.close"], options);
+    }
+
     /// <summary>Step two for SMTP: WHERE FROM. Both answers land on the mail page — one with the
     /// global values filled in, one with the profile's own — because a configuration that is about to
     /// be rolled out to live sites should be seen before it is saved, not applied by a menu click.</summary>

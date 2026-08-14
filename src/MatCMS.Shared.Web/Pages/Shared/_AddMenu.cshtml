@@ -43,6 +43,10 @@
                     if (o.Href is null)
                     {
                         <button type="button" class="add-option" data-add-menu-close @DataAttrs(o)>
+                            @if (o.Icon is { Length: > 0 })
+                            {
+                                <span class="add-option-icon"><i class="ti @o.Icon" aria-hidden="true"></i></span>
+                            }
                             <span class="add-option-title">@o.Title</span>
                             <span class="add-option-sub">@o.Sub</span>
                         </button>
@@ -50,6 +54,10 @@
                     else
                     {
                         <a class="add-option" href="@o.Href" data-add-menu-close @DataAttrs(o)>
+                            @if (o.Icon is { Length: > 0 })
+                            {
+                                <span class="add-option-icon"><i class="ti @o.Icon" aria-hidden="true"></i></span>
+                            }
                             <span class="add-option-title">@o.Title</span>
                             <span class="add-option-sub">@o.Sub</span>
                         </a>

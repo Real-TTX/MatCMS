@@ -275,15 +275,12 @@
     <div class="list-pager" data-list-pager></div>
 </div>
 
-<div class="list-actions">
-    @* Nur wenn Hosting eingeschaltet ist. Ein Knopf, der sicher scheitert, gehört nicht auf die
-       Seite — und der Weg dorthin steht in den Einstellungen, nicht hier. *@
-    @if (Model.HostingEnabled)
-    {
-        <a class="btn" asp-page="New">@T["instances.new"]</a>
-    }
-    <a class="btn@(Model.HostingEnabled ? " btn-ghost" : "")" asp-page="Create">@T["instances.add"]</a>
-</div>
+@* Ein Weg hinein, drei Möglichkeiten darin — statt zweier Knöpfe, deren Unterschied man erst nach
+   dem Klicken sieht. *@
+<partial name="_AddMenu" model='AddMenus.Instances(T,
+    Model.HostingEnabled ? Url.Page("New") : null,
+    Url.Page("Create", null, null, "adopt")!,
+    Url.Page("Create", null, null, "join")!)' />
 
 @section Scripts {
     <script>

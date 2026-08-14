@@ -1106,3 +1106,10 @@ table.data .btn { white-space: nowrap; }
 .field .mat-rs-current { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .field .mat-rs-placeholder { color: var(--muted, #6b7280); }
 .field .mat-rs-chev { flex: 0 0 auto; color: var(--muted, #6b7280); font-size: 12px; }
+
+/* Auswahl mit Symbol: die Antwort ist auf einen Blick zu erkennen, bevor man den Text liest. Nur
+   wirksam, wo eine Option ein Icon mitbringt — ohne bleibt die Darstellung, wie sie war. */
+.add-option:has(.add-option-icon) { display: grid; grid-template-columns: 46px 1fr; align-items: center; column-gap: 14px; }
+.add-option-icon { grid-row: 1 / span 2; display: flex; align-items: center; justify-content: center;
+    width: 46px; height: 46px; border-radius: 12px; background: #f0f2f5; font-size: 24px; color: var(--accent, #2563eb); }
+.add-option:hover .add-option-icon { background: color-mix(in srgb, var(--accent, #2563eb) 12%, transparent); }

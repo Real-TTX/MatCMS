@@ -9,7 +9,7 @@
 </div>
 
 <div class="card">
-    <h2>@T["enroll.joinTitle"]</h2>
+    <h2 id="join">@T["enroll.joinTitle"]</h2>
     <p class="muted">@T["enroll.joinIntro"]</p>
 
     @if (Model.Profiles.Count == 0)
@@ -60,7 +60,7 @@
 </div>
 
 <div class="card">
-    <h2>@T["enroll.adoptTitle"]</h2>
+    <h2 id="adopt">@T["enroll.adoptTitle"]</h2>
     <p class="muted">@T["enroll.adoptIntro"]</p>
 
     @if (!string.IsNullOrWhiteSpace(Model.Error))

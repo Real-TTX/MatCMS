@@ -44,19 +44,31 @@ public class IndexModel : PageModel
         LocalCount = await _db.Instances.CountAsync(i => i.Hosting == InstanceHosting.Local);
     }
 
-    public async Task<IActionResult> OnPostGeneralAsync(string? cloudName, string? canonicalUrl, string? backupQuotaGb, bool forceHttps)
+    public async Task<IActionResult> OnPostGeneralAsync(string? cloudName, string? canonicalUrl, bool forceHttps)
     {
         await _cloud.SaveAsync(new Dictionary<string, string?>
         {
             [SettingKeys.CloudName] = cloudName?.Trim(),
             [SettingKeys.CanonicalUrl] = canonicalUrl?.Trim().TrimEnd('/'),
-            // Only a sensible number is stored; anything else is left empty so the default applies
-            // rather than a zero quota deleting every backup on the next upload.
-            [SettingKeys.BackupQuotaGb] = int.TryParse(backupQuotaGb, out var gb) && gb > 0 ? gb.ToString() : "",
             [SettingKeys.ForceHttpsUrls] = forceHttps ? "1" : "0"
         });
         TempData["Flash"] = "Einstellungen gespeichert.";
         return RedirectToPage(new { tab = "general" });
+    }
+
+    /// <summary>Eigenes Formular, eigener Handler — jede Karte speichert nur ihre eigenen Schlüssel.
+    /// Bliebe das Kontingent am Allgemein-Handler hängen, würde ein Speichern dort den Wert leeren,
+    /// weil das Formular ihn gar nicht mehr mitschickt.</summary>
+    public async Task<IActionResult> OnPostBackupAsync(string? backupQuotaGb)
+    {
+        await _cloud.SaveAsync(new Dictionary<string, string?>
+        {
+            // Nur eine sinnvolle Zahl wird gespeichert; alles andere bleibt leer, damit der Standard
+            // greift statt ein Null-Kontingent beim nächsten Upload alles wegzuräumen.
+            [SettingKeys.BackupQuotaGb] = int.TryParse(backupQuotaGb, out var gb) && gb > 0 ? gb.ToString() : ""
+        });
+        TempData["Flash"] = "Backup-Einstellungen gespeichert.";
+        return RedirectToPage(new { tab = "backup" });
     }
 
     public async Task<IActionResult> OnPostNotificationsAsync(

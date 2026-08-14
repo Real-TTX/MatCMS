@@ -12,6 +12,7 @@
     <button type="button" class="tab active" data-tab="general">@T["settings.tabGeneral"]</button>
     <button type="button" class="tab" data-tab="notifications">@T["settings.tabNotifications"]</button>
     <button type="button" class="tab" data-tab="smtp">@T["settings.tabSmtp"]</button>
+    <button type="button" class="tab" data-tab="backup">@T["backups.title"]</button>
     <button type="button" class="tab" data-tab="docker">@T["settings.tabDocker"]</button>
 </div>
 
@@ -28,12 +29,6 @@
                 <label>URL</label>
                 <input name="canonicalUrl" value="@Model.Get(SettingKeys.CanonicalUrl)" placeholder="https://cloud.beispiel.de" spellcheck="false" />
                 <div class="help">@T["settings.canonicalUrlHint"]</div>
-            </div>
-            <div class="form-field">
-                <label>@T["settings.backupQuota"]</label>
-                <input name="backupQuotaGb" value="@Model.Get(MatCMS.Cloud.Services.SettingKeys.BackupQuotaGb)"
-                       placeholder="@MatCMS.Cloud.Services.BackupStore.DefaultQuotaGb" inputmode="numeric" />
-                <div class="help">@T["settings.backupQuotaHint"]</div>
             </div>
             <label class="checkbox-row">
                 <input type="checkbox" name="forceHttps" value="true" checked="@(Model.Flag(SettingKeys.ForceHttpsUrls) ? "checked" : null)" />
@@ -138,6 +133,25 @@
             <div><button type="submit" class="btn btn-ghost">@T["settings.smtpTestSend"]</button></div>
         </form>
     </div>
+</div>
+
+@* ============ BACKUP ============ *@
+@* Eigener Reiter: Backups sind ein Bereich mit eigener Seite, eigener Belegung und eigenem
+   Kontingent — als eine Zeile unter "Allgemein" war das die einzige Einstellung, die man dort
+   suchen musste, obwohl sie zu etwas anderem gehört. *@
+<div class="tab-panel" data-panel="backup" hidden>
+    <form method="post" asp-page-handler="Backup">
+        <div class="card">
+            <h2>@T["backups.title"]</h2>
+            <div class="form-field">
+                <label>@T["settings.backupQuota"]</label>
+                <input name="backupQuotaGb" value="@Model.Get(SettingKeys.BackupQuotaGb)"
+                       placeholder="@MatCMS.Cloud.Services.BackupStore.DefaultQuotaGb" inputmode="numeric" />
+                <div class="help">@T["settings.backupQuotaHint"]</div>
+            </div>
+            <div><button type="submit" class="btn">@T["settings.save"]</button></div>
+        </div>
+    </form>
 </div>
 
 @* ============ DOCKER ============ *@

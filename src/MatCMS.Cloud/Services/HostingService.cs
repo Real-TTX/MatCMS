@@ -93,4 +93,123 @@ public class HostingService
             return null;
         }
     }
+
+    // --- Anlegen ---------------------------------------------------------------------------------
+
+    /// <param name="Name">Anzeigename; daraus wird der Container- und Volume-Name abgeleitet.</param>
+    /// <param name="Domain">Nur ohne Matcad nötig — dort trägt sie der Betreiber selbst ein.</param>
+    public sealed record CreateRequest(string Name, string? Domain, string ImageTag, string JoinCode);
+
+    public sealed record CreateResult(bool Ok, string? Error, string? ContainerId, int? Port, string? ContainerName);
+
+    /// <summary>Aus einem Anzeigenamen ein Bezeichner, der als Container- und Volume-Name taugt.</summary>
+    public static string Slug(string name)
+    {
+        var chars = name.Trim().ToLowerInvariant()
+            .Select(c => char.IsLetterOrDigit(c) ? c : '-')
+            .ToArray();
+        var slug = new string(chars).Trim('-');
+        while (slug.Contains("--")) slug = slug.Replace("--", "-");
+        return slug.Length == 0 ? "instanz" : slug;
+    }
+
+    /// <summary>
+    /// Legt einen neuen MatCMS-Container an und startet ihn.
+    ///
+    /// <para>Scheitert etwas nach dem Erzeugen, wird der halb gebaute Container wieder entfernt. Ein
+    /// gestoppter Rest mit richtigem Namen wäre schlimmer als gar keiner: der nächste Versuch mit
+    /// demselben Namen liefe darauf auf.</para>
+    ///
+    /// <para>Das Volume bleibt bewusst stehen. Es enthält ab der ersten Sekunde Daten der Website,
+    /// und etwas zu löschen, das Inhalte tragen könnte, ist keine Aufräumarbeit für einen
+    /// Fehlerpfad.</para>
+    /// </summary>
+    public async Task<CreateResult> CreateAsync(CreateRequest req, CancellationToken ct = default)
+    {
+        if (!Enabled) return new(false, "Hosting ist in den Einstellungen nicht eingeschaltet.", null, null, null);
+
+        var client = _docker.ClientOrNull;
+        if (client is null) return new(false, "Docker ist nicht erreichbar.", null, null, null);
+
+        var slug = Slug(req.Name);
+        var containerName = "matcms-" + slug;
+        var volumeName = containerName + "-data";
+
+        if (!UsesMatcad && string.IsNullOrWhiteSpace(req.Domain))
+            return new(false, "Ohne Matcad muss eine Domain angegeben werden.", null, null, null);
+
+        var port = await NextFreePortAsync(ct);
+        if (port is null) return new(false, "Kein freier Port im eingestellten Bereich.", null, null, null);
+
+        var image = "ghcr.io/real-ttx/matcms:" + (string.IsNullOrWhiteSpace(req.ImageTag) ? "latest" : req.ImageTag.Trim());
+        string? createdId = null;
+        try
+        {
+            // Erst ziehen. Ohne das schlüge das Erzeugen mit einer Meldung fehl, die nach einem
+            // Fehler im Aufruf aussieht statt nach einem fehlenden Image.
+            await client.Images.CreateImageAsync(
+                new ImagesCreateParameters { FromImage = image }, null, new Progress<JSONMessage>(), ct);
+
+            var labels = new Dictionary<string, string>
+            {
+                ["matcmscloud.managed"] = "true"
+            };
+            if (UsesMatcad)
+            {
+                // Matcad liest diese Labels und richtet die Route selbst ein.
+                labels["matcad.enable"] = "true";
+                if (!string.IsNullOrWhiteSpace(req.Domain)) labels["matcad.host"] = req.Domain!.Trim();
+                labels["matcad.port"] = "8080";
+            }
+
+            var create = new CreateContainerParameters
+            {
+                Name = containerName,
+                Image = image,
+                Labels = labels,
+                Env = new List<string>
+                {
+                    // Damit sie sich selbst anmeldet und ihr Profil bekommt.
+                    "MatCms__Cloud__Url=" + (_cloud.Get(SettingKeys.CanonicalUrl) ?? ""),
+                    "MatCms__Cloud__JoinCode=" + req.JoinCode,
+                    // Sie startet hinter einem Proxy — ohne das baut sie http-Adressen und wäre in
+                    // der Cloud weder einbettbar noch richtig verlinkt.
+                    "MatCms__Proxy__TrustAll=true",
+                },
+                HostConfig = new HostConfig
+                {
+                    PortBindings = new Dictionary<string, IList<PortBinding>>
+                    {
+                        ["8080/tcp"] = new List<PortBinding> { new() { HostPort = port.Value.ToString() } }
+                    },
+                    Binds = new List<string> { volumeName + ":/app/appdata" },
+                    RestartPolicy = new RestartPolicy { Name = RestartPolicyKind.UnlessStopped },
+                },
+            };
+
+            var created = await client.Containers.CreateContainerAsync(create, ct);
+            createdId = created.ID;
+            await client.Containers.StartContainerAsync(createdId, new ContainerStartParameters(), ct);
+
+            _log.LogInformation("Instanz {Name} angelegt: Container {Id} auf Port {Port}.", containerName, createdId, port);
+            return new(true, null, createdId, port, containerName);
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex, "Anlegen von {Name} fehlgeschlagen.", containerName);
+            if (createdId is not null)
+            {
+                try
+                {
+                    await client.Containers.RemoveContainerAsync(createdId,
+                        new ContainerRemoveParameters { Force = true }, CancellationToken.None);
+                }
+                catch (Exception cleanup)
+                {
+                    _log.LogWarning(cleanup, "Der halb gebaute Container {Id} blieb stehen.", createdId);
+                }
+            }
+            return new(false, ex.Message, null, null, null);
+        }
+    }
 }

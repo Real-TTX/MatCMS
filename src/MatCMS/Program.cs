@@ -148,6 +148,9 @@ builder.Services.AddScoped<CloudService>();
 builder.Services.AddScoped<CloudSyncService>();
 builder.Services.AddScoped<CloudCatalogService>();
 builder.Services.AddHostedService<CloudConnectionService>();
+// Meldet sich selbst an, wenn MatCms:Cloud:Url und :JoinCode gesetzt sind — der Weg, auf dem eine
+// aus der Cloud erzeugte Instanz ohne Zutun in ihr Profil findet.
+builder.Services.AddHostedService<CloudAutoEnrollService>();
 
 // Basic brute-force protection for the login endpoint (per client IP).
 // Behind a reverse proxy, enable ForwardedHeaders so the real client IP is used.

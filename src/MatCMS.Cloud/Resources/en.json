@@ -644,5 +644,14 @@
   "settings.hostingPortsHint": "Every new instance gets its host port from this range. Applies with Matcad too — the proxy has to find the instance somewhere.",
   "settings.hostingNextPort": "Next free port",
   "settings.hostingPortsUsed": "({0} ports in use on the host)",
-  "settings.hostingNoPort": "None free, or daemon unreachable"
+  "settings.hostingNoPort": "None free, or daemon unreachable",
+  "instances.new": "Create instance",
+  "instances.newCreate": "Create",
+  "instances.newNameHint": "Container and volume name are derived from this.",
+  "instances.newProfileHint": "The new site enrols itself with this profile's join code, and starts with whatever the profile rolls out.",
+  "instances.newVersion": "Version",
+  "instances.newVersionHint": "Image tag, e.g. latest. Latest published:",
+  "instances.newDomain": "Domain",
+  "instances.newDomainMatcad": "Optional — Matcad creates the route from it.",
+  "instances.newDomainPlain": "Required: without Matcad nothing else knows the route."
 }

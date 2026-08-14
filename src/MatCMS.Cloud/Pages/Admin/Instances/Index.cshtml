@@ -276,7 +276,13 @@
 </div>
 
 <div class="list-actions">
-    <a class="btn" asp-page="Create">@T["instances.add"]</a>
+    @* Nur wenn Hosting eingeschaltet ist. Ein Knopf, der sicher scheitert, gehört nicht auf die
+       Seite — und der Weg dorthin steht in den Einstellungen, nicht hier. *@
+    @if (Model.HostingEnabled)
+    {
+        <a class="btn" asp-page="New">@T["instances.new"]</a>
+    }
+    <a class="btn@(Model.HostingEnabled ? " btn-ghost" : "")" asp-page="Create">@T["instances.add"]</a>
 </div>
 
 @section Scripts {

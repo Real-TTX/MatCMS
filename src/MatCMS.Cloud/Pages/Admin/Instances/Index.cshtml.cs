@@ -11,11 +11,17 @@ public class IndexModel : PageModel
 {
     private readonly AppDbContext _db;
     private readonly ReleaseWatcher _releases;
+    private readonly CloudContext _cloud;
 
-    public IndexModel(AppDbContext db, ReleaseWatcher releases)
+    /// <summary>Ob die Cloud selbst Instanzen anlegen darf — entscheidet, ob der Knopf dafür
+    /// überhaupt erscheint.</summary>
+    public bool HostingEnabled => _cloud.Flag(SettingKeys.HostingEnabled);
+
+    public IndexModel(AppDbContext db, ReleaseWatcher releases, CloudContext cloud)
     {
         _db = db;
         _releases = releases;
+            _cloud = cloud;
     }
 
     public List<Instance> Items { get; private set; } = new();

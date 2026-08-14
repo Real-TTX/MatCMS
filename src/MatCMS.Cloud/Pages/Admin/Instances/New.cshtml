@@ -1,0 +1,73 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.Instances.NewModel
+@{
+    ViewData["Title"] = T["instances.new"];
+}
+<div class="page-head">
+    <h1>@T["instances.new"]</h1>
+    <div class="list-toolbar">
+        <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
+    </div>
+</div>
+
+<form method="post">
+    <div class="card">
+        <div class="form-field">
+            <label for="name">@T["common.name"]</label>
+            <input id="name" name="name" required placeholder="Kundenseite" />
+            <div class="help">@T["instances.newNameHint"]</div>
+        </div>
+
+        @* Das Profil ist nicht Beiwerk: sein Join-Code ist der Weg, auf dem sich die neue Instanz
+           anmeldet, und sein Inhalt ist das, womit sie startet. *@
+        <div class="form-field">
+            <label for="profileId">@T["profiles.title"]</label>
+            <select id="profileId" name="profileId" required>
+                @foreach (var p in Model.Profiles)
+                {
+                    <option value="@p.Id" selected="@(p.IsDefault ? "selected" : null)">@p.Name</option>
+                }
+            </select>
+            <div class="help">@T["instances.newProfileHint"]</div>
+        </div>
+
+        <div class="form-field">
+            <label for="imageTag">@T["instances.newVersion"]</label>
+            <input id="imageTag" name="imageTag" value="latest" spellcheck="false" />
+            <div class="help">
+                @T["instances.newVersionHint"]
+                @if (Model.LatestVersion is string v)
+                {
+                    <span class="mono">@v</span>
+                }
+            </div>
+        </div>
+
+        @* Mit Matcad entsteht die Route aus den Labels; ohne muss jemand sagen, wohin. Die Frage wird
+           deshalb nur dann gestellt, wenn sie eine Antwort braucht. *@
+        <div class="form-field">
+            <label for="domain">@T["instances.newDomain"]</label>
+            <input id="domain" name="domain" placeholder="kunde.beispiel.de" spellcheck="false"
+                   required="@(Model.UsesMatcad ? null : "required")" />
+            <div class="help">@(Model.UsesMatcad ? T["instances.newDomainMatcad"] : T["instances.newDomainPlain"])</div>
+        </div>
+
+        <div class="kv">
+            <div class="kv-label">@T["settings.hostingNextPort"]</div>
+            <div class="kv-value">
+                @if (Model.NextPort is int np)
+                {
+                    <span class="mono">@np</span>
+                }
+                else
+                {
+                    <span class="badge badge-err">@T["settings.hostingNoPort"]</span>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="list-actions">
+        <button type="submit" class="btn" disabled="@(Model.NextPort is null ? "disabled" : null)">@T["instances.newCreate"]</button>
+    </div>
+</form>

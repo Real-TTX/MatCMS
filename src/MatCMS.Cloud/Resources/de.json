@@ -644,5 +644,14 @@
   "settings.hostingPortsHint": "Aus diesem Bereich bekommt jede neue Instanz ihren Port auf dem Host. Gilt auch mit Matcad — der Proxy muss die Instanz ja irgendwo finden.",
   "settings.hostingNextPort": "Nächster freier Port",
   "settings.hostingPortsUsed": "({0} Ports auf dem Host belegt)",
-  "settings.hostingNoPort": "Keiner frei oder Daemon nicht erreichbar"
+  "settings.hostingNoPort": "Keiner frei oder Daemon nicht erreichbar",
+  "instances.new": "Instanz anlegen",
+  "instances.newCreate": "Anlegen",
+  "instances.newNameHint": "Daraus entstehen Container- und Volume-Name.",
+  "instances.newProfileHint": "Über dessen Join-Code meldet sich die neue Website selbst an — und startet mit dem, was das Profil ausrollt.",
+  "instances.newVersion": "Version",
+  "instances.newVersionHint": "Bild-Tag, z. B. latest. Zuletzt veröffentlicht:",
+  "instances.newDomain": "Domain",
+  "instances.newDomainMatcad": "Optional — Matcad richtet damit die Route ein.",
+  "instances.newDomainPlain": "Pflicht, weil ohne Matcad niemand sonst die Route kennt."
 }

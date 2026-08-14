@@ -630,5 +630,16 @@
   "settings.tabHosting": "Hosting",
   "settings.hostingEnabled": "Diese Cloud darf Instanzen betreiben",
   "settings.hostingEnabledHint": "Erlaubt der Cloud, auf dem erreichbaren Docker-Daemon neue MatCMS-Instanzen anzulegen. Aus, solange es niemand einschaltet — die entsprechenden Aktionen erscheinen dann gar nicht erst.",
-  "settings.hostingNeedsDocker": "Ohne erreichbaren Daemon kann nichts angelegt werden."
+  "settings.hostingNeedsDocker": "Ohne erreichbaren Daemon kann nichts angelegt werden.",
+  "settings.hostingRouting": "Erreichbarkeit",
+  "settings.hostingMode": "Wie wird eine neue Instanz erreichbar?",
+  "settings.hostingModeMatcad": "Über Matcad (Route wird angelegt)",
+  "settings.hostingModeDocker": "Nur Container (Domain selbst angeben)",
+  "settings.hostingModeHint": "Mit Matcad bekommt jede neue Instanz ihre Route automatisch. Ohne startet nur der Container — die Domain trägt man beim Anlegen selbst ein.",
+  "settings.hostingMatcadUrl": "Adresse des Matcad-API",
+  "settings.hostingMatcadToken": "Zugangsschlüssel",
+  "settings.hostingPorts": "Portbereich",
+  "settings.hostingPortFrom": "Von",
+  "settings.hostingPortTo": "Bis",
+  "settings.hostingPortsHint": "Aus diesem Bereich bekommt jede neue Instanz ihren Port auf dem Host. Gilt auch mit Matcad — der Proxy muss die Instanz ja irgendwo finden."
 }

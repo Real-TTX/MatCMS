@@ -183,6 +183,57 @@
                     }
                 </div>
             </div>
+        </div>
+
+        @* Wie eine neue Instanz erreichbar wird. Zwei Wege, und der zweite ist kein Notbehelf: ohne
+           Matcad läuft der Container trotzdem, nur muss dann jemand sagen, unter welcher Domain. *@
+        <div class="card">
+            <h2>@T["settings.hostingRouting"]</h2>
+            <div class="form-field">
+                <label for="hostingMode">@T["settings.hostingMode"]</label>
+                <select id="hostingMode" name="hostingMode" data-hosting-mode>
+                    <option value="matcad" selected="@(Model.Get(SettingKeys.HostingMode) != "docker" ? "selected" : null)">@T["settings.hostingModeMatcad"]</option>
+                    <option value="docker" selected="@(Model.Get(SettingKeys.HostingMode) == "docker" ? "selected" : null)">@T["settings.hostingModeDocker"]</option>
+                </select>
+                <div class="help">@T["settings.hostingModeHint"]</div>
+            </div>
+            <div data-matcad-only>
+                <div class="form-field">
+                    <label for="matcadUrl">@T["settings.hostingMatcadUrl"]</label>
+                    <input id="matcadUrl" name="matcadUrl" value="@Model.Get(SettingKeys.HostingMatcadUrl)" placeholder="http://matcad:8080" spellcheck="false" />
+                </div>
+                <div class="form-field">
+                    <label for="matcadToken">@T["settings.hostingMatcadToken"]</label>
+                    <input id="matcadToken" name="matcadToken" type="password" autocomplete="new-password" placeholder="@T["settings.smtpPasswordKeep"]" />
+                    @* Leer heißt KEEP — sonst würde jedes Speichern der anderen Felder das Geheimnis
+                       löschen, nur weil das Feld leer gerendert wird. *@
+                    @if (!string.IsNullOrEmpty(Model.Get(SettingKeys.HostingMatcadToken)))
+                    {
+                        <label class="checkbox-row">
+                            <input type="checkbox" name="clearMatcadToken" value="true" /> @T["settings.smtpPasswordClear"]
+                        </label>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @* Der Portbereich gilt für beide Wege: auch eine Instanz hinter Matcad braucht einen Port auf
+           dem Host, unter dem der Proxy sie findet. *@
+        <div class="card">
+            <h2>@T["settings.hostingPorts"]</h2>
+            <div class="form-grid">
+                <div class="form-row">
+                    <div class="form-field">
+                        <label for="portFrom">@T["settings.hostingPortFrom"]</label>
+                        <input id="portFrom" name="portFrom" value="@Model.Get(SettingKeys.HostingPortFrom)" placeholder="9110" inputmode="numeric" />
+                    </div>
+                    <div class="form-field">
+                        <label for="portTo">@T["settings.hostingPortTo"]</label>
+                        <input id="portTo" name="portTo" value="@Model.Get(SettingKeys.HostingPortTo)" placeholder="9199" inputmode="numeric" />
+                    </div>
+                </div>
+            </div>
+            <div class="help">@T["settings.hostingPortsHint"]</div>
             <div style="margin-top:14px;"><button type="submit" class="btn">@T["settings.save"]</button></div>
         </div>
     </form>
@@ -234,6 +285,16 @@
                 panels.forEach(function (p) { p.hidden = p.dataset.panel !== name; });
             }
             tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.tab); }); });
+            // Die Matcad-Felder nur zeigen, wenn sie etwas bewirken — sonst fragt die Seite nach
+            // Zugangsdaten für einen Weg, den man gerade abgewählt hat.
+            var mode = document.querySelector('[data-hosting-mode]');
+            var matcadOnly = document.querySelector('[data-matcad-only]');
+            if (mode && matcadOnly) {
+                var syncMode = function () { matcadOnly.hidden = mode.value === 'docker'; };
+                mode.addEventListener('change', syncMode);
+                syncMode();
+            }
+
             var want = new URLSearchParams(location.search).get('tab');
             if (want) show(want);
         })();

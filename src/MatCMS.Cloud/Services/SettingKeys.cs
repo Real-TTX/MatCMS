@@ -32,6 +32,24 @@ public static class SettingKeys
     /// </summary>
     public const string HostingEnabled = "hosting.enabled";
 
+    /// <summary>"matcad" oder "docker": ob eine neue Instanz ihre Route von Matcad bekommt oder als
+    /// reiner Container startet, dem der Betreiber selbst eine Domain zuweist. Ein String und kein
+    /// Schalter, weil es später eine dritte Antwort geben kann.</summary>
+    public const string HostingMode = "hosting.mode";
+
+    /// <summary>Adresse des Matcad-API, das die Route einrichtet.</summary>
+    public const string HostingMatcadUrl = "hosting.matcadUrl";
+
+    /// <summary>Zugangsschlüssel für dieses API — verschlüsselt abgelegt wie jedes andere Geheimnis
+    /// hier, und im Formular nie im Klartext zurückgegeben.</summary>
+    public const string HostingMatcadToken = "hosting.matcadToken";
+
+    /// <summary>Der lokale Portbereich, aus dem eine neue Instanz ihren Port bekommt. Ein BEREICH und
+    /// keine Liste: der nächste freie Port lässt sich daraus ableiten, und niemand pflegt von Hand
+    /// nach, welcher gerade belegt ist.</summary>
+    public const string HostingPortFrom = "hosting.portFrom";
+    public const string HostingPortTo = "hosting.portTo";
+
     // --- Notifications ------------------------------------------------------
     /// <summary>Where notification mails go (comma-separated). Empty = every cloud user's e-mail.</summary>
     public const string NotifyRecipients = "notify.recipients";

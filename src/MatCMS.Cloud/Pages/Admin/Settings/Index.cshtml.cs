@@ -71,15 +71,35 @@ public class IndexModel : PageModel
         return RedirectToPage(new { tab = "backup" });
     }
 
-    public async Task<IActionResult> OnPostHostingAsync(bool hostingEnabled)
+    public async Task<IActionResult> OnPostHostingAsync(
+        bool hostingEnabled, string? hostingMode, string? matcadUrl, string? matcadToken, bool clearMatcadToken,
+        string? portFrom, string? portTo)
     {
         await _cloud.SaveAsync(new Dictionary<string, string?>
         {
             [SettingKeys.HostingEnabled] = hostingEnabled ? "1" : "0"
+            ,
+            // Alles außer "docker" heißt Matcad — der Weg mit Route ist die Vorgabe, und ein
+            // unbekannter Wert soll nicht dazu führen, dass eine Instanz ohne Adresse entsteht.
+            [SettingKeys.HostingMode] = hostingMode == "docker" ? "docker" : "matcad",
+            [SettingKeys.HostingMatcadUrl] = matcadUrl?.Trim().TrimEnd('/'),
+            // Wie beim SMTP-Passwort: leer BEHÄLT, nur der ausdrückliche Haken löscht. Sonst würde
+            // ein Speichern der Portfelder den Schlüssel wegwerfen, weil das Feld leer gerendert wird.
+            [SettingKeys.HostingMatcadToken] = clearMatcadToken ? ""
+                : string.IsNullOrEmpty(matcadToken) ? Get(SettingKeys.HostingMatcadToken)
+                : _secrets.Protect(matcadToken),
+            // Nur ein gültiger Bereich wird gespeichert. Ein verdrehter oder unsinniger würde beim
+            // Anlegen entweder nie einen freien Port finden oder einen belegten vorschlagen.
+            [SettingKeys.HostingPortFrom] = Port(portFrom),
+            [SettingKeys.HostingPortTo] = Port(portTo),
         });
         TempData["Flash"] = "Hosting-Einstellungen gespeichert.";
         return RedirectToPage(new { tab = "hosting" });
     }
+
+    /// <summary>Ein Port oder nichts — 1024 bis 65535, alles andere wird verworfen statt gespeichert.</summary>
+    private static string Port(string? raw) =>
+        int.TryParse(raw, out var p) && p >= 1024 && p <= 65535 ? p.ToString() : "";
 
     public async Task<IActionResult> OnPostNotificationsAsync(
         string? recipients, bool notifyOffline, bool notifyUpdate, bool autoUpdateLocal)

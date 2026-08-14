@@ -630,5 +630,16 @@
   "settings.tabHosting": "Hosting",
   "settings.hostingEnabled": "This cloud may run instances",
   "settings.hostingEnabledHint": "Lets the cloud create new MatCMS instances on the Docker daemon it can reach. Off until somebody switches it on; the matching actions do not appear before that.",
-  "settings.hostingNeedsDocker": "Nothing can be created without a reachable daemon."
+  "settings.hostingNeedsDocker": "Nothing can be created without a reachable daemon.",
+  "settings.hostingRouting": "Routing",
+  "settings.hostingMode": "How does a new instance become reachable?",
+  "settings.hostingModeMatcad": "Via Matcad (route is created)",
+  "settings.hostingModeDocker": "Container only (domain entered manually)",
+  "settings.hostingModeHint": "With Matcad every new instance gets its route automatically. Without, only the container starts and the domain is entered when creating it.",
+  "settings.hostingMatcadUrl": "Matcad API address",
+  "settings.hostingMatcadToken": "Access token",
+  "settings.hostingPorts": "Port range",
+  "settings.hostingPortFrom": "From",
+  "settings.hostingPortTo": "To",
+  "settings.hostingPortsHint": "Every new instance gets its host port from this range. Applies with Matcad too — the proxy has to find the instance somewhere."
 }

@@ -88,6 +88,11 @@ public static class SettingKeys
     // instance runs on ITS Docker host — can perform updates. Empty URL/id/token = fully offline.
     // The token is stored DataProtection-ENCRYPTED (see CloudService), never in the clear.
     public const string CloudUrl = "cloud.url";
+
+    /// <summary>Die Adresse, unter der ein BETREIBER die Cloud aufruft — von ihr gemeldet, weil nur
+    /// sie sie kennt. Kann sich von <see cref="CloudUrl"/> unterscheiden, wenn die Instanz die Cloud
+    /// über einen internen Namen erreicht. Wird gebraucht, um die Einbettung zu erlauben.</summary>
+    public const string CloudPublicUrl = "cloud.publicUrl";
     public const string CloudInstanceId = "cloud.instanceId";
     public const string CloudToken = "cloud.token";
 

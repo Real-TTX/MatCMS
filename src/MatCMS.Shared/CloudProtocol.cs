@@ -15,7 +15,7 @@ public static class CloudProtocol
     /// <summary>Contract version. Bump on <b>every</b> change to the payloads in this file: the cloud
     /// badges an instance reporting an older one as "veraltet", and both sides read this constant, so
     /// one edit covers both.</summary>
-    public const int Version = 9;
+    public const int Version = 10;
 
     /// <summary>Header carrying the instance's bearer token.</summary>
     public const string TokenHeader = "X-MatCMS-Instance-Token";
@@ -119,6 +119,16 @@ public sealed class HeartbeatResponse
 
     /// <summary>"Pending" | "Approved" — a pending instance gets no configuration.</summary>
     public string? Status { get; set; }
+
+    /// <summary>
+    /// The address under which an OPERATOR reaches this cloud — which is not necessarily the one the
+    /// instance calls it at. A site in a Docker network may reach the cloud as http://cloud:8080 while
+    /// the browser opens https://cloud.example.com; the instance needs the second one to allow the
+    /// embedding, and only the cloud knows it.
+    /// <para>Null when no canonical URL is configured there — the instance then falls back to the
+    /// address it uses itself, which is right whenever the two are the same.</para>
+    /// </summary>
+    public string? CloudPublicUrl { get; set; }
 
     /// <summary>Newest published MatCMS release, or null when the registry check has not succeeded
     /// yet.</summary>

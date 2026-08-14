@@ -297,6 +297,18 @@ public class CloudService
             _state.CloudCanUpdate = answer?.CloudCanUpdate ?? false;
             _state.DisplayName = answer?.DisplayName;
             _state.ProfileName = answer?.ProfileName;
+            // Gespeichert und nicht nur im Zustand gehalten: die CSP wird bei jeder Anfrage gesetzt,
+            // auch direkt nach einem Neustart, bevor der erste Herzschlag durch ist.
+            // Nur schreiben, wenn sich etwas ändert — und dann auch wirklich speichern. Der Block
+            // ringsum füllt sonst nur den Arbeitsspeicher, ein Upsert allein wäre folgenlos.
+            var seenPublic = answer?.CloudPublicUrl ?? "";
+            var storedPublic = (await _db.SiteSettings.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Key == SettingKeys.CloudPublicUrl))?.Value ?? "";
+            if (seenPublic != storedPublic)
+            {
+                await UpsertAsync(SettingKeys.CloudPublicUrl, seenPublic);
+                await _db.SaveChangesAsync();
+            }
             _state.ConfigRevision = answer?.ConfigRevision ?? 0;
             _state.AppliedRevision = beat.AppliedRevision;
             _state.SyncError = beat.SyncError;

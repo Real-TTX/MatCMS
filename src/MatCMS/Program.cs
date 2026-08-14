@@ -283,10 +283,20 @@ app.UseForwardedHeaders(fwd);
 app.Use(async (ctx, next) =>
 {
     var site = ctx.RequestServices.GetRequiredService<MatCMS.Services.SiteContext>();
-    var cloud = site.Get(MatCMS.Services.SettingKeys.CloudUrl);
-    var origin = Uri.TryCreate(cloud, UriKind.Absolute, out var cu) ? cu.GetLeftPart(UriPartial.Authority) : null;
+    // BEIDE Wege zur Cloud: der, über den diese Website sie erreicht, und der, unter dem ein
+    // Betreiber sie im Browser aufruft. Die beiden sind nicht immer dieselbe Herkunft — eine Instanz
+    // im Docker-Netz erreicht die Cloud vielleicht als http://cloud:8080, während der Browser
+    // https://cloud.example.com öffnet. Nur die zweite Adresse entscheidet über die Einbettung, und
+    // nur die Cloud kennt sie; sie meldet sie im Herzschlag.
+    string? Origin(string? url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var u) ? u.GetLeftPart(UriPartial.Authority) : null;
+    var allowed = new[]
+    {
+        Origin(site.Get(MatCMS.Services.SettingKeys.CloudUrl)),
+        Origin(site.Get(MatCMS.Services.SettingKeys.CloudPublicUrl)),
+    }.Where(o => o is not null).Distinct().ToList();
     ctx.Response.Headers["Content-Security-Policy"] =
-        origin is null ? "frame-ancestors 'self'" : $"frame-ancestors 'self' {origin}";
+        allowed.Count == 0 ? "frame-ancestors 'self'" : $"frame-ancestors 'self' {string.Join(" ", allowed)}";
     await next();
 });
 

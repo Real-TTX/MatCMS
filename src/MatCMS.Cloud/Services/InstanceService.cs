@@ -245,6 +245,9 @@ public class InstanceService
         {
             ProtocolVersion = CurrentProtocolVersion,
             Status = instance.Status.ToString(),
+            // What the operator types into a browser — the instance cannot know it, and needs it to
+            // allow the embedding. Empty means "same as the address you already use".
+            CloudPublicUrl = _cloud.Get(SettingKeys.CanonicalUrl),
             LatestVersion = _releases.LatestVersion,
             UpdateAvailable = IsUpdateAvailable(instance),
             CloudCanUpdate = instance.Hosting == InstanceHosting.Local,

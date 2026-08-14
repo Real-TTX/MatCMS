@@ -18,14 +18,16 @@ public class IndexModel : PageModel
     private readonly EmailService _mail;
     private readonly DockerHostService _docker;
     private readonly SecretProtector _secrets;
+    private readonly HostingService _hosting;
 
-    public IndexModel(AppDbContext db, CloudContext cloud, EmailService mail, DockerHostService docker, SecretProtector secrets)
+    public IndexModel(AppDbContext db, CloudContext cloud, EmailService mail, DockerHostService docker, SecretProtector secrets, HostingService hosting)
     {
         _db = db;
         _cloud = cloud;
         _mail = mail;
         _docker = docker;
         _secrets = secrets;
+        _hosting = hosting;
     }
 
     public string Get(string key) => _cloud.Get(key) ?? "";
@@ -38,10 +40,17 @@ public class IndexModel : PageModel
     /// "is the socket doing anything for me?".</summary>
     public int LocalCount { get; private set; }
 
+    /// <summary>Der Port, den die nächste Instanz bekäme — die einzige Art, die Vergabe zu prüfen,
+    /// ohne etwas anzulegen. Null heißt: Bereich voll oder Daemon nicht erreichbar.</summary>
+    public int? NextPort { get; private set; }
+    public int UsedPortCount { get; private set; }
+
     public async Task OnGetAsync()
     {
         DockerReachable = await _docker.IsReachableAsync(HttpContext.RequestAborted);
         LocalCount = await _db.Instances.CountAsync(i => i.Hosting == InstanceHosting.Local);
+        NextPort = await _hosting.NextFreePortAsync(HttpContext.RequestAborted);
+        UsedPortCount = (await _hosting.UsedPortsAsync(HttpContext.RequestAborted))?.Count ?? 0;
     }
 
     public async Task<IActionResult> OnPostGeneralAsync(string? cloudName, string? canonicalUrl, bool forceHttps)

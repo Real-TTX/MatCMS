@@ -30,6 +30,11 @@ public class DockerHostService
 
     public bool Configured => _endpoint.Length > 0;
 
+    /// <summary>Derselbe Zugang für Dienste, die den Daemon nur LESEN — etwa die Portsuche. Die
+    /// Verbindung wird hier einmal aufgebaut und bei einem Fehlschlag nicht wieder versucht; das
+    /// gilt dann für alle Nutzer gleichermaßen.</summary>
+    public DockerClient? ClientOrNull => Client;
+
     private DockerClient? Client
     {
         get

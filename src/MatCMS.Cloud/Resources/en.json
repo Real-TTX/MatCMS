@@ -641,5 +641,8 @@
   "settings.hostingPorts": "Port range",
   "settings.hostingPortFrom": "From",
   "settings.hostingPortTo": "To",
-  "settings.hostingPortsHint": "Every new instance gets its host port from this range. Applies with Matcad too — the proxy has to find the instance somewhere."
+  "settings.hostingPortsHint": "Every new instance gets its host port from this range. Applies with Matcad too — the proxy has to find the instance somewhere.",
+  "settings.hostingNextPort": "Next free port",
+  "settings.hostingPortsUsed": "({0} ports in use on the host)",
+  "settings.hostingNoPort": "None free, or daemon unreachable"
 }

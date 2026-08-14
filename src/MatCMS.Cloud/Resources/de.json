@@ -641,5 +641,8 @@
   "settings.hostingPorts": "Portbereich",
   "settings.hostingPortFrom": "Von",
   "settings.hostingPortTo": "Bis",
-  "settings.hostingPortsHint": "Aus diesem Bereich bekommt jede neue Instanz ihren Port auf dem Host. Gilt auch mit Matcad — der Proxy muss die Instanz ja irgendwo finden."
+  "settings.hostingPortsHint": "Aus diesem Bereich bekommt jede neue Instanz ihren Port auf dem Host. Gilt auch mit Matcad — der Proxy muss die Instanz ja irgendwo finden.",
+  "settings.hostingNextPort": "Nächster freier Port",
+  "settings.hostingPortsUsed": "({0} Ports auf dem Host belegt)",
+  "settings.hostingNoPort": "Keiner frei oder Daemon nicht erreichbar"
 }

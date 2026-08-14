@@ -234,6 +234,22 @@
                 </div>
             </div>
             <div class="help">@T["settings.hostingPortsHint"]</div>
+            @* Zeigt die Vergabe, bevor sie zum ersten Mal etwas anlegt — ein Bereich, in dem nichts
+               mehr frei ist, soll hier auffallen und nicht beim Erzeugen. *@
+            <div class="kv" style="margin-top:12px;">
+                <div class="kv-label">@T["settings.hostingNextPort"]</div>
+                <div class="kv-value">
+                    @if (Model.NextPort is int np)
+                    {
+                        <span class="mono">@np</span>
+                        <span class="muted">@T["settings.hostingPortsUsed", Model.UsedPortCount]</span>
+                    }
+                    else
+                    {
+                        <span class="badge badge-err">@T["settings.hostingNoPort"]</span>
+                    }
+                </div>
+            </div>
             <div style="margin-top:14px;"><button type="submit" class="btn">@T["settings.save"]</button></div>
         </div>
     </form>

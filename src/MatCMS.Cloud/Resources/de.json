@@ -626,5 +626,9 @@
   "instances.device": "Geräteansicht",
   "instances.deviceFull": "Ganzes Fenster",
   "instances.deviceLandscape": "Querformat",
-  "instances.deviceTouchNote": "Gezeigt wird die Größe — die Website reagiert darauf mit ihrem eigenen responsiven Layout. Echte Touch-Eingaben lassen sich von hier aus nicht nachbilden; das kann nur die Entwicklerkonsole des Browsers."
+  "instances.deviceTouchNote": "Gezeigt wird die Größe — die Website reagiert darauf mit ihrem eigenen responsiven Layout. Echte Touch-Eingaben lassen sich von hier aus nicht nachbilden; das kann nur die Entwicklerkonsole des Browsers.",
+  "settings.tabHosting": "Hosting",
+  "settings.hostingEnabled": "Diese Cloud darf Instanzen betreiben",
+  "settings.hostingEnabledHint": "Erlaubt der Cloud, auf dem erreichbaren Docker-Daemon neue MatCMS-Instanzen anzulegen. Aus, solange es niemand einschaltet — die entsprechenden Aktionen erscheinen dann gar nicht erst.",
+  "settings.hostingNeedsDocker": "Ohne erreichbaren Daemon kann nichts angelegt werden."
 }

@@ -13,6 +13,7 @@
     <button type="button" class="tab" data-tab="notifications">@T["settings.tabNotifications"]</button>
     <button type="button" class="tab" data-tab="smtp">@T["settings.tabSmtp"]</button>
     <button type="button" class="tab" data-tab="backup">@T["backups.title"]</button>
+    <button type="button" class="tab" data-tab="hosting">@T["settings.tabHosting"]</button>
     <button type="button" class="tab" data-tab="docker">@T["settings.tabDocker"]</button>
 </div>
 
@@ -150,6 +151,39 @@
                 <div class="help">@T["settings.backupQuotaHint"]</div>
             </div>
             <div><button type="submit" class="btn">@T["settings.save"]</button></div>
+        </div>
+    </form>
+</div>
+
+@* ============ HOSTING ============ *@
+@* Eigener Reiter, weil hier mehr hinkommt als ein Haken: das Anlegen neuer Instanzen und was daran
+   hängt (Adressvergabe, Image, Volumes). Der Haken ist das Tor davor. *@
+<div class="tab-panel" data-panel="hosting" hidden>
+    <form method="post" asp-page-handler="Hosting">
+        <div class="card">
+            <h2>@T["settings.tabHosting"]</h2>
+            <label class="checkbox-row">
+                <input type="checkbox" name="hostingEnabled" value="true" checked="@(Model.Flag(SettingKeys.HostingEnabled) ? "checked" : null)" />
+                @T["settings.hostingEnabled"]
+            </label>
+            <div class="help">@T["settings.hostingEnabledHint"]</div>
+            @* Der Haken allein genügt nicht — ohne erreichbaren Daemon kann die Cloud nichts anlegen,
+               und das gehört hier gesagt und nicht erst beim ersten Fehlschlag. *@
+            <div class="kv" style="margin-top:12px;">
+                <div class="kv-label">Docker</div>
+                <div class="kv-value">
+                    @if (Model.DockerReachable)
+                    {
+                        <span class="badge badge-on">@T["settings.dockerOk"]</span>
+                    }
+                    else
+                    {
+                        <span class="badge badge-err">@T["settings.dockerUnreachable"]</span>
+                        <span class="muted">@T["settings.hostingNeedsDocker"]</span>
+                    }
+                </div>
+            </div>
+            <div style="margin-top:14px;"><button type="submit" class="btn">@T["settings.save"]</button></div>
         </div>
     </form>
 </div>

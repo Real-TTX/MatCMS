@@ -626,5 +626,9 @@
   "instances.device": "Device view",
   "instances.deviceFull": "Full window",
   "instances.deviceLandscape": "Landscape",
-  "instances.deviceTouchNote": "This changes the size — the site responds with its own responsive layout. Real touch input cannot be simulated from here; only the browser's own developer tools can do that."
+  "instances.deviceTouchNote": "This changes the size — the site responds with its own responsive layout. Real touch input cannot be simulated from here; only the browser's own developer tools can do that.",
+  "settings.tabHosting": "Hosting",
+  "settings.hostingEnabled": "This cloud may run instances",
+  "settings.hostingEnabledHint": "Lets the cloud create new MatCMS instances on the Docker daemon it can reach. Off until somebody switches it on; the matching actions do not appear before that.",
+  "settings.hostingNeedsDocker": "Nothing can be created without a reachable daemon."
 }

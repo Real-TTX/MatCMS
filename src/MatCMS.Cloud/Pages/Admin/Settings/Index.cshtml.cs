@@ -71,6 +71,16 @@ public class IndexModel : PageModel
         return RedirectToPage(new { tab = "backup" });
     }
 
+    public async Task<IActionResult> OnPostHostingAsync(bool hostingEnabled)
+    {
+        await _cloud.SaveAsync(new Dictionary<string, string?>
+        {
+            [SettingKeys.HostingEnabled] = hostingEnabled ? "1" : "0"
+        });
+        TempData["Flash"] = "Hosting-Einstellungen gespeichert.";
+        return RedirectToPage(new { tab = "hosting" });
+    }
+
     public async Task<IActionResult> OnPostNotificationsAsync(
         string? recipients, bool notifyOffline, bool notifyUpdate, bool autoUpdateLocal)
     {

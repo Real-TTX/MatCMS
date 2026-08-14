@@ -23,6 +23,15 @@ public static class SettingKeys
     /// </summary>
     public const string ForceHttpsUrls = "instances.forceHttps";
 
+    /// <summary>
+    /// Ob diese Cloud selbst Instanzen betreiben darf — Container auf dem erreichbaren Docker-Daemon
+    /// anlegen und später mehr.
+    /// <para>Aus, bis es jemand einschaltet. Der Socket-Zugriff ist schon freiwillig; dies ist die
+    /// zweite, ausdrückliche Zusage, dass diese Cloud nicht nur zuschauen, sondern erzeugen darf.
+    /// Ohne sie erscheinen die entsprechenden Aktionen gar nicht erst.</para>
+    /// </summary>
+    public const string HostingEnabled = "hosting.enabled";
+
     // --- Notifications ------------------------------------------------------
     /// <summary>Where notification mails go (comma-separated). Empty = every cloud user's e-mail.</summary>
     public const string NotifyRecipients = "notify.recipients";

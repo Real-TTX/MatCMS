@@ -233,6 +233,11 @@
                     </div>
                 </div>
             </div>
+            <div class="form-field">
+                <label for="namePattern">@T["settings.hostingNamePattern"]</label>
+                <input id="namePattern" name="namePattern" value="@Model.Get(SettingKeys.HostingNamePattern)" placeholder="@MatCMS.Cloud.Services.HostingService.DefaultNamePattern" spellcheck="false" />
+                <div class="help">@T["settings.hostingNamePatternHint"]</div>
+            </div>
             <div class="help">@T["settings.hostingPortsHint"]</div>
             @* Zeigt die Vergabe, bevor sie zum ersten Mal etwas anlegt — ein Bereich, in dem nichts
                mehr frei ist, soll hier auffallen und nicht beim Erzeugen. *@

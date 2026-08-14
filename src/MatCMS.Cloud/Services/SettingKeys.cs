@@ -50,6 +50,10 @@ public static class SettingKeys
     public const string HostingPortFrom = "hosting.portFrom";
     public const string HostingPortTo = "hosting.portTo";
 
+    /// <summary>Muster für den Namen des Stacks, z. B. "MatCMS-$NAME". $NAME wird durch den
+    /// normalisierten Seitennamen ersetzt.</summary>
+    public const string HostingNamePattern = "hosting.namePattern";
+
     // --- Notifications ------------------------------------------------------
     /// <summary>Where notification mails go (comma-separated). Empty = every cloud user's e-mail.</summary>
     public const string NotifyRecipients = "notify.recipients";

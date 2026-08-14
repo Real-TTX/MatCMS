@@ -82,7 +82,7 @@ public class IndexModel : PageModel
 
     public async Task<IActionResult> OnPostHostingAsync(
         bool hostingEnabled, string? hostingMode, string? matcadUrl, string? matcadToken, bool clearMatcadToken,
-        string? portFrom, string? portTo)
+        string? portFrom, string? portTo, string? namePattern)
     {
         await _cloud.SaveAsync(new Dictionary<string, string?>
         {
@@ -101,6 +101,7 @@ public class IndexModel : PageModel
             // Anlegen entweder nie einen freien Port finden oder einen belegten vorschlagen.
             [SettingKeys.HostingPortFrom] = Port(portFrom),
             [SettingKeys.HostingPortTo] = Port(portTo),
+            [SettingKeys.HostingNamePattern] = namePattern?.Trim(),
         });
         TempData["Flash"] = "Hosting-Einstellungen gespeichert.";
         return RedirectToPage(new { tab = "hosting" });

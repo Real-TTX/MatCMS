@@ -653,5 +653,7 @@
   "instances.newVersionHint": "Bild-Tag, z. B. latest. Zuletzt veröffentlicht:",
   "instances.newDomain": "Domain",
   "instances.newDomainMatcad": "Optional — Matcad richtet damit die Route ein.",
-  "instances.newDomainPlain": "Pflicht, weil ohne Matcad niemand sonst die Route kennt."
+  "instances.newDomainPlain": "Pflicht, weil ohne Matcad niemand sonst die Route kennt.",
+  "settings.hostingNamePattern": "Namensmuster",
+  "settings.hostingNamePatternHint": "$NAME wird durch den Namen der Website ersetzt, in Wortanfängen groß: aus \"My Homepage.com\" wird \"My-Homepage-Com\". Der Name gilt für Stack, Container und Volume."
 }

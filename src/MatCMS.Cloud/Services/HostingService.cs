@@ -102,15 +102,35 @@ public class HostingService
 
     public sealed record CreateResult(bool Ok, string? Error, string? ContainerId, int? Port, string? ContainerName);
 
-    /// <summary>Aus einem Anzeigenamen ein Bezeichner, der als Container- und Volume-Name taugt.</summary>
-    public static string Slug(string name)
+    public const string DefaultNamePattern = "MatCMS-$NAME";
+
+    /// <summary>
+    /// Aus einem Anzeigenamen ein Bezeichner: Wortanfänge groß, alles andere zu Bindestrichen.
+    /// "My Homepage.com" wird zu "My-Homepage-Com".
+    /// <para>Bewusst NICHT kleingeschrieben: der Name steht später in jeder Verwaltungsoberfläche,
+    /// und dort liest sich ein Stack besser, wenn er aussieht wie der Name der Website. Docker
+    /// erlaubt Großbuchstaben in Container- und Volume-Namen.</para>
+    /// </summary>
+    public static string Normalise(string name)
     {
-        var chars = name.Trim().ToLowerInvariant()
-            .Select(c => char.IsLetterOrDigit(c) ? c : '-')
-            .ToArray();
-        var slug = new string(chars).Trim('-');
-        while (slug.Contains("--")) slug = slug.Replace("--", "-");
-        return slug.Length == 0 ? "instanz" : slug;
+        var parts = new string(name.Select(c => char.IsLetterOrDigit(c) ? c : ' ').ToArray())
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Select(w => char.ToUpperInvariant(w[0]) + w[1..].ToLowerInvariant());
+        var joined = string.Join('-', parts);
+        return joined.Length == 0 ? "Instanz" : joined;
+    }
+
+    /// <summary>Der Name des Stacks: das eingestellte Muster mit eingesetztem Namen. Er ist zugleich
+    /// Container- und Volume-Name, damit in jeder Oberfläche dasselbe steht.</summary>
+    public string StackName(string displayName)
+    {
+        var pattern = _cloud.Get(SettingKeys.HostingNamePattern);
+        if (string.IsNullOrWhiteSpace(pattern)) pattern = DefaultNamePattern;
+        // Ein Muster ohne $NAME ergäbe für jede Website denselben Namen — dann wird angehängt statt
+        // ersetzt, sonst kollidiert die zweite Instanz mit der ersten.
+        return pattern.Contains("$NAME")
+            ? pattern.Replace("$NAME", Normalise(displayName))
+            : pattern.TrimEnd('-') + "-" + Normalise(displayName);
     }
 
     /// <summary>
@@ -131,9 +151,9 @@ public class HostingService
         var client = _docker.ClientOrNull;
         if (client is null) return new(false, "Docker ist nicht erreichbar.", null, null, null);
 
-        var slug = Slug(req.Name);
-        var containerName = "matcms-" + slug;
-        var volumeName = containerName + "-data";
+        var stack = StackName(req.Name);
+        var containerName = stack;
+        var volumeName = stack + "-data";
 
         if (!UsesMatcad && string.IsNullOrWhiteSpace(req.Domain))
             return new(false, "Ohne Matcad muss eine Domain angegeben werden.", null, null, null);
@@ -152,7 +172,16 @@ public class HostingService
 
             var labels = new Dictionary<string, string>
             {
-                ["matcmscloud.managed"] = "true"
+                ["matcmscloud.managed"] = "true",
+                // Die Labels, die Compose selbst schreibt. Jede Verwaltungsoberfläche — Docker
+                // Desktop, Dockhand, Portainer — gruppiert danach, ohne von uns etwas zu wissen.
+                // Deshalb dieser Weg und nicht das API eines bestimmten Werkzeugs.
+                ["com.docker.compose.project"] = stack,
+                ["com.docker.compose.service"] = "web",
+                ["com.docker.compose.container-number"] = "1",
+                ["com.docker.compose.oneoff"] = "False",
+                // working_dir und config_files bleiben WEG: sie zeigen auf die Datei, aus der ein
+                // Stack entstand. Ohne Datei dort wäre das eine Lüge gegenüber docker compose.
             };
             if (UsesMatcad)
             {

@@ -653,5 +653,7 @@
   "instances.newVersionHint": "Image tag, e.g. latest. Latest published:",
   "instances.newDomain": "Domain",
   "instances.newDomainMatcad": "Optional — Matcad creates the route from it.",
-  "instances.newDomainPlain": "Required: without Matcad nothing else knows the route."
+  "instances.newDomainPlain": "Required: without Matcad nothing else knows the route.",
+  "settings.hostingNamePattern": "Name pattern",
+  "settings.hostingNamePatternHint": "$NAME is replaced by the site name, capitalised per word: \"My Homepage.com\" becomes \"My-Homepage-Com\". The name is used for stack, container and volume."
 }

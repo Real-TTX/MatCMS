@@ -14,8 +14,11 @@ namespace MatCMS.Shared.Web;
 /// <param name="Icon">Tabler-Klasse, z. B. "ti-plus". Optional: eine Auswahl mit Symbolen liest sich
 /// auf einen Blick, aber nicht jede Frage hat Antworten, die sich sinnvoll bebildern lassen.</param>
 public sealed record AddOption(
+/// <param name="Muted">Zeigt die Möglichkeit, ohne sie anzupreisen: sie ist gerade nicht nutzbar,
+/// aber sie soll auffindbar bleiben. Der Href führt dann dorthin, wo man sie freischaltet — eine
+/// ausgegraute Zeile, die nichts tut, wäre wieder eine Sackgasse.</param>
     string Title, string Sub, string? Href = null, IReadOnlyDictionary<string, string>? Data = null,
-    string? Icon = null);
+    string? Icon = null, bool Muted = false);
 
 /// <summary>
 /// The single "Hinzufügen" entry point under a list, and the ways it offers.

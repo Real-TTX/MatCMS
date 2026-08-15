@@ -1113,3 +1113,8 @@ table.data .btn { white-space: nowrap; }
 .add-option-icon { grid-row: 1 / span 2; display: flex; align-items: center; justify-content: center;
     width: 46px; height: 46px; border-radius: 12px; background: #f0f2f5; font-size: 24px; color: var(--accent, #2563eb); }
 .add-option:hover .add-option-icon { background: color-mix(in srgb, var(--accent, #2563eb) 12%, transparent); }
+
+/* Sichtbar, aber nicht angepriesen: die Möglichkeit gibt es, sie ist nur nicht freigeschaltet. Der
+   Klick führt dorthin, wo man das ändert — deshalb kein pointer-events: none. */
+.add-option.is-muted { opacity: .55; }
+.add-option.is-muted:hover { opacity: 1; }

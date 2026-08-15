@@ -657,7 +657,11 @@
   "settings.hostingNamePattern": "Namensmuster",
   "settings.hostingNamePatternHint": "$NAME wird durch den Namen der Website ersetzt, in Wortanfängen groß: aus \"My Homepage.com\" wird \"My-Homepage-Com\". Der Name gilt für Stack, Container und Volume.",
   "add.whichInstance": "Wie soll die Instanz dazukommen?",
-  "add.instanceNewHint": "Die Cloud legt eine neue Website an und startet sie.",
-  "add.instanceAdoptHint": "Eine laufende Website übernehmen — die Cloud meldet sich dort an.",
-  "add.instanceJoinHint": "Die Website meldet sich selbst, mit dem Join-Code eines Profils."
+  "add.instanceNewHint": "Die Cloud erzeugt eine neue Website und startet sie.",
+  "add.instanceAdoptHint": "Die Cloud meldet sich bei einer laufenden Website an.",
+  "add.instanceJoinHint": "Die Website meldet sich selbst bei der Cloud an.",
+  "add.instanceNewOff": "Erst Hosting einschalten — hier entlang.",
+  "add.instanceJoin": "Mit Join-Code verbinden",
+  "add.instanceAdopt": "Mit Anmeldedaten verbinden",
+  "add.instanceNew": "Neue Instanz anlegen"
 }

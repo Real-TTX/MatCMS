@@ -66,17 +66,20 @@ public static class AddMenus
     /// <para>Der erste Weg fehlt, solange Hosting nicht eingeschaltet ist — ein Angebot, das sicher
     /// scheitert, gehört nicht in die Auswahl.</para>
     /// </summary>
-    public static AddMenu Instances(Localizer t, string? newUrl, string adoptUrl, string joinUrl)
+    public static AddMenu Instances(Localizer t, string? newUrl, string adoptUrl, string joinUrl, string hostingUrl)
     {
         // Reihenfolge nach Häufigkeit, nicht nach Aufwand: der Join-Code ist der übliche Weg, das
         // Anlegen der seltene. Und das Anlegen steht zuletzt, weil es als einziges etwas erzeugt.
         var options = new List<AddOption>
         {
-            new(t["enroll.joinTitle"], t["add.instanceJoinHint"], joinUrl, Icon: "ti-key"),
-            new(t["enroll.adoptTitle"], t["add.instanceAdoptHint"], adoptUrl, Icon: "ti-login"),
+            new(t["add.instanceJoin"], t["add.instanceJoinHint"], joinUrl, Icon: "ti-key"),
+            new(t["add.instanceAdopt"], t["add.instanceAdoptHint"], adoptUrl, Icon: "ti-login"),
         };
-        if (newUrl is { Length: > 0 })
-            options.Add(new AddOption(t["instances.new"], t["add.instanceNewHint"], newUrl, Icon: "ti-cube-plus"));
+        // Immer sichtbar, auch ohne Hosting: was man nicht sieht, sucht man nicht. Ohne Hosting führt
+        // der Eintrag zu dem Schalter, der ihn freischaltet, statt ins Leere.
+        options.Add(newUrl is { Length: > 0 }
+            ? new AddOption(t["add.instanceNew"], t["add.instanceNewHint"], newUrl, Icon: "ti-cube-plus")
+            : new AddOption(t["add.instanceNew"], t["add.instanceNewOff"], hostingUrl, Icon: "ti-cube-plus", Muted: true));
         return new AddMenu("instances", t["add.button"], t["add.whichInstance"], t["action.close"], options);
     }
 

@@ -280,7 +280,8 @@
 <partial name="_AddMenu" model='AddMenus.Instances(T,
     Model.HostingEnabled ? Url.Page("New") : null,
     Url.Page("Create", null, null, "adopt")!,
-    Url.Page("Create", null, null, "join")!)' />
+    Url.Page("Create", null, null, "join")!,
+    Url.Page("/Admin/Settings/Index", null, new { tab = "hosting" })!)' />
 
 @section Scripts {
     <script>

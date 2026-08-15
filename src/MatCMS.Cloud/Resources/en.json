@@ -658,6 +658,10 @@
   "settings.hostingNamePatternHint": "$NAME is replaced by the site name, capitalised per word: \"My Homepage.com\" becomes \"My-Homepage-Com\". The name is used for stack, container and volume.",
   "add.whichInstance": "How should the instance be added?",
   "add.instanceNewHint": "The cloud creates a new site and starts it.",
-  "add.instanceAdoptHint": "Take over a running site — the cloud enrols itself there.",
-  "add.instanceJoinHint": "The site enrols itself using a profile's join code."
+  "add.instanceAdoptHint": "The cloud enrols itself at a running site.",
+  "add.instanceJoinHint": "The site enrols itself with the cloud.",
+  "add.instanceNewOff": "Switch hosting on first — this way.",
+  "add.instanceJoin": "Connect with a join code",
+  "add.instanceAdopt": "Connect with a login",
+  "add.instanceNew": "Create a new instance"
 }

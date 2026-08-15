@@ -88,9 +88,10 @@ public class IndexModel : PageModel
         {
             [SettingKeys.HostingEnabled] = hostingEnabled ? "1" : "0"
             ,
-            // Alles außer "docker" heißt Matcad — der Weg mit Route ist die Vorgabe, und ein
-            // unbekannter Wert soll nicht dazu führen, dass eine Instanz ohne Adresse entsteht.
-            [SettingKeys.HostingMode] = hostingMode == "docker" ? "docker" : "matcad",
+            // Nur ein ausdrückliches "matcad" schaltet Matcad ein; alles andere — auch ein leerer
+            // oder unbekannter Wert — bleibt beim reinen Container. Der Weg, der ohne weitere Angaben
+            // funktioniert, ist die richtige Vorgabe.
+            [SettingKeys.HostingMode] = hostingMode == "matcad" ? "matcad" : "docker",
             [SettingKeys.HostingMatcadUrl] = matcadUrl?.Trim().TrimEnd('/'),
             // Wie beim SMTP-Passwort: leer BEHÄLT, nur der ausdrückliche Haken löscht. Sonst würde
             // ein Speichern der Portfelder den Schlüssel wegwerfen, weil das Feld leer gerendert wird.

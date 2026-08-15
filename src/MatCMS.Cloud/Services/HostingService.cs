@@ -31,8 +31,11 @@ public class HostingService
 
     public bool Enabled => _cloud.Flag(SettingKeys.HostingEnabled);
 
-    /// <summary>True, wenn der Betreiber Matcad die Route überlassen will.</summary>
-    public bool UsesMatcad => _cloud.Get(SettingKeys.HostingMode) != "docker";
+    /// <summary>True nur, wenn Matcad AUSDRÜCKLICH gewählt wurde. Nicht gesetzt heißt: kein Matcad.
+    /// <para>Andersherum wäre es die falsche Vorgabe — eine frisch aufgesetzte Cloud hätte dann einen
+    /// Weg voreingestellt, der ohne Adresse und Zugangsschlüssel gar nicht funktionieren kann.</para>
+    /// </summary>
+    public bool UsesMatcad => _cloud.Get(SettingKeys.HostingMode) == "matcad";
 
     public (int From, int To) PortRange
     {

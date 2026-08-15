@@ -192,12 +192,13 @@
             <div class="form-field">
                 <label for="hostingMode">@T["settings.hostingMode"]</label>
                 <select id="hostingMode" name="hostingMode" data-hosting-mode>
-                    <option value="matcad" selected="@(Model.Get(SettingKeys.HostingMode) != "docker" ? "selected" : null)">@T["settings.hostingModeMatcad"]</option>
-                    <option value="docker" selected="@(Model.Get(SettingKeys.HostingMode) == "docker" ? "selected" : null)">@T["settings.hostingModeDocker"]</option>
+                    @* Der Weg ohne Zusatzangaben steht oben und ist die Vorgabe. *@
+                    <option value="docker" selected="@(Model.Get(SettingKeys.HostingMode) != "matcad" ? "selected" : null)">@T["settings.hostingModeDocker"]</option>
+                    <option value="matcad" selected="@(Model.Get(SettingKeys.HostingMode) == "matcad" ? "selected" : null)">@T["settings.hostingModeMatcad"]</option>
                 </select>
                 <div class="help">@T["settings.hostingModeHint"]</div>
             </div>
-            <div data-matcad-only>
+            <div data-matcad-only hidden="@(Model.Get(SettingKeys.HostingMode) == "matcad" ? null : "hidden")">
                 <div class="form-field">
                     <label for="matcadUrl">@T["settings.hostingMatcadUrl"]</label>
                     <input id="matcadUrl" name="matcadUrl" value="@Model.Get(SettingKeys.HostingMatcadUrl)" placeholder="http://matcad:8080" spellcheck="false" />

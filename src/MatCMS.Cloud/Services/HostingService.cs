@@ -26,8 +26,8 @@ public class HostingService
     }
 
     /// <summary>Vorgabe, wenn kein Bereich eingestellt ist.</summary>
-    public const int DefaultPortFrom = 9110;
-    public const int DefaultPortTo = 9199;
+    public const int DefaultPortFrom = 9201;
+    public const int DefaultPortTo = 9299;
 
     public bool Enabled => _cloud.Flag(SettingKeys.HostingEnabled);
 
@@ -102,22 +102,21 @@ public class HostingService
 
     public sealed record CreateResult(bool Ok, string? Error, string? ContainerId, int? Port, string? ContainerName);
 
-    public const string DefaultNamePattern = "MatCMS-$NAME";
+    public const string DefaultNamePattern = "matcms-instance-{name}";
 
     /// <summary>
-    /// Aus einem Anzeigenamen ein Bezeichner: Wortanfänge groß, alles andere zu Bindestrichen.
-    /// "My Homepage.com" wird zu "My-Homepage-Com".
-    /// <para>Bewusst NICHT kleingeschrieben: der Name steht später in jeder Verwaltungsoberfläche,
-    /// und dort liest sich ein Stack besser, wenn er aussieht wie der Name der Website. Docker
-    /// erlaubt Großbuchstaben in Container- und Volume-Namen.</para>
+    /// Aus einem Anzeigenamen ein Bezeichner nach Docker-Sitte: klein, Bindestriche statt allem
+    /// anderen. "My Homepage.com" wird zu "my-homepage-com".
+    /// <para>Klein geschrieben, weil docker compose Projektnamen selbst kleinschreibt — ein Stack in
+    /// gemischter Schreibweise wäre genau das, was Compose nie erzeugen würde, und läse sich neben
+    /// den übrigen Stacks wie ein Fremdkörper.</para>
     /// </summary>
     public static string Normalise(string name)
     {
-        var parts = new string(name.Select(c => char.IsLetterOrDigit(c) ? c : ' ').ToArray())
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
-            .Select(w => char.ToUpperInvariant(w[0]) + w[1..].ToLowerInvariant());
+        var parts = new string(name.ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : ' ').ToArray())
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var joined = string.Join('-', parts);
-        return joined.Length == 0 ? "Instanz" : joined;
+        return joined.Length == 0 ? "instanz" : joined;
     }
 
     /// <summary>Der Name des Stacks: das eingestellte Muster mit eingesetztem Namen. Er ist zugleich
@@ -126,11 +125,15 @@ public class HostingService
     {
         var pattern = _cloud.Get(SettingKeys.HostingNamePattern);
         if (string.IsNullOrWhiteSpace(pattern)) pattern = DefaultNamePattern;
-        // Ein Muster ohne $NAME ergäbe für jede Website denselben Namen — dann wird angehängt statt
-        // ersetzt, sonst kollidiert die zweite Instanz mit der ersten.
-        return pattern.Contains("$NAME")
-            ? pattern.Replace("$NAME", Normalise(displayName))
-            : pattern.TrimEnd('-') + "-" + Normalise(displayName);
+        var slug = Normalise(displayName);
+        // {name} ist die Schreibweise; $NAME wird noch verstanden, weil es kurz die erste war.
+        // Ein Muster OHNE Platzhalter ergäbe für jede Website denselben Namen — dann wird angehängt
+        // statt ersetzt, sonst kollidiert die zweite Instanz mit der ersten.
+        if (pattern.Contains("{name}", StringComparison.OrdinalIgnoreCase))
+            return pattern.Replace("{name}", slug, StringComparison.OrdinalIgnoreCase).ToLowerInvariant();
+        if (pattern.Contains("$NAME"))
+            return pattern.Replace("$NAME", slug).ToLowerInvariant();
+        return (pattern.TrimEnd('-') + "-" + slug).ToLowerInvariant();
     }
 
     /// <summary>

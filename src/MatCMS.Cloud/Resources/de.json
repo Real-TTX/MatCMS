@@ -655,7 +655,7 @@
   "instances.newDomainMatcad": "Optional — Matcad richtet damit die Route ein.",
   "instances.newDomainPlain": "Pflicht, weil ohne Matcad niemand sonst die Route kennt.",
   "settings.hostingNamePattern": "Namensmuster",
-  "settings.hostingNamePatternHint": "$NAME wird durch den Namen der Website ersetzt, in Wortanfängen groß: aus \"My Homepage.com\" wird \"My-Homepage-Com\". Der Name gilt für Stack, Container und Volume.",
+  "settings.hostingNamePatternHint": "{name} wird durch den Namen der Website ersetzt, kleingeschrieben und mit Bindestrichen — wie Docker es macht. Der Name gilt für Stack, Container und Volume.",
   "add.whichInstance": "Wie soll die Instanz dazukommen?",
   "add.instanceNewHint": "Die Cloud erzeugt eine neue Website und startet sie.",
   "add.instanceAdoptHint": "Die Cloud meldet sich bei einer laufenden Website an.",

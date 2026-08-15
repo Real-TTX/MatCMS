@@ -225,11 +225,11 @@
                 <div class="form-row">
                     <div class="form-field">
                         <label for="portFrom">@T["settings.hostingPortFrom"]</label>
-                        <input id="portFrom" name="portFrom" value="@Model.Get(SettingKeys.HostingPortFrom)" placeholder="9110" inputmode="numeric" />
+                        <input id="portFrom" name="portFrom" value="@Model.Get(SettingKeys.HostingPortFrom)" placeholder="9201" inputmode="numeric" />
                     </div>
                     <div class="form-field">
                         <label for="portTo">@T["settings.hostingPortTo"]</label>
-                        <input id="portTo" name="portTo" value="@Model.Get(SettingKeys.HostingPortTo)" placeholder="9199" inputmode="numeric" />
+                        <input id="portTo" name="portTo" value="@Model.Get(SettingKeys.HostingPortTo)" placeholder="9299" inputmode="numeric" />
                     </div>
                 </div>
             </div>
@@ -237,6 +237,10 @@
                 <label for="namePattern">@T["settings.hostingNamePattern"]</label>
                 <input id="namePattern" name="namePattern" value="@Model.Get(SettingKeys.HostingNamePattern)" placeholder="@MatCMS.Cloud.Services.HostingService.DefaultNamePattern" spellcheck="false" />
                 <div class="help">@T["settings.hostingNamePatternHint"]</div>
+                @* Vorschau, weil ein Muster mit Platzhalter erst dann eindeutig ist, wenn man das
+                   Ergebnis sieht — besonders bei der Normalisierung, die Punkte und Leerzeichen
+                   schluckt. *@
+                <div class="help mono" data-name-preview></div>
             </div>
             <div class="help">@T["settings.hostingPortsHint"]</div>
             @* Zeigt die Vergabe, bevor sie zum ersten Mal etwas anlegt — ein Bereich, in dem nichts
@@ -314,6 +318,24 @@
                 var syncMode = function () { matcadOnly.hidden = mode.value === 'docker'; };
                 mode.addEventListener('change', syncMode);
                 syncMode();
+            }
+
+            // Spiegelt HostingService.Normalise: klein, alles Nicht-Alphanumerische zu Bindestrichen.
+            // Zwei Umsetzungen derselben Regel — die hier zeigt nur an, entschieden wird im Dienst.
+            var pat = document.getElementById('namePattern');
+            var prev = document.querySelector('[data-name-preview]');
+            if (pat && prev) {
+                var demo = 'Meine Seite.de';
+                var slug = demo.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+                var syncPreview = function () {
+                    var p = (pat.value || pat.placeholder || '').trim();
+                    var out = /{name}/i.test(p) ? p.replace(/{name}/ig, slug)
+                            : p.indexOf('$NAME') >= 0 ? p.split('$NAME').join(slug)
+                            : (p.replace(/-+$/, '') + '-' + slug);
+                    prev.textContent = '„' + demo + '" → ' + out.toLowerCase();
+                };
+                pat.addEventListener('input', syncPreview);
+                syncPreview();
             }
 
             var want = new URLSearchParams(location.search).get('tab');

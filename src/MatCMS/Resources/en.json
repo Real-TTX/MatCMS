@@ -1050,5 +1050,12 @@
   "settings.behindProxy": "Behind an HTTPS proxy",
   "settings.behindProxyHelp": "Switch on when a reverse proxy terminates TLS and forwards unencrypted to this site. Without it, redirects and absolute links are built with http:// and a browser on an https page refuses them.",
   "plugins.files": "Additional files",
-  "plugins.filesHelp": "JSON map of path → content, e.g. <code>{\"menu.csx\": \"…\"}</code>. Reachable from the code above via <code>#load \"menu.csx\"</code>. A plugin only sees its own files."
+  "plugins.filesHelp": "JSON map of path → content, e.g. <code>{\"menu.csx\": \"…\"}</code>. Reachable from the code above via <code>#load \"menu.csx\"</code>. A plugin only sees its own files.",
+  "plugins.fileAdd": "File",
+  "plugins.fileAskName": "File name",
+  "plugins.fileDeleteConfirm": "Delete file?",
+  "plugins.fileSaved": "Changes go straight into the field below.",
+  "plugins.filesNone": "No additional files yet.",
+  "plugins.filesBroken": "The raw field does not contain valid JSON — please fix it there.",
+  "plugins.filesRaw": "Raw form (JSON)"
 }

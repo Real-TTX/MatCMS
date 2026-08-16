@@ -1118,3 +1118,20 @@ table.data .btn { white-space: nowrap; }
    Klick führt dorthin, wo man das ändert — deshalb kein pointer-events: none. */
 .add-option.is-muted { opacity: .55; }
 .add-option.is-muted:hover { opacity: 1; }
+
+/* Dateiliste eines Plugins. Bewusst schlicht: sie zeigt, was es gibt, und öffnet es — der Inhalt
+   gehört in den Editor darunter, nicht in ein Modal, das man beim Speichern vergessen kann. */
+.pf-tree { border: 1px solid #cfcfcf; background: #fff; }
+.pf-list { padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+.pf-file { display: flex; align-items: center; gap: 6px; }
+.pf-file-name { flex: 1 1 auto; text-align: left; padding: 7px 10px; border: 0; background: none;
+    cursor: pointer; font-family: var(--font-mono, ui-monospace, monospace); font-size: 13px; border-radius: 6px; }
+.pf-file-name:hover { background: #f2f4f7; }
+.pf-file.is-open .pf-file-name { background: color-mix(in srgb, var(--accent, #2563eb) 12%, transparent); font-weight: 600; }
+.pf-file-del { border: 0; background: none; cursor: pointer; color: #dc2626; padding: 4px 8px; border-radius: 6px; }
+.pf-file-del:hover { background: #fee2e2; }
+.pf-actions { padding: 0 6px 8px; }
+.pf-editor { border-top: 1px solid #cfcfcf; }
+.pf-editor-head { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 8px 12px; background: #fafafa; font-size: 12.5px; }
+.pf-editor textarea { width: 100%; border: 0; border-radius: 0; }

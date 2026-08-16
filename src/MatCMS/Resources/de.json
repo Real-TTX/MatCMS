@@ -1050,5 +1050,12 @@
   "settings.behindProxy": "Hinter einem HTTPS-Proxy",
   "settings.behindProxyHelp": "Einschalten, wenn ein Reverse-Proxy die Verschlüsselung beendet und unverschlüsselt an diese Website weiterreicht. Ohne das baut sie Weiterleitungen und absolute Links mit http:// — ein Browser auf einer https-Seite weist die dann ab.",
   "plugins.files": "Weitere Dateien",
-  "plugins.filesHelp": "JSON-Karte Pfad → Inhalt, z. B. <code>{\"menu.csx\": \"…\"}</code>. Aus dem Code oben erreichbar über <code>#load \"menu.csx\"</code>. Ein Plugin sieht nur seine eigenen Dateien."
+  "plugins.filesHelp": "JSON-Karte Pfad → Inhalt, z. B. <code>{\"menu.csx\": \"…\"}</code>. Aus dem Code oben erreichbar über <code>#load \"menu.csx\"</code>. Ein Plugin sieht nur seine eigenen Dateien.",
+  "plugins.fileAdd": "Datei",
+  "plugins.fileAskName": "Name der Datei",
+  "plugins.fileDeleteConfirm": "Datei löschen?",
+  "plugins.fileSaved": "Änderungen landen sofort im Feld unten.",
+  "plugins.filesNone": "Noch keine weiteren Dateien.",
+  "plugins.filesBroken": "Das Rohfeld enthält kein gültiges JSON — bitte dort korrigieren.",
+  "plugins.filesRaw": "Rohform (JSON)"
 }

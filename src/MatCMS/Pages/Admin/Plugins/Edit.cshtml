@@ -52,10 +52,31 @@
            darauf auf. Schon jetzt nützlich, weil sich der Code damit aufteilen lässt, statt in einem
            einzigen Feld zu wachsen. *@
         <div class="form-field">
-            <label for="FilesJson">@T["plugins.files"]</label>
-            <textarea id="FilesJson" name="FilesJson" rows="8" class="code" data-code="json" spellcheck="false">@Model.FilesJson</textarea>
+            <label>@T["plugins.files"]</label>
+            @* Der Baum SCHREIBT in das Feld darunter, er ersetzt es nicht. Jede Änderung landet
+               sofort dort, und das Feld bleibt sichtbar: fällt das Skript aus, ist trotzdem alles da
+               und von Hand zu retten. Ein Editor, der seinen Inhalt erst beim Absenden erzeugt,
+               verliert ihn beim ersten Fall, an den niemand gedacht hat. *@
+            <div class="pf-tree" data-plugin-files>
+                <div class="pf-list" data-pf-list></div>
+                <div class="pf-actions">
+                    <button type="button" class="btn btn-sm btn-ghost" data-pf-add>+ @T["plugins.fileAdd"]</button>
+                </div>
+                <div class="pf-editor" data-pf-editor hidden>
+                    <div class="pf-editor-head">
+                        <span class="mono" data-pf-current></span>
+                        <span class="muted">@T["plugins.fileSaved"]</span>
+                    </div>
+                    <textarea class="code" rows="14" spellcheck="false" data-pf-content></textarea>
+                </div>
+            </div>
             <div class="help">@Html.Raw(T["plugins.filesHelp"])</div>
         </div>
+
+        <details class="form-field">
+            <summary class="muted">@T["plugins.filesRaw"]</summary>
+            <textarea id="FilesJson" name="FilesJson" rows="6" class="code" spellcheck="false">@Model.FilesJson</textarea>
+        </details>
 
         <h3 class="form-section">Konfiguration</h3>
         <div class="help">Schlüssel/Wert-Paare, die das Plugin per <code>Config("schlüssel")</code> liest — getrennt vom Code, damit man ein Plugin einstellen kann, ohne es zu bearbeiten.</div>
@@ -134,6 +155,103 @@
 
 @section Scripts {
     <script>
+(function () {
+            var root = document.querySelector('[data-plugin-files]');
+            var field = document.getElementById('FilesJson');
+            if (!root || !field) return;
+
+            var list = root.querySelector('[data-pf-list]');
+            var editor = root.querySelector('[data-pf-editor]');
+            var current = root.querySelector('[data-pf-current]');
+            var content = root.querySelector('[data-pf-content]');
+            var open = null;
+
+            function read() {
+                try { return JSON.parse(field.value || '{}') || {}; } catch (e) { return null; }
+            }
+            // Jede Änderung geht SOFORT ins Feld. Nichts wird gesammelt und beim Absenden erzeugt —
+            // was man sieht, ist bereits gespeichert, sobald man das Formular abschickt.
+            function write(map) {
+                field.value = JSON.stringify(map, null, 2);
+            }
+
+            function render() {
+                var map = read();
+                list.innerHTML = '';
+                if (map === null) {
+                    var bad = document.createElement('div');
+                    bad.className = 'help';
+                    bad.textContent = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(T["plugins.filesBroken"].ToString()));
+                    list.appendChild(bad);
+                    return;
+                }
+                var names = Object.keys(map).sort();
+                if (!names.length) {
+                    var none = document.createElement('div');
+                    none.className = 'help';
+                    none.textContent = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(T["plugins.filesNone"].ToString()));
+                    list.appendChild(none);
+                }
+                names.forEach(function (name) {
+                    var row = document.createElement('div');
+                    row.className = 'pf-file' + (name === open ? ' is-open' : '');
+                    var openBtn = document.createElement('button');
+                    openBtn.type = 'button';
+                    openBtn.className = 'pf-file-name mono';
+                    openBtn.textContent = name;
+                    openBtn.addEventListener('click', function () { show(name); });
+                    var del = document.createElement('button');
+                    del.type = 'button';
+                    del.className = 'pf-file-del';
+                    del.textContent = '✕';
+                    del.title = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(T["action.delete"].ToString()));
+                    del.addEventListener('click', function () {
+                        if (!confirm(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(T["plugins.fileDeleteConfirm"].ToString())) + ' ' + name)) return;
+                        var m = read(); if (m === null) return;
+                        delete m[name];
+                        if (open === name) { open = null; editor.hidden = true; }
+                        write(m); render();
+                    });
+                    row.appendChild(openBtn); row.appendChild(del);
+                    list.appendChild(row);
+                });
+            }
+
+            function show(name) {
+                var map = read(); if (map === null) return;
+                open = name;
+                current.textContent = name;
+                content.value = map[name] != null ? map[name] : '';
+                editor.hidden = false;
+                render();
+                content.focus();
+            }
+
+            // Beim Tippen, nicht beim Wechseln: wer eine andere Datei öffnet oder das Formular
+            // abschickt, hat seinen Text damit schon drin.
+            content.addEventListener('input', function () {
+                if (open === null) return;
+                var map = read(); if (map === null) return;
+                map[open] = content.value;
+                write(map);
+            });
+
+            root.querySelector('[data-pf-add]').addEventListener('click', function () {
+                var name = (prompt(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(T["plugins.fileAskName"].ToString())), 'neu.csx') || '').trim();
+                if (!name) return;
+                var map = read();
+                if (map === null) { alert(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(T["plugins.filesBroken"].ToString()))); return; }
+                // Eine bestehende Datei wird geöffnet statt überschrieben — derselbe Name zweimal
+                // anzulegen ist fast immer ein Vertipper, kein Wunsch, sie zu leeren.
+                if (!(name in map)) { map[name] = ''; write(map); }
+                show(name);
+            });
+
+            // Von Hand am Rohfeld geändert: die Liste zieht nach.
+            field.addEventListener('input', function () { render(); });
+            render();
+        })();
+
         // Plugin configuration: key/value rows -> hidden ConfigJson on submit of the main form.
         (function () {
             var rows = document.getElementById('cfg-rows');

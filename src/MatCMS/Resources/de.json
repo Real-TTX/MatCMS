@@ -1059,5 +1059,13 @@
   "plugins.filesBroken": "Das Rohfeld enthält kein gültiges JSON — bitte dort korrigieren.",
   "plugins.filesRaw": "Rohform (JSON)",
   "plugins.filePick": "Links eine Datei wählen oder eine neue anlegen.",
-  "plugins.fileNew": "Neue Datei"
+  "plugins.fileNew": "Neue Datei",
+  "plugins.settings": "Einstellungen",
+  "plugins.settingsHint": "Übernommen wird alles zusammen mit „Speichern“ unter dem Editor.",
+  "plugins.dataVersion": "Daten migriert bis: {0}",
+  "plugins.config": "Konfiguration",
+  "plugins.configHelp": "Schlüssel/Wert-Paare, die das Plugin per <code>Config(\"schlüssel\")</code> liest — getrennt vom Code, damit man ein Plugin einstellen kann, ohne es zu bearbeiten.",
+  "plugins.configField": "Feld",
+  "plugins.configKey": "Schlüssel",
+  "plugins.configValue": "Wert"
 }

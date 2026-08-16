@@ -1127,6 +1127,10 @@ table.data .btn { white-space: nowrap; }
 .pf-root { display: flex; align-items: center; gap: 7px; padding: 10px 12px; border-bottom: 1px solid #e6e8ec;
     font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pf-root i { color: var(--muted, #6b7280); font-size: 16px; }
+.pf-root span { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; }
+/* Das Zahnrad an der Wurzel benutzt den Knopf der Menüleiste — es ist derselbe flache Knopf im
+   selben Baum, nur rechtsbündig. */
+.pf-root .pf-menu-item { flex: 0 0 auto; margin-left: auto; padding: 3px 6px; line-height: 1; }
 .pf-list { padding: 6px; display: flex; flex-direction: column; gap: 1px; flex: 1 1 auto; overflow-y: auto; min-height: 0; }
 .pf-file { display: flex; align-items: center; }
 .pf-file-name { flex: 1 1 auto; text-align: left; padding: 6px 8px 6px 22px; border: 0; background: none;
@@ -1147,6 +1151,10 @@ table.data .btn { white-space: nowrap; }
 .pf-editor textarea { flex: 1 1 auto; width: 100%; border: 0; border-radius: 0; min-height: 280px; resize: vertical; }
 .pf-empty { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; padding: 24px;
     color: var(--muted, #6b7280); font-size: 13.5px; text-align: center; }
+/* display:flex aus einer Klasse schlägt das display:none, das der Browser [hidden] mitgibt — ohne
+   diese Zeile stehen Editor UND Leerzustand gleichzeitig da, obwohl das Skript einen von beiden
+   ausblendet. */
+.pf-editor[hidden], .pf-empty[hidden] { display: none; }
 
 @media (max-width: 800px) { .pf-tree { grid-template-columns: 1fr; } .pf-side { border-right: 0; border-bottom: 1px solid #cfcfcf; } }
 

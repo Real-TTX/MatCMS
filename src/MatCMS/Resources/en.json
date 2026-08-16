@@ -1059,5 +1059,13 @@
   "plugins.filesBroken": "The raw field does not contain valid JSON — please fix it there.",
   "plugins.filesRaw": "Raw form (JSON)",
   "plugins.filePick": "Pick a file on the left, or create one.",
-  "plugins.fileNew": "New file"
+  "plugins.fileNew": "New file",
+  "plugins.settings": "Settings",
+  "plugins.settingsHint": "Everything is applied together with “Save” below the editor.",
+  "plugins.dataVersion": "Data migrated up to: {0}",
+  "plugins.config": "Configuration",
+  "plugins.configHelp": "Key/value pairs the plugin reads via <code>Config(\"key\")</code> — kept apart from the code so a plugin can be configured without editing it.",
+  "plugins.configField": "Field",
+  "plugins.configKey": "Key",
+  "plugins.configValue": "Value"
 }

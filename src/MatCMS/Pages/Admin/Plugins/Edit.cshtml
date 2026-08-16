@@ -21,27 +21,6 @@
         <div class="alert alert-error"><strong>@T["plugins.runError"]:</strong> <span class="mono">@Model.RunError</span></div>
     }
     <form method="post" class="form-grid" id="plugin-form">
-        <div class="form-row">
-            <div class="form-field">
-                <label for="Name">@T["plugins.name"]</label>
-                <input id="Name" name="Name" value="@Model.Name" required />
-            </div>
-            <div class="form-field">
-                <label for="Description">@T["plugins.description"]</label>
-                <input id="Description" name="Description" value="@Model.Description" />
-            </div>
-            <div class="form-field" style="max-width:130px;">
-                <label for="Version">Version</label>
-                <input id="Version" name="Version" value="@Model.Version" placeholder="z.B. 1.0" spellcheck="false" />
-                @if (!string.IsNullOrWhiteSpace(Model.Current.DataVersion))
-                {
-                    <div class="help">Daten migriert bis: @Model.Current.DataVersion</div>
-                }
-            </div>
-        </div>
-        <label class="check">
-            <input type="checkbox" name="Enabled" value="true" @(Model.Enabled ? "checked" : "") /> @T["plugins.enabledLabel"]
-        </label>
         @* Kein eigener Abschnitt mehr: der Code IST eine Datei des Plugins und steht als erste im
            Baum. Das Feld bleibt bestehen und wird vom Baum beschrieben — es ist weiterhin das, was
            abgeschickt wird, und bei ausgefallenem Skript unter "Rohform" erreichbar. *@
@@ -61,7 +40,14 @@
                hinreichen, was beim Auflösen von #load auch tatsächlich so ist. *@
             <div class="pf-tree" data-plugin-files>
                 <aside class="pf-side">
-                    <div class="pf-root"><i class="ti ti-package" aria-hidden="true"></i> @(string.IsNullOrWhiteSpace(Model.Name) ? T["plugins.title"] : Model.Name)</div>
+                    @* Die Wurzel trägt das Zahnrad, weil die Einstellungen dem PLUGIN gehören und
+                       nicht einer seiner Dateien. Auf der Seite bleibt damit der Editor. *@
+                    <div class="pf-root">
+                        <i class="ti ti-package" aria-hidden="true"></i>
+                        <span data-pf-root-name>@(string.IsNullOrWhiteSpace(Model.Name) ? T["plugins.title"] : Model.Name)</span>
+                        <button type="button" class="pf-menu-item" data-pf-settings
+                                title="@T["plugins.settings"]" aria-label="@T["plugins.settings"]"><i class="ti ti-settings" aria-hidden="true"></i></button>
+                    </div>
                     <div class="pf-list" data-pf-list></div>
                     <div class="pf-actions">
                         <button type="button" class="btn btn-sm btn-ghost" data-pf-add>+ @T["plugins.fileAdd"]</button>
@@ -96,12 +82,58 @@
             <textarea id="FilesJson" name="FilesJson" rows="6" class="code" spellcheck="false">@Model.FilesJson</textarea>
         </details>
 
-        <h3 class="form-section">Konfiguration</h3>
-        <div class="help">Schlüssel/Wert-Paare, die das Plugin per <code>Config("schlüssel")</code> liest — getrennt vom Code, damit man ein Plugin einstellen kann, ohne es zu bearbeiten.</div>
-        <div id="cfg-rows" data-config="@Model.ConfigJson"></div>
-        <div style="margin-top:8px;"><button type="button" class="btn btn-sm btn-ghost" id="cfg-add">＋ Feld</button></div>
-        <input type="hidden" name="ConfigJson" id="ConfigJson" />
+        @* Die Einstellungen des Plugins liegen im Dialog am Wurzelelement — sie stehen aber
+           INNERHALB dieses Formulars. Ein Dialog neben dem Formular sähe genauso aus und würde beim
+           Speichern nichts beitragen: Name, Version und Konfiguration kämen leer an und wären damit
+           weg. Deshalb steht das Overlay hier und nicht am Seitenende. *@
+        <div class="modal-overlay" data-pf-settings-dialog>
+            <div class="modal" role="dialog" aria-modal="true" aria-labelledby="pf-settings-title">
+                <div class="modal-head">
+                    <h2 id="pf-settings-title">@T["plugins.settings"]</h2>
+                    <button type="button" class="modal-close" data-pf-settings-close aria-label="@T["action.close"]">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-grid">
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="Name">@T["plugins.name"]</label>
+                                <input id="Name" name="Name" value="@Model.Name" required />
+                            </div>
+                            <div class="form-field" style="max-width:130px;">
+                                <label for="Version">Version</label>
+                                <input id="Version" name="Version" value="@Model.Version" placeholder="z.B. 1.0" spellcheck="false" />
+                                @if (!string.IsNullOrWhiteSpace(Model.Current.DataVersion))
+                                {
+                                    <div class="help">@T["plugins.dataVersion", Model.Current.DataVersion]</div>
+                                }
+                            </div>
+                        </div>
+                        <div class="form-field">
+                            <label for="Description">@T["plugins.description"]</label>
+                            <input id="Description" name="Description" value="@Model.Description" />
+                        </div>
+                        <label class="check">
+                            <input type="checkbox" name="Enabled" value="true" @(Model.Enabled ? "checked" : "") /> @T["plugins.enabledLabel"]
+                        </label>
 
+                        <h3 class="form-section">@T["plugins.config"]</h3>
+                        <div class="help">@Html.Raw(T["plugins.configHelp"])</div>
+                        <div id="cfg-rows" data-config="@Model.ConfigJson"></div>
+                        <div style="margin-top:8px;"><button type="button" class="btn btn-sm btn-ghost" id="cfg-add">＋ @T["plugins.configField"]</button></div>
+                        <input type="hidden" name="ConfigJson" id="ConfigJson" />
+                    </div>
+                </div>
+                @* Der Dialog SPEICHERT nicht selbst — gespeichert wird das ganze Formular unten.
+                   Ein zweiter Speichern-Knopf hier würde versprechen, dass die Dateien draußen
+                   bleiben, wo sie sind, und genau das stimmt nicht. *@
+                <div class="modal-body" style="padding-top:0;">
+                    <div class="modal-foot">
+                        <span class="help" style="flex:1;">@T["plugins.settingsHint"]</span>
+                        <button type="button" class="btn btn-sm btn-ghost" data-pf-settings-close>@T["action.close"]</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </form>
 </div>
 
@@ -301,6 +333,43 @@
             render();
         })();
 
+        // Einstellungsdialog am Wurzelelement.
+        (function () {
+            var dialog = document.querySelector('[data-pf-settings-dialog]');
+            if (!dialog) return;
+            var nameField = document.getElementById('Name');
+            var rootName = document.querySelector('[data-pf-root-name]');
+
+            function open() {
+                dialog.classList.add('open');
+                if (nameField) nameField.focus();
+            }
+            function close() { dialog.classList.remove('open'); }
+
+            document.querySelectorAll('[data-pf-settings]').forEach(function (b) { b.addEventListener('click', open); });
+            dialog.querySelectorAll('[data-pf-settings-close]').forEach(function (b) { b.addEventListener('click', close); });
+            // Klick auf den Schleier schließt, Klick im Dialog nicht.
+            dialog.addEventListener('click', function (e) { if (e.target === dialog) close(); });
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape' && dialog.classList.contains('open')) close();
+            });
+
+            // Der Name steht an der Wurzel des Baums — er zieht sofort nach, sonst widerspricht der
+            // Baum dem Dialog, solange nicht gespeichert wurde.
+            if (nameField && rootName) nameField.addEventListener('input', function () {
+                rootName.textContent = nameField.value.trim() || @Html.Raw(System.Text.Json.JsonSerializer.Serialize(T["plugins.title"].ToString()));
+            });
+
+            // Ein required-Feld in einem ausgeblendeten Dialog kann der Browser nicht anspringen: er
+            // bricht das Absenden ab und sagt nichts. Also den Dialog öffnen, sobald etwas darin
+            // beanstandet wird — sonst klickt man auf Speichern und es passiert einfach nichts.
+            var form = document.getElementById('plugin-form');
+            if (form) form.addEventListener('invalid', function (e) {
+                if (!dialog.contains(e.target)) return;
+                if (!dialog.classList.contains('open')) dialog.classList.add('open');
+            }, true);
+        })();
+
         // Plugin configuration: key/value rows -> hidden ConfigJson on submit of the main form.
         (function () {
             var rows = document.getElementById('cfg-rows');
@@ -310,8 +379,8 @@
             if (!rows || !form || !addBtn) return;
             function addRow(k, v) {
                 var row = document.createElement('div'); row.className = 'field-row';
-                var key = document.createElement('input'); key.type = 'text'; key.placeholder = 'Schlüssel'; key.className = 'cfg-key fr-label'; key.value = k || '';
-                var val = document.createElement('input'); val.type = 'text'; val.placeholder = 'Wert'; val.className = 'cfg-val fr-label'; val.value = v || '';
+                var key = document.createElement('input'); key.type = 'text'; key.placeholder = '@T["plugins.configKey"]'; key.className = 'cfg-key fr-label'; key.value = k || '';
+                var val = document.createElement('input'); val.type = 'text'; val.placeholder = '@T["plugins.configValue"]'; val.className = 'cfg-val fr-label'; val.value = v || '';
                 var rm = document.createElement('button'); rm.type = 'button'; rm.className = 'btn btn-sm btn-danger btn-icon'; rm.title = '@T["action.delete"]';
                 rm.innerHTML = '<i class="ti ti-trash" aria-hidden="true"></i>';
                 rm.addEventListener('click', function () { row.remove(); });

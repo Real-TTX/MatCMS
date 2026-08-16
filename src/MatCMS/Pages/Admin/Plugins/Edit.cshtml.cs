@@ -22,6 +22,7 @@ public class EditModel : PageModel
     [BindProperty] public string? Version { get; set; }
     [BindProperty] public string? Code { get; set; }
     [BindProperty] public string? ConfigJson { get; set; }
+    [BindProperty] public string? FilesJson { get; set; }
     [BindProperty] public bool Enabled { get; set; }
     public string? Error { get; private set; }
     public string? RunError { get; private set; }
@@ -36,7 +37,7 @@ public class EditModel : PageModel
         var p = await _db.Plugins.FindAsync(id);
         if (p is null) return RedirectToPage("Index");
         Current = p;
-        Name = p.Name; Description = p.Description; Code = p.Code; Enabled = p.Enabled; Version = p.Version; ConfigJson = p.ConfigJson;
+        Name = p.Name; Description = p.Description; Code = p.Code; FilesJson = p.FilesJson; Enabled = p.Enabled; Version = p.Version; ConfigJson = p.ConfigJson;
         RunError = _registry.Errors.TryGetValue(id, out var e) ? e : null;
         LoadAssets();
         return Page();
@@ -71,6 +72,9 @@ public class EditModel : PageModel
         p.Version = (Version ?? "").Trim();
         p.Code = Code ?? "";
         p.ConfigJson = SanitizeConfig(ConfigJson);
+        // Nur eine gültige Karte Pfad → Inhalt wird gespeichert. Unsinn hier stillschweigend zu
+        // übernehmen hieße, ihn erst beim nächsten Start des Plugins zu bemerken.
+        p.FilesJson = SanitizeFiles(FilesJson);
         p.Enabled = Enabled;
         await _db.SaveChangesAsync();
 
@@ -192,6 +196,19 @@ public class EditModel : PageModel
                     : p.Value.ToString();
             }
             return obj.ToJsonString();
+        }
+        catch { return "{}"; }
+    }
+
+    /// <summary>Leert das Feld bei ungültigem JSON oder falscher Form. Ein Plugin mit kaputter
+    /// Dateikarte startet sonst gar nicht, und der Fehler stünde erst im Log statt im Editor.</summary>
+    private static string SanitizeFiles(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return "{}";
+        try
+        {
+            var map = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+            return map is null ? "{}" : System.Text.Json.JsonSerializer.Serialize(map);
         }
         catch { return "{}"; }
     }

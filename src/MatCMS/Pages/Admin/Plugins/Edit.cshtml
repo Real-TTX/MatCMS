@@ -48,6 +48,15 @@
             <div class="help">@Html.Raw(T["plugins.codeHelp"])</div>
         </div>
 
+        @* Weitere Dateien des Plugins. Vorerst als JSON-Karte Pfad → Inhalt — der Ordnerbaum baut
+           darauf auf. Schon jetzt nützlich, weil sich der Code damit aufteilen lässt, statt in einem
+           einzigen Feld zu wachsen. *@
+        <div class="form-field">
+            <label for="FilesJson">@T["plugins.files"]</label>
+            <textarea id="FilesJson" name="FilesJson" rows="8" class="code" data-code="json" spellcheck="false">@Model.FilesJson</textarea>
+            <div class="help">@Html.Raw(T["plugins.filesHelp"])</div>
+        </div>
+
         <h3 class="form-section">Konfiguration</h3>
         <div class="help">Schlüssel/Wert-Paare, die das Plugin per <code>Config("schlüssel")</code> liest — getrennt vom Code, damit man ein Plugin einstellen kann, ohne es zu bearbeiten.</div>
         <div id="cfg-rows" data-config="@Model.ConfigJson"></div>

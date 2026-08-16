@@ -408,7 +408,11 @@ public class PluginRunner
                 var ctx = new PluginContext(_registry, _services, p.Key, ParseConfig(p.ConfigJson));
                 try
                 {
-                    await CSharpScript.RunAsync(p.Code ?? "", options, globals: ctx, globalsType: typeof(PluginContext));
+                    // Die Dateien DIESES Plugins sind die einzige Quelle für #load. Je Plugin eigene
+                    // Optionen, damit kein Plugin die Dateien eines anderen sieht.
+                    var files = PluginFileResolver.Parse(p.FilesJson);
+                    var opts = files.Count == 0 ? options : options.WithSourceResolver(new PluginFileResolver(files));
+                    await CSharpScript.RunAsync(p.Code ?? "", opts, globals: ctx, globalsType: typeof(PluginContext));
                 }
                 catch (Exception ex)
                 {

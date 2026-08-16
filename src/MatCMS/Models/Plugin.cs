@@ -27,7 +27,17 @@ public class Plugin
     public string DataVersion { get; set; } = "";
 
     /// <summary>C# script body executed with a <c>PluginContext</c> as globals.</summary>
+    /// <para>Bleibt die EINSTIEGSDATEI, auch wenn ein Plugin weitere Dateien mitbringt. Das Feld
+    /// nicht abzulösen ist Absicht: Bundle-Format und Datenmodell werden von der Cloud mitgelesen,
+    /// und ein alter Leser bekommt so weiterhin etwas Gültiges statt einer leeren Hülle.</para>
     public string Code { get; set; } = "";
+
+    /// <summary>
+    /// Weitere Skriptdateien des Plugins als JSON-Objekt Pfad → Inhalt, z. B.
+    /// <c>{"menu.csx": "…"}</c>. Erreichbar aus <see cref="Code"/> über <c>#load "menu.csx"</c>.
+    /// <para>Leer bei jedem heutigen Plugin — dann verhält sich alles exakt wie vorher.</para>
+    /// </summary>
+    public string FilesJson { get; set; } = "{}";
 
     /// <summary>Admin-editable configuration as a JSON object of string key→value pairs. Kept separate
     /// from the code so a plugin can be configured without editing it; read at runtime via <c>Config("key")</c>.</summary>

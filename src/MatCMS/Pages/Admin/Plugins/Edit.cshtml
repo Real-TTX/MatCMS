@@ -57,17 +57,27 @@
                sofort dort, und das Feld bleibt sichtbar: fällt das Skript aus, ist trotzdem alles da
                und von Hand zu retten. Ein Editor, der seinen Inhalt erst beim Absenden erzeugt,
                verliert ihn beim ersten Fall, an den niemand gedacht hat. *@
+            @* Zwei Spalten: links, was es gibt, rechts, woran man arbeitet. Die Wurzel ist das Plugin
+               selbst — sie macht sichtbar, dass alle Dateien IHM gehören und nirgendwo sonst
+               hinreichen, was beim Auflösen von #load auch tatsächlich so ist. *@
             <div class="pf-tree" data-plugin-files>
-                <div class="pf-list" data-pf-list></div>
-                <div class="pf-actions">
-                    <button type="button" class="btn btn-sm btn-ghost" data-pf-add>+ @T["plugins.fileAdd"]</button>
-                </div>
-                <div class="pf-editor" data-pf-editor hidden>
-                    <div class="pf-editor-head">
-                        <span class="mono" data-pf-current></span>
-                        <span class="muted">@T["plugins.fileSaved"]</span>
+                <aside class="pf-side">
+                    <div class="pf-root"><i class="ti ti-package" aria-hidden="true"></i> @(string.IsNullOrWhiteSpace(Model.Name) ? T["plugins.title"] : Model.Name)</div>
+                    <div class="pf-list" data-pf-list></div>
+                    <div class="pf-actions">
+                        <button type="button" class="btn btn-sm btn-ghost" data-pf-add>+ @T["plugins.fileAdd"]</button>
                     </div>
-                    <textarea class="code" rows="14" spellcheck="false" data-pf-content></textarea>
+                </aside>
+                <div class="pf-main">
+                    <div class="pf-editor" data-pf-editor hidden>
+                        <div class="pf-editor-head">
+                            <span class="mono" data-pf-current></span>
+                            <span class="muted">@T["plugins.fileSaved"]</span>
+                        </div>
+                        <textarea class="code" spellcheck="false" data-pf-content></textarea>
+                    </div>
+                    @* Kein leerer Kasten, sondern der Hinweis, was zu tun ist. *@
+                    <div class="pf-empty" data-pf-empty>@T["plugins.filePick"]</div>
                 </div>
             </div>
             <div class="help">@Html.Raw(T["plugins.filesHelp"])</div>
@@ -165,6 +175,7 @@
             var current = root.querySelector('[data-pf-current]');
             var content = root.querySelector('[data-pf-content]');
             var open = null;
+            var empty = root.querySelector('[data-pf-empty]');
 
             function read() {
                 try { return JSON.parse(field.value || '{}') || {}; } catch (e) { return null; }
@@ -209,7 +220,7 @@
                         if (!confirm(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(T["plugins.fileDeleteConfirm"].ToString())) + ' ' + name)) return;
                         var m = read(); if (m === null) return;
                         delete m[name];
-                        if (open === name) { open = null; editor.hidden = true; }
+                        if (open === name) { open = null; editor.hidden = true; if (empty) empty.hidden = false; }
                         write(m); render();
                     });
                     row.appendChild(openBtn); row.appendChild(del);
@@ -223,6 +234,7 @@
                 current.textContent = name;
                 content.value = map[name] != null ? map[name] : '';
                 editor.hidden = false;
+                if (empty) empty.hidden = true;
                 render();
                 content.focus();
             }

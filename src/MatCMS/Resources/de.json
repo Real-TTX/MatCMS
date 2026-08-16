@@ -1057,5 +1057,6 @@
   "plugins.fileSaved": "Änderungen landen sofort im Feld unten.",
   "plugins.filesNone": "Noch keine weiteren Dateien.",
   "plugins.filesBroken": "Das Rohfeld enthält kein gültiges JSON — bitte dort korrigieren.",
-  "plugins.filesRaw": "Rohform (JSON)"
+  "plugins.filesRaw": "Rohform (JSON)",
+  "plugins.filePick": "Links eine Datei wählen oder eine neue anlegen."
 }

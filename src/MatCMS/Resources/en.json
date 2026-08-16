@@ -1057,5 +1057,6 @@
   "plugins.fileSaved": "Changes go straight into the field below.",
   "plugins.filesNone": "No additional files yet.",
   "plugins.filesBroken": "The raw field does not contain valid JSON — please fix it there.",
-  "plugins.filesRaw": "Raw form (JSON)"
+  "plugins.filesRaw": "Raw form (JSON)",
+  "plugins.filePick": "Pick a file on the left, or create one."
 }

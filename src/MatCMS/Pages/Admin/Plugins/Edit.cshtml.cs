@@ -23,6 +23,12 @@ public class EditModel : PageModel
     [BindProperty] public string? Code { get; set; }
     [BindProperty] public string? ConfigJson { get; set; }
     [BindProperty] public string? FilesJson { get; set; }
+
+    /// <summary>Anzeigename der Einstiegsdatei im Baum. Sie liegt im Feld Code und nicht in der
+    /// Dateikarte — der Name ist Beschriftung, kein Pfad, und deshalb hier und nicht im Modell.
+    /// <para>.csx, weil es ein Roslyn-Skript ist und die übrigen Dateien per #load ebenfalls .csx
+    /// sind; eine .cs würde eine Übersetzungseinheit versprechen, die es hier nicht gibt.</para></summary>
+    public const string EntryFile = "plugin.csx";
     [BindProperty] public bool Enabled { get; set; }
     public string? Error { get; private set; }
     public string? RunError { get; private set; }

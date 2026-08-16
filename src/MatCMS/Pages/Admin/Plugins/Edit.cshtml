@@ -42,11 +42,10 @@
         <label class="check">
             <input type="checkbox" name="Enabled" value="true" @(Model.Enabled ? "checked" : "") /> @T["plugins.enabledLabel"]
         </label>
-        <div class="form-field">
-            <label for="Code">@T["plugins.code"]</label>
-            <textarea id="Code" name="Code" rows="16" class="code" spellcheck="false">@Model.Code</textarea>
-            <div class="help">@Html.Raw(T["plugins.codeHelp"])</div>
-        </div>
+        @* Kein eigener Abschnitt mehr: der Code IST eine Datei des Plugins und steht als erste im
+           Baum. Das Feld bleibt bestehen und wird vom Baum beschrieben — es ist weiterhin das, was
+           abgeschickt wird, und bei ausgefallenem Skript unter "Rohform" erreichbar. *@
+        <textarea id="Code" name="Code" hidden>@Model.Code</textarea>
 
         @* Weitere Dateien des Plugins. Vorerst als JSON-Karte Pfad → Inhalt — der Ordnerbaum baut
            darauf auf. Schon jetzt nützlich, weil sich der Code damit aufteilen lässt, statt in einem
@@ -81,10 +80,13 @@
                 </div>
             </div>
             <div class="help">@Html.Raw(T["plugins.filesHelp"])</div>
+            <div class="help">@Html.Raw(T["plugins.codeHelp"])</div>
         </div>
 
         <details class="form-field">
             <summary class="muted">@T["plugins.filesRaw"]</summary>
+            <label class="muted" for="CodeRaw">@MatCMS.Pages.Admin.Plugins.EditModel.EntryFile</label>
+            <textarea id="CodeRaw" rows="6" class="code" spellcheck="false" data-pf-code-mirror>@Model.Code</textarea>
             <textarea id="FilesJson" name="FilesJson" rows="6" class="code" spellcheck="false">@Model.FilesJson</textarea>
         </details>
 
@@ -175,6 +177,12 @@
             var current = root.querySelector('[data-pf-current]');
             var content = root.querySelector('[data-pf-content]');
             var open = null;
+            // Die Einstiegsdatei liegt NICHT in der Karte, sondern im eigenen Feld Code — sie ist
+            // das, was ausgeführt wird, die anderen werden von ihr geladen. Im Baum steht sie
+            // trotzdem obenan, weil sie für den Bearbeiter eine Datei wie jede andere ist.
+            var ENTRY = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(MatCMS.Pages.Admin.Plugins.EditModel.EntryFile));
+            var codeField = document.getElementById('Code');
+            var codeMirror = document.querySelector('[data-pf-code-mirror]');
             var empty = root.querySelector('[data-pf-empty]');
 
             function read() {
@@ -197,6 +205,7 @@
                     return;
                 }
                 var names = Object.keys(map).sort();
+                names.unshift(ENTRY);
                 if (!names.length) {
                     var none = document.createElement('div');
                     none.className = 'help';
@@ -211,6 +220,13 @@
                     openBtn.className = 'pf-file-name mono';
                     openBtn.textContent = name;
                     openBtn.addEventListener('click', function () { show(name); });
+                    // Die Einstiegsdatei bekommt kein Löschkreuz: ohne sie gäbe es kein Plugin,
+                    // und ein Knopf, der das anbietet, wäre eine Falle.
+                    if (name === ENTRY) {
+                        row.appendChild(openBtn);
+                        list.appendChild(row);
+                        return;
+                    }
                     var del = document.createElement('button');
                     del.type = 'button';
                     del.className = 'pf-file-del';
@@ -232,7 +248,7 @@
                 var map = read(); if (map === null) return;
                 open = name;
                 current.textContent = name;
-                content.value = map[name] != null ? map[name] : '';
+                content.value = name === ENTRY ? codeField.value : (map[name] != null ? map[name] : '');
                 editor.hidden = false;
                 if (empty) empty.hidden = true;
                 render();
@@ -243,6 +259,11 @@
             // abschickt, hat seinen Text damit schon drin.
             content.addEventListener('input', function () {
                 if (open === null) return;
+                if (open === ENTRY) {
+                    codeField.value = content.value;
+                    if (codeMirror) codeMirror.value = content.value;
+                    return;
+                }
                 var map = read(); if (map === null) return;
                 map[open] = content.value;
                 write(map);
@@ -261,6 +282,12 @@
 
             // Von Hand am Rohfeld geändert: die Liste zieht nach.
             field.addEventListener('input', function () { render(); });
+            if (codeMirror) codeMirror.addEventListener('input', function () {
+                codeField.value = codeMirror.value;
+                if (open === ENTRY) content.value = codeMirror.value;
+            });
+            // Beim Öffnen gleich die Einstiegsdatei zeigen — sie ist der Anfang jedes Plugins.
+            show(ENTRY);
             render();
         })();
 

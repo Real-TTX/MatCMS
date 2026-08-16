@@ -1149,3 +1149,12 @@ table.data .btn { white-space: nowrap; }
     color: var(--muted, #6b7280); font-size: 13.5px; text-align: center; }
 
 @media (max-width: 800px) { .pf-tree { grid-template-columns: 1fr; } .pf-side { border-right: 0; border-bottom: 1px solid #cfcfcf; } }
+
+/* Menüleiste über dem Editor: Aktionen links, die offene Datei daneben. */
+.pf-menu { display: flex; align-items: center; gap: 12px; padding: 6px 10px; background: #fafafa;
+    border-bottom: 1px solid #e6e8ec; font-size: 12.5px; }
+.pf-menu-item { border: 0; background: none; cursor: pointer; padding: 5px 9px; border-radius: 6px;
+    font-family: inherit; font-size: 12.5px; }
+.pf-menu-item:hover { background: #eef0f4; }
+.pf-menu-file { font-weight: 600; }
+.pf-menu-hint { margin-left: auto; }

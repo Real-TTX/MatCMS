@@ -68,11 +68,17 @@
                     </div>
                 </aside>
                 <div class="pf-main">
+                    @* Menüleiste über dem Editor. Bewusst nur mit Einträgen, hinter denen etwas
+                       liegt — ein Menü "Blaupausen", das noch nichts kann, verspricht mehr als da
+                       ist und lässt einen suchen, was es nicht gibt. Es kommt dazu, wenn es etwas
+                       auszuführen gibt. *@
+                    <div class="pf-menu">
+                        <button type="button" class="pf-menu-item" data-pf-add-top>@T["plugins.fileNew"]</button>
+                        <span class="pf-menu-file mono" data-pf-current></span>
+                        <span class="pf-menu-hint muted">@T["plugins.fileSaved"]</span>
+                    </div>
                     <div class="pf-editor" data-pf-editor hidden>
-                        <div class="pf-editor-head">
-                            <span class="mono" data-pf-current></span>
-                            <span class="muted">@T["plugins.fileSaved"]</span>
-                        </div>
+
                         <textarea class="code" spellcheck="false" data-pf-content></textarea>
                     </div>
                     @* Kein leerer Kasten, sondern der Hinweis, was zu tun ist. *@
@@ -269,7 +275,7 @@
                 write(map);
             });
 
-            root.querySelector('[data-pf-add]').addEventListener('click', function () {
+            function addFile() {
                 var name = (prompt(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(T["plugins.fileAskName"].ToString())), 'neu.csx') || '').trim();
                 if (!name) return;
                 var map = read();
@@ -278,6 +284,10 @@
                 // anzulegen ist fast immer ein Vertipper, kein Wunsch, sie zu leeren.
                 if (!(name in map)) { map[name] = ''; write(map); }
                 show(name);
+            }
+            // Zwei Wege zum selben: der Knopf unter der Liste und der in der Menüleiste.
+            root.querySelectorAll('[data-pf-add], [data-pf-add-top]').forEach(function (b) {
+                b.addEventListener('click', addFile);
             });
 
             // Von Hand am Rohfeld geändert: die Liste zieht nach.

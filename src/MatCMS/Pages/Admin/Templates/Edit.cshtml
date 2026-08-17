@@ -103,10 +103,13 @@
     <form method="post" id="tpl-form">
         <input type="hidden" name="Id" value="@Model.Id" />
 
+        @* Reiterbeschriftungen ohne Emoji — wie in jeder anderen Reiterleiste des Admin
+           (Einstellungen, Backup, Komponenten, Plugins). Ein Bildzeichen vor dem Wort stand nur
+           hier und ließ diese eine Leiste aus der Reihe fallen. *@
         <div class="tabs" role="tablist">
-            <button type="button" class="tab active" data-tab="designer">🎨 @T["templates.tabDesigner"]</button>
-            <button type="button" class="tab" data-tab="files">📁 @T["tplfiles.tab"]</button>
-            <button type="button" class="tab" data-tab="params">⚙️ @T["templates.tabParameters"]</button>
+            <button type="button" class="tab active" data-tab="designer">@T["templates.tabDesigner"]</button>
+            <button type="button" class="tab" data-tab="files">@T["tplfiles.tab"]</button>
+            <button type="button" class="tab" data-tab="params">@T["templates.tabParameters"]</button>
         </div>
         <p class="help" data-group-hint></p>
 

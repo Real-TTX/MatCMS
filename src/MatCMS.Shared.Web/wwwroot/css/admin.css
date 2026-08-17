@@ -1171,7 +1171,6 @@ table.data .btn { white-space: nowrap; }
     font-family: inherit; font-size: 12.5px; white-space: nowrap; }
 .pf-menu-item:hover { background: #eef0f4; }
 .pf-menu-file { font-weight: 600; }
-.pf-menu-hint { margin-left: auto; }
 /* Die beiden Flächen im Editor (Skriptdatei / hochgeladene Datei) erben die Höhe des Bereichs,
    sonst fiele der Kasten bei der kürzeren in sich zusammen. Das display:flex hier ist genau der
    Fall, den .tab-panel[hidden] mit !important abfängt — ohne das stünden beide gleichzeitig da. */

@@ -1055,7 +1055,6 @@
   "plugins.fileAdd": "File",
   "plugins.fileAskName": "File name",
   "plugins.fileDeleteConfirm": "Delete file?",
-  "plugins.fileSaved": "Changes go straight into the fields under “Advanced”.",
   "plugins.filesNone": "No additional files yet.",
   "plugins.filesBroken": "The raw field under “Advanced” does not contain valid JSON — please fix it there.",
   "plugins.tabEditor": "Editor",

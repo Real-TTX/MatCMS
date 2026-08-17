@@ -1055,7 +1055,6 @@
   "plugins.fileAdd": "Datei",
   "plugins.fileAskName": "Name der Datei",
   "plugins.fileDeleteConfirm": "Datei löschen?",
-  "plugins.fileSaved": "Änderungen landen sofort in den Feldern unter „Erweitert“.",
   "plugins.filesNone": "Noch keine weiteren Dateien.",
   "plugins.filesBroken": "Das Rohfeld unter „Erweitert“ enthält kein gültiges JSON — bitte dort korrigieren.",
   "plugins.tabEditor": "Editor",

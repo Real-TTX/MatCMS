@@ -40,7 +40,14 @@ together by hand:
    while it copies every other entry byte for byte, so entries survive a cloud round trip untouched.
    The addition is detected by presence and needs no `Format` bump: an older reader skips everything
    outside `assets/` and imports the plugin with its entry file alone, a newer one finds no such
-   entries in an old bundle and reads a single-file plugin. The two READERS stay
+   entries in an old bundle and reads a single-file plugin.
+   The manifest additionally carries `Mapping` — a plugin's **folder roles** (folder path → role, see
+   `src/MatCMS/Services/PluginMapping.cs`) — as a **string containing JSON, not a nested object**, for
+   exactly the reason above. Empty means "never written" and is read as the legacy default (the folder
+   `assets` carries the role Assets), so an old bundle and an old backup import unchanged. Note that
+   `assets/` remains the fixed folder name **inside the zip and on disk**
+   (`appdata/plugin-assets/{Key}/`, served at `/plugin-assets/{Key}/…`); the role only frees the name
+   the editor's tree shows for it, which is a label and not a path. The two READERS stay
    separate on purpose: the CMS imports into itself (EF, file system, plugin migration), while the
    cloud only stores and re-packs bundles and edits the manifest **field by field** so properties its
    editor does not surface survive a save. A shared typed manifest class would quietly drop exactly

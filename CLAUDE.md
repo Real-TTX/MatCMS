@@ -32,8 +32,15 @@ together by hand:
    together; there is nothing left to keep in step. The library is deliberately dependency-free (no
    EF, no ASP.NET): a DTO that needs a package has grown into something that belongs in one of the
    two applications.
-2. **The plugin bundle format** — the container shape (manifest entry name, asset folder, size and
-   count guards, allowed asset types) is `src/MatCMS.Shared/PluginBundle.cs`. The two READERS stay
+2. **The plugin bundle format** — the container shape (manifest entry name, asset folder, the `files/`
+   folder for the plugin's further script files and the rule for what path may go in it, size and
+   count guards, allowed asset types) is `src/MatCMS.Shared/PluginBundle.cs`. A plugin's further
+   script files travel as **one zip entry each under `files/`**, not as a field in the manifest —
+   the cloud rewrites `plugin.json` field by field and would flatten a nested object to a string,
+   while it copies every other entry byte for byte, so entries survive a cloud round trip untouched.
+   The addition is detected by presence and needs no `Format` bump: an older reader skips everything
+   outside `assets/` and imports the plugin with its entry file alone, a newer one finds no such
+   entries in an old bundle and reads a single-file plugin. The two READERS stay
    separate on purpose: the CMS imports into itself (EF, file system, plugin migration), while the
    cloud only stores and re-packs bundles and edits the manifest **field by field** so properties its
    editor does not surface survive a save. A shared typed manifest class would quietly drop exactly

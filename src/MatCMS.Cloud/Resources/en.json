@@ -124,6 +124,8 @@
   "profiles.pluginVersionHint": "Raise it so instances pick the new build up — an unchanged version is skipped.",
   "profiles.pluginAssets": "Bundled files",
   "profiles.pluginAssetsHint": "Preserved unchanged when you save.",
+  "profiles.pluginFiles": "Further script files",
+  "profiles.pluginFilesHint": "Part of the plugin, loaded from the entry file with #load. Preserved unchanged when you save — they are edited in the instance's own plugin editor.",
   "profiles.pluginDeleteConfirm": "Remove this plugin from the profile? It stays on the instances.",
   "profiles.addFromStore": "Add from global",
   "profiles.addFromStoreHint": "Entries from the global store. They are taken by reference — change the entry in the store and every profile that took it gets the new version.",

@@ -124,6 +124,8 @@
   "profiles.pluginVersionHint": "Erhöhen, damit die Instanzen die neue Fassung übernehmen — bei gleicher Version wird nichts neu eingespielt.",
   "profiles.pluginAssets": "Mitgelieferte Dateien",
   "profiles.pluginAssetsHint": "Bleiben beim Speichern unverändert im Paket.",
+  "profiles.pluginFiles": "Weitere Skriptdateien",
+  "profiles.pluginFilesHint": "Gehören zum Plugin und werden per #load aus der Einstiegsdatei geladen. Bleiben beim Speichern unverändert im Paket — bearbeitet werden sie im Plugin-Editor der Instanz.",
   "profiles.pluginDeleteConfirm": "Plugin aus dem Profil entfernen? Auf den Instanzen bleibt es bestehen.",
   "profiles.addFromStore": "Aus Global hinzufügen",
   "profiles.addFromStoreHint": "Einträge aus dem globalen Store. Sie werden als Verweis übernommen — änderst du den Eintrag im Store, bekommen ihn alle Profile, die ihn übernommen haben.",

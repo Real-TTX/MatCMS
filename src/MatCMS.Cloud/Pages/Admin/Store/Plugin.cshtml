@@ -68,6 +68,21 @@
                 <div class="kv-label">@T["profiles.pluginKey"]</div>
                 <div class="kv-value mono">@Model.Item.Key</div>
             </div>
+            @if (Model.Files.Count > 0)
+            {
+                <div class="kv">
+                    <div class="kv-label">@T["profiles.pluginFiles"]</div>
+                    <div class="kv-value">
+                        <div class="code-toolbar">
+                            @foreach (var file in Model.Files)
+                            {
+                                <span class="token-chip">@file</span>
+                            }
+                        </div>
+                        <div class="help">@T["profiles.pluginFilesHint"]</div>
+                    </div>
+                </div>
+            }
             @if (Model.Assets.Count > 0)
             {
                 <div class="kv">

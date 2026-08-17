@@ -29,7 +29,11 @@
         @* Ohne Überschrift: der Baum zeigt den Namen des Plugins als Wurzel und darunter seine Dateien.
            Ein "Weitere Dateien" davor stimmte nicht mehr, seit die Einstiegsdatei mit darin steht —
            es sind nicht weitere, es sind ALLE. *@
-        <div class="form-field">
+        @* Das Merkmal data-plugin-files sitzt hier und NICHT am Baum: das Skript sucht alles von
+           diesem Punkt aus, und die Reiter samt Log und Rohform liegen neben dem Baum, nicht darin.
+           Solange es am Baum hing, fand das Skript die Reiterknöpfe nicht mehr und das Umschalten
+           blieb wirkungslos — der Fehler war im Browser sofort zu sehen, im Markup nicht. *@
+        <div class="form-field" data-plugin-files>
             @* Der Baum SCHREIBT in das Feld darunter, er ersetzt es nicht. Jede Änderung landet
                sofort dort, und das Feld bleibt sichtbar: fällt das Skript aus, ist trotzdem alles da
                und von Hand zu retten. Ein Editor, der seinen Inhalt erst beim Absenden erzeugt,
@@ -37,7 +41,20 @@
             @* Zwei Spalten: links, was es gibt, rechts, woran man arbeitet. Die Wurzel ist das Plugin
                selbst — sie macht sichtbar, dass alle Dateien IHM gehören und nirgendwo sonst
                hinreichen, was beim Auflösen von #load auch tatsächlich so ist. *@
-            <div class="pf-tree" data-plugin-files>
+            @* Die Reiter stehen ÜBER dem Editor, nicht in seiner Menüleiste: der Editor ist selbst
+               einer der Reiter — er zeigt den Code des Plugins und sonst nichts. Log und Rohform
+               sind seine Geschwister, nicht seine Unterpunkte, und ein Reiter in der Menüleiste
+               hätte genau das behauptet. Dieselben Klassen wie überall im Admin (.tabs/.tab). *@
+            <div class="tabs" data-pf-tabs>
+                <button type="button" class="tab active" data-pf-tab="editor">@T["plugins.tabEditor"]</button>
+                <button type="button" class="tab" data-pf-tab="log">@T["plugins.log"]</button>
+                <button type="button" class="tab" data-pf-tab="raw">@T["plugins.tabRaw"]</button>
+            </div>
+
+            @* Reiter 1: der Editor — Baum und Datei zusammen, denn ohne den Baum wäre nicht zu
+               sehen, WELCHE Datei im Feld steht. *@
+            <div class="tab-panel" data-pf-panel="editor">
+            <div class="pf-tree">
                 <aside class="pf-side">
                     @* Die Wurzel trägt das Zahnrad, weil die Einstellungen dem PLUGIN gehören und
                        nicht einer seiner Dateien. Auf der Seite bleibt damit der Editor. *@
@@ -81,26 +98,18 @@
                     </div>
                 </aside>
                 <div class="pf-main">
-                    @* Menüleiste über dem Editor. Bewusst nur mit Einträgen, hinter denen etwas
-                       liegt — ein Menü "Blaupausen", das noch nichts kann, verspricht mehr als da
-                       ist und lässt einen suchen, was es nicht gibt. Es kommt dazu, wenn es etwas
-                       auszuführen gibt.
-                       Die Reiter stehen IN dieser Leiste und nicht in einer zweiten darüber: zwei
-                       Leisten übereinander sähen aus wie zwei Menüs und man müsste raten, welches
-                       für was zuständig ist. Rechts davon stehen die Einträge, die nur den Editor
-                       betreffen — unter "Erweitert" werden sie ausgeblendet, weil "Neue Datei"
-                       neben den Rohfeldern nichts zu tun hätte. *@
+                    @* Menüleiste des Editors. Bewusst nur mit Einträgen, hinter denen etwas liegt —
+                       ein Menü "Blaupausen", das noch nichts kann, verspricht mehr als da ist und
+                       lässt einen suchen, was es nicht gibt. Es kommt dazu, wenn es etwas
+                       auszuführen gibt. Hier stehen nur Befehle für die offene Datei; das Umschalten
+                       zwischen Editor, Log und Rohform passiert eine Ebene höher. *@
                     <div class="pf-menu">
-                        <button type="button" class="pf-menu-item is-active" data-pf-tab="editor">@T["plugins.tabEditor"]</button>
-                        <button type="button" class="pf-menu-item" data-pf-tab="log">@T["plugins.log"]</button>
-                        <button type="button" class="pf-menu-item" data-pf-tab="raw">@T["plugins.tabRaw"]</button>
-                        <span class="pf-menu-sep" aria-hidden="true"></span>
-                        <button type="button" class="pf-menu-item" data-pf-add-top data-pf-only="editor">@T["plugins.fileNew"]</button>
-                        <span class="pf-menu-file mono" data-pf-current data-pf-only="editor"></span>
+                        <button type="button" class="pf-menu-item" data-pf-add-top>@T["plugins.fileNew"]</button>
+                        <span class="pf-menu-file mono" data-pf-current></span>
                         <span class="pf-menu-hint muted">@T["plugins.fileSaved"]</span>
                     </div>
-                    @* Reiter 1: der Editor. *@
-                    <div class="tab-panel" data-pf-panel="editor">
+                    @* Fläche für eine Skriptdatei. *@
+                    <div class="tab-panel" data-pf-view="file">
                         <div class="pf-editor" data-pf-editor hidden>
 
                             <textarea class="code" spellcheck="false" data-pf-content></textarea>
@@ -108,12 +117,12 @@
                         @* Kein leerer Kasten, sondern der Hinweis, was zu tun ist. *@
                         <div class="pf-empty" data-pf-empty>@T["plugins.filePick"]</div>
                     </div>
-                    @* Fläche für eine hochgeladene Datei. Sie hat keinen Reiter in der Leiste,
-                       sondern erscheint, wenn im Zweig assets/ eine Datei gewählt wird — sie
-                       gehört zu einer Auswahl im Baum, genau wie der Editor zu einer Skriptdatei.
-                       Kein Textfeld: der Inhalt liegt auf der Platte und wird nicht über dieses
-                       Formular geschrieben. *@
-                    <div class="tab-panel" data-pf-panel="asset" hidden style="padding:12px; gap:10px;">
+                    @* Fläche für eine hochgeladene Datei. Sie ist KEIN Reiter, sondern erscheint an
+                       derselben Stelle wie der Code, wenn im Zweig assets/ eine Datei gewählt wird
+                       — sie gehört zu einer Auswahl im Baum, genau wie der Editor zu einer
+                       Skriptdatei. Kein Textfeld: der Inhalt liegt auf der Platte und wird nicht
+                       über dieses Formular geschrieben. *@
+                    <div class="tab-panel" data-pf-view="asset" hidden style="padding:12px; gap:10px;">
                         <div>
                             <strong class="mono" data-pf-asset-name></strong>
                             <span class="badge" data-pf-asset-kind></span>
@@ -129,33 +138,33 @@
                             <button type="button" class="btn btn-sm btn-danger" data-pf-asset-del>@T["plugins.assetDelete"]</button>
                         </div>
                     </div>
-                    @* Reiter 2: der Log. Er stand als eigener Kasten unter der Seite — dieselbe
-                       Ausgabe, nur weit weg von dem Code, über den sie etwas sagt. Reine Ausgabe:
-                       kein Eingabefeld, nichts, was beim Reiterwechsel am Formular hängt.
-                       Serverseitig beim Seitenaufbau gefüllt, wie zuvor — der Reiter lädt nichts
-                       nach, was es vorher nicht gab. *@
-                    <div class="tab-panel" data-pf-panel="log" hidden style="padding:12px;">
-                        @if (Model.Log.Count == 0)
-                        {
-                            <p class="muted">@T["plugins.logEmpty"]</p>
-                        }
-                        else
-                        {
-                            <pre class="plugin-log">@string.Join("\n", Model.Log.Reverse())</pre>
-                        }
-                    </div>
-                    @* Reiter 3: die Rohform. Sie stand früher als <details> am Seitenende — dieselben
-                       zwei Felder, nur weit weg von dem, was sie zeigen. Hier liegen sie neben dem
-                       Editor, und beide schreiben weiterhin in DIESELBEN Felder: Code (versteckt,
-                       gespiegelt in CodeRaw) und FilesJson. Verschoben, nicht neu gebaut — ein
-                       zweites Paar Felder wäre genau der Weg, auf dem Code verlorengeht. *@
-                    <div class="tab-panel pf-editor" data-pf-panel="raw" hidden>
-                        <label class="pf-editor-head" for="CodeRaw">@MatCMS.Pages.Admin.Plugins.EditModel.EntryFile</label>
-                        <textarea id="CodeRaw" rows="12" class="code" spellcheck="false" data-pf-code-mirror>@Model.Code</textarea>
-                        <label class="pf-editor-head" for="FilesJson">@T["plugins.filesRaw"]</label>
-                        <textarea id="FilesJson" name="FilesJson" rows="12" class="code" spellcheck="false">@Model.FilesJson</textarea>
-                    </div>
                 </div>
+            </div>
+            </div>
+
+            @* Reiter 2: der Log. Er stand als eigener Kasten unter der Seite — dieselbe Ausgabe,
+               nur weit weg von dem Code, über den sie etwas sagt. Reine Ausgabe: kein Eingabefeld,
+               nichts, was beim Reiterwechsel am Formular hängt. Serverseitig beim Seitenaufbau
+               gefüllt, wie zuvor — der Reiter lädt nichts nach, was es vorher nicht gab. *@
+            <div class="tab-panel" data-pf-panel="log" hidden style="padding:12px 0;">
+                @if (Model.Log.Count == 0)
+                {
+                    <p class="muted">@T["plugins.logEmpty"]</p>
+                }
+                else
+                {
+                    <pre class="plugin-log">@string.Join("\n", Model.Log.Reverse())</pre>
+                }
+            </div>
+            @* Reiter 3: die Rohform. Sie stand früher als <details> am Seitenende — dieselben zwei
+               Felder, nur weit weg von dem, was sie zeigen. Beide schreiben weiterhin in DIESELBEN
+               Felder: Code (versteckt, gespiegelt in CodeRaw) und FilesJson. Verschoben, nicht neu
+               gebaut — ein zweites Paar Felder wäre genau der Weg, auf dem Code verlorengeht. *@
+            <div class="tab-panel pf-editor" data-pf-panel="raw" hidden>
+                <label class="pf-editor-head" for="CodeRaw">@MatCMS.Pages.Admin.Plugins.EditModel.EntryFile</label>
+                <textarea id="CodeRaw" rows="12" class="code" spellcheck="false" data-pf-code-mirror>@Model.Code</textarea>
+                <label class="pf-editor-head" for="FilesJson">@T["plugins.filesRaw"]</label>
+                <textarea id="FilesJson" name="FilesJson" rows="12" class="code" spellcheck="false">@Model.FilesJson</textarea>
             </div>
             <div class="help">@Html.Raw(T["plugins.filesHelp"])</div>
             <div class="help">@Html.Raw(T["plugins.codeHelp"])</div>
@@ -330,13 +339,18 @@
             // oder verlorengehen könnte.
             var tabs = root.querySelectorAll('[data-pf-tab]');
             var panels = root.querySelectorAll('[data-pf-panel]');
-            var onlyEls = root.querySelectorAll('[data-pf-only]');
+            var views = root.querySelectorAll('[data-pf-view]');
+            // Zwei Ebenen, und das ist Absicht: oben die Reiter (Editor | Log | Erweitert), innen
+            // im Editor die Fläche für eine Skriptdatei ODER eine hochgeladene Datei. Ein Asset ist
+            // kein Reiter — es wird im Baum gewählt und bleibt damit INNERHALB des Editors, der
+            // Reiter oben bleibt dabei "Editor". Andernfalls stünde die Auswahl im Baum neben einem
+            // Reiter, der sie nicht enthält.
             function activateTab(name) {
-                tabs.forEach(function (t) { t.classList.toggle('is-active', t.getAttribute('data-pf-tab') === name); });
-                panels.forEach(function (p) { p.hidden = p.getAttribute('data-pf-panel') !== name; });
-                // Einträge, die nur zum Editor gehören ("Neue Datei", offene Datei), verschwinden
-                // in den anderen Reitern — sie hätten dort nichts zu tun.
-                onlyEls.forEach(function (el) { el.hidden = el.getAttribute('data-pf-only') !== name; });
+                var top = name === 'asset' ? 'editor' : name;
+                tabs.forEach(function (t) { t.classList.toggle('active', t.getAttribute('data-pf-tab') === top); });
+                panels.forEach(function (p) { p.hidden = p.getAttribute('data-pf-panel') !== top; });
+                var view = name === 'asset' ? 'asset' : 'file';
+                views.forEach(function (v) { v.hidden = v.getAttribute('data-pf-view') !== view; });
             }
             tabs.forEach(function (t) {
                 t.addEventListener('click', function () {
@@ -378,7 +392,7 @@
             // (data-pf-asset-kind, -size, -url), und ein Suchlauf über den ganzen Baum trifft
             // zuerst den Knopf. Genau das hat im Test den Dateinamen im Baum durch "35 B"
             // ersetzt — die Anzeige schrieb in ihre eigene Quelle.
-            var panel = root.querySelector('[data-pf-panel="asset"]');
+            var panel = root.querySelector('[data-pf-view="asset"]');
 
             function showAsset(btn) {
                 openAsset = btn.getAttribute('data-pf-asset');

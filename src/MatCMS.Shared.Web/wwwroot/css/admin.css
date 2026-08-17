@@ -1141,6 +1141,12 @@ table.data .btn { white-space: nowrap; }
 .pf-file-del { border: 0; background: none; cursor: pointer; color: #dc2626; padding: 3px 7px; border-radius: 5px; opacity: 0; }
 .pf-file:hover .pf-file-del, .pf-file.is-open .pf-file-del { opacity: 1; }
 .pf-file-del:hover { background: #fee2e2; }
+/* Der zweite Zweig (assets/) beginnt mit derselben Kopfzeile wie die Wurzel, braucht dafür aber
+   eine Linie nach oben — sonst klebt er an der Dateiliste darüber und sieht aus wie deren letzter
+   Eintrag. Und er nimmt sich nur den Platz, den er füllt: die Skriptdateien sind das, woran
+   gearbeitet wird. */
+.pf-list + .pf-root { border-top: 1px solid #e6e8ec; }
+.pf-side .pf-list:not([data-pf-list]) { flex: 0 1 auto; max-height: 40%; }
 .pf-actions { padding: 6px; border-top: 1px solid #e6e8ec; }
 .pf-actions .btn { width: 100%; }
 

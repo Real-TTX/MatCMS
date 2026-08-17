@@ -48,6 +48,34 @@
                                 title="@T["plugins.settings"]" aria-label="@T["plugins.settings"]"><i class="ti ti-settings" aria-hidden="true"></i></button>
                     </div>
                     <div class="pf-list" data-pf-list></div>
+                    @* Zweiter Zweig: die hochgeladenen Dateien aus appdata/plugin-assets/{Key}.
+                       Sie gehören demselben Plugin, liegen aber auf der Platte und nicht im
+                       Formular — deshalb ein eigener Zweig und keine Zeile in der Dateikarte:
+                       eine Datei, die man hier "anlegt", würde beim Speichern nirgends landen.
+                       Serverseitig gerendert, weil nur der Server weiß, was im Ordner liegt. *@
+                    <div class="pf-root">
+                        <i class="ti ti-folder" aria-hidden="true"></i>
+                        <span class="mono">@MatCMS.Shared.PluginBundle.AssetFolder</span>
+                        <button type="button" class="pf-menu-item" data-pf-asset-add
+                                title="@T["plugins.assetUpload"]" aria-label="@T["plugins.assetUpload"]"><i class="ti ti-upload" aria-hidden="true"></i></button>
+                    </div>
+                    <div class="pf-list">
+                        @if (Model.Assets.Count == 0)
+                        {
+                            <div class="help">@T["plugins.assetsNone"]</div>
+                        }
+                        @foreach (var a in Model.Assets)
+                        {
+                            <div class="pf-file">
+                                @* Name, Größe, Art und URL kommen vom Server an den Knopf. Was der
+                                   Baum später löscht, ist genau dieser Name — nichts, was das
+                                   Skript aus der Seite zusammensucht. *@
+                                <button type="button" class="pf-file-name mono" data-pf-asset="@a.Name"
+                                        data-pf-asset-size="@a.Size" data-pf-asset-kind="@a.Kind"
+                                        data-pf-asset-url="/plugin-assets/@Model.Current.Key/@a.Name">@a.Name</button>
+                            </div>
+                        }
+                    </div>
                     <div class="pf-actions">
                         <button type="button" class="btn btn-sm btn-ghost" data-pf-add>+ @T["plugins.fileAdd"]</button>
                     </div>
@@ -79,6 +107,27 @@
                         </div>
                         @* Kein leerer Kasten, sondern der Hinweis, was zu tun ist. *@
                         <div class="pf-empty" data-pf-empty>@T["plugins.filePick"]</div>
+                    </div>
+                    @* Fläche für eine hochgeladene Datei. Sie hat keinen Reiter in der Leiste,
+                       sondern erscheint, wenn im Zweig assets/ eine Datei gewählt wird — sie
+                       gehört zu einer Auswahl im Baum, genau wie der Editor zu einer Skriptdatei.
+                       Kein Textfeld: der Inhalt liegt auf der Platte und wird nicht über dieses
+                       Formular geschrieben. *@
+                    <div class="tab-panel" data-pf-panel="asset" hidden style="padding:12px; gap:10px;">
+                        <div>
+                            <strong class="mono" data-pf-asset-name></strong>
+                            <span class="badge" data-pf-asset-kind></span>
+                            <span class="muted" data-pf-asset-size></span>
+                        </div>
+                        <img data-pf-asset-preview hidden alt="" style="max-width:320px; max-height:200px; border:1px solid var(--line, #eceef1);" />
+                        <div class="form-field">
+                            <label for="asset-url">URL</label>
+                            <input id="asset-url" class="a-url" readonly onclick="this.select()" data-pf-asset-url />
+                        </div>
+                        <div class="help">@Html.Raw(T["plugins.assetsHelp"])</div>
+                        <div>
+                            <button type="button" class="btn btn-sm btn-danger" data-pf-asset-del>@T["plugins.assetDelete"]</button>
+                        </div>
                     </div>
                     @* Reiter 2: der Log. Er stand als eigener Kasten unter der Seite — dieselbe
                        Ausgabe, nur weit weg von dem Code, über den sie etwas sagt. Reine Ausgabe:
@@ -177,49 +226,19 @@
     </form>
 </div>
 
-<div class="card">
-    <h2>Dateien dieses Plugins</h2>
-    <p class="help">
-        Eigener Asset-Ordner: <code>/plugin-assets/@Model.Current.Key/</code>. Im Plugin-Code einbinden mit
-        <code>IncludeScript("datei.js")</code>, <code>IncludeStyle("datei.css")</code> oder per URL
-        <code>AssetUrl("datei")</code>. So bleibt jedes Plugin ein eigenständiges Bündel.
-    </p>
-    <form method="post" asp-page-handler="UploadAsset" asp-route-id="@Model.Current.Id" enctype="multipart/form-data" class="asset-upload">
-        <input type="file" name="file" required
-               accept=".js,.mjs,.css,.json,.map,.woff,.woff2,.ttf,.eot,.png,.jpg,.jpeg,.gif,.webp" />
-        <button type="submit" class="btn btn-sm">Hochladen</button>
-    </form>
-    @if (Model.Assets.Count == 0)
-    {
-        <p class="muted">Noch keine Dateien in diesem Plugin.</p>
-    }
-    else
-    {
-        <table class="asset-table">
-            <thead>
-                <tr><th>Datei</th><th>Typ</th><th>Größe</th><th>URL</th><th></th></tr>
-            </thead>
-            <tbody>
-                @foreach (var a in Model.Assets)
-                {
-                    var url = "/plugin-assets/" + Model.Current.Key + "/" + a.Name;
-                    <tr>
-                        <td class="a-name">@a.Name</td>
-                        <td><span class="badge">@a.Kind</span></td>
-                        <td>@(a.Size < 1024 ? a.Size + " B" : (a.Size / 1024) + " KB")</td>
-                        <td><input class="a-url" value="@url" readonly onclick="this.select()" /></td>
-                        <td>
-                            <form class="inline-form" method="post" asp-page-handler="DeleteAsset" asp-route-id="@Model.Current.Id" asp-route-name="@a.Name"
-                                  onsubmit="return confirm('Datei „@a.Name“ wirklich löschen?');">
-                                <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
-                            </form>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    }
-</div>
+@* Die beiden Formulare für den Asset-Zweig im Baum. Sie stehen HIER und nicht dort, weil ein
+   Formular nicht in einem anderen stehen darf und die Dateiauswahl mehrteilig (multipart)
+   abgeschickt werden muss — das Plugin-Formular ist es nicht. Beide gehen an dieselben Handler
+   wie bisher; der Baum bedient sie nur.
+   Das Ziel des Entfernens ist der Name, den der Server an den Knopf im Baum geschrieben hat, und
+   nichts, was aus der Seite geraten wurde. *@
+<form id="asset-upload-form" method="post" asp-page-handler="UploadAsset" asp-route-id="@Model.Current.Id"
+      enctype="multipart/form-data" hidden>
+    <input type="file" name="file" id="asset-file" accept="@string.Join(",", MatCMS.Shared.PluginBundle.AllowedAssetExt)" />
+</form>
+<form id="asset-delete-form" method="post" asp-page-handler="DeleteAsset" asp-route-id="@Model.Current.Id" hidden>
+    <input type="hidden" name="name" id="asset-delete-name" />
+</form>
 
 @section Scripts {
     <script>
@@ -233,6 +252,10 @@
             var current = root.querySelector('[data-pf-current]');
             var content = root.querySelector('[data-pf-content]');
             var open = null;
+            // Zwei Arten von Auswahl im selben Baum: eine Skriptdatei (steht im Formular) oder eine
+            // hochgeladene Datei (liegt auf der Platte). Nur eine von beiden ist hervorgehoben,
+            // sonst sähe es aus, als wäre beides gleichzeitig offen.
+            var openAsset = null;
             // Die Einstiegsdatei liegt NICHT in der Karte, sondern im eigenen Feld Code — sie ist
             // das, was ausgeführt wird, die anderen werden von ihr geladen. Im Baum steht sie
             // trotzdem obenan, weil sie für den Bearbeiter eine Datei wie jede andere ist.
@@ -270,7 +293,7 @@
                 }
                 names.forEach(function (name) {
                     var row = document.createElement('div');
-                    row.className = 'pf-file' + (name === open ? ' is-open' : '');
+                    row.className = 'pf-file' + (name === open && openAsset === null ? ' is-open' : '');
                     var openBtn = document.createElement('button');
                     openBtn.type = 'button';
                     openBtn.className = 'pf-file-name mono';
@@ -319,6 +342,14 @@
                 t.addEventListener('click', function () {
                     var name = t.getAttribute('data-pf-tab');
                     activateTab(name);
+                    // Ein Reiter der Leiste gehört keiner hochgeladenen Datei — die Auswahl im
+                    // Zweig assets/ endet hier, sonst bliebe sie hervorgehoben, während rechts
+                    // längst etwas anderes steht.
+                    if (openAsset !== null) {
+                        openAsset = null;
+                        assetBtns.forEach(function (o) { o.parentNode.classList.remove('is-open'); });
+                        render();
+                    }
                     // Zurück zum Editor: die offene Datei wird NEU aus den Feldern gelesen. Wer
                     // unter "Erweitert" von Hand am JSON gearbeitet hat, sieht dasselbe auch im
                     // Editor — sonst stünde dort noch der alte Text und würde beim nächsten
@@ -328,11 +359,76 @@
                 });
             });
 
+            // ---- Zweig assets/ ----------------------------------------------------------------
+            // Hochladen und Entfernen sind Vorgänge auf der Platte: sie schicken ein eigenes
+            // Formular ab und die Seite lädt neu. Alles, was im Editor noch nicht gespeichert ist,
+            // wäre danach weg — deshalb wird vorher gefragt, statt es stillschweigend zu opfern.
+            var savedCode = codeField ? codeField.value : '';
+            var savedFiles = field.value;
+            function unsavedOk() {
+                if ((!codeField || codeField.value === savedCode) && field.value === savedFiles) return true;
+                return confirm(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(T["plugins.assetUnsaved"].ToString())));
+            }
+            var upForm = document.getElementById('asset-upload-form');
+            var upInput = document.getElementById('asset-file');
+            var delForm = document.getElementById('asset-delete-form');
+            var delName = document.getElementById('asset-delete-name');
+            var assetBtns = root.querySelectorAll('[data-pf-asset]');
+            // NUR innerhalb der Fläche suchen: die Knöpfe im Baum tragen dieselben Merkmale
+            // (data-pf-asset-kind, -size, -url), und ein Suchlauf über den ganzen Baum trifft
+            // zuerst den Knopf. Genau das hat im Test den Dateinamen im Baum durch "35 B"
+            // ersetzt — die Anzeige schrieb in ihre eigene Quelle.
+            var panel = root.querySelector('[data-pf-panel="asset"]');
+
+            function showAsset(btn) {
+                openAsset = btn.getAttribute('data-pf-asset');
+                activateTab('asset');
+                assetBtns.forEach(function (o) { o.parentNode.classList.toggle('is-open', o === btn); });
+                render();
+                var size = parseInt(btn.getAttribute('data-pf-asset-size') || '0', 10);
+                var url = btn.getAttribute('data-pf-asset-url') || '';
+                panel.querySelector('[data-pf-asset-name]').textContent = openAsset;
+                panel.querySelector('[data-pf-asset-kind]').textContent = btn.getAttribute('data-pf-asset-kind') || '';
+                panel.querySelector('[data-pf-asset-size]').textContent = size < 1024 ? size + ' B' : Math.round(size / 1024) + ' KB';
+                panel.querySelector('[data-pf-asset-url]').value = url;
+                // Bilder zeigt man, statt sie zu beschreiben — bei den übrigen Typen gäbe es nichts
+                // zu sehen und ein kaputtes Bildsymbol wäre die einzige Aussage.
+                var img = panel.querySelector('[data-pf-asset-preview]');
+                if (img) {
+                    var isImage = /\.(png|jpe?g|gif|webp)$/i.test(openAsset);
+                    img.hidden = !isImage;
+                    img.src = isImage ? url : '';
+                }
+            }
+            assetBtns.forEach(function (b) { b.addEventListener('click', function () { showAsset(b); }); });
+
+            if (upInput && upForm) {
+                root.querySelectorAll('[data-pf-asset-add]').forEach(function (b) {
+                    b.addEventListener('click', function () { if (unsavedOk()) upInput.click(); });
+                });
+                // Ein Klick, nicht zwei: wer eine Datei gewählt hat, will sie hochladen. Die
+                // Grenzen (Typ, Größe, Anzahl) prüft weiterhin der Server — das accept hier ist
+                // Bequemlichkeit im Dateidialog, keine Zusicherung.
+                upInput.addEventListener('change', function () {
+                    if (upInput.files && upInput.files.length) upForm.submit();
+                });
+            }
+            var delBtn = panel ? panel.querySelector('[data-pf-asset-del]') : null;
+            if (delBtn && delForm && delName) delBtn.addEventListener('click', function () {
+                if (openAsset === null) return;
+                if (!confirm(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(T["plugins.assetDeleteConfirm"].ToString())) + ' ' + openAsset)) return;
+                if (!unsavedOk()) return;
+                delName.value = openAsset;
+                delForm.submit();
+            });
+
             function show(name) {
                 var map = read(); if (map === null) return;
                 // Eine Datei zu öffnen heißt, sie sehen zu wollen: dazu gehört der Reiter, in dem
                 // der Editor steht.
                 activateTab('editor');
+                openAsset = null;
+                assetBtns.forEach(function (o) { o.parentNode.classList.remove('is-open'); });
                 open = name;
                 current.textContent = name;
                 content.value = name === ENTRY ? codeField.value : (map[name] != null ? map[name] : '');

@@ -128,6 +128,9 @@ public class EditModel : PageModel
             return RedirectToPage("Edit", new { id });
         }
 
+        var dir = StoragePaths.PluginAssetDir(_env, p.Key);
+        var existing = Directory.Exists(dir) ? Directory.GetFiles(dir) : [];
+
         if (file is null || file.Length == 0)
             TempData["FlashError"] = "Keine Datei erhalten.";
         else
@@ -136,11 +139,18 @@ public class EditModel : PageModel
             var ext = Path.GetExtension(name).ToLowerInvariant();
             if (string.IsNullOrEmpty(name) || !PluginPackager.AllowedAssetExt.Contains(ext))
                 TempData["FlashError"] = $"Dateityp nicht erlaubt ({ext}). Erlaubt: {string.Join(", ", PluginPackager.AllowedAssetExt)}";
-            else if (file.Length > 5 * 1024 * 1024)
-                TempData["FlashError"] = "Datei zu groß (max. 5 MB).";
+            // Die Grenzen sind die des Bündelformats (MatCMS.Shared.PluginBundle) und keine eigenen:
+            // was hier hochgeladen werden darf, muss auch durch Export und Import wieder
+            // durchpassen — sonst legt man eine Datei an, die das eigene ZIP später verwirft.
+            else if (file.Length > MatCMS.Shared.PluginBundle.MaxAssetBytes)
+                TempData["FlashError"] = $"Datei zu groß (max. {MatCMS.Shared.PluginBundle.MaxAssetBytes / 1024 / 1024} MB).";
+            // Eine Datei zu ersetzen bleibt erlaubt, auch wenn der Ordner voll ist — sonst hinge
+            // man an der Grenze fest, ohne etwas ändern zu können.
+            else if (existing.Length >= MatCMS.Shared.PluginBundle.MaxAssetFiles
+                     && !existing.Any(f => string.Equals(Path.GetFileName(f), name, StringComparison.OrdinalIgnoreCase)))
+                TempData["FlashError"] = $"Zu viele Dateien in diesem Plugin (max. {MatCMS.Shared.PluginBundle.MaxAssetFiles}).";
             else
             {
-                var dir = StoragePaths.PluginAssetDir(_env, p.Key);
                 Directory.CreateDirectory(dir);
                 await using var stream = System.IO.File.Create(Path.Combine(dir, name));
                 await file.CopyToAsync(stream);

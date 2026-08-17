@@ -88,14 +88,57 @@
                sind seine Geschwister, nicht seine Unterpunkte, und ein Reiter in der Menüleiste
                hätte genau das behauptet. Dieselben Klassen wie überall im Admin (.tabs/.tab). *@
             <div class="tabs" data-pf-tabs>
-                <button type="button" class="tab active" data-pf-tab="editor">@T["plugins.tabEditor"]</button>
+                <button type="button" class="tab active" data-pf-tab="general">@T["plugins.tabGeneral"]</button>
+                <button type="button" class="tab" data-pf-tab="editor">@T["plugins.tabEditor"]</button>
                 <button type="button" class="tab" data-pf-tab="log">@T["plugins.log"]</button>
                 <button type="button" class="tab" data-pf-tab="raw">@T["plugins.tabRaw"]</button>
             </div>
 
-            @* Reiter 1: der Editor — Baum und Datei zusammen, denn ohne den Baum wäre nicht zu
+            @* Reiter 1: die Einstellungen des Plugins. Sie lagen in einem Dialog am Zahnrad der
+               Baumwurzel — ein Ort, den man erst finden musste, für die Angaben, mit denen jedes
+               Plugin anfängt. Deshalb stehen sie vorn.
+               ACHTUNG, DIE FALLE: Diese Felder MÜSSEN innerhalb von <form id="plugin-form">
+               bleiben. Ein ausgeblendetes Reiterfeld wird trotzdem mit abgeschickt — ein Feld
+               AUSSERHALB des Formulars dagegen gar nicht, und dann kämen Name, Version und
+               Konfiguration beim Speichern aus einem anderen Reiter LEER an und überschrieben den
+               Bestand. Der Reiter darf also verschoben werden, das Formular nicht verlassen. *@
+            <div class="tab-panel form-grid" data-pf-panel="general">
+                <div class="form-row">
+                    <div class="form-field">
+                        <label for="Name">@T["plugins.name"]</label>
+                        <input id="Name" name="Name" value="@Model.Name" required />
+                    </div>
+                    <div class="form-field" style="max-width:130px;">
+                        <label for="Version">Version</label>
+                        <input id="Version" name="Version" value="@Model.Version" placeholder="z.B. 1.0" spellcheck="false" />
+                        @if (!string.IsNullOrWhiteSpace(Model.Current.DataVersion))
+                        {
+                            <div class="help">@T["plugins.dataVersion", Model.Current.DataVersion]</div>
+                        }
+                    </div>
+                </div>
+                <div class="form-field">
+                    <label for="Description">@T["plugins.description"]</label>
+                    <input id="Description" name="Description" value="@Model.Description" />
+                </div>
+                <label class="check">
+                    <input type="checkbox" name="Enabled" value="true" @(Model.Enabled ? "checked" : "") /> @T["plugins.enabledLabel"]
+                </label>
+
+                <h3 class="form-section">@T["plugins.config"]</h3>
+                <div class="help">@Html.Raw(T["plugins.configHelp"])</div>
+                <div id="cfg-rows" data-config="@Model.ConfigJson"></div>
+                <div style="margin-top:8px;"><button type="button" class="btn btn-sm btn-ghost" id="cfg-add">＋ @T["plugins.configField"]</button></div>
+                <input type="hidden" name="ConfigJson" id="ConfigJson" />
+                @* Ein Reiter speichert nicht selbst: gespeichert wird das ganze Formular mit dem
+                   Knopf unten. Ein eigener Speichern-Knopf hier würde versprechen, dass die
+                   Dateien im Reiter "Editor" dabei unberührt bleiben — und das stimmt nicht. *@
+                <div class="help">@T["plugins.settingsHint"]</div>
+            </div>
+
+            @* Reiter 2: der Editor — Baum und Datei zusammen, denn ohne den Baum wäre nicht zu
                sehen, WELCHE Datei im Feld steht. *@
-            <div class="tab-panel" data-pf-panel="editor">
+            <div class="tab-panel" data-pf-panel="editor" hidden>
             <div class="pf-tree">
                 @* EIN Baum, eine Wurzel: das Plugin. Darunter hängen die Systemdatei plugin.csx,
                    der Systemordner assets/ und die eigenen Ordner und Dateien — eingerückt, auf-
@@ -149,7 +192,7 @@
             </div>
             </div>
 
-            @* Reiter 2: der Log. Er stand als eigener Kasten unter der Seite — dieselbe Ausgabe,
+            @* Reiter 3: der Log. Er stand als eigener Kasten unter der Seite — dieselbe Ausgabe,
                nur weit weg von dem Code, über den sie etwas sagt. Reine Ausgabe: kein Eingabefeld,
                nichts, was beim Reiterwechsel am Formular hängt. Serverseitig beim Seitenaufbau
                gefüllt, wie zuvor — der Reiter lädt nichts nach, was es vorher nicht gab. *@
@@ -163,7 +206,7 @@
                     <pre class="plugin-log">@string.Join("\n", Model.Log.Reverse())</pre>
                 }
             </div>
-            @* Reiter 3: die Rohform. Sie stand früher als <details> am Seitenende — dieselben zwei
+            @* Reiter 4: die Rohform. Sie stand früher als <details> am Seitenende — dieselben zwei
                Felder, nur weit weg von dem, was sie zeigen. Beide schreiben weiterhin in DIESELBEN
                Felder: Code (versteckt, gespiegelt in CodeRaw) und FilesJson. Verschoben, nicht neu
                gebaut — ein zweites Paar Felder wäre genau der Weg, auf dem Code verlorengeht. *@
@@ -177,58 +220,6 @@
             <div class="help">@Html.Raw(T["plugins.codeHelp"])</div>
         </div>
 
-        @* Die Einstellungen des Plugins liegen im Dialog am Wurzelelement — sie stehen aber
-           INNERHALB dieses Formulars. Ein Dialog neben dem Formular sähe genauso aus und würde beim
-           Speichern nichts beitragen: Name, Version und Konfiguration kämen leer an und wären damit
-           weg. Deshalb steht das Overlay hier und nicht am Seitenende. *@
-        <div class="modal-overlay" data-pf-settings-dialog>
-            <div class="modal" role="dialog" aria-modal="true" aria-labelledby="pf-settings-title">
-                <div class="modal-head">
-                    <h2 id="pf-settings-title">@T["plugins.settings"]</h2>
-                    <button type="button" class="modal-close" data-pf-settings-close aria-label="@T["action.close"]">✕</button>
-                </div>
-                <div class="modal-body">
-                    <div class="form-grid">
-                        <div class="form-row">
-                            <div class="form-field">
-                                <label for="Name">@T["plugins.name"]</label>
-                                <input id="Name" name="Name" value="@Model.Name" required />
-                            </div>
-                            <div class="form-field" style="max-width:130px;">
-                                <label for="Version">Version</label>
-                                <input id="Version" name="Version" value="@Model.Version" placeholder="z.B. 1.0" spellcheck="false" />
-                                @if (!string.IsNullOrWhiteSpace(Model.Current.DataVersion))
-                                {
-                                    <div class="help">@T["plugins.dataVersion", Model.Current.DataVersion]</div>
-                                }
-                            </div>
-                        </div>
-                        <div class="form-field">
-                            <label for="Description">@T["plugins.description"]</label>
-                            <input id="Description" name="Description" value="@Model.Description" />
-                        </div>
-                        <label class="check">
-                            <input type="checkbox" name="Enabled" value="true" @(Model.Enabled ? "checked" : "") /> @T["plugins.enabledLabel"]
-                        </label>
-
-                        <h3 class="form-section">@T["plugins.config"]</h3>
-                        <div class="help">@Html.Raw(T["plugins.configHelp"])</div>
-                        <div id="cfg-rows" data-config="@Model.ConfigJson"></div>
-                        <div style="margin-top:8px;"><button type="button" class="btn btn-sm btn-ghost" id="cfg-add">＋ @T["plugins.configField"]</button></div>
-                        <input type="hidden" name="ConfigJson" id="ConfigJson" />
-                    </div>
-                </div>
-                @* Der Dialog SPEICHERT nicht selbst — gespeichert wird das ganze Formular unten.
-                   Ein zweiter Speichern-Knopf hier würde versprechen, dass die Dateien draußen
-                   bleiben, wo sie sind, und genau das stimmt nicht. *@
-                <div class="modal-body" style="padding-top:0;">
-                    <div class="modal-foot">
-                        <span class="help" style="flex:1;">@T["plugins.settingsHint"]</span>
-                        <button type="button" class="btn btn-sm btn-ghost" data-pf-settings-close>@T["action.close"]</button>
-                    </div>
-                </div>
-            </div>
-        </div>
     </form>
 </div>
 
@@ -464,7 +455,8 @@
                 row.appendChild(name);
 
                 // Das Zahnrad bleibt an der Wurzel: die Einstellungen gehören dem PLUGIN, und ein
-                // Weg, der ohne Rechtsklick auskommt, muss sichtbar bleiben.
+                // Weg, der ohne Rechtsklick auskommt, muss sichtbar bleiben. Es öffnet jetzt den
+                // Reiter "Allgemein" statt eines Dialogs — dasselbe Ziel, nur an einem Ort.
                 if (o.kind === 'root') {
                     var gear = document.createElement('button');
                     gear.type = 'button';
@@ -562,7 +554,13 @@
                 return items;
             }
 
-            function openSettings() { document.dispatchEvent(new CustomEvent('pf-settings-open')); }
+            // Die Einstellungen sind ein Reiter, kein Dialog: Zahnrad und Menüeintrag schalten
+            // dorthin um. Zwei Wege zum selben Reiter — aber nur ein Ort, an dem die Felder stehen.
+            function openSettings() {
+                activateTab('general');
+                var f = document.getElementById('Name');
+                if (f) f.focus();
+            }
 
             // ---- Anlegen und Löschen ----------------------------------------------------------
             // Dieselben Regeln wie serverseitig in NormalizeFiles: was hier durchkommt, kommt auch
@@ -670,7 +668,8 @@
             var tabs = root.querySelectorAll('[data-pf-tab]');
             var panels = root.querySelectorAll('[data-pf-panel]');
             var views = root.querySelectorAll('[data-pf-view]');
-            // Zwei Ebenen, und das ist Absicht: oben die Reiter (Editor | Log | Erweitert), innen
+            // Zwei Ebenen, und das ist Absicht: oben die Reiter (Allgemein | Editor | Log |
+            // Erweitert), innen
             // im Editor die Fläche für eine Skriptdatei ODER eine hochgeladene Datei. Ein Asset ist
             // kein Reiter — es wird im Baum gewählt und bleibt damit INNERHALB des Editors, der
             // Reiter oben bleibt dabei "Editor". Andernfalls stünde die Auswahl im Baum neben einem
@@ -773,7 +772,10 @@
                 if (openAsset !== null) deleteAsset(openAsset);
             });
 
-            function show(name) {
+            // quiet: beim Seitenaufbau wird die Einstiegsdatei nur vorbereitet, nicht angesprungen —
+            // ein focus() auf das Textfeld würde die Seite dorthin scrollen, während vorne der
+            // Reiter "Allgemein" steht.
+            function show(name, quiet) {
                 var map = read(); if (map === null) return;
                 // Eine Datei zu öffnen heißt, sie sehen zu wollen: dazu gehört der Reiter, in dem
                 // der Editor steht.
@@ -785,7 +787,7 @@
                 editor.hidden = false;
                 if (empty) empty.hidden = true;
                 render();
-                content.focus();
+                if (!quiet) content.focus();
             }
 
             // Beim Tippen, nicht beim Wechseln: wer eine andere Datei öffnet oder das Formular
@@ -804,49 +806,32 @@
 
             // Von Hand am Rohfeld geändert: der Baum zieht nach.
             field.addEventListener('input', function () { render(); });
-            // Der Name des Plugins steht an der Wurzel und zieht beim Tippen im Dialog mit — sonst
-            // widerspricht der Baum dem Dialog, solange nicht gespeichert wurde.
+            // Der Name des Plugins steht an der Wurzel und zieht beim Tippen im Reiter "Allgemein"
+            // mit — sonst widerspricht der Baum dem Namensfeld, solange nicht gespeichert wurde.
             if (nameField) nameField.addEventListener('input', function () { render(); });
             if (codeMirror) codeMirror.addEventListener('input', function () {
                 codeField.value = codeMirror.value;
                 if (open === ENTRY) content.value = codeMirror.value;
             });
-            // Beim Öffnen gleich die Einstiegsdatei zeigen — sie ist der Anfang jedes Plugins.
-            show(ENTRY);
-            render();
-        })();
 
-        // Einstellungsdialog am Wurzelelement.
-        (function () {
-            var dialog = document.querySelector('[data-pf-settings-dialog]');
-            if (!dialog) return;
-            var nameField = document.getElementById('Name');
-
-            function open() {
-                dialog.classList.add('open');
-                if (nameField) nameField.focus();
-            }
-            function close() { dialog.classList.remove('open'); }
-
-            // Der Baum zeichnet seine Wurzel selbst und ersetzt sie bei jeder Änderung. Ein Knopf,
-            // an dem hier ein Zuhörer hinge, wäre nach dem ersten Neuzeichnen tot — deshalb ruft
-            // der Baum den Dialog über ein Ereignis, nicht über ein Element.
-            document.addEventListener('pf-settings-open', open);
-            dialog.querySelectorAll('[data-pf-settings-close]').forEach(function (b) { b.addEventListener('click', close); });
-            // Klick auf den Schleier schließt, Klick im Dialog nicht.
-            dialog.addEventListener('click', function (e) { if (e.target === dialog) close(); });
-            document.addEventListener('keydown', function (e) {
-                if (e.key === 'Escape' && dialog.classList.contains('open')) close();
-            });
-
-            // Ein required-Feld in einem ausgeblendeten Dialog kann der Browser nicht anspringen: er
-            // bricht das Absenden ab und sagt nichts. Also den Dialog öffnen, sobald etwas darin
-            // beanstandet wird — sonst klickt man auf Speichern und es passiert einfach nichts.
-            var form = document.getElementById('plugin-form');
-            if (form) form.addEventListener('invalid', function (e) {
-                if (!dialog.contains(e.target)) return;
-                if (!dialog.classList.contains('open')) dialog.classList.add('open');
+            // Ein required-Feld in einem AUSGEBLENDETEN Reiter kann der Browser nicht anspringen: er
+            // bricht das Absenden ab und sagt nichts. Also auf den Reiter umschalten, sobald etwas
+            // darin beanstandet wird — sonst klickt man auf Speichern und es passiert einfach nichts.
+            // Dieselbe Falle wie zuvor beim Dialog, nur heißt sie jetzt Reiter.
+            var pluginForm = document.getElementById('plugin-form');
+            var generalPanel = root.querySelector('[data-pf-panel="general"]');
+            if (pluginForm && generalPanel) pluginForm.addEventListener('invalid', function (e) {
+                if (!generalPanel.contains(e.target)) return;
+                activateTab('general');
             }, true);
+
+            // Die Einstiegsdatei ist von Anfang an geöffnet — der Editor zeigt sie, sobald man
+            // seinen Reiter wählt. Vorn steht aber "Allgemein": Name, Version und Konfiguration
+            // sind das, womit ein Plugin anfängt. show() schaltet dabei auf den Editor um, deshalb
+            // wird DANACH auf den ersten Reiter zurückgeschaltet.
+            show(ENTRY, true);
+            activateTab('general');
+            render();
         })();
 
         // Plugin configuration: key/value rows -> hidden ConfigJson on submit of the main form.

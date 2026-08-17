@@ -8,8 +8,14 @@ using PagesIndex = MatCMS.Pages.Admin.Pages.IndexModel;
 namespace MatCMS.Services;
 
 /// <summary>
-/// Exports a plugin as a self-contained ZIP bundle (plugin.json + its asset folder) and imports one
-/// back. This is the building block for a plugin store: a bundle fully describes a plugin.
+/// Exports a plugin as a self-contained ZIP bundle (plugin.json + <c>files/</c> + <c>assets/</c>) and
+/// imports one back. This is the building block for a plugin store: a bundle fully describes a plugin.
+/// <para>"Fully" is the point and was once a lie: a plugin may bring further script files besides its
+/// entry file (<c>Plugin.FilesJson</c>, path→content, folders allowed), and a bundle carrying only the
+/// entry file turned every export, cloud rollout and re-import into silent data loss — the plugin came
+/// back looking complete and did nothing. They travel as one zip entry each under
+/// <see cref="MatCMS.Shared.PluginBundle.FileFolder"/>; see there for why entries rather than a
+/// manifest field, and for what old and new readers make of each other's bundles.</para>
 /// </summary>
 public static class PluginPackager
 {
@@ -39,8 +45,10 @@ public static class PluginPackager
     private const long MaxTotalBytes = MatCMS.Shared.PluginBundle.MaxTotalBytes;
     private const int MaxAssetFiles = MatCMS.Shared.PluginBundle.MaxAssetFiles;
     private const long MaxMetaBytes = MatCMS.Shared.PluginBundle.MaxManifestBytes;
+    private const long MaxFileBytes = MatCMS.Shared.PluginBundle.MaxFileBytes;
+    private const int MaxFiles = MatCMS.Shared.PluginBundle.MaxFiles;
 
-    /// <summary>Builds a ZIP bundle (plugin.json + assets/…) for the given plugin.</summary>
+    /// <summary>Builds a ZIP bundle (plugin.json + files/… + assets/…) for the given plugin.</summary>
     public static byte[] Export(Models.Plugin p, IWebHostEnvironment env)
     {
         var meta = new Bundle { Format = 1, Name = p.Name, Key = p.Key, Version = p.Version, Description = p.Description, Code = p.Code };
@@ -50,6 +58,16 @@ public static class PluginPackager
             var metaEntry = zip.CreateEntry(MatCMS.Shared.PluginBundle.ManifestEntry);
             using (var w = new StreamWriter(metaEntry.Open(), new UTF8Encoding(false)))
                 w.Write(JsonSerializer.Serialize(meta, JsonOpts));
+
+            // The further script files, one entry each. A path the shared rule refuses is skipped
+            // rather than repaired: it cannot have come from the editor, and a rewritten path would
+            // silently no longer be the one the entry file `#load`s.
+            foreach (var (path, content) in ParseFiles(p.FilesJson))
+            {
+                var fileEntry = zip.CreateEntry(MatCMS.Shared.PluginBundle.FileFolder + path);
+                using var w = new StreamWriter(fileEntry.Open(), new UTF8Encoding(false));
+                w.Write(content);
+            }
 
             var dir = StoragePaths.PluginAssetDir(env, p.Key);
             if (!string.IsNullOrWhiteSpace(p.Key) && Directory.Exists(dir))

@@ -27,10 +27,8 @@
         assetDelHint = T["plugins.assetDeleteHint"],
         assetUrlCopy = T["plugins.assetUrlCopy"],
         assetUrlCopied = T["plugins.assetUrlCopied"],
-        assetsNone = T["plugins.assetsNone"],
         assetUnsaved = T["plugins.assetUnsaved"],
         broken = T["plugins.filesBroken"],
-        none = T["plugins.filesNone"],
         menu = T["plugins.nodeMenu"],
         toggle = T["plugins.treeToggle"],
         entryTitle = T["plugins.entryFileTitle"],
@@ -356,8 +354,10 @@
                     icon: collapsed[':assets'] ? 'ti-folder' : 'ti-folder-open',
                     title: TXT.sysFolder, mono: true, expandable: true
                 }));
+                // Ein leerer Zweig zeigt NICHTS — wie in einer Entwicklungsumgebung. Die Zeile
+                // "Noch keine hochgeladenen Dateien." sagte nur, was die fehlende Einrückung
+                // darunter schon sagte, und sah dabei aus wie ein Eintrag.
                 if (!collapsed[':assets']) {
-                    if (!ASSETS.length) list.appendChild(hint(TXT.assetsNone, 2));
                     ASSETS.forEach(function (a) {
                         list.appendChild(rowFor({
                             id: ':a:' + a.name, kind: 'asset', depth: 2, path: ASSETDIR + '/' + a.name,
@@ -379,7 +379,6 @@
                     isOpen: open === ENTRY && openAsset === null,
                     activate: function () { show(ENTRY); }
                 }));
-                if (!Object.keys(top.dirs).length && !top.files.length) list.appendChild(hint(TXT.none, 1));
                 renderFiles(top, 1);
             }
 

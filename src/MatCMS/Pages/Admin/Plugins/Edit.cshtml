@@ -18,6 +18,21 @@
         folderNothing = T["plugins.folderNothingCreated"],
         pathInvalid = T["plugins.pathInvalid"],
         del = T["action.delete"],
+        rename = T["plugins.rename"],
+        renameFileAsk = T["plugins.renameFileAsk"],
+        renameFolderAsk = T["plugins.renameFolderAsk"],
+        moveTo = T["plugins.moveTo"],
+        moveRoot = T["plugins.moveRoot"],
+        moveOther = T["plugins.moveOther"],
+        moveAsk = T["plugins.moveAsk"],
+        selfMove = T["plugins.moveIntoSelf"],
+        back = T["plugins.menuBack"],
+        copy = T["plugins.copy"],
+        duplicate = T["plugins.duplicate"],
+        paste = T["plugins.paste"],
+        exists = T["plugins.pathExists"],
+        loadAsk = T["plugins.loadRewriteAsk"],
+        loadShadow = T["plugins.loadShadowWarn"],
         fileDel = T["plugins.fileDeleteConfirm"],
         folderDel = T["plugins.folderDeleteConfirm"],
         delHint = T["plugins.deleteSaveHint"],
@@ -509,18 +524,37 @@
             // ---- Kontextmenü ------------------------------------------------------------------
             var menuEl = null;
             function closeMenu() { if (menuEl) { menuEl.remove(); menuEl = null; } }
-            function showMenu(x, y, items) {
+            // parent: die Einträge, aus denen dieses Menü hervorgegangen ist. Ein Untereintrag
+            // ("Verschieben nach …") ERSETZT das Menü an derselben Stelle und bekommt oben den Weg
+            // zurück — ein zweites, daneben aufklappendes Menü wäre mit der Tastatur nicht zu
+            // erreichen und stünde am Fensterrand zur Hälfte draußen.
+            function showMenu(x, y, items, parent) {
                 closeMenu();                                   // nie zwei gleichzeitig
                 var m = document.createElement('div');
                 m.className = 'pf-ctx';
                 m.setAttribute('role', 'menu');
-                items.forEach(function (it) {
+                var all = parent
+                    ? [{ label: TXT.back, run: function () { showMenu(x, y, parent); } }].concat(items)
+                    : items;
+                all.forEach(function (it) {
                     var b = document.createElement('button');
                     b.type = 'button';
                     b.className = 'pf-ctx-item' + (it.danger ? ' is-danger' : '');
                     b.setAttribute('role', 'menuitem');
                     b.textContent = it.label;
-                    b.addEventListener('click', function () { closeMenu(); it.run(); });
+                    b.addEventListener('click', function (ev) {
+                        // Der Klick darf NICHT bis zum Dokument durchlaufen: der Zuhörer dort
+                        // schließt jedes Menü, das den angeklickten Knopf nicht enthält — und das
+                        // wäre beim Aufklappen genau das eben geöffnete Untermenü. Im Test war es
+                        // eine Auswahl, die aufblitzte und sofort wieder weg war.
+                        ev.stopPropagation();
+                        // Die Auswahl wird erst beim Aufklappen zusammengestellt: welche Ordner es
+                        // gibt, steht in der Karte und kann sich seit dem letzten Zeichnen geändert
+                        // haben.
+                        if (it.children) { showMenu(x, y, it.children(), items); return; }
+                        closeMenu();
+                        it.run();
+                    });
                     m.appendChild(b);
                 });
                 document.body.appendChild(m);
@@ -545,8 +579,26 @@
                     var dir = o.kind === 'root' ? '' : o.path;
                     items.push({ label: TXT.fileNew, run: function () { newFile(dir); } });
                     items.push({ label: TXT.folderNew, run: function () { newFolder(dir); } });
+                    // Eingefügt wird an einem Ordner oder an der Wurzel — dort, wo die Datei
+                    // hinkommt. Im Systemordner steht der Eintrag nicht: der gehört der Platte.
+                    if (clip) items.push({ label: TXT.paste.replace('{0}', clip.name), run: function () { pasteInto(dir); } });
                 }
                 if (o.kind === 'root') items.push({ label: TXT.settings, run: openSettings });
+                // Die Einstiegsdatei bleibt, wo sie ist: sie liegt im Feld Code und nicht in der
+                // Karte, und ein Verweis auf „plugin.csx“ in der Karte weist der Server zurück.
+                // Kopieren geht trotzdem — das Ergebnis ist eine gewöhnliche Datei der Karte.
+                if (o.kind === 'entry') {
+                    items.push({ label: TXT.copy, run: function () { copyNode(ENTRY); } });
+                    items.push({ label: TXT.duplicate, run: function () { duplicate(ENTRY); } });
+                }
+                if (o.kind === 'file' || o.kind === 'folder') {
+                    items.push({ label: TXT.rename, run: function () { renameNode(o); } });
+                    items.push({ label: TXT.moveTo, children: function () { return moveItems(o); } });
+                }
+                if (o.kind === 'file') {
+                    items.push({ label: TXT.copy, run: function () { copyNode(o.path); } });
+                    items.push({ label: TXT.duplicate, run: function () { duplicate(o.path); } });
+                }
                 if (o.kind === 'folder') items.push({ label: TXT.del, danger: true, run: function () { deleteFolder(o.path); } });
                 if (o.kind === 'file') items.push({ label: TXT.del, danger: true, run: function () { deleteFile(o.path); } });
                 // Im Systemordner liegen Dateien von der PLATTE. "Neue Datei" wäre dort ein Eintrag
@@ -663,6 +715,305 @@
                 hit.forEach(function (k) { delete map[k]; closeIfOpen(k); });
                 write(map);
                 render();
+            }
+
+            // ---- Pfade ------------------------------------------------------------------------
+            function dirOf(p) { var i = p.lastIndexOf('/'); return i < 0 ? '' : p.slice(0, i); }
+            function baseOf(p) { var i = p.lastIndexOf('/'); return i < 0 ? p : p.slice(i + 1); }
+
+            // Dieselbe Rechnung wie PluginFileResolver.Normalise serverseitig — sie entscheidet,
+            // WOHIN ein #load zeigt. Wer hier anders rechnet als der Server, benennt Verweise um,
+            // die nie auf die verschobene Datei zeigten.
+            function normPath(p) {
+                var out = [];
+                (p || '').replace(/\\/g, '/').split('/').forEach(function (part) {
+                    var s = part.trim();
+                    if (s === '' || s === '.') return;
+                    if (s === '..') { out.pop(); return; }
+                    out.push(s);
+                });
+                return out.join('/');
+            }
+            function has(map, k) { return Object.prototype.hasOwnProperty.call(map, k); }
+
+            // Belegt ist ein Ziel nicht nur, wenn dort eine Datei liegt: auch ein ORDNER dieses
+            // Namens, eine Datei, unter der der neue Pfad läge, und die Einstiegsdatei sind belegt.
+            // „Elements“ neben „Elements/Hero.csx“ wäre im Baum zweierlei mit einem Namen.
+            function clash(map, path) {
+                var l = path.toLowerCase();
+                if (l === ENTRY.toLowerCase()) return true;
+                return Object.keys(map).some(function (k) {
+                    var kl = k.toLowerCase();
+                    return kl === l || kl.indexOf(l + '/') === 0 || l.indexOf(kl + '/') === 0;
+                });
+            }
+
+            // Ein Duplikat überschreibt nichts: ist der Name belegt, bekommt es den nächsten freien.
+            function freePath(map, dir, name) {
+                var dot = name.lastIndexOf('.');
+                var base = dot > 0 ? name.slice(0, dot) : name;
+                var ext = dot > 0 ? name.slice(dot) : '';
+                var cand = clean(join(dir, name));
+                if (cand && !clash(map, cand)) return cand;
+                for (var n = 1; n < 500; n++) {
+                    cand = clean(join(dir, base + '-kopie' + (n > 1 ? '-' + n : '') + ext));
+                    if (cand && !clash(map, cand)) return cand;
+                }
+                return null;
+            }
+
+            // Alle Ordner der Karte, auch die dazwischenliegenden: aus „a/b/c.csx“ sind das „a“ und
+            // „a/b“. Der Systemordner ist keiner davon — er steht nicht in der Karte.
+            function folderList(map) {
+                var seen = {};
+                Object.keys(map).forEach(function (k) {
+                    var segs = k.split('/'), acc = '';
+                    for (var i = 0; i < segs.length - 1; i++) {
+                        acc = acc ? acc + '/' + segs[i] : segs[i];
+                        seen[acc] = true;
+                    }
+                });
+                return Object.keys(seen).sort(byName);
+            }
+
+            // ---- #load --------------------------------------------------------------------------
+            // NUR eine Zeile, die nichts als eine #load-Anweisung ist, wird angefasst: vom
+            // Zeilenanfang bis zum Zeilenende, höchstens ein Kommentar dahinter. Ein „#load“ in
+            // einem Kommentar (der beginnt mit „//“) oder mitten in einer Zeichenkette fällt damit
+            // heraus — eine grobe Textersetzung über den Pfad hätte genau die getroffen. Und weil
+            // eine Zeile in einem mehrzeiligen Text theoretisch trotzdem so aussehen kann, wird
+            // vorher GEFRAGT und dabei jede betroffene Zeile mit Datei und Nummer genannt.
+            var LOAD = /^([ \t]*#load[ \t]+")([^"\r\n]*)("[ \t]*(?:\/\/[^\r\n]*)?)$/;
+
+            // Wie der Server auflöst: erst ab der Wurzel des Plugins, dann neben der ladenden Datei.
+            function resolveLoad(map, from, spec) {
+                var direct = normPath(spec);
+                if (has(map, direct)) return direct;
+                var dir = dirOf(from);
+                if (dir) {
+                    var rel = normPath(dir + '/' + spec);
+                    if (has(map, rel)) return rel;
+                }
+                return null;
+            }
+
+            // Jede #load-Zeile des Plugins mit Datei, Zeile und dem Ziel, auf das sie zeigt. Die
+            // Einstiegsdatei ist dabei — sie ist die, die am meisten lädt.
+            function loadRefs(map, code) {
+                var out = [];
+                var files = {};
+                Object.keys(map).forEach(function (k) { files[k] = map[k]; });
+                files[ENTRY] = code;
+                Object.keys(files).forEach(function (f) {
+                    (files[f] || '').split('\n').forEach(function (line, i) {
+                        var m = LOAD.exec(line.replace(/\r$/, ''));
+                        if (!m) return;
+                        out.push({ file: f, line: i, pre: m[1], spec: m[2], post: m[3], target: resolveLoad(map, f, m[2]) });
+                    });
+                });
+                return out;
+            }
+
+            // Genau EINE Zeile wird ersetzt, an ihrer Nummer — der Rest der Datei bleibt Zeichen für
+            // Zeichen stehen, samt Zeilenende.
+            function setLine(text, i, value) {
+                var lines = (text || '').split('\n');
+                if (i >= lines.length) return text;
+                lines[i] = value + (/\r$/.test(lines[i]) ? '\r' : '');
+                return lines.join('\n');
+            }
+
+            function refLabel(file, line, spec, target) {
+                return file + ':' + (line + 1) + '  #load "' + spec + '"  →  ' + (target || '—');
+            }
+
+            // ---- Umbenennen und Verschieben ---------------------------------------------------
+            // DER eine Weg, auf dem sich Pfade ändern — Datei wie Ordner, umbenennen wie
+            // verschieben. moves ist die Liste alt → neu; alles Übrige hier ist Prüfung.
+            function applyMoves(moves) {
+                if (!moves.length) return;
+                var map = read();
+                if (map === null) { alert(TXT.broken); return; }
+
+                var moving = {};
+                moves.forEach(function (mv) { moving[mv.from] = mv.to; });
+                // Was stehen bleibt: nur daran wird die Kollision gemessen. Die mitziehenden
+                // Geschwister eines Ordners sind keine Kollision mit sich selbst.
+                var rest = {};
+                Object.keys(map).forEach(function (k) { if (!(k in moving)) rest[k] = map[k]; });
+                for (var i = 0; i < moves.length; i++) {
+                    var to = moves[i].to;
+                    if (to === moves[i].from) return;              // dort liegt sie schon
+                    if (clean(to) !== to) { alert(TXT.pathInvalid); return; }
+                    if (clash(rest, to)) { alert(TXT.exists.replace('{0}', to)); return; }
+                }
+
+                var code = codeField ? codeField.value : '';
+                var refs = loadRefs(map, code);
+                // Verweise, die auf eine der ziehenden Dateien zeigen. Sie brechen, wenn niemand
+                // sie mitzieht — deshalb wird gefragt und dabei JEDE Zeile genannt.
+                var hit = refs.filter(function (r) { return r.target !== null && (r.target in moving); });
+                var rewrite = false;
+                if (hit.length) {
+                    rewrite = confirm(TXT.loadAsk.replace('{0}', hit.map(function (r) {
+                        return refLabel(r.file, r.line, r.spec, moving[r.target]);
+                    }).join('\n')));
+                }
+
+                var next = {};
+                Object.keys(map).forEach(function (k) { next[(k in moving) ? moving[k] : k] = map[k]; });
+                var nextCode = code;
+                if (rewrite) {
+                    // Umgestellt wird auf den vollen Pfad ab der Wurzel: der Server sucht dort
+                    // ZUERST, damit ist die Zeile unabhängig davon richtig, wo die ladende Datei
+                    // selbst gerade liegt.
+                    hit.forEach(function (r) {
+                        var line = r.pre + moving[r.target] + r.post;
+                        if (r.file === ENTRY) { nextCode = setLine(nextCode, r.line, line); return; }
+                        var owner = (r.file in moving) ? moving[r.file] : r.file;
+                        next[owner] = setLine(next[owner], r.line, line);
+                    });
+                }
+
+                // Nachgerechnet statt behauptet: eine Datei, die an die Wurzel wandert, kann einen
+                // Nachbarverweis desselben Namens verdecken. Was danach woandershin zeigt, wird
+                // gesagt — außer den Zeilen, deren Umstellung eben abgelehnt wurde.
+                var after = {};
+                loadRefs(next, nextCode).forEach(function (r) { after[r.file + '#' + r.line] = r; });
+                var warn = [];
+                refs.forEach(function (r) {
+                    if (r.target === null) return;
+                    if (hit.indexOf(r) >= 0 && !rewrite) return;
+                    var owner = (r.file in moving) ? moving[r.file] : r.file;
+                    var want = (r.target in moving) ? moving[r.target] : r.target;
+                    var a = after[owner + '#' + r.line];
+                    if (a && a.target === want) return;
+                    warn.push(refLabel(owner, r.line, a ? a.spec : r.spec, a ? a.target : null));
+                });
+                if (warn.length) alert(TXT.loadShadow.replace('{0}', warn.join('\n')));
+
+                write(next);
+                if (codeField && nextCode !== codeField.value) {
+                    codeField.value = nextCode;
+                    if (codeMirror) codeMirror.value = nextCode;
+                }
+                expandTo(moves[0].to);
+                // Wer eine offene Datei umbenennt oder verschiebt, hat sie danach IMMER NOCH offen —
+                // unter ihrem neuen Pfad und mit unverändertem Inhalt. Sie zuzuklappen wäre der
+                // sicherste Weg, den gerade getippten Text für verloren zu halten.
+                if (open !== null && (open in moving)) { open = moving[open]; expandTo(open); }
+                if (open !== null) show(open, true); else render();
+            }
+
+            // Eine Datei zieht allein um, ein Ordner nimmt ALLES mit, was unter ihm liegt — sonst
+            // bliebe die Hälfte seines Inhalts unter dem alten Pfad stehen.
+            function movesFor(map, o, target) {
+                if (o.kind !== 'folder') return [{ from: o.path, to: target }];
+                var prefix = o.path + '/';
+                return Object.keys(map)
+                    .filter(function (k) { return k.indexOf(prefix) === 0; })
+                    .map(function (k) { return { from: k, to: target + '/' + k.slice(prefix.length) }; });
+            }
+
+            function renameNode(o) {
+                var map = read(); if (map === null) { alert(TXT.broken); return; }
+                var raw = prompt(o.kind === 'folder' ? TXT.renameFolderAsk : TXT.renameFileAsk, baseOf(o.path));
+                if (raw === null) return;
+                var target = clean(join(dirOf(o.path), raw.trim()));
+                if (!target) { alert(TXT.pathInvalid); return; }
+                applyMoves(movesFor(map, o, target));
+            }
+
+            function moveNode(o, dir) {
+                var map = read(); if (map === null) { alert(TXT.broken); return; }
+                // Ein Ordner kann nicht unter sich selbst landen — dabei entstünde ein Pfad, der
+                // sich beim Zeichnen endlos wiederholt.
+                if (o.kind === 'folder' && (dir === o.path || dir.indexOf(o.path + '/') === 0)) { alert(TXT.selfMove); return; }
+                var target = clean(join(dir, baseOf(o.path)));
+                if (!target) { alert(TXT.pathInvalid); return; }
+                applyMoves(movesFor(map, o, target));
+            }
+
+            // Die vorhandenen Ordner zur Auswahl, dazu die Wurzel und der Weg für einen Ordner, den
+            // es noch nicht gibt. Der Systemordner steht NICHT dabei: „assets/“ gehört der Platte,
+            // ein Pfad dorthin weist der Server zurück — die Oberfläche bietet ihn gar nicht erst an.
+            function moveItems(o) {
+                var map = read() || {};
+                var here = dirOf(o.path);
+                var items = [];
+                [''].concat(folderList(map)).forEach(function (t) {
+                    if (t === here) return;                                   // dort liegt sie schon
+                    if (o.kind === 'folder' && (t === o.path || t.indexOf(o.path + '/') === 0)) return;
+                    items.push({ label: t === '' ? TXT.moveRoot : t + '/', run: function () { moveNode(o, t); } });
+                });
+                items.push({
+                    label: TXT.moveOther, run: function () {
+                        var raw = prompt(TXT.moveAsk, here);
+                        if (raw === null) return;
+                        var dir = raw.trim();
+                        if (dir !== '') { dir = clean(dir); if (!dir) { alert(TXT.pathInvalid); return; } }
+                        moveNode(o, dir);
+                    }
+                });
+                return items;
+            }
+
+            // ---- Kopieren, Duplizieren, Einfügen ----------------------------------------------
+            // Eine Ablage IM Editor, nicht die des Betriebssystems: kopiert wird der Inhalt samt
+            // Namen. Über die Systemzwischenablage ginge nur Text — der Name wäre weg, und ohne ihn
+            // hätte „Einfügen“ nichts, woraus es eine Datei machen könnte.
+            var clip = null;
+
+            function contentOf(map, path) {
+                if (path === ENTRY) return codeField ? codeField.value : '';
+                return map[path] != null ? map[path] : '';
+            }
+
+            function copyNode(path) {
+                var map = read(); if (map === null) { alert(TXT.broken); return; }
+                clip = { name: baseOf(path), dir: dirOf(path), text: contentOf(map, path) };
+                // Neu zeichnen, damit „Einfügen: …“ in den Menüs steht: sie werden je Zeile beim
+                // Zeichnen zusammengestellt.
+                render();
+            }
+
+            function pasteInto(dir) {
+                if (!clip) return;
+                var map = read(); if (map === null) { alert(TXT.broken); return; }
+                var target = freePath(map, dir, clip.name);
+                if (!target) { alert(TXT.pathInvalid); return; }
+                map[target] = clip.text;
+                write(map);
+                warnCopiedLoads(map, target, join(clip.dir, clip.name));
+                expandTo(target);
+                show(target);
+            }
+
+            function duplicate(path) {
+                var map = read(); if (map === null) { alert(TXT.broken); return; }
+                var target = freePath(map, dirOf(path), baseOf(path));
+                if (!target) { alert(TXT.pathInvalid); return; }
+                map[target] = contentOf(map, path);
+                write(map);
+                expandTo(target);
+                show(target);
+            }
+
+            // Eine Kopie in einem ANDEREN Ordner löst ihre eigenen #load womöglich anders auf als
+            // das Original: „Hero.csx“ meint neben Elements/ etwas anderes als an der Wurzel.
+            // Umgeschrieben wird hier nichts — die Kopie ist eine neue Datei, und was in ihr steht,
+            // hat der Bearbeiter geschrieben. Gesagt wird es trotzdem.
+            function warnCopiedLoads(map, path, was) {
+                if (dirOf(path) === dirOf(was)) return;
+                var warn = [];
+                (map[path] || '').split('\n').forEach(function (line, i) {
+                    var m = LOAD.exec(line.replace(/\r$/, ''));
+                    if (!m) return;
+                    var now = resolveLoad(map, path, m[2]);
+                    if (resolveLoad(map, was, m[2]) === now) return;
+                    warn.push(refLabel(path, i, m[2], now));
+                });
+                if (warn.length) alert(TXT.loadShadow.replace('{0}', warn.join('\n')));
             }
 
             // ---- Reiter über dem Editor ------------------------------------------------------

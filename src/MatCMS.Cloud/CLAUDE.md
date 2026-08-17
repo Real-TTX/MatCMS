@@ -167,13 +167,28 @@ token chips, colour pickers), `_TabsScript`, `_IconTrash`.
 Payloads are authored **blind** here — without the site they will land on — so every editor needs to
 show the result, not just the values.
 
-- `wwwroot/js/component-editor.js` is MatCMS's `admin-component-editor.js` adapted to the profile
-  page: repeatable field rows instead of raw JSON, per-field sample data, a rendered `srcdoc` iframe,
-  and a debug panel that names placeholders the template uses but no field defines. **Keep the two
-  in sync** — a component authored here must behave exactly like one authored on an instance.
+- The component editor's **view is shared**: `MatCMS.Shared.Web/Pages/Shared/_ComponentEditor.cshtml`
+  renders the three tabs (Allgemein / Felder / HTML-Vorlage), the field designer and the live
+  preview for the CMS's `Components/Edit`, `Profiles/Component` and `Store/Component` alike. It
+  stood three times almost identically; whoever touched one left the others behind. The pages differ
+  only in what their fields post as (`ComponentEditorNames`, same idea as `TemplateFiles.FieldName`)
+  and in four switches on the model: the type is fixed on an instance and entered here,
+  CodeMirror is on only where the bundle is loaded, and the icon goes through each application's OWN
+  `_IconPicker` (the CMS resolves legacy names via `MenuIcons`, the cloud must not).
+  The `<form>`, the card and the action row stay in the page — the cloud's form carries route values
+  and its save button lives outside it. **Everything the partial renders is inside that form**: a
+  field outside it is not submitted at all and would arrive empty.
+  The preview sits in the admin's own two-column build (`.pf-tree` > `.pf-side` / `.pf-main`, the
+  plugin editor's): left the sample fields, right the frame that follows every keystroke.
+- `wwwroot/js/component-editor.js` is MatCMS's `admin-component-editor.js` — the SCRIPT is still two
+  files (the view is not any more). **Keep the two in sync** — a component authored here must behave
+  exactly like one authored on an instance.
   One rule carried over deliberately: an existing field keeps its `id` when its label is renamed,
   because the id is what `{{placeholder}}` refers to and re-slugging it would break blocks already
   placed on live sites.
+  Both cloud previews hook CodeMirror to keep up with typing **in the code**; the hook is retried on
+  `DOMContentLoaded`/`load` rather than set in a `setTimeout(0)`, because `code-editor.js` builds the
+  editor later than that and the hook was silently never attached.
 - The template editor's **files tab is shared**: `MatCMS.Shared.Web/Pages/Shared/_TemplateFiles.cshtml`
   renders the pseudo-files (`body.html`, `article.html`, `styles.css`, `script.js`,
   `maintenance.html`) as a **tree** — one root (the template), its files below it, the open file on

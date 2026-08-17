@@ -75,8 +75,12 @@
         },
         new TemplateFileLabels(
             T["tplfiles.edit"], T["tplfiles.tokens"], T["tplfiles.insertDefault"],
-            T["tplfiles.apply"], T["tplfiles.cancel"],
-            T["tplfiles.badgeCustom"], T["tplfiles.badgeEmpty"]));
+            T["tplfiles.insertDefaultConfirm"],
+            T["tplfiles.badgeCustom"], T["tplfiles.badgeEmpty"],
+            T["tplfiles.pick"], T["tplfiles.menu"], T["tplfiles.toggle"],
+            T["tplfiles.raw"], T["tplfiles.root"]),
+        // Die Wurzel des Baums ist dieses Template — mit seinem Namen, nicht mit dem Wort "Dateien".
+        Model.Name ?? "");
 }
 <div class="page-head">
     <h1>

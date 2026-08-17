@@ -1045,6 +1045,19 @@ table.data .btn { white-space: nowrap; }
 .cm-token:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
 .cm-modal-foot { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line, #e2e4e8); background: #fafbfc; }
 
+/* Der Editor im Dateibaum eines Templates (.pf-tree > .pf-main, siehe _TemplateFiles.cshtml).
+   CodeMirror hat keine eigene Höhe: als Flex-Kind ohne Höhenvorgabe misst es sich auf EINE Zeile,
+   und die Fläche stand als 28 Pixel hoher Streifen neben dem Baum. Die Höhe hier statt am Element
+   im Markup, weil sie zum Kasten gehört und nicht zum einzelnen Vorkommen. */
+.pf-editor .cm-modal-editor { flex: 1 1 auto; height: 320px; }
+/* Der Baum der Templates trägt an jeder Zeile ein Abzeichen (angepasst / leer) — die Auskunft, die
+   ihn erst nützlich macht. In den 230 Pixeln des Plugin-Baums lag es über dem Dateinamen, deshalb
+   hier eine breitere linke Spalte; der Plugin-Baum bleibt, wie er ist. */
+.tpl-tree.pf-tree { grid-template-columns: 300px 1fr; }
+.tpl-tree .pf-file-name { min-width: 0; overflow: hidden; }
+.tpl-tree .tpl-file-badge { flex: 0 0 auto; }
+@media (max-width: 800px) { .tpl-tree.pf-tree { grid-template-columns: 1fr; } }
+
 /* ---- Hinzufügen dialog -------------------------------------------------------------------------
    The three ways to add something, as equally-weighted choices. Deliberately not a <select> or a row
    of small buttons: each one leads somewhere different (a picker, a page, a form), and the operator

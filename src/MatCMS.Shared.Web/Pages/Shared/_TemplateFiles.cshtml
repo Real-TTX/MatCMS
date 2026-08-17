@@ -1,149 +1,458 @@
 @model MatCMS.Shared.Web.TemplateFiles
 @*
-    The template editor's "Dateien" tab: a list of pseudo-files, the hidden fields the surrounding
-    form actually posts, and one CodeMirror modal that edits whichever file was clicked.
+    The template editor's file tab — same build as the plugin editor (MatCMS/Pages/Admin/Plugins/Edit):
+    EIN Baum links mit einer Wurzel (dem Template) und seinen Dateien darunter, rechts die offene
+    Datei mit einer schmalen Menüleiste darüber, Aktionen am Knoten per Rechtsklick / "…" /
+    Kontextmenü-Taste. Es sind die Klassen des Admin (.pf-tree, .pf-side, .pf-list, .pf-file,
+    .pf-menu, .pf-ctx) — ein zweiter, nachgebauter Satz hätte dasselbe zweimal zu pflegen bedeutet.
 
-    Shared by the CMS and the cloud so a theme is authored the same way in both. The pages differ
-    only in what their files post as (LayoutHtml, Parts[post], …), which is why FieldName is part of
-    the model rather than baked in here.
+    WAS SICH GEÄNDERT HAT UND WARUM: vorher war das hier eine Liste von Karten plus ein
+    CodeMirror-DIALOG. Getippt wurde im Dialog, und erst "Übernehmen" schrieb den Text in das Feld,
+    das das Formular abschickt. Jeder andere Weg aus dem Dialog heraus — Abbrechen, Escape, Klick
+    auf den Schleier, Reiterwechsel, ein Klick auf Speichern bei offenem Dialog — verlor die Arbeit
+    ohne Rückfrage. Jetzt schreibt der Editor bei JEDEM Tastendruck in genau dieses Feld, und das
+    Feld selbst bleibt über "Rohform" erreichbar. Ein Editor, der seinen Inhalt erst beim Absenden
+    (oder beim Übernehmen) erzeugt, verliert ihn beim ersten Fall, an den niemand gedacht hat.
 
-    Requires the CodeMirror assets on the page (see _CodeEditorAssets / the template editor's own
-    script section) — this partial only assumes `CodeMirror` is defined by the time it runs.
+    Templates haben andere Dateien als Plugins: keine echten Ordner, keine Systemdatei, kein
+    Systemordner — es sind genau die Pseudo-Dateien, die die Seite übergibt, und es wird keine
+    erfunden. Ihre Reihenfolge kommt von der Seite und wird NICHT sortiert: body.html steht vorn,
+    weil dort angefangen wird.
+
+    Was der Baum unbedingt behalten muss, ist die Besonderheit der Templates: dass zu sehen ist,
+    WELCHE Datei angepasst ist und welche leer aus dem Theme kommt. Das Abzeichen (.tpl-file-badge)
+    hängt deshalb an jeder Zeile des Baums und wird bei jedem Tastendruck neu bestimmt — ein
+    hübscherer Baum, der diese Auskunft verliert, wäre ein Rückschritt.
+
+    Von der CMS und der Cloud gemeinsam benutzt; die Seiten unterscheiden sich nur darin, als was
+    ihre Dateien abgeschickt werden (LayoutHtml, Parts[post], …) — darum steht FieldName am Modell.
+    Braucht CodeMirror auf der Seite (siehe _CodeEditorAssets). Fehlt es oder fällt das Skript aus,
+    stehen die Rohfelder mit Beschriftung da und alles ist trotzdem bearbeitbar.
 *@
 @{
     var files = Model.Files;
     var meta = files.Select(f => new
     {
         name = f.Name,
+        ext = f.Ext,
+        desc = f.Description,
         mode = f.Mode,
         insertDefault = f.InsertDefault,
         baseline = f.Baseline,
         tokens = f.Tokens.Select(t => new { t = t.T, l = t.L })
     }).ToArray();
     var metaJson = System.Text.Json.JsonSerializer.Serialize(meta);
+
+    // Die Texte des Baums gehen als EIN Stück ins Skript: es kann darin kein T[...] aufrufen, und
+    // einzeln in den Code gestreute Übersetzungen sind der Weg, auf dem eine davon irgendwann
+    // Deutsch bleibt.
+    var textJson = System.Text.Json.JsonSerializer.Serialize(new
+    {
+        edit = Model.Labels.Edit,
+        insertDefault = Model.Labels.InsertDefault,
+        insertConfirm = Model.Labels.InsertDefaultConfirm,
+        custom = Model.Labels.BadgeCustom,
+        empty = Model.Labels.BadgeEmpty,
+        pick = Model.Labels.Pick,
+        menu = Model.Labels.Menu,
+        toggle = Model.Labels.Toggle,
+        raw = Model.Labels.Raw,
+        root = string.IsNullOrWhiteSpace(Model.RootLabel) ? Model.Labels.Root : Model.RootLabel
+    });
 }
 
 <div class="help">@Html.Raw(Model.Intro)</div>
-<div class="tpl-files">
-    @for (var i = 0; i < files.Count; i++)
-    {
-        var f = files[i];
-        var custom = !string.IsNullOrWhiteSpace(f.Value)
-                     && (f.Value ?? "").Replace("\r\n", "\n").Trim() != (f.Baseline ?? "").Replace("\r\n", "\n").Trim();
-        <button type="button" class="tpl-file" data-file-idx="@i">
-            <span class="tpl-file-ext ext-@f.Ext">@f.Ext</span>
-            <span class="tpl-file-main">
-                <span class="tpl-file-name">
-                    <code>@f.Name</code>
-                    <span class="tpl-file-badge @(custom ? "on" : "")">@(custom ? Model.Labels.BadgeCustom : Model.Labels.BadgeEmpty)</span>
-                </span>
-                <span class="tpl-file-desc">@f.Description</span>
-            </span>
-            <span class="tpl-file-open"><i class="ti ti-code" aria-hidden="true"></i> @Model.Labels.Edit</span>
-        </button>
-    }
-</div>
 
-@* The hidden stores are what the form submits — the modal only ever writes back into these. *@
-@for (var i = 0; i < files.Count; i++)
-{
-    @* The id matters, not just the name: the cloud's live preview reads the form by element id
-       (val("layoutHtml"), val("customCss") …). Without it the preview silently falls back to the
-       generic sample page and never shows the template's own layout. *@
-    <textarea class="tpl-file-store" data-idx="@i" id="@files[i].FieldName" name="@files[i].FieldName" hidden>@files[i].Value</textarea>
-}
-
-<div class="cm-modal" id="file-editor" hidden>
-    <div class="cm-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="cm-file-name">
-        <div class="cm-modal-head">
-            <span class="cm-modal-file"><i class="ti ti-file-code" aria-hidden="true"></i> <code id="cm-file-name"></code></span>
-            <button type="button" class="cm-modal-close" id="cm-close" title="@Model.Labels.Cancel" aria-label="@Model.Labels.Cancel">✕</button>
-        </div>
-        <div class="cm-modal-editor" id="cm-host"></div>
-        <div class="cm-modal-tokens">
-            <span class="cm-tokens-label">@Model.Labels.Tokens</span>
-            <span id="cm-tokens"></span>
-        </div>
-        <div class="cm-modal-foot">
-            <button type="button" class="btn btn-sm btn-ghost" id="cm-insert-default" hidden>@Model.Labels.InsertDefault</button>
+@* .tpl-tree ist derselbe Baum, nur mit breiterer linker Spalte: an jeder Zeile hängt hier zusätzlich
+   das Abzeichen "angepasst / leer", und in 230 Pixeln lag es über dem Dateinamen. *@
+<div class="pf-tree tpl-tree" data-tf>
+    @* Links: der Baum. Vollständig vom Skript gezeichnet, weil die Zeilen ihren Zustand
+       (angepasst / leer) beim Tippen ändern müssen, ohne dass die Seite neu lädt. *@
+    <aside class="pf-side">
+        <div class="pf-list" data-tf-list></div>
+    </aside>
+    <div class="pf-main">
+        @* Die Menüleiste sagt, WELCHE Datei offen ist, und trägt nur Befehle für sie. *@
+        <div class="pf-menu">
+            <span class="pf-menu-file mono" data-tf-current></span>
             <span style="flex:1;"></span>
-            <button type="button" class="btn btn-sm btn-ghost" id="cm-cancel">@Model.Labels.Cancel</button>
-            <button type="button" class="btn btn-sm" id="cm-apply">@Model.Labels.Apply</button>
+            <button type="button" class="pf-menu-item" data-tf-insert hidden>@Model.Labels.InsertDefault</button>
+            <button type="button" class="pf-menu-item" data-tf-raw aria-pressed="false">@Model.Labels.Raw</button>
         </div>
+        @* Der Editor. Die Rohfelder stehen MIT DARIN und nicht in einem zweiten Kasten irgendwo
+           sonst: ohne Skript sind sie samt Beschriftung sichtbar und bearbeitbar, mit Skript zeigt
+           "Rohform" genau das Feld der offenen Datei — dasselbe Feld, kein zweiter Stand, der beim
+           Umschalten gewinnen oder verlorengehen könnte. *@
+        <div class="pf-editor" data-tf-editor>
+            @* CodeMirror-Fläche. .cm-modal-editor bringt genau das mit, was sie braucht (flex,
+               min-height:0, .CodeMirror{height:100%}) — der Name stammt noch vom Dialog, eine
+               zweite Klasse mit demselben Inhalt wäre die schlechtere Wahl. *@
+            <div class="cm-modal-editor" data-tf-host hidden></div>
+            @for (var i = 0; i < files.Count; i++)
+            {
+                @* Die id ist so wichtig wie der name: die Live-Vorschau der Cloud liest das Formular
+                   über die Element-id (val("layoutHtml"), val("customCss") …). Ohne sie fällt sie
+                   stillschweigend auf die Beispielseite zurück und zeigt das Layout nie. *@
+                <label class="pf-editor-head" data-tf-store-head="@i" for="@files[i].FieldName"
+                       title="@files[i].Description">@files[i].Name</label>
+                <textarea class="tpl-file-store code" data-idx="@i" id="@files[i].FieldName"
+                          name="@files[i].FieldName" spellcheck="false" rows="14">@files[i].Value</textarea>
+            }
+        </div>
+        @* Kein leerer Kasten, sondern der Hinweis, was zu tun ist. *@
+        <div class="pf-empty" data-tf-empty hidden>@Model.Labels.Pick</div>
+        @* Die Platzhalter der offenen Datei. Kein Befehl, sondern Material — deshalb unter dem
+           Editor und nicht in der Menüleiste. *@
+        <div class="cm-modal-tokens" data-tf-tokens hidden>
+            <span class="cm-tokens-label">@Model.Labels.Tokens</span>
+            <span data-tf-token-list></span>
+        </div>
+        <div class="help" data-tf-desc></div>
     </div>
 </div>
 
 <script>
     (function () {
         var FILES = @Html.Raw(metaJson);
-        var LBL = { custom: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Labels.BadgeCustom)), empty: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Labels.BadgeEmpty)) };
-        var stores = Array.prototype.slice.call(document.querySelectorAll('.tpl-file-store'));
-        var rows = Array.prototype.slice.call(document.querySelectorAll('.tpl-file'));
-        var modal = document.getElementById('file-editor');
-        var host = document.getElementById('cm-host');
-        var nameEl = document.getElementById('cm-file-name');
-        var tokEl = document.getElementById('cm-tokens');
-        var insDefBtn = document.getElementById('cm-insert-default');
-        if (!modal || !host || rows.length === 0) return;
-        var cm = null, cur = -1;
+        var TXT = @Html.Raw(textJson);
 
-        function ensureCm() {
-            if (cm) return cm;
-            cm = CodeMirror(host, {
-                lineNumbers: true, autoCloseBrackets: true, matchBrackets: true, styleActiveLine: true,
-                indentUnit: 2, tabSize: 2, lineWrapping: false,
-                extraKeys: { Tab: function (c) { c.replaceSelection('  '); } }
-            });
-            return cm;
-        }
-        function norm(s) { return (s || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n'); }
-        function updateBadge(idx) {
-            var m = FILES[idx], v = norm(stores[idx].value).trim();
-            var custom = v !== '' && v !== norm(m.baseline).trim();
-            var b = rows[idx].querySelector('.tpl-file-badge');
-            if (b) { b.classList.toggle('on', custom); b.textContent = custom ? LBL.custom : LBL.empty; }
-        }
-        function open(idx) {
-            cur = idx;
-            var m = FILES[idx];
-            nameEl.textContent = m.name;
-            tokEl.innerHTML = '';
-            (m.tokens || []).forEach(function (tk) {
-                var s = document.createElement('button');
-                s.type = 'button'; s.className = 'cm-token'; s.textContent = tk.t; s.title = tk.l;
-                s.addEventListener('click', function () { cm.replaceSelection(tk.t); cm.focus(); });
-                tokEl.appendChild(s);
-            });
-            insDefBtn.hidden = !m.insertDefault;
-            modal.hidden = false;
-            ensureCm();
-            cm.setOption('mode', m.mode);
-            cm.setValue(stores[idx].value || '');
-            cm.clearHistory();
-            // After the modal becomes visible, or CodeMirror measures a hidden element as zero-height.
-            setTimeout(function () { cm.refresh(); cm.focus(); cm.setCursor(0, 0); }, 10);
-        }
-        function close() { modal.hidden = true; cur = -1; }
-        function apply() {
-            if (cur < 0) return;
-            stores[cur].value = cm.getValue();
-            // Setting .value fires nothing, so a live preview listening on the form would never
-            // learn that a file changed. Say so explicitly.
-            stores[cur].dispatchEvent(new Event('input', { bubbles: true }));
-            updateBadge(cur);
-            close();
-        }
+        // CodeMirror kommt auf beiden Seiten erst im Skript-Abschnitt am Seitenende (_CodeEditorAssets).
+        // Dieses Stück steht mitten im Formular — es darf den Editor also nicht sofort bauen, sonst
+        // ist CodeMirror noch nicht definiert und der Baum bliebe ein leeres Feld.
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+        else init();
 
-        rows.forEach(function (r) { r.addEventListener('click', function () { open(parseInt(r.dataset.fileIdx, 10)); }); });
-        document.getElementById('cm-apply').addEventListener('click', apply);
-        document.getElementById('cm-cancel').addEventListener('click', close);
-        document.getElementById('cm-close').addEventListener('click', close);
-        insDefBtn.addEventListener('click', function () { if (cur >= 0) cm.setValue(FILES[cur].insertDefault || ''); cm.focus(); });
-        modal.addEventListener('click', function (e) { if (e.target === modal) close(); });
-        document.addEventListener('keydown', function (e) {
-            if (modal.hidden) return;
-            if (e.key === 'Escape') close();
-            else if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'Enter')) { e.preventDefault(); apply(); }
-        });
+        function init() {
+            var box = document.querySelector('[data-tf]');
+            if (!box) return;
+            var list = box.querySelector('[data-tf-list]');
+            var stores = Array.prototype.slice.call(box.querySelectorAll('.tpl-file-store'));
+            var heads = Array.prototype.slice.call(box.querySelectorAll('[data-tf-store-head]'));
+            var host = box.querySelector('[data-tf-host]');
+            var empty = box.querySelector('[data-tf-empty]');
+            var curEl = box.querySelector('[data-tf-current]');
+            var insBtn = box.querySelector('[data-tf-insert]');
+            var rawBtn = box.querySelector('[data-tf-raw]');
+            var tokBox = box.querySelector('[data-tf-tokens]');
+            var tokList = box.querySelector('[data-tf-token-list]');
+            var descEl = box.querySelector('[data-tf-desc]');
+            if (!list || stores.length === 0) return;
+
+            var HAS_CM = typeof CodeMirror !== 'undefined';
+            var cm = null, cur = -1, raw = !HAS_CM, loading = false, collapsed = false;
+
+            function norm(s) { return (s || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n'); }
+            // Angepasst oder leer: leer heißt, die Datei kommt unverändert aus dem Theme. Genau
+            // dieselbe Rechnung wie serverseitig beim ersten Zeichnen — zwei Rechnungen für eine
+            // Auskunft würden irgendwann verschiedene Antworten geben.
+            function isCustom(i) {
+                var v = norm(stores[i].value).trim();
+                return v !== '' && v !== norm(FILES[i].baseline).trim();
+            }
+
+            // ---- Schreiben ------------------------------------------------------------------
+            // Bei JEDEM Tastendruck ins Feld, das abgeschickt wird. Nichts wird gesammelt und beim
+            // Übernehmen oder Absenden erzeugt: was man sieht, steht schon im Formular.
+            function push(i, text) {
+                if (i < 0 || stores[i].value === text) return;
+                stores[i].value = text;
+                // .value setzen löst kein Ereignis aus — die Live-Vorschau der Cloud hört am
+                // Formular zu und erfuhr sonst nie, dass eine Datei sich geändert hat.
+                stores[i].dispatchEvent(new Event('input', { bubbles: true }));
+                badges();
+            }
+
+            // ---- Der Baum -------------------------------------------------------------------
+            function icon(name) {
+                var i = document.createElement('i');
+                i.className = 'ti ' + name;
+                i.setAttribute('aria-hidden', 'true');
+                return i;
+            }
+            function iconFor(ext) {
+                if (ext === 'css') return 'ti-palette';
+                if (ext === 'js') return 'ti-braces';
+                return 'ti-file-code';
+            }
+
+            // Eine Zeile des Baums. Was sie tut, hängt an DIESEM Knoten: der Index steht in o.idx
+            // und wird nicht aus Beschriftungen oder Nachbarzeilen erraten.
+            function rowFor(o) {
+                var row = document.createElement('div');
+                row.className = 'pf-file' + (o.isOpen ? ' is-open' : '');
+                row.style.paddingLeft = (4 + o.depth * 14) + 'px';
+
+                var twist = document.createElement('button');
+                twist.type = 'button';
+                twist.className = 'pf-twist';
+                if (o.expandable) {
+                    twist.appendChild(icon(collapsed ? 'ti-chevron-right' : 'ti-chevron-down'));
+                    twist.title = TXT.toggle;
+                    twist.setAttribute('aria-label', TXT.toggle + ': ' + o.label);
+                    twist.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+                    twist.addEventListener('click', function (ev) {
+                        ev.stopPropagation();
+                        collapsed = !collapsed;
+                        render();
+                    });
+                } else {
+                    twist.tabIndex = -1;
+                    twist.setAttribute('aria-hidden', 'true');
+                }
+                row.appendChild(twist);
+
+                var name = document.createElement('button');
+                name.type = 'button';
+                name.className = 'pf-file-name' + (o.mono ? ' mono' : '');
+                name.appendChild(icon(o.icon));
+                name.appendChild(document.createTextNode(o.label));
+                if (o.title) name.title = o.title;
+                name.addEventListener('click', o.activate);
+                row.appendChild(name);
+
+                // Das Abzeichen der Templates: angepasst oder leer. Es hängt an der Zeile, damit
+                // ein Blick auf den Baum sagt, welche Datei überschrieben ist und welche vom Theme
+                // kommt — dieselbe Auskunft wie in der alten Kartenliste, an derselben Stelle wie
+                // der Name.
+                if (o.kind === 'file') {
+                    var badge = document.createElement('span');
+                    badge.className = 'tpl-file-badge';
+                    badge.setAttribute('data-tf-node-badge', o.idx);
+                    row.appendChild(badge);
+                }
+
+                var items = menuFor(o);
+                if (items.length) {
+                    var more = document.createElement('button');
+                    more.type = 'button';
+                    more.className = 'pf-more';
+                    more.title = TXT.menu;
+                    more.setAttribute('aria-label', TXT.menu + ': ' + o.label);
+                    more.appendChild(icon('ti-dots'));
+                    more.addEventListener('click', function (ev) {
+                        ev.stopPropagation();
+                        var r = more.getBoundingClientRect();
+                        showMenu(r.left, r.bottom, items);
+                    });
+                    row.appendChild(more);
+                    // Rechtsklick auf die ganze Zeile — und, weil nicht jedes Gerät eine rechte
+                    // Maustaste hat, derselbe Inhalt über den Knopf und die Kontextmenü-Taste.
+                    row.addEventListener('contextmenu', function (ev) {
+                        ev.preventDefault();
+                        showMenu(ev.clientX, ev.clientY, items);
+                    });
+                    name.addEventListener('keydown', function (ev) {
+                        if (ev.key !== 'ContextMenu' && !(ev.shiftKey && ev.key === 'F10')) return;
+                        ev.preventDefault();
+                        var r = name.getBoundingClientRect();
+                        showMenu(r.left, r.bottom, items);
+                    });
+                }
+                return row;
+            }
+
+            // Die Wurzel ist das Template selbst: sie macht sichtbar, dass diese Dateien IHM
+            // gehören. Darunter seine Dateien in der Reihenfolge der Seite — nicht alphabetisch,
+            // denn body.html ist der Anfang. Ordner gibt es hier keine, also wird auch keiner
+            // erfunden.
+            function render() {
+                list.innerHTML = '';
+                list.appendChild(rowFor({
+                    kind: 'root', depth: 0, label: TXT.root, icon: 'ti-brush', expandable: true,
+                    activate: function () { collapsed = !collapsed; render(); }
+                }));
+                if (collapsed) { return; }
+                FILES.forEach(function (m, i) {
+                    list.appendChild(rowFor({
+                        kind: 'file', depth: 1, idx: i, label: m.name, icon: iconFor(m.ext),
+                        mono: true, title: m.desc, isOpen: cur === i,
+                        activate: function () { open(i, true); }
+                    }));
+                });
+                badges();
+            }
+
+            function badges() {
+                FILES.forEach(function (m, i) {
+                    var b = list.querySelector('[data-tf-node-badge="' + i + '"]');
+                    if (!b) return;
+                    var on = isCustom(i);
+                    b.classList.toggle('on', on);
+                    b.textContent = on ? TXT.custom : TXT.empty;
+                });
+            }
+
+            // ---- Kontextmenü ----------------------------------------------------------------
+            var menuEl = null;
+            function closeMenu() { if (menuEl) { menuEl.remove(); menuEl = null; } }
+            function showMenu(x, y, items) {
+                closeMenu();                                   // nie zwei gleichzeitig
+                var m = document.createElement('div');
+                m.className = 'pf-ctx';
+                m.setAttribute('role', 'menu');
+                items.forEach(function (it) {
+                    var b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'pf-ctx-item';
+                    b.setAttribute('role', 'menuitem');
+                    b.textContent = it.label;
+                    b.addEventListener('click', function () { closeMenu(); it.run(); });
+                    m.appendChild(b);
+                });
+                document.body.appendChild(m);
+                // Am Zeiger, aber im Fenster: sonst steht das Menü der letzten Zeile zur Hälfte
+                // außerhalb und die Hälfte, die man braucht, fehlt.
+                m.style.left = Math.max(4, Math.min(x, window.innerWidth - m.offsetWidth - 6)) + 'px';
+                m.style.top = Math.max(4, Math.min(y, window.innerHeight - m.offsetHeight - 6)) + 'px';
+                menuEl = m;
+                var first = m.querySelector('.pf-ctx-item');
+                if (first) first.focus();
+            }
+            document.addEventListener('click', function (ev) {
+                if (menuEl && !menuEl.contains(ev.target)) closeMenu();
+            });
+            document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') closeMenu(); });
+            window.addEventListener('resize', closeMenu);
+            list.addEventListener('scroll', closeMenu);
+
+            // Nur was es hier wirklich gibt: öffnen, und den Standard einsetzen, wo die Seite einen
+            // mitgibt. Eine Datei anlegen oder löschen kann man in einem Template nicht — sie sind
+            // Spalten des Datensatzes, nicht Einträge in einem Ordner. Ein Menüeintrag, der das
+            // anbietet, würde etwas versprechen, was der Server nicht kennt.
+            function menuFor(o) {
+                var items = [];
+                if (o.kind !== 'file') return items;
+                items.push({ label: TXT.edit, run: function () { open(o.idx, true); } });
+                if (FILES[o.idx].insertDefault) items.push({ label: TXT.insertDefault, run: function () { insertDefault(o.idx); } });
+                return items;
+            }
+
+            // ---- Der Editor ------------------------------------------------------------------
+            var lastH = 0;
+            function refresh() {
+                if (!cm || !host || host.hidden || !host.offsetHeight) return;
+                lastH = host.offsetHeight;
+                cm.refresh();
+            }
+            function ensureCm() {
+                if (cm || !HAS_CM) return cm;
+                cm = CodeMirror(host, {
+                    lineNumbers: true, autoCloseBrackets: true, matchBrackets: true, styleActiveLine: true,
+                    indentUnit: 2, tabSize: 2, lineWrapping: false,
+                    extraKeys: { Tab: function (c) { c.replaceSelection('  '); } }
+                });
+                // DAS ist der Punkt der ganzen Umstellung: jede Änderung geht sofort ins Feld,
+                // nicht erst beim Übernehmen. loading deckt nur das programmgesteuerte Laden ab —
+                // sonst schriebe das Öffnen einer Datei sich selbst zurück.
+                cm.on('change', function () { if (!loading) push(cur, cm.getValue()); });
+                return cm;
+            }
+            // Die Fläche misst sich verborgen als 0 hoch: der Dateireiter ist beim Laden nicht der
+            // offene. Statt an fremden Reiterknöpfen zu hängen, wird auf die Größe selbst gehört —
+            // das gilt auch fürs Fenster und für jede Seite, die diesen Baum je einbaut.
+            if (window.ResizeObserver && host) {
+                new ResizeObserver(function () {
+                    if (host.offsetHeight && host.offsetHeight !== lastH) refresh();
+                }).observe(host);
+            }
+
+            // Rohform: dasselbe Feld, unverkleidet. Beim Zurückschalten liest der Editor neu aus
+            // dem Feld — wer von Hand daran gearbeitet hat, sieht es auch im Editor, statt beim
+            // nächsten Tastendruck von altem Text überschrieben zu werden.
+            function showRaw(on) {
+                raw = on || !HAS_CM;
+                if (rawBtn) rawBtn.setAttribute('aria-pressed', raw ? 'true' : 'false');
+                if (host) host.hidden = raw || cur < 0;
+                stores.forEach(function (s, i) { s.hidden = !(raw && i === cur); });
+                heads.forEach(function (h, i) { h.hidden = !(raw && i === cur); });
+                if (!raw && cur >= 0 && ensureCm()) {
+                    loading = true;
+                    cm.setValue(stores[cur].value || '');
+                    loading = false;
+                    refresh();
+                }
+            }
+            if (rawBtn) rawBtn.addEventListener('click', function () {
+                showRaw(!raw);
+                if (raw && cur >= 0) stores[cur].focus();
+                else if (cm) cm.focus();
+            });
+
+            function open(i, focus) {
+                cur = i;
+                var m = FILES[i];
+                curEl.textContent = m.name;
+                descEl.textContent = m.desc || '';
+                if (empty) empty.hidden = true;
+
+                tokList.innerHTML = '';
+                (m.tokens || []).forEach(function (tk) {
+                    var b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'cm-token';
+                    b.textContent = tk.t;
+                    b.title = tk.l;
+                    b.addEventListener('click', function () { insertToken(tk.t); });
+                    tokList.appendChild(b);
+                });
+                tokBox.hidden = !(m.tokens && m.tokens.length);
+                insBtn.hidden = !m.insertDefault;
+
+                if (!raw && ensureCm()) {
+                    loading = true;
+                    cm.setOption('mode', m.mode);
+                    cm.setValue(stores[i].value || '');
+                    cm.clearHistory();
+                    loading = false;
+                }
+                showRaw(raw);
+                render();
+                if (focus) {
+                    if (raw) stores[i].focus();
+                    else if (cm) { refresh(); cm.focus(); }
+                }
+            }
+
+            // Ein Platzhalter landet dort, wo der Cursor steht — im Editor wie im Rohfeld. Ein Knopf,
+            // der im Rohfeld nichts täte, wäre schlimmer als keiner.
+            function insertToken(text) {
+                if (cur < 0) return;
+                if (!raw && cm) { cm.replaceSelection(text); cm.focus(); return; }
+                var el = stores[cur];
+                var a = el.selectionStart, b = el.selectionEnd;
+                el.value = el.value.slice(0, a) + text + el.value.slice(b);
+                el.selectionStart = el.selectionEnd = a + text.length;
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.focus();
+                badges();
+            }
+
+            // Der Standard ersetzt, was da ist — deshalb wird gefragt, sobald etwas Eigenes darin
+            // steht. Im Dialog war das noch durch "Abbrechen" zurückzuholen; ohne Dialog muss die
+            // Frage vorher kommen.
+            function insertDefault(i) {
+                var m = FILES[i];
+                if (!m.insertDefault) return;
+                var v = norm(stores[i].value).trim();
+                if (v !== '' && v !== norm(m.insertDefault).trim()
+                    && !confirm(TXT.insertConfirm + '\n\n' + m.name)) return;
+                if (cur !== i) open(i, true);
+                if (!raw && cm) cm.setValue(m.insertDefault);
+                else push(i, m.insertDefault);
+            }
+            if (insBtn) insBtn.addEventListener('click', function () { if (cur >= 0) insertDefault(cur); });
+
+            // Von Hand im Rohfeld getippt: das Abzeichen im Baum zieht mit. Geschrieben wird nichts
+            // — das Feld IST der Stand.
+            stores.forEach(function (s) { s.addEventListener('input', badges); });
+
+            // Ohne Skript stehen alle Rohfelder offen; mit Skript zeigt der Baum eine Datei. Erst
+            // hier verstecken, nicht im Markup: fällt das Skript aus, bleibt alles erreichbar.
+            showRaw(raw);
+            render();
+            // Die erste Datei ist offen, aber ohne Fokus: der Reiter ist beim Laden womöglich gar
+            // nicht der sichtbare, und ein Editor, der sich den Fokus nimmt, reißt die Seite dorthin.
+            open(0, false);
+        }
     })();
 </script>

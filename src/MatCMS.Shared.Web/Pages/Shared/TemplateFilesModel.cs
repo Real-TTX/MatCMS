@@ -31,17 +31,39 @@ public sealed record TemplateFile(
 /// the two applications have separate <c>Localizer</c> types — a shared view cannot reference
 /// either. The resource KEYS are identical in both (<c>tplfiles.*</c>); only the lookup happens in
 /// the page.
+/// <para>
+/// <c>Apply</c> and <c>Cancel</c> are gone with the modal they belonged to: the editor writes into
+/// the posted field on every keystroke, so there is nothing left to confirm or to take back. The
+/// resource keys stay where they are — this record only stops asking for them.
+/// </para>
 /// </summary>
+/// <param name="Edit">"Bearbeiten" — the node's own menu entry for opening a file.</param>
+/// <param name="Tokens">Label above the insertable placeholders.</param>
+/// <param name="InsertDefault">Label of the "insert the default" command.</param>
+/// <param name="InsertDefaultConfirm">Asked before the default replaces content the editor already
+/// has — without the modal there is no "cancel" left to undo it with.</param>
+/// <param name="BadgeCustom">Badge on a file that differs from its baseline.</param>
+/// <param name="BadgeEmpty">Badge on a file that still comes from the theme.</param>
+/// <param name="Pick">Shown in the editor pane while no file is open.</param>
+/// <param name="Menu">Tooltip of the node menu ("…", right-click, context-menu key).</param>
+/// <param name="Toggle">Tooltip of the expander in front of a node.</param>
+/// <param name="Raw">Label of the switch to the plain form field of the open file.</param>
+/// <param name="Root">Fallback label for the tree's root when the template has no name yet.</param>
 public sealed record TemplateFileLabels(
-    string Edit, string Tokens, string InsertDefault, string Apply, string Cancel,
-    string BadgeCustom, string BadgeEmpty);
+    string Edit, string Tokens, string InsertDefault, string InsertDefaultConfirm,
+    string BadgeCustom, string BadgeEmpty,
+    string Pick, string Menu, string Toggle, string Raw, string Root);
 
 /// <summary>
-/// The whole "Dateien" tab: the file list, the hidden fields the form posts, and the CodeMirror
-/// modal that edits them. Shared so the CMS and the cloud offer the same editor — the pages differ
-/// only in which fields their files post as.
+/// The whole "Dateien" tab: the file tree, the fields the form posts and the editor that writes into
+/// them. Shared so the CMS and the cloud offer the same editor — the pages differ only in which
+/// fields their files post as.
 /// </summary>
-/// <param name="Intro">Raw HTML shown above the list (may contain markup).</param>
-/// <param name="Files">The pseudo-files, in display order.</param>
-/// <param name="Labels">Wording for the list and the modal.</param>
-public sealed record TemplateFiles(string Intro, IReadOnlyList<TemplateFile> Files, TemplateFileLabels Labels);
+/// <param name="Intro">Raw HTML shown above the tree (may contain markup).</param>
+/// <param name="Files">The pseudo-files, in display order — the tree keeps that order rather than
+/// sorting, because <c>body.html</c> is where one starts.</param>
+/// <param name="Labels">Wording for the tree and the editor.</param>
+/// <param name="RootLabel">The tree's single root — the template's name. Empty falls back to
+/// <see cref="TemplateFileLabels.Root"/>, which a template being created has to have.</param>
+public sealed record TemplateFiles(
+    string Intro, IReadOnlyList<TemplateFile> Files, TemplateFileLabels Labels, string RootLabel = "");

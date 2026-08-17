@@ -175,11 +175,21 @@ show the result, not just the values.
   because the id is what `{{placeholder}}` refers to and re-slugging it would break blocks already
   placed on live sites.
 - The template editor's **files tab is shared**: `MatCMS.Shared.Web/Pages/Shared/_TemplateFiles.cshtml`
-  renders the pseudo-file list (`body.html`, `article.html`, `styles.css`, `script.js`,
-  `maintenance.html`), the hidden fields the form posts, and the CodeMirror modal — for the CMS and
-  the cloud alike. The pages differ only in what their files post as, which is why `FieldName` is on
-  the model. The partial takes its wording as strings, not `@T[…]`: a shared view cannot reference
-  either application's `Localizer` type, though the resource keys (`tplfiles.*`) are identical in both.
+  renders the pseudo-files (`body.html`, `article.html`, `styles.css`, `script.js`,
+  `maintenance.html`) as a **tree** — one root (the template), its files below it, the open file on
+  the right with a slim menu bar, node actions on right-click / "…" / the context-menu key — for the
+  CMS and the cloud alike. Same build and the same admin classes as the plugin editor
+  (`.pf-tree`/`.pf-side`/`.pf-list`/`.pf-file`/`.pf-menu`/`.pf-ctx`); the badge *angepasst / leer*
+  hangs on every row, because which file is overridden and which still comes from the theme is the
+  one thing a prettier tree must not lose. The pages differ only in what their files post as, which
+  is why `FieldName` is on the model. The partial takes its wording as strings, not `@T[…]`: a shared
+  view cannot reference either application's `Localizer` type, though the resource keys
+  (`tplfiles.*`) are identical in both.
+  **It writes into the posted field on every keystroke.** It used to be a list of cards plus a
+  CodeMirror *modal* whose "Übernehmen" was the only path from the editor into the form field —
+  Abbrechen, Escape, a click on the overlay, a tab switch or a click on *Speichern* while the dialog
+  was open all threw the work away without asking. The raw field of the open file stays reachable
+  ("Rohform"), and without JavaScript all of them stand there labelled and editable.
 - `wwwroot/js/template-preview.js` has no MatCMS counterpart (its designer shows values, not the
   result). It renders a sample page — header, hero, buttons, cards — from the form's current values,
   uses the template's own `LayoutHtml` when it contains `{{content}}`, and marks unresolved `{{token}}`s

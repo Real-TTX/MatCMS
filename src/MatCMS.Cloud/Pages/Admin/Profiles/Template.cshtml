@@ -4,8 +4,8 @@
     ViewData["Title"] = Model.IsNew ? T["profiles.templateAdd"] : Model.Item.Name;
     var et = Model.Item;
 
-    // Same pseudo-files as the CMS, posting into this page's own field names. The list, the modal
-    // and the editor itself come from the shared partial.
+    // Same pseudo-files as the CMS, posting into this page's own field names. The tree and the
+    // editor itself come from the shared partial.
     var bodyTokens = new[]
     {
         new TemplateToken("{{content}}", T["templates.tokContent"]),
@@ -43,8 +43,13 @@
         },
         new TemplateFileLabels(
             T["tplfiles.edit"], T["tplfiles.tokens"], T["tplfiles.insertDefault"],
-            T["tplfiles.apply"], T["tplfiles.cancel"],
-            T["tplfiles.badgeCustom"], T["tplfiles.badgeEmpty"]));
+            T["tplfiles.insertDefaultConfirm"],
+            T["tplfiles.badgeCustom"], T["tplfiles.badgeEmpty"],
+            T["tplfiles.pick"], T["tplfiles.menu"], T["tplfiles.toggle"],
+            T["tplfiles.raw"], T["tplfiles.root"]),
+        // Die Wurzel des Baums ist dieses Template. Ein neues hat noch keinen Namen — dann greift
+        // das Ersatzwort aus den Beschriftungen.
+        et.Name ?? "");
 }
 <div class="page-head">
     <h1>

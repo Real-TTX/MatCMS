@@ -601,6 +601,7 @@
   "backup.formsSection": "Forms",
   "backup.assets": "Media / logo (uploads)",
   "backup.plugins": "Plugins (code & files)",
+  "backup.pluginAssets": "Plugin uploads (plugin images, CSS, JS)",
   "profiles.backupQuota": "Cloud backup storage (GB)",
   "profiles.backupQuotaHint": "Per instance in this profile. Empty = the cloud default ({0} GB). When an instance is full, the next upload drops its oldest backup.",
   "backups.used": "Used",

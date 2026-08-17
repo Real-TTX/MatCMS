@@ -410,6 +410,7 @@
   "backup.forms": "Forms (incl. submissions)",
   "backup.assets": "Media / logo (uploads)",
   "backup.plugins": "Plugins (code & files)",
+  "backup.pluginAssets": "Plugin uploads (plugin images, CSS, JS)",
   "backup.pluginsHint": "Plugins are matched by their key on restore. A plugin that is new here comes back disabled — plugin code runs on the server and has to be reviewed before it is switched on. An existing plugin keeps its state.",
   "backup.users": "Users (incl. passwords)",
   "backup.usersWarn": "Contains credentials (password hashes). Only enable for migrations to a new instance and keep the backup file secure.",

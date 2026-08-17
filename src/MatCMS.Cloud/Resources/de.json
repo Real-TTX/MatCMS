@@ -601,6 +601,7 @@
   "backup.formsSection": "Formulare",
   "backup.assets": "Medien / Logo (Uploads)",
   "backup.plugins": "Plugins (Code & Dateien)",
+  "backup.pluginAssets": "Plugin-Uploads (Bilder, CSS, JS der Plugins)",
   "profiles.backupQuota": "Cloud-Speicher für Backups (GB)",
   "profiles.backupQuotaHint": "Je Instanz dieses Profils. Leer = der Standard der Cloud ({0} GB). Ist eine Instanz voll, fällt beim nächsten Upload ihr ältestes Backup weg.",
   "backups.used": "Belegt",

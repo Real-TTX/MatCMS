@@ -26,6 +26,11 @@ public class BackupScheduleConfig
     /// what an already-stored schedule from before this field falls back to, so existing sites start
     /// carrying their plugins on the very next run instead of only after someone re-saves the form.</summary>
     public bool Plugins { get; set; } = true;
+    /// <summary>The files uploaded into the plugins' own asset folders. Default ON for the same reason
+    /// as Plugins — a stored schedule from before this field falls back to the default, so a site starts
+    /// carrying them on the next run instead of only after someone re-saves the form. Its own tick
+    /// because these are binaries: they can grow a backup, and the backup quota is finite.</summary>
+    public bool PluginAssets { get; set; } = true;
 
     // Granular within-section selection. Empty = the whole section; otherwise only these items.
     /// <summary>Template names to back up (empty = all).</summary>

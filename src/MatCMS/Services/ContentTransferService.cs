@@ -12,7 +12,8 @@ namespace MatCMS.Services;
 /// <summary>
 /// Backup &amp; Restore of the site. A backup is a ZIP containing <c>content.json</c>
 /// (Templates, Pages incl. ContentBlocks, Menu items, Settings, contact submissions, Plugins) and,
-/// optionally, an <c>assets/</c> folder with the uploaded media (wwwroot/uploads).
+/// optionally, an <c>assets/</c> folder with the uploaded media (appdata/uploads) plus a
+/// <c>plugin-assets/{key}/</c> folder per plugin with the files uploaded into that plugin.
 /// Admin users (incl. password hashes) are an OPT-IN section (off by default) — sensitive, meant for
 /// full migrations; on restore they UPSERT by username so the current admin can't be locked out.
 /// Plugins UPSERT by <c>Key</c> and a newly created one comes back DISABLED (see the import below).
@@ -61,6 +62,16 @@ public class ContentTransferService
         /// only exists in this database, so a backup without it is the one thing a nightly backup cannot
         /// bring back.</summary>
         public bool Plugins { get; set; } = true;
+        /// <summary>
+        /// The files uploaded into the plugins' own asset folders (<c>appdata/plugin-assets/{Key}/</c>).
+        /// ON by default, because a restored plugin without its images and stylesheets is a plugin that
+        /// looks installed and renders broken.
+        /// <para>Its OWN switch, next to the other sections rather than folded into "Plugins": these are
+        /// binaries and can make a backup noticeably bigger, backups sit unencrypted in the cloud volume
+        /// and there is a per-instance storage quota. Anything that can grow a backup has to be
+        /// switchable where everything else about a backup is decided — not ride along quietly.</para>
+        /// </summary>
+        public bool PluginAssets { get; set; } = true;
         /// <summary>Admin users incl. password hashes. OFF by default — sensitive; only for full migrations.</summary>
         public bool Users { get; set; } = false;
 
@@ -73,7 +84,8 @@ public class ContentTransferService
         public List<string>? PageKeys { get; set; }      // by "slug|locale" (see PageKey)
         public List<string>? FormSlugs { get; set; }     // by form Slug
 
-        public bool Any => Templates || Pages || Menus || Settings || Submissions || Forms || Assets || Plugins || Users;
+        public bool Any => Templates || Pages || Menus || Settings || Submissions || Forms || Assets
+                           || Plugins || PluginAssets || Users;
     }
 
     /// <summary>Stable identity of a page for granular backup/restore: slug + content locale.</summary>
@@ -97,6 +109,9 @@ public class ContentTransferService
         public int Plugins { get; set; }
         public int Users { get; set; }
         public bool HasAssets { get; set; }
+        /// <summary>How many plugin-asset files the ZIP carries. Shown before a restore like every other
+        /// section — a number nobody sees is a section that gets restored blind.</summary>
+        public int PluginAssets { get; set; }
         // True when that section restores as a per-item UPSERT (others survive); false = replace-all.
         public bool TemplatesPartial { get; set; }
         public bool PagesPartial { get; set; }
@@ -104,6 +119,17 @@ public class ContentTransferService
     }
 
     private string UploadsDir => StoragePaths.Uploads(_env);
+    private string PluginAssetsDir => StoragePaths.PluginAssets(_env);
+
+    /// <summary>
+    /// Folder the plugins' uploaded files live under inside the ZIP — one level deeper than the media,
+    /// because they belong to a plugin: <c>plugin-assets/{key}/{file}</c>, the same shape as on disk.
+    /// <para>Deliberately the same MECHANISM as <c>assets/</c> and not a second one: entries in the same
+    /// zip, an extension allow-list, and "restore what is in the file, leave the rest alone". What
+    /// differs is only the allow-list — the plugin one from <c>PluginBundle</c>, which excludes SVG
+    /// because a plugin asset is served from the site's own origin.</para>
+    /// </summary>
+    private const string PluginAssetFolder = "plugin-assets/";
 
     /// <summary>Builds a ZIP backup (content.json + optional assets/) and returns its bytes.</summary>
     public async Task<byte[]> ExportAsync(BackupOptions options, string? exportedAtUtc = null)
@@ -126,6 +152,25 @@ public class ContentTransferService
                     await using var es = entry.Open();
                     await using var fs = File.OpenRead(file);
                     await fs.CopyToAsync(es);
+                }
+            }
+
+            // The plugins' own uploaded files. One folder per plugin key, exactly as on disk — the key
+            // has to travel, or a restore would not know which plugin a stylesheet belongs to.
+            if (options.PluginAssets && Directory.Exists(PluginAssetsDir))
+            {
+                foreach (var pluginDir in Directory.GetDirectories(PluginAssetsDir))
+                {
+                    var key = Path.GetFileName(pluginDir);
+                    if (string.IsNullOrWhiteSpace(key)) continue;
+                    foreach (var file in Directory.GetFiles(pluginDir))
+                    {
+                        var entry = zip.CreateEntry(
+                            PluginAssetFolder + key + "/" + Path.GetFileName(file), CompressionLevel.Optimal);
+                        await using var es = entry.Open();
+                        await using var fs = File.OpenRead(file);
+                        await fs.CopyToAsync(es);
+                    }
                 }
             }
         }
@@ -351,7 +396,52 @@ public class ContentTransferService
             assetCount++;
         }
 
-        return assetCount > 0 ? $"{summary} ({assetCount} Medien)" : summary;
+        var pluginAssetCount = await RestorePluginAssetsAsync(zip);
+
+        var extra = new List<string>();
+        if (assetCount > 0) extra.Add($"{assetCount} Medien");
+        if (pluginAssetCount > 0) extra.Add($"{pluginAssetCount} Plugin-Dateien");
+        return extra.Count > 0 ? $"{summary} ({string.Join(", ", extra)})" : summary;
+    }
+
+    /// <summary>
+    /// Puts the plugins' uploaded files back under <c>appdata/plugin-assets/{key}/</c>.
+    /// <para>Both path parts are rebuilt rather than trusted, which is the whole security of this: the
+    /// key is re-slugified to a single folder name and the file name is stripped of any directory part,
+    /// so a crafted backup cannot write one byte outside the plugin-assets tree — a restore runs as the
+    /// server, and a backup is a file somebody hands us.</para>
+    /// <para>Nothing is removed. A file that is no longer in the backup stays where it is, exactly as a
+    /// restore leaves untouched sections alone: a restore is not a synchronisation.</para>
+    /// </summary>
+    private async Task<int> RestorePluginAssetsAsync(ZipArchive zip)
+    {
+        var count = 0;
+        foreach (var entry in zip.Entries)
+        {
+            var norm = entry.FullName.Replace('\\', '/');
+            if (!norm.StartsWith(PluginAssetFolder, StringComparison.OrdinalIgnoreCase)) continue;
+
+            var rest = norm[PluginAssetFolder.Length..];
+            var slash = rest.IndexOf('/');
+            if (slash <= 0) continue;                                   // no plugin folder → not ours
+
+            var key = Pages.Admin.Pages.IndexModel.Slugify(rest[..slash]);
+            var name = PluginPackager.SanitizeFileName(rest[(slash + 1)..]);
+            if (string.IsNullOrEmpty(key) || string.IsNullOrEmpty(name)) continue;
+
+            var ext = Path.GetExtension(name).ToLowerInvariant();
+            if (!MatCMS.Shared.PluginBundle.AllowedAssetExt.Contains(ext)) continue;
+            if (entry.Length > MatCMS.Shared.PluginBundle.MaxAssetBytes) continue;
+
+            var dir = StoragePaths.PluginAssetDir(_env, key);
+            Directory.CreateDirectory(dir);
+            var dest = Path.Combine(dir, name);
+            await using (var es = entry.Open())
+            await using (var fs = File.Create(dest))
+                await es.CopyToAsync(fs);
+            count++;
+        }
+        return count;
     }
 
     /// <summary>
@@ -937,6 +1027,7 @@ public class ContentTransferService
         var isZip = data.Length >= 4 && data[0] == 0x50 && data[1] == 0x4B && data[2] == 0x03 && data[3] == 0x04;
         string json;
         var hasAssets = false;
+        var pluginAssets = 0;
         if (isZip)
         {
             using var ms = new MemoryStream(data);
@@ -947,6 +1038,8 @@ public class ContentTransferService
             json = r.ReadToEnd();
             hasAssets = zip.Entries.Any(e => e.FullName.StartsWith("assets/", StringComparison.OrdinalIgnoreCase)
                                              && !string.IsNullOrWhiteSpace(Path.GetFileName(e.FullName)));
+            pluginAssets = zip.Entries.Count(e => e.FullName.StartsWith(PluginAssetFolder, StringComparison.OrdinalIgnoreCase)
+                                                  && !string.IsNullOrWhiteSpace(Path.GetFileName(e.FullName)));
         }
         else
         {
@@ -974,6 +1067,7 @@ public class ContentTransferService
             Plugins = dto.Plugins?.Count ?? 0,
             Users = dto.Users?.Count ?? 0,
             HasAssets = hasAssets,
+            PluginAssets = pluginAssets,
             TemplatesPartial = dto.TemplatesPartial,
             PagesPartial = dto.PagesPartial,
             FormsPartial = dto.FormsPartial

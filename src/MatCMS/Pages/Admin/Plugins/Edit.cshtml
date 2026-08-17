@@ -518,7 +518,54 @@
                         showMenu(r.left, r.bottom, items);
                     });
                 }
+
+                // Ziehen ist die ZUGABE zum Menü, nicht der Weg dorthin: jedes Ziel, das man hier
+                // treffen kann, steht auch unter „Verschieben nach …“ — ohne das wäre der Baum auf
+                // einem Gerät ohne Maus nicht zu bedienen. Die Einstiegsdatei und der Systemordner
+                // sind weder Fracht noch Ziel; sie können nicht verschoben werden.
+                if (o.kind === 'file' || o.kind === 'folder') {
+                    row.draggable = true;
+                    row.addEventListener('dragstart', function (ev) {
+                        drag = o;
+                        row.classList.add('dragging');
+                        if (ev.dataTransfer) {
+                            ev.dataTransfer.effectAllowed = 'move';
+                            ev.dataTransfer.setData('text/plain', o.path);
+                        }
+                    });
+                    row.addEventListener('dragend', function () { row.classList.remove('dragging'); drag = null; });
+                }
+                if (o.kind === 'root' || o.kind === 'folder') {
+                    var dropDir = o.kind === 'root' ? '' : o.path;
+                    row.addEventListener('dragover', function (ev) {
+                        if (!dropOk(dropDir)) return;
+                        // Ohne preventDefault lehnt der Browser das Ablegen ab — und nur dann darf
+                        // die Zeile sich auch als Ziel zeigen.
+                        ev.preventDefault();
+                        if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move';
+                        row.classList.add('is-drop');
+                    });
+                    row.addEventListener('dragleave', function () { row.classList.remove('is-drop'); });
+                    row.addEventListener('drop', function (ev) {
+                        row.classList.remove('is-drop');
+                        if (!dropOk(dropDir)) return;
+                        ev.preventDefault();
+                        var d = drag;
+                        drag = null;
+                        moveNode(d, dropDir);
+                    });
+                }
                 return row;
+            }
+
+            // Was gerade gezogen wird, und wohin es überhaupt darf. Dieselben Regeln wie im Menü —
+            // sie stehen an einer Stelle, damit Ziehen nicht erlaubt, was das Menü verbietet.
+            var drag = null;
+            function dropOk(dir) {
+                if (!drag) return false;
+                if (dirOf(drag.path) === dir) return false;                  // dort liegt es schon
+                if (drag.kind === 'folder' && (dir === drag.path || dir.indexOf(drag.path + '/') === 0)) return false;
+                return true;
             }
 
             // ---- Kontextmenü ------------------------------------------------------------------

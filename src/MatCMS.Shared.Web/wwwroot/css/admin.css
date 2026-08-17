@@ -1164,6 +1164,11 @@ table.data .btn { white-space: nowrap; }
 /* Das Zahnrad an der Wurzel benutzt den Knopf der Menüleiste — derselbe flache Knopf im selben
    Baum. */
 .pf-file .pf-menu-item { flex: 0 0 auto; padding: 3px 6px; line-height: 1; }
+/* Ziehen im Baum: dieselbe Sprache wie beim Verschieben von Blöcken (.block-item.dragging) — die
+   Fracht wird blass, das Ziel hebt sich hervor. Das Hervorheben liegt am Namen und nicht an der
+   ganzen Zeile, damit es genauso aussieht wie die offene Datei und nicht wie ein zweiter Zustand. */
+.pf-file.dragging { opacity: .55; }
+.pf-file.is-drop .pf-file-name { background: color-mix(in srgb, var(--accent, #2563eb) 22%, transparent); }
 /* Das Kontextmenü des Baums ist gebaut wie das Sprachmenü in der Fußleiste
    (.admin-foot-lang-menu/.admin-lang-opt) — nur steht es am Zeiger statt an einem Knopf. Deshalb
    position: fixed am body: in der scrollenden Liste wäre es abgeschnitten, sobald es länger ist

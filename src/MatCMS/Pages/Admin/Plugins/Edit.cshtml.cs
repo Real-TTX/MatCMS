@@ -73,14 +73,24 @@ public class EditModel : PageModel
             return Page();
         }
 
+        // Nur eine gültige Karte Pfad → Inhalt wird gespeichert. Unsinn hier stillschweigend zu
+        // übernehmen hieße, ihn erst beim nächsten Start des Plugins zu bemerken — ihn
+        // stillschweigend WEGZUWERFEN wäre schlimmer: dann wäre der Code weg. Deshalb bleibt die
+        // Seite bei einem unbrauchbaren Pfad stehen und sagt, welcher es ist; das Feld behält dabei
+        // seinen Inhalt und ist unter „Erweitert“ von Hand zu retten.
+        var (filesJson, filesError) = NormalizeFiles(FilesJson);
+        if (filesError is not null)
+        {
+            Error = filesError;
+            return Page();
+        }
+
         p.Name = name;
         p.Description = (Description ?? "").Trim();
         p.Version = (Version ?? "").Trim();
         p.Code = Code ?? "";
         p.ConfigJson = SanitizeConfig(ConfigJson);
-        // Nur eine gültige Karte Pfad → Inhalt wird gespeichert. Unsinn hier stillschweigend zu
-        // übernehmen hieße, ihn erst beim nächsten Start des Plugins zu bemerken.
-        p.FilesJson = SanitizeFiles(FilesJson);
+        p.FilesJson = filesJson;
         p.Enabled = Enabled;
         await _db.SaveChangesAsync();
 
@@ -216,16 +226,70 @@ public class EditModel : PageModel
         catch { return "{}"; }
     }
 
-    /// <summary>Leert das Feld bei ungültigem JSON oder falscher Form. Ein Plugin mit kaputter
-    /// Dateikarte startet sonst gar nicht, und der Fehler stünde erst im Log statt im Editor.</summary>
-    private static string SanitizeFiles(string? json)
+    /// <summary>Der Ordnername des zweiten Zweiges im Baum (hochgeladene Dateien auf der Platte).
+    /// Ohne das abschließende "/" — hier wird ein Pfadabschnitt verglichen, keine ZIP-Eintragung.</summary>
+    private static readonly string AssetBranch =
+        MatCMS.Shared.PluginBundle.AssetFolder.TrimEnd('/');
+
+    /// <summary>
+    /// Prüft und begradigt die Dateikarte Pfad → Inhalt. Ein Ordner ist nichts als ein "/" im Pfad,
+    /// es gibt kein zweites Speicherformat.
+    ///
+    /// <para>Begradigt wird still, was nur Schreibweise ist: Rückwärtsschrägstriche, doppelte oder
+    /// führende "/", "./", Leerraum um die Abschnitte. Das ändert nichts an der Bedeutung.</para>
+    ///
+    /// <para>Zurückgewiesen wird, was mehrdeutig oder gefährlich ist — mit Nennung des Pfades, statt
+    /// ihn stillschweigend fallenzulassen: "..", ein Pfad, der auf "/" endet (ein LEERER Ordner —
+    /// den kann eine flache Karte nicht tragen, und wer ihn anbietet und beim Speichern verschluckt,
+    /// nimmt dem Benutzer etwas weg, das er angelegt zu haben glaubte), der Zweig "assets/" (der
+    /// gehört der Platte und nicht dieser Karte), die Einstiegsdatei (die liegt im Feld Code) und
+    /// zwei Schlüssel, die nach dem Begradigen derselbe Pfad wären.</para>
+    /// </summary>
+    /// <returns>Das begradigte JSON, oder eine Meldung, warum nichts gespeichert wurde.</returns>
+    private static (string Json, string? Error) NormalizeFiles(string? json)
     {
-        if (string.IsNullOrWhiteSpace(json)) return "{}";
-        try
+        if (string.IsNullOrWhiteSpace(json)) return ("{}", null);
+
+        Dictionary<string, string>? map;
+        try { map = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(json); }
+        catch { return ("{}", "Die Dateikarte ist kein gültiges JSON — bitte unter „Erweitert“ korrigieren."); }
+        if (map is null) return ("{}", null);
+
+        // Sortiert gespeichert: die Rohform liest sich dann wie der Baum daneben.
+        var clean = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (rawKey, content) in map)
         {
-            var map = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(json);
-            return map is null ? "{}" : System.Text.Json.JsonSerializer.Serialize(map);
+            var raw = (rawKey ?? "").Replace('\\', '/').Trim();
+            if (raw.EndsWith('/'))
+                return ("{}", $"„{rawKey}“ ist ein leerer Ordner. Ein Ordner entsteht mit seiner ersten Datei — "
+                              + "lege eine Datei darin an.");
+
+            var segments = new List<string>();
+            foreach (var part in raw.Split('/'))
+            {
+                var s = part.Trim();
+                if (s.Length == 0 || s == ".") continue;
+                if (s == "..")
+                    return ("{}", $"„{rawKey}“ enthält „..“. Pfade gelten ab der Wurzel des Plugins.");
+                if (s.Any(ch => char.IsControl(ch) || ch is ':' or '*' or '?' or '"' or '<' or '>' or '|'))
+                    return ("{}", $"„{rawKey}“ enthält unzulässige Zeichen.");
+                segments.Add(s);
+            }
+            if (segments.Count == 0)
+                return ("{}", "Ein Pfad in der Dateikarte ist leer.");
+
+            var path = string.Join('/', segments);
+            if (string.Equals(segments[0], AssetBranch, StringComparison.OrdinalIgnoreCase))
+                return ("{}", $"„{rawKey}“: „{AssetBranch}/“ ist der Ordner der hochgeladenen Dateien. "
+                              + "Skriptdateien gehören nicht dorthin.");
+            if (string.Equals(path, EntryFile, StringComparison.OrdinalIgnoreCase))
+                return ("{}", $"„{EntryFile}“ ist die Einstiegsdatei und liegt nicht in der Dateikarte.");
+            if (clean.ContainsKey(path))
+                return ("{}", $"„{path}“ kommt zweimal vor.");
+
+            clean[path] = content ?? "";
         }
-        catch { return "{}"; }
+        return (System.Text.Json.JsonSerializer.Serialize(clean,
+            new System.Text.Json.JsonSerializerOptions { WriteIndented = true }), null);
     }
 }

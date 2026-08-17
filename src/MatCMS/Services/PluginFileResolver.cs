@@ -39,12 +39,55 @@ public sealed class PluginFileResolver : SourceReferenceResolver
         }
     }
 
-    private static string Normalise(string path) => path.Replace('\\', '/').TrimStart('.', '/');
+    /// <summary>Ein Pfad der Karte: Abschnitte durch "/", ohne "." und "..", ohne führendes "/".
+    /// Ein ".." am Anfang kann nicht aus dem Plugin herausführen — es gibt nichts außerhalb der
+    /// Karte, und der Abschnitt fällt weg statt eine Ebene über der Wurzel zu landen.</summary>
+    private static string Normalise(string path)
+    {
+        var segments = new List<string>();
+        foreach (var part in path.Replace('\\', '/').Split('/'))
+        {
+            var s = part.Trim();
+            if (s.Length == 0 || s == ".") continue;
+            if (s == "..")
+            {
+                if (segments.Count > 0) segments.RemoveAt(segments.Count - 1);
+                continue;
+            }
+            segments.Add(s);
+        }
+        return string.Join('/', segments);
+    }
 
     public override string NormalizePath(string path, string? baseFilePath) => Normalise(path);
 
+    /// <summary>
+    /// Sucht ZUERST ab der Wurzel des Plugins — so bleibt jedes bestehende <c>#load "menu.csx"</c>
+    /// genau das, was es war —, und erst danach neben der ladenden Datei.
+    ///
+    /// <para>Ohne den zweiten Schritt wäre ein <c>#load "Helper.csx"</c> aus
+    /// <c>Elements/Hero.csx</c> heraus ins Leere gelaufen, obwohl die Datei direkt daneben liegt:
+    /// mit Ordnern ist genau das die Schreibweise, die man erwartet.</para>
+    /// </summary>
     public override string? ResolveReference(string path, string? baseFilePath)
-        => _files.ContainsKey(Normalise(path)) ? Normalise(path) : null;
+    {
+        var direct = Normalise(path);
+        if (_files.ContainsKey(direct)) return direct;
+
+        // baseFilePath ist der aufgelöste Pfad der Datei, in der das #load steht (bei der
+        // Einstiegsdatei leer — dort gibt es kein "daneben", sie liegt selbst an der Wurzel).
+        if (!string.IsNullOrEmpty(baseFilePath))
+        {
+            var baseDir = Normalise(baseFilePath);
+            var cut = baseDir.LastIndexOf('/');
+            if (cut > 0)
+            {
+                var relative = Normalise(baseDir[..cut] + "/" + path);
+                if (_files.ContainsKey(relative)) return relative;
+            }
+        }
+        return null;
+    }
 
     public override Stream OpenRead(string resolvedPath)
         => _files.TryGetValue(Normalise(resolvedPath), out var content)

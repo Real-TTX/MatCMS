@@ -2,6 +2,52 @@
 @model MatCMS.Pages.Admin.Plugins.EditModel
 @{
     ViewData["Title"] = T["plugins.edit"];
+
+    // Der Baum wird vom Skript gezeichnet und kann darin kein T[...] aufrufen — also kommen seine Texte
+    // hier an einer Stelle zusammen und gehen als ein Stück hinüber. Einzeln in den Code gestreute
+    // Übersetzungen sind der Weg, auf dem eine davon irgendwann Deutsch bleibt.
+    var treeTexts = System.Text.Json.JsonSerializer.Serialize(new
+    {
+        title = T["plugins.title"],
+        settings = T["plugins.settings"],
+        fileNew = T["plugins.fileNew"],
+        folderNew = T["plugins.folderNew"],
+        fileAsk = T["plugins.fileAskName"],
+        folderAsk = T["plugins.folderAskName"],
+        folderFirst = T["plugins.folderFirstFile"],
+        folderNothing = T["plugins.folderNothingCreated"],
+        pathInvalid = T["plugins.pathInvalid"],
+        del = T["action.delete"],
+        fileDel = T["plugins.fileDeleteConfirm"],
+        folderDel = T["plugins.folderDeleteConfirm"],
+        delHint = T["plugins.deleteSaveHint"],
+        assetUpload = T["plugins.assetUpload"],
+        assetDelete = T["plugins.assetDelete"],
+        assetDel = T["plugins.assetDeleteConfirm"],
+        assetDelHint = T["plugins.assetDeleteHint"],
+        assetUrlCopy = T["plugins.assetUrlCopy"],
+        assetUrlCopied = T["plugins.assetUrlCopied"],
+        assetsNone = T["plugins.assetsNone"],
+        assetUnsaved = T["plugins.assetUnsaved"],
+        broken = T["plugins.filesBroken"],
+        none = T["plugins.filesNone"],
+        menu = T["plugins.nodeMenu"],
+        toggle = T["plugins.treeToggle"],
+        entryTitle = T["plugins.entryFileTitle"],
+        sysFolder = T["plugins.systemFolderTitle"]
+    });
+
+    // Die hochgeladenen Dateien kommen als Liste vom Server ins Skript. Nur er weiß, was im Ordner
+    // liegt — und was der Baum später löscht, ist genau dieser Name und nichts, was aus der Seite
+    // zusammengesucht wurde.
+    var treeAssets = System.Text.Json.JsonSerializer.Serialize(
+        Model.Assets.Select(a => new
+        {
+            name = a.Name,
+            size = a.Size,
+            kind = a.Kind,
+            url = $"/plugin-assets/{Model.Current.Key}/{a.Name}"
+        }));
 }
 <div class="page-head">
     <h1>@T["plugins.edit"]</h1>
@@ -55,56 +101,22 @@
                sehen, WELCHE Datei im Feld steht. *@
             <div class="tab-panel" data-pf-panel="editor">
             <div class="pf-tree">
+                @* EIN Baum, eine Wurzel: das Plugin. Darunter hängen die Systemdatei plugin.csx,
+                   der Systemordner assets/ und die eigenen Ordner und Dateien — eingerückt, auf-
+                   und zuklappbar. Zwei nebeneinanderstehende Listen mit je eigener Kopfzeile waren
+                   keine Baumansicht, sondern zwei Listen, die so taten.
+                   Vollständig vom Skript gezeichnet, weil der Baum sich beim Anlegen einer Datei
+                   ändern muss, ohne dass die Seite neu lädt — die hochgeladenen Dateien kommen
+                   dafür als Liste vom Server ins Skript (siehe ASSETS unten) und nicht aus dem
+                   Markup: was gelöscht wird, ist genau der Name, den der Server geschickt hat. *@
                 <aside class="pf-side">
-                    @* Die Wurzel trägt das Zahnrad, weil die Einstellungen dem PLUGIN gehören und
-                       nicht einer seiner Dateien. Auf der Seite bleibt damit der Editor. *@
-                    <div class="pf-root">
-                        <i class="ti ti-package" aria-hidden="true"></i>
-                        <span data-pf-root-name>@(string.IsNullOrWhiteSpace(Model.Name) ? T["plugins.title"] : Model.Name)</span>
-                        <button type="button" class="pf-menu-item" data-pf-settings
-                                title="@T["plugins.settings"]" aria-label="@T["plugins.settings"]"><i class="ti ti-settings" aria-hidden="true"></i></button>
-                    </div>
                     <div class="pf-list" data-pf-list></div>
-                    @* Zweiter Zweig: die hochgeladenen Dateien aus appdata/plugin-assets/{Key}.
-                       Sie gehören demselben Plugin, liegen aber auf der Platte und nicht im
-                       Formular — deshalb ein eigener Zweig und keine Zeile in der Dateikarte:
-                       eine Datei, die man hier "anlegt", würde beim Speichern nirgends landen.
-                       Serverseitig gerendert, weil nur der Server weiß, was im Ordner liegt. *@
-                    <div class="pf-root">
-                        <i class="ti ti-folder" aria-hidden="true"></i>
-                        <span class="mono">@MatCMS.Shared.PluginBundle.AssetFolder</span>
-                        <button type="button" class="pf-menu-item" data-pf-asset-add
-                                title="@T["plugins.assetUpload"]" aria-label="@T["plugins.assetUpload"]"><i class="ti ti-upload" aria-hidden="true"></i></button>
-                    </div>
-                    <div class="pf-list">
-                        @if (Model.Assets.Count == 0)
-                        {
-                            <div class="help">@T["plugins.assetsNone"]</div>
-                        }
-                        @foreach (var a in Model.Assets)
-                        {
-                            <div class="pf-file">
-                                @* Name, Größe, Art und URL kommen vom Server an den Knopf. Was der
-                                   Baum später löscht, ist genau dieser Name — nichts, was das
-                                   Skript aus der Seite zusammensucht. *@
-                                <button type="button" class="pf-file-name mono" data-pf-asset="@a.Name"
-                                        data-pf-asset-size="@a.Size" data-pf-asset-kind="@a.Kind"
-                                        data-pf-asset-url="/plugin-assets/@Model.Current.Key/@a.Name">@a.Name</button>
-                            </div>
-                        }
-                    </div>
-                    <div class="pf-actions">
-                        <button type="button" class="btn btn-sm btn-ghost" data-pf-add>+ @T["plugins.fileAdd"]</button>
-                    </div>
                 </aside>
                 <div class="pf-main">
-                    @* Menüleiste des Editors. Bewusst nur mit Einträgen, hinter denen etwas liegt —
-                       ein Menü "Blaupausen", das noch nichts kann, verspricht mehr als da ist und
-                       lässt einen suchen, was es nicht gibt. Es kommt dazu, wenn es etwas
-                       auszuführen gibt. Hier stehen nur Befehle für die offene Datei; das Umschalten
-                       zwischen Editor, Log und Rohform passiert eine Ebene höher. *@
+                    @* Menüleiste des Editors: sie sagt, WELCHE Datei offen ist. Angelegt wird am
+                       Knoten im Baum, zu dem es gehört — ein "Neue Datei" hier oben sagte nicht,
+                       in welchem Ordner die Datei landet. *@
                     <div class="pf-menu">
-                        <button type="button" class="pf-menu-item" data-pf-add-top>@T["plugins.fileNew"]</button>
                         <span class="pf-menu-file mono" data-pf-current></span>
                     </div>
                     @* Fläche für eine Skriptdatei. *@
@@ -265,12 +277,21 @@
             // sonst sähe es aus, als wäre beides gleichzeitig offen.
             var openAsset = null;
             // Die Einstiegsdatei liegt NICHT in der Karte, sondern im eigenen Feld Code — sie ist
-            // das, was ausgeführt wird, die anderen werden von ihr geladen. Im Baum steht sie
-            // trotzdem obenan, weil sie für den Bearbeiter eine Datei wie jede andere ist.
+            // das, was ausgeführt wird, die anderen werden von ihr geladen. Im Baum ist sie die
+            // Systemdatei: immer da, an der Wurzel, ohne Menü zum Löschen oder Verschieben.
             var ENTRY = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(MatCMS.Pages.Admin.Plugins.EditModel.EntryFile));
+            // Der Systemordner. Ohne "/" — hier wird ein Pfadabschnitt verglichen.
+            var ASSETDIR = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(MatCMS.Shared.PluginBundle.AssetFolder.TrimEnd('/')));
+            var ASSETS = @Html.Raw(treeAssets);
+            var TXT = @Html.Raw(treeTexts);
             var codeField = document.getElementById('Code');
             var codeMirror = document.querySelector('[data-pf-code-mirror]');
+            var nameField = document.getElementById('Name');
             var empty = root.querySelector('[data-pf-empty]');
+            // Zugeklappte Knoten, nach Kennung. Voreingestellt ist AUFgeklappt: nach dem Speichern
+            // lädt die Seite neu, und ein Baum, der dann zugeklappt dasteht, sieht aus, als wäre
+            // die Arbeit weg.
+            var collapsed = {};
 
             function read() {
                 try { return JSON.parse(field.value || '{}') || {}; } catch (e) { return null; }
@@ -281,54 +302,346 @@
                 field.value = JSON.stringify(map, null, 2);
             }
 
+            // ---- Der Baum ---------------------------------------------------------------------
+            // Aus der FLACHEN Karte Pfad → Inhalt wird hier — und nur hier, zum Zeichnen — ein
+            // verschachtelter Baum. Gespeichert bleibt die Karte: ein Ordner ist nichts als ein "/"
+            // im Pfad. Ein zweites Speicherformat müsste jeder, der die Karte liest, mitlernen.
+            function build(map) {
+                var top = { name: '', path: '', dirs: {}, files: [] };
+                Object.keys(map).forEach(function (p) {
+                    var segs = p.split('/');
+                    var node = top;
+                    for (var i = 0; i < segs.length - 1; i++) {
+                        var s = segs[i];
+                        if (!node.dirs[s]) node.dirs[s] = { name: s, path: (node.path ? node.path + '/' : '') + s, dirs: {}, files: [] };
+                        node = node.dirs[s];
+                    }
+                    node.files.push({ name: segs[segs.length - 1], path: p });
+                });
+                return top;
+            }
+
+            function byName(a, b) { return a.toLowerCase() < b.toLowerCase() ? -1 : (a.toLowerCase() > b.toLowerCase() ? 1 : 0); }
+
+            function hint(text, depth) {
+                var d = document.createElement('div');
+                d.className = 'help';
+                d.style.paddingLeft = (10 + depth * 14) + 'px';
+                d.textContent = text;
+                return d;
+            }
+
             function render() {
                 var map = read();
                 list.innerHTML = '';
-                if (map === null) {
-                    var bad = document.createElement('div');
-                    bad.className = 'help';
-                    bad.textContent = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(T["plugins.filesBroken"].ToString()));
-                    list.appendChild(bad);
-                    return;
-                }
-                var names = Object.keys(map).sort();
-                names.unshift(ENTRY);
-                if (!names.length) {
-                    var none = document.createElement('div');
-                    none.className = 'help';
-                    none.textContent = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(T["plugins.filesNone"].ToString()));
-                    list.appendChild(none);
-                }
-                names.forEach(function (name) {
-                    var row = document.createElement('div');
-                    row.className = 'pf-file' + (name === open && openAsset === null ? ' is-open' : '');
-                    var openBtn = document.createElement('button');
-                    openBtn.type = 'button';
-                    openBtn.className = 'pf-file-name mono';
-                    openBtn.textContent = name;
-                    openBtn.addEventListener('click', function () { show(name); });
-                    // Die Einstiegsdatei bekommt kein Löschkreuz: ohne sie gäbe es kein Plugin,
-                    // und ein Knopf, der das anbietet, wäre eine Falle.
-                    if (name === ENTRY) {
-                        row.appendChild(openBtn);
-                        list.appendChild(row);
-                        return;
-                    }
-                    var del = document.createElement('button');
-                    del.type = 'button';
-                    del.className = 'pf-file-del';
-                    del.textContent = '✕';
-                    del.title = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(T["action.delete"].ToString()));
-                    del.addEventListener('click', function () {
-                        if (!confirm(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(T["plugins.fileDeleteConfirm"].ToString())) + ' ' + name)) return;
-                        var m = read(); if (m === null) return;
-                        delete m[name];
-                        if (open === name) { open = null; editor.hidden = true; if (empty) empty.hidden = false; }
-                        write(m); render();
+                if (map === null) { list.appendChild(hint(TXT.broken, 1)); return; }
+
+                // Die Wurzel ist das Plugin selbst. Alles hängt darunter — auch der Systemordner,
+                // der bisher als zweite Liste danebenstand und damit behauptete, er gehöre nicht
+                // dazu.
+                list.appendChild(rowFor({
+                    id: ':root', kind: 'root', depth: 0, path: '',
+                    label: (nameField && nameField.value.trim()) || TXT.title,
+                    icon: 'ti-package', expandable: true
+                }));
+                if (collapsed[':root']) return;
+
+                // Reihenfolge unter der Wurzel: erst die beiden Systemeinträge, dann was der
+                // Bearbeiter selbst angelegt hat (Ordner vor Dateien, jeweils alphabetisch).
+                // plugin.csx steht damit ÜBER den Ordnern und bricht die Regel "Ordner zuerst" —
+                // absichtlich: sie ist immer da, sie ist der Anfang, und man sucht sie oben. So
+                // hält es auch eine Entwicklungsumgebung mit ihren festen Knoten.
+                list.appendChild(rowFor({
+                    id: ':entry', kind: 'entry', depth: 1, path: ENTRY, label: ENTRY,
+                    icon: 'ti-file-code', title: TXT.entryTitle, mono: true,
+                    isOpen: open === ENTRY && openAsset === null,
+                    activate: function () { show(ENTRY); }
+                }));
+
+                list.appendChild(rowFor({
+                    id: ':assets', kind: 'assetdir', depth: 1, path: ASSETDIR, label: ASSETDIR + '/',
+                    icon: collapsed[':assets'] ? 'ti-folder' : 'ti-folder-open',
+                    title: TXT.sysFolder, mono: true, expandable: true
+                }));
+                if (!collapsed[':assets']) {
+                    if (!ASSETS.length) list.appendChild(hint(TXT.assetsNone, 2));
+                    ASSETS.forEach(function (a) {
+                        list.appendChild(rowFor({
+                            id: ':a:' + a.name, kind: 'asset', depth: 2, path: ASSETDIR + '/' + a.name,
+                            label: a.name, icon: /\.(png|jpe?g|gif|webp)$/i.test(a.name) ? 'ti-photo' : 'ti-file',
+                            mono: true, asset: a, isOpen: openAsset === a.name,
+                            activate: function () { showAsset(a); }
+                        }));
                     });
-                    row.appendChild(openBtn); row.appendChild(del);
-                    list.appendChild(row);
+                }
+
+                var top = build(map);
+                if (!Object.keys(top.dirs).length && !top.files.length) list.appendChild(hint(TXT.none, 1));
+                renderDir(top, 1);
+            }
+
+            function renderDir(node, depth) {
+                Object.keys(node.dirs).sort(byName).forEach(function (key) {
+                    var dir = node.dirs[key];
+                    var id = ':d:' + dir.path;
+                    list.appendChild(rowFor({
+                        // Mit "/" wie der Systemordner: ein Ordner sieht auf einen Blick anders aus
+                        // als eine Datei ohne Endung.
+                        id: id, kind: 'folder', depth: depth, path: dir.path, label: dir.name + '/',
+                        icon: collapsed[id] ? 'ti-folder' : 'ti-folder-open', mono: true, expandable: true
+                    }));
+                    if (!collapsed[id]) renderDir(dir, depth + 1);
                 });
+                node.files.sort(function (a, b) { return byName(a.name, b.name); }).forEach(function (f) {
+                    list.appendChild(rowFor({
+                        id: ':f:' + f.path, kind: 'file', depth: depth, path: f.path, label: f.name,
+                        icon: 'ti-file-text', mono: true, isOpen: open === f.path && openAsset === null,
+                        activate: function () { show(f.path); }
+                    }));
+                });
+            }
+
+            function icon(name) {
+                var i = document.createElement('i');
+                i.className = 'ti ' + name;
+                i.setAttribute('aria-hidden', 'true');
+                return i;
+            }
+
+            // Eine Zeile des Baums. Alles, was sie später tut, hängt an DIESEM Knoten: der Pfad
+            // steht in o.path und wird nicht aus Beschriftungen oder Nachbarzeilen erraten.
+            function rowFor(o) {
+                var row = document.createElement('div');
+                row.className = 'pf-file' + (o.isOpen ? ' is-open' : '');
+                row.style.paddingLeft = (4 + o.depth * 14) + 'px';
+
+                var twist = document.createElement('button');
+                twist.type = 'button';
+                twist.className = 'pf-twist';
+                if (o.expandable) {
+                    twist.appendChild(icon(collapsed[o.id] ? 'ti-chevron-right' : 'ti-chevron-down'));
+                    twist.title = TXT.toggle;
+                    twist.setAttribute('aria-label', TXT.toggle + ': ' + o.label);
+                    twist.setAttribute('aria-expanded', collapsed[o.id] ? 'false' : 'true');
+                    twist.addEventListener('click', function (ev) {
+                        ev.stopPropagation();
+                        collapsed[o.id] = !collapsed[o.id];
+                        render();
+                    });
+                } else {
+                    twist.tabIndex = -1;
+                    twist.setAttribute('aria-hidden', 'true');
+                }
+                row.appendChild(twist);
+
+                var name = document.createElement('button');
+                name.type = 'button';
+                name.className = 'pf-file-name' + (o.mono ? ' mono' : '');
+                name.appendChild(icon(o.icon));
+                name.appendChild(document.createTextNode(o.label));
+                if (o.title) name.title = o.title;
+                name.addEventListener('click', o.activate || function () {
+                    if (o.expandable) { collapsed[o.id] = !collapsed[o.id]; render(); }
+                });
+                row.appendChild(name);
+
+                // Das Zahnrad bleibt an der Wurzel: die Einstellungen gehören dem PLUGIN, und ein
+                // Weg, der ohne Rechtsklick auskommt, muss sichtbar bleiben.
+                if (o.kind === 'root') {
+                    var gear = document.createElement('button');
+                    gear.type = 'button';
+                    gear.className = 'pf-menu-item';
+                    gear.title = TXT.settings;
+                    gear.setAttribute('aria-label', TXT.settings);
+                    gear.appendChild(icon('ti-settings'));
+                    gear.addEventListener('click', function (ev) { ev.stopPropagation(); openSettings(); });
+                    row.appendChild(gear);
+                }
+
+                // Das Menü hängt am Knoten und richtet sich nach ihm. plugin.csx bekommt keins:
+                // löschen, umbenennen, verschieben kann man sie nicht — ein Menü mit ausgegrauten
+                // Einträgen behauptete, es ginge doch irgendwie.
+                var items = menuFor(o);
+                if (items.length) {
+                    var more = document.createElement('button');
+                    more.type = 'button';
+                    more.className = 'pf-more';
+                    more.title = TXT.menu;
+                    more.setAttribute('aria-label', TXT.menu + ': ' + o.label);
+                    more.appendChild(icon('ti-dots'));
+                    more.addEventListener('click', function (ev) {
+                        ev.stopPropagation();
+                        var r = more.getBoundingClientRect();
+                        showMenu(r.left, r.bottom, items);
+                    });
+                    row.appendChild(more);
+                    // Rechtsklick auf die ganze Zeile — und, weil nicht jedes Gerät eine rechte
+                    // Maustaste hat, derselbe Inhalt über den Knopf oben und die Kontextmenü-Taste.
+                    row.addEventListener('contextmenu', function (ev) {
+                        ev.preventDefault();
+                        showMenu(ev.clientX, ev.clientY, items);
+                    });
+                    name.addEventListener('keydown', function (ev) {
+                        if (ev.key !== 'ContextMenu' && !(ev.shiftKey && ev.key === 'F10')) return;
+                        ev.preventDefault();
+                        var r = name.getBoundingClientRect();
+                        showMenu(r.left, r.bottom, items);
+                    });
+                }
+                return row;
+            }
+
+            // ---- Kontextmenü ------------------------------------------------------------------
+            var menuEl = null;
+            function closeMenu() { if (menuEl) { menuEl.remove(); menuEl = null; } }
+            function showMenu(x, y, items) {
+                closeMenu();                                   // nie zwei gleichzeitig
+                var m = document.createElement('div');
+                m.className = 'pf-ctx';
+                m.setAttribute('role', 'menu');
+                items.forEach(function (it) {
+                    var b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'pf-ctx-item' + (it.danger ? ' is-danger' : '');
+                    b.setAttribute('role', 'menuitem');
+                    b.textContent = it.label;
+                    b.addEventListener('click', function () { closeMenu(); it.run(); });
+                    m.appendChild(b);
+                });
+                document.body.appendChild(m);
+                // Am Zeiger, aber im Fenster: sonst steht das Menü einer Datei ganz unten in der
+                // Liste zur Hälfte außerhalb und die Hälfte, die man braucht, fehlt.
+                m.style.left = Math.max(4, Math.min(x, window.innerWidth - m.offsetWidth - 6)) + 'px';
+                m.style.top = Math.max(4, Math.min(y, window.innerHeight - m.offsetHeight - 6)) + 'px';
+                menuEl = m;
+                var first = m.querySelector('.pf-ctx-item');
+                if (first) first.focus();
+            }
+            document.addEventListener('click', function (ev) {
+                if (menuEl && !menuEl.contains(ev.target)) closeMenu();
+            });
+            document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') closeMenu(); });
+            window.addEventListener('resize', closeMenu);
+            list.addEventListener('scroll', closeMenu);
+
+            function menuFor(o) {
+                var items = [];
+                if (o.kind === 'root' || o.kind === 'folder') {
+                    var dir = o.kind === 'root' ? '' : o.path;
+                    items.push({ label: TXT.fileNew, run: function () { newFile(dir); } });
+                    items.push({ label: TXT.folderNew, run: function () { newFolder(dir); } });
+                }
+                if (o.kind === 'root') items.push({ label: TXT.settings, run: openSettings });
+                if (o.kind === 'folder') items.push({ label: TXT.del, danger: true, run: function () { deleteFolder(o.path); } });
+                if (o.kind === 'file') items.push({ label: TXT.del, danger: true, run: function () { deleteFile(o.path); } });
+                // Im Systemordner liegen Dateien von der PLATTE. "Neue Datei" wäre dort ein Eintrag
+                // in der Karte und würde beim Speichern nirgends landen — deshalb hochladen.
+                if (o.kind === 'assetdir') items.push({ label: TXT.assetUpload, run: uploadAsset });
+                if (o.kind === 'asset') {
+                    items.push({ label: TXT.assetUrlCopy, run: function () { copyUrl(o.asset.url); } });
+                    items.push({ label: TXT.assetDelete, danger: true, run: function () { deleteAsset(o.asset.name); } });
+                }
+                return items;
+            }
+
+            function openSettings() { document.dispatchEvent(new CustomEvent('pf-settings-open')); }
+
+            // ---- Anlegen und Löschen ----------------------------------------------------------
+            // Dieselben Regeln wie serverseitig in NormalizeFiles: was hier durchkommt, kommt auch
+            // dort durch. Eine Oberfläche, die etwas anbietet, das der Server zurückweist, schickt
+            // einen los und lässt einen auflaufen.
+            function clean(raw) {
+                var s = (raw || '').replace(/\\/g, '/').trim();
+                if (!s || /\/$/.test(s)) return null;
+                var segs = [], ok = true;
+                s.split('/').forEach(function (part) {
+                    var t = part.trim();
+                    if (t === '' || t === '.') return;
+                    if (t === '..' || /[\u0000-\u001f:*?"<>|]/.test(t)) ok = false;
+                    segs.push(t);
+                });
+                if (!ok || !segs.length) return null;
+                if (segs[0].toLowerCase() === ASSETDIR.toLowerCase()) return null;
+                var p = segs.join('/');
+                if (p.toLowerCase() === ENTRY.toLowerCase()) return null;
+                return p;
+            }
+
+            function join(dir, name) { return dir ? dir + '/' + name : name; }
+
+            function expandTo(path) {
+                collapsed[':root'] = false;
+                var segs = path.split('/'), acc = '';
+                for (var i = 0; i < segs.length - 1; i++) {
+                    acc = acc ? acc + '/' + segs[i] : segs[i];
+                    collapsed[':d:' + acc] = false;
+                }
+            }
+
+            function newFile(dir) {
+                var raw = prompt(TXT.fileAsk + (dir ? ' — ' + dir + '/' : ''), 'neu.csx');
+                if (raw === null) return;
+                var path = clean(join(dir, raw.trim()));
+                if (!path) { alert(TXT.pathInvalid); return; }
+                var map = read();
+                if (map === null) { alert(TXT.broken); return; }
+                // Eine bestehende Datei wird geöffnet statt überschrieben — derselbe Name zweimal
+                // anzulegen ist fast immer ein Vertipper, kein Wunsch, sie zu leeren.
+                if (!(path in map)) { map[path] = ''; write(map); }
+                expandTo(path);
+                show(path);
+            }
+
+            // Ein Ordner entsteht MIT seiner ersten Datei. Die flache Karte Pfad → Inhalt kann
+            // keinen leeren Ordner tragen; einen anzubieten und ihn beim Speichern stillschweigend
+            // fallenzulassen, nähme dem Bearbeiter etwas weg, das er angelegt zu haben glaubte.
+            // Deshalb wird die erste Datei gleich hier verlangt — und wer abbricht, bekommt gesagt,
+            // dass nichts entstanden ist.
+            function newFolder(dir) {
+                var raw = prompt(TXT.folderAsk + (dir ? ' — ' + dir + '/' : ''), 'Elements');
+                if (raw === null) return;
+                var folder = clean(join(dir, raw.trim()));
+                if (!folder) { alert(TXT.pathInvalid); return; }
+                var first = prompt(TXT.folderFirst + ' ' + folder + '/', 'neu.csx');
+                if (first === null || !first.trim()) { alert(TXT.folderNothing); return; }
+                var path = clean(folder + '/' + first.trim());
+                if (!path) { alert(TXT.pathInvalid); return; }
+                var map = read();
+                if (map === null) { alert(TXT.broken); return; }
+                if (!(path in map)) { map[path] = ''; write(map); }
+                expandTo(path);
+                show(path);
+            }
+
+            function closeIfOpen(path) {
+                if (open !== path) return;
+                open = null;
+                current.textContent = '';
+                editor.hidden = true;
+                if (empty) empty.hidden = false;
+            }
+
+            // Gelöscht wird GENAU der Pfad des Knotens, und die Frage nennt ihn — man soll sehen,
+            // was man trifft, statt es aus der Zeile zu schließen, auf die man gezielt hat.
+            function deleteFile(path) {
+                if (!confirm(TXT.fileDel + '\n\n' + path + '\n\n' + TXT.delHint)) return;
+                var map = read(); if (map === null) return;
+                delete map[path];
+                write(map);
+                closeIfOpen(path);
+                render();
+            }
+
+            // Ein Ordner nimmt seinen Inhalt mit — deshalb steht in der Frage, WIE VIELE Dateien
+            // das sind. "Sind ja nur ein paar" ist genau der Fall, der später weh tut.
+            function deleteFolder(path) {
+                var map = read(); if (map === null) return;
+                var prefix = path + '/';
+                var hit = Object.keys(map).filter(function (k) { return k.indexOf(prefix) === 0; });
+                if (!confirm(TXT.folderDel.replace('{0}', hit.length) + '\n\n' + prefix + '\n\n' + TXT.delHint)) return;
+                hit.forEach(function (k) { delete map[k]; closeIfOpen(k); });
+                write(map);
+                render();
             }
 
             // ---- Reiter über dem Editor ------------------------------------------------------
@@ -360,7 +673,6 @@
                     // längst etwas anderes steht.
                     if (openAsset !== null) {
                         openAsset = null;
-                        assetBtns.forEach(function (o) { o.parentNode.classList.remove('is-open'); });
                         render();
                     }
                     // Zurück zum Editor: die offene Datei wird NEU aus den Feldern gelesen. Wer
@@ -380,59 +692,67 @@
             var savedFiles = field.value;
             function unsavedOk() {
                 if ((!codeField || codeField.value === savedCode) && field.value === savedFiles) return true;
-                return confirm(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(T["plugins.assetUnsaved"].ToString())));
+                return confirm(TXT.assetUnsaved);
             }
             var upForm = document.getElementById('asset-upload-form');
             var upInput = document.getElementById('asset-file');
             var delForm = document.getElementById('asset-delete-form');
             var delName = document.getElementById('asset-delete-name');
-            var assetBtns = root.querySelectorAll('[data-pf-asset]');
-            // NUR innerhalb der Fläche suchen: die Knöpfe im Baum tragen dieselben Merkmale
-            // (data-pf-asset-kind, -size, -url), und ein Suchlauf über den ganzen Baum trifft
-            // zuerst den Knopf. Genau das hat im Test den Dateinamen im Baum durch "35 B"
-            // ersetzt — die Anzeige schrieb in ihre eigene Quelle.
             var panel = root.querySelector('[data-pf-view="asset"]');
 
-            function showAsset(btn) {
-                openAsset = btn.getAttribute('data-pf-asset');
+            // Was hier angezeigt wird, kommt aus dem Eintrag, den der Server geschickt hat — nicht
+            // aus dem Markup der Zeile. Als die Anzeige ihre Werte noch aus dem Baum las, schrieb
+            // sie im Test den Dateinamen im Baum durch "35 B" — sie schrieb in ihre eigene Quelle.
+            function showAsset(a) {
+                openAsset = a.name;
                 activateTab('asset');
-                assetBtns.forEach(function (o) { o.parentNode.classList.toggle('is-open', o === btn); });
                 render();
-                var size = parseInt(btn.getAttribute('data-pf-asset-size') || '0', 10);
-                var url = btn.getAttribute('data-pf-asset-url') || '';
-                panel.querySelector('[data-pf-asset-name]').textContent = openAsset;
-                panel.querySelector('[data-pf-asset-kind]').textContent = btn.getAttribute('data-pf-asset-kind') || '';
-                panel.querySelector('[data-pf-asset-size]').textContent = size < 1024 ? size + ' B' : Math.round(size / 1024) + ' KB';
-                panel.querySelector('[data-pf-asset-url]').value = url;
+                panel.querySelector('[data-pf-asset-name]').textContent = a.name;
+                panel.querySelector('[data-pf-asset-kind]').textContent = a.kind || '';
+                panel.querySelector('[data-pf-asset-size]').textContent = a.size < 1024 ? a.size + ' B' : Math.round(a.size / 1024) + ' KB';
+                panel.querySelector('[data-pf-asset-url]').value = a.url;
                 // Bilder zeigt man, statt sie zu beschreiben — bei den übrigen Typen gäbe es nichts
                 // zu sehen und ein kaputtes Bildsymbol wäre die einzige Aussage.
                 var img = panel.querySelector('[data-pf-asset-preview]');
                 if (img) {
-                    var isImage = /\.(png|jpe?g|gif|webp)$/i.test(openAsset);
+                    var isImage = /\.(png|jpe?g|gif|webp)$/i.test(a.name);
                     img.hidden = !isImage;
-                    img.src = isImage ? url : '';
+                    img.src = isImage ? a.url : '';
                 }
             }
-            assetBtns.forEach(function (b) { b.addEventListener('click', function () { showAsset(b); }); });
 
-            if (upInput && upForm) {
-                root.querySelectorAll('[data-pf-asset-add]').forEach(function (b) {
-                    b.addEventListener('click', function () { if (unsavedOk()) upInput.click(); });
-                });
-                // Ein Klick, nicht zwei: wer eine Datei gewählt hat, will sie hochladen. Die
-                // Grenzen (Typ, Größe, Anzahl) prüft weiterhin der Server — das accept hier ist
-                // Bequemlichkeit im Dateidialog, keine Zusicherung.
-                upInput.addEventListener('change', function () {
-                    if (upInput.files && upInput.files.length) upForm.submit();
-                });
+            // Ein Klick, nicht zwei: wer eine Datei gewählt hat, will sie hochladen. Die Grenzen
+            // (Typ, Größe, Anzahl) prüft weiterhin der Server — das accept ist Bequemlichkeit im
+            // Dateidialog, keine Zusicherung.
+            if (upInput && upForm) upInput.addEventListener('change', function () {
+                if (upInput.files && upInput.files.length) upForm.submit();
+            });
+            function uploadAsset() {
+                if (!upInput || !upForm) return;
+                if (unsavedOk()) upInput.click();
             }
-            var delBtn = panel ? panel.querySelector('[data-pf-asset-del]') : null;
-            if (delBtn && delForm && delName) delBtn.addEventListener('click', function () {
-                if (openAsset === null) return;
-                if (!confirm(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(T["plugins.assetDeleteConfirm"].ToString())) + ' ' + openAsset)) return;
+
+            // Der Unterschied gehört in die Frage: eine Skriptdatei verschwindet erst mit dem
+            // Speichern aus der Karte, diese hier ist sofort von der Platte weg. Beides gleich
+            // harmlos aussehen zu lassen, wäre die eigentliche Falle.
+            function deleteAsset(name) {
+                if (!delForm || !delName) return;
+                if (!confirm(TXT.assetDel + '\n\n' + ASSETDIR + '/' + name + '\n\n' + TXT.assetDelHint)) return;
                 if (!unsavedOk()) return;
-                delName.value = openAsset;
+                delName.value = name;
                 delForm.submit();
+            }
+
+            function copyUrl(url) {
+                var done = function () { alert(TXT.assetUrlCopied + ' ' + url); };
+                if (navigator.clipboard && navigator.clipboard.writeText)
+                    navigator.clipboard.writeText(url).then(done, function () { prompt(TXT.assetUrlCopy, url); });
+                else prompt(TXT.assetUrlCopy, url);
+            }
+
+            var delBtn = panel ? panel.querySelector('[data-pf-asset-del]') : null;
+            if (delBtn) delBtn.addEventListener('click', function () {
+                if (openAsset !== null) deleteAsset(openAsset);
             });
 
             function show(name) {
@@ -441,7 +761,6 @@
                 // der Editor steht.
                 activateTab('editor');
                 openAsset = null;
-                assetBtns.forEach(function (o) { o.parentNode.classList.remove('is-open'); });
                 open = name;
                 current.textContent = name;
                 content.value = name === ENTRY ? codeField.value : (map[name] != null ? map[name] : '');
@@ -465,23 +784,11 @@
                 write(map);
             });
 
-            function addFile() {
-                var name = (prompt(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(T["plugins.fileAskName"].ToString())), 'neu.csx') || '').trim();
-                if (!name) return;
-                var map = read();
-                if (map === null) { alert(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(T["plugins.filesBroken"].ToString()))); return; }
-                // Eine bestehende Datei wird geöffnet statt überschrieben — derselbe Name zweimal
-                // anzulegen ist fast immer ein Vertipper, kein Wunsch, sie zu leeren.
-                if (!(name in map)) { map[name] = ''; write(map); }
-                show(name);
-            }
-            // Zwei Wege zum selben: der Knopf unter der Liste und der in der Menüleiste.
-            root.querySelectorAll('[data-pf-add], [data-pf-add-top]').forEach(function (b) {
-                b.addEventListener('click', addFile);
-            });
-
-            // Von Hand am Rohfeld geändert: die Liste zieht nach.
+            // Von Hand am Rohfeld geändert: der Baum zieht nach.
             field.addEventListener('input', function () { render(); });
+            // Der Name des Plugins steht an der Wurzel und zieht beim Tippen im Dialog mit — sonst
+            // widerspricht der Baum dem Dialog, solange nicht gespeichert wurde.
+            if (nameField) nameField.addEventListener('input', function () { render(); });
             if (codeMirror) codeMirror.addEventListener('input', function () {
                 codeField.value = codeMirror.value;
                 if (open === ENTRY) content.value = codeMirror.value;
@@ -496,7 +803,6 @@
             var dialog = document.querySelector('[data-pf-settings-dialog]');
             if (!dialog) return;
             var nameField = document.getElementById('Name');
-            var rootName = document.querySelector('[data-pf-root-name]');
 
             function open() {
                 dialog.classList.add('open');
@@ -504,18 +810,15 @@
             }
             function close() { dialog.classList.remove('open'); }
 
-            document.querySelectorAll('[data-pf-settings]').forEach(function (b) { b.addEventListener('click', open); });
+            // Der Baum zeichnet seine Wurzel selbst und ersetzt sie bei jeder Änderung. Ein Knopf,
+            // an dem hier ein Zuhörer hinge, wäre nach dem ersten Neuzeichnen tot — deshalb ruft
+            // der Baum den Dialog über ein Ereignis, nicht über ein Element.
+            document.addEventListener('pf-settings-open', open);
             dialog.querySelectorAll('[data-pf-settings-close]').forEach(function (b) { b.addEventListener('click', close); });
             // Klick auf den Schleier schließt, Klick im Dialog nicht.
             dialog.addEventListener('click', function (e) { if (e.target === dialog) close(); });
             document.addEventListener('keydown', function (e) {
                 if (e.key === 'Escape' && dialog.classList.contains('open')) close();
-            });
-
-            // Der Name steht an der Wurzel des Baums — er zieht sofort nach, sonst widerspricht der
-            // Baum dem Dialog, solange nicht gespeichert wurde.
-            if (nameField && rootName) nameField.addEventListener('input', function () {
-                rootName.textContent = nameField.value.trim() || @Html.Raw(System.Text.Json.JsonSerializer.Serialize(T["plugins.title"].ToString()));
             });
 
             // Ein required-Feld in einem ausgeblendeten Dialog kann der Browser nicht anspringen: er

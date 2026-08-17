@@ -1,75 +1,33 @@
-@model string?
+@model MatCMS.Pages.Shared.IconPickVm
+@*
+    Nur noch der Adapter. Die Auswahl selbst — Knopf, Dialog, Suche, Raster — steht EINMAL in
+    MatCMS.Shared.Web/Pages/Shared/_IconField.cshtml und wird von der Cloud genauso benutzt. Hier
+    bleiben die zwei Dinge, die eine geteilte Ansicht nicht kann: die Übersetzungen (sie kennt keinen
+    der beiden Localizer) und die alten Icon-Namen (MenuIcons.Resolve gibt es nur im CMS).
+
+    Der Name der Datei bleibt _IconPicker, damit die Seiten, die sie einbinden, sie weiter finden.
+*@
 @{
-    var current = MatCMS.Content.MenuIcons.Resolve(Model);
+    // Alte, kuratierte Namen ("whatsapp", "globe") auf ihren Tabler-Namen bringen — sonst stünde auf
+    // dem Knopf ein leeres Kästchen für ein Symbol, das es sehr wohl gibt.
+    var current = MatCMS.Content.MenuIcons.Resolve(Model.Value);
+    var field = new MatCMS.Shared.Web.IconField(
+        Value: current,
+        FieldName: Model.FieldName,
+        Label: T[Model.LabelKey],
+        Labels: new MatCMS.Shared.Web.IconFieldLabels(
+            Pick: T["icons.pick"],
+            DialogTitle: T["icons.dialogTitle"],
+            Search: T["icons.search"],
+            None: T["icons.none"],
+            NoResults: T["icons.noResults"],
+            Apply: T["icons.apply"],
+            Cancel: T["action.cancel"],
+            Unknown: T["icons.unknown"],
+            Empty: T["icons.empty"],
+            Count: T["icons.count"]),
+        Help: string.IsNullOrEmpty(Model.HelpKey) ? "" : T[Model.HelpKey],
+        WhenSelectId: Model.MenuOnly ? "Menu" : "",
+        WhenSelectValue: "toolbar");
 }
-@* Reusable searchable Tabler-icon picker. Posts the chosen name in a hidden input named "Icon".
-   Used by menu items (toolbar), components, … The menu-only visibility rule at the bottom stays
-   inert on pages without a #Menu select. *@
-<div class="form-field icon-picker" data-icon-picker>
-    <label>@T["menus.icon"]</label>
-    <input type="hidden" name="Icon" value="@current" data-icon-input />
-    <div class="icon-current">
-        <span class="icon-current-preview" data-icon-preview>
-            @if (!string.IsNullOrEmpty(current))
-            {
-                <i class="ti ti-@current" aria-hidden="true"></i>
-            }
-        </span>
-        <span class="icon-current-name" data-icon-name>@(string.IsNullOrEmpty(current) ? "—" : current)</span>
-        <button type="button" class="btn btn-sm btn-ghost" data-icon-clear>@T["menus.iconNone"]</button>
-    </div>
-    <input type="text" class="icon-search" placeholder="@T["menus.iconSearch"]" data-icon-search autocomplete="off" />
-    <div class="icon-grid" data-icon-grid></div>
-    <div class="help">@T["menus.iconHelp"]</div>
-</div>
-<script src="~/_content/MatCMS.Shared.Web/lib/tabler-icons/icon-names.js" asp-append-version="true"></script>
-<script>
-    (function () {
-        var wrap = document.querySelector('[data-icon-picker]');
-        if (!wrap) return;
-        var input = wrap.querySelector('[data-icon-input]');
-        var grid = wrap.querySelector('[data-icon-grid]');
-        var search = wrap.querySelector('[data-icon-search]');
-        var preview = wrap.querySelector('[data-icon-preview]');
-        var nameEl = wrap.querySelector('[data-icon-name]');
-        var all = window.TABLER_ICONS || [];
-        var CAP = 120;
-
-        function select(name) {
-            input.value = name || '';
-            preview.innerHTML = name ? '<i class="ti ti-' + name + '"></i>' : '';
-            nameEl.textContent = name || '—';
-            grid.querySelectorAll('.icon-tile').forEach(function (t) {
-                t.classList.toggle('sel', t.getAttribute('data-icon') === name);
-            });
-        }
-        function render(q) {
-            q = (q || '').trim().toLowerCase();
-            var list = q ? all.filter(function (n) { return n.indexOf(q) !== -1; }) : all;
-            var shown = list.slice(0, CAP);
-            var html = shown.map(function (n) {
-                return '<button type="button" class="icon-tile' + (n === input.value ? ' sel' : '') +
-                    '" data-icon="' + n + '" title="' + n + '"><i class="ti ti-' + n + '"></i></button>';
-            }).join('');
-            if (list.length === 0) html += '<div class="icon-more">' + '@T["menus.iconNoResults"]' + '</div>';
-            else if (list.length > CAP) html += '<div class="icon-more">+' + (list.length - CAP) + ' …</div>';
-            grid.innerHTML = html;
-        }
-        grid.addEventListener('click', function (e) {
-            var t = e.target.closest('.icon-tile');
-            if (t) select(t.getAttribute('data-icon'));
-        });
-        var deb;
-        search.addEventListener('input', function () {
-            clearTimeout(deb);
-            deb = setTimeout(function () { render(search.value); }, 120);
-        });
-        wrap.querySelector('[data-icon-clear]').addEventListener('click', function () { select(''); });
-        render('');
-
-        // Menu-only rule: on the menu-item form the icon applies to the toolbar menu only. Inert elsewhere.
-        var menu = document.getElementById('Menu');
-        function sync() { wrap.style.display = (menu && menu.value === 'toolbar') ? '' : 'none'; }
-        if (menu) { menu.addEventListener('change', sync); sync(); }
-    })();
-</script>
+<partial name="_IconField" model="field" />

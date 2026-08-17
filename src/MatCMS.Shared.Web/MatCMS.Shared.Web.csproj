@@ -22,4 +22,69 @@
        What belongs here: anything both admins must render IDENTICALLY. What does not: anything
        product-specific — cloud.css stays in the cloud, the CMS's public-site scripts stay in the CMS. -->
 
+  <!-- ===== Die Namensliste der Symbole kommt aus dem AUSGELIEFERTEN Paket =====
+       icon-names.js ist kein von Hand gepflegtes Verzeichnis, sondern der Auszug aus genau der CSS,
+       die der Browser auch lädt: jede Regel `.ti-<name>::before` ist ein Symbol, das die Schrift
+       wirklich enthält. Eine abgetippte Liste veraltet beim nächsten Paketwechsel und stimmt dann
+       STILL nicht mehr — die Auswahl böte Symbole an, die als leeres Kästchen ankommen, und ließe
+       neue weg, ohne dass es irgendwo auffiele.
+
+       Die erzeugte Datei bleibt eingecheckt: ein `dotnet publish` oder ein Docker-Bau, der dieses
+       Ziel nicht ausführt, findet sie trotzdem vor. Geschrieben wird nur, wenn sich der Inhalt
+       wirklich unterscheidet — sonst wanderte bei jedem Bau ein Zeitstempel und der Baum wäre nie
+       sauber. -->
+  <UsingTask TaskName="GenerateTablerIconNames" TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <CssFile ParameterType="System.String" Required="true" />
+      <OutFile ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System" />
+      <Using Namespace="System.Collections.Generic" />
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Text" />
+      <Using Namespace="System.Text.RegularExpressions" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        var css = File.ReadAllText(CssFile);
+        // Dokumentreihenfolge, keine eigene Sortierung: das Paket liefert die Regeln bereits
+        // geordnet, und eine zweite Ordnung hier hieße, dass jeder Paketwechsel die ganze Datei
+        // umschreibt statt nur die neuen Namen einzufügen.
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var sb = new StringBuilder("window.TABLER_ICONS=[");
+        var first = true;
+        foreach (Match m in Regex.Matches(css, @"\.ti-([a-z0-9-]+)::?before"))
+        {
+            var name = m.Groups[1].Value;
+            if (!seen.Add(name)) continue;
+            if (!first) sb.Append(',');
+            sb.Append('"').Append(name).Append('"');
+            first = false;
+        }
+        sb.Append("];");
+        var text = sb.ToString();
+
+        if (seen.Count < 100)
+        {
+            // Lieber laut scheitern als eine leere Auswahl ausliefern: findet der Auszug fast nichts,
+            // hat das Paket sein Format geändert und der Ausdruck oben muss nachgezogen werden.
+            Log.LogError("Tabler-Icons: nur " + seen.Count + " Namen aus " + CssFile + " gelesen — das Format der CSS hat sich geändert.");
+        }
+        else if (!File.Exists(OutFile) || File.ReadAllText(OutFile) != text)
+        {
+            File.WriteAllText(OutFile, text, new UTF8Encoding(false));
+            Log.LogMessage(MessageImportance.High, "Tabler-Icons: " + seen.Count + " Namen nach " + OutFile + " geschrieben.");
+        }
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
+  <Target Name="GenerateIconNames" BeforeTargets="BeforeBuild"
+          Inputs="wwwroot/lib/tabler-icons/tabler-icons.min.css"
+          Outputs="wwwroot/lib/tabler-icons/icon-names.js"
+          Condition="Exists('wwwroot/lib/tabler-icons/tabler-icons.min.css')">
+    <GenerateTablerIconNames CssFile="wwwroot/lib/tabler-icons/tabler-icons.min.css"
+                             OutFile="wwwroot/lib/tabler-icons/icon-names.js" />
+  </Target>
+
 </Project>

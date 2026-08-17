@@ -41,7 +41,11 @@
             <div class="help">@T["menus.parentHelp"]</div>
         </div>
     }
-    <partial name="_IconPicker" model="Model.Icon" />
+    @{
+        var iconVm = new MatCMS.Pages.Shared.IconPickVm(
+            Model.Icon, LabelKey: "menus.icon", HelpKey: "menus.iconHelp", MenuOnly: true);
+    }
+    <partial name="_IconPicker" model="iconVm" />
     <label class="check">
         <input type="checkbox" name="OpenInNewTab" value="true" @(Model.OpenInNewTab ? "checked" : "") /> @T["menus.openNewTab"]
     </label>

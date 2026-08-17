@@ -1144,5 +1144,16 @@
   "plugins.bpPublicForm": "Öffentliches Formular für Besucher",
   "plugins.bpPublicFormDesc": "AddPublicPage + Block mit Formular: Eingaben von der Website entgegennehmen und auf dieselbe Seite zurückleiten.",
   "plugins.bpStore": "Daten speichern und lesen",
-  "plugins.bpStoreDesc": "Die Daten des Plugins als JSON in einer SiteSetting — dort, wo das Backup sie mitnimmt."
+  "plugins.bpStoreDesc": "Die Daten des Plugins als JSON in einer SiteSetting — dort, wo das Backup sie mitnimmt.",
+  "icons.pick": "Icon wählen",
+  "icons.dialogTitle": "Icon wählen",
+  "icons.search": "Icon suchen … (z. B. mail, download, cloud)",
+  "icons.none": "Kein Icon",
+  "icons.noResults": "Keine Treffer",
+  "icons.apply": "Übernehmen",
+  "icons.unknown": "unbekannt",
+  "icons.empty": "Kein Icon gewählt",
+  "icons.count": "{0} von {1} angezeigt",
+  "components.icon": "Icon",
+  "components.iconHelp": "Wird im Block-Editor neben der Komponente angezeigt."
 }

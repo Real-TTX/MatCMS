@@ -675,5 +675,15 @@
   "add.instanceNewOff": "Erst Hosting einschalten — hier entlang.",
   "add.instanceJoin": "Mit Join-Code verbinden",
   "add.instanceAdopt": "Mit Anmeldedaten verbinden",
-  "add.instanceNew": "Neue Instanz anlegen"
+  "add.instanceNew": "Neue Instanz anlegen",
+  "icons.pick": "Icon wählen",
+  "icons.dialogTitle": "Icon wählen",
+  "icons.search": "Icon suchen … (z. B. mail, download, cloud)",
+  "icons.none": "Kein Icon",
+  "icons.noResults": "Keine Treffer",
+  "icons.apply": "Übernehmen",
+  "icons.unknown": "unbekannt",
+  "icons.empty": "Kein Icon gewählt",
+  "icons.count": "{0} von {1} angezeigt",
+  "profiles.componentIconHelp": "Wird im Block-Editor der Instanz neben der Komponente angezeigt."
 }

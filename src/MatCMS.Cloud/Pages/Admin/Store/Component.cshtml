@@ -36,10 +36,11 @@
                 </div>
             </div>
             <div class="form-row">
-                <div class="form-field">
-                    <label for="cicon">@T["profiles.componentIcon"]</label>
-                    <input id="cicon" name="icon" value="@ec.Icon" placeholder="photo" />
-                </div>
+                @{
+                    var iconVm = new MatCMS.Cloud.Pages.Shared.IconPickVm(
+                        ec.Icon, HelpKey: "profiles.componentIconHelp");
+                }
+                <partial name="_IconPicker" model="iconVm" />
                 <div class="form-field">
                     <label for="cdesc">@T["profiles.description"]</label>
                     <input id="cdesc" name="description" value="@ec.Description" />

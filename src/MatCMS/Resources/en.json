@@ -1144,5 +1144,16 @@
   "plugins.bpPublicForm": "Public form for visitors",
   "plugins.bpPublicFormDesc": "AddPublicPage + a block with a form: take input from the website and redirect back to the same page.",
   "plugins.bpStore": "Store and read data",
-  "plugins.bpStoreDesc": "The plugin's data as JSON in a SiteSetting — where the backup picks it up."
+  "plugins.bpStoreDesc": "The plugin's data as JSON in a SiteSetting — where the backup picks it up.",
+  "icons.pick": "Choose icon",
+  "icons.dialogTitle": "Choose icon",
+  "icons.search": "Search icon … (e.g. mail, download, cloud)",
+  "icons.none": "No icon",
+  "icons.noResults": "No matches",
+  "icons.apply": "Apply",
+  "icons.unknown": "unknown",
+  "icons.empty": "No icon chosen",
+  "icons.count": "{0} of {1} shown",
+  "components.icon": "Icon",
+  "components.iconHelp": "Shown next to the component in the block editor."
 }

@@ -675,5 +675,15 @@
   "add.instanceNewOff": "Switch hosting on first — this way.",
   "add.instanceJoin": "Connect with a join code",
   "add.instanceAdopt": "Connect with a login",
-  "add.instanceNew": "Create a new instance"
+  "add.instanceNew": "Create a new instance",
+  "icons.pick": "Choose icon",
+  "icons.dialogTitle": "Choose icon",
+  "icons.search": "Search icon … (e.g. mail, download, cloud)",
+  "icons.none": "No icon",
+  "icons.noResults": "No matches",
+  "icons.apply": "Apply",
+  "icons.unknown": "unknown",
+  "icons.empty": "No icon chosen",
+  "icons.count": "{0} of {1} shown",
+  "profiles.componentIconHelp": "Shown next to the component in the instance block editor."
 }

@@ -1,0 +1,83 @@
+@model MatCMS.Shared.Web.IconField
+@*
+    Die Symbolauswahl: man SIEHT das Symbol als Knopf, ein Klick öffnet den Dialog, danach steht das
+    gewählte Symbol wieder auf dem Knopf.
+
+    WAS SICH GEÄNDERT HAT UND WARUM: vorher stand hier ein Raster von 4962 Kacheln MITTEN IM
+    Formular, dauerhaft aufgeklappt. Es drängte die eigentlichen Felder nach unten, und die Auswahl
+    war eine Nebensache, die mehr Platz einnahm als Name und Beschreibung zusammen. Jetzt ist das
+    Raster dort, wo eine Auswahl hingehört: in einem Dialog, der aufgeht, wenn man ihn braucht.
+
+    DIE FALLE, DIE HIER GENAU ANDERSHERUM LIEGT ALS SONST: Beim Template- und beim Plugin-Editor gilt
+    "schreib bei jedem Tastendruck ins Formularfeld", weil dort GEARBEITET wird und ein Abbrechen
+    Arbeit vernichtet. Hier wird nicht gearbeitet, hier wird EINE Sache ausgesucht — deshalb schreibt
+    genau ein Weg (Übernehmen) in das Feld, und Abbrechen, Escape und der Klick daneben lassen es
+    unverändert. Ein Dialog, der schon beim Anklicken einer Kachel das Formular ändert, nähme einem
+    das Zurück, das man von einem Dialog erwartet.
+
+    UND: ein gespeicherter Name, den die ausgelieferte Schrift nicht (mehr) kennt, geht NICHT
+    verloren. Er steht auf dem Knopf, im Textfeld und im Dialog ganz oben mit dem Vermerk
+    "unbekannt" — und wer abbricht, behält ihn. Ihn beim Öffnen stillschweigend zu verwerfen wäre
+    genau die Art Verlust, die erst beim nächsten Speichern auffällt.
+
+    OHNE SKRIPT bleibt die Seite bedienbar: das Textfeld steht beschriftet da und ist das, was
+    abgeschickt wird. Erst das Skript blendet es aus und stellt den Knopf davor. Ein Knopf, der ohne
+    Skript nichts tut, und ein verstecktes Feld daneben — das hieße, eine Komponente wäre bei einem
+    Skriptfehler nicht mehr zu speichern.
+*@
+@{
+    // Eigene Kennung je Auswahl: auf einer Seite dürfen mehrere stehen (Menüpunkt-Formular und
+    // Komponenten-Editor benutzen dieselbe Datei), und ein festes id-Attribut hätte die Beschriftung
+    // der zweiten auf die erste zeigen lassen.
+    var uid = "icf-" + Guid.NewGuid().ToString("N")[..8];
+    var value = (Model.Value ?? "").Trim();
+    var labels = System.Text.Json.JsonSerializer.Serialize(new
+    {
+        pick = Model.Labels.Pick,
+        title = Model.Labels.DialogTitle,
+        search = Model.Labels.Search,
+        none = Model.Labels.None,
+        noResults = Model.Labels.NoResults,
+        apply = Model.Labels.Apply,
+        cancel = Model.Labels.Cancel,
+        unknown = Model.Labels.Unknown,
+        empty = Model.Labels.Empty,
+        count = Model.Labels.Count
+    });
+
+    // Skript und Namensliste gehören je Seite genau einmal hinein, auch wenn die Auswahl zweimal
+    // gerendert wird. Ohne diese Sperre stünde die 78-KB-Liste doppelt im Markup und das Skript
+    // liefe zweimal über dieselben Knöpfe.
+    var once = ViewContext.HttpContext.Items.TryAdd("MatCMS.IconField.Assets", true);
+}
+@* Die beiden data-icon-when-* fallen weg, wenn die Seite keine Bedingung mitgibt: Razor lässt ein
+   Attribut mit null-Wert ganz aus. *@
+<div class="form-field icon-picker" data-icon-picker data-icon-labels="@labels"
+     data-icon-when="@(string.IsNullOrEmpty(Model.WhenSelectId) ? null : Model.WhenSelectId)"
+     data-icon-when-value="@(string.IsNullOrEmpty(Model.WhenSelectId) ? null : Model.WhenSelectValue)">
+    <label for="@uid">@Model.Label</label>
+
+    @* Das Feld, das abgeschickt wird — und das, was ohne Skript dasteht. Der Dialog schreibt hier
+       hinein; er ersetzt es nicht. Der Name bleibt der, den die Seite immer schon benutzt hat. *@
+    <input type="text" id="@uid" name="@Model.FieldName" value="@value" class="mono icon-raw"
+           spellcheck="false" autocomplete="off" data-icon-input />
+
+    @* Mit Skript: der Knopf mit dem Symbol. Bis das Skript läuft, ist die Reihe versteckt — ein
+       Knopf, der nichts tut, ist irreführender als gar keiner. *@
+    <div class="icon-current" data-icon-row hidden>
+        <button type="button" class="icon-current-preview" data-icon-open
+                aria-haspopup="dialog" title="@Model.Labels.Pick" aria-label="@Model.Labels.Pick"></button>
+        <span class="icon-current-name" data-icon-name></span>
+        <button type="button" class="btn btn-sm btn-ghost" data-icon-clear>@Model.Labels.None</button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.Help))
+    {
+        <div class="help">@Model.Help</div>
+    }
+</div>
+@if (once)
+{
+    <script src="~/_content/MatCMS.Shared.Web/lib/tabler-icons/icon-names.js" asp-append-version="true"></script>
+    <script src="~/_content/MatCMS.Shared.Web/js/icon-picker.js" asp-append-version="true"></script>
+}

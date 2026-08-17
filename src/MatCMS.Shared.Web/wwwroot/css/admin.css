@@ -360,7 +360,10 @@ textarea.code-area { width: 100%; box-sizing: border-box; font-family: ui-monosp
 .link-pick .lp-title { font-weight: 600; }
 .link-pick .lp-url { font-size: 12.5px; color: var(--muted); }
 
-/* Toolbar-menu icon picker */
+/* Icon picker — the current icon as a button, the grid in a dialog.
+   Die Klassen sind dieselben wie vorher, als das Raster noch dauerhaft im Formular stand: das
+   Raster (.icon-grid/.icon-tile/.icon-more) und die Zeile mit dem aktuellen Symbol
+   (.icon-current*) sind unverändert, nur umgezogen. Neu ist allein, was der Dialog braucht. */
 .icon-picker .icon-current { display: flex; align-items: center; gap: 12px; margin: 4px 0 10px; }
 .icon-current-preview { width: 40px; height: 40px; border: 1px solid var(--line); border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; color: var(--accent); }
 .icon-current-preview .ti { font-size: 22px; }
@@ -372,6 +375,29 @@ textarea.code-area { width: 100%; box-sizing: border-box; font-family: ui-monosp
 .icon-tile:hover { border-color: var(--accent); }
 .icon-tile.sel { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, #fff); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .icon-more { grid-column: 1 / -1; color: var(--muted); font-size: 13px; padding: 6px 2px; }
+
+/* Das Kästchen mit dem aktuellen Symbol IST jetzt der Knopf, der den Dialog öffnet — deshalb
+   Zeigefinger und ein Rand, der auf Berührung reagiert. Es bleibt dasselbe Kästchen wie zuvor,
+   damit die Menüpunkte nicht plötzlich anders aussehen als die Komponenten. */
+button.icon-current-preview { background: #fff; cursor: pointer; padding: 0; }
+button.icon-current-preview:hover { border-color: var(--accent); }
+button.icon-current-preview:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Leer heißt leer: ein gestrichelter Rahmen sagt „hier fehlt etwas“, ein leeres Kästchen mit
+   durchgezogenem Rand sieht aus wie ein Symbol, das nicht laden wollte. */
+button.icon-current-preview.is-empty { border-style: dashed; color: var(--muted); }
+/* Ein gespeicherter Name, den die Schrift nicht kennt. Er BLEIBT stehen — die Farbe sagt nur, dass
+   er nichts zeichnen wird. */
+.icon-current-name.is-unknown { color: #b45309; }
+/* Das Rohfeld: sichtbar, solange kein Skript läuft. Danach setzt das Skript [hidden]. */
+.icon-picker .icon-raw { max-width: 320px; }
+
+.icon-dialog { width: min(700px, 94vw); padding: 18px 20px; }
+.icon-dialog-head { margin: 0 0 12px; }
+.icon-dialog .icon-search { max-width: none; width: 100%; }
+.icon-dialog .icon-grid { max-width: none; max-height: min(46vh, 380px); }
+.icon-dialog-foot { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+/* Die Zählung steht links und schiebt die Knöpfe nach rechts — sie ist Auskunft, keine Aktion. */
+.icon-dialog-count { flex: 1 1 auto; color: var(--muted); font-size: 12.5px; }
 
 /* Color picker fields (template editor): visible swatch + editable hex */
 .color-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 18px; }

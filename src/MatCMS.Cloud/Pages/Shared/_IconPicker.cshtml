@@ -1,0 +1,30 @@
+@model MatCMS.Cloud.Pages.Shared.IconPickVm
+@*
+    Der Adapter der Cloud — dasselbe Stück wie im CMS. Die Auswahl selbst steht EINMAL in
+    MatCMS.Shared.Web/Pages/Shared/_IconField.cshtml; hier bleibt nur, was eine geteilte Ansicht
+    nicht kann: die Übersetzungen nachschlagen (sie kennt keinen der beiden Localizer). Die
+    Schlüssel (icons.*) sind in beiden Anwendungen dieselben.
+
+    Die Alias-Auflösung des CMS (MenuIcons) gibt es hier bewusst nicht: die Cloud speichert, was der
+    Bearbeiter gewählt hat, und die Instanz löst beim Anzeigen auf. Ein zweiter Ort mit derselben
+    Tabelle wäre genau der, der beim nächsten Alias vergessen wird.
+*@
+@{
+    var field = new MatCMS.Shared.Web.IconField(
+        Value: Model.Value,
+        FieldName: Model.FieldName,
+        Label: T[Model.LabelKey],
+        Labels: new MatCMS.Shared.Web.IconFieldLabels(
+            Pick: T["icons.pick"],
+            DialogTitle: T["icons.dialogTitle"],
+            Search: T["icons.search"],
+            None: T["icons.none"],
+            NoResults: T["icons.noResults"],
+            Apply: T["icons.apply"],
+            Cancel: T["action.cancel"],
+            Unknown: T["icons.unknown"],
+            Empty: T["icons.empty"],
+            Count: T["icons.count"]),
+        Help: string.IsNullOrEmpty(Model.HelpKey) ? "" : T[Model.HelpKey]);
+}
+<partial name="_IconField" model="field" />

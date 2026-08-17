@@ -26,11 +26,10 @@
            abgeschickt wird, und bei ausgefallenem Skript unter "Rohform" erreichbar. *@
         <textarea id="Code" name="Code" hidden>@Model.Code</textarea>
 
-        @* Weitere Dateien des Plugins. Vorerst als JSON-Karte Pfad → Inhalt — der Ordnerbaum baut
-           darauf auf. Schon jetzt nützlich, weil sich der Code damit aufteilen lässt, statt in einem
-           einzigen Feld zu wachsen. *@
+        @* Ohne Überschrift: der Baum zeigt den Namen des Plugins als Wurzel und darunter seine Dateien.
+           Ein "Weitere Dateien" davor stimmte nicht mehr, seit die Einstiegsdatei mit darin steht —
+           es sind nicht weitere, es sind ALLE. *@
         <div class="form-field">
-            <label>@T["plugins.files"]</label>
             @* Der Baum SCHREIBT in das Feld darunter, er ersetzt es nicht. Jede Änderung landet
                sofort dort, und das Feld bleibt sichtbar: fällt das Skript aus, ist trotzdem alles da
                und von Hand zu retten. Ein Editor, der seinen Inhalt erst beim Absenden erzeugt,

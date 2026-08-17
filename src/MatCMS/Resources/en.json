@@ -1051,7 +1051,6 @@
   "forms.el.multiselect.desc": "Dropdown with tick boxes – several options at once.",
   "settings.behindProxy": "Behind an HTTPS proxy",
   "settings.behindProxyHelp": "Switch on when a reverse proxy terminates TLS and forwards unencrypted to this site. Without it, redirects and absolute links are built with http:// and a browser on an https page refuses them.",
-  "plugins.files": "Additional files",
   "plugins.filesHelp": "JSON map of path → content, e.g. <code>{\"menu.csx\": \"…\"}</code>. Reachable from the code above via <code>#load \"menu.csx\"</code>. A plugin only sees its own files.",
   "plugins.fileAdd": "File",
   "plugins.fileAskName": "File name",

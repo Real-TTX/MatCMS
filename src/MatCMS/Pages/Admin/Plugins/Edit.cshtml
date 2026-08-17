@@ -346,18 +346,11 @@
                 }));
                 if (collapsed[':root']) return;
 
-                // Reihenfolge unter der Wurzel: erst die beiden Systemeinträge, dann was der
-                // Bearbeiter selbst angelegt hat (Ordner vor Dateien, jeweils alphabetisch).
-                // plugin.csx steht damit ÜBER den Ordnern und bricht die Regel "Ordner zuerst" —
-                // absichtlich: sie ist immer da, sie ist der Anfang, und man sucht sie oben. So
-                // hält es auch eine Entwicklungsumgebung mit ihren festen Knoten.
-                list.appendChild(rowFor({
-                    id: ':entry', kind: 'entry', depth: 1, path: ENTRY, label: ENTRY,
-                    icon: 'ti-file-code', title: TXT.entryTitle, mono: true,
-                    isOpen: open === ENTRY && openAsset === null,
-                    activate: function () { show(ENTRY); }
-                }));
-
+                // EINE Regel auf JEDER Ebene: erst alle Ordner, dann alle Dateien. Die
+                // Systemeinträge bleiben oben — aber nur INNERHALB ihrer Gruppe: assets/ vor den
+                // eigenen Ordnern, plugin.csx vor den eigenen Dateien. Vorher stand plugin.csx über
+                // dem Systemordner und brach damit als einziger Knoten die Regel; wer den Baum
+                // überfliegt, liest die Einrückung, nicht die Ausnahme.
                 list.appendChild(rowFor({
                     id: ':assets', kind: 'assetdir', depth: 1, path: ASSETDIR, label: ASSETDIR + '/',
                     icon: collapsed[':assets'] ? 'ti-folder' : 'ti-folder-open',
@@ -376,11 +369,28 @@
                 }
 
                 var top = build(map);
+                // Erst die eigenen Ordner …
+                renderDirs(top, 1);
+                // … dann die Dateien, und unter ihnen zuerst die Einstiegsdatei: sie ist immer da
+                // und sie ist der Anfang, deshalb steht sie vor den selbst angelegten Dateien.
+                list.appendChild(rowFor({
+                    id: ':entry', kind: 'entry', depth: 1, path: ENTRY, label: ENTRY,
+                    icon: 'ti-file-code', title: TXT.entryTitle, mono: true,
+                    isOpen: open === ENTRY && openAsset === null,
+                    activate: function () { show(ENTRY); }
+                }));
                 if (!Object.keys(top.dirs).length && !top.files.length) list.appendChild(hint(TXT.none, 1));
-                renderDir(top, 1);
+                renderFiles(top, 1);
             }
 
+            // Ordner und Dateien getrennt zeichnen, damit die Wurzel ihre Systemeinträge dazwischen
+            // schieben kann, ohne die Regel "erst Ordner, dann Dateien" zu brechen.
             function renderDir(node, depth) {
+                renderDirs(node, depth);
+                renderFiles(node, depth);
+            }
+
+            function renderDirs(node, depth) {
                 Object.keys(node.dirs).sort(byName).forEach(function (key) {
                     var dir = node.dirs[key];
                     var id = ':d:' + dir.path;
@@ -392,6 +402,9 @@
                     }));
                     if (!collapsed[id]) renderDir(dir, depth + 1);
                 });
+            }
+
+            function renderFiles(node, depth) {
                 node.files.sort(function (a, b) { return byName(a.name, b.name); }).forEach(function (f) {
                     list.appendChild(rowFor({
                         id: ':f:' + f.path, kind: 'file', depth: depth, path: f.path, label: f.name,

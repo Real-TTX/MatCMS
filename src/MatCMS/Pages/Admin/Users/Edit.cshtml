@@ -3,9 +3,9 @@
 @{
     ViewData["Title"] = T["users.edit"] + " " + Model.Current.Username;
 }
+@* Nur die Überschrift: der Weg zurück steht unten neben dem Speichern-Knopf, wie im Plugin-Editor. *@
 <div class="page-head">
     <h1>@T["users.edit"] @Model.Current.Username</h1>
-    <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
 </div>
 
 <div class="card">
@@ -23,8 +23,9 @@
             <label for="NewPassword">@T["users.newPassword"]</label>
             <input id="NewPassword" name="NewPassword" type="password" placeholder="@T["users.newPasswordPlaceholder"]" />
         </div>
-        <div>
+        <div class="form-actions">
             <button type="submit" class="btn">@T["action.save"]</button>
+            <a class="btn btn-ghost" asp-page="Index">@T["action.back"]</a>
         </div>
     </form>
 </div>

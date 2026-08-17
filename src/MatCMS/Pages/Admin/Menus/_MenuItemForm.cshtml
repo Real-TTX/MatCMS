@@ -45,7 +45,11 @@
     <label class="check">
         <input type="checkbox" name="OpenInNewTab" value="true" @(Model.OpenInNewTab ? "checked" : "") /> @T["menus.openNewTab"]
     </label>
-    <div>
+    @* Speichern, dann Zurück — dieselbe Ordnung und dieselben Klassen wie in Plugins/Edit. Der Weg
+       zurück steht hier unten neben dem Knopf, der dieses Formular abschickt, und nicht mehr oben
+       in der Kopfzeile. *@
+    <div class="form-actions">
         <button type="submit" class="btn">@T[Model.SubmitLabelKey]</button>
+        <a class="btn btn-ghost" href="@Model.BackUrl">@T["action.back"]</a>
     </div>
 </form>

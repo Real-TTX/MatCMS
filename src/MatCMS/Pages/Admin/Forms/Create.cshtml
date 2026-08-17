@@ -3,9 +3,9 @@
 @{
     ViewData["Title"] = T["forms.new"];
 }
+@* Nur die Überschrift: der Weg zurück steht unten neben dem Anlegen-Knopf, wie im Plugin-Editor. *@
 <div class="page-head">
     <h1>@T["forms.new"]</h1>
-    <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
 </div>
 
 <div class="card">
@@ -24,8 +24,9 @@
                 <input id="Slug" name="Slug" value="@Model.Slug" placeholder="@T["forms.slugPlaceholder"]" />
             </div>
         </div>
-        <div>
+        <div class="form-actions">
             <button type="submit" class="btn">@T["forms.createAndEdit"]</button>
+            <a class="btn btn-ghost" asp-page="Index">@T["action.back"]</a>
         </div>
     </form>
 </div>

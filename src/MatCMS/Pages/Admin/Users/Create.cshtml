@@ -3,9 +3,9 @@
 @{
     ViewData["Title"] = T["users.new"];
 }
+@* Nur die Überschrift: der Weg zurück steht unten neben dem Anlegen-Knopf, wie im Plugin-Editor. *@
 <div class="page-head">
     <h1>@T["users.new"]</h1>
-    <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
 </div>
 
 <div class="card">
@@ -29,8 +29,9 @@
             <label for="Password">@T["users.password"]</label>
             <input id="Password" name="Password" type="password" required />
         </div>
-        <div>
+        <div class="form-actions">
             <button type="submit" class="btn">@T["users.createSubmit"]</button>
+            <a class="btn btn-ghost" asp-page="Index">@T["action.back"]</a>
         </div>
     </form>
 </div>

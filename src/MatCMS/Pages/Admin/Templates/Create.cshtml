@@ -4,9 +4,9 @@
 @{
     ViewData["Title"] = T["templates.new"];
 }
+@* Nur die Überschrift: der Weg zurück steht unten neben dem Anlegen-Knopf, wie im Plugin-Editor. *@
 <div class="page-head">
     <h1>@T["templates.new"]</h1>
-    <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
 </div>
 
 <div class="card">
@@ -52,8 +52,9 @@
                 <option value="outline" selected="@(Model.ButtonStyle == "outline")">@T["templates.buttonOutline"]</option>
             </select>
         </div>
-        <div>
+        <div class="form-actions">
             <button type="submit" class="btn">@T["templates.createSubmit"]</button>
+            <a class="btn btn-ghost" asp-page="Index">@T["action.back"]</a>
         </div>
     </form>
 </div>

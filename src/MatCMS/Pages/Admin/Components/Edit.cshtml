@@ -3,14 +3,11 @@
 @{
     ViewData["Title"] = T["components.edit"];
 }
+@* Nur die Überschrift: alle Aktionen dieser Seite stehen unten in EINER Reihe — dieselbe Ordnung
+   wie im Plugin-Editor. Zwei Orte für Knöpfe, die dasselbe Formular betreffen, ließen einen oben
+   nach dem suchen, was unten liegt. *@
 <div class="page-head">
     <h1>@T["components.edit"]</h1>
-    <div style="display:flex;gap:8px;align-items:center;">
-        <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-page-handler="ExportJson" asp-route-id="@Model.Current.Id">
-            <i class="ti ti-download" aria-hidden="true"></i> @T["components.exportJson"]
-        </a>
-        <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
-    </div>
 </div>
 
 <div class="card">
@@ -47,7 +44,16 @@
             <div class="help">@T["components.templateHelp"] <span id="placeholder-hint" class="mono"></span></div>
         </div>
 
-        <div><button type="submit" class="btn">@T["action.save"]</button></div>
+        @* Von positiv nach negativ, wie in Plugins/Edit: Speichern (gefüllt), dann Exportieren,
+           dann Zurück — beide als .btn-ghost. Die Reihe bleibt IM Formular, weil hier keine
+           zerstörende Aktion dazukommt, die ein eigenes Formular bräuchte. *@
+        <div class="form-actions">
+            <button type="submit" class="btn">@T["action.save"]</button>
+            <a class="btn btn-ghost" asp-page="Edit" asp-page-handler="ExportJson" asp-route-id="@Model.Current.Id">
+                <i class="ti ti-download" aria-hidden="true"></i> @T["components.exportJson"]
+            </a>
+            <a class="btn btn-ghost" asp-page="Index">@T["action.back"]</a>
+        </div>
     </form>
 </div>
 

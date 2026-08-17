@@ -23,4 +23,10 @@ public class MenuItemFormVm
     public string QuickPickHelpKey { get; set; } = "menus.quickPickHelpCreate";
     public string SubmitLabelKey { get; set; } = "action.save";
     public bool AutofocusLabel { get; set; }
+
+    /// <summary>Where "Zurück" leads. The link sits in the partial's action row NEXT to the submit
+    /// button — it used to hang in the page head, split from the button that saves the same form.
+    /// Only the two pages know their own way back (a menu item edited from a menu returns to that
+    /// menu, not to the overview), so the URL is built there and handed in.</summary>
+    public string BackUrl { get; set; } = "";
 }

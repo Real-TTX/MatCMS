@@ -3,11 +3,10 @@
 @{
     ViewData["Title"] = Model.Current.Name;
 }
+@* Nur die Überschrift: alle Aktionen dieser Seite stehen unten in EINER Reihe — dieselbe Ordnung
+   wie im Plugin-Editor. *@
 <div class="page-head">
     <h1>@Model.Current.Name</h1>
-    <div class="list-toolbar">
-        <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
-    </div>
 </div>
 
 <div class="card">
@@ -117,8 +116,12 @@
     </form>
 </div>
 
+@* Speichern, dann Zurück — dieselbe Ordnung und dieselben Klassen wie in Plugins/Edit. Der
+   Speichern-Knopf erreicht sein Formular über form="mailtpl-form", weil die Testmail ein eigenes
+   Formular ist und zwei Formulare nicht ineinander stehen dürfen. *@
 <div class="form-actions">
     <button type="submit" class="btn" form="mailtpl-form">@T["action.save"]</button>
+    <a class="btn btn-ghost" asp-page="Index">@T["action.back"]</a>
 </div>
 
 @section Scripts {

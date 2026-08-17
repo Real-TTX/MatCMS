@@ -83,17 +83,14 @@
         // Die Wurzel des Baums ist dieses Template — mit seinem Namen, nicht mit dem Wort "Dateien".
         Model.Name ?? "");
 }
+@* Nur die Überschrift: alle Aktionen dieser Seite stehen unten in EINER Reihe — dieselbe Ordnung
+   wie im Plugin-Editor. Zwei Orte für Knöpfe, die dasselbe Formular betreffen, ließen einen oben
+   nach dem suchen, was unten liegt. *@
 <div class="page-head">
     <h1>
         @T["templates.edit"]
         <span class="badge" title="@T["templates.versionHint"]" style="margin-left:8px;vertical-align:middle;font-size:12px;">@T["templates.version"] V@(Model.SchemaVersion)</span>
     </h1>
-    <div style="display:flex;gap:8px;align-items:center;">
-        <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-page-handler="ExportJson" asp-route-id="@Model.Id">
-            <i class="ti ti-download" aria-hidden="true"></i> @T["templates.exportJson"]
-        </a>
-        <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
-    </div>
 </div>
 
 <div class="card">
@@ -281,8 +278,15 @@
             <input type="hidden" name="ParametersJson" id="ParametersJson" />
         </div>
 
+        @* Von positiv nach negativ, wie in Plugins/Edit: Speichern (gefüllt), dann Exportieren,
+           dann Zurück — beide als .btn-ghost. Sie standen oben in der Kopfzeile und damit weit weg
+           von dem Knopf, der dieselbe Vorlage speichert. *@
         <div class="form-actions">
             <button type="submit" class="btn">@T["action.save"]</button>
+            <a class="btn btn-ghost" asp-page="Edit" asp-page-handler="ExportJson" asp-route-id="@Model.Id">
+                <i class="ti ti-download" aria-hidden="true"></i> @T["templates.exportJson"]
+            </a>
+            <a class="btn btn-ghost" asp-page="Index">@T["action.back"]</a>
         </div>
     </form>
 </div>

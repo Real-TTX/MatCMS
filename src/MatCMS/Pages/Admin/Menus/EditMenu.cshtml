@@ -3,9 +3,10 @@
 @{
     ViewData["Title"] = Model.Current.Name;
 }
+@* Nur die Überschrift: alle Aktionen dieser Seite stehen unten in EINER Reihe — dieselbe Ordnung
+   wie im Plugin-Editor. *@
 <div class="page-head">
     <h1>@Model.Current.Name</h1>
-    <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
 </div>
 
 <div class="card">
@@ -85,8 +86,11 @@
 
 @* Save and delete on one line, positive before negative. The save button sits outside its form and
    reaches it by id, because the delete is a form of its own and the two cannot nest. *@
+@* Speichern, Zurück, Löschen (rot, ganz hinten) — dieselbe Ordnung und dieselben Klassen wie in
+   Plugins/Edit. *@
 <div class="form-actions">
     <button type="submit" class="btn" form="menu-form">@T["action.save"]</button>
+    <a class="btn btn-ghost" asp-page="Index">@T["action.back"]</a>
     @if (!Model.Current.BuiltIn)
     {
         <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@Model.Current.Id"

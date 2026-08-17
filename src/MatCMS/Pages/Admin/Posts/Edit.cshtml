@@ -3,15 +3,11 @@
 @{
     ViewData["Title"] = Model.IsNew ? T["posts.newTitle"] : T["posts.editTitle"];
 }
+@* Nur die Überschrift: alle Aktionen dieser Seite stehen unten in EINER Reihe — dieselbe Ordnung
+   wie im Plugin-Editor. Oben stand ein "Zurück", unten ein "Abbrechen" — zwei Beschriftungen für
+   denselben Weg an zwei Orten. *@
 <div class="page-head">
     <h1>@(Model.IsNew ? T["posts.newTitle"] : T["posts.editTitle"])</h1>
-    <div style="display:flex;gap:8px;">
-        @if (!Model.IsNew)
-        {
-            <a class="btn btn-sm btn-ghost" href="/blog/@Model.Input.Slug" target="_blank" rel="noopener"><i class="ti ti-external-link" aria-hidden="true"></i> @T["posts.view"]</a>
-        }
-        <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
-    </div>
 </div>
 
 <form method="post" asp-route-id="@Model.PostId" id="post-form" class="form-grid" style="max-width:860px;">
@@ -98,9 +94,17 @@
         <input type="date" asp-for="Input.PublishedAt" />
     </div>
 
-    <div class="form-actions" style="display:flex;gap:8px;">
+    @* Speichern, Ansehen, Zurück — dieselbe Ordnung wie in Plugins/Edit. "Ansehen" stand oben in
+       der Kopfzeile und war damit von dem Knopf getrennt, der den Beitrag erst speichert; das
+       "Abbrechen" hier unten führte ohnehin schon zur Liste und heißt jetzt wie überall "Zurück".
+       Das style-Attribut ist weg: .form-actions bringt Flex und Abstand selbst mit. *@
+    <div class="form-actions">
         <button type="submit" class="btn">@T["action.save"]</button>
-        <a class="btn btn-ghost" asp-page="Index">@T["action.cancel"]</a>
+        @if (!Model.IsNew)
+        {
+            <a class="btn btn-ghost" href="/blog/@Model.Input.Slug" target="_blank" rel="noopener"><i class="ti ti-external-link" aria-hidden="true"></i> @T["posts.view"]</a>
+        }
+        <a class="btn btn-ghost" asp-page="Index">@T["action.back"]</a>
     </div>
 </form>
 

@@ -10,7 +10,6 @@
         </span>
         @Model.Definition.Name
     </h1>
-    <a class="btn btn-sm btn-ghost" asp-page="/Admin/Pages/Edit" asp-route-id="@Model.PageId">@T["blocks.backToPage", Model.PageTitle]</a>
 </div>
 <p class="muted">@Model.Definition.Description</p>
 
@@ -18,9 +17,12 @@
     <form id="block-form" method="post">
         <input type="hidden" name="DataJson" id="DataJson" />
         <div id="block-editor"></div>
+        @* Speichern, dann Zurück — dieselbe Ordnung wie in Plugins/Edit. Oben in der Kopfzeile stand
+           derselbe Weg schon einmal, nur als "Zurück zu …" statt "Abbrechen": ein Ziel, zwei
+           Beschriftungen, an zwei Orten. Geblieben ist die genauere von beiden, unten. *@
         <div class="editor-actions">
             <button type="submit" class="btn">@T["action.save"]</button>
-            <a class="btn btn-ghost" asp-page="/Admin/Pages/Edit" asp-route-id="@Model.PageId">@T["action.cancel"]</a>
+            <a class="btn btn-ghost" asp-page="/Admin/Pages/Edit" asp-route-id="@Model.PageId">@T["blocks.backToPage", Model.PageTitle]</a>
         </div>
     </form>
 </div>

@@ -16,9 +16,15 @@
         Pages = Model.Pages,
         QuickPickHelpKey = "menus.quickPickHelpCreate",
         SubmitLabelKey = "menus.addSubmit",
-        AutofocusLabel = true
+        AutofocusLabel = true,
+        // Zurück führt dorthin, wo man hergekommen ist: zu dem Menü, in das der Eintrag soll —
+        // und nur ohne dieses Menü zur Übersicht.
+        BackUrl = Model.MenuId is int backId
+            ? Url.Page("EditMenu", new { id = backId, locale = Model.Locale })!
+            : Url.Page("Index")!
     };
 }
+@* Nur die Überschrift: der Weg zurück steht unten neben dem Anlegen-Knopf, wie im Plugin-Editor. *@
 <div class="page-head">
     <h1>
         @T["menus.new"]
@@ -27,14 +33,6 @@
             <span class="badge badge-on mono" style="margin-left:8px;font-size:12px;vertical-align:middle;">@MatCMS.Services.Localizer.DisplayName(Model.Locale) (@Model.Locale.ToUpperInvariant())</span>
         }
     </h1>
-    @if (Model.MenuId is int backId)
-    {
-        <a class="btn btn-sm btn-ghost" asp-page="EditMenu" asp-route-id="@backId" asp-route-locale="@Model.Locale">@T["action.back"]</a>
-    }
-    else
-    {
-        <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
-    }
 </div>
 
 <div class="card">

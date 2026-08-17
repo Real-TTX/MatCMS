@@ -1,0 +1,109 @@
+@model MatCMS.Shared.Web.ComponentEditor
+@*
+    Der Komponenten-Editor — EINMAL, für CMS und Cloud. Er stand dreimal fast gleich da
+    (MatCMS/Pages/Admin/Components/Edit, MatCMS.Cloud/.../Profiles/Component und .../Store/Component);
+    wer einen davon anfasste, ließ die anderen zurück. Genau dafür gibt es MatCMS.Shared.Web, und
+    genau so macht es der Dateibaum der Templates (_TemplateFiles) schon.
+
+    WAS HIER STEHT und was nicht: alles INNERHALB des Formulars — die Reiter, die Felder, der
+    Feldbau und die Vorschau. Das <form> selbst, die Karte und die Aktionsreihe bleiben in der Seite,
+    weil sie sich wirklich unterscheiden: das Formular der Cloud trägt Routenwerte und hat seinen
+    Speichern-Knopf außerhalb (ein Löschformular darf nicht darin stehen), das des CMS nicht.
+
+    DIE FALLE, DIE DEN UMZUG ÜBERLEBEN MUSS: jedes Reiterfeld bleibt INNERHALB des Formulars. Ein
+    ausgeblendetes Reiterfeld wird trotzdem mit abgeschickt — ein Feld AUSSERHALB des Formulars
+    dagegen gar nicht, und dann kämen Name, Symbol oder Vorlage aus einem anderen Reiter LEER an und
+    überschrieben den Bestand.
+
+    Die Beschriftungen kommen als Zeichenketten herein, nicht als @@T[…]: eine geteilte Ansicht kennt
+    keinen der beiden Localizer. Die Kennungen (FieldsJson, TemplateHtml, field-rows, cp-*) sind
+    dagegen FEST — an ihnen hängen admin-component-editor.js und component-editor.js, und sie sind
+    auf beiden Seiten dieselben.
+*@
+<div class="tabs" role="tablist">
+    <button type="button" class="tab active" data-tab="general">@Model.Labels.TabGeneral</button>
+    <button type="button" class="tab" data-tab="fields">@Model.Labels.TabFields</button>
+    <button type="button" class="tab" data-tab="template">@Model.Labels.TabTemplate</button>
+</div>
+
+@* Reiter 1: womit jede Komponente anfängt. Was hier BEWUSST FEHLT, ist der Dateibaum des
+   Plugin-Editors: eine Komponente hat keine Dateien, sondern eine Feldliste und EINE Vorlage. *@
+<div class="tab-panel form-grid" data-panel="general">
+    <div class="form-row">
+        <div class="form-field">
+            <label for="comp-name">@Model.Labels.Name</label>
+            <input id="comp-name" name="@Model.Names.Name" value="@Model.NameValue" required />
+        </div>
+        <div class="form-field">
+            <label for="comp-type">@Model.Labels.Type</label>
+            @* Die Kennung wird abgeschickt, solange man sie noch setzen darf. Ist sie festgelegt,
+               steht sie ohne name= da: sie kann sich nicht ändern, und ein Feld, das nichts
+               beitragen kann, soll auch nichts mitschicken. (Ein readonly-Feld schickt der Browser
+               sonst sehr wohl mit.) *@
+            <input id="comp-type" name="@(Model.TypeReadOnly ? null : Model.Names.Type)"
+                   value="@Model.TypeValue" class="mono" spellcheck="false"
+                   placeholder="@(Model.TypeReadOnly ? null : Model.TypePlaceholder)"
+                   readonly="@(Model.TypeReadOnly ? "readonly" : null)"
+                   required="@(Model.TypeReadOnly ? null : "required")" />
+            @if (!string.IsNullOrWhiteSpace(Model.Labels.TypeHelp))
+            {
+                <div class="help">@Model.Labels.TypeHelp</div>
+            }
+        </div>
+    </div>
+    <div class="form-field">
+        <label for="comp-desc">@Model.Labels.Description</label>
+        <input id="comp-desc" name="@Model.Names.Description" value="@Model.DescriptionValue" />
+    </div>
+    @* Die Symbolauswahl über den EIGENEN Adapter der Anwendung: das CMS löst dort noch alte
+       Symbolnamen auf (MenuIcons), die Cloud bewusst nicht. Deshalb reicht das Modell hier
+       untypisiert durch, statt sich für eines der beiden Verhalten zu entscheiden.
+       Html.PartialAsync und NICHT <partial …>: MatCMS.Shared.Web hat keine _ViewImports, in einer
+       Ansicht dieser Bibliothek sind die Tag-Helfer also nicht eingeschaltet. Ein <partial> stand
+       hier wörtlich im Markup — die Auswahl fehlte, und das Feld Icon wäre beim Speichern gar nicht
+       mit abgeschickt worden. Am laufenden System aufgefallen, nicht beim Lesen. *@
+    @if (Model.IconPicker is not null)
+    {
+        @await Html.PartialAsync("_IconPicker", Model.IconPicker)
+    }
+</div>
+
+@* Reiter 2: die Felder. Der Hinweis auf die Platzhalter steht hier, weil er DIESE Liste erklärt —
+   die Namen entstehen aus den Beschriftungen, die man hier eingibt. *@
+<div class="tab-panel form-grid" data-panel="fields" hidden>
+    <div class="help">@Model.Labels.FieldsHelp</div>
+    <div id="field-rows" data-fields="@(string.IsNullOrWhiteSpace(Model.FieldsJson) ? "[]" : Model.FieldsJson)"></div>
+    <div><button type="button" class="btn btn-sm btn-ghost" id="add-field">＋ @Model.Labels.AddField</button></div>
+    @* Das Feld, das abgeschickt wird. Der Feldbau schreibt bei JEDEM Tastendruck hinein — es
+       entsteht nicht erst beim Absenden, sonst ginge die Feldliste auf jedem anderen Weg aus der
+       Seite verloren. *@
+    <input type="hidden" name="@Model.Names.FieldsJson" id="FieldsJson" />
+</div>
+
+@* Reiter 3: die Vorlage MIT ihrer Vorschau. Sie standen als zwei Kästen untereinander, die Vorschau
+   also außerhalb des Sichtfelds, sobald die Vorlage länger als ein paar Zeilen war — und genau beim
+   Schreiben der Vorlage will man sehen, was dabei herauskommt. *@
+<div class="tab-panel form-grid" data-panel="template" hidden>
+    <div class="form-field">
+        <label for="TemplateHtml">@Model.Labels.TemplateLabel</label>
+        <textarea id="TemplateHtml" name="@Model.Names.TemplateHtml" rows="14" spellcheck="false"
+                  class="@(Model.CodeMirror ? null : "code")"
+                  data-code="@(Model.CodeMirror ? "html" : null)">@Model.TemplateHtml</textarea>
+        <div class="help">@Model.Labels.TemplateHelp <span id="placeholder-hint" class="mono"></span></div>
+    </div>
+
+    <div class="component-preview" id="cp-card">
+        <div class="cp-head">
+            @* <h2> und nicht <h3>: die Regel .component-preview .cp-head h2 gibt es schon, und für
+               eine andere Ebene bräuchte es eine zweite. *@
+            <h2>@Model.Labels.Preview</h2>
+            <button type="button" class="btn btn-sm btn-ghost" id="cp-debug-toggle">@Model.Labels.Debug</button>
+        </div>
+        <div class="help">@Model.Labels.SampleData</div>
+        <div class="cp-sample" id="cp-sample"></div>
+        <div class="cp-frame-wrap">
+            <iframe id="cp-frame" class="cp-frame" title="@Model.Labels.Preview"></iframe>
+        </div>
+        <div class="cp-debug" id="cp-debug" hidden></div>
+    </div>
+</div>

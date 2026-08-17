@@ -2,6 +2,43 @@
 @model MatCMS.Pages.Admin.Components.EditModel
 @{
     ViewData["Title"] = T["components.edit"];
+
+    // Der Adapter. Der Editor selbst steht EINMAL in MatCMS.Shared.Web/Pages/Shared/_ComponentEditor
+    // und wird von der Cloud genauso benutzt — hier bleibt nur, was eine geteilte Ansicht nicht
+    // kann: die Übersetzungen nachschlagen (sie kennt keinen der beiden Localizer) und sagen, wie
+    // DIESE Seite ihre Felder nennt.
+    var editor = new MatCMS.Shared.Web.ComponentEditor(
+        Names: new MatCMS.Shared.Web.ComponentEditorNames(
+            Name: "Name", Type: "Type", Description: "Description",
+            FieldsJson: "FieldsJson", TemplateHtml: "TemplateHtml"),
+        Labels: new MatCMS.Shared.Web.ComponentEditorLabels(
+            TabGeneral: T["components.tabGeneral"],
+            TabFields: T["components.fields"],
+            TabTemplate: T["components.template"],
+            Name: T["components.name"],
+            Type: T["components.type"],
+            TypeHelp: T["components.typeHelp"],
+            Description: T["components.description"],
+            FieldsHelp: T["components.fieldsHelp"],
+            AddField: T["components.addField"],
+            TemplateLabel: T["components.templateHtml"],
+            TemplateHelp: T["components.templateHelp"],
+            SampleData: T["components.sampleData"],
+            Preview: T["components.preview"],
+            Debug: T["components.debug"]),
+        NameValue: Model.Name,
+        TypeValue: Model.Current.Type,
+        DescriptionValue: Model.Description,
+        FieldsJson: Model.FieldsJson,
+        TemplateHtml: Model.TemplateHtml,
+        IconPicker: new MatCMS.Pages.Shared.IconPickVm(
+            Model.Icon, LabelKey: "components.icon", HelpKey: "components.iconHelp"),
+        // Die Kennung einer bestehenden Komponente steht fest: an ihr hängt jeder bereits gesetzte
+        // Block. Sie wird gezeigt, aber nicht abgeschickt.
+        TypeReadOnly: true,
+        // Kein CodeMirror auf dieser Seite — das Bündel wird hier nicht geladen, und ein
+        // data-code-Feld ohne das Bündel ist nur ein Textfeld.
+        CodeMirror: false);
 }
 @* Nur die Überschrift: alle Aktionen dieser Seite stehen unten in EINER Reihe — dieselbe Ordnung
    wie im Plugin-Editor. Zwei Orte für Knöpfe, die dasselbe Formular betreffen, ließen einen oben
@@ -24,73 +61,10 @@
        ACHTUNG, DIE FALLE AUS Plugins/Edit: alle Reiterfelder MÜSSEN innerhalb dieses <form>
        bleiben. Ein ausgeblendetes Reiterfeld wird trotzdem mit abgeschickt — ein Feld AUSSERHALB
        des Formulars dagegen gar nicht, und dann kämen Name, Symbol oder Vorlage beim Speichern aus
-       einem anderen Reiter LEER an und überschrieben den Bestand. *@
+       einem anderen Reiter LEER an und überschrieben den Bestand. Der geteilte Editor rendert
+       deshalb ALLES innerhalb dieses <form> und nichts darum herum. *@
     <form method="post" class="form-grid" id="component-form">
-        <div class="tabs" role="tablist">
-            <button type="button" class="tab active" data-tab="general">@T["components.tabGeneral"]</button>
-            <button type="button" class="tab" data-tab="fields">@T["components.fields"]</button>
-            <button type="button" class="tab" data-tab="template">@T["components.template"]</button>
-        </div>
-
-        @* Reiter 1: womit jede Komponente anfängt. *@
-        <div class="tab-panel form-grid" data-panel="general">
-            <div class="form-row">
-                <div class="form-field">
-                    <label for="Name">@T["components.name"]</label>
-                    <input id="Name" name="Name" value="@Model.Name" required />
-                </div>
-                <div class="form-field">
-                    <label>@T["components.type"]</label>
-                    <input value="@Model.Current.Type" class="mono" readonly />
-                    <div class="help">@T["components.typeHelp"]</div>
-                </div>
-            </div>
-            <div class="form-field">
-                <label for="Description">@T["components.description"]</label>
-                <input id="Description" name="Description" value="@Model.Description" />
-            </div>
-            @{
-                var iconVm = new MatCMS.Pages.Shared.IconPickVm(
-                    Model.Icon, LabelKey: "components.icon", HelpKey: "components.iconHelp");
-            }
-            <partial name="_IconPicker" model="iconVm" />
-        </div>
-
-        @* Reiter 2: die Felder. Der Hinweis auf die Platzhalter steht auch hier, weil er DIESE
-           Liste erklärt — die Namen entstehen aus den Beschriftungen, die man hier eingibt. *@
-        <div class="tab-panel form-grid" data-panel="fields" hidden>
-            <div class="help">@T["components.fieldsHelp"]</div>
-            <div id="field-rows" data-fields="@Model.FieldsJson"></div>
-            <div><button type="button" class="btn btn-sm btn-ghost" id="add-field">＋ @T["components.addField"]</button></div>
-            <input type="hidden" name="FieldsJson" id="FieldsJson" />
-        </div>
-
-        @* Reiter 3: die Vorlage MIT ihrer Vorschau. Sie standen als zwei Kästen untereinander, die
-           Vorschau also außerhalb des Sichtfelds, sobald die Vorlage länger als ein paar Zeilen war
-           — und genau beim Schreiben der Vorlage will man sehen, was dabei herauskommt. Beides
-           gehört zusammen, deshalb steht es in EINEM Reiter. *@
-        <div class="tab-panel form-grid" data-panel="template" hidden>
-            <div class="form-field">
-                <label for="TemplateHtml">@T["components.templateHtml"]</label>
-                <textarea id="TemplateHtml" name="TemplateHtml" rows="14" class="code" spellcheck="false">@Model.TemplateHtml</textarea>
-                <div class="help">@T["components.templateHelp"] <span id="placeholder-hint" class="mono"></span></div>
-            </div>
-
-            <div class="component-preview" id="cp-card">
-                <div class="cp-head">
-                    @* <h2> und nicht <h3>: die Regel .component-preview .cp-head h2 gibt es schon,
-                       und für eine andere Ebene bräuchte es eine zweite. *@
-                    <h2>@T["components.preview"]</h2>
-                    <button type="button" class="btn btn-sm btn-ghost" id="cp-debug-toggle">@T["components.debug"]</button>
-                </div>
-                <div class="help">@T["components.sampleData"]</div>
-                <div class="cp-sample" id="cp-sample"></div>
-                <div class="cp-frame-wrap">
-                    <iframe id="cp-frame" class="cp-frame" title="@T["components.preview"]"></iframe>
-                </div>
-                <div class="cp-debug" id="cp-debug" hidden></div>
-            </div>
-        </div>
+        <partial name="_ComponentEditor" model="editor" />
 
         @* EINE Aktionsreihe unten, von positiv nach negativ, wie in Plugins/Edit: Speichern
            (gefüllt), dann Exportieren, dann Zurück — beide als .btn-ghost. Sie steht AUSSERHALB der

@@ -204,10 +204,21 @@
     if (templateEl) {
         templateEl.addEventListener("input", function () { clearTimeout(deb); deb = setTimeout(renderPreview, 150); });
         // CodeMirror does not fire input on the textarea, so hook the editor once it exists.
-        setTimeout(function () {
+        // WARTEN, BIS ES IHN GIBT: code-editor.js baut den Editor erst bei DOMContentLoaded, das
+        // frühere setTimeout(0) lief davor und fand nichts — der Haken wurde nie gesetzt, und die
+        // Vorschau zog beim Tippen IN DER VORLAGE nicht nach (erst wieder, sobald ein Beispielfeld
+        // sie anstieß). Am laufenden System nachgewiesen, bevor es hier stand.
+        function hookCodeMirror() {
             var cm = templateEl.nextElementSibling && templateEl.nextElementSibling.CodeMirror;
-            if (cm) cm.on("change", function () { clearTimeout(deb); deb = setTimeout(renderPreview, 150); });
-        }, 0);
+            if (!cm || cm._cpHooked) return !!cm;
+            cm._cpHooked = true;
+            cm.on("change", function () { clearTimeout(deb); deb = setTimeout(renderPreview, 150); });
+            return true;
+        }
+        if (!hookCodeMirror()) {
+            document.addEventListener("DOMContentLoaded", hookCodeMirror);
+            window.addEventListener("load", hookCodeMirror);
+        }
     }
     if (debugToggle && debugEl) {
         debugToggle.addEventListener("click", function () {

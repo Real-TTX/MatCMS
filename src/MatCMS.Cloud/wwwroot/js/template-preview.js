@@ -161,12 +161,22 @@
     form.addEventListener("change", schedule);
 
     // Code fields need their own hook — CodeMirror never fires input on the textarea.
+    // WARTEN, BIS ES DEN EDITOR GIBT: code-editor.js baut ihn erst bei DOMContentLoaded, ein
+    // setTimeout(0) lief davor und fand nichts — der Haken wurde also gar nicht gesetzt und die
+    // Vorschau blieb beim Tippen IM CODE stehen, bis irgendein anderes Feld sie anstieß. Deshalb
+    // wird der Versuch wiederholt, statt ihn an einen Zeitpunkt zu hängen.
     ["layoutHtml", "customCss"].forEach(function (id) {
-        setTimeout(function () {
+        function hook() {
             var el = document.getElementById(id);
             var cm = el && el.nextElementSibling && el.nextElementSibling.CodeMirror;
-            if (cm) cm.on("change", schedule);
-        }, 0);
+            if (!cm || cm._tpHooked) return !!cm;
+            cm._tpHooked = true;
+            cm.on("change", schedule);
+            return true;
+        }
+        if (hook()) return;
+        document.addEventListener("DOMContentLoaded", hook);
+        window.addEventListener("load", hook);
     });
 
     render();

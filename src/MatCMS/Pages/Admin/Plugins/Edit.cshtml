@@ -58,8 +58,38 @@
         assetsTaken = T["plugins.roleAssetsTaken"],
         assetsNotEmpty = T["plugins.roleAssetsNotEmpty"],
         assetsNeeded = T["plugins.roleAssetsNeeded"],
-        mappingBroken = T["plugins.mappingBroken"]
+        mappingBroken = T["plugins.mappingBroken"],
+        bpMenu = T["plugins.blueprint"],
+        bpTarget = T["plugins.bpTarget"],
+        bpAlready = T["plugins.bpAlready"],
+        bpNewFile = T["plugins.bpNewFile"],
+        bpNotLoaded = T["plugins.bpNotLoaded"],
+        bpAppend = T["plugins.bpAppend"],
+        bpInsert = T["plugins.bpInsert"],
+        bpClose = T["action.close"]
     });
+
+    // Die Blaupausen: das Gerüst kommt aus PluginBlueprints, Name und Beschreibung aus den
+    // Ressourcen. Die Schlüssel stehen HIER ausgeschrieben statt aus der Kennung zusammengesetzt —
+    // nur so sieht sie der i18n-Abgleich, und nur so fällt ein fehlender Text vor der Auslieferung
+    // auf statt als roher Schlüssel im Menü.
+    var bpText = new Dictionary<string, string[]>
+    {
+        ["adminpage"] = [T["plugins.bpAdminPage"], T["plugins.bpAdminPageDesc"]],
+        ["block"] = [T["plugins.bpBlock"], T["plugins.bpBlockDesc"]],
+        ["config"] = [T["plugins.bpConfig"], T["plugins.bpConfigDesc"]],
+        ["publicform"] = [T["plugins.bpPublicForm"], T["plugins.bpPublicFormDesc"]],
+        ["store"] = [T["plugins.bpStore"], T["plugins.bpStoreDesc"]]
+    };
+    var blueprints = System.Text.Json.JsonSerializer.Serialize(
+        MatCMS.Services.PluginBlueprints.All.Select(b => new
+        {
+            id = b.Id,
+            marker = b.Marker,
+            code = b.Code,
+            name = bpText[b.Id][0],
+            desc = bpText[b.Id][1]
+        }));
 
     // Die hochgeladenen Dateien kommen als Liste vom Server ins Skript. Nur er weiß, was im Ordner
     // liegt — und was der Baum später löscht, ist genau dieser Name und nichts, was aus der Seite
@@ -181,8 +211,14 @@
                     @* Menüleiste des Editors: sie sagt, WELCHE Datei offen ist. Angelegt wird am
                        Knoten im Baum, zu dem es gehört — ein "Neue Datei" hier oben sagte nicht,
                        in welchem Ordner die Datei landet. *@
+                    @* Der zweite Weg zu den Blaupausen — der erste hängt am Knoten im Baum. Hier
+                       oben, weil daneben steht, WELCHE Datei offen ist: das ist genau das Ziel, in
+                       das eine Blaupause von hier aus schreibt. *@
                     <div class="pf-menu">
                         <span class="pf-menu-file mono" data-pf-current></span>
+                        <button type="button" class="pf-menu-item" data-pf-blueprints style="margin-left:auto;">
+                            <i class="ti ti-file-plus" aria-hidden="true"></i> @T["plugins.blueprint"]
+                        </button>
                     </div>
                     @* Fläche für eine Skriptdatei. *@
                     <div class="tab-panel" data-pf-view="file">
@@ -296,6 +332,27 @@
 <form id="asset-delete-form" method="post" asp-page-handler="DeleteAsset" asp-route-id="@Model.Current.Id" hidden>
     <input type="hidden" name="name" id="asset-delete-name" />
 </form>
+
+@* Die Vorschau einer Blaupause. Sie steht HIER und nicht im Plugin-Formular: ein <form> darf nicht
+   in einem anderen stehen, und dieses hier ist ein method="dialog" — es schickt nichts ab, sondern
+   gibt nur zurück, welcher Knopf gedrückt wurde. Derselbe Aufbau wie der Sprachdialog unter
+   Einstellungen (<dialog class="mat-dialog">), damit hier kein zweiter Dialogstil entsteht.
+   Gezeigt wird IMMER erst, was passieren wird — auch dann, wenn die Datei leer ist und gar nicht
+   gefragt werden muss. Ein Gerüst, das man nicht gelesen hat, bevor es im Code steht, ist keins. *@
+<dialog id="bp-dialog" class="mat-dialog">
+    <form method="dialog">
+        <h3 style="margin:0 0 6px;" id="bp-title"></h3>
+        <p class="help" style="margin:0 0 10px;" id="bp-desc"></p>
+        <p class="help mono" style="margin:0 0 6px;" id="bp-target"></p>
+        <p class="help" style="margin:0 0 10px;" id="bp-note" hidden></p>
+        <pre class="code-block" style="max-height:300px; overflow:auto;"><code id="bp-code"></code></pre>
+        <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:16px;">
+            <button class="btn btn-ghost btn-sm" value="skip" id="bp-skip">@T["plugins.bpSkip"]</button>
+            <button class="btn btn-ghost btn-sm" value="replace" id="bp-replace">@T["plugins.bpReplace"]</button>
+            <button class="btn btn-sm" value="append" id="bp-append">@T["plugins.bpAppend"]</button>
+        </div>
+    </form>
+</dialog>
 
 @section Scripts {
     <script>
@@ -716,6 +773,11 @@
                     // hinkommt. Im Systemordner steht der Eintrag nicht: der gehört der Platte.
                     if (clip) items.push({ label: TXT.paste.replace('{0}', clip.name), run: function () { pasteInto(dir); } });
                 }
+                // Blaupausen hängen an jedem Knoten, an dem Code entstehen kann — an einer Datei
+                // schreiben sie in DIESE Datei, an einem Ordner oder an der Wurzel in die
+                // Einstiegsdatei. Nicht am Assets-Ordner: dort ist kein Code zu Hause.
+                if (o.kind === 'root' || o.kind === 'folder' || o.kind === 'file' || o.kind === 'entry')
+                    items.push({ label: TXT.bpMenu, children: function () { return bpItems(o); } });
                 if (o.kind === 'root') items.push({ label: TXT.settings, run: openSettings });
                 // Die Einstiegsdatei bleibt, wo sie ist: sie liegt im Feld Code und nicht in der
                 // Karte, und ein Verweis auf „plugin.csx“ in der Karte weist der Server zurück.
@@ -1268,6 +1330,114 @@
                 });
                 if (warn.length) alert(TXT.loadShadow.replace('{0}', warn.join('\n')));
             }
+
+            // ---- Blaupausen -------------------------------------------------------------------
+            // Gerüste für das, was Plugins hier wirklich tun. Sie schreiben SOFORT in dieselben
+            // Felder wie alles andere im Baum (Code bzw. FilesJson) — nichts entsteht erst beim
+            // Absenden. Erreichbar am Knoten im Baum und oben in der Menüleiste des Editors.
+            var BLUEPRINTS = @Html.Raw(blueprints);
+            var bpDialog = document.getElementById('bp-dialog');
+            var bpTitleEl = document.getElementById('bp-title');
+            var bpDescEl = document.getElementById('bp-desc');
+            var bpTargetEl = document.getElementById('bp-target');
+            var bpNoteEl = document.getElementById('bp-note');
+            var bpCodeEl = document.getElementById('bp-code');
+            var bpSkip = document.getElementById('bp-skip');
+            var bpReplace = document.getElementById('bp-replace');
+            var bpAppend = document.getElementById('bp-append');
+            // Die Beschriftung von „Überspringen“ einmal merken: bei einer schon angewendeten
+            // Blaupause heißt der Knopf „Schließen“, danach wieder wie vorher.
+            var bpSkipLabel = bpSkip ? bpSkip.textContent : '';
+
+            // Das Ziel ist die Datei, an der man steht — an einem Ordner oder an der Wurzel die
+            // Einstiegsdatei. Die läuft immer; ein neu erfundener Ablageort täte es womöglich nicht.
+            function bpTargetOf(o) { return (o && (o.kind === 'file' || o.kind === 'entry')) ? o.path : ENTRY; }
+
+            function bpItems(o) {
+                return BLUEPRINTS.map(function (bp) {
+                    return { label: bp.name, run: function () { applyBlueprint(bp, bpTargetOf(o)); } };
+                });
+            }
+
+            // DIE Vorkehrung gegen doppeltes Einfügen: gesucht wird die Kennzeichnungszeile der
+            // Blaupause, in ALLEN Dateien samt Einstiegsdatei. Den Code selbst zu vergleichen wäre
+            // nach der ersten Zeile, die jemand anpasst, wertlos — und angepasst wird ein Gerüst
+            // immer. Gibt es die Kennung schon, wird nichts eingefügt und gesagt, wo sie steht.
+            function bpFound(map, marker) {
+                if ((codeField ? codeField.value : '').indexOf(marker) >= 0) return ENTRY;
+                var hit = Object.keys(map).filter(function (k) { return (map[k] || '').indexOf(marker) >= 0; });
+                return hit.length ? hit[0] : null;
+            }
+
+            // Läuft diese Datei überhaupt? Einstiegsdatei, Include-Ordner oder von einem #load
+            // erreicht. Sonst schriebe man ein Gerüst in eine Datei, die niemand lädt — es passiert
+            // nichts, und man sucht den Fehler im Gerüst.
+            function bpLoaded(map, path) {
+                if (path === ENTRY) return true;
+                var roles = readRoles() || {};
+                for (var k in roles) if (roles[k] === ROLE_INCLUDE && isUnder(path, k)) return true;
+                return loadRefs(map, codeField ? codeField.value : '').some(function (r) { return r.target === path; });
+            }
+
+            function setContent(path, text) {
+                if (path === ENTRY) {
+                    codeField.value = text;
+                    if (codeMirror) codeMirror.value = text;
+                    return;
+                }
+                var map = read(); if (map === null) return;
+                map[path] = text;
+                write(map);
+            }
+
+            function applyBlueprint(bp, target) {
+                if (!bpDialog || !bpDialog.showModal) return;
+                var map = read(); if (map === null) { alert(TXT.broken); return; }
+                var already = bpFound(map, bp.marker);
+                var existing = contentOf(map, target);
+                var isEmpty = existing.trim() === '';
+
+                bpTitleEl.textContent = bp.name;
+                bpDescEl.textContent = bp.desc;
+                bpTargetEl.textContent = TXT.bpTarget + ': ' + target;
+                bpCodeEl.textContent = bp.code;
+
+                var notes = [];
+                if (already !== null) notes.push(TXT.bpAlready.replace('{0}', already));
+                else if (isEmpty) notes.push(TXT.bpNewFile);
+                if (already === null && !bpLoaded(map, target)) notes.push(TXT.bpNotLoaded.replace('{0}', target));
+                bpNoteEl.textContent = notes.join(' ');
+                bpNoteEl.hidden = notes.length === 0;
+
+                // Fehlt die Datei oder ist sie leer, wird sie still beschrieben: „Ersetzen“ und
+                // „Anhängen“ wären dasselbe, und eine Frage mit zwei gleichen Antworten ist keine.
+                bpReplace.hidden = already !== null || isEmpty;
+                bpAppend.hidden = already !== null;
+                bpAppend.textContent = isEmpty ? TXT.bpInsert : TXT.bpAppend;
+                bpSkip.textContent = already !== null ? TXT.bpClose : bpSkipLabel;
+
+                bpDialog.returnValue = '';
+                bpDialog.addEventListener('close', function () {
+                    var v = bpDialog.returnValue;
+                    if (v !== 'append' && v !== 'replace') return;      // Überspringen ändert nichts
+                    // „Anhängen“ ist die Vorgabe, weil ein Gerüst zu dem hinzukommt, was schon da
+                    // ist; „Ersetzen“ wirft es weg und muss deshalb ausdrücklich gewählt werden.
+                    var next = (v === 'replace' || isEmpty)
+                        ? bp.code
+                        : existing.replace(/\s*$/, '') + '\n\n' + bp.code;
+                    setContent(target, next);
+                    expandTo(target);
+                    show(target);
+                }, { once: true });
+                bpDialog.showModal();
+            }
+
+            var bpBtn = root.querySelector('[data-pf-blueprints]');
+            if (bpBtn) bpBtn.addEventListener('click', function (ev) {
+                ev.stopPropagation();
+                var r = bpBtn.getBoundingClientRect();
+                showMenu(r.left, r.bottom, bpItems(open === null ? null : { kind: 'file', path: open }));
+            });
 
             // ---- Reiter über dem Editor ------------------------------------------------------
             // Sie schalten nur um, WAS zu sehen ist. Die Felder Code und FilesJson bleiben

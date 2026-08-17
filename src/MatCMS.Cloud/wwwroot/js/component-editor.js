@@ -181,6 +181,13 @@
 
     var deb;
     function refresh() {
+        // Jede Änderung geht SOFORT in das Feld, das abgeschickt wird — bei jedem Tastendruck in
+        // einer Feldzeile, bei jedem Typwechsel, beim Hinzufügen und beim Entfernen.
+        // WIE ES VORHER WAR: FieldsJson entstand ausschließlich im submit-Zuhörer weiter unten. Alles,
+        // was das Formular auf einem anderen Weg abschickte oder die Seite verließ, verlor die
+        // Feldliste. Der submit-Zuhörer bleibt trotzdem stehen: er kostet nichts und fängt einen Fall
+        // ab, in dem refresh() aus irgendeinem Grund nicht mehr gelaufen ist.
+        if (hidden) hidden.value = JSON.stringify(collect());
         if (hint) hint.textContent = collect().map(function (f) { return "{{" + f.id + "}}"; }).join("  ");
         buildSamples(collect());
         clearTimeout(deb);

@@ -1156,5 +1156,8 @@
   "icons.count": "{0} of {1} shown",
   "components.icon": "Icon",
   "components.iconHelp": "Shown next to the component in the block editor.",
+  "components.tabGeneral": "General",
+  "components.typeHelp": "The component identity. Existing blocks point at it, which is why it can no longer be changed.",
+  "components.fieldsHelp": "Every field is asked for in the block editor. The label becomes the {{field}} placeholder for the template; renaming keeps the old placeholder so blocks already placed keep working.",
   "icons.current": "current"
 }

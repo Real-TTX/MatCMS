@@ -1156,5 +1156,8 @@
   "icons.count": "{0} von {1} angezeigt",
   "components.icon": "Icon",
   "components.iconHelp": "Wird im Block-Editor neben der Komponente angezeigt.",
+  "components.tabGeneral": "Allgemein",
+  "components.typeHelp": "Die Identität der Komponente. Bestehende Blöcke zeigen darauf und er lässt sich deshalb nicht mehr ändern.",
+  "components.fieldsHelp": "Jedes Feld wird im Block-Editor abgefragt. Aus der Beschriftung entsteht der Platzhalter {{feld}} für die Vorlage; eine Umbenennung behält den alten Platzhalter, damit bereits gesetzte Blöcke weiter funktionieren.",
   "icons.current": "aktuell"
 }

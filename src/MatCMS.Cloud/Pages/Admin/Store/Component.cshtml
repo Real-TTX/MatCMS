@@ -21,9 +21,17 @@
 }
 
 <form method="post" asp-route-id="@(Model.IsNew ? null : (int?)ec.Id)" id="component-form">
+    @* Dieselben Reiter wie auf der Profilseite und im CMS — eine Komponente sieht überall gleich
+       aus. Kein Dateibaum: eine Komponente hat keine Dateien. Und alle Reiterfelder bleiben
+       INNERHALB des Formulars, sonst kämen sie beim Speichern leer an. *@
     <div class="card">
-        <h2>@T["profiles.tabComponents"]</h2>
-        <div class="form-grid">
+        <div class="tabs" role="tablist">
+            <button type="button" class="tab active" data-tab="general">@T["profiles.tabGeneral"]</button>
+            <button type="button" class="tab" data-tab="fields">@T["profiles.componentFields"]</button>
+            <button type="button" class="tab" data-tab="template">@T["profiles.componentTemplate"]</button>
+        </div>
+
+        <div class="tab-panel form-grid" data-panel="general">
             <div class="form-row">
                 <div class="form-field">
                     <label for="ctype">@T["profiles.componentType"]</label>
@@ -48,29 +56,32 @@
             </div>
         </div>
 
-        <h3 class="form-section">@T["profiles.componentFields"]</h3>
-        <div id="field-rows" data-fields="@(string.IsNullOrWhiteSpace(ec.FieldsJson) ? "[]" : ec.FieldsJson)"></div>
-        <div><button type="button" class="btn btn-sm btn-ghost" id="add-field">＋ @T["profiles.addField"]</button></div>
-        <input type="hidden" name="fieldsJson" id="FieldsJson" />
+        <div class="tab-panel form-grid" data-panel="fields" hidden>
+            <div class="help">@T["profiles.componentFieldsHelp"]</div>
+            <div id="field-rows" data-fields="@(string.IsNullOrWhiteSpace(ec.FieldsJson) ? "[]" : ec.FieldsJson)"></div>
+            <div><button type="button" class="btn btn-sm btn-ghost" id="add-field">＋ @T["profiles.addField"]</button></div>
+            <input type="hidden" name="fieldsJson" id="FieldsJson" />
+        </div>
 
-        <h3 class="form-section">@T["profiles.componentTemplate"]</h3>
-        <div class="form-field">
-            <textarea id="TemplateHtml" name="templateHtml" rows="12" spellcheck="false" data-code="html">@ec.TemplateHtml</textarea>
-            <div class="help">@T["profiles.placeholderHelp"] <span id="placeholder-hint" class="mono"></span></div>
-        </div>
-    </div>
+        <div class="tab-panel form-grid" data-panel="template" hidden>
+            <div class="form-field">
+                <textarea id="TemplateHtml" name="templateHtml" rows="14" spellcheck="false" data-code="html">@ec.TemplateHtml</textarea>
+                <div class="help">@T["profiles.placeholderHelp"] <span id="placeholder-hint" class="mono"></span></div>
+            </div>
 
-    <div class="card component-preview" id="cp-card">
-        <div class="cp-head">
-            <h2>@T["profiles.livePreview"]</h2>
-            <button type="button" class="btn btn-sm btn-ghost" id="cp-debug-toggle">@T["profiles.debug"]</button>
+            <div class="component-preview" id="cp-card">
+                <div class="cp-head">
+                    <h2>@T["profiles.livePreview"]</h2>
+                    <button type="button" class="btn btn-sm btn-ghost" id="cp-debug-toggle">@T["profiles.debug"]</button>
+                </div>
+                <div class="help">@T["profiles.sampleData"]</div>
+                <div class="cp-sample" id="cp-sample"></div>
+                <div class="cp-frame-wrap">
+                    <iframe id="cp-frame" class="cp-frame" title="@T["profiles.livePreview"]"></iframe>
+                </div>
+                <div class="cp-debug" id="cp-debug" hidden></div>
+            </div>
         </div>
-        <div class="help">@T["profiles.sampleData"]</div>
-        <div class="cp-sample" id="cp-sample"></div>
-        <div class="cp-frame-wrap">
-            <iframe id="cp-frame" class="cp-frame" title="@T["profiles.livePreview"]"></iframe>
-        </div>
-        <div class="cp-debug" id="cp-debug" hidden></div>
     </div>
 
 </form>
@@ -99,6 +110,7 @@
 
 @section Scripts {
     <partial name="_CodeEditorAssets" />
+    <partial name="_TabsScript" />
     <script>
         window.CLOUD_FIELD_TYPES = [
             ["text", "@T["profiles.fieldText"]"],

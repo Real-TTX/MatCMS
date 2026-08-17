@@ -118,7 +118,11 @@
         var fields = collect();
         var out = substitute(templateEl ? templateEl.value : "", fields);
         frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8">' +
-            '<link rel="stylesheet" href="/css/site.css">' +
+            // Die Stilvorlage der öffentlichen Seite ist in die geteilte Razor-Klassenbibliothek
+            // gezogen; /css/site.css antwortet seither mit 404 und die Vorschau stand ungestylt da —
+            // sie zeigte also gerade NICHT, wie der Block auf der Website aussieht. Die Cloud hatte
+            // den Pfad schon nachgezogen, das CMS nicht.
+            '<link rel="stylesheet" href="/_content/MatCMS.Shared.Web/css/site.css">' +
             '<style>:root{--accent:#de7e11;--accent-dark:#bc6b0e;--accent-2:#22d3ee;--black:#111;--ink:#333;--bg:#fff;--bg-alt:#f6f7f9;--max:1180px;--btn-radius:0;--font-head:Inter,system-ui,sans-serif;--font-body:Inter,system-ui,sans-serif}' +
             'body{margin:0;padding:18px;background:#fff;color:#333;font-family:Inter,system-ui,sans-serif}</style>' +
             '</head><body>' + out + '</body></html>';
@@ -146,6 +150,14 @@
 
     var deb;
     function refresh() {
+        // Jede Änderung geht SOFORT in das Feld, das abgeschickt wird — bei jedem Tastendruck in
+        // einer Feldzeile, bei jedem Typwechsel, beim Hinzufügen und beim Entfernen.
+        // WIE ES VORHER WAR: FieldsJson entstand ausschließlich im submit-Zuhörer weiter unten. Alles,
+        // was das Formular auf einem anderen Weg abschickte oder die Seite verließ, verlor die
+        // Feldliste — dieselbe Falle, die im Template- und im Plugin-Editor schon aufgeräumt wurde.
+        // Der submit-Zuhörer bleibt trotzdem stehen: er kostet nichts und fängt einen Fall ab, in dem
+        // refresh() aus irgendeinem Grund nicht mehr gelaufen ist.
+        if (hidden) hidden.value = JSON.stringify(collect());
         if (hint) hint.textContent = collect().map(function (f) { return "{{" + f.id + "}}"; }).join("  ");
         buildSamples(collect());
         clearTimeout(deb);

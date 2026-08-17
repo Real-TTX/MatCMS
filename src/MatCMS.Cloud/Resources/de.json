@@ -85,7 +85,7 @@
   "profiles.componentsHint": "Wiederverwendbare Blöcke. Der Typ ist die Identität — ein vorhandener Typ wird auf der Instanz aktualisiert.",
   "profiles.componentType": "Typ",
   "profiles.componentIcon": "Icon",
-  "profiles.componentFields": "Feld-Definition (JSON)",
+  "profiles.componentFields": "Felder",
   "profiles.componentFieldsHint": "Format wie im Komponenten-Editor von MatCMS, z. B. [{\"id\":\"titel\",\"label\":\"Titel\",\"type\":\"text\"}]",
   "profiles.componentTemplate": "HTML-Vorlage",
   "profiles.addComponent": "Komponente übernehmen",
@@ -686,5 +686,6 @@
   "icons.empty": "Kein Icon gewählt",
   "icons.count": "{0} von {1} angezeigt",
   "profiles.componentIconHelp": "Wird im Block-Editor der Instanz neben der Komponente angezeigt.",
+  "profiles.componentFieldsHelp": "Jedes Feld wird im Block-Editor der Instanz abgefragt. Aus der Beschriftung entsteht der Platzhalter {{feld}} für die Vorlage; eine Umbenennung behält den alten Platzhalter, damit bereits gesetzte Blöcke weiter funktionieren.",
   "icons.current": "aktuell"
 }

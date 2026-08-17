@@ -85,7 +85,7 @@
   "profiles.componentsHint": "Reusable blocks. The type is the identity — an existing type is updated on the instance.",
   "profiles.componentType": "Type",
   "profiles.componentIcon": "Icon",
-  "profiles.componentFields": "Field definition (JSON)",
+  "profiles.componentFields": "Fields",
   "profiles.componentFieldsHint": "Same format as the MatCMS component editor, e.g. [{\"id\":\"title\",\"label\":\"Title\",\"type\":\"text\"}]",
   "profiles.componentTemplate": "HTML template",
   "profiles.addComponent": "Save component",
@@ -686,5 +686,6 @@
   "icons.empty": "No icon chosen",
   "icons.count": "{0} of {1} shown",
   "profiles.componentIconHelp": "Shown next to the component in the instance block editor.",
+  "profiles.componentFieldsHelp": "Every field is asked for in the instance block editor. The label becomes the {{field}} placeholder for the template; renaming keeps the old placeholder so blocks already placed keep working.",
   "icons.current": "current"
 }

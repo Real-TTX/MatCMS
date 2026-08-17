@@ -92,18 +92,36 @@
         <div class="help">@Model.Labels.TemplateHelp <span id="placeholder-hint" class="mono"></span></div>
     </div>
 
+    @* Die Vorschau in DERSELBEN Bauart wie der Plugin-Editor und der Dateibaum eines Templates:
+       .pf-tree mit .pf-side links und .pf-main rechts — links, was es gibt, rechts, woran man
+       arbeitet. Hier also links die Felder, die man ausfüllt, rechts die Vorschau, die beim Tippen
+       nachzieht. GENAU DIESE Klassen und kein zweites Spaltenraster: dieses bricht auf schmalen
+       Fenstern schon von selbst untereinander um, ein eigenes hätte das noch einmal lernen müssen.
+       WIE ES VORHER WAR: Beispielfelder ÜBER dem Rahmen. Wer ein Feld tippte, musste scrollen, um
+       die Wirkung zu sehen — das Gegenteil dessen, wofür eine Live-Vorschau da ist.
+       Die Beispielfelder tragen bewusst KEINEN name=: die Vorschau speichert nichts und schickt
+       nichts zum Server, obwohl sie mitten im Formular steht. *@
     <div class="component-preview" id="cp-card">
-        <div class="cp-head">
-            @* <h2> und nicht <h3>: die Regel .component-preview .cp-head h2 gibt es schon, und für
-               eine andere Ebene bräuchte es eine zweite. *@
-            <h2>@Model.Labels.Preview</h2>
-            <button type="button" class="btn btn-sm btn-ghost" id="cp-debug-toggle">@Model.Labels.Debug</button>
+        <div class="pf-tree cp-tree">
+            <aside class="pf-side">
+                <div class="pf-list">
+                    <div class="help">@Model.Labels.SampleData</div>
+                    <div class="cp-sample" id="cp-sample"></div>
+                </div>
+            </aside>
+            <div class="pf-main">
+                @* Die Menüleiste sagt — wie beim Plugin-Editor, wo sie die offene Datei nennt — was
+                   rechts steht. Sie ersetzt die frühere Überschrift samt Knopfreihe darüber: zwei
+                   Zeilen, die dasselbe sagten. *@
+                <div class="pf-menu">
+                    <span class="pf-menu-file">@Model.Labels.Preview</span>
+                    <button type="button" class="pf-menu-item" id="cp-debug-toggle" style="margin-left:auto;">@Model.Labels.Debug</button>
+                </div>
+                <iframe id="cp-frame" class="cp-frame" title="@Model.Labels.Preview"></iframe>
+            </div>
         </div>
-        <div class="help">@Model.Labels.SampleData</div>
-        <div class="cp-sample" id="cp-sample"></div>
-        <div class="cp-frame-wrap">
-            <iframe id="cp-frame" class="cp-frame" title="@Model.Labels.Preview"></iframe>
-        </div>
+        @* Der Debug-Bereich bleibt UNTER beiden Spalten: er redet über die Ausgabe und über die
+           Platzhalter der Vorlage, nicht über ein einzelnes Feld. *@
         <div class="cp-debug" id="cp-debug" hidden></div>
     </div>
 </div>

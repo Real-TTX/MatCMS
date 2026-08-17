@@ -30,6 +30,11 @@ public class PluginModel : PageModel
     public string Code { get; private set; } = "";
     public List<string> Assets { get; private set; } = new();
 
+    /// <summary>The plugin's further script files, by name. Listed, not edited: <see cref="Repack"/>
+    /// copies them through untouched, and a plugin whose real work sits in more than the entry file
+    /// must not read here as if it had only one.</summary>
+    public List<string> Files { get; private set; } = new();
+
     /// <summary>True while no plugin is loaded — the page then shows the upload form instead of the
     /// editor, because a plugin is created by uploading a bundle, not by typing one.</summary>
     public bool IsNew => Item.Id == 0;
@@ -50,6 +55,7 @@ public class PluginModel : PageModel
         var unpacked = ReadBundle(item.Bundle);
         Code = unpacked.Code;
         Assets = unpacked.Assets;
+        Files = unpacked.Files;
         return Page();
     }
 
@@ -191,34 +197,40 @@ public class PluginModel : PageModel
         return File(row.Bundle, "application/zip", $"{row.Key}.zip");
     }
 
-    private sealed record Unpacked(string Code, List<string> Assets);
+    private sealed record Unpacked(string Code, List<string> Assets, List<string> Files);
 
     /// <summary>Reads the editable parts out of a bundle. Never throws — a bundle we cannot read
     /// simply shows up with empty code, which is visible in the editor.</summary>
     private static Unpacked ReadBundle(byte[] zipBytes)
     {
         var assets = new List<string>();
+        var files = new List<string>();
         try
         {
             using var ms = new MemoryStream(zipBytes);
             using var zip = new ZipArchive(ms, ZipArchiveMode.Read);
 
             foreach (var entry in zip.Entries)
-                if (entry.FullName.StartsWith("assets/", StringComparison.OrdinalIgnoreCase) && entry.Length > 0)
-                    assets.Add(entry.FullName["assets/".Length..]);
+            {
+                if (entry.Length == 0) continue;
+                if (entry.FullName.StartsWith(PluginBundle.AssetFolder, StringComparison.OrdinalIgnoreCase))
+                    assets.Add(entry.FullName[PluginBundle.AssetFolder.Length..]);
+                else if (entry.FullName.StartsWith(PluginBundle.FileFolder, StringComparison.OrdinalIgnoreCase))
+                    files.Add(entry.FullName[PluginBundle.FileFolder.Length..]);
+            }
 
             var meta = zip.GetEntry(PluginBundle.ManifestEntry);
-            if (meta is null) return new("", assets);
+            if (meta is null) return new("", assets, files);
 
             using var reader = new StreamReader(meta.Open());
             using var doc = JsonDocument.Parse(reader.ReadToEnd());
             foreach (var prop in new[] { "Code", "code" })
                 if (doc.RootElement.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.String)
-                    return new(v.GetString() ?? "", assets);
+                    return new(v.GetString() ?? "", assets, files);
 
-            return new("", assets);
+            return new("", assets, files);
         }
-        catch { return new("", assets); }
+        catch { return new("", assets, files); }
     }
 
     /// <summary>Rebuilds the bundle with updated metadata, preserving every non-metadata entry.</summary>

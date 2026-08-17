@@ -1006,6 +1006,7 @@
   "plugins.importZip": "Import plugin",
   "plugins.importZipHint": "A bundle with the same key updates an existing plugin; a new one is imported disabled, because plugin code runs server-side.",
   "plugins.importZipBtn": "Import ZIP",
+  "plugins.exportZip": "Export (ZIP)",
   "nav.mailtemplates": "Mail templates",
   "mailtpl.title": "Mail templates",
   "mailtpl.none": "No templates yet.",

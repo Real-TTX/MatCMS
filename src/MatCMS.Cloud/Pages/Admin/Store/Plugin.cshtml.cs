@@ -30,6 +30,7 @@ public class PluginModel : PageModel
     public StorePlugin Item { get; private set; } = new();
     public string Code { get; private set; } = "";
     public List<string> Assets { get; private set; } = new();
+    public List<string> Files { get; private set; } = new();
     public bool IsNew => Item.Id == 0;
 
     /// <summary>Profiles that roll this entry out — shown before a change is saved.</summary>
@@ -45,6 +46,7 @@ public class PluginModel : PageModel
         Item = item;
         Code = StoreBundle.ReadCode(item.Bundle);
         Assets = StoreBundle.ReadAssets(item.Bundle);
+        Files = StoreBundle.ReadFiles(item.Bundle);
         UsedBy = await _db.ProfileStorePlugins.AsNoTracking()
             .Where(x => x.StorePluginId == item.Id).Select(x => x.Profile!.Name).ToListAsync();
         return Page();
@@ -210,19 +212,30 @@ public static class StoreBundle
         catch { return ""; }
     }
 
-    public static List<string> ReadAssets(byte[] zipBytes)
+    public static List<string> ReadAssets(byte[] zipBytes) => ReadFolder(zipBytes, PluginBundle.AssetFolder);
+
+    /// <summary>
+    /// The plugin's further script files. Listed, never edited here: this editor surfaces the entry
+    /// file, and everything else is copied through byte for byte by <see cref="Repack"/>. Showing the
+    /// names is the point — a plugin whose real work sits in three more files must not look like a
+    /// one-file plugin on the screen where it is edited, or someone will "fix" it by rewriting the
+    /// entry file alone.
+    /// </summary>
+    public static List<string> ReadFiles(byte[] zipBytes) => ReadFolder(zipBytes, PluginBundle.FileFolder);
+
+    private static List<string> ReadFolder(byte[] zipBytes, string prefix)
     {
-        var assets = new List<string>();
+        var names = new List<string>();
         try
         {
             using var ms = new MemoryStream(zipBytes);
             using var zip = new ZipArchive(ms, ZipArchiveMode.Read);
             foreach (var entry in zip.Entries)
-                if (entry.FullName.StartsWith("assets/", StringComparison.OrdinalIgnoreCase) && entry.Length > 0)
-                    assets.Add(entry.FullName["assets/".Length..]);
+                if (entry.FullName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && entry.Length > 0)
+                    names.Add(entry.FullName[prefix.Length..]);
         }
-        catch { /* unreadable bundle → no assets listed */ }
-        return assets;
+        catch { /* unreadable bundle → nothing listed */ }
+        return names;
     }
 
     /// <summary>Rebuilds a bundle with updated metadata, preserving every non-metadata entry.</summary>

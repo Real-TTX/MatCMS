@@ -1006,6 +1006,7 @@
   "plugins.importZip": "Plugin importieren",
   "plugins.importZipHint": "Ein Bündel mit gleichem Schlüssel aktualisiert ein vorhandenes Plugin; ein neues wird deaktiviert importiert, weil Plugin-Code serverseitig läuft.",
   "plugins.importZipBtn": "ZIP importieren",
+  "plugins.exportZip": "Exportieren (ZIP)",
   "nav.mailtemplates": "Mail-Vorlagen",
   "mailtpl.title": "Mail-Vorlagen",
   "mailtpl.none": "Noch keine Vorlagen vorhanden.",

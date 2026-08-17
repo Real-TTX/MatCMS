@@ -86,11 +86,15 @@ public static class PluginPackager
 
     /// <summary>
     /// Imports a bundle. If a plugin with the bundle's Key already exists it is UPDATED in place
-    /// (code/description/version + assets replaced; Enabled state, Id and DataVersion preserved);
-    /// otherwise a new plugin is created. In BOTH cases the plugin is left DISABLED — imported code is
-    /// untrusted, so nothing runs until an admin reviews it and enables it. Assets are staged and then
-    /// swapped in, so a corrupt/failed extraction never destroys the plugin's current assets. Returns
-    /// the plugin, whether it was an update, and an error message on failure.
+    /// (code/further files/description/version + assets replaced; Enabled state, Id and DataVersion
+    /// preserved); otherwise a new plugin is created. In BOTH cases the plugin is left DISABLED —
+    /// imported code is untrusted, so nothing runs until an admin reviews it and enables it. Assets are
+    /// staged and then swapped in, so a corrupt/failed extraction never destroys the plugin's current
+    /// assets. Returns the plugin, whether it was an update, and an error message on failure.
+    /// <para>The file map is replaced as a whole, exactly like the code and the assets: an import is a
+    /// replacement, and merging the new bundle's files into the old set would leave a file behind that
+    /// the new version deliberately dropped. That also means importing an OLD, single-file bundle over
+    /// a multi-file plugin reduces it to that one file — which is what that bundle says the plugin is.</para>
     /// </summary>
     public static async Task<(Models.Plugin? plugin, bool updated, string? error)> ImportAsync(
         Stream zipStream, IWebHostEnvironment env, AppDbContext db)
@@ -125,6 +129,12 @@ public static class PluginPackager
             // The bundle Key is the package identity. Re-slugify (never trust input).
             var wantKey = PagesIndex.Slugify(!string.IsNullOrWhiteSpace(meta.Key) ? meta.Key : meta.Name);
             if (string.IsNullOrEmpty(wantKey)) wantKey = "plugin";
+
+            // The further script files. Read BEFORE anything is written, so a bundle whose file map is
+            // unusable is refused as a whole instead of half-importing a plugin that then fails to run.
+            // A bundle without this folder is an old one — a plugin with a single file, not an error.
+            var (files, filesError) = ReadFiles(zip);
+            if (filesError is not null) return (null, false, filesError);
 
             var dir = StoragePaths.PluginAssetDir(env, wantKey);
             var staging = dir + ".importtmp";
@@ -179,6 +189,7 @@ public static class PluginPackager
                     existing.Name = meta.Name.Trim();
                     existing.Description = (meta.Description ?? "").Trim();
                     existing.Code = meta.Code ?? "";
+                    existing.FilesJson = files;
                     existing.Version = (meta.Version ?? "").Trim();
                     existing.Enabled = false;
                     plugin = existing;
@@ -193,6 +204,7 @@ public static class PluginPackager
                         Version = (meta.Version ?? "").Trim(),
                         Description = (meta.Description ?? "").Trim(),
                         Code = meta.Code ?? "",
+                        FilesJson = files,
                         Enabled = false
                     };
                     db.Plugins.Add(plugin);
@@ -220,6 +232,77 @@ public static class PluginPackager
 
             return (plugin, updated, null);
         }
+    }
+
+    /// <summary>
+    /// Reads the stored file map for export. Never throws: a broken <c>FilesJson</c> exports as no
+    /// further files rather than failing the download — the operator asked for a copy of the plugin,
+    /// and refusing to hand out any of it because one field does not parse helps nobody.
+    /// </summary>
+    private static IEnumerable<KeyValuePair<string, string>> ParseFiles(string? filesJson)
+    {
+        if (string.IsNullOrWhiteSpace(filesJson)) yield break;
+
+        Dictionary<string, string>? map;
+        try { map = JsonSerializer.Deserialize<Dictionary<string, string>>(filesJson); }
+        catch { yield break; }
+        if (map is null) yield break;
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (rawPath, content) in map.OrderBy(kv => kv.Key, StringComparer.Ordinal))
+        {
+            var path = MatCMS.Shared.PluginBundle.NormalizeFilePath(rawPath);
+            if (path is null || !seen.Add(path)) continue;
+            yield return new(path, content ?? "");
+        }
+    }
+
+    /// <summary>
+    /// Collects the <c>files/</c> entries of a bundle into the JSON map the plugin stores.
+    /// <para>Refuses instead of quietly skipping: a bundle whose paths are not legal is a bundle whose
+    /// author expects those files to be there, and importing it minus one file produces a plugin that
+    /// compiles halfway and reports a missing <c>#load</c> at some later moment. The zip-bomb guards
+    /// are the same idea as for the assets, counted against the same total budget so a bundle cannot
+    /// dodge the limit by moving weight from one folder to the other.</para>
+    /// </summary>
+    private static (string Json, string? Error) ReadFiles(ZipArchive zip)
+    {
+        var prefix = MatCMS.Shared.PluginBundle.FileFolder;
+        var clean = new Dictionary<string, string>(StringComparer.Ordinal);
+        long total = 0;
+        var count = 0;
+
+        foreach (var e in zip.Entries)
+        {
+            var norm = e.FullName.Replace('\\', '/');
+            if (!norm.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
+            if (norm.EndsWith("/")) continue;                       // directory entry
+            if (e.Length > MaxFileBytes)
+                return ("{}", $"Ungültiges Paket: „{norm}“ ist zu groß für eine Skriptdatei.");
+            if (++count > MaxFiles)
+                return ("{}", "Ungültiges Paket: zu viele Skriptdateien.");
+            total += e.Length;
+            if (total > MaxTotalBytes)
+                return ("{}", "Ungültiges Paket: die Skriptdateien sind zusammen zu groß.");
+
+            var path = MatCMS.Shared.PluginBundle.NormalizeFilePath(norm[prefix.Length..]);
+            if (path is null)
+                return ("{}", $"Ungültiges Paket: „{norm}“ ist kein zulässiger Pfad.");
+            if (clean.ContainsKey(path))
+                return ("{}", $"Ungültiges Paket: „{path}“ kommt zweimal vor.");
+
+            try
+            {
+                // Default StreamReader: UTF-8 with BOM detection — a bundle written by an editor that
+                // insists on a BOM must not turn its first `#load` into an unparsable line.
+                using var r = new StreamReader(e.Open());
+                clean[path] = r.ReadToEnd();
+            }
+            catch { return ("{}", "Paket konnte nicht entpackt werden (beschädigtes ZIP)."); }
+        }
+
+        if (clean.Count == 0) return ("{}", null);
+        return (JsonSerializer.Serialize(clean, new JsonSerializerOptions { WriteIndented = true }), null);
     }
 
     /// <summary>Strips any directory part and keeps only safe filename characters.</summary>

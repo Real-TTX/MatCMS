@@ -41,6 +41,7 @@
         apply = Model.Labels.Apply,
         cancel = Model.Labels.Cancel,
         unknown = Model.Labels.Unknown,
+        current = Model.Labels.Current,
         empty = Model.Labels.Empty,
         count = Model.Labels.Count
     });
@@ -63,12 +64,14 @@
            spellcheck="false" autocomplete="off" data-icon-input />
 
     @* Mit Skript: der Knopf mit dem Symbol. Bis das Skript läuft, ist die Reihe versteckt — ein
-       Knopf, der nichts tut, ist irreführender als gar keiner. *@
+       Knopf, der nichts tut, ist irreführender als gar keiner.
+       Ein „Kein Icon“-Knopf steht hier NICHT mehr: das Leeren ist die erste Kachel im Dialog, und
+       zwei Wege, dasselbe zu tun, sind einer zu viel. Ist nichts gesetzt, zeigt der Knopf selbst
+       das X auf abweichender Fläche — dieselbe Kachel, nur vor dem Dialog. *@
     <div class="icon-current" data-icon-row hidden>
         <button type="button" class="icon-current-preview" data-icon-open
                 aria-haspopup="dialog" title="@Model.Labels.Pick" aria-label="@Model.Labels.Pick"></button>
         <span class="icon-current-name" data-icon-name></span>
-        <button type="button" class="btn btn-sm btn-ghost" data-icon-clear>@Model.Labels.None</button>
     </div>
 
     @if (!string.IsNullOrEmpty(Model.Help))

@@ -374,6 +374,12 @@ textarea.code-area { width: 100%; box-sizing: border-box; font-family: ui-monosp
 .icon-tile .ti { font-size: 22px; }
 .icon-tile:hover { border-color: var(--accent); }
 .icon-tile.sel { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, #fff); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+/* Die erste Kachel: „kein Symbol“. Gleiche Größe, gleiche Stelle, gleiches Verhalten wie jede
+   andere — unterschieden allein durch die gedämpfte Fläche (--bg-alt, die es im Admin schon gibt)
+   und das X. Die Auswahlmarkierung .icon-tile.sel wiegt schwerer (zwei Klassen gegen eine) und
+   gewinnt deshalb, damit auch DIESE Kachel sichtbar gewählt ist, wenn kein Symbol gesetzt ist. */
+.icon-tile-none { background: var(--bg-alt); color: var(--muted); }
+.icon-tile-none:hover { border-color: var(--accent); }
 .icon-more { grid-column: 1 / -1; color: var(--muted); font-size: 13px; padding: 6px 2px; }
 
 /* Das Kästchen mit dem aktuellen Symbol IST jetzt der Knopf, der den Dialog öffnet — deshalb
@@ -382,9 +388,11 @@ textarea.code-area { width: 100%; box-sizing: border-box; font-family: ui-monosp
 button.icon-current-preview { background: #fff; cursor: pointer; padding: 0; }
 button.icon-current-preview:hover { border-color: var(--accent); }
 button.icon-current-preview:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-/* Leer heißt leer: ein gestrichelter Rahmen sagt „hier fehlt etwas“, ein leeres Kästchen mit
-   durchgezogenem Rand sieht aus wie ein Symbol, das nicht laden wollte. */
-button.icon-current-preview.is-empty { border-style: dashed; color: var(--muted); }
+/* Kein Symbol gesetzt: dieselbe abweichende Fläche und dasselbe X wie die erste Kachel im Dialog —
+   der Knopf zeigt also genau die Kachel, die dort gewählt ist. Ein leeres Kästchen sähe dagegen aus
+   wie ein Symbol, das nicht laden wollte. Die Farben sind die vorhandenen Größen des Admin
+   (--bg-alt für die gedämpfte Fläche, --muted für das Zeichen), kein neuer Farbwert. */
+button.icon-current-preview.is-empty { background: var(--bg-alt); color: var(--muted); }
 /* Ein gespeicherter Name, den die Schrift nicht kennt. Er BLEIBT stehen — die Farbe sagt nur, dass
    er nichts zeichnen wird. */
 .icon-current-name.is-unknown { color: #b45309; }

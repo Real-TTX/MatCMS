@@ -15,11 +15,13 @@ namespace MatCMS.Shared.Web;
 /// <param name="Cancel">Leaves the field exactly as it was.</param>
 /// <param name="Unknown">Note next to a stored name the shipped font does not contain (any more).
 /// It is SHOWN and KEPT, never silently dropped — see the partial for why.</param>
+/// <param name="Current">Note under the icon pinned at the top of the grid: the one that is set.
+/// Pinning it is what lets the dialog open without drawing its way down to it.</param>
 /// <param name="Empty">What the name line reads when no icon is set.</param>
 /// <param name="Count">"{0} von {1}" — how much of the filtered list is drawn so far.</param>
 public sealed record IconFieldLabels(
     string Pick, string DialogTitle, string Search, string None, string NoResults,
-    string Apply, string Cancel, string Unknown, string Empty, string Count);
+    string Apply, string Cancel, string Unknown, string Current, string Empty, string Count);
 
 /// <summary>
 /// A Tabler-icon field: the current icon as a BUTTON, a dialog to pick another one, and the plain

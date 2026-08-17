@@ -685,5 +685,6 @@
   "icons.unknown": "unknown",
   "icons.empty": "No icon chosen",
   "icons.count": "{0} of {1} shown",
-  "profiles.componentIconHelp": "Shown next to the component in the instance block editor."
+  "profiles.componentIconHelp": "Shown next to the component in the instance block editor.",
+  "icons.current": "current"
 }

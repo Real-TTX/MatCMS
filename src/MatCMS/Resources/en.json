@@ -1155,5 +1155,6 @@
   "icons.empty": "No icon chosen",
   "icons.count": "{0} of {1} shown",
   "components.icon": "Icon",
-  "components.iconHelp": "Shown next to the component in the block editor."
+  "components.iconHelp": "Shown next to the component in the block editor.",
+  "icons.current": "current"
 }

@@ -685,5 +685,6 @@
   "icons.unknown": "unbekannt",
   "icons.empty": "Kein Icon gewählt",
   "icons.count": "{0} von {1} angezeigt",
-  "profiles.componentIconHelp": "Wird im Block-Editor der Instanz neben der Komponente angezeigt."
+  "profiles.componentIconHelp": "Wird im Block-Editor der Instanz neben der Komponente angezeigt.",
+  "icons.current": "aktuell"
 }

@@ -23,12 +23,13 @@
     // verschachteltes <form>, das der Browser wegwirft. Aus demselben Grund ist jeder Knopf hier
     // ausdrücklich type="button": ohne das schickt er beim Anklicken das Formular ab, in dem er steht.
     var dlg = null, grid = null, search = null, foot = null, titleEl = null;
-    var applyBtn = null, cancelBtn = null, noneBtn = null;
+    var applyBtn = null, cancelBtn = null;
     var owner = null;        // die Auswahl, die den Dialog geöffnet hat
     var picked = '';         // die Wahl IM Dialog — sie wird erst beim Übernehmen übertragen
     var filtered = [];       // die aktuelle Trefferliste
     var drawn = 0;           // wie viele davon schon gezeichnet sind
     var noResults = false;   // die „kein Treffer“-Zeile steht schon da
+    var pinned = false;      // das gesetzte Symbol ist oben angeheftet
     var TXT = {};
 
     function el(tag, cls, text) {
@@ -59,16 +60,16 @@
         grid = el('div', 'icon-grid');
         dlg.appendChild(grid);
 
+        // Unten stehen nur noch Abbrechen und Übernehmen. „Kein Symbol“ ist KEIN Knopf mehr,
+        // sondern die erste Kachel im Raster (siehe tile()) — das Leeren ist eine Wahl wie jede
+        // andere und gehört dorthin, wo man wählt.
         foot = el('div', 'icon-dialog-foot');
         var count = el('span', 'icon-dialog-count');
-        noneBtn = el('button', 'btn btn-sm btn-ghost');
-        noneBtn.type = 'button';
         applyBtn = el('button', 'btn btn-sm');
         applyBtn.type = 'button';
         cancelBtn = el('button', 'btn btn-sm btn-ghost');
         cancelBtn.type = 'button';
         foot.appendChild(count);
-        foot.appendChild(noneBtn);
         foot.appendChild(cancelBtn);
         foot.appendChild(applyBtn);
         dlg.appendChild(foot);
@@ -110,7 +111,6 @@
             if (grid.scrollTop + grid.clientHeight >= grid.scrollHeight - 120) draw();
         });
 
-        noneBtn.addEventListener('click', function () { picked = ''; mark(); });
         applyBtn.addEventListener('click', apply);
         cancelBtn.addEventListener('click', function () { dlg.close(); });
         // Klick auf den Schleier schließt — wie Abbrechen, also ohne zu schreiben. Verglichen wird
@@ -122,18 +122,31 @@
                          ev.clientY >= r.top && ev.clientY <= r.bottom;
             if (!inside) dlg.close();
         });
-        // Escape schließt ein <dialog> von selbst. Hier steht nur, was danach zu tun ist: NICHTS.
-        // Das Feld behält seinen Wert, weil ausschließlich apply() ihn anfasst.
-        dlg.addEventListener('close', function () { owner = null; });
+        // Escape schließt ein <dialog> von selbst. Am Wert wird dabei NICHTS getan — den fasst
+        // ausschließlich apply() an. Was hier geschieht, ist nur das Zurücklegen des Fokus auf den
+        // Knopf, von dem aus geöffnet wurde: sonst steht der Fokus nach dem Schließen wieder am
+        // Seitenanfang und man tastet sich mit der Tastatur ein zweites Mal dorthin.
+        dlg.addEventListener('close', function () {
+            var back = owner;
+            owner = null;
+            if (back && back.btn) back.btn.focus();
+        });
     }
 
     // ---- Zeichnen ---------------------------------------------------------------------------
+    // name === '' ist die Kachel „kein Symbol“: dieselbe Größe, dieselbe Stelle im Raster und
+    // dasselbe Verhalten wie jede andere — sie wird angeklickt und übernommen wie ein Symbol.
+    // Unterschieden wird sie über die Fläche (.icon-tile-none) und das X. Sie ist damit eine WAHL
+    // und kein Sonderknopf daneben; ein Knopf unter dem Dialog behauptete, das Leeren sei etwas
+    // anderes als das Auswählen, und stand außerdem dort, wo man ihn beim Suchen nicht sieht.
     function tile(name, note) {
-        var b = el('button', 'icon-tile' + (name === picked ? ' sel' : ''));
+        var none = !name;
+        var b = el('button', 'icon-tile' + (none ? ' icon-tile-none' : '') + (name === picked ? ' sel' : ''));
         b.type = 'button';
         b.setAttribute('data-icon', name);
-        b.title = name + (note ? ' — ' + note : '');
-        var i = el('i', 'ti ti-' + name);
+        b.title = none ? (TXT.none || '') : (name + (note ? ' — ' + note : ''));
+        if (none) b.setAttribute('aria-label', TXT.none || '');
+        var i = el('i', 'ti ' + (none ? 'ti-x' : 'ti-' + name));
         i.setAttribute('aria-hidden', 'true');
         b.appendChild(i);
         return b;
@@ -142,16 +155,36 @@
     function filter(q) {
         q = (q || '').trim().toLowerCase();
         filtered = q ? ALL.filter(function (n) { return n.indexOf(q) !== -1; }) : ALL.slice();
-        // Der gespeicherte Name, den die Schrift nicht kennt, steht ganz vorn und ist damit
-        // überhaupt auffindbar — sonst wäre die einzige Auskunft über ihn, dass die Kachel leer ist.
         grid.innerHTML = '';
         grid.scrollTop = 0;
         drawn = 0;
         noResults = false;
-        if (owner && owner.unknown && (!q || owner.unknown.toLowerCase().indexOf(q) !== -1)) {
-            var row = el('div', 'icon-more', TXT.unknown || '');
-            grid.appendChild(tile(owner.unknown, TXT.unknown));
-            grid.appendChild(row);
+        pinned = false;
+
+        // „Kein Symbol“ ist die ERSTE Kachel — IMMER, auch während einer Suche. Sie ist kein
+        // Suchtreffer, sondern die stehende Möglichkeit, das Feld zu leeren; sie beim Tippen
+        // verschwinden zu lassen hieße, dass ausgerechnet der eine Eintrag, den man nie eintippen
+        // kann, genau dann weg ist, wenn man tippt. Dass sie kein Treffer ist, sagt ihre eigene
+        // Fläche und das X — und der Zähler unten zählt nur die echten Symbole.
+        grid.appendChild(tile(''));
+
+        // Das gesetzte Symbol steht GANZ OBEN, angeheftet, statt dass der Dialog zu ihm hinscrollt.
+        // Hinscrollen hieß, alles bis dahin zu zeichnen — bei „star“ waren das rund 4000 Kacheln,
+        // also genau das, was das stückweise Zeichnen vermeiden soll. Oben angeheftet sieht man
+        // sofort, was gilt, und gezeichnet werden trotzdem nur die ersten 180.
+        // Der Sonderfall, um den es dabei vor allem geht: ein Name, den die Schrift NICHT kennt.
+        // Er wäre in der Liste gar nicht zu finden — angeheftet ist er sichtbar, benannt und
+        // vorausgewählt, und wer abbricht, behält ihn.
+        var cur = owner ? (owner.input.value || '').trim() : '';
+        if (cur && (!q || cur.toLowerCase().indexOf(q) !== -1)) {
+            var known = ALL.indexOf(cur) !== -1;
+            var note = known ? (TXT.current || '') : (TXT.unknown || '');
+            grid.appendChild(tile(cur, note));
+            grid.appendChild(el('div', 'icon-more', note));
+            pinned = true;
+            // Aus der Liste darunter nehmen, sonst stünde dasselbe Symbol zweimal da.
+            var ix = filtered.indexOf(cur);
+            if (ix !== -1) filtered.splice(ix, 1);
         }
         draw();
     }
@@ -161,7 +194,7 @@
             // Kein Treffer UND kein behaltener unbekannter Name: dann steht hier, dass nichts
             // gefunden wurde — genau einmal, sonst hinge die Zeile bei jedem Bildlauf ein weiteres
             // Mal darunter.
-            if (filtered.length === 0 && !noResults && !(owner && owner.unknown)) {
+            if (filtered.length === 0 && !noResults && !pinned) {
                 noResults = true;
                 grid.appendChild(el('div', 'icon-more', TXT.noResults || ''));
             }
@@ -176,7 +209,11 @@
         count();
         // Passt das Raster noch nicht einmal seine eigene Höhe aus, kommt nie ein Bildlauf und damit
         // nie ein Nachladen — deshalb hier gleich weiter, bis es voll ist.
-        if (grid.scrollHeight <= grid.clientHeight && drawn < filtered.length) draw();
+        // clientHeight > 0 ist dabei die eigentliche Bedingung: ein noch geschlossenes <dialog> ist
+        // display:none, also sind BEIDE Höhen 0 und "passt nicht aus" war immer wahr — der Dialog
+        // zeichnete beim Öffnen alle 4962 Kacheln in einem Zug, genau das, was das stückweise
+        // Zeichnen verhindern soll. Am laufenden System gemessen: 752 ms und das ganze Raster.
+        if (grid.clientHeight > 0 && grid.scrollHeight <= grid.clientHeight && drawn < filtered.length) draw();
     }
 
     function count() {
@@ -214,13 +251,21 @@
             i.setAttribute('aria-hidden', 'true');
             p.btn.appendChild(i);
         }
+        // Kein Symbol heißt nicht "leerer Knopf": der Knopf zeigt dann dasselbe X auf derselben
+        // abweichenden Fläche wie die erste Kachel im Dialog. So sieht man ohne Öffnen, dass nichts
+        // gewählt ist — und man hat trotzdem etwas Sichtbares zum Anklicken statt eines leeren
+        // Kästchens, das auch ein nicht geladenes Symbol sein könnte.
+        if (!name) {
+            var x = el('i', 'ti ti-x');
+            x.setAttribute('aria-hidden', 'true');
+            p.btn.appendChild(x);
+        }
         p.btn.classList.toggle('is-empty', !name);
         p.nameEl.textContent = name || p.txt.empty;
         // Ein unbekannter Name wird benannt, nicht weggeräumt: sonst sieht man nur ein leeres
         // Kästchen und hält es für "kein Symbol" — und speichert es dann versehentlich weg.
         p.nameEl.classList.toggle('is-unknown', !!name && !known);
         if (name && !known) p.nameEl.textContent = name + ' — ' + p.txt.unknown;
-        p.unknown = (name && !known) ? name : '';
     }
 
     function open(p) {
@@ -231,14 +276,12 @@
         titleEl.textContent = TXT.title;
         search.placeholder = TXT.search;
         search.value = '';
-        noneBtn.textContent = TXT.none;
         applyBtn.textContent = TXT.apply;
         cancelBtn.textContent = TXT.cancel;
-        filter('');
+        // ERST öffnen, DANN zeichnen: vorher hat das Raster keine Höhe (siehe draw()), und die
+        // Nachlade-Schleife hielte sich für „noch nicht voll“, bis alles gezeichnet ist.
         dlg.showModal();
-        // Zum aktuellen Symbol scrollen, statt am Anfang der 4962 zu stehen.
-        var sel = grid.querySelector('.icon-tile.sel');
-        if (sel) sel.scrollIntoView({ block: 'center' });
+        filter('');
         search.focus();
     }
 
@@ -253,7 +296,7 @@
             wrap: wrap, input: input, row: row,
             btn: row.querySelector('[data-icon-open]'),
             nameEl: row.querySelector('[data-icon-name]'),
-            txt: txt, unknown: ''
+            txt: txt
         };
         if (!p.btn || !p.nameEl) return;
 
@@ -262,12 +305,6 @@
         input.hidden = true;
 
         p.btn.addEventListener('click', function () { open(p); });
-        wrap.querySelector('[data-icon-clear]').addEventListener('click', function () {
-            input.value = '';
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-            input.dispatchEvent(new Event('change', { bubbles: true }));
-            paint(p);
-        });
         // Wer das Feld doch von Hand füllt (Rohform, eingefügter Wert), soll den Knopf mitwandern
         // sehen.
         input.addEventListener('input', function () { paint(p); });

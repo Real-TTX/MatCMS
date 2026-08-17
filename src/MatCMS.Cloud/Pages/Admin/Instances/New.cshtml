@@ -3,11 +3,9 @@
 @{
     ViewData["Title"] = T["instances.new"];
 }
+@* Heading only: the way back sits next to the create button at the bottom, as in the CMS. *@
 <div class="page-head">
     <h1>@T["instances.new"]</h1>
-    <div class="list-toolbar">
-        <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
-    </div>
 </div>
 
 <form method="post">
@@ -67,7 +65,10 @@
         </div>
     </div>
 
-    <div class="list-actions">
+    @* .form-actions, not .list-actions: this row belongs to a form, not to a list — same class the
+       CMS uses for the same thing. *@
+    <div class="form-actions">
         <button type="submit" class="btn" disabled="@(Model.NextPort is null ? "disabled" : null)">@T["instances.newCreate"]</button>
+        <a class="btn btn-ghost" asp-page="Index">@T["action.back"]</a>
     </div>
 </form>

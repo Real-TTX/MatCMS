@@ -3,14 +3,13 @@
 @{
     ViewData["Title"] = T["profiles.translation"];
 }
+@* Heading only: every action on this page sits in ONE row at the bottom, in the CMS's order
+   (save, export, back, destructive last). *@
 <div class="page-head">
     <h1>
         @T["profiles.translation"]
         <span class="muted" style="font-size:14px;font-weight:400;"> — @Model.Owner.Name</span>
     </h1>
-    <div class="list-toolbar">
-        <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@Model.Owner.Id" asp-route-tab="settings">@T["action.back"]</a>
-    </div>
 </div>
 
 <form method="post" asp-route-profileId="@Model.Owner.Id" id="editor-form">
@@ -53,6 +52,7 @@
 
 <div class="form-actions">
     <button type="submit" class="btn" form="editor-form">@T["settings.save"]</button>
+    <a class="btn btn-ghost" asp-page="Edit" asp-route-id="@Model.Owner.Id" asp-route-tab="settings">@T["action.back"]</a>
     @if (!Model.IsNew)
     {
         <form class="inline-form" method="post" asp-page-handler="Remove" asp-route-profileId="@Model.Owner.Id"

@@ -3,9 +3,9 @@
 @{
     ViewData["Title"] = T["instances.add"];
 }
+@* Heading only: the way back sits next to the adopt button at the bottom, as in the CMS. *@
 <div class="page-head">
     <h1>@T["instances.add"]</h1>
-    <a class="btn btn-ghost" asp-page="Index">@T["common.back"]</a>
 </div>
 
 <div class="card">
@@ -94,6 +94,9 @@
             </select>
         </div>
         <div class="help muted">@T["enroll.credentialsHint"]</div>
-        <button type="submit" class="btn">@T["enroll.adopt"]</button>
+        <div class="form-actions">
+            <button type="submit" class="btn">@T["enroll.adopt"]</button>
+            <a class="btn btn-ghost" asp-page="Index">@T["common.back"]</a>
+        </div>
     </form>
 </div>

@@ -4,21 +4,14 @@
     ViewData["Title"] = Model.IsNew ? T["profiles.addComponent"] : Model.Item.Name;
     var ec = Model.Item;
 }
+@* Heading only: every action on this page sits in ONE row at the bottom, in the CMS's order
+   (save, export, back, destructive last). Two places for buttons that act on the same form had
+   you looking up for what lives down. *@
 <div class="page-head">
     <h1>
         @(Model.IsNew ? T["profiles.addComponent"] : Model.Item.Name)
         <span class="muted" style="font-size:14px;font-weight:400;"> — @Model.Owner.Name</span>
     </h1>
-    <div class="list-toolbar">
-        @if (!Model.IsNew)
-        {
-            <a class="btn btn-sm btn-ghost" asp-page="Component" asp-page-handler="Export"
-               asp-route-profileId="@Model.Owner.Id" asp-route-id="@ec.Id">
-                <i class="ti ti-download" aria-hidden="true"></i> @T["components.exportJson"]
-            </a>
-        }
-        <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@Model.Owner.Id" asp-route-tab="components">@T["action.back"]</a>
-    </div>
 </div>
 
 <form method="post" asp-route-profileId="@Model.Owner.Id" asp-route-id="@(Model.IsNew ? null : (int?)ec.Id)" id="component-form">
@@ -80,6 +73,14 @@
    page. The delete keeps its confirm, which is what actually guards it. *@
 <div class="form-actions">
     <button type="submit" class="btn" form="component-form">@T["settings.save"]</button>
+    @if (!Model.IsNew)
+    {
+        <a class="btn btn-ghost" asp-page="Component" asp-page-handler="Export"
+           asp-route-profileId="@Model.Owner.Id" asp-route-id="@ec.Id">
+            <i class="ti ti-download" aria-hidden="true"></i> @T["components.exportJson"]
+        </a>
+    }
+    <a class="btn btn-ghost" asp-page="Edit" asp-route-id="@Model.Owner.Id" asp-route-tab="components">@T["action.back"]</a>
     @if (!Model.IsNew)
     {
         <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-profileId="@Model.Owner.Id" asp-route-id="@ec.Id"

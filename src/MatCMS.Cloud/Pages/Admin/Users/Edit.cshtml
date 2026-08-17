@@ -3,9 +3,9 @@
 @{
     ViewData["Title"] = Model.IsNew ? T["users.add"] : T["users.edit"];
 }
+@* Heading only: the way back sits next to the save button at the bottom, as in the CMS. *@
 <div class="page-head">
     <h1>@ViewData["Title"]</h1>
-    <a class="btn btn-ghost" asp-page="Index">@T["common.back"]</a>
 </div>
 
 <div class="card">
@@ -30,6 +30,9 @@
             <label for="Password">@T["users.password"]</label>
             <input id="Password" name="Password" type="password" placeholder="@(Model.IsNew ? "" : T["users.passwordKeep"])" />
         </div>
-        <button type="submit" class="btn">@T["common.save"]</button>
+        <div class="form-actions">
+            <button type="submit" class="btn">@T["common.save"]</button>
+            <a class="btn btn-ghost" asp-page="Index">@T["common.back"]</a>
+        </div>
     </form>
 </div>

@@ -4,21 +4,13 @@
     ViewData["Title"] = Model.IsNew ? T["mailtpl.add"] : Model.Item.Name;
     var m = Model.Item;
 }
+@* Heading only: every action on this page sits in ONE row at the bottom, in the CMS's order
+   (save, export, back, destructive last). *@
 <div class="page-head">
     <h1>
         @(Model.IsNew ? T["mailtpl.add"] : Model.Item.Name)
         <span class="muted" style="font-size:14px;font-weight:400;"> — @Model.Owner.Name</span>
     </h1>
-    <div class="list-toolbar">
-        @if (!Model.IsNew)
-        {
-            <a class="btn btn-sm btn-ghost" asp-page="MailTemplate" asp-page-handler="Export"
-               asp-route-profileId="@Model.Owner.Id" asp-route-id="@m.Id">
-                <i class="ti ti-download" aria-hidden="true"></i> @T["components.exportJson"]
-            </a>
-        }
-        <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@Model.Owner.Id" asp-route-tab="mailtemplates">@T["action.back"]</a>
-    </div>
 </div>
 
 <form method="post" asp-route-profileId="@Model.Owner.Id" asp-route-id="@(Model.IsNew ? null : (int?)m.Id)" id="editor-form">
@@ -67,6 +59,14 @@
 
 <div class="form-actions">
     <button type="submit" class="btn" form="editor-form">@T["settings.save"]</button>
+    @if (!Model.IsNew)
+    {
+        <a class="btn btn-ghost" asp-page="MailTemplate" asp-page-handler="Export"
+           asp-route-profileId="@Model.Owner.Id" asp-route-id="@m.Id">
+            <i class="ti ti-download" aria-hidden="true"></i> @T["components.exportJson"]
+        </a>
+    }
+    <a class="btn btn-ghost" asp-page="Edit" asp-route-id="@Model.Owner.Id" asp-route-tab="mailtemplates">@T["action.back"]</a>
     @if (!Model.IsNew)
     {
         <form class="inline-form" method="post" asp-page-handler="Delete"

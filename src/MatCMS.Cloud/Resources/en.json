@@ -162,6 +162,8 @@
   "tplfiles.menu": "Actions",
   "tplfiles.toggle": "Expand/collapse",
   "tplfiles.raw": "Raw",
+  "tplfiles.copy": "Copy content",
+  "tplfiles.copied": "Content copied.",
   "tplfiles.root": "Template",
   "tplfiles.apply": "Apply",
   "tplfiles.cancel": "Cancel",

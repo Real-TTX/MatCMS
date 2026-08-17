@@ -49,10 +49,15 @@ public sealed record TemplateFile(
 /// <param name="Toggle">Tooltip of the expander in front of a node.</param>
 /// <param name="Raw">Label of the switch to the plain form field of the open file.</param>
 /// <param name="Root">Fallback label for the tree's root when the template has no name yet.</param>
+/// <param name="Copy">"Inhalt kopieren" — puts the open file's text on the system clipboard. The only
+/// one of the plugin editor's new file commands that means anything here: a template's files are
+/// columns of the record, so renaming, moving, duplicating and pasting have nothing to act on.</param>
+/// <param name="Copied">Confirmation shown after the content went to the clipboard.</param>
 public sealed record TemplateFileLabels(
     string Edit, string Tokens, string InsertDefault, string InsertDefaultConfirm,
     string BadgeCustom, string BadgeEmpty,
-    string Pick, string Menu, string Toggle, string Raw, string Root);
+    string Pick, string Menu, string Toggle, string Raw, string Root,
+    string Copy, string Copied);
 
 /// <summary>
 /// The whole "Dateien" tab: the file tree, the fields the form posts and the editor that writes into

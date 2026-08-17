@@ -162,6 +162,8 @@
   "tplfiles.menu": "Aktionen",
   "tplfiles.toggle": "Auf-/zuklappen",
   "tplfiles.raw": "Rohform",
+  "tplfiles.copy": "Inhalt kopieren",
+  "tplfiles.copied": "Inhalt kopiert.",
   "tplfiles.root": "Template",
   "tplfiles.apply": "Übernehmen",
   "tplfiles.cancel": "Abbrechen",

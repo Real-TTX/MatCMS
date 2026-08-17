@@ -57,6 +57,8 @@
         menu = Model.Labels.Menu,
         toggle = Model.Labels.Toggle,
         raw = Model.Labels.Raw,
+        copy = Model.Labels.Copy,
+        copied = Model.Labels.Copied,
         root = string.IsNullOrWhiteSpace(Model.RootLabel) ? Model.Labels.Root : Model.RootLabel
     });
 }
@@ -315,16 +317,45 @@
             window.addEventListener('resize', closeMenu);
             list.addEventListener('scroll', closeMenu);
 
-            // Nur was es hier wirklich gibt: öffnen, und den Standard einsetzen, wo die Seite einen
-            // mitgibt. Eine Datei anlegen oder löschen kann man in einem Template nicht — sie sind
-            // Spalten des Datensatzes, nicht Einträge in einem Ordner. Ein Menüeintrag, der das
-            // anbietet, würde etwas versprechen, was der Server nicht kennt.
+            // Nur was es hier wirklich gibt: öffnen, den Inhalt kopieren, und den Standard
+            // einsetzen, wo die Seite einen mitgibt. Anlegen, löschen, umbenennen, verschieben,
+            // duplizieren und einfügen kann man in einem Template NICHT — seine Dateien sind
+            // Spalten des Datensatzes, nicht Einträge in einem Ordner: es gibt keinen Pfad, den man
+            // ändern, und keinen Ordner, in den man etwas legen könnte. Ein Menüeintrag dafür würde
+            // etwas versprechen, was der Server nicht kennt. Kopieren dagegen betrifft nur den
+            // INHALT — das gibt es hier genauso wie im Plugin-Editor.
             function menuFor(o) {
                 var items = [];
                 if (o.kind !== 'file') return items;
                 items.push({ label: TXT.edit, run: function () { open(o.idx, true); } });
+                items.push({ label: TXT.copy, run: function () { copyContent(o.idx); } });
                 if (FILES[o.idx].insertDefault) items.push({ label: TXT.insertDefault, run: function () { insertDefault(o.idx); } });
                 return items;
+            }
+
+            // Kopiert wird aus dem FELD, das abgeschickt wird — nicht aus CodeMirror: bei jedem
+            // Tastendruck steht dort ohnehin dasselbe, und im Rohmodus gibt es gar keinen Editor.
+            // Ohne Zwischenablage (kein sicherer Kontext, altes Gerät) der alte Weg über eine
+            // Auswahl; ein Knopf, der stillschweigend nichts tut, wäre schlimmer als keiner.
+            function copyContent(i) {
+                var text = stores[i].value || '';
+                var done = function () { alert(TXT.copied); };
+                var fallback = function () {
+                    var ta = document.createElement('textarea');
+                    ta.value = text;
+                    ta.style.position = 'fixed';
+                    ta.style.left = '-9999px';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    var ok = false;
+                    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+                    ta.remove();
+                    if (ok) done();
+                    else { open(i, true); showRaw(true); stores[i].select(); }
+                };
+                if (navigator.clipboard && navigator.clipboard.writeText)
+                    navigator.clipboard.writeText(text).then(done, fallback);
+                else fallback();
             }
 
             // ---- Der Editor ------------------------------------------------------------------

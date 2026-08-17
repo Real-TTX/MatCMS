@@ -56,30 +56,45 @@
                     @* Menüleiste über dem Editor. Bewusst nur mit Einträgen, hinter denen etwas
                        liegt — ein Menü "Blaupausen", das noch nichts kann, verspricht mehr als da
                        ist und lässt einen suchen, was es nicht gibt. Es kommt dazu, wenn es etwas
-                       auszuführen gibt. *@
+                       auszuführen gibt.
+                       Die Reiter stehen IN dieser Leiste und nicht in einer zweiten darüber: zwei
+                       Leisten übereinander sähen aus wie zwei Menüs und man müsste raten, welches
+                       für was zuständig ist. Rechts davon stehen die Einträge, die nur den Editor
+                       betreffen — unter "Erweitert" werden sie ausgeblendet, weil "Neue Datei"
+                       neben den Rohfeldern nichts zu tun hätte. *@
                     <div class="pf-menu">
-                        <button type="button" class="pf-menu-item" data-pf-add-top>@T["plugins.fileNew"]</button>
-                        <span class="pf-menu-file mono" data-pf-current></span>
+                        <button type="button" class="pf-menu-item is-active" data-pf-tab="editor">@T["plugins.tabEditor"]</button>
+                        <button type="button" class="pf-menu-item" data-pf-tab="raw">@T["plugins.tabRaw"]</button>
+                        <span class="pf-menu-sep" aria-hidden="true"></span>
+                        <button type="button" class="pf-menu-item" data-pf-add-top data-pf-only="editor">@T["plugins.fileNew"]</button>
+                        <span class="pf-menu-file mono" data-pf-current data-pf-only="editor"></span>
                         <span class="pf-menu-hint muted">@T["plugins.fileSaved"]</span>
                     </div>
-                    <div class="pf-editor" data-pf-editor hidden>
+                    @* Reiter 1: der Editor. *@
+                    <div class="tab-panel" data-pf-panel="editor">
+                        <div class="pf-editor" data-pf-editor hidden>
 
-                        <textarea class="code" spellcheck="false" data-pf-content></textarea>
+                            <textarea class="code" spellcheck="false" data-pf-content></textarea>
+                        </div>
+                        @* Kein leerer Kasten, sondern der Hinweis, was zu tun ist. *@
+                        <div class="pf-empty" data-pf-empty>@T["plugins.filePick"]</div>
                     </div>
-                    @* Kein leerer Kasten, sondern der Hinweis, was zu tun ist. *@
-                    <div class="pf-empty" data-pf-empty>@T["plugins.filePick"]</div>
+                    @* Reiter 2: die Rohform. Sie stand früher als <details> am Seitenende — dieselben
+                       zwei Felder, nur weit weg von dem, was sie zeigen. Hier liegen sie neben dem
+                       Editor, und beide schreiben weiterhin in DIESELBEN Felder: Code (versteckt,
+                       gespiegelt in CodeRaw) und FilesJson. Verschoben, nicht neu gebaut — ein
+                       zweites Paar Felder wäre genau der Weg, auf dem Code verlorengeht. *@
+                    <div class="tab-panel pf-editor" data-pf-panel="raw" hidden>
+                        <label class="pf-editor-head" for="CodeRaw">@MatCMS.Pages.Admin.Plugins.EditModel.EntryFile</label>
+                        <textarea id="CodeRaw" rows="12" class="code" spellcheck="false" data-pf-code-mirror>@Model.Code</textarea>
+                        <label class="pf-editor-head" for="FilesJson">@T["plugins.filesRaw"]</label>
+                        <textarea id="FilesJson" name="FilesJson" rows="12" class="code" spellcheck="false">@Model.FilesJson</textarea>
+                    </div>
                 </div>
             </div>
             <div class="help">@Html.Raw(T["plugins.filesHelp"])</div>
             <div class="help">@Html.Raw(T["plugins.codeHelp"])</div>
         </div>
-
-        <details class="form-field">
-            <summary class="muted">@T["plugins.filesRaw"]</summary>
-            <label class="muted" for="CodeRaw">@MatCMS.Pages.Admin.Plugins.EditModel.EntryFile</label>
-            <textarea id="CodeRaw" rows="6" class="code" spellcheck="false" data-pf-code-mirror>@Model.Code</textarea>
-            <textarea id="FilesJson" name="FilesJson" rows="6" class="code" spellcheck="false">@Model.FilesJson</textarea>
-        </details>
 
         @* Die Einstellungen des Plugins liegen im Dialog am Wurzelelement — sie stehen aber
            INNERHALB dieses Formulars. Ein Dialog neben dem Formular sähe genauso aus und würde beim
@@ -281,8 +296,39 @@
                 });
             }
 
+            // ---- Reiter über dem Editor ------------------------------------------------------
+            // Sie schalten nur um, WAS zu sehen ist. Die Felder Code und FilesJson bleiben
+            // dieselben, werden weiterhin bei jedem Tastendruck geschrieben und stehen in beiden
+            // Reitern nebeneinander — es gibt keinen zweiten Stand, der beim Wechseln gewinnen
+            // oder verlorengehen könnte.
+            var tabs = root.querySelectorAll('[data-pf-tab]');
+            var panels = root.querySelectorAll('[data-pf-panel]');
+            var onlyEls = root.querySelectorAll('[data-pf-only]');
+            function activateTab(name) {
+                tabs.forEach(function (t) { t.classList.toggle('is-active', t.getAttribute('data-pf-tab') === name); });
+                panels.forEach(function (p) { p.hidden = p.getAttribute('data-pf-panel') !== name; });
+                // Einträge, die nur zum Editor gehören ("Neue Datei", offene Datei), verschwinden
+                // in den anderen Reitern — sie hätten dort nichts zu tun.
+                onlyEls.forEach(function (el) { el.hidden = el.getAttribute('data-pf-only') !== name; });
+            }
+            tabs.forEach(function (t) {
+                t.addEventListener('click', function () {
+                    var name = t.getAttribute('data-pf-tab');
+                    activateTab(name);
+                    // Zurück zum Editor: die offene Datei wird NEU aus den Feldern gelesen. Wer
+                    // unter "Erweitert" von Hand am JSON gearbeitet hat, sieht dasselbe auch im
+                    // Editor — sonst stünde dort noch der alte Text und würde beim nächsten
+                    // Tastendruck die Handarbeit überschreiben.
+                    if (name === 'editor') { if (open !== null) show(open); }
+                    else if (codeMirror) codeMirror.value = codeField.value;
+                });
+            });
+
             function show(name) {
                 var map = read(); if (map === null) return;
+                // Eine Datei zu öffnen heißt, sie sehen zu wollen: dazu gehört der Reiter, in dem
+                // der Editor steht.
+                activateTab('editor');
                 open = name;
                 current.textContent = name;
                 content.value = name === ENTRY ? codeField.value : (map[name] != null ? map[name] : '');

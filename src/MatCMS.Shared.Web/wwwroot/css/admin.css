@@ -193,6 +193,22 @@ body.nav-open .admin-menu-toggle span:nth-child(3) { transform: translateY(-6px)
 textarea.cp-sample-inp { resize: vertical; min-height: 0; }
 .cp-frame-wrap { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #fff; }
 .cp-frame { width: 100%; height: 300px; border: 0; display: block; background: #fff; }
+
+/* Die Vorschau steht im ZWEISPALTER des Plugin-Editors (.pf-tree > .pf-side/.pf-list + .pf-main):
+   links die Felder, die man ausfüllt, rechts das, was dabei herauskommt. Kein zweites
+   Spaltenraster daneben — dieses hier kann den Umbruch auf schmale Fenster schon, und der andere
+   Zweispalter des Admin (.live-editor) ist eine ganze SEITE (100vh, .admin-content ohne Rand) und
+   passt nicht in einen Reiter in einer Karte in einem Formular.
+   Breiter als der Dateibaum, weil links Eingabefelder stehen und keine Dateinamen: in 230 Pixeln
+   ist ein Textfeld nicht mehr zu lesen. */
+.cp-tree.pf-tree { --pf-side-width: 330px; }
+.cp-tree .pf-list { padding: 12px; gap: 12px; }
+/* Eine Spalte statt der selbsttätigen Kachelung: die Felder stehen jetzt in der schmalen Spalte
+   untereinander und nicht mehr über die volle Breite verteilt. */
+.cp-tree .cp-sample { grid-template-columns: 1fr; margin: 0; }
+/* Der Rahmen füllt die rechte Spalte, statt auf seinen 300 festen Pixeln zu beharren — sonst
+   klaffte unter ihm eine leere Fläche, sobald die Feldliste links länger wird. */
+.cp-tree .cp-frame { flex: 1 1 auto; height: auto; min-height: 320px; }
 .cp-debug { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 14px; font-size: 13px; }
 .cp-dbg-row { display: flex; gap: 12px; align-items: baseline; padding: 4px 0; flex-wrap: wrap; }
 .cp-dbg-row > span { color: var(--muted); min-width: 210px; }
@@ -1086,11 +1102,13 @@ table.data .btn { white-space: nowrap; }
 .pf-editor .cm-modal-editor { flex: 1 1 auto; height: 320px; }
 /* Der Baum der Templates trägt an jeder Zeile ein Abzeichen (angepasst / leer) — die Auskunft, die
    ihn erst nützlich macht. In den 230 Pixeln des Plugin-Baums lag es über dem Dateinamen, deshalb
-   hier eine breitere linke Spalte; der Plugin-Baum bleibt, wie er ist. */
-.tpl-tree.pf-tree { grid-template-columns: 300px 1fr; }
+   hier eine breitere linke Spalte; der Plugin-Baum bleibt, wie er ist.
+   Verstellt wird nur noch die STELLSCHRAUBE --pf-side-width und nicht mehr das ganze Raster: wer das
+   Raster überschrieb, musste den Umbruch für schmale Fenster gleich mit überschreiben — genau dafür
+   stand hier eine zweite @media-Zeile, und die dritte Abweichung hätte sie wieder vergessen. */
+.tpl-tree.pf-tree { --pf-side-width: 300px; }
 .tpl-tree .pf-file-name { min-width: 0; overflow: hidden; }
 .tpl-tree .tpl-file-badge { flex: 0 0 auto; }
-@media (max-width: 800px) { .tpl-tree.pf-tree { grid-template-columns: 1fr; } }
 
 /* ---- Hinzufügen dialog -------------------------------------------------------------------------
    The three ways to add something, as equally-weighted choices. Deliberately not a <select> or a row
@@ -1169,7 +1187,11 @@ table.data .btn { white-space: nowrap; }
 /* Plugin-Dateien: links was es gibt, rechts woran man arbeitet — die Anordnung, die jeder aus einem
    Code-Editor kennt. Die Wurzel ist das Plugin, weil die Dateien ihm gehören und sonst nirgendwohin
    reichen. */
-.pf-tree { display: grid; grid-template-columns: 230px 1fr; border: 1px solid #cfcfcf; background: #fff; min-height: 340px; }
+/* Die BREITE der linken Spalte ist das einzige, was sich von Fall zu Fall unterscheidet — deshalb
+   steht sie als Stellschraube hier und wird von den Abweichungen (.tpl-tree, .cp-tree) nur noch
+   umgesetzt. Das Raster selbst und der Umbruch für schmale Fenster stehen dadurch an EINER Stelle:
+   wer beides überschreiben musste, hat beim zweiten Mal das eine vergessen. */
+.pf-tree { --pf-side-width: 230px; display: grid; grid-template-columns: var(--pf-side-width) 1fr; border: 1px solid #cfcfcf; background: #fff; min-height: 340px; }
 .pf-side { border-right: 1px solid #cfcfcf; background: #fafbfc; display: flex; flex-direction: column; min-width: 0; }
 .pf-list { padding: 6px; display: flex; flex-direction: column; gap: 1px; flex: 1 1 auto; overflow-y: auto; min-height: 0; }
 /* Eine Zeile des Baums: Klapper, Symbol und Name, rechts das, was man mit ihr tun kann. Die

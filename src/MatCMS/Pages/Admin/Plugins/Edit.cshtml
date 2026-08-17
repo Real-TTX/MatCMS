@@ -190,6 +190,10 @@
                     </div>
                 </div>
             </div>
+            @* Was im Editor geschrieben wird, läuft im Plugin — deshalb steht der Hinweis auf das,
+               was dort zur Verfügung steht, in DIESEM Reiter. Unter der Reiterleiste stand er für
+               alle vier und erklärte damit auch dem Reiter "Allgemein" die Dateikarte. *@
+            <div class="help">@Html.Raw(T["plugins.codeHelp"])</div>
             </div>
 
             @* Reiter 3: der Log. Er stand als eigener Kasten unter der Seite — dieselbe Ausgabe,
@@ -215,9 +219,10 @@
                 <textarea id="CodeRaw" rows="12" class="code" spellcheck="false" data-pf-code-mirror>@Model.Code</textarea>
                 <label class="pf-editor-head" for="FilesJson">@T["plugins.filesRaw"]</label>
                 <textarea id="FilesJson" name="FilesJson" rows="12" class="code" spellcheck="false">@Model.FilesJson</textarea>
+                @* Die Rohform IST die Dateikarte — hier steht der Hinweis, wie sie aufgebaut ist,
+                   am nächsten an dem Feld, das man von Hand bearbeitet. *@
+                <div class="help">@Html.Raw(T["plugins.filesHelp"])</div>
             </div>
-            <div class="help">@Html.Raw(T["plugins.filesHelp"])</div>
-            <div class="help">@Html.Raw(T["plugins.codeHelp"])</div>
         </div>
 
     </form>

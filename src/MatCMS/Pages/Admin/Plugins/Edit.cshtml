@@ -47,7 +47,18 @@
         menu = T["plugins.nodeMenu"],
         toggle = T["plugins.treeToggle"],
         entryTitle = T["plugins.entryFileTitle"],
-        sysFolder = T["plugins.systemFolderTitle"]
+        sysFolder = T["plugins.systemFolderTitle"],
+        mapping = T["plugins.mapping"],
+        roleNone = T["plugins.roleNone"],
+        roleAssets = T["plugins.roleAssets"],
+        roleInclude = T["plugins.roleInclude"],
+        badgeAssets = T["plugins.roleBadgeAssets"],
+        badgeInclude = T["plugins.roleBadgeInclude"],
+        includeTitle = T["plugins.includeFolderTitle"],
+        assetsTaken = T["plugins.roleAssetsTaken"],
+        assetsNotEmpty = T["plugins.roleAssetsNotEmpty"],
+        assetsNeeded = T["plugins.roleAssetsNeeded"],
+        mappingBroken = T["plugins.mappingBroken"]
     });
 
     // Die hochgeladenen Dateien kommen als Liste vom Server ins Skript. Nur er weiß, was im Ordner
@@ -209,6 +220,11 @@
                was dort zur Verfügung steht, in DIESEM Reiter. Unter der Reiterleiste stand er für
                alle vier und erklärte damit auch dem Reiter "Allgemein" die Dateikarte. *@
             <div class="help">@Html.Raw(T["plugins.codeHelp"])</div>
+            @* Was eine Ordnerrolle bedeutet, steht in DIESEM Reiter — dort, wo der Baum steht, an dem
+               man sie vergibt. Besonders der Satz über den Assets-Ordner: sein Name ist eine
+               Beschriftung, keine URL, und wer das nicht liest, erwartet beim Umbenennen etwas
+               anderes als das, was passiert (nämlich nichts). *@
+            <div class="help">@Html.Raw(T["plugins.rolesHelp"])</div>
             </div>
 
             @* Reiter 3: der Log. Er stand als eigener Kasten unter der Seite — dieselbe Ausgabe,
@@ -234,6 +250,12 @@
                 <textarea id="CodeRaw" rows="12" class="code" spellcheck="false" data-pf-code-mirror>@Model.Code</textarea>
                 <label class="pf-editor-head" for="FilesJson">@T["plugins.filesRaw"]</label>
                 <textarea id="FilesJson" name="FilesJson" rows="12" class="code" spellcheck="false">@Model.FilesJson</textarea>
+                @* Die Rollen stehen als drittes Feld hier und nicht in einem eigenen Reiter: sie sind
+                   dieselbe Art Sache wie die Dateikarte — eine Karte, die der Baum schreibt und die
+                   man im Notfall von Hand retten kann. Der Baum schreibt bei jeder Rollenänderung
+                   sofort hier hinein, genau wie in Code und FilesJson. *@
+                <label class="pf-editor-head" for="MappingJson">@T["plugins.mappingRaw"]</label>
+                <textarea id="MappingJson" name="MappingJson" rows="6" class="code" spellcheck="false">@Model.MappingJson</textarea>
                 @* Die Rohform IST die Dateikarte — hier steht der Hinweis, wie sie aufgebaut ist,
                    am nächsten an dem Feld, das man von Hand bearbeitet. *@
                 <div class="help">@Html.Raw(T["plugins.filesHelp"])</div>
@@ -295,9 +317,13 @@
             // das, was ausgeführt wird, die anderen werden von ihr geladen. Im Baum ist sie die
             // Systemdatei: immer da, an der Wurzel, ohne Menü zum Löschen oder Verschieben.
             var ENTRY = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(MatCMS.Pages.Admin.Plugins.EditModel.EntryFile));
-            // Der Systemordner. Ohne "/" — hier wird ein Pfadabschnitt verglichen.
-            var ASSETDIR = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(MatCMS.Shared.PluginBundle.AssetFolder.TrimEnd('/')));
+            // Der Zweig, den das BÜNDELFORMAT für sich beansprucht (assets/ im ZIP). Er bleibt in der
+            // Dateikarte gesperrt — eine Skriptdatei darunter überstünde weder Export noch Import.
+            // Der Assets-ORDNER im Baum ist etwas anderes: der darf heißen, wie man will, und wird
+            // über seine ROLLE erkannt, nicht über seinen Namen.
+            var RESERVED = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(MatCMS.Shared.PluginBundle.AssetFolder.TrimEnd('/')));
             var ASSETS = @Html.Raw(treeAssets);
+            var ROLE_ASSETS = 'assets', ROLE_INCLUDE = 'include';
             var TXT = @Html.Raw(treeTexts);
             var codeField = document.getElementById('Code');
             var codeMirror = document.querySelector('[data-pf-code-mirror]');
@@ -317,21 +343,67 @@
                 field.value = JSON.stringify(map, null, 2);
             }
 
+            // ---- Die Rollen der Ordner --------------------------------------------------------
+            // Ordnerpfad → Rolle, im Feld MappingJson unter „Erweitert“. DIESELBE Regel wie bei der
+            // Dateikarte: jede Änderung geht sofort ins Feld, nichts entsteht erst beim Absenden.
+            // Die Rollen gehören dem PLUGIN und nicht der Dateikarte — ein Ordner ohne eigene Datei
+            // (der Assets-Ordner ist genau das) hätte in einer flachen Karte Pfad→Inhalt keinen Platz.
+            var mapField = document.getElementById('MappingJson');
+            function readRoles() {
+                if (!mapField) return {};
+                try { var o = JSON.parse(mapField.value || '{}'); return (o && typeof o === 'object') ? o : {}; }
+                catch (e) { return null; }
+            }
+            function writeRoles(roles) {
+                if (mapField) mapField.value = JSON.stringify(roles, null, 2);
+            }
+            function roleOf(path) {
+                var r = readRoles();
+                return (r && r[path]) ? r[path] : '';
+            }
+            // Der Ordner mit der Rolle Assets, oder null. Es gibt nur EIN Verzeichnis auf der Platte,
+            // also auch nur einen solchen Ordner — bei mehreren (nur von Hand im Rohfeld möglich)
+            // gewinnt der erste alphabetisch, damit die Anzeige jedenfalls stabil bleibt.
+            function assetsDir() {
+                var r = readRoles(); if (!r) return null;
+                var hit = Object.keys(r).filter(function (k) { return r[k] === ROLE_ASSETS; }).sort(byName);
+                return hit.length ? hit[0] : null;
+            }
+            // Abschnittsweise, nicht zeichenweise: „assetsX/a.csx“ liegt nicht in „assets“.
+            function isUnder(path, folder) {
+                if (!folder) return false;
+                var p = path.toLowerCase(), f = folder.toLowerCase();
+                return p === f || p.indexOf(f + '/') === 0;
+            }
+
             // ---- Der Baum ---------------------------------------------------------------------
             // Aus der FLACHEN Karte Pfad → Inhalt wird hier — und nur hier, zum Zeichnen — ein
             // verschachtelter Baum. Gespeichert bleibt die Karte: ein Ordner ist nichts als ein "/"
             // im Pfad. Ein zweites Speicherformat müsste jeder, der die Karte liest, mitlernen.
             function build(map) {
                 var top = { name: '', path: '', dirs: {}, files: [] };
-                Object.keys(map).forEach(function (p) {
-                    var segs = p.split('/');
+                // Den Ordner eines Pfades anlegen, Ebene für Ebene, und ihn zurückgeben.
+                function dirNode(segs, upto) {
                     var node = top;
-                    for (var i = 0; i < segs.length - 1; i++) {
+                    for (var i = 0; i < upto; i++) {
                         var s = segs[i];
                         if (!node.dirs[s]) node.dirs[s] = { name: s, path: (node.path ? node.path + '/' : '') + s, dirs: {}, files: [] };
                         node = node.dirs[s];
                     }
-                    node.files.push({ name: segs[segs.length - 1], path: p });
+                    return node;
+                }
+                Object.keys(map).forEach(function (p) {
+                    var segs = p.split('/');
+                    dirNode(segs, segs.length - 1).files.push({ name: segs[segs.length - 1], path: p });
+                });
+                // Ordner, die es NUR in der Rollenkarte gibt. Der Assets-Ordner ist genau so einer:
+                // seine Dateien liegen auf der Platte, in der Dateikarte steht von ihm nichts. Ohne
+                // diesen Schritt wäre der Ordner, dem man gerade eine Rolle gegeben hat, aus dem Baum
+                // verschwunden — und mit ihm der Weg, sie wieder wegzunehmen.
+                var roles = readRoles() || {};
+                Object.keys(roles).forEach(function (d) {
+                    var segs = d.split('/');
+                    dirNode(segs, segs.length);
                 });
                 return top;
             }
@@ -350,6 +422,9 @@
                 var map = read();
                 list.innerHTML = '';
                 if (map === null) { list.appendChild(hint(TXT.broken, 1)); return; }
+                // Auch die Rollenkarte kann von Hand kaputtgeschrieben werden. Dann sagt der Baum,
+                // WO das zu reparieren ist, statt einen Ordner nach dem anderen ohne Rolle zu zeigen.
+                if (readRoles() === null) { list.appendChild(hint(TXT.mappingBroken, 1)); return; }
 
                 // Die Wurzel ist das Plugin selbst. Alles hängt darunter — auch der Systemordner,
                 // der bisher als zweite Liste danebenstand und damit behauptete, er gehöre nicht
@@ -361,32 +436,11 @@
                 }));
                 if (collapsed[':root']) return;
 
-                // EINE Regel auf JEDER Ebene: erst alle Ordner, dann alle Dateien. Die
-                // Systemeinträge bleiben oben — aber nur INNERHALB ihrer Gruppe: assets/ vor den
-                // eigenen Ordnern, plugin.csx vor den eigenen Dateien. Vorher stand plugin.csx über
-                // dem Systemordner und brach damit als einziger Knoten die Regel; wer den Baum
-                // überfliegt, liest die Einrückung, nicht die Ausnahme.
-                list.appendChild(rowFor({
-                    id: ':assets', kind: 'assetdir', depth: 1, path: ASSETDIR, label: ASSETDIR + '/',
-                    icon: collapsed[':assets'] ? 'ti-folder' : 'ti-folder-open',
-                    title: TXT.sysFolder, mono: true, expandable: true
-                }));
-                // Ein leerer Zweig zeigt NICHTS — wie in einer Entwicklungsumgebung. Die Zeile
-                // "Noch keine hochgeladenen Dateien." sagte nur, was die fehlende Einrückung
-                // darunter schon sagte, und sah dabei aus wie ein Eintrag.
-                if (!collapsed[':assets']) {
-                    ASSETS.forEach(function (a) {
-                        list.appendChild(rowFor({
-                            id: ':a:' + a.name, kind: 'asset', depth: 2, path: ASSETDIR + '/' + a.name,
-                            label: a.name, icon: /\.(png|jpe?g|gif|webp)$/i.test(a.name) ? 'ti-photo' : 'ti-file',
-                            mono: true, asset: a, isOpen: openAsset === a.name,
-                            activate: function () { showAsset(a); }
-                        }));
-                    });
-                }
-
                 var top = build(map);
-                // Erst die eigenen Ordner …
+                // EINE Regel auf JEDER Ebene: erst alle Ordner, dann alle Dateien. Der Assets-Ordner
+                // steht nicht mehr fest an erster Stelle, sondern alphabetisch zwischen den anderen:
+                // er ist ein Ordner wie jeder andere, nur mit einer Rolle. Ihn oben festzunageln
+                // hieße, seinen Namen doch wieder für etwas Besonderes zu halten.
                 renderDirs(top, 1);
                 // … dann die Dateien, und unter ihnen zuerst die Einstiegsdatei: sie ist immer da
                 // und sie ist der Anfang, deshalb steht sie vor den selbst angelegten Dateien.
@@ -410,13 +464,34 @@
                 Object.keys(node.dirs).sort(byName).forEach(function (key) {
                     var dir = node.dirs[key];
                     var id = ':d:' + dir.path;
+                    var role = roleOf(dir.path);
+                    var isAssets = role === ROLE_ASSETS;
                     list.appendChild(rowFor({
-                        // Mit "/" wie der Systemordner: ein Ordner sieht auf einen Blick anders aus
-                        // als eine Datei ohne Endung.
-                        id: id, kind: 'folder', depth: depth, path: dir.path, label: dir.name + '/',
-                        icon: collapsed[id] ? 'ti-folder' : 'ti-folder-open', mono: true, expandable: true
+                        // Mit "/": ein Ordner sieht auf einen Blick anders aus als eine Datei ohne
+                        // Endung. Das Abzeichen daneben sagt die Rolle — ohne es wäre sie eine
+                        // unsichtbare Eigenschaft, die man beim nächsten Öffnen vergessen hat.
+                        id: id, kind: isAssets ? 'assetdir' : 'folder', depth: depth, path: dir.path,
+                        label: dir.name + '/',
+                        icon: collapsed[id] ? 'ti-folder' : 'ti-folder-open', mono: true, expandable: true,
+                        badge: isAssets ? TXT.badgeAssets : (role === ROLE_INCLUDE ? TXT.badgeInclude : null),
+                        title: isAssets ? TXT.sysFolder : (role === ROLE_INCLUDE ? TXT.includeTitle : null)
                     }));
-                    if (!collapsed[id]) renderDir(dir, depth + 1);
+                    if (collapsed[id]) return;
+                    // Im Assets-Ordner liegen die Dateien der PLATTE. Sie kommen als Liste vom Server
+                    // (siehe ASSETS) und nicht aus der Dateikarte — dort steht von ihnen nichts, und
+                    // was der Baum später anfasst, ist genau der Name, den der Server geschickt hat.
+                    if (isAssets) {
+                        ASSETS.forEach(function (a) {
+                            list.appendChild(rowFor({
+                                id: ':a:' + a.name, kind: 'asset', depth: depth + 1, path: dir.path + '/' + a.name,
+                                label: a.name, icon: /\.(png|jpe?g|gif|webp)$/i.test(a.name) ? 'ti-photo' : 'ti-file',
+                                mono: true, asset: a, isOpen: openAsset === a.name,
+                                activate: function () { showAsset(a); }
+                            }));
+                        });
+                        return;
+                    }
+                    renderDir(dir, depth + 1);
                 });
             }
 
@@ -469,6 +544,14 @@
                 name.appendChild(icon(o.icon));
                 name.appendChild(document.createTextNode(o.label));
                 if (o.title) name.title = o.title;
+                // Das Abzeichen steht IM Knopf hinter dem Namen: es gehört zu diesem Ordner, und wer
+                // die Zeile anfährt, hört den Rollennamen mit vorgelesen.
+                if (o.badge) {
+                    var b = document.createElement('span');
+                    b.className = 'badge badge-off';
+                    b.textContent = o.badge;
+                    name.appendChild(b);
+                }
                 name.addEventListener('click', o.activate || function () {
                     if (o.expandable) { collapsed[o.id] = !collapsed[o.id]; render(); }
                 });
@@ -523,6 +606,9 @@
                 // treffen kann, steht auch unter „Verschieben nach …“ — ohne das wäre der Baum auf
                 // einem Gerät ohne Maus nicht zu bedienen. Die Einstiegsdatei und der Systemordner
                 // sind weder Fracht noch Ziel; sie können nicht verschoben werden.
+                // Der Assets-Ordner ist weder Fracht noch Ziel: er steht für ein Verzeichnis auf der
+                // Platte, das sich nicht mitverschieben lässt, und was man in ihn hineinzöge, wäre
+                // eine Kartendatei in einem Ordner, der der Platte gehört.
                 if (o.kind === 'file' || o.kind === 'folder') {
                     row.draggable = true;
                     row.addEventListener('dragstart', function (ev) {
@@ -638,7 +724,11 @@
                     items.push({ label: TXT.copy, run: function () { copyNode(ENTRY); } });
                     items.push({ label: TXT.duplicate, run: function () { duplicate(ENTRY); } });
                 }
-                if (o.kind === 'file' || o.kind === 'folder') {
+                // Im Assets-Ordner liegen Dateien von der PLATTE. "Neue Datei" wäre dort ein Eintrag
+                // in der Karte und würde beim Speichern nirgends landen — deshalb hochladen. Der
+                // Eintrag steht VORN, weil er hier das ist, was „Neue Datei“ sonst ist.
+                if (o.kind === 'assetdir') items.push({ label: TXT.assetUpload, run: uploadAsset });
+                if (o.kind === 'file' || o.kind === 'folder' || o.kind === 'assetdir') {
                     items.push({ label: TXT.rename, run: function () { renameNode(o); } });
                     items.push({ label: TXT.moveTo, children: function () { return moveItems(o); } });
                 }
@@ -646,11 +736,16 @@
                     items.push({ label: TXT.copy, run: function () { copyNode(o.path); } });
                     items.push({ label: TXT.duplicate, run: function () { duplicate(o.path); } });
                 }
+                // Die Rolle entscheidet, was mit den Dateien im Ordner passiert — der Name ist frei.
+                // Deshalb hängt der Eintrag am ORDNER und nicht an einer Einstellung des Plugins:
+                // dort, wo man gerade steht, statt an einem Ort, den man erst suchen muss.
+                if (o.kind === 'folder' || o.kind === 'assetdir')
+                    items.push({ label: TXT.mapping, children: function () { return roleItems(o); } });
+                // Löschen gibt es nur, wo etwas zu löschen ist: der Assets-Ordner enthält in der Karte
+                // nichts, und ein „Löschen“ dort sähe aus, als nähme es die Dateien von der Platte
+                // mit. Wer ihn loswerden will, nimmt ihm unter „Mapping“ die Rolle.
                 if (o.kind === 'folder') items.push({ label: TXT.del, danger: true, run: function () { deleteFolder(o.path); } });
                 if (o.kind === 'file') items.push({ label: TXT.del, danger: true, run: function () { deleteFile(o.path); } });
-                // Im Systemordner liegen Dateien von der PLATTE. "Neue Datei" wäre dort ein Eintrag
-                // in der Karte und würde beim Speichern nirgends landen — deshalb hochladen.
-                if (o.kind === 'assetdir') items.push({ label: TXT.assetUpload, run: uploadAsset });
                 if (o.kind === 'asset') {
                     items.push({ label: TXT.assetUrlCopy, run: function () { copyUrl(o.asset.url); } });
                     items.push({ label: TXT.assetDelete, danger: true, run: function () { deleteAsset(o.asset.name); } });
@@ -666,11 +761,62 @@
                 if (f) f.focus();
             }
 
+            // ---- Die Rolle eines Ordners setzen ------------------------------------------------
+            // Eine Auswahl wie ein Optionsfeld: die geltende Rolle ist gefüllt, die anderen leer. Ein
+            // Menü aus drei Einträgen, von denen einer schon gilt, ist ehrlicher als ein Dialog mit
+            // „Übernehmen“ — es wirkt sofort ins Feld, wie alles andere im Baum auch.
+            function roleItems(o) {
+                var cur = roleOf(o.path);
+                function item(role, label) {
+                    return {
+                        label: (cur === role ? '●  ' : '○  ') + label,
+                        run: function () { setRole(o.path, role); }
+                    };
+                }
+                return [item('', TXT.roleNone), item(ROLE_ASSETS, TXT.roleAssets), item(ROLE_INCLUDE, TXT.roleInclude)];
+            }
+
+            function setRole(path, role) {
+                var roles = readRoles();
+                if (roles === null) { alert(TXT.mappingBroken); return; }
+                if ((roles[path] || '') === role) return;                 // gilt schon
+                var map = read(); if (map === null) { alert(TXT.broken); return; }
+
+                if (role === ROLE_ASSETS) {
+                    // Es gibt genau EIN Verzeichnis auf der Platte. Die Rolle ein zweites Mal zu
+                    // vergeben müsste den ersten Ordner entwerten — das darf nicht stillschweigend
+                    // geschehen, also geschieht es gar nicht.
+                    var taken = assetsDir();
+                    if (taken !== null && taken !== path) { alert(TXT.assetsTaken.replace('{0}', taken)); return; }
+                    // In einem Assets-Ordner liegen Dateien der Platte. Läge dort auch eine
+                    // Skriptdatei der Karte, wären es zwei Wahrheiten über denselben Pfad — und der
+                    // Server weist sie beim Speichern ohnehin zurück.
+                    var inside = Object.keys(map).filter(function (k) { return isUnder(k, path); });
+                    if (inside.length) { alert(TXT.assetsNotEmpty.replace('{0}', path).replace('{1}', inside[0])); return; }
+                }
+                // Dem letzten Assets-Ordner die Rolle wegzunehmen, während Dateien auf der Platte
+                // liegen, macht sie unerreichbar: sie bleiben liegen und sind nirgends mehr zu sehen.
+                // Verloren, ohne dass etwas gelöscht wurde — deshalb hier UND noch einmal beim
+                // Speichern serverseitig, denn das Rohfeld geht an dieser Prüfung vorbei.
+                if (roles[path] === ROLE_ASSETS && role !== ROLE_ASSETS && ASSETS.length) {
+                    alert(TXT.assetsNeeded.replace('{0}', ASSETS.length));
+                    return;
+                }
+
+                if (role === '') delete roles[path]; else roles[path] = role;
+                writeRoles(roles);
+                collapsed[':d:' + path] = false;
+                render();
+            }
+
             // ---- Anlegen und Löschen ----------------------------------------------------------
             // Dieselben Regeln wie serverseitig in NormalizeFiles: was hier durchkommt, kommt auch
             // dort durch. Eine Oberfläche, die etwas anbietet, das der Server zurückweist, schickt
             // einen los und lässt einen auflaufen.
-            function clean(raw) {
+            // forAssets: der Pfad ist der ASSETS-ORDNER selbst. Für ihn gelten die beiden Sperren
+            // nicht, die nur Inhalte der Dateikarte meinen — er darf „assets“ heißen (das ist sogar
+            // seine Vorgabe) und er liegt naturgemäß dort, wo kein Kartenpfad hin darf.
+            function clean(raw, forAssets) {
                 var s = (raw || '').replace(/\\/g, '/').trim();
                 if (!s || /\/$/.test(s)) return null;
                 var segs = [], ok = true;
@@ -681,9 +827,18 @@
                     segs.push(t);
                 });
                 if (!ok || !segs.length) return null;
-                if (segs[0].toLowerCase() === ASSETDIR.toLowerCase()) return null;
                 var p = segs.join('/');
                 if (p.toLowerCase() === ENTRY.toLowerCase()) return null;
+                if (!forAssets) {
+                    // „assets/“ bleibt im Bündelformat vergeben — eine Skriptdatei darunter überstünde
+                    // weder Export noch Import, und was die Oberfläche erlaubt, muss durch ein Bündel
+                    // passen.
+                    if (segs[0].toLowerCase() === RESERVED.toLowerCase()) return null;
+                    // Und alles unterhalb des Ordners mit der ROLLE Assets — egal wie er heißt. DAS
+                    // ist die Stelle, an der die Umstellung sonst ein Loch reißt: Anlegen, Umbenennen
+                    // und Verschieben laufen alle hier durch.
+                    if (isUnder(p, assetsDir() || '')) return null;
+                }
                 return p;
             }
 
@@ -761,6 +916,13 @@
                 if (!confirm(TXT.folderDel.replace('{0}', hit.length) + '\n\n' + prefix + '\n\n' + TXT.delHint)) return;
                 hit.forEach(function (k) { delete map[k]; closeIfOpen(k); });
                 write(map);
+                // Mit dem Ordner geht seine Rolle. Bliebe sie stehen, käme der Ordner beim nächsten
+                // Zeichnen als leerer Knoten zurück — gelöscht und trotzdem noch da.
+                var roles = readRoles();
+                if (roles !== null) {
+                    Object.keys(roles).forEach(function (k) { if (isUnder(k, path)) delete roles[k]; });
+                    writeRoles(roles);
+                }
                 render();
             }
 
@@ -786,10 +948,14 @@
             // Belegt ist ein Ziel nicht nur, wenn dort eine Datei liegt: auch ein ORDNER dieses
             // Namens, eine Datei, unter der der neue Pfad läge, und die Einstiegsdatei sind belegt.
             // „Elements“ neben „Elements/Hero.csx“ wäre im Baum zweierlei mit einem Namen.
+            // Die Ordner der ROLLENKARTE zählen mit: der Assets-Ordner steht in keiner Kartenzeile,
+            // ist aber im Baum da — ohne ihn hier könnte man einen zweiten Ordner desselben Namens
+            // anlegen und hätte zweierlei mit einem Namen.
             function clash(map, path) {
                 var l = path.toLowerCase();
                 if (l === ENTRY.toLowerCase()) return true;
-                return Object.keys(map).some(function (k) {
+                var roles = readRoles() || {};
+                return Object.keys(map).concat(Object.keys(roles)).some(function (k) {
                     var kl = k.toLowerCase();
                     return kl === l || kl.indexOf(l + '/') === 0 || l.indexOf(kl + '/') === 0;
                 });
@@ -810,12 +976,21 @@
             }
 
             // Alle Ordner der Karte, auch die dazwischenliegenden: aus „a/b/c.csx“ sind das „a“ und
-            // „a/b“. Der Systemordner ist keiner davon — er steht nicht in der Karte.
+            // „a/b“. Dazu die Ordner, die es nur in der Rollenkarte gibt — im Baum sind sie sichtbar,
+            // also müssen sie auch in einer Liste von Ordnern vorkommen.
             function folderList(map) {
                 var seen = {};
                 Object.keys(map).forEach(function (k) {
                     var segs = k.split('/'), acc = '';
                     for (var i = 0; i < segs.length - 1; i++) {
+                        acc = acc ? acc + '/' + segs[i] : segs[i];
+                        seen[acc] = true;
+                    }
+                });
+                var roles = readRoles() || {};
+                Object.keys(roles).forEach(function (d) {
+                    var segs = d.split('/'), acc = '';
+                    for (var i = 0; i < segs.length; i++) {
                         acc = acc ? acc + '/' + segs[i] : segs[i];
                         seen[acc] = true;
                     }
@@ -877,8 +1052,12 @@
             // ---- Umbenennen und Verschieben ---------------------------------------------------
             // DER eine Weg, auf dem sich Pfade ändern — Datei wie Ordner, umbenennen wie
             // verschieben. moves ist die Liste alt → neu; alles Übrige hier ist Prüfung.
-            function applyMoves(moves) {
-                if (!moves.length) return;
+            // folderMove ({from,to}) ist gesetzt, wenn ein ORDNER selbst umzieht. Er braucht einen
+            // eigenen Eintrag, weil ein Ordner in der flachen Karte gar nicht vorkommt: der
+            // Assets-Ordner hat keine einzige Kartenzeile, und ohne diesen Zusatz wäre sein
+            // Umbenennen eine Liste von null Umzügen — also nichts.
+            function applyMoves(moves, folderMove) {
+                if (!moves.length && !folderMove) return;
                 var map = read();
                 if (map === null) { alert(TXT.broken); return; }
 
@@ -893,6 +1072,10 @@
                     if (to === moves[i].from) return;              // dort liegt sie schon
                     if (clean(to) !== to) { alert(TXT.pathInvalid); return; }
                     if (clash(rest, to)) { alert(TXT.exists.replace('{0}', to)); return; }
+                }
+                if (folderMove) {
+                    if (folderMove.to === folderMove.from) return;  // dort liegt er schon
+                    if (clash(rest, folderMove.to)) { alert(TXT.exists.replace('{0}', folderMove.to)); return; }
                 }
 
                 var code = codeField ? codeField.value : '';
@@ -940,11 +1123,24 @@
                 if (warn.length) alert(TXT.loadShadow.replace('{0}', warn.join('\n')));
 
                 write(next);
+                // Eine Rolle hängt am ORDNER und zieht mit ihm um — auch die der Unterordner. Bliebe
+                // sie am alten Pfad stehen, hätte man danach einen Ordner ohne Rolle und eine Rolle
+                // ohne Ordner; beim Assets-Ordner, dessen Rolle sein ganzer Inhalt ist, wäre er weg.
+                if (folderMove) {
+                    var roles = readRoles();
+                    if (roles !== null) {
+                        var nextRoles = {};
+                        Object.keys(roles).forEach(function (k) {
+                            nextRoles[isUnder(k, folderMove.from) ? folderMove.to + k.slice(folderMove.from.length) : k] = roles[k];
+                        });
+                        writeRoles(nextRoles);
+                    }
+                }
                 if (codeField && nextCode !== codeField.value) {
                     codeField.value = nextCode;
                     if (codeMirror) codeMirror.value = nextCode;
                 }
-                expandTo(moves[0].to);
+                expandTo(moves.length ? moves[0].to : folderMove.to + '/x');
                 // Wer eine offene Datei umbenennt oder verschiebt, hat sie danach IMMER NOCH offen —
                 // unter ihrem neuen Pfad und mit unverändertem Inhalt. Sie zuzuklappen wäre der
                 // sicherste Weg, den gerade getippten Text für verloren zu halten.
@@ -955,30 +1151,35 @@
             // Eine Datei zieht allein um, ein Ordner nimmt ALLES mit, was unter ihm liegt — sonst
             // bliebe die Hälfte seines Inhalts unter dem alten Pfad stehen.
             function movesFor(map, o, target) {
-                if (o.kind !== 'folder') return [{ from: o.path, to: target }];
+                if (!isFolderNode(o)) return [{ from: o.path, to: target }];
                 var prefix = o.path + '/';
                 return Object.keys(map)
                     .filter(function (k) { return k.indexOf(prefix) === 0; })
                     .map(function (k) { return { from: k, to: target + '/' + k.slice(prefix.length) }; });
             }
 
+            // Ordner ist Ordner: der Assets-Ordner unterscheidet sich nur durch seine Rolle, nicht
+            // durch die Art, wie er umbenannt oder verschoben wird. Genau das ist der Punkt — sein
+            // Name im Baum ist eine Beschriftung, kein Pfad auf der Platte.
+            function isFolderNode(o) { return o.kind === 'folder' || o.kind === 'assetdir'; }
+
             function renameNode(o) {
                 var map = read(); if (map === null) { alert(TXT.broken); return; }
-                var raw = prompt(o.kind === 'folder' ? TXT.renameFolderAsk : TXT.renameFileAsk, baseOf(o.path));
+                var raw = prompt(isFolderNode(o) ? TXT.renameFolderAsk : TXT.renameFileAsk, baseOf(o.path));
                 if (raw === null) return;
-                var target = clean(join(dirOf(o.path), raw.trim()));
+                var target = clean(join(dirOf(o.path), raw.trim()), o.kind === 'assetdir');
                 if (!target) { alert(TXT.pathInvalid); return; }
-                applyMoves(movesFor(map, o, target));
+                applyMoves(movesFor(map, o, target), isFolderNode(o) ? { from: o.path, to: target } : null);
             }
 
             function moveNode(o, dir) {
                 var map = read(); if (map === null) { alert(TXT.broken); return; }
                 // Ein Ordner kann nicht unter sich selbst landen — dabei entstünde ein Pfad, der
                 // sich beim Zeichnen endlos wiederholt.
-                if (o.kind === 'folder' && (dir === o.path || dir.indexOf(o.path + '/') === 0)) { alert(TXT.selfMove); return; }
-                var target = clean(join(dir, baseOf(o.path)));
+                if (isFolderNode(o) && (dir === o.path || dir.indexOf(o.path + '/') === 0)) { alert(TXT.selfMove); return; }
+                var target = clean(join(dir, baseOf(o.path)), o.kind === 'assetdir');
                 if (!target) { alert(TXT.pathInvalid); return; }
-                applyMoves(movesFor(map, o, target));
+                applyMoves(movesFor(map, o, target), isFolderNode(o) ? { from: o.path, to: target } : null);
             }
 
             // Die vorhandenen Ordner zur Auswahl, dazu die Wurzel und der Weg für einen Ordner, den
@@ -987,10 +1188,15 @@
             function moveItems(o) {
                 var map = read() || {};
                 var here = dirOf(o.path);
+                var assets = assetsDir();
                 var items = [];
                 [''].concat(folderList(map)).forEach(function (t) {
                     if (t === here) return;                                   // dort liegt sie schon
-                    if (o.kind === 'folder' && (t === o.path || t.indexOf(o.path + '/') === 0)) return;
+                    if (isFolderNode(o) && (t === o.path || t.indexOf(o.path + '/') === 0)) return;
+                    // In den Assets-Ordner führt kein Weg: seine Dateien liegen auf der Platte, und
+                    // der Server weist jeden Kartenpfad dorthin zurück. Ihn hier anzubieten hieße,
+                    // einen Weg zu zeigen, an dessen Ende eine Fehlermeldung steht.
+                    if (assets !== null && isUnder(t, assets)) return;
                     items.push({ label: t === '' ? TXT.moveRoot : t + '/', run: function () { moveNode(o, t); } });
                 });
                 items.push({
@@ -1110,8 +1316,10 @@
             // wäre danach weg — deshalb wird vorher gefragt, statt es stillschweigend zu opfern.
             var savedCode = codeField ? codeField.value : '';
             var savedFiles = field.value;
+            var savedRoles = mapField ? mapField.value : '';
             function unsavedOk() {
-                if ((!codeField || codeField.value === savedCode) && field.value === savedFiles) return true;
+                if ((!codeField || codeField.value === savedCode) && field.value === savedFiles
+                    && (!mapField || mapField.value === savedRoles)) return true;
                 return confirm(TXT.assetUnsaved);
             }
             var upForm = document.getElementById('asset-upload-form');
@@ -1207,8 +1415,11 @@
                 write(map);
             });
 
-            // Von Hand am Rohfeld geändert: der Baum zieht nach.
+            // Von Hand am Rohfeld geändert: der Baum zieht nach — bei der Dateikarte wie bei den
+            // Rollen. Beide Felder sind derselbe Fall: der Baum schreibt sie, und wer sie von Hand
+            // anfasst, soll sofort sehen, was daraus wird.
             field.addEventListener('input', function () { render(); });
+            if (mapField) mapField.addEventListener('input', function () { render(); });
             // Der Name des Plugins steht an der Wurzel und zieht beim Tippen im Reiter "Allgemein"
             // mit — sonst widerspricht der Baum dem Namensfeld, solange nicht gespeichert wurde.
             if (nameField) nameField.addEventListener('input', function () { render(); });

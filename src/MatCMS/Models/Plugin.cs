@@ -39,6 +39,19 @@ public class Plugin
     /// </summary>
     public string FilesJson { get; set; } = "{}";
 
+    /// <summary>
+    /// Die ROLLEN der Ordner dieses Plugins als JSON-Objekt Ordnerpfad → Rolle, z. B.
+    /// <c>{"Bilder": "assets", "Gemeinsam": "include"}</c>. Siehe <see cref="MatCMS.Services.PluginMapping"/>.
+    /// <para>Ordnernamen sind frei; die ROLLE entscheidet, was mit den Dateien darin geschieht. Deshalb
+    /// steht sie hier am Plugin und nicht in der Dateikarte: ein Ordner ohne eigene Datei — der
+    /// Assets-Ordner ist genau das — hätte in einer flachen Karte Pfad→Inhalt keinen Platz.</para>
+    /// <para><b>LEER heißt Bestand, nicht „keine Rolle“:</b> ein Plugin, das dieses Feld nie
+    /// geschrieben hat, bekommt die alte Festverdrahtung als Vorgabe (der Ordner <c>assets</c> trägt
+    /// die Rolle Assets) und verhält sich damit exakt wie vorher. <c>{}</c> dagegen ist ausdrücklich
+    /// „keine Rolle“ — sonst käme eine gerade entfernte Rolle beim nächsten Laden zurück.</para>
+    /// </summary>
+    public string MappingJson { get; set; } = "";
+
     /// <summary>Admin-editable configuration as a JSON object of string key→value pairs. Kept separate
     /// from the code so a plugin can be configured without editing it; read at runtime via <c>Config("key")</c>.</summary>
     public string ConfigJson { get; set; } = "{}";

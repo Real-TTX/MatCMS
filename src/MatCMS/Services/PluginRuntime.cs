@@ -412,7 +412,12 @@ public class PluginRunner
                     // Optionen, damit kein Plugin die Dateien eines anderen sieht.
                     var files = PluginFileResolver.Parse(p.FilesJson);
                     var opts = files.Count == 0 ? options : options.WithSourceResolver(new PluginFileResolver(files));
-                    await CSharpScript.RunAsync(p.Code ?? "", opts, globals: ctx, globalsType: typeof(PluginContext));
+                    // Ordner mit der Rolle „Include“ werden vor der Einstiegsdatei geladen, ohne dass
+                    // jemand sie von Hand einbindet. Ohne solchen Ordner kommt der Code unverändert
+                    // zurück — ein Plugin ohne gesetzte Rolle läuft damit exakt wie vorher.
+                    var mapping = PluginMapping.Parse(p.MappingJson);
+                    var code = PluginMapping.BuildEntry(p.Code, PluginMapping.IncludeFiles(files, mapping));
+                    await CSharpScript.RunAsync(code, opts, globals: ctx, globalsType: typeof(PluginContext));
                 }
                 catch (Exception ex)
                 {

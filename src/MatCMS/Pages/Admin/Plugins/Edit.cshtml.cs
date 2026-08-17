@@ -23,6 +23,10 @@ public class EditModel : PageModel
     [BindProperty] public string? Code { get; set; }
     [BindProperty] public string? ConfigJson { get; set; }
     [BindProperty] public string? FilesJson { get; set; }
+    /// <summary>Die Rollen der Ordner (Ordnerpfad → Rolle). Kommt als AUSDRÜCKLICHE Karte in die Seite
+    /// und geht als solche zurück: <see cref="MatCMS.Services.PluginMapping.Parse"/> löst die Vorgabe
+    /// des Bestands hier einmal auf, damit die Oberfläche nicht ein zweites Mal raten muss.</summary>
+    [BindProperty] public string? MappingJson { get; set; }
 
     /// <summary>Anzeigename der Einstiegsdatei im Baum. Sie liegt im Feld Code und nicht in der
     /// Dateikarte — der Name ist Beschriftung, kein Pfad, und deshalb hier und nicht im Modell.
@@ -44,6 +48,8 @@ public class EditModel : PageModel
         if (p is null) return RedirectToPage("Index");
         Current = p;
         Name = p.Name; Description = p.Description; Code = p.Code; FilesJson = p.FilesJson; Enabled = p.Enabled; Version = p.Version; ConfigJson = p.ConfigJson;
+        MappingJson = System.Text.Json.JsonSerializer.Serialize(PluginMapping.Parse(p.MappingJson),
+            new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
         RunError = _registry.Errors.TryGetValue(id, out var e) ? e : null;
         LoadAssets();
         return Page();
@@ -78,10 +84,32 @@ public class EditModel : PageModel
         // stillschweigend WEGZUWERFEN wäre schlimmer: dann wäre der Code weg. Deshalb bleibt die
         // Seite bei einem unbrauchbaren Pfad stehen und sagt, welcher es ist; das Feld behält dabei
         // seinen Inhalt und ist unter „Erweitert“ von Hand zu retten.
-        var (filesJson, filesError) = NormalizeFiles(FilesJson);
+        // Erst die Rollen LESEN (nachsichtig), denn welcher Ordner der Assets-Ordner ist, entscheidet,
+        // welche Pfade die Dateikarte nicht tragen darf. Danach die Karte prüfen, und mit dem
+        // Ergebnis die Rollen streng prüfen — in dieser Reihenfolge, sonst prüfte jede Seite gegen
+        // einen Stand, den die andere gerade ändert.
+        var wanted = PluginMapping.Parse(MappingJson);
+        var (filesJson, files, filesError) = NormalizeFiles(FilesJson, PluginMapping.AssetsFolder(wanted));
         if (filesError is not null)
         {
             Error = filesError;
+            return Page();
+        }
+
+        var (mappingJson, mappingError) = PluginMapping.Normalize(MappingJson, files);
+        if (mappingError is not null)
+        {
+            Error = mappingError;
+            return Page();
+        }
+        // Ein Plugin mit hochgeladenen Dateien BRAUCHT einen Ordner, der sie zeigt. Ohne diese Prüfung
+        // nähme man der Rolle Assets den letzten Ordner weg und die Dateien lägen weiterhin auf der
+        // Platte, wären aber nirgends mehr zu sehen — verloren, ohne dass etwas gelöscht wurde.
+        if (Assets.Count > 0 && PluginMapping.AssetsFolder(PluginMapping.Parse(mappingJson)) is null)
+        {
+            Error = $"Dieses Plugin hat {Assets.Count} hochgeladene Datei(en). Ein Ordner muss die Rolle "
+                  + "„Assets“ tragen, sonst sind sie nicht mehr zu erreichen — benenne den Ordner um "
+                  + "oder gib die Rolle einem anderen.";
             return Page();
         }
 
@@ -91,6 +119,7 @@ public class EditModel : PageModel
         p.Code = Code ?? "";
         p.ConfigJson = SanitizeConfig(ConfigJson);
         p.FilesJson = filesJson;
+        p.MappingJson = mappingJson;
         p.Enabled = Enabled;
         await _db.SaveChangesAsync();
 
@@ -102,6 +131,7 @@ public class EditModel : PageModel
         {
             // Stay on the page and show the compile/run error.
             Name = p.Name; Description = p.Description; Code = p.Code; Enabled = p.Enabled; Version = p.Version; ConfigJson = p.ConfigJson;
+            MappingJson = p.MappingJson;
             return Page();
         }
 
@@ -226,9 +256,14 @@ public class EditModel : PageModel
         catch { return "{}"; }
     }
 
-    /// <summary>Der Ordnername des zweiten Zweiges im Baum (hochgeladene Dateien auf der Platte).
-    /// Ohne das abschließende "/" — hier wird ein Pfadabschnitt verglichen, keine ZIP-Eintragung.</summary>
-    private static readonly string AssetBranch =
+    /// <summary>Der Ordnername, den das BÜNDELFORMAT für die hochgeladenen Dateien vergibt
+    /// (<c>assets/</c> im ZIP). Ohne das abschließende "/" — hier wird ein Pfadabschnitt verglichen,
+    /// keine ZIP-Eintragung.
+    /// <para>Er bleibt in der Dateikarte gesperrt, auch wenn der Assets-ORDNER im Baum inzwischen
+    /// heißen darf, wie man will: <c>PluginBundle.NormalizeFilePath</c> weist diesen Zweig für jedes
+    /// Bündel zurück, und eine Skriptdatei darunter überstünde weder Export noch Import. Was die
+    /// Oberfläche erlaubt, muss durch ein Bündel passen.</para></summary>
+    private static readonly string ReservedBundleBranch =
         MatCMS.Shared.PluginBundle.AssetFolder.TrimEnd('/');
 
     /// <summary>
@@ -244,16 +279,26 @@ public class EditModel : PageModel
     /// nimmt dem Benutzer etwas weg, das er angelegt zu haben glaubte), der Zweig "assets/" (der
     /// gehört der Platte und nicht dieser Karte), die Einstiegsdatei (die liegt im Feld Code) und
     /// zwei Schlüssel, die nach dem Begradigen derselbe Pfad wären.</para>
+    ///
+    /// <para>Der Assets-Zweig hängt jetzt an der ROLLE, nicht mehr am Namen „assets“: was
+    /// <paramref name="assetsFolder"/> nennt, ist für die Karte gesperrt — egal wie der Ordner heißt
+    /// und wie tief er liegt. DAS ist die Stelle, an der die Umstellung sonst ein Loch reißt, denn
+    /// Umbenennen, Verschieben und die Rohform schreiben alle in dieselbe Karte und müssen alle an
+    /// derselben Prüfung hängenbleiben. Der feste Zweig <c>assets/</c> bleibt zusätzlich gesperrt,
+    /// weil das Bündelformat ihn für sich beansprucht.</para>
     /// </summary>
-    /// <returns>Das begradigte JSON, oder eine Meldung, warum nichts gespeichert wurde.</returns>
-    private static (string Json, string? Error) NormalizeFiles(string? json)
+    /// <returns>Das begradigte JSON und die begradigte Karte, oder eine Meldung, warum nichts
+    /// gespeichert wurde.</returns>
+    private static (string Json, IReadOnlyDictionary<string, string> Files, string? Error) NormalizeFiles(
+        string? json, string? assetsFolder)
     {
-        if (string.IsNullOrWhiteSpace(json)) return ("{}", null);
+        var none = (IReadOnlyDictionary<string, string>)new Dictionary<string, string>();
+        if (string.IsNullOrWhiteSpace(json)) return ("{}", none, null);
 
         Dictionary<string, string>? map;
         try { map = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(json); }
-        catch { return ("{}", "Die Dateikarte ist kein gültiges JSON — bitte unter „Erweitert“ korrigieren."); }
-        if (map is null) return ("{}", null);
+        catch { return ("{}", none, "Die Dateikarte ist kein gültiges JSON — bitte unter „Erweitert“ korrigieren."); }
+        if (map is null) return ("{}", none, null);
 
         // Sortiert gespeichert: die Rohform liest sich dann wie der Baum daneben.
         var clean = new SortedDictionary<string, string>(StringComparer.Ordinal);
@@ -261,7 +306,7 @@ public class EditModel : PageModel
         {
             var raw = (rawKey ?? "").Replace('\\', '/').Trim();
             if (raw.EndsWith('/'))
-                return ("{}", $"„{rawKey}“ ist ein leerer Ordner. Ein Ordner entsteht mit seiner ersten Datei — "
+                return ("{}", none, $"„{rawKey}“ ist ein leerer Ordner. Ein Ordner entsteht mit seiner ersten Datei — "
                               + "lege eine Datei darin an.");
 
             var segments = new List<string>();
@@ -270,26 +315,30 @@ public class EditModel : PageModel
                 var s = part.Trim();
                 if (s.Length == 0 || s == ".") continue;
                 if (s == "..")
-                    return ("{}", $"„{rawKey}“ enthält „..“. Pfade gelten ab der Wurzel des Plugins.");
+                    return ("{}", none, $"„{rawKey}“ enthält „..“. Pfade gelten ab der Wurzel des Plugins.");
                 if (s.Any(ch => char.IsControl(ch) || ch is ':' or '*' or '?' or '"' or '<' or '>' or '|'))
-                    return ("{}", $"„{rawKey}“ enthält unzulässige Zeichen.");
+                    return ("{}", none, $"„{rawKey}“ enthält unzulässige Zeichen.");
                 segments.Add(s);
             }
             if (segments.Count == 0)
-                return ("{}", "Ein Pfad in der Dateikarte ist leer.");
+                return ("{}", none, "Ein Pfad in der Dateikarte ist leer.");
 
             var path = string.Join('/', segments);
-            if (string.Equals(segments[0], AssetBranch, StringComparison.OrdinalIgnoreCase))
-                return ("{}", $"„{rawKey}“: „{AssetBranch}/“ ist der Ordner der hochgeladenen Dateien. "
-                              + "Skriptdateien gehören nicht dorthin.");
+            if (string.Equals(segments[0], ReservedBundleBranch, StringComparison.OrdinalIgnoreCase))
+                return ("{}", none, $"„{rawKey}“: „{ReservedBundleBranch}/“ ist im Bündelformat für die "
+                              + "hochgeladenen Dateien vergeben. Skriptdateien gehören nicht dorthin.");
+            if (assetsFolder is not null && PluginMapping.IsUnder(path, assetsFolder))
+                return ("{}", none, $"„{rawKey}“ liegt in „{assetsFolder}/“ — dieser Ordner trägt die Rolle "
+                              + "„Assets“, seine Dateien liegen auf der Platte. Skriptdateien gehören nicht dorthin.");
             if (string.Equals(path, EntryFile, StringComparison.OrdinalIgnoreCase))
-                return ("{}", $"„{EntryFile}“ ist die Einstiegsdatei und liegt nicht in der Dateikarte.");
+                return ("{}", none, $"„{EntryFile}“ ist die Einstiegsdatei und liegt nicht in der Dateikarte.");
             if (clean.ContainsKey(path))
-                return ("{}", $"„{path}“ kommt zweimal vor.");
+                return ("{}", none, $"„{path}“ kommt zweimal vor.");
 
             clean[path] = content ?? "";
         }
         return (System.Text.Json.JsonSerializer.Serialize(clean,
-            new System.Text.Json.JsonSerializerOptions { WriteIndented = true }), null);
+            new System.Text.Json.JsonSerializerOptions { WriteIndented = true }),
+            clean.ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal), null);
     }
 }

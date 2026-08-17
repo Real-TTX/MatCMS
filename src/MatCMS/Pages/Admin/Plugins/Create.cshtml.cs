@@ -1,5 +1,6 @@
 using MatCMS.Data;
 using MatCMS.Models;
+using MatCMS.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
@@ -48,7 +49,15 @@ public class CreateModel : PageModel
         var n = 2;
         while (await _db.Plugins.AnyAsync(p => p.Key == key)) key = baseKey + "-" + n++;
 
-        var plugin = new MatCMS.Models.Plugin { Name = name, Key = key, Code = Starter, Enabled = false };
+        // Die Rollenkarte wird AUSDRÜCKLICH gesetzt, nicht leer gelassen: leer heißt „nie geschrieben“
+        // und wird als Bestand gelesen. Ein neues Plugin fängt mit einem Assets-Ordner an — er heißt
+        // „assets“, weil man irgendwo anfangen muss, und darf umbenannt werden wie jeder andere.
+        var plugin = new MatCMS.Models.Plugin
+        {
+            Name = name, Key = key, Code = Starter, Enabled = false,
+            MappingJson = System.Text.Json.JsonSerializer.Serialize(
+                new Dictionary<string, string> { [PluginMapping.LegacyAssetFolder] = PluginMapping.RoleAssets })
+        };
         _db.Plugins.Add(plugin);
         await _db.SaveChangesAsync();
         return RedirectToPage("Edit", new { id = plugin.Id });

@@ -334,7 +334,8 @@ public class ContentTransferService
                 {
                     Key = p.Key, Name = p.Name, Description = p.Description,
                     Version = p.Version, DataVersion = p.DataVersion,
-                    Code = p.Code, FilesJson = p.FilesJson, ConfigJson = p.ConfigJson,
+                    Code = p.Code, FilesJson = p.FilesJson, MappingJson = p.MappingJson,
+                    ConfigJson = p.ConfigJson,
                     Enabled = p.Enabled, CreatedAt = p.CreatedAt
                 }).ToList();
         }
@@ -893,6 +894,10 @@ public class ContentTransferService
                 row.DataVersion = p.DataVersion ?? "";
                 row.Code = p.Code ?? "";
                 row.FilesJson = string.IsNullOrWhiteSpace(p.FilesJson) ? "{}" : p.FilesJson!;
+                // LEER bleibt leer: eine leere Rollenkarte heißt „nie geschrieben“ und wird als
+                // Bestand gelesen. Sie hier auf „{}“ zu setzen hieße, jedem alten Backup beim
+                // Einspielen den Assets-Ordner wegzunehmen.
+                row.MappingJson = p.MappingJson ?? "";
                 row.ConfigJson = string.IsNullOrWhiteSpace(p.ConfigJson) ? "{}" : p.ConfigJson!;
                 n++;
             }
@@ -1113,6 +1118,9 @@ public class ContentTransferService
         public string? Code { get; set; }
         /// <summary>Further script files (path → content) reachable from Code via <c>#load</c>.</summary>
         public string? FilesJson { get; set; }
+        /// <summary>Die Rollen der Ordner (Ordnerpfad → Rolle). Leer = nie geschrieben, wird als
+        /// Bestand gelesen — siehe <see cref="MatCMS.Services.PluginMapping"/>.</summary>
+        public string? MappingJson { get; set; }
         public string? ConfigJson { get; set; }
         /// <summary>State at the time of the backup. Recorded for the record only — the import never
         /// applies it (a new plugin lands disabled, an existing one keeps its own state).</summary>

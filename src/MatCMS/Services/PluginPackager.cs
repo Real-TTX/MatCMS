@@ -28,6 +28,17 @@ public static class PluginPackager
         public string Version { get; set; } = "";
         public string Description { get; set; } = "";
         public string Code { get; set; } = "";
+
+        /// <summary>
+        /// Die Rollen der Ordner (Ordnerpfad → Rolle) — als <b>Zeichenkette</b> mit JSON darin, nicht
+        /// als verschachteltes Objekt. Das ist kein Schönheitsfehler, sondern die Bedingung, unter der
+        /// das Feld eine Runde durch die Cloud überlebt: die schreibt <c>plugin.json</c> Feld für Feld
+        /// um und würde ein verschachteltes Objekt zu einer Zeichenkette platt machen — die
+        /// Eigenschaft überlebte, ihre Bedeutung nicht. Siehe <c>MatCMS.Shared/PluginBundle</c>.
+        /// <para>Leer in jedem älteren Bündel; ein Leser, der sie nicht kennt, überliest sie, und ein
+        /// Plugin ohne dieses Feld bekommt die Vorgabe des Bestands. Kein <c>Format</c>-Sprung nötig.</para>
+        /// </summary>
+        public string Mapping { get; set; } = "";
     }
 
     private static readonly JsonSerializerOptions JsonOpts = new()
@@ -51,7 +62,11 @@ public static class PluginPackager
     /// <summary>Builds a ZIP bundle (plugin.json + files/… + assets/…) for the given plugin.</summary>
     public static byte[] Export(Models.Plugin p, IWebHostEnvironment env)
     {
-        var meta = new Bundle { Format = 1, Name = p.Name, Key = p.Key, Version = p.Version, Description = p.Description, Code = p.Code };
+        var meta = new Bundle
+        {
+            Format = 1, Name = p.Name, Key = p.Key, Version = p.Version, Description = p.Description,
+            Code = p.Code, Mapping = p.MappingJson ?? ""
+        };
         using var ms = new MemoryStream();
         using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
         {
@@ -190,6 +205,10 @@ public static class PluginPackager
                     existing.Description = (meta.Description ?? "").Trim();
                     existing.Code = meta.Code ?? "";
                     existing.FilesJson = files;
+                    // Leer bleibt leer, nicht "{}": ein altes Bündel kennt das Feld nicht, und eine
+                    // leere Rollenkarte wird als Bestand gelesen — der Assets-Ordner bleibt damit da,
+                    // statt beim Import eines älteren Bündels zu verschwinden.
+                    existing.MappingJson = meta.Mapping ?? "";
                     existing.Version = (meta.Version ?? "").Trim();
                     existing.Enabled = false;
                     plugin = existing;
@@ -205,6 +224,7 @@ public static class PluginPackager
                         Description = (meta.Description ?? "").Trim(),
                         Code = meta.Code ?? "",
                         FilesJson = files,
+                        MappingJson = meta.Mapping ?? "",
                         Enabled = false
                     };
                     db.Plugins.Add(plugin);

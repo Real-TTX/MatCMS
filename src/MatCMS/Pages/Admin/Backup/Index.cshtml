@@ -50,6 +50,7 @@
     var settingsExport = FlatGrp(T["backup.settings"], "IncSettings", true, false);
     var subsExport = FlatGrp(T["backup.submissions"], "IncSubmissions", true, false);
     var assetsExport = FlatGrp(T["backup.assets"], "IncAssets", true, false);
+    var pluginsExport = FlatGrp(T["backup.plugins"], "IncPlugins", true, false);
     var usersExport = FlatGrp(T["backup.users"], "IncUsers", false, false);
 
     var tplSched = Grp(T["backup.templates"], "Schedule.Templates", cfg.Templates, true, "TemplateNames", TplItems(true));
@@ -59,6 +60,7 @@
     var settingsSched = FlatGrp(T["backup.settings"], "Schedule.Settings", cfg.Settings, true);
     var subsSched = FlatGrp(T["backup.submissions"], "Schedule.Submissions", cfg.Submissions, true);
     var assetsSched = FlatGrp(T["backup.assets"], "Schedule.Assets", cfg.Assets, true);
+    var pluginsSched = FlatGrp(T["backup.plugins"], "Schedule.Plugins", cfg.Plugins, true);
 
     string nextDue;
     if (!cfg.Enabled) { nextDue = "–"; }
@@ -94,8 +96,10 @@
                 <partial name="_GranularGroup" model="settingsExport" />
                 <partial name="_GranularGroup" model="subsExport" />
                 <partial name="_GranularGroup" model="assetsExport" />
+                <partial name="_GranularGroup" model="pluginsExport" />
                 <partial name="_GranularGroup" model="usersExport" />
             </div>
+            <p class="help">@T["backup.pluginsHint"]</p>
             <p class="help">⚠️ @T["backup.usersWarn"]</p>
             <div class="form-actions">
                 <button type="submit" class="btn">@T["backup.download"]</button>
@@ -171,6 +175,7 @@
                     <partial name="_GranularGroup" model="settingsSched" />
                     <partial name="_GranularGroup" model="subsSched" />
                     <partial name="_GranularGroup" model="assetsSched" />
+                    <partial name="_GranularGroup" model="pluginsSched" />
                 </div>
             </div>
 
@@ -285,6 +290,7 @@
                         html += row('@T["backup.submissions"]', i.submissions);
                         html += row('@T["backup.formsSection"]', i.forms ? (i.forms + mode(i.formsPartial)) : '');
                         html += row('@T["backup.assets"]', i.media || (i.hasAssets ? '✓' : ''));
+                        html += row('@T["backup.plugins"]', i.plugins);
                         html += '</ul>';
                         out.className = 'inspect-result ok';
                         out.innerHTML = html;

@@ -66,6 +66,9 @@ public class BackupModel : PageModel
         public bool Submissions { get; set; } = true;
         public bool Forms { get; set; } = true;
         public bool Assets { get; set; } = true;
+        /// <summary>Plugin code and its script files. Worth its own tick because it is the only backup
+        /// section whose contents exist nowhere but the instance's own database.</summary>
+        public bool Plugins { get; set; } = true;
         // Always empty — see the class comment. Written so the instance sees the field it expects
         // rather than falling back to whatever it had stored before.
         public List<string> TemplateNames { get; set; } = [];
@@ -97,7 +100,7 @@ public class BackupModel : PageModel
     public async Task<IActionResult> OnPostAsync(
         int profileId, bool enabled, int intervalHours, int retain,
         bool templates, bool pages, bool menus, bool settings, bool submissions, bool forms, bool assets,
-        bool toCloud)
+        bool plugins, bool toCloud)
     {
         var profile = await _db.Profiles.FindAsync(profileId);
         if (profile is null) return RedirectToPage("Index");
@@ -114,7 +117,7 @@ public class BackupModel : PageModel
             IntervalHours = Math.Clamp(intervalHours, 1, 24 * 30),
             Retain = Math.Clamp(retain, 1, 100),
             Templates = templates, Pages = pages, Menus = menus, Settings = settings,
-            Submissions = submissions, Forms = forms, Assets = assets,
+            Submissions = submissions, Forms = forms, Assets = assets, Plugins = plugins,
         };
 
         await UpsertAsync(profileId, ScheduleKey, JsonSerializer.Serialize(cfg));

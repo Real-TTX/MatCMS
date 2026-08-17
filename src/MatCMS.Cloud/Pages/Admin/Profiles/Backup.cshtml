@@ -66,6 +66,10 @@
             <input type="checkbox" name="assets" value="true" checked="@(Model.Current.Assets ? "checked" : null)" />
             @T["backup.assets"]
         </label>
+        <label class="checkbox-row">
+            <input type="checkbox" name="plugins" value="true" checked="@(Model.Current.Plugins ? "checked" : null)" />
+            @T["backup.plugins"]
+        </label>
         <div class="help">@T["profiles.backupContentHint"]</div>
     </div>
 

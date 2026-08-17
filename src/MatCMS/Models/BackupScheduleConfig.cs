@@ -22,6 +22,10 @@ public class BackupScheduleConfig
     public bool Submissions { get; set; } = true;
     public bool Forms { get; set; } = true;
     public bool Assets { get; set; } = true;
+    /// <summary>Plugins (code, further script files, configuration). Default ON — and the default is
+    /// what an already-stored schedule from before this field falls back to, so existing sites start
+    /// carrying their plugins on the very next run instead of only after someone re-saves the form.</summary>
+    public bool Plugins { get; set; } = true;
 
     // Granular within-section selection. Empty = the whole section; otherwise only these items.
     /// <summary>Template names to back up (empty = all).</summary>

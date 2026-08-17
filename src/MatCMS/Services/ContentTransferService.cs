@@ -11,10 +11,11 @@ namespace MatCMS.Services;
 
 /// <summary>
 /// Backup &amp; Restore of the site. A backup is a ZIP containing <c>content.json</c>
-/// (Templates, Pages incl. ContentBlocks, Menu items, Settings, contact submissions) and,
+/// (Templates, Pages incl. ContentBlocks, Menu items, Settings, contact submissions, Plugins) and,
 /// optionally, an <c>assets/</c> folder with the uploaded media (wwwroot/uploads).
 /// Admin users (incl. password hashes) are an OPT-IN section (off by default) — sensitive, meant for
 /// full migrations; on restore they UPSERT by username so the current admin can't be locked out.
+/// Plugins UPSERT by <c>Key</c> and a newly created one comes back DISABLED (see the import below).
 /// On restore, only the sections present are replaced; missing sections/assets are left untouched.
 /// Legacy plain-JSON backups are also accepted.
 /// </summary>
@@ -56,6 +57,10 @@ public class ContentTransferService
         public bool Submissions { get; set; } = true;
         public bool Forms { get; set; } = true;
         public bool Assets { get; set; } = true;
+        /// <summary>User-authored plugins (code + further script files + config). ON by default: a plugin
+        /// only exists in this database, so a backup without it is the one thing a nightly backup cannot
+        /// bring back.</summary>
+        public bool Plugins { get; set; } = true;
         /// <summary>Admin users incl. password hashes. OFF by default — sensitive; only for full migrations.</summary>
         public bool Users { get; set; } = false;
 
@@ -68,7 +73,7 @@ public class ContentTransferService
         public List<string>? PageKeys { get; set; }      // by "slug|locale" (see PageKey)
         public List<string>? FormSlugs { get; set; }     // by form Slug
 
-        public bool Any => Templates || Pages || Menus || Settings || Submissions || Forms || Assets;
+        public bool Any => Templates || Pages || Menus || Settings || Submissions || Forms || Assets || Plugins || Users;
     }
 
     /// <summary>Stable identity of a page for granular backup/restore: slug + content locale.</summary>
@@ -89,6 +94,7 @@ public class ContentTransferService
         public int Forms { get; set; }
         public int Media { get; set; }
         public int Components { get; set; }
+        public int Plugins { get; set; }
         public int Users { get; set; }
         public bool HasAssets { get; set; }
         // True when that section restores as a per-item UPSERT (others survive); false = replace-all.
@@ -272,6 +278,22 @@ public class ContentTransferService
                 }).ToList();
         }
 
+        // Plugins. Their code lives NOWHERE but this database — no file on disk, no image layer — so a
+        // backup that leaves them out makes a deleted plugin unrecoverable however many nightly copies
+        // exist. FilesJson travels with Code: a plugin whose entry file `#load`s further script files
+        // would otherwise come back as a broken shell that still looks complete.
+        if (options.Plugins)
+        {
+            dto.Plugins = (await _db.Plugins.AsNoTracking().OrderBy(p => p.Id).ToListAsync())
+                .Select(p => new PluginDto
+                {
+                    Key = p.Key, Name = p.Name, Description = p.Description,
+                    Version = p.Version, DataVersion = p.DataVersion,
+                    Code = p.Code, FilesJson = p.FilesJson, ConfigJson = p.ConfigJson,
+                    Enabled = p.Enabled, CreatedAt = p.CreatedAt
+                }).ToList();
+        }
+
         // Admin users (opt-in) — includes password hashes; only for full migrations.
         if (options.Users)
         {
@@ -355,7 +377,7 @@ public class ContentTransferService
                             && dto.MenuItems is null && dto.Settings is null && dto.Submissions is null
                             && dto.Forms is null && dto.FormSubmissions is null
                             && dto.Media is null && dto.Components is null && dto.Users is null
-                            && dto.Posts is null))
+                            && dto.Posts is null && dto.Plugins is null))
             throw new InvalidOperationException(
                 "Die Datei hat kein bekanntes Backup-Format (keine Abschnitte gefunden).");
 
@@ -747,6 +769,47 @@ public class ContentTransferService
             summary.Add($"{dto.Posts.Count} Beiträge");
         }
 
+        // Plugins: UPSERT by Key — the same identity the cloud rollout uses (PluginPackager.ImportAsync),
+        // so a plugin restored here and the same plugin pushed from a profile land on one row.
+        //
+        // Deliberately NOT a replace-all like the sections above: plugin code is the one payload that can
+        // be authored on the site itself, and wiping the ones a backup happens not to carry would destroy
+        // exactly the work this section was added to protect.
+        //
+        // A plugin that is NEW here comes back DISABLED. Plugin code runs server-side, and a restore is
+        // not a review — the same rule the cloud rollout follows ("imported plugins stay disabled"). An
+        // EXISTING plugin keeps whatever state it has: it was already reviewed and switched on here, and
+        // a nightly restore that silently turned the site's plugins off would be its own outage.
+        if (dto.Plugins is not null)
+        {
+            var existingPlugins = await _db.Plugins.ToListAsync();
+            var n = 0;
+            var disabled = 0;
+            foreach (var p in dto.Plugins)
+            {
+                var key = (p.Key ?? "").Trim();
+                if (key.Length == 0) continue;
+                var row = existingPlugins.FirstOrDefault(x => string.Equals(x.Key, key, StringComparison.OrdinalIgnoreCase));
+                if (row is null)
+                {
+                    row = new Plugin { Key = key, Enabled = false, CreatedAt = p.CreatedAt == default ? DateTime.UtcNow : p.CreatedAt };
+                    _db.Plugins.Add(row);
+                    existingPlugins.Add(row);   // same key twice in one backup updates one row, no duplicate insert
+                    disabled++;
+                }
+                row.Name = string.IsNullOrWhiteSpace(p.Name) ? key : p.Name!;
+                row.Description = p.Description ?? "";
+                row.Version = p.Version ?? "";
+                row.DataVersion = p.DataVersion ?? "";
+                row.Code = p.Code ?? "";
+                row.FilesJson = string.IsNullOrWhiteSpace(p.FilesJson) ? "{}" : p.FilesJson!;
+                row.ConfigJson = string.IsNullOrWhiteSpace(p.ConfigJson) ? "{}" : p.ConfigJson!;
+                n++;
+            }
+            await _db.SaveChangesAsync();
+            summary.Add(disabled > 0 ? $"{n} Plugins ({disabled} deaktiviert)" : $"{n} Plugins");
+        }
+
         // Users: UPSERT by username (never a replace-all) so the current admin can't be locked out.
         if (dto.Users is not null)
         {
@@ -908,6 +971,7 @@ public class ContentTransferService
             Forms = dto.Forms?.Count ?? 0,
             Media = dto.Media?.Count ?? 0,
             Components = dto.Components?.Count ?? 0,
+            Plugins = dto.Plugins?.Count ?? 0,
             Users = dto.Users?.Count ?? 0,
             HasAssets = hasAssets,
             TemplatesPartial = dto.TemplatesPartial,
@@ -940,6 +1004,26 @@ public class ContentTransferService
         public List<ComponentDto>? Components { get; set; }
         public List<UserDto>? Users { get; set; }
         public List<PostDto>? Posts { get; set; }
+        public List<PluginDto>? Plugins { get; set; }
+    }
+
+    private sealed class PluginDto
+    {
+        /// <summary>Identity on restore — the plugin's stable slug, same as the cloud rollout uses.</summary>
+        public string? Key { get; set; }
+        public string? Name { get; set; }
+        public string? Description { get; set; }
+        public string? Version { get; set; }
+        public string? DataVersion { get; set; }
+        /// <summary>The entry script.</summary>
+        public string? Code { get; set; }
+        /// <summary>Further script files (path → content) reachable from Code via <c>#load</c>.</summary>
+        public string? FilesJson { get; set; }
+        public string? ConfigJson { get; set; }
+        /// <summary>State at the time of the backup. Recorded for the record only — the import never
+        /// applies it (a new plugin lands disabled, an existing one keeps its own state).</summary>
+        public bool Enabled { get; set; }
+        public DateTime CreatedAt { get; set; }
     }
 
     private sealed class PostDto

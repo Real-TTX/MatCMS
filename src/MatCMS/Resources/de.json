@@ -409,6 +409,8 @@
   "backup.submissions": "Anfragen (Submissions)",
   "backup.forms": "Formulare (inkl. Einsendungen)",
   "backup.assets": "Medien / Logo (Uploads)",
+  "backup.plugins": "Plugins (Code & Dateien)",
+  "backup.pluginsHint": "Plugins werden beim Wiederherstellen anhand ihres Schlüssels abgeglichen. Ein neu angelegtes Plugin kommt deaktiviert zurück — Plugin-Code läuft auf dem Server und muss vor dem Einschalten geprüft werden. Ein bereits vorhandenes Plugin behält seinen Zustand.",
   "backup.users": "Benutzer (inkl. Passwörter)",
   "backup.usersWarn": "Enthält Anmeldedaten (Passwort-Hashes). Nur für Umzüge auf eine neue Instanz aktivieren und die Backup-Datei sicher aufbewahren.",
   "backup.download": "Backup herunterladen",

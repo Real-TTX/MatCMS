@@ -64,6 +64,7 @@
                        neben den Rohfeldern nichts zu tun hätte. *@
                     <div class="pf-menu">
                         <button type="button" class="pf-menu-item is-active" data-pf-tab="editor">@T["plugins.tabEditor"]</button>
+                        <button type="button" class="pf-menu-item" data-pf-tab="log">@T["plugins.log"]</button>
                         <button type="button" class="pf-menu-item" data-pf-tab="raw">@T["plugins.tabRaw"]</button>
                         <span class="pf-menu-sep" aria-hidden="true"></span>
                         <button type="button" class="pf-menu-item" data-pf-add-top data-pf-only="editor">@T["plugins.fileNew"]</button>
@@ -79,7 +80,22 @@
                         @* Kein leerer Kasten, sondern der Hinweis, was zu tun ist. *@
                         <div class="pf-empty" data-pf-empty>@T["plugins.filePick"]</div>
                     </div>
-                    @* Reiter 2: die Rohform. Sie stand früher als <details> am Seitenende — dieselben
+                    @* Reiter 2: der Log. Er stand als eigener Kasten unter der Seite — dieselbe
+                       Ausgabe, nur weit weg von dem Code, über den sie etwas sagt. Reine Ausgabe:
+                       kein Eingabefeld, nichts, was beim Reiterwechsel am Formular hängt.
+                       Serverseitig beim Seitenaufbau gefüllt, wie zuvor — der Reiter lädt nichts
+                       nach, was es vorher nicht gab. *@
+                    <div class="tab-panel" data-pf-panel="log" hidden style="padding:12px;">
+                        @if (Model.Log.Count == 0)
+                        {
+                            <p class="muted">@T["plugins.logEmpty"]</p>
+                        }
+                        else
+                        {
+                            <pre class="plugin-log">@string.Join("\n", Model.Log.Reverse())</pre>
+                        }
+                    </div>
+                    @* Reiter 3: die Rohform. Sie stand früher als <details> am Seitenende — dieselben
                        zwei Felder, nur weit weg von dem, was sie zeigen. Hier liegen sie neben dem
                        Editor, und beide schreiben weiterhin in DIESELBEN Felder: Code (versteckt,
                        gespiegelt in CodeRaw) und FilesJson. Verschoben, nicht neu gebaut — ein
@@ -202,18 +218,6 @@
                 }
             </tbody>
         </table>
-    }
-</div>
-
-<div class="card">
-    <h2>@T["plugins.log"]</h2>
-    @if (Model.Log.Count == 0)
-    {
-        <p class="muted">@T["plugins.logEmpty"]</p>
-    }
-    else
-    {
-        <pre class="plugin-log">@string.Join("\n", Model.Log.Reverse())</pre>
     }
 </div>
 

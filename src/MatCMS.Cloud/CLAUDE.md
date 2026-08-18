@@ -698,6 +698,12 @@ Deliberately the same question that releases the removal, so there are never two
 whether a backup exists; it also makes it self-healing, because a file that disappears is asked for
 again.
 
+**The way is hidden for an instance older than protocol 11** (`InstanceService.IsOutdatedProtocol`),
+and refused server-side as well. Such an instance does not know the field and ignores it, so the wait
+would stand for ever on a site that is running perfectly well — the one state where "nothing happens,
+visibly" is still the wrong answer, because nothing CAN happen. This matters during a staggered
+rollout, when the cloud is necessarily updated before its instances.
+
 A backup can also be requested on its own, from the instance's Backup tab, with no removal attached.
 That is the ordinary use — the removal way is a *user* of it, not the reason for it.
 

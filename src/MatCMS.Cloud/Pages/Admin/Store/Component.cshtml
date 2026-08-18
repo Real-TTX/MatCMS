@@ -25,7 +25,16 @@
             TemplateHelp: T["profiles.placeholderHelp"],
             SampleData: T["profiles.sampleData"],
             Preview: T["profiles.livePreview"],
-            Debug: T["profiles.debug"]),
+            Debug: T["profiles.debug"],
+            // Die Wörter, die das SKRIPT schreibt: die Feldzeilen und der Debug-Bereich entstehen in
+            // JavaScript und können nicht im Markup stehen.
+            Remove: T["common.delete"],
+            DbgPlaceholders: T["profiles.dbgPlaceholders"],
+            DbgUnknown: T["profiles.dbgUnknown"],
+            DbgUnused: T["profiles.dbgUnused"],
+            DbgOutput: T["profiles.dbgOutput"],
+            DbgOk: T["profiles.dbgOk"],
+            DbgEmpty: T["profiles.dbgEmpty"]),
         NameValue: ec.Name,
         TypeValue: ec.Type,
         DescriptionValue: ec.Description,
@@ -35,7 +44,17 @@
             ec.Icon, HelpKey: "profiles.componentIconHelp"),
         TypeReadOnly: false,
         CodeMirror: true,
-        TypePlaceholder: "hero-cta");
+        TypePlaceholder: "hero-cta",
+        FieldTypes: [
+            new MatCMS.Shared.Web.ComponentFieldType("text", T["profiles.fieldText"]),
+            new MatCMS.Shared.Web.ComponentFieldType("textarea", T["profiles.fieldTextarea"]),
+            new MatCMS.Shared.Web.ComponentFieldType("richtext", T["profiles.fieldRichtext"]),
+            new MatCMS.Shared.Web.ComponentFieldType("image", T["profiles.fieldImage"]),
+            new MatCMS.Shared.Web.ComponentFieldType("url", T["profiles.fieldUrl"])
+        ]);
+        // KEIN PreviewTheme: hier hängt kein Profil und damit kein aktiviertes Template daran, aus
+        // dem sich ein Design borgen ließe. Die Vorschau zeichnet in den neutralen Vorgaben des
+        // Skripts — dasselbe, was window.CLOUD_PREVIEW_THEME = {} vorher bewirkte.
 }
 @* Heading only: every action on this page sits in ONE row at the bottom, in the CMS's order
    (save, export, back, destructive last). *@
@@ -88,26 +107,9 @@
 @section Scripts {
     <partial name="_CodeEditorAssets" />
     <partial name="_TabsScript" />
-    <script>
-        window.CLOUD_FIELD_TYPES = [
-            ["text", "@T["profiles.fieldText"]"],
-            ["textarea", "@T["profiles.fieldTextarea"]"],
-            ["richtext", "@T["profiles.fieldRichtext"]"],
-            ["image", "@T["profiles.fieldImage"]"],
-            ["url", "@T["profiles.fieldUrl"]"]
-        ];
-        window.CLOUD_CP = {
-            remove: "@T["common.delete"]",
-            dbgPlaceholders: "@T["profiles.dbgPlaceholders"]",
-            dbgUnknown: "@T["profiles.dbgUnknown"]",
-            dbgUnused: "@T["profiles.dbgUnused"]",
-            dbgOutput: "@T["profiles.dbgOutput"]",
-            dbgOk: "@T["profiles.dbgOk"]",
-            dbgEmpty: "@T["profiles.dbgEmpty"]"
-        };
-        // No profile here, so no activated template to borrow a theme from — the preview uses the
-        // neutral defaults baked into component-editor.js.
-        window.CLOUD_PREVIEW_THEME = {};
-    </script>
-    <script src="~/js/component-editor.js" asp-append-version="true"></script>
+    @* Das Skript des Editors liegt EINMAL in der geteilten Bibliothek — das CMS lädt dasselbe.
+       Was diese Seite unterscheidet (Feldarten, die Wörter des Skripts, die Farben der Vorschau),
+       hängt als data-Merkmal am #field-rows des geteilten Editors; ein window.*-Block davor
+       entfällt damit. *@
+    <script src="~/_content/MatCMS.Shared.Web/js/component-editor.js" asp-append-version="true"></script>
 }

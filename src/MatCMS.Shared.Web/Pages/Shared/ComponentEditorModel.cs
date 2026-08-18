@@ -23,12 +23,47 @@ namespace MatCMS.Shared.Web;
 /// looking at and are NOT saved.</param>
 /// <param name="Preview">Names the preview pane and the frame (its accessible title).</param>
 /// <param name="Debug">Caption of the switch that opens the placeholder/output panel.</param>
+/// <param name="Remove">Title of the trash button on a field row. The SCRIPT writes this one, not
+/// the markup — the rows are built in JavaScript.</param>
+/// <param name="DbgPlaceholders">Debug row: every placeholder the template uses.</param>
+/// <param name="DbgUnknown">Debug row: placeholders no field defines — the mistake this panel
+/// exists for.</param>
+/// <param name="DbgUnused">Debug row: fields the template never uses.</param>
+/// <param name="DbgOutput">Debug row: heading above the rendered HTML.</param>
+/// <param name="DbgOk">Shown when no placeholder is unknown.</param>
+/// <param name="DbgEmpty">Stands in for an empty debug row.</param>
 public sealed record ComponentEditorLabels(
     string TabGeneral, string TabFields, string TabTemplate,
     string Name, string Type, string TypeHelp, string Description,
     string FieldsHelp, string AddField,
     string TemplateLabel, string TemplateHelp,
-    string SampleData, string Preview, string Debug);
+    string SampleData, string Preview, string Debug,
+    string Remove, string DbgPlaceholders, string DbgUnknown,
+    string DbgUnused, string DbgOutput, string DbgOk, string DbgEmpty);
+
+/// <summary>
+/// One selectable field type: the value stored in the field list and the wording the dropdown shows.
+/// The list travels from the page because only the application can translate it — and the SCRIPT
+/// needs it even where no dropdown is ever seen (the thumbnail page), because the type decides
+/// whether a sample value is escaped or inserted as HTML.
+/// </summary>
+public sealed record ComponentFieldType(string Value, string Label);
+
+/// <summary>
+/// The colours and fonts the live preview draws in. This is the one place the two applications
+/// genuinely disagree, so it is a parameter rather than a branch: the CMS shows its admin's own
+/// palette, while the cloud borrows the theme of the template the profile activates, so a block is
+/// judged in the design it will actually live in.
+/// <para>Every value is optional. What is not given is NOT emitted rather than defaulted here —
+/// <see cref="Accent2"/> is set by the CMS alone, and inventing one for the cloud would silently
+/// overwrite the stylesheet's own.</para>
+/// </summary>
+public sealed record ComponentPreviewTheme(
+    string? Accent = null, string? AccentDark = null, string? Accent2 = null,
+    string? Heading = null, string? Text = null,
+    string? Background = null, string? AltBackground = null,
+    string? ContainerWidth = null, string? ButtonRadius = null,
+    string? HeadingFont = null, string? BodyFont = null);
 
 /// <summary>
 /// What each field posts as. The CMS and the cloud write into different records and have always
@@ -77,6 +112,9 @@ public sealed record ComponentEditorNames(
 /// preference.</param>
 /// <param name="TypePlaceholder">Example type shown in the empty field; only useful where the type
 /// is still editable.</param>
+/// <param name="FieldTypes">The selectable field types, translated by the page.</param>
+/// <param name="PreviewTheme">The design the live preview draws in. Null means the script's neutral
+/// defaults.</param>
 public sealed record ComponentEditor(
     ComponentEditorNames Names,
     ComponentEditorLabels Labels,
@@ -88,4 +126,70 @@ public sealed record ComponentEditor(
     object? IconPicker = null,
     bool TypeReadOnly = false,
     bool CodeMirror = false,
-    string TypePlaceholder = "");
+    string TypePlaceholder = "",
+    IReadOnlyList<ComponentFieldType>? FieldTypes = null,
+    ComponentPreviewTheme? PreviewTheme = null)
+{
+    /// <summary>The field types as the script reads them: <c>[[value, label], …]</c>.</summary>
+    public string FieldTypesJson => ComponentEditorJson.FieldTypes(FieldTypes);
+
+    /// <summary>The wording the SCRIPT writes (the rows are built in JavaScript, so these cannot sit
+    /// in the markup).</summary>
+    public string ScriptLabelsJson => ComponentEditorJson.Labels(Labels);
+
+    /// <summary>The preview's colours and fonts.</summary>
+    public string PreviewThemeJson => ComponentEditorJson.Theme(PreviewTheme);
+}
+
+/// <summary>
+/// Turns the editor's parameters into the JSON that rides on <c>#field-rows</c> as
+/// <c>data-field-types</c>, <c>data-labels</c> and <c>data-preview-theme</c>.
+/// <para>Why on the ELEMENT and no longer in <c>window.MATCMS_*</c> / <c>window.CLOUD_*</c>: the
+/// script now lives once, so its only interface must not depend on which application rendered the
+/// page. It is also the only interface a page without the shared partial can serve — the component
+/// thumbnail (<c>Admin/ComponentPreview</c>) writes the same attributes by hand and runs the same
+/// renderer, which is what keeps a tile and the editor from disagreeing about a component.</para>
+/// <para>Public and static so that page can reach it without building a whole
+/// <see cref="ComponentEditor"/>.</para>
+/// </summary>
+public static class ComponentEditorJson
+{
+    private static readonly System.Text.Json.JsonSerializerOptions Options = new()
+    {
+        // Nulls are LEFT OUT rather than written: the script tells "not given" from "given empty"
+        // and only fills in a default for the former.
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+    };
+
+    public static string FieldTypes(IReadOnlyList<ComponentFieldType>? types) =>
+        System.Text.Json.JsonSerializer.Serialize(
+            (types ?? []).Select(t => new[] { t.Value, t.Label }), Options);
+
+    public static string Labels(ComponentEditorLabels labels) =>
+        System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, string>
+        {
+            ["remove"] = labels.Remove,
+            ["dbgPlaceholders"] = labels.DbgPlaceholders,
+            ["dbgUnknown"] = labels.DbgUnknown,
+            ["dbgUnused"] = labels.DbgUnused,
+            ["dbgOutput"] = labels.DbgOutput,
+            ["dbgOk"] = labels.DbgOk,
+            ["dbgEmpty"] = labels.DbgEmpty
+        }, Options);
+
+    public static string Theme(ComponentPreviewTheme? theme) =>
+        System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, string?>
+        {
+            ["accent"] = theme?.Accent,
+            ["accentDark"] = theme?.AccentDark,
+            ["accent2"] = theme?.Accent2,
+            ["heading"] = theme?.Heading,
+            ["text"] = theme?.Text,
+            ["background"] = theme?.Background,
+            ["altBackground"] = theme?.AltBackground,
+            ["containerWidth"] = theme?.ContainerWidth,
+            ["buttonRadius"] = theme?.ButtonRadius,
+            ["headingFont"] = theme?.HeadingFont,
+            ["bodyFont"] = theme?.BodyFont
+        }, Options);
+}

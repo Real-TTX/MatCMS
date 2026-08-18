@@ -56,7 +56,10 @@ together by hand:
    `admin.css`, `admin-list.js`, the CodeMirror and Tabler-Icons bundles, `_IconTrash.cshtml`,
    `_EmptyRow.cshtml` (the "no records" row), `_IconField.cshtml` (the icon picker),
    `_TemplateFiles.cshtml` (the template file editor) and `_ComponentEditor.cshtml` (the whole
-   component editor: tabs, fields, field designer and live preview).
+   component editor: tabs, fields, field designer and live preview) **with its script,
+   `js/component-editor.js`** — what the two applications differ in rides along as `data-`
+   attributes on `#field-rows` (field types, the script's own wording, the preview's theme), never
+   as a branch on which application is rendering.
    The shared views take their **wording as strings, not `@T[…]`** — a shared view cannot reference
    either application's `Localizer` type — so each app keeps a thin adapter that looks the keys up
    (`_IconPicker.cshtml`, and the `@{ }` block of the pages using `_ComponentEditor`). The library

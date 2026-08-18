@@ -2,6 +2,33 @@
 @model MatCMS.Cloud.Pages.Admin.ComponentPreviewModel
 @{
     Layout = null;
+
+    // Dieselben Parameter, die der geteilte Editor an #field-rows hängt — diese Seite kann die
+    // geteilte Ansicht nicht benutzen (sie ist ein nacktes Dokument ohne Layout), reicht dem Skript
+    // aber genau dieselbe Schnittstelle.
+    // DIE FELDARTEN MÜSSEN SEIN, obwohl man hier kein Auswahlfeld je zu sehen bekommt: der Renderer
+    // liest die Art aus der Zeile zurück, um zu entscheiden, ob ein Wert maskiert (text) oder als
+    // HTML eingesetzt wird (richtext). Ohne sie fiele jedes Feld auf "text" zurück und ein
+    // Rich-Text-Block zeigte sein Markup.
+    var fieldTypesJson = MatCMS.Shared.Web.ComponentEditorJson.FieldTypes([
+        new MatCMS.Shared.Web.ComponentFieldType("text", T["profiles.fieldText"]),
+        new MatCMS.Shared.Web.ComponentFieldType("textarea", T["profiles.fieldTextarea"]),
+        new MatCMS.Shared.Web.ComponentFieldType("richtext", T["profiles.fieldRichtext"]),
+        new MatCMS.Shared.Web.ComponentFieldType("image", T["profiles.fieldImage"]),
+        new MatCMS.Shared.Web.ComponentFieldType("url", T["profiles.fieldUrl"])]);
+
+    // Die Kachel zeichnet im Design des Templates, das das Profil aktiviert — wie der Editor.
+    var previewThemeJson = MatCMS.Shared.Web.ComponentEditorJson.Theme(
+        new MatCMS.Shared.Web.ComponentPreviewTheme(
+            Accent: Model.PreviewTheme?.AccentColor,
+            Heading: Model.PreviewTheme?.HeadingColor,
+            Text: Model.PreviewTheme?.TextColor,
+            Background: Model.PreviewTheme?.BackgroundColor,
+            AltBackground: Model.PreviewTheme?.AltBackground,
+            ContainerWidth: Model.PreviewTheme?.ContainerWidth,
+            ButtonRadius: Model.PreviewTheme?.ButtonRadius,
+            HeadingFont: Model.PreviewTheme?.HeadingFont,
+            BodyFont: Model.PreviewTheme?.BodyFont));
 }
 <!DOCTYPE html>
 <html lang="de">
@@ -18,10 +45,11 @@
     </style>
 </head>
 <body>
-    @* component-editor.js bootstraps from these exact ids, which is the point: the tile and the editor
-       run the same renderer and cannot disagree about what a component looks like. *@
+    @* component-editor.js bootstraps from these exact ids, which is the point: the tile and the
+       editor run the same renderer and cannot disagree about what a component looks like. *@
     <form id="component-form">
-        <div id="field-rows" data-fields="@Model.FieldsJson"></div>
+        <div id="field-rows" data-fields="@Model.FieldsJson"
+             data-field-types="@fieldTypesJson" data-preview-theme="@previewThemeJson"></div>
         <input type="hidden" id="FieldsJson" />
         <textarea id="TemplateHtml">@Model.TemplateHtml</textarea>
         <div id="cp-sample"></div>
@@ -29,31 +57,6 @@
 
     <iframe id="cp-frame" title="@Model.Name"></iframe>
 
-    <script>
-        // The field TYPES have to be here even though no select is ever seen: the renderer reads the
-        // type back off the row to decide whether a value is escaped (text) or inserted as HTML
-        // (richtext). Without them every field would collapse to "text" and a rich-text block would
-        // render as visible markup.
-        window.CLOUD_FIELD_TYPES = [
-            ["text", "@T["profiles.fieldText"]"],
-            ["textarea", "@T["profiles.fieldTextarea"]"],
-            ["richtext", "@T["profiles.fieldRichtext"]"],
-            ["image", "@T["profiles.fieldImage"]"],
-            ["url", "@T["profiles.fieldUrl"]"]
-        ];
-        window.CLOUD_PREVIEW_THEME = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(new
-        {
-            accent = Model.PreviewTheme?.AccentColor,
-            heading = Model.PreviewTheme?.HeadingColor,
-            text = Model.PreviewTheme?.TextColor,
-            background = Model.PreviewTheme?.BackgroundColor,
-            altBackground = Model.PreviewTheme?.AltBackground,
-            containerWidth = Model.PreviewTheme?.ContainerWidth,
-            buttonRadius = Model.PreviewTheme?.ButtonRadius,
-            headingFont = Model.PreviewTheme?.HeadingFont,
-            bodyFont = Model.PreviewTheme?.BodyFont
-        }));
-    </script>
-    <script src="~/js/component-editor.js" asp-append-version="true"></script>
+    <script src="~/_content/MatCMS.Shared.Web/js/component-editor.js" asp-append-version="true"></script>
 </body>
 </html>

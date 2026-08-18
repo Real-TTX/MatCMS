@@ -180,15 +180,27 @@ show the result, not just the values.
   field outside it is not submitted at all and would arrive empty.
   The preview sits in the admin's own two-column build (`.pf-tree` > `.pf-side` / `.pf-main`, the
   plugin editor's): left the sample fields, right the frame that follows every keystroke.
-- `wwwroot/js/component-editor.js` is MatCMS's `admin-component-editor.js` — the SCRIPT is still two
-  files (the view is not any more). **Keep the two in sync** — a component authored here must behave
-  exactly like one authored on an instance.
+- The editor's **script is shared too**: `MatCMS.Shared.Web/wwwroot/js/component-editor.js`, loaded
+  as `~/_content/MatCMS.Shared.Web/js/component-editor.js`. It was two files
+  (`MatCMS/wwwroot/js/admin-component-editor.js` and `MatCMS.Cloud/wwwroot/js/component-editor.js`)
+  that had to be kept in sync by hand; there is nothing left to keep in step.
+  **What differs travels as `data-` attributes on `#field-rows`**, never as a branch on which
+  application is rendering: `data-field-types` (the translated field types — needed even where no
+  dropdown is ever seen, because the type decides escaping), `data-labels` (the wording the script
+  itself writes: the trash button's title and the debug rows) and `data-preview-theme` (the CMS
+  shows its admin's palette, the cloud borrows the theme of the template its profile activates).
+  `ComponentEditorJson` builds all three; a page without the shared partial — the component
+  thumbnail `Admin/ComponentPreview` — writes the same attributes by hand and therefore runs the
+  same renderer.
+  **CodeMirror is deliberately NOT a switch**: the script asks the DOM whether an editor hangs on
+  the template field and reads through it when there is one. The hook is retried on
+  `DOMContentLoaded`/`load` rather than set in a `setTimeout(0)`, because `code-editor.js` builds the
+  editor later than that and the hook was silently never attached.
   One rule carried over deliberately: an existing field keeps its `id` when its label is renamed,
   because the id is what `{{placeholder}}` refers to and re-slugging it would break blocks already
   placed on live sites.
-  Both cloud previews hook CodeMirror to keep up with typing **in the code**; the hook is retried on
-  `DOMContentLoaded`/`load` rather than set in a `setTimeout(0)`, because `code-editor.js` builds the
-  editor later than that and the hook was silently never attached.
+  And the one that must survive every rebuild: **the field list is written into the posted field on
+  every keystroke**, not only on submit — otherwise every other way out of the page loses it.
 - The template editor's **files tab is shared**: `MatCMS.Shared.Web/Pages/Shared/_TemplateFiles.cshtml`
   renders the pseudo-files (`body.html`, `article.html`, `styles.css`, `script.js`,
   `maintenance.html`) as a **tree** — one root (the template), its files below it, the open file on

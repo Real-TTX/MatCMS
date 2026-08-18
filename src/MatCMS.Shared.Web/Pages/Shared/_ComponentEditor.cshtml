@@ -17,8 +17,10 @@
 
     Die Beschriftungen kommen als Zeichenketten herein, nicht als @@T[…]: eine geteilte Ansicht kennt
     keinen der beiden Localizer. Die Kennungen (FieldsJson, TemplateHtml, field-rows, cp-*) sind
-    dagegen FEST — an ihnen hängen admin-component-editor.js und component-editor.js, und sie sind
-    auf beiden Seiten dieselben.
+    dagegen FEST — an ihnen hängt component-editor.js, das seit dem Zusammenlegen ebenfalls einmal in
+    dieser Bibliothek liegt (~/_content/MatCMS.Shared.Web/js/component-editor.js). Jede Seite, die
+    diesen Editor rendert, muss es einbinden; was sie unterscheidet, hängt als data-Merkmal an
+    #field-rows.
 *@
 <div class="tabs" role="tablist">
     <button type="button" class="tab active" data-tab="general">@Model.Labels.TabGeneral</button>
@@ -72,7 +74,17 @@
    die Namen entstehen aus den Beschriftungen, die man hier eingibt. *@
 <div class="tab-panel form-grid" data-panel="fields" hidden>
     <div class="help">@Model.Labels.FieldsHelp</div>
-    <div id="field-rows" data-fields="@(string.IsNullOrWhiteSpace(Model.FieldsJson) ? "[]" : Model.FieldsJson)"></div>
+    @* Alles, was das Skript von DIESER Seite wissen muss, hängt hier am Element: die gespeicherte
+       Feldliste, die übersetzten Feldarten, die Wörter, die das Skript selbst schreibt (die Zeilen
+       entstehen in JavaScript), und die Farben/Schriften der Vorschau. Vorher standen sie als
+       window.MATCMS_* bzw. window.CLOUD_* in der Seite — zwei Namen für dieselbe Sache, und genau
+       daran hingen zwei Skripte. Jetzt liegt das Skript einmal, also darf seine Schnittstelle nicht
+       davon abhängen, welche Anwendung rendert. *@
+    <div id="field-rows"
+         data-fields="@(string.IsNullOrWhiteSpace(Model.FieldsJson) ? "[]" : Model.FieldsJson)"
+         data-field-types="@Model.FieldTypesJson"
+         data-labels="@Model.ScriptLabelsJson"
+         data-preview-theme="@Model.PreviewThemeJson"></div>
     <div><button type="button" class="btn btn-sm btn-ghost" id="add-field">＋ @Model.Labels.AddField</button></div>
     @* Das Feld, das abgeschickt wird. Der Feldbau schreibt bei JEDEM Tastendruck hinein — es
        entsteht nicht erst beim Absenden, sonst ginge die Feldliste auf jedem anderen Weg aus der

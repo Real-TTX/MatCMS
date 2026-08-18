@@ -25,7 +25,17 @@
             TemplateHelp: T["components.templateHelp"],
             SampleData: T["components.sampleData"],
             Preview: T["components.preview"],
-            Debug: T["components.debug"]),
+            Debug: T["components.debug"],
+            // Die Wörter, die das SKRIPT schreibt: die Feldzeilen und der Debug-Bereich entstehen in
+            // JavaScript, können also nicht im Markup stehen. Sie kommen denselben Weg wie alle
+            // anderen — nachgeschlagen hier, weitergereicht als Zeichenkette.
+            Remove: T["action.delete"],
+            DbgPlaceholders: T["components.dbgPlaceholders"],
+            DbgUnknown: T["components.dbgUnknown"],
+            DbgUnused: T["components.dbgUnused"],
+            DbgOutput: T["components.dbgOutput"],
+            DbgOk: T["components.dbgOk"],
+            DbgEmpty: T["components.dbgEmpty"]),
         NameValue: Model.Name,
         TypeValue: Model.Current.Type,
         DescriptionValue: Model.Description,
@@ -38,7 +48,24 @@
         TypeReadOnly: true,
         // Kein CodeMirror auf dieser Seite — das Bündel wird hier nicht geladen, und ein
         // data-code-Feld ohne das Bündel ist nur ein Textfeld.
-        CodeMirror: false);
+        CodeMirror: false,
+        FieldTypes: [
+            new MatCMS.Shared.Web.ComponentFieldType("text", T["components.type.text"]),
+            new MatCMS.Shared.Web.ComponentFieldType("textarea", T["components.type.textarea"]),
+            new MatCMS.Shared.Web.ComponentFieldType("richtext", T["components.type.richtext"]),
+            new MatCMS.Shared.Web.ComponentFieldType("image", T["components.type.image"]),
+            new MatCMS.Shared.Web.ComponentFieldType("url", T["components.type.url"])
+        ],
+        // Die Vorschau des CMS zeichnet in den Farben des Admin. Sie standen bis zum Zusammenlegen
+        // fest im Skript — jetzt stehen sie hier, weil genau das der Unterschied zur Cloud ist: die
+        // borgt sich das Design des Templates, das ihr Profil aktiviert. Ein Schalter im Skript
+        // wäre der falsche Ort für eine Entscheidung, die der Seite gehört.
+        PreviewTheme: new MatCMS.Shared.Web.ComponentPreviewTheme(
+            Accent: "#de7e11", AccentDark: "#bc6b0e", Accent2: "#22d3ee",
+            Heading: "#111", Text: "#333",
+            Background: "#fff", AltBackground: "#f6f7f9",
+            ContainerWidth: "1180", ButtonRadius: "0",
+            HeadingFont: "Inter", BodyFont: "Inter"));
 }
 @* Nur die Überschrift: alle Aktionen dieser Seite stehen unten in EINER Reihe — dieselbe Ordnung
    wie im Plugin-Editor. Zwei Orte für Knöpfe, die dasselbe Formular betreffen, ließen einen oben
@@ -100,26 +127,9 @@
             if (want) show(want);
         })();
     </script>
-    <script>
-        window.MATCMS_CP = {
-            debug: "@T["components.debug"]",
-            dbgPlaceholders: "@T["components.dbgPlaceholders"]",
-            dbgUnknown: "@T["components.dbgUnknown"]",
-            dbgUnused: "@T["components.dbgUnused"]",
-            dbgOutput: "@T["components.dbgOutput"]",
-            dbgOk: "@T["components.dbgOk"]",
-            dbgEmpty: "@T["components.dbgEmpty"]"
-        };
-    </script>
-    <script>
-        window.MATCMS_FIELD_TYPES = [
-            ["text", "@T["components.type.text"]"],
-            ["textarea", "@T["components.type.textarea"]"],
-            ["richtext", "@T["components.type.richtext"]"],
-            ["image", "@T["components.type.image"]"],
-            ["url", "@T["components.type.url"]"]
-        ];
-        window.MATCMS_REMOVE = "@T["action.delete"]";
-    </script>
-    <script src="~/js/admin-component-editor.js" asp-append-version="true"></script>
+    @* Das Skript des Editors liegt EINMAL in der geteilten Bibliothek — die Cloud lädt dasselbe.
+       Was diese Seite unterscheidet (Feldarten, die Wörter des Skripts, die Farben der Vorschau),
+       hängt als data-Merkmal am #field-rows des geteilten Editors und braucht deshalb keinen
+       window.*-Block mehr davor. *@
+    <script src="~/_content/MatCMS.Shared.Web/js/component-editor.js" asp-append-version="true"></script>
 }

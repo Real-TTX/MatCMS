@@ -126,6 +126,43 @@ public class EditModel : PageModel
             return Page();
         }
 
+        // The code fields are normalized FIRST and their length is reported, not applied. These five
+        // pseudo-files are the only place on this page where a value can be too long, and until now
+        // "too long" meant TemplateFonts.Code silently returned the first 20 000 characters — a save
+        // that answered "Template gespeichert." while cutting a stylesheet off mid-declaration. The
+        // limit itself stays (CSS and JS are inlined into every public page, so this is page weight on
+        // every request), but it is now something the operator is told rather than something that
+        // happens to their work. Checked before anything is written to the row, so a refused save
+        // leaves the record exactly as it was and the editor still holds every character they typed.
+        var css = TemplateFonts.Code(CustomCss);
+        var js = TemplateFonts.Code(CustomJs);
+        var layout = TemplateFonts.Code(LayoutHtml);
+        var parts = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var key in TemplateSchema.KnownParts)
+            parts[key] = TemplateFonts.Code(Parts.TryGetValue(key, out var pv) ? pv : "");
+
+        // The pseudo-file names the editor's tree shows, so the message names what the operator sees.
+        var tooLong = new List<string>();
+        void Check(string file, string value, int max)
+        {
+            if (value.Length > max) tooLong.Add($"„{file}“: {value.Length} Zeichen, erlaubt sind {max}");
+        }
+        Check("styles.css", css, TemplateFonts.MaxInlineCode);
+        Check("script.js", js, TemplateFonts.MaxInlineCode);
+        Check("body.html", layout, TemplateFonts.MaxLayoutHtml);
+        Check("article.html", parts[TemplateSchema.PartPost], TemplateFonts.MaxLayoutHtml);
+        Check("maintenance.html", parts[TemplateSchema.PartMaintenance], TemplateFonts.MaxLayoutHtml);
+        if (tooLong.Count > 0)
+        {
+            IsActive = t.IsActive;
+            SchemaVersion = t.SchemaVersion;
+            Error = "Nicht gespeichert, weil zu lang — " + string.Join("; ", tooLong)
+                  + ". Diese Dateien werden in jede Seite der Website eingebettet, darum die Grenze. "
+                  + "Der eingegebene Inhalt steht unverändert im Editor und ist nicht abgeschnitten.";
+            await LoadMenuMappingAsync(LayoutHtml, MenuMap);
+            return Page();
+        }
+
         t.Name = name;
         t.AccentColor = TemplateFonts.NormalizeColor(AccentColor);
         t.SecondaryColor = TemplateFonts.OptionalColor(SecondaryColor);
@@ -141,9 +178,9 @@ public class EditModel : PageModel
         t.HeaderBackground = TemplateFonts.OptionalColor(HeaderBackground);
         t.HeaderTextColor = TemplateFonts.OptionalColor(HeaderTextColor);
         t.HeaderPadding = TemplateFonts.Int(HeaderPadding, "16", 4, 60);
-        t.CustomCss = TemplateFonts.Code(CustomCss);
-        t.CustomJs = TemplateFonts.Code(CustomJs);
-        t.LayoutHtml = TemplateFonts.Code(LayoutHtml, 50000);
+        t.CustomCss = css;
+        t.CustomJs = js;
+        t.LayoutHtml = layout;
         t.ParametersJson = SanitizeParameters(ParametersJson);
 
         // Persist only slots that actually map to an existing menu.
@@ -155,12 +192,11 @@ public class EditModel : PageModel
 
         // Per-page-type layout parts: keep only known parts that were actually customised (a part left
         // at its built-in default is stored as "unset" so the row stays clean and default changes in a
-        // later engine version still apply). TemplateFonts.Code trims, LF-normalizes (so the browser's
-        // CRLF can match the LF-only default constant) and caps size.
+        // later engine version still apply). Already trimmed and LF-normalized above, which is what
+        // lets the browser's CRLF compare equal to the LF-only default constant.
         var cleanParts = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var key in TemplateSchema.KnownParts)
+        foreach (var (key, html) in parts)
         {
-            var html = TemplateFonts.Code(Parts.TryGetValue(key, out var v) ? v : "", 50000);
             if (!string.IsNullOrWhiteSpace(html) && html.Trim() != TemplateSchema.DefaultFor(key).Trim())
                 cleanParts[key] = html;
         }

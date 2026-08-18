@@ -49,12 +49,30 @@ public static class TemplateFonts
         return fallback;
     }
 
-    /// <summary>Trim advanced CSS/JS/HTML, normalize newlines to LF, and cap length to keep pages sane.
+    /// <summary>
+    /// Length limit for the code fields that are INLINED into every public page render: the template's
+    /// <c>CustomCss</c> goes into a <c>&lt;style&gt;</c> and <c>CustomJs</c> into a <c>&lt;script&gt;</c>
+    /// on every request (<c>Pages/Shared/_Layout.cshtml</c>). That — page weight, not storage — is the
+    /// whole reason a limit exists here. It is NOT a transport limit: the form carries half a million
+    /// characters without complaining, and only ASP.NET's own ~4-MiB form-value limit refuses (measured:
+    /// 500 000 characters → 302, five million → 400). Nor is it SQLite, which stores a gigabyte per cell.
+    /// <para>Whoever raises it is deciding how much CSS every visitor downloads on every page.</para>
+    /// </summary>
+    public const int MaxInlineCode = 20000;
+
+    /// <summary>Length limit for layout HTML — <c>LayoutHtml</c> and the per-page-type parts. Higher than
+    /// <see cref="MaxInlineCode"/> because markup is bulkier per idea than a stylesheet, and it replaces
+    /// the page body instead of adding to it.</summary>
+    public const int MaxLayoutHtml = 50000;
+
+    /// <summary>Trim advanced CSS/JS/HTML and normalize newlines to LF.
     /// LF-normalization matters because browsers submit textarea content with CRLF: without it, a value
-    /// could never compare equal to an LF-only default constant (e.g. the template's default page part).</summary>
-    public static string Code(string? value, int max = 20000)
-    {
-        var v = (value ?? "").Replace("\r\n", "\n").Replace("\r", "\n").Trim();
-        return v.Length > max ? v[..max] : v;
-    }
+    /// could never compare equal to an LF-only default constant (e.g. the template's default page part).
+    /// <para><b>This deliberately does not cap any more.</b> It used to return <c>v[..max]</c>, which
+    /// turned a 30 000-character stylesheet into 20 000 characters ending mid-declaration and reported
+    /// "Template gespeichert." — the operator found out from the broken site. Silent truncation is never
+    /// the right answer to "too long": the caller checks the length against
+    /// <see cref="MaxInlineCode"/> / <see cref="MaxLayoutHtml"/> and says so instead.</para></summary>
+    public static string Code(string? value) =>
+        (value ?? "").Replace("\r\n", "\n").Replace("\r", "\n").Trim();
 }

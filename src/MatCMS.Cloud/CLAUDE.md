@@ -617,6 +617,46 @@ What each mode can do:
 - **Remote** — notify only, plus the exact command (`docker compose pull && docker compose up -d`).
   A guided/agent-driven remote update is backlog.
 
+### Removing an instance — who owns the container
+
+`Instances/Delete` is the only way out. It offers **two destructive ways** (remove the container and
+keep the volumes / remove both) and, for everything else, plain **unregistering**: the cloud forgets
+the instance and the site keeps running.
+
+**`Hosting == Local` does NOT mean "ours".** Local only says the container sits on the daemon we can
+reach, which is equally true of a site somebody started by hand next to us. The answer is
+`DockerHostService.ManagedLabel` (`matcmscloud.managed`), stamped by `HostingService` on everything
+the cloud creates itself and re-read from the daemon on **every heartbeat** into
+`Instance.CloudManaged` — so a site that moved falls back to "not ours" instead of keeping a licence
+to delete something it no longer is. An instance that only joined with a code may be unregistered;
+its container is never touched, and the two destructive options are not rendered for it at all.
+
+Two traps, both load-bearing:
+
+- **Nothing derives the target from a name.** The volume name is derivable on paper
+  (`HostingService.StackName(...) + "-data"`), but the display name is editable on the instance page,
+  so a re-derived name can point at something else entirely. `InspectTeardownAsync` reads the mounts
+  off the container that is actually about to be removed. The confirmation form carries the container
+  id only so the POST can check it still describes what the operator was shown — the id it acts on
+  comes from the record and the daemon again. A confirmation screen that hands its own answer back as
+  the instruction is how the wrong container gets removed.
+- **`ContainerRemoveParameters.RemoveVolumes` does not remove NAMED volumes.** It is
+  `docker rm --volumes`, which only clears anonymous ones, and an instance's data volume is named.
+  Relying on it reports "completely removed" while the customer's database is still on disk. Named
+  volumes are removed one by one, explicitly, *after* the container (a volume still in use cannot be
+  removed), and whatever survives is reported by name rather than swallowed.
+
+Cloud-side backups hang off the instance row and **cascade with it on every way**, including the one
+that keeps the volumes — so the page says how many will go. The files themselves stay behind as
+orphans for `BackupStore.FindOrphansAsync`.
+
+**Not built: the third way, "take a backup first, then remove."** It needs a backup REQUEST on the
+heartbeat (the mirror of `PendingRestore`, so a `CloudProtocol.Version` bump and a change in both
+apps) plus something that completes the removal once the upload has actually arrived — the gate being
+`CloudBackup.UploadedAt` later than the moment we asked, never "we asked". It is deliberately not
+offered rather than half-offered: a menu entry whose removal fires before the backup landed is worse
+than a missing one.
+
 ## Backlog
 
 - **Provisioning new MatCMS instances** via **MatOS** + **Matcad**: MatOS already installs apps as

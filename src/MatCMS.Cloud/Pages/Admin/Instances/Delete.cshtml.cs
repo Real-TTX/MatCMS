@@ -58,6 +58,14 @@ public class DeleteModel : PageModel
     public bool CanTearDown => Target is { CloudManaged: true };
 
     /// <summary>
+    /// Whether the instance can answer a backup request at all. An older one does not know the field
+    /// and would ignore it, so the way would wait for ever on a healthy site.
+    /// <para>Offering it anyway and letting it hang would be the worst of both: the operator believes
+    /// a removal is under way, and it never is. A way that cannot work is not shown.</para>
+    /// </summary>
+    public bool CanBackupFirst => CanTearDown && !InstanceService.IsOutdatedProtocol(Item);
+
+    /// <summary>
     /// How many backups this instance has lying in the cloud. Shown because they go with it: the
     /// rows hang off the instance and cascade away when it is deleted, whichever way is chosen —
     /// including the one that promises to keep the data.

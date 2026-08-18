@@ -446,6 +446,7 @@
   "instances.removeBackupFirst": "Fetch a backup, then remove completely",
   "instances.removeBackupFirstHint": "In that order: the cloud asks the instance for a backup, waits until it has actually arrived here, and only then removes container and volumes. If no backup arrives, NOTHING is removed — the operation stays visibly on hold until the backup is here or you take it back.",
   "instances.removeBackupFirstArchive": "This one backup outlives the removal: it is moved to the archive before anything is deleted, and can be found afterwards under Backups → Archive. The instance's other backups go with it, as they do on every other way.",
+  "instances.removeBackupFirstOutdated": "“Fetch a backup, then remove completely” is not available here: this instance still speaks an older version of the protocol and cannot answer a backup request. The way appears once the instance has been updated.",
   "instances.removeConfirmBackupFirst": "Ask “{0}” for a backup and remove the instance completely afterwards? Nothing is removed until the backup has really arrived in the cloud.",
   "instances.removeWaiting": "Removal on hold — waiting for the backup",
   "instances.removeWaitingSince": "On hold since",

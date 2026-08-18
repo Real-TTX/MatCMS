@@ -127,6 +127,19 @@ public class InstanceRemovalService
     public async Task<Outcome> ScheduleWithBackupAsync(
         Instance item, string? expectedContainerId, CancellationToken ct = default)
     {
+        // An instance that predates the backup request would never answer: it does not know the
+        // field, so it ignores it, and the wait would stand for ever on a site that is running
+        // perfectly well. Refused here rather than allowed to hang — this is the one state where
+        // "nothing happens, visibly" is still the wrong answer, because nothing CAN happen.
+        //
+        // It matters during a staggered rollout: the cloud is updated before its instances, so for a
+        // while every instance is one version behind and this way genuinely cannot work on any of
+        // them.
+        if (InstanceService.IsOutdatedProtocol(item))
+            return new Outcome(false,
+                "Diese Instanz spricht noch eine ältere Fassung des Protokolls und kann kein Backup "
+                + "liefern. Bitte zuerst aktualisieren. Es wurde nichts vorgemerkt.", false);
+
         // Checked NOW as well as later. Not because the later check could be skipped, but because an
         // operator who cannot have this way should be told so while they are still looking at the
         // page, rather than six hours later in an event log.

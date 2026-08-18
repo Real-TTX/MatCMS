@@ -151,13 +151,23 @@ else
                     <div class="help">@T["instances.removeFullHint"]</div>
 
                     @* Nur bei selbst angelegten Instanzen, wie die beiden Wege darüber — und die
-                       Reihenfolge steht im Hinweistext, weil genau sie den Weg ausmacht. *@
-                    <label class="checkbox-row">
-                        <input type="radio" name="mode" value="@MatCMS.Cloud.Pages.Admin.Instances.DeleteModel.ModeBackupFirst" />
-                        @T["instances.removeBackupFirst"]
-                    </label>
-                    <div class="help">@T["instances.removeBackupFirstHint"]</div>
-                    <div class="help">@T["instances.removeBackupFirstArchive"]</div>
+                       Reihenfolge steht im Hinweistext, weil genau sie den Weg ausmacht.
+                       Zusätzlich nur bei Instanzen, die die Anforderung überhaupt verstehen: Eine
+                       ältere ignoriert sie, und der Vorgang stünde für immer auf einer Website, der
+                       nichts fehlt. Ein Weg, der nicht funktionieren KANN, wird nicht angeboten. *@
+                    @if (Model.CanBackupFirst)
+                    {
+                        <label class="checkbox-row">
+                            <input type="radio" name="mode" value="@MatCMS.Cloud.Pages.Admin.Instances.DeleteModel.ModeBackupFirst" />
+                            @T["instances.removeBackupFirst"]
+                        </label>
+                        <div class="help">@T["instances.removeBackupFirstHint"]</div>
+                        <div class="help">@T["instances.removeBackupFirstArchive"]</div>
+                    }
+                    else
+                    {
+                        <div class="help">@T["instances.removeBackupFirstOutdated"]</div>
+                    }
                 }
             </div>
         </div>

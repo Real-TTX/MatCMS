@@ -37,6 +37,11 @@ public class DetailsModel : PageModel
     /// <summary>This instance's backups, newest first.</summary>
     public List<CloudBackup> Backups { get; private set; } = new();
 
+    /// <summary>The backup that answers the outstanding request, if one has arrived. Shown instead of
+    /// "we asked", because those are two different facts and only one of them means the data is
+    /// safe.</summary>
+    public CloudBackup? RequestedBackup { get; private set; }
+
     public Instance Item { get; private set; } = new();
     public List<InstanceEvent> Events { get; private set; } = new();
     public List<Profile> Profiles { get; private set; } = new();
@@ -79,6 +84,12 @@ public class DetailsModel : PageModel
     {
         if (view is not null) ContextSwitcher.Remember(HttpContext, view);
         if (!await LoadAsync(id)) return RedirectToPage("Index");
+
+        if (Item.BackupRequestId > 0)
+            RequestedBackup = await _db.CloudBackups.AsNoTracking()
+                .Where(b => b.InstanceId == Item.Id && b.RequestId == Item.BackupRequestId)
+                .OrderByDescending(b => b.UploadedAt)
+                .FirstOrDefaultAsync();
 
         Backups = await _db.CloudBackups.AsNoTracking()
             .Where(b => b.InstanceId == id)
@@ -148,6 +159,39 @@ public class DetailsModel : PageModel
 
     /// <summary>Looks the backup up WITHIN this instance. Taking the id on its own would let a wrong
     /// or crafted id act on another instance's backup from a page that claims to be about this one.</summary>
+    /// <summary>
+    /// Asks the instance for a fresh backup, here and now. Independent of any removal: the cloud
+    /// holding the disk should be able to fetch a copy when it wants one, and the removal way is a
+    /// USER of this rather than the only reason for it.
+    /// <para>Nothing is removed, nothing is scheduled — the request stands on its own and the answer
+    /// simply appears in the backup list.</para>
+    /// </summary>
+    public async Task<IActionResult> OnPostRequestBackupAsync(int id)
+    {
+        var item = await _db.Instances.FirstOrDefaultAsync(i => i.Id == id);
+        if (item is null) return RedirectToPage("Index");
+
+        if (item.Status != InstanceStatus.Approved)
+        {
+            TempData["FlashError"] = "Eine nicht freigegebene Instanz wird nicht um ein Backup gebeten.";
+            return RedirectToPage(new { id });
+        }
+        // A request that is already outstanding is left alone. Bumping it would make the instance
+        // start over, and the work already under way would answer an id nobody waits for any more.
+        if (item.BackupRequestId > 0 && item.BackupRequestError is null && item.RemovalPending)
+        {
+            TempData["FlashError"] = "Für diese Instanz läuft bereits eine Anforderung.";
+            return RedirectToPage(new { id });
+        }
+
+        await _instances.RequestBackupAsync(item);
+        _instances.Log(item, InstanceEventKind.BackupRequested,
+            "Backup in der Cloud angefordert — die Instanz holt es beim nächsten Kontakt.");
+        await _db.SaveChangesAsync();
+        TempData["Flash"] = "Backup angefordert. Es trifft beim nächsten Kontakt der Instanz ein.";
+        return RedirectToPage(new { id });
+    }
+
     private Task<CloudBackup?> OwnBackupAsync(int instanceId, int backupId) =>
         _db.CloudBackups.FirstOrDefaultAsync(b => b.Id == backupId && b.InstanceId == instanceId);
 

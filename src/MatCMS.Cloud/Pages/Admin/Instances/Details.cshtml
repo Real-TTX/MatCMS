@@ -74,6 +74,36 @@
             </div>
         </div>
     }
+    @if (Model.Item.BackupRequestId > 0)
+    {
+        <div class="card">
+            <h2>@T["instances.backupRequest"]</h2>
+            <div class="kv">
+                <div class="kv-label">@T["instances.backupRequestedAt"]</div>
+                <div class="kv-value">@(Model.Item.BackupRequestedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm"))</div>
+            </div>
+            <div class="kv">
+                <div class="kv-label">@T["instances.backupRequestState"]</div>
+                <div class="kv-value">
+                    @if (Model.RequestedBackup is not null)
+                    {
+                        <span class="badge badge-on">@T["instances.removeWaitingArrived"]</span>
+                        <span class="mono">@Model.RequestedBackup.FileName</span>
+                    }
+                    else if (Model.Item.BackupRequestError is not null)
+                    {
+                        <span class="badge badge-err">@T["instances.backupRequestFailed"]</span>
+                        <span class="muted">@Model.Item.BackupRequestError</span>
+                    }
+                    else
+                    {
+                        <span class="badge badge-new">@T["instances.removeWaitingOpen"]</span>
+                    }
+                </div>
+            </div>
+            <div class="help">@T["instances.backupRequestHint"]</div>
+        </div>
+    }
     <div class="card">
         <h2>@T["instances.state"]</h2>
         <div class="kv">
@@ -500,6 +530,12 @@
         <div class="page-head">
             <h2>@T["backups.title"]</h2>
             <div class="list-toolbar">
+                @* Ein Backup lässt sich jederzeit anfordern, ohne dass irgendetwas entfernt wird: Die
+                   Cloud hält die Platte und darf sich eine Kopie holen, wenn sie eine will. Der
+                   Entfernen-Weg benutzt dasselbe, ist aber nicht der Grund dafür. *@
+                <form class="inline-form" method="post" asp-page-handler="RequestBackup" asp-route-id="@Model.Item.Id">
+                    <button type="submit" class="btn btn-sm">@T["instances.requestBackup"]</button>
+                </form>
                 <a class="btn btn-sm btn-ghost" asp-page="/Admin/Backups/Index" asp-route-instance="@Model.Item.Id" asp-route-tab="list">@T["backups.manage"]</a>
             </div>
         </div>

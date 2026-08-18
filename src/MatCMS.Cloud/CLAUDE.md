@@ -327,7 +327,9 @@ DataProtection), sent as an `X-MatCMS-Instance-Token` header.
 - **Heartbeat** (~60 s) — *implemented*: `POST /api/instances/{publicId}/heartbeat`, contract in
   `../MatCMS.Shared/CloudProtocol.cs`. Carries app version, protocol version, host name, container id,
   image ref and content counts; the response carries the latest release, `UpdateAvailable`,
-  `CloudCanUpdate` and (reserved, always empty) `PendingSync`. An instance counts as **offline**
+  `CloudCanUpdate`, a `PendingRestore` and a `PendingBackup`. The last two are mirrors of each
+  other: the cloud only ever ASKS, and the instance fetches or produces the file itself. An instance
+  counts as **offline**
   after `InstanceService.OfflineAfter` (150 s ≈ 2.5 missed beats). Bump
   `InstanceService.CurrentProtocolVersion` whenever the contract changes — older instances are
   badged *veraltet*. `POST /api/instances/{publicId}/disconnect` marks an instance offline at once
@@ -620,9 +622,13 @@ What each mode can do:
 
 ### Removing an instance — who owns the container
 
-`Instances/Delete` is the only way out. It offers **two destructive ways** (remove the container and
-keep the volumes / remove both) and, for everything else, plain **unregistering**: the cloud forgets
-the instance and the site keeps running.
+`Instances/Delete` is the only way out. It offers **three destructive ways** (remove the container and
+keep the volumes / remove both / take a backup first and then remove both) and, for everything else,
+plain **unregistering**: the cloud forgets the instance and the site keeps running.
+
+The removing itself is **not** in the page: it is `Services/InstanceRemovalService.cs`, because the
+third way is finished minutes later by `InstanceMonitorService` and two implementations of "delete a
+customer's site" would be two chances to get the guards subtly different.
 
 **`Hosting == Local` does NOT mean "ours".** Local only says the container sits on the daemon we can
 reach, which is equally true of a site somebody started by hand next to us. The answer is
@@ -651,12 +657,49 @@ Cloud-side backups hang off the instance row and **cascade with it on every way*
 that keeps the volumes — so the page says how many will go. The files themselves stay behind as
 orphans for `BackupStore.FindOrphansAsync`.
 
-**Not built: the third way, "take a backup first, then remove."** It needs a backup REQUEST on the
-heartbeat (the mirror of `PendingRestore`, so a `CloudProtocol.Version` bump and a change in both
-apps) plus something that completes the removal once the upload has actually arrived — the gate being
-`CloudBackup.UploadedAt` later than the moment we asked, never "we asked". It is deliberately not
-offered rather than half-offered: a menu entry whose removal fires before the backup landed is worse
-than a missing one.
+### The third way: back up first, then remove
+
+Confirmed now, carried out later. `ScheduleWithBackupAsync` only asks the instance for a backup and
+records `Instance.PendingRemovalMode`; `InstanceMonitorService` finishes the job on a later tick.
+
+**The gate is the FILE, and nothing else.** `InstanceService.ArrivedBackupAsync` asks for a
+`CloudBackup` row carrying the id of *this* request whose bytes are on our disk. Three near-misses
+that all look like an answer and are not:
+
+- *"We asked."* Obviously not enough, and the reason this way did not exist before.
+- *"The instance reported success."* The upload is a separate request that can still fail afterwards.
+  `BackupReport` is recorded for the operator to read and is never what the removal decides on.
+- *"A backup arrived after we asked."* A site that was offline for a week uploads last week's file the
+  moment it returns. Hence `PendingBackup.RequestId`, echoed on the upload in
+  `CloudProtocol.BackupRequestHeader` and stored as `CloudBackup.RequestId`. A counter, not a
+  timestamp: it survives JSON, an HTTP header and two SQLite round trips as itself.
+
+**There is no deadline, and there must never be one.** Nothing turns the wait into a removal after
+some period — that would be the exact accident the way exists to prevent. It ends when the backup
+arrives or when an operator takes it back (`CancelPendingAsync`, always available). What the clock
+does instead is *tell somebody*: after `InstanceRemovalService.WaitNoticeAfter` (6 h) the operator
+gets one mail saying the removal has not happened and why. A reported failure ends the request
+outright rather than being re-asked every beat — a backup takes minutes and holds up the site's
+heartbeat while it runs.
+
+**The backup survives the removal, or the removal does not happen.** This is the trap that would have
+made the whole way pointless: the backup it just took hangs off the instance row and would cascade
+away with it. So the file is lifted into `ArchivedBackup` — a table with **no foreign key**, which
+therefore cannot be cascaded — and the bytes move to `appdata/backups-archive/<id>/`, a *sibling* of
+the live folder so neither the quota pruner nor the orphan finder can reach them. Nothing prunes the
+archive. If archiving fails, nothing is removed. Found afterwards under **Backups → Archiv**, with the
+former instance's name, its public id and the reason. Only that one backup is kept; the instance's
+others go the way they go on every other route, and the page says so.
+
+**The request is silenced by the file too.** `HeartbeatAsync` asks `ArrivedBackupAsync` before it
+offers `PendingBackup` again. Without that the request stands in every response and the instance
+builds a fresh backup every minute — fifteen of them in fifteen minutes, which is how it was found.
+Deliberately the same question that releases the removal, so there are never two opinions about
+whether a backup exists; it also makes it self-healing, because a file that disappears is asked for
+again.
+
+A backup can also be requested on its own, from the instance's Backup tab, with no removal attached.
+That is the ordinary use — the removal way is a *user* of it, not the reason for it.
 
 ## Backlog
 

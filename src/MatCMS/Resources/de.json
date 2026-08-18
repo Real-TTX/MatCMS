@@ -104,6 +104,7 @@
   "components.type.image": "Bild",
   "components.type.url": "URL/Link",
   "components.preview": "Live-Vorschau",
+  "components.previewNote": "Nur Ansicht — Klicks bleiben ohne Wirkung.",
   "components.sampleData": "Testdaten (nur für die Vorschau, wird nicht gespeichert)",
   "components.debug": "Debug",
   "components.dbgPlaceholders": "Platzhalter im Template",

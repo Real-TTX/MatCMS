@@ -127,6 +127,10 @@
                    Zeilen, die dasselbe sagten. *@
                 <div class="pf-menu">
                     <span class="pf-menu-file">@Model.Labels.Preview</span>
+                    @* Ein Klick in der Vorschau tut nichts — das steht EINMAL hier und nicht als
+                       Meldung bei jedem Klick. Wer den Satz gelesen hat, wundert sich nicht mehr;
+                       wer ihn nicht braucht, wird nicht bei jedem Versuch aufgehalten. *@
+                    <span class="muted">@Model.Labels.PreviewNote</span>
                     <button type="button" class="pf-menu-item" id="cp-debug-toggle" style="margin-left:auto;">@Model.Labels.Debug</button>
                 </div>
                 <iframe id="cp-frame" class="cp-frame" title="@Model.Labels.Preview"></iframe>

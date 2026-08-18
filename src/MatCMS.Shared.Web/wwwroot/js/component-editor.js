@@ -50,6 +50,9 @@
     var debugEl = document.getElementById("cp-debug");
     var debugToggle = document.getElementById("cp-debug-toggle");
     var samples = {};
+    // Ob das nächste Laden des Rahmens von UNS kommt (ein neu gesetztes srcdoc) oder vom Inhalt
+    // selbst. Siehe den Wächter weiter unten.
+    var expectLoad = false;
 
     function slug(s) {
         return (s || "").trim().toLowerCase()
@@ -186,12 +189,43 @@
             "font-family:" + bodyFont + ",system-ui,sans-serif}";
     }
 
+    // Die Vorschau ist zum ANSEHEN da, nicht zum Bedienen. Abgeschottet wird deshalb der RAHMEN und
+    // nicht der einzelne Klick: sandbox="" nimmt dem Vorschaudokument alles, womit es irgendwohin
+    // gelangen könnte — Skripte (location = …, window.open), <meta refresh>, Formulare samt
+    // Absendeknopf, das Navigieren des Editorfensters (target="_top"/"_parent") und jedes Fenster,
+    // das der Inhalt selbst öffnen will (target="_blank"). Ein Klick-Abfangen im Skript hätte nur
+    // gegriffen, woran jemand gedacht hat, und gar nicht bei dem, was der Vorschauinhalt VON SELBST
+    // tut.
+    // WAS ÜBRIG BLEIBT, und zwar bewusst: Strg-Klick und mittlere Maustaste. Die öffnet der BROWSER
+    // in einem neuen Reiter, nicht das Dokument — der Sandkasten greift dort nicht, und alles, was
+    // es noch verhindern könnte (href umschreiben, pointer-events: none), kostet Darstellung. Der
+    // Editor und die Vorschau bleiben dabei unberührt: es geht nichts verloren, es kommt nur ein
+    // Reiter dazu.
+    // Es hat einen zweiten Grund: ohne sandbox liegt srcdoc im Ursprung des Admin — die eingegebene
+    // Vorlage konnte per Skript an parent.document und damit an die Sitzung.
+    // WARUM DAS SKRIPT das Merkmal setzt und nicht das Markup: die Kachelseite
+    // (Admin/ComponentPreview) schreibt ihren Rahmen selbst und dürfte es sonst vergessen — hier
+    // hängt es an dem einen Renderer, den beide Seiten benutzen.
+    function seal() {
+        if (frame.getAttribute("sandbox") === null) frame.setAttribute("sandbox", "");
+    }
+
     function renderPreview() {
         if (!frame) return;
         var fields = collect();
         var tpl = templateValue();
         var out = substitute(tpl, fields);
+        seal();
+        expectLoad = true;
         frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8">' +
+            // Was der Sandkasten NICHT verhindert, ist der Verweis, der den Rahmen SELBST woandershin
+            // trägt — genau der gemeldete Fehler: nach einem Klick stand die ganze Website in der
+            // Vorschau. <base target="_blank"> schickt jeden Verweis ohne eigenes Ziel in ein neues
+            // Fenster, und genau das verbietet der Sandkasten mangels allow-popups. Der Klick
+            // verläuft also ins Leere, OHNE am Inhalt etwas zu ändern: ein umgeschriebenes href
+            // hätte a:link, a:hover und jede a[href]-Regel verloren, und die Vorschau soll aussehen
+            // wie das Ergebnis.
+            '<base target="_blank">' +
             // Die Stilvorlage der öffentlichen Seite liegt in der geteilten Razor-Klassenbibliothek;
             // /css/site.css antwortete seither mit 404 und die Vorschau stand ungestylt da — sie
             // zeigte also gerade NICHT, wie der Block auf der Website aussieht.
@@ -263,6 +297,19 @@
             window.addEventListener("load", hookCodeMirror);
         }
     }
+    // Der Wächter — der Gurt hinter dem Sandkasten. Ein Ziel bleibt übrig, das keine der beiden
+    // Sperren erfasst: target="_self" trägt den Rahmen ohne neues Fenster woandershin. Statt jede
+    // solche Möglichkeit aufzuzählen (die Liste ist nie fertig), wird das ERGEBNIS geprüft: lädt der
+    // Rahmen etwas, das nicht von uns gesetzt wurde, steht sofort wieder die Vorschau darin.
+    // Der Editor selbst bleibt davon unberührt — der Sandkasten sorgt dafür, dass die Seite ihren
+    // Platz gar nicht erst verlässt, hier geht es nur um den Inhalt des Rahmens.
+    if (frame) {
+        frame.addEventListener("load", function () {
+            if (expectLoad) { expectLoad = false; return; }
+            renderPreview();
+        });
+    }
+
     if (debugToggle && debugEl) {
         debugToggle.addEventListener("click", function () {
             debugEl.hidden = !debugEl.hidden;

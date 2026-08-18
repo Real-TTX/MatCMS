@@ -22,6 +22,10 @@ namespace MatCMS.Shared.Web;
 /// <param name="SampleData">Line above the sample inputs — it has to say that these values are for
 /// looking at and are NOT saved.</param>
 /// <param name="Preview">Names the preview pane and the frame (its accessible title).</param>
+/// <param name="PreviewNote">One short line next to that name: the preview is for looking at, clicks
+/// in it do nothing. It is stated ONCE, in the menu bar, rather than as a message on every click —
+/// the frame is sandboxed, so a link or a submit button in a component simply has no effect, and
+/// without this line that reads as a broken editor.</param>
 /// <param name="Debug">Caption of the switch that opens the placeholder/output panel.</param>
 /// <param name="Remove">Title of the trash button on a field row. The SCRIPT writes this one, not
 /// the markup — the rows are built in JavaScript.</param>
@@ -37,7 +41,7 @@ public sealed record ComponentEditorLabels(
     string Name, string Type, string TypeHelp, string Description,
     string FieldsHelp, string AddField,
     string TemplateLabel, string TemplateHelp,
-    string SampleData, string Preview, string Debug,
+    string SampleData, string Preview, string PreviewNote, string Debug,
     string Remove, string DbgPlaceholders, string DbgUnknown,
     string DbgUnused, string DbgOutput, string DbgOk, string DbgEmpty);
 

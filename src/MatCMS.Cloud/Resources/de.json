@@ -93,6 +93,7 @@
   "profiles.addField": "Feld",
   "profiles.placeholderHelp": "Platzhalter je Feld:",
   "profiles.livePreview": "Live-Vorschau",
+  "profiles.previewNote": "Nur Ansicht — Klicks bleiben ohne Wirkung.",
   "profiles.debug": "Debug",
   "profiles.sampleData": "Testdaten (nur für die Vorschau, wird nicht gespeichert)",
   "profiles.fieldText": "Text",

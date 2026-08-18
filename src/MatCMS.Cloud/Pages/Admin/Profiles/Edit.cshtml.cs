@@ -193,6 +193,12 @@ public class EditModel : PageModel
     public List<ProfileSetting> OtherSettings =>
         Settings.Where(s => !ProfileService.IsGroupKey(s.Key)).OrderBy(s => s.Key).ToList();
 
+    /// <summary>The backup policy as stored, or the defaults — so the tab opens on something sensible
+    /// rather than on zeroes nobody would want rolled out.</summary>
+    public BackupSchedule BackupPolicy { get; private set; } = new();
+
+    public bool BackupToCloud { get; private set; }
+
     public async Task<IActionResult> OnGetAsync(int id)
     {
         if (!await LoadAsync(id)) return RedirectToPage("Index");
@@ -207,6 +213,8 @@ public class EditModel : PageModel
 
         Item = profile;
         Settings = await _db.ProfileSettings.AsNoTracking().Where(s => s.ProfileId == id).ToListAsync();
+        BackupPolicy = BackupSchedule.Parse(Settings.FirstOrDefault(s => s.Key == BackupSchedule.ScheduleKey)?.Value);
+        BackupToCloud = Settings.FirstOrDefault(s => s.Key == BackupSchedule.ToCloudKey)?.Value == "1";
         Users = await _db.ProfileUsers.AsNoTracking().Where(u => u.ProfileId == id).OrderBy(u => u.Username).ToListAsync();
         // Never load the bundle blobs for a listing — a few plugins with assets would drag megabytes
         // through memory on every page render for nothing.
@@ -401,6 +409,77 @@ public class EditModel : PageModel
         var code = await _profiles.RotateJoinCodeAsync(profile);
         TempData["Flash"] = $"Neuer Join-Code: {code}";
         return RedirectToPage(new { id, tab = "general" });
+    }
+
+    // --- Backup payload -----------------------------------------------------
+
+    /// <summary>
+    /// Saves the backup policy. Its own handler, and therefore its own form: every tab on this page
+    /// posts only its own fields, so saving on Allgemein cannot carry a stale — or empty — copy of
+    /// the backup values along with it.
+    /// <para>This used to be a page of its own whose save button reached back into the form with
+    /// <c>form="editor-form"</c>, because the "Aus Profil entfernen" form could not be nested inside
+    /// the editor. As a tab the two forms are plain siblings, so nothing has to sit outside the form
+    /// it belongs to — a field that does would not be submitted at all and would arrive here empty.</para>
+    /// </summary>
+    public async Task<IActionResult> OnPostBackupAsync(
+        int id, bool enabled, int intervalHours, int retain,
+        bool templates, bool pages, bool menus, bool settings, bool submissions, bool forms, bool assets,
+        bool plugins, bool pluginAssets, bool toCloud)
+    {
+        var profile = await _db.Profiles.FindAsync(id);
+        if (profile is null) return RedirectToPage("Index");
+
+        // Saving this tab is what puts the group into the profile; the row's delete is what takes it
+        // out again. That decision is not a checkbox halfway down the form.
+        profile.SyncBackup = true;
+
+        var cfg = new BackupSchedule
+        {
+            Enabled = enabled,
+            // Clamped rather than trusted: the instance runs `Math.Max(1, IntervalHours)` anyway, so a
+            // zero here would silently become hourly on every site instead of what was typed.
+            IntervalHours = Math.Clamp(intervalHours, 1, 24 * 30),
+            Retain = Math.Clamp(retain, 1, 100),
+            Templates = templates, Pages = pages, Menus = menus, Settings = settings,
+            Submissions = submissions, Forms = forms, Assets = assets, Plugins = plugins,
+            PluginAssets = pluginAssets,
+        };
+
+        await UpsertSettingAsync(id, BackupSchedule.ScheduleKey, JsonSerializer.Serialize(cfg));
+        await UpsertSettingAsync(id, BackupSchedule.ToCloudKey, toCloud ? "1" : "0");
+
+        await _db.SaveChangesAsync();
+        await _profiles.TouchAsync(id);
+        TempData["Flash"] = "Backup-Einstellungen gespeichert.";
+        return RedirectToPage(new { id, tab = "backup" });
+    }
+
+    /// <summary>Stops rolling the policy out. The stored values survive, and — more importantly —
+    /// nothing is switched off on the instances: a site that was backing itself up keeps doing so.
+    /// Taking a payload out of a profile has never meant undoing it on live sites.</summary>
+    public async Task<IActionResult> OnPostBackupRemoveAsync(int id)
+    {
+        var profile = await _db.Profiles.FindAsync(id);
+        if (profile is null) return RedirectToPage("Index");
+
+        profile.SyncBackup = false;
+        await _db.SaveChangesAsync();
+        await _profiles.TouchAsync(id);
+        TempData["Flash"] = "Backup-Einstellungen werden von diesem Profil nicht mehr ausgerollt.";
+        return RedirectToPage(new { id, tab = "settings" });
+    }
+
+    private async Task UpsertSettingAsync(int profileId, string key, string value)
+    {
+        var row = await _db.ProfileSettings.FirstOrDefaultAsync(s => s.ProfileId == profileId && s.Key == key);
+        if (row is null)
+        {
+            row = new ProfileSetting { ProfileId = profileId, Key = key };
+            _db.ProfileSettings.Add(row);
+        }
+        row.Value = value;
+        row.IsSecret = false;
     }
 
     // --- Settings payload ---------------------------------------------------

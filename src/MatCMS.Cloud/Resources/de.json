@@ -580,6 +580,8 @@
   "settings.backupQuotaHint": "Wird es mehr, fällt das älteste Backup dieser Instanz weg. Leer lassen für den Standard.",
   "profiles.backup": "Backup",
   "profiles.backupValue": "Zeitplan, Inhalt und Übertragung in die Cloud",
+  "profiles.tabBackup": "Backup",
+  "profiles.backupInactiveHint": "Wird noch nicht ausgerollt. Mit dem Speichern übernimmt dieses Profil die Backup-Einstellungen und schickt sie an seine Instanzen.",
   "profiles.backupSchedule": "Zeitplan",
   "profiles.backupEnabled": "Automatische Backups",
   "profiles.backupInterval": "Alle … Stunden",

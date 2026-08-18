@@ -13,6 +13,7 @@
 <div class="tabs" role="tablist">
     <button type="button" class="tab active" data-tab="general">@T["profiles.tabGeneral"]</button>
     <button type="button" class="tab" data-tab="settings">@T["profiles.tabSettings"]</button>
+    <button type="button" class="tab" data-tab="backup">@T["profiles.tabBackup"]</button>
     <button type="button" class="tab" data-tab="users">@T["profiles.tabUsers"]</button>
     <button type="button" class="tab" data-tab="plugins">@T["profiles.tabPlugins"]</button>
     <button type="button" class="tab" data-tab="components">@T["profiles.tabComponents"]</button>
@@ -231,11 +232,11 @@
                 @if (Model.Item.SyncBackup)
                 {
                     <tr data-search="backup sicherung zeitplan">
-                        <td><a asp-page="Backup" asp-route-profileId="@Model.Item.Id"><span class="mono">backup.*</span></a></td>
+                        <td><a asp-page="Edit" asp-route-id="@Model.Item.Id" asp-route-tab="backup"><span class="mono">backup.*</span></a></td>
                         <td class="muted">@T["profiles.backupValue"]</td>
                         <td>
                             <div class="actions">
-                                <form class="inline-form" method="post" asp-page="Backup" asp-page-handler="Remove" asp-route-profileId="@Model.Item.Id"
+                                <form class="inline-form" method="post" asp-page-handler="BackupRemove" asp-route-id="@Model.Item.Id"
                                       onsubmit="return confirm('@T["profiles.backupRemoveConfirm"]');">
                                     <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["profiles.removeFromProfile"]" aria-label="@T["profiles.removeFromProfile"]"><partial name="_IconTrash" /></button>
                                 </form>
@@ -270,9 +271,113 @@
         @* Two steps, because "which setting" and "where from" are two questions. Only SMTP has a
            global side to take from — free key/value settings exist nowhere but in the profile, so
            asking them the second question would offer an option that cannot be answered. *@
-        <partial name="_AddMenu" model='AddMenus.Settings(T, Url.Page("Setting", new { profileId = Model.Item.Id })!, Model.Item.SyncSmtp, Model.Item.SyncTranslation ? null : Url.Page("Translation", new { profileId = Model.Item.Id }), Model.Item.SyncBackup ? null : Url.Page("Backup", new { profileId = Model.Item.Id }))' />
+        <partial name="_AddMenu" model='AddMenus.Settings(T, Url.Page("Setting", new { profileId = Model.Item.Id })!, Model.Item.SyncSmtp, Model.Item.SyncTranslation ? null : Url.Page("Translation", new { profileId = Model.Item.Id }), Model.Item.SyncBackup ? null : Url.Page("Edit", new { id = Model.Item.Id, tab = "backup" }))' />
     </div>
     <partial name="_AddMenu" model='AddMenus.SmtpSource(T, Url.Page("Smtp", new { profileId = Model.Item.Id, source = "global" })!, Url.Page("Smtp", new { profileId = Model.Item.Id, source = "own" })!, Url.Page("Smtp", new { profileId = Model.Item.Id, source = "cloud" })!)' />
+</div>
+
+@* ============ BACKUP ============ *@
+@* Eigener Reiter statt eigener Seite: Backup ist ein Bereich mit Zeitplan, Inhalt und Übertragung —
+   in den Cloud-Einstellungen steht er längst als Reiter, im Profil musste man ihn über eine Zeile in
+   der Einstellungsliste suchen.
+   Alles, was gespeichert werden soll, steht INNERHALB dieses Formulars. Ein Feld daneben würde gar
+   nicht mitgeschickt und käme beim Speichern leer an — genau deshalb hing der Speichern-Knopf früher
+   per `form="editor-form"` an einem Formular, in dem er nicht stand. Als Reiter sind das Editor- und
+   das Entfernen-Formular schlichte Geschwister, und der Knopf steht dort, wo er hingehört. *@
+<div class="tab-panel" data-panel="backup" hidden>
+    <form method="post" asp-page-handler="Backup" asp-route-id="@Model.Item.Id">
+        <div class="card">
+            <h2>@T["profiles.backupSchedule"]</h2>
+            @if (!Model.Item.SyncBackup)
+            {
+                <div class="help">@T["profiles.backupInactiveHint"]</div>
+            }
+            <label class="checkbox-row">
+                <input type="checkbox" name="enabled" value="true" checked="@(Model.BackupPolicy.Enabled ? "checked" : null)" />
+                @T["profiles.backupEnabled"]
+            </label>
+            <div class="form-grid">
+                <div class="form-row">
+                    <div class="form-field">
+                        <label for="intervalHours">@T["profiles.backupInterval"]</label>
+                        <input id="intervalHours" name="intervalHours" value="@Model.BackupPolicy.IntervalHours" inputmode="numeric" />
+                        <div class="help">@T["profiles.backupIntervalHint"]</div>
+                    </div>
+                    <div class="form-field">
+                        <label for="retain">@T["profiles.backupRetain"]</label>
+                        <input id="retain" name="retain" value="@Model.BackupPolicy.Retain" inputmode="numeric" />
+                        <div class="help">@T["profiles.backupRetainHint"]</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>@T["profiles.backupContent"]</h2>
+            <label class="checkbox-row">
+                <input type="checkbox" name="templates" value="true" checked="@(Model.BackupPolicy.Templates ? "checked" : null)" />
+                @T["backup.templates"]
+            </label>
+            <label class="checkbox-row">
+                <input type="checkbox" name="pages" value="true" checked="@(Model.BackupPolicy.Pages ? "checked" : null)" />
+                @T["backup.pagesSection"]
+            </label>
+            <label class="checkbox-row">
+                <input type="checkbox" name="menus" value="true" checked="@(Model.BackupPolicy.Menus ? "checked" : null)" />
+                @T["backup.menus"]
+            </label>
+            <label class="checkbox-row">
+                <input type="checkbox" name="settings" value="true" checked="@(Model.BackupPolicy.Settings ? "checked" : null)" />
+                @T["backup.settings"]
+            </label>
+            <label class="checkbox-row">
+                <input type="checkbox" name="submissions" value="true" checked="@(Model.BackupPolicy.Submissions ? "checked" : null)" />
+                @T["backup.submissions"]
+            </label>
+            <label class="checkbox-row">
+                <input type="checkbox" name="forms" value="true" checked="@(Model.BackupPolicy.Forms ? "checked" : null)" />
+                @T["backup.formsSection"]
+            </label>
+            <label class="checkbox-row">
+                <input type="checkbox" name="assets" value="true" checked="@(Model.BackupPolicy.Assets ? "checked" : null)" />
+                @T["backup.assets"]
+            </label>
+            <label class="checkbox-row">
+                <input type="checkbox" name="plugins" value="true" checked="@(Model.BackupPolicy.Plugins ? "checked" : null)" />
+                @T["backup.plugins"]
+            </label>
+            <label class="checkbox-row">
+                <input type="checkbox" name="pluginAssets" value="true" checked="@(Model.BackupPolicy.PluginAssets ? "checked" : null)" />
+                @T["backup.pluginAssets"]
+            </label>
+            <div class="help">@T["profiles.backupContentHint"]</div>
+        </div>
+
+        <div class="card">
+            <h2>@T["profiles.backupCloud"]</h2>
+            <label class="checkbox-row">
+                <input type="checkbox" name="toCloud" value="true" checked="@(Model.BackupToCloud ? "checked" : null)" />
+                @T["profiles.backupToCloud"]
+            </label>
+            <div class="help">@T["profiles.backupToCloudHint"]</div>
+        </div>
+
+        <div class="list-actions">
+            <button type="submit" class="btn">@T["settings.save"]</button>
+        </div>
+    </form>
+
+    @* Geschwister-Formular, kein verschachteltes: ein Formular im Formular gibt es im Browser nicht,
+       und die Felder oben stehen deshalb weiterhin vollständig in ihrem eigenen. *@
+    @if (Model.Item.SyncBackup)
+    {
+        <div class="list-actions">
+            <form class="inline-form" method="post" asp-page-handler="BackupRemove" asp-route-id="@Model.Item.Id"
+                  onsubmit="return confirm('@T["profiles.backupRemoveConfirm"]');">
+                <button type="submit" class="btn btn-danger">@T["profiles.removeFromProfile"]</button>
+            </form>
+        </div>
+    }
 </div>
 
 @* ============ USERS ============ *@

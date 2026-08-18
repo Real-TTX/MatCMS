@@ -580,6 +580,8 @@
   "settings.backupQuotaHint": "Beyond it, that instance’s oldest backup is dropped. Leave empty for the default.",
   "profiles.backup": "Backup",
   "profiles.backupValue": "Schedule, contents and cloud upload",
+  "profiles.tabBackup": "Backup",
+  "profiles.backupInactiveHint": "Not rolled out yet. Saving makes this profile own the backup settings and send them to its instances.",
   "profiles.backupSchedule": "Schedule",
   "profiles.backupEnabled": "Automatic backups",
   "profiles.backupInterval": "Every … hours",

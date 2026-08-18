@@ -103,6 +103,14 @@ public class IndexModel : PageModel
     /// leaving two rows nobody can tell apart.
     /// <para><c>IsActive</c> is not part of it, in either direction: which design a site runs is a
     /// per-site decision and must not travel with a theme.</para>
+    /// <para><b>A field the JSON does not contain is not a field the JSON empties.</b> This used to
+    /// read every property with a fallback, so pasting the two-line document the input's own
+    /// placeholder invites (<c>{ "Name": "…" }</c>) wiped <c>LayoutHtml</c>, <c>CustomCss</c> and the
+    /// template parameters off an existing theme — and reported "importiert" while doing it. Refusing
+    /// such a document outright would be the worse answer: on a NEW template there is nothing to lose,
+    /// and a hand-written partial theme is a legitimate thing to paste. So a missing field leaves what
+    /// stands (on a new row: the column default, which is what the fallbacks were), and the flash
+    /// NAMES the fields it left alone — the silence was the actual damage here.</para>
     /// </summary>
     public async Task<IActionResult> OnPostImportAsync(string? templateJson)
     {
@@ -122,38 +130,61 @@ public class IndexModel : PageModel
         }
 
         var row = await _db.Templates.FirstOrDefaultAsync(t => t.Name == name);
+        var isNew = row is null;
         if (row is null)
         {
             row = new Template { Name = name };
             _db.Templates.Add(row);
         }
-        row.AccentColor = JsonImport.Text(root, "AccentColor", "#de7e11");
-        row.SecondaryColor = JsonImport.Text(root, "SecondaryColor");
-        row.HeadingFont = JsonImport.Text(root, "HeadingFont", "Geologica");
-        row.BodyFont = JsonImport.Text(root, "BodyFont", "Inter");
-        row.ButtonStyle = JsonImport.Text(root, "ButtonStyle", "solid");
-        row.HeadingColor = JsonImport.Text(root, "HeadingColor", "#010101");
-        row.TextColor = JsonImport.Text(root, "TextColor", "#1a1a1a");
-        row.BackgroundColor = JsonImport.Text(root, "BackgroundColor", "#ffffff");
-        row.AltBackground = JsonImport.Text(root, "AltBackground", "#f6f7f9");
-        row.ContainerWidth = JsonImport.Text(root, "ContainerWidth", "1180");
-        row.ButtonRadius = JsonImport.Text(root, "ButtonRadius", "0");
-        row.HeaderBackground = JsonImport.Text(root, "HeaderBackground");
-        row.HeaderTextColor = JsonImport.Text(root, "HeaderTextColor");
-        row.HeaderPadding = JsonImport.Text(root, "HeaderPadding", "16");
-        row.CustomCss = JsonImport.Text(root, "CustomCss");
-        row.CustomJs = JsonImport.Text(root, "CustomJs");
-        row.LayoutHtml = JsonImport.Text(root, "LayoutHtml");
+
+        // Every setter below runs only when the document actually carries the property; what it did
+        // not carry is collected instead. The fallbacks are still passed for the second case Has()
+        // does not cover — a property that IS there but holds the wrong JSON kind.
+        var missing = new List<string>();
+        void Str(string prop, Action<string> set, string fallback = "")
+        {
+            if (JsonImport.Has(root, prop)) set(JsonImport.Text(root, prop, fallback));
+            else missing.Add(prop);
+        }
         // Raw, not Text: these are nested blobs. Hand-written JSON writes them as real objects and
         // arrays, our own export writes them as strings — both have to arrive intact.
-        row.MenuMapJson = JsonImport.Raw(root, "MenuMapJson", "{}");
-        row.ParametersJson = JsonImport.Raw(root, "ParametersJson", "[]");
-        row.ParamValuesJson = JsonImport.Raw(root, "ParamValuesJson", "{}");
-        row.PartsJson = JsonImport.Raw(root, "PartsJson", "{}");
-        row.SchemaVersion = JsonImport.Int(root, "SchemaVersion", 1);
+        void Blob(string prop, Action<string> set, string fallback)
+        {
+            if (JsonImport.Has(root, prop)) set(JsonImport.Raw(root, prop, fallback));
+            else missing.Add(prop);
+        }
+
+        Str("AccentColor", v => row.AccentColor = v, "#de7e11");
+        Str("SecondaryColor", v => row.SecondaryColor = v);
+        Str("HeadingFont", v => row.HeadingFont = v, "Geologica");
+        Str("BodyFont", v => row.BodyFont = v, "Inter");
+        Str("ButtonStyle", v => row.ButtonStyle = v, "solid");
+        Str("HeadingColor", v => row.HeadingColor = v, "#010101");
+        Str("TextColor", v => row.TextColor = v, "#1a1a1a");
+        Str("BackgroundColor", v => row.BackgroundColor = v, "#ffffff");
+        Str("AltBackground", v => row.AltBackground = v, "#f6f7f9");
+        Str("ContainerWidth", v => row.ContainerWidth = v, "1180");
+        Str("ButtonRadius", v => row.ButtonRadius = v, "0");
+        Str("HeaderBackground", v => row.HeaderBackground = v);
+        Str("HeaderTextColor", v => row.HeaderTextColor = v);
+        Str("HeaderPadding", v => row.HeaderPadding = v, "16");
+        Str("CustomCss", v => row.CustomCss = v);
+        Str("CustomJs", v => row.CustomJs = v);
+        Str("LayoutHtml", v => row.LayoutHtml = v);
+        Blob("MenuMapJson", v => row.MenuMapJson = v, "{}");
+        Blob("ParametersJson", v => row.ParametersJson = v, "[]");
+        Blob("ParamValuesJson", v => row.ParamValuesJson = v, "{}");
+        Blob("PartsJson", v => row.PartsJson = v, "{}");
+        if (JsonImport.Has(root, "SchemaVersion")) row.SchemaVersion = JsonImport.Int(root, "SchemaVersion", 1);
+        else missing.Add("SchemaVersion");
 
         await _db.SaveChangesAsync();
-        TempData["Flash"] = $"Template \"{row.Name}\" importiert.";
+        // Only worth saying on an update: on a new template a missing field is a default, not a
+        // decision that overruled something. On an update it is the difference between "your JSON
+        // did this" and "your JSON stayed out of this", and the operator has to be able to tell.
+        TempData["Flash"] = isNew || missing.Count == 0
+            ? $"Template \"{row.Name}\" importiert."
+            : $"Template \"{row.Name}\" aktualisiert. Nicht im JSON enthalten und daher unverändert: {string.Join(", ", missing)}.";
         return RedirectToPage();
     }
 }

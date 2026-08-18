@@ -23,6 +23,20 @@ public static class JsonImport
         catch { return null; }
     }
 
+    /// <summary>
+    /// Whether the document CONTAINS the property at all — the question every reader below cannot
+    /// answer, because each of them folds "absent" and "present but unreadable" into the same
+    /// fallback. That is fine for a fresh record and wrong for an update: an importer that treats a
+    /// field the document never mentioned as "set it to the default" empties columns nobody asked it
+    /// to touch. Ask this first wherever the import may land on an EXISTING row.
+    /// </summary>
+    public static bool Has(JsonElement root, string property)
+    {
+        foreach (var candidate in Candidates(property))
+            if (root.TryGetProperty(candidate, out _)) return true;
+        return false;
+    }
+
     /// <summary>A string property, matched case-insensitively on the first character.</summary>
     public static string Text(JsonElement root, string property, string fallback = "")
     {

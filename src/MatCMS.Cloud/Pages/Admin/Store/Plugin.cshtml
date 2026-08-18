@@ -21,8 +21,15 @@
     </div>
 }
 
-@* A plugin is created by uploading a bundle, not by typing one. *@
-<form method="post" asp-page-handler="Upload" asp-route-id="@(Model.IsNew ? null : (int?)Model.Item.Id)" enctype="multipart/form-data" id="editor-form">
+@* A plugin is created by uploading a bundle, not by typing one.
+   OHNE asp-route-id, wie auf der Profilseite: die Kennung steht ohnehin schon in der Adresse und
+   wird beim Erzeugen der Ziel-URL von dort übernommen (/Admin/Store/Plugin/5?handler=Upload).
+   WARUM NICHT MEHR MITGEGEBEN: beim NEUEN Plugin war der Wert null, und ein leerer Wert erfüllt die
+   Routenbedingung {id:int?} nicht — die URL ließ sich nicht bilden, das Formular stand mit
+   action="" da und schickte an die AKTUELLE Adresse, also OHNE ?handler=Upload. Es lief damit
+   OnPostAsync(int id) mit id=0, das fand keinen Datensatz und leitete wortlos zur Store-Liste
+   zurück: ein Plugin ließ sich im Store gar nicht anlegen. Am laufenden System nachgestellt. *@
+<form method="post" asp-page-handler="Upload" enctype="multipart/form-data" id="upload-form">
     <div class="card">
         <h2>@(Model.IsNew ? T["profiles.addPlugin"] : T["profiles.pluginReplace"])</h2>
         <div class="form-field">
@@ -36,7 +43,13 @@
 
 @if (!Model.IsNew)
 {
-    <form method="post" asp-route-id="@Model.Item.Id">
+    @* Das BEARBEITEN-Formular, mit eigener Kennung: der Speichern-Knopf unten steht außerhalb (das
+       Löschen ist ein eigenes Formular, und zwei Formulare dürfen nicht ineinander stehen) und
+       findet es über form="plugin-form" — genau wie in Plugins/Edit des CMS.
+       WIE ES VORHER WAR: dieses Formular hatte gar keine Kennung, "editor-form" hing am Upload
+       darüber, und der Speichern-Knopf zeigte damit auf den Upload. Name, Version und Code waren in
+       dem abgeschickten Formular gar nicht enthalten und ließen sich hier nie speichern. *@
+    <form method="post" asp-route-id="@Model.Item.Id" id="plugin-form">
         <div class="card">
             <h2>@T["profiles.pluginEdit"]</h2>
             <p class="muted">@T["profiles.pluginEditHint"]</p>
@@ -114,7 +127,7 @@
 <div class="form-actions">
     @if (!Model.IsNew)
     {
-        <button type="submit" class="btn" form="editor-form">@T["settings.save"]</button>
+        <button type="submit" class="btn" form="plugin-form">@T["settings.save"]</button>
         <a class="btn btn-ghost" asp-page="Plugin" asp-page-handler="Download" asp-route-id="@Model.Item.Id">
             <i class="ti ti-download" aria-hidden="true"></i> @T["profiles.pluginDownload"]
         </a>

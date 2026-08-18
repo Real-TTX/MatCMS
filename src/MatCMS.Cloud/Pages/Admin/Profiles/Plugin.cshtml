@@ -14,7 +14,7 @@
 
 @* A plugin is created by uploading a bundle, not by typing one — so a new plugin shows the upload
    form and the editor only appears once there is something to edit. *@
-<form method="post" asp-page-handler="Upload" asp-route-profileId="@Model.Owner.Id" enctype="multipart/form-data" id="editor-form">
+<form method="post" asp-page-handler="Upload" asp-route-profileId="@Model.Owner.Id" enctype="multipart/form-data" id="upload-form">
     <div class="card">
         <h2>@(Model.IsNew ? T["profiles.addPlugin"] : T["profiles.pluginReplace"])</h2>
         <div class="form-field">
@@ -28,7 +28,16 @@
 
 @if (!Model.IsNew)
 {
-<form method="post" asp-route-profileId="@Model.Owner.Id" asp-route-id="@Model.Item.Id">
+@* Das BEARBEITEN-Formular, mit eigener Kennung: der Speichern-Knopf unten steht außerhalb (das
+   Löschen ist ein eigenes Formular, und zwei Formulare dürfen nicht ineinander stehen) und findet
+   es über form="plugin-form" — genau wie in Plugins/Edit des CMS.
+   WIE ES VORHER WAR: dieses Formular hatte gar keine Kennung, "editor-form" hing am Upload darüber,
+   und der Speichern-Knopf zeigte damit auf den Upload. Am laufenden System: mit leerem Dateifeld
+   brach der Browser den Klick an dessen required ab (gar kein POST), mit gewählter Datei lief
+   ?handler=Upload und ersetzte Name und Version durch die aus dem Bündel. Name, Version und Code
+   waren in dem abgeschickten Formular überhaupt nicht enthalten und ließen sich hier nie
+   speichern. *@
+<form method="post" asp-route-profileId="@Model.Owner.Id" asp-route-id="@Model.Item.Id" id="plugin-form">
     <div class="card">
         <h2>@T["profiles.pluginEdit"]</h2>
         <p class="muted">@T["profiles.pluginEditHint"]</p>
@@ -106,7 +115,7 @@
 <div class="form-actions">
     @if (!Model.IsNew)
     {
-        <button type="submit" class="btn" form="editor-form">@T["settings.save"]</button>
+        <button type="submit" class="btn" form="plugin-form">@T["settings.save"]</button>
         <a class="btn btn-ghost" asp-page="Plugin" asp-page-handler="Download"
            asp-route-profileId="@Model.Owner.Id" asp-route-id="@Model.Item.Id">
             <i class="ti ti-download" aria-hidden="true"></i> @T["profiles.pluginDownload"]

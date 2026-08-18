@@ -81,6 +81,9 @@ builder.Services.AddScoped<InstanceService>();
 builder.Services.AddScoped<ProfileService>();
 builder.Services.AddScoped<MailSpool>();
 builder.Services.AddScoped<BackupStore>();
+// Used by the confirmation page AND by the watchdog that completes a delayed removal — which is
+// exactly why it is a service and not page code.
+builder.Services.AddScoped<InstanceRemovalService>();
 // The top-bar switcher needs its list on every admin page, so the layout asks for it directly.
 builder.Services.AddScoped<ContextSwitcher>();
 builder.Services.AddScoped<HostingService>();

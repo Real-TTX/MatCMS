@@ -21,6 +21,13 @@ public class IndexModel : PageModel
     }
 
     public List<CloudBackup> Items { get; private set; } = new();
+
+    /// <summary>Backups whose instance no longer exists — the ones taken because it was about to be
+    /// removed. They belong on this page and nowhere else: an operator looking for what is still
+    /// there of a removed site looks here, not in a folder on the server.</summary>
+    public List<ArchivedBackup> Archived { get; private set; } = new();
+
+    public long ArchivedBytes { get; private set; }
     public List<Instance> Instances { get; private set; } = new();
     public List<BackupStore.Orphan> Orphans { get; private set; } = new();
 
@@ -120,7 +127,12 @@ public class IndexModel : PageModel
         }
         Items = await query.OrderByDescending(b => b.CreatedAt).ToListAsync();
 
-        ActiveTab = tab == "list" || FilteredInstance is not null ? "list" : "overview";
+        Archived = await _db.ArchivedBackups.AsNoTracking().OrderByDescending(a => a.ArchivedAt).ToListAsync();
+        ArchivedBytes = Archived.Sum(a => a.SizeBytes);
+
+        ActiveTab = tab == "archive" ? "archive"
+            : tab == "list" || FilteredInstance is not null ? "list"
+            : "overview";
 
         // Over everything, not over the filter: it answers "how much disk is this costing me".
         TotalBytes = await _db.CloudBackups.SumAsync(b => (long?)b.SizeBytes) ?? 0;
@@ -170,6 +182,33 @@ public class IndexModel : PageModel
         await _store.CancelRestoreAsync(row);
         TempData["Flash"] = "Anforderung zurückgenommen.";
         return RedirectToPage(new { instance });
+    }
+
+    /// <summary>Removes an archived backup. The only thing that ever does — nothing prunes the
+    /// archive on its own, because an archive that deletes its own contents to stay under a limit is
+    /// a hole in the one place that promised there would not be one.</summary>
+    public async Task<IActionResult> OnPostDeleteArchivedAsync(int id)
+    {
+        var row = await _db.ArchivedBackups.FirstOrDefaultAsync(a => a.Id == id);
+        if (row is null) return RedirectToPage(new { tab = "archive" });
+
+        await _store.DeleteArchivedAsync(row);
+        TempData["Flash"] = $"„{row.FileName}“ aus dem Archiv gelöscht.";
+        return RedirectToPage(new { tab = "archive" });
+    }
+
+    public async Task<IActionResult> OnGetDownloadArchivedAsync(int id)
+    {
+        var row = await _db.ArchivedBackups.AsNoTracking().FirstOrDefaultAsync(a => a.Id == id);
+        if (row is null) return RedirectToPage(new { tab = "archive" });
+
+        var path = _store.PathFor(row);
+        if (!System.IO.File.Exists(path)) return RedirectToPage(new { tab = "archive" });
+        return new PhysicalFileResult(path, "application/zip")
+        {
+            FileDownloadName = row.FileName,
+            EnableRangeProcessing = true,
+        };
     }
 
     public async Task<IActionResult> OnPostCleanOrphansAsync(int? instance)

@@ -12,6 +12,10 @@ namespace MatCMS.Cloud.Services;
 /// <item><b>Update notice</b> — a newer MatCMS release than an instance runs is mailed once per
 /// release (<see cref="Instance.UpdateNotifiedVersion"/>).</item>
 /// <item><b>Auto-update</b> — only for LOCAL instances and only when explicitly switched on.</item>
+/// <item><b>Delayed removals</b> — an instance whose removal is waiting for a backup is removed
+/// here, once the backup has actually arrived, and only then. This is also where a wait that has
+/// been running too long turns into a mail, because a removal that quietly never happens is a
+/// removal the operator believes has happened.</item>
 /// </list>
 /// Everything here is best-effort: SMTP or Docker being down must never stop the loop.
 /// </summary>
@@ -55,6 +59,7 @@ public class InstanceMonitorService : BackgroundService
         var releases = sp.GetRequiredService<ReleaseWatcher>();
         var docker = sp.GetRequiredService<DockerHostService>();
         var mail = sp.GetRequiredService<EmailService>();
+        var removals = sp.GetRequiredService<InstanceRemovalService>();
 
         var settings = await db.CloudSettings.AsNoTracking()
             .ToDictionaryAsync(s => s.Key, s => s.Value, StringComparer.OrdinalIgnoreCase, ct);
@@ -71,6 +76,12 @@ public class InstanceMonitorService : BackgroundService
         // Recipients ride along per mail: two instances on different profiles can have different
         // notification targets, so one global list at send time would be wrong.
         var pending = new List<(string subject, string body, string? recipients)>();
+
+        // --- 0) removals waiting for a backup ---------------------------------
+        // Before the loop below, and over its OWN list: a waiting instance need not be approved (it
+        // can have been rejected, or still be pending, in which case no backup will ever arrive and
+        // the wait simply goes on saying so), and it has to be looked at even while it is offline.
+        await CompleteRemovalsAsync(removals, instances, db, pending, globalRecipients, ct);
 
         foreach (var instance in all)
         {
@@ -171,6 +182,80 @@ public class InstanceMonitorService : BackgroundService
 
             var (ok, error) = await mail.SendAsync(to, subject, body);
             if (!ok) _log.LogWarning("Notification '{Subject}' could not be sent: {Error}", subject, error);
+        }
+    }
+
+    /// <summary>
+    /// Finishes the removals that were waiting for a backup — and, for the ones still waiting, makes
+    /// sure somebody eventually hears about it.
+    ///
+    /// <para><b>Nothing here has a deadline that removes anything.</b> The wait ends when the backup
+    /// arrives, or when an operator takes it back. What the clock does instead is raise a notice:
+    /// after <see cref="InstanceRemovalService.WaitNoticeAfter"/> the operator is told, once, that a
+    /// removal they confirmed has not happened, and why. That is the difference between a state that
+    /// is patient and one that is stuck — while a "for safety, remove it anyway" timer would destroy
+    /// exactly the site this way exists to protect.</para>
+    ///
+    /// <para>Recipients come from the global notification settings rather than the instance's
+    /// profile: the instance may have none, it is about to stop existing, and the person waiting on
+    /// this is the operator of the cloud rather than of the site.</para>
+    /// </summary>
+    private async Task CompleteRemovalsAsync(
+        InstanceRemovalService removals, InstanceService instances, AppDbContext db,
+        List<(string subject, string body, string? recipients)> pending,
+        string? globalRecipients, CancellationToken ct)
+    {
+        var waiting = await removals.PendingAsync(ct);
+        foreach (var instance in waiting)
+        {
+            var name = instance.Name;
+
+            // Removes only if the backup is really here. Null means "still nothing to do", which is
+            // the normal answer for as long as the wait lasts.
+            var outcome = await removals.TryCompletePendingAsync(instance, ct);
+            if (outcome is { Removed: true })
+            {
+                _log.LogWarning("Delayed removal of {Name} completed: {Message}", name, outcome.Message);
+                pending.Add((
+                    $"[MatCMS.Cloud] {name} wurde nach dem Backup entfernt",
+                    $"Das Backup der Instanz \"{name}\" ist eingetroffen und liegt im Archiv.\r\n" +
+                    $"Erst danach wurde sie entfernt.\r\n\r\n{outcome.Message}",
+                    globalRecipients));
+                continue;
+            }
+
+            // Everything below is about a wait that is still running. One mail per request, guarded
+            // by the same kind of flag as the offline alert — a notice repeated every 60 s is a
+            // notice nobody reads.
+            if (instance.BackupWaitNotified) continue;
+
+            var problem =
+                instance.PendingRemovalError is string removalError
+                    ? removalError
+                : instance.BackupRequestError is string backupError
+                    ? $"Die Instanz konnte das Backup nicht erstellen: {backupError}"
+                : instance.PendingRemovalAt is DateTime since
+                  && DateTime.UtcNow - since > InstanceRemovalService.WaitNoticeAfter
+                    ? (InstanceService.IsOnline(instance)
+                        ? "Die Instanz meldet sich, hat das angeforderte Backup aber noch nicht abgeliefert."
+                        : "Die Instanz meldet sich nicht, das angeforderte Backup kann daher nicht eintreffen.")
+                : null;
+            if (problem is null) continue;
+
+            instance.BackupWaitNotified = true;
+            instances.Log(instance, InstanceEventKind.RemovalPending,
+                $"Entfernen wartet weiterhin: {problem}");
+            await db.SaveChangesAsync(ct);
+
+            pending.Add((
+                $"[MatCMS.Cloud] Entfernen von {name} wartet weiterhin",
+                $"Das Entfernen der Instanz \"{name}\" wurde vorgemerkt, ist aber noch nicht geschehen.\r\n" +
+                $"Vorgemerkt am: {instance.PendingRemovalAt:yyyy-MM-dd HH:mm} UTC\r\n\r\n" +
+                $"{problem}\r\n\r\n" +
+                "Es wurde nichts entfernt, und es wird auch nichts entfernt, solange das Backup nicht " +
+                "hier ist. In der Cloud lässt sich das Backup erneut anfordern oder das Entfernen " +
+                "zurücknehmen.",
+                globalRecipients));
         }
     }
 }

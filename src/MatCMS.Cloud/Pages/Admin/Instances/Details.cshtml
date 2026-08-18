@@ -56,6 +56,24 @@
 
 @* ============ OVERVIEW ============ *@
 <div class="tab-panel" data-panel="overview">
+    @* Ein vorgemerktes Entfernen steht ÜBER dem Zustand, nicht darin: Die Instanz sieht sonst
+       vollkommen normal aus, und dass sie beim nächsten eintreffenden Backup verschwindet, wäre
+       nirgends zu sehen, wo man hinschaut. *@
+    @if (Model.Item.RemovalPending)
+    {
+        <div class="card">
+            <div class="kv">
+                <div class="kv-label">@T["instances.removePending"]</div>
+                <div class="kv-value">
+                    <span class="badge badge-err">@T["instances.removeWaiting"]</span>
+                </div>
+            </div>
+            <div class="help">@T["instances.removePendingHint"]</div>
+            <div class="form-actions">
+                <a class="btn btn-sm" asp-page="Delete" asp-route-id="@Model.Item.Id">@T["instances.removeTitle"]</a>
+            </div>
+        </div>
+    }
     <div class="card">
         <h2>@T["instances.state"]</h2>
         <div class="kv">
@@ -672,9 +690,10 @@
               onsubmit="return confirm('@T["instances.rotateConfirm"]');">
             <button type="submit" class="btn btn-ghost">@T["instances.rotateToken"]</button>
         </form>
-        @* Kein POST mit confirm() mehr: Entfernen hat drei verschiedene Ausgänge — abmelden,
-           Container weg, Container UND Daten weg — und welcher davon gemeint ist, kann ein
-           einzeiliger Browser-Dialog nicht fragen. Die Rückfrage ist eine eigene Seite. *@
+        @* Kein POST mit confirm() mehr: Entfernen hat vier verschiedene Ausgänge — abmelden,
+           Container weg, Container UND Daten weg, und Backup holen und dann alles weg — und welcher
+           davon gemeint ist, kann ein einzeiliger Browser-Dialog nicht fragen. Die Rückfrage ist
+           eine eigene Seite. *@
         <a class="btn btn-danger" asp-page="Delete" asp-route-id="@Model.Item.Id">@T["instances.removeTitle"]</a>
     </div>
 </div>

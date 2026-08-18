@@ -171,6 +171,12 @@
                         {
                             <span class="badge badge-off" title="@T["instances.outdatedProtocolHint"]">@T["instances.outdatedProtocol"]</span>
                         }
+                        @* Eine Instanz, die auf ihr Backup wartet, um danach zu verschwinden, darf in
+                           dieser Liste nicht aussehen wie jede andere. *@
+                        @if (i.RemovalPending)
+                        {
+                            <span class="badge badge-err" title="@T["instances.removePendingHint"]">@T["instances.removePending"]</span>
+                        }
                         @* The address, under the name: it is what tells two similarly named instances
                            apart, and a guessed one is marked so nobody reads a port mapping as a
                            configured URL. *@

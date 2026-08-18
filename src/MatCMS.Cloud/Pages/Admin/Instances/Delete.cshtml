@@ -3,8 +3,8 @@
 @{
     ViewData["Title"] = T["instances.removeTitle"];
 }
-@* Eigene Seite statt eines confirm()-Dialogs: Hier stehen drei verschiedene Wege nebeneinander, von
-   denen einer Kundendaten unwiederbringlich löscht. Ein einzeiliger Browser-Dialog kann weder den
+@* Eigene Seite statt eines confirm()-Dialogs: Hier stehen vier verschiedene Wege nebeneinander, von
+   denen zwei Kundendaten unwiederbringlich löschen. Ein einzeiliger Browser-Dialog kann weder den
    Namen der Instanz noch den betroffenen Container und Datenträger zeigen — und genau das ist das
    Einzige, was die Frage beantwortbar macht. *@
 <div class="page-head">
@@ -61,58 +61,135 @@
     </div>
 </div>
 
-<form method="post" asp-route-id="@Model.Item.Id" data-remove-form>
-    @* Die geprüfte Rückfrage, kein Auftrag: Der POST holt sein Ziel aus dem Datensatz und vom Daemon
-       und vergleicht es nur mit diesem Wert. Stimmen sie nicht überein, passiert nichts. *@
-    <input type="hidden" name="containerId" value="@Model.Target?.Id" />
-
+@if (Model.Item.RemovalPending)
+{
+    @* Der Wartezustand ist die Seite, nicht eine Zeile darauf. Solange er läuft, ist die Frage
+       "was soll geschehen?" bereits beantwortet — sie noch einmal zu stellen hieße, sie ein zweites
+       Mal beantworten zu lassen, und die zweite Antwort käme ohne Backup zum Zug. *@
     <div class="card">
-        <h2>@T["instances.removeWhat"]</h2>
-        <div class="form-field">
-            <label class="checkbox-row">
-                <input type="radio" name="mode" value="@MatCMS.Cloud.Pages.Admin.Instances.DeleteModel.ModeUnregister" checked="checked" />
-                @T["instances.removeUnregister"]
-            </label>
-            <div class="help">@T["instances.removeUnregisterHint"]</div>
+        <h2>@T["instances.removeWaiting"]</h2>
 
-            @if (Model.CanTearDown)
-            {
-                <label class="checkbox-row">
-                    <input type="radio" name="mode" value="@MatCMS.Cloud.Pages.Admin.Instances.DeleteModel.ModeKeepData" />
-                    @T["instances.removeKeepData"]
-                </label>
-                <div class="help">@T["instances.removeKeepDataHint"]</div>
-
-                <label class="checkbox-row">
-                    <input type="radio" name="mode" value="@MatCMS.Cloud.Pages.Admin.Instances.DeleteModel.ModeFull" />
-                    @T["instances.removeFull"]
-                </label>
-                <div class="help">@T["instances.removeFullHint"]</div>
-            }
+        <div class="kv">
+            <div class="kv-label">@T["instances.removeWaitingSince"]</div>
+            <div class="kv-value">@(Model.Item.PendingRemovalAt?.ToString("yyyy-MM-dd HH:mm") + " UTC")</div>
         </div>
+        <div class="kv">
+            <div class="kv-label">@T["instances.removeWaitingBackup"]</div>
+            <div class="kv-value">
+                @if (Model.ArrivedBackup is not null)
+                {
+                    <span class="badge badge-on">@T["instances.removeWaitingArrived"]</span>
+                    <span class="mono">@Model.ArrivedBackup.FileName</span>
+                }
+                else
+                {
+                    <span class="badge badge-new">@T["instances.removeWaitingOpen"]</span>
+                }
+            </div>
+        </div>
+
+        @if (Model.Item.BackupRequestError is not null)
+        {
+            <div class="kv">
+                <div class="kv-label">@T["instances.removeWaitingProblem"]</div>
+                <div class="kv-value">@Model.Item.BackupRequestError</div>
+            </div>
+        }
+        @if (Model.Item.PendingRemovalError is not null)
+        {
+            <div class="kv">
+                <div class="kv-label">@T["instances.removeWaitingProblem"]</div>
+                <div class="kv-value">@Model.Item.PendingRemovalError</div>
+            </div>
+        }
+
+        @* Der wichtigste Satz der ganzen Seite: Es gibt keine Frist, nach der doch gelöscht wird. *@
+        <div class="help">@T["instances.removeWaitingNoDeadline"]</div>
     </div>
 
     <div class="form-actions">
-        <button type="submit" class="btn btn-danger">@T["instances.removeSubmit"]</button>
-        <a class="btn btn-ghost" asp-page="Details" asp-route-id="@Model.Item.Id">@T["action.cancel"]</a>
+        @if (Model.Item.BackupRequestError is not null || Model.Item.PendingRemovalError is not null)
+        {
+            <form method="post" asp-page-handler="RetryBackup" asp-route-id="@Model.Item.Id" class="inline-form">
+                <button type="submit" class="btn">@T["instances.removeRetryBackup"]</button>
+            </form>
+        }
+        <form method="post" asp-page-handler="CancelPending" asp-route-id="@Model.Item.Id" class="inline-form">
+            <button type="submit" class="btn btn-ghost">@T["instances.removeCancelPending"]</button>
+        </form>
+        <a class="btn btn-ghost" asp-page="Details" asp-route-id="@Model.Item.Id">@T["action.back"]</a>
     </div>
-</form>
+}
+else
+{
+    <form method="post" asp-route-id="@Model.Item.Id" data-remove-form>
+        @* Die geprüfte Rückfrage, kein Auftrag: Der POST holt sein Ziel aus dem Datensatz und vom
+           Daemon und vergleicht es nur mit diesem Wert. Stimmen sie nicht überein, passiert nichts. *@
+        <input type="hidden" name="containerId" value="@Model.Target?.Id" />
 
-@* Die harmlose Antwort ist vorausgewählt, ein gedankenloser Klick meldet also nur ab. Nur der eine
-   Weg, der Daten unwiederbringlich löscht, fragt noch einmal nach — und nennt dabei den Namen, weil
-   man diese Seite aus einer Liste erreicht, in der alle Instanzen gleich aussehen. Ein Rückfrage-
-   Dialog, der bei JEDER Antwort erscheint, wird weggeklickt, bevor man ihn gelesen hat. *@
+        <div class="card">
+            <h2>@T["instances.removeWhat"]</h2>
+            <div class="form-field">
+                <label class="checkbox-row">
+                    <input type="radio" name="mode" value="@MatCMS.Cloud.Pages.Admin.Instances.DeleteModel.ModeUnregister" checked="checked" />
+                    @T["instances.removeUnregister"]
+                </label>
+                <div class="help">@T["instances.removeUnregisterHint"]</div>
+
+                @if (Model.CanTearDown)
+                {
+                    <label class="checkbox-row">
+                        <input type="radio" name="mode" value="@MatCMS.Cloud.Pages.Admin.Instances.DeleteModel.ModeKeepData" />
+                        @T["instances.removeKeepData"]
+                    </label>
+                    <div class="help">@T["instances.removeKeepDataHint"]</div>
+
+                    <label class="checkbox-row">
+                        <input type="radio" name="mode" value="@MatCMS.Cloud.Pages.Admin.Instances.DeleteModel.ModeFull" />
+                        @T["instances.removeFull"]
+                    </label>
+                    <div class="help">@T["instances.removeFullHint"]</div>
+
+                    @* Nur bei selbst angelegten Instanzen, wie die beiden Wege darüber — und die
+                       Reihenfolge steht im Hinweistext, weil genau sie den Weg ausmacht. *@
+                    <label class="checkbox-row">
+                        <input type="radio" name="mode" value="@MatCMS.Cloud.Pages.Admin.Instances.DeleteModel.ModeBackupFirst" />
+                        @T["instances.removeBackupFirst"]
+                    </label>
+                    <div class="help">@T["instances.removeBackupFirstHint"]</div>
+                    <div class="help">@T["instances.removeBackupFirstArchive"]</div>
+                }
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-danger">@T["instances.removeSubmit"]</button>
+            <a class="btn btn-ghost" asp-page="Details" asp-route-id="@Model.Item.Id">@T["action.cancel"]</a>
+        </div>
+    </form>
+
+}
+
+@* Die harmlose Antwort ist vorausgewählt, ein gedankenloser Klick meldet also nur ab. Nur die
+   beiden Wege, die Daten unwiederbringlich löschen, fragen noch einmal nach — und nennen dabei
+   den Namen, weil man diese Seite aus einer Liste erreicht, in der alle Instanzen gleich
+   aussehen. Ein Rückfrage-Dialog, der bei JEDER Antwort erscheint, wird weggeklickt, bevor man
+   ihn gelesen hat. *@
 @section Scripts {
     <script>
         (function () {
             var form = document.querySelector('[data-remove-form]');
             if (!form) return;
+            var texts = {
+                '@MatCMS.Cloud.Pages.Admin.Instances.DeleteModel.ModeFull':
+                    @Html.Raw(System.Text.Json.JsonSerializer.Serialize(T["instances.removeConfirmFull", Model.Item.Name])),
+                '@MatCMS.Cloud.Pages.Admin.Instances.DeleteModel.ModeBackupFirst':
+                    @Html.Raw(System.Text.Json.JsonSerializer.Serialize(T["instances.removeConfirmBackupFirst", Model.Item.Name]))
+            };
             form.addEventListener('submit', function (e) {
                 var picked = form.querySelector('input[name="mode"]:checked');
-                if (picked && picked.value === '@MatCMS.Cloud.Pages.Admin.Instances.DeleteModel.ModeFull'
-                    && !confirm(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(T["instances.removeConfirmFull", Model.Item.Name])))) {
-                    e.preventDefault();
-                }
+                var text = picked ? texts[picked.value] : null;
+                if (text && !confirm(text)) e.preventDefault();
             });
         })();
     </script>

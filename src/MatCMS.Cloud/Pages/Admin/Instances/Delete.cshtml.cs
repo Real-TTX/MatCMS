@@ -24,24 +24,28 @@ namespace MatCMS.Cloud.Pages.Admin.Instances;
 /// screen that hands its own answer back as the instruction is how the wrong container gets removed.
 /// If the two disagree — the site moved, the container was replaced — nothing happens and the
 /// operator is asked to look again.</para>
+///
+/// <para><b>What the page does NOT do any more is the removing.</b> That lives in
+/// <see cref="InstanceRemovalService"/>, because the third way is finished minutes later by the
+/// watchdog and two implementations of "delete a customer's site" would be two chances to get the
+/// guards subtly different.</para>
 /// </summary>
 public class DeleteModel : PageModel
 {
     private readonly AppDbContext _db;
     private readonly DockerHostService _docker;
-    private readonly ILogger<DeleteModel> _log;
+    private readonly InstanceRemovalService _removals;
 
-    public DeleteModel(AppDbContext db, DockerHostService docker, ILogger<DeleteModel> log)
+    public DeleteModel(AppDbContext db, DockerHostService docker, InstanceRemovalService removals)
     {
-        _db = db; _docker = docker; _log = log;
+        _db = db; _docker = docker; _removals = removals;
     }
 
-    // The ways, as they travel in the form. Strings rather than an enum's numbers for the same
-    // reason the sync modes are strings: a value that does not parse must fall to the harmless end,
-    // not to whatever happens to be 0.
-    public const string ModeUnregister = "unregister";
-    public const string ModeKeepData = "keep-data";
-    public const string ModeFull = "full";
+    // Re-exposed so the view can name them without reaching into the service namespace.
+    public const string ModeUnregister = InstanceRemovalService.ModeUnregister;
+    public const string ModeKeepData = InstanceRemovalService.ModeKeepData;
+    public const string ModeFull = InstanceRemovalService.ModeFull;
+    public const string ModeBackupFirst = InstanceRemovalService.ModeBackupFirst;
 
     public Instance Item { get; private set; } = new();
 
@@ -64,6 +68,10 @@ public class DeleteModel : PageModel
     /// </summary>
     public int BackupCount { get; private set; }
 
+    /// <summary>The backup that has arrived for the outstanding request, if one has. What the page
+    /// shows instead of "we asked" — because that is the whole difference this way is built on.</summary>
+    public CloudBackup? ArrivedBackup { get; private set; }
+
     public async Task<IActionResult> OnGetAsync(int id)
     {
         var item = await _db.Instances.AsNoTracking().FirstOrDefaultAsync(i => i.Id == id);
@@ -71,6 +79,14 @@ public class DeleteModel : PageModel
         Item = item;
         Target = await _docker.InspectTeardownAsync(item.ContainerId, HttpContext.RequestAborted);
         BackupCount = await _db.CloudBackups.CountAsync(b => b.InstanceId == id);
+
+        // Only interesting while something is waiting on it; asked here so the wait can say what it
+        // is actually waiting for rather than only that it is waiting.
+        if (item.RemovalPending)
+            ArrivedBackup = await _db.CloudBackups.AsNoTracking()
+                .Where(b => b.InstanceId == item.Id && b.RequestId == item.BackupRequestId)
+                .OrderByDescending(b => b.UploadedAt)
+                .FirstOrDefaultAsync();
         return Page();
     }
 
@@ -79,66 +95,67 @@ public class DeleteModel : PageModel
         var item = await _db.Instances.FirstOrDefaultAsync(i => i.Id == id);
         if (item is null) return RedirectToPage("Index");
 
+        // A removal already waiting must not be overtaken by a second answer to the same question —
+        // a double submit, or a stale tab, would otherwise remove the site without its backup.
+        if (item.RemovalPending)
+        {
+            TempData["FlashError"] = "Für diese Instanz ist bereits ein Entfernen vorgemerkt.";
+            return RedirectToPage(new { id });
+        }
+
         // Anything unrecognised is treated as the harmless way rather than guessed at. There is no
         // sensible "did you mean full removal?".
         mode = mode switch
         {
             ModeFull => ModeFull,
             ModeKeepData => ModeKeepData,
+            ModeBackupFirst => ModeBackupFirst,
             _ => ModeUnregister
         };
 
-        if (mode == ModeUnregister) return await UnregisterAsync(item);
-
-        // Everything below removes a container, so the target is resolved from the RECORD and the
-        // daemon — never from the form — and then checked against what the operator was shown.
-        var target = await _docker.InspectTeardownAsync(item.ContainerId, HttpContext.RequestAborted);
-        if (target is null)
+        var outcome = mode switch
         {
-            TempData["FlashError"] = "Zu dieser Instanz gibt es auf diesem Host keinen Container. Es wurde nichts entfernt.";
-            return RedirectToPage(new { id });
-        }
-        if (!target.CloudManaged)
-        {
-            TempData["FlashError"] = "Diese Instanz wurde nicht von dieser Cloud angelegt. Ihr Container wird nicht angefasst.";
-            return RedirectToPage(new { id });
-        }
-        if (!string.Equals(target.Id, containerId, StringComparison.Ordinal))
-        {
-            // Between the question and the answer the instance re-classified, or the page was stale.
-            // Removing something the operator was never shown is exactly what must not happen.
-            TempData["FlashError"] = "Der Container hat sich geändert, seit die Rückfrage angezeigt wurde. Es wurde nichts entfernt — bitte erneut prüfen.";
-            return RedirectToPage(new { id });
-        }
+            ModeUnregister => await _removals.UnregisterAsync(item, HttpContext.RequestAborted),
+            ModeBackupFirst => await _removals.ScheduleWithBackupAsync(item, containerId, HttpContext.RequestAborted),
+            _ => await _removals.TearDownAsync(item, mode, containerId, HttpContext.RequestAborted),
+        };
 
-        var withVolumes = mode == ModeFull;
-        _log.LogWarning("Teardown of instance {Name} ({PublicId}) requested: container {Container}, volumes {Volumes}",
-            item.Name, item.PublicId, target.Id, withVolumes ? string.Join(", ", target.Volumes) : "(kept)");
-
-        var result = await _docker.RemoveInstanceContainerAsync(target.Id, withVolumes, HttpContext.RequestAborted);
-        if (!result.Ok)
+        if (!outcome.Ok)
         {
             // The record stays. An instance whose container is still running must not vanish from the
             // list — that is how a container nobody knows about is left behind.
-            TempData["FlashError"] = result.Message;
+            TempData["FlashError"] = outcome.Message;
             return RedirectToPage(new { id });
         }
 
-        var name = item.Name;
-        _db.Instances.Remove(item);
-        await _db.SaveChangesAsync();
-        TempData["Flash"] = $"\"{name}\": {result.Message}";
-        return RedirectToPage("Index");
+        TempData["Flash"] = outcome.Message;
+        // A removal that is only PENDING keeps its page: there is a wait to look at, and being sent
+        // back to the list would read as "done".
+        return outcome.Removed ? RedirectToPage("Index") : RedirectToPage(new { id });
     }
 
-    /// <summary>The only way open to an instance the cloud did not build: forget it here and leave it
-    /// alone out there. The site keeps running; it simply stops being managed.</summary>
-    private async Task<IActionResult> UnregisterAsync(Instance item)
+    /// <summary>Asks the instance again after it refused or failed. New request id, so a late answer
+    /// to the old one cannot end this wait.</summary>
+    public async Task<IActionResult> OnPostRetryBackupAsync(int id)
     {
-        var name = item.Name;
-        _db.Instances.Remove(item);
-        await _db.SaveChangesAsync();
-        TempData["Flash"] = $"\"{name}\" wurde aus der Cloud abgemeldet. Die Website läuft unverändert weiter.";
-        return RedirectToPage("Index");
+        var item = await _db.Instances.FirstOrDefaultAsync(i => i.Id == id);
+        if (item is null) return RedirectToPage("Index");
+        if (!item.RemovalPending) return RedirectToPage(new { id });
+
+        var outcome = await _removals.RetryBackupAsync(item, HttpContext.RequestAborted);
+        TempData["Flash"] = outcome.Message;
+        return RedirectToPage(new { id });
+    }
+
+    /// <summary>The way out of the wait. Always available — it is what makes "this never times out
+    /// into a deletion" a promise instead of a trap.</summary>
+    public async Task<IActionResult> OnPostCancelPendingAsync(int id)
+    {
+        var item = await _db.Instances.FirstOrDefaultAsync(i => i.Id == id);
+        if (item is null) return RedirectToPage("Index");
+
+        var outcome = await _removals.CancelPendingAsync(item, HttpContext.RequestAborted);
+        TempData["Flash"] = outcome.Message;
+        return RedirectToPage(new { id });
     }
 }

@@ -15,6 +15,7 @@
 <div class="tabs" role="tablist">
     <button type="button" class="tab @(Model.ActiveTab == "overview" ? "active" : null)" data-tab="overview">@T["backups.tabOverview"]</button>
     <button type="button" class="tab @(Model.ActiveTab == "list" ? "active" : null)" data-tab="list">@T["backups.tabList"]</button>
+    <button type="button" class="tab @(Model.ActiveTab == "archive" ? "active" : null)" data-tab="archive">@T["backups.tabArchive"]</button>
 </div>
 
 @* ============ ÜBERSICHT ============ *@
@@ -209,6 +210,70 @@
                                     }
                                     <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@b.Id" asp-route-instance="@Model.FilteredInstance"
                                           onsubmit="return confirm('@T["backups.deleteConfirm"]');">
+                                        <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+        <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+        <div class="list-pager" data-list-pager></div>
+    </div>
+</div>
+
+@* ============ ARCHIVE ============ *@
+@* Backups, deren Instanz es nicht mehr gibt. Eigener Reiter statt einer Zeile in der Liste: Sie
+   gehören zu keiner Instanz mehr, lassen sich weder zurückspielen noch nach Instanz filtern, und in
+   der Spalte Instanz stünde ein Name, der auf nichts mehr zeigt. *@
+<div class="tab-panel" data-panel="archive" hidden="@(Model.ActiveTab == "archive" ? null : "hidden")">
+    <div data-list data-list-page-size="50">
+        <div class="page-head">
+            <div class="list-toolbar">
+                <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+            </div>
+        </div>
+
+        <p class="muted">@T["backups.archiveHint", size(Model.ArchivedBytes)]</p>
+
+        <table class="data" data-list-table>
+            <thead>
+                <tr>
+                    <th>@T["backups.file"]</th>
+                    <th>@T["backups.archiveInstance"]</th>
+                    <th>@T["backups.created"]</th>
+                    <th>@T["backups.archivedAt"]</th>
+                    <th>@T["backups.size"]</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Archived.Count == 0)
+                {
+                    <partial name="_EmptyRow" model='@T["backups.archiveNone"]' />
+                }
+                else
+                {
+                    @foreach (var a in Model.Archived)
+                    {
+                        <tr data-search="@(a.FileName + " " + a.InstanceName)">
+                            <td>
+                                <a asp-page="Index" asp-page-handler="DownloadArchived" asp-route-id="@a.Id"><strong>@a.FileName</strong></a>
+                                <div class="muted">@a.Reason</div>
+                            </td>
+                            <td>
+                                @a.InstanceName
+                                <div class="muted mono">@a.InstancePublicId</div>
+                            </td>
+                            <td class="muted">@a.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                            <td class="muted">@a.ArchivedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                            <td class="muted">@size(a.SizeBytes)</td>
+                            <td>
+                                <div class="actions">
+                                    <form class="inline-form" method="post" asp-page-handler="DeleteArchived" asp-route-id="@a.Id"
+                                          onsubmit="return confirm('@T["backups.archiveDeleteConfirm"]');">
                                         <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
                                     </form>
                                 </div>

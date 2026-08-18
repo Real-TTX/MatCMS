@@ -238,7 +238,8 @@ show the result, not just the values.
   (an in-memory value set by a middleware in MatCMS's `Program.cs`) reports where the site was last
   actually reached, so a site with no canonical URL configured still has an address here.
 - Plugins are edited **in place**: the bundle is unpacked, `plugin.json` rewritten, every other entry
-  copied byte for byte (`Repack` in `Pages/Admin/Profiles/Edit.cshtml.cs`). Repacking rather than
+  copied byte for byte (`Repack` in `Pages/Admin/Profiles/Plugin.cshtml.cs`, second copy for the store
+  in `Pages/Admin/Store/Plugin.cshtml.cs`). Repacking rather than
   storing code separately keeps ONE format on the wire — the instance still receives the exact ZIP
   its own importer expects. Verified end to end: edit here → roll out → MatCMS imports it with the
   new code and version.

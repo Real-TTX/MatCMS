@@ -147,5 +147,5 @@ public static class SettingKeys
     /// of any generic save path — the token needs encrypting, so CloudService owns these. Also the
     /// deny-list for pushed settings: a profile must never be able to rewrite the cloud link.</summary>
     public static readonly string[] Cloud =
-        [CloudUrl, CloudInstanceId, CloudToken, CloudAppliedRevision, CloudSyncError, CloudSyncReport, CloudSeeded, CloudSyncRunAt];
+        [CloudUrl, CloudPublicUrl, CloudInstanceId, CloudToken, CloudAppliedRevision, CloudSyncError, CloudSyncReport, CloudSeeded, CloudSyncRunAt];
 }

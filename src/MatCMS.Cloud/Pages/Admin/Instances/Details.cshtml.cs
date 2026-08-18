@@ -279,16 +279,10 @@ public class DetailsModel : PageModel
         return RedirectToPage(new { id });
     }
 
-    public async Task<IActionResult> OnPostDeleteAsync(int id)
-    {
-        var item = await _db.Instances.FindAsync(id);
-        if (item is null) return RedirectToPage("Index");
-
-        _db.Instances.Remove(item);
-        await _db.SaveChangesAsync();
-        TempData["Flash"] = $"Instanz \"{item.Name}\" entfernt.";
-        return RedirectToPage("Index");
-    }
+    // Das frühere OnPostDelete ist absichtlich weg. Es löschte nur die Zeile — der Container lief
+    // weiter, kannte seine Cloud noch und hinterließ Backup-Dateien ohne Datensatz. Vor allem aber
+    // war es ein zweiter, ungefragter Löschweg neben dem, der die drei Ausgänge auseinanderhält.
+    // Entfernen läuft ausschließlich über Instances/Delete.
     /// <summary>
     /// Puts given-up messages back in the queue. An operator who just fixed the mail server wants the
     /// backlog delivered, not a clean slate — so the attempt counter is reset and the worker picks

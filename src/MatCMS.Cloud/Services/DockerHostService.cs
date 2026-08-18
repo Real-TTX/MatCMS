@@ -30,6 +30,16 @@ public class DockerHostService
 
     public bool Configured => _endpoint.Length > 0;
 
+    /// <summary>
+    /// The label <see cref="HostingService"/> stamps on every container the cloud creates ITSELF.
+    /// <para>It is the only honest answer to "did we build this?". An instance that merely joined
+    /// with a code runs on somebody else's machine — or next to ours by coincidence — and finding
+    /// its container on our daemon says where it is, not who put it there. Deriving a target from
+    /// the display name instead would be a guess, and a guess is how the wrong container gets
+    /// removed.</para>
+    /// </summary>
+    public const string ManagedLabel = "matcmscloud.managed";
+
     /// <summary>Derselbe Zugang für Dienste, die den Daemon nur LESEN — etwa die Portsuche. Die
     /// Verbindung wird hier einmal aufgebaut und bei einem Fehlschlag nicht wieder versucht; das
     /// gilt dann für alle Nutzer gleichermaßen.</summary>
@@ -59,7 +69,11 @@ public class DockerHostService
     /// <summary>What the daemon knows about one container. <paramref name="PublishedPort"/> is the
     /// host port its HTTP port is mapped to, or null when nothing is published — that is what lets
     /// the cloud offer a preview URL for an instance that never reported one.</summary>
-    public sealed record ContainerInfo(string Id, string Name, string Image, string State, int? PublishedPort);
+    /// <param name="CloudManaged">True when the container carries <see cref="ManagedLabel"/>, i.e.
+    /// this cloud created it. Read from the SAME listing that decides local/remote, so it costs
+    /// nothing extra and can never disagree with it.</param>
+    public sealed record ContainerInfo(
+        string Id, string Name, string Image, string State, int? PublishedPort, bool CloudManaged = false);
 
     /// <summary>True when the daemon answers. Cheap ping, used by the settings/status UI.</summary>
     public async Task<bool> IsReachableAsync(CancellationToken ct = default)
@@ -111,7 +125,11 @@ public class DockerHostService
                 .Select(p => (int?)p.PublicPort)
                 .FirstOrDefault();
 
-            return new ContainerInfo(match.ID, name, match.Image ?? "", match.State ?? "", published);
+            var managed = match.Labels is not null
+                && match.Labels.TryGetValue(ManagedLabel, out var flag)
+                && string.Equals(flag, "true", StringComparison.OrdinalIgnoreCase);
+
+            return new ContainerInfo(match.ID, name, match.Image ?? "", match.State ?? "", published, managed);
         }
         catch (Exception ex)
         {
@@ -237,6 +255,158 @@ public class DockerHostService
         return colon > slash && colon > 0
             ? (image[..colon], image[(colon + 1)..])
             : (image, "latest");
+    }
+
+    /// <param name="Volumes">The named volumes the container actually had, as the daemon reported
+    /// them — never a name rebuilt from the instance's display name.</param>
+    public sealed record TeardownTarget(
+        string Id, string Name, string Image, IReadOnlyList<string> Volumes, bool CloudManaged);
+
+    /// <summary>
+    /// Inspects the container an instance reported and returns exactly what a teardown would touch.
+    ///
+    /// <para>This exists so the confirmation the operator sees is built from the DAEMON's answer and
+    /// nothing else. The volume name is derivable on paper — <c>HostingService</c> builds it as
+    /// <c>&lt;stack&gt;-data</c> from the display name — but the display name is editable on the
+    /// instance's own page, so re-deriving it later can name a volume that belongs to something
+    /// else entirely. Reading the mounts off the container we are about to remove cannot.</para>
+    ///
+    /// <para>Returns null when there is no such container here, which is also the honest answer for
+    /// a remote instance: nothing on this host to tear down.</para>
+    /// </summary>
+    public async Task<TeardownTarget?> InspectTeardownAsync(string? containerId, CancellationToken ct = default)
+    {
+        var client = Client;
+        if (client is null) return null;
+
+        var found = await FindContainerAsync(containerId, ct);
+        if (found is null) return null;
+
+        try
+        {
+            var info = await client.Containers.InspectContainerAsync(found.Id, ct);
+
+            // Only NAMED volumes. A bind mount belongs to the host's file system and is not ours to
+            // delete; an anonymous volume has no name to offer and goes with the container anyway.
+            var volumes = (info.Mounts ?? [])
+                .Where(m => string.Equals(m.Type, "volume", StringComparison.OrdinalIgnoreCase)
+                            && !string.IsNullOrWhiteSpace(m.Name))
+                .Select(m => m.Name)
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+
+            var managed = info.Config?.Labels is { } labels
+                          && labels.TryGetValue(ManagedLabel, out var flag)
+                          && string.Equals(flag, "true", StringComparison.OrdinalIgnoreCase);
+
+            return new TeardownTarget(info.ID, (info.Name ?? "").TrimStart('/'),
+                info.Config?.Image ?? found.Image, volumes, managed);
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(ex, "Inspecting container {Id} failed", found.Id);
+            return null;
+        }
+    }
+
+    public sealed record TeardownResult(bool Ok, string Message, IReadOnlyList<string> RemovedVolumes);
+
+    /// <summary>
+    /// Removes a container the cloud created, and — only if asked — its named volumes with it.
+    ///
+    /// <para><b>Three guards, and none of them is optional.</b> The container must still be the one
+    /// the caller inspected (<paramref name="expectedId"/> is the full id from
+    /// <see cref="InspectTeardownAsync"/>, not a name), it must carry <see cref="ManagedLabel"/>, and
+    /// it must still look like MatCMS. A container this cloud did not create is refused outright —
+    /// an instance that only joined with a code runs on somebody else's machine, and the cloud may
+    /// forget it but must never reach into it.</para>
+    ///
+    /// <para><b>The trap: <c>ContainerRemoveParameters.RemoveVolumes</c> does NOT remove named
+    /// volumes.</b> It is `docker rm --volumes`, which only clears ANONYMOUS ones — and the instance's
+    /// data volume is named (<c>&lt;stack&gt;-data</c>). Setting that flag and calling it done would
+    /// report "everything removed" while the customer's database sat there forever. The named volumes
+    /// are therefore removed one by one, explicitly, after the container is gone.</para>
+    ///
+    /// <para>The volumes are removed AFTER the container, because a volume still in use cannot be
+    /// removed and the daemon would refuse. A volume that fails anyway is reported by name rather
+    /// than swallowed: an operator who chose "remove everything" needs to know what stayed.</para>
+    /// </summary>
+    public async Task<TeardownResult> RemoveInstanceContainerAsync(
+        string expectedId, bool removeVolumes, CancellationToken ct = default)
+    {
+        var client = Client;
+        if (client is null) return new(false, "Kein Zugriff auf den Docker-Daemon.", []);
+        if (string.IsNullOrWhiteSpace(expectedId) || expectedId.Length < 12)
+            return new(false, "Kein gültiges Ziel angegeben.", []);
+
+        ContainerInspectResponse info;
+        try
+        {
+            info = await client.Containers.InspectContainerAsync(expectedId, ct);
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(ex, "Container {Id} could not be inspected for teardown", expectedId);
+            return new(false, "Der Container wurde auf dem Daemon nicht gefunden.", []);
+        }
+
+        var labels = info.Config?.Labels;
+        var image = info.Config?.Image ?? "";
+
+        if (labels is null || !labels.TryGetValue(ManagedLabel, out var flag)
+            || !string.Equals(flag, "true", StringComparison.OrdinalIgnoreCase))
+            return new(false, "Dieser Container wurde nicht von dieser Cloud angelegt und wird nicht angefasst.", []);
+
+        if (!LooksLikeMatCms(image, labels))
+            return new(false, "Dieser Container sieht nicht nach MatCMS aus und wird nicht angefasst.", []);
+
+        var volumes = removeVolumes
+            ? (info.Mounts ?? [])
+                .Where(m => string.Equals(m.Type, "volume", StringComparison.OrdinalIgnoreCase)
+                            && !string.IsNullOrWhiteSpace(m.Name))
+                .Select(m => m.Name).Distinct(StringComparer.Ordinal).ToList()
+            : [];
+
+        try
+        {
+            // Stopping first is politeness, not a requirement — Force would kill it anyway. A
+            // container that is already stopped makes this throw, which is not a failure.
+            try { await client.Containers.StopContainerAsync(info.ID, new ContainerStopParameters(), ct); }
+            catch (Exception ex) { _log.LogDebug(ex, "Container {Id} was not running", info.ID); }
+
+            await client.Containers.RemoveContainerAsync(
+                info.ID, new ContainerRemoveParameters { Force = true }, ct);
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex, "Removing container {Id} failed", info.ID);
+            return new(false, "Der Container konnte nicht entfernt werden: " + ex.Message, []);
+        }
+
+        var removed = new List<string>();
+        var failed = new List<string>();
+        foreach (var volume in volumes)
+        {
+            try
+            {
+                await client.Volumes.RemoveAsync(volume, force: false, ct);
+                removed.Add(volume);
+            }
+            catch (Exception ex)
+            {
+                _log.LogWarning(ex, "Removing volume {Volume} failed", volume);
+                failed.Add(volume);
+            }
+        }
+
+        // The container is gone either way, so this is a partial success and has to read as one:
+        // saying "removed" while the data volume is still on disk is the report that gets believed.
+        if (failed.Count > 0)
+            return new(true, $"Container entfernt. Diese Datenträger blieben stehen: {string.Join(", ", failed)}.", removed);
+
+        return new(true, removeVolumes && removed.Count > 0
+            ? $"Container und Datenträger entfernt ({string.Join(", ", removed)})."
+            : "Container entfernt.", removed);
     }
 
     /// <summary>Safety guard for the destructive path: the image name (or a compose service label)

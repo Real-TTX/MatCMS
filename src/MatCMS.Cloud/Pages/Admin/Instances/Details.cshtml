@@ -672,10 +672,10 @@
               onsubmit="return confirm('@T["instances.rotateConfirm"]');">
             <button type="submit" class="btn btn-ghost">@T["instances.rotateToken"]</button>
         </form>
-        <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@Model.Item.Id"
-              onsubmit="return confirm('@T["instances.deleteConfirm"]');">
-            <button type="submit" class="btn btn-danger">@T["common.delete"]</button>
-        </form>
+        @* Kein POST mit confirm() mehr: Entfernen hat drei verschiedene Ausgänge — abmelden,
+           Container weg, Container UND Daten weg — und welcher davon gemeint ist, kann ein
+           einzeiliger Browser-Dialog nicht fragen. Die Rückfrage ist eine eigene Seite. *@
+        <a class="btn btn-danger" asp-page="Delete" asp-route-id="@Model.Item.Id">@T["instances.removeTitle"]</a>
     </div>
 </div>
 

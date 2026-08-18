@@ -178,7 +178,7 @@ public class HostingService
 
             var labels = new Dictionary<string, string>
             {
-                ["matcmscloud.managed"] = "true",
+                [DockerHostService.ManagedLabel] = "true",
                 // Die Labels, die Compose selbst schreibt. Jede Verwaltungsoberfläche — Docker
                 // Desktop, Dockhand, Portainer — gruppiert danach, ohne von uns etwas zu wissen.
                 // Deshalb dieser Weg und nicht das API eines bestimmten Werkzeugs.

@@ -114,6 +114,22 @@ public class Instance
     /// </summary>
     public int? LocalPort { get; set; }
 
+    /// <summary>
+    /// True when the local container carries the label this cloud stamps on everything it creates
+    /// itself (<see cref="Services.DockerHostService.ManagedLabel"/>) — i.e. the cloud built this
+    /// site and owns its container and data volume.
+    ///
+    /// <para>This is the difference between "we may tear this down" and "we may only forget it".
+    /// <see cref="Hosting"/> alone does NOT answer that: local merely means the container happens to
+    /// sit on the daemon we can reach, which is also true of a site somebody started by hand next to
+    /// us. Only the label says who put it there.</para>
+    ///
+    /// <para>Re-derived on EVERY heartbeat like the other two fields, and for the same reason: a site
+    /// that moves, or a container that was replaced by hand, must fall back to "not ours" instead of
+    /// leaving the cloud holding a licence to delete something it no longer recognises.</para>
+    /// </summary>
+    public bool CloudManaged { get; set; }
+
     /// <summary>Address to show the site at: what the instance reported (or an operator typed), else
     /// the local container's published port.</summary>
     public string? PreviewUrl =>

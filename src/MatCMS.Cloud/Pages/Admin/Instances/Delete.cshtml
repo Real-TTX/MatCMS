@@ -1,0 +1,119 @@
+@page "{id:int}"
+@model MatCMS.Cloud.Pages.Admin.Instances.DeleteModel
+@{
+    ViewData["Title"] = T["instances.removeTitle"];
+}
+@* Eigene Seite statt eines confirm()-Dialogs: Hier stehen drei verschiedene Wege nebeneinander, von
+   denen einer Kundendaten unwiederbringlich löscht. Ein einzeiliger Browser-Dialog kann weder den
+   Namen der Instanz noch den betroffenen Container und Datenträger zeigen — und genau das ist das
+   Einzige, was die Frage beantwortbar macht. *@
+<div class="page-head">
+    <h1>@T["instances.removeTitle"]</h1>
+    <div class="list-toolbar">
+        <a class="btn btn-sm btn-ghost" asp-page="Details" asp-route-id="@Model.Item.Id">@T["action.back"]</a>
+    </div>
+</div>
+
+<div class="card">
+    <h2>@Model.Item.Name</h2>
+    @* Was die Cloud über das Ziel WEISS, bevor gefragt wird, was damit geschehen soll. Der
+       Datenträgername kommt aus dem Container selbst, nicht aus dem Anzeigenamen — der ist
+       änderbar, und ein daraus abgeleiteter Name kann auf etwas ganz anderes zeigen. *@
+    <div class="kv">
+        <div class="kv-label">@T["instances.hosting"]</div>
+        <div class="kv-value">
+            @if (Model.CanTearDown)
+            {
+                <span class="badge badge-on">@T["instances.removeOwn"]</span>
+            }
+            else
+            {
+                <span class="badge badge-off">@T["instances.removeForeign"]</span>
+            }
+        </div>
+    </div>
+    @if (Model.Target is not null)
+    {
+        <div class="kv">
+            <div class="kv-label">@T["instances.removeContainer"]</div>
+            <div class="kv-value"><span class="mono">@Model.Target.Name</span></div>
+        </div>
+        @if (Model.Target.Volumes.Count > 0)
+        {
+            <div class="kv">
+                <div class="kv-label">@T["instances.removeVolumes"]</div>
+                <div class="kv-value"><span class="mono">@string.Join(", ", Model.Target.Volumes)</span></div>
+            </div>
+        }
+    }
+    @if (Model.BackupCount > 0)
+    {
+        @* Gilt für JEDEN der Wege, auch für den, der die Datenträger behält — die Backups hängen am
+           Datensatz der Instanz und gehen mit ihm. Ohne diesen Satz liest sich "Datenträger behalten"
+           so, als bliebe alles erhalten. *@
+        <div class="kv">
+            <div class="kv-label">@T["instances.removeBackups"]</div>
+            <div class="kv-value">@T["instances.removeBackupsValue", Model.BackupCount]</div>
+        </div>
+    }
+    <div class="help">
+        @(Model.CanTearDown ? T["instances.removeOwnHint"] : T["instances.removeForeignHint"])
+    </div>
+</div>
+
+<form method="post" asp-route-id="@Model.Item.Id" data-remove-form>
+    @* Die geprüfte Rückfrage, kein Auftrag: Der POST holt sein Ziel aus dem Datensatz und vom Daemon
+       und vergleicht es nur mit diesem Wert. Stimmen sie nicht überein, passiert nichts. *@
+    <input type="hidden" name="containerId" value="@Model.Target?.Id" />
+
+    <div class="card">
+        <h2>@T["instances.removeWhat"]</h2>
+        <div class="form-field">
+            <label class="checkbox-row">
+                <input type="radio" name="mode" value="@MatCMS.Cloud.Pages.Admin.Instances.DeleteModel.ModeUnregister" checked="checked" />
+                @T["instances.removeUnregister"]
+            </label>
+            <div class="help">@T["instances.removeUnregisterHint"]</div>
+
+            @if (Model.CanTearDown)
+            {
+                <label class="checkbox-row">
+                    <input type="radio" name="mode" value="@MatCMS.Cloud.Pages.Admin.Instances.DeleteModel.ModeKeepData" />
+                    @T["instances.removeKeepData"]
+                </label>
+                <div class="help">@T["instances.removeKeepDataHint"]</div>
+
+                <label class="checkbox-row">
+                    <input type="radio" name="mode" value="@MatCMS.Cloud.Pages.Admin.Instances.DeleteModel.ModeFull" />
+                    @T["instances.removeFull"]
+                </label>
+                <div class="help">@T["instances.removeFullHint"]</div>
+            }
+        </div>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-danger">@T["instances.removeSubmit"]</button>
+        <a class="btn btn-ghost" asp-page="Details" asp-route-id="@Model.Item.Id">@T["action.cancel"]</a>
+    </div>
+</form>
+
+@* Die harmlose Antwort ist vorausgewählt, ein gedankenloser Klick meldet also nur ab. Nur der eine
+   Weg, der Daten unwiederbringlich löscht, fragt noch einmal nach — und nennt dabei den Namen, weil
+   man diese Seite aus einer Liste erreicht, in der alle Instanzen gleich aussehen. Ein Rückfrage-
+   Dialog, der bei JEDER Antwort erscheint, wird weggeklickt, bevor man ihn gelesen hat. *@
+@section Scripts {
+    <script>
+        (function () {
+            var form = document.querySelector('[data-remove-form]');
+            if (!form) return;
+            form.addEventListener('submit', function (e) {
+                var picked = form.querySelector('input[name="mode"]:checked');
+                if (picked && picked.value === '@MatCMS.Cloud.Pages.Admin.Instances.DeleteModel.ModeFull'
+                    && !confirm(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(T["instances.removeConfirmFull", Model.Item.Name])))) {
+                    e.preventDefault();
+                }
+            });
+        })();
+    </script>
+}

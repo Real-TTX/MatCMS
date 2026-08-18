@@ -209,7 +209,7 @@ public class InstanceRemovalService
         if (item.PendingRemovalMode is null || item.PendingRemovalError is not null) return null;
 
         // 1) The gate. Everything else in this method is downstream of this one question.
-        var backup = await _instances.ArrivedBackupAsync(item, _backups, ct);
+        var backup = await _instances.ArrivedBackupAsync(item, ct);
         if (backup is null) return null;
 
         // 2) Still the same container? Asked before the backup is moved.

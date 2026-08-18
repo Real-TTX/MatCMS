@@ -29,14 +29,16 @@ public class InstanceService
     private readonly ReleaseWatcher _releases;
     private readonly ProfileService _profiles;
     private readonly CloudContext _cloud;
+    private readonly BackupStore _backups;
 
-    public InstanceService(AppDbContext db, DockerHostService docker, ReleaseWatcher releases, ProfileService profiles, CloudContext cloud)
+    public InstanceService(AppDbContext db, DockerHostService docker, ReleaseWatcher releases, ProfileService profiles, CloudContext cloud, BackupStore backups)
     {
         _cloud = cloud;
         _db = db;
         _docker = docker;
         _releases = releases;
         _profiles = profiles;
+        _backups = backups;
     }
 
     public static bool IsOnline(Instance i) =>
@@ -241,6 +243,19 @@ public class InstanceService
 
         await _db.SaveChangesAsync(ct);
 
+        // Wird die Anforderung noch gestellt? Nur gefragt, wenn überhaupt eine offen ist — der
+        // normale Herzschlag kostet dadurch keine zusätzliche Abfrage.
+        //
+        // Das Verstummen ist der Punkt: Ohne es steht die Anforderung weiter in JEDER Antwort, und
+        // die Instanz baut im Minutentakt ein neues Backup. Genau das ist beim Prüfen passiert —
+        // fünfzehn Backups in fünfzehn Minuten für eine einzige Anforderung. Gefragt wird dieselbe
+        // Stelle, die auch das Entfernen freigibt, damit es nicht zwei Meinungen darüber gibt, ob
+        // ein Backup da ist: verschwindet die Datei wieder, wird auch wieder gefragt.
+        var wantsBackup = instance.Status == InstanceStatus.Approved
+                          && instance.BackupRequestId > 0
+                          && instance.BackupRequestError is null
+                          && await ArrivedBackupAsync(instance, ct) is null;
+
         return new HeartbeatResponse
         {
             ProtocolVersion = CurrentProtocolVersion,
@@ -265,8 +280,7 @@ public class InstanceService
             // approved is not asked to do work for us — and repeated on every beat until it is
             // answered, which is how a site that was down when we asked still hears about it.
             // An answered-with-failure request is NOT repeated: see Instance.BackupRequestError.
-            Backup = instance.Status == InstanceStatus.Approved && instance.BackupRequestId > 0
-                     && instance.BackupRequestError is null
+            Backup = wantsBackup
                 ? new PendingBackup
                 {
                     RequestId = instance.BackupRequestId,
@@ -438,7 +452,7 @@ public class InstanceService
     /// can drift apart (see <see cref="CloudBackup"/>), and of all the places to trust the table
     /// alone, the one that then deletes a customer's site is the worst.</para>
     /// </summary>
-    public async Task<CloudBackup?> ArrivedBackupAsync(Instance instance, BackupStore store, CancellationToken ct = default)
+    public async Task<CloudBackup?> ArrivedBackupAsync(Instance instance, CancellationToken ct = default)
     {
         if (instance.BackupRequestId <= 0) return null;
 
@@ -448,7 +462,7 @@ public class InstanceService
             .FirstOrDefaultAsync(ct);
         if (row is null) return null;
 
-        return File.Exists(store.PathFor(row)) ? row : null;
+        return File.Exists(_backups.PathFor(row)) ? row : null;
     }
 
     private async Task<PendingRestore?> PendingRestoreAsync(int instanceId, CancellationToken ct)

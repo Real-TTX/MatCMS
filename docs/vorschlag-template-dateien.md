@@ -100,8 +100,8 @@ Die Karte wird die Wahrheit, `LayoutHtml`/`CustomCss`/`CustomJs`/`PartsJson` ent
 - **Kostet:** die feste Feldliste steht rund ein Dutzend Mal — vier Modelle (`Template.cs`,
   `MatCMS.Cloud/Models/Profile.cs:231-268`, `Models/Store.cs:37-65`,
   `ContentTransferService.cs:1177-1201`), das Wire-DTO
-  (`src/MatCMS.Shared/CloudProtocol.cs:287-312`) und sechs Kopierstellen
-  (`Cloud/Services/ProfileService.cs:310-348`, `Cloud/Program.cs:476-499`,
+  (`src/MatCMS.Shared/CloudProtocol.cs:347-372`) und sechs Kopierstellen
+  (`Cloud/Services/ProfileService.cs:310-348`, `Cloud/Program.cs:523-545`,
   `CloudSyncService.cs:541-563`, `CloudCatalogService.cs:102-142`,
   `ContentTransferService.cs:199-211` und `:940-963`), dazu vier Importer und vier Exporter. Plus
   ein Sprung von `CloudProtocol.Version` (`CloudProtocol.cs:18`), der jede verbundene
@@ -145,7 +145,7 @@ einen zweiten Durchgang braucht — mit Tiefenbegrenzung und Zyklusschutz.
 ## Was das für die Cloud bedeutet
 
 Templates reisen als `ConfigTemplate` mit fest aufgezählten Feldern
-(`src/MatCMS.Shared/CloudProtocol.cs:287-312`); Store und Profil halten dieselben Spalten
+(`src/MatCMS.Shared/CloudProtocol.cs:347-372`); Store und Profil halten dieselben Spalten
 (`Models/Store.cs:37-65`, `Models/Profile.cs:231-268`).
 
 Die Eigenschaft, die `src/MatCMS.Cloud/CLAUDE.md` schützt — feldweise bearbeiten, damit unbekannte

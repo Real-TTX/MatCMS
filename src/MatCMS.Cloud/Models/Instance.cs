@@ -164,6 +164,64 @@ public class Instance
     /// </summary>
     public string? AutoUpdateAttemptedVersion { get; set; }
 
+    // --- A backup the cloud asked this instance to make ---------------------
+    // The mirror of the restore request, which lives on the backup row because the file it names
+    // already exists. A backup request has no row to hang on yet — the file it is asking for is the
+    // thing that does not exist — so it lives here, on the instance being asked.
+
+    /// <summary>
+    /// The outstanding backup request, or 0 for none. Bumped rather than reused, so an upload that
+    /// answers an older request can never be mistaken for an answer to the current one.
+    /// </summary>
+    public int BackupRequestId { get; set; }
+
+    /// <summary>When the cloud asked. Shown, and used to tell an operator how long a wait has been
+    /// going on — never to end one.</summary>
+    public DateTime? BackupRequestedAt { get; set; }
+
+    /// <summary>
+    /// What the instance said went wrong, if it answered at all. Set means the request is over and
+    /// failed: the cloud stops asking, says why, and offers to ask again.
+    /// <para>Stopping matters. Making a backup takes minutes and blocks the site's heartbeat while it
+    /// runs, so re-asking on every beat for something that fails every time would grind a site down
+    /// for as long as nobody looked.</para>
+    /// </summary>
+    public string? BackupRequestError { get; set; }
+
+    /// <summary>Set once the operator has been mailed that a request is still unanswered, so that
+    /// notice goes out once per request rather than once per check.</summary>
+    public bool BackupWaitNotified { get; set; }
+
+    // --- A removal waiting for that backup ----------------------------------
+
+    /// <summary>
+    /// The removal that is waiting for the backup above: <c>keep-data</c> or <c>full</c>, null for
+    /// no removal pending. A string for the same reason the sync modes are strings — a value that
+    /// does not parse must fall to the harmless end rather than to whatever happens to be 0.
+    /// <para><b>It never expires.</b> There is no age at which this turns into a deletion: the whole
+    /// point of the wait is that the backup has to be here first, and a timeout that removed the site
+    /// anyway would be exactly the accident this way exists to prevent. It is ended by the backup
+    /// arriving, or by an operator taking it back — nothing else.</para>
+    /// </summary>
+    public string? PendingRemovalMode { get; set; }
+
+    /// <summary>The container id the operator was SHOWN when they confirmed. Carried across the wait
+    /// so the check that guards the immediate ways still holds for the delayed one: between the
+    /// question and the deed the site may have moved or been rebuilt, and removing something nobody
+    /// was ever shown is what must not happen.</summary>
+    public string? PendingRemovalContainerId { get; set; }
+
+    /// <summary>When the operator confirmed the removal.</summary>
+    public DateTime? PendingRemovalAt { get; set; }
+
+    /// <summary>Why the delayed removal could not be carried out once the backup was there. Kept so
+    /// the wait ends in something visible instead of in silence.</summary>
+    public string? PendingRemovalError { get; set; }
+
+    /// <summary>True while a removal is waiting for its backup — what the list and the detail page
+    /// badge, so an instance in this state is never merely "still there".</summary>
+    public bool RemovalPending => PendingRemovalMode is not null;
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     /// <summary>True once the instance has ever checked in.</summary>

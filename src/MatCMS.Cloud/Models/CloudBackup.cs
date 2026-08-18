@@ -38,6 +38,16 @@ public class CloudBackup
     /// checked, and makes a truncated upload visible instead of silently unrestorable.</summary>
     public string Sha256 { get; set; } = "";
 
+    /// <summary>
+    /// The backup request this file answers (<see cref="Instance.BackupRequestId"/>), or 0 for one
+    /// the site made on its own schedule.
+    /// <para>This is what "the backup has arrived" means. Not "the instance said it made one" and not
+    /// "a backup turned up after we asked": a site that was offline for a week uploads last week's
+    /// file the moment it returns, and a removal that took that for its answer would delete a site
+    /// against a backup of the site as it was a week ago.</para>
+    /// </summary>
+    public int RequestId { get; set; }
+
     /// <summary>Set when an operator asked for this backup to be restored. The cloud only MARKS it —
     /// the instance picks it up on its next heartbeat and does the work itself, because nothing here
     /// ever reaches into a site.</summary>

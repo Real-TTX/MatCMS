@@ -13,6 +13,10 @@ public class AppDbContext : DbContext
     public DbSet<InstanceSyncRun> InstanceSyncRuns => Set<InstanceSyncRun>();
     public DbSet<SpooledMail> SpooledMails => Set<SpooledMail>();
     public DbSet<CloudBackup> CloudBackups => Set<CloudBackup>();
+
+    // Deliberately WITHOUT a relationship to Instance: a backup that has to survive the removal of
+    // its instance cannot hang off the row that is being removed. See ArchivedBackup.
+    public DbSet<ArchivedBackup> ArchivedBackups => Set<ArchivedBackup>();
     public DbSet<CloudSetting> CloudSettings => Set<CloudSetting>();
 
     public DbSet<Profile> Profiles => Set<Profile>();

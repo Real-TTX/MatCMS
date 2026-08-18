@@ -318,6 +318,21 @@ public class CloudService
             if (_state.ConfigRevision > 0 && _state.ConfigRevision != beat.AppliedRevision)
                 await PullAndApplyAsync(settings, ct);
 
+            // A backup the cloud asked for. BEFORE the restore below, and that order is the whole
+            // point: if the cloud asked for both in the same beat, a backup taken afterwards would
+            // preserve the state the restore just imposed — the opposite of what a backup taken
+            // before a restore is for.
+            if (answer?.Backup is { RequestId: > 0 } wanted)
+            {
+                var backups = _services.GetService<CloudBackupService>();
+                if (backups is not null)
+                {
+                    _log.LogInformation("Cloud asked for a backup ({Reason}).", wanted.Reason ?? "ohne Angabe");
+                    var (ok, error, file) = await backups.TakeAndUploadAsync(wanted, ct);
+                    await backups.ReportBackupAsync(wanted.RequestId, ok, error, file, ct);
+                }
+            }
+
             // A restore somebody asked for in the cloud. Done here rather than on a schedule of its
             // own because the heartbeat is already the channel through which this site learns what
             // is wanted of it — and because it means a restore begins within a minute of the click.

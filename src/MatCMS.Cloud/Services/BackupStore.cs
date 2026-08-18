@@ -73,9 +73,18 @@ public class BackupStore
 
     public string RootDir => Path.Combine(_env.ContentRootPath, "appdata", "backups");
 
+    /// <summary>Where archived backups live — a SIBLING of <see cref="RootDir"/>, not a folder
+    /// inside it, so the quota pruner and the orphan finder cannot reach them by walking the live
+    /// tree. Neither would understand a file that belongs to no instance.</summary>
+    public string ArchiveRootDir => Path.Combine(_env.ContentRootPath, "appdata", "backups-archive");
+
     private string DirFor(int instanceId) => Path.Combine(RootDir, instanceId.ToString());
 
     public string PathFor(CloudBackup b) => Path.Combine(DirFor(b.InstanceId), b.FileName);
+
+    /// <summary>Keyed by the archive row's own id, not by the instance's: instance ids are handed out
+    /// again, and a later instance must not inherit a folder holding a removed one's data.</summary>
+    public string PathFor(ArchivedBackup b) => Path.Combine(ArchiveRootDir, b.Id.ToString(), b.FileName);
 
     public sealed record Result(bool Ok, string? Error, CloudBackup? Backup);
 
@@ -86,7 +95,7 @@ public class BackupStore
     /// </summary>
     public async Task<Result> StoreAsync(
         Instance instance, string fileName, string origin, DateTime createdAt,
-        Stream content, CancellationToken ct = default)
+        Stream content, CancellationToken ct = default, int requestId = 0)
     {
         // The name comes from the instance, so it decides nothing about where the file lands.
         var safe = Path.GetFileName(fileName ?? "");
@@ -148,6 +157,7 @@ public class BackupStore
                 CreatedAt = createdAt == default ? DateTime.UtcNow : createdAt,
                 Origin = string.IsNullOrWhiteSpace(origin) ? "auto" : origin.Trim(),
                 Sha256 = hash,
+                RequestId = requestId,
             };
             _db.CloudBackups.Add(row);
             await _db.SaveChangesAsync(ct);
@@ -204,6 +214,77 @@ public class BackupStore
         b.RestoreRequestedAt = DateTime.UtcNow;
         b.RestoreDoneAt = null;
         b.RestoreError = null;
+        await _db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Lifts one backup out of the instance's storage and into the archive, so it survives the
+    /// removal of the instance it belongs to.
+    /// <para>Row first, file second, and the row is only kept if the bytes actually moved. The other
+    /// order would leave a "safe" archive entry pointing at a file the cascade then deleted — which
+    /// is the same loss as not archiving at all, but reported as success.</para>
+    /// </summary>
+    public async Task<ArchivedBackup?> ArchiveAsync(CloudBackup b, Instance instance, string reason, CancellationToken ct = default)
+    {
+        var source = PathFor(b);
+        if (!File.Exists(source))
+        {
+            _log.LogError("Cannot archive backup {File} of instance {Instance}: the file is gone", b.FileName, instance.Id);
+            return null;
+        }
+
+        var row = new ArchivedBackup
+        {
+            InstanceName = instance.Name,
+            InstancePublicId = instance.PublicId,
+            FileName = b.FileName,
+            SizeBytes = b.SizeBytes,
+            CreatedAt = b.CreatedAt,
+            UploadedAt = b.UploadedAt,
+            Sha256 = b.Sha256,
+            Reason = reason,
+        };
+        _db.ArchivedBackups.Add(row);
+        await _db.SaveChangesAsync(ct);           // the id is what names the folder
+
+        try
+        {
+            var target = PathFor(row);
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Move(source, target, overwrite: true);
+        }
+        catch (Exception ex)
+        {
+            // Moved nothing, so the row is a lie and goes again. The caller is expected to treat a
+            // null answer as "do not proceed" — the backup is what the removal was waiting for.
+            _log.LogError(ex, "Archiving backup {File} of instance {Instance} failed", b.FileName, instance.Id);
+            _db.ArchivedBackups.Remove(row);
+            await _db.SaveChangesAsync(ct);
+            return null;
+        }
+
+        // The live row goes; its bytes are somewhere else now. Deleting it through DeleteAsync would
+        // try to delete the file we just moved and log a warning about it.
+        _db.CloudBackups.Remove(b);
+        await _db.SaveChangesAsync(ct);
+        _log.LogInformation("Backup {File} of instance {Instance} archived as #{Id}", row.FileName, instance.Name, row.Id);
+        return row;
+    }
+
+    /// <summary>Removes an archived backup, file and row together. The only thing that ever deletes
+    /// one — nothing here prunes the archive on its own.</summary>
+    public async Task DeleteArchivedAsync(ArchivedBackup b, CancellationToken ct = default)
+    {
+        TryDelete(PathFor(b));
+        try
+        {
+            var dir = Path.GetDirectoryName(PathFor(b));
+            if (dir is not null && Directory.Exists(dir) && Directory.GetFileSystemEntries(dir).Length == 0)
+                Directory.Delete(dir);
+        }
+        catch (Exception ex) { _log.LogWarning(ex, "Could not remove the archive folder"); }
+
+        _db.ArchivedBackups.Remove(b);
         await _db.SaveChangesAsync(ct);
     }
 

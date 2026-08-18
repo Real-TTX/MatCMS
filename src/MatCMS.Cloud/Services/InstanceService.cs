@@ -259,7 +259,22 @@ public class InstanceService
             // A backup somebody asked to be restored. Only for an approved instance, and only the
             // OLDEST outstanding one — asking a site to overwrite itself twice in a row is never
             // what was meant, and the second request is still there on the next beat.
-            Restore = instance.Status == InstanceStatus.Approved ? await PendingRestoreAsync(instance.Id, ct) : null
+            Restore = instance.Status == InstanceStatus.Approved ? await PendingRestoreAsync(instance.Id, ct) : null,
+
+            // A backup the cloud asked for. Same gate as the restore — an instance that is not
+            // approved is not asked to do work for us — and repeated on every beat until it is
+            // answered, which is how a site that was down when we asked still hears about it.
+            // An answered-with-failure request is NOT repeated: see Instance.BackupRequestError.
+            Backup = instance.Status == InstanceStatus.Approved && instance.BackupRequestId > 0
+                     && instance.BackupRequestError is null
+                ? new PendingBackup
+                {
+                    RequestId = instance.BackupRequestId,
+                    Reason = instance.RemovalPending
+                        ? "Die Cloud sichert diese Website, bevor sie entfernt wird."
+                        : "Die Cloud hat ein Backup angefordert."
+                }
+                : null
         };
     }
 
@@ -395,6 +410,46 @@ public class InstanceService
         Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
     private static string? Trim(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+
+    /// <summary>
+    /// Asks the instance for a fresh backup. Bumps the id rather than reusing it, so an upload that
+    /// answers the previous request can never be read as an answer to this one — and clears the
+    /// previous outcome, so request and answer always describe the same attempt.
+    /// </summary>
+    public async Task RequestBackupAsync(Instance instance, CancellationToken ct = default)
+    {
+        instance.BackupRequestId += 1;
+        instance.BackupRequestedAt = DateTime.UtcNow;
+        instance.BackupRequestError = null;
+        instance.BackupWaitNotified = false;
+        await _db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// The backup that answers the outstanding request, or null while none has arrived.
+    ///
+    /// <para><b>This is the gate everything else hangs on.</b> It asks the one question that means
+    /// the data is safe — is the FILE here — and it asks it of the stored row, not of anything the
+    /// instance claimed. "We asked" is not an answer; "the instance said it worked" is not an answer
+    /// either, because the upload can still have failed after the report was written. Only a row
+    /// carrying this request's id, whose bytes are on our disk, is.</para>
+    ///
+    /// <para>The file is checked on disk as well as in the table. Row and file are two things that
+    /// can drift apart (see <see cref="CloudBackup"/>), and of all the places to trust the table
+    /// alone, the one that then deletes a customer's site is the worst.</para>
+    /// </summary>
+    public async Task<CloudBackup?> ArrivedBackupAsync(Instance instance, BackupStore store, CancellationToken ct = default)
+    {
+        if (instance.BackupRequestId <= 0) return null;
+
+        var row = await _db.CloudBackups
+            .Where(b => b.InstanceId == instance.Id && b.RequestId == instance.BackupRequestId)
+            .OrderByDescending(b => b.UploadedAt)
+            .FirstOrDefaultAsync(ct);
+        if (row is null) return null;
+
+        return File.Exists(store.PathFor(row)) ? row : null;
+    }
 
     private async Task<PendingRestore?> PendingRestoreAsync(int instanceId, CancellationToken ct)
     {

@@ -19,7 +19,19 @@ public enum InstanceEventKind
     /// because it is the one event here that OVERWRITES a live site, and it should be findable as
     /// such rather than buried among sync entries.</summary>
     BackupRestored = 12,
-    BackupRestoreFailed = 13
+    BackupRestoreFailed = 13,
+
+    /// <summary>The cloud asked this instance for a backup, and what came of it. Its own kind
+    /// because a removal can be waiting on exactly this — when nothing happens, this is the trail
+    /// that says whether the request went out, was answered, or was refused.</summary>
+    BackupRequested = 14,
+    BackupRequestFailed = 15,
+
+    /// <summary>A removal that is waiting for its backup, and its end. Kept apart from the request
+    /// above because "the backup arrived" and "the site was therefore removed" are two different
+    /// facts, and the second one has to be findable on its own.</summary>
+    RemovalPending = 16,
+    RemovalCancelled = 17
 }
 
 /// <summary>Audit trail per instance: what happened, and whether a notification went out for it.

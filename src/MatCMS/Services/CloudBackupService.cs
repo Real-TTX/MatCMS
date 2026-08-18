@@ -45,7 +45,7 @@ public class CloudBackupService
     /// worst moment of the day for no reason.</para>
     /// </summary>
     public async Task<(bool ok, string? error)> UploadAsync(
-        string fileName, string origin = "auto", CancellationToken ct = default)
+        string fileName, string origin = "auto", int requestId = 0, CancellationToken ct = default)
     {
         var settings = await _cloud.GetSettingsAsync();
         if (!settings.Configured) return (false, "Diese Website ist mit keiner Cloud verbunden.");
@@ -69,6 +69,10 @@ public class CloudBackupService
             req.Headers.Add("X-MatCMS-Backup-Name", info.Name);
             req.Headers.Add("X-MatCMS-Backup-Origin", origin);
             req.Headers.Add("X-MatCMS-Backup-Created", info.LastWriteTimeUtc.ToString("o"));
+            // Which request this answers, or 0 for a backup this site made on its own. The cloud
+            // gates on the ARRIVAL of a file carrying the id it asked for — see
+            // CloudProtocol.BackupRequestHeader for why "a backup arrived" is not good enough.
+            if (requestId > 0) req.Headers.Add(CloudProtocol.BackupRequestHeader, requestId.ToString());
 
             using var res = await client.SendAsync(req, ct);
             if (!res.IsSuccessStatusCode)
@@ -92,6 +96,70 @@ public class CloudBackupService
         public bool Ok { get; set; }
         public string? Error { get; set; }
         public int? Id { get; set; }
+    }
+
+    /// <summary>
+    /// Makes a backup because the cloud asked for one, and uploads it — the mirror of
+    /// <see cref="RestoreAsync"/>.
+    /// <para>The backup itself is NOT reimplemented here: <see cref="BackupManager.RunAsync"/> runs
+    /// with this site's own schedule configuration, so a requested backup contains exactly what a
+    /// scheduled one would and lands in the same folder under the same retention. A second way of
+    /// producing a backup would be a second thing to keep correct, and the one that only runs when
+    /// somebody else asks is the one nobody would notice going wrong.</para>
+    /// <para><b>The site's "send backups to the cloud" switch is deliberately not consulted.</b> That
+    /// switch decides whether this site pushes its backups out on its own; this is an explicit
+    /// request from the cloud this site is already linked to — the same cloud that may ask it to
+    /// overwrite itself with <see cref="RestoreAsync"/>. Honouring the request only when the schedule
+    /// happened to be switched on would leave the asking side waiting for ever with no way to tell
+    /// "refused" from "not answered".</para>
+    /// </summary>
+    public async Task<(bool ok, string? error, string? fileName)> TakeAndUploadAsync(
+        PendingBackup request, CancellationToken ct = default)
+    {
+        var settings = await _cloud.GetSettingsAsync();
+        if (!settings.Configured) return (false, "Diese Website ist mit keiner Cloud verbunden.", null);
+
+        string name;
+        try
+        {
+            var cfg = await _backups.GetConfigAsync();
+            name = await _backups.RunAsync(cfg, "cloud");
+            _log.LogInformation("Backup {Name} made because the cloud asked for it ({Reason}).",
+                name, request.Reason ?? "ohne Angabe");
+        }
+        catch (Exception ex)
+        {
+            // Reported rather than swallowed: on the other side something may be waiting on this
+            // file, and a failure it never hears about is indistinguishable from a site that simply
+            // went quiet.
+            _log.LogError(ex, "Making the backup the cloud asked for failed");
+            return (false, "Backup konnte nicht erstellt werden: " + ex.Message, null);
+        }
+
+        var (ok, error) = await UploadAsync(name, "cloud", request.RequestId, ct);
+        return (ok, error, name);
+    }
+
+    /// <summary>Tells the cloud what became of a backup it asked for. Best effort, and never the
+    /// thing the cloud decides on: the file either arrived or it did not.</summary>
+    public async Task ReportBackupAsync(
+        int requestId, bool ok, string? error, string? fileName, CancellationToken ct = default)
+    {
+        try
+        {
+            var settings = await _cloud.GetSettingsAsync();
+            if (!settings.Configured) return;
+
+            var client = _http.CreateClient();
+            client.DefaultRequestHeaders.Add(CloudProtocol.TokenHeader, settings.Token);
+            await client.PostAsJsonAsync(
+                $"{settings.Url}/api/instances/{settings.InstanceId}/backups/taken",
+                new BackupReport { RequestId = requestId, Ok = ok, Error = error, FileName = fileName }, ct);
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(ex, "Reporting the backup outcome failed");
+        }
     }
 
     /// <summary>

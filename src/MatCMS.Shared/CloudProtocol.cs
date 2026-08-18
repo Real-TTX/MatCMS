@@ -15,10 +15,21 @@ public static class CloudProtocol
     /// <summary>Contract version. Bump on <b>every</b> change to the payloads in this file: the cloud
     /// badges an instance reporting an older one as "veraltet", and both sides read this constant, so
     /// one edit covers both.</summary>
-    public const int Version = 10;
+    public const int Version = 11;
 
     /// <summary>Header carrying the instance's bearer token.</summary>
     public const string TokenHeader = "X-MatCMS-Instance-Token";
+
+    /// <summary>
+    /// Header on a backup upload naming the request it answers (<see cref="PendingBackup.RequestId"/>);
+    /// absent or <c>0</c> for a backup the site made on its own.
+    /// <para>A constant rather than a magic string like its neighbours, because this one is
+    /// load-bearing: it is what lets the cloud tell "the backup we asked for has arrived" from "a
+    /// backup happened to arrive". A site that was offline for a week uploads last week's file the
+    /// moment it comes back — without this header that stale upload would answer a request it never
+    /// saw, and something would then be deleted on the strength of it.</para>
+    /// </summary>
+    public const string BackupRequestHeader = "X-MatCMS-Backup-Request";
 }
 
 /// <summary>
@@ -142,6 +153,10 @@ public sealed class HeartbeatResponse
     /// way for an unknown instruction about overwriting a live site to fail.</summary>
     public PendingRestore? Restore { get; set; }
 
+    /// <summary>A backup the cloud has asked this instance to make and upload, or null. Same shape
+    /// and same reasoning as <see cref="Restore"/>: the cloud asks, the instance acts.</summary>
+    public PendingBackup? Backup { get; set; }
+
     /// <summary>True when the cloud can update this instance itself (it found the container on its
     /// own daemon).</summary>
     public bool CloudCanUpdate { get; set; }
@@ -236,6 +251,51 @@ public sealed class RestoreReport
     public int BackupId { get; set; }
     public bool Ok { get; set; }
     public string? Error { get; set; }
+}
+
+/// <summary>
+/// A backup the cloud wants this instance to MAKE and upload — the mirror of
+/// <see cref="PendingRestore"/>, and deliberately built the same way: it rides on the heartbeat, the
+/// cloud only ever asks, and the instance does the work with the code it already uses for its own
+/// backups.
+/// <para>Null is the normal case, so an instance that does not know this field yet simply never
+/// makes one. That is the right way for an unknown instruction to fail here: the cloud sees that no
+/// backup arrived, and whatever was waiting on it goes on waiting instead of proceeding without
+/// it.</para>
+/// </summary>
+public sealed class PendingBackup
+{
+    /// <summary>
+    /// Identifies THIS request. It comes back on the upload (<see cref="CloudProtocol.BackupRequestHeader"/>)
+    /// and in <see cref="BackupReport"/>, and it is the only thing that lets the cloud say "the file
+    /// we asked for is the one that arrived".
+    /// <para>A counter rather than the request's timestamp: the value survives JSON, an HTTP header
+    /// and two SQLite round trips as itself, while a time compared for equality across all of that
+    /// is a coin toss. A comparison that quietly never matches would leave every removal waiting for
+    /// ever; one that matches too eagerly would delete a site against the wrong file.</para>
+    /// </summary>
+    public int RequestId { get; set; }
+
+    /// <summary>Why the cloud is asking, in the site's own language. Written into the instance's log
+    /// so its operator can see that the cloud asked for this backup rather than the schedule.</summary>
+    public string? Reason { get; set; }
+}
+
+/// <summary>
+/// What an instance reports back after attempting a backup it was asked for.
+/// <para>A courtesy, not the gate. The cloud believes a backup exists because the FILE arrived,
+/// never because a report said so — see <see cref="PendingBackup.RequestId"/>. A report that never
+/// comes therefore costs nothing, and one claiming success while the upload failed changes
+/// nothing.</para>
+/// </summary>
+public sealed class BackupReport
+{
+    public int RequestId { get; set; }
+    public bool Ok { get; set; }
+    public string? Error { get; set; }
+
+    /// <summary>Name of the file the instance produced, for the log entry.</summary>
+    public string? FileName { get; set; }
 }
 
 public sealed class MailRequest

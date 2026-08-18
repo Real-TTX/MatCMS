@@ -358,7 +358,7 @@ app.MapPost("/api/instances/{publicId}/mail", async (
 // Uploaded as the raw request body rather than multipart: there is exactly one file, and multipart
 // would buffer it to a temp file first to give us back the stream we already had.
 app.MapPost("/api/instances/{publicId}/backups", async (
-    HttpContext ctx, string publicId, InstanceService instances, BackupStore store) =>
+    HttpContext ctx, string publicId, InstanceService instances, BackupStore store, AppDbContext db) =>
 {
     var token = ctx.Request.Headers[CloudProtocol.TokenHeader].ToString();
     var instance = await instances.AuthenticateAsync(publicId, token);
@@ -379,7 +379,19 @@ app.MapPost("/api/instances/{publicId}/backups", async (
         System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal,
         out var created);
 
-    var result = await store.StoreAsync(instance, name, origin, created, ctx.Request.Body, ctx.RequestAborted);
+    // Which request this upload answers, if any. Read here and stored on the row, because this is
+    // the ONLY moment the two facts — "these bytes arrived" and "they are the ones we asked for" —
+    // are known together.
+    _ = int.TryParse(ctx.Request.Headers[CloudProtocol.BackupRequestHeader].ToString(), out var requestId);
+
+    var result = await store.StoreAsync(instance, name, origin, created, ctx.Request.Body,
+        ctx.RequestAborted, requestId);
+    if (result.Ok && requestId > 0)
+    {
+        instances.Log(instance, MatCMS.Cloud.Models.InstanceEventKind.BackupRequested,
+            $"Angefordertes Backup \"{result.Backup?.FileName}\" ist eingetroffen.");
+        await db.SaveChangesAsync();
+    }
     // A refusal comes back as 200 with Ok=false so the instance can TELL its operator why the
     // backup did not make it — a bare 4xx gives it nothing to say.
     return Results.Ok(new { ok = result.Ok, error = result.Error, id = result.Backup?.Id });
@@ -424,6 +436,41 @@ app.MapPost("/api/instances/{publicId}/backups/restored", async (
         : MatCMS.Cloud.Models.InstanceEventKind.BackupRestoreFailed,
         report.Ok ? $"Backup \"{row.FileName}\" wurde zurückgespielt."
                   : $"Zurückspielen von \"{row.FileName}\" fehlgeschlagen: {row.RestoreError}");
+    await db.SaveChangesAsync();
+    return Results.Ok();
+}).RequireRateLimiting("instanceApi");
+
+// What the instance made of a BACKUP it was asked for. Recorded so an operator can read why nothing
+// arrived — never as the thing that decides whether one did. That question is answered by the file,
+// and only by the file (InstanceService.ArrivedBackupAsync).
+app.MapPost("/api/instances/{publicId}/backups/taken", async (
+    HttpContext ctx, string publicId, BackupReport report, InstanceService instances, AppDbContext db) =>
+{
+    var token = ctx.Request.Headers[CloudProtocol.TokenHeader].ToString();
+    var instance = await instances.AuthenticateAsync(publicId, token);
+    if (instance is null) return Results.Unauthorized();
+
+    // A report for anything other than the request currently outstanding is dropped. A late answer
+    // to a request that was already taken back, or superseded, must not put an error on the new one.
+    if (report.RequestId <= 0 || report.RequestId != instance.BackupRequestId) return Results.Ok();
+
+    if (report.Ok)
+    {
+        // Deliberately NOT treated as "the backup is here". The upload is a separate request that can
+        // still have failed, and whatever is waiting waits for the bytes.
+        instances.Log(instance, MatCMS.Cloud.Models.InstanceEventKind.BackupRequested,
+            $"Instanz meldet das angeforderte Backup als erstellt ({report.FileName ?? "ohne Namen"}).");
+    }
+    else
+    {
+        // Ends the request rather than leaving it to be re-asked on every beat: making a backup takes
+        // minutes and holds up the site's heartbeat, so retrying something that reliably fails would
+        // grind the site down for as long as nobody looked. An operator can ask again.
+        instance.BackupRequestError = string.IsNullOrWhiteSpace(report.Error)
+            ? "Unbekannter Fehler." : report.Error!.Trim();
+        instances.Log(instance, MatCMS.Cloud.Models.InstanceEventKind.BackupRequestFailed,
+            $"Angefordertes Backup fehlgeschlagen: {instance.BackupRequestError}");
+    }
     await db.SaveChangesAsync();
     return Results.Ok();
 }).RequireRateLimiting("instanceApi");

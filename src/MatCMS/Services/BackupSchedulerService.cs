@@ -43,7 +43,7 @@ public class BackupSchedulerService : BackgroundService
                     var toCloud = scope.ServiceProvider.GetRequiredService<CloudBackupService>();
                     if (await toCloud.IsEnabledAsync())
                     {
-                        var (ok, error) = await toCloud.UploadAsync(name, "auto", stoppingToken);
+                        var (ok, error) = await toCloud.UploadAsync(name, "auto", ct: stoppingToken);
                         if (ok) _log.LogInformation("Backup {Name} uploaded to the cloud.", name);
                         else _log.LogWarning("Uploading backup {Name} to the cloud failed: {Error}", name, error);
                     }

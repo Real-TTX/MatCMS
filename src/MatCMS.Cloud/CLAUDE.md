@@ -196,6 +196,22 @@ show the result, not just the values.
   the template field and reads through it when there is one. The hook is retried on
   `DOMContentLoaded`/`load` rather than set in a `setTimeout(0)`, because `code-editor.js` builds the
   editor later than that and the hook was silently never attached.
+  **A preview is for looking at: every rendered frame is sandboxed.** Both renderers set
+  `sandbox=""` on their frame and write `<base target="_blank">` into the document — the frame's
+  `srcdoc` inherits the EDITOR PAGE's address as its base, so every `href`, every `action` and even a
+  bare `#` pointed into the admin: a click loaded the whole site into the preview, and a
+  `target="_top"` carried the editor page away with everything unsaved. The sandbox stops what the
+  content does by itself (scripts, `location = …`, `<meta refresh>`, forms, popups, navigating the
+  editor window), the `<base>` turns a plain link click into a popup the sandbox then refuses, and a
+  `load` watchdog re-renders the preview if the frame ever ends up somewhere else anyway
+  (`target="_self"`). It is set in the SCRIPT, not the markup, because the thumbnail pages
+  (`Admin/ComponentPreview`, `Admin/TemplatePreview`) write their frames by hand and would forget it.
+  Two prices, both accepted: a `<script>` in a component template does not run in the preview, and
+  Ctrl-click / middle-click still open a new tab because the BROWSER does that, not the document —
+  everything that would stop it (rewriting `href`, `pointer-events: none`) costs exactly the fidelity
+  the preview exists for. The same treatment is on the mail-template previews, which render
+  server-side; the CMS's page/form builder previews are deliberately the other kind — you interact
+  with them, and they intercept navigation in their own script instead.
   One rule carried over deliberately: an existing field keeps its `id` when its label is renamed,
   because the id is what `{{placeholder}}` refers to and re-slugging it would break blocks already
   placed on live sites.

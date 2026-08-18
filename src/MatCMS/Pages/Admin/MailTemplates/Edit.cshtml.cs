@@ -145,8 +145,13 @@ public class EditModel : PageModel
             : "<pre style=\"font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;white-space:pre-wrap;\">"
               + System.Net.WebUtility.HtmlEncode(rendered) + "</pre>";
 
+        // Die Vorschau ist zum Ansehen da: der Rahmen ist abgeschottet (sandbox am iframe), und
+        // dieser <base> schickt jeden Verweis der Mail in ein neues Fenster — das der Sandkasten
+        // mangels allow-popups verbietet. Ohne beides trug ein Klick auf einen Link IN DER MAIL die
+        // fremde Seite in die Vorschau, und ein target="_top" die Editorseite samt Ungespeichertem
+        // fort.
         return Content(
-            "<!doctype html><html><head><meta charset=\"utf-8\">"
+            "<!doctype html><html><head><meta charset=\"utf-8\"><base target=\"_blank\">"
             + "<style>body{margin:0;padding:16px;background:#fff;}</style></head><body>"
             + html + "</body></html>",
             "text/html; charset=utf-8");

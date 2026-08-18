@@ -76,5 +76,10 @@
         <button type="button" class="btn btn-sm btn-ghost" id="preview-refresh">@T["mailtpl.previewRefresh"]</button>
     </div>
     <div class="help">@T["mailtpl.previewHint"]</div>
-    <iframe name="mail-preview" id="mail-preview" class="mail-preview" title="@T["mailtpl.preview"]"></iframe>
+    @* Abgeschottet: eine Mail besteht aus Verweisen, und ohne sandbox trug ein Klick darauf die
+       fremde Seite in die Vorschau (oder, mit target="_top", die Editorseite fort). Der <base>
+       im gelieferten Dokument macht daraus einen Versuch, ein Fenster zu öffnen — den der
+       Sandkasten verbietet. Das Formular daneben darf den Rahmen weiterhin beladen: sandbox
+       beschränkt den INHALT, nicht den, der ihn hineinlädt. *@
+    <iframe name="mail-preview" id="mail-preview" class="mail-preview" sandbox title="@T["mailtpl.preview"]"></iframe>
 </div>

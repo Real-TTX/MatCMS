@@ -207,6 +207,7 @@ public class ContentTransferService
                     HeaderBackground = t.HeaderBackground, HeaderTextColor = t.HeaderTextColor, HeaderPadding = t.HeaderPadding,
                     CustomCss = t.CustomCss, CustomJs = t.CustomJs, LayoutHtml = t.LayoutHtml,
                     MenuMapJson = t.MenuMapJson,
+                    ParametersJson = t.ParametersJson, ParamValuesJson = t.ParamValuesJson,
                     SchemaVersion = t.SchemaVersion, PartsJson = t.PartsJson
                 }).ToList();
 
@@ -527,6 +528,10 @@ public class ContentTransferService
                     CustomJs = t.CustomJs ?? "",
                     LayoutHtml = t.LayoutHtml ?? "",
                     MenuMapJson = string.IsNullOrWhiteSpace(t.MenuMapJson) ? "{}" : t.MenuMapJson!,
+                    // This branch builds a BRAND NEW row, so there is nothing to preserve: an older
+                    // backup that carries neither field lands on the column defaults, exactly as before.
+                    ParametersJson = string.IsNullOrWhiteSpace(t.ParametersJson) ? "[]" : t.ParametersJson!,
+                    ParamValuesJson = string.IsNullOrWhiteSpace(t.ParamValuesJson) ? "{}" : t.ParamValuesJson!,
                     SchemaVersion = t.SchemaVersion <= 0 ? 1 : t.SchemaVersion,
                     PartsJson = string.IsNullOrWhiteSpace(t.PartsJson) ? "{}" : t.PartsJson!
                 };
@@ -958,6 +963,15 @@ public class ContentTransferService
         row.CustomJs = t.CustomJs ?? "";
         row.LayoutHtml = t.LayoutHtml ?? "";
         row.MenuMapJson = string.IsNullOrWhiteSpace(t.MenuMapJson) ? "{}" : t.MenuMapJson!;
+        // Here the row may already EXIST and carry parameters, so absent ≠ empty: a backup written
+        // before these two fields existed contains no such property (null), and overwriting the row
+        // with "[]"/"{}" on that basis would destroy exactly what this fix is about. Only a value the
+        // backup actually contains is applied — an explicitly empty one included, because clearing
+        // the parameters is a legitimate state the operator may have backed up.
+        if (t.ParametersJson is not null)
+            row.ParametersJson = string.IsNullOrWhiteSpace(t.ParametersJson) ? "[]" : t.ParametersJson;
+        if (t.ParamValuesJson is not null)
+            row.ParamValuesJson = string.IsNullOrWhiteSpace(t.ParamValuesJson) ? "{}" : t.ParamValuesJson;
         row.SchemaVersion = t.SchemaVersion <= 0 ? 1 : t.SchemaVersion;
         row.PartsJson = string.IsNullOrWhiteSpace(t.PartsJson) ? "{}" : t.PartsJson!;
         MatCMS.Content.TemplateSchema.Upgrade(row); // bring older backups up to the current format
@@ -1196,6 +1210,16 @@ public class ContentTransferService
         public string? CustomJs { get; set; }
         public string? LayoutHtml { get; set; }
         public string? MenuMapJson { get; set; }
+        /// <summary>The parameter SCHEMA a template designer published ({{param:id}}), and below it the
+        /// values this site's admin set on them. Both were missing here while every other carrier of a
+        /// template (the editor's JSON export, the wire contract, the cloud's store and profile rows)
+        /// took them along — so a full restore, which drops all templates and rebuilds them from this
+        /// DTO, silently handed the site back a theme with no parameters and no values.
+        /// <para>Deliberately nullable, unlike most fields here: a backup written before these existed
+        /// contains no such property, and "not contained" must not be applied as "set it to empty".</para></summary>
+        public string? ParametersJson { get; set; }
+        /// <inheritdoc cref="ParametersJson"/>
+        public string? ParamValuesJson { get; set; }
         public int SchemaVersion { get; set; }
         public string? PartsJson { get; set; }
     }

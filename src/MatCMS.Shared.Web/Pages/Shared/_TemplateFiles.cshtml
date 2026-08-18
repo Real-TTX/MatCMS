@@ -95,10 +95,18 @@
                 @* Die id ist so wichtig wie der name: die Live-Vorschau der Cloud liest das Formular
                    über die Element-id (val("layoutHtml"), val("customCss") …). Ohne sie fällt sie
                    stillschweigend auf die Beispielseite zurück und zeigt das Layout nie. *@
+                @* Die Beschriftung ist NUR für den Fall ohne Skript da: dann stehen alle Rohfelder
+                   offen, und fünf unbeschriftete Textflächen sagten nichts. Sobald das Skript läuft,
+                   wird sie ausgeblendet — welche Datei offen ist, sagt die Menüleiste ÜBER dem
+                   Editor, und dieselbe Auskunft ein zweites Mal darunter las sich wie eine zweite
+                   Dateileiste neben dem Baum. Das aria-label trägt den Namen weiter, wenn die
+                   Beschriftung verborgen ist: eine verborgene <label> steht auch dem Vorleser nicht
+                   mehr zur Verfügung. *@
                 <label class="pf-editor-head" data-tf-store-head="@i" for="@files[i].FieldName"
                        title="@files[i].Description">@files[i].Name</label>
                 <textarea class="tpl-file-store code" data-idx="@i" id="@files[i].FieldName"
-                          name="@files[i].FieldName" spellcheck="false" rows="14">@files[i].Value</textarea>
+                          name="@files[i].FieldName" aria-label="@files[i].Name"
+                          spellcheck="false" rows="14">@files[i].Value</textarea>
             }
         </div>
         @* Kein leerer Kasten, sondern der Hinweis, was zu tun ist. *@
@@ -395,7 +403,10 @@
                 if (rawBtn) rawBtn.setAttribute('aria-pressed', raw ? 'true' : 'false');
                 if (host) host.hidden = raw || cur < 0;
                 stores.forEach(function (s, i) { s.hidden = !(raw && i === cur); });
-                heads.forEach(function (h, i) { h.hidden = !(raw && i === cur); });
+                // Die Beschriftungen bleiben weg, sobald das Skript läuft — auch in der Rohform:
+                // den Namen der offenen Datei sagt die Menüleiste darüber schon, und unter dem
+                // Inhalt gehören nur der Inhalt und die Platzhalter hin.
+                heads.forEach(function (h) { h.hidden = true; });
                 if (!raw && cur >= 0 && ensureCm()) {
                     loading = true;
                     cm.setValue(stores[cur].value || '');

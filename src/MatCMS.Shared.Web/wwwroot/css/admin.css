@@ -1248,7 +1248,10 @@ table.data .btn { white-space: nowrap; }
 /* display:flex aus einer Klasse schlägt das display:none, das der Browser [hidden] mitgibt — ohne
    diese Zeile stehen Editor UND Leerzustand gleichzeitig da, obwohl das Skript einen von beiden
    ausblendet. */
-.pf-editor[hidden], .pf-empty[hidden] { display: none; }
+/* Und dieselbe Falle noch einmal, bei der Beschriftung: sie trug hidden, stand aber trotzdem da —
+   fünf Dateinamen untereinander unter dem Editor, wie eine zweite, tote Dateileiste neben dem
+   Baum. Am laufenden System gefunden, nicht beim Lesen. */
+.pf-editor[hidden], .pf-empty[hidden], .pf-editor-head[hidden] { display: none; }
 
 @media (max-width: 800px) { .pf-tree { grid-template-columns: 1fr; } .pf-side { border-right: 0; border-bottom: 1px solid #cfcfcf; } }
 

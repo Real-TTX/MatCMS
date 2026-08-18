@@ -126,7 +126,20 @@
 
         var fonts = encodeURIComponent(headingFont) + ':wght@500;600;700&family=' + encodeURIComponent(bodyFont) + ':wght@400;500;600';
 
+        // Dieselbe Abschottung wie im Komponenten-Editor, und aus demselben Anlass: hier ist sie
+        // sogar leichter auszulösen, weil die Beispielnavigation aus href="#" besteht — und "#"
+        // löst sich in einem srcdoc-Rahmen gegen die ADRESSE DER EDITORSEITE auf, ein Klick lud also
+        // die Admin-Seite in die Vorschau. sandbox="" nimmt dem Dokument Skripte, Formulare, neue
+        // Fenster und das Navigieren der Editorseite; <base target="_blank"> schickt jeden Verweis
+        // ohne eigenes Ziel in ein neues Fenster, das der Sandkasten mangels allow-popups verbietet.
+        // Das Merkmal setzt das Skript, nicht das Markup: Profiles/Template, Store/Template UND die
+        // Kachelseite Admin/TemplatePreview benutzen denselben Renderer, und keine der drei kann es
+        // damit vergessen. Die Schriften kommen weiter von Google Fonts — die antworten mit
+        // Access-Control-Allow-Origin: *, also lädt sie auch ein Dokument ohne eigenen Ursprung.
+        if (frame.getAttribute("sandbox") === null) frame.setAttribute("sandbox", "");
+        expectLoad = true;
         frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8">' +
+            '<base target="_blank">' +
             '<link href="https://fonts.googleapis.com/css2?family=' + fonts + '&display=swap" rel="stylesheet">' +
             '<style>' +
             '*{box-sizing:border-box}' +
@@ -153,6 +166,15 @@
             customCss +
             '</style></head><body>' + body + '</body></html>';
     }
+
+    // Der Wächter hinter dem Sandkasten: ein target="_self" trägt den Rahmen ohne neues Fenster
+    // woandershin, und diese Liste wird nie vollständig. Deshalb wird das ERGEBNIS geprüft — lädt
+    // der Rahmen etwas, das nicht von uns gesetzt wurde, steht sofort wieder die Vorschau darin.
+    var expectLoad = false;
+    frame.addEventListener("load", function () {
+        if (expectLoad) { expectLoad = false; return; }
+        render();
+    });
 
     var deb;
     function schedule() { clearTimeout(deb); deb = setTimeout(render, 160); }

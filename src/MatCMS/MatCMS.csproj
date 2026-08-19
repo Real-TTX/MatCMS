@@ -44,6 +44,14 @@
     <PackageReference Include="MailKit" Version="4.*" />
     <!-- Override the transitive (vulnerable) SQLitePCLRaw 2.1.11 with the current 3.0.x bundle. -->
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.*" />
+    <!-- Thumbnails (ThumbnailService). Held at 2.1.* ON PURPOSE, and it is not staleness: 2.1.x is
+         the last branch under Apache-2.0 and it is still getting security patches (2.1.13). From 3.0
+         on ImageSharp is under the Six Labors Split License, which is a PAID licence above a revenue
+         threshold — not something to slip into an image we ship to customers as a by-product of a
+         thumbnailer. ImageSharp over SkiaSharp/Magick because it is PURE MANAGED: no native binary,
+         no RID matrix in the publish output, no extra apt package in the Dockerfile, and a build on
+         Windows behaves like the one inside the Linux container. -->
+    <PackageReference Include="SixLabors.ImageSharp" Version="2.1.*" />
   </ItemGroup>
 
   <ItemGroup>

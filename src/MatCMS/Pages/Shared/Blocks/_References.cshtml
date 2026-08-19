@@ -49,9 +49,9 @@
         color: var(--accent); text-decoration: none; word-break: break-all; }
     .ref-card__link:hover { text-decoration: underline; }
 
-    /* Screenshots: a scroll strip of thumbnails, full size only in the site-wide lightbox
-       (gallery.js binds every [data-lightbox]) — so a project with ten screenshots costs
-       ten thumbnails on first paint, not ten full images. */
+    /* Screenshots: a scroll strip of thumbnails, full size only in the lightbox. The images here are
+       the generated 320-px copies, not the originals scaled by CSS: displayed at 104 px, a project
+       with ten screenshots used to cost ten full-size downloads on first paint. */
     .ref-card__shots { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px;
         scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
     .ref-card__shot { flex: 0 0 auto; display: block; border-radius: 8px; overflow: hidden;

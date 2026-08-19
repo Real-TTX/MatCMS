@@ -137,6 +137,8 @@ builder.Services.AddScoped<BackupManager>();
 builder.Services.AddScoped<CloudBackupService>();
 builder.Services.AddHostedService<BackupSchedulerService>();
 builder.Services.AddHttpClient();
+// Stateless apart from the file cache it manages, so one instance for the whole app.
+builder.Services.AddSingleton<ThumbnailService>();
 builder.Services.AddScoped<VersionService>();
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<TranslationService>();
@@ -556,6 +558,40 @@ app.MapPost("/api/cloud/link", async (
         url = site.CanonicalBaseUrl(ctx.Request)
     });
 }).RequireRateLimiting("cloudLink");
+
+// Scaled copies of uploaded images: /thumb/{width}/{file}. PUBLIC, like /uploads itself — a
+// thumbnail of a picture that anyone may fetch full size protects nothing by being harder to reach.
+//
+// Note what this route does NOT do: it never touches appdata/uploads. The original keeps its bytes
+// and its /uploads/… URL, which is the URL sitting inside every stored page, block and backup on
+// every customer instance. A thumbnail is a second file under a second URL, and if the whole
+// appdata/thumbs folder is thrown away the site keeps working — the next request rebuilds it.
+app.MapGet("/thumb/{width:int}/{file}", async (int width, string file,
+    MatCMS.Services.ThumbnailService thumbs, IWebHostEnvironment env, HttpContext ctx) =>
+{
+    var path = await thumbs.GetOrCreateAsync(file, width, ctx.RequestAborted);
+    if (path is not null)
+    {
+        // The upload names are GUIDs, so a given URL can never point at different bytes later.
+        ctx.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+        ctx.Response.Headers.XContentTypeOptions = "nosniff";
+        return Results.File(path, "image/webp");
+    }
+
+    // Could not be scaled (unknown width, animated GIF, unreadable file). Fall back to the original
+    // rather than to a broken image: slower is a performance problem, a hole in the page is a bug.
+    var safe = Path.GetFileName(file ?? "");
+    var original = Path.Combine(MatCMS.Services.StoragePaths.Uploads(env), safe);
+    if (safe.Length == 0 || safe != file || !File.Exists(original)) return Results.NotFound();
+    ctx.Response.Headers.XContentTypeOptions = "nosniff";
+    return Results.File(original, Path.GetExtension(safe).ToLowerInvariant() switch
+    {
+        ".png" => "image/png",
+        ".gif" => "image/gif",
+        ".webp" => "image/webp",
+        _ => "image/jpeg"
+    });
+});
 
 // Simple image upload endpoint used by the block editor / settings / media library (admin only).
 app.MapPost("/admin/api/upload", async (HttpRequest request, IWebHostEnvironment env, MatCMS.Data.AppDbContext db) =>

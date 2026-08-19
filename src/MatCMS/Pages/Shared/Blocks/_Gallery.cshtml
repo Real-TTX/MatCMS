@@ -72,8 +72,12 @@
             @foreach (var it in items)
             {
                 <figure class="gallery__item" data-tags="@it.Tags">
+                    @* The TILE gets the scaled copy, the link keeps the original: what the grid shows is
+                       ~400 px wide, so a 2 MB phone photo was being downloaded in full to be squeezed
+                       into it by CSS. href stays untouched — that is the URL stored in the page, and the
+                       lightbox must still open the real picture. *@
                     <a href="@it.Src" class="gallery__link" data-lightbox data-caption="@it.Caption">
-                        <img src="@it.Src" alt="@it.Alt" loading="lazy" />
+                        <img src="@MatCMS.Services.ThumbnailService.Url(it.Src, 1200)" alt="@it.Alt" loading="lazy" />
                     </a>
                     @if (!string.IsNullOrWhiteSpace(it.Caption))
                     {

@@ -32,11 +32,11 @@
     {
         if (href.Length > 0)
         {
-            <a class="ref-card__media" href="@href" rel="noopener" target="_blank"><img src="@main" alt="@mainAlt" loading="lazy" decoding="async" /></a>
+            <a class="ref-card__media" href="@href" rel="noopener" target="_blank"><img src="@MatCMS.Services.ThumbnailService.Url(main, 1200)" alt="@mainAlt" loading="lazy" decoding="async" /></a>
         }
         else
         {
-            <figure class="ref-card__media"><img src="@main" alt="@mainAlt" loading="lazy" decoding="async" /></figure>
+            <figure class="ref-card__media"><img src="@MatCMS.Services.ThumbnailService.Url(main, 1200)" alt="@mainAlt" loading="lazy" decoding="async" /></figure>
         }
     }
     <div class="ref-card__body">
@@ -63,7 +63,7 @@
                 @foreach (var s in shots)
                 {
                     <a class="ref-card__shot" href="@s.Src" data-lightbox data-caption="@(string.IsNullOrWhiteSpace(s.Caption) ? title : s.Caption)">
-                        <img src="@s.Src" alt="@s.Alt" loading="lazy" decoding="async" />
+                        <img src="@MatCMS.Services.ThumbnailService.Url(s.Src, 320)" alt="@s.Alt" loading="lazy" decoding="async" />
                     </a>
                 }
             </div>

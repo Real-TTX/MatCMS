@@ -396,6 +396,10 @@ public class ContentTransferService
             await using (var fs = File.Create(dest))
                 await es.CopyToAsync(fs);
             assetCount++;
+            // The original was just OVERWRITTEN (File.Create truncates). Any cached thumbnail of that
+            // name now shows the previous picture, and it would keep showing it forever because the
+            // cache is keyed by file name and never expires. Drop it; the next request rebuilds it.
+            DropThumbnails(name);
         }
 
         var pluginAssetCount = await RestorePluginAssetsAsync(zip);
@@ -404,6 +408,28 @@ public class ContentTransferService
         if (assetCount > 0) extra.Add($"{assetCount} Medien");
         if (pluginAssetCount > 0) extra.Add($"{pluginAssetCount} Plugin-Dateien");
         return extra.Count > 0 ? $"{summary} ({string.Join(", ", extra)})" : summary;
+    }
+
+    /// <summary>
+    /// Forgets every cached thumbnail of one upload, across all widths and including a "could not be
+    /// scaled" marker — the replacement file may well be decodable where the old one was not.
+    /// <para>Note what is NOT here: an export side. Thumbnails live in <c>appdata/thumbs</c>, a sibling
+    /// of <c>uploads/</c>, so the flat <c>Directory.GetFiles(UploadsDir)</c> above never sees them and
+    /// they stay out of the ZIP. That is deliberate. Backups sit unencrypted in the cloud volume
+    /// against a per-instance quota, and a thumbnail carries no information the original does not — it
+    /// is rebuilt from it in milliseconds. Packing them would roughly double a media-heavy backup to
+    /// transport nothing.</para>
+    /// </summary>
+    private void DropThumbnails(string name)
+    {
+        var root = StoragePaths.Thumbs(_env);
+        if (!Directory.Exists(root)) return;
+        foreach (var width in ThumbnailService.Widths)
+        {
+            var file = Path.Combine(root, width.ToString(), name + ".webp");
+            try { if (File.Exists(file)) File.Delete(file); } catch { /* a stale thumbnail must never fail a restore */ }
+            try { if (File.Exists(file + ".failed")) File.Delete(file + ".failed"); } catch { /* same */ }
+        }
     }
 
     /// <summary>

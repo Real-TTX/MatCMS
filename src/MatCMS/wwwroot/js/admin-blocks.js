@@ -50,6 +50,17 @@
         output.value = JSON.stringify(serialize());
     });
 
+    // What the block looked like the moment it was built. Nothing here is persisted until the form
+    // is submitted, so anybody who wants to LEAVE the editor has to be able to ask whether that
+    // would throw work away — and comparing against this snapshot answers it exactly, where
+    // listening for "input" would already call an untouched block dirty (the controls fire events
+    // while they are being set up).
+    var pristine = JSON.stringify(serialize());
+    window.matBlockDirty = function () {
+        try { return JSON.stringify(serialize()) !== pristine; } catch (e) { return false; }
+    };
+    // After a save the page reloads, so the snapshot is taken fresh — no reset needed here.
+
     // Live preview: on any field change, hand the block's current data up to the page editor, which
     // updates its draft and re-renders the preview (nothing is persisted until "Speichern").
     var liveT;

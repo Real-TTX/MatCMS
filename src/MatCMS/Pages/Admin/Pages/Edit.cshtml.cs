@@ -43,6 +43,20 @@ public class EditModel : PageModel
     // Active locales that do not yet have a translation in this group (→ "create translation").
     public IReadOnlyList<string> MissingLocales { get; private set; } = new List<string>();
 
+    /// <summary>One language version of a page, the way the toolbar's page switcher shows it.</summary>
+    public record SwitchVersion(int Id, string Title, string Locale, string Url, bool IsPublished, bool IsPrimary);
+
+    /// <summary>A logical page (one translation group) with all its language versions.</summary>
+    public record SwitchGroup(string Key, string PrimaryTitle, IReadOnlyList<SwitchVersion> Versions);
+
+    // The whole site's pages for the toolbar switcher — grouped exactly the way the page LIST groups
+    // them (translation group = one logical page, languages = its versions). The same slug four times
+    // with four different titles is otherwise indistinguishable in a flat list of titles.
+    public IReadOnlyList<SwitchGroup> SwitchGroups { get; private set; } = new List<SwitchGroup>();
+    // The current page's own group, listed first and on its own: switching the language is by far the
+    // most frequent switch on a multilingual site and must not need a search first.
+    public SwitchGroup? CurrentGroup { get; private set; }
+
     // Inline block settings panel (Shopify-style): when ?block=<id> is set.
     public ContentBlock? SelectedBlock { get; private set; }
     public BlockDefinition? SelectedDef { get; private set; }
@@ -102,6 +116,7 @@ public class EditModel : PageModel
         };
 
         await LoadTranslationsAsync(page);
+        await LoadSwitcherAsync(page);
 
         if (block is int blockId)
         {
@@ -721,5 +736,43 @@ public class EditModel : PageModel
                             && MissingLocales.Contains(p.Locale))
                 .OrderBy(p => p.Locale).ThenBy(p => p.Title)
                 .ToListAsync();
+    }
+
+    // Feeds the toolbar's page switcher. Deliberately built like Pages/Index: pages grouped by
+    // TranslationGroup, the versions ordered by the site's language order, the default-locale page
+    // as the primary. A page without a group is its own singleton. Building the list the same way
+    // the page list builds it is the point — the switcher must not sort the site differently from
+    // the overview the operator came from.
+    private async Task LoadSwitcherAsync(PageEntity page)
+    {
+        var all = await _db.Pages.AsNoTracking()
+            .OrderBy(p => p.NavOrder).ThenBy(p => p.FooterOrder).ThenBy(p => p.Title)
+            .ToListAsync();
+
+        static int LocaleRank(string loc)
+        {
+            var i = Array.IndexOf(Localizer.SupportedCultures.ToArray(), loc);
+            return i < 0 ? 99 : i;
+        }
+
+        var groups = all
+            .GroupBy(p => string.IsNullOrWhiteSpace(p.TranslationGroup) ? $"__single:{p.Id}" : p.TranslationGroup!)
+            .Select(g =>
+            {
+                var ordered = g.OrderBy(p => LocaleRank(p.Locale)).ThenBy(p => p.Id).ToList();
+                var primary = ordered.FirstOrDefault(p => p.Locale == Localizer.DefaultCulture) ?? ordered[0];
+                var versions = ordered
+                    .Select(p => new SwitchVersion(p.Id, p.Title, p.Locale,
+                        SiteContext.LocalizedUrl(p.Locale, p.Slug), p.IsPublished, p.Id == primary.Id))
+                    .ToList();
+                return new SwitchGroup(g.Key, primary.Title, versions);
+            })
+            .OrderBy(g => g.PrimaryTitle, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
+        CurrentGroup = groups.FirstOrDefault(g => g.Versions.Any(v => v.Id == page.Id));
+        // The current group appears exactly once, at the top — repeating it below would offer the
+        // same page twice and make the arrow keys walk over it a second time.
+        SwitchGroups = groups.Where(g => g != CurrentGroup).ToList();
     }
 }

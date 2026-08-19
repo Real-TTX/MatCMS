@@ -222,7 +222,9 @@
 
                 <details class="le-settings">
                     <summary>@T["editor.pageSettings"]</summary>
-                    <form method="post" asp-page-handler="Meta" asp-route-id="@Model.Current.Id" class="form-grid">
+                    @* id: the page switcher compares this form against its state at load, so leaving
+                       the page with an edited title/slug asks first instead of dropping it. *@
+                    <form id="page-meta-form" method="post" asp-page-handler="Meta" asp-route-id="@Model.Current.Id" class="form-grid">
                         <div class="form-field">
                             <label>@T["editor.metaTitle"]</label>
                             <input name="Meta.Title" value="@Model.Meta.Title" required />
@@ -379,7 +381,101 @@
     <main class="le-preview">
         <div class="le-toolbar">
             <span class="le-url mono">@url</span>
-            <a class="btn btn-sm btn-ghost" href="@url" target="_blank">@T["editor.openNewTab"]</a>
+            @* Page switcher, middle of the bar. Built from the FORM field "richselect" (.mat-rs*):
+               two-line entries with title, address, language and state — the admin already has that
+               dropdown, and a page list that shows nothing but a title is unusable on a site where
+               the same slug exists in four languages with four different titles.
+               A switch LEAVES the page: admin-page-switcher.js asks first when something is unsaved,
+               which is why the entries are plain links and no form posts here. *@
+            @{
+                string SwitchSearch(MatCMS.Pages.Admin.Pages.EditModel.SwitchVersion v) =>
+                    (v.Title + " " + v.Url + " " + v.Locale + " " + MatCMS.Services.Localizer.DisplayName(v.Locale)).ToLowerInvariant();
+            }
+            <div class="mat-rs le-pagepick" data-page-switch
+                 data-confirm="@T["editor.switchUnsaved"]"
+                 data-confirm-block="@T["editor.switchUnsavedBlock"]"
+                 data-confirm-settings="@T["editor.switchUnsavedSettings"]">
+                <button type="button" class="btn btn-sm btn-ghost mat-rs-trigger" data-ps-btn
+                        aria-haspopup="listbox" aria-expanded="false" title="@T["editor.switchPage"]">
+                    <span class="mat-rs-current">
+                        <span class="badge @(Model.CurrentGroup?.Versions.FirstOrDefault(v => v.Id == Model.Current.Id)?.IsPrimary == false ? "badge-off" : "badge-on") mono">@Model.Current.Locale.ToUpperInvariant()</span>
+                        <span class="mat-rs-cur-title">@Model.Current.Title</span>
+                    </span>
+                    <span class="mat-rs-chev" aria-hidden="true">▾</span>
+                </button>
+                <div class="mat-rs-menu" data-ps-menu hidden>
+                    @* Header with ✕ — hidden on the desktop by mat-richselect.css, shown when the menu
+                       becomes a full-screen sheet on a phone. *@
+                    <div class="mat-rs-sheet-head">
+                        <span class="mat-rs-sheet-title">@T["editor.switchPage"]</span>
+                        <button type="button" class="mat-rs-close" data-ps-close aria-label="@T["editor.close"]">✕</button>
+                    </div>
+                    <div class="bpick-search ps-search">
+                        <svg class="bpick-sico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+                        <input type="search" data-ps-search placeholder="@T["editor.switchSearch"]" autocomplete="off"
+                               role="combobox" aria-expanded="true" aria-controls="ps-list" aria-autocomplete="list" />
+                    </div>
+                    <div class="mat-rs-scroll" id="ps-list" role="listbox" aria-label="@T["editor.switchPage"]">
+                        @* Two sections, each with its own heading, and inside them one block per
+                           LOGICAL page. The heading belongs to the section and not to the first page
+                           in it — a search that filters that page away used to take the heading with
+                           it, leaving a result list with no idea what it was a list of. *@
+                        @{
+                            var switchSections = new List<(string Head, IReadOnlyList<MatCMS.Pages.Admin.Pages.EditModel.SwitchGroup> Groups)>();
+                            if (Model.CurrentGroup is not null)
+                                switchSections.Add((Model.CurrentGroup.Versions.Count > 1 ? T["editor.switchThisPage"] : T["editor.switchCurrent"],
+                                                    new[] { Model.CurrentGroup }));
+                            if (Model.SwitchGroups.Count > 0)
+                                switchSections.Add((T["editor.switchAllPages"], Model.SwitchGroups));
+                        }
+                        @foreach (var (head, sectionGroups) in switchSections)
+                        {
+                        <div class="ps-section" role="presentation" data-ps-section>
+                            <div class="bpick-grouphead" data-ps-head>@head</div>
+                            @foreach (var g in sectionGroups)
+                            {
+                            <div class="bpick-group" role="presentation" data-ps-group>
+                                @foreach (var v in g.Versions)
+                                {
+                                    var isCur = v.Id == Model.Current.Id;
+                                    <a class="mat-rs-opt" role="option" tabindex="-1" data-ps-opt
+                                       id="ps-opt-@v.Id"
+                                       href="@Url.Page("Edit", new { id = v.Id })"
+                                       data-title="@v.Title"
+                                       data-search="@SwitchSearch(v)"
+                                       aria-selected="@(isCur ? "true" : "false")">
+                                        <span class="mat-rs-opt-body">
+                                            <span class="mat-rs-opt-title">@v.Title</span>
+                                            @* Second line carries what the title cannot: the real address
+                                               (which already differs per language) and the language name. *@
+                                            <span class="mat-rs-opt-desc"><span class="mono">@v.Url</span> · @MatCMS.Services.Localizer.DisplayName(v.Locale)</span>
+                                        </span>
+                                        <span class="mat-rs-opt-tags">
+                                            @* Same colour code as the page list: the original is the
+                                               solid badge, a translation the muted one. *@
+                                            <span class="badge @(v.IsPrimary ? "badge-on" : "badge-off") mono">@v.Locale.ToUpperInvariant()</span>
+                                            @if (v.IsPublished)
+                                            {
+                                                <span class="badge badge-on">@T["pages.published"]</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge badge-off">@T["pages.draft"]</span>
+                                            }
+                                        </span>
+                                    </a>
+                                }
+                            </div>
+                            }
+                        </div>
+                        }
+                        <p class="bpick-empty" data-ps-empty hidden>@T["editor.switchNone"]</p>
+                    </div>
+                </div>
+            </div>
+            <div class="actions le-toolbar-actions">
+                <a class="btn btn-sm btn-ghost" href="@url" target="_blank">@T["editor.openNewTab"]</a>
+            </div>
         </div>
         <div class="le-frame-wrap">
             <iframe id="preview-frame" src="@previewUrl" title="@T["editor.livePreview"]"></iframe>
@@ -395,4 +491,7 @@
     <script src="~/js/mat-richselect.js" asp-append-version="true"></script>
     <script src="~/js/admin-blocks.js" asp-append-version="true"></script>
     <script src="~/js/admin-page-editor.js" asp-append-version="true"></script>
+    @* Loaded AFTER admin-blocks.js: the switcher asks that script whether the open block still
+       carries unsaved edits before it lets go of the page. *@
+    <script src="~/js/admin-page-switcher.js" asp-append-version="true"></script>
 }

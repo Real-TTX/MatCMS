@@ -783,6 +783,57 @@ table.data .btn { white-space: nowrap; }
 .le-preview { display: flex; flex-direction: column; min-width: 0; background: #eceef1; }
 .le-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: #fff; }
 .le-url { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---- Page switcher in the toolbar -------------------------------------------------------------
+   The dropdown itself is the form field "richselect" (.mat-rs*, mat-richselect.css) — everything
+   here only places it and adapts the entries to a LIST OF LINKS instead of a value picker.
+   Address and actions each take an equal share of the remaining width, so the switcher sits in the
+   MIDDLE of the bar and not wherever the path happens to end. */
+.le-toolbar .le-url { flex: 1 1 0; min-width: 0; }
+.le-toolbar-actions { flex: 1 1 0; justify-content: flex-end; flex-wrap: nowrap; }
+.le-pagepick { flex: 0 1 430px; min-width: 0; display: flex; justify-content: center; }
+.le-pagepick .mat-rs-trigger { max-width: 100%; min-width: 0; }
+.le-pagepick .mat-rs-current { gap: 8px; }
+/* The trigger is a .btn, and .btn shouts in capitals — a page title must not. On this site the
+   Croatian titles ARE capitals ("APARTMAN 1"), so an uppercasing trigger would hide the one
+   difference the operator is looking for. */
+.le-pagepick .mat-rs-cur-title { font-weight: 600; text-transform: none; letter-spacing: normal; }
+/* Trigger is a .btn-ghost, which inverts on hover — the badge has to come along or it disappears. */
+.le-pagepick .mat-rs-trigger:hover .badge { background: rgba(255, 255, 255, .18); color: #fff; }
+.le-pagepick .mat-rs-menu { min-width: 320px; }
+.le-pagepick .ps-search { padding: 10px 10px 4px; }
+.le-pagepick .mat-rs-scroll { max-height: min(60vh, 460px); }
+/* Entries are links, not buttons: they need the button's reset back. */
+.le-pagepick .mat-rs-opt { text-decoration: none; color: inherit; align-items: flex-start; }
+/* The search hides entries with [hidden]. That attribute is a UA rule and loses against the
+   class-level "display: flex" of .mat-rs-opt — without this the filter would leave every entry on
+   screen. Cost us the whole search once. */
+.le-pagepick .mat-rs-opt[hidden] { display: none; }
+.le-pagepick .mat-rs-opt-body { flex: 1 1 auto; min-width: 0; }
+.le-pagepick .mat-rs-opt-desc { display: block; }
+.le-pagepick .mat-rs-opt-tags { flex: 0 0 auto; margin-top: 0; align-self: center; justify-content: flex-end; }
+/* The keyboard cursor. Separate from [aria-selected], which marks the page you are ON — the two are
+   different things and are on screen at the same time. */
+.le-pagepick .mat-rs-opt.is-active { background: rgba(128, 128, 128, .16); box-shadow: inset 0 0 0 2px var(--accent); }
+.le-pagepick .bpick-grouphead { padding: 4px 10px 0; margin-bottom: 4px; }
+.le-pagepick .ps-section + .ps-section { margin-top: 16px; }
+.le-pagepick .bpick-empty { padding: 26px 0; }
+
+/* Phone: the bar stacks and the switcher goes FULL WIDTH on its own line. Squeezing three items
+   into 390px left the switcher a stump nobody can read a page title in. */
+@media (max-width: 700px) {
+    .le-toolbar { flex-wrap: wrap; }
+    .le-pagepick { order: -1; flex: 1 1 100%; }
+    .le-pagepick .mat-rs-trigger { width: 100%; justify-content: space-between; }
+}
+@media (max-width: 600px) {
+    /* Full-screen sheet (mat-richselect.css): search bar fixed under the header, list scrolls under
+       it — with the on-screen keyboard up, a search box that scrolls away is a search box you
+       cannot see what you typed into. Finger-sized rows, no hover-only affordances. */
+    .le-pagepick.mat-rs-modal .ps-search { flex: 0 0 auto; padding: 10px 12px; }
+    .le-pagepick.mat-rs-modal .mat-rs-opt { padding: 14px 12px; min-height: 56px; }
+    .le-pagepick.mat-rs-modal .mat-rs-menu { min-width: 0; }
+}
 .le-frame-wrap { flex: 1; min-height: 0; padding: 16px; }
 .le-preview iframe { width: 100%; height: 100%; border: 1px solid var(--line); border-radius: 8px; background: #fff; box-shadow: 0 8px 30px rgba(0, 0, 0, .07); }
 

@@ -7,6 +7,18 @@
     // visibility, and returns { serialize() }. Used by the in-page block editor below AND by the
     // translation-compare dialog (diff-edit.js), so both share identical controls (rich text, image
     // picker, link picker, lists, conditions).
+    // Ein per Skript gesetzter Wert löst KEIN input-Ereignis aus, und ein hinzugefügter, entfernter
+    // oder verschobener DOM-Knoten erst recht nicht — das tut nur echte Eingabe des Bedieners.
+    // Live-Vorschau und Sichtbarkeits-Bedingungen hängen aber genau daran. Jede Änderung, die nicht
+    // aus dem Feld selbst kommt, muss sich deshalb selbst melden. mat-richselect, mat-datepicker und
+    // die Link-Knöpfe im Medien-Wähler tun das längst; nur die Steuerelemente hier taten es nicht,
+    // und deshalb blieb die Vorschau nach einer Bildauswahl auf dem alten Stand stehen.
+    // Nur "input", nicht zusätzlich "change": beide Zuhörer hängen ohnehin an beidem, ein zweites
+    // Ereignis würde dieselbe Arbeit nur ein zweites Mal anstoßen.
+    function notifyChanged(node) {
+        if (node) node.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+
     function build(container, schema, data) {
         data = data || {};
         var collectors = [];
@@ -221,7 +233,7 @@
             lb.setAttribute("aria-label", "Seite verlinken");
             lb.innerHTML = '<i class="ti ti-link" aria-hidden="true"></i>';
             lb.addEventListener("click", function () {
-                if (window.openLinkPicker) window.openLinkPicker(function (u) { iu.value = u; });
+                if (window.openLinkPicker) window.openLinkPicker(function (u) { iu.value = u; notifyChanged(iu); });
             });
             lf.appendChild(lb);
             wrap.appendChild(lf);
@@ -319,7 +331,9 @@
         btn.className = "btn btn-ghost btn-sm";
         btn.textContent = "Bild wählen";
         btn.addEventListener("click", function () {
-            openMediaPicker(function (u) { inp.value = u; preview.style.backgroundImage = "url('" + u + "')"; });
+            // Die Vorschaukachel NICHT hier noch einmal setzen: das erledigt der input-Zuhörer am
+            // Feld selbst, sobald die Meldung raus ist — eine Stelle, an der der Pfad zum Bild wird.
+            openMediaPicker(function (u) { inp.value = u; notifyChanged(inp); });
         });
 
         row.appendChild(btn);
@@ -380,9 +394,9 @@
                     return o;
                 }
             };
-            up.addEventListener("click", function () { moveItem(card, -1); });
-            down.addEventListener("click", function () { moveItem(card, 1); });
-            del.addEventListener("click", function () { card.remove(); });
+            up.addEventListener("click", function () { moveItem(card, -1); notifyChanged(listEl); });
+            down.addEventListener("click", function () { moveItem(card, 1); notifyChanged(listEl); });
+            del.addEventListener("click", function () { card.remove(); notifyChanged(listEl); });
 
             entries.push(entry);
             listEl.appendChild(card);
@@ -404,7 +418,7 @@
         addBtn.className = "btn btn-ghost btn-sm";
         addBtn.style.marginTop = "10px";
         addBtn.textContent = "+ " + (field.itemLabel || "Eintrag") + " hinzufügen";
-        addBtn.addEventListener("click", function () { addItem({}); });
+        addBtn.addEventListener("click", function () { addItem({}); notifyChanged(listEl); });
         container.appendChild(addBtn);
 
         // If items carry an image, allow picking several from the media library at once; each becomes
@@ -424,6 +438,8 @@
             bulkBtn.addEventListener("click", function () {
                 window.openMediaPicker(function (urls) {
                     (urls || []).forEach(function (u) { var o = {}; o[imgField.id] = u; addItem(o); });
+                    // Eine Meldung für den ganzen Schwung — die Vorschau zeichnet ohnehin gebündelt.
+                    notifyChanged(listEl);
                 }, { multiple: true });
             });
             container.appendChild(bulkBtn);

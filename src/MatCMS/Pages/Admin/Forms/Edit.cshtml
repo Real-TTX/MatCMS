@@ -4,7 +4,7 @@
 @{
     ViewData["Title"] = T["forms.editorTitle"];
     var editing = Model.SelectedElement is not null;
-    var previewUrl = $"/admin/forms/preview/{Model.Current.Id}?builder=1";
+    var previewUrl = $"/admin/forms/preview/{Model.Current.Id}?builder=true";
 
     string TypeName(string t) => T["forms.el." + t + ".name"];
     string ElSummary(FormElement e)
@@ -201,6 +201,7 @@
                                             @foreach (var t in elTypes.Where(e => ElCat(e.Type) == k))
                                             {
                                                 <form method="post" asp-page-handler="AddElement" asp-route-id="@Model.Current.Id" asp-route-type="@t.Type">
+                                                    <input type="hidden" name="position" class="add-position" value="" />
                                                     <button type="submit" class="tile" data-cat="@ElCat(t.Type)"
                                                             title="@T["forms.el." + t.Type + ".desc"]"
                                                             data-name="@(((string)TypeName(t.Type)).ToLowerInvariant())"

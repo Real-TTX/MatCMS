@@ -57,12 +57,18 @@
         fCatBtns.forEach(function (x) { x.classList.toggle("is-active", x.getAttribute("data-cat") === "all"); });
         fApplyFilter();
     }
+    // `position` = where the new element goes among the top-level elements; null appends. The
+    // picker carries it in a hidden field on every tile form, so whichever tile is pressed posts
+    // the place the operator pointed at.
+    function fOpenPicker(position) {
+        if (!modal) return;
+        modal.querySelectorAll(".add-position").forEach(function (i) { i.value = position == null ? "" : String(position); });
+        modal.classList.add("open");
+        fResetFilter();
+        setTimeout(function () { if (fSearch) fSearch.focus(); }, 30);
+    }
     if (modal && openBtn) {
-        openBtn.addEventListener("click", function () {
-            modal.classList.add("open");
-            fResetFilter();
-            setTimeout(function () { if (fSearch) fSearch.focus(); }, 30);
-        });
+        openBtn.addEventListener("click", function () { fOpenPicker(null); });
         if (closeBtn) closeBtn.addEventListener("click", function () { modal.classList.remove("open"); });
         modal.addEventListener("click", function (e) { if (e.target === modal) modal.classList.remove("open"); });
         document.addEventListener("keydown", function (e) { if (e.key === "Escape") modal.classList.remove("open"); });
@@ -84,11 +90,21 @@
         var id = row.getAttribute("data-element-id");
         row.addEventListener("mouseenter", function () { postFrame({ type: "mat-scroll-element", id: id }); });
     });
+    // The element open in the sidebar is highlighted in the preview, so the two halves of the
+    // editor always agree on what is being edited.
+    var selectedElId = (document.querySelector(".form-builder") || {}).getAttribute
+        ? document.querySelector(".form-builder").getAttribute("data-selected-element") : null;
+    function syncSelection() { if (selectedElId) postFrame({ type: "mat-select-el", id: selectedElId }); }
+    if (frame) frame.addEventListener("load", syncSelection);
+
     window.addEventListener("message", function (e) {
         var d = e.data || {};
+        if (d.type === "mat-preview-ready") syncSelection();
         if (d.type === "mat-select-element" && d.id) {
             window.location.search = "?element=" + encodeURIComponent(d.id);
         }
+        // Clicked a gap between two elements in the preview: open the picker for that place.
+        if (d.type === "mat-insert-at") fOpenPicker(d.index);
     });
 
     // ---------- Element settings form ----------

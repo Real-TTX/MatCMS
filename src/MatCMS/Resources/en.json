@@ -307,6 +307,8 @@
   "forms.switchFields": "{0} fields",
   "forms.switchUnsavedElement": "Changes in the open element",
   "forms.switchUnsavedSettings": "Changes in the form settings (name, slug, notification)",
+  "forms.insertHere": "+ Element",
+  "forms.elementFallbackName": "Element",
   "forms.unreadLabel": "new",
   "forms.submissions": "Submissions",
   "forms.confirmDelete": "Really delete the form “{0}”? All submissions will be lost.",

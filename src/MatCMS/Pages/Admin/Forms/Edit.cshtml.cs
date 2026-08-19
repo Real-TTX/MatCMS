@@ -146,7 +146,11 @@ public class EditModel : PageModel
         }).ToList();
     }
 
-    public async Task<IActionResult> OnPostAddElementAsync(int id, string type)
+    /// <param name="position">Where the new element goes among the TOP-LEVEL elements, coming from an
+    /// insert zone in the preview. Null (the "+ Element" button) still appends. Clamped rather than
+    /// rejected: the preview may have been rendered before somebody else reordered the form, and
+    /// landing at the end is a far better answer there than a 400.</param>
+    public async Task<IActionResult> OnPostAddElementAsync(int id, string type, int? position = null)
     {
         var form = await _db.Forms.FindAsync(id);
         if (form is null) return NotFound();
@@ -156,7 +160,10 @@ public class EditModel : PageModel
         var el = new FormElement { Id = GenId(), Type = type, Label = DefaultLabel(type) };
         if (type == "select")
             el.Options = new() { new FormOption { Value = "option-1", Label = "Option 1" } };
-        elements.Add(el);
+        if (position is int pos)
+            elements.Insert(Math.Clamp(pos, 0, elements.Count), el);
+        else
+            elements.Add(el);
 
         form.DefinitionJson = FormDefinition.Serialize(elements);
         await _db.SaveChangesAsync();

@@ -203,10 +203,13 @@
     {
         switch (el.Type)
         {
+            // data-el on these two as well: they are top-level elements like any other, so the
+            // builder has to be able to click them and has to be able to count them when it works
+            // out where a new element goes. The attribute is inert outside the builder.
             case "title":
-                return new HtmlString("<h3 class=\"form-el-title\">" + System.Net.WebUtility.HtmlEncode(el.Label) + "</h3>");
+                return new HtmlString("<h3 class=\"form-el-title\" data-el=\"" + System.Net.WebUtility.HtmlEncode(el.Id) + "\">" + System.Net.WebUtility.HtmlEncode(el.Label) + "</h3>");
             case "description":
-                return new HtmlString("<p class=\"form-el-desc\">" + System.Net.WebUtility.HtmlEncode(el.Label) + "</p>");
+                return new HtmlString("<p class=\"form-el-desc\" data-el=\"" + System.Net.WebUtility.HtmlEncode(el.Id) + "\">" + System.Net.WebUtility.HtmlEncode(el.Label) + "</p>");
             case "group":
             {
                 var sb = new System.Text.StringBuilder();
@@ -232,6 +235,52 @@
                 return renderInput(el);
         }
     };
+}
+@* Builder mode only. Same vocabulary as the PAGE preview (Pages/View.cshtml): .mat-ed-block for a
+   selectable element, .mat-selected for the one being edited, .mat-insert for the gap between two —
+   the two previews should not need two words for the same thing. Nothing of this reaches the public
+   site, which never renders with Builder = true. *@
+@if (Model.Builder)
+{
+    <style>
+        /* Only elements are interactive; the rest of the page is not a target. */
+        html { cursor: not-allowed; }
+        .mat-ed-block { position: relative; cursor: pointer; }
+        .mat-ed-block::after {
+            content: attr(data-block-name);
+            /* Right-hand side: a form field carries its own label on the LEFT, and the name tag sat
+               straight on top of it. */
+            position: absolute; top: 2px; right: 4px; z-index: 9998;
+            background: #2563eb; color: #fff; font: 600 11px/1 Inter, system-ui, sans-serif;
+            padding: 4px 8px; border-radius: 5px; letter-spacing: .03em;
+            opacity: 0; transform: translateY(-4px); transition: opacity .12s ease, transform .12s ease;
+            pointer-events: none;
+        }
+        /* The preview renders every control DISABLED, and a disabled control emits no click at all —
+           so a click on the text box itself, which is most of what a field looks like, reached nothing
+           and the whole select-in-the-preview felt broken. In the builder the controls are a picture of
+           the form, not the form: the pointer goes straight through them to the element. */
+        .mat-ed-block input, .mat-ed-block select, .mat-ed-block textarea,
+        .mat-ed-block button, .mat-ed-block label { pointer-events: none; }
+        .mat-ed-block:hover { outline: 1px dashed rgba(37, 99, 235, .5); outline-offset: 2px; }
+        .mat-ed-block:hover::after { opacity: 1; transform: translateY(0); }
+        .mat-ed-block.mat-selected { outline: 3px solid #2563eb; outline-offset: 2px; }
+        .mat-insert { display: block; width: 100%; border: none; background: none; padding: 0; margin: 0; cursor: pointer; position: relative; height: 22px; opacity: 0; transition: opacity .12s ease; z-index: 9997; }
+        .mat-insert::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 3px; background: #2563eb; border-radius: 3px; transform: translateY(-50%); }
+        .mat-insert span { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 1; font: 700 11px/1 Inter, system-ui, sans-serif; background: #2563eb; color: #fff; padding: 4px 14px; border-radius: 999px; white-space: nowrap; box-shadow: 0 2px 8px rgba(37,99,235,.4); opacity: 0; transition: opacity .12s ease; }
+        body:hover .mat-insert { opacity: .45; }
+        .mat-insert:hover { opacity: 1; }
+        .mat-insert:hover span { opacity: 1; }
+        /* A gap that only appears under a mouse pointer does not exist on a phone. Where there is no
+           hover, the zones are simply always there — visible, and tall enough to hit with a thumb. */
+        @@media (hover: none) {
+            .mat-insert { opacity: .6; height: 40px; }
+            .mat-insert span { opacity: 1; padding: 7px 16px; }
+            /* The name tag stays hover-only even here: shown permanently it printed itself
+               over every heading and label in the form. The GAPS are what has to be reachable
+               without a pointer; the tag is not. */
+        }
+    </style>
 }
 <link rel="stylesheet" href="~/css/mat-datepicker.css" asp-append-version="true" />
 <script>window.matDpI18n = window.matDpI18n || @Html.Raw(dpI18nJson);</script>
@@ -352,22 +401,83 @@
         @if (Model.Builder)
         {
             <text>
-            // Builder bridge: clicking an element selects it in the parent editor.
+            // ---- Builder bridge --------------------------------------------------------------
+            // Two things travel up to the editor: which element was clicked, and where a new one
+            // should go. Everything here re-runs after a live-preview swap, because that swap
+            // replaces the whole body and takes the decorations with it.
             function post(msg) { if (window.parent && window.parent !== window) window.parent.postMessage(msg, "*"); }
+            // NOT the captured `root`: a live-preview swap replaces the body, so the old node is
+            // detached and every query against it silently returns nothing.
+            function scope() { return document.getElementById("@containerId") || document; }
+            var selectedEl = null;
+
             document.addEventListener("click", function (e) {
+                if (e.target.closest(".mat-insert")) return;   // the zone posts its own message
                 var host = e.target.closest("[data-el]");
                 if (host) { e.preventDefault(); e.stopPropagation(); post({ type: "mat-select-element", id: host.getAttribute("data-el") }); }
             }, true);
+
+            // Top-level elements only. A field inside a group carries its own data-el (clicking it
+            // selects the group, which the server resolves), but a new element is never inserted
+            // INTO a group from out here — the group's own panel does that.
+            function topHosts() {
+                var f = scope().querySelector ? scope().querySelector("form.form-fields") : null;
+                if (!f) return [];
+                return Array.prototype.slice.call(f.children).filter(function (c) {
+                    return c.nodeType === 1 && c.hasAttribute("data-el");
+                });
+            }
+
+            function decorate() {
+                var hosts = topHosts();
+                hosts.forEach(function (h) {
+                    h.classList.add("mat-ed-block");
+                    // The label the operator sees in the sidebar, taken from what is on screen —
+                    // no second source that could drift from the first.
+                    var lbl = h.querySelector("label, legend");
+                    var name = (lbl ? lbl.textContent : h.textContent) || "";
+                    h.setAttribute("data-block-name", name.replace(/\s+/g, " ").trim().slice(0, 40) || "@Html.Raw(System.Text.Json.JsonSerializer.Serialize((string)T["forms.elementFallbackName"]).Trim('"'))");
+                });
+                Array.prototype.slice.call(scope().querySelectorAll(".mat-insert")).forEach(function (z) { z.remove(); });
+                var label = "@Html.Raw(System.Text.Json.JsonSerializer.Serialize((string)T["forms.insertHere"]).Trim('"'))";
+                function makeZone(index) {
+                    var z = document.createElement("button");
+                    z.type = "button";
+                    z.className = "mat-insert";
+                    z.title = label;
+                    z.setAttribute("aria-label", label);
+                    z.innerHTML = "<span></span>";
+                    z.firstChild.textContent = label;
+                    z.addEventListener("click", function (e) {
+                        e.preventDefault(); e.stopPropagation();
+                        post({ type: "mat-insert-at", index: index });
+                    });
+                    return z;
+                }
+                hosts.forEach(function (h, i) { h.parentNode.insertBefore(makeZone(i), h); });
+                // One at the very end, so appending is the same gesture as inserting.
+                if (hosts.length) hosts[hosts.length - 1].insertAdjacentElement("afterend", makeZone(hosts.length));
+                if (selectedEl) markSelected(selectedEl);
+            }
+
+            function markSelected(id) {
+                selectedEl = id;
+                Array.prototype.slice.call(scope().querySelectorAll(".mat-selected")).forEach(function (n) { n.classList.remove("mat-selected"); });
+                var el = scope().querySelector("[data-el='" + id + "']");
+                if (el) el.classList.add("mat-selected");
+            }
+
             window.addEventListener("message", function (e) {
                 var d = e.data || {};
-                // Live preview: swap in freshly-rendered draft HTML. The click bridge above is bound to
-                // document (delegated), so it keeps working on the new content without re-running.
-                if (d.type === "mat-render" && typeof d.html === "string") { document.body.innerHTML = d.html; return; }
+                if (d.type === "mat-render" && typeof d.html === "string") { document.body.innerHTML = d.html; decorate(); return; }
+                if (d.type === "mat-select-el" && d.id) { markSelected(d.id); return; }
                 if (d.type === "mat-scroll-element" && d.id) {
-                    var el = root.querySelector("[data-el='" + d.id + "']");
+                    var el = scope().querySelector("[data-el='" + d.id + "']");
                     if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
                 }
             });
+
+            decorate();
             post({ type: "mat-preview-ready" });
             </text>
         }

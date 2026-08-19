@@ -307,6 +307,8 @@
   "forms.switchFields": "{0} Felder",
   "forms.switchUnsavedElement": "Änderungen am geöffneten Element",
   "forms.switchUnsavedSettings": "Änderungen an den Formular-Einstellungen (Name, Slug, Benachrichtigung)",
+  "forms.insertHere": "+ Element",
+  "forms.elementFallbackName": "Element",
   "forms.unreadLabel": "neu",
   "forms.submissions": "Einsendungen",
   "forms.confirmDelete": "Formular „{0}“ wirklich löschen? Alle Einsendungen gehen verloren.",

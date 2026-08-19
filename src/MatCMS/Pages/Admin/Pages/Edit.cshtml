@@ -410,11 +410,13 @@
                         title="@Model.Current.Title — @url"
                         aria-label="@T["editor.switchPage"]: @Model.Current.Title, @url">
                     <span class="mat-rs-current">
-                        <span class="badge @(curIsPrimary ? "badge-on" : "badge-off") mono">@Model.Current.Locale.ToUpperInvariant()</span>
                         <span class="mat-rs-opt-body">
                             <span class="mat-rs-opt-title">@Model.Current.Title</span>
                             <span class="mat-rs-opt-desc mono">@url</span>
                         </span>
+                        @* Right-hand side, like the entries: the badge stays put while titles of every
+                           length come and go in front of it. *@
+                        <span class="badge @(curIsPrimary ? "badge-on" : "badge-off") mono">@Model.Current.Locale.ToUpperInvariant()</span>
                     </span>
                     <span class="mat-rs-chev" aria-hidden="true">▾</span>
                 </button>
@@ -465,10 +467,13 @@
                                                (which already differs per language) and the language name. *@
                                             <span class="mat-rs-opt-desc"><span class="mono">@v.Url</span> · @MatCMS.Services.Localizer.DisplayName(v.Locale)</span>
                                         </span>
+                                        @* State first, LANGUAGE last — the language sits hard against the
+                                           right edge on purpose. It is a two-letter code of constant
+                                           width, so right-aligned it forms a column the eye can run
+                                           down; the state next to it reads "Veröffentlicht" or
+                                           "Entwurf" and would, from the outside, push that column out
+                                           of line from row to row. *@
                                         <span class="mat-rs-opt-tags">
-                                            @* Same colour code as the page list: the original is the
-                                               solid badge, a translation the muted one. *@
-                                            <span class="badge @(v.IsPrimary ? "badge-on" : "badge-off") mono">@v.Locale.ToUpperInvariant()</span>
                                             @if (v.IsPublished)
                                             {
                                                 <span class="badge badge-on">@T["pages.published"]</span>
@@ -477,6 +482,9 @@
                                             {
                                                 <span class="badge badge-off">@T["pages.draft"]</span>
                                             }
+                                            @* Same colour code as the page list: the original is the
+                                               solid badge, a translation the muted one. *@
+                                            <span class="badge @(v.IsPrimary ? "badge-on" : "badge-off") mono">@v.Locale.ToUpperInvariant()</span>
                                         </span>
                                     </a>
                                 }

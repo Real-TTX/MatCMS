@@ -802,6 +802,9 @@ table.data .btn { white-space: nowrap; }
 .le-pagepick { flex: 0 1 440px; min-width: 280px; display: flex; }
 .le-pagepick .mat-rs-trigger { width: 100%; min-width: 0; padding: 6px 12px; text-align: left; }
 .le-pagepick .mat-rs-current { gap: 9px; flex: 1 1 auto; }
+/* The badge is pushed to the right edge of the trigger, in the same column the entries put theirs in,
+   so it no longer slides left and right with the length of the title. */
+.le-pagepick .mat-rs-trigger .badge { margin-left: auto; flex: 0 0 auto; }
 /* .btn shouts in capitals and spaces its letters out — a page title and a path must not. On this site
    the Croatian titles ARE capitals ("APARTMAN 1"), so an uppercasing trigger would hide the one
    difference the operator is looking for, and an uppercased path is unreadable. */

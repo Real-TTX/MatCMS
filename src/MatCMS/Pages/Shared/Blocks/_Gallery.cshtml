@@ -68,7 +68,10 @@
                 }
             </div>
         }
-        <div class="@cls" data-gallery>
+        @* data-lightbox-group closes this gallery off: prev/next stay inside THIS block. Before, the
+           lightbox collected every [data-lightbox] on the page, so two gallery blocks under each other
+           were silently one chain and "weiter" walked out of the gallery the visitor had opened. *@
+        <div class="@cls" data-gallery data-lightbox-group>
             @foreach (var it in items)
             {
                 <figure class="gallery__item" data-tags="@it.Tags">

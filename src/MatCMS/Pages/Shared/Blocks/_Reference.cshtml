@@ -27,7 +27,11 @@
 
     var tagList = tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 }
-<article class="ref-card">
+@* Every project is its own closed gallery. On /projekte with nine references the lightbox used to
+   bind ALL [data-lightbox] on the page into one chain, so "weiter" past the last screenshot of
+   project 1 landed in project 2 — a visitor browsing "Villa Nika" ended up in someone else's job with
+   no way to tell where the boundary was. The group ends the chain here; it wraps at the article. *@
+<article class="ref-card" data-lightbox-group>
     @if (main.Length > 0)
     {
         if (href.Length > 0)

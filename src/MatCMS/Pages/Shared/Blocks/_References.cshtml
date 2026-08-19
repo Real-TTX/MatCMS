@@ -49,7 +49,8 @@
         color: var(--accent); text-decoration: none; word-break: break-all; }
     .ref-card__link:hover { text-decoration: underline; }
 
-    /* Screenshots: a scroll strip of thumbnails, full size only in the lightbox. The images here are
+    /* Screenshots: a scroll strip of thumbnails, full size only in the lightbox — which is scoped to
+       THIS reference (data-lightbox-group on .ref-card), so blättern never leaves the project. The images here are
        the generated 320-px copies, not the originals scaled by CSS: displayed at 104 px, a project
        with ten screenshots used to cost ten full-size downloads on first paint. */
     .ref-card__shots { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px;

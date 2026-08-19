@@ -20,13 +20,30 @@
 })();
 
 // Self-contained lightbox for gallery blocks. No dependencies.
+//
+// GROUPS. Every [data-lightbox] belongs to the nearest [data-lightbox-group] ancestor; links without
+// one share a single implicit page-wide group. That implicit group is what this file used to do for
+// EVERYTHING: one flat list of every [data-lightbox] on the page. On a Referenzen page with nine
+// projects that meant "weiter" ran out of project 1 and into project 2's screenshots, and two gallery
+// blocks under each other were silently one chain. Prev/next now wrap inside the group they were
+// opened from. Markup that predates the attribute (a plugin, a hand-written HTML block) still lands
+// in the implicit group and behaves exactly as before.
 (function () {
     "use strict";
-    var links = Array.prototype.slice.call(document.querySelectorAll("[data-lightbox]"));
-    if (!links.length) return;
+    var all = Array.prototype.slice.call(document.querySelectorAll("[data-lightbox]"));
+    if (!all.length) return;
 
+    // Build the groups. One entry per [data-lightbox-group] element, plus the implicit one (key null).
+    var groups = new Map();
+    all.forEach(function (a) {
+        var host = a.closest("[data-lightbox-group]");
+        if (!groups.has(host)) groups.set(host, []);
+        groups.get(host).push(a);
+    });
+
+    var links = [];                  // the links of the group currently open
     var index = 0;
-    var overlay, imgEl, capEl;
+    var overlay, imgEl, capEl, prevBtn, nextBtn;
 
     function build() {
         overlay = document.createElement("div");
@@ -39,9 +56,11 @@
         document.body.appendChild(overlay);
         imgEl = overlay.querySelector(".lb-img");
         capEl = overlay.querySelector(".lb-cap");
+        prevBtn = overlay.querySelector(".lb-prev");
+        nextBtn = overlay.querySelector(".lb-next");
         overlay.querySelector(".lb-close").addEventListener("click", close);
-        overlay.querySelector(".lb-prev").addEventListener("click", function (e) { e.stopPropagation(); step(-1); });
-        overlay.querySelector(".lb-next").addEventListener("click", function (e) { e.stopPropagation(); step(1); });
+        prevBtn.addEventListener("click", function (e) { e.stopPropagation(); step(-1); });
+        nextBtn.addEventListener("click", function (e) { e.stopPropagation(); step(1); });
         overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
         document.addEventListener("keydown", function (e) {
             if (!overlay.classList.contains("open")) return;
@@ -57,12 +76,27 @@
         var cap = a.getAttribute("data-caption") || "";
         capEl.textContent = cap;
         capEl.style.display = cap ? "" : "none";
+        // A one-image group has nothing to page through.
+        var many = links.length > 1;
+        prevBtn.style.display = many ? "" : "none";
+        nextBtn.style.display = many ? "" : "none";
     }
-    function open(i) { index = i; if (!overlay) build(); show(); overlay.classList.add("open"); document.body.style.overflow = "hidden"; }
+
+    function open(group, i) {
+        links = groups.get(group);
+        index = i;
+        if (!overlay) build();
+        show();
+        overlay.classList.add("open");
+        document.body.style.overflow = "hidden";
+    }
+
     function close() { overlay.classList.remove("open"); document.body.style.overflow = ""; }
     function step(d) { index = (index + d + links.length) % links.length; show(); }
 
-    links.forEach(function (a, i) {
-        a.addEventListener("click", function (e) { e.preventDefault(); open(i); });
+    groups.forEach(function (list, group) {
+        list.forEach(function (a, i) {
+            a.addEventListener("click", function (e) { e.preventDefault(); open(group, i); });
+        });
     });
 })();

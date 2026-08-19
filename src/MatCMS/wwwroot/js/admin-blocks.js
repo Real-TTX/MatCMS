@@ -398,7 +398,11 @@
 
         // If items carry an image, allow picking several from the media library at once; each becomes
         // an ordered entry (reorder with ▲▼). Lets a gallery use images in its OWN per-block order.
-        var imgField = (field.itemFields || []).filter(function (f) { return f.type === "image"; })[0];
+        // Case-insensitive: das Schema kommt mit "Image" (JsonStringEnumConverter schreibt den
+        // Enum-Namen, die CamelCase-Policy gilt nur für Property-NAMEN). Der Vergleich auf "image"
+        // war deshalb immer falsch — der Knopf ist nie erschienen, auch nicht bei Galerie und
+        // Logo-Leiste. buildField() lowercased an derselben Stelle längst.
+        var imgField = (field.itemFields || []).filter(function (f) { return String(f.type || "").toLowerCase() === "image"; })[0];
         if (imgField && window.openMediaPicker) {
             var bulkBtn = document.createElement("button");
             bulkBtn.type = "button";

@@ -27,8 +27,13 @@ public sealed class MatCmsCultureProvider : RequestCultureProvider
         if (isAdmin)
         {
             // Explicit admin choice (culture cookie, UI-culture part) wins; otherwise English.
+            // Checked against the ADMIN-UI list, not the content universe: an admin whose cookie still
+            // holds a language we no longer offer (hr/sk) has to land on English rather than in a UI
+            // that is 19 keys translated and German for the rest. The cookie itself is left untouched —
+            // it is the user's stored choice and takes effect again by itself the day the language is
+            // offered again.
             var pref = CookieUiCulture(httpContext.Request.Cookies[CookieRequestCultureProvider.DefaultCookieName]);
-            culture = Localizer.IsSupported(pref) ? pref! : "en";
+            culture = Localizer.IsAdminUiSupported(pref) ? pref! : "en";
         }
         else
         {

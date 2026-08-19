@@ -105,6 +105,16 @@ layer, then the folder) go into **both** Dockerfiles.
 
 Code, identifiers and comments in **English**; user-facing strings in **German**, via `@T["key"]`
 against `Resources/<culture>.json`. Comments explain the *why* and the trap, not the *what*.
+
+**Two language lists, and they are not the same thing.** `Localizer.AdminUiCultures` (de/en) is what
+the back-office switcher offers and what `/set-language` accepts — the language of the *admin*.
+`Localizer.SupportedCultures` is the *content* universe: the public `/{culture}/…` routes, the
+`i18n.languages` setting, every page and menu locale. They used to be one list, so "offer fewer admin
+languages" would have taken a live site's `/hr/` and `/sk/` pages off the air. Narrow the first one,
+never the second. `Resources/hr.json`/`sk.json` stay on disk (19 of ~1180 keys) so re-offering a
+language is a finished translation plus one entry in `AdminUiCultures`; `tools/i18n-audit.js` audits
+exactly the languages that are offered.
+
 Razor Pages use the `Index/Create/Edit` triple with `OnGetAsync` / `OnPost<Action>Async` and PRG via
 `TempData["Flash"]` / `TempData["FlashError"]`.
 

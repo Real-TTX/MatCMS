@@ -25,6 +25,11 @@ function usedKeys(dir) {
 let bad = 0;
 for (const app of ['src/MatCMS', 'src/MatCMS.Cloud']) {
     const used = usedKeys(app + '/Pages');
+    // de/en only — deliberately, and NOT because hr/sk went away: their Resources/*.json stay on disk
+    // so re-offering them later is a translation, not an archaeology. They just hold ~19 of ~1180 keys,
+    // so auditing them would report eight hundred "missing" and turn this gate permanently red for
+    // everyone. Audit a language here once it is complete enough to be offered in the admin switcher
+    // (Localizer.AdminUiCultures) — the two lists belong together.
     for (const culture of ['de', 'en']) {
         const res = JSON.parse(fs.readFileSync(app + '/Resources/' + culture + '.json', 'utf8'));
         const missing = [...used].filter(k => !(k in res)).sort();

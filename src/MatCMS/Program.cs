@@ -13,9 +13,11 @@ using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 
 // --- Localization ---------------------------------------------------------
-// Supported cultures (UI language + public content locales). Adding a language = drop
-// Resources/<culture>.json and add the code to Localizer.SupportedCultures — the switcher, cookie
-// provider, content routing and Localizer all pick it up automatically.
+// The CONTENT culture universe: public "/{culture}/…" routes, the active-languages setting and every
+// page/menu locale. Adding a content language = add the code to Localizer.SupportedCultures.
+// The ADMIN-UI language is a SECOND, smaller list (Localizer.AdminUiCultures, currently de/en) —
+// the back-office switcher and /set-language read that one. Keep them apart: they were one list once,
+// and then "offer fewer admin languages" would have deleted the /hr/ and /sk/ pages of a live site.
 string[] supportedCultures = Localizer.SupportedCultures;
 
 // --- Storage locations (persisted via Docker volume at /app/appdata) ---
@@ -448,13 +450,16 @@ app.MapGet("/admin/maintenance/preview", (SiteContext site, Localizer t) =>
 // Language switcher: sets the culture cookie and redirects back to a safe, local URL.
 // Values arrive as form fields (posted by the switcher), read them directly to avoid
 // minimal-API form-binding/antiforgery coupling.
+// The cookie only ever steers the ADMIN UI (MatCmsCultureProvider takes the public site's locale from
+// the URL), so the accepted values are Localizer.AdminUiCultures — not the content universe. Posting
+// "hr" by hand no longer stores a language the back-office cannot render; public /hr/ is untouched.
 app.MapPost("/set-language", async (HttpContext ctx) =>
 {
     var form = ctx.Request.HasFormContentType ? await ctx.Request.ReadFormAsync() : null;
     var culture = form?["culture"].ToString() ?? ctx.Request.Query["culture"].ToString();
     var returnUrl = form?["returnUrl"].ToString() ?? ctx.Request.Query["returnUrl"].ToString();
 
-    if (!string.IsNullOrEmpty(culture) && supportedCultures.Contains(culture))
+    if (Localizer.IsAdminUiSupported(culture))
     {
         ctx.Response.Cookies.Append(
             CookieRequestCultureProvider.DefaultCookieName,

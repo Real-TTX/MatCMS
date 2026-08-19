@@ -9,13 +9,18 @@
         Context.Request.Path.StartsWithSegments(path, StringComparison.OrdinalIgnoreCase) ? "active" : "";
     var displayName = User.FindFirst("DisplayName")?.Value ?? User.Identity?.Name ?? "Admin";
 
-    // Admin-UI language switcher: only offer cultures that actually have an admin translation file
-    // (Resources/<lang>.json). A content-only language (e.g. English pages) must NOT add an admin-UI
-    // toggle here — the visitor-facing language selector lives in the public template, not the admin.
+    // Admin-UI language switcher: offer exactly the languages on Localizer.AdminUiCultures, and of
+    // those only the ones that really ship a Resources/<lang>.json. Driving this off "a resource file
+    // exists" alone put hr/sk in the menu although they hold 19 of ~1180 keys. Note the list is the
+    // ADMIN-UI one on purpose — SupportedUICultures is the CONTENT universe, and narrowing THAT to
+    // shrink this menu would take the /hr/ and /sk/ pages off a live site. The visitor-facing language
+    // selector lives in the public template, not here, and is unaffected either way.
     var allUiCultures = LocOptions.Value.SupportedUICultures ?? new System.Collections.Generic.List<System.Globalization.CultureInfo>();
     string _uiLang(System.Globalization.CultureInfo c) => c.Name.Split('-', 2)[0];
-    var cultures = allUiCultures.Where(c => System.IO.File.Exists(
-        System.IO.Path.Combine(Env.ContentRootPath, "Resources", _uiLang(c) + ".json"))).ToList();
+    var cultures = allUiCultures
+        .Where(c => MatCMS.Services.Localizer.IsAdminUiSupported(_uiLang(c)))
+        .Where(c => System.IO.File.Exists(
+            System.IO.Path.Combine(Env.ContentRootPath, "Resources", _uiLang(c) + ".json"))).ToList();
     // Use Name (not TwoLetterISOLanguageName): under InvariantGlobalization the latter collapses to "iv".
     var currentCulture = System.Globalization.CultureInfo.CurrentUICulture.Name.Split('-', 2)[0];
     if (string.IsNullOrEmpty(currentCulture)) currentCulture = MatCMS.Services.Localizer.ResourceFallbackCulture;

@@ -42,6 +42,26 @@ public class Localizer
     /// </summary>
     public static readonly string[] SupportedCultures = ["de", "en", "fr", "it", "es", "hr", "sk", "nl", "pl"];
 
+    /// <summary>
+    /// The ADMIN-UI languages actually OFFERED in the back-office (the switcher in the admin foot and
+    /// what <c>/set-language</c> accepts). Deliberately a SEPARATE list from
+    /// <see cref="SupportedCultures"/>: that one is the CONTENT universe — it drives the public
+    /// "/{culture}/…" routes, <see cref="ParseActive"/> and every page/menu locale. Deriving the
+    /// back-office switcher from it (which is what the presence of <c>Resources/&lt;c&gt;.json</c> used
+    /// to do) ties the two together, and then "offer fewer admin languages" silently means "take
+    /// content languages away" — on a site with Croatian and Slovak pages that unpublishes them.
+    /// Only de/en are complete translations; hr/sk ship 19 of ~1180 keys, i.e. a German UI with a
+    /// Croatian label on it. The resource files stay on disk, so re-offering a language is this list
+    /// plus a finished translation, nothing else.
+    /// </summary>
+    public static readonly string[] AdminUiCultures = ["de", "en"];
+
+    /// <summary>True if <paramref name="culture"/> is offered as an ADMIN-UI language
+    /// (<see cref="AdminUiCultures"/>) — not to be confused with <see cref="IsSupported"/>, which
+    /// answers the same question for CONTENT locales.</summary>
+    public static bool IsAdminUiSupported(string? culture) =>
+        !string.IsNullOrEmpty(culture) && AdminUiCultures.Contains(culture);
+
     /// <summary>Routable cultures other than the current default (served under a URL prefix). Computed
     /// (not cached) so it reflects the configured <see cref="DefaultCulture"/>.</summary>
     public static IReadOnlyList<string> NonDefaultCultures =>

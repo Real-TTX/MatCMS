@@ -398,7 +398,8 @@
             <div class="mat-rs le-pagepick" data-page-switch
                  data-confirm="@T["editor.switchUnsaved"]"
                  data-confirm-block="@T["editor.switchUnsavedBlock"]"
-                 data-confirm-settings="@T["editor.switchUnsavedSettings"]">
+                 data-confirm-settings="@T["editor.switchUnsavedSettings"]"
+                 data-dirty-probe="matBlockDirty" data-dirty-forms="page-meta-form">
                 @{
                     var curIsPrimary = Model.CurrentGroup?.Versions.FirstOrDefault(v => v.Id == Model.Current.Id)?.IsPrimary != false;
                 }

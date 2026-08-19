@@ -30,6 +30,16 @@ public class EditModel : PageModel
     /// <summary>All users — offered as selectable notification recipients (those with an e-mail).</summary>
     public List<User> AllUsers { get; private set; } = new();
 
+    /// <summary>One form as the switcher in the toolbar shows it.</summary>
+    public record SwitchForm(int Id, string Name, string Slug, int Fields, int Submissions, int Unread);
+
+    // Every form, for the toolbar switcher. DELIBERATELY a flat list: a Form has no Locale and no
+    // TranslationGroup, so there is nothing to group by. On the customer instance the four language
+    // variants are four independent forms whose language lives in the NAME ("Kontakt (hr)") — a
+    // grouping here would be one this editor invented, and the moment somebody renamed a form it
+    // would fall apart. The search covers the name, so typing "hr" still finds them.
+    public IReadOnlyList<SwitchForm> SwitchForms { get; private set; } = new List<SwitchForm>();
+
     public class FormMetaInput
     {
         public string Name { get; set; } = "";
@@ -74,6 +84,7 @@ public class EditModel : PageModel
         Elements = FormDefinition.Parse(form.DefinitionJson);
 
         AllUsers = await _db.Users.AsNoTracking().OrderBy(u => u.Username).ToListAsync();
+        await LoadSwitcherAsync();
         var notify = FormNotify.Parse(form.NotifyJson);
         Settings = new SettingsInput
         {
@@ -111,6 +122,28 @@ public class EditModel : PageModel
             }
         }
         return Page();
+    }
+
+    // Feeds the toolbar switcher. Built like Forms/Index, so the switcher shows a form the same way
+    // the overview the operator came from shows it: name, slug, and how many submissions are in.
+    private async Task LoadSwitcherAsync()
+    {
+        var forms = await _db.Forms.AsNoTracking().OrderBy(f => f.Name).ToListAsync();
+        var counts = await _db.FormSubmissions
+            .GroupBy(s => s.FormId)
+            .Select(g => new { FormId = g.Key, Total = g.Count(), Unread = g.Count(s => !s.IsRead) })
+            .ToListAsync();
+
+        SwitchForms = forms.Select(f =>
+        {
+            var c = counts.FirstOrDefault(x => x.FormId == f.Id);
+            // Fields, not elements: a heading or a description is not something anybody fills in, and
+            // "3 Felder" for a form with one input reads like a miscount. Flatten so the children of
+            // a group are counted, because that is what the form asks for.
+            var fields = FormDefinition.Flatten(FormDefinition.Parse(f.DefinitionJson))
+                .Count(e => FormDefinition.IsInput(e.Type));
+            return new SwitchForm(f.Id, f.Name, f.Slug, fields, c?.Total ?? 0, c?.Unread ?? 0);
+        }).ToList();
     }
 
     public async Task<IActionResult> OnPostAddElementAsync(int id, string type)

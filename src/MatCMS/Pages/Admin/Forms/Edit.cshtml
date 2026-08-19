@@ -91,7 +91,9 @@
 
                 <details class="le-settings">
                     <summary>@T["forms.settings"]</summary>
-                    <form method="post" asp-page-handler="Meta" asp-route-id="@Model.Current.Id" class="form-grid">
+                    @* id: the switcher compares these two forms against their state at load, so leaving with an
+                       edited name/slug or an edited notification setting asks first instead of dropping it. *@
+                    <form id="form-meta-form" method="post" asp-page-handler="Meta" asp-route-id="@Model.Current.Id" class="form-grid">
                         <div class="form-field">
                             <label>@T["forms.nameField"]</label>
                             <input name="Meta.Name" value="@Model.Meta.Name" required />
@@ -106,7 +108,7 @@
 
                 <details class="le-settings">
                     <summary>@T["forms.notifyTitle"]</summary>
-                    <form method="post" asp-page-handler="Settings" asp-route-id="@Model.Current.Id" class="form-grid">
+                    <form id="form-settings-form" method="post" asp-page-handler="Settings" asp-route-id="@Model.Current.Id" class="form-grid">
                         <div class="form-field">
                             <label>@T["forms.successMessage"]</label>
                             <textarea name="Settings.SuccessMessage" rows="2" placeholder="@T["forms.successPlaceholder"]">@Model.Settings.SuccessMessage</textarea>
@@ -225,7 +227,82 @@
 
     <main class="le-preview">
         <div class="le-toolbar">
-            <span class="le-url mono">@T["forms.previewLabel"]</span>
+            @* The same switcher the page editor has (.mat-rs* + .le-pagepick), only for FORMS. What
+               differs rides along as data- attributes; the script is shared.
+               No languages and no grouping here on purpose: a Form has neither Locale nor
+               TranslationGroup. Where a site has "Kontakt (de)" and "Kontakt (hr)" those are two
+               independent forms whose language lives in the name — the search finds it, but this
+               editor does not invent a relation the data does not have. *@
+            @{
+                string FormSearch(MatCMS.Pages.Admin.Forms.EditModel.SwitchForm f) =>
+                    (f.Name + " " + f.Slug).ToLowerInvariant();
+            }
+            <div class="mat-rs le-pagepick" data-page-switch
+                 data-confirm="@T["editor.switchUnsaved"]"
+                 data-confirm-block="@T["forms.switchUnsavedElement"]"
+                 data-confirm-settings="@T["forms.switchUnsavedSettings"]"
+                 data-dirty-probe="matElementDirty" data-dirty-forms="form-meta-form,form-settings-form">
+                <button type="button" class="btn btn-sm btn-ghost mat-rs-trigger" data-ps-btn
+                        aria-haspopup="listbox" aria-expanded="false"
+                        title="@Model.Current.Name — @Model.Current.Slug"
+                        aria-label="@T["forms.switchForm"]: @Model.Current.Name, @Model.Current.Slug">
+                    <span class="mat-rs-current">
+                        <span class="mat-rs-opt-body">
+                            <span class="mat-rs-opt-title">@Model.Current.Name</span>
+                            <span class="mat-rs-opt-desc mono">@Model.Current.Slug</span>
+                        </span>
+                    </span>
+                    <span class="mat-rs-chev" aria-hidden="true">▾</span>
+                </button>
+                <div class="mat-rs-menu" data-ps-menu hidden>
+                    <div class="mat-rs-sheet-head">
+                        <span class="mat-rs-sheet-title">@T["forms.switchForm"]</span>
+                        <button type="button" class="mat-rs-close" data-ps-close aria-label="@T["editor.close"]">✕</button>
+                    </div>
+                    <div class="bpick-search ps-search">
+                        <svg class="bpick-sico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+                        <input type="search" data-ps-search placeholder="@T["forms.switchSearch"]" autocomplete="off"
+                               role="combobox" aria-expanded="true" aria-controls="ps-list" aria-autocomplete="list" />
+                    </div>
+                    <div class="mat-rs-scroll" id="ps-list" role="listbox" aria-label="@T["forms.switchForm"]">
+                        <div class="ps-section" role="presentation" data-ps-section>
+                            <div class="bpick-grouphead" data-ps-head>@T["forms.switchAll"]</div>
+                            <div class="bpick-group" role="presentation" data-ps-group>
+                                @foreach (var f in Model.SwitchForms)
+                                {
+                                    <a class="mat-rs-opt" role="option" tabindex="-1" data-ps-opt
+                                       id="ps-opt-@f.Id"
+                                       href="@Url.Page("Edit", new { id = f.Id })"
+                                       data-title="@f.Name"
+                                       data-search="@FormSearch(f)"
+                                       aria-selected="@(f.Id == Model.Current.Id ? "true" : "false")">
+                                        <span class="mat-rs-opt-body">
+                                            <span class="mat-rs-opt-title">@f.Name</span>
+                                            @* Slug and field count: the slug is how a "form" block
+                                               references this form, the count says at a glance which
+                                               of two similarly named forms is the built-out one. *@
+                                            <span class="mat-rs-opt-desc"><span class="mono">@f.Slug</span> · @T["forms.switchFields", f.Fields]</span>
+                                        </span>
+                                        <span class="mat-rs-opt-tags">
+                                            @if (f.Unread > 0)
+                                            {
+                                                <span class="badge badge-new">@f.Unread @T["forms.unreadLabel"]</span>
+                                            }
+                                            @* Outermost and of constant shape, like the language badge
+                                               in the page switcher: the counts line up in one column. *@
+                                            <span class="badge @(f.Submissions > 0 ? "badge-on" : "badge-off") mono">@f.Submissions</span>
+                                        </span>
+                                    </a>
+                                }
+                            </div>
+                        </div>
+                        <p class="bpick-empty" data-ps-empty hidden>@T["forms.switchNone"]</p>
+                    </div>
+                </div>
+            </div>
+            <div class="actions le-toolbar-actions">
+                <a class="btn btn-sm btn-ghost" asp-page="Submissions" asp-route-id="@Model.Current.Id">@T["forms.submissions"]</a>
+            </div>
         </div>
         <div class="le-frame-wrap">
             <iframe id="preview-frame" src="@previewUrl" title="@T["editor.livePreview"]"></iframe>
@@ -236,4 +313,8 @@
 @section Scripts {
     <script src="~/js/admin-sortable.js" asp-append-version="true"></script>
     <script src="~/js/admin-form-builder.js" asp-append-version="true"></script>
+    @* Same dropdown as the page editor. Loaded AFTER the builder: the switcher asks that script
+       whether the open element still carries unsaved edits before it lets go of the page. *@
+    <link rel="stylesheet" href="~/css/mat-richselect.css" asp-append-version="true" />
+    <script src="~/js/admin-page-switcher.js" asp-append-version="true"></script>
 }

@@ -1,4 +1,7 @@
-// The page switcher in the live editor's toolbar.
+// The switcher in the live editor's toolbar — used by the PAGE editor and the FORM editor. The file
+// name predates the second use; what differs between the two rides along as data- attributes on the
+// picker (which editor state to ask about, which settings forms to watch, the wording), never as a
+// branch on which editor is rendering.
 //
 // Look and markup are the FORM field "richselect" (.mat-rs*, mat-richselect.css): two-line entries
 // with a title, the address, the language and the state, an inline dropdown on the desktop and a
@@ -41,20 +44,27 @@
     function isOpen() { return !menu.hidden; }
 
     // ---------- unsaved-change guard ----------------------------------------------------------
-    // Two independent pots of unsaved work in this editor, both browser-side until submitted:
-    // the open block's fields (admin-blocks.js) and the page settings form.
-    var metaForm = document.getElementById("page-meta-form");
+    // Two independent pots of unsaved work in either editor, both browser-side until submitted:
+    //   1. the thing currently open in the sidebar — the block (admin-blocks.js) or the form element
+    //      (admin-form-builder.js). Named by data-dirty-probe, a global that answers true/false.
+    //   2. the settings forms, listed BY ID in data-dirty-forms. Explicit and not "every form in the
+    //      sidebar", because both editors also carry action-only forms (create translation, link
+    //      translation, delete) whose controls change without anything being unsaved.
     function snapshot(form) {
         if (!form) return "";
         try { return new URLSearchParams(new FormData(form)).toString(); } catch (e) { return ""; }
     }
-    var metaPristine = snapshot(metaForm);
+    var probeName = root.getAttribute("data-dirty-probe") || "";
+    var watched = (root.getAttribute("data-dirty-forms") || "").split(",")
+        .map(function (s) { return document.getElementById(s.trim()); })
+        .filter(function (f) { return !!f; })
+        .map(function (f) { return { form: f, pristine: snapshot(f) }; });
 
     function lostWork() {
         var parts = [];
-        if (typeof window.matBlockDirty === "function" && window.matBlockDirty())
+        if (probeName && typeof window[probeName] === "function" && window[probeName]())
             parts.push(root.getAttribute("data-confirm-block") || "");
-        if (metaForm && snapshot(metaForm) !== metaPristine)
+        if (watched.some(function (w) { return snapshot(w.form) !== w.pristine; }))
             parts.push(root.getAttribute("data-confirm-settings") || "");
         return parts.filter(function (p) { return !!p; });
     }

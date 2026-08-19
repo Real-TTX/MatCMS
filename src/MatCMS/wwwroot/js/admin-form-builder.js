@@ -106,6 +106,15 @@
         output.value = JSON.stringify(read());
     });
 
+    // What the element looked like the moment its panel was built. The switcher in the toolbar asks
+    // this before it lets go of the page — nothing here is persisted until the form is submitted.
+    // A comparison, not an "input" listener: the controls fire events while they are being set up,
+    // so a listener would call an untouched element dirty and the question would come every time.
+    var elPristine = JSON.stringify(read());
+    window.matElementDirty = function () {
+        try { return JSON.stringify(read()) !== elPristine; } catch (e) { return false; }
+    };
+
     // ---------- Live preview: re-render the whole (unsaved) form on every edit ----------
     (function () {
         var tokenEl = document.querySelector('input[name="__RequestVerificationToken"]');

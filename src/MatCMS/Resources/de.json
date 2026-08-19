@@ -675,6 +675,8 @@
   "block.gallery.opt.source.media": "Aus Mediathek",
   "block.gallery.f.layout": "Layout",
   "block.gallery.f.columns": "Spalten",
+  "block.gallery.f.strip": "Bildstreifen in der Großansicht",
+  "block.gallery.f.strip.help": "Zeigt am unteren Rand der geöffneten Ansicht alle Bilder dieser Galerie – das aktuelle in der Mitte. Aus = wie bisher.",
   "block.gallery.f.images": "Bilder",
   "block.gallery.f.image": "Bild",
   "block.gallery.f.caption": "Bildunterschrift",

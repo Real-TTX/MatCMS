@@ -393,6 +393,12 @@ public class BlockRegistry
                     Options = [ new("grid", "block.opt.layout.grid"), new("masonry", "block.opt.layout.masonry") ] },
                 new BlockField { Id = "columns", Label = "block.gallery.f.columns", Type = FieldType.Select, Default = "3",
                     Options = [ new("2", "block.opt.columns.2"), new("3", "block.opt.columns.3"), new("4", "block.opt.columns.4") ] },
+                // Default "no", and that is the whole point: an existing block carries no "strip" key,
+                // reads back as the default and keeps rendering what it rendered yesterday. A filmstrip
+                // that switched itself on across every customer site would be a redesign by update.
+                new BlockField { Id = "strip", Label = "block.gallery.f.strip", Type = FieldType.Select, Default = "no",
+                    Options = [ new("no", "block.opt.yesno.no"), new("yes", "block.opt.yesno.yes") ],
+                    Help = "block.gallery.f.strip.help" },
                 new BlockField
                 {
                     Id = "images", Label = "block.gallery.f.images", Type = FieldType.List, ItemLabel = "block.gallery.item",

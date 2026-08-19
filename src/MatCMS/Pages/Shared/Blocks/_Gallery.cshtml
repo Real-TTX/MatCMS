@@ -8,6 +8,10 @@
     var columns = Model.StrOr("columns", "3");
     var source = Model.StrOr("source", "manual");
     var showFilter = Model.StrOr("showFilter", "yes") != "no";
+    // Opt-in, default off: a filmstrip appearing under every existing customer gallery after an
+    // update is a redesign nobody asked for. Stored blocks have no "strip" key at all, so they read
+    // back as "no" and render exactly as before.
+    var strip = Model.StrOr("strip", "no") == "yes";
 
     static string SafeSrc(string image) =>
         (!string.IsNullOrWhiteSpace(image)
@@ -51,6 +55,11 @@
     }
 
     var cls = "gallery gallery--" + (layout == "masonry" ? "masonry" : "grid") + " cols-" + columns;
+    // The option rides in the VALUE of the group attribute, not in a second data-strip attribute.
+    // Razor does not drop an attribute just because its value is null (measured: it emits
+    // data-strip=""), so a separate flag would leave an empty attribute on every existing gallery
+    // that never switched the option on. The group attribute has to be there either way.
+    string? group = strip ? "strip" : null;
 }
 <section class="section gallery-block">
     <div class="container">
@@ -71,15 +80,22 @@
         @* data-lightbox-group closes this gallery off: prev/next stay inside THIS block. Before, the
            lightbox collected every [data-lightbox] on the page, so two gallery blocks under each other
            were silently one chain and "weiter" walked out of the gallery the visitor had opened. *@
-        <div class="@cls" data-gallery data-lightbox-group>
+        <div class="@cls" data-gallery data-lightbox-group="@group">
             @foreach (var it in items)
             {
+                // Whole-attribute-or-nothing, and a null IHtmlContent in CONTENT position writes
+                // nothing — the only way to leave the tag of an unchanged gallery untouched. Html.Raw
+                // is safe here: SafeSrc above already rejected quotes, parentheses and backslashes,
+                // and the URL builder only prefixes a fixed path.
+                var thumbAttr = strip
+                    ? Html.Raw($" data-thumb=\"{MatCMS.Services.ThumbnailService.Url(it.Src, 320)}\"")
+                    : null;
                 <figure class="gallery__item" data-tags="@it.Tags">
                     @* The TILE gets the scaled copy, the link keeps the original: what the grid shows is
                        ~400 px wide, so a 2 MB phone photo was being downloaded in full to be squeezed
                        into it by CSS. href stays untouched — that is the URL stored in the page, and the
                        lightbox must still open the real picture. *@
-                    <a href="@it.Src" class="gallery__link" data-lightbox data-caption="@it.Caption">
+                    <a href="@it.Src" class="gallery__link" data-lightbox data-caption="@it.Caption"@thumbAttr>
                         <img src="@MatCMS.Services.ThumbnailService.Url(it.Src, 1200)" alt="@it.Alt" loading="lazy" />
                     </a>
                     @if (!string.IsNullOrWhiteSpace(it.Caption))

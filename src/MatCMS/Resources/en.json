@@ -675,6 +675,8 @@
   "block.gallery.opt.source.media": "From Media Library",
   "block.gallery.f.layout": "Layout",
   "block.gallery.f.columns": "Columns",
+  "block.gallery.f.strip": "Filmstrip in the lightbox",
+  "block.gallery.f.strip.help": "Shows every image of this gallery along the bottom edge of the opened view, the current one centred. Off = unchanged.",
   "block.gallery.f.images": "Images",
   "block.gallery.f.image": "Image",
   "block.gallery.f.caption": "Caption",

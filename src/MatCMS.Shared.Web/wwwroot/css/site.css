@@ -412,6 +412,44 @@ h1, h2, h3, h4 {
 .lightbox .lb-prev { left: 8px; }
 .lightbox .lb-next { right: 8px; }
 
+/* Bildstreifen — only when the gallery block asked for it (.lightbox--strip). Kept out of the plain
+   .lightbox rules on purpose: without the modifier not one declaration below applies, so a gallery
+   that never switched the option on is byte-for-byte the old overlay. */
+.lightbox .lb-strip { display: none; }
+/* The side padding is half the strip minus half a thumbnail, and it is what makes "the active one is
+   in the middle" true at BOTH ENDS. Without it scrollLeft simply clamps at 0, so picture 1 of 16 sat
+   at the left edge instead of centred (measured: 220 px off). The padding buys the scroll range the
+   first and last thumbnail need to reach the centre. --lb-thumb-w = image width + the 2 px borders. */
+.lightbox--strip .lb-strip { --lb-thumb-w: 96px;
+    position: absolute; left: 0; right: 0; bottom: 0; display: flex; gap: 8px;
+    padding: 12px calc(50% - var(--lb-thumb-w) / 2) calc(12px + env(safe-area-inset-bottom, 0px));
+    overflow-x: auto; overflow-y: hidden;
+    background: linear-gradient(to top, rgba(0,0,0,.75), rgba(0,0,0,0));
+    scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
+/* The picture makes room for the strip instead of hiding behind it. */
+.lightbox--strip .lb-figure { max-height: 74vh; margin-bottom: 96px; }
+.lightbox--strip .lb-img { max-height: 66vh; }
+.lightbox--strip .lb-prev, .lightbox--strip .lb-next { top: calc(50% - 48px); }
+.lightbox .lb-thumb { position: static; flex: 0 0 auto; padding: 0; line-height: 0; border-radius: 6px;
+    overflow: hidden; opacity: .5; border: 2px solid transparent; transition: opacity .15s ease, border-color .15s ease; }
+.lightbox .lb-thumb img { width: 92px; height: 62px; object-fit: cover; display: block; }
+.lightbox .lb-thumb:hover { opacity: .85; }
+/* The active one must be readable at a glance: full opacity AND a ring — colour alone is not enough. */
+.lightbox .lb-thumb.is-active { opacity: 1; border-color: #fff; }
+.lightbox .lb-thumb:focus-visible { outline: 2px solid var(--accent, #fff); outline-offset: 2px; }
+
+@media (max-width: 640px) {
+    .lightbox--strip .lb-strip { --lb-thumb-w: 72px; }
+    .lightbox--strip .lb-figure { margin-bottom: 78px; }
+    .lightbox .lb-thumb img { width: 68px; height: 46px; }
+}
+/* No gliding for anyone who asked the OS for less motion. The script already passes behavior:"auto"
+   to scrollTo; this covers the CSS side (a smooth scroll-behaviour inherited from the page). */
+@media (prefers-reduced-motion: reduce) {
+    .lightbox .lb-strip { scroll-behavior: auto; }
+    .lightbox .lb-thumb { transition: none; }
+}
+
 /* ---------- Service grid ---------- */
 .service-grid { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); counter-reset: svc; }
 .service-card { counter-increment: svc; }

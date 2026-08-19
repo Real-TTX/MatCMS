@@ -1,0 +1,76 @@
+@model MatCMS.Content.BlockData
+@{
+    var title = Model.Str("title");
+    var subtitle = Model.Str("subtitle");
+    var url = Model.Str("url");
+    var tags = Model.Str("tags");
+
+    // Same guard the card/gallery blocks use: only site-relative or http(s) sources, and nothing that
+    // could break out of the attribute.
+    static string Safe(string v, bool url = false) =>
+        (!string.IsNullOrWhiteSpace(v)
+            && (v.StartsWith("/") || v.StartsWith("http://") || v.StartsWith("https://") || (url && (v.StartsWith("#") || v.StartsWith("mailto:") || v.StartsWith("tel:"))))
+            && v.IndexOfAny(new[] { '"', '\'', '(', ')', '\\', '\n', '\r', ' ' }) < 0)
+            ? v : "";
+
+    var href = Safe(url, url: true);
+    var shots = Model.List("screenshots")
+        .Select(s => (Src: Safe(s.Str("image")), Alt: s.Str("alt"), Caption: s.Str("caption")))
+        .Where(s => s.Src.Length > 0).ToList();
+
+    // Hauptbild is optional — without one the first screenshot moves up, so a reference is never a
+    // headless block of text. It then stays in the strip too: the strip is the lightbox's running
+    // order, and dropping it would make the first screenshot unreachable at full size.
+    var main = Safe(Model.Str("image"));
+    var mainAlt = title;
+    if (main.Length == 0 && shots.Count > 0) { main = shots[0].Src; mainAlt = string.IsNullOrWhiteSpace(shots[0].Alt) ? title : shots[0].Alt; }
+
+    var tagList = tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+}
+<article class="ref-card">
+    @if (main.Length > 0)
+    {
+        if (href.Length > 0)
+        {
+            <a class="ref-card__media" href="@href" rel="noopener" target="_blank"><img src="@main" alt="@mainAlt" loading="lazy" decoding="async" /></a>
+        }
+        else
+        {
+            <figure class="ref-card__media"><img src="@main" alt="@mainAlt" loading="lazy" decoding="async" /></figure>
+        }
+    }
+    <div class="ref-card__body">
+        @if (!string.IsNullOrWhiteSpace(title))
+        {
+            <h3>@if (href.Length > 0) { <a href="@href" rel="noopener" target="_blank">@title</a> } else { @title }</h3>
+        }
+        @if (!string.IsNullOrWhiteSpace(subtitle))
+        {
+            <p class="ref-card__text">@subtitle</p>
+        }
+        @if (tagList.Length > 0)
+        {
+            <div class="ref-card__tags">
+                @foreach (var t in tagList)
+                {
+                    <span class="ref-card__tag">@t</span>
+                }
+            </div>
+        }
+        @if (shots.Count > 0)
+        {
+            <div class="ref-card__shots">
+                @foreach (var s in shots)
+                {
+                    <a class="ref-card__shot" href="@s.Src" data-lightbox data-caption="@(string.IsNullOrWhiteSpace(s.Caption) ? title : s.Caption)">
+                        <img src="@s.Src" alt="@s.Alt" loading="lazy" decoding="async" />
+                    </a>
+                }
+            </div>
+        }
+        @if (href.Length > 0)
+        {
+            <a class="ref-card__link" href="@href" rel="noopener" target="_blank">@url</a>
+        }
+    </div>
+</article>

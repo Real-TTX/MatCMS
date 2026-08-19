@@ -41,6 +41,7 @@ public class BlockRegistry
         ["hero"] = "design", ["cta"] = "design", ["cards"] = "design", ["card"] = "design",
         ["leistungen"] = "design", ["leistung"] = "design", ["servicegrid"] = "design",
         ["service"] = "design", ["imagetext"] = "design", ["posts"] = "design",
+        ["references"] = "design", ["reference"] = "design",
         ["form"] = "form",
         ["html"] = "embed"
     };
@@ -89,6 +90,7 @@ public class BlockRegistry
     private const string SvgImageText = @"<rect x=""3"" y=""4"" width=""8"" height=""16"" rx=""1""/><path d=""M14 7h6""/><path d=""M14 12h6""/><path d=""M14 17h4""/>";
     private const string SvgSpacer = @"<path d=""M4 12h16""/><path d=""M8 7l4-4 4 4""/><path d=""M8 17l4 4 4-4""/>";
     private const string SvgLogoStrip = @"<rect x=""3"" y=""9"" width=""5"" height=""6"" rx=""1""/><rect x=""10"" y=""9"" width=""5"" height=""6"" rx=""1""/><rect x=""17"" y=""9"" width=""4"" height=""6"" rx=""1""/>";
+    private const string SvgReferences = @"<rect x=""3"" y=""4"" width=""8"" height=""7"" rx=""1""/><rect x=""3"" y=""14"" width=""8"" height=""6"" rx=""1""/><path d=""M14 6h7""/><path d=""M14 10h5""/><path d=""M14 16h7""/><path d=""M14 20h5""/>";
     private const string SvgForm = @"<rect x=""4"" y=""3"" width=""16"" height=""18"" rx=""2""/><path d=""M8 8h8""/><path d=""M8 12h8""/><path d=""M8 16h4""/>";
 
     // Name / Description / field Label / option Label / ItemLabel hold LOCALIZATION KEYS
@@ -455,7 +457,7 @@ public class BlockRegistry
             // Generic grouping container: holds arbitrary content blocks AND other containers (cards,
             // columns, service grid, accordion, leistungen) — nested containers render recursively.
             AllowedChildren = ["richtext", "image", "imagetext", "cta", "quote", "html", "gallery", "logostrip", "spacer", "posts",
-                               "cards", "columns", "servicegrid", "accordion", "leistungen", "section"],
+                               "cards", "columns", "servicegrid", "accordion", "leistungen", "references", "section"],
             Fields =
             [
                 new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },
@@ -491,6 +493,66 @@ public class BlockRegistry
                 new BlockField { Id = "showFilter", Label = "block.gallery.f.showFilter", Type = FieldType.Select, Default = "no",
                     Options = [ new("yes", "block.opt.yesno.yes"), new("no", "block.opt.yesno.no") ],
                     Help = "block.posts.f.showFilter.help" },
+            ]
+        },
+        // Referenzen/Projekte. A CONTAINER with one child block per reference — not a component and
+        // not one flat List field: a component can never sit inside a container (AllowedChildren only
+        // ever names built-in types) and its {{field}} template renders exactly once, so it cannot
+        // repeat; and a single List cannot itself carry a second (screenshot) list per entry. Children
+        // are the shape the editor already gives per-entry add/remove, ordering and a settings panel.
+        new BlockDefinition
+        {
+            Type = "references",
+            Name = "block.references.name",
+            Description = "block.references.desc",
+            Svg = SvgReferences,
+            Partial = "Blocks/_References",
+            AllowedChildren = ["reference"],
+            Fields =
+            [
+                new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },
+                new BlockField { Id = "intro", Label = "block.f.intro", Type = FieldType.Textarea },
+                // Kachel oder Liste. The children stay layout-agnostic (as card/cards already do): the
+                // switch is a class on the wrapper, so flipping it never rewrites a stored reference.
+                new BlockField { Id = "display", Label = "block.references.f.display", Type = FieldType.Select, Default = "grid",
+                    Options = [ new("grid", "block.references.opt.grid"), new("list", "block.references.opt.list") ] },
+                new BlockField { Id = "columns", Label = "block.gallery.f.columns", Type = FieldType.Select, Default = "3",
+                    ShowWhenField = "display", ShowWhenValue = "grid",
+                    Options = [ new("2", "block.opt.columns.2"), new("3", "block.opt.columns.3"), new("4", "block.opt.columns.4") ] },
+            ]
+        },
+        new BlockDefinition
+        {
+            Type = "reference",
+            Name = "block.reference.name",
+            Description = "block.reference.desc",
+            Svg = SvgImageText,
+            Partial = "Blocks/_Reference",
+            ChildOnly = true,
+            Fields =
+            [
+                new BlockField { Id = "image", Label = "block.reference.f.image", Type = FieldType.Image,
+                    Help = "Optional. Ohne Hauptbild rückt der erste Screenshot nach." },
+                new BlockField { Id = "title", Label = "block.f.title", Type = FieldType.Text },
+                new BlockField { Id = "subtitle", Label = "block.reference.f.subtitle", Type = FieldType.Textarea },
+                new BlockField { Id = "url", Label = "block.reference.f.url", Type = FieldType.Url, Placeholder = "https://" },
+                // Tags stay a plain comma-separated string — the shape TagUtil and the card block already
+                // read. No tag table and no maintenance screen for six words per project.
+                new BlockField { Id = "tags", Label = "block.reference.f.tags", Type = FieldType.Text,
+                    Help = "Stack o. Ä. als Chips (kommagetrennt), z. B. „ASP.NET Core, SQLite, Docker“." },
+                new BlockField
+                {
+                    Id = "screenshots", Label = "block.reference.f.screenshots", Type = FieldType.List,
+                    ItemLabel = "block.reference.item",
+                    // An item field of type image ⇒ the editor offers the media library's multi-pick
+                    // button, so a whole set of screenshots is added at once and reordered with ▲▼.
+                    ItemFields =
+                    [
+                        new BlockField { Id = "image", Label = "block.f.image", Type = FieldType.Image },
+                        new BlockField { Id = "alt", Label = "block.f.alt", Type = FieldType.Text },
+                        new BlockField { Id = "caption", Label = "block.gallery.f.caption", Type = FieldType.Text },
+                    ]
+                },
             ]
         },
         new BlockDefinition

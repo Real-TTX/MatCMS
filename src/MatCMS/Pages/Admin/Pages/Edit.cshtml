@@ -379,8 +379,12 @@
     </aside>
 
     <main class="le-preview">
+        @* No separate path on the left any more — it moved INTO the switcher, under the title. The bar
+           was saying the same thing twice, and the copy on the left was the worse of the two: cut off
+           with an ellipsis and no tooltip, and standing apart from the language badge that explains
+           it. In the trigger the prefix that tells the languages apart (/apartment-1 against
+           /hr/apartment-1) sits directly next to that badge. *@
         <div class="le-toolbar">
-            <span class="le-url mono">@url</span>
             @* Page switcher, middle of the bar. Built from the FORM field "richselect" (.mat-rs*):
                two-line entries with title, address, language and state — the admin already has that
                dropdown, and a page list that shows nothing but a title is unusable on a site where
@@ -395,11 +399,22 @@
                  data-confirm="@T["editor.switchUnsaved"]"
                  data-confirm-block="@T["editor.switchUnsavedBlock"]"
                  data-confirm-settings="@T["editor.switchUnsavedSettings"]">
+                @{
+                    var curIsPrimary = Model.CurrentGroup?.Versions.FirstOrDefault(v => v.Id == Model.Current.Id)?.IsPrimary != false;
+                }
+                @* The trigger shows exactly what an ENTRY shows — badge, title, address — because that
+                   is what it is: the entry you are standing on. title= carries both in full, so a long
+                   path can still be read; the path line it replaced had no tooltip at all. *@
                 <button type="button" class="btn btn-sm btn-ghost mat-rs-trigger" data-ps-btn
-                        aria-haspopup="listbox" aria-expanded="false" title="@T["editor.switchPage"]">
+                        aria-haspopup="listbox" aria-expanded="false"
+                        title="@Model.Current.Title — @url"
+                        aria-label="@T["editor.switchPage"]: @Model.Current.Title, @url">
                     <span class="mat-rs-current">
-                        <span class="badge @(Model.CurrentGroup?.Versions.FirstOrDefault(v => v.Id == Model.Current.Id)?.IsPrimary == false ? "badge-off" : "badge-on") mono">@Model.Current.Locale.ToUpperInvariant()</span>
-                        <span class="mat-rs-cur-title">@Model.Current.Title</span>
+                        <span class="badge @(curIsPrimary ? "badge-on" : "badge-off") mono">@Model.Current.Locale.ToUpperInvariant()</span>
+                        <span class="mat-rs-opt-body">
+                            <span class="mat-rs-opt-title">@Model.Current.Title</span>
+                            <span class="mat-rs-opt-desc mono">@url</span>
+                        </span>
                     </span>
                     <span class="mat-rs-chev" aria-hidden="true">▾</span>
                 </button>

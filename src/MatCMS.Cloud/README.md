@@ -1,16 +1,58 @@
-# MatCMS.Cloud – Control Plane für MatCMS-Instanzen
+<div align="center">
+
+<img src="wwwroot/img/logo.svg" width="240" alt="MatCMS.Cloud" />
+
+# MatCMS.Cloud
+
+**Die Control Plane für selbst gehostete MatCMS-Instanzen.**
+
+Alle Websites zentral im Blick: Update-Überwachung, Benachrichtigungen, Fern-Updates mit Rollback
+und Profil-Sync – für eine Instanz oder eine ganze Flotte.
+
+</div>
+
+![Übersicht: Online/Offline, verfügbare Updates, zentrale Release-Überwachung und die letzten Ereignisse](../../docs/images/cloud-overview.png)
+
+---
 
 **MatCMS.Cloud** ist die zentrale Verwaltung für selbst-gehostete
 [MatCMS](https://github.com/Real-TTX/MatCMS)-Installationen. Eine MatCMS-Instanz verbindet sich mit
 der Cloud; darüber laufen **Update-Überwachung**, **Benachrichtigungen** und – wo möglich – die
-**Ausführung der Updates**. Später kommt das Deployen/Synchronhalten von Plugins, Benutzern, SMTP
-und Komponenten dazu.
+**Ausführung der Updates**, dazu **Profile & Sync** für Einstellungen, Benutzer, Plugins und
+Komponenten.
 
 - **Framework:** ASP.NET Core 10 (Razor Pages), C# – identischer Stack wie MatCMS
 - **Datenbank:** SQLite (via EF Core) – eine Datei, kein extra DB-Container
 - **Auth:** Cookie-basiert, Login **nur** über `/login` (Standard: `admin` / `admin`)
 - **Ports:** intern `8080` (Basis-Image-Default), gemappt auf Host `9100`
 - **Persistenz:** ein Docker-Volume `matcms-cloud-data` → `/app/appdata` (DB, Keys)
+
+## Screenshots
+
+### Instanzen im Überblick
+
+![Instanzen-Liste mit Status, Hosting, Version und Update-Hinweis](../../docs/images/cloud-instances.png)
+
+Alle verbundenen Instanzen mit **Online-/Offline-Status**, *lokal/remote*, gemeldeter Version und dem
+letzten Heartbeat. Durchsuchbar, filterbar und wahlweise als Kacheln mit Live-Vorschau; eine Instanz
+mit älterem Image bekommt einen **Update**-Hinweis.
+
+### Übersicht & Release-Überwachung
+
+![Dashboard mit Kennzahlen und zentraler Release-Prüfung](../../docs/images/cloud-overview.png)
+
+Kennzahlen (Instanzen, online, offline, Updates verfügbar), die **zentrale** GHCR-Release-Prüfung für
+alle Instanzen auf einmal und die letzten Ereignisse (offline, neue Version, Sync).
+
+### Profile & Einstellungen
+
+| Profile | Einstellungen |
+|---|---|
+| ![Profile](../../docs/images/cloud-profiles.png) | ![Einstellungen](../../docs/images/cloud-settings.png) |
+
+Profile bündeln Konfiguration (Einstellungen/SMTP, Benutzer, Plugins, Komponenten, Templates) und
+rollen sie auf zugeordnete Instanzen aus; die globalen Einstellungen steuern Benachrichtigungen und
+Auto-Update.
 
 ---
 
@@ -151,15 +193,16 @@ In MatCMS liegt die Gegenseite unter *Einstellungen → Cloud*. Die API dahinter
 
 Zwei GitHub-Actions-Workflows bauen das Docker-Image und pushen es in die
 **GitHub Container Registry (GHCR)** unter `ghcr.io/<owner>/matcms-cloud`
-(der `<owner>` wird kleingeschrieben).
+(der `<owner>` wird kleingeschrieben). Im Monorepo lösen sie nur bei Änderungen unter
+`src/MatCMS.Cloud/**` aus (`paths:`-Filter), bauen also kein CMS-Image mit.
 
-| Branch / Kontext | Workflow                        | Version                                | `:latest`? |
-|------------------|---------------------------------|----------------------------------------|:----------:|
-| `main` (Release) | `.github/workflows/release.yml` | `MAJOR.MINOR.<build>-<datetime>`       | ja         |
-| `dev` (Nightly)  | `.github/workflows/dev.yml`     | `nightly-<build>-<datetime>`           | nein       |
-| lokal            | (Dockerfile-Default)            | `local-<datetime>` (manuell empfohlen) | –          |
+| Branch / Kontext | Workflow                              | Version                                | `:latest`? |
+|------------------|---------------------------------------|----------------------------------------|:----------:|
+| `main` (Release) | `.github/workflows/cloud-release.yml` | `MAJOR.MINOR.<build>-<datetime>`       | ja         |
+| `dev` (Nightly)  | `.github/workflows/cloud-dev.yml`     | `nightly-<build>-<datetime>`           | nein       |
+| lokal            | (Dockerfile-Default)                  | `local-<datetime>` (manuell empfohlen) | –          |
 
-- `MAJOR.MINOR` kommt aus der Datei **`VERSION`** im Repo-Wurzelverzeichnis (Default `1.0`).
+- `MAJOR.MINOR` kommt aus der Datei **`VERSION`** im Projektordner `src/MatCMS.Cloud` (Default `1.0`).
 - `<build>` = `github.run_number`, `<datetime>` = UTC `yyyyMMddHHmmss`.
 - Die berechnete Version wird als Build-Arg **`APP_VERSION`** übergeben und als
   `InformationalVersion` hinterlegt.
@@ -216,9 +259,9 @@ MatCMS.Cloud/
 
 - SQLite-DB (`appdata/matcmscloud.db`) und Data-Protection-Keys liegen im **einen** Volume
   `matcms-cloud-data` (`/app/appdata`).
-- Das Schema wird beim Start automatisch angelegt (`EnsureCreated`). **Hinweis:** Bei
-  Schema-Änderungen am Modell muss das Volume zurückgesetzt werden (`docker compose down -v`), da
-  ohne EF-Migrationen gearbeitet wird — genau wie bei MatCMS.
+- Das Schema wird beim Start per **EF-Core-Migration** (`db.Database.Migrate()`) angelegt und
+  fortgeschrieben — Schema-Änderungen kommen als Migration ins Repo, ein Volume-Reset ist dafür
+  nicht nötig (genau wie bei MatCMS).
 
 ---
 

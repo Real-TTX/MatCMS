@@ -4,273 +4,242 @@
 
 # MatCMS.Cloud
 
-**Die Control Plane für selbst gehostete MatCMS-Instanzen.**
+**The control plane for self-hosted MatCMS instances.**
 
-Alle Websites zentral im Blick: Update-Überwachung, Benachrichtigungen, Fern-Updates mit Rollback
-und Profil-Sync – für eine Instanz oder eine ganze Flotte.
+Every website in one view: update monitoring, notifications, remote updates with rollback and profile
+sync – for a single instance or a whole fleet.
 
 </div>
 
-![Übersicht: Online/Offline, verfügbare Updates, zentrale Release-Überwachung und die letzten Ereignisse](../../docs/images/cloud-overview.png)
+![Overview: online/offline, available updates, central release monitoring and the latest events](../../docs/images/cloud-overview.png)
 
 ---
 
-**MatCMS.Cloud** ist die zentrale Verwaltung für selbst-gehostete
-[MatCMS](https://github.com/Real-TTX/MatCMS)-Installationen. Eine MatCMS-Instanz verbindet sich mit
-der Cloud; darüber laufen **Update-Überwachung**, **Benachrichtigungen** und – wo möglich – die
-**Ausführung der Updates**, dazu **Profile & Sync** für Einstellungen, Benutzer, Plugins und
-Komponenten.
+**MatCMS.Cloud** is the central management for self-hosted
+[MatCMS](https://github.com/Real-TTX/MatCMS) installations. A MatCMS instance connects to the cloud;
+from there run **update monitoring**, **notifications** and – where possible – the **execution of
+updates**, plus **profiles & sync** for settings, users, plugins and components.
 
-- **Framework:** ASP.NET Core 10 (Razor Pages), C# – identischer Stack wie MatCMS
-- **Datenbank:** SQLite (via EF Core) – eine Datei, kein extra DB-Container
-- **Auth:** Cookie-basiert, Login **nur** über `/login` (Standard: `admin` / `admin`)
-- **Ports:** intern `8080` (Basis-Image-Default), gemappt auf Host `9100`
-- **Persistenz:** ein Docker-Volume `matcms-cloud-data` → `/app/appdata` (DB, Keys)
+- **Framework:** ASP.NET Core 10 (Razor Pages), C# – the same stack as MatCMS
+- **Database:** SQLite (via EF Core) – one file, no extra DB container
+- **Auth:** cookie-based, sign-in **only** via `/login` (default: `admin` / `admin`)
+- **Ports:** internally `8080` (base-image default), mapped to host `9100`
+- **Persistence:** one Docker volume `matcms-cloud-data` → `/app/appdata` (DB, keys)
 
 ## Screenshots
 
-### Instanzen im Überblick
+### Instances at a glance
 
-![Instanzen-Liste mit Status, Hosting, Version und Update-Hinweis](../../docs/images/cloud-instances.png)
+![Instance list with status, hosting, version and update hint](../../docs/images/cloud-instances.png)
 
-Alle verbundenen Instanzen mit **Online-/Offline-Status**, *lokal/remote*, gemeldeter Version und dem
-letzten Heartbeat. Durchsuchbar, filterbar und wahlweise als Kacheln mit Live-Vorschau; eine Instanz
-mit älterem Image bekommt einen **Update**-Hinweis.
+All connected instances with their **online/offline status**, *local/remote*, reported version and
+the last heartbeat. Searchable, filterable and optionally as tiles with a live preview; an instance
+on an older image gets an **update** hint.
 
-### Übersicht & Release-Überwachung
+### Overview & release monitoring
 
-![Dashboard mit Kennzahlen und zentraler Release-Prüfung](../../docs/images/cloud-overview.png)
+![Dashboard with metrics and the central release check](../../docs/images/cloud-overview.png)
 
-Kennzahlen (Instanzen, online, offline, Updates verfügbar), die **zentrale** GHCR-Release-Prüfung für
-alle Instanzen auf einmal und die letzten Ereignisse (offline, neue Version, Sync).
+Metrics (instances, online, offline, updates available), the **central** GHCR release check for all
+instances at once, and the latest events (offline, new version, sync).
 
-### Profile & Einstellungen
+### Profiles & settings
 
-| Profile | Einstellungen |
+| Profiles | Settings |
 |---|---|
-| ![Profile](../../docs/images/cloud-profiles.png) | ![Einstellungen](../../docs/images/cloud-settings.png) |
+| ![Profiles](../../docs/images/cloud-profiles.png) | ![Settings](../../docs/images/cloud-settings.png) |
 
-Profile bündeln Konfiguration (Einstellungen/SMTP, Benutzer, Plugins, Komponenten, Templates) und
-rollen sie auf zugeordnete Instanzen aus; die globalen Einstellungen steuern Benachrichtigungen und
-Auto-Update.
-
----
-
-## Funktionsumfang
-
-- **Instanzen** – Verbindung per Join-Code oder Adoption, Heartbeat im Minutentakt, Online-/Offline-Status
-  (Dead-Man-Switch nach ~150 s), gemeldete Version, Host, Container und Inhalts-Zahlen, Verlauf je
-  Instanz. Die Liste lässt sich durchsuchen und filtern (online/offline, wartet auf Freigabe, Update
-  verfügbar, Konfiguration abweichend) und auf **Kacheln mit Live-Vorschau** der Startseiten
-  umschalten; jede Instanz hat außerdem einen Vorschau-Tab mit der eingebetteten Website.
-- **Update-Überwachung** – die Cloud fragt **einmal zentral** die GitHub Container Registry nach dem
-  neuesten `ghcr.io/real-ttx/matcms`-Release ab (alle 30 Minuten) und vergleicht gegen jede Instanz.
-  Die Instanzen müssen selbst nicht mehr prüfen.
-- **Lokal vs. remote** – die Cloud erkennt selbst, ob eine Instanz auf **demselben Docker-Host**
-  läuft: die Instanz meldet ihre Container-ID, die Cloud sucht sie über den gemounteten Docker-Socket.
-  Treffer = *lokal*, sonst *remote*. Ein Umzug auf einen anderen Host stuft die Instanz automatisch
-  wieder auf *remote* zurück.
-- **Updates ausführen** – für **lokale** Instanzen per Klick: neues Image ziehen, Container mit
-  identischer Konfiguration (Env, Volumes, Ports, Labels, Netzwerke) neu erstellen, starten – bei
-  einem Fehler **Rollback** auf den alten Container. Optional automatisch (Standard: aus).
-  Für **remote**-Instanzen nur der Hinweis samt Befehl.
-- **Benachrichtigungen** – E-Mail (MailKit/SMTP) bei *Instanz offline*, *neue Version verfügbar* und
-  *fehlgeschlagenem Update*. Jeweils **einmal pro Ereignis**, nicht pro Prüfung.
-- **Profile & Sync** – Konfiguration (Einstellungen/SMTP, Benutzer, Plugins, Komponenten) wird an
-  Profilen gepflegt und auf alle zugeordneten Instanzen ausgerollt; siehe unten.
-- **Benutzer** – Cloud-Operatoren mit Login per E-Mail.
-
-Noch nicht gebaut (siehe `CLAUDE.md` → Backlog): eine Vorschau, was ein Sync ändern würde, bevor er
-angewendet wird, und das Provisionieren neuer Instanzen über MatOS/Matcad.
+Profiles bundle configuration (settings/SMTP, users, plugins, components, templates) and roll it out
+to the assigned instances; the global settings control notifications and auto-update.
 
 ---
 
-## Schnellstart mit Docker (empfohlen)
+## Feature set
 
-Voraussetzung: Docker Desktop.
+- **Instances** – connect via a join code or adoption, a heartbeat every minute, online/offline
+  status (dead-man switch after ~150 s), reported version, host, container and content counts, and a
+  per-instance history. The list is searchable and filterable (online/offline, awaiting approval,
+  update available, configuration drift) and can switch to **tiles with a live preview** of the home
+  pages; every instance also has a preview tab with the embedded website.
+- **Update monitoring** – the cloud polls the GitHub Container Registry for the latest
+  `ghcr.io/real-ttx/matcms` release **once, centrally** (every 30 minutes) and compares it against
+  every instance. The instances no longer have to check for themselves.
+- **Local vs. remote** – the cloud works out by itself whether an instance runs on the **same Docker
+  host**: the instance reports its container id, the cloud looks it up over the mounted Docker
+  socket. Match = *local*, otherwise *remote*. Moving to another host automatically demotes the
+  instance back to *remote*.
+- **Running updates** – for **local** instances at a click: pull the new image, recreate the
+  container with an identical configuration (env, volumes, ports, labels, networks), start it – and
+  on failure **roll back** to the old container. Optionally automatic (default: off). For **remote**
+  instances just the hint plus the command.
+- **Notifications** – email (MailKit/SMTP) on *instance offline*, *new version available* and *failed
+  update*. Each **once per event**, not once per check.
+- **Profiles & sync** – configuration (settings/SMTP, users, plugins, components) is maintained on
+  profiles and rolled out to all assigned instances; see below.
+- **Users** – cloud operators signing in by email.
+
+Not built yet (see `CLAUDE.md` → backlog): a preview of what a sync would change before it is applied,
+and provisioning new instances through MatOS/Matcad.
+
+---
+
+## Quick start with Docker (recommended)
+
+Prerequisite: Docker Desktop.
 
 ```bash
 docker compose up -d --build
 ```
 
-Danach läuft die Oberfläche auf **http://localhost:9100**
-Admin-Login: **http://localhost:9100/login** (Benutzer `admin`, Passwort `admin`).
+The UI then runs at **http://localhost:9100**
+Admin sign-in: **http://localhost:9100/login** (user `admin`, password `admin`).
 
-Alternativ das mitgelieferte Skript:
+Or the bundled script:
 
 ```bash
 ./run-docker.ps1
 ```
 
-Nützliche Befehle:
+Useful commands:
 
 ```bash
-docker compose logs -f       # Logs ansehen
-docker compose down          # stoppen (Daten bleiben im Volume erhalten)
-docker compose up -d --build # neu bauen & starten
-docker compose down -v       # ZURÜCKSETZEN (löscht das Volume: DB, Keys)
+docker compose logs -f       # follow logs
+docker compose down          # stop (data stays in the volume)
+docker compose up -d --build # rebuild & start
+docker compose down -v       # RESET (deletes the volume: DB, keys)
 ```
 
-### Docker-Socket: optional, aber Voraussetzung fürs Update-Ausführen
+### Docker socket: optional, but required for running updates
 
-`docker-compose.yml` mountet `/var/run/docker.sock`. Nur damit kann die Cloud lokale Instanzen
-erkennen **und** aktualisieren. Der Mount ist eine Rechteausweitung (Socket-Zugriff ≙ root auf dem
-Host) – wer nur Benachrichtigungen will, entfernt die Zeile; dann gilt jede Instanz als *remote*.
-Der Update-Code fasst ausschließlich Container an, deren Image (oder Compose-Projekt) als MatCMS
-identifiziert wurde.
+`docker-compose.yml` mounts `/var/run/docker.sock`. Only with it can the cloud detect **and** update
+local instances. The mount is a privilege escalation (socket access ≙ root on the host) – if you only
+want notifications, remove the line; then every instance counts as *remote*. The update code only
+touches containers whose image (or compose project) was identified as MatCMS.
 
-Unter Windows/Docker Desktop ist der Endpunkt `npipe://./pipe/docker_engine`
-(`MatCmsCloud__Docker__Endpoint`), das setzt `run-dev.ps1` automatisch.
-
----
-
-## Eine Instanz verbinden
-
-Es gibt zwei Wege, beide unter **Instanzen → Instanz hinzufügen**:
-
-**Weg 1 – die Instanz meldet sich (Join-Code).** Jedes Profil hat einen Join-Code. In MatCMS unter
-*Einstellungen → Cloud* die Cloud-URL und den Code eintragen – die Instanz holt sich Zugangsdaten und
-Konfiguration selbst. Funktioniert auch hinter NAT, weil die Verbindung ausgehend aufgebaut wird, und
-ist der Weg zum Ausrollen vieler Seiten: Der Code hängt am **Profil**, die Instanz landet also
-automatisch in der richtigen Gruppe.
-
-**Weg 2 – die Cloud verbindet sich (Adoption).** URL einer bestehenden Instanz plus ein
-Administrator-Konto *von dieser Instanz* eingeben. Die Cloud übergibt die Verbindung direkt; die
-Instanz prüft die Zugangsdaten gegen ihre eigene Benutzertabelle, bevor sie sie annimmt. Die
-Zugangsdaten werden nur für diesen einen Vorgang benutzt und nicht gespeichert. Dafür muss die
-Instanz einmal erreichbar sein – danach läuft alles wieder ausgehend.
-
-Ob eine neue Instanz sofort aktiv ist oder erst freigegeben werden muss, steuert der Schalter
-**Automatisch freigeben** am Profil.
-
-## Profile
-
-Ein Profil bündelt Regeln und Konfiguration für die zugeordneten Instanzen:
-
-- **Regeln** – Benachrichtigungen, Empfänger, automatisches Update lokaler Instanzen. Ohne Profil
-  gelten die globalen Einstellungen.
-- **Einstellungen** – SMTP-Block plus beliebige weitere MatCMS-Einstellungsschlüssel.
-- **Benutzer** – Konten, die auf den Instanzen angelegt werden. Das Passwort wird einmal in der Cloud
-  gehasht; im Klartext wird es nirgends gespeichert.
-- **Plugins** – Plugin-Pakete, wie MatCMS sie exportiert. Gleicher Schlüssel = Aktualisierung.
-  Ein hochgeladenes Paket lässt sich hier **direkt bearbeiten** (Name, Version, Beschreibung, C#-Code);
-  beim Speichern wird es neu gepackt, mitgelieferte Dateien bleiben unverändert.
-- **Komponenten** – wiederverwendbare Blöcke, identifiziert über ihren Typ. Der Editor ist derselbe
-  wie in MatCMS: Felder anklicken statt JSON tippen, Testdaten eingeben, **Live-Vorschau** des
-  gerenderten Blocks, plus ein Debug-Panel, das Platzhalter ohne passendes Feld anzeigt.
-- **Templates** – komplette Designs samt Layout-HTML, CSS, JS, Parametern und Layout-Teilen, mit
-  **Live-Vorschau**: eine Beispielseite, die sich beim Tippen mitverändert, Farbwähler für alle
-  Farbwerte und CodeMirror für HTML/CSS/JS. Nicht aufgelöste `{{platzhalter}}` werden in der Vorschau
-  rot markiert. Am schnellsten geht es so: Template in MatCMS fertig bauen, dort unter *Templates →
-  Template öffnen → „Als JSON exportieren"* herunterladen und hier im Profil einfügen. Welches
-  Template auf den Instanzen **aktiv** wird, ist ein eigener Schalter – leer bedeutet, dass die
-  Instanz ihre Wahl behält. Die vom Kunden gesetzten Template-Parameter werden nicht überschrieben.
-
-Jede Änderung erhöht die **Revision** des Profils. Die Instanzen sehen sie im Heartbeat, holen sich
-die neue Konfiguration und melden zurück, welche Revision sie angewendet haben – daraus entsteht die
-Anzeige *synchron / abweichend / Fehler* je Instanz.
-
-Pro Nutzlast lässt sich einstellen, ob die Cloud **überschreibt** (Instanz wird angeglichen) oder nur
-**ergänzt** (nur Fehlendes wird angelegt). Drei Regeln gelten dabei immer:
-
-1. **Benutzer werden nur ergänzt** – bestehende Konten werden nie geändert oder gelöscht. Sonst
-   könnte man sich über eine Cloud-Einstellung aus der eigenen Seite aussperren.
-2. **Nichts wird gelöscht**, nur weil es nicht mehr im Profil steht. Ein Plugin aus dem Profil zu
-   nehmen stoppt künftige Rollouts, entfernt es aber nicht von laufenden Seiten.
-3. **Importierte Plugins bleiben deaktiviert** – Plugin-Code läuft serverseitig, das schaltet ein
-   Mensch auf der Instanz frei.
-
-In MatCMS liegt die Gegenseite unter *Einstellungen → Cloud*. Die API dahinter:
-`POST /api/instances/{id}/heartbeat` mit dem Header `X-MatCMS-Instance-Token`.
-
-> **Damit „lokal" erkannt wird**, muss die Instanz ihre Container-ID melden – das passiert
-> automatisch aus `/proc/self/cgroup` bzw. `/proc/self/mountinfo`. Optional kann per Umgebungs-
-> variable `MATCMS_IMAGE` das eigene Image gemeldet werden (nur zur Anzeige).
+On Windows/Docker Desktop the endpoint is `npipe://./pipe/docker_engine`
+(`MatCmsCloud__Docker__Endpoint`), which `run-dev.ps1` sets automatically.
 
 ---
 
-## CI/CD & Versionierung
+## Connecting an instance
 
-Zwei GitHub-Actions-Workflows bauen das Docker-Image und pushen es in die
-**GitHub Container Registry (GHCR)** unter `ghcr.io/<owner>/matcms-cloud`
-(der `<owner>` wird kleingeschrieben). Im Monorepo lösen sie nur bei Änderungen unter
-`src/MatCMS.Cloud/**` aus (`paths:`-Filter), bauen also kein CMS-Image mit.
+There are two ways, both under **Instances → Add instance**:
 
-| Branch / Kontext | Workflow                              | Version                                | `:latest`? |
+**Way 1 – the instance reaches out (join code).** Every profile has a join code. In MatCMS, under
+*Settings → Cloud*, enter the cloud URL and the code – the instance fetches its credentials and
+configuration itself. This works behind NAT too, because the connection is outbound, and it is the
+way to roll out many sites: the code belongs to the **profile**, so the instance automatically lands
+in the right group.
+
+**Way 2 – the cloud reaches out (adoption).** Enter the URL of an existing instance plus an
+administrator account *of that instance*. The cloud hands the connection over directly; the instance
+verifies the credentials against its own user table before accepting them. The credentials are used
+for this one operation only and are not stored. For this the instance has to be reachable once –
+after that everything is outbound again.
+
+Whether a new instance is active right away or has to be approved first is controlled by the
+**Auto-approve** switch on the profile.
+
+## Profiles
+
+A profile bundles rules and configuration for its assigned instances:
+
+- **Rules** – notifications, recipients, automatic updates of local instances. Without a profile the
+  global settings apply.
+- **Settings** – an SMTP block plus any other MatCMS setting keys.
+- **Users** – accounts created on the instances. The password is hashed once in the cloud; it is
+  never stored in clear text.
+- **Plugins** – plugin packages as MatCMS exports them. Same key = an update. An uploaded package can
+  be **edited right here** (name, version, description, C# code); on save it is repacked, bundled
+  files stay unchanged.
+- **Components** – reusable blocks, identified by their type. The editor is the same as in MatCMS:
+  click fields instead of typing JSON, enter test data, get a **live preview** of the rendered block,
+  plus a debug panel that shows placeholders without a matching field.
+- **Templates** – complete designs with layout HTML, CSS, JS, parameters and layout parts, with a
+  **live preview**: a sample page that changes as you type, color pickers for every color value and
+  CodeMirror for HTML/CSS/JS. Unresolved `{{placeholders}}` are highlighted red in the preview. The
+  fastest way: build the template in MatCMS, export it there under *Templates → open template → "Export
+  as JSON"* and paste it into the profile here. Which template becomes **active** on the instances is
+  a separate switch – empty means the instance keeps its choice. Template parameters set by the
+  customer are not overwritten.
+
+Every change bumps the profile's **revision**. The instances see it in the heartbeat, fetch the new
+configuration and report back which revision they applied – that is where the *in sync / drifted /
+error* display per instance comes from.
+
+Per payload you can set whether the cloud **overwrites** (the instance is aligned) or only **adds**
+(only what is missing is created). Three rules always hold:
+
+1. **Users are only added** – existing accounts are never changed or deleted. Otherwise a cloud
+   setting could lock you out of your own site.
+2. **Nothing is deleted** just because it is no longer in the profile. Removing a plugin from the
+   profile stops future rollouts but does not remove it from running sites.
+3. **Imported plugins stay disabled** – plugin code runs server-side, so a human enables it on the
+   instance.
+
+In MatCMS the other side lives under *Settings → Cloud*. The API behind it:
+`POST /api/instances/{id}/heartbeat` with the header `X-MatCMS-Instance-Token`.
+
+> **For "local" to be detected**, the instance must report its container id – which happens
+> automatically from `/proc/self/cgroup` or `/proc/self/mountinfo`. Optionally the environment
+> variable `MATCMS_IMAGE` can report its own image (for display only).
+
+---
+
+## CI/CD & versioning
+
+Two GitHub Actions workflows build the Docker image and push it to the
+**GitHub Container Registry (GHCR)** under `ghcr.io/<owner>/matcms-cloud` (the `<owner>` is
+lowercased). In the monorepo they only fire on changes under `src/MatCMS.Cloud/**` (`paths:` filter),
+so they never build a CMS image.
+
+| Branch / context | Workflow                              | Version                                | `:latest`? |
 |------------------|---------------------------------------|----------------------------------------|:----------:|
-| `main` (Release) | `.github/workflows/cloud-release.yml` | `MAJOR.MINOR.<build>-<datetime>`       | ja         |
-| `dev` (Nightly)  | `.github/workflows/cloud-dev.yml`     | `nightly-<build>-<datetime>`           | nein       |
-| lokal            | (Dockerfile-Default)                  | `local-<datetime>` (manuell empfohlen) | –          |
+| `main` (release) | `.github/workflows/cloud-release.yml` | `MAJOR.MINOR.<build>-<datetime>`       | yes        |
+| `dev` (nightly)  | `.github/workflows/cloud-dev.yml`     | `nightly-<build>-<datetime>`           | no         |
+| local            | (Dockerfile default)                  | `local-<datetime>` (set it manually)   | –          |
 
-- `MAJOR.MINOR` kommt aus der Datei **`VERSION`** im Projektordner `src/MatCMS.Cloud` (Default `1.0`).
+- `MAJOR.MINOR` comes from the **`VERSION`** file in the project folder `src/MatCMS.Cloud` (default `1.0`).
 - `<build>` = `github.run_number`, `<datetime>` = UTC `yyyyMMddHHmmss`.
-- Die berechnete Version wird als Build-Arg **`APP_VERSION`** übergeben und als
-  `InformationalVersion` hinterlegt.
+- The computed version is passed as build arg **`APP_VERSION`** and stored as `InformationalVersion`.
 
 ---
 
-## Lokale Entwicklung (Hot Reload)
+## Local development (hot reload)
 
-Voraussetzung: .NET SDK 10.
+Prerequisite: .NET SDK 10.
 
 ```bash
 ./run-dev.ps1
 ```
 
-bzw. manuell:
+or manually:
 
 ```bash
 dotnet restore
 dotnet watch run
 ```
 
-Läuft ebenfalls auf **http://localhost:9100**.
+Also runs at **http://localhost:9100**.
 
 ---
 
-## Projektstruktur
+## Data & persistence
 
-```
-MatCMS.Cloud/
-├─ Program.cs                  # Startup, DI, Auth, Rate-Limits, Instanz-API (Heartbeat/Disconnect)
-├─ Data/                       # EF Core DbContext + DbSeeder
-├─ Models/                     # Instance, InstanceEvent, User, CloudSetting
-├─ Services/
-│  ├─ InstanceService.cs       # Pairing, Token-Auth, Heartbeat, lokal/remote-Klassifizierung
-│  ├─ InstanceProtocol.cs      # Wire-Contract (HeartbeatRequest/Response) + Protokoll-Version
-│  ├─ DockerHostService.cs     # Container finden + Update ausführen (Docker.DotNet)
-│  ├─ GhcrClient.cs            # GHCR-Tag-Abfrage + Versionsvergleich
-│  ├─ ReleaseWatcher.cs        # zentraler Release-Poll (30 min) als Singleton-Cache
-│  ├─ InstanceMonitorService.cs# Watchdog: offline, Update-Hinweis, Auto-Update
-│  ├─ EmailService.cs          # SMTP via MailKit (465 implizit SSL + 587 STARTTLS)
-│  └─ …                        # Auth, CloudContext, Localizer, SettingKeys, VersionService
-├─ Resources/                  # i18n-Strings der Oberfläche (de.json / en.json)
-├─ Pages/
-│  ├─ Login / Logout / Error
-│  ├─ Shared/_AdminLayout.cshtml
-│  └─ Admin/                   # Übersicht, Instanzen, Einstellungen, Benutzer
-├─ wwwroot/                    # site.css + admin.css (aus MatCMS), cloud.css, Tabler-Icons
-├─ Dockerfile / docker-compose.yml
-├─ VERSION                     # MAJOR.MINOR für die CI-Versionierung
-└─ appdata/                    # Laufzeitdaten: SQLite-DB, Keys (Volume, gitignored)
-```
-
-### Daten & Persistenz
-
-- SQLite-DB (`appdata/matcmscloud.db`) und Data-Protection-Keys liegen im **einen** Volume
+- The SQLite DB (`appdata/matcmscloud.db`) and the data-protection keys live in the **one** volume
   `matcms-cloud-data` (`/app/appdata`).
-- Das Schema wird beim Start per **EF-Core-Migration** (`db.Database.Migrate()`) angelegt und
-  fortgeschrieben — Schema-Änderungen kommen als Migration ins Repo, ein Volume-Reset ist dafür
-  nicht nötig (genau wie bei MatCMS).
+- The schema is created and kept up to date at startup via **EF Core migrations**
+  (`db.Database.Migrate()`) – schema changes ship as a migration in the repo, no volume reset needed
+  (just like MatCMS).
 
 ---
 
-## Sicherheitshinweise
+## Security notes
 
-- **Standard-Zugang `admin` / `admin` nach dem ersten Start ändern.**
-- Für den öffentlichen Betrieb hinter einen **Reverse-Proxy mit HTTPS** stellen. Der Container
-  spricht intern HTTP auf 8080; Host-Port 9100 kommt nur aus dem Compose-Mapping.
-- **Login-Schutz:** `/login` ist pro Client-IP ratenbegrenzt (10/min), die Instanz-API auf 120/min.
-  Hinter einem Reverse-Proxy `ForwardedHeaders` aktivieren, damit die echte Client-IP zählt.
-- **Instanz-Token** werden nur als SHA-256-Hash gespeichert und beim Vergleich zeitkonstant geprüft.
-- **Der Docker-Socket ist der kritischste Teil.** Nur mounten, wenn die Cloud Updates ausführen soll.
+- **Change the default `admin` / `admin` login after the first start.**
+- For public operation put it behind a **reverse proxy with HTTPS**. The container speaks HTTP on
+  8080 internally; host port 9100 only comes from the compose mapping.
+- **Login protection:** `/login` is rate-limited per client IP (10/min), the instance API at 120/min.
+  Behind a reverse proxy enable `ForwardedHeaders` so the real client IP counts.
+- **Instance tokens** are stored only as a SHA-256 hash and compared in constant time.
+- **The Docker socket is the most critical part.** Only mount it if the cloud should run updates.

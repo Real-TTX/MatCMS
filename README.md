@@ -4,113 +4,112 @@
 
 # MatCMS
 
-**Ein leichtgewichtiges, block-basiertes CMS – selbst gehostet, in einem Container.**
+**A lightweight, block-based CMS – self-hosted, in a single container.**
 
-Seiten aus Blöcken bauen, Templates und Menüs pflegen, Formulare klicken, mehrsprachig
-übersetzen – und alles per Backup sichern. Kein Cloud-Zwang, keine Fremd-Dienste, eine SQLite-Datei.
+Build pages from blocks, manage templates and menus, click forms together, translate across
+languages – and back everything up. No cloud lock-in, no third-party services, one SQLite file.
 
 </div>
 
-![Der Live-Editor: Blockliste links, echte Seitenvorschau rechts](docs/images/page-editor.png)
+![The live editor: block list on the left, a real page preview on the right](docs/images/page-editor.png)
 
 ---
 
-## Worum es geht
+## What this is about
 
-Die meisten CMS sind entweder ein Datenbank-Monster mit Plugin-Zoo oder ein Baukasten, der dir
-nach dem ersten Kunden über den Kopf wächst. MatCMS liegt dazwischen: eine **ASP.NET-Core-Anwendung
-in genau einem Docker-Container**, die eine Website aus **Blöcken** zusammensetzt – mit Live-Vorschau,
-Templates, Plugins, Formularen und voller Mehrsprachigkeit. Eine Instanz = eine Website; mehrere
-Websites laufen als mehrere Container nebeneinander und lassen sich zentral über die
-[Cloud-Control-Plane](#cloud) überwachen und aktualisieren.
+Most content systems are either a database monster with a plugin zoo or a builder that outgrows you
+after the first client. MatCMS sits in between: an **ASP.NET Core application in exactly one Docker
+container** that assembles a website from **blocks** – with a live preview, templates, plugins, forms
+and full multilingual support. One instance = one website; several websites run as several containers
+side by side and can be watched and updated centrally from the [cloud control plane](#cloud).
 
-## Auf einen Blick
+## At a glance
 
-**Seiten & Inhalte**
-- **Block-basierter Editor** mit Blockliste, **Drag & Drop** und **echter Live-Vorschau** der Seite
-- **Kategorisierte Blockauswahl** mit Suche, Favoriten und „zuletzt verwendet" – Layout, Text,
-  Medien, Design, Formular, Embed, Plugin- und Custom-Blöcke
-- **Verschachtelte Blöcke** (Spalten, Sektionen, Karten-Grids mit Kind-Elementen)
-- **Posts/Blog**, Menüs, Medien-Bibliothek und wiederverwendbare **Komponenten**
+**Pages & content**
+- **Block-based editor** with a block list, **drag & drop** and a **real live preview** of the page
+- **Categorized block picker** with search, favorites and "recently used" – layout, text, media,
+  design, form, embed, plugin and custom blocks
+- **Nested blocks** (columns, sections, card grids with child elements)
+- **Posts/blog**, menus, a media library and reusable **components**
 
-**Templates & Design**
-- **Templates** je Seitentyp (Header/Footer/Layout-Teile), zentral gepflegt
-- **Plugins** als in C# geschriebene Blöcke (Roslyn-Scripting, zur Laufzeit ausgeführt) –
-  z. B. Google-Bewertungen mit im Block einstellbarer Überschrift
-- Heller/dunkler Auftritt, sauberes Off-Canvas-Layout auf schmalen Screens
+**Templates & design**
+- **Templates** per page type (header/footer/layout parts), maintained in one place
+- **Plugins** as blocks written in C# (Roslyn scripting, executed at runtime) – e.g. Google reviews
+  with a heading configurable right in the block
+- Light/dark appearance, a clean off-canvas layout on narrow screens
 
-**Formulare**
-- **Visueller Formular-Builder** mit Live-Vorschau: Text, E-Mail, Auswahl, Gruppen, Bedingungen
-- **Eigene Controls**: Bild-Auswahl mit Titel/Tags/Beschreibung, **Datums- und Zeitraum-Picker**
-  (zwei Monate, flexible „± Tage") – auf Mobil als Vollbild-Dialog
-- Alle Button-/Feld-Texte pro Feld anpassbar und **je Sprache übersetzbar**
-- Bestätigungstext, E-Mail-Benachrichtigung, Einsendungen im Admin
+**Forms**
+- **Visual form builder** with a live preview: text, email, choice, groups, conditions
+- **Custom controls**: an image picker with title/tags/description and a **date & date-range picker**
+  (two months, flexible "± days") – rendered as a full-screen dialog on mobile
+- Every button/field text is adjustable per field and **translatable per language**
+- Confirmation message, email notification, submissions in the admin
 
-**Mehrsprachigkeit**
-- Eigene Seiten-/Formular-Version **pro Sprache** (de/en/hr/sk … über `<html lang>` gesteuert)
-- **Übersetzungs-Vergleich** (Diff) feldweise: was ist übersetzt, was fehlt, Klick-zum-Bearbeiten
-- Datepicker-Monatsnamen, Wochentage und Standard-Texte automatisch je Sprache
+**Multilingual**
+- A separate page/form version **per language** (de/en/hr/sk … driven by `<html lang>`)
+- A field-level **translation diff**: what is translated, what is missing, click-to-edit
+- Datepicker month names, weekdays and default texts follow the language automatically
 
-**Betrieb**
-- **Backup/Restore**: selektiver Export/Import (Seiten, Formulare, Medien, Einstellungen …)
-- Benutzer & Rollen, Mail-Templates, SMTP
-- **Ein Container, ein Volume** – DB, Data-Protection-Keys, Uploads und geplante Backups darin
-- Zentrale **Update-Überwachung & Fern-Updates** über die [Cloud](#cloud)
+**Operations**
+- **Backup/restore**: selective export/import (pages, forms, media, settings …)
+- Users & roles, mail templates, SMTP
+- **One container, one volume** – DB, data-protection keys, uploads and scheduled backups inside it
+- Central **update monitoring & remote updates** through the [cloud](#cloud)
 
 ## Screenshots
 
-### Block-basiertes Bearbeiten
+### Block-based editing
 
-![Live-Editor mit Blockliste und Vorschau](docs/images/page-editor.png)
+![Live editor with block list and preview](docs/images/page-editor.png)
 
-Jede Seite besteht aus Blöcken. Links die sortierbare Liste (per Drag & Drop), rechts die echte
-Vorschau – Änderungen erscheinen sofort.
+Every page is made of blocks. The sortable list (drag & drop) on the left, the real preview on the
+right – changes show up immediately.
 
-### Blockauswahl – kategorisiert, mit Suche
+### Block picker – categorized, with search
 
-![Der Add-Block-Dialog mit Kategorien und Kacheln](docs/images/block-picker.png)
+![The add-block dialog with categories and tiles](docs/images/block-picker.png)
 
-Suche, Kategorien (Layout, Text, Medien, Design, Formular, Embed, Plugins, Custom) sowie
-**Favoriten** und **zuletzt verwendet**. Gleich große, klare Kacheln.
+Search, categories (layout, text, media, design, form, embed, plugins, custom) plus **favorites** and
+**recently used**. Uniform, tidy tiles.
 
-### Formular-Builder
+### Form builder
 
-![Formular-Editor mit Elementliste und Live-Vorschau](docs/images/form-builder.png)
+![Form editor with element list and live preview](docs/images/form-builder.png)
 
-Elemente zusammenklicken, rechts sofort sehen. Neben Standardfeldern gibt es eigene Controls wie die
-Bild-Auswahl und den Zeitraum-Picker – und pro Feld übersetzbare Texte.
+Click elements together and see the result on the right. Alongside the standard fields there are
+custom controls like the image picker and the date-range picker – with per-field translatable texts.
 
 ### Frontend
 
-| Startseite | Kontaktformular |
+| Home page | Contact form |
 |---|---|
-| ![Öffentliche Startseite](docs/images/home.png) | ![Gerendertes Formular](docs/images/form.png) |
+| ![Public home page](docs/images/home.png) | ![Rendered form](docs/images/form.png) |
 
-Aus denselben Blöcken entsteht die öffentliche Seite – schnell, ohne Aufbau-Ruckeln, in Hell/Dunkel.
+The public site is built from the same blocks – fast, no layout jank, in light or dark.
 
-### Verwaltung
+### Administration
 
-| Templates | Plugins | Medien |
+| Templates | Plugins | Media |
 |---|---|---|
-| ![Templates](docs/images/templates.png) | ![Plugins](docs/images/plugins.png) | ![Medien-Bibliothek](docs/images/media.png) |
+| ![Templates](docs/images/templates.png) | ![Plugins](docs/images/plugins.png) | ![Media library](docs/images/media.png) |
 
-Templates, Plugins, Medien, Komponenten, Menüs, Benutzer, Mail-Templates und Backup – alles in einer
-Oberfläche, in Deutsch **und** Englisch.
+Templates, plugins, media, components, menus, users, mail templates and backup – all in one
+interface, in English **and** German.
 
-### Auf dem Handy
+### On mobile
 
-| Startseite | Formular |
+| Home page | Form |
 |---|---|
-| ![Startseite auf dem Handy](docs/images/mobile-home.png) | ![Formular auf dem Handy](docs/images/mobile-form.png) |
+| ![Home page on a phone](docs/images/mobile-home.png) | ![Form on a phone](docs/images/mobile-form.png) |
 
-## Schnellstart
+## Quick start
 
-Fertige Images liegen in der GitHub Container Registry:
+Ready-made images are published to the GitHub Container Registry:
 
-| Tag | Gebaut aus | Wofür |
+| Tag | Built from | Use it for |
 |---|---|---|
-| `ghcr.io/real-ttx/matcms:latest` | `main` | Releases |
-| `ghcr.io/real-ttx/matcms:nightly` | `dev` | die neuesten Features |
+| `ghcr.io/real-ttx/matcms:latest` | `main` | releases |
+| `ghcr.io/real-ttx/matcms:nightly` | `dev` | the newest features |
 
 `docker-compose.yml`:
 
@@ -123,7 +122,7 @@ services:
     ports:
       - "9101:8080"
     volumes:
-      - matcms-data:/app/appdata   # DB, Keys, Uploads, Backups – alles hier drin
+      - matcms-data:/app/appdata   # DB, keys, uploads, backups – everything lives here
 
 volumes:
   matcms-data:
@@ -133,70 +132,69 @@ volumes:
 docker compose up -d
 ```
 
-**http://localhost:9101** öffnen und mit **`admin` / `admin`** anmelden. Ein Update ist danach nur
-`docker compose pull && docker compose up -d` – das Volume behält Inhalte, Einstellungen und Keys.
+Open **http://localhost:9101** and sign in with **`admin` / `admin`**. An update afterwards is just
+`docker compose pull && docker compose up -d` – the volume keeps content, settings and keys.
 
 ## Cloud
 
-Mehrere MatCMS-Instanzen zentral im Blick: **MatCMS.Cloud** ist die Control Plane für selbst
-gehostete Instanzen. Eine Instanz verbindet sich mit der Cloud, danach übernimmt diese:
+Keep several MatCMS instances in one view: **MatCMS.Cloud** is the control plane for self-hosted
+instances. An instance connects to the cloud, and from then on the cloud takes over:
 
-- **Update-Überwachung** – **einmal zentral** die GHCR-Registry abfragen statt in jeder Instanz,
-  „Update verfügbar" pro Instanz
-- **Benachrichtigungen** – E-Mail bei *Instanz offline*, *neue Version* und *fehlgeschlagenem Update*
-- **Updates ausführen** – für **lokale** Instanzen per Klick (Image ziehen, Container identisch neu
-  erstellen, **Rollback** bei Fehler); für **remote** nur Hinweis + Befehl
-- **Profile & Sync** – Einstellungen, Benutzer, Plugins und Komponenten an Profilen pflegen und auf
-  zugeordnete Instanzen ausrollen
+- **Update monitoring** – poll the GHCR registry **once, centrally** instead of in every instance,
+  with "update available" per instance
+- **Notifications** – email on *instance offline*, *new version* and *failed update*
+- **Running updates** – for **local** instances at a click (pull the image, recreate the container
+  identically, **roll back** on error); for **remote** ones just the hint plus the command
+- **Profiles & sync** – maintain settings, users, plugins and components on profiles and roll them
+  out to the assigned instances
 
-→ **Volle Doku & Screenshots: [src/MatCMS.Cloud/README.md](src/MatCMS.Cloud/README.md)**
-(Image `ghcr.io/real-ttx/matcms-cloud`, Port `9100`).
+→ **Full docs & screenshots: [src/MatCMS.Cloud/README.md](src/MatCMS.Cloud/README.md)**
+(image `ghcr.io/real-ttx/matcms-cloud`, port `9100`).
 
 ## Monorepo
 
-Zwei Anwendungen, ein Repo, gemeinsamer Stack – im Gleichschritt entwickelt:
+Two applications, one repo, a shared stack – developed in lockstep:
 
-| Projekt | Was es ist | Port | Image |
+| Project | What it is | Port | Image |
 |---|---|---|---|
-| [`src/MatCMS`](src/MatCMS) | Das CMS (dieses README) | 9101 | `ghcr.io/real-ttx/matcms` |
-| [`src/MatCMS.Cloud`](src/MatCMS.Cloud) | Die Control Plane | 9100 | `ghcr.io/real-ttx/matcms-cloud` |
+| [`src/MatCMS`](src/MatCMS) | The CMS (this README) | 9101 | `ghcr.io/real-ttx/matcms` |
+| [`src/MatCMS.Cloud`](src/MatCMS.Cloud) | The control plane | 9100 | `ghcr.io/real-ttx/matcms-cloud` |
 
-Beide teilen einen **Vertrag** (`CloudProtocol` ↔ `InstanceProtocol`), das **Plugin-Paketformat** und
-die komplette **Admin-Oberfläche** (`site.css`, `admin.css`, geteilte Partials, CodeMirror). In einem
-Repo ändert **ein Commit beide Seiten** – das war der Grund für die Zusammenlegung. Geteilte Teile
-wandern nach `src/MatCMS.Shared` / `src/MatCMS.Shared.Web`.
+Both share a **contract** (`CloudProtocol` ↔ `InstanceProtocol`), the **plugin package format** and
+the entire **admin UI** (`site.css`, `admin.css`, shared partials, CodeMirror). In one repo **a single
+commit changes both sides** – which is why they were merged. Shared parts move into
+`src/MatCMS.Shared` / `src/MatCMS.Shared.Web`.
 
-### Bauen & starten
+### Build & run
 
 ```bash
 cd src/MatCMS       && docker compose up -d --build   # → http://localhost:9101
 cd src/MatCMS.Cloud && docker compose up -d --build   # → http://localhost:9100
 ```
 
-Lokal mit Hot Reload (.NET SDK 10):
+Locally with hot reload (.NET SDK 10):
 
 ```bash
 cd src/MatCMS       && ./run-dev.ps1
 cd src/MatCMS.Cloud && ./run-dev.ps1
 ```
 
-Alle Projekte auf einmal: `dotnet build MatCMS.slnx`.
+All projects at once: `dotnet build MatCMS.slnx`.
 
 ### Stack
 
-ASP.NET Core 10 · Razor Pages · C# (`net10.0`) · SQLite via EF Core (mit Migrationen) ·
-Docker-first · `InvariantGlobalization`. Kein separater DB-Container, keine Node-Build-Kette im
-Betrieb.
+ASP.NET Core 10 · Razor Pages · C# (`net10.0`) · SQLite via EF Core (with migrations) · Docker-first ·
+`InvariantGlobalization`. No separate DB container, no Node build chain at runtime.
 
 ### CI/CD
 
-Vier Workflows in `.github/workflows/`, je zwei pro Anwendung; die **`paths:`-Filter** sorgen dafür,
-dass eine CMS-Änderung kein Cloud-Image baut und umgekehrt:
+Four workflows in `.github/workflows/`, two per application; the **`paths:` filters** make sure a CMS
+change does not build a cloud image and vice versa:
 
-| Workflow | Baut | Auslöser |
+| Workflow | Builds | Trigger |
 |---|---|---|
-| `release.yml` / `dev.yml` | `matcms` | Änderungen unter `src/MatCMS/**` |
-| `cloud-release.yml` / `cloud-dev.yml` | `matcms-cloud` | Änderungen unter `src/MatCMS.Cloud/**` |
+| `release.yml` / `dev.yml` | `matcms` | changes under `src/MatCMS/**` |
+| `cloud-release.yml` / `cloud-dev.yml` | `matcms-cloud` | changes under `src/MatCMS.Cloud/**` |
 
-Versionsschema je Anwendung: `MAJOR.MINOR` aus der jeweiligen `VERSION`-Datei, `<build>` aus der
-Lauf-Nummer.
+Versioning per application: `MAJOR.MINOR` from that project's `VERSION` file, `<build>` from the run
+number.

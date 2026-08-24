@@ -78,6 +78,11 @@
         return window.confirm(tpl.replace("{0}", "• " + parts.join("\n• ")).replace("{1}", title || ""));
     }
 
+    // Shared so OTHER navigations that also drop browser-side edits can ask the same question — most
+    // of all the preview's "click a block to open it", which reloads to ?block=… (admin-page-editor.js).
+    // Returns the list of unsaved pots (empty = nothing to lose), so each caller phrases its own prompt.
+    window.matLostWork = lostWork;
+
     // ---------- open / close -------------------------------------------------------------------
     function setActive(i) {
         var vis = visible();

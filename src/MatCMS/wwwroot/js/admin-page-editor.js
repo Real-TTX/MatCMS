@@ -173,6 +173,15 @@
         var d = e.data || {};
         if (d.type === "mat-preview-ready") syncSelection();
         if (d.type === "mat-select-block" && d.id) {
+            // Opening another block reloads the editor (?block=…), which drops any browser-side edits
+            // in the open block or the settings forms. Ask first — same guard the page switcher uses.
+            if (typeof window.matLostWork === "function") {
+                var lost = window.matLostWork();
+                if (lost.length) {
+                    var tpl = root.getAttribute("data-confirm-blockswitch") || "{0}";
+                    if (!window.confirm(tpl.replace("{0}", "• " + lost.join("\n• ")))) return;
+                }
+            }
             window.location.search = "?block=" + encodeURIComponent(d.id);
         }
         if (d.type === "mat-insert-at") openPicker(d.index);

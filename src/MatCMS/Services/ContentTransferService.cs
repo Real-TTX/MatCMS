@@ -238,6 +238,7 @@ public class ContentTransferService
                 Locale = p.Locale, TranslationGroup = p.TranslationGroup,
                 IsPublished = p.IsPublished, ShowInNav = p.ShowInNav, ShowInFooter = p.ShowInFooter,
                 NavOrder = p.NavOrder, FooterOrder = p.FooterOrder, MetaDescription = p.MetaDescription,
+                CustomCss = p.CustomCss,
                 CreatedAt = p.CreatedAt, UpdatedAt = p.UpdatedAt,
                 // Preserve the block hierarchy: top-level blocks with their children nested inside.
                 Blocks = BuildBlockDtos(p.Blocks, null)
@@ -1057,6 +1058,7 @@ public class ContentTransferService
         row.NavOrder = p.NavOrder;
         row.FooterOrder = p.FooterOrder;
         row.MetaDescription = p.MetaDescription;
+        row.CustomCss = p.CustomCss;
         row.UpdatedAt = DateTime.UtcNow;
     }
 
@@ -1263,6 +1265,7 @@ public class ContentTransferService
         public int NavOrder { get; set; }
         public int FooterOrder { get; set; }
         public string? MetaDescription { get; set; }
+        public string? CustomCss { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
         public List<BlockDto>? Blocks { get; set; }

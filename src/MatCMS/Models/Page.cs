@@ -34,6 +34,11 @@ public class Page
 
     public string? MetaDescription { get; set; }
 
+    /// <summary>Optional page-specific CSS, injected in a &lt;style&gt; only on this page's response
+    /// (so it is naturally scoped to the page — no selector prefixing needed). Admin-entered and
+    /// output raw, exactly like the template's CustomCss and the html block.</summary>
+    public string? CustomCss { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 

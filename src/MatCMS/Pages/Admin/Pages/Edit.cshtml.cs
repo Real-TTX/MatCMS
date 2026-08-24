@@ -74,6 +74,7 @@ public class EditModel : PageModel
         public string Slug { get; set; } = "";
         public string Locale { get; set; } = Localizer.DefaultCulture;
         public string? MetaDescription { get; set; }
+        public string? CustomCss { get; set; }
         public bool IsPublished { get; set; }
     }
 
@@ -112,6 +113,7 @@ public class EditModel : PageModel
             Slug = page.Slug,
             Locale = page.Locale,
             MetaDescription = page.MetaDescription,
+            CustomCss = page.CustomCss,
             IsPublished = page.IsPublished
         };
 
@@ -225,6 +227,7 @@ public class EditModel : PageModel
         if (string.IsNullOrEmpty(page.TranslationGroup))
             page.TranslationGroup = Guid.NewGuid().ToString("N");
         page.MetaDescription = Meta.MetaDescription;
+        page.CustomCss = string.IsNullOrWhiteSpace(Meta.CustomCss) ? null : Meta.CustomCss;
         page.IsPublished = Meta.IsPublished;
         page.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
@@ -624,6 +627,12 @@ public class EditModel : PageModel
             Options = [ new("", "Standard"), new("s", "Klein"), new("m", "Mittel"), new("l", "Groß") ] },
         new BlockField { Id = "_spaceBottom", Label = "Abstand unten", Type = FieldType.Select, Default = "",
             Options = [ new("", "Standard"), new("s", "Klein"), new("m", "Mittel"), new("l", "Groß") ] },
+        // Per-block custom CSS (advanced). Rendered scoped under this block's own `.blk-<id>` wrapper
+        // via native CSS nesting, so rules never leak to other blocks. Write bare declarations
+        // (e.g. `background:#f6f6f6`) or nested selectors with `&` (e.g. `& h2 { color:#289068 }`).
+        new BlockField { Id = "_css", Label = "Custom CSS", Type = FieldType.Textarea,
+            Placeholder = "background: #f6f6f6;\n& h2 { color: #289068; }",
+            Help = "Nur für diesen Block. Gescoped über & (native CSS-Verschachtelung), z. B. „& .btn { … }“." },
     ];
 
     // Produces a JSON-friendly copy of a field with all localization keys resolved to text.

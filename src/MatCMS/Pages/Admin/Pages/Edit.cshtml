@@ -11,7 +11,7 @@
     var editing = Model.SelectedBlock is not null && Model.SelectedDef is not null;
 }
 
-<div class="live-editor" data-page-id="@Model.Current.Id" data-selected-block="@(Model.SelectedBlock?.Id)">
+<div class="live-editor" data-page-id="@Model.Current.Id" data-selected-block="@(Model.SelectedBlock?.Id)" data-confirm-blockswitch="@T["editor.blockSwitchUnsaved"]">
     @Html.AntiForgeryToken()
     <script id="page-blocks" type="application/json">@Html.Raw(Model.BlocksJson.Replace("</", "<\\/"))</script>
     <aside class="le-sidebar">
@@ -252,6 +252,11 @@
                         <div class="form-field">
                             <label>@T["editor.metaDescription"]</label>
                             <input name="Meta.MetaDescription" value="@Model.Meta.MetaDescription" />
+                        </div>
+                        <div class="form-field">
+                            <label>@T["editor.pageCss"]</label>
+                            <textarea name="Meta.CustomCss" rows="6" spellcheck="false" style="font-family:var(--mono,ui-monospace,monospace);font-size:13px">@Model.Meta.CustomCss</textarea>
+                            <small class="muted">@T["editor.pageCss.help"]</small>
                         </div>
                         <label class="check">
                             <input type="checkbox" name="Meta.IsPublished" value="true" @(Model.Meta.IsPublished ? "checked" : "") /> @T["editor.published"]

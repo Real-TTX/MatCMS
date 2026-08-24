@@ -25,16 +25,23 @@
     var _lw = data.Str("_width");
     var _lst = data.Str("_spaceTop");
     var _lsb = data.Str("_spaceBottom");
+    var _css = data.Str("_css");
     var layoutCls = "";
     if (_lw == "narrow") { layoutCls += " bw-narrow"; } else if (_lw == "full") { layoutCls += " bw-full"; }
     if (_lst.Length > 0) { layoutCls += " bst-" + _lst; }
     if (_lsb.Length > 0) { layoutCls += " bsb-" + _lsb; }
-    var wrapCls = (editor ? "mat-ed-block" : "block-wrap") + layoutCls;
+    // Per-block custom CSS scopes under this stable class (nesting keeps it from leaking).
+    var blkCls = " blk-" + block.Id;
+    var wrapCls = (editor ? "mat-ed-block" : "block-wrap") + blkCls + layoutCls;
     var edAttrs = editor
         ? new Microsoft.AspNetCore.Html.HtmlString($" id=\"block-{block.Id}\" data-block-id=\"{block.Id}\" data-block-name=\"{System.Net.WebUtility.HtmlEncode(T[def.Name])}\"")
         : Microsoft.AspNetCore.Html.HtmlString.Empty;
 
     <div class="@wrapCls"@edAttrs>
+        @if (!string.IsNullOrWhiteSpace(_css))
+        {
+            <style>@Html.Raw(ScopeCss(block.Id, _css))</style>
+        }
         @if (def.IsPluginBlock)
         {
             @Html.Raw(RenderPluginBlock(def, block.DataJson))
@@ -54,6 +61,16 @@
     </div>
 }
 @functions {
+    // Wraps a block's custom CSS under its own `.blk-<id>` scope (native CSS nesting), so bare
+    // declarations and `&`-nested selectors both work without leaking to other blocks. The `</style`
+    // guard prevents an early tag close from breaking out into arbitrary HTML.
+    static string ScopeCss(int id, string css)
+    {
+        var clean = System.Text.RegularExpressions.Regex.Replace(
+            css, "</\\s*style", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return ".blk-" + id + "{" + clean + "}";
+    }
+
     // Resolves a container's children into (partial, data) pairs; a child that is itself a container
     // gets its own sub-model built recursively (depth-guarded) so arbitrary nesting renders.
     static MatCMS.Content.ContainerBlockModel BuildContainer(int parentId, MatCMS.Content.BlockData data,

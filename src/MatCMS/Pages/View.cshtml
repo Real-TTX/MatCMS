@@ -5,6 +5,13 @@
     var http = ViewContext.HttpContext;
     var editor = http.Request.Query.ContainsKey("editor") && http.User.IsInRole("Admin");
 }
+@if (!string.IsNullOrWhiteSpace(Model.CurrentPage.CustomCss))
+{
+    @* Page-specific CSS: this <style> is only emitted on this page's own response, so it is
+       naturally scoped to the page. Admin-entered and output raw (like the template's CustomCss);
+       the </style guard prevents an early tag close from breaking out into HTML. *@
+    <style>@Html.Raw(System.Text.RegularExpressions.Regex.Replace(Model.CurrentPage.CustomCss, "</\\s*style", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase))</style>
+}
 @if (editor)
 {
     <div id="mat-blocks">

@@ -1,0 +1,21 @@
+@model MatCMS.Content.BlockData
+@{
+    var label = Model.Str("label");
+    var title = Model.Str("title");
+    var text = Model.Str("text");
+}
+<div class="tl-step">
+    <span class="tl-num" aria-hidden="true"></span>
+    @if (!string.IsNullOrWhiteSpace(label))
+    {
+        <span class="tl-label">@label</span>
+    }
+    @if (!string.IsNullOrWhiteSpace(title))
+    {
+        <h3>@title</h3>
+    }
+    @if (!string.IsNullOrWhiteSpace(text))
+    {
+        <p>@text</p>
+    }
+</div>

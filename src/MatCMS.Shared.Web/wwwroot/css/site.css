@@ -778,3 +778,83 @@ h1, h2, h3, h4 {
     .mat-hassub { display: block; }
     .mat-hassub > .mat-sub { display: flex; flex-direction: column; padding-left: 16px; }
 }
+
+/* =========================================================================
+   Block: herocta — Hero mit CTA + Bogen-Pfeil. Zwei Farbwelten (Akzent/Bunt),
+   umgeschaltet über .hc--accent / .hc--vivid (Feld "colors" am Block).
+   ========================================================================= */
+.hc--vivid { --hcg: linear-gradient(92deg,#3b6fff,#8b5cf6 60%,#c026d3); --hcg-solid:#7c5cff; --hc-arrow:#8b5cf6; }
+.hc--accent { --hcg: linear-gradient(92deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #ffffff)); --hcg-solid: var(--accent); --hc-arrow: color-mix(in srgb, var(--accent) 80%, #000); }
+.hc { position: relative; overflow: hidden; text-align: center; padding: 88px 20px 96px; isolation: isolate; }
+.hc-bg { position: absolute; inset: -20% -10% 0 -10%; z-index: -1; filter: blur(6px); }
+.hc--vivid .hc-bg { background:
+    radial-gradient(42% 55% at 22% 30%, rgba(99,102,241,.30), transparent 70%),
+    radial-gradient(40% 55% at 80% 26%, rgba(168,85,247,.30), transparent 70%),
+    radial-gradient(46% 60% at 62% 68%, rgba(56,189,248,.24), transparent 70%),
+    radial-gradient(40% 55% at 32% 74%, rgba(236,72,153,.18), transparent 72%); }
+.hc--accent .hc-bg { background:
+    radial-gradient(44% 58% at 24% 30%, color-mix(in srgb, var(--accent) 26%, transparent), transparent 70%),
+    radial-gradient(42% 56% at 80% 28%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 72%),
+    radial-gradient(48% 62% at 60% 74%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 74%); }
+.hc-inner { max-width: 900px; margin: 0 auto; }
+.hc-title { font-family: var(--font-head), sans-serif; font-weight: 800; letter-spacing: -0.02em;
+    font-size: clamp(34px, 6vw, 64px); line-height: 1.05; margin: 0 0 22px; color: var(--ink, #14151a); }
+.hc-grad, .hc-new { background: var(--hcg); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.hc-old { position: relative; color: #9aa0ab; font-weight: 800; }
+.hc-old::after { content: ""; position: absolute; left: -4%; right: -4%; top: 52%; height: 4px; border-radius: 3px; background: #ef4444; transform: rotate(-9deg); }
+.hc-sub { max-width: 56ch; margin: 0 auto 40px; font-size: clamp(16px, 2vw, 19px); line-height: 1.6; color: var(--muted, #55606e); }
+/* Wenn der Pfeil an ist, garantierter Freiraum über dem CTA – unabhängig von der Untertext-Länge, damit die Pfeil-Notiz nie auf den Text fällt. */
+.hc--hasarrow .hc-sub { margin-bottom: 108px; }
+.hc-cta { position: relative; display: inline-flex; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: center; }
+.hc-btn { display: inline-flex; align-items: center; gap: 9px; font-weight: 700; font-size: 16px; padding: 15px 26px; border-radius: 14px; text-decoration: none; transition: transform .18s ease, box-shadow .18s ease; }
+.hc-btn--primary { color: #fff; background: var(--hcg); box-shadow: 0 12px 30px color-mix(in srgb, var(--hcg-solid) 35%, transparent); }
+.hc-btn--primary:hover { transform: translateY(-2px); color: #fff; box-shadow: 0 16px 38px color-mix(in srgb, var(--hcg-solid) 45%, transparent); }
+.hc-btn--primary .hc-btn-ar { transition: transform .18s ease; }
+.hc-btn--primary:hover .hc-btn-ar { transform: translateX(4px); }
+.hc-btn--ghost { color: var(--ink, #14151a); background: #fff; border: 1px solid var(--line, #e4e6ec); }
+.hc-btn--ghost:hover { border-color: #c9ccd6; transform: translateY(-1px); color: var(--ink, #14151a); }
+.hc-note { margin: 30px 0 0; font-size: 14px; color: #7a828f; }
+.hc-arrow { position: absolute; left: -150px; top: -88px; width: 150px; height: 92px; color: var(--hc-arrow); pointer-events: none; }
+.hc-arrow svg { width: 100%; height: 100%; overflow: visible; display: block; }
+.hc-arrow-note { position: absolute; left: 2px; top: -18px; transform: rotate(-8deg); font-family: "Segoe Script","Bradley Hand",cursive; font-size: 17px; color: var(--hc-arrow); white-space: nowrap; }
+.hc-arc, .hc-head { stroke-dasharray: 320; stroke-dashoffset: 320; }
+.hc.is-in .hc-arc { transition: stroke-dashoffset 1s cubic-bezier(.6,.05,.2,1) .15s; stroke-dashoffset: 0; }
+.hc.is-in .hc-head { transition: stroke-dashoffset .35s ease 1s; stroke-dashoffset: 0; }
+.hc.is-in .hc-arrow { animation: hcBob 2.4s ease-in-out 1.5s infinite; }
+@keyframes hcBob { 0%,100% { transform: translate(0,0); } 50% { transform: translate(2px,-4px); } }
+@media (max-width: 720px) { .hc-arrow { display: none; } .hc-btn { width: 100%; justify-content: center; } .hc-cta { gap: 10px; } }
+@media (prefers-reduced-motion: reduce) { .hc.is-in .hc-arc, .hc.is-in .hc-head { transition: none; stroke-dashoffset: 0; } .hc.is-in .hc-arrow { animation: none; } }
+
+/* =========================================================================
+   Block: timeline — Ablauf mit Scroll-Fortschrittsbalken. .tl--accent/.tl--vivid.
+   ========================================================================= */
+.tl--vivid { --hcg: linear-gradient(92deg,#3b6fff,#8b5cf6 60%,#c026d3); --hcg-solid:#7c5cff; }
+.tl--accent { --hcg: linear-gradient(92deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #ffffff)); --hcg-solid: var(--accent); }
+/* Vertikale Timeline: Titel links, Karte rechts, linker Strang mit Punkten (füllt sich beim Scrollen). */
+.tl-steps { position: relative; }
+.tl-rail { position: absolute; left: 19px; top: 30px; bottom: 30px; width: 2px; background: color-mix(in srgb, var(--ink,#14151a) 12%, transparent); }
+.tl-rail-fill { position: absolute; left: 19px; top: 30px; width: 2px; height: 0; background: var(--hcg); transition: height .5s ease; }
+.tl-step { position: relative; display: grid; grid-template-columns: minmax(200px, .8fr) 1.5fr; gap: 34px; padding: 26px 0 26px 60px; }
+.tl-dot { position: absolute; left: 12px; top: 34px; width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 3px solid color-mix(in srgb, var(--ink,#14151a) 20%, transparent); z-index: 1; transition: background .3s ease, border-color .3s ease, box-shadow .3s ease; }
+.tl-step.is-in .tl-dot { border-color: var(--hcg-solid); background: var(--hcg-solid); box-shadow: 0 0 0 5px color-mix(in srgb, var(--hcg-solid) 18%, transparent); }
+.tl-title h3 { font-family: var(--font-head), sans-serif; font-weight: 800; letter-spacing: -0.01em; font-size: clamp(24px, 3vw, 38px); line-height: 1.08; margin: 0; color: #a2a9b4; transition: color .3s ease; }
+.tl-step.is-in .tl-title h3 { background: var(--hcg); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.tl-card { background: #fff; border: 1px solid var(--line, #e6e6e6); border-radius: 18px; padding: 26px 30px; box-shadow: 0 10px 30px color-mix(in srgb, var(--ink,#14151a) 6%, transparent); }
+.tl-card-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.tl-icon { width: 52px; height: 52px; flex: none; display: inline-flex; align-items: center; justify-content: center; font-size: 26px; border-radius: 14px; background: var(--hcg); }
+.tl-num { font-family: var(--font-head), sans-serif; font-weight: 800; font-size: 34px; line-height: 1; background: var(--hcg); -webkit-background-clip: text; background-clip: text; color: transparent; opacity: .9; margin-left: auto; }
+.tl-card-body { color: var(--muted, #55606e); line-height: 1.7; margin: 0 0 18px; }
+.tl-seg { position: relative; display: grid; grid-template-columns: repeat(var(--tl-n, 4), 1fr); gap: 8px; }
+.tl-seg-b { height: 6px; border-radius: 999px; background: color-mix(in srgb, var(--ink,#14151a) 12%, transparent); }
+.tl-seg-fill { position: absolute; left: 0; top: 0; height: 6px; width: 0; border-radius: 999px; background: var(--hcg); z-index: 1; }
+.tl-step.is-in .tl-seg-fill { width: var(--tl-seg, 100%); transition: width .9s cubic-bezier(.6,.05,.2,1) .15s; }
+@media (max-width: 820px) { .tl-step { grid-template-columns: 1fr; gap: 14px; padding-left: 52px; } .tl-title h3 { font-size: 24px; } }
+@media (prefers-reduced-motion: reduce) { .tl-step.is-in .tl-seg-fill, .tl-rail-fill { transition: none; } }
+
+/* =========================================================================
+   Hero: Cursor-Pfeil (gestrichelt), erscheint in Button-Nähe und folgt der Maus.
+   ========================================================================= */
+.hc-cursor { position: absolute; inset: 0; z-index: 5; width: 100%; height: 100%; pointer-events: none; opacity: 0; transition: opacity .16s ease; overflow: visible; filter: drop-shadow(0 1px 1px rgba(255,255,255,.7)); }
+.hc-cursor .hc-line { fill: none; stroke: var(--hc-arrow); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 6 6; }
+.hc-cursor .hc-headline { fill: none; stroke: var(--hc-arrow); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+@media (pointer: coarse) { .hc-cursor { display: none; } }

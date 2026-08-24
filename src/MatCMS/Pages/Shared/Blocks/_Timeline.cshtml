@@ -1,0 +1,78 @@
+@using System.Globalization
+@model MatCMS.Content.ContainerBlockModel
+@{
+    var heading = Model.Data.Str("heading");
+    var intro = Model.Data.Str("intro");
+    var colors = Model.Data.StrOr("colors", "accent") == "vivid" ? "vivid" : "accent";
+    var steps = Model.Children;
+    var count = steps.Count;
+    var inv = CultureInfo.InvariantCulture;
+}
+<section class="section tl-block tl--@colors">
+    <div class="container">
+        @if (!string.IsNullOrWhiteSpace(heading) || !string.IsNullOrWhiteSpace(intro))
+        {
+            <div class="section__intro">
+                @if (!string.IsNullOrWhiteSpace(heading)) { <h2>@heading</h2> }
+                @if (!string.IsNullOrWhiteSpace(intro)) { <p>@intro</p> }
+            </div>
+        }
+        <div class="tl-steps" style="--tl-n:@count">
+            <span class="tl-rail" aria-hidden="true"></span>
+            <span class="tl-rail-fill" aria-hidden="true"></span>
+            @for (var i = 0; i < count; i++)
+            {
+                var d = steps[i].Data;
+                var icon = d.Str("icon");
+                var title = d.Str("title");
+                var text = d.Str("text");
+                var num = (i + 1).ToString("00");
+                var seg = ((i + 1) / (double)count * 100).ToString("0.##", inv);
+                <div class="tl-step" style="--tl-seg:@(seg)%">
+                    <span class="tl-dot" aria-hidden="true"></span>
+                    <div class="tl-title"><h3>@title</h3></div>
+                    <div class="tl-card">
+                        <div class="tl-card-head">
+                            @if (!string.IsNullOrWhiteSpace(icon)) { <span class="tl-icon" aria-hidden="true">@icon</span> }
+                            <span class="tl-num" aria-hidden="true">@num</span>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(text)) { <div class="tl-card-body">@Html.Raw(NlToBr(text))</div> }
+                        <div class="tl-seg">
+                            <div class="tl-seg-fill"></div>
+                            @for (var j = 0; j < count; j++) { <span class="tl-seg-b"></span> }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</section>
+<script>
+    (function () {
+        if (window.__tlInit) return; window.__tlInit = true;
+        function run() {
+            document.querySelectorAll('.tl-block').forEach(function (block) {
+                var steps = block.querySelectorAll('.tl-step');
+                var fill = block.querySelector('.tl-rail-fill');
+                function reach(step) {
+                    step.classList.add('is-in');
+                    if (!fill) return;
+                    var dot = step.querySelector('.tl-dot');
+                    var y = step.offsetTop + (dot ? dot.offsetTop + dot.offsetHeight / 2 : step.offsetHeight / 2);
+                    var cur = parseFloat(fill.style.height) || 0;
+                    if (y > cur) fill.style.height = y + 'px';
+                }
+                if ('IntersectionObserver' in window) {
+                    var io = new IntersectionObserver(function (es) {
+                        es.forEach(function (e) { if (e.isIntersecting) { reach(e.target); io.unobserve(e.target); } });
+                    }, { threshold: 0.4 });
+                    steps.forEach(function (s) { io.observe(s); });
+                } else { steps.forEach(reach); }
+            });
+        }
+        if (document.readyState !== 'loading') run(); else document.addEventListener('DOMContentLoaded', run);
+    })();
+</script>
+@functions {
+    static string NlToBr(string s) => System.Net.WebUtility.HtmlEncode(s ?? "").Replace("\r\n", "\n").Replace("\n", "<br>");
+}

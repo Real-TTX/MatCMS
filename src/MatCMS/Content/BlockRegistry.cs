@@ -39,6 +39,7 @@ public class BlockRegistry
         ["richtext"] = "text", ["quote"] = "text", ["faq"] = "text", ["accordion"] = "text",
         ["image"] = "media", ["gallery"] = "media", ["logostrip"] = "media",
         ["hero"] = "design", ["cta"] = "design", ["cards"] = "design", ["card"] = "design",
+        ["herocta"] = "design", ["timeline"] = "design", ["step"] = "design",
         ["leistungen"] = "design", ["leistung"] = "design", ["servicegrid"] = "design",
         ["service"] = "design", ["imagetext"] = "design", ["posts"] = "design",
         ["references"] = "design", ["reference"] = "design",
@@ -365,6 +366,64 @@ public class BlockRegistry
                 new BlockField { Id = "title", Label = "block.f.title", Type = FieldType.Text },
                 new BlockField { Id = "text", Label = "block.f.text", Type = FieldType.Textarea },
                 new BlockField { Id = "image", Label = "block.leistung.f.image", Type = FieldType.Image },
+            ]
+        },
+        new BlockDefinition
+        {
+            Type = "herocta",
+            Name = "block.herocta.name",
+            Description = "block.herocta.desc",
+            Svg = SvgCta,
+            Partial = "Blocks/_HeroCta",
+            Fields =
+            [
+                new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Textarea,
+                    Placeholder = "Moderne *Unternehmenswebsite*\nerstellen lassen ab", Help = "Text in *Sternchen* wird als Farbverlauf hervorgehoben. Zeilenumbrüche bleiben erhalten." },
+                new BlockField { Id = "priceOld", Label = "block.herocta.f.priceOld", Type = FieldType.Text, Placeholder = "1200€" },
+                new BlockField { Id = "priceNew", Label = "block.herocta.f.priceNew", Type = FieldType.Text, Placeholder = "950€" },
+                new BlockField { Id = "sub", Label = "block.herocta.f.sub", Type = FieldType.Textarea },
+                new BlockField { Id = "buttonText", Label = "block.f.buttonText", Type = FieldType.Text, Placeholder = "Jetzt sichern" },
+                new BlockField { Id = "buttonUrl", Label = "block.f.buttonUrl", Type = FieldType.Url, Placeholder = "/kontakt" },
+                new BlockField { Id = "button2Text", Label = "block.herocta.f.button2Text", Type = FieldType.Text },
+                new BlockField { Id = "button2Url", Label = "block.herocta.f.button2Url", Type = FieldType.Url },
+                new BlockField { Id = "note", Label = "block.herocta.f.note", Type = FieldType.Text },
+                new BlockField { Id = "arrow", Label = "block.herocta.f.arrow", Type = FieldType.Select, Default = "draw",
+                    Options = [ new("draw", "block.opt.arrow.draw"), new("cursor", "block.opt.arrow.cursor"), new("off", "block.opt.arrow.off") ] },
+                new BlockField { Id = "arrowText", Label = "block.herocta.f.arrowText", Type = FieldType.Text,
+                    Placeholder = "nur diesen Monat", ShowWhenField = "arrow", ShowWhenValue = "draw" },
+                new BlockField { Id = "colors", Label = "block.f.colors", Type = FieldType.Select, Default = "accent",
+                    Options = [ new("accent", "block.opt.colors.accent"), new("vivid", "block.opt.colors.vivid") ] },
+            ]
+        },
+        new BlockDefinition
+        {
+            Type = "timeline",
+            Name = "block.timeline.name",
+            Description = "block.timeline.desc",
+            Svg = SvgGrid,
+            Partial = "Blocks/_Timeline",
+            AllowedChildren = ["step"],
+            Fields =
+            [
+                new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },
+                new BlockField { Id = "intro", Label = "block.f.intro", Type = FieldType.Textarea },
+                new BlockField { Id = "colors", Label = "block.f.colors", Type = FieldType.Select, Default = "accent",
+                    Options = [ new("accent", "block.opt.colors.accent"), new("vivid", "block.opt.colors.vivid") ] },
+            ]
+        },
+        new BlockDefinition
+        {
+            Type = "step",
+            Name = "block.step.name",
+            Description = "block.step.desc",
+            Svg = SvgText,
+            Partial = "Blocks/_Step",
+            ChildOnly = true,
+            Fields =
+            [
+                new BlockField { Id = "icon", Label = "block.card.f.icon", Type = FieldType.Text, Help = "block.card.f.icon.help" },
+                new BlockField { Id = "title", Label = "block.f.title", Type = FieldType.Text },
+                new BlockField { Id = "text", Label = "block.f.text", Type = FieldType.Textarea },
             ]
         },
         new BlockDefinition

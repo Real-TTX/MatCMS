@@ -1,0 +1,116 @@
+@model MatCMS.Content.BlockData
+@{
+    var heading = Model.Str("heading");
+    var priceOld = Model.Str("priceOld");
+    var priceNew = Model.Str("priceNew");
+    var sub = Model.Str("sub");
+    var btnText = Model.Str("buttonText");
+    var btnUrl = Model.StrOr("buttonUrl", "#");
+    var btn2Text = Model.Str("button2Text");
+    var btn2Url = Model.StrOr("button2Url", "#");
+    var note = Model.Str("note");
+    var arrowRaw = Model.StrOr("arrow", "draw");
+    var arrowMode = arrowRaw == "cursor" ? "cursor" : (arrowRaw == "off" || arrowRaw == "no") ? "off" : "draw";
+    var arrowText = Model.Str("arrowText");
+    var colors = Model.StrOr("colors", "accent") == "vivid" ? "vivid" : "accent";
+    var hasBtn = !string.IsNullOrWhiteSpace(btnText);
+    var drawArrow = arrowMode == "draw" && hasBtn;
+    var cursorArrow = arrowMode == "cursor" && hasBtn;
+}
+<section class="hc hc--@colors@(drawArrow ? " hc--hasarrow" : "")@(cursorArrow ? " hc--cursorarrow" : "")">
+    <div class="hc-bg" aria-hidden="true"></div>
+    @if (cursorArrow)
+    {
+        <svg class="hc-cursor" aria-hidden="true"><path class="hc-line"></path><path class="hc-headline"></path></svg>
+    }
+    <div class="hc-inner">
+        @if (!string.IsNullOrWhiteSpace(heading) || !string.IsNullOrWhiteSpace(priceNew))
+        {
+            <h1 class="hc-title">@Html.Raw(RenderHeading(heading))@if (!string.IsNullOrWhiteSpace(priceOld)) { <text> <span class="hc-old">@priceOld</span></text> }@if (!string.IsNullOrWhiteSpace(priceNew)) { <text> <span class="hc-new">@priceNew</span></text> }</h1>
+        }
+        @if (!string.IsNullOrWhiteSpace(sub))
+        {
+            <p class="hc-sub">@sub</p>
+        }
+        <div class="hc-cta">
+            @if (drawArrow)
+            {
+                <span class="hc-arrow" aria-hidden="true">
+                    <svg viewBox="0 0 220 150" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path class="hc-arc" d="M12 14 C 40 96, 110 128, 196 118" stroke="currentColor" stroke-width="4" stroke-linecap="round" />
+                        <path class="hc-head" d="M196 118 L 176 106 M196 118 L 184 138" stroke="currentColor" stroke-width="4" stroke-linecap="round" />
+                    </svg>
+                    @if (!string.IsNullOrWhiteSpace(arrowText))
+                    {
+                        <span class="hc-arrow-note">@arrowText</span>
+                    }
+                </span>
+            }
+            @if (!string.IsNullOrWhiteSpace(btnText))
+            {
+                <a class="hc-btn hc-btn--primary" href="@btnUrl">@btnText <span class="hc-btn-ar">&rarr;</span></a>
+            }
+            @if (!string.IsNullOrWhiteSpace(btn2Text))
+            {
+                <a class="hc-btn hc-btn--ghost" href="@btn2Url">@btn2Text</a>
+            }
+        </div>
+        @if (!string.IsNullOrWhiteSpace(note))
+        {
+            <p class="hc-note">@note</p>
+        }
+    </div>
+</section>
+<script>
+(function () {
+    if (window.__hcInit) return; window.__hcInit = true;
+    function run() {
+        var els = document.querySelectorAll('.hc');
+        if ('IntersectionObserver' in window) {
+            var io = new IntersectionObserver(function (ents) {
+                ents.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add('is-in'); io.unobserve(en.target); } });
+            }, { threshold: 0.3 });
+            els.forEach(function (e) { io.observe(e); });
+        } else { els.forEach(function (e) { e.classList.add('is-in'); }); }
+        document.querySelectorAll('.hc--cursorarrow').forEach(initCursor);
+    }
+    // Cursor-Pfeil: zeichnet in Button-Nähe einen gebogenen, gestrichelten Pfeil vom Cursor zum Button-Rand.
+    function initCursor(hero) {
+        var svg = hero.querySelector('.hc-cursor'); if (!svg) return;
+        var line = svg.querySelector('.hc-line'), head = svg.querySelector('.hc-headline');
+        var btn = hero.querySelector('.hc-btn--primary'); if (!line || !head || !btn) return;
+        var R = 360;
+        function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+        hero.addEventListener('mousemove', function (e) {
+            var hr = hero.getBoundingClientRect(), br = btn.getBoundingClientRect();
+            var cx = e.clientX - hr.left, cy = e.clientY - hr.top;
+            var bx0 = br.left - hr.left, by0 = br.top - hr.top, bx1 = br.right - hr.left, by1 = br.bottom - hr.top;
+            var over = cx >= bx0 && cx <= bx1 && cy >= by0 && cy <= by1;
+            var bcx = (bx0 + bx1) / 2, bcy = (by0 + by1) / 2, dist = Math.hypot(cx - bcx, cy - bcy);
+            if (over || dist > R) { svg.style.opacity = 0; return; }
+            var nx = clamp(cx, bx0, bx1), ny = clamp(cy, by0, by1);        // nächster Punkt am Button-Rand
+            var ang = Math.atan2(ny - cy, nx - cx);
+            var sx = cx + Math.cos(ang) * 26, sy = cy + Math.sin(ang) * 26; // Start etwas neben dem Cursor
+            var ex = nx - Math.cos(ang) * 10, ey = ny - Math.sin(ang) * 10; // Ende kurz vor dem Rand
+            var mx = (sx + ex) / 2, my = (sy + ey) / 2, pang = ang - Math.PI / 2, bow = Math.min(70, dist * 0.3);
+            var qx = mx + Math.cos(pang) * bow, qy = my + Math.sin(pang) * bow;
+            line.setAttribute('d', 'M' + sx + ' ' + sy + ' Q ' + qx + ' ' + qy + ' ' + ex + ' ' + ey);
+            var tang = Math.atan2(ey - qy, ex - qx), hl = 13, a1 = tang + Math.PI - 0.42, a2 = tang + Math.PI + 0.42;
+            head.setAttribute('d', 'M' + ex + ' ' + ey + ' L ' + (ex + Math.cos(a1) * hl) + ' ' + (ey + Math.sin(a1) * hl) + ' M' + ex + ' ' + ey + ' L ' + (ex + Math.cos(a2) * hl) + ' ' + (ey + Math.sin(a2) * hl));
+            svg.style.opacity = Math.max(0, Math.min(1, (R - dist) / (R * 0.5)));
+        });
+        hero.addEventListener('mouseleave', function () { svg.style.opacity = 0; });
+    }
+    if (document.readyState !== 'loading') run(); else document.addEventListener('DOMContentLoaded', run);
+})();
+</script>
+@functions {
+    // Renders a hero heading: HTML-encodes the text, turns *…* into a gradient span, keeps line breaks.
+    static string RenderHeading(string s)
+    {
+        if (string.IsNullOrEmpty(s)) return "";
+        var enc = System.Net.WebUtility.HtmlEncode(s);
+        enc = System.Text.RegularExpressions.Regex.Replace(enc, "\\*(.+?)\\*", "<span class=\"hc-grad\">$1</span>");
+        return enc.Replace("\r\n", "\n").Replace("\n", "<br>");
+    }
+}

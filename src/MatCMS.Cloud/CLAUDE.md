@@ -730,6 +730,17 @@ rollout, when the cloud is necessarily updated before its instances.
 A backup can also be requested on its own, from the instance's Backup tab, with no removal attached.
 That is the ordinary use — the removal way is a *user* of it, not the reason for it.
 
+**An operator can also UPLOAD a backup ZIP** from their own machine on that same tab
+(`Details.OnPostUploadBackupAsync` → `BackupStore.StoreAsync` with origin `upload`), optionally
+marking it for restore in the same step. It is stored and restored by the exact same path as an
+instance-pushed one — there is deliberately no second format and no second restore route — so the
+instance downloads and applies it on its next beat, and `ContentTransferService.ImportAsync`
+preserving the `cloud.*` keys is what makes uploading even a foreign site's backup safe (it cannot
+hand this container another identity). The detail page carries `[RequestSizeLimit]` /
+`[RequestFormLimits]` at `BackupStore.MaxUploadBytes` because a backup with media dwarfs the
+framework's 128 MB multipart default and Kestrel's 30 MB body cap; the real ceiling is still the
+streaming guard in `StoreAsync`.
+
 ## Backlog
 
 - **Provisioning new MatCMS instances** via **MatOS** + **Matcad**: MatOS already installs apps as

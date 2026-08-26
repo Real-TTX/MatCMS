@@ -512,3 +512,8 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
 .device-opt:hover { border-color: var(--accent, #2563eb); }
 .device-opt.is-active { border-color: var(--accent, #2563eb); background: color-mix(in srgb, var(--accent, #2563eb) 8%, transparent); }
 .device-opt.is-active i { color: var(--accent, #2563eb); }
+
+/* Manual backup upload on the instance's backup tab: a tidy inline row (file picker, the
+   "restore immediately" toggle, the submit button) rather than three stacked block elements. */
+.upload-backup { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+.upload-backup .checkbox-row { margin: 0; }

@@ -31,7 +31,12 @@ public enum InstanceEventKind
     /// above because "the backup arrived" and "the site was therefore removed" are two different
     /// facts, and the second one has to be findable on its own.</summary>
     RemovalPending = 16,
-    RemovalCancelled = 17
+    RemovalCancelled = 17,
+
+    /// <summary>An operator uploaded a backup ZIP into the cloud for this instance. Its own kind
+    /// because it enters a restorable file the site never produced — the trail should say where a
+    /// backup that suddenly appears came from.</summary>
+    BackupUploaded = 18
 }
 
 /// <summary>Audit trail per instance: what happened, and whether a notification went out for it.

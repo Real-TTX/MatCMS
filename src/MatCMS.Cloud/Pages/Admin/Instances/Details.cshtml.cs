@@ -7,6 +7,12 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 namespace MatCMS.Cloud.Pages.Admin.Instances;
 
+// A backup ZIP with media runs to hundreds of megabytes, well past the framework's 128 MB
+// multipart default and Kestrel's 30 MB body cap. Both are lifted to BackupStore.MaxUploadBytes so
+// the manual upload below can accept the same size the streaming guard already enforces; the other
+// handlers on this page post tiny forms, to which a higher ceiling makes no difference.
+[RequestSizeLimit(BackupStore.MaxUploadBytes)]
+[RequestFormLimits(MultipartBodyLengthLimit = BackupStore.MaxUploadBytes)]
 public class DetailsModel : PageModel
 {
     private readonly AppDbContext _db;
@@ -190,6 +196,59 @@ public class DetailsModel : PageModel
         await _db.SaveChangesAsync();
         TempData["Flash"] = "Backup angefordert. Es trifft beim nächsten Kontakt der Instanz ein.";
         return RedirectToPage(new { id });
+    }
+
+    /// <summary>
+    /// Takes a backup ZIP the operator uploads from their own machine and stores it as one of THIS
+    /// instance's backups — streamed to disk by <see cref="BackupStore.StoreAsync"/> exactly like an
+    /// instance-pushed one, so it is restorable by the very same path and no second format exists.
+    /// <para>With <paramref name="restoreNow"/> it is also marked for restore straight away: the
+    /// instance downloads and applies it on its next heartbeat, keeping its own cloud link (the
+    /// importer preserves the <c>cloud.*</c> keys), so uploading a foreign site's backup cannot hand
+    /// this container another identity.</para>
+    /// </summary>
+    public async Task<IActionResult> OnPostUploadBackupAsync(int id, IFormFile? file, bool restoreNow)
+    {
+        var item = await _db.Instances.Include(i => i.Profile).FirstOrDefaultAsync(i => i.Id == id);
+        if (item is null) return RedirectToPage("Index");
+
+        if (file is null || file.Length == 0)
+        {
+            TempData["FlashError"] = "Keine Datei ausgewählt.";
+            return RedirectToPage(new { id, tab = "backup" });
+        }
+
+        // The real size guard is in StoreAsync, which streams and stops at MaxUploadBytes rather than
+        // trusting a Content-Length; the page attributes only stop the request being rejected earlier.
+        await using var stream = file.OpenReadStream();
+        var result = await _backups.StoreAsync(item, file.FileName, "upload", DateTime.UtcNow, stream,
+            HttpContext.RequestAborted);
+
+        if (!result.Ok || result.Backup is null)
+        {
+            TempData["FlashError"] = result.Error ?? "Upload fehlgeschlagen.";
+            return RedirectToPage(new { id, tab = "backup" });
+        }
+
+        _instances.Log(item, InstanceEventKind.BackupUploaded,
+            $"Backup \"{result.Backup.FileName}\" über die Cloud hochgeladen.");
+        await _db.SaveChangesAsync();
+
+        if (restoreNow)
+        {
+            // Marking a restore is offered to an Approved instance only — for any other status the
+            // heartbeat never hands the pending restore out. The mark is harmless meanwhile and is
+            // picked up once the instance is approved, so we set it and say so rather than refuse.
+            await _backups.RequestRestoreAsync(result.Backup);
+            TempData["Flash"] = item.Status == InstanceStatus.Approved
+                ? $"„{result.Backup.FileName}“ hochgeladen und wird beim nächsten Kontakt der Instanz zurückgespielt."
+                : $"„{result.Backup.FileName}“ hochgeladen und zum Einspielen vorgemerkt — es wird erst nach Freigabe der Instanz zurückgespielt.";
+        }
+        else
+        {
+            TempData["Flash"] = $"„{result.Backup.FileName}“ hochgeladen. Zum Einspielen „Zurückspielen“ in der Liste wählen.";
+        }
+        return RedirectToPage(new { id, tab = "backup" });
     }
 
     private Task<CloudBackup?> OwnBackupAsync(int instanceId, int backupId) =>

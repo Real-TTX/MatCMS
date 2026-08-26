@@ -574,6 +574,20 @@
             </div>
         </div>
 
+        @* Upload from the operator's own machine. Stored as one of this instance's backups and, if
+           asked, marked for restore in the same step — the site downloads and applies it on its next
+           beat, exactly as it would one it made itself. *@
+        <form class="upload-backup" method="post" asp-page-handler="UploadBackup" asp-route-id="@Model.Item.Id"
+              enctype="multipart/form-data">
+            <input type="file" name="file" accept=".zip" required aria-label="@T["instances.uploadBackup"]" />
+            <label class="checkbox-row">
+                <input type="checkbox" name="restoreNow" value="true" />
+                <span>@T["instances.uploadRestoreNow"]</span>
+            </label>
+            <button type="submit" class="btn btn-sm">@T["instances.uploadBackup"]</button>
+        </form>
+        <div class="help">@T["instances.uploadBackupHint"]</div>
+
         <table class="data" data-list-table style="margin-top:14px;">
             <thead>
                 <tr>

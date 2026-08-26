@@ -135,6 +135,12 @@
                 {
                     <span class="badge badge-on">@T["instances.local"]</span>
                     <span class="muted mono">@Model.Item.LocalContainerName</span>
+                    @* The published host port is what the operator needs to reach the container
+                       directly — shown here rather than buried in the preview tab. *@
+                    @if (Model.Item.LocalPort is int localPort)
+                    {
+                        <span class="muted mono">· @T["instances.port"] @localPort</span>
+                    }
                 }
                 else if (Model.Item.Hosting == InstanceHosting.Remote)
                 {

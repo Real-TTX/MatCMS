@@ -406,6 +406,7 @@
   "instances.state": "Zustand",
   "instances.host": "Host",
   "instances.container": "Container-ID",
+  "instances.port": "Port",
   "instances.image": "Image",
   "instances.content": "Inhalt",
   "instances.contentCounts": "{0} Seiten · {1} Plugins · {2} Benutzer",

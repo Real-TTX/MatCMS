@@ -633,6 +633,13 @@ What each mode can do:
   travel with the config, so `docker compose` still recognises the container afterwards.
   Two guards, both load-bearing: the socket mount is **opt-in** at the compose level, and
   `LooksLikeMatCms` refuses any container whose image (or compose project) doesn't name MatCMS.
+  **The socket needs no `group_add` / `DOCKER_GID`.** The image runs the app as non-root `app`,
+  which cannot read the root-owned `660` socket — the old symptom was `SocketException(13)
+  "Permission denied"` and every instance silently staying *remote*. `docker-entrypoint.sh` now
+  starts PID 1 as root, reads the mounted socket's own gid and `exec gosu app:<gid>` — the app
+  drops to `app` with the socket's group as its primary group, so it is unprivileged **and** can
+  read the socket. Mounting the socket is therefore all that is needed (as with Portainer & co.),
+  and `docker-compose*.yml` carry no group/user override. No socket → plain `gosu app`, unchanged.
 - **Remote** — notify only, plus the exact command (`docker compose pull && docker compose up -d`).
   A guided/agent-driven remote update is backlog.
 

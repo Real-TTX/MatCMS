@@ -8,13 +8,10 @@ services:
       - MatCmsCloud__Docker__Endpoint=unix:///var/run/docker.sock
     volumes:
       - matcms-cloud-data:/app/appdata
-      # Remove this line to run notify-only (no cloud-side update execution).
+      # Mounting the socket is all that is needed. The image's entrypoint detects it and grants
+      # the app process access, then runs the app unprivileged — no group_add / DOCKER_GID, no
+      # user override. Remove this line to run notify-only (no cloud-side update execution).
       - /var/run/docker.sock:/var/run/docker.sock
-    # The app runs as non-root; the socket is mode 660. Without a matching group the app gets
-    # "permission denied" and every instance silently stays "remote".
-    #   DOCKER_GID=$(stat -c '%g' /var/run/docker.sock) docker compose -f docker-compose.prod.yml up -d
-    group_add:
-      - "${DOCKER_GID:-0}"
     networks:
       - main
     restart: unless-stopped

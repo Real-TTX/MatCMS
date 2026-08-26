@@ -30,9 +30,17 @@ WORKDIR /app
 COPY --from=build /app/publish .
 
 # Writable folder for the SQLite DB and the data-protection keys.
-USER root
 RUN mkdir -p /app/appdata && chown -R app:app /app
-USER app
+
+# gosu lets the entrypoint start as root, grant the app process access to a mounted Docker
+# socket (see docker-entrypoint.sh) and then drop back to the unprivileged "app" user — so a
+# socket mount "just works" with no group_add / DOCKER_GID, exactly like Portainer & co.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends gosu \
+ && rm -rf /var/lib/apt/lists/* \
+ && gosu nobody true
+COPY src/MatCMS.Cloud/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # The internal port stays the ASP.NET base-image default (8080).
 # The externally reachable port is set only via the compose port mapping.
@@ -40,4 +48,7 @@ ENV ASPNETCORE_ENVIRONMENT=Production
 
 EXPOSE 8080
 
-ENTRYPOINT ["dotnet", "MatCMS.Cloud.dll"]
+# PID 1 starts as root ONLY so the entrypoint can adopt the socket's group; the app itself
+# runs as the non-root "app" user (the entrypoint execs it via gosu). CMD is what it execs.
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+CMD ["dotnet", "MatCMS.Cloud.dll"]

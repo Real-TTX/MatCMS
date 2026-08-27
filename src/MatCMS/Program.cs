@@ -78,6 +78,14 @@ builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(dataDir, "keys")))
     .SetApplicationName("MatCMS");
 
+// When this instance is meant to be logged into INSIDE the cloud admin's iframe, its login lives in
+// a CROSS-ORIGIN frame. A SameSite=Lax cookie is neither sent nor set there, so the auth AND the
+// antiforgery cookie have to be SameSite=None; Secure to survive — otherwise the login POST looks
+// like it does nothing and the frame stays blank. Opt-in on purpose (MatCms:EmbedAuth): None demands
+// Secure, so it REQUIRES the instance to be served over HTTPS; turning it on for a plain-http/local
+// site would break login instead of fixing it. Off = the previous Lax behaviour, unchanged.
+bool.TryParse(builder.Configuration["MatCms:EmbedAuth"], out var embedAuth);
+
 // --- Authentication: cookie based, login only via /login ---
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
@@ -89,7 +97,8 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.SlidingExpiration = true;
         options.Cookie.Name = "matcms.auth";
         options.Cookie.HttpOnly = true;
-        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SameSite = embedAuth ? SameSiteMode.None : SameSiteMode.Lax;
+        if (embedAuth) options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
     });
 
 builder.Services.AddAuthorization(options =>
@@ -163,7 +172,17 @@ builder.Services.AddHostedService<CloudAutoEnrollService>();
 // Website zu zeigen — und zwar genau auf den Seiten mit Formular, allen voran der Anmeldeseite.
 // Abgeschaltet und weiter unten durch eine Regel ersetzt, die dieselbe Gefahr abwehrt, aber die
 // eine erlaubte Einbettung benennt.
-builder.Services.AddAntiforgery(o => o.SuppressXFrameOptionsHeader = true);
+builder.Services.AddAntiforgery(o =>
+{
+    o.SuppressXFrameOptionsHeader = true;
+    // Same reason as the auth cookie above: inside the cloud's cross-origin iframe a Lax antiforgery
+    // cookie is never set, so the login form's token check would fail there. Kept in step with it.
+    if (embedAuth)
+    {
+        o.Cookie.SameSite = SameSiteMode.None;
+        o.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    }
+});
 
 builder.Services.AddRateLimiter(options =>
 {

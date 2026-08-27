@@ -594,6 +594,17 @@ leaves as a blank rectangle with no explanation anywhere.
 first and says so in words instead of rendering a frame the browser will refuse. It stays useful even
 with the headers configured, because a site may genuinely be http-only.
 
+**Logging into an instance INSIDE the cloud's iframe** needs one more thing on the instance side.
+Framing already works (MatCMS suppresses `X-Frame-Options` and sets `frame-ancestors 'self' <cloud>`),
+but the login sits in a CROSS-ORIGIN frame where a `SameSite=Lax` cookie is never set — the form
+submits into the void and the frame stays blank (the console's "Blocked autofocusing … cross-origin
+subframe" is only a red herring). The instance opts in with **`MatCms:EmbedAuth=true`**, which switches
+its auth AND antiforgery cookies to `SameSite=None; Secure`. It REQUIRES the instance to be served over
+HTTPS (a `None` cookie without `Secure` is rejected), so it is off by default — turning it on for a
+plain-http site breaks login instead of fixing it. Note the modern-browser caveat: with third-party
+cookies fully disabled, even `SameSite=None` can be blocked; CHIPS/`Partitioned` is the follow-up if
+that bites.
+
 ### Update checks & notifications
 
 - `GhcrClient` lists all tags of a public GHCR package. It follows the `Link: …; rel="next"`

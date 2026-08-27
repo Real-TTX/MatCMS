@@ -1,0 +1,58 @@
+@model MatCMS.Content.BlockData
+@{
+    var heading = Model.StrOr("heading", "Anmelden");
+    // Which member (if any) is behind this request — the member scheme is not the default one, so it
+    // is asked for by name. Cached per request inside CurrentAsync.
+    var member = await MatCMS.Services.MemberService.CurrentAsync(Context);
+    var loggedIn = member?.Identity?.IsAuthenticated == true;
+    var name = member?.FindFirst("DisplayName")?.Value ?? member?.Identity?.Name;
+    var back = Context.Request.Path + Context.Request.QueryString;
+}
+<section class="member-login">
+    <div class="container">
+        <div class="member-login-card">
+            @if (!string.IsNullOrWhiteSpace(heading))
+            {
+                <h2>@heading</h2>
+            }
+            @if (loggedIn)
+            {
+                <p>Angemeldet als <strong>@name</strong>.</p>
+                <form method="post" action="/anmelden?handler=Logout">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="returnUrl" value="@back" />
+                    <button type="submit" class="btn">Abmelden</button>
+                </form>
+            }
+            else
+            {
+                <form method="post" action="/anmelden">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="returnUrl" value="@back" />
+                    <label class="member-login-field">
+                        <span>Benutzername</span>
+                        <input name="username" autocomplete="username" required />
+                    </label>
+                    <label class="member-login-field">
+                        <span>Passwort</span>
+                        <input name="password" type="password" autocomplete="current-password" required />
+                    </label>
+                    <label class="member-login-remember">
+                        <input type="checkbox" name="remember" value="true" /> Angemeldet bleiben
+                    </label>
+                    <button type="submit" class="btn">Anmelden</button>
+                </form>
+            }
+        </div>
+    </div>
+</section>
+<style>
+    .member-login { padding: 32px 0; }
+    .member-login-card { max-width: 380px; margin: 0 auto; background: #fff; border: 1px solid rgba(0,0,0,.1); border-radius: 12px; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,.05); }
+    .member-login-card h2 { margin: 0 0 16px; }
+    .member-login-field { display: block; margin: 0 0 12px; }
+    .member-login-field span { display: block; font-size: .85rem; margin-bottom: 5px; opacity: .8; }
+    .member-login-field input { width: 100%; padding: 10px 12px; border: 1px solid rgba(0,0,0,.2); border-radius: 8px; font: inherit; box-sizing: border-box; }
+    .member-login-remember { display: flex; align-items: center; gap: 8px; margin: 0 0 16px; font-size: .9rem; }
+    .member-login .btn { cursor: pointer; }
+</style>

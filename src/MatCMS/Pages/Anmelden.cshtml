@@ -1,0 +1,54 @@
+@page "/anmelden"
+@model MatCMS.Pages.AnmeldenModel
+@{
+    ViewData["Title"] = "Anmelden";
+}
+<style>
+    .member-auth { display: flex; justify-content: center; padding: 48px 16px; }
+    .member-auth-card { width: 100%; max-width: 380px; background: #fff; border: 1px solid rgba(0,0,0,.1); border-radius: 12px; padding: 28px; box-shadow: 0 10px 30px rgba(0,0,0,.06); }
+    .member-auth-card h1 { margin: 0 0 18px; font-size: 1.5rem; }
+    .member-auth-field { display: block; margin: 0 0 14px; }
+    .member-auth-field span { display: block; font-size: .85rem; margin-bottom: 6px; opacity: .8; }
+    .member-auth-field input { width: 100%; padding: 10px 12px; border: 1px solid rgba(0,0,0,.2); border-radius: 8px; font: inherit; box-sizing: border-box; }
+    .member-auth-remember { display: flex; align-items: center; gap: 8px; margin: 0 0 18px; font-size: .9rem; }
+    .member-auth-error { background: #fdecec; color: #b02020; border: 1px solid #f3c0c0; border-radius: 8px; padding: 10px 12px; margin: 0 0 16px; }
+    .member-auth .btn { cursor: pointer; }
+</style>
+<section class="member-auth">
+    <div class="member-auth-card">
+        <h1>Anmelden</h1>
+
+        @if (!string.IsNullOrEmpty(Model.Error))
+        {
+            <p class="member-auth-error">@Model.Error</p>
+        }
+
+        @if (Model.LoggedIn)
+        {
+            <p>Angemeldet als <strong>@Model.MemberName</strong>.</p>
+            <form method="post" asp-page-handler="Logout">
+                <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+                <button type="submit" class="btn">Abmelden</button>
+                <a class="btn btn-ghost" href="/">Zur Startseite</a>
+            </form>
+        }
+        else
+        {
+            <form method="post">
+                <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+                <label class="member-auth-field">
+                    <span>Benutzername</span>
+                    <input name="username" autocomplete="username" required autofocus />
+                </label>
+                <label class="member-auth-field">
+                    <span>Passwort</span>
+                    <input name="password" type="password" autocomplete="current-password" required />
+                </label>
+                <label class="member-auth-remember">
+                    <input type="checkbox" name="remember" value="true" /> Angemeldet bleiben
+                </label>
+                <button type="submit" class="btn">Anmelden</button>
+            </form>
+        }
+    </div>
+</section>

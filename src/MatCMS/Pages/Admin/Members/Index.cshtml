@@ -1,0 +1,66 @@
+@page
+@model MatCMS.Pages.Admin.Members.IndexModel
+@{
+    ViewData["Title"] = "Mitglieder";
+}
+<div data-list>
+    <div class="page-head">
+        <h1>Mitglieder</h1>
+        <div class="list-toolbar">
+            <input type="search" class="list-search" data-list-search placeholder="Suchen…" aria-label="Suchen" autocomplete="off" />
+            <a class="btn btn-sm btn-ghost" asp-page="/Admin/Roles/Index">Rollen verwalten</a>
+        </div>
+    </div>
+
+    <p class="help">Konten für den geschützten Bereich der öffentlichen Website. Getrennt von den Admin-Benutzern.</p>
+
+    <table class="data" data-list-table>
+        <thead>
+            <tr>
+                <th>Benutzername</th>
+                <th>Anzeigename</th>
+                <th>Rollen</th>
+                <th>Status</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Items.Count == 0)
+            {
+                <tr><td colspan="99" class="muted"><em>Noch keine Mitglieder.</em></td></tr>
+            }
+            @foreach (var m in Model.Items)
+            {
+                <tr data-search="@(m.Username + " " + m.DisplayName + " " + m.RolesCsv)">
+                    <td><strong>@m.Username</strong></td>
+                    <td class="muted">@(string.IsNullOrWhiteSpace(m.DisplayName) ? "—" : m.DisplayName)</td>
+                    <td class="muted">@(string.IsNullOrWhiteSpace(m.RolesCsv) ? "—" : m.RolesCsv.Replace(",", ", "))</td>
+                    <td>
+                        @if (m.IsActive)
+                        {
+                            <span class="badge badge-on">aktiv</span>
+                        }
+                        else
+                        {
+                            <span class="badge badge-off">deaktiviert</span>
+                        }
+                    </td>
+                    <td>
+                        <div class="actions">
+                            <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@m.Id">Bearbeiten</a>
+                            <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@m.Id"
+                                  onsubmit="return confirm('Dieses Mitglied löschen?');">
+                                <button type="submit" class="btn btn-sm btn-danger">Löschen</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <div class="list-empty" data-list-empty hidden>Keine Treffer.</div>
+</div>
+
+<div class="list-actions">
+    <a class="btn" asp-page="Edit">Mitglied anlegen</a>
+</div>

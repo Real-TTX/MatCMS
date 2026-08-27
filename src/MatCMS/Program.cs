@@ -99,12 +99,28 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = embedAuth ? SameSiteMode.None : SameSiteMode.Lax;
         if (embedAuth) options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    })
+    // A SECOND, independent scheme for public-site visitors (the "guest area" login). Its own cookie
+    // and login path, kept apart from the admin one so the two audiences never bleed into each other.
+    // A visitor is accessing the site directly (not through the cloud iframe), so this stays Lax.
+    .AddCookie(MatCMS.Services.MemberService.Scheme, options =>
+    {
+        options.LoginPath = "/anmelden";
+        options.LogoutPath = "/anmelden";
+        options.AccessDeniedPath = "/anmelden";
+        options.ExpireTimeSpan = TimeSpan.FromDays(30);
+        options.SlidingExpiration = true;
+        options.Cookie.Name = "matcms.member";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
     });
 
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("Admin", policy => policy.RequireRole("Admin"));
 });
+
+builder.Services.AddScoped<MatCMS.Services.MemberService>();
 
 builder.Services.AddLocalization();
 builder.Services.AddSingleton<Localizer>();

@@ -1,0 +1,51 @@
+@page
+@model MatCMS.Pages.Admin.Roles.IndexModel
+@{
+    ViewData["Title"] = "Rollen";
+}
+<div class="page-head">
+    <h1>Rollen</h1>
+    <div class="list-toolbar">
+        <a class="btn btn-sm btn-ghost" asp-page="/Admin/Members/Index">Zu den Mitgliedern</a>
+    </div>
+</div>
+
+<p class="help">Gruppen für den geschützten Bereich (z. B. „Familie", „Trauzeugen"). Eine Seite kann eine Rolle verlangen; Mitglieder mit dieser Rolle sehen sie.</p>
+
+<div class="card">
+    <form method="post" asp-page-handler="Add" class="form-row" style="align-items:flex-end;gap:12px;">
+        <div class="form-field" style="flex:1;">
+            <label for="name">Neue Rolle</label>
+            <input id="name" name="name" placeholder="z. B. Familie" required />
+        </div>
+        <button type="submit" class="btn">Hinzufügen</button>
+    </form>
+</div>
+
+<div class="card">
+    <table class="data">
+        <thead>
+            <tr><th>Rolle</th><th></th></tr>
+        </thead>
+        <tbody>
+            @if (Model.Items.Count == 0)
+            {
+                <tr><td colspan="99" class="muted"><em>Noch keine Rollen.</em></td></tr>
+            }
+            @foreach (var r in Model.Items)
+            {
+                <tr>
+                    <td><strong>@r.Name</strong></td>
+                    <td>
+                        <div class="actions">
+                            <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@r.Id"
+                                  onsubmit="return confirm('Diese Rolle löschen?');">
+                                <button type="submit" class="btn btn-sm btn-danger">Löschen</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

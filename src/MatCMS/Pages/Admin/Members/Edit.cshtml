@@ -1,0 +1,59 @@
+@page "{id:int?}"
+@model MatCMS.Pages.Admin.Members.EditModel
+@{
+    ViewData["Title"] = Model.IsNew ? "Mitglied anlegen" : "Mitglied bearbeiten";
+}
+<div class="page-head">
+    <h1>@(Model.IsNew ? "Mitglied anlegen" : "Mitglied bearbeiten")</h1>
+</div>
+
+<div class="card">
+    @if (!string.IsNullOrWhiteSpace(Model.Error))
+    {
+        <div class="alert alert-error">@Model.Error</div>
+    }
+    <form method="post" class="form-grid">
+        <input type="hidden" asp-for="Input.Id" />
+        <div class="form-row">
+            <div class="form-field">
+                <label asp-for="Input.Username">Benutzername</label>
+                <input asp-for="Input.Username" required autofocus />
+            </div>
+            <div class="form-field">
+                <label asp-for="Input.DisplayName">Anzeigename</label>
+                <input asp-for="Input.DisplayName" placeholder="z. B. Familie Jehle" />
+            </div>
+        </div>
+        <div class="form-field">
+            <label asp-for="Input.Password">Passwort</label>
+            <input asp-for="Input.Password" type="password" autocomplete="new-password" />
+            <div class="help">@(Model.IsNew ? "Erforderlich." : "Leer lassen, um das aktuelle Passwort zu behalten.")</div>
+        </div>
+        <div class="form-field">
+            <label>Rollen</label>
+            @if (Model.AllRoles.Count == 0)
+            {
+                <p class="muted">Noch keine Rollen. <a asp-page="/Admin/Roles/Index">Rollen anlegen</a>.</p>
+            }
+            else
+            {
+                <div class="checkbox-list">
+                    @foreach (var role in Model.AllRoles)
+                    {
+                        <label class="checkbox-row">
+                            <input type="checkbox" name="Input.Roles" value="@role" checked="@(Model.Input.Roles.Contains(role))" />
+                            <span>@role</span>
+                        </label>
+                    }
+                </div>
+            }
+        </div>
+        <label class="checkbox-row">
+            <input asp-for="Input.IsActive" type="checkbox" /> <span>Konto aktiv</span>
+        </label>
+        <div class="form-actions">
+            <button type="submit" class="btn">Speichern</button>
+            <a class="btn btn-ghost" asp-page="Index">Zurück</a>
+        </div>
+    </form>
+</div>

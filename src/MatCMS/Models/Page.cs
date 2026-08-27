@@ -1,5 +1,16 @@
 namespace MatCMS.Models;
 
+/// <summary>Who may open a page on the public site.</summary>
+public enum PageAccess
+{
+    /// <summary>Anyone. The default, and what every existing page stays.</summary>
+    Public = 0,
+
+    /// <summary>Only a logged-in <see cref="SiteMember"/> — optionally narrowed to one role via
+    /// <see cref="Page.RequiredRole"/>.</summary>
+    Members = 1
+}
+
 public class Page
 {
     public int Id { get; set; }
@@ -38,6 +49,14 @@ public class Page
     /// (so it is naturally scoped to the page — no selector prefixing needed). Admin-entered and
     /// output raw, exactly like the template's CustomCss and the html block.</summary>
     public string? CustomCss { get; set; }
+
+    /// <summary>Whether this page is public or restricted to logged-in members. Default
+    /// <see cref="PageAccess.Public"/>, so every existing page is unchanged.</summary>
+    public PageAccess Access { get; set; } = PageAccess.Public;
+
+    /// <summary>When <see cref="Access"/> is <see cref="PageAccess.Members"/>: the single role a
+    /// member must hold (a <see cref="SiteRole.Name"/>). Empty = any logged-in member suffices.</summary>
+    public string? RequiredRole { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

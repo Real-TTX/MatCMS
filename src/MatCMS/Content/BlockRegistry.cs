@@ -43,7 +43,7 @@ public class BlockRegistry
         ["leistungen"] = "design", ["leistung"] = "design", ["servicegrid"] = "design",
         ["service"] = "design", ["imagetext"] = "design", ["posts"] = "design",
         ["references"] = "design", ["reference"] = "design",
-        ["form"] = "form",
+        ["form"] = "form", ["memberlogin"] = "form",
         ["html"] = "embed"
     };
     private static string CatOf(string type) => CategoryByType.TryGetValue(type, out var c) ? c : "design";
@@ -227,6 +227,21 @@ public class BlockRegistry
                     Help = "Formulare werden unter „Formulare“ verwaltet." },
                 new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },
                 new BlockField { Id = "intro", Label = "block.f.intro", Type = FieldType.Textarea },
+            ]
+        },
+        // The public "guest area" login form, so a landing page can carry it exactly like the
+        // original wedding site (counter + login). Renders logged-in state + logout when a member is
+        // already signed in. See Blocks/_MemberLogin.
+        new BlockDefinition
+        {
+            Type = "memberlogin",
+            Name = "block.memberlogin.name",
+            Description = "block.memberlogin.desc",
+            Svg = SvgForm,
+            Partial = "Blocks/_MemberLogin",
+            Fields =
+            [
+                new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },
             ]
         },
         new BlockDefinition

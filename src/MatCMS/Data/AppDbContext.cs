@@ -23,6 +23,10 @@ public class AppDbContext : DbContext
     public DbSet<Plugin> Plugins => Set<Plugin>();
     public DbSet<Post> Posts => Set<Post>();
 
+    // Public-site visitor accounts and their role vocabulary (the "guest area" login).
+    public DbSet<SiteMember> SiteMembers => Set<SiteMember>();
+    public DbSet<SiteRole> SiteRoles => Set<SiteRole>();
+
     protected override void OnModelCreating(ModelBuilder b)
     {
         b.Entity<Post>().HasIndex(p => new { p.Slug, p.Locale }).IsUnique();
@@ -36,6 +40,8 @@ public class AppDbContext : DbContext
         b.Entity<Component>().HasIndex(c => c.Type).IsUnique();
         b.Entity<MailTemplate>().HasIndex(m => m.Key).IsUnique();
         b.Entity<Menu>().HasIndex(m => m.Key).IsUnique();
+        b.Entity<SiteMember>().HasIndex(m => m.Username).IsUnique();
+        b.Entity<SiteRole>().HasIndex(r => r.Name).IsUnique();
 
         b.Entity<ContentBlock>()
             .HasOne(cb => cb.Page)

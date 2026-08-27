@@ -34,6 +34,17 @@ public class ViewModel : PageModel
         if (page is null || (!page.IsPublished && !User.IsInRole("Admin")))
             return NotFound();
 
+        // Members-only pages: a visitor who is not logged in (or lacks the required role) never sees
+        // the content. Sent to the login with a returnUrl so they land back here afterwards; a member
+        // who IS logged in but lacks the role gets the same page with a "denied" note rather than a
+        // silent 404, so they understand it is their account, not a broken link.
+        if (!await MemberService.CanViewAsync(HttpContext, page))
+        {
+            var loggedIn = (await MemberService.CurrentAsync(HttpContext))?.Identity?.IsAuthenticated == true;
+            var back = Uri.EscapeDataString(Request.Path + Request.QueryString);
+            return Redirect($"/anmelden?returnUrl={back}{(loggedIn ? "&denied=1" : "")}");
+        }
+
         CurrentPage = page;
         ViewData["Title"] = page.Title;
         ViewData["MetaDescription"] = page.MetaDescription;

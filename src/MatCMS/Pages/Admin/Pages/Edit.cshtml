@@ -258,6 +258,25 @@
                             <textarea name="Meta.CustomCss" rows="6" spellcheck="false" style="font-family:var(--mono,ui-monospace,monospace);font-size:13px">@Model.Meta.CustomCss</textarea>
                             <small class="muted">@T["editor.pageCss.help"]</small>
                         </div>
+                        <div class="form-field">
+                            <label>Zugriff</label>
+                            <select name="Meta.Access">
+                                <option value="Public" selected="@(Model.Meta.Access == MatCMS.Models.PageAccess.Public ? "selected" : null)">Öffentlich</option>
+                                <option value="Members" selected="@(Model.Meta.Access == MatCMS.Models.PageAccess.Members ? "selected" : null)">Nur angemeldete Mitglieder</option>
+                            </select>
+                            <small class="muted">Geschützte Seiten verlangen eine Anmeldung im Mitgliederbereich.</small>
+                        </div>
+                        <div class="form-field">
+                            <label>Benötigte Rolle</label>
+                            <select name="Meta.RequiredRole">
+                                <option value="">— jede/r Angemeldete —</option>
+                                @foreach (var role in Model.AllRoles)
+                                {
+                                    <option value="@role" selected="@(Model.Meta.RequiredRole == role ? "selected" : null)">@role</option>
+                                }
+                            </select>
+                            <small class="muted">Nur wirksam bei „Nur angemeldete Mitglieder".</small>
+                        </div>
                         <label class="check">
                             <input type="checkbox" name="Meta.IsPublished" value="true" @(Model.Meta.IsPublished ? "checked" : "") /> @T["editor.published"]
                         </label>

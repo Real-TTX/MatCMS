@@ -76,7 +76,13 @@ public class EditModel : PageModel
         public string? MetaDescription { get; set; }
         public string? CustomCss { get; set; }
         public bool IsPublished { get; set; }
+        public PageAccess Access { get; set; } = PageAccess.Public;
+        public string? RequiredRole { get; set; }
     }
+
+    /// <summary>The member roles a page may require (empty = the members-area is unused). Fed to the
+    /// access dropdown in the editor.</summary>
+    public List<string> AllRoles { get; private set; } = new();
 
     private static readonly JsonSerializerOptions SchemaOpts = new()
     {
@@ -114,8 +120,11 @@ public class EditModel : PageModel
             Locale = page.Locale,
             MetaDescription = page.MetaDescription,
             CustomCss = page.CustomCss,
-            IsPublished = page.IsPublished
+            IsPublished = page.IsPublished,
+            Access = page.Access,
+            RequiredRole = page.RequiredRole
         };
+        AllRoles = await _db.SiteRoles.AsNoTracking().OrderBy(r => r.Name).Select(r => r.Name).ToListAsync();
 
         await LoadTranslationsAsync(page);
         await LoadSwitcherAsync(page);
@@ -229,6 +238,11 @@ public class EditModel : PageModel
         page.MetaDescription = Meta.MetaDescription;
         page.CustomCss = string.IsNullOrWhiteSpace(Meta.CustomCss) ? null : Meta.CustomCss;
         page.IsPublished = Meta.IsPublished;
+        page.Access = Meta.Access;
+        // A required role only means anything for a members-only page; drop it otherwise so a page
+        // flipped back to public does not keep a stale gate.
+        page.RequiredRole = Meta.Access == PageAccess.Members && !string.IsNullOrWhiteSpace(Meta.RequiredRole)
+            ? Meta.RequiredRole!.Trim() : null;
         page.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
 

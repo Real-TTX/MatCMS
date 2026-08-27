@@ -147,8 +147,18 @@
             <div class="form-field">
                 <label>@T["settings.backupQuota"]</label>
                 <input name="backupQuotaGb" value="@Model.Get(SettingKeys.BackupQuotaGb)"
-                       placeholder="@MatCMS.Cloud.Services.BackupStore.DefaultQuotaGb" inputmode="numeric" />
-                <div class="help">@T["settings.backupQuotaHint"]</div>
+                       placeholder="@MatCMS.Cloud.Services.BackupStore.DefaultQuotaGb" inputmode="decimal" />
+                <div class="help">@T["settings.backupQuotaHint"] Nachkommastellen erlaubt (0,1 = 100 MB).</div>
+            </div>
+            <div class="form-field">
+                <label>Aufbewahrung automatischer Backups (Standard)</label>
+                <div class="form-row">
+                    <div class="form-field"><label>Täglich</label><input name="backupKeepDaily" value="@Model.Get(SettingKeys.BackupKeepDaily)" placeholder="aus" inputmode="numeric" /></div>
+                    <div class="form-field"><label>Wöchentlich</label><input name="backupKeepWeekly" value="@Model.Get(SettingKeys.BackupKeepWeekly)" placeholder="aus" inputmode="numeric" /></div>
+                    <div class="form-field"><label>Monatlich</label><input name="backupKeepMonthly" value="@Model.Get(SettingKeys.BackupKeepMonthly)" placeholder="aus" inputmode="numeric" /></div>
+                    <div class="form-field"><label>Max. Anzahl</label><input name="backupMaxCount" value="@Model.Get(SettingKeys.BackupMaxCount)" placeholder="aus" inputmode="numeric" /></div>
+                </div>
+                <div class="help">Je Tag/Woche/Monat wird das neueste Backup behalten (klassisches Großvater-Vater-Sohn). Leer/0 = aus. Betrifft nur die von den Instanzen selbst erstellten Backups — manuell oder über die API hochgeladene werden nie automatisch gelöscht. Pro Profil überschreibbar.</div>
             </div>
             <div><button type="submit" class="btn">@T["settings.save"]</button></div>
         </div>

@@ -188,7 +188,7 @@ public class EditModel : PageModel
     /// </summary>
     /// <summary>The cloud-wide default, shown as the placeholder so an empty field says what it will
     /// actually do rather than just being blank.</summary>
-    public int GlobalQuotaGb { get; private set; } = BackupStore.DefaultQuotaGb;
+    public double GlobalQuotaGb { get; private set; } = BackupStore.DefaultQuotaGb;
 
     public List<ProfileSetting> OtherSettings =>
         Settings.Where(s => !ProfileService.IsGroupKey(s.Key)).OrderBy(s => s.Key).ToList();
@@ -359,7 +359,9 @@ public class EditModel : PageModel
         string? settingsMode, string? usersMode, string? pluginsMode, string? componentsMode, string? templatesMode,
         string? mailTemplatesMode,
         string? activateTemplateName,
-        string? backupQuotaGb = null)
+        string? backupQuotaGb = null,
+        string? backupKeepDaily = null, string? backupKeepWeekly = null,
+        string? backupKeepMonthly = null, string? backupMaxCount = null)
     {
         var profile = await _db.Profiles.FindAsync(id);
         if (profile is null) return RedirectToPage("Index");
@@ -369,8 +371,16 @@ public class EditModel : PageModel
         profile.AutoApprove = autoApprove;
         // Empty means "use the cloud-wide default", so it has to stay distinguishable from a number.
         // Anything that is not a positive number becomes empty rather than being stored: a zero quota
-        // would delete every backup these instances own on their next upload.
-        profile.BackupQuotaGb = int.TryParse(backupQuotaGb, out var gb) && gb > 0 ? gb : null;
+        // would delete every backup these instances own on their next upload. Fractional GB allowed
+        // (0.1 = 100 MB), comma or dot.
+        profile.BackupQuotaGb = BackupStore.ParseGb(backupQuotaGb) is double gb && gb > 0 ? gb : null;
+        // Retention: empty = use the cloud-wide default; 0 = that tier explicitly off. So a blank field
+        // stays null and only a typed number (incl. 0) is stored.
+        static int? Tier(string? s) => int.TryParse(s, out var n) && n >= 0 ? n : (int?)null;
+        profile.BackupKeepDaily = Tier(backupKeepDaily);
+        profile.BackupKeepWeekly = Tier(backupKeepWeekly);
+        profile.BackupKeepMonthly = Tier(backupKeepMonthly);
+        profile.BackupMaxCount = Tier(backupMaxCount);
         profile.AutoUpdateLocal = autoUpdateLocal;
         profile.NotifyOffline = notifyOffline;
         profile.NotifyUpdate = notifyUpdate;

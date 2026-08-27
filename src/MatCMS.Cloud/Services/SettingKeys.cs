@@ -13,6 +13,11 @@ public static class SettingKeys
     /// this is the number that decides how far back a site can be restored — not a technical limit
     /// but a policy, which is why it belongs in the settings and not in a constant.</summary>
     public const string BackupQuotaGb = "backup.quotaGb";
+    // Cloud-wide retention defaults (used when a profile leaves the field empty). All optional; 0 = off.
+    public const string BackupKeepDaily = "backup.keepDaily";
+    public const string BackupKeepWeekly = "backup.keepWeekly";
+    public const string BackupKeepMonthly = "backup.keepMonthly";
+    public const string BackupMaxCount = "backup.maxCount";
 
     /// <summary>
     /// "My instances are reachable over https, whatever they report."

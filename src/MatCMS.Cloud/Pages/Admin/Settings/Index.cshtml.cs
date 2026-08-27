@@ -68,13 +68,25 @@ public class IndexModel : PageModel
     /// <summary>Eigenes Formular, eigener Handler — jede Karte speichert nur ihre eigenen Schlüssel.
     /// Bliebe das Kontingent am Allgemein-Handler hängen, würde ein Speichern dort den Wert leeren,
     /// weil das Formular ihn gar nicht mehr mitschickt.</summary>
-    public async Task<IActionResult> OnPostBackupAsync(string? backupQuotaGb)
+    public async Task<IActionResult> OnPostBackupAsync(
+        string? backupQuotaGb,
+        string? backupKeepDaily, string? backupKeepWeekly, string? backupKeepMonthly, string? backupMaxCount)
     {
+        // Store the quota as an invariant-culture string so it reads back the same regardless of the
+        // server locale; fractional allowed (0.1 = 100 MB), comma or dot on input.
+        var quota = BackupStore.ParseGb(backupQuotaGb) is double gb && gb > 0
+            ? gb.ToString(System.Globalization.CultureInfo.InvariantCulture) : "";
+        // Retention tiers: a number (incl. 0 = off) is stored; anything else is left empty, which the
+        // resolver reads as "off" for the cloud-wide default.
+        static string Tier(string? s) => int.TryParse(s, out var n) && n >= 0 ? n.ToString() : "";
+
         await _cloud.SaveAsync(new Dictionary<string, string?>
         {
-            // Nur eine sinnvolle Zahl wird gespeichert; alles andere bleibt leer, damit der Standard
-            // greift statt ein Null-Kontingent beim nächsten Upload alles wegzuräumen.
-            [SettingKeys.BackupQuotaGb] = int.TryParse(backupQuotaGb, out var gb) && gb > 0 ? gb.ToString() : ""
+            [SettingKeys.BackupQuotaGb] = quota,
+            [SettingKeys.BackupKeepDaily] = Tier(backupKeepDaily),
+            [SettingKeys.BackupKeepWeekly] = Tier(backupKeepWeekly),
+            [SettingKeys.BackupKeepMonthly] = Tier(backupKeepMonthly),
+            [SettingKeys.BackupMaxCount] = Tier(backupMaxCount),
         });
         TempData["Flash"] = "Backup-Einstellungen gespeichert.";
         return RedirectToPage(new { tab = "backup" });

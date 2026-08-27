@@ -95,7 +95,22 @@ public class Profile
     /// page is about what gets rolled out, and opening it switches the rollout ON — an operator who
     /// only wanted to grant a customer more space would have started backing up their sites.</para>
     /// </summary>
-    public int? BackupQuotaGb { get; set; }
+    /// <summary>Disk ceiling in GB, FRACTIONAL (e.g. 0.1 = 100 MB). Null = the cloud-wide default.
+    /// The safety net that never keeps the very last backup from fitting.</summary>
+    public double? BackupQuotaGb { get; set; }
+
+    // --- Cloud-side retention (GFS) for AUTOMATIC backups --------------------
+    // How many of the instance's OWN scheduled ("auto") backups the cloud keeps, in the classic
+    // grandfather-father-son shape. Manual/API uploads are exempt — never auto-pruned. Null on the
+    // profile = fall back to the cloud-wide default; 0 = that tier is off. Retention is entirely a
+    // CLOUD decision (it holds the disk), like the quota above, and is not rolled out to the instance.
+    public int? BackupKeepDaily { get; set; }
+    public int? BackupKeepWeekly { get; set; }
+    public int? BackupKeepMonthly { get; set; }
+
+    /// <summary>Absolute cap on the number of AUTO backups kept, applied on top of the GFS tiers.
+    /// Null = cloud-wide default, 0 = no count cap.</summary>
+    public int? BackupMaxCount { get; set; }
 
     // --- Which payloads this profile pushes ---------------------------------
     public bool SyncSettings { get; set; }

@@ -27,6 +27,11 @@ public class InstanceMonitorService : BackgroundService
     private readonly IServiceScopeFactory _scopes;
     private readonly ILogger<InstanceMonitorService> _log;
 
+    // Retention is enforced on every upload; this counts ticks so the time-based tiers (GFS) also get
+    // a sweep when uploads stop. 60 ticks × 60 s ≈ hourly, which is plenty for day/week/month buckets.
+    private const int SweepEveryTicks = 60;
+    private int _ticksSinceSweep = SweepEveryTicks;   // sweep on the first tick too
+
     public InstanceMonitorService(IServiceScopeFactory scopes, ILogger<InstanceMonitorService> log)
     {
         _scopes = scopes;
@@ -74,6 +79,19 @@ public class InstanceMonitorService : BackgroundService
         var all = await db.Instances.Include(i => i.Profile)
             .Where(i => i.Status == InstanceStatus.Approved)
             .ToListAsync(ct);
+
+        // Periodic retention sweep (~hourly): prune time-based tiers for sites that stopped uploading.
+        // Uploads prune themselves in BackupStore.StoreAsync, so this only has to catch the tail.
+        if (++_ticksSinceSweep >= SweepEveryTicks)
+        {
+            _ticksSinceSweep = 0;
+            var backups = sp.GetRequiredService<BackupStore>();
+            foreach (var instance in all)
+            {
+                try { await backups.EnforceRetentionAsync(instance.Id, ct); }
+                catch (Exception ex) { _log.LogWarning(ex, "Retention sweep failed for instance {Id}", instance.Id); }
+            }
+        }
         // Recipients ride along per mail: two instances on different profiles can have different
         // notification targets, so one global list at send time would be wrong.
         var pending = new List<(string subject, string body, string? recipients)>();

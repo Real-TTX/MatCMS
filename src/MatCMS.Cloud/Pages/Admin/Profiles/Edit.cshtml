@@ -102,9 +102,19 @@
             </label>
             <div class="form-field">
                 <label for="backupQuotaGb">@T["profiles.backupQuota"]</label>
-                <input id="backupQuotaGb" name="backupQuotaGb" value="@(Model.Item.BackupQuotaGb?.ToString() ?? "")"
-                       placeholder="@Model.GlobalQuotaGb" inputmode="numeric" />
-                <div class="help">@T["profiles.backupQuotaHint", Model.GlobalQuotaGb]</div>
+                <input id="backupQuotaGb" name="backupQuotaGb" value="@(Model.Item.BackupQuotaGb?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "")"
+                       placeholder="@Model.GlobalQuotaGb" inputmode="decimal" />
+                <div class="help">@T["profiles.backupQuotaHint", Model.GlobalQuotaGb] Nachkommastellen erlaubt (0,1 = 100 MB).</div>
+            </div>
+            <div class="form-field">
+                <label>Backup-Aufbewahrung (automatische Backups)</label>
+                <div class="form-row">
+                    <div class="form-field"><label for="bkd">Täglich</label><input id="bkd" name="backupKeepDaily" value="@(Model.Item.BackupKeepDaily?.ToString() ?? "")" placeholder="Standard" inputmode="numeric" /></div>
+                    <div class="form-field"><label for="bkw">Wöchentlich</label><input id="bkw" name="backupKeepWeekly" value="@(Model.Item.BackupKeepWeekly?.ToString() ?? "")" placeholder="Standard" inputmode="numeric" /></div>
+                    <div class="form-field"><label for="bkm">Monatlich</label><input id="bkm" name="backupKeepMonthly" value="@(Model.Item.BackupKeepMonthly?.ToString() ?? "")" placeholder="Standard" inputmode="numeric" /></div>
+                    <div class="form-field"><label for="bmc">Max. Anzahl</label><input id="bmc" name="backupMaxCount" value="@(Model.Item.BackupMaxCount?.ToString() ?? "")" placeholder="Standard" inputmode="numeric" /></div>
+                </div>
+                <div class="help">Wie viele der EIGENEN (automatischen) Backups die Cloud behält: je Tag/Woche/Monat das neueste, höchstens „Max. Anzahl". Leer = Cloud-Standard, 0 = aus. Manuell/über API hochgeladene Backups werden nie automatisch gelöscht.</div>
             </div>
             <div class="form-field">
                 <label for="notifyRecipients">@T["settings.recipients"]</label>

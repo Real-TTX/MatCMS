@@ -34,11 +34,21 @@ public class BackupStore
     /// <para>Read per call rather than cached: it is asked for once per upload and once per page view,
     /// and a stale value would go on deleting to a limit the operator has already changed.</para>
     /// </summary>
-    public async Task<int> DefaultQuotaGbAsync(CancellationToken ct = default)
+    public async Task<double> DefaultQuotaGbAsync(CancellationToken ct = default)
     {
         var row = await _db.CloudSettings.AsNoTracking()
             .FirstOrDefaultAsync(s => s.Key == SettingKeys.BackupQuotaGb, ct);
-        return int.TryParse(row?.Value, out var v) && v > 0 ? v : DefaultQuotaGb;
+        return ParseGb(row?.Value) is double v && v > 0 ? v : DefaultQuotaGb;
+    }
+
+    /// <summary>Parses a GB value that a human typed — accepting a comma OR a dot as the decimal mark,
+    /// so "0,1" and "0.1" (both = 100 MB) mean the same thing. Null when it is not a number.</summary>
+    public static double? ParseGb(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        var normalized = text.Trim().Replace(',', '.');
+        return double.TryParse(normalized, System.Globalization.NumberStyles.Any,
+            System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : null;
     }
 
     /// <summary>
@@ -59,8 +69,8 @@ public class BackupStore
             .Select(i => i.Profile != null ? i.Profile.BackupQuotaGb : null)
             .FirstOrDefaultAsync(ct);
 
-        var gb = profileQuota is int q && q > 0 ? q : await DefaultQuotaGbAsync(ct);
-        return (long)gb * 1024 * 1024 * 1024;
+        var gb = profileQuota is double q && q > 0 ? q : await DefaultQuotaGbAsync(ct);
+        return (long)(gb * 1024 * 1024 * 1024);
     }
 
     /// <summary>A hard ceiling per file, so a broken instance cannot fill the disk with one request.
@@ -162,7 +172,7 @@ public class BackupStore
             _db.CloudBackups.Add(row);
             await _db.SaveChangesAsync(ct);
 
-            await EnforceQuotaAsync(instance.Id, ct);
+            await EnforceRetentionAsync(instance.Id, ct);
             return new Result(true, null, row);
         }
         catch (Exception ex)
@@ -173,32 +183,104 @@ public class BackupStore
         }
     }
 
-    /// <summary>Drops the oldest backups until the instance is inside its quota. Never below
-    /// <see cref="KeepAtLeast"/>: one oversized backup must not take the last other copy with it.</summary>
-    public async Task EnforceQuotaAsync(int instanceId, CancellationToken ct = default)
+    /// <summary>Resolved retention numbers for one instance: profile value if set, else the
+    /// cloud-wide default, else 0 (that tier off). 0 everywhere = retention disabled, quota only.</summary>
+    public sealed record Retention(int KeepDaily, int KeepWeekly, int KeepMonthly, int MaxCount)
     {
-        var quota = await QuotaBytesAsync(instanceId, ct);
+        public bool Any => KeepDaily > 0 || KeepWeekly > 0 || KeepMonthly > 0 || MaxCount > 0;
+    }
+
+    public async Task<Retention> ResolveRetentionAsync(int instanceId, CancellationToken ct = default)
+    {
+        var prof = await _db.Instances.AsNoTracking()
+            .Where(i => i.Id == instanceId).Select(i => i.Profile).FirstOrDefaultAsync(ct);
+        var settings = await _db.CloudSettings.AsNoTracking()
+            .ToDictionaryAsync(s => s.Key, s => s.Value, ct);
+
+        int Resolve(int? profileVal, string key)
+        {
+            if (profileVal is int p && p >= 0) return p;                 // profile wins (0 = off on purpose)
+            return settings.TryGetValue(key, out var v) && int.TryParse(v, out var n) && n >= 0 ? n : 0;
+        }
+        return new Retention(
+            Resolve(prof?.BackupKeepDaily, SettingKeys.BackupKeepDaily),
+            Resolve(prof?.BackupKeepWeekly, SettingKeys.BackupKeepWeekly),
+            Resolve(prof?.BackupKeepMonthly, SettingKeys.BackupKeepMonthly),
+            Resolve(prof?.BackupMaxCount, SettingKeys.BackupMaxCount));
+    }
+
+    private static bool IsAuto(CloudBackup b) =>
+        string.Equals(b.Origin, "auto", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Prunes an instance's backups to policy. Two layers, and both leave MANUAL/API uploads alone —
+    /// only the site's own scheduled ("auto") backups are ever auto-deleted:
+    /// <list type="number">
+    /// <item><b>GFS + max-count</b> (when configured): keep the newest auto backup per day for
+    /// KeepDaily days, per ISO week for KeepWeekly weeks, per month for KeepMonthly months, and never
+    /// more than MaxCount auto backups in total. The newest auto backup is always kept.</item>
+    /// <item><b>Disk quota</b>: if the total is still over the (fractional) GB quota, drop the oldest
+    /// remaining AUTO backups until it fits — never the very last backup overall.</item>
+    /// </list>
+    /// Retention entirely unset (all zero) leaves layer 1 off, so this behaves exactly like the old
+    /// quota-only pruner. Called after every upload and by the monitor's periodic sweep.
+    /// </summary>
+    public async Task EnforceRetentionAsync(int instanceId, CancellationToken ct = default)
+    {
         var rows = await _db.CloudBackups
             .Where(b => b.InstanceId == instanceId)
             .OrderByDescending(b => b.CreatedAt)
             .ToListAsync(ct);
+        if (rows.Count == 0) return;
 
-        long total = 0;
+        var auto = rows.Where(IsAuto).ToList();   // newest-first; the only ones we may auto-delete
         var doomed = new List<CloudBackup>();
-        for (var i = 0; i < rows.Count; i++)
-        {
-            total += rows[i].SizeBytes;
-            if (total > quota && i >= KeepAtLeast) doomed.Add(rows[i]);
-        }
-        if (doomed.Count == 0) return;
 
-        foreach (var b in doomed)
+        // --- Layer 1: GFS + max-count over the auto backups ---
+        var policy = await ResolveRetentionAsync(instanceId, ct);
+        if (policy.Any && auto.Count > 0)
+        {
+            var keep = new HashSet<int> { auto[0].Id };   // always keep the newest auto backup
+            void Tier(int limit, Func<DateTime, string> period)
+            {
+                if (limit <= 0) return;
+                var seen = new HashSet<string>();
+                foreach (var b in auto)
+                {
+                    var p = period(b.CreatedAt);
+                    if (seen.Contains(p)) continue;   // an older backup in a period already kept
+                    if (seen.Count >= limit) break;   // this tier's periods are full
+                    seen.Add(p);
+                    keep.Add(b.Id);
+                }
+            }
+            Tier(policy.KeepDaily, d => d.ToString("yyyy-MM-dd"));
+            Tier(policy.KeepWeekly, d => $"{System.Globalization.ISOWeek.GetYear(d)}-W{System.Globalization.ISOWeek.GetWeekOfYear(d):00}");
+            Tier(policy.KeepMonthly, d => d.ToString("yyyy-MM"));
+            if (policy.MaxCount > 0) foreach (var b in auto.Take(policy.MaxCount)) keep.Add(b.Id);
+
+            doomed.AddRange(auto.Where(b => !keep.Contains(b.Id)));
+        }
+
+        // --- Layer 2: disk quota (drops oldest surviving AUTO backups first) ---
+        var quota = await QuotaBytesAsync(instanceId, ct);
+        long total = rows.Where(b => !doomed.Contains(b)).Sum(b => b.SizeBytes);
+        foreach (var b in rows.Where(b => IsAuto(b) && !doomed.Contains(b)).OrderBy(b => b.CreatedAt))
+        {
+            if (total <= quota) break;
+            if (rows.Count - doomed.Count <= KeepAtLeast) break;   // never remove the last backup
+            doomed.Add(b);
+            total -= b.SizeBytes;
+        }
+
+        if (doomed.Count == 0) return;
+        foreach (var b in doomed.DistinctBy(b => b.Id))
         {
             TryDelete(PathFor(b));
             _db.CloudBackups.Remove(b);
         }
         await _db.SaveChangesAsync(ct);
-        _log.LogInformation("Backup quota: dropped {Count} old backup(s) for instance {Instance}", doomed.Count, instanceId);
+        _log.LogInformation("Retention: removed {Count} auto backup(s) for instance {Instance}", doomed.Count, instanceId);
     }
 
     /// <summary>

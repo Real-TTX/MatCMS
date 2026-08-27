@@ -387,7 +387,19 @@ backup group's page for a practical reason too — opening that page switches th
 operator who only wanted to grant more space would have started backing up their sites.
 `BackupStore.QuotaBytesAsync(instanceId)` resolves profile → default; an instance with no profile
 falls back to the default, which is a real state (pending, or profile deleted) and must never mean
-"no quota".
+"no quota". The quota is a **fractional GB `double`** (0.1 = 100 MB) — `BackupStore.ParseGb` accepts a
+comma or a dot so a German-entered "0,1" and "0.1" mean the same, and it is stored invariant.
+
+**Retention is separate from — and layered on top of — the quota.** `BackupStore.EnforceRetentionAsync`
+(run after every upload and by `InstanceMonitorService`'s ~hourly sweep) first applies a classic
+**GFS** over the site's own scheduled (`origin == "auto"`) backups — keep the newest per day for
+`KeepDaily` days, per ISO week for `KeepWeekly` weeks, per month for `KeepMonthly` months, capped at
+`MaxCount` — then the disk quota drops the oldest surviving AUTO backups until it fits. Two invariants:
+**manual/API uploads are never auto-deleted** (only `auto` backups are ever pruned), and the very
+newest auto backup and the last backup overall are always kept. The numbers live per profile
+(`Profile.BackupKeep*`/`BackupMaxCount`, null = fall back) with cloud-wide defaults in `SettingKeys.BackupKeep*`;
+**all zero = retention off, quota only** — which is exactly the old behaviour, so nothing prunes by
+surprise until an operator sets a tier.
 
 `ProfileService.IsGroupKey` is what keeps the two kinds apart. A free key/value row carrying a group
 key would be skipped by the rollout unless that group happened to be on — it would sit in the list

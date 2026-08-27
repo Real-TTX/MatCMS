@@ -88,7 +88,7 @@
         var menuMap = MatCMS.Content.LayoutRenderer.ParseMap(tpl.MenuMapJson);
         var custLangs = Site.LanguageLinks()
             .Select(l => new MatCMS.Content.LayoutRenderer.LangLink(l.Locale, l.Url, l.IsCurrent)).ToList();
-        customBody = MatCMS.Content.LayoutRenderer.Render(tpl.LayoutHtml, globals, menuMap, key => Site.MenuItems(key), custLangs);
+        customBody = MatCMS.Content.LayoutRenderer.Render(MatCMS.Content.TemplateAssets.Resolve(tpl.LayoutHtml, tpl.Id), globals, menuMap, key => Site.MenuItems(key), custLangs);
 
         // Overlay fallback: if the template doesn't place a {{#languages}}/{{languages}} switcher itself,
         // inject a small floating one so a multilingual site always has a language selector.
@@ -148,7 +148,7 @@
             @Html.Raw(".btn:hover { background: var(--accent); color: #fff; }")
         }
     </style>
-    @{ var customCssResolved = MatCMS.Content.TemplateParams.Apply(tpl.CustomCss, tplParams, css: true); }
+    @{ var customCssResolved = MatCMS.Content.TemplateAssets.Resolve(MatCMS.Content.TemplateParams.Apply(tpl.CustomCss, tplParams, css: true), tpl.Id); }
     @if (!string.IsNullOrWhiteSpace(customCssResolved))
     {
         <style>@Html.Raw(customCssResolved)</style>
@@ -247,7 +247,7 @@ else
     @await RenderSectionAsync("Scripts", required: false)
     @if (!string.IsNullOrWhiteSpace(tpl.CustomJs))
     {
-        <script>@Html.Raw(tpl.CustomJs)</script>
+        <script>@Html.Raw(MatCMS.Content.TemplateAssets.Resolve(tpl.CustomJs, tpl.Id))</script>
     }
     @foreach (var b in PluginReg.BodyHtml)
     {

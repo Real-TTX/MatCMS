@@ -300,6 +300,49 @@
     </form>
 </div>
 
+@* Template-Dateien: eigene Formulare (Multipart-Upload / Löschen), daher AUSSERHALB des Speichern-
+   Formulars. Referenziert im Layout/Login/CSS/JS über {{asset:name}}. *@
+<div class="card">
+    <h2>Dateien</h2>
+    <p class="help">Eigene Dateien (JS, CSS, Schriften, Bilder), die dieses Template mitbringt — z. B. eine Zähler-Bibliothek selbst hosten statt per CDN. Im Layout/Login/CSS/JS als <code>{{asset:dateiname}}</code> einbinden.</p>
+
+    <form method="post" enctype="multipart/form-data" asp-page-handler="UploadAsset" asp-route-id="@Model.Id"
+          class="form-row" style="align-items:flex-end;gap:12px;">
+        <div class="form-field" style="flex:1;">
+            <label for="asset-file">Datei hochladen</label>
+            <input id="asset-file" type="file" name="file" required />
+        </div>
+        <button type="submit" class="btn">Hochladen</button>
+    </form>
+
+    @if (Model.Assets.Count > 0)
+    {
+        <table class="data" style="margin-top:14px;">
+            <thead><tr><th>Datei</th><th>Einbinden</th><th>Größe</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var a in Model.Assets)
+                {
+                    <tr>
+                        <td><a href="/template-assets/@Model.Id/@a.Name" target="_blank" rel="noopener"><strong>@a.Name</strong></a></td>
+                        <td class="muted mono">{{asset:@a.Name}}</td>
+                        <td class="muted">@(a.SizeBytes < 1024 ? a.SizeBytes + " B" : (a.SizeBytes / 1024) + " KB")</td>
+                        <td>
+                            <form method="post" asp-page-handler="DeleteAsset" asp-route-id="@Model.Id" asp-route-assetId="@a.Id"
+                                  onsubmit="return confirm('Diese Datei löschen?');" class="inline-form">
+                                <button type="submit" class="btn btn-sm btn-danger">Löschen</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <p class="muted" style="margin-top:12px;"><em>Noch keine Dateien.</em></p>
+    }
+</div>
+
 @section Scripts {
     <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/lib/codemirror/codemirror.min.css" asp-append-version="true" />
     <style>

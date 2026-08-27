@@ -35,21 +35,23 @@ public class AnmeldenModel : PageModel
 
     private void ResolveTemplate()
     {
-        var login = _site.ActiveTemplate?.LoginHtml;
-        if (string.IsNullOrWhiteSpace(login)) return;
+        var tpl = _site.ActiveTemplate;
+        if (tpl is null || string.IsNullOrWhiteSpace(tpl.LoginHtml)) return;
 
         var errorHtml = string.IsNullOrEmpty(Error) ? "" : $"<div class=\"login-error\">{WebUtility.HtmlEncode(Error)}</div>";
-        var raw = login
+        var raw = tpl.LoginHtml
             .Replace("{{error}}", errorHtml)
             .Replace("{{site_name}}", WebUtility.HtmlEncode(_site.SiteName))
             .Replace("{{year}}", DateTime.Now.Year.ToString());
+        // Attached files: {{asset:name}} -> /template-assets/{id}/name (same as on the public pages).
+        raw = MatCMS.Content.TemplateAssets.Resolve(raw, tpl.Id) ?? raw;
 
         const string token = "{{login_form}}";
         var idx = raw.IndexOf(token, StringComparison.Ordinal);
         if (idx >= 0) { CustomBefore = raw[..idx]; CustomAfter = raw[(idx + token.Length)..]; }
         else { CustomBefore = raw; CustomAfter = ""; }   // no token: form is appended after
-        CustomCss = _site.ActiveTemplate?.CustomCss ?? "";
-        CustomJs = _site.ActiveTemplate?.CustomJs ?? "";
+        CustomCss = MatCMS.Content.TemplateAssets.Resolve(tpl.CustomCss, tpl.Id) ?? "";
+        CustomJs = MatCMS.Content.TemplateAssets.Resolve(tpl.CustomJs, tpl.Id) ?? "";
         HasCustom = true;
     }
 

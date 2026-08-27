@@ -15,6 +15,7 @@ public class AppDbContext : DbContext
     public DbSet<MenuItem> MenuItems => Set<MenuItem>();
     public DbSet<Menu> Menus => Set<Menu>();
     public DbSet<Template> Templates => Set<Template>();
+    public DbSet<TemplateAsset> TemplateAssets => Set<TemplateAsset>();
     public DbSet<Form> Forms => Set<Form>();
     public DbSet<FormSubmission> FormSubmissions => Set<FormSubmission>();
     public DbSet<Media> Media => Set<Media>();
@@ -42,6 +43,12 @@ public class AppDbContext : DbContext
         b.Entity<Menu>().HasIndex(m => m.Key).IsUnique();
         b.Entity<SiteMember>().HasIndex(m => m.Username).IsUnique();
         b.Entity<SiteRole>().HasIndex(r => r.Name).IsUnique();
+
+        // Template files: one name per template, and they go with the template when it is deleted.
+        b.Entity<TemplateAsset>().HasIndex(a => new { a.TemplateId, a.Name }).IsUnique();
+        b.Entity<TemplateAsset>()
+            .HasOne(a => a.Template).WithMany()
+            .HasForeignKey(a => a.TemplateId).OnDelete(DeleteBehavior.Cascade);
 
         b.Entity<ContentBlock>()
             .HasOne(cb => cb.Page)

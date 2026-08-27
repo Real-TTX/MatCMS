@@ -479,6 +479,17 @@ app.Use(async (ctx, next) =>
 
 app.MapRazorPages();
 
+// Serves a file attached to a template (see TemplateAsset). Public and cacheable — these are static
+// site assets (scripts, styles, fonts) a template brings with it, referenced via {{asset:name}}.
+app.MapGet("/template-assets/{templateId:int}/{name}", async (
+    int templateId, string name, MatCMS.Data.AppDbContext db) =>
+{
+    var asset = await db.TemplateAssets.AsNoTracking()
+        .FirstOrDefaultAsync(a => a.TemplateId == templateId && a.Name == name);
+    if (asset is null) return Results.NotFound();
+    return Results.File(asset.Bytes, asset.ContentType, enableRangeProcessing: true);
+});
+
 // Admin-only preview of the maintenance page (admins bypass the middleware, so this lets them see it).
 app.MapGet("/admin/maintenance/preview", (SiteContext site, Localizer t) =>
     Results.Content(MaintenancePage.Render(site, t), "text/html; charset=utf-8"))

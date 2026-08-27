@@ -8,10 +8,19 @@ using Microsoft.EntityFrameworkCore;
 
 namespace MatCMS.Pages.Admin.Templates;
 
+// Template files (JS/CSS/fonts/images) are uploaded here; 8 MB is far more than a self-hosted clock
+// or font needs and keeps a stray large upload out. The framework's 128 MB multipart default would
+// otherwise apply page-wide.
+[RequestSizeLimit(8_000_000)]
+[RequestFormLimits(MultipartBodyLengthLimit = 8_000_000)]
 public class EditModel : PageModel
 {
     private readonly AppDbContext _db;
     public EditModel(AppDbContext db) => _db = db;
+
+    /// <summary>Files attached to this template, served at /template-assets/{id}/{name} and referenced
+    /// via {{asset:name}} in the template's HTML/CSS/JS.</summary>
+    public List<TemplateAsset> Assets { get; private set; } = new();
 
     [BindProperty] public int Id { get; set; }
     [BindProperty] public string? Name { get; set; }
@@ -82,8 +91,65 @@ public class EditModel : PageModel
         SchemaVersion = t.SchemaVersion;
         Parts = TemplateSchema.Parse(t.PartsJson);
 
+        Assets = await _db.TemplateAssets.AsNoTracking()
+            .Where(a => a.TemplateId == id).OrderBy(a => a.Name).ToListAsync();
+
         await LoadMenuMappingAsync(t.LayoutHtml, LayoutRenderer.ParseMap(t.MenuMapJson));
         return Page();
+    }
+
+    /// <summary>Attaches a file to the template. The name is taken from the upload (sanitised to a
+    /// safe file name); re-uploading the same name replaces it.</summary>
+    public async Task<IActionResult> OnPostUploadAssetAsync(int id, IFormFile? file)
+    {
+        var t = await _db.Templates.FindAsync(id);
+        if (t is null) return RedirectToPage("Index");
+        if (file is null || file.Length == 0)
+        {
+            TempData["FlashError"] = "Keine Datei ausgewählt.";
+            return RedirectToPage(new { id, tab = "files" });
+        }
+
+        var name = System.IO.Path.GetFileName(file.FileName ?? "").Trim();
+        // Only the safe file-name shape the {{asset:…}} token accepts, so a file can always be referenced.
+        if (name.Length == 0 || !System.Text.RegularExpressions.Regex.IsMatch(name, "^[A-Za-z0-9._-]+$"))
+        {
+            TempData["FlashError"] = "Ungültiger Dateiname. Erlaubt: Buchstaben, Ziffern, . _ -";
+            return RedirectToPage(new { id, tab = "files" });
+        }
+
+        using var ms = new MemoryStream();
+        await file.CopyToAsync(ms);
+        var bytes = ms.ToArray();
+
+        var existing = await _db.TemplateAssets.FirstOrDefaultAsync(a => a.TemplateId == id && a.Name == name);
+        if (existing is not null)
+        {
+            existing.Bytes = bytes;
+            existing.ContentType = TemplateAssets.ContentTypeFor(name);
+        }
+        else
+        {
+            _db.TemplateAssets.Add(new TemplateAsset
+            {
+                TemplateId = id, Name = name, Bytes = bytes, ContentType = TemplateAssets.ContentTypeFor(name)
+            });
+        }
+        await _db.SaveChangesAsync();
+        TempData["Flash"] = $"Datei „{name}“ gespeichert.";
+        return RedirectToPage(new { id, tab = "files" });
+    }
+
+    public async Task<IActionResult> OnPostDeleteAssetAsync(int id, int assetId)
+    {
+        var asset = await _db.TemplateAssets.FirstOrDefaultAsync(a => a.Id == assetId && a.TemplateId == id);
+        if (asset is not null)
+        {
+            _db.TemplateAssets.Remove(asset);
+            await _db.SaveChangesAsync();
+            TempData["Flash"] = "Datei gelöscht.";
+        }
+        return RedirectToPage(new { id, tab = "files" });
     }
 
     /// <summary>

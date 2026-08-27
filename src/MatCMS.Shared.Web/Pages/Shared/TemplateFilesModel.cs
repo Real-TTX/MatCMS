@@ -71,4 +71,32 @@ public sealed record TemplateFileLabels(
 /// <param name="RootLabel">The tree's single root — the template's name. Empty falls back to
 /// <see cref="TemplateFileLabels.Root"/>, which a template being created has to have.</param>
 public sealed record TemplateFiles(
-    string Intro, IReadOnlyList<TemplateFile> Files, TemplateFileLabels Labels, string RootLabel = "");
+    string Intro, IReadOnlyList<TemplateFile> Files, TemplateFileLabels Labels, string RootLabel = "",
+    TemplateAssetsPanel? Assets = null);
+
+/// <summary>One uploaded template asset shown in the tree's "assets" folder. Unlike a pseudo-file it is
+/// a REAL file (served at <see cref="Url"/>, referenced by <see cref="Token"/> = <c>{{asset:name}}</c>)
+/// and is not editable inline — clicking it opens a small info/delete view, mirroring the plugin editor.</summary>
+/// <param name="Id">Backing row id — put into the delete form so the server knows which file to drop.</param>
+/// <param name="Kind">"image" | "js" | "css" | "font" | "file" — drives the icon/badge and preview.</param>
+/// <param name="SizeText">Human-readable size, formatted by the page ("12 KB").</param>
+public sealed record TemplateAssetEntry(int Id, string Name, string Url, string Kind, string SizeText, string Token);
+
+/// <summary>
+/// The optional "assets" folder for the template file tree: the template's uploaded files plus the
+/// wiring to upload and delete them. Null on an editor with no asset storage (the cloud's template
+/// views), so nothing extra renders there and those pages are unchanged.
+/// <para>Upload and delete run through their own forms — multipart, and OUTSIDE the editor's save form —
+/// which the page renders with the ids named here; the tree's controls reach them via the HTML
+/// <c>form=</c> attribute (a form owner can sit elsewhere in the document).</para>
+/// </summary>
+/// <param name="FolderLabel">The folder's display name (e.g. "assets").</param>
+/// <param name="Files">The uploaded assets.</param>
+/// <param name="UploadFormId">Id of the page's multipart upload form the file input/button target.</param>
+/// <param name="DeleteFormId">Id of the page's delete form; its hidden <paramref name="DeleteInputName"/>
+/// gets the asset id before submit.</param>
+public sealed record TemplateAssetsPanel(
+    string FolderLabel, IReadOnlyList<TemplateAssetEntry> Files,
+    string UploadFormId, string DeleteFormId, string DeleteInputName,
+    string UploadLabel, string DeleteLabel, string UrlLabel, string TokenLabel,
+    string EmptyLabel, string DeleteConfirm, string Help);

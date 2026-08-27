@@ -65,6 +65,28 @@
         new TemplateToken("{{year}}", "Jahr"),
     };
 
+    // The uploaded assets, shown as the tree's "assets" folder. Upload/delete run through the two forms
+    // rendered AFTER the save form (below); the tree reaches them via the HTML form= attribute.
+    string AssetKind(string name, string ct)
+    {
+        ct = (ct ?? "").ToLowerInvariant();
+        var ext = System.IO.Path.GetExtension(name).TrimStart('.').ToLowerInvariant();
+        if (ct.StartsWith("image/") || ext is "png" or "jpg" or "jpeg" or "gif" or "webp" or "svg" or "ico") return "image";
+        if (ct.Contains("css") || ext == "css") return "css";
+        if (ct.Contains("javascript") || ext is "js" or "mjs") return "js";
+        if (ext is "woff" or "woff2" or "ttf" or "otf" or "eot") return "font";
+        return "file";
+    }
+    string SizeText(long b) => b < 1024 ? b + " B" : (b < 1024 * 1024 ? (b / 1024) + " KB" : (b / (1024.0 * 1024)).ToString("0.0") + " MB");
+    var assetEntries = Model.Assets.Select(a => new TemplateAssetEntry(
+        a.Id, a.Name, $"/template-assets/{Model.Id}/{a.Name}", AssetKind(a.Name, a.ContentType),
+        SizeText(a.SizeBytes), "{{asset:" + a.Name + "}}")).ToList();
+    var assetsPanel = new TemplateAssetsPanel(
+        "assets", assetEntries, "tpl-asset-upload", "tpl-asset-del", "assetId",
+        "Datei hochladen", "Löschen", "URL", "Einbinden ({{asset:…}})",
+        "Noch keine Dateien.", "Diese Datei löschen?",
+        "Eigene Dateien (JS, CSS, Schriften, Bilder), die dieses Template mitbringt — z. B. eine Zähler-Bibliothek selbst hosten statt per CDN. Im Layout/Login/CSS/JS als <code>{{asset:dateiname}}</code> einbinden.");
+
     var templateFiles = new TemplateFiles(
         T["tplfiles.intro"],
         new[]
@@ -90,7 +112,8 @@
             T["tplfiles.raw"], T["tplfiles.root"],
             T["tplfiles.copy"], T["tplfiles.copied"]),
         // Die Wurzel des Baums ist dieses Template — mit seinem Namen, nicht mit dem Wort "Dateien".
-        Model.Name ?? "");
+        Model.Name ?? "",
+        assetsPanel);
 }
 @* Nur die Überschrift: alle Aktionen dieser Seite stehen unten in EINER Reihe — dieselbe Ordnung
    wie im Plugin-Editor. Zwei Orte für Knöpfe, die dasselbe Formular betreffen, ließen einen oben
@@ -300,48 +323,15 @@
     </form>
 </div>
 
-@* Template-Dateien: eigene Formulare (Multipart-Upload / Löschen), daher AUSSERHALB des Speichern-
-   Formulars. Referenziert im Layout/Login/CSS/JS über {{asset:name}}. *@
-<div class="card">
-    <h2>Dateien</h2>
-    <p class="help">Eigene Dateien (JS, CSS, Schriften, Bilder), die dieses Template mitbringt — z. B. eine Zähler-Bibliothek selbst hosten statt per CDN. Im Layout/Login/CSS/JS als <code>{{asset:dateiname}}</code> einbinden.</p>
-
-    <form method="post" enctype="multipart/form-data" asp-page-handler="UploadAsset" asp-route-id="@Model.Id"
-          class="form-row" style="align-items:flex-end;gap:12px;">
-        <div class="form-field" style="flex:1;">
-            <label for="asset-file">Datei hochladen</label>
-            <input id="asset-file" type="file" name="file" required />
-        </div>
-        <button type="submit" class="btn">Hochladen</button>
-    </form>
-
-    @if (Model.Assets.Count > 0)
-    {
-        <table class="data" style="margin-top:14px;">
-            <thead><tr><th>Datei</th><th>Einbinden</th><th>Größe</th><th></th></tr></thead>
-            <tbody>
-                @foreach (var a in Model.Assets)
-                {
-                    <tr>
-                        <td><a href="/template-assets/@Model.Id/@a.Name" target="_blank" rel="noopener"><strong>@a.Name</strong></a></td>
-                        <td class="muted mono">{{asset:@a.Name}}</td>
-                        <td class="muted">@(a.SizeBytes < 1024 ? a.SizeBytes + " B" : (a.SizeBytes / 1024) + " KB")</td>
-                        <td>
-                            <form method="post" asp-page-handler="DeleteAsset" asp-route-id="@Model.Id" asp-route-assetId="@a.Id"
-                                  onsubmit="return confirm('Diese Datei löschen?');" class="inline-form">
-                                <button type="submit" class="btn btn-sm btn-danger">Löschen</button>
-                            </form>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    }
-    else
-    {
-        <p class="muted" style="margin-top:12px;"><em>Noch keine Dateien.</em></p>
-    }
-</div>
+@* Template-Dateien: Upload und Löschen laufen über eigene Formulare — Multipart, und AUSSERHALB des
+   Speichern-Formulars. Sichtbar sind sie im „Files"-Tab (assets-Ordner); die Bedienelemente dort
+   greifen per form=-Attribut auf genau diese beiden Formulare zu. Ein <form> im <form> gibt es nicht,
+   ein Bedienelement darf seinem Formular aber per Attribut zugeordnet sein. *@
+<form id="tpl-asset-upload" method="post" enctype="multipart/form-data"
+      asp-page-handler="UploadAsset" asp-route-id="@Model.Id" hidden></form>
+<form id="tpl-asset-del" method="post" asp-page-handler="DeleteAsset" asp-route-id="@Model.Id" hidden>
+    <input type="hidden" name="assetId" value="" />
+</form>
 
 @section Scripts {
     <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/lib/codemirror/codemirror.min.css" asp-append-version="true" />
@@ -362,11 +352,15 @@
             var tabs = document.querySelectorAll('.tab');
             var panels = document.querySelectorAll('.tab-panel');
             var hint = document.querySelector('[data-group-hint]');
-            var HINTS = {
-                designer: '@T["templates.tabHintDesigner"]',
-                files: '@T["templates.tabHintFiles"]',
-                params: '@T["templates.tabHintParams"]'
-            };
+            // Als JSON, NICHT als '@@T[…]' in ein JS-String-Literal: Razor HTML-encodiert dort den
+            // Apostroph zu &#x27;, und textContent zeigt das Entity dann wörtlich ("template&#x27;s").
+            // JSON-Serialisierung liefert einen echten, JS-sicheren String mit dem Apostroph selbst.
+            var HINTS = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, string>
+            {
+                ["designer"] = T["templates.tabHintDesigner"],
+                ["files"] = T["templates.tabHintFiles"],
+                ["params"] = T["templates.tabHintParams"]
+            }));
             function show(name) {
                 if (name !== 'params' && name !== 'files') name = 'designer';
                 tabs.forEach(function (t) { t.classList.toggle('active', t.dataset.tab === name); });

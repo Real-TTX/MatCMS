@@ -61,9 +61,37 @@
         copied = Model.Labels.Copied,
         root = string.IsNullOrWhiteSpace(Model.RootLabel) ? Model.Labels.Root : Model.RootLabel
     });
+
+    // The optional "assets" folder (uploaded, real files). Null → the branch and its panels never render,
+    // so an editor without asset storage (the cloud's template views) is unchanged.
+    var ap = Model.Assets;
+    var assetsJson = ap is null ? "null" : System.Text.Json.JsonSerializer.Serialize(new
+    {
+        folder = ap.FolderLabel,
+        uploadForm = ap.UploadFormId,
+        delForm = ap.DeleteFormId,
+        delInput = ap.DeleteInputName,
+        uploadLabel = ap.UploadLabel,
+        deleteLabel = ap.DeleteLabel,
+        urlLabel = ap.UrlLabel,
+        tokenLabel = ap.TokenLabel,
+        empty = ap.EmptyLabel,
+        confirm = ap.DeleteConfirm,
+        help = ap.Help,
+        files = ap.Files.Select(f => new { id = f.Id, name = f.Name, url = f.Url, kind = f.Kind, size = f.SizeText, token = f.Token })
+    });
 }
 
 <div class="help">@Html.Raw(Model.Intro)</div>
+@* Flex-Layout NUR über die Klasse (nicht inline): ein inline display:flex überschriebe das
+   hidden-Attribut, und die Panels blieben offen, obwohl eine Skriptdatei gewählt ist. *@
+<style>
+    .pf-asset:not([hidden]), .pf-upload:not([hidden]) { display:flex; flex-direction:column; gap:10px; padding:12px; }
+    /* admin.css setzt .cm-modal-tokens{display:flex}, was das hidden-Attribut übersteuert — beim
+       Öffnen einer Asset-/Upload-Ansicht (dort gibt es keine Platzhalter) blitzte die Leiste sonst auf.
+       Der attributgenaue Selektor ist spezifischer und gewinnt, ohne die normale Anzeige zu stören. */
+    .cm-modal-tokens[hidden] { display:none; }
+</style>
 
 @* .tpl-tree ist derselbe Baum, nur mit breiterer linker Spalte: an jeder Zeile hängt hier zusätzlich
    das Abzeichen "angepasst / leer", und in 230 Pixeln lag es über dem Dateinamen. *@
@@ -111,6 +139,39 @@
         </div>
         @* Kein leerer Kasten, sondern der Hinweis, was zu tun ist. *@
         <div class="pf-empty" data-tf-empty hidden>@Model.Labels.Pick</div>
+        @* Ansicht einer hochgeladenen Datei (assets-Ordner). Kein Textfeld: der Inhalt liegt in der
+           Datenbank und wird NICHT über das Speichern-Formular geschrieben — genau wie im Plugin-Editor.
+           Nur sichtbar, wenn eine Asset-Zeile gewählt ist. *@
+        <div class="pf-asset" data-tf-asset hidden>
+            <div>
+                <strong class="mono" data-tf-asset-name></strong>
+                <span class="badge" data-tf-asset-kind></span>
+                <span class="muted" data-tf-asset-size></span>
+            </div>
+            <img data-tf-asset-img hidden alt="" style="max-width:320px;max-height:200px;border:1px solid var(--line,#eceef1);" />
+            <div class="form-field">
+                <label data-tf-asset-tokenlabel></label>
+                <input class="mono" readonly onclick="this.select()" data-tf-asset-token />
+            </div>
+            <div class="form-field">
+                <label data-tf-asset-urllabel></label>
+                <input class="mono" readonly onclick="this.select()" data-tf-asset-url />
+            </div>
+            <div><button type="button" class="btn btn-sm btn-danger" data-tf-asset-del></button></div>
+        </div>
+        @* Datei hochladen. Datei-Feld und Knopf gehören per form=-Attribut zu einem Multipart-Formular,
+           das AUSSERHALB des Speichern-Formulars steht (die Seite rendert es) — ein <form> im <form>
+           gibt es in HTML nicht, aber ein Bedienelement darf seinem Formular per Attribut zugeordnet sein. *@
+        <div class="pf-upload" data-tf-upload hidden>
+            <div class="help" data-tf-upload-help></div>
+            <div class="form-row" style="align-items:flex-end;gap:12px;">
+                <div class="form-field" style="flex:1;">
+                    <label data-tf-upload-label></label>
+                    <input type="file" name="file" required data-tf-upload-file />
+                </div>
+                <button type="submit" class="btn" data-tf-upload-btn></button>
+            </div>
+        </div>
         @* Die Platzhalter der offenen Datei. Kein Befehl, sondern Material — deshalb unter dem
            Editor und nicht in der Menüleiste. *@
         <div class="cm-modal-tokens" data-tf-tokens hidden>
@@ -125,6 +186,7 @@
     (function () {
         var FILES = @Html.Raw(metaJson);
         var TXT = @Html.Raw(textJson);
+        var ASSETS = @Html.Raw(assetsJson);   // null = kein assets-Ordner (Cloud-Ansichten)
 
         // CodeMirror kommt auf beiden Seiten erst im Skript-Abschnitt am Seitenende (_CodeEditorAssets).
         // Dieses Stück steht mitten im Formular — es darf den Editor also nicht sofort bauen, sonst
@@ -148,8 +210,25 @@
             var descEl = box.querySelector('[data-tf-desc]');
             if (!list || stores.length === 0) return;
 
+            // Panels for uploaded assets (only present when ASSETS is set).
+            var assetView = box.querySelector('[data-tf-asset]');
+            var uploadView = box.querySelector('[data-tf-upload]');
+
             var HAS_CM = typeof CodeMirror !== 'undefined';
             var cm = null, cur = -1, raw = !HAS_CM, loading = false, collapsed = false;
+            // The assets folder collapses independently of the root, and an asset/upload selection is
+            // tracked apart from `cur` (a pseudo-file index) so only one thing is ever highlighted.
+            var assetsCollapsed = false, curAsset = null, uploadOpen = false;
+
+            // Wire the upload controls to the page's external multipart form (form owner via attribute).
+            if (ASSETS && uploadView) {
+                var uf = uploadView.querySelector('[data-tf-upload-file]');
+                var ub = uploadView.querySelector('[data-tf-upload-btn]');
+                if (uf) uf.setAttribute('form', ASSETS.uploadForm);
+                if (ub) { ub.setAttribute('form', ASSETS.uploadForm); ub.textContent = ASSETS.uploadLabel; }
+                var ul = uploadView.querySelector('[data-tf-upload-label]'); if (ul) ul.textContent = ASSETS.uploadLabel;
+                var uh = uploadView.querySelector('[data-tf-upload-help]'); if (uh) uh.innerHTML = ASSETS.help || '';
+            }
 
             function norm(s) { return (s || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n'); }
             // Angepasst oder leer: leer heißt, die Datei kommt unverändert aus dem Theme. Genau
@@ -196,13 +275,16 @@
                 twist.type = 'button';
                 twist.className = 'pf-twist';
                 if (o.expandable) {
-                    twist.appendChild(icon(collapsed ? 'ti-chevron-right' : 'ti-chevron-down'));
+                    // Each expandable node carries its own open state and toggle, so the assets folder
+                    // collapses independently of the root (the old single `collapsed` toggled both).
+                    var isExp = (o.expanded !== undefined) ? o.expanded : !collapsed;
+                    twist.appendChild(icon(isExp ? 'ti-chevron-down' : 'ti-chevron-right'));
                     twist.title = TXT.toggle;
                     twist.setAttribute('aria-label', TXT.toggle + ': ' + o.label);
-                    twist.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+                    twist.setAttribute('aria-expanded', isExp ? 'true' : 'false');
                     twist.addEventListener('click', function (ev) {
                         ev.stopPropagation();
-                        collapsed = !collapsed;
+                        if (o.onToggle) o.onToggle(); else collapsed = !collapsed;
                         render();
                     });
                 } else {
@@ -265,10 +347,19 @@
             // gehören. Darunter seine Dateien in der Reihenfolge der Seite — nicht alphabetisch,
             // denn body.html ist der Anfang. Ordner gibt es hier keine, also wird auch keiner
             // erfunden.
+            function assetIcon(kind) {
+                if (kind === 'image') return 'ti-photo';
+                if (kind === 'css') return 'ti-palette';
+                if (kind === 'js') return 'ti-braces';
+                if (kind === 'font') return 'ti-typography';
+                return 'ti-file';
+            }
+
             function render() {
                 list.innerHTML = '';
                 list.appendChild(rowFor({
                     kind: 'root', depth: 0, label: TXT.root, icon: 'ti-brush', expandable: true,
+                    expanded: !collapsed, onToggle: function () { collapsed = !collapsed; },
                     activate: function () { collapsed = !collapsed; render(); }
                 }));
                 if (collapsed) { return; }
@@ -279,6 +370,32 @@
                         activate: function () { open(i, true); }
                     }));
                 });
+                // The uploaded files live in their own "assets" folder — a real folder of real files,
+                // like the plugin editor. Selecting the folder opens the upload panel; selecting a file
+                // opens its info/delete view. Absent (ASSETS null) → nothing here, as on the cloud.
+                if (ASSETS) {
+                    list.appendChild(rowFor({
+                        kind: 'assetsfolder', depth: 1, label: ASSETS.folder,
+                        icon: assetsCollapsed ? 'ti-folder' : 'ti-folder-open',
+                        expandable: true, expanded: !assetsCollapsed, isOpen: uploadOpen,
+                        onToggle: function () { assetsCollapsed = !assetsCollapsed; },
+                        activate: function () { openUpload(); }
+                    }));
+                    if (!assetsCollapsed) {
+                        ASSETS.files.forEach(function (a) {
+                            list.appendChild(rowFor({
+                                kind: 'asset', depth: 2, assetId: a.id, label: a.name, icon: assetIcon(a.kind),
+                                mono: true, title: a.url, isOpen: curAsset === a.id,
+                                activate: function () { openAsset(a); }
+                            }));
+                        });
+                        if (ASSETS.files.length === 0)
+                            list.appendChild(rowFor({
+                                kind: 'note', depth: 2, label: ASSETS.empty, icon: 'ti-point',
+                                activate: function () { openUpload(); }
+                            }));
+                    }
+                }
                 badges();
             }
 
@@ -334,6 +451,11 @@
             // INHALT — das gibt es hier genauso wie im Plugin-Editor.
             function menuFor(o) {
                 var items = [];
+                // An uploaded asset can be deleted (it is a real file); its content isn't editable here.
+                if (o.kind === 'asset' && ASSETS) {
+                    items.push({ label: ASSETS.deleteLabel, run: function () { deleteAsset(o.assetId); } });
+                    return items;
+                }
                 if (o.kind !== 'file') return items;
                 items.push({ label: TXT.edit, run: function () { open(o.idx, true); } });
                 items.push({ label: TXT.copy, run: function () { copyContent(o.idx); } });
@@ -420,8 +542,67 @@
                 else if (cm) cm.focus();
             });
 
+            // ---- Hochgeladene Dateien (assets-Ordner) ---------------------------------------
+            // Blendet alles vom Code-Editor aus, damit an derselben Stelle die Asset- bzw. Upload-
+            // Ansicht stehen kann. Der Editor-Zustand (cur, CodeMirror) bleibt unberührt.
+            function hideCodeViews() {
+                if (host) host.hidden = true;
+                stores.forEach(function (s) { s.hidden = true; });
+                heads.forEach(function (h) { h.hidden = true; });
+                if (empty) empty.hidden = true;
+                if (tokBox) tokBox.hidden = true;
+                if (insBtn) insBtn.hidden = true;
+                if (rawBtn) rawBtn.hidden = true;
+                descEl.textContent = '';
+            }
+            function openAsset(a) {
+                if (!assetView) return;
+                cur = -1; curAsset = a.id; uploadOpen = false;
+                hideCodeViews();
+                if (uploadView) uploadView.hidden = true;
+                assetView.hidden = false;
+                assetView.querySelector('[data-tf-asset-name]').textContent = a.name;
+                assetView.querySelector('[data-tf-asset-kind]').textContent = a.kind;
+                assetView.querySelector('[data-tf-asset-size]').textContent = a.size || '';
+                var img = assetView.querySelector('[data-tf-asset-img]');
+                if (a.kind === 'image') { img.src = a.url; img.hidden = false; }
+                else { img.hidden = true; img.removeAttribute('src'); }
+                assetView.querySelector('[data-tf-asset-tokenlabel]').textContent = ASSETS.tokenLabel;
+                assetView.querySelector('[data-tf-asset-token]').value = a.token;
+                assetView.querySelector('[data-tf-asset-urllabel]').textContent = ASSETS.urlLabel;
+                assetView.querySelector('[data-tf-asset-url]').value = a.url;
+                var del = assetView.querySelector('[data-tf-asset-del]');
+                del.textContent = ASSETS.deleteLabel;
+                del.onclick = function () { deleteAsset(a.id); };
+                curEl.textContent = a.name;
+                render();
+            }
+            function openUpload() {
+                if (!uploadView) return;
+                cur = -1; curAsset = null; uploadOpen = true;
+                hideCodeViews();
+                if (assetView) assetView.hidden = true;
+                uploadView.hidden = false;
+                curEl.textContent = ASSETS.folder;
+                render();
+            }
+            // Löschen läuft über das seiteneigene Formular (außerhalb des Speichern-Formulars): die
+            // Asset-Id in das versteckte Feld, dann absenden. form.submit() umgeht onsubmit, darum wird
+            // hier vorher gefragt.
+            function deleteAsset(id) {
+                if (!ASSETS || !confirm(ASSETS.confirm)) return;
+                var f = document.getElementById(ASSETS.delForm);
+                if (!f) return;
+                var inp = f.querySelector('[name="' + ASSETS.delInput + '"]') || f.querySelector('input');
+                if (inp) inp.value = id;
+                f.submit();
+            }
+
             function open(i, focus) {
-                cur = i;
+                cur = i; curAsset = null; uploadOpen = false;
+                if (assetView) assetView.hidden = true;
+                if (uploadView) uploadView.hidden = true;
+                if (rawBtn) rawBtn.hidden = false;
                 var m = FILES[i];
                 curEl.textContent = m.name;
                 descEl.textContent = m.desc || '';

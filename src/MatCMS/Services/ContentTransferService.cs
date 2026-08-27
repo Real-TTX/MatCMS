@@ -196,6 +196,13 @@ public class ContentTransferService
                 var wanted = new HashSet<string>(options.TemplateNames, StringComparer.OrdinalIgnoreCase);
                 tplQuery = tplQuery.Where(t => wanted.Contains(t.Name)).ToList();
             }
+            // Attached files, grouped by template — carried in the backup (bytes and all) so a self-hosted
+            // script/font is not lost on restore. Only for the templates actually being exported.
+            var exportIds = tplQuery.Select(t => t.Id).ToHashSet();
+            var assetsByTpl = (await _db.TemplateAssets.AsNoTracking()
+                    .Where(a => exportIds.Contains(a.TemplateId)).ToListAsync())
+                .GroupBy(a => a.TemplateId)
+                .ToDictionary(g => g.Key, g => g.ToList());
             dto.Templates = tplQuery
                 .Select(t => new TemplateDto
                 {
@@ -206,6 +213,13 @@ public class ContentTransferService
                     ContainerWidth = t.ContainerWidth, ButtonRadius = t.ButtonRadius,
                     HeaderBackground = t.HeaderBackground, HeaderTextColor = t.HeaderTextColor, HeaderPadding = t.HeaderPadding,
                     CustomCss = t.CustomCss, CustomJs = t.CustomJs, LayoutHtml = t.LayoutHtml,
+                    LoginHtml = t.LoginHtml,
+                    Assets = assetsByTpl.TryGetValue(t.Id, out var al)
+                        ? al.Select(a => new TemplateAssetDto
+                        {
+                            Name = a.Name, ContentType = a.ContentType, Base64 = Convert.ToBase64String(a.Bytes)
+                        }).ToList()
+                        : null,
                     MenuMapJson = t.MenuMapJson,
                     ParametersJson = t.ParametersJson, ParamValuesJson = t.ParamValuesJson,
                     SchemaVersion = t.SchemaVersion, PartsJson = t.PartsJson
@@ -232,6 +246,8 @@ public class ContentTransferService
                 var wanted = new HashSet<string>(options.PageKeys, StringComparer.OrdinalIgnoreCase);
                 pages = pages.Where(p => wanted.Contains(PageKey(p.Slug, p.Locale))).ToList();
             }
+            // Resolve a page's TemplateId to the template NAME for the export (ids shift on restore).
+            var tplNameById = await _db.Templates.AsNoTracking().ToDictionaryAsync(t => t.Id, t => t.Name);
             dto.Pages = pages.Select(p => new PageDto
             {
                 Title = p.Title, Slug = p.Slug, NavLabel = p.NavLabel,
@@ -239,6 +255,8 @@ public class ContentTransferService
                 IsPublished = p.IsPublished, ShowInNav = p.ShowInNav, ShowInFooter = p.ShowInFooter,
                 NavOrder = p.NavOrder, FooterOrder = p.FooterOrder, MetaDescription = p.MetaDescription,
                 CustomCss = p.CustomCss,
+                TemplateName = p.TemplateId is int tid && tplNameById.TryGetValue(tid, out var tn) ? tn : null,
+                Access = p.Access, RequiredRole = p.RequiredRole, TemplateParamsJson = p.TemplateParamsJson,
                 CreatedAt = p.CreatedAt, UpdatedAt = p.UpdatedAt,
                 // Preserve the block hierarchy: top-level blocks with their children nested inside.
                 Blocks = BuildBlockDtos(p.Blocks, null)
@@ -554,6 +572,7 @@ public class ContentTransferService
                     CustomCss = t.CustomCss ?? "",
                     CustomJs = t.CustomJs ?? "",
                     LayoutHtml = t.LayoutHtml ?? "",
+                    LoginHtml = t.LoginHtml ?? "",
                     MenuMapJson = string.IsNullOrWhiteSpace(t.MenuMapJson) ? "{}" : t.MenuMapJson!,
                     // This branch builds a BRAND NEW row, so there is nothing to preserve: an older
                     // backup that carries neither field lands on the column defaults, exactly as before.
@@ -571,6 +590,37 @@ public class ContentTransferService
             if (all.Count > 0 && all.All(t => !t.IsActive)) all[0].IsActive = true;
             await _db.SaveChangesAsync();
             summary.Add($"{dto.Templates.Count} Templates");
+        }
+
+        // Template files: applied after the templates themselves exist (either branch), matched to their
+        // now-saved row by name. Each template's set is replaced wholesale from the backup — a template
+        // the backup carries with no files ends up with none, mirroring how its style fields restore.
+        if (dto.Templates is not null && dto.Templates.Any(t => t.Assets is { Count: > 0 }))
+        {
+            var rowsByName = await _db.Templates.ToDictionaryAsync(
+                t => t.Name, t => t, StringComparer.OrdinalIgnoreCase);
+            var assetCount = 0;
+            foreach (var t in dto.Templates)
+            {
+                var name = string.IsNullOrWhiteSpace(t.Name) ? "Template" : t.Name!;
+                if (t.Assets is null || !rowsByName.TryGetValue(name, out var row)) continue;
+                var old = await _db.TemplateAssets.Where(a => a.TemplateId == row.Id).ToListAsync();
+                _db.TemplateAssets.RemoveRange(old);
+                foreach (var a in t.Assets)
+                {
+                    if (string.IsNullOrWhiteSpace(a.Name)) continue;
+                    _db.TemplateAssets.Add(new TemplateAsset
+                    {
+                        TemplateId = row.Id,
+                        Name = a.Name!.Trim(),
+                        ContentType = string.IsNullOrWhiteSpace(a.ContentType) ? "application/octet-stream" : a.ContentType!,
+                        Bytes = string.IsNullOrEmpty(a.Base64) ? Array.Empty<byte>() : Convert.FromBase64String(a.Base64)
+                    });
+                    assetCount++;
+                }
+            }
+            await _db.SaveChangesAsync();
+            if (assetCount > 0) summary.Add($"{assetCount} Template-Dateien");
         }
 
         if (dto.Components is not null)
@@ -598,6 +648,13 @@ public class ContentTransferService
         {
             var blockCount = 0;
 
+            // Re-link each page to its own template by NAME — template ids changed on restore, and the
+            // templates were imported just above. Unknown/absent name → no per-page template (active one).
+            var tplIdByName = await _db.Templates.AsNoTracking()
+                .ToDictionaryAsync(t => t.Name, t => t.Id, StringComparer.OrdinalIgnoreCase);
+            int? ResolveTpl(string? name) =>
+                !string.IsNullOrWhiteSpace(name) && tplIdByName.TryGetValue(name!, out var id) ? id : (int?)null;
+
             if (dto.PagesPartial)
             {
                 // Granular restore: upsert each page by (slug, locale); its blocks are replaced.
@@ -622,6 +679,7 @@ public class ContentTransferService
                         _db.ContentBlocks.RemoveRange(row.Blocks); // drop the page's old blocks (all levels)
                         ApplyPageFields(row, p, locale);
                     }
+                    row.TemplateId = ResolveTpl(p.TemplateName);
                     await _db.SaveChangesAsync();               // ensure page Id exists + old blocks removed
                     blockCount += await InsertBlockTreeAsync(p.Blocks, row.Id, null);
                 }
@@ -636,6 +694,7 @@ public class ContentTransferService
                 {
                     var row = new Page();
                     ApplyPageFields(row, p, string.IsNullOrWhiteSpace(p.Locale) ? Localizer.DefaultCulture : p.Locale!);
+                    row.TemplateId = ResolveTpl(p.TemplateName);
                     row.CreatedAt = p.CreatedAt == default ? DateTime.UtcNow : p.CreatedAt;
                     _db.Pages.Add(row);
                     await _db.SaveChangesAsync();               // page Id
@@ -989,6 +1048,9 @@ public class ContentTransferService
         row.CustomCss = t.CustomCss ?? "";
         row.CustomJs = t.CustomJs ?? "";
         row.LayoutHtml = t.LayoutHtml ?? "";
+        // Absent ≠ empty: an older backup carries no LoginHtml, and blanking an existing row's custom
+        // login page on that basis would be wrong. Only an included value (empty allowed) is applied.
+        if (t.LoginHtml is not null) row.LoginHtml = t.LoginHtml;
         row.MenuMapJson = string.IsNullOrWhiteSpace(t.MenuMapJson) ? "{}" : t.MenuMapJson!;
         // Here the row may already EXIST and carry parameters, so absent ≠ empty: a backup written
         // before these two fields existed contains no such property (null), and overwriting the row
@@ -1059,6 +1121,12 @@ public class ContentTransferService
         row.FooterOrder = p.FooterOrder;
         row.MetaDescription = p.MetaDescription;
         row.CustomCss = p.CustomCss;
+        // Absent Access reads as Public (an older backup has no such property), so an existing members-only
+        // page is only ever demoted to public when the backup actually says so. TemplateId is NOT set here
+        // — it needs the imported templates' fresh ids and is resolved by name in the page-import loop.
+        row.Access = p.Access ?? PageAccess.Public;
+        row.RequiredRole = p.RequiredRole;
+        row.TemplateParamsJson = p.TemplateParamsJson;
         row.UpdatedAt = DateTime.UtcNow;
     }
 
@@ -1237,6 +1305,13 @@ public class ContentTransferService
         public string? CustomCss { get; set; }
         public string? CustomJs { get; set; }
         public string? LayoutHtml { get; set; }
+        /// <summary>The template's custom /anmelden page. Nullable for the same reason as the fields
+        /// below: an older backup has no such property, and "absent" must be read as "leave as default",
+        /// not "blank the login page".</summary>
+        public string? LoginHtml { get; set; }
+        /// <summary>Files attached to the template ({{asset:name}} → /template-assets/{id}/{name}), bytes
+        /// and all, so a self-hosted script/font survives backup→restore. Null on an older backup.</summary>
+        public List<TemplateAssetDto>? Assets { get; set; }
         public string? MenuMapJson { get; set; }
         /// <summary>The parameter SCHEMA a template designer published ({{param:id}}), and below it the
         /// values this site's admin set on them. Both were missing here while every other carrier of a
@@ -1250,6 +1325,14 @@ public class ContentTransferService
         public string? ParamValuesJson { get; set; }
         public int SchemaVersion { get; set; }
         public string? PartsJson { get; set; }
+    }
+
+    private sealed class TemplateAssetDto
+    {
+        public string? Name { get; set; }
+        public string? ContentType { get; set; }
+        /// <summary>The file's bytes, Base64-encoded (JSON has no byte type).</summary>
+        public string? Base64 { get; set; }
     }
 
     private sealed class PageDto
@@ -1266,6 +1349,16 @@ public class ContentTransferService
         public int FooterOrder { get; set; }
         public string? MetaDescription { get; set; }
         public string? CustomCss { get; set; }
+        /// <summary>The page's own template, exported by NAME (not Id): a restore rebuilds templates with
+        /// fresh ids, so the link is re-resolved against the imported template names. Null = the site's
+        /// active template, exactly as an older backup (which has no such property) restores.</summary>
+        public string? TemplateName { get; set; }
+        /// <summary>Public vs. members-only, and the required member role — otherwise a restore would
+        /// silently make every members-only page public. Nullable Access so absent reads as Public.</summary>
+        public PageAccess? Access { get; set; }
+        public string? RequiredRole { get; set; }
+        /// <summary>Per-page template parameter overrides (JSON). Null on an older backup.</summary>
+        public string? TemplateParamsJson { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
         public List<BlockDto>? Blocks { get; set; }

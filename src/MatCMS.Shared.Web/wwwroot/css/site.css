@@ -858,3 +858,11 @@ h1, h2, h3, h4 {
 .hc-cursor .hc-line { fill: none; stroke: var(--hc-arrow); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 6 6; }
 .hc-cursor .hc-headline { fill: none; stroke: var(--hc-arrow); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
 @media (pointer: coarse) { .hc-cursor { display: none; } }
+
+/* Count-up / countdown block (e.g. days since a wedding). Self-contained; no external clock lib. */
+.countup { padding: 40px 0; text-align: center; }
+.countup .cu-heading { margin: 0 0 20px; }
+.cu-grid { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; }
+.cu-unit { min-width: 84px; padding: 14px 10px; border-radius: 12px; background: var(--alt-bg, #f6f7f9); }
+.cu-num { display: block; font-size: clamp(1.8rem, 5vw, 3rem); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; color: var(--accent, #de7e11); }
+.cu-label { display: block; margin-top: 6px; font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; opacity: .7; }

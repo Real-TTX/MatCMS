@@ -39,7 +39,7 @@ public class BlockRegistry
         ["richtext"] = "text", ["quote"] = "text", ["faq"] = "text", ["accordion"] = "text",
         ["image"] = "media", ["gallery"] = "media", ["logostrip"] = "media",
         ["hero"] = "design", ["cta"] = "design", ["cards"] = "design", ["card"] = "design",
-        ["herocta"] = "design", ["timeline"] = "design", ["step"] = "design",
+        ["herocta"] = "design", ["timeline"] = "design", ["step"] = "design", ["countup"] = "design",
         ["leistungen"] = "design", ["leistung"] = "design", ["servicegrid"] = "design",
         ["service"] = "design", ["imagetext"] = "design", ["posts"] = "design",
         ["references"] = "design", ["reference"] = "design",
@@ -212,6 +212,24 @@ public class BlockRegistry
                 new BlockField { Id = "text", Label = "block.f.text", Type = FieldType.Textarea },
                 new BlockField { Id = "buttonText", Label = "block.f.buttonText", Type = FieldType.Text },
                 new BlockField { Id = "buttonUrl", Label = "block.f.buttonUrl", Type = FieldType.Url },
+            ]
+        },
+        // A live day/hour/minute/second counter, counting UP since a date (e.g. a wedding) or DOWN to
+        // one. Self-contained (inline script, no FlipClock dependency). See Blocks/_CountUp.
+        new BlockDefinition
+        {
+            Type = "countup",
+            Name = "block.countup.name",
+            Description = "block.countup.desc",
+            Svg = SvgCta,
+            Partial = "Blocks/_CountUp",
+            Fields =
+            [
+                new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },
+                new BlockField { Id = "date", Label = "block.countup.f.date", Type = FieldType.Text,
+                    Help = "Format: 2016-07-16 14:00" },
+                new BlockField { Id = "mode", Label = "block.countup.f.mode", Type = FieldType.Select,
+                    Options = [ new("up", "block.countup.opt.up"), new("down", "block.countup.opt.down") ] },
             ]
         },
         new BlockDefinition

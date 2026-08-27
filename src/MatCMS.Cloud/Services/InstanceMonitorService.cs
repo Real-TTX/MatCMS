@@ -9,8 +9,9 @@ namespace MatCMS.Cloud.Services;
 /// <list type="number">
 /// <item><b>Dead-man switch</b> — an instance whose heartbeat stopped is flagged offline and mailed
 /// about ONCE per outage (<see cref="Instance.OfflineNotified"/>), not once per tick.</item>
-/// <item><b>Update notice</b> — a newer MatCMS release than an instance runs is mailed once per
-/// release (<see cref="Instance.UpdateNotifiedVersion"/>).</item>
+/// <item><b>Update notice</b> — a newer MatCMS release than an instance runs is flagged once per
+/// release per instance (<see cref="Instance.UpdateNotifiedVersion"/>), but the MAILS are collected
+/// and sent as ONE summary per recipient list ("Site: old → new"), not one mail per instance.</item>
 /// <item><b>Auto-update</b> — only for LOCAL instances and only when explicitly switched on.</item>
 /// <item><b>Delayed removals</b> — an instance whose removal is waiting for a backup is removed
 /// here, once the backup has actually arrived, and only then. This is also where a wait that has
@@ -83,6 +84,13 @@ public class InstanceMonitorService : BackgroundService
         // the wait simply goes on saying so), and it has to be looked at even while it is offline.
         await CompleteRemovalsAsync(removals, instances, db, pending, globalRecipients, ct);
 
+        // Update notices are COLLECTED, not mailed one by one: a release drop otherwise sent a
+        // separate mail for every instance ("richtiger Spam"). They are grouped by recipient list
+        // below into one summary per target — recipients can differ per profile, so a single global
+        // mail would reach the wrong people.
+        var latestVersion = releases.LatestVersion;
+        var updates = new List<(string Name, string? Old, InstanceHosting Hosting, string? Recipients)>();
+
         foreach (var instance in all)
         {
             // Policy comes from the instance's profile; the global settings are only the fallback
@@ -117,17 +125,9 @@ public class InstanceMonitorService : BackgroundService
                 instance.UpdateNotifiedVersion = latest;
                 instances.Log(instance, InstanceEventKind.UpdateAvailable,
                     $"Neue Version {latest} verfügbar (läuft {instance.Version ?? "?"}).", notified: !notifyUpdate);
+                // Collected, not sent here — see the grouping after the loop.
                 if (notifyUpdate)
-                {
-                    var how = instance.Hosting == InstanceHosting.Local
-                        ? "Diese Instanz läuft lokal — die Cloud kann das Update selbst ausführen."
-                        : "Diese Instanz läuft remote — bitte dort ausführen: docker compose pull && docker compose up -d";
-                    pending.Add((
-                        $"[MatCMS.Cloud] Update {latest} für {instance.Name}",
-                        $"Für die Instanz \"{instance.Name}\" ist eine neue Version verfügbar.\r\n" +
-                        $"Installiert: {instance.Version ?? "unbekannt"}\r\nVerfügbar: {latest}\r\n\r\n{how}",
-                        policy.Recipients));
-                }
+                    updates.Add((instance.Name, instance.Version, instance.Hosting, policy.Recipients));
             }
 
             // --- 3) auto-update (local only, opt-in) ------------------------
@@ -157,6 +157,24 @@ public class InstanceMonitorService : BackgroundService
                         $"Das automatische Update ist fehlgeschlagen:\r\n\r\n{result.Message}",
                         policy.Recipients));
             }
+        }
+
+        // One summary per distinct recipient list: "Site: alte Version → neue Version", instead of a
+        // separate mail per instance. Grouped so two profiles with different notification targets each
+        // get their own summary, and an empty key (no per-profile override) falls back at send time.
+        foreach (var group in updates.GroupBy(u => u.Recipients ?? ""))
+        {
+            var items = group.ToList();
+            var n = items.Count;
+            var lines = string.Join("\r\n", items.Select(u =>
+                $"• {u.Name}: {u.Old ?? "unbekannt"} → {latestVersion} [{InstanceService.Describe(u.Hosting)}]"));
+            pending.Add((
+                $"[MatCMS.Cloud] Update {latestVersion} verfügbar ({n} Instanz{(n == 1 ? "" : "en")})",
+                $"Für folgende Instanz{(n == 1 ? "" : "en")} ist die neue Version {latestVersion} verfügbar:\r\n\r\n" +
+                lines + "\r\n\r\n" +
+                "Lokale Instanzen kann die Cloud selbst aktualisieren (Instanz → „Jetzt aktualisieren“). " +
+                "Für entfernte Instanzen dort ausführen: docker compose pull && docker compose up -d",
+                group.Key.Length == 0 ? null : group.Key));
         }
 
         await db.SaveChangesAsync(ct);

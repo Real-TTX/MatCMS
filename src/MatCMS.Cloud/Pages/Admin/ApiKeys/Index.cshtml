@@ -1,0 +1,100 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.ApiKeys.IndexModel
+@{
+    ViewData["Title"] = T["apikeys.title"];
+}
+<div data-list>
+    <div class="page-head">
+        <h1>@T["apikeys.title"]</h1>
+        <div class="list-toolbar">
+            <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+        </div>
+    </div>
+
+    <p class="help">@T["apikeys.intro"]</p>
+
+    @* The one moment the raw key is visible. Never stored in the clear — copy it now or make a new one. *@
+    @if (Model.NewKey is not null)
+    {
+        <div class="alert alert-success">
+            <strong>@T["apikeys.newTitle"]</strong>
+            <div class="help">@T["apikeys.newOnce"]</div>
+            <p class="mono is-secret" style="margin:.5rem 0 0;word-break:break-all;">@Model.NewKey</p>
+        </div>
+    }
+
+    <table class="data" data-list-table>
+        <thead>
+            <tr>
+                <th>@T["common.name"]</th>
+                <th>@T["apikeys.key"]</th>
+                <th>@T["apikeys.rights"]</th>
+                <th>@T["apikeys.reach"]</th>
+                <th>@T["apikeys.lastUsed"]</th>
+                <th>@T["common.status"]</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Items.Count == 0)
+            {
+                <partial name="_EmptyRow" model='@T["apikeys.none"]' />
+            }
+            @foreach (var k in Model.Items)
+            {
+                <tr data-search="@(k.Name + " " + k.Prefix)">
+                    <td><strong>@k.Name</strong></td>
+                    <td class="muted mono">@k.Prefix…</td>
+                    <td>
+                        <span class="badge badge-off">@T["apikeys.rightBase"]</span>
+                        @if (k.CanRestore)
+                        {
+                            <span class="badge badge-new">@T["apikeys.rightRestore"]</span>
+                        }
+                    </td>
+                    <td class="muted">
+                        @if (k.AllInstances)
+                        {
+                            @T["apikeys.reachAll"]
+                        }
+                        else
+                        {
+                            @T["apikeys.reachN", k.Instances.Count]
+                        }
+                    </td>
+                    <td class="muted mono">@(k.LastUsedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? T["apikeys.never"])</td>
+                    <td>
+                        @if (k.Revoked)
+                        {
+                            <span class="badge badge-err">@T["apikeys.revoked"]</span>
+                        }
+                        else
+                        {
+                            <span class="badge badge-on">@T["apikeys.active"]</span>
+                        }
+                    </td>
+                    <td>
+                        <div class="actions">
+                            @if (!k.Revoked)
+                            {
+                                <form class="inline-form" method="post" asp-page-handler="Revoke" asp-route-id="@k.Id"
+                                      onsubmit="return confirm('@T["apikeys.revokeConfirm"]');">
+                                    <button type="submit" class="btn btn-sm btn-ghost">@T["apikeys.revoke"]</button>
+                                </form>
+                            }
+                            <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@k.Id"
+                                  onsubmit="return confirm('@T["apikeys.deleteConfirm"]');">
+                                <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+</div>
+
+<div class="list-actions">
+    <a class="btn" asp-page="Create">@T["apikeys.add"]</a>
+</div>

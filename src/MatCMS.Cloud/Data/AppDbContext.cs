@@ -19,6 +19,10 @@ public class AppDbContext : DbContext
     public DbSet<ArchivedBackup> ArchivedBackups => Set<ArchivedBackup>();
     public DbSet<CloudSetting> CloudSettings => Set<CloudSetting>();
 
+    // Operator API keys and their per-key instance scope.
+    public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
+    public DbSet<ApiKeyInstance> ApiKeyInstances => Set<ApiKeyInstance>();
+
     public DbSet<Profile> Profiles => Set<Profile>();
     public DbSet<ProfileSetting> ProfileSettings => Set<ProfileSetting>();
     public DbSet<ProfileUser> ProfileUsers => Set<ProfileUser>();
@@ -47,6 +51,18 @@ public class AppDbContext : DbContext
         // token hash is compared right after).
         b.Entity<Instance>().HasIndex(i => i.PublicId).IsUnique();
         b.Entity<Instance>().HasIndex(i => i.TokenHash);
+
+        // API keys resolve by hash on every /api/v1 call — unique and indexed, same as instance
+        // tokens. The scope link cascades from both ends: deleting the key or the instance drops only
+        // the link, never the other side.
+        b.Entity<ApiKey>().HasIndex(k => k.KeyHash).IsUnique();
+        b.Entity<ApiKeyInstance>().HasIndex(x => new { x.ApiKeyId, x.InstanceId }).IsUnique();
+        b.Entity<ApiKeyInstance>()
+            .HasOne(x => x.ApiKey).WithMany(k => k.Instances)
+            .HasForeignKey(x => x.ApiKeyId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<ApiKeyInstance>()
+            .HasOne(x => x.Instance).WithMany()
+            .HasForeignKey(x => x.InstanceId).OnDelete(DeleteBehavior.Cascade);
 
         // Deleting a profile must never delete the instances that used it — they fall back to
         // "no profile" and simply stop receiving configuration.

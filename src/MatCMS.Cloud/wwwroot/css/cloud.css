@@ -517,3 +517,7 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
    "restore immediately" toggle, the submit button) rather than three stacked block elements. */
 .upload-backup { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
 .upload-backup .checkbox-row { margin: 0; }
+
+/* Instance picker on the API-key create page: a slightly inset, scrollable list so a cloud with
+   many instances does not push the submit button off the screen. */
+.scope-instances { margin: 8px 0 0 24px; padding-left: 12px; border-left: 2px solid var(--border, #e5e7eb); max-height: 320px; overflow: auto; }

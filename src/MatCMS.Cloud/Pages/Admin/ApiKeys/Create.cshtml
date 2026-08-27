@@ -1,0 +1,81 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.ApiKeys.CreateModel
+@{
+    ViewData["Title"] = T["apikeys.add"];
+}
+<div class="page-head">
+    <h1>@T["apikeys.add"]</h1>
+    <div class="list-toolbar">
+        <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
+    </div>
+</div>
+
+<form method="post">
+    <div class="card">
+        <div class="form-field">
+            <label for="name">@T["common.name"]</label>
+            <input id="name" name="name" required placeholder="@T["apikeys.namePlaceholder"]" />
+            <div class="help">@T["apikeys.nameHint"]</div>
+        </div>
+
+        <div class="form-section">
+            <h2>@T["apikeys.rights"]</h2>
+            <label class="checkbox-row">
+                <input type="checkbox" name="canRestore" value="true" />
+                <span>@T["apikeys.canRestore"]</span>
+            </label>
+            <div class="help">@T["apikeys.canRestoreHint"]</div>
+        </div>
+
+        <div class="form-section" data-scope>
+            <h2>@T["apikeys.reach"]</h2>
+            <label class="checkbox-row">
+                <input type="radio" name="scope" value="all" checked data-scope-all />
+                <span>@T["apikeys.scopeAll"]</span>
+            </label>
+            <label class="checkbox-row">
+                <input type="radio" name="scope" value="selected" data-scope-selected />
+                <span>@T["apikeys.scopeSelected"]</span>
+            </label>
+
+            <div class="scope-instances" data-scope-list hidden>
+                @if (Model.Instances.Count == 0)
+                {
+                    <p class="muted">@T["apikeys.noInstances"]</p>
+                }
+                else
+                {
+                    @foreach (var i in Model.Instances)
+                    {
+                        <label class="checkbox-row">
+                            <input type="checkbox" name="instanceIds" value="@i.Id" />
+                            <span>@i.Name <span class="muted mono">@i.PublicId</span></span>
+                        </label>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn">@T["apikeys.create"]</button>
+        <a class="btn btn-ghost" asp-page="Index">@T["action.cancel"]</a>
+    </div>
+</form>
+
+@section Scripts {
+    <script>
+        // Reveal the instance list only when "selected instances" is chosen.
+        (function () {
+            var wrap = document.querySelector('[data-scope]');
+            if (!wrap) return;
+            var list = wrap.querySelector('[data-scope-list]');
+            var sel = wrap.querySelector('[data-scope-selected]');
+            function sync() { list.hidden = !sel.checked; }
+            wrap.querySelectorAll('input[name="scope"]').forEach(function (r) {
+                r.addEventListener('change', sync);
+            });
+            sync();
+        })();
+    </script>
+}

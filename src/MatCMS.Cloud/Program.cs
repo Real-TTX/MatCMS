@@ -90,6 +90,7 @@ builder.Services.AddScoped<HostingService>();
 builder.Services.AddSingleton<SecretProtector>();
 builder.Services.AddScoped<AdoptionService>();
 builder.Services.AddScoped<VersionService>();
+builder.Services.AddScoped<ApiKeyService>();
 
 // Singletons: one registry poll and one Docker client for the whole process.
 builder.Services.AddSingleton<GhcrClient>();
@@ -123,6 +124,19 @@ builder.Services.AddRateLimiter(options =>
     // The instance API is token-authenticated but anonymous at the transport level, so it gets its
     // own generous per-IP budget: a 60s heartbeat needs ~1/min, several instances may share one NAT.
     options.AddPolicy("instanceApi", ctx =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 120,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+
+    // The operator API (/api/v1) is key-authenticated but anonymous at the transport level, like the
+    // instance API — so it gets its own per-IP budget rather than sharing the login one. Generous
+    // because a backup cycle is a burst of list/request/download/upload/restore calls, not a trickle.
+    options.AddPolicy("operatorApi", ctx =>
         RateLimitPartition.GetFixedWindowLimiter(
             ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             _ => new FixedWindowRateLimiterOptions
@@ -477,6 +491,176 @@ app.MapPost("/api/instances/{publicId}/backups/taken", async (
     await db.SaveChangesAsync();
     return Results.Ok();
 }).RequireRateLimiting("instanceApi");
+
+// --- Operator API (/api/v1) -----------------------------------------------
+// A KEY-authenticated surface for the backup cycle: list instances, ask for a fresh backup, pull it,
+// upload an edited one, and — only with the restore right on the key — put it back live. Everything
+// here goes through the SAME BackupStore / InstanceService the admin UI uses; there is no second
+// implementation and no second format. The cloud still never reaches into a site: a restore is
+// MARKED, and the instance downloads and applies it on its next heartbeat, exactly as from the UI.
+
+// Resolves the caller's key from the Authorization header, or the 401 to return.
+static async Task<(MatCMS.Cloud.Models.ApiKey? key, IResult? error)> ApiCallerAsync(
+    HttpContext ctx, ApiKeyService keys)
+{
+    var key = await keys.AuthenticateAsync(ctx.Request.Headers.Authorization.ToString(), ctx.RequestAborted);
+    return key is null
+        ? (null, Results.Json(new { error = "Ungültiger oder fehlender API-Schlüssel." }, statusCode: StatusCodes.Status401Unauthorized))
+        : (key, null);
+}
+
+// Resolves the target instance for a key. A missing instance and one outside the key's scope give
+// the SAME 404 on purpose: otherwise a scoped key could enumerate which instances exist by watching
+// for 404 vs 403.
+static async Task<(MatCMS.Cloud.Models.Instance? instance, IResult? error)> ApiInstanceAsync(
+    AppDbContext db, MatCMS.Cloud.Models.ApiKey key, string publicId)
+{
+    var instance = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == publicId);
+    if (instance is null || !ApiKeyService.CanAccess(key, instance))
+        return (null, Results.Json(new { error = "Instanz nicht gefunden." }, statusCode: StatusCodes.Status404NotFound));
+    return (instance, null);
+}
+
+// List the instances this key may act on.
+app.MapGet("/api/v1/instances", async (HttpContext ctx, ApiKeyService keys, AppDbContext db) =>
+{
+    var (key, error) = await ApiCallerAsync(ctx, keys);
+    if (error is not null) return error;
+
+    var q = db.Instances.AsNoTracking().AsQueryable();
+    if (!key!.AllInstances)
+    {
+        var ids = key.Instances.Select(s => s.InstanceId).ToList();
+        q = q.Where(i => ids.Contains(i.Id));
+    }
+    var list = await q.OrderBy(i => i.Name).Select(i => new
+    {
+        id = i.PublicId,
+        name = i.Name,
+        status = i.Status.ToString(),
+        hosting = i.Hosting.ToString(),
+        version = i.Version,
+        url = i.Url,
+        lastHeartbeatUtc = i.LastHeartbeatUtc
+    }).ToListAsync();
+
+    return Results.Ok(new { canRestore = key.CanRestore, instances = list });
+}).RequireRateLimiting("operatorApi");
+
+// Ask the instance for a fresh backup. Returns the request id to correlate the arriving file with.
+app.MapPost("/api/v1/instances/{publicId}/backups/request", async (
+    HttpContext ctx, string publicId, ApiKeyService keys, InstanceService instances, AppDbContext db) =>
+{
+    var (key, error) = await ApiCallerAsync(ctx, keys);
+    if (error is not null) return error;
+    var (instance, ierr) = await ApiInstanceAsync(db, key!, publicId);
+    if (ierr is not null) return ierr;
+    if (instance!.Status != MatCMS.Cloud.Models.InstanceStatus.Approved)
+        return Results.Json(new { error = "Instanz ist nicht freigegeben." }, statusCode: StatusCodes.Status409Conflict);
+
+    await instances.RequestBackupAsync(instance, ctx.RequestAborted);
+    instances.Log(instance, MatCMS.Cloud.Models.InstanceEventKind.BackupRequested, "Backup über die API angefordert.");
+    await db.SaveChangesAsync();
+    return Results.Ok(new { requestId = instance.BackupRequestId });
+}).RequireRateLimiting("operatorApi");
+
+// List this instance's backups, newest first, with the fields a client needs to pick one and to
+// poll a restore: requestId ties a file to a request above, the restore flags to a restore below.
+app.MapGet("/api/v1/instances/{publicId}/backups", async (
+    HttpContext ctx, string publicId, ApiKeyService keys, AppDbContext db) =>
+{
+    var (key, error) = await ApiCallerAsync(ctx, keys);
+    if (error is not null) return error;
+    var (instance, ierr) = await ApiInstanceAsync(db, key!, publicId);
+    if (ierr is not null) return ierr;
+
+    var rows = await db.CloudBackups.AsNoTracking()
+        .Where(b => b.InstanceId == instance!.Id)
+        .OrderByDescending(b => b.CreatedAt)
+        .Select(b => new
+        {
+            id = b.Id,
+            fileName = b.FileName,
+            sizeBytes = b.SizeBytes,
+            createdAt = b.CreatedAt,
+            uploadedAt = b.UploadedAt,
+            origin = b.Origin,
+            sha256 = b.Sha256,
+            requestId = b.RequestId,
+            restorePending = b.RestoreRequestedAt != null && b.RestoreDoneAt == null && b.RestoreError == null,
+            restoreDoneAt = b.RestoreDoneAt,
+            restoreError = b.RestoreError
+        })
+        .ToListAsync();
+    return Results.Ok(new { backups = rows });
+}).RequireRateLimiting("operatorApi");
+
+// Pull one backup's bytes. Streamed with range support so a dropped download can resume.
+app.MapGet("/api/v1/instances/{publicId}/backups/{id:int}/download", async (
+    HttpContext ctx, string publicId, int id, ApiKeyService keys, BackupStore store, AppDbContext db) =>
+{
+    var (key, error) = await ApiCallerAsync(ctx, keys);
+    if (error is not null) return error;
+    var (instance, ierr) = await ApiInstanceAsync(db, key!, publicId);
+    if (ierr is not null) return ierr;
+
+    var row = await db.CloudBackups.AsNoTracking()
+        .FirstOrDefaultAsync(b => b.Id == id && b.InstanceId == instance!.Id);
+    if (row is null) return Results.NotFound();
+    var path = store.PathFor(row);
+    if (!File.Exists(path)) return Results.NotFound();
+    return Results.File(path, "application/zip", row.FileName, enableRangeProcessing: true);
+}).RequireRateLimiting("operatorApi");
+
+// Upload an (edited) backup as the raw request body — one file, so no multipart. Stored exactly like
+// an instance-pushed one; the file name rides in X-MatCMS-Backup-Name (must end in .zip).
+app.MapPost("/api/v1/instances/{publicId}/backups", async (
+    HttpContext ctx, string publicId, ApiKeyService keys, BackupStore store, InstanceService instances, AppDbContext db) =>
+{
+    var (key, error) = await ApiCallerAsync(ctx, keys);
+    if (error is not null) return error;
+    var (instance, ierr) = await ApiInstanceAsync(db, key!, publicId);
+    if (ierr is not null) return ierr;
+
+    // Lift Kestrel's 30 MB body cap for this call; the real ceiling is the streaming guard in
+    // StoreAsync (BackupStore.MaxUploadBytes), which refuses WITH a reason instead of dropping.
+    var sizeFeature = ctx.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>();
+    if (sizeFeature is { IsReadOnly: false }) sizeFeature.MaxRequestBodySize = null;
+
+    var name = ctx.Request.Headers["X-MatCMS-Backup-Name"].ToString();
+    if (string.IsNullOrWhiteSpace(name)) name = $"api-upload-{DateTime.UtcNow:yyyyMMdd-HHmmss}.zip";
+
+    var result = await store.StoreAsync(instance!, name, "api", DateTime.UtcNow, ctx.Request.Body, ctx.RequestAborted);
+    if (!result.Ok || result.Backup is null)
+        return Results.Json(new { ok = false, error = result.Error }, statusCode: StatusCodes.Status400BadRequest);
+
+    instances.Log(instance!, MatCMS.Cloud.Models.InstanceEventKind.BackupUploaded,
+        $"Backup \"{result.Backup.FileName}\" über die API hochgeladen.");
+    await db.SaveChangesAsync();
+    return Results.Ok(new { ok = true, id = result.Backup.Id, fileName = result.Backup.FileName, sha256 = result.Backup.Sha256 });
+}).RequireRateLimiting("operatorApi").DisableAntiforgery();
+
+// Put a backup back LIVE — the one destructive action, gated on the key's restore right. The cloud
+// only MARKS it; the instance downloads and applies it on its next beat and reports the outcome,
+// which the backups list above then shows.
+app.MapPost("/api/v1/instances/{publicId}/backups/{id:int}/restore", async (
+    HttpContext ctx, string publicId, int id, ApiKeyService keys, BackupStore store, AppDbContext db) =>
+{
+    var (key, error) = await ApiCallerAsync(ctx, keys);
+    if (error is not null) return error;
+    if (!key!.CanRestore)
+        return Results.Json(new { error = "Dieser Schlüssel darf nicht wiederherstellen." }, statusCode: StatusCodes.Status403Forbidden);
+    var (instance, ierr) = await ApiInstanceAsync(db, key, publicId);
+    if (ierr is not null) return ierr;
+    if (instance!.Status != MatCMS.Cloud.Models.InstanceStatus.Approved)
+        return Results.Json(new { error = "Instanz ist nicht freigegeben." }, statusCode: StatusCodes.Status409Conflict);
+
+    var row = await db.CloudBackups.FirstOrDefaultAsync(b => b.Id == id && b.InstanceId == instance.Id);
+    if (row is null) return Results.NotFound();
+
+    await store.RequestRestoreAsync(row, ctx.RequestAborted);
+    return Results.Ok(new { ok = true, id = row.Id, message = "Wiederherstellung vorgemerkt — die Instanz spielt sie beim nächsten Kontakt ein." });
+}).RequireRateLimiting("operatorApi");
 
 // --- Catalogue ------------------------------------------------------------
 // The store, browsable by an approved instance itself ("Weiter durchsuchen…" in MatCMS). This is the

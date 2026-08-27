@@ -741,6 +741,32 @@ hand this container another identity). The detail page carries `[RequestSizeLimi
 framework's 128 MB multipart default and Kestrel's 30 MB body cap; the real ceiling is still the
 streaming guard in `StoreAsync`.
 
+### Operator API (`/api/v1`) & API keys
+
+A **key-authenticated** surface for driving the backup cycle from outside — pull a site's backup,
+upload an edited one, restore it live — without a cookie session. It is the operator counterpart to
+the instance API: same "anonymous at the transport level, authenticated by a secret" shape, its own
+rate-limit policy (`operatorApi`), and it goes through the **same `BackupStore` / `InstanceService`**
+the admin UI uses. There is no second restore path and no second backup format.
+
+- **`ApiKey`** (`Models/ApiKey.cs`, `Services/ApiKeyService.cs`): stored as **SHA-256 only**, shown
+  once, with a clear `Prefix` for the list — exactly like an instance token (`ApiKeyService.Hash`
+  mirrors `InstanceService.HashToken`). Two rights that were deliberate product decisions:
+  **`CanRestore`** gates the one destructive call (pull/upload is the base right; overwriting a live
+  site must be granted on purpose), and **`AllInstances` + `ApiKeyInstance` scope** limits a key to
+  named instances. A scoped key with no rows reaches nothing, on purpose — a mis-created key is inert,
+  not accidentally global. Managed under **Admin → API-Schlüssel** (`Pages/Admin/ApiKeys/`); revoking
+  keeps the row (a key that could restore a site is worth an audit trail), deleting cascades its scope.
+- **Auth**: `Authorization: Bearer <key>`. `ApiCallerAsync` resolves the key or returns 401;
+  `ApiInstanceAsync` resolves the target instance and returns the SAME 404 for "does not exist" and
+  "outside this key's scope", so a scoped key cannot enumerate instances by 404-vs-403.
+- **Endpoints** (all `/api/v1`, `Program.cs`): `GET instances`; `POST instances/{publicId}/backups/request`
+  (fresh backup, returns the `requestId` to correlate the arriving file); `GET …/backups` (list, with
+  `requestId` + restore state for polling); `GET …/backups/{id}/download`; `POST …/backups` (upload the
+  raw body, origin `api`, Kestrel cap lifted like the instance upload); `POST …/backups/{id}/restore`
+  (gated on `CanRestore`). Restore is still only MARKED — the instance downloads and applies it on its
+  next beat and reports back, which the list then shows.
+
 ## Backlog
 
 - **Provisioning new MatCMS instances** via **MatOS** + **Matcad**: MatOS already installs apps as

@@ -11,7 +11,6 @@
     <div class="page-head">
         <h1>@T["instances.title"]</h1>
         <div class="list-toolbar">
-            <a class="btn btn-sm" asp-page="UpdateAll" title="Alle lokalen Instanzen mit Update nacheinander aktualisieren"><i class="ti ti-refresh" aria-hidden="true"></i> Alle aktualisieren</a>
             <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
             <select class="list-search" data-list-filter aria-label="@T["instances.filter"]">
                 <option value="">@T["instances.filterAll"]</option>
@@ -283,12 +282,22 @@
 </div>
 
 @* Ein Weg hinein, drei Möglichkeiten darin — statt zweier Knöpfe, deren Unterschied man erst nach
-   dem Klicken sieht. *@
-<partial name="_AddMenu" model='AddMenus.Instances(T,
-    Model.HostingEnabled ? Url.Page("New") : null,
-    Url.Page("Create", null, null, "adopt")!,
-    Url.Page("Create", null, null, "join")!,
-    Url.Page("/Admin/Settings/Index", null, new { tab = "hosting" })!)' />
+   dem Klicken sieht. „Alle aktualisieren" steht bewusst HIER unten neben „Hinzufügen" (nicht oben in
+   der Such-/Filter-Toolbar, wo es eine Flotten-Aktion zwischen Filtern versteckte). Den Knopf des
+   AddMenu rendern wir selbst in dieselbe .list-actions-Zeile; das Partial liefert per WithButton=false
+   nur noch den Dialog dazu. *@
+@{
+    var addMenu = AddMenus.Instances(T,
+        Model.HostingEnabled ? Url.Page("New") : null,
+        Url.Page("Create", null, null, "adopt")!,
+        Url.Page("Create", null, null, "join")!,
+        Url.Page("/Admin/Settings/Index", null, new { tab = "hosting" })!);
+}
+<div class="list-actions">
+    <button type="button" class="btn" data-add-menu="@addMenu.Id">@addMenu.ButtonLabel</button>
+    <a class="btn btn-ghost" asp-page="UpdateAll" title="Alle lokalen Instanzen mit Update nacheinander aktualisieren"><i class="ti ti-refresh" aria-hidden="true"></i> Alle aktualisieren</a>
+</div>
+<partial name="_AddMenu" model="addMenu with { WithButton = false }" />
 
 @section Scripts {
     <script>

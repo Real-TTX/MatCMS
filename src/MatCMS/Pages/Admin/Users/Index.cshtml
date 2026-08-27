@@ -8,37 +8,103 @@
     <h1>@T["users.title"]</h1>
 </div>
 
-<table class="data">
-    <thead>
-        <tr>
-            <th>@T["users.colEmail"]</th>
-            <th>@T["users.colDisplayName"]</th>
-            <th>@T["users.colRole"]</th>
-            <th>@T["users.colCreated"]</th>
-            <th></th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach (var u in Model.Items)
-        {
-            <tr>
-                <td><strong>@(string.IsNullOrWhiteSpace(u.Email) ? u.Username : u.Email)</strong> @(u.Username == me ? T["users.you"] : "")</td>
-                <td>@(string.IsNullOrWhiteSpace(u.DisplayName) ? "—" : u.DisplayName)</td>
-                <td>@u.Role</td>
-                <td class="muted">@u.CreatedAt.ToString("dd.MM.yyyy")</td>
-                <td>
-                    <div class="actions">
-                        <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@u.Id">@T["action.edit"]</a>
-                        <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@u.Id" onsubmit="return confirm('@T["users.confirmDelete", u.Username]');">
-                            <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
-                        </form>
-                    </div>
-                </td>
-            </tr>
-        }
-    </tbody>
-</table>
-
-<div class="list-actions">
-    <a class="btn" asp-page="Create">@T["users.create"]</a>
+<div class="tabs" role="tablist">
+    <button type="button" class="tab active" data-tab="users">@T["nav.users"]</button>
+    <button type="button" class="tab" data-tab="members">@T["nav.members"]</button>
 </div>
+
+@* ===== Benutzer (Backoffice) ===== *@
+<div class="tab-panel" data-panel="users">
+    <table class="data">
+        <thead>
+            <tr>
+                <th>@T["users.colEmail"]</th>
+                <th>@T["users.colDisplayName"]</th>
+                <th>@T["users.colRole"]</th>
+                <th>@T["users.colCreated"]</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var u in Model.Items)
+            {
+                <tr>
+                    <td><strong>@(string.IsNullOrWhiteSpace(u.Email) ? u.Username : u.Email)</strong> @(u.Username == me ? T["users.you"] : "")</td>
+                    <td>@(string.IsNullOrWhiteSpace(u.DisplayName) ? "—" : u.DisplayName)</td>
+                    <td>@u.Role</td>
+                    <td class="muted">@u.CreatedAt.ToString("dd.MM.yyyy")</td>
+                    <td>
+                        <div class="actions">
+                            <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@u.Id">@T["action.edit"]</a>
+                            <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@u.Id" onsubmit="return confirm('@T["users.confirmDelete", u.Username]');">
+                                <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <div class="list-actions">
+        <a class="btn" asp-page="Create">@T["users.create"]</a>
+    </div>
+</div>
+
+@* ===== Mitglieder (öffentlicher Login) ===== *@
+<div class="tab-panel" data-panel="members" hidden>
+    <p class="help">Konten für den geschützten Bereich der öffentlichen Website. Getrennt von den Backoffice-Benutzern.</p>
+    <table class="data">
+        <thead>
+            <tr>
+                <th>Benutzername</th>
+                <th>Anzeigename</th>
+                <th>Rollen</th>
+                <th>Status</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Members.Count == 0)
+            {
+                <tr><td colspan="99" class="muted"><em>Noch keine Mitglieder.</em></td></tr>
+            }
+            @foreach (var m in Model.Members)
+            {
+                <tr>
+                    <td><strong>@m.Username</strong></td>
+                    <td class="muted">@(string.IsNullOrWhiteSpace(m.DisplayName) ? "—" : m.DisplayName)</td>
+                    <td class="muted">@(string.IsNullOrWhiteSpace(m.RolesCsv) ? "—" : m.RolesCsv.Replace(",", ", "))</td>
+                    <td>@(m.IsActive ? Html.Raw("<span class=\"badge badge-on\">aktiv</span>") : Html.Raw("<span class=\"badge badge-off\">deaktiviert</span>"))</td>
+                    <td>
+                        <div class="actions">
+                            <a class="btn btn-sm btn-ghost" asp-page="/Admin/Members/Edit" asp-route-id="@m.Id">@T["action.edit"]</a>
+                            <form class="inline-form" method="post" asp-page-handler="DeleteMember" asp-route-memberId="@m.Id" onsubmit="return confirm('Dieses Mitglied löschen?');">
+                                <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <div class="list-actions">
+        <a class="btn" asp-page="/Admin/Members/Edit">Mitglied anlegen</a>
+        <a class="btn btn-ghost" asp-page="/Admin/Roles/Index">Rollen verwalten</a>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            var tabs = document.querySelectorAll('.tab');
+            var panels = document.querySelectorAll('.tab-panel');
+            function show(name) {
+                tabs.forEach(function (t) { t.classList.toggle('active', t.dataset.tab === name); });
+                panels.forEach(function (p) { p.hidden = p.dataset.panel !== name; });
+            }
+            tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.tab); }); });
+            var want = new URLSearchParams(location.search).get('tab');
+            if (want) show(want);
+        })();
+    </script>
+}

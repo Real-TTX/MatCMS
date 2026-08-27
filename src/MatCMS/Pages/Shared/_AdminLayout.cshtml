@@ -80,7 +80,6 @@
             <div class="admin-nav-sep" role="separator"></div>
             @* Verwaltung & System *@
             <a class="@Active("/admin/users")" asp-page="/Admin/Users/Index">👤 @T["nav.users"]</a>
-            <a class="@Active("/admin/members")" asp-page="/Admin/Members/Index">👥 @T["nav.members"]</a>
             <a class="@Active("/admin/backup")" asp-page="/Admin/Backup/Index">💾 @T["nav.backup"]</a>
             @if (Plugins.AdminMenu.Count > 0)
             {

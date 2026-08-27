@@ -859,10 +859,12 @@ h1, h2, h3, h4 {
 .hc-cursor .hc-headline { fill: none; stroke: var(--hc-arrow); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
 @media (pointer: coarse) { .hc-cursor { display: none; } }
 
-/* Count-up / countdown block (e.g. days since a wedding). Self-contained; no external clock lib. */
-.countup { padding: 40px 0; text-align: center; }
-.countup .cu-heading { margin: 0 0 20px; }
-.cu-grid { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; }
-.cu-unit { min-width: 84px; padding: 14px 10px; border-radius: 12px; background: var(--alt-bg, #f6f7f9); }
-.cu-num { display: block; font-size: clamp(1.8rem, 5vw, 3rem); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; color: var(--accent, #de7e11); }
-.cu-label { display: block; margin-top: 6px; font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; opacity: .7; }
+/* Count-up / countdown block, FlipClock look: each digit its own black card, groups split by a
+   colon, digits in the theme accent. Self-contained; no external clock library. */
+.countup { padding: 32px 0; text-align: center; }
+.countup .cu-heading { margin: 0 0 16px; }
+.fc { display: inline-flex; align-items: center; gap: 5px; flex-wrap: wrap; justify-content: center; }
+.fc-d { position: relative; background: #111; color: var(--accent, #2563eb); font-weight: 700; font-size: 2.6rem; line-height: 1; padding: 12px 9px; border-radius: 7px; min-width: 26px; text-align: center; font-variant-numeric: tabular-nums; box-shadow: 0 2px 5px rgba(0,0,0,.35); }
+.fc-d::after { content: ""; position: absolute; left: 5px; right: 5px; top: 50%; height: 1px; transform: translateY(-.5px); background: rgba(255,255,255,.12); }
+.fc-c { color: var(--accent, #2563eb); font-weight: 700; font-size: 2rem; padding: 0 1px; }
+@media (max-width: 560px) { .fc-d { font-size: 1.8rem; padding: 9px 6px; min-width: 20px; } .fc-c { font-size: 1.4rem; } }

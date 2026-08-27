@@ -4,40 +4,32 @@
     var date = Model.Str("date");
     var mode = Model.StrOr("mode", "up") == "down" ? "down" : "up";
 }
-<section class="countup">
-    <div class="container">
-        @if (!string.IsNullOrWhiteSpace(heading))
-        {
-            <h2 class="cu-heading">@heading</h2>
-        }
-        <div class="cu-grid" data-countup data-date="@date" data-mode="@mode" role="timer" aria-live="off">
-            <div class="cu-unit"><span class="cu-num" data-d>–</span><span class="cu-label">Tage</span></div>
-            <div class="cu-unit"><span class="cu-num" data-h>–</span><span class="cu-label">Stunden</span></div>
-            <div class="cu-unit"><span class="cu-num" data-m>–</span><span class="cu-label">Minuten</span></div>
-            <div class="cu-unit"><span class="cu-num" data-s>–</span><span class="cu-label">Sekunden</span></div>
-        </div>
-    </div>
-</section>
-<script>
-(function () {
-    if (window.__cuInit) return; window.__cuInit = true;
-    function pad(n) { return (n < 10 ? '0' : '') + n; }
-    function tickAll() {
-        document.querySelectorAll('[data-countup]').forEach(function (el) {
-            // Accept "2016-07-16 14:00" and ISO alike; a space becomes 'T' so Safari parses it too.
-            var t = new Date((el.getAttribute('data-date') || '').trim().replace(' ', 'T')).getTime();
-            if (isNaN(t)) return;
-            var diff = el.getAttribute('data-mode') === 'down' ? (t - Date.now()) : (Date.now() - t);
-            if (diff < 0) diff = 0;
-            var s = Math.floor(diff / 1000);
-            var d = Math.floor(s / 86400); s -= d * 86400;
-            var h = Math.floor(s / 3600); s -= h * 3600;
-            var m = Math.floor(s / 60); s -= m * 60;
-            var set = function (sel, v) { var e = el.querySelector(sel); if (e) e.textContent = v; };
-            set('[data-d]', d); set('[data-h]', pad(h)); set('[data-m]', pad(m)); set('[data-s]', pad(s));
-        });
+<div class="countup">
+    @if (!string.IsNullOrWhiteSpace(heading))
+    {
+        <h2 class="cu-heading">@heading</h2>
     }
-    function run() { tickAll(); setInterval(tickAll, 1000); }
-    if (document.readyState !== 'loading') run(); else document.addEventListener('DOMContentLoaded', run);
-})();
+    <div class="fc" data-countup data-date="@date" data-mode="@mode" role="timer" aria-live="off"></div>
+</div>
+<script>
+    (function () {
+        if (window.__cuInit) return; window.__cuInit = true;
+        function pad2(n) { return (n < 10 ? '0' : '') + n; }
+        // FlipClock-Optik: jede Ziffer eine eigene Karte, Gruppen mit Doppelpunkt getrennt.
+        function cards(str) { var h = ''; for (var i = 0; i < str.length; i++) h += '<span class="fc-d">' + str[i] + '</span>'; return h; }
+        function tick() {
+            document.querySelectorAll('[data-countup]').forEach(function (el) {
+                var t = new Date((el.getAttribute('data-date') || '').trim().replace(' ', 'T')).getTime();
+                if (isNaN(t)) return;
+                var diff = el.getAttribute('data-mode') === 'down' ? (t - Date.now()) : (Date.now() - t);
+                if (diff < 0) diff = 0;
+                var s = Math.floor(diff / 1000), d = Math.floor(s / 86400); s -= d * 86400;
+                var h = Math.floor(s / 3600); s -= h * 3600; var m = Math.floor(s / 60); s -= m * 60;
+                var sep = '<span class="fc-c">:</span>';
+                el.innerHTML = cards(String(d)) + sep + cards(pad2(h)) + sep + cards(pad2(m)) + sep + cards(pad2(s));
+            });
+        }
+        function run() { tick(); setInterval(tick, 1000); }
+        if (document.readyState !== 'loading') run(); else document.addEventListener('DOMContentLoaded', run);
+    })();
 </script>

@@ -30,7 +30,8 @@
         <script>
             (function () {
                 if (window.__cuInit) return; window.__cuInit = true;
-                function pad(n) { return (n < 10 ? '0' : '') + n; }
+                function pad2(n) { return (n < 10 ? '0' : '') + n; }
+                function cards(str) { var h = ''; for (var i = 0; i < str.length; i++) h += '<span class="fc-d">' + str[i] + '</span>'; return h; }
                 function tick() {
                     document.querySelectorAll('[data-countup]').forEach(function (el) {
                         var t = new Date((el.getAttribute('data-date') || '').trim().replace(' ', 'T')).getTime();
@@ -39,8 +40,8 @@
                         if (diff < 0) diff = 0;
                         var s = Math.floor(diff / 1000), d = Math.floor(s / 86400); s -= d * 86400;
                         var h = Math.floor(s / 3600); s -= h * 3600; var m = Math.floor(s / 60); s -= m * 60;
-                        var set = function (q, v) { var e = el.querySelector(q); if (e) e.textContent = v; };
-                        set('[data-d]', d); set('[data-h]', pad(h)); set('[data-m]', pad(m)); set('[data-s]', pad(s));
+                        var sep = '<span class="fc-c">:</span>';
+                        el.innerHTML = cards(String(d)) + sep + cards(pad2(h)) + sep + cards(pad2(m)) + sep + cards(pad2(s));
                     });
                 }
                 tick(); setInterval(tick, 1000);

@@ -375,6 +375,14 @@ public class DetailsModel : PageModel
         _instances.Log(item,
             result.Ok ? InstanceEventKind.UpdateSucceeded : InstanceEventKind.UpdateFailed,
             result.Message, notified: true);
+
+        // The container was just recreated on the new image but has not beaten back yet, so its
+        // reported Version is still the OLD one — which left "Update verfügbar" (and the button)
+        // standing until the next heartbeat, inviting a second, pointless update. Move the version
+        // forward optimistically so the badge clears at once; the next heartbeat reports the real
+        // version and corrects this if anything went wrong.
+        if (result.Ok && _releases.LatestVersion is string latest)
+            item.Version = latest;
         await _db.SaveChangesAsync();
 
         if (result.Ok) TempData["Flash"] = result.Message;

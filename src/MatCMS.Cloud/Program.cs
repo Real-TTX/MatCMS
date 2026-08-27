@@ -96,6 +96,7 @@ builder.Services.AddScoped<ApiKeyService>();
 builder.Services.AddSingleton<GhcrClient>();
 builder.Services.AddSingleton<ReleaseWatcher>();
 builder.Services.AddSingleton<DockerHostService>();
+builder.Services.AddSingleton<BulkUpdateService>();
 builder.Services.AddHostedService<ReleaseWatcherService>();
 builder.Services.AddHostedService<InstanceMonitorService>();
 builder.Services.AddHostedService<MailSpoolService>();

@@ -1,0 +1,115 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.Instances.UpdateAllModel
+@{
+    ViewData["Title"] = "Alle aktualisieren";
+}
+<div class="page-head">
+    <h1>Alle aktualisieren</h1>
+    <div class="list-toolbar">
+        <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
+    </div>
+</div>
+
+@if (Model.RunId is null)
+{
+    @* Auswahl: welche lokalen Instanzen haben ein Update? *@
+    <div class="card">
+        @if (Model.Candidates.Count == 0)
+        {
+            <p class="muted">Es gibt aktuell keine lokalen Instanzen mit verfügbarem Update. (Entfernte Instanzen aktualisieren sich selbst — die Cloud kann sie nicht anfassen.)</p>
+        }
+        else
+        {
+            <p class="help">Diese lokalen Instanzen werden nacheinander aktualisiert — jede mit Rollback bei Fehler. Neueste Version: <span class="mono">@Model.LatestVersion</span></p>
+            <table class="data">
+                <thead><tr><th>Instanz</th><th>Von</th><th></th><th>Auf</th></tr></thead>
+                <tbody>
+                    @foreach (var i in Model.Candidates)
+                    {
+                        <tr>
+                            <td><strong>@i.Name</strong></td>
+                            <td class="muted mono">@(i.Version ?? "?")</td>
+                            <td class="muted">→</td>
+                            <td class="mono">@Model.LatestVersion</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <div class="list-actions">
+                <form method="post" asp-page-handler="Start">
+                    <button type="submit" class="btn"><i class="ti ti-refresh" aria-hidden="true"></i> @Model.Candidates.Count Instanz(en) jetzt aktualisieren</button>
+                </form>
+            </div>
+        }
+    </div>
+}
+else
+{
+    @* Fortschritt: Balken + Live-Tabelle, per Polling gefüllt. *@
+    <div class="card" data-run="@Model.RunId">
+        <div class="kv">
+            <div class="kv-label">Fortschritt</div>
+            <div class="kv-value">
+                <div class="quota-row" style="max-width:420px;">
+                    <div class="quota-bar"><span id="ua-bar" style="width:0%"></span></div>
+                    <span class="quota-pct"><span id="ua-done">0</span>&nbsp;/&nbsp;<span id="ua-total">@("?")</span></span>
+                </div>
+            </div>
+        </div>
+        <div class="kv">
+            <div class="kv-label">Status</div>
+            <div class="kv-value"><span id="ua-state" class="badge badge-new">läuft…</span></div>
+        </div>
+
+        <table class="data" style="margin-top:12px;">
+            <thead><tr><th>Instanz</th><th>Von</th><th></th><th>Auf</th><th>Status</th><th>Meldung</th></tr></thead>
+            <tbody id="ua-rows">
+                <tr><td colspan="99" class="muted"><em>Wird gestartet…</em></td></tr>
+            </tbody>
+        </table>
+        <div class="list-actions">
+            <a class="btn btn-ghost" asp-page="Index" id="ua-back" hidden>@T["action.back"]</a>
+        </div>
+    </div>
+
+    <script>
+            (function () {
+                var run = document.querySelector('[data-run]').getAttribute('data-run');
+                var esc = function (s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; };
+                var badge = { pending: 'badge-off', updating: 'badge-new', done: 'badge-on', failed: 'badge-err', skipped: 'badge-off' };
+                var label = { pending: 'wartet', updating: 'aktualisiert…', done: 'fertig', failed: 'Fehler', skipped: 'übersprungen' };
+                function render(d) {
+                    document.getElementById('ua-total').textContent = d.total;
+                    document.getElementById('ua-done').textContent = d.completed;
+                    var pct = d.total ? Math.round(d.completed * 100 / d.total) : 0;
+                    document.getElementById('ua-bar').style.width = pct + '%';
+                    var rows = (d.items || []).map(function (i) {
+                        return '<tr><td><strong>' + esc(i.name) + '</strong></td>' +
+                            '<td class="muted mono">' + esc(i.from || '?') + '</td><td class="muted">→</td>' +
+                            '<td class="mono">' + esc(i.to) + '</td>' +
+                            '<td><span class="badge ' + (badge[i.status] || 'badge-off') + '">' + (label[i.status] || i.status) + '</span></td>' +
+                            '<td class="muted">' + esc(i.message || '') + '</td></tr>';
+                    }).join('');
+                    if (rows) document.getElementById('ua-rows').innerHTML = rows;
+                    if (d.done) {
+                        var st = document.getElementById('ua-state');
+                        var failed = (d.items || []).some(function (i) { return i.status === 'failed'; });
+                        st.className = 'badge ' + (failed ? 'badge-err' : 'badge-on');
+                        st.textContent = failed ? 'abgeschlossen (mit Fehlern)' : 'abgeschlossen';
+                        document.getElementById('ua-back').hidden = false;
+                    }
+                }
+                function poll() {
+                    fetch('?handler=Status&run=' + encodeURIComponent(run), { headers: { 'X-Requested-With': 'fetch' } })
+                        .then(function (r) { return r.json(); })
+                        .then(function (d) {
+                            if (!d.found) { return; }
+                            render(d);
+                            if (!d.done) setTimeout(poll, 1500);
+                        })
+                        .catch(function () { setTimeout(poll, 2000); });
+                }
+                poll();
+            })();
+    </script>
+}

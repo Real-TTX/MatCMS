@@ -17,6 +17,13 @@ public static class LayoutRenderer
 {
     private static readonly Regex LoopRx =
         new(@"\{\{#menu:([a-zA-Z0-9_-]+)\}\}(.*?)\{\{/menu:\1\}\}", RegexOptions.Singleline | RegexOptions.Compiled);
+    // Parameter conditionals: {{#if:name}} / {{#if:name=value}} … {{/if:name}} and the negated
+    // {{#ifnot:…}} … {{/ifnot:name}}. The closing tag repeats the parameter name so blocks nest and
+    // two conditions on different parameters can't cross-match.
+    private static readonly Regex IfRx =
+        new(@"\{\{#if:([a-zA-Z0-9_-]+)(?:=([^}]*))?\}\}(.*?)\{\{/if:\1\}\}", RegexOptions.Singleline | RegexOptions.Compiled);
+    private static readonly Regex IfNotRx =
+        new(@"\{\{#ifnot:([a-zA-Z0-9_-]+)(?:=([^}]*))?\}\}(.*?)\{\{/ifnot:\1\}\}", RegexOptions.Singleline | RegexOptions.Compiled);
     private static readonly Regex MenuRx =
         new(@"\{\{menu:([a-zA-Z0-9_-]+)\}\}", RegexOptions.Compiled);
     private static readonly Regex LangLoopRx =
@@ -30,9 +37,15 @@ public static class LayoutRenderer
         IReadOnlyDictionary<string, string> globals,
         IReadOnlyDictionary<string, string> menuMap,
         Func<string, IReadOnlyList<MenuItem>> menuItems,
-        IReadOnlyList<LangLink>? languages = null)
+        IReadOnlyList<LangLink>? languages = null,
+        IReadOnlyDictionary<string, string>? paramValues = null)
     {
         string Key(string slot) => menuMap.TryGetValue(slot, out var k) && !string.IsNullOrWhiteSpace(k) ? k : slot;
+
+        // 0) Parameter conditionals — evaluated FIRST so a dropped branch takes its {{#menu}} loops and
+        //    {{param:…}} tokens with it (they are never rendered). This is what lets ONE template serve
+        //    several variants (e.g. a public vs. members area, switched by a per-page parameter value).
+        layoutHtml = ApplyConditionals(layoutHtml, paramValues);
 
         // 1) Per-item loops with custom markup (hierarchy-aware: a node with children is wrapped so
         //    its sub-items render as a dropdown next to the parent — see .mat-hassub/.mat-sub CSS).
@@ -77,6 +90,39 @@ public static class LayoutRenderer
         if (globals.TryGetValue("content", out var content))
             html = html.Replace("{{content}}", content);
         return html;
+    }
+
+    /// <summary>Resolves {{#if:…}} / {{#ifnot:…}} blocks against the resolved parameter values, keeping
+    /// or dropping each block's body. <c>{{#if:name}}</c> keeps its body when the parameter is "truthy"
+    /// (non-empty and not one of 0/false/off/no); <c>{{#if:name=value}}</c> keeps it on an exact,
+    /// case-insensitive value match. Unknown parameters count as empty/false.</summary>
+    public static string ApplyConditionals(string html, IReadOnlyDictionary<string, string>? paramValues)
+    {
+        if (string.IsNullOrEmpty(html) || html.IndexOf("{{#if", StringComparison.Ordinal) < 0)
+            return html;
+        var vals = paramValues ?? EmptyParams;
+        // Innermost-first isn't required (regex is non-greedy and the closing tag is name-scoped), but a
+        // couple of passes let a kept outer block reveal inner conditionals for evaluation.
+        for (var pass = 0; pass < 4; pass++)
+        {
+            var before = html;
+            html = IfRx.Replace(html, m => Matches(vals, m.Groups[1].Value, m.Groups[2]) ? m.Groups[3].Value : "");
+            html = IfNotRx.Replace(html, m => Matches(vals, m.Groups[1].Value, m.Groups[2]) ? "" : m.Groups[3].Value);
+            if (ReferenceEquals(before, html) || before == html) break;
+        }
+        return html;
+    }
+
+    private static readonly Dictionary<string, string> EmptyParams = new(StringComparer.Ordinal);
+
+    private static bool Matches(IReadOnlyDictionary<string, string> vals, string name, Group value)
+    {
+        var actual = vals.TryGetValue(name, out var v) ? (v ?? "") : "";
+        if (value.Success) // {{#if:name=value}} — exact (case-insensitive) match
+            return string.Equals(actual.Trim(), value.Value.Trim(), StringComparison.OrdinalIgnoreCase);
+        // {{#if:name}} — truthy test
+        var t = actual.Trim();
+        return t.Length > 0 && t is not ("0" or "false" or "off" or "no");
     }
 
     /// <summary>Renders a flat item list as an inline menu: leaf items render as a plain link

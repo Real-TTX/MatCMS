@@ -68,6 +68,19 @@ public class EditModel : PageModel
     [BindProperty] public PageMetaInput Meta { get; set; } = new();
     [BindProperty] public string DataJson { get; set; } = "{}";
 
+    /// <summary>Keeps a per-page template-params value only if it is a JSON object; anything else (blank,
+    /// a typo, a non-object) becomes null so it can never break template rendering.</summary>
+    private static string? NormalizeParamsJson(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.ValueKind == JsonValueKind.Object ? json.Trim() : null;
+        }
+        catch { return null; }
+    }
+
     public class PageMetaInput
     {
         public string Title { get; set; } = "";
@@ -78,11 +91,17 @@ public class EditModel : PageModel
         public bool IsPublished { get; set; }
         public PageAccess Access { get; set; } = PageAccess.Public;
         public string? RequiredRole { get; set; }
+        public int? TemplateId { get; set; }
+        public string? TemplateParamsJson { get; set; }
     }
 
     /// <summary>The member roles a page may require (empty = the members-area is unused). Fed to the
     /// access dropdown in the editor.</summary>
     public List<string> AllRoles { get; private set; } = new();
+
+    /// <summary>Templates a page may render with (the page-template dropdown). Empty selection = the
+    /// site's active template.</summary>
+    public List<Template> AllTemplates { get; private set; } = new();
 
     private static readonly JsonSerializerOptions SchemaOpts = new()
     {
@@ -122,9 +141,12 @@ public class EditModel : PageModel
             CustomCss = page.CustomCss,
             IsPublished = page.IsPublished,
             Access = page.Access,
-            RequiredRole = page.RequiredRole
+            RequiredRole = page.RequiredRole,
+            TemplateId = page.TemplateId,
+            TemplateParamsJson = page.TemplateParamsJson
         };
         AllRoles = await _db.SiteRoles.AsNoTracking().OrderBy(r => r.Name).Select(r => r.Name).ToListAsync();
+        AllTemplates = await _db.Templates.AsNoTracking().OrderBy(t => t.Name).ToListAsync();
 
         await LoadTranslationsAsync(page);
         await LoadSwitcherAsync(page);
@@ -243,6 +265,11 @@ public class EditModel : PageModel
         // flipped back to public does not keep a stale gate.
         page.RequiredRole = Meta.Access == PageAccess.Members && !string.IsNullOrWhiteSpace(Meta.RequiredRole)
             ? Meta.RequiredRole!.Trim() : null;
+        // Per-page template: 0/empty means "use the active template".
+        page.TemplateId = Meta.TemplateId is > 0 ? Meta.TemplateId : null;
+        // Per-page template parameter overrides (JSON object). Kept only if it parses to an object, so a
+        // typo can't poison rendering; blank clears it.
+        page.TemplateParamsJson = NormalizeParamsJson(Meta.TemplateParamsJson);
         page.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
 

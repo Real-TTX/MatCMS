@@ -259,6 +259,39 @@
                             <small class="muted">@T["editor.pageCss.help"]</small>
                         </div>
                         <div class="form-field">
+                            <label>Template</label>
+                            <select name="Meta.TemplateId">
+                                <option value="">— Aktives Template —</option>
+                                @foreach (var t in Model.AllTemplates)
+                                {
+                                    <option value="@t.Id" selected="@(Model.Meta.TemplateId == t.Id ? "selected" : null)">@t.Name</option>
+                                }
+                            </select>
+                            <small class="muted">Leer = aktives Template der Website. So kann diese Seite ein eigenes Design/Menü haben.</small>
+                        </div>
+                        @{
+                            // Declared parameters of the template this page uses (its own, else the active one),
+                            // shown as a hint so the operator knows which keys the JSON below accepts.
+                            var paramTpl = Model.Meta.TemplateId is int ptid
+                                ? Model.AllTemplates.FirstOrDefault(t => t.Id == ptid)
+                                : Model.AllTemplates.FirstOrDefault(t => t.IsActive);
+                            var declaredParams = paramTpl is null
+                                ? new List<MatCMS.Content.TemplateParam>()
+                                : MatCMS.Content.TemplateParams.Schema(paramTpl.ParametersJson);
+                        }
+                        <div class="form-field">
+                            <label>Template-Parameter (JSON)</label>
+                            <textarea name="Meta.TemplateParamsJson" rows="3" spellcheck="false" placeholder='{ "bereich": "intern" }' style="font-family:var(--mono,ui-monospace,monospace);font-size:13px">@Model.Meta.TemplateParamsJson</textarea>
+                            @if (declaredParams.Count > 0)
+                            {
+                                <small class="muted">Überschreibt Parameter dieser Seite. Verfügbar: @string.Join(", ", declaredParams.Select(p => p.Id))</small>
+                            }
+                            else
+                            {
+                                <small class="muted">Überschreibt Template-Parameter nur für diese Seite (z. B. um mit <code>{{#if:…}}</code> ein anderes Menü zu zeigen). Das Template muss Parameter deklarieren.</small>
+                            }
+                        </div>
+                        <div class="form-field">
                             <label>Zugriff</label>
                             <select name="Meta.Access">
                                 <option value="Public" selected="@(Model.Meta.Access == MatCMS.Models.PageAccess.Public ? "selected" : null)">Öffentlich</option>

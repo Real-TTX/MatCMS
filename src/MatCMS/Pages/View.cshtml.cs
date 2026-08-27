@@ -46,6 +46,12 @@ public class ViewModel : PageModel
         }
 
         CurrentPage = page;
+        // A page may render with its own template (SiteContext.ActiveTemplate reads this before the
+        // layout draws). Set before returning so the very first template access picks it up.
+        if (page.TemplateId is int tid) HttpContext.Items["pageTemplate"] = tid;
+        // Per-page template parameter overrides ({{param:…}}/{{#if:…}}), read by Site.ActiveTemplateParams.
+        if (!string.IsNullOrWhiteSpace(page.TemplateParamsJson))
+            HttpContext.Items["pageTemplateParams"] = page.TemplateParamsJson;
         ViewData["Title"] = page.Title;
         ViewData["MetaDescription"] = page.MetaDescription;
         return Page();

@@ -45,6 +45,17 @@ public class Page
 
     public string? MetaDescription { get; set; }
 
+    /// <summary>Optional template this page renders with, overriding the site's active template. Null =
+    /// use the active template. Lets one site run more than one design/menu — e.g. a public area and a
+    /// members-only area with their own navigation — without separate installations.</summary>
+    public int? TemplateId { get; set; }
+
+    /// <summary>Per-page overrides for the (per-page or active) template's parameters, as a JSON object
+    /// (<c>{"bereich":"intern"}</c>). Lets ONE template render differently on this page via {{param:id}}
+    /// and {{#if:id}} — e.g. a members area that reuses the public template but swaps its menu. Empty/null
+    /// = the template's own values apply, so every existing page is unchanged.</summary>
+    public string? TemplateParamsJson { get; set; }
+
     /// <summary>Optional page-specific CSS, injected in a &lt;style&gt; only on this page's response
     /// (so it is naturally scoped to the page — no selector prefixing needed). Admin-entered and
     /// output raw, exactly like the template's CustomCss and the html block.</summary>

@@ -185,6 +185,15 @@ public class SiteContext
                 {
                     _activeTemplate = _db.Templates.AsNoTracking().FirstOrDefault(t => t.Id == pvId);
                 }
+                // Per-page template: a page may render with its own template, set by the page renderer
+                // into HttpContext.Items before the layout draws. This is what lets one site run more
+                // than one design/menu (e.g. a members area with its own navigation).
+                if (_activeTemplate is null
+                    && http?.Items.TryGetValue("pageTemplate", out var pt) == true
+                    && pt is int ptid && ptid > 0)
+                {
+                    _activeTemplate = _db.Templates.AsNoTracking().FirstOrDefault(t => t.Id == ptid);
+                }
                 _activeTemplate ??= _db.Templates.AsNoTracking()
                     .OrderByDescending(t => t.IsActive).ThenBy(t => t.Id)
                     .FirstOrDefault();
@@ -199,6 +208,34 @@ public class SiteContext
                 BodyFont = "Inter",
                 ButtonStyle = "solid"
             };
+        }
+    }
+
+    private IReadOnlyDictionary<string, string>? _activeTemplateParams;
+
+    /// <summary>The active template's resolved parameters ({{param:id}} / {{#if:id}}), with the current
+    /// page's per-page overrides applied on top. This is what lets ONE template render as several
+    /// variants: the page sets e.g. <c>bereich=intern</c> and the template branches on it. Set into
+    /// <c>HttpContext.Items["pageTemplateParams"]</c> by the page renderer (a JSON object of overrides).
+    /// Only declared parameters exist, so a stray override key is ignored.</summary>
+    public IReadOnlyDictionary<string, string> ActiveTemplateParams
+    {
+        get
+        {
+            if (_activeTemplateParams is not null) return _activeTemplateParams;
+            var resolved = MatCMS.Content.TemplateParams.Resolve(ActiveTemplate);
+            var overridesJson = _http.HttpContext?.Items.TryGetValue("pageTemplateParams", out var o) == true
+                ? o as string : null;
+            if (!string.IsNullOrWhiteSpace(overridesJson))
+            {
+                var over = MatCMS.Content.TemplateParams.Values(overridesJson);
+                // Only override declared params, and only with a non-empty value (empty = "leave default").
+                foreach (var kv in over)
+                    if (resolved.ContainsKey(kv.Key) && !string.IsNullOrEmpty(kv.Value))
+                        resolved[kv.Key] = kv.Value;
+            }
+            _activeTemplateParams = resolved;
+            return _activeTemplateParams;
         }
     }
 

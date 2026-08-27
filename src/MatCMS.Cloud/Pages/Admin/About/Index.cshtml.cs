@@ -41,6 +41,16 @@ public class IndexModel : PageModel
     public async Task OnGetAsync(bool check = false)
     {
         DockerReachable = await _docker.IsReachableAsync(HttpContext.RequestAborted);
-        if (check) Check = await _version.CheckAsync(HttpContext.RequestAborted);
+        if (check)
+        {
+            // Force BOTH checks, not just the cloud's own image. The instance-facing release cache
+            // (ReleaseWatcher) otherwise only refreshes on startup and every 30 min, which is exactly
+            // what makes "did my new instance image show up yet?" untestable without a restart. One
+            // click here re-polls the registry, and the next instance heartbeat (~60 s) sees the
+            // result. Both talk to a registry, so — like the self-check — this is on demand, never on
+            // plain page load.
+            await _releases.RefreshAsync(HttpContext.RequestAborted);
+            Check = await _version.CheckAsync(HttpContext.RequestAborted);
+        }
     }
 }

@@ -7,7 +7,7 @@
   "about.runningVersion": "Laufende Version",
   "about.image": "Docker-Image",
   "about.latest": "Neueste Version",
-  "about.checkUpdates": "Auf Updates prüfen",
+  "about.checkUpdates": "Jetzt prüfen (Cloud + Instanzen)",
   "about.upToDate": "aktuell",
   "about.updateAvailable": "Update verfügbar: {0}",
   "about.updateVia": "Die Cloud aktualisiert sich nicht selbst. Auf dem Server das neue Image ziehen und den Container neu starten:",

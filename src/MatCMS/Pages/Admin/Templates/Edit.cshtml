@@ -57,6 +57,13 @@
         new TemplateToken("{{post_attachments}}", T["templates.tok.attachments"]),
     };
     var paramToken = new[] { new TemplateToken("{{param:id}}", T["templates.tokParam"]) };
+    var loginTokens = new[]
+    {
+        new TemplateToken("{{login_form}}", "Anmeldeformular"),
+        new TemplateToken("{{error}}", "Fehlermeldung"),
+        new TemplateToken("{{site_name}}", "Seitenname"),
+        new TemplateToken("{{year}}", "Jahr"),
+    };
 
     var templateFiles = new TemplateFiles(
         T["tplfiles.intro"],
@@ -64,6 +71,8 @@
         {
             new TemplateFile("body.html", "html", T["tplfiles.body.desc"], "LayoutHtml", Model.LayoutHtml,
                 "htmlmixed", bodyTokens, InsertDefault: StarterBody),
+            new TemplateFile("login.html", "html", "Eigene Anmelde-Seite (/anmelden) ohne Kopf/Navigation. Leer = Standard-Login. {{login_form}} wird durch das Formular ersetzt.", "LoginHtml", Model.LoginHtml,
+                "htmlmixed", loginTokens),
             new TemplateFile("article.html", "html", T["tplfiles.article.desc"], "Parts[post]", postValue,
                 "htmlmixed", postTokens, InsertDefault: Model.DefaultPostPart, Baseline: Model.DefaultPostPart),
             new TemplateFile("styles.css", "css", T["tplfiles.styles.desc"], "CustomCss", Model.CustomCss,

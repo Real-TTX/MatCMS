@@ -74,6 +74,17 @@ public class Template
     public string MenuMapJson { get; set; } = "{}";
 
     /// <summary>
+    /// Optional FULL-PAGE HTML for the member login page (<c>/anmelden</c>). When set, that page drops
+    /// the normal site header/nav and renders this instead — so the login can be a landing of its own
+    /// (logo, monogram, counter, a styled login bar), exactly like a bespoke site. The token
+    /// <c>{{login_form}}</c> is replaced by the actual username/password/submit form; <c>{{error}}</c>,
+    /// <c>{{site_name}}</c> and <c>{{year}}</c> are also substituted. The template's CustomCss/CustomJs
+    /// are injected too, so the same styling and scripts (e.g. a counter) are available. Empty = the
+    /// built-in default login card.
+    /// </summary>
+    public string LoginHtml { get; set; } = "";
+
+    /// <summary>
     /// Parameters the template DESIGNER publishes for users to tune (without editing the template):
     /// JSON array [{ id, label, type, options, default }]. Types: text|select|color|number|bool.
     /// Referenced in <see cref="CustomCss"/> / <see cref="LayoutHtml"/> as <c>{{param:id}}</c>.

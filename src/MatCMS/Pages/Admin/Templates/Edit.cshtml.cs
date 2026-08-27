@@ -32,6 +32,7 @@ public class EditModel : PageModel
     [BindProperty] public string? CustomCss { get; set; }
     [BindProperty] public string? CustomJs { get; set; }
     [BindProperty] public string? LayoutHtml { get; set; }
+    [BindProperty] public string? LoginHtml { get; set; }
     [BindProperty] public string? ParametersJson { get; set; }
     [BindProperty] public Dictionary<string, string> MenuMap { get; set; } = new();
     // Per-page-type layout overrides, keyed by part (currently just "post"). Bound from Parts[post].
@@ -75,6 +76,7 @@ public class EditModel : PageModel
         CustomCss = t.CustomCss;
         CustomJs = t.CustomJs;
         LayoutHtml = t.LayoutHtml;
+        LoginHtml = t.LoginHtml;
         ParametersJson = t.ParametersJson;
         IsActive = t.IsActive;
         SchemaVersion = t.SchemaVersion;
@@ -101,7 +103,7 @@ public class EditModel : PageModel
             t.AccentColor, t.SecondaryColor, t.HeadingFont, t.BodyFont, t.ButtonStyle,
             t.HeadingColor, t.TextColor, t.BackgroundColor, t.AltBackground,
             t.ContainerWidth, t.ButtonRadius, t.HeaderBackground, t.HeaderTextColor, t.HeaderPadding,
-            t.CustomCss, t.CustomJs, t.LayoutHtml,
+            t.CustomCss, t.CustomJs, t.LayoutHtml, t.LoginHtml,
             t.MenuMapJson, t.ParametersJson, t.ParamValuesJson,
             t.SchemaVersion, t.PartsJson
         };
@@ -137,6 +139,7 @@ public class EditModel : PageModel
         var css = TemplateFonts.Code(CustomCss);
         var js = TemplateFonts.Code(CustomJs);
         var layout = TemplateFonts.Code(LayoutHtml);
+        var login = TemplateFonts.Code(LoginHtml);
         var parts = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var key in TemplateSchema.KnownParts)
             parts[key] = TemplateFonts.Code(Parts.TryGetValue(key, out var pv) ? pv : "");
@@ -150,6 +153,7 @@ public class EditModel : PageModel
         Check("styles.css", css, TemplateFonts.MaxInlineCode);
         Check("script.js", js, TemplateFonts.MaxInlineCode);
         Check("body.html", layout, TemplateFonts.MaxLayoutHtml);
+        Check("login.html", login, TemplateFonts.MaxLayoutHtml);
         Check("article.html", parts[TemplateSchema.PartPost], TemplateFonts.MaxLayoutHtml);
         Check("maintenance.html", parts[TemplateSchema.PartMaintenance], TemplateFonts.MaxLayoutHtml);
         if (tooLong.Count > 0)
@@ -181,6 +185,7 @@ public class EditModel : PageModel
         t.CustomCss = css;
         t.CustomJs = js;
         t.LayoutHtml = layout;
+        t.LoginHtml = login;
         t.ParametersJson = SanitizeParameters(ParametersJson);
 
         // Persist only slots that actually map to an existing menu.

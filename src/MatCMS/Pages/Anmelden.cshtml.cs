@@ -1,3 +1,4 @@
+using System.Net;
 using MatCMS.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -8,16 +9,49 @@ namespace MatCMS.Pages;
 /// The public "guest area" login. A members-only page redirects unauthenticated visitors here with a
 /// <c>returnUrl</c>; the same login form also lives as the <c>memberlogin</c> block so it can sit on a
 /// landing page. Entirely separate from the admin <c>/login</c> — different scheme, different cookie.
+/// <para>When the active template carries a <see cref="Models.Template.LoginHtml"/>, this page renders
+/// THAT as a full standalone page (no site header/nav), so the login can look like a bespoke landing.</para>
 /// </summary>
 public class AnmeldenModel : PageModel
 {
     private readonly MemberService _members;
-    public AnmeldenModel(MemberService members) => _members = members;
+    private readonly SiteContext _site;
+    public AnmeldenModel(MemberService members, SiteContext site) { _members = members; _site = site; }
 
     public string? Error { get; private set; }
     public string? ReturnUrl { get; private set; }
     public bool LoggedIn { get; private set; }
     public string? MemberName { get; private set; }
+
+    // --- Custom (template-provided) login page ---
+    /// <summary>Non-null when the active template defines a custom login page: the HTML before and
+    /// after the {{login_form}} token, plus the template's CSS/JS to inject.</summary>
+    public bool HasCustom { get; private set; }
+    public string CustomBefore { get; private set; } = "";
+    public string CustomAfter { get; private set; } = "";
+    public string CustomCss { get; private set; } = "";
+    public string CustomJs { get; private set; } = "";
+    public string SiteName => _site.SiteName;
+
+    private void ResolveTemplate()
+    {
+        var login = _site.ActiveTemplate?.LoginHtml;
+        if (string.IsNullOrWhiteSpace(login)) return;
+
+        var errorHtml = string.IsNullOrEmpty(Error) ? "" : $"<div class=\"login-error\">{WebUtility.HtmlEncode(Error)}</div>";
+        var raw = login
+            .Replace("{{error}}", errorHtml)
+            .Replace("{{site_name}}", WebUtility.HtmlEncode(_site.SiteName))
+            .Replace("{{year}}", DateTime.Now.Year.ToString());
+
+        const string token = "{{login_form}}";
+        var idx = raw.IndexOf(token, StringComparison.Ordinal);
+        if (idx >= 0) { CustomBefore = raw[..idx]; CustomAfter = raw[(idx + token.Length)..]; }
+        else { CustomBefore = raw; CustomAfter = ""; }   // no token: form is appended after
+        CustomCss = _site.ActiveTemplate?.CustomCss ?? "";
+        CustomJs = _site.ActiveTemplate?.CustomJs ?? "";
+        HasCustom = true;
+    }
 
     public async Task<IActionResult> OnGetAsync(string? returnUrl = null, bool denied = false)
     {
@@ -26,13 +60,12 @@ public class AnmeldenModel : PageModel
         LoggedIn = member?.Identity?.IsAuthenticated == true;
         MemberName = member?.FindFirst("DisplayName")?.Value ?? member?.Identity?.Name;
 
-        // A logged-in visitor who was bounced here only because their account lacks the page's role.
         if (denied && LoggedIn)
             Error = "Dieses Konto hat keinen Zugriff auf die angeforderte Seite.";
-        // Already logged in and just visiting /anmelden directly → send them on.
         else if (LoggedIn && !denied)
             return Redirect(ReturnUrl ?? "/");
 
+        ResolveTemplate();
         return Page();
     }
 
@@ -44,6 +77,7 @@ public class AnmeldenModel : PageModel
         {
             Error = "Benutzername oder Passwort ist falsch.";
             MemberName = null;
+            ResolveTemplate();
             return Page();
         }
 
@@ -57,8 +91,6 @@ public class AnmeldenModel : PageModel
         return Redirect(Local(returnUrl) ?? "/");
     }
 
-    /// <summary>Only ever return to a local path ("/…" but not "//…") — never an attacker-supplied
-    /// absolute URL.</summary>
     private static string? Local(string? url) =>
         !string.IsNullOrEmpty(url) && url.StartsWith('/') && !url.StartsWith("//")
         && Uri.IsWellFormedUriString(url, UriKind.Relative) ? url : null;

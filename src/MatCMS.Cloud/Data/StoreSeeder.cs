@@ -204,6 +204,87 @@ public static class StoreSeeder
     // Only the values a template carries; no layout. A theme that shipped its own LayoutHtml would
     // override whatever a site had built, which is the one thing a rolled-out design must not do.
 
+    // ---- "Portal": großes zentriertes Logo, Menü als eigene Reihe darunter ----
+    private const string PortalLayout = """
+<header class="pt-head">
+  <a class="pt-logo" href="/">{{logo}}</a>
+  <nav class="pt-nav">{{#menu:primary}}<a href="{{url}}">{{label}}</a>{{/menu:primary}}</nav>
+  {{languages:dropdown}}
+</header>
+<main class="pt-main">{{content}}</main>
+<footer class="pt-foot">
+  <nav class="pt-foot-nav">{{#menu:secondary}}<a href="{{url}}">{{label}}</a>{{/menu:secondary}}</nav>
+  <p class="pt-foot-text">{{footer_text}}</p>
+</footer>
+""";
+
+    private const string PortalCss = """
+.pt-head { background: var(--header-bg, #fff); padding: 28px 16px 0; text-align: center; border-bottom: 1px solid rgba(0,0,0,.06); }
+.pt-logo { display: inline-block; }
+.pt-logo img { height: 92px; width: auto; display: block; margin: 0 auto 14px; }
+.pt-nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 26px; padding: 6px 0 18px; }
+.pt-nav a { color: var(--header-text, #141a2e); text-decoration: none; font-weight: 600; letter-spacing: .01em; padding: 8px 2px; border-bottom: 2px solid transparent; }
+.pt-nav a:hover { border-bottom-color: var(--accent, #3457d5); color: var(--accent, #3457d5); }
+.pt-main { display: block; }
+.pt-foot { background: var(--alt-bg, #f3f5fb); margin-top: 48px; padding: 32px 16px; text-align: center; color: #5b6480; }
+.pt-foot-nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 22px; margin-bottom: 10px; }
+.pt-foot-nav a { color: inherit; text-decoration: none; }
+.pt-foot-nav a:hover { color: var(--accent, #3457d5); }
+.pt-foot-text { margin: 0; font-size: 14px; }
+@media (max-width: 640px) { .pt-logo img { height: 64px; } }
+""";
+
+    // ---- "Vanta": animierter Hintergrund (three.js + Vanta per CDN), Stil über Parameter `effect` ----
+    private const string VantaParams =
+        """[{"id":"effect","label":"Effekt","type":"select","options":"waves,birds,fog,net","default":"waves"}]""";
+
+    private const string VantaLayout = """
+<div id="vanta-bg" class="vanta-bg" aria-hidden="true"></div>
+<header class="vt-head">
+  <a class="vt-brand" href="/">{{logo}}</a>
+  <nav class="vt-nav">{{#menu:primary}}<a href="{{url}}">{{label}}</a>{{/menu:primary}}</nav>
+  {{languages:dropdown}}
+</header>
+<main class="vt-main">{{content}}</main>
+<footer class="vt-foot">
+  <nav class="vt-foot-nav">{{#menu:secondary}}<a href="{{url}}">{{label}}</a>{{/menu:secondary}}</nav>
+  <p>{{footer_text}}</p>
+</footer>
+<script src="https://cdn.jsdelivr.net/npm/three@0.134.0/build/three.min.js"></script>
+{{#if:effect=waves}}<script src="https://cdn.jsdelivr.net/npm/vanta@0.5.24/dist/vanta.waves.min.js"></script>{{/if:effect}}
+{{#if:effect=birds}}<script src="https://cdn.jsdelivr.net/npm/vanta@0.5.24/dist/vanta.birds.min.js"></script>{{/if:effect}}
+{{#if:effect=fog}}<script src="https://cdn.jsdelivr.net/npm/vanta@0.5.24/dist/vanta.fog.min.js"></script>{{/if:effect}}
+{{#if:effect=net}}<script src="https://cdn.jsdelivr.net/npm/vanta@0.5.24/dist/vanta.net.min.js"></script>{{/if:effect}}
+<script>
+(function () {
+  function init() {
+    if (!window.VANTA) return;
+    var fx = ('{{param:effect}}' || 'waves').toUpperCase();
+    if (!VANTA[fx]) return;
+    VANTA[fx]({ el: '#vanta-bg', mouseControls: true, touchControls: true, gyroControls: false, minHeight: 200, minWidth: 200, scale: 1, scaleMobile: 1 });
+  }
+  if (document.readyState !== 'loading') init();
+  else document.addEventListener('DOMContentLoaded', init);
+})();
+</script>
+""";
+
+    private const string VantaCss = """
+.vanta-bg { position: fixed; inset: 0; z-index: -1; }
+body { background: transparent; }
+.vt-head { display: flex; align-items: center; gap: 20px; padding: 16px 22px; background: rgba(255,255,255,.82); backdrop-filter: blur(6px); }
+.vt-brand img { height: 46px; width: auto; display: block; }
+.vt-nav { display: flex; flex-wrap: wrap; gap: 4px 20px; margin-left: auto; }
+.vt-nav a { color: #16202b; text-decoration: none; font-weight: 600; }
+.vt-nav a:hover { color: var(--accent, #2f7de1); }
+.vt-main > .section:first-child, .vt-main > *:first-child { }
+.vt-main .container { background: rgba(255,255,255,.9); border-radius: 14px; }
+.vt-foot { margin-top: 48px; padding: 28px 22px; background: rgba(16,24,32,.82); color: #d6dee6; text-align: center; }
+.vt-foot-nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 20px; margin-bottom: 8px; }
+.vt-foot-nav a { color: inherit; text-decoration: none; }
+.vt-foot-nav a:hover { color: #fff; }
+""";
+
     private static IEnumerable<StoreTemplate> Templates() =>
     [
         new StoreTemplate
@@ -238,6 +319,33 @@ public static class StoreSeeder
             BackgroundColor = "#ffffff", AltBackground = "#f3f7ef",
             ContainerWidth = "1100", ButtonRadius = "10",
             HeaderBackground = "#ffffff", HeaderTextColor = "#1e2b1f", HeaderPadding = "20",
+        },
+        new StoreTemplate
+        {
+            Name = "Portal",
+            Description = "Großes, zentriertes Logo mit Menü darunter — ruhig und repräsentativ, für Startseiten, Vereine und Portale.",
+            AccentColor = "#3457d5", SecondaryColor = "#9aa7c7",
+            HeadingFont = "Geologica", BodyFont = "Inter", ButtonStyle = "solid",
+            HeadingColor = "#141a2e", TextColor = "#2b3350",
+            BackgroundColor = "#ffffff", AltBackground = "#f3f5fb",
+            ContainerWidth = "1080", ButtonRadius = "6",
+            HeaderBackground = "#ffffff", HeaderTextColor = "#141a2e", HeaderPadding = "22",
+            LayoutHtml = PortalLayout, CustomCss = PortalCss,
+            MenuMapJson = """{"primary":"header","secondary":"footer"}""",
+        },
+        new StoreTemplate
+        {
+            Name = "Vanta",
+            Description = "Animierter Hintergrund (three.js + Vanta). Über den Parameter Effekt zwischen Waves, Birds, Fog und Net umschaltbar; Skripte per CDN.",
+            AccentColor = "#2f7de1", SecondaryColor = "#8fb6e6",
+            HeadingFont = "Geologica", BodyFont = "Inter", ButtonStyle = "solid",
+            HeadingColor = "#0f1b28", TextColor = "#22303d",
+            BackgroundColor = "#ffffff", AltBackground = "#eef4fb",
+            ContainerWidth = "1120", ButtonRadius = "8",
+            HeaderBackground = "#ffffff", HeaderTextColor = "#0f1b28", HeaderPadding = "16",
+            LayoutHtml = VantaLayout, CustomCss = VantaCss,
+            MenuMapJson = """{"primary":"header","secondary":"footer"}""",
+            ParametersJson = VantaParams,
         },
     ];
 

@@ -15,7 +15,7 @@ public static class CloudProtocol
     /// <summary>Contract version. Bump on <b>every</b> change to the payloads in this file: the cloud
     /// badges an instance reporting an older one as "veraltet", and both sides read this constant, so
     /// one edit covers both.</summary>
-    public const int Version = 11;
+    public const int Version = 12;
 
     /// <summary>Header carrying the instance's bearer token.</summary>
     public const string TokenHeader = "X-MatCMS-Instance-Token";
@@ -219,6 +219,12 @@ public sealed class InstanceConfig
     /// dropping every notification a site produces.</para>
     /// </summary>
     public string MailTransport { get; set; } = "smtp";
+
+    /// <summary>When true, the instance removes the built-in default <c>admin</c> account — but ONLY if
+    /// it still carries the default password (untouched) AND at least one OTHER Admin remains, so a
+    /// provisioned site can shed its well-known default login without ever risking a lock-out. Default
+    /// false, and an instance that predates the field simply ignores it (the default admin stays).</summary>
+    public bool RemoveDefaultAdmin { get; set; }
 }
 
 /// <summary>

@@ -157,6 +157,13 @@ public class Profile
     /// </summary>
     public bool SyncBackup { get; set; }
     public bool SyncUsers { get; set; }
+
+    /// <summary>Let the instance drop the built-in default <c>admin</c>/<c>admin</c> login once a real
+    /// admin exists. Guarded on the instance side (default password still set + another Admin present),
+    /// so it can never lock anyone out. Opt-in, and independent of the add-only user rollout — the point
+    /// is to shed the well-known default after provisioning your own account.</summary>
+    public bool RemoveDefaultAdmin { get; set; }
+
     public bool SyncPlugins { get; set; }
     public bool SyncComponents { get; set; }
     public bool SyncTemplates { get; set; }

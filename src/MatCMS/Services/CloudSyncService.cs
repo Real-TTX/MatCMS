@@ -1,6 +1,7 @@
 using MatCMS.Data;
 using MatCMS.Models;
 using MatCMS.Shared;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 namespace MatCMS.Services;
 
@@ -208,6 +209,11 @@ public class CloudSyncService
                 else ReportSkippedOnce("user", config.Users.Select(u => u.Username));
             }
 
+            // Opt-in: shed the built-in default admin once the site has its own. Runs regardless of the
+            // user rollout (a real admin may already exist), but only ever removes under two guards.
+            if (config.RemoveDefaultAdmin)
+                await RemoveDefaultAdminAsync(ct);
+
             if (config.Components is not null)
             {
                 var plan = Plan(PayloadComponents, config.ComponentsMode, seeded);
@@ -380,6 +386,44 @@ public class CloudSyncService
 
         await SaveAsync(ct);
         return count;
+    }
+
+    /// <summary>Opt-in cleanup of the built-in default <c>admin</c>/<c>admin</c> login. Removes it ONLY
+    /// when both guards hold, otherwise it does nothing and says why:
+    /// <list type="number">
+    /// <item>the account "admin" still carries the DEFAULT password (untouched) — a real admin who set
+    ///   their own password, even under the name "admin", is never removed; and</item>
+    /// <item>at least one OTHER Admin account remains afterwards — so this can never lock a site out,
+    ///   the same invariant that makes the whole user sync add-only.</item>
+    /// </list>
+    /// Idempotent: once the default is gone (or was never the default), later applies are no-ops.</summary>
+    private async Task RemoveDefaultAdminAsync(CancellationToken ct)
+    {
+        var admin = await _db.Users.FirstOrDefaultAsync(u => u.Username == "admin", ct);
+        if (admin is null) return; // already removed, or this site never had it
+
+        // Still the seeded default password? If the operator changed it, leave the account alone.
+        var check = new PasswordHasher<User>().VerifyHashedPassword(admin, admin.PasswordHash, "admin");
+        if (check is not (PasswordVerificationResult.Success or PasswordVerificationResult.SuccessRehashNeeded))
+        {
+            Report("user", "admin", "skipped-changed");
+            return;
+        }
+
+        // Never leave the site without an admin.
+        var otherAdmins = await _db.Users.CountAsync(u => u.Role == "Admin" && u.Username != "admin", ct);
+        if (otherAdmins == 0)
+        {
+            Report("user", "admin", "skipped-noalt");
+            return;
+        }
+
+        if (!_dryRun)
+        {
+            _db.Users.Remove(admin);
+            await SaveAsync(ct);
+        }
+        Report("user", "admin", "removed");
     }
 
     // --- Components ---------------------------------------------------------

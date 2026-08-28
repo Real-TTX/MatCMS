@@ -62,6 +62,8 @@
   "profiles.mode.add.hint": "Es wird nur ergänzt, was auf der Instanz fehlt. Vorhandenes bleibt unverändert.",
   "profiles.mode.once.hint": "Wird einmal vollständig ausgerollt und danach nie wieder angefasst — auch nicht bei späteren Änderungen am Profil.",
   "profiles.usersAddOnly": "Benutzer werden grundsätzlich nur ergänzt — bestehende Konten auf der Instanz werden nie geändert oder gelöscht.",
+  "profiles.removeDefaultAdmin": "Standard-Admin (admin) entfernen",
+  "profiles.removeDefaultAdmin.hint": "Entfernt den eingebauten Login admin/admin — aber nur, wenn er noch das Standard-Kennwort hat UND ein anderer Admin existiert. So kann kein Aussperren passieren. Ideal, um nach dem Ausrollen des eigenen Admins den Standard-Login loszuwerden.",
   "profiles.tabGeneral": "Allgemein",
   "profiles.tabSettings": "Einstellungen",
   "profiles.tabUsers": "Benutzer",

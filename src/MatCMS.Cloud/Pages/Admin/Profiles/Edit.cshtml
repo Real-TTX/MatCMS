@@ -178,6 +178,12 @@
                 </div>
             }
             <div class="help">@T["profiles.usersAddOnly"]</div>
+
+            <label class="checkbox-row" style="margin-top:10px;">
+                <input type="checkbox" name="removeDefaultAdmin" value="true" checked="@(Model.Item.RemoveDefaultAdmin ? "checked" : null)" />
+                @T["profiles.removeDefaultAdmin"]
+            </label>
+            <div class="help">@T["profiles.removeDefaultAdmin.hint"]</div>
         </div>
 
         <div class="list-actions">

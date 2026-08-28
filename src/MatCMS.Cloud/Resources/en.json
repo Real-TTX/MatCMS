@@ -62,6 +62,8 @@
   "profiles.mode.add.hint": "Only what is missing on the instance gets added. Anything already there stays as it is.",
   "profiles.mode.once.hint": "Rolled out in full once and never touched again — not even when the profile changes later.",
   "profiles.usersAddOnly": "Users are always add-only — existing accounts on the instance are never changed or deleted.",
+  "profiles.removeDefaultAdmin": "Remove default admin (admin)",
+  "profiles.removeDefaultAdmin.hint": "Removes the built-in admin/admin login — but only if it still has the default password AND another admin exists. This can never lock anyone out. Ideal for shedding the default login after rolling out your own admin.",
   "profiles.tabGeneral": "General",
   "profiles.tabSettings": "Settings",
   "profiles.tabUsers": "Users",

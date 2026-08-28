@@ -355,7 +355,7 @@ public class EditModel : PageModel
         int id, string name, string? description, bool autoApprove, bool isDefault,
         bool autoUpdateLocal, bool notifyOffline, bool notifyUpdate, string? notifyRecipients,
         bool syncSettings, bool syncUsers, bool syncPlugins, bool syncComponents, bool syncTemplates,
-        bool syncMailTemplates,
+        bool syncMailTemplates, bool removeDefaultAdmin,
         string? settingsMode, string? usersMode, string? pluginsMode, string? componentsMode, string? templatesMode,
         string? mailTemplatesMode,
         string? activateTemplateName,
@@ -387,6 +387,7 @@ public class EditModel : PageModel
         profile.NotifyRecipients = string.IsNullOrWhiteSpace(notifyRecipients) ? null : notifyRecipients.Trim();
         profile.SyncSettings = syncSettings;
         profile.SyncUsers = syncUsers;
+        profile.RemoveDefaultAdmin = removeDefaultAdmin;
         profile.SyncPlugins = syncPlugins;
         profile.SyncComponents = syncComponents;
         profile.SyncTemplates = syncTemplates;

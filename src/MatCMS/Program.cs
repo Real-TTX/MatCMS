@@ -358,6 +358,44 @@ app.Use(async (ctx, next) =>
     }.Where(o => o is not null).Distinct().ToList();
     ctx.Response.Headers["Content-Security-Policy"] =
         allowed.Count == 0 ? "frame-ancestors 'self'" : $"frame-ancestors 'self' {string.Join(" ", allowed)}";
+
+    // EmbedAuth ZUR LAUFZEIT: im Cloud-iFrame müssen Auth- und Antiforgery-Cookie SameSite=None; Secure
+    // sein, sonst werden sie im fremd-origin Rahmen nie gesetzt und die Anmeldung tut scheinbar nichts.
+    // Bewusst hier per Response-Rewrite statt beim Start (Cookie-Optionen), denn ein Startup-Wert bräuchte
+    // nach dem Ausrollen der Einstellung einen Instanz-Neustart — den die Cloud kaum gezielt auslösen kann.
+    // So genügt die ausgerollte Einstellung site.embedAuth; sie greift ab dem nächsten Request.
+    var embed = site.Get(MatCMS.Services.SettingKeys.EmbedAuth).Trim().ToLowerInvariant()
+        is "1" or "true" or "on" or "yes";
+    if (embed)
+    {
+        // None OHNE Secure lehnt der Browser ab → immer beides. Vorhandenes samesite=… ersetzen.
+        static string CrossSite(string c)
+        {
+            c = System.Text.RegularExpressions.Regex.Replace(c, @";\s*samesite=[^;]*", "",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (!System.Text.RegularExpressions.Regex.IsMatch(c, @";\s*secure(\s*;|\s*$)",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                c += "; secure";
+            return c + "; samesite=none";
+        }
+        ctx.Response.OnStarting(() =>
+        {
+            var sc = ctx.Response.Headers.SetCookie;
+            if (sc.Count > 0)
+            {
+                var outv = new string[sc.Count];
+                for (var i = 0; i < sc.Count; i++)
+                {
+                    var c = sc[i] ?? "";
+                    outv[i] = (c.StartsWith("matcms.auth=", StringComparison.Ordinal)
+                               || c.StartsWith(".AspNetCore.Antiforgery.", StringComparison.Ordinal))
+                        ? CrossSite(c) : c;
+                }
+                ctx.Response.Headers.SetCookie = outv;
+            }
+            return Task.CompletedTask;
+        });
+    }
     await next();
 });
 

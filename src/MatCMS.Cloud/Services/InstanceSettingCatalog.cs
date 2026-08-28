@@ -43,6 +43,8 @@ public static class InstanceSettingCatalog
                 "1 = an. Nötig, wenn ein Proxy die Verschlüsselung beendet: sonst baut die Website alle absoluten Adressen mit http und ein https-Browser weist sie ab."),
             new Entry("site.canonicalUrl", "Kanonische URL",
                 "Pro Website verschieden — als Profilwert nur sinnvoll, wenn wirklich alle Instanzen dieselbe Adresse haben."),
+            new Entry("site.embedAuth", "Login im Cloud-iFrame",
+                "1 = an. Erlaubt die Anmeldung im eingebetteten Cloud-Rahmen (Cookies SameSite=None; Secure). Erfordert HTTPS auf der Instanz; wirkt nach dem nächsten Neustart der Instanz."),
         ]),
         new Group("Kopfleiste", [
             new Entry("TopBarLink1Text", "Link 1: Text"),

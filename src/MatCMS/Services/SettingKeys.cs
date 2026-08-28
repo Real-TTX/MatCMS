@@ -50,6 +50,13 @@ public static class SettingKeys
     /// </summary>
     public const string BehindHttpsProxy = "site.behindHttpsProxy";
 
+    /// <summary>"1" = this instance is meant to be logged into inside the cloud admin's iframe, so its
+    /// auth and antiforgery cookies switch to <c>SameSite=None; Secure</c>. A SETTING, not only the old
+    /// <c>MatCms:EmbedAuth</c> env var, so the cloud can roll it out per profile — no container env
+    /// editing. Requires HTTPS (a None cookie without Secure is rejected); a change takes effect on the
+    /// next instance start, which the cloud can trigger for the instances it manages.</summary>
+    public const string EmbedAuth = "site.embedAuth";
+
     // "1" once the setup wizard has been completed (drives the dashboard prompt).
     public const string SetupComplete = "setup.complete";
 

@@ -81,10 +81,29 @@ builder.Services.AddDataProtection()
 // When this instance is meant to be logged into INSIDE the cloud admin's iframe, its login lives in
 // a CROSS-ORIGIN frame. A SameSite=Lax cookie is neither sent nor set there, so the auth AND the
 // antiforgery cookie have to be SameSite=None; Secure to survive — otherwise the login POST looks
-// like it does nothing and the frame stays blank. Opt-in on purpose (MatCms:EmbedAuth): None demands
-// Secure, so it REQUIRES the instance to be served over HTTPS; turning it on for a plain-http/local
-// site would break login instead of fixing it. Off = the previous Lax behaviour, unchanged.
-bool.TryParse(builder.Configuration["MatCms:EmbedAuth"], out var embedAuth);
+// like it does nothing and the frame stays blank. None demands Secure, so it REQUIRES the instance to
+// be served over HTTPS; turning it on for a plain-http/local site would break login instead of fixing
+// it. Off = the previous Lax behaviour, unchanged.
+// Read from the SETTINGS TABLE (roll-out-able from a cloud profile — no container env var, which is the
+// whole point: the cloud that manages these instances can turn it on for a fleet). The env var
+// MatCms:EmbedAuth stays as an optional override that wins when present. Read here at startup, exactly
+// like the default language above, because the cookie options are built now; a change needs a restart,
+// which the cloud can trigger for the instances it created.
+bool embedAuth;
+if (bool.TryParse(builder.Configuration["MatCms:EmbedAuth"], out var embedAuthEnv))
+    embedAuth = embedAuthEnv;
+else
+{
+    var v = "";
+    try
+    {
+        var opts = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connectionString).Options;
+        using var probe = new AppDbContext(opts);
+        v = probe.SiteSettings.AsNoTracking().FirstOrDefault(s => s.Key == SettingKeys.EmbedAuth)?.Value ?? "";
+    }
+    catch { /* fresh DB / not migrated yet → default off */ }
+    embedAuth = v.Trim().ToLowerInvariant() is "1" or "true" or "on" or "yes";
+}
 
 // --- Authentication: cookie based, login only via /login ---
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)

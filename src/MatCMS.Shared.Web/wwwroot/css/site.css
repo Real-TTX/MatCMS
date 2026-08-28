@@ -185,6 +185,9 @@ h1, h2, h3, h4 {
     top: calc(100% + 8px);
     right: 0;
     min-width: 190px;
+    /* Never spill past the viewport edge (narrow screens / button near the corner) — the menu is
+       right-anchored, so without this it could run off the left instead of staying readable. */
+    max-width: calc(100vw - 24px);
     background: #fff;
     border: 1px solid var(--line, #e2e4e8);
     border-radius: 12px;
@@ -737,9 +740,14 @@ h1, h2, h3, h4 {
     .main-nav a::after { display: none; }
     .nav-toggle:checked ~ .main-nav { display: flex; }
     .lang-switch { padding: 12px 0 0; margin: 0; border-left: none; }
-    /* Fallback dropdown inside the collapsed mobile nav: own row, menu opens in-flow (no clipping). */
-    .mat-lang { margin: 12px 0 0; align-self: flex-start; }
-    .mat-lang-menu { position: static; margin-top: 8px; box-shadow: none; }
+    /* Fallback dropdown inside the collapsed mobile nav: own row, menu opens in-flow (no clipping).
+       ONLY the inline switcher (in the nav / placed via {{languages:dropdown}}) — NOT the fixed
+       overlay: making the overlay's menu static detached it from its button, so it opened somewhere
+       else entirely. The overlay keeps its absolute, button-anchored menu on every screen size. */
+    .mat-lang:not(.mat-lang--overlay) { margin: 12px 0 0; align-self: flex-start; }
+    .mat-lang:not(.mat-lang--overlay) .mat-lang-menu { position: static; margin-top: 8px; box-shadow: none; }
+    /* The overlay moves tighter into the corner on small screens so it clears a burger/logo. */
+    .mat-lang--overlay { top: 12px; right: 12px; }
 
     .columns-grid.cols-2,
     .columns-grid.cols-3,

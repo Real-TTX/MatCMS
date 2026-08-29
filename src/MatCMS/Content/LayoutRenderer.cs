@@ -45,7 +45,15 @@ public static class LayoutRenderer
         // 0) Parameter conditionals — evaluated FIRST so a dropped branch takes its {{#menu}} loops and
         //    {{param:…}} tokens with it (they are never rendered). This is what lets ONE template serve
         //    several variants (e.g. a public vs. members area, switched by a per-page parameter value).
-        layoutHtml = ApplyConditionals(layoutHtml, paramValues);
+        //    Two language PSEUDO-params ride along so a template can branch on how many languages a site
+        //    offers: {{#if:multilingual}}…{{/if:multilingual}} and {{#if:langcount=3}}… — no real
+        //    parameter needed, it comes from the switcher data itself.
+        var langCount = (languages ?? Array.Empty<LangLink>()).Count;
+        var condVals = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (paramValues is not null) foreach (var kv in paramValues) condVals[kv.Key] = kv.Value;
+        condVals["langcount"] = langCount.ToString();
+        condVals["multilingual"] = langCount > 1 ? "1" : "";
+        layoutHtml = ApplyConditionals(layoutHtml, condVals);
 
         // 1) Per-item loops with custom markup (hierarchy-aware: a node with children is wrapped so
         //    its sub-items render as a dropdown next to the parent — see .mat-hassub/.mat-sub CSS).
@@ -79,6 +87,14 @@ public static class LayoutRenderer
         html = html.Replace("{{languages:flags}}", langs.Count > 1 ? RenderLangDropdown(langs, flags: true) : "");
         html = html.Replace("{{languages:dropdown}}", langs.Count > 1 ? RenderLangDropdown(langs) : "");
         html = html.Replace("{{languages}}", langs.Count > 1 ? DefaultLangs(langs) : "");
+        // A flag BUTTON that opens a DIALOG (centered on desktop, full-screen on mobile). Touch-friendly
+        // and — unlike a dropdown — never clipped by a header/overflow. The TRIGGER's look is chosen by
+        // a template parameter "langstyle": "flag" (flag only) / "code" (DE/EN…) / else flag+code.
+        var langStyle = condVals.TryGetValue("langstyle", out var lst) ? lst : "";
+        html = html.Replace("{{languages:modal}}", langs.Count > 1 ? RenderLangModal(langs, langStyle) : "");
+        // The number of available languages — for a template that wants to show/decide something itself
+        // ("… in 4 Sprachen"). Rendered even for a single-language site (then "1").
+        html = html.Replace("{{languages:count}}", langs.Count.ToString());
 
         // 3) Global placeholders — everything except {{content}} first, then the page content last
         //    (so block HTML isn't itself scanned for placeholders).
@@ -169,6 +185,9 @@ public static class LayoutRenderer
         tpl.Replace("{{locale}}", WebUtility.HtmlEncode(l.Locale))
            .Replace("{{label}}", WebUtility.HtmlEncode(l.Locale.ToUpperInvariant()))
            .Replace("{{url}}", WebUtility.HtmlEncode(l.Url))
+           // The flag as an inline-SVG image, so a template's own {{#languages}} loop can show flags
+           // (include {{flag}} to show them, leave it out for text-only). Same artwork as the dropdown.
+           .Replace("{{flag}}", FlagSvg(l.Locale))
            .Replace("{{current}}", l.IsCurrent ? " class=\"lang-current\" aria-current=\"true\"" : "");
 
     private static string DefaultLangs(IReadOnlyList<LangLink> langs)
@@ -217,6 +236,49 @@ public static class LayoutRenderer
               .Append("</a>");
         }
         sb.Append("</div></div>");
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// A flag button that opens a DIALOG with the language list (centered on desktop, full-screen on
+    /// mobile via CSS). Toggled by wwwroot/js/lang-switch.js. Rendered empty on a single-language site.
+    /// The clean answer to "the floating switcher collides / the dropdown gets clipped": a modal never
+    /// does, and on touch it is far easier to hit than a dropdown item.
+    /// </summary>
+    /// <param name="style">Trigger look: "flag" (flag only) · "code" (DE/EN…, no flag) · anything else =
+    /// flag + code. The dialog LIST always shows flag + name + code, so the choice is only about the
+    /// current-language button.</param>
+    public static string RenderLangModal(IReadOnlyList<LangLink> langs, string style = "")
+    {
+        if (langs.Count < 2) return "";
+        var current = langs.FirstOrDefault(l => l.IsCurrent) ?? langs[0];
+        string Enc(string s) => WebUtility.HtmlEncode(s);
+        style = (style ?? "").Trim().ToLowerInvariant();
+        var showFlag = style != "code";
+        var showCode = style != "flag";
+
+        var sb = new StringBuilder();
+        sb.Append("<div class=\"mat-langm").Append(showCode ? "" : " mat-langm--flagonly").Append("\" data-mat-langm>");
+        sb.Append("<button type=\"button\" class=\"mat-langm-btn\" data-mat-langm-open aria-haspopup=\"dialog\" aria-expanded=\"false\" aria-label=\"Language\">");
+        if (showFlag) sb.Append(FlagSvg(current.Locale));
+        if (showCode) sb.Append("<span class=\"mat-langm-cur\">").Append(Enc(current.Locale.ToUpperInvariant())).Append("</span>");
+        sb.Append("</button>");
+        sb.Append("<div class=\"mat-langm-overlay\" data-mat-langm-overlay hidden>");
+        sb.Append("<div class=\"mat-langm-dialog\" role=\"dialog\" aria-modal=\"true\">");
+        sb.Append("<button type=\"button\" class=\"mat-langm-close\" data-mat-langm-close aria-label=\"×\">")
+          .Append("<svg viewBox=\"0 0 24 24\" width=\"22\" height=\"22\" fill=\"none\" stroke=\"currentColor\" ")
+          .Append("stroke-width=\"2\" stroke-linecap=\"round\" aria-hidden=\"true\"><path d=\"M6 6l12 12M18 6L6 18\"/></svg></button>");
+        sb.Append("<div class=\"mat-langm-list\">");
+        foreach (var l in langs)
+        {
+            sb.Append("<a href=\"").Append(Enc(l.Url)).Append('"')
+              .Append(l.IsCurrent ? " class=\"is-current\" aria-current=\"true\"" : "").Append('>');
+            sb.Append(FlagSvg(l.Locale)); // the list always shows flags; only the trigger style varies
+            sb.Append("<span class=\"mat-langm-name\">").Append(Enc(MatCMS.Services.Localizer.DisplayName(l.Locale))).Append("</span>");
+            sb.Append("<span class=\"mat-langm-code\">").Append(Enc(l.Locale.ToUpperInvariant())).Append("</span>")
+              .Append("</a>");
+        }
+        sb.Append("</div></div></div></div>");
         return sb.ToString();
     }
 

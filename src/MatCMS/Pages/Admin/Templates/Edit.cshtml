@@ -45,6 +45,11 @@
         new TemplateToken("{{#menu:primary}}…{{/menu:primary}}", T["templates.tokMenuLoop"]),
         new TemplateToken("{{param:id}}", T["templates.tokParam"]),
         new TemplateToken("{{languages}}", T["templates.tokLanguages"]),
+        new TemplateToken("{{languages:dropdown}}", T["templates.tokLanguagesDropdown"]),
+        new TemplateToken("{{languages:flags}}", T["templates.tokLanguagesFlags"]),
+        new TemplateToken("{{languages:modal}}", T["templates.tokLanguagesModal"]),
+        new TemplateToken("{{#languages}}<a href=\"{{url}}\"{{current}}>{{flag}} {{label}}</a>{{/languages}}", T["templates.tokLanguagesLoop"]),
+        new TemplateToken("{{languages:count}}", T["templates.tokLanguagesCount"]),
     };
     var postTokens = new[]
     {

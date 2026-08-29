@@ -235,6 +235,51 @@ h1, h2, h3, h4 {
     background: rgba(255, 255, 255, .94);
 }
 
+/* ---------- Language switcher: MODAL variant ({{languages:modal}}) ---------- */
+/* A flag button that opens a real dialog. Centered card on desktop, full-screen on mobile — never
+   clipped by a header/overflow, and a big touch target instead of a fiddly dropdown row. */
+.mat-langm { display: inline-flex; align-items: center; }
+.mat-langm-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    border: 1px solid var(--line, #e2e4e8); background: #fff; color: var(--ink, #222);
+    border-radius: 999px; padding: 6px 12px; cursor: pointer;
+    font-family: inherit; font-size: 13px; font-weight: 600; letter-spacing: .06em; line-height: 1;
+}
+.mat-langm-btn:hover { border-color: var(--accent); color: var(--accent); }
+.mat-langm-btn .mat-lang-flag { border-radius: 3px; box-shadow: 0 0 0 1px rgba(0,0,0,.08); }
+html.mat-langm-lock { overflow: hidden; }
+.mat-langm-overlay {
+    position: fixed; inset: 0; z-index: 2000;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+    background: rgba(15, 23, 32, .55); backdrop-filter: blur(2px);
+}
+/* display:flex above beats the [hidden] UA rule — without this the closed, invisible overlay still
+   covers the viewport (inset:0) and swallows every click on the page. */
+.mat-langm-overlay[hidden] { display: none; }
+.mat-langm-dialog {
+    position: relative; width: 100%; max-width: 360px;
+    background: #fff; border-radius: 16px; box-shadow: 0 24px 64px rgba(0, 0, 0, .3);
+    padding: 20px; max-height: calc(100vh - 40px); overflow: auto;
+}
+.mat-langm-close {
+    position: absolute; top: 12px; right: 12px; width: 36px; height: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 0; background: transparent; color: var(--muted, #6b7280); cursor: pointer; border-radius: 8px;
+}
+.mat-langm-close:hover { background: var(--bg-alt, #f4f5f7); color: var(--ink, #222); }
+/* Clear the absolute ✕ (top:12px, 36px tall) so it never overlaps the first language row. */
+.mat-langm-list { display: flex; flex-direction: column; gap: 4px; margin-top: 34px; }
+.mat-langm-list a {
+    display: flex; align-items: center; gap: 12px; padding: 13px 12px; border-radius: 10px;
+    text-decoration: none; color: var(--ink, #222); font-size: 16px;
+}
+.mat-langm-list a::after { display: none; }
+.mat-langm-list a:hover { background: var(--bg-alt, #f4f5f7); }
+.mat-langm-list a.is-current { color: var(--accent); font-weight: 700; }
+.mat-langm-list .mat-lang-flag { border-radius: 3px; box-shadow: 0 0 0 1px rgba(0,0,0,.08); flex: 0 0 auto; }
+.mat-langm-name { flex: 1; }
+.mat-langm-code { font-size: 12px; font-weight: 600; letter-spacing: .06em; color: var(--muted, #6b7280); }
+
 /* Mobile nav toggle */
 .nav-toggle, .nav-toggle-label { display: none; }
 
@@ -746,8 +791,17 @@ h1, h2, h3, h4 {
        else entirely. The overlay keeps its absolute, button-anchored menu on every screen size. */
     .mat-lang:not(.mat-lang--overlay) { margin: 12px 0 0; align-self: flex-start; }
     .mat-lang:not(.mat-lang--overlay) .mat-lang-menu { position: static; margin-top: 8px; box-shadow: none; }
-    /* The overlay moves tighter into the corner on small screens so it clears a burger/logo. */
-    .mat-lang--overlay { top: 12px; right: 12px; }
+    /* On mobile the burger sits top-right — so the floating FALLBACK overlay must get out of its way:
+       park it bottom-right and open its menu upward. (The clean answer is to place
+       {{languages:dropdown}} in the template header so it integrates and no overlay is injected at all.) */
+    .mat-lang--overlay { top: auto; bottom: 14px; right: 14px; }
+    .mat-lang--overlay .mat-lang-menu { top: auto; bottom: calc(100% + 8px); }
+    /* Modal variant on mobile: full-screen sheet, and the trigger shrinks to a compact flag chip so it
+       fits next to a burger. */
+    .mat-langm-overlay { padding: 0; }
+    .mat-langm-dialog { max-width: none; height: 100vh; max-height: 100vh; border-radius: 0; padding: 26px 20px; }
+    .mat-langm-btn { padding: 7px 9px; gap: 0; }
+    .mat-langm-btn .mat-langm-cur { display: none; }
 
     .columns-grid.cols-2,
     .columns-grid.cols-3,

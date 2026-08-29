@@ -24,3 +24,6 @@ src/*/appdata/
 
 # Scratch files left behind by tooling (review diffs etc.)
 *.diff.tmp
+
+# local scratch work (never committed)
+.tmpwork/

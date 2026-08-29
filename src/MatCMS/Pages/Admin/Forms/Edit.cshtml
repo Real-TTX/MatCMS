@@ -153,6 +153,18 @@
                             <textarea name="Settings.NotifyEmails" rows="2" placeholder="@T["forms.notifyPlaceholder"]">@Model.Settings.NotifyEmails</textarea>
                             <div class="help">@T["forms.notifyEmailsHelp"]</div>
                         </div>
+                        <div class="form-field">
+                            <label>@T["forms.spam.label"]</label>
+                            @{ var sl = Model.Settings.SpamLevel; }
+                            <select name="Settings.SpamLevel">
+                                <option value="-1" selected="@(sl == -1)">@T["forms.spam.inherit"]</option>
+                                <option value="0" selected="@(sl == 0)">@T["forms.spam.off"]</option>
+                                <option value="1" selected="@(sl == 1)">@T["forms.spam.l1"]</option>
+                                <option value="2" selected="@(sl == 2)">@T["forms.spam.l2"]</option>
+                                <option value="3" selected="@(sl == 3)">@T["forms.spam.l3"]</option>
+                            </select>
+                            <div class="help">@T["forms.spam.help"]</div>
+                        </div>
                         <div><button type="submit" class="btn btn-sm">@T["action.save"]</button></div>
                     </form>
                 </details>

@@ -333,6 +333,30 @@
                 <form method="post" action="@(ViewContext.HttpContext.Request.Path)?handler=Form" class="form-fields">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="__formSlug" value="@Model.Slug" />
+                    @if (Model.SpamLevel > 0)
+                    {
+                        @* Honeypot: pushed off-screen (NOT display:none — some bots skip hidden inputs),
+                           labelled to look real and tempting to a form-filler bot. A human never sees it. *@
+                        <div class="mat-hp" aria-hidden="true" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden">
+                            <label>Website (nicht ausfüllen)
+                                <input type="text" name="@MatCMS.Services.FormGuard.HoneypotField" tabindex="-1" autocomplete="off" value="" />
+                            </label>
+                        </div>
+                        <input type="hidden" name="@MatCMS.Services.FormGuard.TokenField" value="@Model.GuardToken" />
+                        <input type="hidden" name="@MatCMS.Services.FormGuard.InteractionField" value="" />
+                        @if (Model.SpamLevel >= 2)
+                        {
+                            <input type="hidden" name="@MatCMS.Services.FormGuard.PowField" value="" />
+                        }
+                        @if (Model.SpamLevel >= 3)
+                        {
+                            <div class="form-field" data-el="__captcha">
+                                <label for="fld___fc">@T["form.captchaQuestion"] @Model.CaptchaA + @Model.CaptchaB? <span class="req">*</span></label>
+                                <input class="mat-input" type="text" inputmode="numeric" pattern="[0-9]*" id="fld___fc"
+                                       name="@MatCMS.Services.FormGuard.CaptchaField" autocomplete="off" required data-required="1" />
+                            </div>
+                        }
+                    }
                     @foreach (var el in Model.Elements)
                     {
                         @renderElement(el)
@@ -397,6 +421,70 @@
                 e.preventDefault();
             }
         });
+
+        @if (Model.SpamLevel > 0 && !Model.Preview)
+        {
+            <text>
+            // ---- Spam guard -------------------------------------------------------------------------
+            // Invisible level-1 signals plus (level 2) a background proof-of-work. The interaction proof
+            // is what tells the server a browser — not a script — filled this in.
+            (function () {
+                var formEl = root.querySelector("form.form-fields");
+                if (!formEl) return;
+                var nonce = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.GuardNonce));
+                var iField = formEl.querySelector("input[name='@MatCMS.Services.FormGuard.InteractionField']");
+                var armed = false;
+                function arm() { if (armed || !iField) return; armed = true; iField.value = nonce; }
+                ["keydown", "pointerdown", "touchstart", "focusin", "change"].forEach(function (ev) {
+                    root.addEventListener(ev, arm, { passive: true });
+                });
+
+                // Proof-of-work (level >= 2): find a nonce whose SHA-256(challenge:nonce) has enough
+                // leading zero bits. Runs in the background right after load, so it is almost always
+                // finished by the time a human has filled the form; if not, submit waits for it.
+                var powBits = @Model.PowBits;
+                var powField = formEl.querySelector("input[name='@MatCMS.Services.FormGuard.PowField']");
+                var powReady = !(powBits > 0 && powField);
+                if (powBits > 0 && powField && window.crypto && crypto.subtle) {
+                    (async function () {
+                        var challenge = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Challenge));
+                        var enc = new TextEncoder();
+                        for (var i = 0; ; i++) {
+                            var buf = await crypto.subtle.digest("SHA-256", enc.encode(challenge + ":" + i));
+                            if (lz(new Uint8Array(buf)) >= powBits) { powField.value = "" + i; break; }
+                        }
+                        powReady = true;
+                    })();
+                } else { powReady = true; }
+                function lz(h) {
+                    // Bit maths deliberately avoids the less-than and shift operators so the Razor
+                    // markup parser in this .cshtml never mistakes one for the start of a tag.
+                    var c = 0;
+                    for (var k = 0; h.length > k; k++) {
+                        var b = h[k];
+                        if (b === 0) { c += 8; continue; }
+                        for (var j = 7; j >= 0; j--) { if ((b & (128 >> (7 - j))) === 0) c++; else return c; }
+                        break;
+                    }
+                    return c;
+                }
+
+                formEl.addEventListener("submit", function (e) {
+                    arm(); // a user who only clicked "Absenden" still counts as interaction
+                    if (powReady) return;
+                    e.preventDefault();
+                    var btn = formEl.querySelector("button[type=submit]");
+                    if (btn) btn.disabled = true;
+                    var iv = setInterval(function () {
+                        if (!powReady) return;
+                        clearInterval(iv);
+                        if (btn) btn.disabled = false;
+                        formEl.submit();
+                    }, 120);
+                });
+            })();
+            </text>
+        }
 
         @if (Model.Builder)
         {

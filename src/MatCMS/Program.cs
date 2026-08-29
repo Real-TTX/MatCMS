@@ -185,6 +185,10 @@ builder.Services.AddHttpClient();
 builder.Services.AddSingleton<ThumbnailService>();
 builder.Services.AddScoped<VersionService>();
 builder.Services.AddScoped<EmailService>();
+// Self-hosted form anti-spam (honeypot + signed timing + PoW + captcha). Stateless apart from the
+// per-IP rate-limit counter it keeps in the shared memory cache, so one instance for the whole app.
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<FormGuard>();
 builder.Services.AddScoped<TranslationService>();
 builder.Services.AddSingleton<PluginRegistry>();
 builder.Services.AddScoped<PluginRunner>();

@@ -60,6 +60,11 @@ public static class SettingKeys
     // "1" once the setup wizard has been completed (drives the dashboard prompt).
     public const string SetupComplete = "setup.complete";
 
+    /// <summary>Site-wide DEFAULT anti-spam level for forms ("0".."3"; empty = "1"). A form may override
+    /// it with its own <c>Form.SpamLevel</c>. A SETTING (not env) so the cloud can roll one policy out to
+    /// a whole fleet — see <see cref="FormGuard"/>. 0 off, 1 invisible, 2 +proof-of-work, 3 +captcha.</summary>
+    public const string AntiSpamLevel = "antispam.level";
+
     // Maintenance / "coming soon" mode (Settings → Wartung). When on, public visitors get a themed
     // maintenance page (HTTP 503); admins bypass it. Title/message are editable here; the standard page
     // uses the active template's colours and can be overridden via its "maintenance.html" layout part.
@@ -129,7 +134,7 @@ public static class SettingKeys
     public static readonly string[] All =
     [
         CanonicalUrl, BehindHttpsProxy, SiteName, LogoUrl, FaviconUrl,
-        FooterText, ContactRecipient
+        FooterText, ContactRecipient, AntiSpamLevel
     ];
 
     /// <summary>SMTP setting keys (managed on the Settings → SMTP tab).</summary>

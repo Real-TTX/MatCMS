@@ -3,6 +3,8 @@
 @model MatCMS.Content.BlockData
 @inject MatCMS.Data.AppDbContext Db
 @inject MatCMS.Services.Localizer T
+@inject MatCMS.Services.FormGuard Guard
+@inject MatCMS.Services.SiteContext Site
 @{
     var slug = Model.Str("form");
     var form = string.IsNullOrWhiteSpace(slug)
@@ -52,6 +54,21 @@ else
             }
         }
     }
+    // Anti-spam: the form's own level, or the site-wide default (antispam.level, empty = 1). Issued
+    // per render, because the timing token and PoW/captcha challenges must be fresh each time.
+    var level = form.SpamLevel ?? (int.TryParse(Site.Get(MatCMS.Services.SettingKeys.AntiSpamLevel, "1"), out var gl) ? gl : 1);
+    if (level > 0)
+    {
+        var issued = Guard.Issue(form.Slug, level);
+        rm.SpamLevel = level;
+        rm.GuardToken = issued.Token;
+        rm.GuardNonce = issued.Nonce;
+        rm.PowBits = issued.PowBits;
+        rm.Challenge = issued.Challenge;
+        rm.CaptchaA = issued.CaptchaA;
+        rm.CaptchaB = issued.CaptchaB;
+    }
+
     @await Html.PartialAsync("Blocks/_FormRender", rm)
 }
 @functions {

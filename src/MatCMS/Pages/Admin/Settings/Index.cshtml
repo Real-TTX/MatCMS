@@ -316,6 +316,17 @@
                 <input name="Values[@SettingKeys.SiteName]" value="@V(SettingKeys.SiteName)" />
             </div>
             <div class="form-field">
+                <label>@T["settings.spam.label"]</label>
+                @{ var spam = V(SettingKeys.AntiSpamLevel); if (string.IsNullOrEmpty(spam)) spam = "1"; }
+                <select name="Values[@SettingKeys.AntiSpamLevel]">
+                    <option value="0" selected="@(spam == "0")">@T["forms.spam.off"]</option>
+                    <option value="1" selected="@(spam == "1")">@T["forms.spam.l1"]</option>
+                    <option value="2" selected="@(spam == "2")">@T["forms.spam.l2"]</option>
+                    <option value="3" selected="@(spam == "3")">@T["forms.spam.l3"]</option>
+                </select>
+                <div class="help">@T["settings.spam.help"]</div>
+            </div>
+            <div class="form-field">
                 <label>@T["settings.logo"]</label>
                 <div class="image-field" data-upload>
                     <div class="preview" data-preview></div>

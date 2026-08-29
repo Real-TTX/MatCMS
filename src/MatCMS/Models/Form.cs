@@ -30,6 +30,11 @@ public class Form
     /// <summary>Notification recipients as JSON: {"userIds":[1,2],"emails":["a@b.com"]}.</summary>
     public string NotifyJson { get; set; } = "";
 
+    /// <summary>Anti-spam protection level for THIS form, or null to inherit the site-wide default
+    /// (<c>antispam.level</c>). 0 off, 1 invisible (honeypot + timing + JS-interaction), 2 adds
+    /// proof-of-work, 3 adds an arithmetic captcha. See <see cref="MatCMS.Services.FormGuard"/>.</summary>
+    public int? SpamLevel { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public List<FormSubmission> Submissions { get; set; } = new();

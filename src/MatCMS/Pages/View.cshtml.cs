@@ -14,13 +14,15 @@ public class ViewModel : PageModel
     private readonly AppDbContext _db;
     private readonly EmailService _email;
     private readonly SiteContext _site;
+    private readonly FormGuard _guard;
 
-    public ViewModel(AppDbContext db, BlockRegistry registry, EmailService email, SiteContext site)
+    public ViewModel(AppDbContext db, BlockRegistry registry, EmailService email, SiteContext site, FormGuard guard)
     {
         _db = db;
         Registry = registry;
         _email = email;
         _site = site;
+        _guard = guard;
     }
 
     public BlockRegistry Registry { get; }
@@ -80,6 +82,32 @@ public class ViewModel : PageModel
         var inputs = FormDefinition.Flatten(elements)
             .Where(e => FormDefinition.IsInput(e.Type))
             .ToList();
+
+        // Anti-spam gate BEFORE any storage/mail. The form's own level, or the site default
+        // (antispam.level, empty = 1). Two outcomes short-circuit: a silent drop looks like success to
+        // a bot (nothing stored, nothing sent), a retry shows the visitor a message and keeps their input.
+        var spamLevel = form.SpamLevel ??
+            (int.TryParse(_site.Get(SettingKeys.AntiSpamLevel, "1"), out var gl) ? gl : 1);
+        if (spamLevel > 0)
+        {
+            var guard = _guard.Validate(Request, formSlug, spamLevel, HttpContext.Connection.RemoteIpAddress?.ToString());
+            if (guard.Verdict == FormGuard.Verdict.SpamSilent)
+            {
+                TempData["FormSuccess_" + formSlug] = string.IsNullOrWhiteSpace(form.SuccessMessage)
+                    ? "Vielen Dank! Ihre Angaben wurden übermittelt."
+                    : form.SuccessMessage!.Trim();
+                return Redirect(SiteContext.LocalizedUrl(locale, key));
+            }
+            if (guard.Verdict == FormGuard.Verdict.Retry)
+            {
+                var kept = new Dictionary<string, string>(StringComparer.Ordinal);
+                foreach (var el in inputs) kept[el.Id] = Request.Form[el.Id].ToString().Trim();
+                TempData["FormErrors_" + formSlug] = System.Text.Json.JsonSerializer.Serialize(
+                    new List<string> { guard.Message ?? "Bitte erneut senden." });
+                TempData["FormValues_" + formSlug] = System.Text.Json.JsonSerializer.Serialize(kept);
+                return Redirect(SiteContext.LocalizedUrl(locale, key));
+            }
+        }
 
         // Collect raw values first (needed to evaluate conditions).
         var values = new Dictionary<string, string>(StringComparer.Ordinal);

@@ -22,4 +22,19 @@ public class FormRenderModel
     public string? Success { get; set; }
     public List<string> Errors { get; set; } = new();
     public Dictionary<string, string> Values { get; set; } = new();
+
+    // --- Anti-spam (see Services.FormGuard) ---------------------------------------------------------
+    /// <summary>Effective protection level (0 off … 3 captcha). 0 renders no guard markup.</summary>
+    public int SpamLevel { get; set; }
+    /// <summary>DataProtection-signed token that carries the checks' secrets (hidden field).</summary>
+    public string? GuardToken { get; set; }
+    /// <summary>Nonce the client script writes back on first interaction to prove JS ran.</summary>
+    public string? GuardNonce { get; set; }
+    /// <summary>Proof-of-work difficulty in leading zero bits (0 = no PoW, level &lt; 2).</summary>
+    public int PowBits { get; set; }
+    /// <summary>Proof-of-work challenge the client hashes against (level ≥ 2).</summary>
+    public string? Challenge { get; set; }
+    /// <summary>Captcha operands (level ≥ 3): the visitor answers <c>CaptchaA + CaptchaB</c>.</summary>
+    public int CaptchaA { get; set; }
+    public int CaptchaB { get; set; }
 }

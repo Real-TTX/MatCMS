@@ -53,6 +53,9 @@ public class EditModel : PageModel
         public bool NotifyEnabled { get; set; }
         public List<int> NotifyUserIds { get; set; } = new();
         public string NotifyEmails { get; set; } = "";
+
+        /// <summary>Anti-spam level for this form: -1 = inherit the site default, else 0..3.</summary>
+        public int SpamLevel { get; set; } = -1;
     }
 
     /// <summary>Element types offered in the "+ Element" picker (inner SVG markup for a 0 0 24 24 icon).</summary>
@@ -92,7 +95,8 @@ public class EditModel : PageModel
             SubmitLabel = form.SubmitLabel ?? "",
             NotifyEnabled = form.NotifyEnabled,
             NotifyUserIds = notify.UserIds,
-            NotifyEmails = string.Join("\n", notify.Emails)
+            NotifyEmails = string.Join("\n", notify.Emails),
+            SpamLevel = form.SpamLevel ?? -1
         };
 
         if (!string.IsNullOrWhiteSpace(element))
@@ -293,6 +297,8 @@ public class EditModel : PageModel
             UserIds = (Settings.NotifyUserIds ?? new()).Distinct().ToList(),
             Emails = FormNotify.ParseEmails(Settings.NotifyEmails)
         }.Serialize();
+        // -1 (inherit) is stored as null; 0..3 are kept, anything else falls back to inherit.
+        form.SpamLevel = Settings.SpamLevel is >= 0 and <= 3 ? Settings.SpamLevel : null;
 
         await _db.SaveChangesAsync();
         TempData["Flash"] = "Meldung & Benachrichtigungen gespeichert.";

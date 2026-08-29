@@ -14,28 +14,96 @@
         && image.IndexOfAny(new[] { '\'', '"', '(', ')', '\\', '\n', '\r' }) < 0)
         ? image : "";
     var hasImage = safeImage.Length > 0;
-    var classes = "hero"
-        + (hasImage ? " hero--with-image" : "")
-        + (align == "center" ? " hero--center" : "");
+
+    // Focal point for the cropped banner. Friendly names map to object-position; a raw value like
+    // "50% 78%" is passed through (sanitised to digits/%/keywords) so it can be fine-tuned per site.
+    var posRaw = Model.Str("imagePosition").Trim().ToLowerInvariant();
+    var objPos = posRaw switch
+    {
+        "" or "center" => "",
+        "top" => "center top",
+        "bottom" => "center bottom",
+        _ when System.Text.RegularExpressions.Regex.IsMatch(posRaw, @"^[0-9%.\s a-z]+$") => posRaw,
+        _ => ""
+    };
+
+    // "overlay" fuses the title WITH the photo: the image is the section background, the text sits on
+    // it over a gradient scrim. Only meaningful with an image; otherwise fall back to the banner.
+    var heroStyle = Model.Str("heroStyle");
+    var overlay = heroStyle == "overlay" && hasImage;
+    var split = heroStyle == "split" && hasImage;
+    var centerCls = align == "center" ? " hero--center" : "";
+    var hCls = imgH.Length > 0 ? " hero-image--" + imgH : "";
+    var bgRaw = Model.Str("heroBg");
+    var bgCls = (bgRaw is "soft" or "dark" or "accent") ? " hero--bg-" + bgRaw : "";
 }
-<section class="@classes">
-    <div class="container">
-        <div class="hero__inner">
-            <h1>@heading</h1>
-            @if (!string.IsNullOrWhiteSpace(sub))
-            {
-                <p class="hero__sub">@sub</p>
-            }
-            @if (!string.IsNullOrWhiteSpace(btnText))
-            {
-                <a class="btn" href="@btnUrl">@btnText</a>
-            }
-        </div>
-    </div>
-</section>
-@if (hasImage)
+@if (split)
 {
-    <div class="hero-image@(imgH.Length > 0 ? " hero-image--" + imgH : "")">
-        <img src="@safeImage" alt="" />
-    </div>
+    <section class="hero hero--split@(bgCls)">
+        <div class="container">
+            <div class="hero--split__grid">
+                <div class="hero--split__text">
+                    <h1>@heading</h1>
+                    @if (!string.IsNullOrWhiteSpace(sub))
+                    {
+                        <p class="hero__sub">@sub</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(btnText))
+                    {
+                        <a class="btn" href="@btnUrl">@btnText</a>
+                    }
+                </div>
+                <div class="hero--split__img">
+                    <img src="@safeImage" alt=""@(objPos.Length > 0 ? $" style=\"object-position:{objPos}\"" : "") />
+                </div>
+            </div>
+        </div>
+    </section>
+}
+else if (overlay)
+{
+    <section class="hero hero--overlay@(centerCls)" style="--hero-bg:url('@safeImage')">
+        @* A natural <img> (not a cover background) so the WHOLE photo is shown, never cropped — capped
+           to a sensible height; a blurred copy of the same photo fills the sides instead of empty bars. *@
+        <img class="hero-ov-img" src="@safeImage" alt="" />
+        <div class="hero-ov-text">
+            <div class="container">
+                <div class="hero__inner">
+                    <h1>@heading</h1>
+                    @if (!string.IsNullOrWhiteSpace(sub))
+                    {
+                        <p class="hero__sub">@sub</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(btnText))
+                    {
+                        <a class="btn" href="@btnUrl">@btnText</a>
+                    }
+                </div>
+            </div>
+        </div>
+    </section>
+}
+else
+{
+    <section class="hero@(hasImage ? " hero--with-image" : "")@(centerCls)">
+        <div class="container">
+            <div class="hero__inner">
+                <h1>@heading</h1>
+                @if (!string.IsNullOrWhiteSpace(sub))
+                {
+                    <p class="hero__sub">@sub</p>
+                }
+                @if (!string.IsNullOrWhiteSpace(btnText))
+                {
+                    <a class="btn" href="@btnUrl">@btnText</a>
+                }
+            </div>
+        </div>
+    </section>
+    @if (hasImage)
+    {
+        <div class="hero-image@(hCls)">
+            <img src="@safeImage" alt=""@(objPos.Length > 0 ? $" style=\"object-position:{objPos}\"" : "") />
+        </div>
+    }
 }

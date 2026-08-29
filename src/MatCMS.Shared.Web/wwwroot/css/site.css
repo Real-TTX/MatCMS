@@ -420,6 +420,52 @@ html.mat-langm-lock { overflow: hidden; }
 .hero-image--lg img { height: 620px; object-fit: cover; }
 .hero-image--full img { height: 88vh; object-fit: cover; }
 
+/* Overlay hero: title fused ONTO the photo. The image is a natural <img> (NOT a cover background),
+   so the whole picture is always shown, never cropped; the title floats over it with a gradient. */
+.hero--overlay { position: relative; color: #fff; overflow: hidden; background: #0e1a24; }
+/* Blurred copy of the photo fills the frame behind the whole (uncropped) image, so the capped height
+   has no empty side bars. */
+.hero--overlay::before {
+    content: ""; position: absolute; inset: 0; z-index: 0;
+    background-image: var(--hero-bg); background-size: cover; background-position: center;
+    filter: blur(26px) brightness(.55); transform: scale(1.12);
+}
+.hero-ov-img { position: relative; z-index: 0; display: block; margin: 0 auto; width: auto; max-width: 100%; max-height: 60vh; }
+.hero-ov-text {
+    position: absolute; inset: 0; z-index: 1; display: flex; align-items: flex-end;
+    background: linear-gradient(to bottom, rgba(0,0,0,.06) 50%, rgba(0,0,0,.5) 100%);
+}
+.hero--overlay.hero--center .hero-ov-text { align-items: center; text-align: center; }
+.hero-ov-text .container { width: 100%; }
+.hero--overlay .hero__inner { padding: 40px 0; }
+.hero--overlay h1 { color: #fff; text-shadow: 0 2px 30px rgba(0,0,0,.45); }
+.hero--overlay .hero__sub { color: rgba(255,255,255,.92); text-shadow: 0 1px 20px rgba(0,0,0,.5); }
+
+/* Split hero: text beside the photo — the photo in a rounded card, the title calm on the page. */
+.hero--split { padding: 56px 0; }
+.hero--split__grid { display: grid; grid-template-columns: 1fr 1.05fr; gap: 48px; align-items: center; }
+.hero--split__text h1 { margin: 0 0 14px; }
+.hero--split__text .hero__sub { font-size: 19px; color: var(--muted, #6b7280); margin: 0 0 26px; line-height: 1.5; }
+.hero--split__img { border-radius: 18px; overflow: hidden; box-shadow: 0 24px 60px rgba(0, 0, 0, .16); }
+.hero--split__img img { display: block; width: 100%; height: clamp(320px, 34vw, 480px); object-fit: cover; }
+@media (max-width: 760px) {
+    .hero--split { padding: 32px 0; }
+    .hero--split__grid { grid-template-columns: 1fr; gap: 26px; }
+    .hero--split__img img { height: 260px; }
+}
+
+/* Hero background tints (use the theme's own colours). Dark/accent flip the text to light and give
+   the button a warm secondary fill so it stays legible. */
+.hero--bg-soft { background: var(--bg-alt, #f2f6f8); }
+.hero--bg-dark { background: var(--black, #16323b); }
+.hero--bg-accent { background: var(--accent, #2f7d95); }
+.hero--bg-dark h1, .hero--bg-accent h1 { color: #fff; }
+.hero--bg-dark .hero__sub, .hero--bg-accent .hero__sub { color: rgba(255, 255, 255, .82); }
+.hero--bg-dark .btn, .hero--bg-accent .btn {
+    background: var(--accent-2, #c9a86a); color: var(--black, #16323b); border: 0;
+}
+.hero--bg-dark .btn:hover, .hero--bg-accent .btn:hover { filter: brightness(1.07); }
+
 /* ---------- Gallery block + lightbox ---------- */
 .gallery-filter { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
 .gallery-filter .gfilter { font: inherit; font-size: 14px; padding: 7px 16px; border: 1px solid var(--line); background: #fff; border-radius: 999px; cursor: pointer; color: var(--ink); transition: background .15s ease, color .15s ease, border-color .15s ease; }

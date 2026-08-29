@@ -118,6 +118,17 @@ public class BlockRegistry
                     Options = [ new("left", "block.opt.align.left"), new("center", "block.opt.align.center") ] },
                 new BlockField { Id = "imageHeight", Label = "block.hero.f.imageHeight", Type = FieldType.Select, Default = "",
                     Options = [ new("", "block.opt.h.auto"), new("sm", "block.opt.h.sm"), new("md", "block.opt.h.md"), new("lg", "block.opt.h.lg"), new("full", "block.opt.h.full") ] },
+                // Focal point: which part of the image stays in view when it is cropped to the banner
+                // height. Default center; "bottom" keeps a subject that sits low in the photo (e.g. a
+                // building marked at the lower edge) from being cropped away.
+                new BlockField { Id = "imagePosition", Label = "block.hero.f.imagePosition", Type = FieldType.Select, Default = "",
+                    Options = [ new("", "block.opt.pos.center"), new("top", "block.opt.pos.top"), new("bottom", "block.opt.pos.bottom") ] },
+                // "banner" (default) = title above, image below. "overlay" = title ON the image, with a
+                // gradient scrim for contrast — a far stronger opener when the photo carries the mood.
+                new BlockField { Id = "heroStyle", Label = "block.hero.f.style", Type = FieldType.Select, Default = "",
+                    Options = [ new("", "block.hero.opt.banner"), new("overlay", "block.hero.opt.overlay"), new("split", "block.hero.opt.split") ] },
+                new BlockField { Id = "heroBg", Label = "block.hero.f.bg", Type = FieldType.Select, Default = "",
+                    Options = [ new("", "block.hero.opt.bg.none"), new("soft", "block.hero.opt.bg.soft"), new("dark", "block.hero.opt.bg.dark"), new("accent", "block.hero.opt.bg.accent") ] },
             ]
         },
         new BlockDefinition

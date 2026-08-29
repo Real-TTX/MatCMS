@@ -3,6 +3,8 @@
     var heading = Model.Data.Str("heading");
     var intro = Model.Data.Str("intro");
     var cols = Model.Data.StrOr("columns", "4");
+    // When the items carry icons, render separated feature CARDS instead of the numbered border grid.
+    var hasIcons = Model.Children.Any(c => !string.IsNullOrWhiteSpace(c.Data.Str("icon")));
 }
 <section class="section section--alt">
     <div class="container">
@@ -19,7 +21,7 @@
                 }
             </div>
         }
-        <div class="service-grid cols-@cols">
+        <div class="service-grid cols-@cols@(hasIcons ? " service-grid--cards" : "")">
             @foreach (var child in Model.Children)
             {
                 @await Html.PartialAsync(child.Partial, child.Data)

@@ -624,6 +624,7 @@
   "block.opt.h.full": "Bildschirmhoch",
   "block.column.f.bg": "Hintergrundfarbe",
   "block.column.f.fg": "Textfarbe",
+  "block.service.f.icon": "Icon (Tabler-Name)",
   "block.service.name": "Service",
   "block.service.desc": "Einzelner Service (Unterblock von „Service-Grid“)",
   "block.faq.name": "Frage",

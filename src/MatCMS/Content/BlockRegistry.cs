@@ -206,6 +206,8 @@ public class BlockRegistry
             ChildOnly = true,
             Fields =
             [
+                new BlockField { Id = "icon", Label = "block.service.f.icon", Type = FieldType.Text,
+                    Placeholder = "beach", Help = "Tabler-Icon-Name ohne \"ti-\" (z. B. beach, car, leaf). Leer = Nummer." },
                 new BlockField { Id = "title", Label = "block.f.title", Type = FieldType.Text },
                 new BlockField { Id = "text", Label = "block.f.description", Type = FieldType.Textarea },
             ]

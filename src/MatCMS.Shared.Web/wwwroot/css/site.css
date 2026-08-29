@@ -575,6 +575,23 @@ html.mat-langm-lock { overflow: hidden; }
     letter-spacing: .02em;
 }
 
+/* Icon variant: separated feature cards with a round icon badge (modern), instead of the number grid. */
+.service-grid--cards { display: grid; gap: 20px; background: none; border: 0; }
+.service-grid--cards .service-card {
+    background: var(--bg, #fff); border: 1px solid var(--line, #e2e4e8); border-radius: 16px;
+    padding: 30px 24px; text-align: center; box-shadow: 0 8px 30px rgba(0, 0, 0, .05);
+    transition: transform .18s ease, box-shadow .18s ease;
+}
+.service-grid--cards .service-card:hover { transform: translateY(-3px); box-shadow: 0 16px 40px rgba(0, 0, 0, .1); background: var(--bg, #fff); }
+.service-icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 58px; height: 58px; border-radius: 50%;
+    background: var(--bg-alt, #eef4f5); color: var(--accent, #2f7d95); font-size: 27px; margin: 0 0 16px;
+}
+.service-icon i { line-height: 1; }
+.service-grid--cards .service-card h3 { text-transform: none; letter-spacing: 0; font-size: 18px; margin: 0 0 8px; }
+.service-grid--cards .service-card p { margin: 0; color: var(--muted, #6b7280); line-height: 1.55; }
+
 .service-card p { color: var(--muted); font-size: 15.5px; margin: 0; }
 
 /* ---------- CTA ---------- */

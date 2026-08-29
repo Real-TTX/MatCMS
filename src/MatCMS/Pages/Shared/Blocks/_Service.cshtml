@@ -2,9 +2,19 @@
 @{
     var title = Model.Str("title");
     var text = Model.Str("text");
+    // Optional Tabler icon (a-z, 0-9, - only). When set it replaces the running number.
+    var iconRaw = Model.Str("icon").Trim().ToLowerInvariant();
+    var icon = System.Text.RegularExpressions.Regex.IsMatch(iconRaw, "^[a-z0-9-]+$") ? iconRaw : "";
 }
-<div class="service-card">
-    <span class="num" aria-hidden="true"></span>
+<div class="service-card@(icon.Length > 0 ? " service-card--icon" : "")">
+    @if (icon.Length > 0)
+    {
+        <span class="service-icon" aria-hidden="true"><i class="ti ti-@icon"></i></span>
+    }
+    else
+    {
+        <span class="num" aria-hidden="true"></span>
+    }
     @if (!string.IsNullOrWhiteSpace(title))
     {
         <h3>@title</h3>

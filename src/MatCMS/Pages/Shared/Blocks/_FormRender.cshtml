@@ -138,6 +138,10 @@
             }
             else { sb.Append(E(ph)); }
             sb.Append("</span><span class=\"mat-rs-chev\" aria-hidden=\"true\">▾</span></button>");
+            // Clear (✕): a sibling of the trigger — a <button> cannot nest in the trigger <button> — laid
+            // over its right edge. Hidden until something is chosen (incl. a query-string prefill).
+            sb.Append("<button type=\"button\" class=\"mat-rs-clear\" data-rs-clear aria-label=\"")
+              .Append(E((string)T["form.clear"])).Append("\"").Append(nothingChosen ? " hidden" : "").Append(">✕</button>");
             sb.Append("<input type=\"hidden\" id=\"fld_").Append(el.Id).Append("\" name=\"").Append(el.Id).Append("\" value=\"").Append(E(val)).Append("\" data-rs-input");
             if (el.Required) sb.Append(" data-required=\"1\"");
             sb.Append(" data-placeholder=\"").Append(E(ph)).Append("\"")

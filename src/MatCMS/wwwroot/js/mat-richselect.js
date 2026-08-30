@@ -41,6 +41,26 @@
         var closeBtn = e.target.closest('[data-rs-close]');
         if (closeBtn) { e.preventDefault(); closeAll(null); return; }
 
+        // Clear (✕): reset the field to its placeholder without opening the menu. Handled before the
+        // trigger below so a click on it never toggles the dropdown.
+        var clr = e.target.closest('[data-rs-clear]');
+        if (clr) {
+            e.preventDefault(); e.stopPropagation();
+            var cwrap = clr.closest('.mat-rs');
+            var cinput = cwrap.querySelector('[data-rs-input]');
+            var ccur = cwrap.querySelector('[data-rs-current]');
+            var cmenu = cwrap.querySelector('[data-rs-menu]');
+            cinput.value = '';
+            ccur.innerHTML = '';
+            ccur.textContent = cinput.getAttribute('data-placeholder') || '';
+            ccur.classList.add('mat-rs-placeholder');
+            cmenu.querySelectorAll('[data-rs-opt]').forEach(function (o) { o.removeAttribute('aria-selected'); o.classList.remove('on'); });
+            clr.hidden = true;
+            cinput.dispatchEvent(new Event('input', { bubbles: true }));
+            cinput.dispatchEvent(new Event('change', { bubbles: true }));
+            return;
+        }
+
         var btn = e.target.closest('[data-rs-btn]');
         if (btn) {
             e.preventDefault();
@@ -96,6 +116,8 @@
                 mt.textContent = label;
                 cur.appendChild(mt);
                 cur.classList.toggle('mat-rs-placeholder', chosen.length === 0);
+                var mclr = wrap.querySelector('[data-rs-clear]');
+                if (mclr) mclr.hidden = chosen.length === 0;
 
                 // The menu STAYS open — closing after every tick would make picking three options
                 // three trips, which is the whole reason this field exists.
@@ -120,6 +142,8 @@
             ct.textContent = title ? title.textContent : input.value;
             cur.appendChild(ct);
             cur.classList.remove('mat-rs-placeholder');
+            var sclr = wrap.querySelector('[data-rs-clear]');
+            if (sclr) sclr.hidden = false;
             menu.querySelectorAll('[data-rs-opt]').forEach(function (o) { o.removeAttribute('aria-selected'); });
             opt.setAttribute('aria-selected', 'true');
             menu.hidden = true;

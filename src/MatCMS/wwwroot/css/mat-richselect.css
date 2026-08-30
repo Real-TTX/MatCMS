@@ -8,6 +8,17 @@
 .mat-rs-cur-img { width: 28px; height: 28px; border-radius: 6px; background: #eee center/cover no-repeat; flex: none; }
 .mat-rs-cur-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mat-rs-chev { flex: none; opacity: .6; font-size: 12px; }
+/* Clear (✕): laid over the trigger's right edge, just left of the chevron. Shown only when a value is
+   chosen. Sits above the trigger so it takes the click; the rest of the field still opens the menu. */
+.mat-rs-clear {
+    position: absolute; top: 50%; right: 30px; transform: translateY(-50%);
+    border: 0; background: none; cursor: pointer; color: #999;
+    font-size: 15px; line-height: 1; padding: 4px 6px; border-radius: 6px; z-index: 2;
+}
+.mat-rs-clear:hover { background: rgba(0, 0, 0, .08); color: #333; }
+.mat-rs-clear[hidden] { display: none; }
+/* Keep the closed value from sliding under the ✕ when it is shown. */
+.mat-rs-trigger:has(+ .mat-rs-clear:not([hidden])) .mat-rs-current { padding-right: 26px; }
 
 .mat-rs-menu {
     position: absolute; z-index: 50; left: 0; right: 0; top: calc(100% + 4px);

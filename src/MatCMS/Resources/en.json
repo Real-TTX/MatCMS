@@ -1083,6 +1083,7 @@
   "form.submit": "Send",
   "form.captchaQuestion": "Security question: what is",
   "form.close": "Close",
+  "form.clear": "Clear selection",
   "form.selectPlaceholder": "– Please select –",
   "form.noFields": "This form has no fields yet.",
   "form.notFound": "No form selected or form not found.",

@@ -1083,6 +1083,7 @@
   "form.submit": "Absenden",
   "form.captchaQuestion": "Sicherheitsfrage: Wie viel ist",
   "form.close": "Schließen",
+  "form.clear": "Auswahl löschen",
   "form.selectPlaceholder": "– Bitte auswählen –",
   "form.noFields": "Dieses Formular hat noch keine Felder.",
   "form.notFound": "Kein Formular ausgewählt oder Formular nicht gefunden.",

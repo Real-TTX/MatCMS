@@ -27,6 +27,7 @@
   "profiles.title": "Profiles",
   "profiles.intro": "A profile bundles configuration and rules. Instances that enroll with a profile's join code land in it automatically and receive its settings.",
   "profiles.create": "Create",
+  "profiles.duplicate": "Duplicate",
   "profiles.createIntro": "Name and description are enough. Join code, contents and behaviour are set on the profile itself afterwards.",
   "profiles.default": "default",
   "profiles.deleteConfirm": "Really delete this profile? Assigned instances keep running but stop receiving configuration.",

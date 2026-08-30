@@ -53,6 +53,64 @@ public class ProfileService
         return profile;
     }
 
+    /// <summary>
+    /// Clones a profile with everything it rolls out — every setting, user, plugin (bundle and all),
+    /// component, template and mail template it OWNS, plus every store item and global user it merely
+    /// REFERENCES — into a brand-new profile. What is NOT copied is what makes a profile itself: the
+    /// clone gets a fresh join code, is never the default, starts at revision 1 and has zero assigned
+    /// instances (an instance stays with the profile it enrolled in). Rows are read detached
+    /// (<c>AsNoTracking</c>) and re-added with <c>Id = 0</c> under the new <c>ProfileId</c>, so every
+    /// column travels without being named here — a field added to a payload later cannot be silently
+    /// dropped from the copy. Store links keep their <c>Store*Id</c>: a reference, not a second copy.
+    /// </summary>
+    public async Task<Profile> DuplicateAsync(int sourceId)
+    {
+        var clone = await _db.Profiles.AsNoTracking().FirstOrDefaultAsync(p => p.Id == sourceId)
+            ?? throw new InvalidOperationException("Profil nicht gefunden.");
+
+        // Name has a unique index, so find a free "(Kopie)" / "(Kopie 2)" / … variant first.
+        var stem = clone.Name;
+        var name = $"{stem} (Kopie)";
+        for (var n = 2; await _db.Profiles.AnyAsync(p => p.Name == name); n++)
+            name = $"{stem} (Kopie {n})";
+
+        clone.Id = 0;
+        clone.Name = name;
+        clone.JoinCode = NewJoinCode();
+        clone.IsDefault = false;
+        clone.Revision = 1;
+        clone.CreatedAt = DateTime.UtcNow;
+        _db.Profiles.Add(clone);
+        await _db.SaveChangesAsync();   // assigns clone.Id
+
+        // Re-insert each payload row under the new profile. Detached rows given Id = 0 become fresh
+        // inserts; only Id and ProfileId are touched, so bundles, encrypted secret values and every
+        // other column come along unchanged.
+        async Task Copy<T>(IQueryable<T> query, Action<T> repoint) where T : class
+        {
+            var rows = await query.AsNoTracking().ToListAsync();
+            foreach (var r in rows) repoint(r);
+            _db.AddRange(rows);
+        }
+
+        // Own-copy payloads (the profile's own data).
+        await Copy(_db.ProfileSettings.Where(x => x.ProfileId == sourceId), x => { x.Id = 0; x.ProfileId = clone.Id; });
+        await Copy(_db.ProfileUsers.Where(x => x.ProfileId == sourceId), x => { x.Id = 0; x.ProfileId = clone.Id; });
+        await Copy(_db.ProfilePlugins.Where(x => x.ProfileId == sourceId), x => { x.Id = 0; x.ProfileId = clone.Id; });
+        await Copy(_db.ProfileComponents.Where(x => x.ProfileId == sourceId), x => { x.Id = 0; x.ProfileId = clone.Id; });
+        await Copy(_db.ProfileTemplates.Where(x => x.ProfileId == sourceId), x => { x.Id = 0; x.ProfileId = clone.Id; });
+        await Copy(_db.ProfileMailTemplates.Where(x => x.ProfileId == sourceId), x => { x.Id = 0; x.ProfileId = clone.Id; });
+        // Store selections + global users (references — the shared store/user row is untouched).
+        await Copy(_db.ProfileStorePlugins.Where(x => x.ProfileId == sourceId), x => { x.Id = 0; x.ProfileId = clone.Id; });
+        await Copy(_db.ProfileStoreTemplates.Where(x => x.ProfileId == sourceId), x => { x.Id = 0; x.ProfileId = clone.Id; });
+        await Copy(_db.ProfileStoreComponents.Where(x => x.ProfileId == sourceId), x => { x.Id = 0; x.ProfileId = clone.Id; });
+        await Copy(_db.ProfileStoreMailTemplates.Where(x => x.ProfileId == sourceId), x => { x.Id = 0; x.ProfileId = clone.Id; });
+        await Copy(_db.ProfileGlobalUsers.Where(x => x.ProfileId == sourceId), x => { x.Id = 0; x.ProfileId = clone.Id; });
+        await _db.SaveChangesAsync();
+
+        return clone;
+    }
+
     /// <summary>Resolves an enrolling instance's join code to its profile. Compared in constant time
     /// so a code cannot be recovered character by character through timing.</summary>
     public async Task<Profile?> FindByJoinCodeAsync(string? code)

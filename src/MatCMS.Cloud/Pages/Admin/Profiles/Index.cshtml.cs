@@ -48,6 +48,16 @@ public class IndexModel : PageModel
         return RedirectToPage();
     }
 
+    // Duplicating copies everything the profile rolls out into a new one with a fresh join code and no
+    // assigned instances (see ProfileService.DuplicateAsync). Lands the operator in the copy to edit.
+    public async Task<IActionResult> OnPostDuplicateAsync(int id)
+    {
+        if (!await _db.Profiles.AnyAsync(p => p.Id == id)) return RedirectToPage();
+        var clone = await _profiles.DuplicateAsync(id);
+        TempData["Flash"] = $"Profil dupliziert: \"{clone.Name}\". Es hat einen neuen Beitritts-Code und noch keine zugeordneten Instanzen.";
+        return RedirectToPage("Edit", new { id = clone.Id });
+    }
+
     // Making a profile the default is edited ON the profile (General tab), not as a row action —
     // per-record settings belong to the record's own page.
 }

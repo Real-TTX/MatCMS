@@ -552,6 +552,13 @@ table.data th:last-child, table.data td:last-child { width: 1%; white-space: now
 table.data .actions { flex-wrap: nowrap; justify-content: flex-end; }
 table.data .btn { white-space: nowrap; }
 
+/* A wide data table scrolls inside THIS box instead of pushing the whole page — and with it the
+   sticky top bar — past the viewport's right edge (which left the header short of full width).
+   admin-list.js drops every [data-list-table] into a .table-scroll on load; the table keeps
+   width:100% and still stretches when it fits, so only a genuinely too-wide table scrolls here.
+   The ≤860 rule further down still covers plain (non-list) tables on small screens. */
+.table-scroll { overflow-x: auto; overscroll-behavior-x: contain; }
+
 .muted { color: var(--muted); }
 .mono { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 13px; }
 

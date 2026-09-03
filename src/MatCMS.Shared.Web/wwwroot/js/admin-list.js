@@ -14,6 +14,18 @@
         var key = root.getAttribute('data-list-key');   // localStorage suffix for the chosen view
         var page = 0;
 
+        // Contain a wide table's horizontal scroll to the table itself. Without this the table widens
+        // the whole page, the sticky top bar then stops at the viewport edge while the body scrolls
+        // on — the reported "header not full width" bug. Idempotent, and it leaves the table's own
+        // width:100% intact (so it still stretches when it fits). Tiles/pager/empty stay siblings.
+        var listTable = root.querySelector('[data-list-table]');
+        if (listTable && listTable.parentElement && !listTable.parentElement.classList.contains('table-scroll')) {
+            var scrollWrap = document.createElement('div');
+            scrollWrap.className = 'table-scroll';
+            listTable.parentNode.insertBefore(scrollWrap, listTable);
+            scrollWrap.appendChild(listTable);
+        }
+
         function items() {
             return Array.prototype.slice.call(root.querySelectorAll(
                 '[data-list-table] tbody > tr, [data-list-tiles] > [data-search]'));

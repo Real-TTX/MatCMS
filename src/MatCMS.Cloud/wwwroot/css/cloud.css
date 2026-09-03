@@ -111,6 +111,10 @@
 .instance-tile-sub { font-size: 12px; margin-bottom: 6px; }
 .instance-tile-meta { display: flex; flex-wrap: wrap; gap: 6px; }
 
+/* The instance's URL sits in the (already narrow) Name column. A long unbroken address is the main
+   thing that forced the Instanzen table wider than the page; let it wrap so the table usually fits. */
+.instance-url { overflow-wrap: anywhere; }
+
 /* ============ Editable rows ============ */
 /* A row currently loaded into the form below it. */
 table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff); }

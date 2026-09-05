@@ -4,7 +4,11 @@
     var heading = Model.Data.Str("heading");
     var intro = Model.Data.Str("intro");
     var columns = Model.Data.StrOr("columns", "3");
-    var isCarousel = Model.Data.StrOr("layout", "grid") == "carousel";
+    var layout = Model.Data.StrOr("layout", "grid");
+    var isCoverflow = layout == "coverflow";
+    // Coverflow reuses the carousel track (scroll + arrows + carousel.js), plus a centred visual.
+    var isCarousel = layout == "carousel" || isCoverflow;
+    var autoplay = Model.Data.StrOr("autoplay", "off") == "on";
 }
 <section class="section cards-block">
     <div class="container">
@@ -15,7 +19,7 @@
                 @if (!string.IsNullOrWhiteSpace(intro)) { <p>@intro</p> }
             </div>
         }
-        <div class="cards-wrap @(isCarousel ? "is-carousel" : "")" @(isCarousel ? "data-carousel" : "")@(isCarousel ? $" data-prev=\"{System.Net.WebUtility.HtmlEncode((string)T["carousel.prev"])}\" data-next=\"{System.Net.WebUtility.HtmlEncode((string)T["carousel.next"])}\"" : "")>
+        <div class="cards-wrap @(isCarousel ? "is-carousel" : "")@(isCoverflow ? " is-coverflow" : "")" @(isCarousel ? "data-carousel" : "")@(autoplay && isCarousel ? " data-autoplay" : "")@(isCarousel ? $" data-prev=\"{System.Net.WebUtility.HtmlEncode((string)T["carousel.prev"])}\" data-next=\"{System.Net.WebUtility.HtmlEncode((string)T["carousel.next"])}\"" : "")>
             <div class="cards-grid cols-@columns">
                 @foreach (var child in Model.Children)
                 {
@@ -55,4 +59,25 @@
     .carousel-btn[disabled] { opacity: .35; cursor: default; }
     .carousel-btn.prev { left: -8px; }
     .carousel-btn.next { right: -8px; }
+
+    /* Cover-flow: a centred, self-sliding cover carousel. The middle card is full size and sharp,
+       the neighbours are smaller and dimmed (carousel.js sets .cf-center on the middle one). Covers
+       are shown whole (contain), because book covers are portrait and cropping loses the title. */
+    .cards-wrap.is-coverflow .cards-grid { grid-auto-columns: minmax(240px, 280px); gap: 30px;
+        scroll-snap-type: x mandatory; padding: 24px max(24px, calc(50% - 140px)); align-items: center; }
+    .cards-wrap.is-coverflow .feat-card { scroll-snap-align: center; border: none; background: transparent;
+        box-shadow: none; transform: scale(.82); opacity: .5;
+        transition: transform .4s ease, opacity .4s ease; }
+    .cards-wrap.is-coverflow .feat-card.cf-center { transform: scale(1); opacity: 1; }
+    .cards-wrap.is-coverflow .feat-card__img { height: 360px; background-size: contain;
+        background-repeat: no-repeat; background-position: center bottom;
+        filter: drop-shadow(0 16px 34px rgba(0,0,0,.22)); border-radius: 0; }
+    .cards-wrap.is-coverflow .feat-card__body { align-items: center; text-align: center; gap: 8px; padding: 16px 10px 4px; }
+    .cards-wrap.is-coverflow .feat-card .btn { align-self: center; }
+    /* Only the centred cover's button/text invites a click; the dimmed neighbours stay quiet. */
+    .cards-wrap.is-coverflow .feat-card:not(.cf-center) .feat-card__body { visibility: hidden; }
+    .cards-wrap.is-coverflow .feat-card:not(.cf-center) { cursor: pointer; }
+    @@media (prefers-reduced-motion: reduce) {
+        .cards-wrap.is-coverflow .feat-card { transition: none; }
+    }
 </style>

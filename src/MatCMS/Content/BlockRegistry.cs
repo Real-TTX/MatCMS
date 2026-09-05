@@ -531,8 +531,12 @@ public class BlockRegistry
                 new BlockField { Id = "columns", Label = "block.gallery.f.columns", Type = FieldType.Select, Default = "3",
                     Options = [ new("2", "block.opt.columns.2"), new("3", "block.opt.columns.3"), new("4", "block.opt.columns.4") ] },
                 new BlockField { Id = "layout", Label = "block.cards.f.layout", Type = FieldType.Select, Default = "grid",
-                    Options = [ new("grid", "block.cards.opt.grid"), new("carousel", "block.cards.opt.carousel") ],
-                    Help = "Nebeneinander (Raster) oder als scrollbares Carousel." },
+                    Options = [ new("grid", "block.cards.opt.grid"), new("carousel", "block.cards.opt.carousel"), new("coverflow", "block.cards.opt.coverflow") ],
+                    Help = "Raster, scrollbares Carousel oder zentrierter Cover-Flow." },
+                // Only meaningful for carousel / coverflow: slides on by itself, pausing on hover/touch.
+                new BlockField { Id = "autoplay", Label = "block.cards.f.autoplay", Type = FieldType.Select, Default = "off",
+                    Options = [ new("off", "block.cards.opt.autoplay.off"), new("on", "block.cards.opt.autoplay.on") ],
+                    Help = "block.cards.f.autoplay.help" },
             ]
         },
         new BlockDefinition

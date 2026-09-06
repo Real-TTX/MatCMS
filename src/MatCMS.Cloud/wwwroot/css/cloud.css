@@ -91,6 +91,9 @@
     width: 1280px;
     height: 900px;
     border: 0;
+    /* The preview must never capture the mouse wheel — otherwise the page won't scroll while the
+       pointer sits over a tile. Clicks fall through to the surrounding .instance-tile link (details). */
+    pointer-events: none;
     transform: scale(.28);
     transform-origin: 0 0;
     pointer-events: none;

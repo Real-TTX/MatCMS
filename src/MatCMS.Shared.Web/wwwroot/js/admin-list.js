@@ -26,9 +26,13 @@
             scrollWrap.appendChild(listTable);
         }
 
+        // Page/filter over the ACTIVE view only. Counting table rows AND tiles together saw every
+        // record twice, which invented phantom pages — in tile view, "page 2" then showed nothing
+        // but the (CSS-hidden) table rows. Whichever view is on drives the count.
         function items() {
-            return Array.prototype.slice.call(root.querySelectorAll(
-                '[data-list-table] tbody > tr, [data-list-tiles] > [data-search]'));
+            var tiles = root.classList.contains('list-view-tiles') && root.querySelector('[data-list-tiles]');
+            var sel = tiles ? '[data-list-tiles] > [data-search]' : '[data-list-table] tbody > tr';
+            return Array.prototype.slice.call(root.querySelectorAll(sel));
         }
         function hay(el) { return (el.getAttribute('data-search') || el.textContent || '').toLowerCase(); }
 
@@ -71,6 +75,8 @@
                 b.classList.toggle('active', b.getAttribute('data-view') === v);
             });
             if (key) { try { localStorage.setItem('matcms.list.' + key, v); } catch (e) { } }
+            // The active view changed, so the item set (and therefore the paging) must be recomputed.
+            page = 0; apply();
         }
 
         if (search) search.addEventListener('input', function () { page = 0; apply(); });

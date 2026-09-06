@@ -41,7 +41,7 @@ public class BlockRegistry
         ["hero"] = "design", ["cta"] = "design", ["cards"] = "design", ["card"] = "design",
         ["herocta"] = "design", ["timeline"] = "design", ["step"] = "design", ["countup"] = "design",
         ["leistungen"] = "design", ["leistung"] = "design", ["servicegrid"] = "design",
-        ["service"] = "design", ["imagetext"] = "design", ["posts"] = "design", ["bookdetail"] = "design",
+        ["service"] = "design", ["imagetext"] = "design", ["posts"] = "design",
         ["references"] = "design", ["reference"] = "design",
         ["form"] = "form", ["memberlogin"] = "form",
         ["html"] = "embed"
@@ -344,32 +344,6 @@ public class BlockRegistry
                 new BlockField { Id = "image", Label = "block.f.image", Type = FieldType.Image },
                 new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },
                 new BlockField { Id = "body", Label = "block.f.body", Type = FieldType.RichText },
-                new BlockField { Id = "imageSide", Label = "block.imagetext.f.imageSide", Type = FieldType.Select, Default = "left",
-                    Options = [ new("left", "block.opt.imageSide.left"), new("right", "block.opt.imageSide.right") ] },
-            ]
-        },
-        // A product/book page in one editable block: cover, an optional status badge (e.g. "Bald
-        // verfügbar"), title/subtitle, description and a chip list of facts (age, format, pages). Built
-        // so a book detail page is maintainable in the editor instead of hand-written HTML in an imagetext.
-        new BlockDefinition
-        {
-            Type = "bookdetail",
-            Name = "block.bookdetail.name",
-            Description = "block.bookdetail.desc",
-            Svg = SvgImageText,
-            Partial = "Blocks/_BookDetail",
-            Fields =
-            [
-                new BlockField { Id = "image", Label = "block.f.image", Type = FieldType.Image },
-                new BlockField { Id = "badge", Label = "block.bookdetail.f.badge", Type = FieldType.Text,
-                    Placeholder = "Bald verfügbar", Help = "block.bookdetail.f.badge.help" },
-                new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },
-                new BlockField { Id = "subheading", Label = "block.bookdetail.f.subheading", Type = FieldType.Text },
-                new BlockField { Id = "body", Label = "block.f.body", Type = FieldType.RichText },
-                new BlockField { Id = "meta", Label = "block.bookdetail.f.meta", Type = FieldType.Textarea,
-                    Placeholder = "ab 5 Jahren\nHochformat 8,5 × 11 Zoll\n36 Seiten · 16 Motive", Help = "block.bookdetail.f.meta.help" },
-                new BlockField { Id = "buttonText", Label = "block.f.buttonText", Type = FieldType.Text },
-                new BlockField { Id = "buttonUrl", Label = "block.f.buttonUrl", Type = FieldType.Url },
                 new BlockField { Id = "imageSide", Label = "block.imagetext.f.imageSide", Type = FieldType.Select, Default = "left",
                     Options = [ new("left", "block.opt.imageSide.left"), new("right", "block.opt.imageSide.right") ] },
             ]

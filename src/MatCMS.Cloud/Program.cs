@@ -6,6 +6,7 @@ using MatCMS.Cloud.Services;
 using MatCMS.Shared;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -96,6 +97,10 @@ builder.Services.AddScoped<AdoptionService>();
 builder.Services.AddScoped<VersionService>();
 builder.Services.AddScoped<ApiKeyService>();
 builder.Services.AddScoped<OperatorScope>();
+
+// SSO: short-lived authorization codes live in memory (see OAuthCodes).
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<OAuthCodes>();
 
 // Singletons: one registry poll and one Docker client for the whole process.
 builder.Services.AddSingleton<GhcrClient>();
@@ -509,6 +514,73 @@ app.MapPost("/api/instances/{publicId}/backups/taken", async (
     }
     await db.SaveChangesAsync();
     return Results.Ok();
+}).RequireRateLimiting("instanceApi");
+
+// --- SSO / OAuth (a MatCMS instance logs a user in with their cloud account) --------------------
+// authorize (front-channel): the cloud user must be logged in AND allowed for the target instance;
+// it hands back a short code bound to the user, the client instance and a PKCE challenge. token
+// (back-channel): authenticated by the instance token exactly like the heartbeat, redeems the code
+// and returns the user's identity. No JWT — the exchange is a direct, token-authenticated TLS call.
+static bool SsoRedirectAllowed(MatCMS.Cloud.Models.Instance inst, string redirectUri)
+{
+    if (!Uri.TryCreate(redirectUri, UriKind.Absolute, out var ru)) return false;
+    if (ru.Scheme != Uri.UriSchemeHttps && ru.Scheme != Uri.UriSchemeHttp) return false;
+    if (!ru.AbsolutePath.EndsWith("/sso/callback", StringComparison.OrdinalIgnoreCase)) return false;
+    var known = inst.PreviewUrl;    // the instance's own reported address
+    return !string.IsNullOrWhiteSpace(known) && Uri.TryCreate(known, UriKind.Absolute, out var ku)
+        && string.Equals(ru.GetLeftPart(UriPartial.Authority), ku.GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase);
+}
+
+app.MapGet("/oauth/authorize", async (HttpContext ctx, AppDbContext db, OperatorScope scope, OAuthCodes codes,
+    string? client_id, string? redirect_uri, string? state, string? code_challenge, string? code_challenge_method, string? response_type) =>
+{
+    // Not logged in → cloud login, then straight back here (returnUrl carries the whole request).
+    if (ctx.User.Identity?.IsAuthenticated != true)
+        return Results.Redirect($"/login?returnUrl={Uri.EscapeDataString(ctx.Request.GetEncodedPathAndQuery())}");
+
+    if (response_type != "code" || string.IsNullOrEmpty(code_challenge) || (code_challenge_method ?? "S256") != "S256"
+        || string.IsNullOrEmpty(client_id) || string.IsNullOrEmpty(redirect_uri) || string.IsNullOrEmpty(state))
+        return Results.BadRequest("Ungültige Anfrage.");
+
+    var inst = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == client_id);
+    if (inst is null || inst.Status != MatCMS.Cloud.Models.InstanceStatus.Approved)
+        return Results.BadRequest("Unbekannte Instanz.");
+    if (!SsoRedirectAllowed(inst, redirect_uri!))
+        return Results.BadRequest("redirect_uri passt nicht zur Instanz.");
+
+    // The single authorization rule: may this cloud user sign in to THIS instance? (Admin: any;
+    // Operator: only assigned.) Reuses the exact gate the admin UI uses.
+    if (!await scope.CanAccessInstanceAsync(inst.Id))
+        return Results.Content($"<!doctype html><meta charset=\"utf-8\"><body style=\"font-family:sans-serif;max-width:32rem;margin:4rem auto\"><h1>Kein Zugriff</h1><p>Dein Cloud-Konto ist für die Instanz „{System.Net.WebUtility.HtmlEncode(inst.Name)}“ nicht freigegeben.</p></body>", "text/html");
+
+    var code = codes.Issue(new OAuthCodes.Grant(scope.UserId!.Value, inst.PublicId, redirect_uri!, code_challenge!));
+    var sep = redirect_uri!.Contains('?') ? "&" : "?";
+    return Results.Redirect($"{redirect_uri}{sep}code={Uri.EscapeDataString(code)}&state={Uri.EscapeDataString(state!)}");
+}).RequireRateLimiting("login");
+
+app.MapPost("/oauth/token", async (HttpContext ctx, AppDbContext db, InstanceService instances, OAuthCodes codes) =>
+{
+    var form = await ctx.Request.ReadFormAsync();
+    var token = ctx.Request.Headers[CloudProtocol.TokenHeader].ToString();
+    var inst = await instances.AuthenticateAsync(form["client_id"].ToString(), token);
+    if (inst is null) return Results.Json(new { error = "invalid_client" }, statusCode: StatusCodes.Status401Unauthorized);
+
+    var grant = codes.Redeem(form["code"].ToString());
+    if (grant is null || grant.InstancePublicId != inst.PublicId
+        || grant.RedirectUri != form["redirect_uri"].ToString()
+        || !OAuthCodes.VerifyPkce(grant.CodeChallenge, form["code_verifier"].ToString()))
+        return Results.Json(new { error = "invalid_grant" }, statusCode: StatusCodes.Status400BadRequest);
+
+    var user = await db.Users.FindAsync(grant.UserId);
+    if (user is null) return Results.Json(new { error = "invalid_grant" }, statusCode: StatusCodes.Status400BadRequest);
+
+    return Results.Ok(new
+    {
+        sub = user.Id.ToString(),
+        email = user.Email ?? user.Username,
+        name = user.DisplayName ?? user.Username,
+        username = user.Username,
+    });
 }).RequireRateLimiting("instanceApi");
 
 // --- Operator API (/api/v1) -----------------------------------------------

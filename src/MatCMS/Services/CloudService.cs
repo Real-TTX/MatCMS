@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Text.Json;
 using MatCMS.Data;
 using MatCMS.Models;
 using MatCMS.Shared;
@@ -594,6 +595,53 @@ public class CloudService
         client.DefaultRequestHeaders.UserAgent.ParseAdd("MatCMS-Instance");
         client.DefaultRequestHeaders.Add(CloudProtocol.TokenHeader, settings.Token);
         return client;
+    }
+
+    // ---- SSO (login with a cloud account) --------------------------------------------------------
+    public sealed record SsoUser(string Sub, string Email, string Name, string Username);
+
+    /// <summary>The cloud address a BROWSER should hit (the reported public URL if any, otherwise the
+    /// configured cloud URL) plus this instance's client id — for building the SSO authorize link.
+    /// Null when the instance is not linked to a cloud.</summary>
+    public async Task<(string CloudUrl, string InstanceId)?> GetSsoClientAsync()
+    {
+        var s = await GetSettingsAsync();
+        if (string.IsNullOrWhiteSpace(s.Url) || string.IsNullOrWhiteSpace(s.InstanceId)) return null;
+        var pub = (await _db.SiteSettings.AsNoTracking()
+            .Where(x => x.Key == SettingKeys.CloudPublicUrl).Select(x => x.Value).FirstOrDefaultAsync())?.Trim().TrimEnd('/');
+        return (string.IsNullOrWhiteSpace(pub) ? s.Url : pub, s.InstanceId);
+    }
+
+    /// <summary>Back-channel of the SSO flow: redeem the authorization code (with its PKCE verifier)
+    /// at the cloud's <c>/oauth/token</c>, authenticated by this instance's token. Returns the cloud
+    /// user's identity, or null on any failure.</summary>
+    public async Task<SsoUser?> ExchangeSsoCodeAsync(string code, string verifier, string redirectUri, CancellationToken ct = default)
+    {
+        var settings = await GetSettingsAsync();
+        if (string.IsNullOrWhiteSpace(settings.Url) || string.IsNullOrWhiteSpace(settings.InstanceId) || string.IsNullOrWhiteSpace(settings.Token))
+            return null;
+        try
+        {
+            var client = CreateClient(settings);   // sends X-MatCMS-Instance-Token (the client secret)
+            var form = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["grant_type"] = "authorization_code",
+                ["client_id"] = settings.InstanceId,
+                ["code"] = code,
+                ["code_verifier"] = verifier,
+                ["redirect_uri"] = redirectUri,
+            });
+            var res = await client.PostAsync($"{settings.Url}/oauth/token", form, ct);
+            if (!res.IsSuccessStatusCode) return null;
+            using var stream = await res.Content.ReadAsStreamAsync(ct);
+            using var json = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+            var root = json.RootElement;
+            string G(string k) => root.TryGetProperty(k, out var v) ? (v.GetString() ?? "") : "";
+            var email = G("email");
+            if (string.IsNullOrWhiteSpace(email)) return null;
+            return new SsoUser(G("sub"), email, G("name"), G("username"));
+        }
+        catch { return null; }
     }
 
     private async Task UpsertAsync(string key, string value)

@@ -148,6 +148,8 @@
   "login.password": "Password",
   "login.rememberMe": "Stay signed in",
   "login.submit": "Sign in",
+  "login.or": "or",
+  "login.sso": "Sign in with cloud account",
   "login.back": "← Back to the website",
   "dashboard.title": "Dashboard",
   "dashboard.editPages": "Edit pages",

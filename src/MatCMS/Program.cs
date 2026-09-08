@@ -666,6 +666,82 @@ app.MapPost("/api/cloud/link", async (
     });
 }).RequireRateLimiting("cloudLink");
 
+// --- SSO: log in with a MatCMS.Cloud account ---------------------------------------------------
+// /sso/start builds a PKCE authorize request and bounces the browser to the cloud; /sso/callback
+// verifies state, redeems the code over the token-authenticated back-channel (CloudService), then
+// JIT-provisions a local user and signs them in. Local login always stays available alongside this.
+static string SsoB64Url(byte[] b) => Convert.ToBase64String(b).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+app.MapGet("/sso/start", async (HttpContext ctx, MatCMS.Services.SiteContext site, MatCMS.Services.CloudService cloud,
+    Microsoft.AspNetCore.DataProtection.IDataProtectionProvider dp, string? returnUrl) =>
+{
+    var enabled = site.Get(MatCMS.Services.SettingKeys.SsoEnabled) is "1" or "true" or "on" or "yes";
+    var client = enabled ? await cloud.GetSsoClientAsync() : null;
+    if (client is null) return Results.Redirect("/login");   // SSO off or not linked → normal login
+
+    var verifier = SsoB64Url(System.Security.Cryptography.RandomNumberGenerator.GetBytes(48));
+    var challenge = SsoB64Url(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.ASCII.GetBytes(verifier)));
+    var state = SsoB64Url(System.Security.Cryptography.RandomNumberGenerator.GetBytes(24));
+    var redirectUri = $"{ctx.Request.Scheme}://{ctx.Request.Host}/sso/callback";
+    var safeReturn = (!string.IsNullOrEmpty(returnUrl) && returnUrl.StartsWith("/") && !returnUrl.StartsWith("//")) ? returnUrl : "/admin";
+
+    var payload = System.Text.Json.JsonSerializer.Serialize(new { v = verifier, s = state, r = safeReturn });
+    ctx.Response.Cookies.Append("matcms.ssoflow", dp.CreateProtector("MatCMS.SsoFlow").Protect(payload),
+        new CookieOptions { HttpOnly = true, Secure = ctx.Request.IsHttps, SameSite = SameSiteMode.Lax, MaxAge = TimeSpan.FromMinutes(10), Path = "/sso" });
+
+    var (cloudUrl, instanceId) = client.Value;
+    var url = $"{cloudUrl}/oauth/authorize?response_type=code&client_id={Uri.EscapeDataString(instanceId)}"
+            + $"&redirect_uri={Uri.EscapeDataString(redirectUri)}&state={Uri.EscapeDataString(state)}"
+            + $"&code_challenge={challenge}&code_challenge_method=S256";
+    return Results.Redirect(url);
+}).RequireRateLimiting("login");
+
+app.MapGet("/sso/callback", async (HttpContext ctx, MatCMS.Services.CloudService cloud, MatCMS.Services.AuthService auth,
+    MatCMS.Data.AppDbContext db, Microsoft.AspNetCore.DataProtection.IDataProtectionProvider dp, string? code, string? state) =>
+{
+    var raw = ctx.Request.Cookies["matcms.ssoflow"];
+    ctx.Response.Cookies.Delete("matcms.ssoflow", new CookieOptions { Path = "/sso" });
+    if (string.IsNullOrEmpty(code) || string.IsNullOrEmpty(state) || string.IsNullOrEmpty(raw))
+        return Results.Redirect("/login?sso=failed");
+
+    string verifier, expectedState, returnUrl;
+    try
+    {
+        var json = System.Text.Json.JsonDocument.Parse(dp.CreateProtector("MatCMS.SsoFlow").Unprotect(raw)).RootElement;
+        verifier = json.GetProperty("v").GetString() ?? "";
+        expectedState = json.GetProperty("s").GetString() ?? "";
+        returnUrl = json.GetProperty("r").GetString() ?? "/admin";
+    }
+    catch { return Results.Redirect("/login?sso=failed"); }
+
+    if (!System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+            System.Text.Encoding.ASCII.GetBytes(state), System.Text.Encoding.ASCII.GetBytes(expectedState)))
+        return Results.Redirect("/login?sso=failed");
+
+    var redirectUri = $"{ctx.Request.Scheme}://{ctx.Request.Host}/sso/callback";
+    var claims = await cloud.ExchangeSsoCodeAsync(code, verifier, redirectUri, ctx.RequestAborted);
+    if (claims is null) return Results.Redirect("/login?sso=failed");
+
+    // JIT: match by username (= e-mail on this instance), create as Admin if new (no local password).
+    var email = claims.Email.Trim();
+    var user = await db.Users.FirstOrDefaultAsync(u => u.Username == email);
+    if (user is null)
+    {
+        user = new MatCMS.Models.User
+        {
+            Username = email,
+            Email = email,
+            DisplayName = string.IsNullOrWhiteSpace(claims.Name) ? email : claims.Name,
+            Role = "Admin",
+            PasswordHash = auth.HashPassword(SsoB64Url(System.Security.Cryptography.RandomNumberGenerator.GetBytes(24)))
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+    }
+    await auth.SignInAsync(ctx, user, true);
+    return Results.Redirect(returnUrl.StartsWith("/") && !returnUrl.StartsWith("//") ? returnUrl : "/admin");
+}).RequireRateLimiting("login");
+
 // Scaled copies of uploaded images: /thumb/{width}/{file}. PUBLIC, like /uploads itself — a
 // thumbnail of a picture that anyone may fetch full size protects nothing by being harder to reach.
 //

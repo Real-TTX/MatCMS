@@ -57,6 +57,12 @@ public static class SettingKeys
     /// next instance start, which the cloud can trigger for the instances it manages.</summary>
     public const string EmbedAuth = "site.embedAuth";
 
+    /// <summary>"1" = show a "Mit Cloud anmelden" button on the login page and enable the SSO flow
+    /// (/sso/start + /sso/callback): a user signs in with their MatCMS.Cloud account. Only works when
+    /// this instance is connected to a cloud. A rollable DB setting (not env), like <see cref="EmbedAuth"/>
+    /// — the cloud can switch it on per profile. Local login always stays available.</summary>
+    public const string SsoEnabled = "sso.enabled";
+
     // "1" once the setup wizard has been completed (drives the dashboard prompt).
     public const string SetupComplete = "setup.complete";
 

@@ -40,6 +40,11 @@
             </label>
             <button type="submit" class="btn btn-block">@T["login.submit"]</button>
         </form>
+        @if (Model.SsoAvailable)
+        {
+            <div style="text-align:center;color:#9aa0a6;font-size:13px;margin:14px 0 10px;">@T["login.or"]</div>
+            <a class="btn btn-ghost btn-block" href="/sso/start?returnUrl=@Uri.EscapeDataString(Model.ReturnUrl ?? "/admin")">@T["login.sso"]</a>
+        }
         <a class="login-back" href="/">@T["login.back"]</a>
     </div>
 </body>

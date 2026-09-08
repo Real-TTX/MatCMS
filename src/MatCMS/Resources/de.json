@@ -147,6 +147,8 @@
   "login.password": "Passwort",
   "login.rememberMe": "Angemeldet bleiben",
   "login.submit": "Anmelden",
+  "login.or": "oder",
+  "login.sso": "Mit Cloud-Konto anmelden",
   "login.back": "← Zurück zur Website",
   "dashboard.title": "Dashboard",
   "dashboard.editPages": "Seiten bearbeiten",

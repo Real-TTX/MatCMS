@@ -44,16 +44,22 @@
                 <img class="admin-logo" src="@Cloud.LogoUrl" alt="@Cloud.CloudName" />
             </a>
         </div>
+        @{ var isAdmin = User.IsInRole("Admin"); }
         <nav class="admin-nav">
             <a class="@Active("/admin/instances")" asp-page="/Admin/Instances/Index">🖥️ @T["nav.instances"]</a>
-            <a class="@Active("/admin/profiles")" asp-page="/Admin/Profiles/Index">🧩 @T["nav.profiles"]</a>
-            <a class="@Active("/admin/store")" asp-page="/Admin/Store/Index">📦 @T["nav.store"]</a>
-            <a class="@Active("/admin/mail")" asp-page="/Admin/Mail/Index">✉️ @T["spool.title"]</a>
-            <a class="@Active("/admin/backups")" asp-page="/Admin/Backups/Index">💾 @T["backups.title"]</a>
-            <div class="admin-nav-sep" role="separator"></div>
-            <a class="@Active("/admin/settings")" asp-page="/Admin/Settings/Index">⚙️ @T["nav.settings"]</a>
-            <a class="@Active("/admin/users")" asp-page="/Admin/Users/Index">👤 @T["nav.users"]</a>
-            <a class="@Active("/admin/apikeys")" asp-page="/Admin/ApiKeys/Index">🔑 @T["nav.apikeys"]</a>
+            @* Fleet-wide areas — an Operator only manages its own instances, so these are hidden and
+               server-side blocked (AuthorizeFolder "Admin" in Program.cs). *@
+            @if (isAdmin)
+            {
+                <a class="@Active("/admin/profiles")" asp-page="/Admin/Profiles/Index">🧩 @T["nav.profiles"]</a>
+                <a class="@Active("/admin/store")" asp-page="/Admin/Store/Index">📦 @T["nav.store"]</a>
+                <a class="@Active("/admin/mail")" asp-page="/Admin/Mail/Index">✉️ @T["spool.title"]</a>
+                <a class="@Active("/admin/backups")" asp-page="/Admin/Backups/Index">💾 @T["backups.title"]</a>
+                <div class="admin-nav-sep" role="separator"></div>
+                <a class="@Active("/admin/settings")" asp-page="/Admin/Settings/Index">⚙️ @T["nav.settings"]</a>
+                <a class="@Active("/admin/users")" asp-page="/Admin/Users/Index">👤 @T["nav.users"]</a>
+                <a class="@Active("/admin/apikeys")" asp-page="/Admin/ApiKeys/Index">🔑 @T["nav.apikeys"]</a>
+            }
         </nav>
         <div class="admin-nav-foot">
             <div class="admin-foot-actions">

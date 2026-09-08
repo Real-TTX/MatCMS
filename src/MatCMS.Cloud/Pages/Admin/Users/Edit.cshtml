@@ -30,9 +30,46 @@
             <label for="Password">@T["users.password"]</label>
             <input id="Password" name="Password" type="password" placeholder="@(Model.IsNew ? "" : T["users.passwordKeep"])" />
         </div>
+        <div class="form-field">
+            <label for="Role">@T["users.role"]</label>
+            <select id="Role" name="Role" data-role-select>
+                <option value="Admin" selected="@(Model.Role == "Admin")">@T["users.roleAdmin"]</option>
+                <option value="Operator" selected="@(Model.Role == "Operator")">@T["users.roleOperator"]</option>
+            </select>
+            <div class="help">@T["users.roleHelp"]</div>
+        </div>
+        <div class="form-field" data-operator-instances style="@(Model.Role == "Operator" ? "" : "display:none")">
+            <label>@T["users.instances"]</label>
+            <div class="help">@T["users.instancesHelp"]</div>
+            @if (Model.AllInstances.Count == 0)
+            {
+                <p class="muted">@T["users.noInstances"]</p>
+            }
+            else
+            {
+                <div class="check-list">
+                    @foreach (var i in Model.AllInstances)
+                    {
+                        <label class="check">
+                            <input type="checkbox" name="InstanceIds" value="@i.Id" @(Model.InstanceIds.Contains(i.Id) ? "checked" : "") />
+                            <span>@i.Name</span>
+                        </label>
+                    }
+                </div>
+            }
+        </div>
         <div class="form-actions">
             <button type="submit" class="btn">@T["common.save"]</button>
             <a class="btn btn-ghost" asp-page="Index">@T["common.back"]</a>
         </div>
     </form>
 </div>
+<script>
+    (function () {
+        var sel = document.querySelector('[data-role-select]');
+        var box = document.querySelector('[data-operator-instances]');
+        if (sel && box) sel.addEventListener('change', function () {
+            box.style.display = sel.value === 'Operator' ? '' : 'none';
+        });
+    })();
+</script>

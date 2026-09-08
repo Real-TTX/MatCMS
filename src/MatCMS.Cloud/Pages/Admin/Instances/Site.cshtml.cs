@@ -18,7 +18,8 @@ namespace MatCMS.Cloud.Pages.Admin.Instances;
 public class SiteModel : PageModel
 {
     private readonly AppDbContext _db;
-    public SiteModel(AppDbContext db) => _db = db;
+    private readonly OperatorScope _scope;
+    public SiteModel(AppDbContext db, OperatorScope scope) { _db = db; _scope = scope; }
 
     public Instance Item { get; private set; } = new();
 
@@ -62,15 +63,22 @@ public class SiteModel : PageModel
     public async Task<IActionResult> OnGetAsync(int id, string? view = null)
     {
         if (view is not null) ContextSwitcher.Remember(HttpContext, view);
+        // An Operator may only frame (and switch between) its assigned instances.
+        if (!await _scope.CanAccessInstanceAsync(id)) return RedirectToPage("Index");
         var item = await _db.Instances.AsNoTracking().Include(i => i.Profile)
             .FirstOrDefaultAsync(i => i.Id == id);
         if (item is null) return RedirectToPage("Index");
         Item = item;
 
         // Rejected ones stay out: they were refused, so they are not something to switch between.
-        Switchable = await _db.Instances.AsNoTracking()
-            .Where(i => i.Status != InstanceStatus.Rejected || i.Id == id)
-            .OrderBy(i => i.Name).ToListAsync();
+        var q = _db.Instances.AsNoTracking()
+            .Where(i => i.Status != InstanceStatus.Rejected || i.Id == id);
+        if (!_scope.IsAdmin)
+        {
+            var allowed = await _scope.AllowedInstanceIdsAsync();
+            q = q.Where(i => allowed.Contains(i.Id));
+        }
+        Switchable = await q.OrderBy(i => i.Name).ToListAsync();
 
         return Page();
     }

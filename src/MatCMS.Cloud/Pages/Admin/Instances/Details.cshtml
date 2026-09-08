@@ -29,7 +29,7 @@
     </div>
 </div>
 
-@if (Model.Item.Status == InstanceStatus.Pending)
+@if (Model.Item.Status == InstanceStatus.Pending && Model.IsAdmin)
 {
     <div class="alert alert-info">
         <strong>@T["instances.approvalTitle"]</strong> @T["instances.approvalHint"]
@@ -263,27 +263,32 @@
 <div class="tab-panel" data-panel="config" hidden>
     <div class="card">
         <h2>@T["instances.configuration"]</h2>
-        <form method="post" asp-page-handler="AssignProfile" asp-route-id="@Model.Item.Id">
-            <div class="form-field">
-                <label for="profileId">@T["profiles.title"]</label>
-                <select id="profileId" name="profileId">
-                    <option value="">@T["enroll.noProfile"]</option>
-                    @foreach (var p in Model.Profiles)
+        @* Assigning a profile is an admin decision — an Operator only runs the instance, so the form
+           is hidden for them (and blocked server-side). The sync state below stays visible. *@
+        @if (Model.IsAdmin)
+        {
+            <form method="post" asp-page-handler="AssignProfile" asp-route-id="@Model.Item.Id">
+                <div class="form-field">
+                    <label for="profileId">@T["profiles.title"]</label>
+                    <select id="profileId" name="profileId">
+                        <option value="">@T["enroll.noProfile"]</option>
+                        @foreach (var p in Model.Profiles)
+                        {
+                            <option value="@p.Id" selected="@(Model.Item.ProfileId == p.Id ? "selected" : null)">@p.Name</option>
+                        }
+                    </select>
+                </div>
+                @* Straight into the profile that decides what this instance receives — otherwise it is
+                   "remember the name, go to Profile, find it in the list". *@
+                <div class="actions">
+                    <button type="submit" class="btn">@T["instances.assignProfile"]</button>
+                    @if (Model.Item.Profile is not null)
                     {
-                        <option value="@p.Id" selected="@(Model.Item.ProfileId == p.Id ? "selected" : null)">@p.Name</option>
+                        <a class="btn btn-ghost" asp-page="/Admin/Profiles/Edit" asp-route-id="@Model.Item.Profile.Id">@T["instances.manageProfile"]</a>
                     }
-                </select>
-            </div>
-            @* Straight into the profile that decides what this instance receives — otherwise it is
-               "remember the name, go to Profile, find it in the list". *@
-            <div class="actions">
-                <button type="submit" class="btn">@T["instances.assignProfile"]</button>
-                @if (Model.Item.Profile is not null)
-                {
-                    <a class="btn btn-ghost" asp-page="/Admin/Profiles/Edit" asp-route-id="@Model.Item.Profile.Id">@T["instances.manageProfile"]</a>
-                }
-            </div>
-        </form>
+                </div>
+            </form>
+        }
 
         <div class="kv" style="margin-top:18px;">
             <div class="kv-label">@T["instances.syncState"]</div>
@@ -729,28 +734,33 @@
     @* Every action for this instance on one line, positive before negative. *@
     <div class="form-actions">
         <button type="submit" class="btn" form="instance-form">@T["settings.save"]</button>
-        @if (Model.Item.Status == InstanceStatus.Approved)
+        @* Enrollment (approve/reject), token rotation and removal are admin-only — hidden for an
+           Operator (and blocked server-side). An Operator may still Save name/URL/notes above. *@
+        @if (Model.IsAdmin)
         {
-            <form class="inline-form" method="post" asp-page-handler="Reject" asp-route-id="@Model.Item.Id"
-                  onsubmit="return confirm('@T["instances.rejectConfirm"]');">
-                <button type="submit" class="btn btn-ghost">@T["instances.reject"]</button>
+            if (Model.Item.Status == InstanceStatus.Approved)
+            {
+                <form class="inline-form" method="post" asp-page-handler="Reject" asp-route-id="@Model.Item.Id"
+                      onsubmit="return confirm('@T["instances.rejectConfirm"]');">
+                    <button type="submit" class="btn btn-ghost">@T["instances.reject"]</button>
+                </form>
+            }
+            else if (Model.Item.Status == InstanceStatus.Rejected)
+            {
+                <form class="inline-form" method="post" asp-page-handler="Approve" asp-route-id="@Model.Item.Id">
+                    <button type="submit" class="btn btn-ghost">@T["instances.approve"]</button>
+                </form>
+            }
+            <form class="inline-form" method="post" asp-page-handler="Rotate" asp-route-id="@Model.Item.Id"
+                  onsubmit="return confirm('@T["instances.rotateConfirm"]');">
+                <button type="submit" class="btn btn-ghost">@T["instances.rotateToken"]</button>
             </form>
+            @* Kein POST mit confirm() mehr: Entfernen hat vier verschiedene Ausgänge — abmelden,
+               Container weg, Container UND Daten weg, und Backup holen und dann alles weg — und welcher
+               davon gemeint ist, kann ein einzeiliger Browser-Dialog nicht fragen. Die Rückfrage ist
+               eine eigene Seite. *@
+            <a class="btn btn-danger" asp-page="Delete" asp-route-id="@Model.Item.Id">@T["instances.removeTitle"]</a>
         }
-        else if (Model.Item.Status == InstanceStatus.Rejected)
-        {
-            <form class="inline-form" method="post" asp-page-handler="Approve" asp-route-id="@Model.Item.Id">
-                <button type="submit" class="btn btn-ghost">@T["instances.approve"]</button>
-            </form>
-        }
-        <form class="inline-form" method="post" asp-page-handler="Rotate" asp-route-id="@Model.Item.Id"
-              onsubmit="return confirm('@T["instances.rotateConfirm"]');">
-            <button type="submit" class="btn btn-ghost">@T["instances.rotateToken"]</button>
-        </form>
-        @* Kein POST mit confirm() mehr: Entfernen hat vier verschiedene Ausgänge — abmelden,
-           Container weg, Container UND Daten weg, und Backup holen und dann alles weg — und welcher
-           davon gemeint ist, kann ein einzeiliger Browser-Dialog nicht fragen. Die Rückfrage ist
-           eine eigene Seite. *@
-        <a class="btn btn-danger" asp-page="Delete" asp-route-id="@Model.Item.Id">@T["instances.removeTitle"]</a>
     </div>
 </div>
 

@@ -44,6 +44,10 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("Admin", policy => policy.RequireRole("Admin"));
+    // The shared admin shell (dashboard + instances) is open to both roles; the Admin-only areas are
+    // re-locked to "Admin" via AuthorizeFolder below. An Operator is scoped to its instances at the
+    // data level (OperatorScope), not just by which pages it may open.
+    options.AddPolicy("AdminOrOperator", policy => policy.RequireRole("Admin", "Operator"));
 });
 
 // --- Localization ---------------------------------------------------------
@@ -91,6 +95,7 @@ builder.Services.AddSingleton<SecretProtector>();
 builder.Services.AddScoped<AdoptionService>();
 builder.Services.AddScoped<VersionService>();
 builder.Services.AddScoped<ApiKeyService>();
+builder.Services.AddScoped<OperatorScope>();
 
 // Singletons: one registry poll and one Docker client for the whole process.
 builder.Services.AddSingleton<GhcrClient>();
@@ -150,8 +155,21 @@ builder.Services.AddRateLimiter(options =>
 
 builder.Services.AddRazorPages(options =>
 {
-    // Everything under /Admin requires the Admin role.
-    options.Conventions.AuthorizeFolder("/Admin", "Admin");
+    // /Admin is open to Admins AND Operators (the dashboard + the Instances area are shared).
+    options.Conventions.AuthorizeFolder("/Admin", "AdminOrOperator");
+    // …but these areas are Admin-only. An Operator manages instances, nothing fleet-wide.
+    options.Conventions.AuthorizeFolder("/Admin/Profiles", "Admin");
+    options.Conventions.AuthorizeFolder("/Admin/Store", "Admin");
+    options.Conventions.AuthorizeFolder("/Admin/Users", "Admin");
+    options.Conventions.AuthorizeFolder("/Admin/Settings", "Admin");
+    options.Conventions.AuthorizeFolder("/Admin/ApiKeys", "Admin");
+    options.Conventions.AuthorizeFolder("/Admin/Backups", "Admin");
+    options.Conventions.AuthorizeFolder("/Admin/Mail", "Admin");
+    // Creating and removing instances stays with admins; an Operator only runs its assigned ones.
+    options.Conventions.AuthorizePage("/Admin/Instances/New", "Admin");
+    options.Conventions.AuthorizePage("/Admin/Instances/Create", "Admin");
+    options.Conventions.AuthorizePage("/Admin/Instances/Delete", "Admin");
+    options.Conventions.AuthorizePage("/Admin/Instances/UpdateAll", "Admin");
 });
 
 var app = builder.Build();

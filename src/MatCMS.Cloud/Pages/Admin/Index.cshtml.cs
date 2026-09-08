@@ -12,14 +12,18 @@ public class IndexModel : PageModel
     private readonly InstanceService _instances;
     private readonly ReleaseWatcher _releases;
     private readonly DockerHostService _docker;
+    private readonly OperatorScope _scope;
 
-    public IndexModel(AppDbContext db, InstanceService instances, ReleaseWatcher releases, DockerHostService docker)
+    public IndexModel(AppDbContext db, InstanceService instances, ReleaseWatcher releases, DockerHostService docker, OperatorScope scope)
     {
         _db = db;
         _instances = instances;
         _releases = releases;
         _docker = docker;
+        _scope = scope;
     }
+
+    public bool IsAdmin => _scope.IsAdmin;
 
     public List<Instance> Instances { get; private set; } = new();
     public List<InstanceEvent> RecentEvents { get; private set; } = new();
@@ -38,13 +42,18 @@ public class IndexModel : PageModel
 
     public async Task OnGetAsync()
     {
-        Instances = await _db.Instances.AsNoTracking().OrderBy(i => i.Name).ToListAsync();
-        RecentEvents = await _db.InstanceEvents.AsNoTracking()
-            .Include(e => e.Instance)
-            .OrderByDescending(e => e.CreatedAt)
-            .Take(15)
-            .ToListAsync();
-        DockerReachable = await _docker.IsReachableAsync(HttpContext.RequestAborted);
+        var iq = _db.Instances.AsNoTracking().AsQueryable();
+        var eq = _db.InstanceEvents.AsNoTracking().Include(e => e.Instance).AsQueryable();
+        // Operators see a dashboard of ONLY their instances (and the events for them).
+        if (!_scope.IsAdmin)
+        {
+            var allowed = await _scope.AllowedInstanceIdsAsync();
+            iq = iq.Where(i => allowed.Contains(i.Id));
+            eq = eq.Where(e => allowed.Contains(e.InstanceId));
+        }
+        Instances = await iq.OrderBy(i => i.Name).ToListAsync();
+        RecentEvents = await eq.OrderByDescending(e => e.CreatedAt).Take(15).ToListAsync();
+        DockerReachable = _scope.IsAdmin && await _docker.IsReachableAsync(HttpContext.RequestAborted);
     }
 
     public bool HasUpdate(Instance i) => _releases.IsUpdateAvailableFor(i.Version);

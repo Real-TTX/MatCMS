@@ -12,16 +12,21 @@ public class IndexModel : PageModel
     private readonly AppDbContext _db;
     private readonly ReleaseWatcher _releases;
     private readonly CloudContext _cloud;
+    private readonly OperatorScope _scope;
 
     /// <summary>Ob die Cloud selbst Instanzen anlegen darf — entscheidet, ob der Knopf dafür
-    /// überhaupt erscheint.</summary>
-    public bool HostingEnabled => _cloud.Flag(SettingKeys.HostingEnabled);
+    /// überhaupt erscheint. Ein Operator darf ohnehin keine anlegen.</summary>
+    public bool HostingEnabled => _scope.IsAdmin && _cloud.Flag(SettingKeys.HostingEnabled);
 
-    public IndexModel(AppDbContext db, ReleaseWatcher releases, CloudContext cloud)
+    /// <summary>An Operator only manages assigned instances — no create/delete/fleet actions.</summary>
+    public bool IsAdmin => _scope.IsAdmin;
+
+    public IndexModel(AppDbContext db, ReleaseWatcher releases, CloudContext cloud, OperatorScope scope)
     {
         _db = db;
         _releases = releases;
-            _cloud = cloud;
+        _cloud = cloud;
+        _scope = scope;
     }
 
     public List<Instance> Items { get; private set; } = new();
@@ -39,10 +44,21 @@ public class IndexModel : PageModel
 
     public async Task OnGetAsync(int? profile = null)
     {
-        AllProfiles = await _db.Profiles.AsNoTracking().OrderBy(p => p.Name).ToListAsync();
+        // The profile filter is an admin tool; an Operator doesn't browse the fleet by profile.
+        AllProfiles = _scope.IsAdmin
+            ? await _db.Profiles.AsNoTracking().OrderBy(p => p.Name).ToListAsync()
+            : new();
 
         var query = _db.Instances.AsNoTracking().Include(i => i.Profile).AsQueryable();
-        if (profile is int pid)
+
+        // Operators see ONLY their assigned instances — the one place this is enforced for the list.
+        if (!_scope.IsAdmin)
+        {
+            var allowed = await _scope.AllowedInstanceIdsAsync();
+            query = query.Where(i => allowed.Contains(i.Id));
+        }
+
+        if (_scope.IsAdmin && profile is int pid)
         {
             FilteredProfile = await _db.Profiles.AsNoTracking().FirstOrDefaultAsync(p => p.Id == pid);
             // An unknown id narrows to nothing rather than silently showing everything — otherwise a
@@ -61,6 +77,8 @@ public class IndexModel : PageModel
 
     public async Task<IActionResult> OnPostDeleteAsync(int id)
     {
+        // Removing an instance is admin-only (the dedicated Delete page is too); block the bare handler.
+        if (!_scope.IsAdmin) return Forbid();
         var instance = await _db.Instances.FindAsync(id);
         if (instance is null) return RedirectToPage();
 

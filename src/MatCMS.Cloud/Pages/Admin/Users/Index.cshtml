@@ -18,6 +18,7 @@
                 <th>@T["users.email"]</th>
                 <th>@T["users.displayName"]</th>
                 <th>@T["users.username"]</th>
+                <th>@T["users.role"]</th>
                 <th></th>
             </tr>
         </thead>
@@ -38,6 +39,16 @@
                     </td>
                     <td class="muted">@(string.IsNullOrWhiteSpace(u.DisplayName) ? "—" : u.DisplayName)</td>
                     <td class="muted mono">@u.Username</td>
+                    <td>
+                        @if (u.Role == MatCMS.Cloud.Models.User.RoleOperator)
+                        {
+                            <span class="badge badge-off">@T["users.roleOperator"]</span>
+                        }
+                        else
+                        {
+                            <span class="badge badge-on">@T["users.roleAdmin"]</span>
+                        }
+                    </td>
                     <td>
                         <div class="actions">
                             <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@u.Id">@T["action.edit"]</a>

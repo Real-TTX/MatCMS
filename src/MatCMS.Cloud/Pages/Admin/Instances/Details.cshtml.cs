@@ -4,6 +4,7 @@ using MatCMS.Cloud.Services;
 using MatCMS.Shared;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.EntityFrameworkCore;
 namespace MatCMS.Cloud.Pages.Admin.Instances;
 
@@ -13,22 +14,48 @@ namespace MatCMS.Cloud.Pages.Admin.Instances;
 // handlers on this page post tiny forms, to which a higher ceiling makes no difference.
 [RequestSizeLimit(BackupStore.MaxUploadBytes)]
 [RequestFormLimits(MultipartBodyLengthLimit = BackupStore.MaxUploadBytes)]
-public class DetailsModel : PageModel
+public class DetailsModel : PageModel, IAsyncPageFilter
 {
     private readonly AppDbContext _db;
     private readonly InstanceService _instances;
     private readonly ReleaseWatcher _releases;
     private readonly DockerHostService _docker;
     private readonly BackupStore _backups;
+    private readonly OperatorScope _scope;
 
-    public DetailsModel(AppDbContext db, InstanceService instances, ReleaseWatcher releases, DockerHostService docker, BackupStore backups)
+    public DetailsModel(AppDbContext db, InstanceService instances, ReleaseWatcher releases, DockerHostService docker, BackupStore backups, OperatorScope scope)
     {
         _db = db;
         _instances = instances;
         _releases = releases;
         _docker = docker;
         _backups = backups;
+        _scope = scope;
     }
+
+    /// <summary>Admin-only, even on one's own instance: enrollment decisions, profile assignment and
+    /// token rotation are fleet/operator-config matters, not day-to-day instance management.</summary>
+    private static readonly string[] AdminOnlyHandlers =
+        { "OnPostApproveAsync", "OnPostRejectAsync", "OnPostAssignProfileAsync", "OnPostRotateAsync" };
+
+    /// <summary>Single security choke point for THIS page: every handler (GET and each POST) takes the
+    /// instance <c>id</c>, so one filter can enforce both the per-instance access scope (an Operator
+    /// may only touch assigned instances) and the admin-only handlers — no handler can be forgotten.</summary>
+    public async Task OnPageHandlerExecutionAsync(PageHandlerExecutingContext context, PageHandlerExecutionDelegate next)
+    {
+        if (context.HandlerArguments.TryGetValue("id", out var raw) && raw is int id)
+        {
+            if (!await _scope.CanAccessInstanceAsync(id)) { context.Result = RedirectToPage("Index"); return; }
+            var method = context.HandlerMethod?.MethodInfo.Name ?? "";
+            if (!_scope.IsAdmin && Array.IndexOf(AdminOnlyHandlers, method) >= 0) { context.Result = Forbid(); return; }
+        }
+        await next();
+    }
+
+    public Task OnPageHandlerSelectionAsync(PageHandlerSelectedContext context) => Task.CompletedTask;
+
+    /// <summary>Whether the current user is an Admin — the view hides admin-only actions for Operators.</summary>
+    public bool IsAdmin => _scope.IsAdmin;
 
     /// <summary>What this instance occupies in the cloud, and what it is granted — formatted here
     /// rather than in the view so the page and the backup overview cannot disagree about a size.</summary>

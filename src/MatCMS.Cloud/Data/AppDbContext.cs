@@ -23,6 +23,9 @@ public class AppDbContext : DbContext
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
     public DbSet<ApiKeyInstance> ApiKeyInstances => Set<ApiKeyInstance>();
 
+    // Per-user instance scope for the "Operator" role (login users, not API keys).
+    public DbSet<UserInstance> UserInstances => Set<UserInstance>();
+
     public DbSet<Profile> Profiles => Set<Profile>();
     public DbSet<ProfileSetting> ProfileSettings => Set<ProfileSetting>();
     public DbSet<ProfileUser> ProfileUsers => Set<ProfileUser>();
@@ -61,6 +64,15 @@ public class AppDbContext : DbContext
             .HasOne(x => x.ApiKey).WithMany(k => k.Instances)
             .HasForeignKey(x => x.ApiKeyId).OnDelete(DeleteBehavior.Cascade);
         b.Entity<ApiKeyInstance>()
+            .HasOne(x => x.Instance).WithMany()
+            .HasForeignKey(x => x.InstanceId).OnDelete(DeleteBehavior.Cascade);
+
+        // Per-user (Operator) instance scope — same shape as the API-key scope above.
+        b.Entity<UserInstance>().HasIndex(x => new { x.UserId, x.InstanceId }).IsUnique();
+        b.Entity<UserInstance>()
+            .HasOne(x => x.User).WithMany(u => u.Instances)
+            .HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<UserInstance>()
             .HasOne(x => x.Instance).WithMany()
             .HasForeignKey(x => x.InstanceId).OnDelete(DeleteBehavior.Cascade);
 

@@ -109,25 +109,35 @@ public class BackupManager
     public async Task<string> RunAsync(BackupScheduleConfig cfg, string prefix = "auto")
     {
         var options = ToOptions(cfg);
-        var bytes = await _transfer.ExportAsync(options);
+        var bytes = await _transfer.ExportAsync(options);   // in memory first — the old files are still safe
         var stamp = DateTime.UtcNow.ToString("yyyy-MM-dd-HHmmss");
         var name = $"{await SiteSlugAsync()}_{prefix}_{stamp}.zip";
+
+        // Free space BEFORE writing. Otherwise, on a full disk, the write below throws and the cleanup
+        // that follows never runs — so no new backup AND nothing pruned, which is exactly the failure
+        // we want to avoid. Keep the newest (Retain-1) old backups; the new one restores the total to
+        // Retain. Retain=1 clears all old ones first, then writes the single newest.
+        PruneToKeep(Math.Max(0, cfg.Retain - 1));
         await File.WriteAllBytesAsync(Path.Combine(BackupsDir, name), bytes);
 
-        Prune(cfg.Retain);
+        Prune(cfg.Retain);   // normal-case trim / safety once the new file is on disk
 
         cfg.LastRunUtc = DateTime.UtcNow.ToString("o");
         await SaveConfigAsync(cfg);
         return name;
     }
 
-    /// <summary>Deletes the oldest scheduled backups beyond the retention count.</summary>
-    public void Prune(int retain)
+    /// <summary>Deletes the oldest scheduled backups beyond the retention count (always keeps ≥ 1).</summary>
+    public void Prune(int retain) => PruneToKeep(retain < 1 ? 1 : retain);
+
+    /// <summary>Keeps the <paramref name="keep"/> newest scheduled backups and deletes the rest. Unlike
+    /// <see cref="Prune"/>, <paramref name="keep"/> may be 0 — used to clear room before a new write.</summary>
+    private void PruneToKeep(int keep)
     {
-        if (retain < 1) retain = 1;
+        if (keep < 0) keep = 0;
         var files = new DirectoryInfo(BackupsDir).GetFiles("*.zip")
             .OrderByDescending(f => f.LastWriteTimeUtc).ToList();
-        foreach (var f in files.Skip(retain))
+        foreach (var f in files.Skip(keep))
             try { f.Delete(); } catch { /* ignore */ }
     }
 

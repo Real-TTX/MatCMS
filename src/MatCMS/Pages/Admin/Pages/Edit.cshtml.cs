@@ -19,17 +19,22 @@ public class EditModel : PageModel
     private readonly AppDbContext _db;
     private readonly Localizer _t;
     private readonly TranslationService _translator;
+    private readonly AiService _ai;
 
-    public EditModel(AppDbContext db, BlockRegistry registry, Localizer t, TranslationService translator)
+    public EditModel(AppDbContext db, BlockRegistry registry, Localizer t, TranslationService translator, AiService ai)
     {
         _db = db;
         Registry = registry;
         _t = t;
         _translator = translator;
+        _ai = ai;
     }
 
     /// <summary>True when a machine-translation provider is configured (shows the auto-translate button).</summary>
     public bool TranslatorConfigured { get; private set; }
+
+    /// <summary>True when AI is switched on for this site (shows the "KI verbessern" block action).</summary>
+    public bool AiEnabled { get; private set; }
 
     public BlockRegistry Registry { get; }
     public PageEntity Current { get; private set; } = default!;
@@ -123,6 +128,7 @@ public class EditModel : PageModel
 
         Current = page;
         TranslatorConfigured = (await _translator.GetConfigAsync()).IsConfigured;
+        AiEnabled = _ai.Enabled;
         BlocksJson = JsonSerializer.Serialize(
             page.Blocks.OrderBy(b => b.SortOrder).Select(b => new
             {
@@ -279,6 +285,82 @@ public class EditModel : PageModel
 
     // Creates a translation of this page in another locale (same TranslationGroup), copying its
     // blocks as a starting point. The new page is a draft and opens in the editor.
+    /// <summary>
+    /// Proposes an AI rewrite of a block's prose fields WITHOUT saving anything. It works on the CURRENT
+    /// editor state (the DataJson the client posts, so unsaved edits are respected), collects the prose
+    /// string fields (the same machine-vs-content split as auto-translate), rewrites each through the
+    /// cloud relay, and returns a proposed DataJson plus a before/after per changed field. The client
+    /// shows the diff and — only on the operator's confirm — applies it via the normal SaveBlock.
+    /// </summary>
+    public async Task<IActionResult> OnPostAiRewriteBlockAsync(int id, string? instruction, string? dataJson)
+    {
+        if (!_ai.Enabled)
+            return new JsonResult(new { ok = false, error = "KI ist für diese Website nicht aktiviert." });
+
+        JsonObject? root;
+        try { root = JsonNode.Parse(string.IsNullOrWhiteSpace(dataJson) ? "{}" : dataJson!) as JsonObject; }
+        catch { root = null; }
+        if (root is null) return new JsonResult(new { ok = false, error = "Ungültige Blockdaten." });
+
+        var instr = string.IsNullOrWhiteSpace(instruction)
+            ? "Verbessere den Text: klar, prägnant und fehlerfrei, ohne den Sinn zu verändern."
+            : instruction!.Trim();
+
+        // Machine settings, not content — never rewrite these (same list as auto-translate + _css).
+        var skipKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "align", "width", "layout", "columns", "imageHeight", "size", "display", "showFilter",
+            "source", "perPage", "limit", "form", "tag", "tags", "_width", "_spaceTop", "_spaceBottom",
+            "buttonStyle", "icon", "imageSide", "bg", "fg", "position", "variant", "style", "_css"
+        };
+        static bool Prose(string s) => s.Length > 1 && s.Any(char.IsLetter) && !s.StartsWith("/") && !s.StartsWith("http");
+
+        // Collect prose slots, bounded so one block can't fan out into dozens of paid calls.
+        const int maxSlots = 12;
+        var slots = new List<(JsonObject Obj, string Prop, string Value)>();
+        void Collect(JsonNode? node)
+        {
+            if (slots.Count >= maxSlots) return;
+            switch (node)
+            {
+                case JsonObject obj:
+                    foreach (var p in obj.ToList())
+                    {
+                        if (slots.Count >= maxSlots) break;
+                        if (skipKeys.Contains(p.Key)) continue;
+                        if (p.Value is JsonValue v && v.TryGetValue<string>(out var s) && Prose(s))
+                            slots.Add((obj, p.Key, s));
+                        else Collect(p.Value);
+                    }
+                    break;
+                case JsonArray arr:
+                    foreach (var it in arr) Collect(it);
+                    break;
+            }
+        }
+        Collect(root);
+
+        if (slots.Count == 0)
+            return new JsonResult(new { ok = false, error = "In diesem Block gibt es keinen Text zum Verbessern." });
+
+        var changes = new List<object>();
+        foreach (var (obj, prop, value) in slots)
+        {
+            var (ok, text, error) = await _ai.RewriteAsync(instr, value, ct: HttpContext.RequestAborted);
+            if (!ok) return new JsonResult(new { ok = false, error = error ?? "KI-Aufruf fehlgeschlagen." });
+            var after = (text ?? "").Trim();
+            if (after.Length == 0 || after == value) continue;   // nothing changed for this field
+            obj[prop] = after;                                    // write into the proposed clone
+            changes.Add(new { field = prop, before = value, after });
+        }
+
+        if (changes.Count == 0)
+            return new JsonResult(new { ok = false, error = "Die KI hatte keine Verbesserung vorzuschlagen." });
+
+        // `root` is now the proposed DataJson (originals captured in `changes` before overwriting).
+        return new JsonResult(new { ok = true, proposed = root.ToJsonString(), changes });
+    }
+
     /// <summary>
     /// Machine-translates THIS (non-default-locale) version from its default-locale sibling: every
     /// translatable text field of every source block is translated and written into this page's

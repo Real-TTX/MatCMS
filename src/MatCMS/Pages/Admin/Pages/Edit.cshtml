@@ -108,8 +108,39 @@
                         <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["editor.blockDelete"]" aria-label="@T["editor.blockDelete"]"><i class="ti ti-trash" aria-hidden="true"></i></button>
                     </form>
                     <button type="submit" form="block-form" name="thenAdd" value="true" class="btn btn-sm btn-ghost btn-icon" title="@T["editor.addBlock"]" aria-label="@T["editor.addBlock"]"><i class="ti ti-plus" aria-hidden="true"></i></button>
+                    @if (Model.AiEnabled)
+                    {
+                        <button type="button" id="ai-block-btn" class="btn btn-sm btn-ghost btn-icon"
+                                title="@T["editor.aiImprove"]" aria-label="@T["editor.aiImprove"]"
+                                data-ai-url="@Url.Page(null, "AiRewriteBlock", new { id = Model.Current.Id })">
+                            <i class="ti ti-sparkles" aria-hidden="true"></i>
+                        </button>
+                    }
                     <button type="submit" form="block-form" name="close" value="true" class="btn btn-sm btn-icon le-save" title="@T["editor.saveAndClose"]" aria-label="@T["editor.saveAndClose"]"><i class="ti ti-check" aria-hidden="true"></i></button>
                 </div>
+                @if (Model.AiEnabled)
+                {
+                    <dialog id="ai-dialog" class="ai-dialog"
+                            data-lbl-before="@T["editor.aiBefore"]" data-lbl-after="@T["editor.aiAfter"]" data-lbl-working="@T["editor.aiWorking"]">
+                        <h3>@T["editor.aiDialogTitle"]</h3>
+                        <label class="ai-instr-label" for="ai-instruction">@T["editor.aiInstruction"]</label>
+                        <textarea id="ai-instruction" rows="2" placeholder="@T["editor.aiInstructionPlaceholder"]"></textarea>
+                        <div class="ai-dialog-actions">
+                            <button type="button" id="ai-propose" class="btn btn-sm">@T["editor.aiPropose"]</button>
+                            <span id="ai-status" class="ai-status muted"></span>
+                        </div>
+                        <div id="ai-diff" class="ai-diff"></div>
+                        <div class="ai-dialog-foot">
+                            <button type="button" id="ai-apply" class="btn btn-sm" disabled>@T["editor.aiApply"]</button>
+                            <button type="button" id="ai-cancel" class="btn btn-sm btn-ghost">@T["editor.aiCancel"]</button>
+                        </div>
+                    </dialog>
+                    @* Applies the accepted proposal through the NORMAL per-block save (non-destructive PRG),
+                       with its own DataJson so the block editor's own submit-serialize can't overwrite it. *@
+                    <form id="ai-apply-form" method="post" asp-page-handler="SaveBlock" asp-route-id="@Model.Current.Id" asp-route-blockId="@Model.SelectedBlock!.Id">
+                        <input type="hidden" name="DataJson" id="ai-apply-data" />
+                    </form>
+                }
             </div>
             <script id="block-schema" type="application/json">@Html.Raw(Model.SchemaJson.Replace("</", "<\\/"))</script>
             <script id="block-data" type="application/json">@Html.Raw(Model.CurrentJson.Replace("</", "<\\/"))</script>
@@ -572,6 +603,8 @@
     <script src="~/js/mat-richselect.js" asp-append-version="true"></script>
     <script src="~/js/admin-blocks.js" asp-append-version="true"></script>
     <script src="~/js/admin-page-editor.js" asp-append-version="true"></script>
+    @* AI "improve text" dialog — only wired when the block editor and the KI button are present. *@
+    <script src="~/js/ai-block-edit.js" asp-append-version="true"></script>
     @* Loaded AFTER admin-blocks.js: the switcher asks that script whether the open block still
        carries unsaved edits before it lets go of the page. *@
     <script src="~/js/admin-page-switcher.js" asp-append-version="true"></script>

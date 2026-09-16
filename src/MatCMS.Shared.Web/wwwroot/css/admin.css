@@ -1358,3 +1358,22 @@ table.data .btn { white-space: nowrap; }
 .recovery-codes { list-style: none; margin: 12px 0 0; padding: 14px 16px; background: var(--bg-alt);
     border: 1px solid var(--line); border-radius: 10px; columns: 2; column-gap: 28px; }
 .recovery-codes li { padding: 3px 0; font-size: 15px; letter-spacing: 1px; }
+
+/* ============ AI „Text verbessern" dialog (page/block editor) ============ */
+.ai-dialog { width: min(680px, 92vw); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+.ai-dialog::backdrop { background: rgba(0, 0, 0, .35); }
+.ai-dialog h3 { margin: 0 0 12px; }
+.ai-dialog textarea { width: 100%; resize: vertical; }
+.ai-instr-label { display: block; font-size: 13px; margin-bottom: 4px; }
+.ai-dialog-actions { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
+.ai-status { font-size: 13px; }
+.ai-diff { max-height: 46vh; overflow: auto; display: flex; flex-direction: column; gap: 12px; }
+.ai-change { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.ai-change .ai-field { font-size: 12px; margin-bottom: 6px; opacity: .7; }
+.ai-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ai-col .ai-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; opacity: .6; margin-bottom: 4px; }
+.ai-col .ai-text { white-space: pre-wrap; word-break: break-word; font-size: 14px; }
+.ai-before .ai-text { color: #b91c1c; }
+.ai-after .ai-text { color: #15803d; }
+.ai-dialog-foot { display: flex; gap: 10px; margin-top: 14px; }
+@media (max-width: 560px) { .ai-cols { grid-template-columns: 1fr; } }

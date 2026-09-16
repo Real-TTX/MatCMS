@@ -57,6 +57,9 @@
 
     var api = build(editor, safeParse(schemaEl.textContent, []), safeParse(dataEl ? dataEl.textContent : "{}", {}));
     function serialize() { return api.serialize(); }
+    // Exposed so the AI "improve text" action can read the CURRENT editor state (unsaved edits and all)
+    // to propose a rewrite against, and apply the result via the normal SaveBlock.
+    window.matBlockSerialize = serialize;
 
     form.addEventListener("submit", function () {
         output.value = JSON.stringify(serialize());

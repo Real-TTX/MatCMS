@@ -21,6 +21,7 @@
                 <th>@T["users.colEmail"]</th>
                 <th>@T["users.colDisplayName"]</th>
                 <th>@T["users.colRole"]</th>
+                <th>@T["users.col2fa"]</th>
                 <th>@T["users.colCreated"]</th>
                 <th></th>
             </tr>
@@ -32,6 +33,16 @@
                     <td><strong>@(string.IsNullOrWhiteSpace(u.Email) ? u.Username : u.Email)</strong> @(u.Username == me ? T["users.you"] : "")</td>
                     <td>@(string.IsNullOrWhiteSpace(u.DisplayName) ? "—" : u.DisplayName)</td>
                     <td>@u.Role</td>
+                    <td>
+                        @if (u.TwoFactorEnabled)
+                        {
+                            <span class="badge badge-on">@T["twofactor.on"]</span>
+                        }
+                        else
+                        {
+                            <span class="badge badge-off">@T["twofactor.off"]</span>
+                        }
+                    </td>
                     <td class="muted">@u.CreatedAt.ToString("dd.MM.yyyy")</td>
                     <td>
                         <div class="actions">

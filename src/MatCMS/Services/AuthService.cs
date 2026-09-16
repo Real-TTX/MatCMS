@@ -36,7 +36,10 @@ public class AuthService
         return VerifyPassword(user, password) ? user : null;
     }
 
-    public async Task SignInAsync(HttpContext http, User user, bool persistent)
+    /// <param name="amr">Optional "authentication method" marker for the session. The SSO callback
+    /// passes "sso" so the "2FA required" gate can tell a federated login — whose second factor the
+    /// cloud already enforced — from a local password login that still owes a local TOTP.</param>
+    public async Task SignInAsync(HttpContext http, User user, bool persistent, string? amr = null)
     {
         var claims = new List<Claim>
         {
@@ -46,6 +49,8 @@ public class AuthService
         };
         if (!string.IsNullOrWhiteSpace(user.DisplayName))
             claims.Add(new Claim("DisplayName", user.DisplayName));
+        if (!string.IsNullOrWhiteSpace(amr))
+            claims.Add(new Claim("amr", amr));
 
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         var props = new AuthenticationProperties { IsPersistent = persistent };

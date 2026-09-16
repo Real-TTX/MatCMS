@@ -174,6 +174,7 @@ builder.Services.Configure<RequestLocalizationOptions>(options =>
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<TwoFactorService>();
 builder.Services.AddScoped<BlockRegistry>();
 builder.Services.AddScoped<SiteContext>();
 builder.Services.AddScoped<ContentTransferService>();
@@ -392,6 +393,7 @@ app.Use(async (ctx, next) =>
                 {
                     var c = sc[i] ?? "";
                     outv[i] = (c.StartsWith("matcms.auth=", StringComparison.Ordinal)
+                               || c.StartsWith("matcms.2fa=", StringComparison.Ordinal)
                                || c.StartsWith(".AspNetCore.Antiforgery.", StringComparison.Ordinal))
                         ? CrossSite(c) : c;
                 }
@@ -482,6 +484,39 @@ app.UseRouting();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+
+// --- Enforce "2FA required" (Settings → Sicherheit, cloud-rollable) ---------
+// When the policy is on, a signed-in admin who has NOT set up 2FA is funnelled to the enrolment page —
+// forced setup, NOT a lock-out: they reach the page, can still log out, and recover later. Scoped to
+// /admin so the extra user lookup only happens while navigating the back office with the policy active.
+// SSO logins are covered by the cloud that authenticated them; this catches local password users.
+app.Use(async (ctx, next) =>
+{
+    var p = ctx.Request.Path.Value ?? "/";
+    if (p.StartsWith("/admin", StringComparison.OrdinalIgnoreCase)
+        && ctx.User?.Identity?.IsAuthenticated == true
+        && ctx.User.FindFirst("amr")?.Value != "sso"   // federated logins get their factor from the cloud
+        && !p.StartsWith("/admin/account/twofactor", StringComparison.OrdinalIgnoreCase))
+    {
+        var site = ctx.RequestServices.GetRequiredService<SiteContext>();
+        if (site.Get(SettingKeys.Require2fa) is "1" or "true" or "on" or "yes")
+        {
+            var idClaim = ctx.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (int.TryParse(idClaim, out var uid))
+            {
+                var db = ctx.RequestServices.GetRequiredService<AppDbContext>();
+                var enrolled = await db.Users.AsNoTracking()
+                    .Where(u => u.Id == uid).Select(u => u.TwoFactorEnabled).FirstOrDefaultAsync();
+                if (!enrolled)
+                {
+                    ctx.Response.Redirect("/admin/account/twofactor?enrol=true");
+                    return;
+                }
+            }
+        }
+    }
+    await next();
+});
 
 // Remember the address this site is actually reached at. A site with no canonical URL configured
 // otherwise has no address to report to MatCMS.Cloud, which then cannot link to it or preview it.
@@ -738,7 +773,11 @@ app.MapGet("/sso/callback", async (HttpContext ctx, MatCMS.Services.CloudService
         db.Users.Add(user);
         await db.SaveChangesAsync();
     }
-    await auth.SignInAsync(ctx, user, true);
+    // No instance-side 2FA challenge here on purpose: an SSO user was already authenticated by the
+    // cloud, which enforces its own second factor. The "sso" marker tells the "2FA required" gate to
+    // let this federated session through rather than force a redundant local TOTP enrolment — the
+    // instance policy applies to LOCAL password logins (Login.cshtml.cs).
+    await auth.SignInAsync(ctx, user, true, amr: "sso");
     return Results.Redirect(returnUrl.StartsWith("/") && !returnUrl.StartsWith("//") ? returnUrl : "/admin");
 }).RequireRateLimiting("login");
 

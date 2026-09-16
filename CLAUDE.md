@@ -24,7 +24,7 @@ recorded without running it) and upgrade normally from there.
 
 ## Why they live together
 
-Three things genuinely span both applications, and keeping them in separate repos meant holding them
+Four things genuinely span both applications, and keeping them in separate repos meant holding them
 together by hand:
 
 1. **The wire contract** — now **`src/MatCMS.Shared/CloudProtocol.cs`**, one definition referenced by
@@ -69,6 +69,22 @@ together by hand:
    They used to be byte-identical copies kept in step by hand and a `diff`. Both apps reach them at
    `~/_content/MatCMS.Shared.Web/…`; the partial resolves by name as usual. Product-specific assets
    stay put: `cloud.css` in the cloud, the CMS's public-site scripts in the CMS.
+4. **The second factor (TOTP)** — the RFC 6238 algorithm is **`src/MatCMS.Shared/TwoFactor.cs`** (secret
+   generation, code verification that also returns the matched 30-second step for one-time use, Base32,
+   recovery-code hashing), dependency-free like the wire contract, so both apps share ONE implementation
+   of security-sensitive crypto rather than two hand-kept copies. The enrolment QR is rendered
+   **client-side** from a vendored `qrcode.min.js` in `src/MatCMS.Shared.Web/wwwroot/lib/qrcode/` — the
+   cloud ships no image library, so a server-side encoder would have to be added to both. What each app
+   keeps to itself: **where the secret lives** (DataProtection-encrypted on its own `User` row; recovery
+   codes as SHA-256 hashes), the login challenge (`/login/2fa` + a short-lived encrypted pending cookie),
+   the self-service enrolment page (`Admin/Account/TwoFactor`), and the "2FA erforderlich" policy
+   (rollable instance setting `security.require2fa` on the CMS; a cloud-wide `CloudSetting` on the cloud,
+   enforced by a forced-enrolment gate that also covers the cloud's `/oauth/authorize`). 2FA is per-user
+   and **never rides the user rollout** (`ConfigUser` carries no 2FA field; instance users are add-only)
+   — and a **restore is add-only for existing accounts**, so neither path can reset a password or strip
+   an enrolled admin's second factor. A decrypt failure of the secret (cross-instance restore, lost keys)
+   disables only the TOTP branch; the key-independent recovery codes still work, so an admin is never
+   hard-locked out. (Known v1 gap: `/api/cloud/link` adoption still authenticates by password alone.)
 
 ## Layout
 

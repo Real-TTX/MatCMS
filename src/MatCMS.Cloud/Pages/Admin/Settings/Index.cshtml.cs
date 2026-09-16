@@ -124,6 +124,19 @@ public class IndexModel : PageModel
     private static string Port(string? raw) =>
         int.TryParse(raw, out var p) && p >= 1024 && p <= 65535 ? p.ToString() : "";
 
+    /// <summary>Security policy card. Its own form, so saving it never touches the other settings.</summary>
+    public async Task<IActionResult> OnPostSecurityAsync(bool require2fa)
+    {
+        await _cloud.SaveAsync(new Dictionary<string, string?>
+        {
+            [SettingKeys.Require2fa] = require2fa ? "1" : "0"
+        });
+        TempData["Flash"] = require2fa
+            ? "Zwei-Faktor-Pflicht ist AKTIV — Konten ohne 2FA werden zur Einrichtung geführt."
+            : "Sicherheitseinstellungen gespeichert.";
+        return RedirectToPage(new { tab = "security" });
+    }
+
     public async Task<IActionResult> OnPostNotificationsAsync(
         string? recipients, bool notifyOffline, bool notifyUpdate, bool autoUpdateLocal)
     {

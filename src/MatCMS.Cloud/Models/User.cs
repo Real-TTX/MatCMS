@@ -20,6 +20,23 @@ public class User
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    // --- Two-factor (TOTP) ----------------------------------------------------
+    // Off for every existing account; turned on only after the user confirms a code during enrolment.
+    // The secret is stored DataProtection-ENCRYPTED (see TwoFactorService) and recovery codes only as
+    // SHA-256 hashes — neither is ever kept in the clear. All three are nullable/false so the migration
+    // is purely additive and old rows upgrade untouched. Never rolled out to instances (ConfigUser
+    // carries no 2FA field): a cloud account's second factor is a fact about the cloud login only.
+
+    /// <summary>Whether this cloud account requires a second factor at login.</summary>
+    public bool TwoFactorEnabled { get; set; }
+
+    /// <summary>DataProtection-encrypted TOTP secret (Base32 plaintext inside). Null until enrolled.</summary>
+    public string? TotpSecret { get; set; }
+
+    /// <summary>Newline-separated SHA-256 hashes of the still-unused single-use recovery codes; a code
+    /// is consumed by removing its hash. Null/empty = none left.</summary>
+    public string? RecoveryCodes { get; set; }
+
     public const string RoleAdmin = "Admin";
     public const string RoleOperator = "Operator";
 }

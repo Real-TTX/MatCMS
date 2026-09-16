@@ -367,7 +367,8 @@ public class ContentTransferService
                 .Select(u => new UserDto
                 {
                     Username = u.Username, PasswordHash = u.PasswordHash, Role = u.Role,
-                    DisplayName = u.DisplayName, Email = u.Email, CreatedAt = u.CreatedAt
+                    DisplayName = u.DisplayName, Email = u.Email, CreatedAt = u.CreatedAt,
+                    TwoFactorEnabled = u.TwoFactorEnabled, TotpSecret = u.TotpSecret, RecoveryCodes = u.RecoveryCodes
                 }).ToList();
         }
 
@@ -1006,17 +1007,30 @@ public class ContentTransferService
                 var uname = (u.Username ?? "").Trim();
                 if (uname.Length == 0 || string.IsNullOrWhiteSpace(u.PasswordHash)) continue;
                 var row = existingUsers.FirstOrDefault(x => string.Equals(x.Username, uname, StringComparison.OrdinalIgnoreCase));
+                var isNew = row is null;
                 if (row is null)
                 {
                     row = new User { Username = uname };
                     _db.Users.Add(row);
                     existingUsers.Add(row);
                 }
-                row.PasswordHash = u.PasswordHash!;
-                row.Role = string.IsNullOrWhiteSpace(u.Role) ? "Admin" : u.Role!;
+                // Add-only for the security-critical fields: a restore can be triggered with an
+                // arbitrary — even foreign — backup (a cloud operator, or an API key with CanRestore),
+                // so it must NOT reset an EXISTING admin's password/role or strip their second factor;
+                // that would be a takeover path and would silently defeat a 2FA mandate. A fresh full
+                // migration creates the accounts, so they still get their complete state; an existing
+                // account keeps its own. Mirrors the "users are add-only" rollout rule.
+                if (isNew)
+                {
+                    row.PasswordHash = u.PasswordHash!;
+                    row.Role = string.IsNullOrWhiteSpace(u.Role) ? "Admin" : u.Role!;
+                    row.TwoFactorEnabled = u.TwoFactorEnabled;
+                    row.TotpSecret = u.TotpSecret;
+                    row.RecoveryCodes = u.RecoveryCodes;
+                    if (u.CreatedAt != default) row.CreatedAt = u.CreatedAt;
+                }
                 row.DisplayName = u.DisplayName;
                 row.Email = u.Email;
-                if (u.CreatedAt != default) row.CreatedAt = u.CreatedAt;
                 n++;
             }
             await _db.SaveChangesAsync();
@@ -1262,6 +1276,14 @@ public class ContentTransferService
         public string? DisplayName { get; set; }
         public string? Email { get; set; }
         public DateTime CreatedAt { get; set; }
+
+        // Two-factor state travels as stored: the TOTP secret DataProtection-encrypted, the recovery
+        // codes as hashes. A same-instance restore round-trips fully; a restore onto a DIFFERENT
+        // instance cannot decrypt the secret (different keys), so that admin falls back to recovery
+        // codes (portable hashes) or an admin reset — never a hard lock-out.
+        public bool TwoFactorEnabled { get; set; }
+        public string? TotpSecret { get; set; }
+        public string? RecoveryCodes { get; set; }
     }
 
     private sealed class FormDto

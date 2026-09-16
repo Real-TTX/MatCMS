@@ -48,6 +48,10 @@ public class AppDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder b)
     {
         b.Entity<User>().HasIndex(u => u.Username).IsUnique();
+        // Optimistic-concurrency guard so two simultaneous logins can't spend the same single-use
+        // recovery code twice: the second UPDATE matches 0 rows and throws (handled in TwoFactorService).
+        // Marking an existing column as a token only changes the generated WHERE clause — no migration.
+        b.Entity<User>().Property(u => u.RecoveryCodes).IsConcurrencyToken();
         b.Entity<CloudSetting>().HasIndex(s => s.Key).IsUnique();
 
         // Both are lookup keys on the API hot path (every heartbeat resolves by PublicId, and the

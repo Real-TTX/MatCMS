@@ -19,6 +19,7 @@
                 <th>@T["users.displayName"]</th>
                 <th>@T["users.username"]</th>
                 <th>@T["users.role"]</th>
+                <th>@T["users.col2fa"]</th>
                 <th></th>
             </tr>
         </thead>
@@ -47,6 +48,16 @@
                         else
                         {
                             <span class="badge badge-on">@T["users.roleAdmin"]</span>
+                        }
+                    </td>
+                    <td>
+                        @if (u.TwoFactorEnabled)
+                        {
+                            <span class="badge badge-on">@T["twofactor.on"]</span>
+                        }
+                        else
+                        {
+                            <span class="badge badge-off">@T["twofactor.off"]</span>
                         }
                     </td>
                     <td>

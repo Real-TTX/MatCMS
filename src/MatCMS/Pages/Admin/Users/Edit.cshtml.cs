@@ -10,11 +10,13 @@ public class EditModel : PageModel
 {
     private readonly AppDbContext _db;
     private readonly AuthService _auth;
+    private readonly TwoFactorService _twoFactor;
 
-    public EditModel(AppDbContext db, AuthService auth)
+    public EditModel(AppDbContext db, AuthService auth, TwoFactorService twoFactor)
     {
         _db = db;
         _auth = auth;
+        _twoFactor = twoFactor;
     }
 
     public User Current { get; private set; } = default!;
@@ -47,5 +49,17 @@ public class EditModel : PageModel
         await _db.SaveChangesAsync();
         TempData["Flash"] = "Benutzer gespeichert.";
         return RedirectToPage("Index");
+    }
+
+    /// <summary>Admin resets a colleague's two-factor auth (lost device). Clears the secret + recovery
+    /// codes; the user can enrol again. Enrolment itself is never done by an admin — only the reset.</summary>
+    public async Task<IActionResult> OnPostResetTwoFactorAsync(int id)
+    {
+        var user = await _db.Users.FindAsync(id);
+        if (user is null) return NotFound();
+
+        await _twoFactor.DisableAsync(user);
+        TempData["Flash"] = "Zwei-Faktor-Authentifizierung wurde zurückgesetzt.";
+        return RedirectToPage("Edit", new { id });
     }
 }

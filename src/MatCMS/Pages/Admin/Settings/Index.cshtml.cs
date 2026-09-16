@@ -84,7 +84,7 @@ public class IndexModel : PageModel
         SmtpConfigured = !string.IsNullOrWhiteSpace(
             (await _db.SiteSettings.AsNoTracking().FirstOrDefaultAsync(x => x.Key == SettingKeys.SmtpHost))?.Value);
         var existing = await _db.SiteSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
-        foreach (var key in SettingKeys.All.Concat(SettingKeys.Smtp).Concat(SettingKeys.Errors).Concat(SettingKeys.Code).Concat(SettingKeys.Maintenance).Concat(SettingKeys.Translate))
+        foreach (var key in SettingKeys.All.Concat(SettingKeys.Smtp).Concat(SettingKeys.Errors).Concat(SettingKeys.Code).Concat(SettingKeys.Maintenance).Concat(SettingKeys.Translate).Concat(SettingKeys.Security))
             Values[key] = existing.TryGetValue(key, out var v) ? v : "";
         CurrentActive = Localizer.ParseActive(existing.TryGetValue(SettingKeys.Languages, out var lv) ? lv : "")
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -266,6 +266,17 @@ public class IndexModel : PageModel
         await SaveKeysAsync(SettingKeys.Errors);
         TempData["Flash"] = "Fehlerhandling gespeichert.";
         return RedirectToPage(new { tab = "errors" });
+    }
+
+    /// <summary>Security policy tab. The checkbox only posts a value when ticked, so SaveKeysAsync
+    /// writes "" (= off) for the unticked case — same shape as the maintenance toggle.</summary>
+    public async Task<IActionResult> OnPostSecurityAsync()
+    {
+        await SaveKeysAsync(SettingKeys.Security);
+        TempData["Flash"] = Values.TryGetValue(SettingKeys.Require2fa, out var on) && on == "1"
+            ? "Zwei-Faktor-Pflicht ist AKTIV — Admins ohne 2FA werden zur Einrichtung geführt."
+            : "Sicherheitseinstellungen gespeichert.";
+        return RedirectToPage(new { tab = "security" });
     }
 
     public async Task<IActionResult> OnPostCodeAsync()

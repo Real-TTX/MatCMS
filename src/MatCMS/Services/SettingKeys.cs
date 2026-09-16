@@ -63,6 +63,14 @@ public static class SettingKeys
     /// — the cloud can switch it on per profile. Local login always stays available.</summary>
     public const string SsoEnabled = "sso.enabled";
 
+    /// <summary>"1" = every back-office admin must set up two-factor auth; one who has not is funnelled
+    /// to the enrolment page on their next admin request (forced setup, not a lock-out). Optional per
+    /// account otherwise. A rollable DB setting (not env), like <see cref="SsoEnabled"/> — the cloud can
+    /// switch it on for a whole fleet from a profile. The prefix is deliberately NOT one of the
+    /// group-key prefixes (smtp./translate./backup./mail.transport) so it rides the free-settings
+    /// rollout.</summary>
+    public const string Require2fa = "security.require2fa";
+
     // "1" once the setup wizard has been completed (drives the dashboard prompt).
     public const string SetupComplete = "setup.complete";
 
@@ -151,6 +159,9 @@ public static class SettingKeys
 
     /// <summary>Error-handling setting keys (managed on the Settings → Fehlerhandling tab).</summary>
     public static readonly string[] Errors = [NotFoundPage, ErrorPage];
+
+    /// <summary>Security-policy keys (managed on the Settings → Sicherheit tab).</summary>
+    public static readonly string[] Security = [Require2fa];
 
     /// <summary>Custom-code / tracking keys (managed on the Settings → Code tab).</summary>
     public static readonly string[] Code = [AnalyticsGa4, CodeHead, CodeBodyStart, CodeBodyEnd];

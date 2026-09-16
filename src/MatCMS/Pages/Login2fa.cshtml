@@ -1,0 +1,41 @@
+@page "/login/2fa"
+@model MatCMS.Pages.Login2faModel
+@inject MatCMS.Services.SiteContext Site
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@T["login.2fa.pageTitle"] – @Site.SiteName</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Geologica:wght@@500;600;700&family=Inter:wght@@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/admin.css" asp-append-version="true" />
+    <link rel="icon" href="@Site.LogoUrl" />
+</head>
+<body class="login-page">
+    <div class="login-card">
+        <img class="login-logo" src="@Site.LogoUrl" alt="@Site.SiteName" />
+        <h1>@T["login.2fa.heading"]</h1>
+        <p class="help" style="text-align:center;">@T["login.2fa.intro"]</p>
+        @if (!string.IsNullOrWhiteSpace(Model.Error))
+        {
+            <div class="alert alert-error">@Model.Error</div>
+        }
+        <form method="post">
+            <div class="form-field">
+                <label for="Code">@T["login.2fa.code"]</label>
+                <input id="Code" name="Code" inputmode="numeric" autocomplete="one-time-code"
+                       autofocus required value="" />
+                <div class="help">@T["login.2fa.recoveryHint"]</div>
+            </div>
+            <button type="submit" class="btn btn-block">@T["login.2fa.submit"]</button>
+        </form>
+        <a class="login-back" href="/login">@T["login.2fa.cancel"]</a>
+    </div>
+</body>
+</html>

@@ -88,6 +88,17 @@ Matmon.Cloud's `src/`-layout or PostgreSQL.
 - **Cookie auth** (`matcmscloud.auth`, 7 days sliding), login only via `/login`, `Admin` policy,
   `AuthorizeFolder("/Admin", "Admin")`, DataProtection keys persisted to `appdata/keys`, per-IP
   rate limit on `/login` (10/min) — copy the `Program.cs` blocks from MatCMS.
+- **Two-factor (TOTP)** mirrors the CMS (shared algorithm in `MatCMS.Shared/TwoFactor.cs`, QR from the
+  shared `qrcode.min.js`). Cloud-specific: `Services/TwoFactorService.cs` (secret DataProtection-encrypted
+  on the `User` row, recovery codes hashed, per-user replay/lockout state in `IMemoryCache`), the login
+  challenge (`/login/2fa` + `matcmscloud.2fa` pending cookie), self-service `Admin/Account/TwoFactor`
+  (linked in the sidebar for Operators too), and a cloud-wide "2FA erforderlich" toggle
+  (`CloudSetting security.require2fa`, Einstellungen → Sicherheit). A forced-enrolment gate covers
+  `/admin` **and** `/oauth/authorize` — the latter matters because the instance's `/sso/callback`
+  exempts `amr=sso` sessions from its own 2FA gate, trusting the cloud to have enforced the factor, so an
+  un-enrolled account must not be able to mint an SSO code. The catalog additionally offers the INSTANCE
+  key `security.require2fa` (`InstanceSettingCatalog`) for rollout to sites — a different setting from
+  the cloud's own, kept apart. 2FA never rides `ConfigUser` (it has no such field; users are add-only).
 - **NuGet floats on `10.0.*`** ("immer aktuell"): `Microsoft.EntityFrameworkCore.Sqlite`,
   `Microsoft.Extensions.Identity.Core`, `MailKit 4.*` (SMTP, implicit SSL *and* STARTTLS),
   `SQLitePCLRaw.bundle_e_sqlite3 3.0.*`. Add `Docker.DotNet` for the local-host update executor.

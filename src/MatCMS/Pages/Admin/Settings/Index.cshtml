@@ -13,6 +13,7 @@
     <button type="button" class="tab active" data-tab="general">@T["settings.tabGeneral"]</button>
     <button type="button" class="tab" data-tab="smtp">@T["settings.tabMail"]</button>
     <button type="button" class="tab" data-tab="errors">@T["settings.tabErrors"]</button>
+    <button type="button" class="tab" data-tab="security">@T["settings.tabSecurity"]</button>
     <button type="button" class="tab" data-tab="code">@T["settings.tabCode"]</button>
     <button type="button" class="tab" data-tab="maintenance">@T["settings.maint.tab"]</button>
     <button type="button" class="tab" data-tab="languages">@T["settings.tabLanguages"]</button>
@@ -472,6 +473,22 @@
                 </select>
             </div>
             <div><button type="submit" class="btn">@T["settings.save"]</button></div>
+        </div>
+    </form>
+</div>
+
+@* ============ SICHERHEIT ============ *@
+<div class="tab-panel" data-panel="security" hidden>
+    <form method="post" asp-page-handler="Security">
+        <div class="card">
+            <h2>@T["settings.securityHeading"]</h2>
+            <p class="muted">@T["settings.securityIntro"]</p>
+            <label class="checkbox-row">
+                <input type="checkbox" name="Values[@SettingKeys.Require2fa]" value="1" checked="@(V(SettingKeys.Require2fa) == "1")" />
+                @T["settings.require2fa"]
+            </label>
+            <div class="help">@T["settings.require2faHelp"]</div>
+            <div style="margin-top:14px;"><button type="submit" class="btn">@T["settings.save"]</button></div>
         </div>
     </form>
 </div>

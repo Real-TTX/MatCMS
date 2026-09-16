@@ -28,6 +28,12 @@ public static class SettingKeys
     /// </summary>
     public const string ForceHttpsUrls = "instances.forceHttps";
 
+    /// <summary>"1" = every cloud account must use two-factor auth; one who has not set it up is
+    /// funnelled to the enrolment page on the next admin request (forced setup, not a lock-out).
+    /// Optional per account otherwise. A cloud-wide policy stored in CloudSettings; separate from the
+    /// per-instance <c>security.require2fa</c> a profile can roll out to sites.</summary>
+    public const string Require2fa = "security.require2fa";
+
     /// <summary>
     /// Ob diese Cloud selbst Instanzen betreiben darf — Container auf dem erreichbaren Docker-Daemon
     /// anlegen und später mehr.

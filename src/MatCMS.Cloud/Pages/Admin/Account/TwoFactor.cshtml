@@ -1,0 +1,98 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.Account.TwoFactorModel
+@{
+    ViewData["Title"] = T["twofactor.title"];
+}
+<div class="page-head">
+    <h1>@T["twofactor.title"]</h1>
+</div>
+
+@if (Model.RequiredByPolicy && !Model.Enrolled)
+{
+    <div class="alert alert-error">@T["twofactor.requiredNotice"]</div>
+}
+
+@if (Model.NewRecoveryCodes.Count > 0)
+{
+    <div class="card">
+        <h2>@T["twofactor.recoveryTitle"]</h2>
+        <p class="help">@T["twofactor.recoveryIntro"]</p>
+        <ul class="recovery-codes mono">
+            @foreach (var code in Model.NewRecoveryCodes)
+            {
+                <li>@code</li>
+            }
+        </ul>
+    </div>
+}
+
+@if (Model.Enrolled)
+{
+    <div class="card">
+        <div class="kv">
+            <div class="kv-label">@T["twofactor.status"]</div>
+            <div class="kv-value"><span class="badge badge-on">@T["twofactor.on"]</span></div>
+        </div>
+        <div class="kv">
+            <div class="kv-label">@T["twofactor.recoveryRemaining"]</div>
+            <div class="kv-value">@Model.RemainingCodes</div>
+        </div>
+        <div class="form-actions" style="margin-top:14px;">
+            <form method="post" asp-page-handler="Regenerate" class="inline-form">
+                <button type="submit" class="btn btn-ghost">@T["twofactor.regenerate"]</button>
+            </form>
+            <form method="post" asp-page-handler="Disable" class="inline-form"
+                  onsubmit="return confirm('@T["twofactor.confirmDisable"]');">
+                <button type="submit" class="btn btn-danger">@T["twofactor.disable"]</button>
+            </form>
+        </div>
+    </div>
+}
+else
+{
+    <div class="card">
+        <h2>@T["twofactor.setupTitle"]</h2>
+        <p class="help">@T["twofactor.setupStep1"]</p>
+        <div class="twofactor-enrol">
+            <div class="twofactor-qr" id="twofactor-qr" data-otpauth="@Model.OtpauthUri"></div>
+            <div class="twofactor-manual">
+                <div class="help">@T["twofactor.manualKey"]</div>
+                <code class="mono twofactor-secret">@Model.PendingSecret</code>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Model.Error))
+        {
+            <div class="alert alert-error">@Model.Error</div>
+        }
+
+        <form method="post" asp-page-handler="Enable" class="form-grid" style="margin-top:14px;">
+            <input type="hidden" name="PendingSecret" value="@Model.PendingSecret" />
+            <div class="form-field">
+                <label for="Code">@T["twofactor.confirmCode"]</label>
+                <input id="Code" name="Code" inputmode="numeric" autocomplete="one-time-code"
+                       placeholder="000000" required />
+                <div class="help">@T["twofactor.setupStep2"]</div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn">@T["twofactor.enable"]</button>
+            </div>
+        </form>
+    </div>
+}
+
+@section Scripts {
+    <script src="~/_content/MatCMS.Shared.Web/lib/qrcode/qrcode.min.js" asp-append-version="true"></script>
+    <script>
+        (function () {
+            var el = document.getElementById('twofactor-qr');
+            if (!el || typeof qrcode !== 'function') return;
+            var uri = el.getAttribute('data-otpauth');
+            if (!uri) return;
+            var qr = qrcode(0, 'M');
+            qr.addData(uri);
+            qr.make();
+            el.innerHTML = qr.createSvgTag({ cellSize: 5, margin: 4 });
+        })();
+    </script>
+}

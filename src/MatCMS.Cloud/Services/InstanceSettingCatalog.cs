@@ -50,6 +50,10 @@ public static class InstanceSettingCatalog
             new Entry("sso.enabled", "Anmeldung mit Cloud-Konto",
                 "1 = an. Zeigt auf der Anmeldeseite den Knopf „Mit Cloud-Konto anmelden“ und schaltet den SSO-Ablauf frei. Wirkt nur, wenn die Instanz mit dieser Cloud verbunden ist; der lokale Login bleibt daneben bestehen."),
         ]),
+        new Group("Sicherheit", [
+            new Entry("security.require2fa", "Zwei-Faktor-Pflicht",
+                "1 = an. Admins der Instanz ohne Zwei-Faktor-Authentifizierung werden bei der nächsten Anmeldung zur Einrichtung geführt. Einzelne Konten können 2FA auch freiwillig aktivieren."),
+        ]),
         new Group("Kopfleiste", [
             new Entry("TopBarLink1Text", "Link 1: Text"),
             new Entry("TopBarLink1Url", "Link 1: Ziel"),

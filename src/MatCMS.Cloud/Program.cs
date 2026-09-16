@@ -80,6 +80,7 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddHttpClient();
 
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<TwoFactorService>();
 builder.Services.AddScoped<CloudContext>();
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<InstanceService>();
@@ -267,6 +268,38 @@ app.UseRouting();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+
+// --- Enforce "2FA required" for cloud accounts (Einstellungen → Sicherheit) ---
+// When the policy is on, a signed-in account (Admin or Operator) that has NOT set up 2FA is funnelled
+// to the enrolment page — forced setup, not a lock-out. Scoped to /admin so the user lookup only
+// happens while navigating the back office with the policy active. The OAuth authorize step trusts the
+// finished login cookie, so gating the login (above) plus this covers SSO into instances too.
+app.Use(async (ctx, next) =>
+{
+    var p = ctx.Request.Path.Value ?? "/";
+    if (p.StartsWith("/admin", StringComparison.OrdinalIgnoreCase)
+        && ctx.User?.Identity?.IsAuthenticated == true
+        && !p.StartsWith("/admin/account/twofactor", StringComparison.OrdinalIgnoreCase))
+    {
+        var cloud = ctx.RequestServices.GetRequiredService<CloudContext>();
+        if (cloud.Flag(SettingKeys.Require2fa))
+        {
+            var idClaim = ctx.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (int.TryParse(idClaim, out var uid))
+            {
+                var db = ctx.RequestServices.GetRequiredService<AppDbContext>();
+                var enrolled = await db.Users.AsNoTracking()
+                    .Where(u => u.Id == uid).Select(u => u.TwoFactorEnabled).FirstOrDefaultAsync();
+                if (!enrolled)
+                {
+                    ctx.Response.Redirect("/admin/account/twofactor?enrol=true");
+                    return;
+                }
+            }
+        }
+    }
+    await next();
+});
 
 app.MapRazorPages();
 
@@ -537,6 +570,19 @@ app.MapGet("/oauth/authorize", async (HttpContext ctx, AppDbContext db, Operator
     // Not logged in → cloud login, then straight back here (returnUrl carries the whole request).
     if (ctx.User.Identity?.IsAuthenticated != true)
         return Results.Redirect($"/login?returnUrl={Uri.EscapeDataString(ctx.Request.GetEncodedPathAndQuery())}");
+
+    // The cloud IS the second factor an instance trusts for SSO (its /sso/callback exempts amr=sso from
+    // its own 2FA gate). But a password-only login already grants a full session for an account that has
+    // not enrolled yet, and the "2FA required" enforcement middleware only covers /admin — not this
+    // endpoint. So enforce enrolment here too, or a password alone federates into a managed instance as
+    // Admin while the mandate is on.
+    if (scope.UserId is int authUid
+        && ctx.RequestServices.GetRequiredService<CloudContext>().Flag(SettingKeys.Require2fa))
+    {
+        var enrolled = await db.Users.AsNoTracking()
+            .Where(u => u.Id == authUid).Select(u => u.TwoFactorEnabled).FirstOrDefaultAsync();
+        if (!enrolled) return Results.Redirect("/admin/account/twofactor?enrol=true");
+    }
 
     if (response_type != "code" || string.IsNullOrEmpty(code_challenge) || (code_challenge_method ?? "S256") != "S256"
         || string.IsNullOrEmpty(client_id) || string.IsNullOrEmpty(redirect_uri) || string.IsNullOrEmpty(state))

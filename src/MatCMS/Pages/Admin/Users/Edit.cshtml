@@ -29,3 +29,19 @@
         </div>
     </form>
 </div>
+
+@if (Model.Current.TwoFactorEnabled)
+{
+    <div class="card">
+        <h2>@T["twofactor.title"]</h2>
+        <div class="kv">
+            <div class="kv-label">@T["twofactor.status"]</div>
+            <div class="kv-value"><span class="badge badge-on">@T["twofactor.on"]</span></div>
+        </div>
+        <p class="help">@T["users.2faResetHint"]</p>
+        <form method="post" asp-page-handler="ResetTwoFactor" asp-route-id="@Model.Current.Id"
+              onsubmit="return confirm('@T["users.2faResetConfirm"]');">
+            <button type="submit" class="btn btn-danger">@T["users.2faReset"]</button>
+        </form>
+    </div>
+}

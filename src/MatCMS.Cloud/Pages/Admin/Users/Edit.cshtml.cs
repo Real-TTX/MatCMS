@@ -15,14 +15,19 @@ public class EditModel : PageModel
 {
     private readonly AppDbContext _db;
     private readonly AuthService _auth;
+    private readonly TwoFactorService _twoFactor;
 
-    public EditModel(AppDbContext db, AuthService auth)
+    public EditModel(AppDbContext db, AuthService auth, TwoFactorService twoFactor)
     {
         _db = db;
         _auth = auth;
+        _twoFactor = twoFactor;
     }
 
     public int? Id { get; private set; }
+
+    /// <summary>Whether the edited account has 2FA on (shows the admin reset control).</summary>
+    public bool TwoFactorEnabled { get; private set; }
     [BindProperty] public string Username { get; set; } = "";
     [BindProperty] public string? Email { get; set; }
     [BindProperty] public string? DisplayName { get; set; }
@@ -53,8 +58,21 @@ public class EditModel : PageModel
         Email = user.Email;
         DisplayName = user.DisplayName;
         Role = user.Role;
+        TwoFactorEnabled = user.TwoFactorEnabled;
         InstanceIds = user.Instances.Select(x => x.InstanceId).ToList();
         return Page();
+    }
+
+    /// <summary>Admin resets a colleague's two-factor auth (lost device). Clears the secret + recovery
+    /// codes; the user can enrol again. Enrolment itself is never done by an admin — only the reset.</summary>
+    public async Task<IActionResult> OnPostResetTwoFactorAsync(int id)
+    {
+        var user = await _db.Users.FindAsync(id);
+        if (user is null) return RedirectToPage("Index");
+
+        await _twoFactor.DisableAsync(user);
+        TempData["Flash"] = "Zwei-Faktor-Authentifizierung wurde zurückgesetzt.";
+        return RedirectToPage("Edit", new { id });
     }
 
     public async Task<IActionResult> OnPostAsync(int? id)

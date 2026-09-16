@@ -1,5 +1,6 @@
 using MatCMS.Services;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.RateLimiting;
@@ -13,12 +14,14 @@ public class LoginModel : PageModel
     private readonly AuthService _auth;
     private readonly SiteContext _site;
     private readonly CloudService _cloud;
+    private readonly IDataProtectionProvider _dp;
 
-    public LoginModel(AuthService auth, SiteContext site, CloudService cloud)
+    public LoginModel(AuthService auth, SiteContext site, CloudService cloud, IDataProtectionProvider dp)
     {
         _auth = auth;
         _site = site;
         _cloud = cloud;
+        _dp = dp;
     }
 
     [BindProperty] public string Username { get; set; } = "";
@@ -32,12 +35,14 @@ public class LoginModel : PageModel
     /// instance is actually linked to a cloud.</summary>
     public bool SsoAvailable { get; private set; }
 
-    public async Task<IActionResult> OnGet(string? returnUrl, string? sso)
+    public async Task<IActionResult> OnGet(string? returnUrl, string? sso, string? twofa)
     {
         if (User.Identity?.IsAuthenticated == true)
             return Redirect(SafeReturn(returnUrl));
         ReturnUrl = returnUrl;
         if (sso == "failed") Error = "Die Anmeldung mit dem Cloud-Konto ist fehlgeschlagen.";
+        if (twofa == "locked") Error = "Zu viele falsche Codes. Bitte melde dich erneut an.";
+        if (twofa == "expired") Error = "Die Anmeldung ist abgelaufen. Bitte melde dich erneut an.";
         var enabled = _site.Get(SettingKeys.SsoEnabled) is "1" or "true" or "on" or "yes";
         SsoAvailable = enabled && await _cloud.GetSsoClientAsync() is not null;
         return Page();
@@ -58,6 +63,16 @@ public class LoginModel : PageModel
         {
             Error = "E-Mail oder Passwort ist falsch.";
             return Page();
+        }
+
+        // Password is right. If this account has a second factor, do NOT sign in yet: stash the pending
+        // identity in a short-lived encrypted cookie and send the browser to the code challenge. The
+        // real session cookie is only issued once /login/2fa succeeds.
+        if (user.TwoFactorEnabled)
+        {
+            TwoFactorLoginCookie.Write(HttpContext, _dp,
+                new TwoFactorLoginCookie.Pending(user.Id, RememberMe, SafeReturn(returnUrl)));
+            return Redirect("/login/2fa");
         }
 
         await _auth.SignInAsync(HttpContext, user, RememberMe);

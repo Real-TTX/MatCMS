@@ -5,9 +5,20 @@
     string V(string id) => Model.Values.TryGetValue(id, out var v) ? v : "";
 }
 @* Nur die Überschrift: alle Aktionen dieser Seite stehen unten in EINER Reihe — dieselbe Ordnung
-   wie im Plugin-Editor. *@
+   wie im Plugin-Editor. Die KI-Aktion sitzt rechts im Kopf (nur wenn KI aktiv ist und es überhaupt
+   anpassbare Parameter gibt). *@
 <div class="page-head">
     <h1>@T["templates.customizeHeading"] – @Model.Current.Name</h1>
+    @if (Model.AiEnabled && Model.Params.Count > 0)
+    {
+        <div class="list-toolbar">
+            <button type="button" id="ai-theme-btn" class="btn btn-sm btn-ghost"
+                    title="@T["templates.aiButton"]"
+                    data-ai-url="@Url.Page(null, "AiTheme", new { id = Model.Current.Id })">
+                <i class="ti ti-sparkles" aria-hidden="true"></i> @T["templates.aiButton"]
+            </button>
+        </div>
+    }
 </div>
 
 <div class="card">
@@ -64,3 +75,27 @@
     }
     <a class="btn btn-ghost" asp-page="Index">@T["action.back"]</a>
 </div>
+
+@if (Model.AiEnabled && Model.Params.Count > 0)
+{
+    @* Design-KI: Vorschlag neuer Parameterwerte → Vorher/Nachher je Parameter → „Übernehmen" schreibt
+       die Werte in die echten Formularfelder und speichert über den normalen Save (PRG). Reuse der
+       geteilten .ai-dialog/.ai-change-Styles aus admin.css. *@
+    <dialog id="ai-theme-dialog" class="ai-dialog"
+            data-lbl-before="@T["templates.aiBefore"]" data-lbl-after="@T["templates.aiAfter"]"
+            data-lbl-working="@T["templates.aiWorking"]">
+        <h3>@T["templates.aiDialogTitle"]</h3>
+        <label class="ai-instr-label" for="ai-theme-instruction">@T["templates.aiInstruction"]</label>
+        <textarea id="ai-theme-instruction" rows="2" placeholder="@T["templates.aiInstructionPlaceholder"]"></textarea>
+        <div class="ai-dialog-actions">
+            <button type="button" id="ai-theme-propose" class="btn btn-sm">@T["templates.aiPropose"]</button>
+            <span id="ai-theme-status" class="ai-status muted"></span>
+        </div>
+        <div id="ai-theme-diff" class="ai-diff"></div>
+        <div class="ai-dialog-foot">
+            <button type="button" id="ai-theme-apply" class="btn btn-sm" disabled>@T["templates.aiApply"]</button>
+            <button type="button" id="ai-theme-cancel" class="btn btn-sm btn-ghost">@T["templates.aiCancel"]</button>
+        </div>
+    </dialog>
+    <script src="~/js/ai-theme-edit.js" asp-append-version="true"></script>
+}

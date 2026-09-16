@@ -52,4 +52,36 @@ public class AiService
             ("user", $"Anweisung: {instruction}\n\nText:\n{text}"),
         }, maxTokens: 800, ct: ct);
     }
+
+    /// <summary>Proposes new values for a template's design parameters to match a design instruction.
+    /// Returns the model's raw text — asked for as a bare JSON object <c>{ "paramId": "newValue", … }</c>
+    /// containing ONLY the parameters it chooses to change. The caller validates every proposed value
+    /// against its parameter's declared type before offering it; nothing here is trusted or applied.</summary>
+    public Task<(bool ok, string? text, string? error)> SuggestThemeAsync(
+        string instruction,
+        IReadOnlyList<(string id, string label, string type, string options, string value)> parameters,
+        CancellationToken ct = default)
+    {
+        var sb = new System.Text.StringBuilder();
+        foreach (var p in parameters)
+        {
+            sb.Append("- id=").Append(p.id).Append(" | Label: ").Append(p.label).Append(" | Typ: ").Append(p.type);
+            if (!string.IsNullOrWhiteSpace(p.options)) sb.Append(" | Optionen: ").Append(p.options);
+            sb.Append(" | aktuell: ").Append(string.IsNullOrEmpty(p.value) ? "(leer)" : p.value).Append('\n');
+        }
+        var system =
+            "Du bist ein erfahrener Web-Designer. Du bekommst die Design-Parameter eines Website-Themes "
+          + "(je Zeile: id, Label, Typ, ggf. Optionen, aktueller Wert) und eine Gestaltungs-Anweisung. "
+          + "Schlage neue Werte vor, die die Anweisung stimmig umsetzen — achte auf Farbharmonie, "
+          + "ausreichenden Kontrast/Lesbarkeit und Konsistenz. Werteregeln: color = Hex #rrggbb; "
+          + "select = EXAKT eine der genannten Optionen; number = nur eine Zahl; bool = true oder false; "
+          + "text = kurzer Text. Ändere NUR die Parameter, die für die Anweisung sinnvoll sind — die "
+          + "übrigen lässt du weg. Antworte AUSSCHLIESSLICH mit einem JSON-Objekt "
+          + "{ \"id\": \"neuerWert\", … } ohne Erklärungen und ohne Markdown-Codeblock.";
+        return RunAsync("theme", new[]
+        {
+            ("system", system),
+            ("user", $"Anweisung: {instruction}\n\nParameter:\n{sb}"),
+        }, maxTokens: 500, ct: ct);
+    }
 }

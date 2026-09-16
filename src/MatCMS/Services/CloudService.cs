@@ -588,6 +588,36 @@ public class CloudService
         }
     }
 
+    /// <summary>Relays an AI model call to the connected cloud, which holds the provider key and runs
+    /// the completion. Synchronous (the caller needs the text back). Never throws — a failure comes back
+    /// as (false, null, error), so an editor action can show why instead of breaking.</summary>
+    public async Task<(bool ok, string? text, string? error)> CallAiAsync(
+        AiRequest request, CancellationToken ct = default)
+    {
+        var settings = await GetSettingsAsync();
+        if (!settings.Configured) return (false, null, "Diese Website ist mit keiner Cloud verbunden.");
+
+        try
+        {
+            var client = CreateClient(settings);
+            client.Timeout = TimeSpan.FromSeconds(120);   // AI completions are slow; the mail 30s is too short
+            using var res = await client.PostAsJsonAsync(
+                $"{settings.Url}/api/instances/{settings.InstanceId}/ai", request, ct);
+
+            if (!res.IsSuccessStatusCode)
+                return (false, null, $"Die Cloud hat die KI-Anfrage abgelehnt (HTTP {(int)res.StatusCode}).");
+
+            var answer = await res.Content.ReadFromJsonAsync<AiResponse>(cancellationToken: ct);
+            if (answer is null) return (false, null, "Die Cloud hat nicht geantwortet.");
+            return (answer.Ok, answer.Text, answer.Ok ? null : answer.Error ?? "Unbekannter Grund.");
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(ex, "Relaying AI request to the cloud failed");
+            return (false, null, ex.Message);
+        }
+    }
+
     private HttpClient CreateClient(CloudSettings settings)
     {
         var client = _http.CreateClient();

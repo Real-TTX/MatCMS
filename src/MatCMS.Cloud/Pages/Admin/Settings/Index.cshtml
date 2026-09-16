@@ -13,6 +13,7 @@
     <button type="button" class="tab" data-tab="security">@T["settings.tabSecurity"]</button>
     <button type="button" class="tab" data-tab="notifications">@T["settings.tabNotifications"]</button>
     <button type="button" class="tab" data-tab="smtp">@T["settings.tabSmtp"]</button>
+    <button type="button" class="tab" data-tab="ai">@T["settings.tabAi"]</button>
     <button type="button" class="tab" data-tab="backup">@T["backups.title"]</button>
     <button type="button" class="tab" data-tab="hosting">@T["settings.tabHosting"]</button>
     <button type="button" class="tab" data-tab="docker">@T["settings.tabDocker"]</button>
@@ -151,6 +152,50 @@
             <div><button type="submit" class="btn btn-ghost">@T["settings.smtpTestSend"]</button></div>
         </form>
     </div>
+</div>
+
+@* ============ KI (AI) ============ *@
+<div class="tab-panel" data-panel="ai" hidden>
+    <form method="post" asp-page-handler="Ai">
+        <div class="card">
+            <h2>@T["settings.aiHeading"]</h2>
+            <p class="muted">@T["settings.aiIntro"]</p>
+            <div class="form-grid">
+                <div class="form-row">
+                    <div class="form-field">
+                        <label>@T["settings.aiProvider"]</label>
+                        <select name="provider">
+                            <option value="openai" selected>OpenAI / ChatGPT</option>
+                        </select>
+                        <div class="help">@T["settings.aiProviderHint"]</div>
+                    </div>
+                    <div class="form-field">
+                        <label>@T["settings.aiModel"]</label>
+                        <input name="model" value="@Model.Get(SettingKeys.AiModel)" placeholder="gpt-4o-mini" spellcheck="false" />
+                    </div>
+                </div>
+                <div class="form-field">
+                    <label>@T["settings.aiApiKey"]</label>
+                    <input name="apiKey" type="password" autocomplete="new-password"
+                           placeholder="@(string.IsNullOrEmpty(Model.Get(SettingKeys.AiApiKey)) ? "sk-…" : T["settings.aiApiKeyKeep"])" spellcheck="false" />
+                    @if (!string.IsNullOrEmpty(Model.Get(SettingKeys.AiApiKey)))
+                    {
+                        <label class="checkbox-row">
+                            <input type="checkbox" name="clearKey" value="true" />
+                            @T["settings.aiApiKeyClear"]
+                        </label>
+                    }
+                    <div class="help">@T["settings.aiApiKeyHint"]</div>
+                </div>
+                <div class="form-field">
+                    <label>@T["settings.aiBaseUrl"]</label>
+                    <input name="baseUrl" value="@Model.Get(SettingKeys.AiBaseUrl)" placeholder="https://api.openai.com/v1" spellcheck="false" />
+                    <div class="help">@T["settings.aiBaseUrlHint"]</div>
+                </div>
+            </div>
+            <div style="margin-top:14px;"><button type="submit" class="btn">@T["settings.save"]</button></div>
+        </div>
+    </form>
 </div>
 
 @* ============ BACKUP ============ *@

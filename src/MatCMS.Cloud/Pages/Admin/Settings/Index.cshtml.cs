@@ -176,6 +176,23 @@ public class IndexModel : PageModel
         return RedirectToPage(new { tab = "smtp" });
     }
 
+    /// <summary>Central AI provider connection. The key is stored SecretProtector-encrypted with the
+    /// same empty-keeps / explicit-clear rule as the SMTP password, and never echoed back to the form.</summary>
+    public async Task<IActionResult> OnPostAiAsync(string? provider, string? model, string? baseUrl, string? apiKey, bool clearKey)
+    {
+        await _cloud.SaveAsync(new Dictionary<string, string?>
+        {
+            [SettingKeys.AiProvider] = string.IsNullOrWhiteSpace(provider) ? "openai" : provider.Trim().ToLowerInvariant(),
+            [SettingKeys.AiModel] = model?.Trim(),
+            [SettingKeys.AiBaseUrl] = baseUrl?.Trim().TrimEnd('/'),
+            [SettingKeys.AiApiKey] = clearKey ? ""
+                : string.IsNullOrEmpty(apiKey) ? Get(SettingKeys.AiApiKey)
+                : _secrets.Protect(apiKey),
+        });
+        TempData["Flash"] = "KI-Einstellungen gespeichert.";
+        return RedirectToPage(new { tab = "ai" });
+    }
+
     public async Task<IActionResult> OnPostSmtpTestAsync(string? testTo)
     {
         if (string.IsNullOrWhiteSpace(testTo))

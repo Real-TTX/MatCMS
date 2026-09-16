@@ -169,6 +169,17 @@ public class Profile
     public bool SyncTemplates { get; set; }
     public bool SyncMailTemplates { get; set; }
 
+    /// <summary>Group switch for AI: when on, assigned instances may use AI features, relayed through
+    /// the cloud (the provider key stays central). Off = the sites show no AI. Like the other Sync*
+    /// switches, off rolls out nothing for the group.</summary>
+    public bool SyncAi { get; set; }
+
+    /// <summary>Monthly AI token budget the cloud grants EACH assigned instance (0 or null = unlimited).
+    /// The cloud vergibt it and enforces it in the relay; the instance never sees the number — same
+    /// stance as <see cref="BackupQuotaGb"/> ("the side holding the resource decides"). Over the budget,
+    /// the relay refuses with a reason and the site's AI features pause until the month rolls over.</summary>
+    public int? AiMonthlyTokenBudget { get; set; }
+
     /// <summary>
     /// Name of the template that should be the ACTIVE design on every assigned instance. Empty means
     /// "roll the templates out but leave the choice to the site" — switching the live design of a

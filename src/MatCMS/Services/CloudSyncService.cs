@@ -198,6 +198,26 @@ public class CloudSyncService
                 await SaveAsync(ct);
             }
 
+            // AI transport, same shape and same "reset when the profile stops deciding" exception as
+            // mail: "cloud" = relay model calls through the cloud, otherwise "off" (no AI). The provider
+            // credential is never rolled out — only this flag.
+            {
+                var ai = string.Equals(config.AiTransport, "cloud", StringComparison.OrdinalIgnoreCase)
+                    ? "cloud" : "off";
+                var row = await _db.SiteSettings.FirstOrDefaultAsync(s => s.Key == SettingKeys.AiTransport, ct);
+                if (row is null)
+                {
+                    if (!_dryRun) _db.SiteSettings.Add(new SiteSetting { Key = SettingKeys.AiTransport, Value = ai });
+                    Report("setting", SettingKeys.AiTransport, "installed", ai);
+                }
+                else if (row.Value != ai)
+                {
+                    if (!_dryRun) row.Value = ai;
+                    Report("setting", SettingKeys.AiTransport, "updated", ai);
+                }
+                await SaveAsync(ct);
+            }
+
             if (config.Users is not null)
             {
                 var plan = Plan(PayloadUsers, config.UsersMode, seeded);

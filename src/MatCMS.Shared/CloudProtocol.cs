@@ -15,7 +15,7 @@ public static class CloudProtocol
     /// <summary>Contract version. Bump on <b>every</b> change to the payloads in this file: the cloud
     /// badges an instance reporting an older one as "veraltet", and both sides read this constant, so
     /// one edit covers both.</summary>
-    public const int Version = 12;
+    public const int Version = 13;
 
     /// <summary>Header carrying the instance's bearer token.</summary>
     public const string TokenHeader = "X-MatCMS-Instance-Token";
@@ -220,6 +220,14 @@ public sealed class InstanceConfig
     /// </summary>
     public string MailTransport { get; set; } = "smtp";
 
+    /// <summary>
+    /// Whether the instance may use AI features, and how: "off" (no AI) or "cloud" (relay every model
+    /// call through the cloud, which holds the provider credential — the key never reaches the site).
+    /// <para>A string, like the modes above: an instance that predates the field defaults to "off" and
+    /// simply shows no AI features rather than misreading a number.</para>
+    /// </summary>
+    public string AiTransport { get; set; } = "off";
+
     /// <summary>When true, the instance removes the built-in default <c>admin</c> account — but ONLY if
     /// it still carries the default password (untouched) AND at least one OTHER Admin remains, so a
     /// provisioned site can shed its well-known default login without ever risking a lock-out. Default
@@ -326,6 +334,47 @@ public sealed class MailResponse
 {
     public bool Queued { get; set; }
     public string? Error { get; set; }
+}
+
+/// <summary>One chat message in an <see cref="AiRequest"/>.</summary>
+public sealed class AiMessage
+{
+    /// <summary>"system" | "user" | "assistant".</summary>
+    public string Role { get; set; } = "user";
+    public string Content { get; set; } = "";
+}
+
+/// <summary>
+/// An AI model call an instance relays through the cloud (POST /api/instances/{id}/ai). Unlike mail,
+/// this is SYNCHRONOUS: the instance needs the completion back in the same response.
+/// <para>The cloud fixes the MODEL and provider centrally (like it fixes the mail FROM), so an instance
+/// cannot escalate to a costlier model or a different account through request fields — it supplies only
+/// the task and the content. Token caps are clamped cloud-side.</para>
+/// </summary>
+public sealed class AiRequest
+{
+    /// <summary>What the instance is doing, for logging / limits (e.g. "rewrite", "generate", "seo",
+    /// "theme"). Free string; advisory only.</summary>
+    public string Purpose { get; set; } = "";
+
+    /// <summary>The chat messages (a task/system message plus the content to work on).</summary>
+    public List<AiMessage> Messages { get; set; } = new();
+
+    /// <summary>Completion-length cap the instance would like; the cloud clamps it to its own maximum.</summary>
+    public int? MaxTokens { get; set; }
+}
+
+/// <summary>
+/// What the cloud answers to an <see cref="AiRequest"/>. <c>Ok=false</c> carries a reason the instance
+/// can show (provider error, budget exhausted, AI not enabled). Token counts feed budget accounting.
+/// </summary>
+public sealed class AiResponse
+{
+    public bool Ok { get; set; }
+    public string? Text { get; set; }
+    public string? Error { get; set; }
+    public int PromptTokens { get; set; }
+    public int CompletionTokens { get; set; }
 }
 
 /// <summary>

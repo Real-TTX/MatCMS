@@ -19,6 +19,7 @@
     <button type="button" class="tab" data-tab="components">@T["profiles.tabComponents"]</button>
     <button type="button" class="tab" data-tab="templates">@T["profiles.tabTemplates"]</button>
     <button type="button" class="tab" data-tab="mailtemplates">@T["profiles.tabMailTemplates"]</button>
+    <button type="button" class="tab" data-tab="ai">@T["profiles.tabAi"]</button>
 </div>
 
 
@@ -390,6 +391,38 @@
         <div class="list-actions">
             <form class="inline-form" method="post" asp-page-handler="BackupRemove" asp-route-id="@Model.Item.Id"
                   onsubmit="return confirm('@T["profiles.backupRemoveConfirm"]');">
+                <button type="submit" class="btn btn-danger">@T["profiles.removeFromProfile"]</button>
+            </form>
+        </div>
+    }
+</div>
+
+@* ============ KI (AI) ============ *@
+<div class="tab-panel" data-panel="ai" hidden>
+    <form method="post" asp-page-handler="Ai" asp-route-id="@Model.Item.Id">
+        <div class="card">
+            <h2>@T["profiles.aiHeading"]</h2>
+            @if (!Model.Item.SyncAi)
+            {
+                <div class="help">@T["profiles.aiInactiveHint"]</div>
+            }
+            <p class="muted">@T["profiles.aiIntro"]</p>
+            <div class="form-field">
+                <label for="aiBudget">@T["profiles.aiBudget"]</label>
+                <input id="aiBudget" name="budget" value="@(Model.Item.AiMonthlyTokenBudget?.ToString() ?? "")"
+                       inputmode="numeric" placeholder="@T["profiles.aiBudgetUnlimited"]" />
+                <div class="help">@T["profiles.aiBudgetHint"]</div>
+            </div>
+        </div>
+        <div class="list-actions">
+            <button type="submit" class="btn">@T["settings.save"]</button>
+        </div>
+    </form>
+    @if (Model.Item.SyncAi)
+    {
+        <div class="list-actions">
+            <form class="inline-form" method="post" asp-page-handler="AiRemove" asp-route-id="@Model.Item.Id"
+                  onsubmit="return confirm('@T["profiles.aiRemoveConfirm"]');">
                 <button type="submit" class="btn btn-danger">@T["profiles.removeFromProfile"]</button>
             </form>
         </div>

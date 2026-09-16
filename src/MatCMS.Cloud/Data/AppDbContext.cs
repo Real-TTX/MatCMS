@@ -19,6 +19,9 @@ public class AppDbContext : DbContext
     public DbSet<ArchivedBackup> ArchivedBackups => Set<ArchivedBackup>();
     public DbSet<CloudSetting> CloudSettings => Set<CloudSetting>();
 
+    // Per-instance/per-month AI token ledger for the relay budget.
+    public DbSet<AiUsage> AiUsages => Set<AiUsage>();
+
     // Operator API keys and their per-key instance scope.
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
     public DbSet<ApiKeyInstance> ApiKeyInstances => Set<ApiKeyInstance>();
@@ -52,6 +55,12 @@ public class AppDbContext : DbContext
         // recovery code twice: the second UPDATE matches 0 rows and throws (handled in TwoFactorService).
         // Marking an existing column as a token only changes the generated WHERE clause — no migration.
         b.Entity<User>().Property(u => u.RecoveryCodes).IsConcurrencyToken();
+
+        // AI usage ledger: one row per instance per month; cascades with the instance.
+        b.Entity<AiUsage>().HasIndex(u => new { u.InstanceId, u.Period }).IsUnique();
+        b.Entity<AiUsage>()
+            .HasOne(u => u.Instance).WithMany()
+            .HasForeignKey(u => u.InstanceId).OnDelete(DeleteBehavior.Cascade);
         b.Entity<CloudSetting>().HasIndex(s => s.Key).IsUnique();
 
         // Both are lookup keys on the API hot path (every heartbeat resolves by PublicId, and the

@@ -203,12 +203,19 @@ public class ProfileService
     public static bool IsBackupKey(string key) =>
         key.StartsWith("backup.", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>AI keys belong to the AI group. Its own switch (<see cref="Profile.SyncAi"/>) drives a
+    /// dedicated wire field (<c>AiTransport</c>), and — crucially — the central provider key must NEVER
+    /// be pushable as a free row, so <c>ai.*</c> is treated as a group key and excluded from the
+    /// free-settings rollout / suggestion list.</summary>
+    public static bool IsAiKey(string key) =>
+        key.StartsWith("ai.", StringComparison.OrdinalIgnoreCase);
+
     /// <summary>True for any key that belongs to a settings GROUP rather than to the free key/value
     /// rows. Those keys are only rolled out when their own group is switched on, so a free row
     /// carrying one would sit in the profile looking active and never arrive anywhere — which is why
     /// the setting editor refuses them outright.</summary>
     public static bool IsGroupKey(string key) =>
-        IsSmtpKey(key) || IsTranslateKey(key) || IsBackupKey(key)
+        IsSmtpKey(key) || IsTranslateKey(key) || IsBackupKey(key) || IsAiKey(key)
         || string.Equals(key, "mail.transport", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Builds the payload an approved instance downloads. Sections the profile does not
@@ -299,6 +306,11 @@ public class ProfileService
         // group switch.
         if (profile.SyncSmtp && profile.MailSource == MailSources.Cloud)
             config.MailTransport = "cloud";
+
+        // AI: when the profile's AI group is on, the instance relays model calls through the cloud.
+        // The credential itself is never rolled out — only this "use the relay" flag.
+        if (profile.SyncAi)
+            config.AiTransport = "cloud";
 
         if (profile.SyncUsers)
         {

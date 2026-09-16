@@ -98,6 +98,12 @@ public static class SettingKeys
     /// decides it; absent means smtp, which is what every site did before the relay existed.</summary>
     public const string MailTransport = "mail.transport";
 
+    /// <summary>How this site uses AI: "cloud" (relay each model call through the connected cloud, which
+    /// holds the provider key) or "off"/empty (no AI features). Rolled out from a profile's AI group —
+    /// never a free key and never the key itself — same shape as <see cref="MailTransport"/>. Read via
+    /// SiteContext.Get; the whole AI feature is gated on it.</summary>
+    public const string AiTransport = "ai.transport";
+
     /// <summary>Whether finished backups are handed to the connected cloud. Off unless somebody says
     /// otherwise — uploading a customer's whole site somewhere is a decision, not a default.</summary>
     public const string BackupToCloud = "backup.toCloud";

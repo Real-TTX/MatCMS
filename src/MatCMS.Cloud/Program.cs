@@ -83,6 +83,7 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<TwoFactorService>();
 builder.Services.AddScoped<CloudContext>();
 builder.Services.AddScoped<EmailService>();
+builder.Services.AddScoped<AiService>();
 builder.Services.AddScoped<InstanceService>();
 builder.Services.AddScoped<ProfileService>();
 builder.Services.AddScoped<MailSpool>();
@@ -141,6 +142,20 @@ builder.Services.AddRateLimiter(options =>
             _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = 120,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+
+    // AI relay (/api/instances/{id}/ai): token-authenticated but anonymous at the transport level. Its
+    // OWN budget (not the instanceApi one) because each call spends real money on the central key — a
+    // tighter per-IP cap bounds a runaway or compromised instance. Cost is also bounded per instance by
+    // the profile's monthly token budget, enforced in the endpoint.
+    options.AddPolicy("aiApi", ctx =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 30,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
             }));
@@ -423,6 +438,50 @@ app.MapPost("/api/instances/{publicId}/mail", async (
     // operator why the mail did not go out, and a bare 4xx gives it nothing to say.
     return Results.Ok(new MailResponse { Queued = result.Queued, Error = result.Error });
 }).RequireRateLimiting("instanceApi");
+
+// --- AI relay -------------------------------------------------------------
+// An instance relays each model call here; the cloud calls the provider with ITS central key (the key
+// never reaches the site) and returns the completion SYNCHRONOUSLY — unlike mail, which spools. Gated
+// like /mail (token + Approved + the profile's SyncAi switch re-checked server-side), plus a monthly
+// per-instance token budget so one site cannot drain the central credit. Returns 200 with Ok=false +
+// a reason on a refusal, so the instance can tell its operator why.
+app.MapPost("/api/instances/{publicId}/ai", async (
+    HttpContext ctx, string publicId, AiRequest req, InstanceService instances, AiService ai, AppDbContext db) =>
+{
+    var token = ctx.Request.Headers[CloudProtocol.TokenHeader].ToString();
+    var instance = await instances.AuthenticateAsync(publicId, token);
+    if (instance is null) return Results.Unauthorized();
+    if (instance.Status != MatCMS.Cloud.Models.InstanceStatus.Approved)
+        return Results.Ok(new AiResponse { Ok = false, Error = "Instanz ist nicht freigegeben." });
+    // A valid token is not permission to spend the key — the profile must have AI switched on.
+    if (instance.Profile is null || !instance.Profile.SyncAi)
+        return Results.Ok(new AiResponse { Ok = false, Error = "KI ist für dieses Profil nicht aktiviert." });
+
+    // Monthly token budget per instance (0/null = unlimited). The cloud grants it; the instance never
+    // sees the number — same stance as the backup quota.
+    var period = DateTime.UtcNow.ToString("yyyy-MM");
+    var usage = await db.AiUsages.FirstOrDefaultAsync(u => u.InstanceId == instance.Id && u.Period == period);
+    var budget = instance.Profile.AiMonthlyTokenBudget ?? 0;
+    if (budget > 0 && (usage?.Tokens ?? 0) >= budget)
+        return Results.Ok(new AiResponse { Ok = false, Error = "Das monatliche KI-Budget dieser Instanz ist aufgebraucht." });
+
+    var res = await ai.CompleteAsync(req, ctx.RequestAborted);
+
+    // Book only what the provider actually reported (successful calls).
+    if (res.Ok)
+    {
+        if (usage is null)
+        {
+            usage = new MatCMS.Cloud.Models.AiUsage { InstanceId = instance.Id, Period = period };
+            db.AiUsages.Add(usage);
+        }
+        usage.Tokens += res.PromptTokens + res.CompletionTokens;
+        usage.Calls += 1;
+        usage.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+    }
+    return Results.Ok(res);
+}).RequireRateLimiting("aiApi");
 
 // --- Backups --------------------------------------------------------------
 // An instance uploads its own backups here and fetches them back when an operator asks for a

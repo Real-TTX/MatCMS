@@ -191,6 +191,7 @@ builder.Services.AddScoped<EmailService>();
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<FormGuard>();
 builder.Services.AddScoped<TranslationService>();
+builder.Services.AddScoped<AiService>();
 builder.Services.AddSingleton<PluginRegistry>();
 builder.Services.AddScoped<PluginRunner>();
 

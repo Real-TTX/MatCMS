@@ -79,6 +79,23 @@ public static class SettingKeys
     /// Off by default: recreating a container is destructive enough to want a human click.</summary>
     public const string AutoUpdateLocal = "update.autoLocal";
 
+    // --- AI (Admin → Einstellungen → KI) ------------------------------------
+    /// <summary>Provider id: "openai" (default) or "" (off). Room for "anthropic" etc. later; the
+    /// AiService abstracts over it.</summary>
+    public const string AiProvider = "ai.provider";
+
+    /// <summary>Model id the cloud uses for EVERY relayed call, e.g. "gpt-4o-mini". Central on purpose,
+    /// so a connected instance can never escalate to a costlier model through a request field.</summary>
+    public const string AiModel = "ai.model";
+
+    /// <summary>Optional base URL for an OpenAI-compatible endpoint; empty = the provider's default.</summary>
+    public const string AiBaseUrl = "ai.baseUrl";
+
+    /// <summary>The provider API key. SecretProtector-encrypted at rest, <b>never</b> rolled out to an
+    /// instance (the entire reason for the relay is that the key stays central) and never echoed back
+    /// to the settings form. The OAuth "Mit ChatGPT anmelden" token (later) lands here the same way.</summary>
+    public const string AiApiKey = "ai.apiKey";
+
     // --- SMTP (own tab; kept out of `All` so each form saves only its own keys) ---
     public const string SmtpHost = "smtp.host";
     public const string SmtpPort = "smtp.port";

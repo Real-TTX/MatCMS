@@ -88,8 +88,13 @@ else
         }
         else
         {
+            @* allow-top-navigation ist load-bearing für den SSO-/Login-Ausbruch: OAuth-Login gehört auf
+               Top-Level (im Cross-Site-iFrame scheitern die Lax-Cookies/Antiforgery → 400). Der
+               Frame-Buster auf der Cloud-Login-/Consent-Seite darf das Top-Fenster aber nur navigieren,
+               wenn die Sandbox es erlaubt — sonst wird der Ausbruch still blockiert. Die eingebettete
+               Instanz ist die eigene (vertraute) Website des Betreibers, daher vertretbar. *@
             <iframe class="site-embed-frame" data-site-frame src="@Model.Item.PreviewUrl" title="@Model.Item.Name"
-                    referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>
+                    referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-top-navigation"></iframe>
             <div class="site-embed-fallback muted">
                 @T["instances.embedBlocked"]
                 <a href="@Model.Item.PreviewUrl" target="_blank" rel="noopener">@T["instances.openSite"]</a>

@@ -732,10 +732,14 @@ app.MapGet("/sso/start", async (HttpContext ctx, MatCMS.Services.SiteContext sit
 }).RequireRateLimiting("login");
 
 app.MapGet("/sso/callback", async (HttpContext ctx, MatCMS.Services.CloudService cloud, MatCMS.Services.AuthService auth,
-    MatCMS.Data.AppDbContext db, Microsoft.AspNetCore.DataProtection.IDataProtectionProvider dp, string? code, string? state) =>
+    MatCMS.Data.AppDbContext db, Microsoft.AspNetCore.DataProtection.IDataProtectionProvider dp, string? code, string? state, string? error) =>
 {
     var raw = ctx.Request.Cookies["matcms.ssoflow"];
     ctx.Response.Cookies.Delete("matcms.ssoflow", new CookieOptions { Path = "/sso" });
+    // The user clicked "Ablehnen" on the cloud consent screen → OAuth returns error=access_denied, not
+    // a code. Show a "cancelled" message rather than a generic failure.
+    if (!string.IsNullOrEmpty(error))
+        return Results.Redirect("/login?sso=cancelled");
     if (string.IsNullOrEmpty(code) || string.IsNullOrEmpty(state) || string.IsNullOrEmpty(raw))
         return Results.Redirect("/login?sso=failed");
 

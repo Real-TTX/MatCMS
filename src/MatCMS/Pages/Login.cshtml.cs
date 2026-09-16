@@ -41,6 +41,7 @@ public class LoginModel : PageModel
             return Redirect(SafeReturn(returnUrl));
         ReturnUrl = returnUrl;
         if (sso == "failed") Error = "Die Anmeldung mit dem Cloud-Konto ist fehlgeschlagen.";
+        if (sso == "cancelled") Error = "Die Anmeldung mit dem Cloud-Konto wurde abgebrochen.";
         if (twofa == "locked") Error = "Zu viele falsche Codes. Bitte melde dich erneut an.";
         if (twofa == "expired") Error = "Die Anmeldung ist abgelaufen. Bitte melde dich erneut an.";
         var enabled = _site.Get(SettingKeys.SsoEnabled) is "1" or "true" or "on" or "yes";

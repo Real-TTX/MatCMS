@@ -9,6 +9,17 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    @* Break out of any frame BEFORE rendering. The cloud login (and the SSO authorize it protects) must
+       run first-party: inside a cross-site frame — e.g. the instance embedded in the cloud's site view —
+       the SameSite=Lax auth/antiforgery cookies are unreliable and the login POST fails with 400. On
+       top level the existing cloud session is used and the flow just continues. Never legitimately
+       framed, so this only ever fires on the broken embedded path. *@
+    <script>
+        // If blocked (sandbox without allow-top-navigation) the top-nav quietly fails and the page just
+        // renders in the frame — deliberately NO self-reload fallback, which would spin an infinite
+        // reload loop. The cloud's own instance-embed grants allow-top-navigation so the break-out works.
+        if (window.top !== window.self) { try { window.top.location.replace(window.location.href); } catch (e) {} }
+    </script>
     <title>@T["login.pageTitle"] – @Cloud.CloudName</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

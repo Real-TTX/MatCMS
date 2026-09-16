@@ -550,60 +550,12 @@ app.MapPost("/api/instances/{publicId}/backups/taken", async (
 }).RequireRateLimiting("instanceApi");
 
 // --- SSO / OAuth (a MatCMS instance logs a user in with their cloud account) --------------------
-// authorize (front-channel): the cloud user must be logged in AND allowed for the target instance;
-// it hands back a short code bound to the user, the client instance and a PKCE challenge. token
-// (back-channel): authenticated by the instance token exactly like the heartbeat, redeems the code
-// and returns the user's identity. No JWT — the exchange is a direct, token-authenticated TLS call.
-static bool SsoRedirectAllowed(MatCMS.Cloud.Models.Instance inst, string redirectUri)
-{
-    if (!Uri.TryCreate(redirectUri, UriKind.Absolute, out var ru)) return false;
-    if (ru.Scheme != Uri.UriSchemeHttps && ru.Scheme != Uri.UriSchemeHttp) return false;
-    if (!ru.AbsolutePath.EndsWith("/sso/callback", StringComparison.OrdinalIgnoreCase)) return false;
-    var known = inst.PreviewUrl;    // the instance's own reported address
-    return !string.IsNullOrWhiteSpace(known) && Uri.TryCreate(known, UriKind.Absolute, out var ku)
-        && string.Equals(ru.GetLeftPart(UriPartial.Authority), ku.GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase);
-}
-
-app.MapGet("/oauth/authorize", async (HttpContext ctx, AppDbContext db, OperatorScope scope, OAuthCodes codes,
-    string? client_id, string? redirect_uri, string? state, string? code_challenge, string? code_challenge_method, string? response_type) =>
-{
-    // Not logged in → cloud login, then straight back here (returnUrl carries the whole request).
-    if (ctx.User.Identity?.IsAuthenticated != true)
-        return Results.Redirect($"/login?returnUrl={Uri.EscapeDataString(ctx.Request.GetEncodedPathAndQuery())}");
-
-    // The cloud IS the second factor an instance trusts for SSO (its /sso/callback exempts amr=sso from
-    // its own 2FA gate). But a password-only login already grants a full session for an account that has
-    // not enrolled yet, and the "2FA required" enforcement middleware only covers /admin — not this
-    // endpoint. So enforce enrolment here too, or a password alone federates into a managed instance as
-    // Admin while the mandate is on.
-    if (scope.UserId is int authUid
-        && ctx.RequestServices.GetRequiredService<CloudContext>().Flag(SettingKeys.Require2fa))
-    {
-        var enrolled = await db.Users.AsNoTracking()
-            .Where(u => u.Id == authUid).Select(u => u.TwoFactorEnabled).FirstOrDefaultAsync();
-        if (!enrolled) return Results.Redirect("/admin/account/twofactor?enrol=true");
-    }
-
-    if (response_type != "code" || string.IsNullOrEmpty(code_challenge) || (code_challenge_method ?? "S256") != "S256"
-        || string.IsNullOrEmpty(client_id) || string.IsNullOrEmpty(redirect_uri) || string.IsNullOrEmpty(state))
-        return Results.BadRequest("Ungültige Anfrage.");
-
-    var inst = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == client_id);
-    if (inst is null || inst.Status != MatCMS.Cloud.Models.InstanceStatus.Approved)
-        return Results.BadRequest("Unbekannte Instanz.");
-    if (!SsoRedirectAllowed(inst, redirect_uri!))
-        return Results.BadRequest("redirect_uri passt nicht zur Instanz.");
-
-    // The single authorization rule: may this cloud user sign in to THIS instance? (Admin: any;
-    // Operator: only assigned.) Reuses the exact gate the admin UI uses.
-    if (!await scope.CanAccessInstanceAsync(inst.Id))
-        return Results.Content($"<!doctype html><meta charset=\"utf-8\"><body style=\"font-family:sans-serif;max-width:32rem;margin:4rem auto\"><h1>Kein Zugriff</h1><p>Dein Cloud-Konto ist für die Instanz „{System.Net.WebUtility.HtmlEncode(inst.Name)}“ nicht freigegeben.</p></body>", "text/html");
-
-    var code = codes.Issue(new OAuthCodes.Grant(scope.UserId!.Value, inst.PublicId, redirect_uri!, code_challenge!));
-    var sep = redirect_uri!.Contains('?') ? "&" : "?";
-    return Results.Redirect($"{redirect_uri}{sep}code={Uri.EscapeDataString(code)}&state={Uri.EscapeDataString(state!)}");
-}).RequireRateLimiting("login");
-
+// authorize (front-channel): the CONSENT SCREEN lives in Pages/OauthAuthorize.cshtml (a Razor Page at
+// /oauth/authorize). The cloud user must be logged in AND allowed for the target instance, and must
+// explicitly click "Zulassen" before a short PKCE-bound code is issued — no silent auto-login. That
+// page also carries the 2FA-required gate (this path is outside /admin) and the redirect_uri check.
+// token (back-channel, below): authenticated by the instance token like the heartbeat, redeems the code
+// and returns the user's identity. No JWT — a direct, token-authenticated TLS call.
 app.MapPost("/oauth/token", async (HttpContext ctx, AppDbContext db, InstanceService instances, OAuthCodes codes) =>
 {
     var form = await ctx.Request.ReadFormAsync();

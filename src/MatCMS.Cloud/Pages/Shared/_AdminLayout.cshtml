@@ -47,9 +47,6 @@
         @{ var isAdmin = User.IsInRole("Admin"); }
         <nav class="admin-nav">
             <a class="@Active("/admin/instances")" asp-page="/Admin/Instances/Index">🖥️ @T["nav.instances"]</a>
-            @* Personal 2FA setup — every account has one (Operators too), so it stays outside the
-               Admin-only block below. *@
-            <a class="@Active("/admin/account")" asp-page="/Admin/Account/TwoFactor">🔐 @T["nav.twofactor"]</a>
             @* Fleet-wide areas — an Operator only manages its own instances, so these are hidden and
                server-side blocked (AuthorizeFolder "Admin" in Program.cs). *@
             @if (isAdmin)
@@ -83,6 +80,9 @@
                         </div>
                     </div>
                 }
+                @* Personal account / 2FA is a per-account setting (Operators have one too), not a
+                   management area — it sits with the session actions here, not as its own nav item. *@
+                <a class="admin-foot-btn admin-foot-icon" asp-page="/Admin/Account/TwoFactor" title="@T["nav.twofactor"]" aria-label="@T["nav.twofactor"]">🔐</a>
                 <form method="post" asp-page="/Logout" class="admin-foot-logout">
                     <button type="submit" class="admin-foot-btn">🚪 @T["nav.logout"]</button>
                 </form>

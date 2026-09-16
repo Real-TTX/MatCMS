@@ -80,7 +80,6 @@
             <div class="admin-nav-sep" role="separator"></div>
             @* Verwaltung & System *@
             <a class="@Active("/admin/users")" asp-page="/Admin/Users/Index">👤 @T["nav.users"]</a>
-            <a class="@Active("/admin/account/twofactor")" asp-page="/Admin/Account/TwoFactor">🔐 @T["nav.twofactor"]</a>
             <a class="@Active("/admin/backup")" asp-page="/Admin/Backup/Index">💾 @T["nav.backup"]</a>
             @if (Plugins.AdminMenu.Count > 0)
             {
@@ -112,6 +111,9 @@
                         </div>
                     </div>
                 }
+                @* Persönliches Konto / 2FA ist eine Konto-Einstellung, kein Verwaltungsbereich — es
+                   sitzt bei den Session-Aktionen (neben Abmelden), nicht als eigener Menüpunkt. *@
+                <a class="admin-foot-btn admin-foot-icon" asp-page="/Admin/Account/TwoFactor" title="@T["nav.twofactor"]" aria-label="@T["nav.twofactor"]">🔐</a>
                 <form method="post" asp-page="/Logout" class="admin-foot-logout">
                     <button type="submit" class="admin-foot-btn">🚪 @T["nav.logout"]</button>
                 </form>

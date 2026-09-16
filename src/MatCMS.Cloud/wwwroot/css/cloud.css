@@ -372,6 +372,30 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
 .quota-bar.is-high > span { background: #d97706; }
 .quota-bar.is-full > span { background: #dc2626; }
 
+/* ============ „Alle aktualisieren": Fortschritt, Status-Icons, Attention-Zeile ============ */
+.ua-progress { display: flex; flex-direction: column; gap: 8px; }
+.ua-progress-head { display: flex; align-items: center; justify-content: space-between; }
+.ua-count { font-variant-numeric: tabular-nums; color: var(--muted, #6b7280); font-size: 14px; }
+.ua-bar { height: 12px; border-radius: 6px; }
+.ua-bar > span { transition: width .3s ease; }
+/* Status-Spalte hinten: ein Icon, grün/rot/gelb; Meldung im Tooltip (Erfolg) oder Attention-Zeile. */
+.ua-table th.ua-th-status, .ua-table td.ua-status { text-align: center; width: 64px; }
+.ua-status .ti { font-size: 20px; vertical-align: middle; }
+.uas-pending  { color: #9ca3af; }
+.uas-updating { color: #2563eb; }
+.uas-done     { color: #16a34a; }
+.uas-failed   { color: #dc2626; }
+.uas-warn     { color: #d97706; }
+.ua-spin { animation: ua-spin .9s linear infinite; display: inline-block; }
+@keyframes ua-spin { to { transform: rotate(360deg); } }
+/* Die Meldung nur bei Fehler/Warnung: eine umrahmte 2. Zeile unter der Instanzzeile. */
+.ua-attn-row > td { padding-top: 0; border-top: 0; }
+.ua-attn { display: flex; align-items: flex-start; gap: 8px; border: 1px solid; border-radius: 8px;
+    padding: 8px 12px; margin: 0 0 8px; font-size: 13.5px; line-height: 1.4; }
+.ua-attn .ti { font-size: 18px; flex: 0 0 auto; margin-top: 1px; }
+.ua-attn-err  { border-color: #fca5a5; background: #fef2f2; color: #991b1b; }
+.ua-attn-warn { border-color: #fcd34d; background: #fffbeb; color: #92400e; }
+
 /* The address on an instance tile. Truncated rather than wrapped: a long host name would push the
    status badges out of line and make a grid of tiles ragged. */
 .instance-tile-url {

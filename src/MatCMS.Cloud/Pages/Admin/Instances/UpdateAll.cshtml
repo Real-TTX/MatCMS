@@ -45,24 +45,21 @@
 }
 else
 {
-    @* Fortschritt: Balken + Live-Tabelle, per Polling gefüllt. *@
+    @* Fortschritt: Balken oben, darunter die Live-Tabelle mit Status-Icon je Instanz. Eine Fehler-/
+       Warnungs-Meldung erscheint als umrahmte „Attention"-Zeile unter der Zeile; bei Erfolg steckt die
+       Meldung im Tooltip des Icons. Per Polling gefüllt. *@
     <div class="card" data-run="@Model.RunId">
-        <div class="kv">
-            <div class="kv-label">Fortschritt</div>
-            <div class="kv-value">
-                <div class="quota-row" style="max-width:420px;">
-                    <div class="quota-bar"><span id="ua-bar" style="width:0%"></span></div>
-                    <span class="quota-pct"><span id="ua-done">0</span>&nbsp;/&nbsp;<span id="ua-total">@("?")</span></span>
-                </div>
+        @* Progressbar oben, prominent und über die volle Breite. *@
+        <div class="ua-progress">
+            <div class="ua-progress-head">
+                <span id="ua-state" class="badge badge-new">läuft…</span>
+                <span class="ua-count"><span id="ua-done">0</span>&nbsp;/&nbsp;<span id="ua-total">@("?")</span></span>
             </div>
-        </div>
-        <div class="kv">
-            <div class="kv-label">Status</div>
-            <div class="kv-value"><span id="ua-state" class="badge badge-new">läuft…</span></div>
+            <div class="quota-bar ua-bar"><span id="ua-bar" style="width:0%"></span></div>
         </div>
 
-        <table class="data" style="margin-top:12px;">
-            <thead><tr><th>Instanz</th><th>Von</th><th></th><th>Auf</th><th>Status</th><th>Meldung</th></tr></thead>
+        <table class="data ua-table" style="margin-top:16px;">
+            <thead><tr><th>Instanz</th><th>Von</th><th></th><th>Auf</th><th class="ua-th-status">Status</th></tr></thead>
             <tbody id="ua-rows">
                 <tr><td colspan="99" class="muted"><em>Wird gestartet…</em></td></tr>
             </tbody>
@@ -76,21 +73,41 @@ else
             (function () {
                 var run = document.querySelector('[data-run]').getAttribute('data-run');
                 var esc = function (s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; };
-                var badge = { pending: 'badge-off', updating: 'badge-new', done: 'badge-on', failed: 'badge-err', skipped: 'badge-off' };
-                var label = { pending: 'wartet', updating: 'aktualisiert…', done: 'fertig', failed: 'Fehler', skipped: 'übersprungen' };
+                // icon, colour class, label, and whether an error/warning attention row is shown.
+                var STAT = {
+                    pending:  { icon: 'ti-clock',                 cls: 'uas-pending',  label: 'wartet',         attn: false },
+                    updating: { icon: 'ti-loader-2',              cls: 'uas-updating', label: 'aktualisiert…',  attn: false },
+                    done:     { icon: 'ti-circle-check-filled',   cls: 'uas-done',     label: 'fertig',         attn: false },
+                    failed:   { icon: 'ti-alert-circle-filled',   cls: 'uas-failed',   label: 'Fehler',         attn: true },
+                    skipped:  { icon: 'ti-alert-triangle-filled', cls: 'uas-warn',     label: 'übersprungen',   attn: true }
+                };
                 function render(d) {
                     document.getElementById('ua-total').textContent = d.total;
                     document.getElementById('ua-done').textContent = d.completed;
                     var pct = d.total ? Math.round(d.completed * 100 / d.total) : 0;
                     document.getElementById('ua-bar').style.width = pct + '%';
-                    var rows = (d.items || []).map(function (i) {
-                        return '<tr><td><strong>' + esc(i.name) + '</strong></td>' +
+
+                    var html = '';
+                    (d.items || []).forEach(function (i) {
+                        var s = STAT[i.status] || { icon: 'ti-point', cls: 'uas-pending', label: i.status, attn: false };
+                        var msg = i.message || '';
+                        // Success (and any non-error state) with a message: it lives in the icon's tooltip.
+                        var title = (!s.attn && msg) ? msg : s.label;
+                        var spin = i.status === 'updating' ? ' ua-spin' : '';
+                        html += '<tr class="ua-row"><td><strong>' + esc(i.name) + '</strong></td>' +
                             '<td class="muted mono">' + esc(i.from || '?') + '</td><td class="muted">→</td>' +
                             '<td class="mono">' + esc(i.to) + '</td>' +
-                            '<td><span class="badge ' + (badge[i.status] || 'badge-off') + '">' + (label[i.status] || i.status) + '</span></td>' +
-                            '<td class="muted">' + esc(i.message || '') + '</td></tr>';
-                    }).join('');
-                    if (rows) document.getElementById('ua-rows').innerHTML = rows;
+                            '<td class="ua-status"><i class="ti ' + s.icon + ' ' + s.cls + spin + '" title="' + esc(title) + '" aria-label="' + esc(s.label) + '"></i></td></tr>';
+                        // Error / warning: a bordered attention line spanning the row.
+                        if (s.attn && msg) {
+                            html += '<tr class="ua-attn-row"><td colspan="99">' +
+                                '<div class="ua-attn ua-attn-' + (i.status === 'failed' ? 'err' : 'warn') + '">' +
+                                '<i class="ti ' + (i.status === 'failed' ? 'ti-alert-circle' : 'ti-alert-triangle') + '" aria-hidden="true"></i>' +
+                                '<span>' + esc(msg) + '</span></div></td></tr>';
+                        }
+                    });
+                    if (html) document.getElementById('ua-rows').innerHTML = html;
+
                     if (d.done) {
                         var st = document.getElementById('ua-state');
                         var failed = (d.items || []).some(function (i) { return i.status === 'failed'; });

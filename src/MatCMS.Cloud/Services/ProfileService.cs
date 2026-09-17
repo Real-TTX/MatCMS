@@ -310,7 +310,10 @@ public class ProfileService
         // AI: when the profile's AI group is on, the instance relays model calls through the cloud.
         // The credential itself is never rolled out — only this "use the relay" flag.
         if (profile.SyncAi)
+        {
             config.AiTransport = "cloud";
+            config.AiInstruction = string.IsNullOrWhiteSpace(profile.AiInstruction) ? null : profile.AiInstruction.Trim();
+        }
 
         if (profile.SyncUsers)
         {

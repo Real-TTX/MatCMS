@@ -180,6 +180,11 @@ public class Profile
     /// the relay refuses with a reason and the site's AI features pause until the month rolls over.</summary>
     public int? AiMonthlyTokenBudget { get; set; }
 
+    /// <summary>Always-on AI instruction/context rolled out to assigned instances: brand, tone, language,
+    /// facts the model must honour on EVERY AI action. Prepended to every relayed system prompt on the
+    /// site. Empty = none. Rolled out only while <see cref="SyncAi"/> is on (rides the AiTransport group).</summary>
+    public string? AiInstruction { get; set; }
+
     /// <summary>
     /// Name of the template that should be the ACTIVE design on every assigned instance. Empty means
     /// "roll the templates out but leave the choice to the site" — switching the live design of a

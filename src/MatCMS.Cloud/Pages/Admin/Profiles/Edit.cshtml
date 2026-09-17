@@ -411,6 +411,11 @@
             <div class="help">@T["profiles.aiEnabledHint"]</div>
             <p class="muted">@T["profiles.aiIntro"]</p>
             <div class="form-field">
+                <label for="aiInstruction">@T["profiles.aiInstruction"]</label>
+                <textarea id="aiInstruction" name="instruction" rows="4" placeholder="@T["profiles.aiInstructionPlaceholder"]">@Model.Item.AiInstruction</textarea>
+                <div class="help">@T["profiles.aiInstructionHint"]</div>
+            </div>
+            <div class="form-field">
                 <label for="aiBudget">@T["profiles.aiBudget"]</label>
                 <input id="aiBudget" name="budget" value="@(Model.Item.AiMonthlyTokenBudget?.ToString() ?? "")"
                        inputmode="numeric" placeholder="@T["profiles.aiBudgetUnlimited"]" />

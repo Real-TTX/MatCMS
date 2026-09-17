@@ -15,7 +15,7 @@ public static class CloudProtocol
     /// <summary>Contract version. Bump on <b>every</b> change to the payloads in this file: the cloud
     /// badges an instance reporting an older one as "veraltet", and both sides read this constant, so
     /// one edit covers both.</summary>
-    public const int Version = 13;
+    public const int Version = 14;
 
     /// <summary>Header carrying the instance's bearer token.</summary>
     public const string TokenHeader = "X-MatCMS-Instance-Token";
@@ -227,6 +227,12 @@ public sealed class InstanceConfig
     /// simply shows no AI features rather than misreading a number.</para>
     /// </summary>
     public string AiTransport { get; set; } = "off";
+
+    /// <summary>An always-on instruction/context the cloud rolls out for this site's AI: brand, tone,
+    /// language, facts the model should honour on EVERY AI action ("a vacation rental on the Baltic
+    /// coast; warm tone; always German"). Prepended to every relayed system prompt. Empty/null = none.
+    /// Rides with <see cref="AiTransport"/>; a site that predates the field simply ignores it.</summary>
+    public string? AiInstruction { get; set; }
 
     /// <summary>When true, the instance removes the built-in default <c>admin</c> account — but ONLY if
     /// it still carries the default password (untouched) AND at least one OTHER Admin remains, so a

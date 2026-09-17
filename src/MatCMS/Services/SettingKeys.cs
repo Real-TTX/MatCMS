@@ -104,6 +104,11 @@ public static class SettingKeys
     /// SiteContext.Get; the whole AI feature is gated on it.</summary>
     public const string AiTransport = "ai.transport";
 
+    /// <summary>An always-on instruction/context the cloud rolled out for this site's AI (brand, tone,
+    /// language, facts). Prepended to every relayed AI system prompt. Empty = none. Set only via the
+    /// cloud profile — never edited on the instance.</summary>
+    public const string AiInstruction = "ai.instruction";
+
     /// <summary>Whether finished backups are handed to the connected cloud. Off unless somebody says
     /// otherwise — uploading a customer's whole site somewhere is a decision, not a default.</summary>
     public const string BackupToCloud = "backup.toCloud";

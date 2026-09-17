@@ -218,6 +218,28 @@ public class CloudSyncService
                 await SaveAsync(ct);
             }
 
+            // Global AI instruction: an always-on context prepended to every AI prompt on this site.
+            // Rides with the AI group and resets when the profile stops deciding, exactly like the
+            // transport flag above — empty when none, so a cleared instruction actually clears.
+            {
+                var instr = (config.AiInstruction ?? "").Trim();
+                var row = await _db.SiteSettings.FirstOrDefaultAsync(s => s.Key == SettingKeys.AiInstruction, ct);
+                if (row is null)
+                {
+                    if (instr.Length > 0)
+                    {
+                        if (!_dryRun) _db.SiteSettings.Add(new SiteSetting { Key = SettingKeys.AiInstruction, Value = instr });
+                        Report("setting", SettingKeys.AiInstruction, "installed", instr);
+                    }
+                }
+                else if (row.Value != instr)
+                {
+                    if (!_dryRun) row.Value = instr;
+                    Report("setting", SettingKeys.AiInstruction, "updated", instr);
+                }
+                await SaveAsync(ct);
+            }
+
             if (config.Users is not null)
             {
                 var plan = Plan(PayloadUsers, config.UsersMode, seeded);

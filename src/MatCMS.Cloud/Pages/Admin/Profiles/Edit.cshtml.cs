@@ -484,7 +484,7 @@ public class EditModel : PageModel
     /// <summary>Turns the AI group on for this profile and sets the monthly token budget per instance
     /// (empty/0 = unlimited). Saving this tab adds the group; the remove button takes it out. The
     /// provider key is NOT here — it lives centrally on the cloud (Einstellungen → KI).</summary>
-    public async Task<IActionResult> OnPostAiAsync(int id, bool enabled, string? budget)
+    public async Task<IActionResult> OnPostAiAsync(int id, bool enabled, string? budget, string? instruction)
     {
         var profile = await _db.Profiles.FindAsync(id);
         if (profile is null) return RedirectToPage("Index");
@@ -494,6 +494,8 @@ public class EditModel : PageModel
         // relay it may no longer use). The provider key is NOT here — it lives centrally on the cloud.
         profile.SyncAi = enabled;
         profile.AiMonthlyTokenBudget = int.TryParse((budget ?? "").Trim(), out var b) && b > 0 ? b : null;
+        // Always-on context prepended to every AI prompt on assigned sites (brand/tone/language/facts).
+        profile.AiInstruction = string.IsNullOrWhiteSpace(instruction) ? null : instruction.Trim();
 
         await _db.SaveChangesAsync();
         await _profiles.TouchAsync(id);

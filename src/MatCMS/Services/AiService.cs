@@ -28,12 +28,15 @@ public class AiService
         CancellationToken ct = default)
     {
         if (!Enabled) return (false, null, "KI ist für diese Website nicht aktiviert.");
-        var req = new AiRequest
-        {
-            Purpose = purpose,
-            MaxTokens = maxTokens,
-            Messages = messages.Select(m => new AiMessage { Role = m.role, Content = m.content }).ToList(),
-        };
+        var msgs = new List<AiMessage>();
+        // Global, cloud-rolled-out context first — brand/tone/language/facts the model must honour on
+        // EVERY action. Its own system message, ahead of the per-action prompt, so it colours the result
+        // without replacing the action's own instructions. Empty = nothing added.
+        var context = (_site.Get(SettingKeys.AiInstruction) ?? "").Trim();
+        if (context.Length > 0)
+            msgs.Add(new AiMessage { Role = "system", Content = "Kontext dieser Website (immer beachten):\n" + context });
+        msgs.AddRange(messages.Select(m => new AiMessage { Role = m.role, Content = m.content }));
+        var req = new AiRequest { Purpose = purpose, MaxTokens = maxTokens, Messages = msgs };
         return await _cloud.CallAiAsync(req, ct);
     }
 

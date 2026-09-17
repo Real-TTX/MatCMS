@@ -628,31 +628,20 @@ plain-http site breaks login instead of fixing it. Note the modern-browser cavea
 cookies fully disabled, even `SameSite=None` can be blocked; CHIPS/`Partitioned` is the follow-up if
 that bites.
 
-**SSO into an instance from inside that iframe** needs the SAME on the CLOUD side — the consent step
-runs the *cloud's* own `/login` and `/oauth/authorize`, whose `matcmscloud.auth`/`.2fa`/antiforgery
-cookies are `SameSite=Lax` and drop in the frame (the 400 seen in Brave). Two paths, chosen by the
-cloud setting **`security.embedAuth`** (Einstellungen → Sicherheit, `SettingKeys.EmbedAuth`):
-- **off (default)** — a **frame-buster** in `Login.cshtml`/`OauthAuthorize.cshtml` forces the flow to
-  top level (and the instance's SSO button carries `target="_top"`); robust, but leaves the iframe.
-- **on** — no frame-buster, and a per-response middleware rewrites those three cookies to
-  `SameSite=None; Secure; Partitioned` (the same `CrossSite` shape as the instance, done at runtime so
-  toggling needs no restart; skipped for `/api`). The instance's SSO button then omits `target="_top"`
-  (`LoginModel.EmbedAuth`), so the whole login→consent→callback flow stays in the frame. **Both**
-  `security.embedAuth` (cloud) AND `site.embedAuth` (instance) must be on, and both apps got
-  `; Partitioned` (CHIPS) added to their `CrossSite` so a browser that blocks third-party cookies
-  (Brave strict) still keeps them; browsers without CHIPS ignore the attribute → plain `None`.
-
-Three things the in-iframe SSO needs, learned the hard way:
-- **`matcms.ssoflow` MUST be in the instance's `CrossSite` list.** It carries the PKCE verifier/state of
-  the in-progress login; left `SameSite=Lax` it is dropped in the cross-site frame and `/sso/callback`
-  finds no state → the whole SSO fails even though every other cookie was handled.
-- The cloud sets **`Content-Security-Policy: frame-ancestors 'self'`** on its embedAuth responses, so the
-  login/consent may be framed by the cloud admin (top = same origin) without depending on how a browser
-  reads the antiforgery `X-Frame-Options: SAMEORIGIN` across a cross-origin→same-origin frame nav.
-- Because the cloud session cookie is **Partitioned** under embedAuth, an operator already signed in
-  BEFORE turning embedAuth on still holds a non-partitioned cookie that Brave blocks in the frame — they
-  must **sign out and back into the cloud once** so the session cookie is re-issued partitioned. Both
-  `security.embedAuth` (cloud) and `site.embedAuth` (instance) on, both images redeployed, then re-login.
+**SSO from inside the cloud's instance iframe runs in a NEW TAB, not in the frame.** The consent step
+runs the cloud's own `/login`/`/oauth/authorize`, whose `SameSite=Lax` cookies drop in a cross-site
+frame (the 400 in Brave). Making them work in-frame was tried with `SameSite=None; Secure; Partitioned`
+(CHIPS) on both apps and it STILL failed in Brave — the browser blocks the cookies regardless, there is
+no reliable server-side fix (that whole `security.embedAuth` / cookie-rewrite / frame-conditional path
+was removed again). So the instance's SSO button (`Pages/Login.cshtml`) and the cloud's **"In Instanz
+anmelden"** tool on the site view (`Instances/Site.cshtml`) both use **`target="_blank"`**: the flow runs
+first-party in a new tab, where the operator's cloud session is recognised (no re-login) and it works in
+every browser incl. Brave. The `frame-buster` on the cloud `/login`/`/oauth/authorize` stays as a
+defensive guard against an unintended embed. The only way to get a working *in-iframe* session would be
+same-origin (a host/subdomain reverse proxy) — assessed and rejected as too much infra for the gain
+(path-prefix proxying is worse: MatCMS emits absolute URLs everywhere incl. stored content). The
+instance's own **`site.embedAuth`** (above) is a separate, still-supported opt-in for framing the
+instance's OWN password login same-site; it is not used by the SSO flow.
 
 ### Update checks & notifications
 

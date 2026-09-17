@@ -41,6 +41,16 @@
                         title="@T["instances.device"]" aria-label="@T["instances.device"]">
                     <i class="ti ti-device-imac" aria-hidden="true"></i>
                 </button>
+                @* Auto-Login: öffnet den SSO-Ablauf der Instanz in einem NEUEN TAB. Dort läuft alles
+                   First-Party (deine Cloud-Sitzung wird erkannt → kein erneutes Tippen) → funktioniert
+                   zuverlässig in jedem Browser. Bewusst neuer Tab statt iFrame: im fremd-eingebetteten
+                   iFrame blockt der Browser die Anmelde-Cookies (Cross-Site) — das lässt sich nicht
+                   umgehen. Ist SSO auf der Instanz aus, landet man einfach auf deren Login-Seite. *@
+                <a class="stool stool-login" href="@(Model.Item.PreviewUrl?.TrimEnd('/'))/sso/start?returnUrl=/admin"
+                   target="_blank" rel="noopener"
+                   title="@T["instances.ssoLogin"]" aria-label="@T["instances.ssoLogin"]">
+                    <i class="ti ti-login-2" aria-hidden="true"></i>
+                </a>
                 <a class="stool stool-new" data-site-newtab href="@Model.Item.PreviewUrl" target="_blank" rel="noopener"
                    title="@T["instances.openSite"]" aria-label="@T["instances.openSite"]">
                     <i class="ti ti-external-link" aria-hidden="true"></i>

@@ -43,11 +43,12 @@
         @if (Model.SsoAvailable)
         {
             <div style="text-align:center;color:#9aa0a6;font-size:13px;margin:14px 0 10px;">@T["login.or"]</div>
-            @* Ohne embedAuth bricht target="_top" bewusst aus dem iFrame aus: dann gehört der OAuth-Ablauf
-               auf die oberste Ebene, weil die Cloud-Cookies im Cross-Site-Rahmen sonst scheitern (400).
-               MIT embedAuth (Cloud + Instanz auf SameSite=None; Partitioned) bleibt der Ablauf im iFrame —
-               dann KEIN _top, sonst spränge man unnötig raus. Ohne iFrame ist _top ohnehin gleich _self. *@
-            <a class="btn btn-ghost btn-block" target="@(Model.EmbedAuth ? null : "_top")" href="/sso/start?returnUrl=@Uri.EscapeDataString(Model.ReturnUrl ?? "/admin")">@T["login.sso"]</a>
+            @* target="_blank": Läuft dieser Login im Cloud-iFrame (Instanz-Ansicht), MUSS der OAuth-Ablauf
+               in einem neuen Tab (First-Party) laufen — im Cross-Site-iFrame blockt der Browser die
+               Anmelde-Cookies (das ließ sich mit SameSite=None/CHIPS nicht zuverlässig lösen, v. a. Brave).
+               Im neuen Tab wird die bestehende Cloud-Sitzung erkannt. Ohne iFrame öffnet _blank einfach
+               einen Tab — akzeptabel für den seltenen SSO-Klick. *@
+            <a class="btn btn-ghost btn-block" target="_blank" rel="noopener" href="/sso/start?returnUrl=@Uri.EscapeDataString(Model.ReturnUrl ?? "/admin")">@T["login.sso"]</a>
         }
         <a class="login-back" href="/">@T["login.back"]</a>
     </div>

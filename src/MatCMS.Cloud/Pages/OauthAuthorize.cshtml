@@ -9,15 +9,12 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    @* OAuth authorize breaks out of any frame UNLESS embedAuth is on (see the note in Login.cshtml). No
-       self-reload fallback (that would loop when top-nav is blocked). With embedAuth the consent stays
-       IN the instance-preview frame; its cookies are then SameSite=None; Secure; Partitioned. *@
-    @if (!Cloud.Flag(MatCMS.Cloud.Services.SettingKeys.EmbedAuth))
-    {
-        <script>
-            if (window.top !== window.self) { try { window.top.location.replace(window.location.href); } catch (e) {} }
-        </script>
-    }
+    @* OAuth authorize must run first-party (see the note in Login.cshtml). Break out of any frame; the
+       SSO flow from the cloud iframe opens in a new tab, so this only guards an unintended embed. No
+       self-reload fallback (that would loop when top-nav is blocked). *@
+    <script>
+        if (window.top !== window.self) { try { window.top.location.replace(window.location.href); } catch (e) {} }
+    </script>
     <title>@T["sso.consent.pageTitle"] – @Cloud.CloudName</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

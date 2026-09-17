@@ -54,11 +54,6 @@
                 @T["settings.require2fa"]
             </label>
             <div class="help">@T["settings.require2faHelp"]</div>
-            <label class="checkbox-row" style="margin-top:14px;">
-                <input type="checkbox" name="embedAuth" value="true" checked="@(Model.Flag(SettingKeys.EmbedAuth) ? "checked" : null)" />
-                @T["settings.embedAuth"]
-            </label>
-            <div class="help">@T["settings.embedAuthHelp"]</div>
             <div style="margin-top:14px;"><button type="submit" class="btn">@T["settings.save"]</button></div>
         </div>
     </form>

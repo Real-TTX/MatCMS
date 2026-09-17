@@ -9,18 +9,14 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    @* Break out of any frame BEFORE rendering — UNLESS embedAuth is on. Without embedAuth the cloud
-       login (and the SSO authorize it protects) must run first-party: inside a cross-site frame the
-       SameSite=Lax auth/antiforgery cookies are unreliable and the login POST fails with 400, so we
-       force top level (no self-reload fallback — that would spin an infinite loop when top-nav is
-       blocked). With embedAuth the cookies are SameSite=None; Secure; Partitioned, so the flow is meant
-       to stay IN the frame and the frame-buster is omitted. *@
-    @if (!Cloud.Flag(MatCMS.Cloud.Services.SettingKeys.EmbedAuth))
-    {
-        <script>
-            if (window.top !== window.self) { try { window.top.location.replace(window.location.href); } catch (e) {} }
-        </script>
-    }
+    @* Break out of any frame BEFORE rendering. The cloud login (and the SSO authorize it protects) must
+       run first-party: inside a cross-site frame the SameSite=Lax auth/antiforgery cookies are dropped
+       and the login POST fails with 400. SSO from the cloud's instance iframe opens in a NEW TAB (the
+       instance login button uses target=_blank), so this normally never fires; it only guards an
+       unintended embed. No self-reload fallback — that would loop when top-nav is blocked. *@
+    <script>
+        if (window.top !== window.self) { try { window.top.location.replace(window.location.href); } catch (e) {} }
+    </script>
     <title>@T["login.pageTitle"] – @Cloud.CloudName</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

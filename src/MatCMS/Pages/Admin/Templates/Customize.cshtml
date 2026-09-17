@@ -5,20 +5,9 @@
     string V(string id) => Model.Values.TryGetValue(id, out var v) ? v : "";
 }
 @* Nur die Überschrift: alle Aktionen dieser Seite stehen unten in EINER Reihe — dieselbe Ordnung
-   wie im Plugin-Editor. Die KI-Aktion sitzt rechts im Kopf (nur wenn KI aktiv ist und es überhaupt
-   anpassbare Parameter gibt). *@
+   wie im Plugin-Editor. *@
 <div class="page-head">
     <h1>@T["templates.customizeHeading"] – @Model.Current.Name</h1>
-    @if (Model.AiEnabled && Model.Params.Count > 0)
-    {
-        <div class="list-toolbar">
-            <button type="button" id="ai-theme-btn" class="btn btn-sm btn-ghost"
-                    title="@T["templates.aiButton"]"
-                    data-ai-url="@Url.Page(null, "AiTheme", new { id = Model.Current.Id })">
-                <i class="ti ti-sparkles" aria-hidden="true"></i> @T["templates.aiButton"]
-            </button>
-        </div>
-    }
 </div>
 
 <div class="card">
@@ -72,6 +61,14 @@
     @if (Model.Params.Count > 0)
     {
         <button type="submit" class="btn" form="customize-form">@T["action.save"]</button>
+        @if (Model.AiEnabled)
+        {
+            <button type="button" id="ai-theme-btn" class="btn btn-ghost"
+                    title="@T["templates.aiButton"]"
+                    data-ai-url="@Url.Page(null, "AiTheme", new { id = Model.Current.Id })">
+                <i class="ti ti-sparkles" aria-hidden="true"></i> @T["templates.aiButton"]
+            </button>
+        }
     }
     <a class="btn btn-ghost" asp-page="Index">@T["action.back"]</a>
 </div>

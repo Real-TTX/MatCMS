@@ -9,13 +9,6 @@
         <h1>@T["pages.title"]</h1>
         <div class="list-toolbar">
             <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
-            @if (Model.AiEnabled)
-            {
-                <button type="button" class="btn btn-sm btn-ghost" id="ai-sitegen-btn" data-ai-url="@Url.Page(null, "AiGenerateSite")">
-                    <i class="ti ti-sparkles" aria-hidden="true"></i> @T["pages.aiSiteGenButton"]
-                </button>
-            }
-            <a class="btn btn-sm" asp-page="Create">@T["pages.create"]</a>
         </div>
     </div>
 
@@ -100,6 +93,16 @@
     </table>
     <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
     <nav class="list-pager" data-list-pager aria-label="@T["list.pager"]"></nav>
+    @* Aktions-Buttons gehören UNTER die Liste (.list-actions), nicht in die Kopf-Toolbar. *@
+    <div class="list-actions">
+        <a class="btn" asp-page="Create">@T["pages.create"]</a>
+        @if (Model.AiEnabled)
+        {
+            <button type="button" class="btn btn-ghost" id="ai-sitegen-btn" data-ai-url="@Url.Page(null, "AiGenerateSite")">
+                <i class="ti ti-sparkles" aria-hidden="true"></i> @T["pages.aiSiteGenButton"]
+            </button>
+        }
+    </div>
 </div>
 
 @if (Model.AiEnabled)

@@ -9,6 +9,12 @@
         <h1>@T["pages.title"]</h1>
         <div class="list-toolbar">
             <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+            @if (Model.AiEnabled)
+            {
+                <button type="button" class="btn btn-sm btn-ghost" id="ai-sitegen-btn" data-ai-url="@Url.Page(null, "AiGenerateSite")">
+                    <i class="ti ti-sparkles" aria-hidden="true"></i> @T["pages.aiSiteGenButton"]
+                </button>
+            }
             <a class="btn btn-sm" asp-page="Create">@T["pages.create"]</a>
         </div>
     </div>
@@ -95,6 +101,31 @@
     <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
     <nav class="list-pager" data-list-pager aria-label="@T["list.pager"]"></nav>
 </div>
+
+@if (Model.AiEnabled)
+{
+    @* Website-Generator: die KI schlägt mehrere Seiten (mit Blöcken + Menü) vor → Liste bestätigen →
+       per normalem Formular anlegen (add-only, PRG). Reuse der .ai-dialog/.ai-pagegen-*-Styles. *@
+    <dialog id="ai-sitegen-dialog" class="ai-dialog" data-lbl-working="@T["editor.aiWorking"]"
+            data-lbl-blocks="@T["pages.aiSiteGenBlocks"]" data-lbl-nav="@T["pages.aiSiteGenNav"]">
+        <h3>@T["pages.aiSiteGenTitle"]</h3>
+        <label class="ai-instr-label" for="ai-sitegen-instruction">@T["pages.aiSiteGenInstruction"]</label>
+        <textarea id="ai-sitegen-instruction" rows="3" placeholder="@T["pages.aiSiteGenPlaceholder"]"></textarea>
+        <div class="ai-dialog-actions">
+            <button type="button" id="ai-sitegen-propose" class="btn btn-sm">@T["pages.aiSiteGenPropose"]</button>
+            <span id="ai-sitegen-status" class="ai-status muted"></span>
+        </div>
+        <div id="ai-sitegen-list" class="ai-pagegen-list"></div>
+        <div class="ai-dialog-foot">
+            <button type="button" id="ai-sitegen-apply" class="btn btn-sm" disabled>@T["pages.aiSiteGenApply"]</button>
+            <button type="button" id="ai-sitegen-cancel" class="btn btn-sm btn-ghost">@T["editor.aiCancel"]</button>
+        </div>
+    </dialog>
+    <form id="ai-sitegen-form" method="post" asp-page-handler="AiCreateSite">
+        <input type="hidden" name="sitesJson" id="ai-sitegen-data" />
+    </form>
+    <script src="~/js/ai-site-gen.js" asp-append-version="true"></script>
+}
 
 <style>
     /* Language versions are always shown as indented child rows (no collapse). */

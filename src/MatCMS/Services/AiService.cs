@@ -127,4 +127,24 @@ public class AiService
         var body = $"Auftrag: {instruction}\n\nVerfügbare Blöcke:\n{blocksSpec}";
         return RunAsync("pagegen", new[] { ("system", system), ("user", body) }, maxTokens: 2000, ct: ct);
     }
+
+    /// <summary>Generates a whole WEBSITE — several pages, each with a title, slug, whether it belongs in
+    /// the menu, and a block list — from a briefing + the available blocks. Answers with a JSON array of
+    /// pages. The caller validates every page and every block against the registry; nothing is trusted.
+    /// The global site instruction rides along (via RunAsync), so the whole site comes out on-brand.</summary>
+    public Task<(bool ok, string? text, string? error)> GenerateSiteAsync(
+        string briefing, string blocksSpec, CancellationToken ct = default)
+    {
+        var system =
+            "Du bist Web-Redakteur und Designer und baust eine ganze WEBSITE (mehrere Seiten) aus "
+          + "VORGEGEBENEN Bausteinen. Unten die verfügbaren Blocktypen mit ihren Textfeldern. Erstelle "
+          + "eine sinnvolle, kompakte Seitenstruktur (z. B. Start, Details/Über uns, Angebot/Preise, "
+          + "Kontakt) — höchstens 6 Seiten. Für JEDE Seite: ein kurzer Titel, ein URL-Slug (klein, nur "
+          + "a-z, 0-9, Bindestrich), ob sie ins Hauptmenü gehört (nav true/false), und eine Blockliste "
+          + "(nur aufgelistete type/feldId, echte Inhalte, KEIN Lorem Ipsum). Antworte AUSSCHLIESSLICH "
+          + "mit einem JSON-Array von Seiten: [{\"title\":\"Start\",\"slug\":\"home\",\"nav\":true,"
+          + "\"blocks\":[{\"type\":\"hero\",\"data\":{\"heading\":\"…\"}}]}, …] — ohne Erklärungen, ohne Markdown.";
+        var body = $"Auftrag: {briefing}\n\nVerfügbare Blöcke:\n{blocksSpec}";
+        return RunAsync("sitegen", new[] { ("system", system), ("user", body) }, maxTokens: 4000, ct: ct);
+    }
 }

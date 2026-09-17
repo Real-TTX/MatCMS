@@ -20,14 +20,16 @@ public class EditModel : PageModel
     private readonly Localizer _t;
     private readonly TranslationService _translator;
     private readonly AiService _ai;
+    private readonly BlockGenerator _blockGen;
 
-    public EditModel(AppDbContext db, BlockRegistry registry, Localizer t, TranslationService translator, AiService ai)
+    public EditModel(AppDbContext db, BlockRegistry registry, Localizer t, TranslationService translator, AiService ai, BlockGenerator blockGen)
     {
         _db = db;
         Registry = registry;
         _t = t;
         _translator = translator;
         _ai = ai;
+        _blockGen = blockGen;
     }
 
     /// <summary>True when a machine-translation provider is configured (shows the auto-translate button).</summary>
@@ -426,107 +428,8 @@ public class EditModel : PageModel
     }
 
     // --- AI "generate page" -----------------------------------------------------------------------
-    // The model is told which blocks exist (their text fields) + the site's global instruction, and
-    // returns a list of blocks to create. Everything it returns is validated against the registry here
-    // — unknown types/fields are dropped — and nothing is written until the operator confirms.
-
-    private sealed record GenField(string Id, string Label, string Kind);
-    private sealed record GenBlock(string Type, string Name, List<GenField> Fields);
-
-    /// <summary>Top-level, fully-text-fillable blocks the AI may use: no containers, no child-only, no
-    /// repeaters (a half-filled list block renders wrong), and at least one text field. Text fields only
-    /// (Text/Textarea/RichText) — the model writes prose, not colours or image URLs.</summary>
-    private List<GenBlock> AllowedGenBlocks()
-    {
-        var result = new List<GenBlock>();
-        foreach (var def in Registry.All)
-        {
-            if (def.ChildOnly || def.IsContainer) continue;
-            if (def.Fields.Any(f => f.ItemFields.Count > 0)) continue;   // skip repeaters
-            var fields = new List<GenField>();
-            foreach (var f in def.Fields)
-            {
-                var kind = f.Type switch
-                {
-                    FieldType.Text => "text",
-                    FieldType.Textarea => "multiline",
-                    FieldType.RichText => "rich",
-                    _ => null
-                };
-                if (kind is null) continue;
-                fields.Add(new GenField(f.Id, _t[f.Label], kind));
-            }
-            if (fields.Count == 0) continue;
-            result.Add(new GenBlock(def.Type, _t[def.Name], fields));
-        }
-        return result;
-    }
-
-    private string BuildBlockSpecText()
-    {
-        var sb = new System.Text.StringBuilder();
-        foreach (var b in AllowedGenBlocks())
-        {
-            sb.Append("- type \"").Append(b.Type).Append("\" (").Append(b.Name).Append("): ");
-            sb.Append(string.Join(", ", b.Fields.Select(f =>
-                $"{f.Id} [{f.Label}{(f.Kind == "multiline" ? ", mehrzeilig" : f.Kind == "rich" ? ", HTML erlaubt" : "")}]")));
-            sb.Append('\n');
-        }
-        return sb.ToString();
-    }
-
-    private static string ExtractJsonArray(string? text)
-    {
-        var s = (text ?? "").Trim();
-        if (s.StartsWith("```"))
-        {
-            var nl = s.IndexOf('\n');
-            if (nl >= 0) s = s[(nl + 1)..];
-            if (s.EndsWith("```")) s = s[..^3];
-            s = s.Trim();
-        }
-        var a = s.IndexOf('[');
-        var b = s.LastIndexOf(']');
-        return (a >= 0 && b > a) ? s[a..(b + 1)] : s;
-    }
-
-    /// <summary>Validates the model's JSON array against the allowed blocks: only known block types, only
-    /// their known text fields, only non-empty strings, bounded count/length. Returns clean (type, data).</summary>
-    private List<(string Type, string Name, JsonObject Data)> ValidateGeneratedBlocks(string? json)
-    {
-        var result = new List<(string, string, JsonObject)>();
-        var allowed = AllowedGenBlocks().GroupBy(b => b.Type, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
-        JsonNode? root;
-        try { root = JsonNode.Parse(ExtractJsonArray(json)); } catch { return result; }
-        if (root is not JsonArray arr) return result;
-
-        foreach (var item in arr)
-        {
-            if (result.Count >= 12) break;                               // bound a page to 12 blocks
-            if (item is not JsonObject obj) continue;
-            var type = (obj["type"] as JsonValue)?.ToString() ?? "";
-            if (!allowed.TryGetValue(type, out var spec)) continue;      // unknown block type → drop
-            var textIds = spec.Fields.ToDictionary(f => f.Id, f => f, StringComparer.OrdinalIgnoreCase);
-            var data = new JsonObject();
-            if (obj["data"] is JsonObject d)
-            {
-                foreach (var kv in d)
-                {
-                    if (!textIds.ContainsKey(kv.Key)) continue;          // unknown field → drop
-                    if (kv.Value is JsonValue v && v.TryGetValue<string>(out var sv))
-                    {
-                        var val = sv.Trim();
-                        if (val.Length == 0) continue;
-                        data[kv.Key] = val.Length > 3000 ? val[..3000] : val;
-                    }
-                }
-            }
-            if (data.Count == 0) continue;                               // no filled text → skip
-            result.Add((spec.Type, spec.Name, data));
-        }
-        return result;
-    }
+    // The block catalogue (which blocks the model may use) and the TRUSTED-BOUNDARY validation of what it
+    // returns live in the shared BlockGenerator service — the same validator the site generator uses.
 
     /// <summary>Proposes a whole page as a list of blocks, generated from the description + the site's
     /// global AI instruction, validated against the registry. Returns { ok, blocks[summary], proposed }
@@ -538,10 +441,10 @@ public class EditModel : PageModel
         if (string.IsNullOrWhiteSpace(instruction))
             return new JsonResult(new { ok = false, error = "Bitte beschreibe kurz, was die Seite enthalten soll." });
 
-        var (ok, text, error) = await _ai.GeneratePageAsync(instruction.Trim(), BuildBlockSpecText(), HttpContext.RequestAborted);
+        var (ok, text, error) = await _ai.GeneratePageAsync(instruction.Trim(), _blockGen.BuildSpecText(), HttpContext.RequestAborted);
         if (!ok) return new JsonResult(new { ok = false, error = error ?? "KI-Aufruf fehlgeschlagen." });
 
-        var blocks = ValidateGeneratedBlocks(text);
+        var blocks = _blockGen.ValidateBlocks(text);
         if (blocks.Count == 0)
             return new JsonResult(new { ok = false, error = "Die KI hat keine verwertbaren Blöcke geliefert." });
 
@@ -566,7 +469,7 @@ public class EditModel : PageModel
         var page = await _db.Pages.FirstOrDefaultAsync(p => p.Id == id);
         if (page is null) return NotFound();
 
-        var blocks = ValidateGeneratedBlocks(blocksJson);
+        var blocks = _blockGen.ValidateBlocks(blocksJson);
         if (blocks.Count == 0)
         {
             TempData["FlashError"] = "Es gab keine gültigen Blöcke zum Anlegen.";

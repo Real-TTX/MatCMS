@@ -1376,5 +1376,10 @@ table.data .btn { white-space: nowrap; }
 .ai-before .ai-text { color: #b91c1c; }
 .ai-after .ai-text { color: #15803d; }
 .ai-swatch { display: inline-block; width: 16px; height: 16px; border-radius: 4px; border: 1px solid var(--line); vertical-align: -3px; margin-right: 6px; }
+.ai-pagegen-list { max-height: 46vh; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
+.ai-pagegen-item { display: grid; grid-template-columns: auto auto 1fr; align-items: baseline; gap: 8px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.ai-pagegen-num { font-size: 11px; opacity: .5; min-width: 1.2em; }
+.ai-pagegen-name { font-weight: 600; font-size: 13px; }
+.ai-pagegen-snip { color: var(--muted, #6b7280); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ai-dialog-foot { display: flex; gap: 10px; margin-top: 14px; }
 @media (max-width: 560px) { .ai-cols { grid-template-columns: 1fr; } }

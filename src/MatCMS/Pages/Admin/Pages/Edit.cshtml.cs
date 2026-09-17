@@ -425,6 +425,169 @@ public class EditModel : PageModel
         return sb.ToString().Trim();
     }
 
+    // --- AI "generate page" -----------------------------------------------------------------------
+    // The model is told which blocks exist (their text fields) + the site's global instruction, and
+    // returns a list of blocks to create. Everything it returns is validated against the registry here
+    // — unknown types/fields are dropped — and nothing is written until the operator confirms.
+
+    private sealed record GenField(string Id, string Label, string Kind);
+    private sealed record GenBlock(string Type, string Name, List<GenField> Fields);
+
+    /// <summary>Top-level, fully-text-fillable blocks the AI may use: no containers, no child-only, no
+    /// repeaters (a half-filled list block renders wrong), and at least one text field. Text fields only
+    /// (Text/Textarea/RichText) — the model writes prose, not colours or image URLs.</summary>
+    private List<GenBlock> AllowedGenBlocks()
+    {
+        var result = new List<GenBlock>();
+        foreach (var def in Registry.All)
+        {
+            if (def.ChildOnly || def.IsContainer) continue;
+            if (def.Fields.Any(f => f.ItemFields.Count > 0)) continue;   // skip repeaters
+            var fields = new List<GenField>();
+            foreach (var f in def.Fields)
+            {
+                var kind = f.Type switch
+                {
+                    FieldType.Text => "text",
+                    FieldType.Textarea => "multiline",
+                    FieldType.RichText => "rich",
+                    _ => null
+                };
+                if (kind is null) continue;
+                fields.Add(new GenField(f.Id, _t[f.Label], kind));
+            }
+            if (fields.Count == 0) continue;
+            result.Add(new GenBlock(def.Type, _t[def.Name], fields));
+        }
+        return result;
+    }
+
+    private string BuildBlockSpecText()
+    {
+        var sb = new System.Text.StringBuilder();
+        foreach (var b in AllowedGenBlocks())
+        {
+            sb.Append("- type \"").Append(b.Type).Append("\" (").Append(b.Name).Append("): ");
+            sb.Append(string.Join(", ", b.Fields.Select(f =>
+                $"{f.Id} [{f.Label}{(f.Kind == "multiline" ? ", mehrzeilig" : f.Kind == "rich" ? ", HTML erlaubt" : "")}]")));
+            sb.Append('\n');
+        }
+        return sb.ToString();
+    }
+
+    private static string ExtractJsonArray(string? text)
+    {
+        var s = (text ?? "").Trim();
+        if (s.StartsWith("```"))
+        {
+            var nl = s.IndexOf('\n');
+            if (nl >= 0) s = s[(nl + 1)..];
+            if (s.EndsWith("```")) s = s[..^3];
+            s = s.Trim();
+        }
+        var a = s.IndexOf('[');
+        var b = s.LastIndexOf(']');
+        return (a >= 0 && b > a) ? s[a..(b + 1)] : s;
+    }
+
+    /// <summary>Validates the model's JSON array against the allowed blocks: only known block types, only
+    /// their known text fields, only non-empty strings, bounded count/length. Returns clean (type, data).</summary>
+    private List<(string Type, string Name, JsonObject Data)> ValidateGeneratedBlocks(string? json)
+    {
+        var result = new List<(string, string, JsonObject)>();
+        var allowed = AllowedGenBlocks().GroupBy(b => b.Type, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+        JsonNode? root;
+        try { root = JsonNode.Parse(ExtractJsonArray(json)); } catch { return result; }
+        if (root is not JsonArray arr) return result;
+
+        foreach (var item in arr)
+        {
+            if (result.Count >= 12) break;                               // bound a page to 12 blocks
+            if (item is not JsonObject obj) continue;
+            var type = (obj["type"] as JsonValue)?.ToString() ?? "";
+            if (!allowed.TryGetValue(type, out var spec)) continue;      // unknown block type → drop
+            var textIds = spec.Fields.ToDictionary(f => f.Id, f => f, StringComparer.OrdinalIgnoreCase);
+            var data = new JsonObject();
+            if (obj["data"] is JsonObject d)
+            {
+                foreach (var kv in d)
+                {
+                    if (!textIds.ContainsKey(kv.Key)) continue;          // unknown field → drop
+                    if (kv.Value is JsonValue v && v.TryGetValue<string>(out var sv))
+                    {
+                        var val = sv.Trim();
+                        if (val.Length == 0) continue;
+                        data[kv.Key] = val.Length > 3000 ? val[..3000] : val;
+                    }
+                }
+            }
+            if (data.Count == 0) continue;                               // no filled text → skip
+            result.Add((spec.Type, spec.Name, data));
+        }
+        return result;
+    }
+
+    /// <summary>Proposes a whole page as a list of blocks, generated from the description + the site's
+    /// global AI instruction, validated against the registry. Returns { ok, blocks[summary], proposed }
+    /// WITHOUT saving; the client shows the list and — on confirm — posts `proposed` to CreateBlocks.</summary>
+    public async Task<IActionResult> OnPostAiGeneratePageAsync(int id, string? instruction)
+    {
+        if (!_ai.Enabled)
+            return new JsonResult(new { ok = false, error = "KI ist für diese Website nicht aktiviert." });
+        if (string.IsNullOrWhiteSpace(instruction))
+            return new JsonResult(new { ok = false, error = "Bitte beschreibe kurz, was die Seite enthalten soll." });
+
+        var (ok, text, error) = await _ai.GeneratePageAsync(instruction.Trim(), BuildBlockSpecText(), HttpContext.RequestAborted);
+        if (!ok) return new JsonResult(new { ok = false, error = error ?? "KI-Aufruf fehlgeschlagen." });
+
+        var blocks = ValidateGeneratedBlocks(text);
+        if (blocks.Count == 0)
+            return new JsonResult(new { ok = false, error = "Die KI hat keine verwertbaren Blöcke geliefert." });
+
+        var proposed = new JsonArray();
+        var summary = new List<object>();
+        foreach (var (type, name, data) in blocks)
+        {
+            var firstText = "";
+            foreach (var kv in data) { if (kv.Value is JsonValue vv) { firstText = vv.ToString(); break; } }
+            summary.Add(new { type, name, snippet = Truncate(StripHtml(firstText), 140) });
+            proposed.Add(new JsonObject { ["type"] = type, ["data"] = data });   // data node moves here
+        }
+        return new JsonResult(new { ok = true, blocks = summary, proposed = proposed.ToJsonString() });
+    }
+
+    /// <summary>Creates the confirmed AI-proposed blocks on this page (appended after existing ones). The
+    /// posted JSON is RE-validated here — the client is never trusted — and this is a normal antiforgery-
+    /// protected form post, so the result lands via PRG in the editor where it can be edited or deleted.</summary>
+    public async Task<IActionResult> OnPostAiCreateBlocksAsync(int id, string? blocksJson)
+    {
+        if (!_ai.Enabled) return RedirectToPage("Edit", new { id });
+        var page = await _db.Pages.FirstOrDefaultAsync(p => p.Id == id);
+        if (page is null) return NotFound();
+
+        var blocks = ValidateGeneratedBlocks(blocksJson);
+        if (blocks.Count == 0)
+        {
+            TempData["FlashError"] = "Es gab keine gültigen Blöcke zum Anlegen.";
+            return RedirectToPage("Edit", new { id });
+        }
+
+        var maxSort = await _db.ContentBlocks.Where(b => b.PageId == id && b.ParentId == null)
+            .Select(b => (int?)b.SortOrder).MaxAsync() ?? -1;
+        var sort = maxSort + 1;
+        foreach (var (type, _, data) in blocks)
+            _db.ContentBlocks.Add(new ContentBlock
+            {
+                PageId = id, ParentId = null, BlockType = type, DataJson = data.ToJsonString(), SortOrder = sort++
+            });
+        page.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        TempData["Flash"] = $"{blocks.Count} Block(e) von der KI angelegt.";
+        return RedirectToPage("Edit", new { id });
+    }
+
     /// <summary>
     /// Machine-translates THIS (non-default-locale) version from its default-locale sibling: every
     /// translatable text field of every source block is translated and written into this page's

@@ -249,6 +249,13 @@
 
                 <div class="le-add">
                     <button type="button" class="btn btn-block js-add-block" id="add-block-btn">@T["editor.addBlock"]</button>
+                    @if (Model.AiEnabled)
+                    {
+                        <button type="button" class="btn btn-block btn-ghost" id="ai-pagegen-btn" style="margin-top:8px;"
+                                data-ai-url="@Url.Page(null, "AiGeneratePage", new { id = Model.Current.Id })">
+                            <i class="ti ti-sparkles" aria-hidden="true"></i> @T["editor.aiPageGenButton"]
+                        </button>
+                    }
                 </div>
 
                 <details class="le-settings">
@@ -608,9 +615,33 @@
 @if (Model.AiEnabled)
 {
     <partial name="_AiSeoDialog" />
+
+    @* Seiten-Generator: die KI schlägt eine Block-Struktur vor (kennt die Blocktypen + globale
+       Anweisung) → Vorschlagsliste bestätigen → per normalem Formular anlegen (PRG). *@
+    <dialog id="ai-pagegen-dialog" class="ai-dialog" data-lbl-working="@T["editor.aiWorking"]">
+        <h3>@T["editor.aiPageGenTitle"]</h3>
+        <label class="ai-instr-label" for="ai-pagegen-instruction">@T["editor.aiPageGenInstruction"]</label>
+        <textarea id="ai-pagegen-instruction" rows="3" placeholder="@T["editor.aiPageGenPlaceholder"]"></textarea>
+        <div class="ai-dialog-actions">
+            <button type="button" id="ai-pagegen-propose" class="btn btn-sm">@T["editor.aiPageGenPropose"]</button>
+            <span id="ai-pagegen-status" class="ai-status muted"></span>
+        </div>
+        <div id="ai-pagegen-list" class="ai-pagegen-list"></div>
+        <div class="ai-dialog-foot">
+            <button type="button" id="ai-pagegen-apply" class="btn btn-sm" disabled>@T["editor.aiPageGenApply"]</button>
+            <button type="button" id="ai-pagegen-cancel" class="btn btn-sm btn-ghost">@T["editor.aiCancel"]</button>
+        </div>
+    </dialog>
+    <form id="ai-pagegen-form" method="post" asp-page-handler="AiCreateBlocks" asp-route-id="@Model.Current.Id">
+        <input type="hidden" name="blocksJson" id="ai-pagegen-data" />
+    </form>
 }
 
 @section Scripts {
+    @if (Model.AiEnabled)
+    {
+        <script src="~/js/ai-page-gen.js" asp-append-version="true"></script>
+    }
     <script src="~/js/admin-sortable.js" asp-append-version="true"></script>
     @* The same dropdown the public forms use — multi-select fields in the block editor are built
        from its markup, so its stylesheet and behaviour have to be here too. *@

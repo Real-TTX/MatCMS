@@ -107,4 +107,24 @@ public class AiService
         var body = $"Titel: {title}\n\nInhalt:\n{trimmed}{extra}";
         return RunAsync("seo", new[] { ("system", system), ("user", body) }, maxTokens: 220, ct: ct);
     }
+
+    /// <summary>Generates a whole page as a list of blocks. The model is given the AVAILABLE block types
+    /// with their text fields (<paramref name="blocksSpec"/>) and a brief, and must answer with a JSON
+    /// array of <c>{type, data}</c> using only those types/fields. The caller validates every block
+    /// against the registry — nothing here is trusted. The global site instruction (via RunAsync) rides
+    /// along, so the page comes out on-brand.</summary>
+    public Task<(bool ok, string? text, string? error)> GeneratePageAsync(
+        string instruction, string blocksSpec, CancellationToken ct = default)
+    {
+        var system =
+            "Du bist Web-Redakteur und Designer und baust eine Website-Seite aus VORGEGEBENEN Bausteinen. "
+          + "Unten die verfügbaren Blocktypen mit ihren Textfeldern (feldId [Beschreibung]). Wähle eine "
+          + "sinnvolle Abfolge (z. B. Hero am Anfang, dann Inhalt, am Ende ein Aufruf zur Handlung) und "
+          + "fülle die Textfelder mit echten, zum Auftrag passenden Inhalten — KEIN Lorem Ipsum, keine "
+          + "Platzhalter. Verwende AUSSCHLIESSLICH die aufgelisteten type-Werte und feldId-Werte; erfinde "
+          + "keine. Antworte AUSSCHLIESSLICH mit einem JSON-Array "
+          + "[{\"type\":\"hero\",\"data\":{\"heading\":\"…\"}}, …] — ohne Erklärungen, ohne Markdown.";
+        var body = $"Auftrag: {instruction}\n\nVerfügbare Blöcke:\n{blocksSpec}";
+        return RunAsync("pagegen", new[] { ("system", system), ("user", body) }, maxTokens: 2000, ct: ct);
+    }
 }

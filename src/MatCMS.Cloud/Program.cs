@@ -310,6 +310,10 @@ app.Use(async (ctx, next) =>
         }
         ctx.Response.OnStarting(() =>
         {
+            // Allow the cloud login/consent to be framed by the cloud admin itself (top = same origin),
+            // explicitly — rather than trusting the antiforgery X-Frame-Options: SAMEORIGIN, whose
+            // behaviour on a framed cross-origin→same-origin navigation varies between browsers.
+            ctx.Response.Headers["Content-Security-Policy"] = "frame-ancestors 'self'";
             var sc = ctx.Response.Headers.SetCookie;
             if (sc.Count > 0)
             {

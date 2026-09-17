@@ -399,8 +399,12 @@ app.Use(async (ctx, next) =>
                 for (var i = 0; i < sc.Count; i++)
                 {
                     var c = sc[i] ?? "";
+                    // matcms.ssoflow carries the PKCE verifier/state of an in-progress SSO login. Without
+                    // it here it stayed SameSite=Lax and was DROPPED in the cross-site iframe, so /sso/
+                    // callback found no state and the whole login failed — the in-iframe SSO bug.
                     outv[i] = (c.StartsWith("matcms.auth=", StringComparison.Ordinal)
                                || c.StartsWith("matcms.2fa=", StringComparison.Ordinal)
+                               || c.StartsWith("matcms.ssoflow=", StringComparison.Ordinal)
                                || c.StartsWith(".AspNetCore.Antiforgery.", StringComparison.Ordinal))
                         ? CrossSite(c) : c;
                 }

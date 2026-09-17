@@ -642,6 +642,18 @@ cloud setting **`security.embedAuth`** (Einstellungen → Sicherheit, `SettingKe
   `; Partitioned` (CHIPS) added to their `CrossSite` so a browser that blocks third-party cookies
   (Brave strict) still keeps them; browsers without CHIPS ignore the attribute → plain `None`.
 
+Three things the in-iframe SSO needs, learned the hard way:
+- **`matcms.ssoflow` MUST be in the instance's `CrossSite` list.** It carries the PKCE verifier/state of
+  the in-progress login; left `SameSite=Lax` it is dropped in the cross-site frame and `/sso/callback`
+  finds no state → the whole SSO fails even though every other cookie was handled.
+- The cloud sets **`Content-Security-Policy: frame-ancestors 'self'`** on its embedAuth responses, so the
+  login/consent may be framed by the cloud admin (top = same origin) without depending on how a browser
+  reads the antiforgery `X-Frame-Options: SAMEORIGIN` across a cross-origin→same-origin frame nav.
+- Because the cloud session cookie is **Partitioned** under embedAuth, an operator already signed in
+  BEFORE turning embedAuth on still holds a non-partitioned cookie that Brave blocks in the frame — they
+  must **sign out and back into the cloud once** so the session cookie is re-issued partitioned. Both
+  `security.embedAuth` (cloud) and `site.embedAuth` (instance) on, both images redeployed, then re-login.
+
 ### Update checks & notifications
 
 - `GhcrClient` lists all tags of a public GHCR package. It follows the `Link: …; rel="next"`

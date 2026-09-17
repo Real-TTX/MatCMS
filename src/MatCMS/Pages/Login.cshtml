@@ -43,11 +43,11 @@
         @if (Model.SsoAvailable)
         {
             <div style="text-align:center;color:#9aa0a6;font-size:13px;margin:14px 0 10px;">@T["login.or"]</div>
-            @* target="_top" bricht bewusst aus einem iFrame aus: läuft dieser Login im Cloud-iFrame
-               (Instanz-Ansicht), gehört der OAuth-Ablauf auf die oberste Ebene — nur dort sind die
-               Cloud-Cookies First-Party, sonst scheitert /login an der Antiforgery (400) und /oauth/
-               authorize sieht „nicht angemeldet" und schleift. Ohne iFrame ist _top gleich _self. *@
-            <a class="btn btn-ghost btn-block" target="_top" href="/sso/start?returnUrl=@Uri.EscapeDataString(Model.ReturnUrl ?? "/admin")">@T["login.sso"]</a>
+            @* Ohne embedAuth bricht target="_top" bewusst aus dem iFrame aus: dann gehört der OAuth-Ablauf
+               auf die oberste Ebene, weil die Cloud-Cookies im Cross-Site-Rahmen sonst scheitern (400).
+               MIT embedAuth (Cloud + Instanz auf SameSite=None; Partitioned) bleibt der Ablauf im iFrame —
+               dann KEIN _top, sonst spränge man unnötig raus. Ohne iFrame ist _top ohnehin gleich _self. *@
+            <a class="btn btn-ghost btn-block" target="@(Model.EmbedAuth ? null : "_top")" href="/sso/start?returnUrl=@Uri.EscapeDataString(Model.ReturnUrl ?? "/admin")">@T["login.sso"]</a>
         }
         <a class="login-back" href="/">@T["login.back"]</a>
     </div>

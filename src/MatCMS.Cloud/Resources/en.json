@@ -85,6 +85,8 @@
   "settings.securityIntro": "Policies for signing in to the cloud.",
   "settings.require2fa": "Require two-factor authentication for all accounts",
   "settings.require2faHelp": "When on, accounts without 2FA are guided through setup at their next sign-in. Individual accounts can also enable 2FA voluntarily.",
+  "settings.embedAuth": "Allow sign-in inside the iframe (SSO without breaking out)",
+  "settings.embedAuthHelp": "When on, the cloud login and the SSO consent run inside the instance preview (iframe) instead of jumping to top level. Requires HTTPS. For the full flow the instance must also have \"embedAuth\" on. Leave off if you don't need in-iframe sign-in.",
   "nav.instances": "Instances",
   "nav.profiles": "Profiles",
   "nav.store": "Store",

@@ -35,6 +35,11 @@ public class LoginModel : PageModel
     /// instance is actually linked to a cloud.</summary>
     public bool SsoAvailable { get; private set; }
 
+    /// <summary>When this instance is meant to run inside the cloud's iframe (embedAuth on), the SSO
+    /// button must NOT break out to top level — the whole flow stays in the frame. Off = keep the
+    /// top-level break-out, which is the robust default outside an embed.</summary>
+    public bool EmbedAuth { get; private set; }
+
     public async Task<IActionResult> OnGet(string? returnUrl, string? sso, string? twofa)
     {
         if (User.Identity?.IsAuthenticated == true)
@@ -46,6 +51,7 @@ public class LoginModel : PageModel
         if (twofa == "expired") Error = "Die Anmeldung ist abgelaufen. Bitte melde dich erneut an.";
         var enabled = _site.Get(SettingKeys.SsoEnabled) is "1" or "true" or "on" or "yes";
         SsoAvailable = enabled && await _cloud.GetSsoClientAsync() is not null;
+        EmbedAuth = _site.Get(SettingKeys.EmbedAuth).Trim().ToLowerInvariant() is "1" or "true" or "on" or "yes";
         return Page();
     }
 

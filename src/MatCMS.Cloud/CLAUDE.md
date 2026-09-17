@@ -628,6 +628,20 @@ plain-http site breaks login instead of fixing it. Note the modern-browser cavea
 cookies fully disabled, even `SameSite=None` can be blocked; CHIPS/`Partitioned` is the follow-up if
 that bites.
 
+**SSO into an instance from inside that iframe** needs the SAME on the CLOUD side — the consent step
+runs the *cloud's* own `/login` and `/oauth/authorize`, whose `matcmscloud.auth`/`.2fa`/antiforgery
+cookies are `SameSite=Lax` and drop in the frame (the 400 seen in Brave). Two paths, chosen by the
+cloud setting **`security.embedAuth`** (Einstellungen → Sicherheit, `SettingKeys.EmbedAuth`):
+- **off (default)** — a **frame-buster** in `Login.cshtml`/`OauthAuthorize.cshtml` forces the flow to
+  top level (and the instance's SSO button carries `target="_top"`); robust, but leaves the iframe.
+- **on** — no frame-buster, and a per-response middleware rewrites those three cookies to
+  `SameSite=None; Secure; Partitioned` (the same `CrossSite` shape as the instance, done at runtime so
+  toggling needs no restart; skipped for `/api`). The instance's SSO button then omits `target="_top"`
+  (`LoginModel.EmbedAuth`), so the whole login→consent→callback flow stays in the frame. **Both**
+  `security.embedAuth` (cloud) AND `site.embedAuth` (instance) must be on, and both apps got
+  `; Partitioned` (CHIPS) added to their `CrossSite` so a browser that blocks third-party cookies
+  (Brave strict) still keeps them; browsers without CHIPS ignore the attribute → plain `None`.
+
 ### Update checks & notifications
 
 - `GhcrClient` lists all tags of a public GHCR package. It follows the `Link: …; rel="next"`

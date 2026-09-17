@@ -34,6 +34,16 @@ public static class SettingKeys
     /// per-instance <c>security.require2fa</c> a profile can roll out to sites.</summary>
     public const string Require2fa = "security.require2fa";
 
+    /// <summary>"1" = serve the cloud's OWN admin auth + antiforgery cookies as <c>SameSite=None; Secure;
+    /// Partitioned</c> so the cloud login and the SSO consent can run INSIDE the instance-preview iframe
+    /// instead of breaking out to top level. Off by default (the frame-buster then forces top level, the
+    /// robust path). Requires the cloud to be served over HTTPS — a <c>None</c> cookie without
+    /// <c>Secure</c> is rejected. This is the cloud-side mirror of the instance's <c>site.embedAuth</c>;
+    /// both must be on for a fully in-iframe SSO. <c>Partitioned</c> (CHIPS) is what lets it survive a
+    /// browser that blocks third-party cookies (e.g. Brave strict); browsers without CHIPS ignore the
+    /// unknown attribute and fall back to plain <c>SameSite=None</c>.</summary>
+    public const string EmbedAuth = "security.embedAuth";
+
     /// <summary>
     /// Ob diese Cloud selbst Instanzen betreiben darf — Container auf dem erreichbaren Docker-Daemon
     /// anlegen und später mehr.

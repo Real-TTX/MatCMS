@@ -284,6 +284,52 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// --- EmbedAuth: run the cloud login + SSO consent INSIDE the instance-preview iframe --------------
+// When security.embedAuth is on, the cloud's auth, 2FA-pending and antiforgery cookies must be
+// SameSite=None; Secure; Partitioned or the browser drops them in the cross-context frame and the
+// login/consent POST fails (the 400 seen in Brave). Done here per-response (not at startup) so toggling
+// the setting takes effect on the next request without a restart — the frame-buster on /login and
+// /oauth/authorize is disabled by the same flag so the flow stays in the frame. Skipped for the
+// high-frequency instance API, which sets none of these cookies. Off = unchanged Lax behaviour.
+app.Use(async (ctx, next) =>
+{
+    if (!ctx.Request.Path.StartsWithSegments("/api")
+        && ctx.RequestServices.GetRequiredService<CloudContext>().Flag(SettingKeys.EmbedAuth))
+    {
+        // None demands Secure; Partitioned (CHIPS) demands both. Replace any existing samesite=…; add
+        // secure/partitioned once. Unknown attribute is ignored by browsers without CHIPS → plain None.
+        static string CrossSite(string c)
+        {
+            c = System.Text.RegularExpressions.Regex.Replace(c, @";\s*samesite=[^;]*", "",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (!System.Text.RegularExpressions.Regex.IsMatch(c, @";\s*secure(\s*;|\s*$)",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase)) c += "; secure";
+            if (!System.Text.RegularExpressions.Regex.IsMatch(c, @";\s*partitioned(\s*;|\s*$)",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase)) c += "; partitioned";
+            return c + "; samesite=none";
+        }
+        ctx.Response.OnStarting(() =>
+        {
+            var sc = ctx.Response.Headers.SetCookie;
+            if (sc.Count > 0)
+            {
+                var outv = new string[sc.Count];
+                for (var i = 0; i < sc.Count; i++)
+                {
+                    var c = sc[i] ?? "";
+                    outv[i] = (c.StartsWith("matcmscloud.auth=", StringComparison.Ordinal)
+                               || c.StartsWith("matcmscloud.2fa=", StringComparison.Ordinal)
+                               || c.StartsWith(".AspNetCore.Antiforgery.", StringComparison.Ordinal))
+                        ? CrossSite(c) : c;
+                }
+                ctx.Response.Headers.SetCookie = outv;
+            }
+            return Task.CompletedTask;
+        });
+    }
+    await next();
+});
+
 // --- Enforce "2FA required" for cloud accounts (Einstellungen → Sicherheit) ---
 // When the policy is on, a signed-in account (Admin or Operator) that has NOT set up 2FA is funnelled
 // to the enrolment page — forced setup, not a lock-out. Scoped to /admin so the user lookup only

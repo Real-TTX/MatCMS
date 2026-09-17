@@ -85,6 +85,8 @@
   "settings.securityIntro": "Richtlinien für die Anmeldung an der Cloud.",
   "settings.require2fa": "Zwei-Faktor-Authentifizierung für alle Konten erforderlich",
   "settings.require2faHelp": "Wenn aktiv, werden Konten ohne 2FA bei der nächsten Anmeldung zur Einrichtung geführt. Einzelne Konten können 2FA auch freiwillig aktivieren.",
+  "settings.embedAuth": "Anmeldung im iFrame erlauben (SSO ohne Ausbruch)",
+  "settings.embedAuthHelp": "Wenn aktiv, laufen Cloud-Login und die SSO-Zustimmung innerhalb der Instanz-Vorschau (iFrame), statt auf die oberste Ebene zu springen. Erfordert HTTPS. Für den vollständigen Ablauf muss auch die Instanz „embedAuth“ aktiv haben. Aus lassen, wenn du keine Anmeldung im iFrame brauchst.",
   "nav.instances": "Instanzen",
   "nav.profiles": "Profile",
   "nav.store": "Store",

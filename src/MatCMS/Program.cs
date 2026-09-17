@@ -382,6 +382,12 @@ app.Use(async (ctx, next) =>
             if (!System.Text.RegularExpressions.Regex.IsMatch(c, @";\s*secure(\s*;|\s*$)",
                 System.Text.RegularExpressions.RegexOptions.IgnoreCase))
                 c += "; secure";
+            // Partitioned (CHIPS): lets the cookie survive in the cloud's cross-site iframe on a browser
+            // that blocks third-party cookies (e.g. Brave strict). Ignored by browsers without CHIPS, so
+            // it safely degrades to plain SameSite=None. Needed for the in-iframe SSO flow to complete.
+            if (!System.Text.RegularExpressions.Regex.IsMatch(c, @";\s*partitioned(\s*;|\s*$)",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                c += "; partitioned";
             return c + "; samesite=none";
         }
         ctx.Response.OnStarting(() =>

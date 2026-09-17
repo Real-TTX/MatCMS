@@ -361,6 +361,70 @@ public class EditModel : PageModel
         return new JsonResult(new { ok = true, proposed = root.ToJsonString(), changes });
     }
 
+    /// <summary>SEO: propose a meta description for THIS page, summarised from its SAVED block content
+    /// (relayed through the cloud). Returns { ok, proposed } without saving — the client shows a
+    /// before/after and writes the accepted text into the meta field, saved with the normal page save.</summary>
+    public async Task<IActionResult> OnPostAiMetaDescriptionAsync(int id, string? instruction)
+    {
+        if (!_ai.Enabled)
+            return new JsonResult(new { ok = false, error = "KI ist für diese Website nicht aktiviert." });
+        var page = await Load(id);
+        if (page is null) return new JsonResult(new { ok = false, error = "Seite nicht gefunden." });
+
+        var content = GatherPageText(page);
+        if (content.Length < 10)
+            return new JsonResult(new { ok = false, error = "Die Seite hat noch zu wenig Inhalt. Bitte erst Inhalt speichern." });
+
+        var (ok, text, error) = await _ai.SummarizeForSeoAsync("meta", page.Title, content, instruction, HttpContext.RequestAborted);
+        if (!ok) return new JsonResult(new { ok = false, error = error ?? "KI-Aufruf fehlgeschlagen." });
+        var proposed = (text ?? "").Trim();
+        return proposed.Length == 0
+            ? new JsonResult(new { ok = false, error = "Die KI hatte keinen Vorschlag." })
+            : new JsonResult(new { ok = true, proposed });
+    }
+
+    /// <summary>Concatenated prose of a page's blocks (machine fields skipped, HTML stripped), bounded —
+    /// the content a summary reads. Same machine-vs-content split as the block rewrite / auto-translate.</summary>
+    private static string GatherPageText(PageEntity page)
+    {
+        var skip = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "align", "width", "layout", "columns", "imageHeight", "size", "display", "showFilter",
+            "source", "perPage", "limit", "form", "tag", "tags", "_width", "_spaceTop", "_spaceBottom",
+            "buttonStyle", "icon", "imageSide", "bg", "fg", "position", "variant", "style", "_css"
+        };
+        static bool Prose(string s) => s.Length > 1 && s.Any(char.IsLetter) && !s.StartsWith("/") && !s.StartsWith("http");
+        var sb = new System.Text.StringBuilder();
+        void Walk(JsonNode? node)
+        {
+            if (sb.Length > 5000) return;
+            switch (node)
+            {
+                case JsonObject obj:
+                    foreach (var p in obj)
+                    {
+                        if (skip.Contains(p.Key)) continue;
+                        if (p.Value is JsonValue v && v.TryGetValue<string>(out var s))
+                        {
+                            var t = StripHtml(s);
+                            if (Prose(t)) { sb.Append(t); sb.Append(' '); }
+                        }
+                        else Walk(p.Value);
+                    }
+                    break;
+                case JsonArray arr:
+                    foreach (var it in arr) Walk(it);
+                    break;
+            }
+        }
+        foreach (var b in page.Blocks.OrderBy(b => b.SortOrder))
+        {
+            if (string.IsNullOrWhiteSpace(b.DataJson)) continue;
+            try { Walk(JsonNode.Parse(b.DataJson)); } catch { /* skip malformed */ }
+        }
+        return sb.ToString().Trim();
+    }
+
     /// <summary>
     /// Machine-translates THIS (non-default-locale) version from its default-locale sibling: every
     /// translatable text field of every source block is translated and written into this page's

@@ -282,7 +282,15 @@
                         }
                         <div class="form-field">
                             <label>@T["editor.metaDescription"]</label>
-                            <input name="Meta.MetaDescription" value="@Model.Meta.MetaDescription" />
+                            <input name="Meta.MetaDescription" id="Meta_MetaDescription" value="@Model.Meta.MetaDescription" />
+                            @if (Model.AiEnabled)
+                            {
+                                <button type="button" class="btn btn-sm btn-ghost" style="margin-top:6px;" data-ai-seo
+                                        data-ai-url="@Url.Page(null, "AiMetaDescription", new { id = Model.Current.Id })"
+                                        data-target="Meta_MetaDescription" data-title="@T["editor.aiMetaTitle"]">
+                                    <i class="ti ti-sparkles" aria-hidden="true"></i> @T["editor.aiMetaButton"]
+                                </button>
+                            }
                         </div>
                         <div class="form-field">
                             <label>@T["editor.pageCss"]</label>
@@ -594,6 +602,13 @@
         </div>
     </main>
 </div>
+
+@* SEO-KI-Dialog (Meta-Beschreibung) — außerhalb der Tabs, damit <dialog>.showModal nie in einem
+   versteckten Panel hängt. Nur wenn KI aktiv ist. *@
+@if (Model.AiEnabled)
+{
+    <partial name="_AiSeoDialog" />
+}
 
 @section Scripts {
     <script src="~/js/admin-sortable.js" asp-append-version="true"></script>

@@ -1,5 +1,7 @@
+using System.Text.RegularExpressions;
 using MatCMS.Data;
 using MatCMS.Models;
+using MatCMS.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
@@ -9,10 +11,17 @@ namespace MatCMS.Pages.Admin.Posts;
 public class EditModel : PageModel
 {
     private readonly AppDbContext _db;
-    public EditModel(AppDbContext db) => _db = db;
+    private readonly AiService _ai;
+    public EditModel(AppDbContext db, AiService ai)
+    {
+        _db = db;
+        _ai = ai;
+    }
 
     public int PostId { get; private set; }
     public bool IsNew => PostId == 0;
+    /// <summary>True when AI is switched on for this site (shows the "KI: Teaser" action).</summary>
+    public bool AiEnabled { get; private set; }
     /// <summary>Distinct tags across all posts — offered as one-click suggestions in the tag picker.</summary>
     public List<string> AllTags { get; private set; } = new();
 
@@ -40,6 +49,7 @@ public class EditModel : PageModel
     public async Task<IActionResult> OnGetAsync(int id)
     {
         PostId = id;
+        AiEnabled = _ai.Enabled;
         AllTags = await LoadAllTagsAsync();
         if (id == 0)
         {
@@ -100,4 +110,35 @@ public class EditModel : PageModel
         TempData["Flash"] = "Beitrag gespeichert.";
         return RedirectToPage("Edit", new { id = p.Id });
     }
+
+    /// <summary>SEO/Blog: propose a teaser (excerpt) for this post, summarised from its content
+    /// (relayed through the cloud). The current editor content is posted so unsaved edits count; falls
+    /// back to the saved post. Returns { ok, proposed } without saving — the client shows a before/after
+    /// and writes the accepted teaser into the excerpt field, saved with the normal post save.</summary>
+    public async Task<IActionResult> OnPostAiExcerptAsync(int id, string? instruction, string? content, string? title)
+    {
+        if (!_ai.Enabled)
+            return new JsonResult(new { ok = false, error = "KI ist für diese Website nicht aktiviert." });
+
+        var html = content ?? "";
+        var heading = (title ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(html) && id != 0)
+        {
+            var saved = await _db.Posts.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
+            if (saved is not null) { html = saved.ContentHtml; if (heading.Length == 0) heading = saved.Title; }
+        }
+        var text = StripHtml(html);
+        if (text.Length < 10)
+            return new JsonResult(new { ok = false, error = "Der Beitrag hat noch zu wenig Text für einen Teaser." });
+
+        var (ok, resp, error) = await _ai.SummarizeForSeoAsync("excerpt", heading, text, instruction, HttpContext.RequestAborted);
+        if (!ok) return new JsonResult(new { ok = false, error = error ?? "KI-Aufruf fehlgeschlagen." });
+        var proposed = (resp ?? "").Trim();
+        return proposed.Length == 0
+            ? new JsonResult(new { ok = false, error = "Die KI hatte keinen Vorschlag." })
+            : new JsonResult(new { ok = true, proposed });
+    }
+
+    private static string StripHtml(string s) =>
+        Regex.Replace(s ?? "", "<.*?>", " ").Replace("\n", " ").Replace("&nbsp;", " ").Replace("  ", " ").Trim();
 }

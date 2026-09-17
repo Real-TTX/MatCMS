@@ -1,0 +1,19 @@
+@* Shared SEO-field AI dialog: one per editor page. A [data-ai-seo] button configures it (endpoint,
+   target field, optional content/title source) and opens it. Reuses the shared .ai-dialog/.ai-change
+   styles. Rendered only where AI is enabled. The title is set from the clicked button's data-title. *@
+<dialog id="ai-seo-dialog" class="ai-dialog"
+        data-lbl-before="@T["editor.aiBefore"]" data-lbl-after="@T["editor.aiAfter"]" data-lbl-working="@T["editor.aiWorking"]">
+    <h3 id="ai-seo-title">@T["editor.aiSeoTitle"]</h3>
+    <label class="ai-instr-label" for="ai-seo-instruction">@T["editor.aiSeoInstruction"]</label>
+    <textarea id="ai-seo-instruction" rows="2" placeholder="@T["editor.aiSeoPlaceholder"]"></textarea>
+    <div class="ai-dialog-actions">
+        <button type="button" id="ai-seo-propose" class="btn btn-sm">@T["editor.aiPropose"]</button>
+        <span id="ai-seo-status" class="ai-status muted"></span>
+    </div>
+    <div id="ai-seo-diff" class="ai-diff"></div>
+    <div class="ai-dialog-foot">
+        <button type="button" id="ai-seo-apply" class="btn btn-sm" disabled>@T["editor.aiApply"]</button>
+        <button type="button" id="ai-seo-cancel" class="btn btn-sm btn-ghost">@T["editor.aiCancel"]</button>
+    </div>
+</dialog>
+<script src="~/js/ai-seo-field.js" asp-append-version="true"></script>

@@ -39,6 +39,15 @@
     <div class="field">
         <label>@T["posts.excerpt"] <span class="muted">@T["posts.excerptHint"]</span></label>
         <textarea asp-for="Input.Excerpt" rows="2" placeholder="@T["posts.excerptPlaceholder"]"></textarea>
+        @if (Model.AiEnabled)
+        {
+            <button type="button" class="btn btn-sm btn-ghost" style="margin-top:6px;" data-ai-seo
+                    data-ai-url="@Url.Page(null, "AiExcerpt", new { id = Model.PostId })"
+                    data-target="Input_Excerpt" data-content-from="rt-editor" data-title-from="Input_Title"
+                    data-title="@T["editor.aiExcerptTitle"]">
+                <i class="ti ti-sparkles" aria-hidden="true"></i> @T["editor.aiExcerptButton"]
+            </button>
+        }
     </div>
 
     <div class="field">
@@ -109,6 +118,10 @@
 </form>
 
 @section Scripts {
+    @if (Model.AiEnabled)
+    {
+        <partial name="_AiSeoDialog" />
+    }
     <style>
         .rt-toolbar { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:6px; }
         .rt-toolbar button { padding:5px 10px; border:1px solid var(--line,#ddd); background:#fff; border-radius:6px; cursor:pointer; font-size:13px; }

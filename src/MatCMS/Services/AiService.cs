@@ -84,4 +84,24 @@ public class AiService
             ("user", $"Anweisung: {instruction}\n\nParameter:\n{sb}"),
         }, maxTokens: 500, ct: ct);
     }
+
+    /// <summary>Summarises page/post content into a short SEO text: a meta description
+    /// (<paramref name="kind"/> = "meta") or a blog teaser ("excerpt"). Returns ONLY the text — no
+    /// quotes, label or markdown — bounded in length, in the content language. Nothing is invented; it
+    /// condenses the given content. An optional <paramref name="instruction"/> steers focus/tone.</summary>
+    public Task<(bool ok, string? text, string? error)> SummarizeForSeoAsync(
+        string kind, string title, string content, string? instruction, CancellationToken ct = default)
+    {
+        var (what, limit) = kind == "excerpt"
+            ? ("einen kurzen, einladenden Teaser für diesen Blog-Beitrag (erscheint auf Karten und in Listen)", 200)
+            : ("eine prägnante SEO-Meta-Beschreibung für diese Seite (das Snippet in Suchmaschinen)", 160);
+        var extra = string.IsNullOrWhiteSpace(instruction) ? "" : $"\n\nZusätzliche Anweisung: {instruction!.Trim()}";
+        var system =
+            $"Du bist SEO-Redakteur. Schreibe {what}. Höchstens {limit} Zeichen, ein bis zwei Sätze, aktiv "
+          + "und konkret. Fasse NUR den gegebenen Inhalt zusammen — nichts erfinden, keine Platzhalter. Gib "
+          + "AUSSCHLIESSLICH den Text zurück: ohne Anführungszeichen, ohne Label, ohne Markdown.";
+        var trimmed = content.Length > 6000 ? content[..6000] : content;
+        var body = $"Titel: {title}\n\nInhalt:\n{trimmed}{extra}";
+        return RunAsync("seo", new[] { ("system", system), ("user", body) }, maxTokens: 220, ct: ct);
+    }
 }

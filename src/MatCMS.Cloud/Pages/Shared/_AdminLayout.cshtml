@@ -80,9 +80,9 @@
                         </div>
                     </div>
                 }
-                @* Personal account / 2FA is a per-account setting (Operators have one too), not a
+                @* Personal account (password, 2FA) is a per-account area (Operators have one too), not a
                    management area — it sits with the session actions here, not as its own nav item. *@
-                <a class="admin-foot-btn admin-foot-icon" asp-page="/Admin/Account/TwoFactor" title="@T["nav.twofactor"]" aria-label="@T["nav.twofactor"]">🔐</a>
+                <a class="admin-foot-btn admin-foot-icon" asp-page="/Admin/Account/Index" title="@T["nav.account"]" aria-label="@T["nav.account"]">🔐</a>
                 <form method="post" asp-page="/Logout" class="admin-foot-logout">
                     <button type="submit" class="admin-foot-btn">🚪 @T["nav.logout"]</button>
                 </form>

@@ -1,0 +1,68 @@
+@page
+@model MatCMS.Pages.Admin.Account.IndexModel
+@{
+    ViewData["Title"] = T["account.title"];
+}
+<div class="page-head">
+    <h1>@T["account.title"]</h1>
+</div>
+
+@* Identität — nur Anzeige. Login-E-Mail/Benutzername ändert ein Admin unter Benutzer. *@
+<div class="card">
+    <h2>@T["account.identity"]</h2>
+    <div class="kv"><div class="kv-label">@T["account.username"]</div><div class="kv-value">@Model.Account.Username</div></div>
+    @if (!string.IsNullOrWhiteSpace(Model.Account.Email))
+    {
+        <div class="kv"><div class="kv-label">@T["account.email"]</div><div class="kv-value">@Model.Account.Email</div></div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Model.Account.DisplayName))
+    {
+        <div class="kv"><div class="kv-label">@T["account.displayName"]</div><div class="kv-value">@Model.Account.DisplayName</div></div>
+    }
+    <div class="kv"><div class="kv-label">@T["account.role"]</div><div class="kv-value">@Model.Account.Role</div></div>
+</div>
+
+@* Passwort ändern — verlangt das aktuelle Passwort. *@
+<div class="card">
+    <h2>@T["account.passwordTitle"]</h2>
+    <p class="help">@T["account.passwordHelp"]</p>
+    <form method="post" asp-page-handler="Password" class="form-grid" autocomplete="off">
+        <div class="form-field">
+            <label for="CurrentPassword">@T["account.currentPassword"]</label>
+            <input id="CurrentPassword" name="CurrentPassword" type="password" autocomplete="current-password" required />
+        </div>
+        <div class="form-field">
+            <label for="NewPassword">@T["account.newPassword"]</label>
+            <input id="NewPassword" name="NewPassword" type="password" autocomplete="new-password" minlength="8" required />
+            <div class="help">@T["account.passwordRule"]</div>
+        </div>
+        <div class="form-field">
+            <label for="ConfirmPassword">@T["account.confirmPassword"]</label>
+            <input id="ConfirmPassword" name="ConfirmPassword" type="password" autocomplete="new-password" minlength="8" required />
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn">@T["account.changePassword"]</button>
+        </div>
+    </form>
+</div>
+
+@* Zwei-Faktor — Status + Sprung zur Einrichtungsseite. *@
+<div class="card">
+    <h2>@T["account.twoFactorTitle"]</h2>
+    <div class="kv">
+        <div class="kv-label">@T["twofactor.status"]</div>
+        <div class="kv-value">
+            @if (Model.TwoFactorEnabled)
+            {
+                <span class="badge badge-on">@T["account.twoFactorOn"]</span>
+            }
+            else
+            {
+                <span class="badge badge-off">@T["account.twoFactorOff"]</span>
+            }
+        </div>
+    </div>
+    <div class="form-actions" style="margin-top:14px;">
+        <a class="btn btn-ghost" asp-page="/Admin/Account/TwoFactor">@(Model.TwoFactorEnabled ? T["account.manage2fa"] : T["account.setup2fa"])</a>
+    </div>
+</div>

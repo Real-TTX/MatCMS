@@ -111,9 +111,9 @@
                         </div>
                     </div>
                 }
-                @* Persönliches Konto / 2FA ist eine Konto-Einstellung, kein Verwaltungsbereich — es
-                   sitzt bei den Session-Aktionen (neben Abmelden), nicht als eigener Menüpunkt. *@
-                <a class="admin-foot-btn admin-foot-icon" asp-page="/Admin/Account/TwoFactor" title="@T["nav.twofactor"]" aria-label="@T["nav.twofactor"]">🔐</a>
+                @* Persönliches Konto (Passwort, 2FA) ist eine Konto-Sache, kein Verwaltungsbereich —
+                   es sitzt bei den Session-Aktionen (neben Abmelden), nicht als eigener Menüpunkt. *@
+                <a class="admin-foot-btn admin-foot-icon" asp-page="/Admin/Account/Index" title="@T["nav.account"]" aria-label="@T["nav.account"]">🔐</a>
                 <form method="post" asp-page="/Logout" class="admin-foot-logout">
                     <button type="submit" class="admin-foot-btn">🚪 @T["nav.logout"]</button>
                 </form>

@@ -484,33 +484,21 @@ public class EditModel : PageModel
     /// <summary>Turns the AI group on for this profile and sets the monthly token budget per instance
     /// (empty/0 = unlimited). Saving this tab adds the group; the remove button takes it out. The
     /// provider key is NOT here — it lives centrally on the cloud (Einstellungen → KI).</summary>
-    public async Task<IActionResult> OnPostAiAsync(int id, string? budget)
+    public async Task<IActionResult> OnPostAiAsync(int id, bool enabled, string? budget)
     {
         var profile = await _db.Profiles.FindAsync(id);
         if (profile is null) return RedirectToPage("Index");
 
-        profile.SyncAi = true;
+        // One checkbox drives it: ticked = roll AI out (SyncAi), unticked = stop (instances fall back to
+        // "off" on the next sync — like mail, this group resets rather than leaving a site pointed at a
+        // relay it may no longer use). The provider key is NOT here — it lives centrally on the cloud.
+        profile.SyncAi = enabled;
         profile.AiMonthlyTokenBudget = int.TryParse((budget ?? "").Trim(), out var b) && b > 0 ? b : null;
 
         await _db.SaveChangesAsync();
         await _profiles.TouchAsync(id);
-        TempData["Flash"] = "KI-Einstellungen gespeichert.";
+        TempData["Flash"] = enabled ? "KI ist für dieses Profil aktiv." : "KI ist für dieses Profil deaktiviert.";
         return RedirectToPage(new { id, tab = "ai" });
-    }
-
-    /// <summary>Stops rolling AI out (the instances fall back to "off" on the next sync — the one
-    /// group, like mail, that resets, because a site pointed at a relay it may no longer use should
-    /// simply have no AI rather than fail every call).</summary>
-    public async Task<IActionResult> OnPostAiRemoveAsync(int id)
-    {
-        var profile = await _db.Profiles.FindAsync(id);
-        if (profile is null) return RedirectToPage("Index");
-
-        profile.SyncAi = false;
-        await _db.SaveChangesAsync();
-        await _profiles.TouchAsync(id);
-        TempData["Flash"] = "KI wird von diesem Profil nicht mehr ausgerollt.";
-        return RedirectToPage(new { id, tab = "settings" });
     }
 
     private async Task UpsertSettingAsync(int profileId, string key, string value)

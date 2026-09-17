@@ -27,6 +27,8 @@
   "profiles.tabAi": "AI",
   "profiles.aiHeading": "AI for this profile",
   "profiles.aiInactiveHint": "AI is not active for this profile yet. Saving enables it.",
+  "profiles.aiEnabled": "AI active for this profile",
+  "profiles.aiEnabledHint": "Unlocks the AI features for assigned instances (the key stays central on the cloud). Untick + Save disables it.",
   "profiles.aiIntro": "Enable so the assigned instances can use AI features (via the cloud). The provider key is set centrally in Settings → AI.",
   "profiles.aiBudget": "Monthly token budget per instance",
   "profiles.aiBudgetUnlimited": "empty = unlimited",

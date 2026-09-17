@@ -399,13 +399,16 @@
 
 @* ============ KI (AI) ============ *@
 <div class="tab-panel" data-panel="ai" hidden>
+    @* Eine Checkbox + Speichern: angehakt speichern = KI an (SyncAi=true), Haken weg + speichern = aus.
+       Ein Schalter, kein separater „Aktivieren/Entfernen"-Knopf — dasselbe Muster wie der Backup-Reiter. *@
     <form method="post" asp-page-handler="Ai" asp-route-id="@Model.Item.Id">
         <div class="card">
             <h2>@T["profiles.aiHeading"]</h2>
-            @if (!Model.Item.SyncAi)
-            {
-                <div class="help">@T["profiles.aiInactiveHint"]</div>
-            }
+            <label class="checkbox-row">
+                <input type="checkbox" name="enabled" value="true" checked="@(Model.Item.SyncAi ? "checked" : null)" />
+                @T["profiles.aiEnabled"]
+            </label>
+            <div class="help">@T["profiles.aiEnabledHint"]</div>
             <p class="muted">@T["profiles.aiIntro"]</p>
             <div class="form-field">
                 <label for="aiBudget">@T["profiles.aiBudget"]</label>
@@ -418,15 +421,6 @@
             <button type="submit" class="btn">@T["settings.save"]</button>
         </div>
     </form>
-    @if (Model.Item.SyncAi)
-    {
-        <div class="list-actions">
-            <form class="inline-form" method="post" asp-page-handler="AiRemove" asp-route-id="@Model.Item.Id"
-                  onsubmit="return confirm('@T["profiles.aiRemoveConfirm"]');">
-                <button type="submit" class="btn btn-danger">@T["profiles.removeFromProfile"]</button>
-            </form>
-        </div>
-    }
 </div>
 
 @* ============ USERS ============ *@

@@ -106,23 +106,31 @@
 {
     @* Website-Generator: die KI schlägt mehrere Seiten (mit Blöcken + Menü) vor → Liste bestätigen →
        per normalem Formular anlegen (add-only, PRG). Reuse der .ai-dialog/.ai-pagegen-*-Styles. *@
-    <dialog id="ai-sitegen-dialog" class="ai-dialog" data-lbl-working="@T["editor.aiWorking"]"
+    <dialog id="ai-sitegen-dialog" class="ai-dialog ai-dialog-wide" data-lbl-working="@T["editor.aiWorking"]"
             data-lbl-blocks="@T["pages.aiSiteGenBlocks"]" data-lbl-nav="@T["pages.aiSiteGenNav"]">
         <h3>@T["pages.aiSiteGenTitle"]</h3>
         <label class="ai-instr-label" for="ai-sitegen-instruction">@T["pages.aiSiteGenInstruction"]</label>
-        <textarea id="ai-sitegen-instruction" rows="3" placeholder="@T["pages.aiSiteGenPlaceholder"]"></textarea>
+        <textarea id="ai-sitegen-instruction" rows="2" placeholder="@T["pages.aiSiteGenPlaceholder"]"></textarea>
         <div class="ai-dialog-actions">
             <button type="button" id="ai-sitegen-propose" class="btn btn-sm">@T["pages.aiSiteGenPropose"]</button>
             <span id="ai-sitegen-status" class="ai-status muted"></span>
         </div>
-        <div id="ai-sitegen-list" class="ai-pagegen-list"></div>
+        @* Seiten-Umschalter (eine Karte je Seite) + visuelle Vorschau der gewählten Seite im iFrame. *@
+        <div id="ai-sitegen-tabs" class="ai-preview-tabs"></div>
+        <iframe id="ai-sitegen-frame" name="ai-sitegen-frame" class="ai-preview-frame" title="@T["pages.aiSiteGenTitle"]"></iframe>
         <div class="ai-dialog-foot">
             <button type="button" id="ai-sitegen-apply" class="btn btn-sm" disabled>@T["pages.aiSiteGenApply"]</button>
             <button type="button" id="ai-sitegen-cancel" class="btn btn-sm btn-ghost">@T["editor.aiCancel"]</button>
         </div>
     </dialog>
+    @* Website anlegen (bestätigt) *@
     <form id="ai-sitegen-form" method="post" asp-page-handler="AiCreateSite">
         <input type="hidden" name="sitesJson" id="ai-sitegen-data" />
+    </form>
+    @* Vorschau-Render: postet die Blöcke EINER Seite in den iFrame (read-only). *@
+    <form id="ai-sitegen-preview-form" method="post" action="/Admin/Pages/AiPreview" target="ai-sitegen-frame">
+        <input type="hidden" name="blocksJson" id="ai-sitegen-preview-data" />
+        <input type="hidden" name="title" id="ai-sitegen-preview-title" />
     </form>
     <script src="~/js/ai-site-gen.js" asp-append-version="true"></script>
 }

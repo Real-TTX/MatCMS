@@ -1381,5 +1381,12 @@ table.data .btn { white-space: nowrap; }
 .ai-pagegen-num { font-size: 11px; opacity: .5; min-width: 1.2em; }
 .ai-pagegen-name { font-weight: 600; font-size: 13px; }
 .ai-pagegen-snip { color: var(--muted, #6b7280); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ai-dialog-wide { width: min(1040px, 96vw); }
+.ai-preview-frame { width: 100%; height: 56vh; border: 1px solid var(--line); border-radius: 10px; background: #fff; display: block; }
+.ai-preview-empty { color: var(--muted, #6b7280); font-size: 13px; padding: 24px; text-align: center; }
+.ai-preview-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+.ai-preview-tab { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 4px 12px; font-size: 13px; cursor: pointer; }
+.ai-preview-tab.is-active { background: var(--accent, #2563eb); color: #fff; border-color: transparent; }
+.ai-preview-tab .ai-preview-tab-nav { opacity: .6; font-size: 11px; margin-left: 4px; }
 .ai-dialog-foot { display: flex; gap: 10px; margin-top: 14px; }
 @media (max-width: 560px) { .ai-cols { grid-template-columns: 1fr; } }

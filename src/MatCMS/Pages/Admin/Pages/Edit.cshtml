@@ -618,22 +618,30 @@
 
     @* Seiten-Generator: die KI schlägt eine Block-Struktur vor (kennt die Blocktypen + globale
        Anweisung) → Vorschlagsliste bestätigen → per normalem Formular anlegen (PRG). *@
-    <dialog id="ai-pagegen-dialog" class="ai-dialog" data-lbl-working="@T["editor.aiWorking"]">
+    <dialog id="ai-pagegen-dialog" class="ai-dialog ai-dialog-wide" data-lbl-working="@T["editor.aiWorking"]">
         <h3>@T["editor.aiPageGenTitle"]</h3>
         <label class="ai-instr-label" for="ai-pagegen-instruction">@T["editor.aiPageGenInstruction"]</label>
-        <textarea id="ai-pagegen-instruction" rows="3" placeholder="@T["editor.aiPageGenPlaceholder"]"></textarea>
+        <textarea id="ai-pagegen-instruction" rows="2" placeholder="@T["editor.aiPageGenPlaceholder"]"></textarea>
         <div class="ai-dialog-actions">
             <button type="button" id="ai-pagegen-propose" class="btn btn-sm">@T["editor.aiPageGenPropose"]</button>
             <span id="ai-pagegen-status" class="ai-status muted"></span>
         </div>
-        <div id="ai-pagegen-list" class="ai-pagegen-list"></div>
+        @* Visuelle Vorschau: die vorgeschlagenen Blöcke werden über die echte Vorschau-Seite (Layout des
+           Live-Auftritts) in diesen iFrame gerendert — nichts wird gespeichert. *@
+        <iframe id="ai-pagegen-frame" name="ai-pagegen-frame" class="ai-preview-frame" title="@T["editor.aiPageGenTitle"]"></iframe>
         <div class="ai-dialog-foot">
             <button type="button" id="ai-pagegen-apply" class="btn btn-sm" disabled>@T["editor.aiPageGenApply"]</button>
             <button type="button" id="ai-pagegen-cancel" class="btn btn-sm btn-ghost">@T["editor.aiCancel"]</button>
         </div>
     </dialog>
+    @* Anlegen (bestätigt) *@
     <form id="ai-pagegen-form" method="post" asp-page-handler="AiCreateBlocks" asp-route-id="@Model.Current.Id">
         <input type="hidden" name="blocksJson" id="ai-pagegen-data" />
+    </form>
+    @* Vorschau-Render: postet die Blöcke in den iFrame oben (read-only, kein Antiforgery nötig). *@
+    <form id="ai-pagegen-preview-form" method="post" action="/Admin/Pages/AiPreview" target="ai-pagegen-frame">
+        <input type="hidden" name="blocksJson" id="ai-pagegen-preview-data" />
+        <input type="hidden" name="title" id="ai-pagegen-preview-title" />
     </form>
 }
 

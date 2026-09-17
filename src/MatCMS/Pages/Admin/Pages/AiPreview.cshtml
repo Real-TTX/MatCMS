@@ -1,0 +1,10 @@
+@page
+@model MatCMS.Pages.Admin.Pages.AiPreviewModel
+@inject MatCMS.Content.BlockRegistry Registry
+@{
+    // The REAL public layout (Pages/Shared/_Layout.cshtml), by name exactly as the public site references
+    // it — so the preview looks like a live page (header, template CSS, fonts, block styling) and
+    // overrides the admin _ViewStart. Nothing here is saved.
+    Layout = "_Layout";
+}
+@await Html.PartialAsync("_BlockList", new MatCMS.Content.BlockListModel(Model.Blocks, Registry, false))

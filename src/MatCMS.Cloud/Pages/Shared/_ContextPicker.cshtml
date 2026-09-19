@@ -11,17 +11,11 @@
     var instances = await Switcher.InstancesAsync();
     var current = Model is int cid ? instances.FirstOrDefault(i => i.Id == cid) : null;
     var currentName = current?.Name ?? Cloud.CloudName;
-    // The two ways to look at ONE instance: the cloud's own view of it (state, config, backups) and
-    // the site itself. Only meaningful once an instance is the context, and only if there is an
-    // address to show — so the toggle appears with it and not before.
-    var canEmbed = current is not null
-                   && !string.IsNullOrWhiteSpace(current.PreviewUrl)
-                   && !MatCMS.Cloud.Services.MixedContent.IsBlocked(ViewContext.HttpContext.Request.IsHttps, current.PreviewUrl);
-    var onSite = ViewContext.RouteData.Values["page"]?.ToString()?.EndsWith("/Site", StringComparison.OrdinalIgnoreCase) == true;
-    // Where the menu sends you: the view last chosen with the toggle, so stepping to the next
-    // instance keeps the way you were looking at the last one.
-    var preferSite = MatCMS.Cloud.Services.ContextSwitcher.CurrentView(ViewContext.HttpContext)
-                     == MatCMS.Cloud.Services.ContextSwitcher.ViewSite;
+    // The instance's live site and its admin open FIRST-PARTY in a new tab — the admin bar on the
+    // instance itself carries the cloud-like chrome and the way back. No iframe: a cross-site frame
+    // cannot hold the instance's login cookies (the reason the old embed view was dropped). So all
+    // this needs is an address; mixed-content no longer matters, because nothing is framed.
+    var siteUrl = current?.PreviewUrl?.Trim().TrimEnd('/');
 }
 <div class="inst-ctx">
 <div class="inst-picker" data-inst-picker>
@@ -50,7 +44,7 @@
                          && !MatCMS.Cloud.Services.MixedContent.IsBlocked(ViewContext.HttpContext.Request.IsHttps, i.PreviewUrl);
             <a class="inst-picker-item@(i.Id == Model ? " is-current" : "")@(online ? "" : " is-offline")"
                role="option" aria-selected="@(i.Id == Model ? "true" : "false")"
-               href="@(hasUrl && preferSite ? Url.Page("/Admin/Instances/Site", new { id = i.Id }) : Url.Page("/Admin/Instances/Details", new { id = i.Id }))">
+               href="@Url.Page("/Admin/Instances/Details", new { id = i.Id })">
                 <span class="inst-picker-shot">
                     @if (hasUrl)
                     {
@@ -93,18 +87,18 @@
     </div>
 </div>
 
-@* Two views of the same instance, side by side and icon-only: it is a switch between two places,
-   not two commands, and a segmented pair says that in the width of two buttons. *@
-@if (canEmbed)
+@* The iframe view is gone (a cross-site frame can't carry the instance's login cookies). Instead two
+   buttons open the instance FIRST-PARTY in a new tab, where its own admin bar gives the cloud-like
+   chrome and a way back. "Verwaltung öffnen" runs the SSO auto-login (returnUrl=/admin); with SSO off
+   it simply lands on the instance's login. Only shown once an instance with an address is the context. *@
+@if (!string.IsNullOrEmpty(siteUrl))
 {
-    <div class="inst-view-toggle" role="group" aria-label="@T["instances.viewSwitch"]">
-        <a class="ivt-btn@(onSite ? "" : " is-active")" href="@Url.Page("/Admin/Instances/Details", new { id = current!.Id, view = "cloud" })"
-           title="@T["instances.viewCloud"]" aria-label="@T["instances.viewCloud"]" aria-current="@(onSite ? null : "page")">
-            <i class="ti ti-layout-dashboard" aria-hidden="true"></i>
+    <div class="inst-open-actions">
+        <a class="btn btn-sm btn-ghost" href="@siteUrl" target="_blank" rel="noopener" title="@T["instances.openSite"]">
+            <i class="ti ti-external-link" aria-hidden="true"></i> <span class="btn-txt">@T["instances.openSite"]</span>
         </a>
-        <a class="ivt-btn@(onSite ? " is-active" : "")" href="@Url.Page("/Admin/Instances/Site", new { id = current!.Id, view = "site" })"
-           title="@T["instances.viewSite"]" aria-label="@T["instances.viewSite"]" aria-current="@(onSite ? "page" : null)">
-            <i class="ti ti-browser" aria-hidden="true"></i>
+        <a class="btn btn-sm" href="@siteUrl/sso/start?returnUrl=/admin" target="_blank" rel="noopener" title="@T["instances.openAdmin"]">
+            <i class="ti ti-login-2" aria-hidden="true"></i> <span class="btn-txt">@T["instances.openAdmin"]</span>
         </a>
     </div>
 }

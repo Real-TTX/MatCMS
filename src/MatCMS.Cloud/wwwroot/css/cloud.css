@@ -437,15 +437,13 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
 .inst-picker-btn { min-width: 190px; justify-content: space-between; }
 .inst-picker-name { font-size: 14px; }
 
-/* Two places, one control: a segmented pair, icon-only, so it costs the width of two buttons. */
-.inst-view-toggle { display: inline-flex; flex: 0 0 auto; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; background: #fff; }
-.ivt-btn {
-    display: flex; align-items: center; justify-content: center;
-    width: 36px; height: 36px; color: var(--muted, #6b7280); text-decoration: none; font-size: 17px;
-}
-.ivt-btn + .ivt-btn { border-left: 1px solid var(--line); }
-.ivt-btn:hover { background: #f6f7f9; color: inherit; }
-.ivt-btn.is-active { background: var(--accent, #2563eb); color: #fff; }
+/* Open the instance FIRST-PARTY in a new tab — the live site and its admin (SSO auto-login). This
+   replaced the old iframe view + its cloud/site toggle: a cross-site frame cannot hold the instance's
+   login cookies, so the instance's own admin bar provides the chrome and the way back instead. On a
+   narrow bar the labels drop to icon-only. */
+.inst-open-actions { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.inst-open-actions .btn { white-space: nowrap; }
+@media (max-width: 820px) { .inst-open-actions .btn-txt { display: none; } }
 
 @media (max-width: 700px) { .inst-picker-btn { min-width: 0; } }
 
@@ -462,9 +460,8 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
 .admin-topbar { height: var(--topbar-h); padding-top: 0; padding-bottom: 0; }
 .admin-brand .admin-logo { height: 40px; }
 
-/* Comfortably inside 67px, and both controls the same height so the group reads as one row. */
-.inst-picker-btn, .ivt-btn { height: 34px; }
-.ivt-btn { width: 34px; }
+/* Comfortably inside 67px. */
+.inst-picker-btn { height: 34px; }
 
 /* ---- Browser-like controls over the embedded site ---------------------------------------------- */
 .site-embed-actions { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1 1 auto; justify-content: flex-end; }

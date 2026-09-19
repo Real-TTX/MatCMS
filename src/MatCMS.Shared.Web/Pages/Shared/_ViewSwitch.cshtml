@@ -1,0 +1,29 @@
+@model MatCMS.Shared.Web.ViewSwitch
+@*
+    Cloud | Website | Admin — the same segmented switch everywhere, so switching views feels like one
+    control no matter which of the three you are looking at. The active segment is highlighted and is
+    plain text (you are already there); the others are same-tab links. A non-active segment with no URL
+    is left out. No tag helpers here (the RCL has no _ViewImports) — plain HTML + Razor only.
+*@
+@{
+    var segs = new[]
+    {
+        ("cloud", "vs-cloud", "ti-cloud",            Model.CloudUrl ?? "", Model.CloudLabel),
+        ("web",   "vs-web",   "ti-world",            Model.WebUrl   ?? "", Model.WebLabel),
+        ("admin", "vs-admin", "ti-layout-dashboard", Model.AdminUrl ?? "", Model.AdminLabel),
+    };
+}
+<div class="mat-viewswitch" role="group" aria-label="@Model.CloudLabel · @Model.WebLabel · @Model.AdminLabel">
+    @foreach (var (key, cls, icon, url, label) in segs)
+    {
+        var active = string.Equals(Model.Active, key, StringComparison.OrdinalIgnoreCase);
+        if (active)
+        {
+            <span class="mat-vs @cls is-active" title="@label" aria-label="@label" aria-current="page"><i class="ti @icon" aria-hidden="true"></i></span>
+        }
+        else if (!string.IsNullOrEmpty(url))
+        {
+            <a class="mat-vs @cls" href="@url" title="@label" aria-label="@label"><i class="ti @icon" aria-hidden="true"></i></a>
+        }
+    }
+</div>

@@ -11,11 +11,8 @@
     var instances = await Switcher.InstancesAsync();
     var current = Model is int cid ? instances.FirstOrDefault(i => i.Id == cid) : null;
     var currentName = current?.Name ?? Cloud.CloudName;
-    // The instance's live site and its admin open FIRST-PARTY in a new tab — the admin bar on the
-    // instance itself carries the cloud-like chrome and the way back. No iframe: a cross-site frame
-    // cannot hold the instance's login cookies (the reason the old embed view was dropped). So all
-    // this needs is an address; mixed-content no longer matters, because nothing is framed.
-    var siteUrl = current?.PreviewUrl?.Trim().TrimEnd('/');
+    // The Cloud|Website|Admin switch is NOT here — it lives in the topbar's right side (_AdminLayout →
+    // _ViewSwitch), so it reads the same as on the instance. This partial is just the instance PICKER.
 }
 <div class="inst-ctx">
 <div class="inst-picker" data-inst-picker>
@@ -87,21 +84,4 @@
     </div>
 </div>
 
-@* The iframe view is gone (a cross-site frame can't carry the instance's login cookies). Instead two
-   buttons open the instance FIRST-PARTY in a new tab, where its own admin bar gives the cloud-like
-   chrome and a way back. BOTH run the SSO auto-login so the operator lands logged in and the admin bar
-   is right there — the site button returns to the public home (returnUrl=/), the admin button to
-   /admin. With SSO off on the instance, both simply land on its login. Only shown once an instance
-   with an address is the context. *@
-@if (!string.IsNullOrEmpty(siteUrl))
-{
-    <div class="inst-open-actions">
-        <a class="btn btn-sm btn-ghost" href="@siteUrl/sso/start?returnUrl=/" target="_blank" rel="noopener" title="@T["instances.openSite"]">
-            <i class="ti ti-external-link" aria-hidden="true"></i> <span class="btn-txt">@T["instances.openSite"]</span>
-        </a>
-        <a class="btn btn-sm" href="@siteUrl/sso/start?returnUrl=/admin" target="_blank" rel="noopener" title="@T["instances.openAdmin"]">
-            <i class="ti ti-login-2" aria-hidden="true"></i> <span class="btn-txt">@T["instances.openAdmin"]</span>
-        </a>
-    </div>
-}
 </div>

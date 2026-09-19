@@ -401,13 +401,8 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
 .inst-picker-btn { min-width: 190px; justify-content: space-between; }
 .inst-picker-name { font-size: 14px; }
 
-/* Open the instance FIRST-PARTY in a new tab — the live site and its admin (SSO auto-login). This
-   replaced the old iframe view + its cloud/site toggle: a cross-site frame cannot hold the instance's
-   login cookies, so the instance's own admin bar provides the chrome and the way back instead. On a
-   narrow bar the labels drop to icon-only. */
-.inst-open-actions { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; }
-.inst-open-actions .btn { white-space: nowrap; }
-@media (max-width: 820px) { .inst-open-actions .btn-txt { display: none; } }
+/* The Cloud|Website|Admin switch (shared .mat-viewswitch in site.css) sits in the topbar's right side
+   (_AdminLayout), "Cloud" active — same control as on the instance itself. Nothing app-specific to add. */
 
 @media (max-width: 700px) { .inst-picker-btn { min-width: 0; } }
 

@@ -1,35 +1,34 @@
 @inject MatCMS.Services.SiteContext Site
 @{
-    // Cloud-managed = a cloud URL is configured (linked). Shown as a "zur Cloud" jump — top-level, so
-    // First-Party on the cloud again (no cross-site cookie issue). The current page's edit link is
-    // passed by the content view via ViewData; absent on non-page routes.
+    // The instance's cloud link (if any) — the Cloud segment of the switcher points there. Empty means
+    // not cloud-managed, and the shared switcher then simply omits the Cloud segment.
     var cloudUrl = (Site.Get(MatCMS.Services.SettingKeys.CloudUrl) ?? "").Trim().TrimEnd('/');
-    var cloudManaged = !string.IsNullOrEmpty(cloudUrl);
     var editId = ViewContext.ViewData["AdminEditPageId"] as int?;
     var who = ViewContext.HttpContext.User.FindFirst("DisplayName")?.Value
               ?? ViewContext.HttpContext.User.Identity?.Name;
 }
-@* Slim admin bar over the LIVE site for logged-in back-office admins (WordPress-style). First-party on
-   the instance's own domain, so it works everywhere — this is the "flip it" answer to the iframe cookie
-   wall. Same design family as the admin chrome so switching cloud ↔ instance feels seamless. *@
+@* Slim admin bar over the LIVE site for logged-in back-office admins. First-party on the instance's own
+   domain, so it works everywhere — the "flip it" answer to the iframe cookie wall. The Cloud|Website|Admin
+   switch (shared with the cloud and the back-office) sits left with the brand and marks WEBSITE active, so
+   moving between the three views feels like one control. Same design family as the admin chrome. *@
 <div class="mat-adminbar" role="navigation" aria-label="@T["adminbar.label"]">
     <div class="mat-adminbar-inner">
-        <a class="mab-brand" href="/admin" title="@Site.SiteName">
-            <img class="mab-logo" src="@Site.LogoUrl" alt="" />
-            <span>@Site.SiteName</span>
-        </a>
-        <div class="mab-tools">
-            <a class="mab-stool mab-dash" href="/admin" title="@T["adminbar.dashboard"]" aria-label="@T["adminbar.dashboard"]"><i class="ti ti-layout-dashboard" aria-hidden="true"></i></a>
+        <div class="mab-left">
+            <a class="mab-brand" href="/admin" title="@Site.SiteName">
+                <img class="mab-logo" src="@Site.LogoUrl" alt="" />
+                <span>@Site.SiteName</span>
+            </a>
+            <partial name="_ViewSwitch" model="@(new MatCMS.Shared.Web.ViewSwitch(
+                Active: "web",
+                CloudUrl: string.IsNullOrEmpty(cloudUrl) ? null : cloudUrl,
+                WebUrl: null, AdminUrl: "/admin",
+                CloudLabel: T["adminbar.viewCloud"], WebLabel: T["adminbar.viewWebsite"], AdminLabel: T["adminbar.viewAdmin"]))" />
             @if (editId is int pid)
             {
                 <a class="mab-stool mab-edit" href="/admin/pages/edit/@pid" title="@T["adminbar.editPage"]" aria-label="@T["adminbar.editPage"]"><i class="ti ti-edit" aria-hidden="true"></i></a>
             }
         </div>
         <div class="mab-right">
-            @if (cloudManaged)
-            {
-                <a class="mab-stool mab-cloud" href="@cloudUrl" target="_top" rel="noopener" title="@T["adminbar.toCloud"]" aria-label="@T["adminbar.toCloud"]"><i class="ti ti-cloud" aria-hidden="true"></i></a>
-            }
             @if (!string.IsNullOrWhiteSpace(who))
             {
                 <span class="mab-user">@who</span>

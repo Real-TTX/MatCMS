@@ -137,16 +137,16 @@
             </button>
             <div class="admin-topbar-title">@title</div>
             <div class="admin-topbar-right">
-                @* Session toolbar — the SAME actions and look as the public admin bar (_AdminBar) and
-                   the cloud topbar, so switching cloud ↔ live site ↔ back-office feels seamless. Reuses
-                   the shared .mab-stool buttons (site.css). These also live in the sidebar footer, which
-                   is what mobile falls back to (this row is hidden below 640px). *@
+                @* Same Cloud|Website|Admin switch as the public admin bar and the cloud — "Admin" active
+                   here — plus the account + logout actions. One control everywhere, so switching
+                   cloud ↔ live site ↔ back-office feels seamless. Hidden below 640px (sidebar footer
+                   covers these on mobile). *@
                 <div class="admin-topbar-tools">
-                    <a class="mab-stool mab-view" href="/" target="_blank" rel="noopener" title="@T["nav.viewSite"]" aria-label="@T["nav.viewSite"]"><i class="ti ti-world" aria-hidden="true"></i></a>
-                    @if (cloudManaged)
-                    {
-                        <a class="mab-stool mab-cloud" href="@cloudUrl" title="@T["adminbar.toCloud"]" aria-label="@T["adminbar.toCloud"]"><i class="ti ti-cloud" aria-hidden="true"></i></a>
-                    }
+                    <partial name="_ViewSwitch" model="@(new MatCMS.Shared.Web.ViewSwitch(
+                        Active: "admin",
+                        CloudUrl: cloudManaged ? cloudUrl : null,
+                        WebUrl: "/", AdminUrl: null,
+                        CloudLabel: T["adminbar.viewCloud"], WebLabel: T["adminbar.viewWebsite"], AdminLabel: T["adminbar.viewAdmin"]))" />
                     <a class="mab-stool mab-account" asp-page="/Admin/Account/Index" title="@T["nav.account"]" aria-label="@T["nav.account"]"><i class="ti ti-key" aria-hidden="true"></i></a>
                     <form method="post" asp-page="/Logout" style="margin:0;">
                         <button type="submit" class="mab-stool mab-out" title="@T["nav.logout"]" aria-label="@T["nav.logout"]"><i class="ti ti-logout-2" aria-hidden="true"></i></button>

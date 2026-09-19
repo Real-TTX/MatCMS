@@ -1,5 +1,6 @@
 @inject MatCMS.Cloud.Services.CloudContext Cloud
 @inject MatCMS.Cloud.Services.VersionService Version
+@inject MatCMS.Cloud.Services.ContextSwitcher Switcher
 @inject Microsoft.Extensions.Options.IOptions<Microsoft.AspNetCore.Builder.RequestLocalizationOptions> LocOptions
 @inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment Env
 @{
@@ -123,7 +124,14 @@
                of its sites — is the same question everywhere, so it is answered in the same place
                everywhere instead of only on the page that happens to embed a site.
                ViewData["InstanceId"] names the instance being viewed; absent means the cloud. *@
-            @{ var currentInstanceId = ViewData["InstanceId"] as int?; }
+            @{
+                var currentInstanceId = ViewData["InstanceId"] as int?;
+                // For the Cloud|Website|Admin switch on the right: the instance being viewed (if any) and
+                // its address. Same-tab SSO links, so the operator lands logged in on the instance.
+                var vsInstance = currentInstanceId is int vsid
+                    ? (await Switcher.InstancesAsync()).FirstOrDefault(i => i.Id == vsid) : null;
+                var vsUrl = vsInstance?.PreviewUrl?.Trim().TrimEnd('/');
+            }
             <div class="inst-head">
                 <partial name="_ContextPicker" model="currentInstanceId" />
                 @if (ViewData["NoTopbarTitle"] is not true)
@@ -133,7 +141,19 @@
                     <div class="admin-topbar-title">@title</div>
                 }
             </div>
-            <div class="admin-topbar-right">@await RenderSectionAsync("TopbarActions", required: false)</div>
+            <div class="admin-topbar-right">
+                @* The Cloud|Website|Admin switch — same control as on the instance itself, "Cloud" active
+                   here. Only when an instance is the context (there is somewhere to switch TO). *@
+                @if (!string.IsNullOrEmpty(vsUrl))
+                {
+                    <partial name="_ViewSwitch" model="@(new MatCMS.Shared.Web.ViewSwitch(
+                        Active: "cloud", CloudUrl: null,
+                        WebUrl: $"{vsUrl}/sso/start?returnUrl=/",
+                        AdminUrl: $"{vsUrl}/sso/start?returnUrl=/admin",
+                        CloudLabel: T["instances.viewCloud"], WebLabel: T["instances.viewWebsite"], AdminLabel: T["instances.viewAdmin"]))" />
+                }
+                @await RenderSectionAsync("TopbarActions", required: false)
+            </div>
         </header>
 
         <main class="admin-content">

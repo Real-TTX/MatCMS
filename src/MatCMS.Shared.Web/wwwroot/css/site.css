@@ -1009,18 +1009,35 @@ body.has-adminbar .site-header { top: 68px; }
 .mab-brand { display: inline-flex; align-items: center; gap: 10px; color: #111; text-decoration: none;
     font-family: "Geologica", "Inter", sans-serif; font-weight: 600; font-size: 20px; white-space: nowrap; }
 .mab-logo { height: 30px; width: auto; }
-.mab-tools, .mab-right { display: inline-flex; align-items: center; gap: 4px; }
-/* Icon-only, coloured by what they do — exactly like the cloud's .stool tools. */
+/* Brand + the shared Cloud|Website|Admin switch sit together on the left; the session actions on the right. */
+.mab-left { display: inline-flex; align-items: center; gap: 14px; min-width: 0; }
+.mab-right { display: inline-flex; align-items: center; gap: 4px; }
+/* Icon-only action buttons (edit page, logout) — coloured by what they do, same 34px as the switch. */
 .mab-stool { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px;
     border: 0; border-radius: 9px; background: transparent; cursor: pointer; font-size: 18px;
     text-decoration: none; color: #374151; font-family: inherit; }
 .mab-stool:hover { background: #f0f2f5; }
-.mab-stool.mab-dash  { color: #7c3aed; }
 .mab-stool.mab-edit  { color: #2563eb; }
-.mab-stool.mab-view  { color: #2563eb; }
 .mab-stool.mab-account { color: #7c3aed; }
-.mab-stool.mab-cloud { color: #059669; }
 .mab-stool.mab-out   { color: #dc2626; margin-left: 6px; border-left: 1px solid #e5e7eb; border-radius: 0 9px 9px 0; width: 42px; }
 .mab-stool.mab-out:hover { background: #fee2e2; }
 .mab-user { font-size: 14px; color: #6b7280; margin-right: 4px; white-space: nowrap; }
 @media (max-width: 640px) { .mat-adminbar-inner { padding: 0 16px; height: 56px; } .mab-brand span, .mab-user { display: none; } body.has-adminbar .site-header { top: 57px; } }
+
+/* Cloud | Website | Admin — the ONE view switcher, shared across the cloud's instance view, the public
+   site's admin bar and the instance back-office (site.css is loaded on all three). A segmented control
+   34px high so it never grows the 67px bar; the current view is filled in its colour, the others show a
+   coloured icon and switch same-tab. `_ViewSwitch.cshtml` renders it. */
+.mat-viewswitch { display: inline-flex; align-items: center; flex: 0 0 auto;
+    border: 1px solid #e5e7eb; border-radius: 9px; overflow: hidden; background: #fff; }
+.mat-vs { display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 34px;
+    border: 0; background: transparent; cursor: pointer; text-decoration: none; font-size: 18px; color: #6b7280; }
+.mat-vs + .mat-vs { border-left: 1px solid #e5e7eb; }
+.mat-vs:hover { background: #f6f7f9; }
+.mat-vs.vs-cloud { color: #059669; }
+.mat-vs.vs-web   { color: #2563eb; }
+.mat-vs.vs-admin { color: #7c3aed; }
+.mat-vs.is-active { color: #fff; }
+.mat-vs.is-active.vs-cloud { background: #059669; }
+.mat-vs.is-active.vs-web   { background: #2563eb; }
+.mat-vs.is-active.vs-admin { background: #7c3aed; }

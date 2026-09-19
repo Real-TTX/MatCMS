@@ -4,6 +4,8 @@
     // Editor preview mode: only for admins, adds per-block wrappers + inspector highlighting.
     var http = ViewContext.HttpContext;
     var editor = http.Request.Query.ContainsKey("editor") && http.User.IsInRole("Admin");
+    // Tell the admin bar which page this is, so it can offer a direct "edit this page" link.
+    ViewData["AdminEditPageId"] = Model.CurrentPage.Id;
 }
 @if (!string.IsNullOrWhiteSpace(Model.CurrentPage.CustomCss))
 {

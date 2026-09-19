@@ -1,0 +1,42 @@
+@inject MatCMS.Services.SiteContext Site
+@{
+    // Cloud-managed = a cloud URL is configured (linked). Shown as a "zur Cloud" jump — top-level, so
+    // First-Party on the cloud again (no cross-site cookie issue). The current page's edit link is
+    // passed by the content view via ViewData; absent on non-page routes.
+    var cloudUrl = (Site.Get(MatCMS.Services.SettingKeys.CloudUrl) ?? "").Trim().TrimEnd('/');
+    var cloudManaged = !string.IsNullOrEmpty(cloudUrl);
+    var editId = ViewContext.ViewData["AdminEditPageId"] as int?;
+    var who = ViewContext.HttpContext.User.FindFirst("DisplayName")?.Value
+              ?? ViewContext.HttpContext.User.Identity?.Name;
+}
+@* Slim admin bar over the LIVE site for logged-in back-office admins (WordPress-style). First-party on
+   the instance's own domain, so it works everywhere — this is the "flip it" answer to the iframe cookie
+   wall. Same design family as the admin chrome so switching cloud ↔ instance feels seamless. *@
+<div class="mat-adminbar" role="navigation" aria-label="@T["adminbar.label"]">
+    <div class="mat-adminbar-inner">
+        <a class="mab-brand" href="/admin" title="@Site.SiteName">
+            <img class="mab-logo" src="@Site.LogoUrl" alt="" />
+            <span>@Site.SiteName</span>
+        </a>
+        <div class="mab-tools">
+            <a class="mab-btn" href="/admin"><i class="ti ti-layout-dashboard" aria-hidden="true"></i> @T["adminbar.dashboard"]</a>
+            @if (editId is int pid)
+            {
+                <a class="mab-btn" href="/admin/pages/edit/@pid"><i class="ti ti-edit" aria-hidden="true"></i> @T["adminbar.editPage"]</a>
+            }
+        </div>
+        <div class="mab-right">
+            @if (cloudManaged)
+            {
+                <a class="mab-btn mab-cloud" href="@cloudUrl" target="_top" rel="noopener"><i class="ti ti-cloud" aria-hidden="true"></i> @T["adminbar.toCloud"]</a>
+            }
+            @if (!string.IsNullOrWhiteSpace(who))
+            {
+                <span class="mab-user">@who</span>
+            }
+            <form method="post" asp-page="/Logout" class="mab-logout">
+                <button type="submit" class="mab-btn" title="@T["adminbar.logout"]" aria-label="@T["adminbar.logout"]"><i class="ti ti-logout-2" aria-hidden="true"></i></button>
+            </form>
+        </div>
+    </div>
+</div>

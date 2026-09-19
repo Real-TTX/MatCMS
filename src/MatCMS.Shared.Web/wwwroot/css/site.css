@@ -993,3 +993,30 @@ html.mat-langm-lock { overflow: hidden; }
 .fc-d::after { content: ""; position: absolute; left: 5px; right: 5px; top: 50%; height: 1px; transform: translateY(-.5px); background: rgba(255,255,255,.12); }
 .fc-c { color: var(--accent, #2563eb); font-weight: 700; font-size: 2rem; padding: 0 1px; }
 @media (max-width: 560px) { .fc-d { font-size: 1.8rem; padding: 9px 6px; min-width: 20px; } .fc-c { font-size: 1.4rem; } }
+
+/* --- Admin bar over the live site (logged-in back-office admins) ------------------------------ */
+/* Slim, dark, sticky bar in normal flow (pushes the site down, never overlaps). Same product design
+   family as the admin chrome, so switching cloud ↔ instance feels seamless even as the URL changes. */
+.mat-adminbar { position: sticky; top: 0; z-index: 2147483000; background: #1f2430; color: #e6e8ec;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 13px; line-height: 1; box-shadow: 0 1px 6px rgba(0,0,0,.25); }
+.mat-adminbar-inner { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 14px; }
+.mab-brand { display: inline-flex; align-items: center; gap: 8px; color: #fff; text-decoration: none;
+    font-weight: 600; white-space: nowrap; }
+.mab-logo { height: 22px; width: auto; border-radius: 4px; background: #fff; }
+.mab-tools { display: inline-flex; align-items: center; gap: 6px; margin-left: 6px; min-width: 0; }
+.mab-right { margin-left: auto; display: inline-flex; align-items: center; gap: 10px; }
+.mab-btn { display: inline-flex; align-items: center; gap: 6px; color: #e6e8ec; text-decoration: none;
+    background: rgba(255,255,255,.08); border: 0; border-radius: 7px; padding: 7px 11px; font-size: 13px;
+    font-family: inherit; cursor: pointer; white-space: nowrap; }
+.mab-btn:hover { background: rgba(255,255,255,.16); color: #fff; }
+.mab-btn i { font-size: 15px; }
+.mab-cloud { background: #2563eb; color: #fff; }
+.mab-cloud:hover { background: #1d4ed8; }
+.mab-user { opacity: .65; white-space: nowrap; }
+@media (max-width: 640px) {
+    .mab-brand span, .mab-user { display: none; }
+    .mab-btn { padding: 7px 9px; }
+    .mab-tools .mab-btn span, .mab-tools .mab-btn { font-size: 0; gap: 0; }
+    .mab-tools .mab-btn i { font-size: 17px; }
+}

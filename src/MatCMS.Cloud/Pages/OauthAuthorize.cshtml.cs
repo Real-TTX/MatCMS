@@ -10,15 +10,22 @@ using Microsoft.EntityFrameworkCore;
 namespace MatCMS.Cloud.Pages;
 
 /// <summary>
-/// The SSO consent screen — the front channel of the cloud-as-IdP OAuth flow. A MatCMS instance sends
-/// the browser here (<c>/oauth/authorize?…</c>); the cloud shows WHO is asking and only an explicit
-/// "Zulassen" mints the authorization code, exactly like a Google consent prompt. It replaces the old
-/// endpoint that issued the code automatically, so a live cloud session can never silently federate
-/// into an instance the user did not intend.
-/// <para>It is a Razor Page (not a minimal-API endpoint) on purpose: that gives the POST antiforgery,
-/// the login-card styling and localization for free. [Authorize] sends an unauthenticated visitor to
-/// the cloud login and back. The whole security validation (PKCE, instance Approved, redirect_uri match,
-/// per-instance access, 2FA mandate) is re-run on POST, so a tampered hidden field cannot grant a code.</para>
+/// The front channel of the cloud-as-IdP OAuth flow. A MatCMS instance sends the browser here
+/// (<c>/oauth/authorize?…</c>). When the operator is already signed into the cloud AND authorized for the
+/// instance, the code is minted automatically for a genuine top-level navigation (<see cref="OnGetAsync"/>)
+/// — arriving that way is the result of clicking the view switch in one's OWN cloud admin, so there is
+/// nothing left to consent to. The consent form + <see cref="OnPostAsync"/> remain the fallback and ARE
+/// reached for: a malformed/unknown request, an account with no access, and — crucially — any GET that is
+/// NOT a confirmed navigation (a no-cors <c>&lt;img&gt;</c>/<c>&lt;script&gt;</c>/fetch drive-by, or a
+/// browser too old to send <c>Sec-Fetch-*</c>), so a silent sub-resource load can never mint a code and
+/// leak the visitor's identity claims. (An unauthenticated visitor is bounced to the cloud login by
+/// [Authorize] and back.)
+/// <para>It is a Razor Page (not a minimal-API endpoint) on purpose: [Authorize] does the login bounce,
+/// and the retained POST path gets antiforgery, login-card styling and localization for free. The whole
+/// security validation (PKCE, instance Approved, redirect_uri match, per-instance access, 2FA mandate) is
+/// re-run on BOTH GET and POST, so neither a tampered hidden field nor a drive-by GET can grant a code
+/// for an instance the operator may not access — and the code is single-use, PKCE-bound and only ever
+/// delivered to the validated redirect_uri.</para>
 /// </summary>
 [Authorize]
 [EnableRateLimiting("login")]
@@ -61,6 +68,25 @@ public class OauthAuthorizeModel : PageModel
         if (error is not null) { Error = error; return Page(); }
         if (inst is null) { NoAccess = true; return Page(); }
 
+        // Auto-approve — but ONLY for a genuine top-level navigation (the real switch/SSO flow: a 302
+        // from the instance's /sso/start to a document load). The operator is already authenticated
+        // ([Authorize]) and authorized (ResolveAsync passed CanAccessInstance), and everything security-
+        // relevant (PKCE present, Approved, redirect_uri = the instance's own /sso/callback, access, 2FA)
+        // was re-validated, so issuing the code here is as safe as the old POST for token/session/authz.
+        // The ONE thing the consent POST also blocked was a SILENT drive-by: a no-cors <img>/<script>/fetch
+        // to this URL against a logged-in operator would mint a code (delivered only to the instance's own
+        // callback, redeemable only with that instance's token) and leak the operator's identity claims to
+        // whoever controls that instance. Sec-Fetch-Mode=navigate is sent by real navigations and NEVER by
+        // no-cors sub-resource loads, so it separates the two; anything else falls through to the explicit
+        // consent screen below — a click a silent load cannot make.
+        if (string.Equals(Request.Headers["Sec-Fetch-Mode"].ToString(), "navigate", StringComparison.OrdinalIgnoreCase))
+        {
+            var code = _codes.Issue(new OAuthCodes.Grant(_scope.UserId!.Value, inst.PublicId, redirect_uri!, code_challenge!));
+            return Redirect(BuildRedirect(redirect_uri!, code: code));
+        }
+
+        // Not a confirmed top-level navigation (a drive-by sub-resource load, or a browser too old to send
+        // Sec-Fetch-*) → show the consent screen instead of silently issuing. This is the retained fallback.
         InstanceName = inst.Name;
         AccountLabel = User.FindFirst("DisplayName")?.Value ?? User.Identity?.Name ?? "";
         return Page();

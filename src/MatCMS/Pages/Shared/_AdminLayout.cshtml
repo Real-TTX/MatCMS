@@ -25,10 +25,16 @@
     var currentCulture = System.Globalization.CultureInfo.CurrentUICulture.Name.Split('-', 2)[0];
     if (string.IsNullOrEmpty(currentCulture)) currentCulture = MatCMS.Services.Localizer.ResourceFallbackCulture;
     var returnUrl = Context.Request.Path + Context.Request.QueryString;
-    // Cloud-managed = a cloud URL is configured (linked). Shown as a "zur Cloud" jump in the topbar
-    // toolbar (same as the public admin bar), so the back-office and the live site offer the same tools.
+    // The Cloud segment of the topbar switch shows ONLY for a session that came FROM the cloud (SSO →
+    // amr=sso) — a direct login has no cloud context. It deep-links to THIS instance on the cloud (the
+    // cloud resolves the public id → Details via /Admin/Instances/Open), not the cloud home. Website +
+    // Admin stay for every logged-in admin, same as the public bar.
     var cloudUrl = (Site.Get(MatCMS.Services.SettingKeys.CloudUrl) ?? "").Trim().TrimEnd('/');
-    var cloudManaged = !string.IsNullOrEmpty(cloudUrl);
+    var cloudId = (Site.Get(MatCMS.Services.SettingKeys.CloudInstanceId) ?? "").Trim();
+    var fromCloud = User.HasClaim("amr", "sso");
+    var cloudLink = fromCloud && !string.IsNullOrEmpty(cloudUrl)
+        ? (!string.IsNullOrEmpty(cloudId) ? $"{cloudUrl}/Admin/Instances/Open/{Uri.EscapeDataString(cloudId)}" : cloudUrl)
+        : null;
 }
 <!DOCTYPE html>
 <html lang="@currentCulture">
@@ -128,7 +134,7 @@
                 <div class="admin-topbar-tools">
                     <partial name="_ViewSwitch" model="@(new MatCMS.Shared.Web.ViewSwitch(
                         Active: "admin",
-                        CloudUrl: cloudManaged ? cloudUrl : null,
+                        CloudUrl: cloudLink,
                         WebUrl: "/", AdminUrl: null,
                         CloudLabel: T["adminbar.viewCloud"], WebLabel: T["adminbar.viewWebsite"], AdminLabel: T["adminbar.viewAdmin"]))" />
                     <a class="mab-stool mab-account" asp-page="/Admin/Account/Index" title="@T["nav.account"]" aria-label="@T["nav.account"]"><i class="ti ti-key" aria-hidden="true"></i></a>

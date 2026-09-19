@@ -52,6 +52,10 @@
         }
         else
         {
+            @* Fallback consent form. The seamless path (a real top-level navigation from the cloud switch)
+               is auto-approved on GET; this renders for a GET that is NOT a confirmed navigation — a
+               drive-by <img>/<script>/fetch or an old browser — so a silent sub-resource load can't mint a
+               code without a human click. See OauthAuthorizeModel.OnGetAsync. *@
             <h1>@T["sso.consent.heading"]</h1>
             <p class="help" style="text-align:center;">@T["sso.consent.intro", Model.InstanceName]</p>
             @if (!string.IsNullOrEmpty(Model.AccountLabel))

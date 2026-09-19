@@ -3,6 +3,15 @@
     // The instance's cloud link (if any) — the Cloud segment of the switcher points there. Empty means
     // not cloud-managed, and the shared switcher then simply omits the Cloud segment.
     var cloudUrl = (Site.Get(MatCMS.Services.SettingKeys.CloudUrl) ?? "").Trim().TrimEnd('/');
+    var cloudId = (Site.Get(MatCMS.Services.SettingKeys.CloudInstanceId) ?? "").Trim();
+    // The Cloud segment shows ONLY for a session that came FROM the cloud (SSO → amr=sso claim) — a direct
+    // instance login has no cloud context (and may have no cloud account at all). It deep-links to THIS
+    // instance's page ON the cloud: the cloud resolves the public id → Details (/Admin/Instances/Open),
+    // so you land on the instance, not the cloud home. Website + Admin stay for every logged-in admin.
+    var fromCloud = ViewContext.HttpContext.User.HasClaim("amr", "sso");
+    var cloudLink = fromCloud && !string.IsNullOrEmpty(cloudUrl)
+        ? (!string.IsNullOrEmpty(cloudId) ? $"{cloudUrl}/Admin/Instances/Open/{Uri.EscapeDataString(cloudId)}" : cloudUrl)
+        : null;
     var editId = ViewContext.ViewData["AdminEditPageId"] as int?;
 }
 @* Slim admin bar over the LIVE site for logged-in back-office admins. First-party on the instance's own
@@ -25,7 +34,7 @@
         <div class="mab-right">
             <partial name="_ViewSwitch" model="@(new MatCMS.Shared.Web.ViewSwitch(
                 Active: "web",
-                CloudUrl: string.IsNullOrEmpty(cloudUrl) ? null : cloudUrl,
+                CloudUrl: cloudLink,
                 WebUrl: null, AdminUrl: "/admin",
                 CloudLabel: T["adminbar.viewCloud"], WebLabel: T["adminbar.viewWebsite"], AdminLabel: T["adminbar.viewAdmin"]))" />
             <a class="mab-stool mab-account" asp-page="/Admin/Account/Index" title="@T["nav.account"]" aria-label="@T["nav.account"]"><i class="ti ti-key" aria-hidden="true"></i></a>

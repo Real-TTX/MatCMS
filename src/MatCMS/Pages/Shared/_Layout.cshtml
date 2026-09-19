@@ -185,9 +185,10 @@
         @Html.Raw(Site.HeadCode)
     }
 </head>
-<body>
+<body class="@(User.IsInRole("Admin") ? "has-adminbar" : null)">
 @* Admin bar over the live site for logged-in back-office admins — first-party here, so no cross-site
-   cookie issue (the "flip it instead of iframe" approach). Rendered first so it sits atop everything. *@
+   cookie issue (the "flip it instead of iframe" approach). Rendered first so it sits atop everything.
+   The has-adminbar body class makes the site's own sticky header stick below the bar (no overlap). *@
 @if (User.IsInRole("Admin"))
 {
     <partial name="_AdminBar" />

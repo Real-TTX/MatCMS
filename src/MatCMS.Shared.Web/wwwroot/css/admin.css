@@ -116,6 +116,13 @@
 .admin-topbar-title { font-family: var(--font-head); font-weight: 600; font-size: 20px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .admin-user { font-size: 14px; color: var(--muted); }
 
+/* CMS session toolbar in the admin topbar's right side — the same actions as the public admin bar,
+   so the back-office feels like one product with the live site and the cloud. The buttons are the
+   shared .mab-stool from site.css (loaded here too), not a parallel class. Cloud-unused wrapper, so
+   admin.css stays cloud-safe. Hidden on mobile: the sidebar footer (via the drawer) carries them there. */
+.admin-topbar-tools { display: inline-flex; align-items: center; gap: 4px; }
+@media (max-width: 640px) { .admin-topbar-tools { display: none; } }
+
 /* Mobile menu button (hamburger) — hidden on desktop, shown in the drawer breakpoint. */
 .admin-menu-toggle { display: none; }
 .admin-menu-toggle span {

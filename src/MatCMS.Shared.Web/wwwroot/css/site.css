@@ -1017,6 +1017,8 @@ body.has-adminbar .site-header { top: 68px; }
 .mab-stool:hover { background: #f0f2f5; }
 .mab-stool.mab-dash  { color: #7c3aed; }
 .mab-stool.mab-edit  { color: #2563eb; }
+.mab-stool.mab-view  { color: #2563eb; }
+.mab-stool.mab-account { color: #7c3aed; }
 .mab-stool.mab-cloud { color: #059669; }
 .mab-stool.mab-out   { color: #dc2626; margin-left: 6px; border-left: 1px solid #e5e7eb; border-radius: 0 9px 9px 0; width: 42px; }
 .mab-stool.mab-out:hover { background: #fee2e2; }

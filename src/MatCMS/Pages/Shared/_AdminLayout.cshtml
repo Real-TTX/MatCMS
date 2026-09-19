@@ -25,6 +25,10 @@
     var currentCulture = System.Globalization.CultureInfo.CurrentUICulture.Name.Split('-', 2)[0];
     if (string.IsNullOrEmpty(currentCulture)) currentCulture = MatCMS.Services.Localizer.ResourceFallbackCulture;
     var returnUrl = Context.Request.Path + Context.Request.QueryString;
+    // Cloud-managed = a cloud URL is configured (linked). Shown as a "zur Cloud" jump in the topbar
+    // toolbar (same as the public admin bar), so the back-office and the live site offer the same tools.
+    var cloudUrl = (Site.Get(MatCMS.Services.SettingKeys.CloudUrl) ?? "").Trim().TrimEnd('/');
+    var cloudManaged = !string.IsNullOrEmpty(cloudUrl);
 }
 <!DOCTYPE html>
 <html lang="@currentCulture">
@@ -132,7 +136,23 @@
                 <span></span><span></span><span></span>
             </button>
             <div class="admin-topbar-title">@title</div>
-            <div class="admin-topbar-right"></div>
+            <div class="admin-topbar-right">
+                @* Session toolbar — the SAME actions and look as the public admin bar (_AdminBar) and
+                   the cloud topbar, so switching cloud ↔ live site ↔ back-office feels seamless. Reuses
+                   the shared .mab-stool buttons (site.css). These also live in the sidebar footer, which
+                   is what mobile falls back to (this row is hidden below 640px). *@
+                <div class="admin-topbar-tools">
+                    <a class="mab-stool mab-view" href="/" target="_blank" rel="noopener" title="@T["nav.viewSite"]" aria-label="@T["nav.viewSite"]"><i class="ti ti-world" aria-hidden="true"></i></a>
+                    @if (cloudManaged)
+                    {
+                        <a class="mab-stool mab-cloud" href="@cloudUrl" title="@T["adminbar.toCloud"]" aria-label="@T["adminbar.toCloud"]"><i class="ti ti-cloud" aria-hidden="true"></i></a>
+                    }
+                    <a class="mab-stool mab-account" asp-page="/Admin/Account/Index" title="@T["nav.account"]" aria-label="@T["nav.account"]"><i class="ti ti-key" aria-hidden="true"></i></a>
+                    <form method="post" asp-page="/Logout" style="margin:0;">
+                        <button type="submit" class="mab-stool mab-out" title="@T["nav.logout"]" aria-label="@T["nav.logout"]"><i class="ti ti-logout-2" aria-hidden="true"></i></button>
+                    </form>
+                </div>
+            </div>
         </header>
         @* The title the hidden bar would have shown is handed to the embedding page instead, so it
            can put it in ITS bar. Cross-origin, hence postMessage — the cloud cannot read this

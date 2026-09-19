@@ -108,7 +108,7 @@ public class InstanceService
             PublicId = NewPublicId(),
             TokenHash = HashToken(token),
             Name = string.IsNullOrWhiteSpace(request.SiteName) ? PlaceholderName : request.SiteName!.Trim(),
-            Url = string.IsNullOrWhiteSpace(request.Url) ? null : request.Url!.Trim(),
+            Url = SafeUrl(request.Url),
             ProfileId = profile.Id,
             Status = profile.AutoApprove ? InstanceStatus.Approved : InstanceStatus.Pending,
             ProtocolVersion = request.ProtocolVersion,
@@ -223,7 +223,7 @@ public class InstanceService
         // Upgraded on the way IN, so everything downstream — frame, links, the mixed-content guard —
         // sees one address and cannot disagree about it. Reversible: switch the setting off and the
         // next heartbeat writes what the instance actually said.
-        if (!string.IsNullOrWhiteSpace(beat.Url)) instance.Url = ForceHttps(beat.Url!.Trim());
+        if (SafeUrl(beat.Url) is string beatUrl) instance.Url = ForceHttps(beatUrl);
         // The reported site name only SEEDS the label — never overwrite a name an operator set here.
         // "Set" is anything other than the placeholder; the placeholder counts as "not set yet", so an
         // instance that enrolled before its site name was configured still picks it up instead of
@@ -488,6 +488,16 @@ public class InstanceService
             Sha256 = row.Sha256,
         };
     }
+    /// <summary>An instance-reported URL, accepted only if it is an absolute http/https address —
+    /// anything else (e.g. a <c>javascript:</c> scheme) is dropped. The instance is a separate,
+    /// possibly hostile principal and the control plane renders this value as an href/src, so an unsafe
+    /// scheme must never be stored. Empty/whitespace → null. Defence in depth next to the render-side
+    /// guard in <see cref="Models.Instance.PreviewUrl"/>.</summary>
+    private static string? SafeUrl(string? url) =>
+        Uri.TryCreate(url?.Trim(), UriKind.Absolute, out var u)
+        && (u.Scheme == Uri.UriSchemeHttp || u.Scheme == Uri.UriSchemeHttps)
+            ? url!.Trim() : null;
+
     /// <summary>Turns http into https when the operator has said their instances are reachable that
     /// way. Only the scheme — host, port and path are the instance's to report.</summary>
     private string ForceHttps(string url) =>

@@ -998,14 +998,17 @@ html.mat-langm-lock { overflow: hidden; }
 /* Mirrors the MatCMS.Cloud top bar 1:1 (white, 1px bottom border, ~67px, Geologica title, 34px
    icon "stool" buttons) so switching cloud → instance looks seamless even as the URL changes. Sticky
    in normal flow: it pushes the site down, never overlaps. */
+/* Height on the OUTER element with border-box so the 1px border is INCLUDED — total 67px, exactly like
+   the admin/cloud .admin-topbar (which also carries its border inside a 67px border-box). Byte-identical
+   bar height everywhere. */
 .mat-adminbar { position: sticky; top: 0; z-index: 2147483000; background: #fff;
-    border-bottom: 1px solid #e5e7eb; box-shadow: 0 1px 4px rgba(0,0,0,.04); }
+    height: 67px; box-sizing: border-box; border-bottom: 1px solid #e5e7eb; box-shadow: 0 1px 4px rgba(0,0,0,.04); }
 .mat-adminbar-inner { display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    padding: 0 32px; height: 67px; box-sizing: border-box; }
+    padding: 0 32px; height: 100%; box-sizing: border-box; }
 /* The site's OWN sticky header must stick BELOW the admin bar, not fight it for the same top:0 — which
    glued both to the top and let the admin bar (huge z-index) cover the site menu, and made mobile
-   scrolling jump. Offset = bar inner height (67) + its 1px bottom border. Only when the bar renders. */
-body.has-adminbar .site-header { top: 68px; }
+   scrolling jump. Offset = the bar's full 67px height. Only when the bar renders. */
+body.has-adminbar .site-header { top: 67px; }
 .mab-brand { display: inline-flex; align-items: center; gap: 10px; color: #111; text-decoration: none;
     font-family: "Geologica", "Inter", sans-serif; font-weight: 600; font-size: 20px; white-space: nowrap; }
 .mab-logo { height: 30px; width: auto; }
@@ -1021,8 +1024,9 @@ body.has-adminbar .site-header { top: 68px; }
 .mab-stool.mab-account { color: #7c3aed; }
 .mab-stool.mab-out   { color: #dc2626; margin-left: 6px; border-left: 1px solid #e5e7eb; border-radius: 0 9px 9px 0; width: 42px; }
 .mab-stool.mab-out:hover { background: #fee2e2; }
-.mab-user { font-size: 14px; color: #6b7280; margin-right: 4px; white-space: nowrap; }
-@media (max-width: 640px) { .mat-adminbar-inner { padding: 0 16px; height: 56px; } .mab-brand span, .mab-user { display: none; } body.has-adminbar .site-header { top: 57px; } }
+/* Stays 67px on mobile too, so it matches the cloud + back-office bars everywhere; only the brand text
+   drops to keep room for the switch. */
+@media (max-width: 640px) { .mat-adminbar-inner { padding: 0 16px; } .mab-brand span { display: none; } }
 
 /* Cloud | Website | Admin — the ONE view switcher, shared across the cloud's instance view, the public
    site's admin bar and the instance back-office (site.css is loaded on all three). A segmented control

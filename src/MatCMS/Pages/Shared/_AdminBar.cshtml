@@ -4,8 +4,6 @@
     // not cloud-managed, and the shared switcher then simply omits the Cloud segment.
     var cloudUrl = (Site.Get(MatCMS.Services.SettingKeys.CloudUrl) ?? "").Trim().TrimEnd('/');
     var editId = ViewContext.ViewData["AdminEditPageId"] as int?;
-    var who = ViewContext.HttpContext.User.FindFirst("DisplayName")?.Value
-              ?? ViewContext.HttpContext.User.Identity?.Name;
 }
 @* Slim admin bar over the LIVE site for logged-in back-office admins. First-party on the instance's own
    domain, so it works everywhere — the "flip it" answer to the iframe cookie wall. The Cloud|Website|Admin
@@ -18,23 +16,21 @@
                 <img class="mab-logo" src="@Site.LogoUrl" alt="" />
                 <span>@Site.SiteName</span>
             </a>
-            <partial name="_ViewSwitch" model="@(new MatCMS.Shared.Web.ViewSwitch(
-                Active: "web",
-                CloudUrl: string.IsNullOrEmpty(cloudUrl) ? null : cloudUrl,
-                WebUrl: null, AdminUrl: "/admin",
-                CloudLabel: T["adminbar.viewCloud"], WebLabel: T["adminbar.viewWebsite"], AdminLabel: T["adminbar.viewAdmin"]))" />
             @if (editId is int pid)
             {
                 <a class="mab-stool mab-edit" href="/admin/pages/edit/@pid" title="@T["adminbar.editPage"]" aria-label="@T["adminbar.editPage"]"><i class="ti ti-edit" aria-hidden="true"></i></a>
             }
         </div>
+        @* Same trailing group as the cloud and the back-office: switch + Konto + Abmelden. *@
         <div class="mab-right">
-            @if (!string.IsNullOrWhiteSpace(who))
-            {
-                <span class="mab-user">@who</span>
-            }
+            <partial name="_ViewSwitch" model="@(new MatCMS.Shared.Web.ViewSwitch(
+                Active: "web",
+                CloudUrl: string.IsNullOrEmpty(cloudUrl) ? null : cloudUrl,
+                WebUrl: null, AdminUrl: "/admin",
+                CloudLabel: T["adminbar.viewCloud"], WebLabel: T["adminbar.viewWebsite"], AdminLabel: T["adminbar.viewAdmin"]))" />
+            <a class="mab-stool mab-account" asp-page="/Admin/Account/Index" title="@T["nav.account"]" aria-label="@T["nav.account"]"><i class="ti ti-key" aria-hidden="true"></i></a>
             <form method="post" asp-page="/Logout" class="mab-logout" style="margin:0;">
-                <button type="submit" class="mab-stool mab-out" title="@T["adminbar.logout"]" aria-label="@T["adminbar.logout"]"><i class="ti ti-logout-2" aria-hidden="true"></i></button>
+                <button type="submit" class="mab-stool mab-out" title="@T["nav.logout"]" aria-label="@T["nav.logout"]"><i class="ti ti-logout-2" aria-hidden="true"></i></button>
             </form>
         </div>
     </div>

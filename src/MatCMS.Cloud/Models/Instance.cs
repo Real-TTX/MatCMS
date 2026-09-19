@@ -131,15 +131,28 @@ public class Instance
     public bool CloudManaged { get; set; }
 
     /// <summary>Address to show the site at: what the instance reported (or an operator typed), else
-    /// the local container's published port.</summary>
+    /// the local container's published port.
+    /// <para>SECURITY: <see cref="Url"/> is instance-reported (a separate, possibly hostile principal
+    /// that merely holds an instance token) and is rendered by the control plane as an <c>&lt;a href&gt;</c>
+    /// (the view switcher) and an iframe <c>src</c> (the picker thumbnails). Razor attribute-encoding does
+    /// NOT sanitise the URL SCHEME, so a <c>javascript:</c> value would execute in the cloud-admin origin.
+    /// This getter therefore returns the URL only when it is an absolute http/https address; anything else
+    /// falls back to the port guess (or null), so no unsafe scheme can ever reach an href/src.</para></summary>
     public string? PreviewUrl =>
-        !string.IsNullOrWhiteSpace(Url) ? Url
+        IsHttpUrl(Url) ? Url
         : LocalPort is not null ? $"http://localhost:{LocalPort}"
         : null;
 
     /// <summary>True when the preview address is only a guess from the port mapping — the UI says so
-    /// rather than letting an operator wonder why a blank frame appeared.</summary>
-    public bool PreviewIsGuessed => string.IsNullOrWhiteSpace(Url) && LocalPort is not null;
+    /// rather than letting an operator wonder why a blank frame appeared. A non-http(s) reported URL
+    /// counts as "no usable URL" here too, so it degrades to the guess rather than being shown.</summary>
+    public bool PreviewIsGuessed => !IsHttpUrl(Url) && LocalPort is not null;
+
+    /// <summary>Whether <paramref name="u"/> is an absolute http/https URL — the only schemes safe to
+    /// emit as an href/src from an instance-reported value.</summary>
+    private static bool IsHttpUrl(string? u) =>
+        Uri.TryCreate(u?.Trim(), UriKind.Absolute, out var uri)
+        && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
 
     // --- Reported content stats (dashboard) --------------------------------
     public int PageCount { get; set; }

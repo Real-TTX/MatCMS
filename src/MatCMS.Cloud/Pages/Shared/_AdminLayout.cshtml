@@ -142,15 +142,22 @@
                 }
             </div>
             <div class="admin-topbar-right">
-                @* The Cloud|Website|Admin switch — same control as on the instance itself, "Cloud" active
-                   here. Only when an instance is the context (there is somewhere to switch TO). *@
+                @* The SAME trailing group as on the instance (public bar and back-office): the
+                   Cloud|Website|Admin switch + Account + Logout, so all three surfaces read identically.
+                   "Cloud" is active here. Only when an instance is the context (somewhere to switch TO). *@
                 @if (!string.IsNullOrEmpty(vsUrl))
                 {
-                    <partial name="_ViewSwitch" model="@(new MatCMS.Shared.Web.ViewSwitch(
-                        Active: "cloud", CloudUrl: null,
-                        WebUrl: $"{vsUrl}/sso/start?returnUrl=/",
-                        AdminUrl: $"{vsUrl}/sso/start?returnUrl=/admin",
-                        CloudLabel: T["instances.viewCloud"], WebLabel: T["instances.viewWebsite"], AdminLabel: T["instances.viewAdmin"]))" />
+                    <div class="admin-topbar-tools">
+                        <partial name="_ViewSwitch" model="@(new MatCMS.Shared.Web.ViewSwitch(
+                            Active: "cloud", CloudUrl: null,
+                            WebUrl: $"{vsUrl}/sso/start?returnUrl=/",
+                            AdminUrl: $"{vsUrl}/sso/start?returnUrl=/admin",
+                            CloudLabel: T["instances.viewCloud"], WebLabel: T["instances.viewWebsite"], AdminLabel: T["instances.viewAdmin"]))" />
+                        <a class="mab-stool mab-account" asp-page="/Admin/Account/Index" title="@T["nav.account"]" aria-label="@T["nav.account"]"><i class="ti ti-key" aria-hidden="true"></i></a>
+                        <form method="post" asp-page="/Logout" style="margin:0;">
+                            <button type="submit" class="mab-stool mab-out" title="@T["nav.logout"]" aria-label="@T["nav.logout"]"><i class="ti ti-logout-2" aria-hidden="true"></i></button>
+                        </form>
+                    </div>
                 }
                 @await RenderSectionAsync("TopbarActions", required: false)
             </div>

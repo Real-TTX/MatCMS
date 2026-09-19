@@ -995,28 +995,26 @@ html.mat-langm-lock { overflow: hidden; }
 @media (max-width: 560px) { .fc-d { font-size: 1.8rem; padding: 9px 6px; min-width: 20px; } .fc-c { font-size: 1.4rem; } }
 
 /* --- Admin bar over the live site (logged-in back-office admins) ------------------------------ */
-/* Slim, dark, sticky bar in normal flow (pushes the site down, never overlaps). Same product design
-   family as the admin chrome, so switching cloud ↔ instance feels seamless even as the URL changes. */
-.mat-adminbar { position: sticky; top: 0; z-index: 2147483000; background: #1f2430; color: #e6e8ec;
-    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    font-size: 13px; line-height: 1; box-shadow: 0 1px 6px rgba(0,0,0,.25); }
-.mat-adminbar-inner { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 14px; }
-.mab-brand { display: inline-flex; align-items: center; gap: 8px; color: #fff; text-decoration: none;
-    font-weight: 600; white-space: nowrap; }
-.mab-logo { height: 22px; width: auto; border-radius: 4px; background: #fff; }
-.mab-tools { display: inline-flex; align-items: center; gap: 6px; margin-left: 6px; min-width: 0; }
-.mab-right { margin-left: auto; display: inline-flex; align-items: center; gap: 10px; }
-.mab-btn { display: inline-flex; align-items: center; gap: 6px; color: #e6e8ec; text-decoration: none;
-    background: rgba(255,255,255,.08); border: 0; border-radius: 7px; padding: 7px 11px; font-size: 13px;
-    font-family: inherit; cursor: pointer; white-space: nowrap; }
-.mab-btn:hover { background: rgba(255,255,255,.16); color: #fff; }
-.mab-btn i { font-size: 15px; }
-.mab-cloud { background: #2563eb; color: #fff; }
-.mab-cloud:hover { background: #1d4ed8; }
-.mab-user { opacity: .65; white-space: nowrap; }
-@media (max-width: 640px) {
-    .mab-brand span, .mab-user { display: none; }
-    .mab-btn { padding: 7px 9px; }
-    .mab-tools .mab-btn span, .mab-tools .mab-btn { font-size: 0; gap: 0; }
-    .mab-tools .mab-btn i { font-size: 17px; }
-}
+/* Mirrors the MatCMS.Cloud top bar 1:1 (white, 1px bottom border, ~67px, Geologica title, 34px
+   icon "stool" buttons) so switching cloud → instance looks seamless even as the URL changes. Sticky
+   in normal flow: it pushes the site down, never overlaps. */
+.mat-adminbar { position: sticky; top: 0; z-index: 2147483000; background: #fff;
+    border-bottom: 1px solid #e5e7eb; box-shadow: 0 1px 4px rgba(0,0,0,.04); }
+.mat-adminbar-inner { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 16px 32px; min-height: 67px; box-sizing: border-box; }
+.mab-brand { display: inline-flex; align-items: center; gap: 10px; color: #111; text-decoration: none;
+    font-family: "Geologica", "Inter", sans-serif; font-weight: 600; font-size: 20px; white-space: nowrap; }
+.mab-logo { height: 30px; width: auto; }
+.mab-tools, .mab-right { display: inline-flex; align-items: center; gap: 4px; }
+/* Icon-only, coloured by what they do — exactly like the cloud's .stool tools. */
+.mab-stool { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px;
+    border: 0; border-radius: 9px; background: transparent; cursor: pointer; font-size: 18px;
+    text-decoration: none; color: #374151; font-family: inherit; }
+.mab-stool:hover { background: #f0f2f5; }
+.mab-stool.mab-dash  { color: #7c3aed; }
+.mab-stool.mab-edit  { color: #2563eb; }
+.mab-stool.mab-cloud { color: #059669; }
+.mab-stool.mab-out   { color: #dc2626; margin-left: 6px; border-left: 1px solid #e5e7eb; border-radius: 0 9px 9px 0; width: 42px; }
+.mab-stool.mab-out:hover { background: #fee2e2; }
+.mab-user { font-size: 14px; color: #6b7280; margin-right: 4px; white-space: nowrap; }
+@media (max-width: 640px) { .mat-adminbar-inner { padding: 12px 16px; min-height: 56px; } .mab-brand span, .mab-user { display: none; } }

@@ -89,12 +89,14 @@
 
 @* The iframe view is gone (a cross-site frame can't carry the instance's login cookies). Instead two
    buttons open the instance FIRST-PARTY in a new tab, where its own admin bar gives the cloud-like
-   chrome and a way back. "Verwaltung öffnen" runs the SSO auto-login (returnUrl=/admin); with SSO off
-   it simply lands on the instance's login. Only shown once an instance with an address is the context. *@
+   chrome and a way back. BOTH run the SSO auto-login so the operator lands logged in and the admin bar
+   is right there — the site button returns to the public home (returnUrl=/), the admin button to
+   /admin. With SSO off on the instance, both simply land on its login. Only shown once an instance
+   with an address is the context. *@
 @if (!string.IsNullOrEmpty(siteUrl))
 {
     <div class="inst-open-actions">
-        <a class="btn btn-sm btn-ghost" href="@siteUrl" target="_blank" rel="noopener" title="@T["instances.openSite"]">
+        <a class="btn btn-sm btn-ghost" href="@siteUrl/sso/start?returnUrl=/" target="_blank" rel="noopener" title="@T["instances.openSite"]">
             <i class="ti ti-external-link" aria-hidden="true"></i> <span class="btn-txt">@T["instances.openSite"]</span>
         </a>
         <a class="btn btn-sm" href="@siteUrl/sso/start?returnUrl=/admin" target="_blank" rel="noopener" title="@T["instances.openAdmin"]">

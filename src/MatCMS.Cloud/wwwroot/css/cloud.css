@@ -211,28 +211,6 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
    border in the sidebar, where it separates the logo from the navigation below it. */
 .admin-topbar-brand .admin-brand { margin-bottom: 0; border-bottom: 0; padding-bottom: 0; }
 
-/* ---- Instance site, embedded in the shell ------------------------------------------------------
-   Same trick the admin already uses for its live editor: the content area gives up its padding so
-   the frame can have the window. The 1px is the bar's own bottom border. */
-.admin-content:has(.site-embed) { padding: 0; max-width: none; }
-
-.site-embed { position: relative; height: calc(100dvh - var(--topbar-h) - 1px); background: var(--bg-alt, #f6f7f9); }
-.site-embed-frame { position: relative; z-index: 1; width: 100%; height: 100%; border: 0; display: block; background: #fff; }
-
-/* Sits BEHIND the frame, so it is what remains visible when a site refuses to be framed. A blank
-   white rectangle would otherwise read as "the cloud is broken" rather than "this site says no". */
-.site-embed-fallback {
-    position: absolute; inset: 0; z-index: 0;
-    display: flex; align-items: center; justify-content: center; gap: 6px;
-    padding: 24px; text-align: center; font-size: 14px;
-}
-
-.site-embed-actions { display: flex; align-items: center; gap: 8px; }
-
-.site-embed-hint { display: flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 13px; border-bottom: 1px solid var(--line); background: #fff; }
-.admin-content:has(.site-embed-hint) .site-embed { height: calc(100dvh - var(--topbar-h) - 1px - 34px); }
-.site-embed-note { padding: 32px; }
-
 @media (max-width: 860px) {
     /* The brand block would eat most of a phone screen; it shrinks to the logo and the bar reflows. */
     .admin-bare .admin-topbar { padding-left: 16px; height: auto; }
@@ -309,10 +287,6 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
 }
 .inst-picker-meta strong { font-size: 14px; }
 .inst-picker-meta span { font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-/* Pushed to the far end: closing is the one action that leaves, so it does not sit among the ones
-   that stay. */
-.site-embed-actions .inst-close { margin-left: 10px; }
 
 /* A key/value row whose value carries its own action: the two sit on ONE line, the action right
    behind the value it acts on. Otherwise the buttons collect at the bottom of the card and you have
@@ -411,16 +385,6 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
    page it IS the page title; nothing shrinks it and no separator character stands in front of it. */
 .inst-head { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .inst-head .inst-picker { flex: 0 0 auto; }
-.inst-page-title {
-    font-family: var(--font-head);
-    font-weight: 600;
-    font-size: 20px;
-    min-width: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-@media (max-width: 900px) { .inst-page-title { font-size: 17px; } }
 
 /* The cloud's own entry in the switcher. An icon where the others show a thumbnail: it is the page
    you are already in, not a site to preview. */
@@ -463,83 +427,12 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
 /* Comfortably inside 67px. */
 .inst-picker-btn { height: 34px; }
 
-/* ---- Browser-like controls over the embedded site ---------------------------------------------- */
-.site-embed-actions { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1 1 auto; justify-content: flex-end; }
-
-/* The address. Grows into whatever is left and disappears when that is not enough — the switcher and
-   the buttons DO something, this only tells, so it is the first thing to give up its place. */
-.site-addr {
-    /* No cap: it takes whatever the switcher and the buttons leave, which is the point of showing an
-       address at all — a truncated one is a riddle. */
-    flex: 1 1 auto; min-width: 0;
-    height: 34px; padding: 0 12px;
-    border: 1px solid var(--line); border-radius: 999px;
-    background: #f6f7f9; color: var(--muted, #6b7280);
-    font-family: var(--font-mono, ui-monospace, monospace); font-size: 12.5px;
-    text-overflow: ellipsis; cursor: default;
-}
-.site-addr:focus { outline: none; }
-@media (max-width: 1100px) { .site-addr { display: none; } }
-
-.site-tools { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; }
-
-/* Icon-only, coloured by what they do. Colour on the icon and not a filled button: five filled
-   buttons in a row would read as five demands. */
-.stool {
-    display: flex; align-items: center; justify-content: center;
-    width: 34px; height: 34px; border: 0; border-radius: 9px;
-    background: transparent; cursor: pointer; font-size: 18px; text-decoration: none;
-}
-.stool:hover { background: #f0f2f5; }
-.stool-home   { color: #2563eb; }
-.stool-reload { color: #0891b2; }
-.stool-admin  { color: #7c3aed; }
-.stool-new    { color: #059669; }
-.stool-admin.is-active { background: #7c3aed; color: #fff; }
-
-/* Apart from the rest and red: leaving is the one thing here that is not navigation within the site. */
-.stool-close { color: #dc2626; margin-left: 8px; border-left: 1px solid var(--line); border-radius: 0 9px 9px 0; padding-left: 8px; width: 42px; }
-.stool-close:hover { background: #fee2e2; }
-
-/* The address bar could not grow because the block it sits in could not either: .admin-topbar-right
-   had no rule at all, so it sized to its contents and left no free space for a flex child to take.
-   Removing the input's max-width therefore changed nothing.
-   Now the right-hand side takes everything the switcher does not, and the switcher keeps its size —
-   it is the one thing here whose width should not depend on how long an address happens to be. */
+/* Topbar layout: the right-hand section takes whatever the switcher + open-buttons leave, so the
+   switcher keeps its size and the group sits together on the left. (The old embedded-site "browser"
+   chrome — address bar, stool tools, device view — was removed together with the iframe view.) */
 .admin-topbar-right { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; justify-content: flex-end; }
 .inst-head { flex: 0 0 auto; }
-
-/* Every step from the bar down to the input has to be allowed to grow — one link that sizes to its
-   contents stops the whole chain, which is what happened above. */
-.site-embed-actions { flex: 1 1 auto; min-width: 0; }
-
-/* Abstand zwischen Umschalter und Adressleiste. Solange die rechte Seite sich nach ihrem Inhalt
-   bemaß, hielt space-between die beiden auseinander; jetzt füllt sie den Platz und die zwei stoßen
-   aneinander. Der Abstand gehört also an die Leiste selbst, nicht an eines der beiden Teile. */
 .admin-topbar { column-gap: 28px; }
-
-/* Begrenzt und rechtsbündig: auf einem breiten Bildschirm wäre ein Feld über die halbe Leiste hinweg
-   nur leerer Kasten, und es soll bei den Knöpfen stehen, zu denen es gehört. Doppelt so breit wie die
-   erste Fassung; was dann noch abgeschnitten wird, steht vollständig im Mouse-Over. */
-.site-addr { max-width: 1280px; margin-left: auto; }
-
-/* ---- Geräteansicht ---------------------------------------------------------------------------- */
-.stool-device { color: #db2777; }
-/* Beim Gerät wird der Rahmen zum Gerät: zentriert auf grauem Grund, damit man seine Kanten sieht.
-   Scrollt der Bereich, ist die gewählte Höhe größer als das Fenster — das gehört zur Aussage. */
-.site-embed.is-device { display: flex; align-items: flex-start; justify-content: center; overflow: auto; padding: 24px; }
-.site-embed.is-device .site-embed-frame { flex: 0 0 auto; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 10px 40px rgba(0,0,0,.18); background: #fff; }
-.device-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
-.device-opt {
-    display: flex; flex-direction: column; align-items: center; gap: 4px;
-    padding: 14px 10px; border: 1px solid var(--line); border-radius: 12px;
-    background: #fff; cursor: pointer; font-family: inherit; font-size: 13.5px;
-}
-.device-opt i { font-size: 22px; color: var(--muted, #6b7280); }
-.device-opt em { font-style: normal; font-size: 12px; color: var(--muted, #6b7280); font-variant-numeric: tabular-nums; }
-.device-opt:hover { border-color: var(--accent, #2563eb); }
-.device-opt.is-active { border-color: var(--accent, #2563eb); background: color-mix(in srgb, var(--accent, #2563eb) 8%, transparent); }
-.device-opt.is-active i { color: var(--accent, #2563eb); }
 
 /* Manual backup upload on the instance's backup tab: a tidy inline row (file picker, the
    "restore immediately" toggle, the submit button) rather than three stacked block elements. */

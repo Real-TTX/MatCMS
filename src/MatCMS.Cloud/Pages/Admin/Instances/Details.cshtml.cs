@@ -110,12 +110,8 @@ public class DetailsModel : PageModel, IAsyncPageFilter
     public bool Online => InstanceService.IsOnline(Item);
     public bool CanCloudUpdate => Item.Hosting == InstanceHosting.Local && Item.ContainerId is not null;
 
-    /// <param name="view">Set only by the view toggle. Any other way in here leaves the
-    /// remembered choice alone — otherwise opening one instance from a list would silently
-    /// decide how every later one opens.</param>
-    public async Task<IActionResult> OnGetAsync(int id, string? view = null)
+    public async Task<IActionResult> OnGetAsync(int id)
     {
-        if (view is not null) ContextSwitcher.Remember(HttpContext, view);
         if (!await LoadAsync(id)) return RedirectToPage("Index");
 
         if (Item.BackupRequestId > 0)

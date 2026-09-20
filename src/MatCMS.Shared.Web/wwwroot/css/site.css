@@ -995,38 +995,44 @@ html.mat-langm-lock { overflow: hidden; }
 @media (max-width: 560px) { .fc-d { font-size: 1.8rem; padding: 9px 6px; min-width: 20px; } .fc-c { font-size: 1.4rem; } }
 
 /* --- Admin bar over the live site (logged-in back-office admins) ------------------------------ */
-/* Mirrors the MatCMS.Cloud top bar 1:1 (white, 1px bottom border, ~67px, Geologica title, 34px
-   icon "stool" buttons) so switching cloud → instance looks seamless even as the URL changes. Sticky
-   in normal flow: it pushes the site down, never overlaps. */
-/* Height on the OUTER element with border-box so the 1px border is INCLUDED — total 67px, exactly like
-   the admin/cloud .admin-topbar (which also carries its border inside a 67px border-box). Byte-identical
-   bar height everywhere. */
+/* The admin bar over the LIVE site mirrors the back-office chrome: white bar, 67px (border inside the
+   border-box, so it matches .admin-topbar byte-for-byte), a GREY logo block on the left exactly like the
+   admin's sidebar/brand column, and icon actions on the right. Sticky in normal flow — pushes the site
+   down, never overlaps. */
 .mat-adminbar { position: sticky; top: 0; z-index: 2147483000; background: #fff;
     height: 67px; box-sizing: border-box; border-bottom: 1px solid #e5e7eb; box-shadow: 0 1px 4px rgba(0,0,0,.04); }
-.mat-adminbar-inner { display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    padding: 0 32px; height: 100%; box-sizing: border-box; }
-/* The site's OWN sticky header must stick BELOW the admin bar, not fight it for the same top:0 — which
-   glued both to the top and let the admin bar (huge z-index) cover the site menu, and made mobile
-   scrolling jump. Offset = the bar's full 67px height. Only when the bar renders. */
+/* No horizontal padding: the grey brand block touches the left edge like the admin's 250px sidebar
+   column. The actions carry their own right padding. */
+.mat-adminbar-inner { display: flex; align-items: center; justify-content: space-between;
+    height: 100%; box-sizing: border-box; }
+/* The site's OWN sticky header must stick BELOW the admin bar, not fight it for the same top:0. Offset =
+   the bar's full 67px height. Only when the bar renders. */
 body.has-adminbar .site-header { top: 67px; }
-.mab-brand { display: inline-flex; align-items: center; gap: 10px; color: #111; text-decoration: none;
-    font-family: "Geologica", "Inter", sans-serif; font-weight: 600; font-size: 20px; white-space: nowrap; }
-.mab-logo { height: 30px; width: auto; }
-/* Brand + the shared Cloud|Website|Admin switch sit together on the left; the session actions on the right. */
-.mab-left { display: inline-flex; align-items: center; gap: 14px; min-width: 0; }
-.mab-right { display: inline-flex; align-items: center; gap: 4px; }
-/* Icon-only action buttons (edit page, logout) — coloured by what they do, same 34px as the switch. */
+/* Grey logo block, NO text — the same brand column the admin back-office shows (250px, #edeff2, right
+   border, 40px logo), so the live site and the admin look like one product. */
+.mab-brand { display: inline-flex; align-items: center; height: 100%; width: 250px; box-sizing: border-box;
+    padding: 0 14px; background: #edeff2; border-right: 1px solid #dfe1e6; text-decoration: none; flex: 0 0 auto; }
+/* Same sizing as the admin's .admin-logo — max-height + max-width:100% so it fits the block and never
+   collapses to 0 width (which a bare width:auto does inside an auto-width flex parent). */
+.mab-logo { max-height: 40px; max-width: 100%; width: auto; object-fit: contain; }
+.mab-right { display: inline-flex; align-items: center; gap: 4px; padding-right: 24px; flex: 0 0 auto; }
+/* Icon-only action buttons (edit page, zur Cloud, account, logout) — coloured by what they do, 34px. */
 .mab-stool { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px;
     border: 0; border-radius: 9px; background: transparent; cursor: pointer; font-size: 18px;
     text-decoration: none; color: #374151; font-family: inherit; }
 .mab-stool:hover { background: #f0f2f5; }
 .mab-stool.mab-edit  { color: #2563eb; }
+.mab-stool.mab-cloud { color: #059669; }
 .mab-stool.mab-account { color: #7c3aed; }
 .mab-stool.mab-out   { color: #dc2626; margin-left: 6px; border-left: 1px solid #e5e7eb; border-radius: 0 9px 9px 0; width: 42px; }
 .mab-stool.mab-out:hover { background: #fee2e2; }
-/* Stays 67px on mobile too, so it matches the cloud + back-office bars everywhere; only the brand text
-   drops to keep room for the switch. */
-@media (max-width: 640px) { .mat-adminbar-inner { padding: 0 16px; } .mab-brand span { display: none; } }
+/* Mobile: the grey block shrinks (logo scales down via max-width) and the switch segments narrow a touch,
+   so the whole row — logo, switch, zur-Cloud, account, logout — fits one line on a phone. */
+@media (max-width: 640px) {
+    .mab-brand { width: 130px; padding: 0 10px; }
+    .mab-right { padding-right: 10px; gap: 2px; }
+    .mat-vs { width: 38px; }
+}
 
 /* Cloud | Website | Admin — the ONE view switcher, shared across the cloud's instance view, the public
    site's admin bar and the instance back-office (site.css is loaded on all three). A segmented control

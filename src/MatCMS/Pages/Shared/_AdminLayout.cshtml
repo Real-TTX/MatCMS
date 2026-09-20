@@ -127,16 +127,18 @@
             </button>
             <div class="admin-topbar-title">@title</div>
             <div class="admin-topbar-right">
-                @* Same Cloud|Website|Admin switch as the public admin bar and the cloud — "Admin" active
-                   here — plus the account + logout actions. One control everywhere, so switching
-                   cloud ↔ live site ↔ back-office feels seamless. Hidden below 640px (sidebar footer
-                   covers these on mobile). *@
+                @* Same trailing group as the public admin bar: Website|Admin switch ("Admin" active here),
+                   the optional "zur Cloud" jump (only for a cloud/SSO session), then account + logout —
+                   account/logout always top-right. One control language everywhere. *@
                 <div class="admin-topbar-tools">
                     <partial name="_ViewSwitch" model="@(new MatCMS.Shared.Web.ViewSwitch(
                         Active: "admin",
-                        CloudUrl: cloudLink,
-                        WebUrl: "/", AdminUrl: null,
+                        CloudUrl: null, WebUrl: "/", AdminUrl: null,
                         CloudLabel: T["adminbar.viewCloud"], WebLabel: T["adminbar.viewWebsite"], AdminLabel: T["adminbar.viewAdmin"]))" />
+                    @if (cloudLink is not null)
+                    {
+                        <a class="mab-stool mab-cloud" href="@cloudLink" title="@T["adminbar.viewCloud"]" aria-label="@T["adminbar.viewCloud"]"><i class="ti ti-cloud" aria-hidden="true"></i></a>
+                    }
                     <a class="mab-stool mab-account" asp-page="/Admin/Account/Index" title="@T["nav.account"]" aria-label="@T["nav.account"]"><i class="ti ti-key" aria-hidden="true"></i></a>
                     <form method="post" asp-page="/Logout" style="margin:0;">
                         <button type="submit" class="mab-stool mab-out" title="@T["nav.logout"]" aria-label="@T["nav.logout"]"><i class="ti ti-logout-2" aria-hidden="true"></i></button>

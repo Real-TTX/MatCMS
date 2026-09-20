@@ -1,42 +1,39 @@
 @inject MatCMS.Services.SiteContext Site
 @{
-    // The instance's cloud link (if any) — the Cloud segment of the switcher points there. Empty means
-    // not cloud-managed, and the shared switcher then simply omits the Cloud segment.
+    // "zur Cloud" is its OWN button (not a switch segment) and appears only for a session that came FROM
+    // the cloud (SSO → amr=sso) — a direct instance login has no cloud context. It deep-links to THIS
+    // instance's page on the cloud (the cloud resolves the public id → Details via /Admin/Instances/Open),
+    // so you land on the instance, not the cloud home. Website + Admin stay for every logged-in admin.
     var cloudUrl = (Site.Get(MatCMS.Services.SettingKeys.CloudUrl) ?? "").Trim().TrimEnd('/');
     var cloudId = (Site.Get(MatCMS.Services.SettingKeys.CloudInstanceId) ?? "").Trim();
-    // The Cloud segment shows ONLY for a session that came FROM the cloud (SSO → amr=sso claim) — a direct
-    // instance login has no cloud context (and may have no cloud account at all). It deep-links to THIS
-    // instance's page ON the cloud: the cloud resolves the public id → Details (/Admin/Instances/Open),
-    // so you land on the instance, not the cloud home. Website + Admin stay for every logged-in admin.
     var fromCloud = ViewContext.HttpContext.User.HasClaim("amr", "sso");
     var cloudLink = fromCloud && !string.IsNullOrEmpty(cloudUrl)
         ? (!string.IsNullOrEmpty(cloudId) ? $"{cloudUrl}/Admin/Instances/Open/{Uri.EscapeDataString(cloudId)}" : cloudUrl)
         : null;
     var editId = ViewContext.ViewData["AdminEditPageId"] as int?;
 }
-@* Slim admin bar over the LIVE site for logged-in back-office admins. First-party on the instance's own
-   domain, so it works everywhere — the "flip it" answer to the iframe cookie wall. The Cloud|Website|Admin
-   switch (shared with the cloud and the back-office) sits left with the brand and marks WEBSITE active, so
-   moving between the three views feels like one control. Same design family as the admin chrome. *@
+@* Admin bar over the LIVE site for logged-in back-office admins. First-party on the instance's own domain,
+   so it works everywhere (the "flip it" answer to the iframe cookie wall). Built to look like the admin
+   back-office: a GREY logo block on the left (like the sidebar's brand column) and the actions on the
+   right — Website|Admin switch, the optional "zur Cloud" jump, then account + logout (always top-right). *@
 <div class="mat-adminbar" role="navigation" aria-label="@T["adminbar.label"]">
     <div class="mat-adminbar-inner">
-        <div class="mab-left">
-            <a class="mab-brand" href="/admin" title="@Site.SiteName">
-                <img class="mab-logo" src="@Site.LogoUrl" alt="" />
-                <span>@Site.SiteName</span>
-            </a>
+        <a class="mab-brand" href="/admin" title="@Site.SiteName" aria-label="@Site.SiteName">
+            <img class="mab-logo" src="@Site.LogoUrl" alt="@Site.SiteName" />
+        </a>
+        <div class="mab-right">
             @if (editId is int pid)
             {
                 <a class="mab-stool mab-edit" href="/admin/pages/edit/@pid" title="@T["adminbar.editPage"]" aria-label="@T["adminbar.editPage"]"><i class="ti ti-edit" aria-hidden="true"></i></a>
             }
-        </div>
-        @* Same trailing group as the cloud and the back-office: switch + Konto + Abmelden. *@
-        <div class="mab-right">
             <partial name="_ViewSwitch" model="@(new MatCMS.Shared.Web.ViewSwitch(
                 Active: "web",
-                CloudUrl: cloudLink,
-                WebUrl: null, AdminUrl: "/admin",
+                CloudUrl: null, WebUrl: null, AdminUrl: "/admin",
                 CloudLabel: T["adminbar.viewCloud"], WebLabel: T["adminbar.viewWebsite"], AdminLabel: T["adminbar.viewAdmin"]))" />
+            @if (cloudLink is not null)
+            {
+                <a class="mab-stool mab-cloud" href="@cloudLink" title="@T["adminbar.viewCloud"]" aria-label="@T["adminbar.viewCloud"]"><i class="ti ti-cloud" aria-hidden="true"></i></a>
+            }
             <a class="mab-stool mab-account" asp-page="/Admin/Account/Index" title="@T["nav.account"]" aria-label="@T["nav.account"]"><i class="ti ti-key" aria-hidden="true"></i></a>
             <form method="post" asp-page="/Logout" class="mab-logout" style="margin:0;">
                 <button type="submit" class="mab-stool mab-out" title="@T["nav.logout"]" aria-label="@T["nav.logout"]"><i class="ti ti-logout-2" aria-hidden="true"></i></button>

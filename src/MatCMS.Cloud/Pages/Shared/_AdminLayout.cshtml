@@ -83,7 +83,7 @@
                 }
                 @* Personal account (password, 2FA) is a per-account area (Operators have one too), not a
                    management area — it sits with the session actions here, not as its own nav item. *@
-                <a class="admin-foot-btn admin-foot-icon" asp-page="/Admin/Account/Index" title="@T["nav.account"]" aria-label="@T["nav.account"]">🔐</a>
+                <a class="admin-foot-btn admin-foot-icon" asp-page="/Admin/Account/Index" title="@T["nav.account"]" aria-label="@T["nav.account"]">👤</a>
                 <form method="post" asp-page="/Logout" class="admin-foot-logout">
                     <button type="submit" class="admin-foot-btn">🚪 @T["nav.logout"]</button>
                 </form>
@@ -154,7 +154,7 @@
                             AdminUrl: $"{vsUrl}/sso/start?returnUrl=/admin",
                             CloudLabel: T["instances.viewCloud"], WebLabel: T["instances.viewWebsite"], AdminLabel: T["instances.viewAdmin"]))" />
                     }
-                    <a class="mab-stool mab-account" asp-page="/Admin/Account/Index" title="@T["nav.account"]" aria-label="@T["nav.account"]"><i class="ti ti-key" aria-hidden="true"></i></a>
+                    <a class="mab-stool mab-account" asp-page="/Admin/Account/Index" title="@T["nav.account"]" aria-label="@T["nav.account"]"><i class="ti ti-user-circle" aria-hidden="true"></i></a>
                     <form method="post" asp-page="/Logout" style="margin:0;">
                         <button type="submit" class="mab-stool mab-out" title="@T["nav.logout"]" aria-label="@T["nav.logout"]"><i class="ti ti-logout-2" aria-hidden="true"></i></button>
                     </form>

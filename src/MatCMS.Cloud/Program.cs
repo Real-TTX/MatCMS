@@ -99,6 +99,10 @@ builder.Services.AddScoped<AdoptionService>();
 builder.Services.AddScoped<VersionService>();
 builder.Services.AddScoped<ApiKeyService>();
 builder.Services.AddScoped<OperatorScope>();
+// OAuth 2.0 Device Authorization Grant (RFC 8628): pending device/user codes, persisted (see DeviceCodes).
+builder.Services.AddScoped<DeviceCodes>();
+// OAuth 2.0 Authorization Code connector clients (native "Sign in", e.g. a ChatGPT custom GPT).
+builder.Services.AddScoped<OAuthClientService>();
 
 // SSO: short-lived authorization codes live in memory (see OAuthCodes).
 builder.Services.AddMemoryCache();
@@ -172,6 +176,19 @@ builder.Services.AddRateLimiter(options =>
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
             }));
+
+    // The Device Authorization endpoint (/oauth/device_authorization) is anonymous and starts a flow; its
+    // own per-IP budget bounds a flood of code requests. The polling side runs on /oauth/token under the
+    // instanceApi budget, and each grant is self-throttled by its own interval (slow_down).
+    options.AddPolicy("deviceAuth", ctx =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 30,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
 });
 
 builder.Services.AddRazorPages(options =>
@@ -182,6 +199,8 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AuthorizeFolder("/Admin/Profiles", "Admin");
     options.Conventions.AuthorizeFolder("/Admin/Store", "Admin");
     options.Conventions.AuthorizeFolder("/Admin/Users", "Admin");
+    // Managing OAuth connector clients mints Admin-level access, like API keys — Admin-only.
+    options.Conventions.AuthorizeFolder("/Admin/OAuthClients", "Admin");
     options.Conventions.AuthorizeFolder("/Admin/Settings", "Admin");
     options.Conventions.AuthorizeFolder("/Admin/ApiKeys", "Admin");
     options.Conventions.AuthorizeFolder("/Admin/Backups", "Admin");
@@ -615,9 +634,102 @@ app.MapPost("/api/instances/{publicId}/backups/taken", async (
 // page also carries the 2FA-required gate (this path is outside /admin) and the redirect_uri check.
 // token (back-channel, below): authenticated by the instance token like the heartbeat, redeems the code
 // and returns the user's identity. No JWT — a direct, token-authenticated TLS call.
-app.MapPost("/oauth/token", async (HttpContext ctx, AppDbContext db, InstanceService instances, OAuthCodes codes) =>
+// device_authorization (RFC 8628): a browserless client (a CLI, an agent, or ChatGPT) starts here. It
+// gets a device_code to poll with and a human user_code to show; the operator confirms the user_code at
+// verification_uri (/device). Anonymous — the grant is worthless until an authenticated operator approves
+// it and the same client redeems it at /oauth/token. No client secret: the flow IS the authentication.
+app.MapPost("/oauth/device_authorization", async (HttpContext ctx, DeviceCodes devices) =>
 {
     var form = await ctx.Request.ReadFormAsync();
+    var issued = await devices.IssueAsync(form["client_id"].ToString(), ctx.RequestAborted);
+    var baseUrl = $"{ctx.Request.Scheme}://{ctx.Request.Host}";
+    return Results.Ok(new
+    {
+        device_code = issued.DeviceCode,
+        user_code = issued.UserCode,
+        verification_uri = $"{baseUrl}/device",
+        verification_uri_complete = $"{baseUrl}/device?code={Uri.EscapeDataString(issued.UserCode)}",
+        expires_in = issued.ExpiresIn,
+        interval = issued.Interval,
+    });
+}).RequireRateLimiting("deviceAuth");
+
+// OAuth Authorization Server Metadata (RFC 8414) — lets a connector discover the device + token endpoints
+// instead of hard-coding them. Public, read-only, advertises only what this cloud actually implements.
+app.MapGet("/.well-known/oauth-authorization-server", (HttpContext ctx) =>
+{
+    var baseUrl = $"{ctx.Request.Scheme}://{ctx.Request.Host}";
+    return Results.Ok(new
+    {
+        issuer = baseUrl,
+        // The connector authorize endpoint (external "Sign in" clients). The instance-SSO /oauth/authorize
+        // is internal and hardcoded by instances, so it is deliberately not advertised here.
+        authorization_endpoint = $"{baseUrl}/oauth/c/authorize",
+        device_authorization_endpoint = $"{baseUrl}/oauth/device_authorization",
+        token_endpoint = $"{baseUrl}/oauth/token",
+        grant_types_supported = new[] { "authorization_code", "urn:ietf:params:oauth:grant-type:device_code" },
+        code_challenge_methods_supported = new[] { "S256" },
+        token_endpoint_auth_methods_supported = new[] { "client_secret_post", "client_secret_basic", "none" },
+    });
+});
+
+app.MapPost("/oauth/token", async (HttpContext ctx, AppDbContext db, InstanceService instances, OAuthCodes codes,
+    DeviceCodes devices, ApiKeyService apiKeys, OAuthClientService clients) =>
+{
+    var form = await ctx.Request.ReadFormAsync();
+
+    // Device Authorization Grant branch (RFC 8628): authenticated by the device_code secret itself, so it
+    // is handled entirely before the instance-token-authenticated SSO code exchange below. On the first
+    // poll after approval this mints and returns the operator key once (see DeviceCodes.RedeemAsync).
+    if (form["grant_type"].ToString() == "urn:ietf:params:oauth:grant-type:device_code")
+    {
+        var poll = await devices.RedeemAsync(form["device_code"].ToString(), apiKeys, ctx.RequestAborted);
+        return poll.Kind switch
+        {
+            DeviceCodes.PollKind.Ok => Results.Ok(new { access_token = poll.AccessToken, token_type = "Bearer", scope = "operator" }),
+            DeviceCodes.PollKind.AuthorizationPending => Results.Json(new { error = "authorization_pending" }, statusCode: StatusCodes.Status400BadRequest),
+            DeviceCodes.PollKind.SlowDown => Results.Json(new { error = "slow_down" }, statusCode: StatusCodes.Status400BadRequest),
+            DeviceCodes.PollKind.AccessDenied => Results.Json(new { error = "access_denied" }, statusCode: StatusCodes.Status400BadRequest),
+            DeviceCodes.PollKind.ExpiredToken => Results.Json(new { error = "expired_token" }, statusCode: StatusCodes.Status400BadRequest),
+            _ => Results.Json(new { error = "invalid_grant" }, statusCode: StatusCodes.Status400BadRequest),
+        };
+    }
+
+    // Authorization Code branch for a registered connector client (a native "Sign in", e.g. a ChatGPT GPT).
+    // Authenticated by the CLIENT's own id+secret (client_secret_post or HTTP Basic), then the code minted at
+    // /oauth/c/authorize is redeemed and a full-access operator key is returned. Kept separate from the
+    // instance-SSO code exchange below (that one authenticates by instance token and returns userinfo).
+    if (form["grant_type"].ToString() == "authorization_code")
+    {
+        // Credentials: HTTP Basic (RFC 6749 §2.3.1, form-url-encoded then base64) or client_secret_post.
+        var (cid, csecret) = (form["client_id"].ToString(), form["client_secret"].ToString());
+        var authz = ctx.Request.Headers.Authorization.ToString();
+        if (authz.StartsWith("Basic ", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                var raw = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(authz["Basic ".Length..].Trim()));
+                var sep = raw.IndexOf(':');
+                if (sep > 0) { cid = Uri.UnescapeDataString(raw[..sep]); csecret = Uri.UnescapeDataString(raw[(sep + 1)..]); }
+            }
+            catch { /* malformed Basic header → falls through to invalid_client below */ }
+        }
+
+        var client = await clients.AuthenticateAsync(cid, csecret, ctx.RequestAborted);
+        if (client is null) return Results.Json(new { error = "invalid_client" }, statusCode: StatusCodes.Status401Unauthorized);
+
+        var cgrant = codes.RedeemConnector(form["code"].ToString());
+        if (cgrant is null || cgrant.ClientId != client.ClientId
+            || cgrant.RedirectUri != form["redirect_uri"].ToString()
+            || (cgrant.CodeChallenge is not null && !OAuthCodes.VerifyPkce(cgrant.CodeChallenge, form["code_verifier"].ToString())))
+            return Results.Json(new { error = "invalid_grant" }, statusCode: StatusCodes.Status400BadRequest);
+
+        var minted = await apiKeys.CreateAsync(
+            name: $"Connector: {client.Name} · {DateTime.UtcNow:yyyy-MM-dd}",
+            canRestore: true, allInstances: true, instanceIds: Array.Empty<int>(), ctx.RequestAborted);
+        return Results.Ok(new { access_token = minted.RawKey, token_type = "Bearer", scope = "operator" });
+    }
+
     var token = ctx.Request.Headers[CloudProtocol.TokenHeader].ToString();
     var inst = await instances.AuthenticateAsync(form["client_id"].ToString(), token);
     if (inst is null) return Results.Json(new { error = "invalid_client" }, statusCode: StatusCodes.Status401Unauthorized);

@@ -1,0 +1,24 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.OAuthClients.CreateModel
+@{
+    ViewData["Title"] = T["oauthclients.create"];
+}
+<div class="page-head"><h1>@T["oauthclients.create"]</h1></div>
+
+<form method="post" class="card" style="max-width:660px;">
+    <div class="form-grid">
+        <div class="form-field">
+            <label>@T["oauthclients.name"]</label>
+            <input name="name" placeholder="ChatGPT" required />
+        </div>
+        <div class="form-field">
+            <label>@T["oauthclients.redirects"]</label>
+            <textarea name="redirectUris" rows="3" placeholder="https://chat.openai.com/aip/g-…/oauth/callback" spellcheck="false"></textarea>
+            <div class="help">@T["oauthclients.redirectsHint"]</div>
+        </div>
+    </div>
+    <div style="margin-top:14px;">
+        <button type="submit" class="btn">@T["oauthclients.create"]</button>
+        <a class="btn btn-ghost" asp-page="Index">@T["oauthclients.back"]</a>
+    </div>
+</form>

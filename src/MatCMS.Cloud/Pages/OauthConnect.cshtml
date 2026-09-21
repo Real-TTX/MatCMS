@@ -1,0 +1,66 @@
+@page "/oauth/c/authorize"
+@model MatCMS.Cloud.Pages.OauthConnectModel
+@inject MatCMS.Cloud.Services.CloudContext Cloud
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script>
+        if (window.top !== window.self) { try { window.top.location.replace(window.location.href); } catch (e) {} }
+    </script>
+    <title>@T["oauthclients.consentTitle"] – @Cloud.CloudName</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Geologica:wght@@500;600;700&family=Inter:wght@@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/admin.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/cloud.css" asp-append-version="true" />
+    <link rel="icon" href="@Cloud.LogoUrl" />
+</head>
+<body class="login-page">
+    <div class="login-card">
+        <img class="login-logo" src="@Cloud.LogoUrl" alt="@Cloud.CloudName" />
+        @if (Model.Error is not null)
+        {
+            <h1>@T["sso.consent.errTitle"]</h1>
+            @if (Model.Error == "unknown")
+            {
+                <div class="alert alert-error">@T["sso.consent.errUnknown"]</div>
+            }
+            else if (Model.Error == "redirect")
+            {
+                <div class="alert alert-error">@T["sso.consent.errRedirect"]</div>
+            }
+            else
+            {
+                <div class="alert alert-error">@T["sso.consent.errInvalid"]</div>
+            }
+            <a class="login-back" href="/admin">@T["sso.consent.toDashboard"]</a>
+        }
+        else
+        {
+            <h1>@T["oauthclients.consentTitle"]</h1>
+            <p class="help" style="text-align:center;">@T["oauthclients.consentIntro", Model.ClientName]</p>
+            <div class="alert alert-error" style="text-align:left;">@T["device.warn"]</div>
+            @if (!string.IsNullOrEmpty(Model.AccountLabel))
+            {
+                <p class="muted" style="text-align:center;">@T["sso.consent.asAccount", Model.AccountLabel]</p>
+            }
+            <form method="post">
+                <input type="hidden" name="client_id" value="@Model.client_id" />
+                <input type="hidden" name="redirect_uri" value="@Model.redirect_uri" />
+                <input type="hidden" name="state" value="@Model.state" />
+                <input type="hidden" name="code_challenge" value="@Model.code_challenge" />
+                <input type="hidden" name="code_challenge_method" value="@Model.code_challenge_method" />
+                <input type="hidden" name="response_type" value="@Model.response_type" />
+                <button type="submit" name="decision" value="allow" class="btn btn-block">@T["sso.consent.allow"]</button>
+                <button type="submit" name="decision" value="deny" class="btn btn-ghost btn-block" style="margin-top:8px;">@T["sso.consent.deny"]</button>
+            </form>
+        }
+    </div>
+</body>
+</html>

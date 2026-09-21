@@ -91,6 +91,12 @@ public class InstanceMonitorService : BackgroundService
                 try { await backups.EnforceRetentionAsync(instance.Id, ct); }
                 catch (Exception ex) { _log.LogWarning(ex, "Retention sweep failed for instance {Id}", instance.Id); }
             }
+
+            // Device-auth grants only ever grow: an anonymous /oauth/device_authorization POST inserts a
+            // row and nothing on the hot path removes one. Prune expired/long-consumed grants here so the
+            // DeviceCodes table cannot grow unbounded from a request flood.
+            try { await sp.GetRequiredService<DeviceCodes>().PruneAsync(ct); }
+            catch (Exception ex) { _log.LogWarning(ex, "Device-code prune failed"); }
         }
         // Recipients ride along per mail: two instances on different profiles can have different
         // notification targets, so one global list at send time would be wrong.

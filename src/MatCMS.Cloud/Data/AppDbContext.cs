@@ -26,6 +26,12 @@ public class AppDbContext : DbContext
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
     public DbSet<ApiKeyInstance> ApiKeyInstances => Set<ApiKeyInstance>();
 
+    // Pending OAuth 2.0 Device Authorization Grants (RFC 8628) — browserless clients (CLI/agent/ChatGPT).
+    public DbSet<DeviceCode> DeviceCodes => Set<DeviceCode>();
+
+    // Registered OAuth clients for the Authorization Code connector flow (native "Sign in", e.g. a ChatGPT GPT).
+    public DbSet<OAuthClient> OAuthClients => Set<OAuthClient>();
+
     // Per-user instance scope for the "Operator" role (login users, not API keys).
     public DbSet<UserInstance> UserInstances => Set<UserInstance>();
 
@@ -79,6 +85,15 @@ public class AppDbContext : DbContext
         b.Entity<ApiKeyInstance>()
             .HasOne(x => x.Instance).WithMany()
             .HasForeignKey(x => x.InstanceId).OnDelete(DeleteBehavior.Cascade);
+
+        // Device codes: the device_code hash is the poll lookup (unique, like an API-key hash), the
+        // user_code the /device lookup. Deliberately NO FK to the minted ApiKey — the key is a first-class
+        // audit object that must survive the device grant being pruned, so the link is a plain id column.
+        b.Entity<DeviceCode>().HasIndex(d => d.DeviceCodeHash).IsUnique();
+        b.Entity<DeviceCode>().HasIndex(d => d.UserCode);
+
+        // OAuth connector clients resolve by ClientId on every authorize/token call.
+        b.Entity<OAuthClient>().HasIndex(c => c.ClientId).IsUnique();
 
         // Per-user (Operator) instance scope — same shape as the API-key scope above.
         b.Entity<UserInstance>().HasIndex(x => new { x.UserId, x.InstanceId }).IsUnique();

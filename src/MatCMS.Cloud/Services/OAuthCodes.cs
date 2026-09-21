@@ -17,6 +17,10 @@ namespace MatCMS.Cloud.Services;
 public class OAuthCodes
 {
     private readonly IMemoryCache _cache;
+    // TryGetValue + Remove is two operations; a lock makes "read-and-consume" atomic so two concurrent
+    // token requests with the same code cannot both redeem it (which for the connector would double-mint a
+    // full-access key). OAuthCodes is a singleton, so this instance lock is process-wide.
+    private readonly object _redeemLock = new();
     public OAuthCodes(IMemoryCache cache) => _cache = cache;
 
     public sealed record Grant(int UserId, string InstancePublicId, string RedirectUri, string CodeChallenge);
@@ -33,7 +37,33 @@ public class OAuthCodes
     {
         if (string.IsNullOrEmpty(code)) return null;
         var key = "oauth:" + code;
-        if (_cache.TryGetValue(key, out Grant? g)) { _cache.Remove(key); return g; }
+        lock (_redeemLock)
+        {
+            if (_cache.TryGetValue(key, out Grant? g)) { _cache.Remove(key); return g; }
+        }
+        return null;
+    }
+
+    // --- Authorization Code flow for a registered OAuth CLIENT (a native connector, e.g. a ChatGPT
+    //     custom GPT), as opposed to the instance-SSO grant above. Same short-lived, single-use, memory
+    //     store; bound to the client_id + redirect_uri, and to a PKCE challenge when the client sends one. ---
+    public sealed record ConnectorGrant(int UserId, string ClientId, string RedirectUri, string? CodeChallenge);
+
+    public string IssueConnector(ConnectorGrant grant)
+    {
+        var code = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+        _cache.Set("oauthc:" + code, grant, TimeSpan.FromMinutes(2));
+        return code;
+    }
+
+    public ConnectorGrant? RedeemConnector(string? code)
+    {
+        if (string.IsNullOrEmpty(code)) return null;
+        var key = "oauthc:" + code;
+        lock (_redeemLock)
+        {
+            if (_cache.TryGetValue(key, out ConnectorGrant? g)) { _cache.Remove(key); return g; }
+        }
         return null;
     }
 

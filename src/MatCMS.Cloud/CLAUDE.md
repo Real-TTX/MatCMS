@@ -821,6 +821,31 @@ the admin UI uses. There is no second restore path and no second backup format.
   raw body, origin `api`, Kestrel cap lifted like the instance upload); `POST …/backups/{id}/restore`
   (gated on `CanRestore`). Restore is still only MARKED — the instance downloads and applies it on its
   next beat and reports back, which the list then shows.
+- **Device Authorization Grant (RFC 8628)** — a browserless client (a CLI, an agent, or ChatGPT) obtains
+  an operator key without one being pasted in. `POST /oauth/device_authorization` returns a `device_code`
+  + a human `user_code`; the operator confirms it at **`/device`** and the client polls the **device-code
+  branch of `/oauth/token`** to receive the raw `mck_` key once. `/device` (`Pages/Device.cshtml`) is
+  **Admin-only** (`[Authorize(Policy="Admin")]` + the same 2FA-mandate gate as `/oauth/authorize`) because
+  approval MINTS a full-access `AllInstances`+`CanRestore` key — an Admin capability; a bare `[Authorize]`
+  would let a scoped Operator escalate. `Services/DeviceCodes.cs` owns the flow: codes are **persisted**
+  (table `DeviceCodes`, so a restart mid-poll doesn't drop a pending grant), stored **SHA-256-only** like
+  every other handed-out secret, **single-use via an atomic `Approved→Consumed` compare-and-set**
+  (`ExecuteUpdateAsync`, so two concurrent polls can't double-mint), interval-throttled (`slow_down`), and
+  pruned on `InstanceMonitorService`'s hourly sweep. `/.well-known/oauth-authorization-server` (RFC 8414)
+  advertises the endpoints. The minted key is an ordinary `ApiKey`, revocable under **Admin → API-Schlüssel**.
+  The device branch of `/oauth/token` is authenticated by the device_code itself (no instance token), kept
+  separate from the SSO code exchange in the same handler.
+- **Authorization Code connector (native "Sign in")** — for a client that redirects a browser (a ChatGPT
+  custom GPT action). Registered clients live in `OAuthClients` (`Models/OAuthClient.cs`,
+  `Services/OAuthClientService.cs`: `client_id` `mcc_…`, secret `mcs_…` stored SHA-256-only, an **exact**
+  redirect_uri allowlist), managed under **Admin → ChatGPT-Connector** (`Pages/Admin/OAuthClients/`,
+  Admin-only). Flow: the client sends the browser to **`/oauth/c/authorize`** (`Pages/OauthConnect.cshtml`,
+  Admin-only, ALWAYS an explicit consent click — no silent auto-approve, since approval mints a full-access
+  key), which issues a PKCE/redirect-bound single-use code (`OAuthCodes.IssueConnector`, memory); the client
+  exchanges it at the **`authorization_code` branch of `/oauth/token`**, authenticated by its own secret
+  (`client_secret_post` or HTTP Basic), and receives a full-access operator `mck_` key. Distinct from the
+  instance-SSO `/oauth/authorize` (client_id = instance PublicId, returns userinfo). Both this and the device
+  flow are surfaced from the **KI tab of *Einstellungen*** ("ChatGPT / Gerät verbinden").
 
 ## Backlog
 

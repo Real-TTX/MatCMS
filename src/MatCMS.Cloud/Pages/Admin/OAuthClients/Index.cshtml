@@ -1,0 +1,91 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.OAuthClients.IndexModel
+@{
+    ViewData["Title"] = T["oauthclients.title"];
+}
+<div data-list>
+    <div class="page-head">
+        <h1>@T["oauthclients.title"]</h1>
+        <div class="list-toolbar">
+            <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+        </div>
+    </div>
+
+    <p class="help">@T["oauthclients.intro"]</p>
+
+    @* The one moment the client secret is visible. Never stored in the clear — copy it now. *@
+    @if (Model.NewSecret is not null)
+    {
+        <div class="alert alert-success">
+            <strong>@T["oauthclients.created"]</strong>
+            <div class="kv" style="margin-top:.6rem;">
+                <div class="kv-label">@T["oauthclients.clientId"]</div>
+                <div class="kv-value mono" style="word-break:break-all;">@Model.NewClientId</div>
+                <div class="kv-label">@T["oauthclients.clientSecret"]</div>
+                <div class="kv-value mono is-secret" style="word-break:break-all;">@Model.NewSecret</div>
+                <div class="kv-label">@T["oauthclients.authUrl"]</div>
+                <div class="kv-value mono" style="word-break:break-all;">@Model.BaseUrl/oauth/c/authorize</div>
+                <div class="kv-label">@T["oauthclients.tokenUrl"]</div>
+                <div class="kv-value mono" style="word-break:break-all;">@Model.BaseUrl/oauth/token</div>
+            </div>
+        </div>
+    }
+
+    <table class="data" data-list-table>
+        <thead>
+            <tr>
+                <th>@T["common.name"]</th>
+                <th>@T["oauthclients.clientId"]</th>
+                <th>@T["oauthclients.redirects"]</th>
+                <th>@T["apikeys.lastUsed"]</th>
+                <th>@T["common.status"]</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Items.Count == 0)
+            {
+                <partial name="_EmptyRow" model='@T["oauthclients.none"]' />
+            }
+            @foreach (var c in Model.Items)
+            {
+                <tr data-search="@(c.Name + " " + c.ClientId)">
+                    <td><strong>@c.Name</strong></td>
+                    <td class="muted mono">@c.ClientId</td>
+                    <td class="muted">@c.RedirectUris.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length</td>
+                    <td class="muted mono">@(c.LastUsedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? T["apikeys.never"])</td>
+                    <td>
+                        @if (c.Revoked)
+                        {
+                            <span class="badge badge-err">@T["oauthclients.revoked"]</span>
+                        }
+                        else
+                        {
+                            <span class="badge badge-on">@T["apikeys.active"]</span>
+                        }
+                    </td>
+                    <td>
+                        <div class="actions">
+                            @if (!c.Revoked)
+                            {
+                                <form class="inline-form" method="post" asp-page-handler="Revoke" asp-route-id="@c.Id"
+                                      onsubmit="return confirm('@T["apikeys.revokeConfirm"]');">
+                                    <button type="submit" class="btn btn-sm btn-ghost">@T["oauthclients.revoke"]</button>
+                                </form>
+                            }
+                            <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@c.Id"
+                                  onsubmit="return confirm('@T["apikeys.deleteConfirm"]');">
+                                <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+</div>
+
+<div class="list-actions">
+    <a class="btn" asp-page="Create">@T["oauthclients.create"]</a>
+</div>

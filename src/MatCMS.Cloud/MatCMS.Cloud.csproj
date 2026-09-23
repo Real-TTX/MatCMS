@@ -39,6 +39,9 @@
     <PackageReference Include="Docker.DotNet" Version="3.125.*" />
     <!-- Override the transitive (vulnerable) SQLitePCLRaw 2.1.11 with the current 3.0.x bundle. -->
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.*" />
+    <!-- Official Model Context Protocol server SDK: exposes the operator API as MCP tools at /mcp so
+         ChatGPT/Claude connect to the cloud directly. HTTP (streamable) transport for a remote server. -->
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.*" />
   </ItemGroup>
 
   <ItemGroup>

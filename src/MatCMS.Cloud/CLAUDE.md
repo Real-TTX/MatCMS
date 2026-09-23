@@ -846,6 +846,23 @@ the admin UI uses. There is no second restore path and no second backup format.
   (`client_secret_post` or HTTP Basic), and receives a full-access operator `mck_` key. Distinct from the
   instance-SSO `/oauth/authorize` (client_id = instance PublicId, returns userinfo). Both this and the device
   flow are surfaced from the **KI tab of *Einstellungen*** ("ChatGPT / Gerät verbinden").
+- **MCP server (`/mcp`)** — a remote **Model Context Protocol** server so an AI client (ChatGPT, Claude,
+  Cursor) drives the cloud directly, instead of hand-wiring HTTP calls. Built INTO this app (official
+  `ModelContextProtocol.AspNetCore` SDK, HTTP/streamable transport, `app.MapMcp("/mcp")`), **not** a
+  separate project or image — it needs the same DB, services and key auth, and the cloud is the only node
+  an outside client can reach. Tools live in `Mcp/*Tools.cs` (`[McpServerToolType]` / `[McpServerTool]`),
+  discovered by `WithToolsFromAssembly()`. **Auth is the same operator key as `/api/v1`**: a `UseWhen`
+  branch on `/mcp` validates `Authorization: Bearer <mck_…>` on every request (via `ApiKeyService`), stashes
+  the key in `HttpContext.Items`, and `Mcp/McpContext` hands it to the tools; a missing/invalid key gets a
+  401 whose `WWW-Authenticate` points at `/.well-known/oauth-protected-resource` (RFC 9728), which points at
+  the connector auth server already advertised under `/.well-known/oauth-authorization-server` — so ChatGPT's
+  OAuth connector flow works against the SAME device/connector endpoints. Every tool is **scoped to the key**
+  (`ApiKeyService.CanAccess`, same opaque "nicht gefunden" for unknown vs out-of-scope as `ApiInstanceAsync`)
+  and restore is gated on `CanRestore`. **Stage 1 mirrors the operator API's ACTIONS only**: `list_instances`,
+  `get_instance`, `list_backups`, `request_backup`, `restore_backup` — all through the SAME
+  `InstanceService`/`BackupStore` as the UI and REST. The raw backup **download/upload stays REST** on
+  purpose (streaming a multi-MB ZIP through a chat model is pointless). Changing a connected site's CONTENT is
+  **Stage 2**, a separate pull-based channel — designed in `docs/mcp-stage2-content-channel.md`, not built.
 
 ## Backlog
 

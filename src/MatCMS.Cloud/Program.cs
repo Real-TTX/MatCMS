@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using System.Globalization;
 using System.Threading.RateLimiting;
 using MatCMS.Cloud.Data;
+using MatCMS.Cloud.Mcp;
 using MatCMS.Cloud.Services;
 using MatCMS.Shared;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -103,6 +104,12 @@ builder.Services.AddScoped<OperatorScope>();
 builder.Services.AddScoped<DeviceCodes>();
 // OAuth 2.0 Authorization Code connector clients (native "Sign in", e.g. a ChatGPT custom GPT).
 builder.Services.AddScoped<OAuthClientService>();
+
+// Remote MCP server (/mcp): exposes the operator API as tools for a connected AI client (ChatGPT, Claude).
+// HTTP (streamable) transport; tools discovered from this assembly (Mcp/*Tools.cs). Every request is
+// authenticated by an operator key in the /mcp middleware below; McpContext hands the resolved key to tools.
+builder.Services.AddMcpServer().WithHttpTransport().WithToolsFromAssembly();
+builder.Services.AddScoped<McpContext>();
 
 // SSO: short-lived authorization codes live in memory (see OAuthCodes).
 builder.Services.AddMemoryCache();
@@ -336,6 +343,45 @@ app.Use(async (ctx, next) =>
 });
 
 app.MapRazorPages();
+
+// --- Remote MCP server (/mcp) ---------------------------------------------
+// Key-authenticated like /api/v1, but anonymous at the transport level: an AI client (ChatGPT, Claude)
+// sends Authorization: Bearer <operator key>. This branch validates it on EVERY /mcp request and stashes
+// the resolved key for the tools (McpContext reads it); an invalid/missing key gets a 401 before any tool
+// runs. UseWhen rejoins the main pipeline, so the request then reaches the mapped MCP endpoint below.
+app.UseWhen(ctx => ctx.Request.Path.StartsWithSegments("/mcp"), branch =>
+    branch.Use(async (ctx, next) =>
+    {
+        var keys = ctx.RequestServices.GetRequiredService<ApiKeyService>();
+        var key = await keys.AuthenticateAsync(ctx.Request.Headers.Authorization.ToString(), ctx.RequestAborted);
+        if (key is null)
+        {
+            // Point OAuth-capable clients (e.g. ChatGPT) at the connector auth server we already run.
+            ctx.Response.Headers.WWWAuthenticate =
+                $"Bearer resource_metadata=\"{ctx.Request.Scheme}://{ctx.Request.Host}/.well-known/oauth-protected-resource\"";
+            ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            await ctx.Response.WriteAsJsonAsync(new { error = "invalid_token", error_description = "Ungültiger oder fehlender Operator-Schlüssel." });
+            return;
+        }
+        ctx.Items[MatCMS.Cloud.Mcp.McpContext.ItemKey] = key;
+        await next();
+    }));
+
+// OAuth Protected Resource Metadata (RFC 9728): tells an MCP client which authorization server to use, so
+// ChatGPT's connector can run the OAuth flow against the endpoints /.well-known/oauth-authorization-server
+// already advertises. Public, read-only.
+app.MapGet("/.well-known/oauth-protected-resource", (HttpContext ctx) =>
+{
+    var baseUrl = $"{ctx.Request.Scheme}://{ctx.Request.Host}";
+    return Results.Ok(new
+    {
+        resource = $"{baseUrl}/mcp",
+        authorization_servers = new[] { baseUrl },
+        bearer_methods_supported = new[] { "header" },
+    });
+});
+
+app.MapMcp("/mcp").RequireRateLimiting("operatorApi");
 
 // --- Instance API ---------------------------------------------------------
 // Anonymous at the transport level; every call is authenticated by the instance token. The instance

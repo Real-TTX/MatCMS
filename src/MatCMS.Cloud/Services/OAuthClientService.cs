@@ -38,6 +38,19 @@ public class OAuthClientService
         return new Created(client, secret);
     }
 
+    /// <summary>Updates an existing client's label and redirect allowlist. The client id and secret are never
+    /// touched — a ChatGPT connector typically needs its callback URL added AFTER creation, once ChatGPT has
+    /// shown it, and re-creating the client would rotate the secret the operator already pasted in.</summary>
+    public async Task<bool> UpdateAsync(int id, string name, string redirectUris, CancellationToken ct = default)
+    {
+        var client = await _db.OAuthClients.FindAsync(new object?[] { id }, ct);
+        if (client is null) return false;
+        if (!string.IsNullOrWhiteSpace(name)) client.Name = name.Trim();
+        client.RedirectUris = NormalizeUris(redirectUris);
+        await _db.SaveChangesAsync(ct);
+        return true;
+    }
+
     public Task<OAuthClient?> FindByClientIdAsync(string? clientId, CancellationToken ct = default) =>
         string.IsNullOrWhiteSpace(clientId)
             ? Task.FromResult<OAuthClient?>(null)

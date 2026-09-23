@@ -1,0 +1,47 @@
+@* Step-by-step "how to connect ChatGPT" box plus the page-wide copy-button wiring. Rendered on both the
+   connector list (Index) and the edit page, so the guide and the copy behaviour live in one place. Uses only
+   @@T and existing admin classes; no model. *@
+<details class="card" open>
+    <summary><strong>@T["oauthclients.setupHeading"]</strong></summary>
+    <ol style="margin:.8rem 0 0; padding-left:1.2rem; line-height:1.6;">
+        <li>@T["oauthclients.setupStep1"]</li>
+        <li>@T["oauthclients.setupStep2"]</li>
+        <li>@T["oauthclients.setupStep3"]</li>
+        <li>@T["oauthclients.setupStep4"]</li>
+        <li>@T["oauthclients.setupStep5"]</li>
+    </ol>
+</details>
+
+@* Wire every [data-copy] button on the page: copy the text of the [data-copy-val] in the same .copy-row.
+   Same clipboard-with-execCommand-fallback as _TemplateFiles.cshtml. Guarded so including the partial twice
+   cannot bind twice. *@
+<script>
+    (function () {
+        if (window.__connectorCopyWired) return;
+        window.__connectorCopyWired = true;
+        function flash(btn) {
+            var old = btn.textContent;
+            btn.textContent = btn.getAttribute('data-copied') || 'OK';
+            setTimeout(function () { btn.textContent = old; }, 1500);
+        }
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('[data-copy]');
+            if (!btn) return;
+            var row = btn.closest('.copy-row');
+            var val = row && row.querySelector('[data-copy-val]');
+            var text = val ? (val.textContent || '').trim() : '';
+            if (!text) return;
+            function done() { flash(btn); }
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(done, function () { legacy(text, done); });
+            } else { legacy(text, done); }
+        });
+        function legacy(text, done) {
+            var ta = document.createElement('textarea');
+            ta.value = text; ta.style.position = 'fixed'; ta.style.left = '-9999px';
+            document.body.appendChild(ta); ta.select();
+            try { document.execCommand('copy'); done(); } catch (e) { /* ignore */ }
+            ta.remove();
+        }
+    })();
+</script>

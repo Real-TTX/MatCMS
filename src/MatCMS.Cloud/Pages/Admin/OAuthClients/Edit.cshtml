@@ -1,0 +1,66 @@
+@page "{id:int}"
+@model MatCMS.Cloud.Pages.Admin.OAuthClients.EditModel
+@{
+    ViewData["Title"] = T["oauthclients.editTitle"];
+}
+<div class="page-head"><h1>@T["oauthclients.editTitle"] – @Model.Client.Name</h1></div>
+
+@* Step-by-step guide + the page-wide copy-button wiring for the values below. *@
+<partial name="_ConnectorHelp" />
+
+@* The values ChatGPT needs, shown again for reference. The secret is NOT among them — it exists only once,
+   at creation (see the note). *@
+<div class="card">
+    <h2>@T["oauthclients.pasteHeading"]</h2>
+    <div class="kv" style="margin-top:.4rem;">
+        <div class="kv-label">@T["oauthclients.clientId"]</div>
+        <div class="kv-value">
+            <div class="copy-row" style="display:flex;align-items:center;gap:.5rem;">
+                <code class="mono" data-copy-val style="flex:1;word-break:break-all;">@Model.Client.ClientId</code>
+                <button type="button" class="btn btn-sm btn-ghost" data-copy data-copied="@T["oauthclients.copied"]">@T["oauthclients.copy"]</button>
+            </div>
+        </div>
+        <div class="kv-label">@T["oauthclients.authUrl"]</div>
+        <div class="kv-value">
+            <div class="copy-row" style="display:flex;align-items:center;gap:.5rem;">
+                <code class="mono" data-copy-val style="flex:1;word-break:break-all;">@Model.BaseUrl/oauth/c/authorize</code>
+                <button type="button" class="btn btn-sm btn-ghost" data-copy data-copied="@T["oauthclients.copied"]">@T["oauthclients.copy"]</button>
+            </div>
+        </div>
+        <div class="kv-label">@T["oauthclients.tokenUrl"]</div>
+        <div class="kv-value">
+            <div class="copy-row" style="display:flex;align-items:center;gap:.5rem;">
+                <code class="mono" data-copy-val style="flex:1;word-break:break-all;">@Model.BaseUrl/oauth/token</code>
+                <button type="button" class="btn btn-sm btn-ghost" data-copy data-copied="@T["oauthclients.copied"]">@T["oauthclients.copy"]</button>
+            </div>
+        </div>
+        <div class="kv-label">@T["oauthclients.scope"]</div>
+        <div class="kv-value">
+            <div class="copy-row" style="display:flex;align-items:center;gap:.5rem;">
+                <code class="mono" data-copy-val style="flex:1;">operator</code>
+                <button type="button" class="btn btn-sm btn-ghost" data-copy data-copied="@T["oauthclients.copied"]">@T["oauthclients.copy"]</button>
+            </div>
+        </div>
+        <div class="kv-label">@T["oauthclients.tokenMethod"]</div>
+        <div class="kv-value">@T["oauthclients.tokenMethodValue"]</div>
+    </div>
+    <p class="help" style="margin-top:.6rem;">@T["oauthclients.secretOnce"]</p>
+</div>
+
+<form method="post" class="card" style="max-width:660px;">
+    <div class="form-grid">
+        <div class="form-field">
+            <label>@T["oauthclients.name"]</label>
+            <input name="name" value="@Model.Client.Name" required />
+        </div>
+        <div class="form-field">
+            <label>@T["oauthclients.redirects"]</label>
+            <textarea name="redirectUris" rows="3" placeholder="https://chat.openai.com/aip/g-…/oauth/callback" spellcheck="false">@Model.Client.RedirectUris</textarea>
+            <div class="help">@T["oauthclients.redirectsHint"]</div>
+        </div>
+    </div>
+    <div style="margin-top:14px;">
+        <button type="submit" class="btn">@T["common.save"]</button>
+        <a class="btn btn-ghost" asp-page="Index">@T["oauthclients.back"]</a>
+    </div>
+</form>

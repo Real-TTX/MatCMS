@@ -13,12 +13,9 @@ public class CreateModel : PageModel
 
     public async Task<IActionResult> OnPostAsync(string name, string redirectUris)
     {
-        if (string.IsNullOrWhiteSpace(redirectUris))
-        {
-            TempData["FlashError"] = "Bitte mindestens eine gültige Redirect-URI angeben.";
-            return Page();
-        }
-        var created = await _clients.CreateAsync(name, redirectUris);
+        // Redirect URI may be left empty on purpose: a ChatGPT connector only learns its callback URL after
+        // the action is saved in ChatGPT, so the operator adds it afterwards via Edit. See _ConnectorHelp.
+        var created = await _clients.CreateAsync(name, redirectUris ?? "");
         // The secret exists only here — handed to the list page to be shown exactly once.
         TempData["NewClientId"] = created.Client.ClientId;
         TempData["NewSecret"] = created.ClientSecret;

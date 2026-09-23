@@ -13,21 +13,56 @@
 
     <p class="help">@T["oauthclients.intro"]</p>
 
-    @* The one moment the client secret is visible. Never stored in the clear — copy it now. *@
+    @* Step-by-step guide + the page-wide copy-button wiring used by the boxes below. *@
+    <partial name="_ConnectorHelp" />
+
+    @* The one moment the client secret is visible. Never stored in the clear — copy it now. The values are
+       laid out exactly as ChatGPT's OAuth action asks for them, each with a copy button. *@
     @if (Model.NewSecret is not null)
     {
         <div class="alert alert-success">
             <strong>@T["oauthclients.created"]</strong>
-            <div class="kv" style="margin-top:.6rem;">
+            <p class="help" style="margin:.5rem 0 .3rem;">@T["oauthclients.pasteHeading"]:</p>
+            <div class="kv" style="margin-top:.4rem;">
                 <div class="kv-label">@T["oauthclients.clientId"]</div>
-                <div class="kv-value mono" style="word-break:break-all;">@Model.NewClientId</div>
+                <div class="kv-value">
+                    <div class="copy-row" style="display:flex;align-items:center;gap:.5rem;">
+                        <code class="mono" data-copy-val style="flex:1;word-break:break-all;">@Model.NewClientId</code>
+                        <button type="button" class="btn btn-sm btn-ghost" data-copy data-copied="@T["oauthclients.copied"]">@T["oauthclients.copy"]</button>
+                    </div>
+                </div>
                 <div class="kv-label">@T["oauthclients.clientSecret"]</div>
-                <div class="kv-value mono is-secret" style="word-break:break-all;">@Model.NewSecret</div>
+                <div class="kv-value">
+                    <div class="copy-row" style="display:flex;align-items:center;gap:.5rem;">
+                        <code class="mono is-secret" data-copy-val style="flex:1;word-break:break-all;">@Model.NewSecret</code>
+                        <button type="button" class="btn btn-sm btn-ghost" data-copy data-copied="@T["oauthclients.copied"]">@T["oauthclients.copy"]</button>
+                    </div>
+                </div>
                 <div class="kv-label">@T["oauthclients.authUrl"]</div>
-                <div class="kv-value mono" style="word-break:break-all;">@Model.BaseUrl/oauth/c/authorize</div>
+                <div class="kv-value">
+                    <div class="copy-row" style="display:flex;align-items:center;gap:.5rem;">
+                        <code class="mono" data-copy-val style="flex:1;word-break:break-all;">@Model.BaseUrl/oauth/c/authorize</code>
+                        <button type="button" class="btn btn-sm btn-ghost" data-copy data-copied="@T["oauthclients.copied"]">@T["oauthclients.copy"]</button>
+                    </div>
+                </div>
                 <div class="kv-label">@T["oauthclients.tokenUrl"]</div>
-                <div class="kv-value mono" style="word-break:break-all;">@Model.BaseUrl/oauth/token</div>
+                <div class="kv-value">
+                    <div class="copy-row" style="display:flex;align-items:center;gap:.5rem;">
+                        <code class="mono" data-copy-val style="flex:1;word-break:break-all;">@Model.BaseUrl/oauth/token</code>
+                        <button type="button" class="btn btn-sm btn-ghost" data-copy data-copied="@T["oauthclients.copied"]">@T["oauthclients.copy"]</button>
+                    </div>
+                </div>
+                <div class="kv-label">@T["oauthclients.scope"]</div>
+                <div class="kv-value">
+                    <div class="copy-row" style="display:flex;align-items:center;gap:.5rem;">
+                        <code class="mono" data-copy-val style="flex:1;">operator</code>
+                        <button type="button" class="btn btn-sm btn-ghost" data-copy data-copied="@T["oauthclients.copied"]">@T["oauthclients.copy"]</button>
+                    </div>
+                </div>
+                <div class="kv-label">@T["oauthclients.tokenMethod"]</div>
+                <div class="kv-value">@T["oauthclients.tokenMethodValue"]</div>
             </div>
+            <p class="help" style="margin-top:.6rem;"><strong>@T["oauthclients.redirectsOptional"]</strong></p>
         </div>
     }
 
@@ -68,6 +103,7 @@
                         <div class="actions">
                             @if (!c.Revoked)
                             {
+                                <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@c.Id">@T["oauthclients.edit"]</a>
                                 <form class="inline-form" method="post" asp-page-handler="Revoke" asp-route-id="@c.Id"
                                       onsubmit="return confirm('@T["apikeys.revokeConfirm"]');">
                                     <button type="submit" class="btn btn-sm btn-ghost">@T["oauthclients.revoke"]</button>

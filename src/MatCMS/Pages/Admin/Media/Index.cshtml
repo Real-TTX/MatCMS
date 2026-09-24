@@ -2,7 +2,10 @@
 @model MatCMS.Pages.Admin.Media.IndexModel
 @{
     ViewData["Title"] = T["media.title"];
+    // id → url of everything in the library, so a cropped image can point the cropper at its ORIGINAL.
+    var urlById = Model.Items.GroupBy(x => x.Id).ToDictionary(g => g.Key, g => g.First().Url);
 }
+<link rel="stylesheet" href="~/lib/cropper/cropper.min.css" asp-append-version="true" />
 <div data-list data-list-key="media" class="list-view-tiles">
     <div class="page-head">
         <h1>@T["media.title"]</h1>
@@ -21,6 +24,11 @@
     .media-thumb-file { display: flex; align-items: center; justify-content: center; background: var(--bg-alt, #f1efe9); }
     .media-fileext { font: 700 13px/1 var(--font-head, sans-serif); letter-spacing: .06em; color: #6b6257;
         border: 2px solid currentColor; border-radius: 6px; padding: 8px 11px; }
+    /* Crop controls inside the media preview */
+    .mm-crop-start { margin-top: 8px; }
+    .crop-tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-top: 8px; }
+    .crop-ratios, .crop-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .crop-note { margin-top: 6px; font-size: 12px; color: #6b6257; }
 </style>
 
 @if (Model.AllTags.Count > 0)
@@ -54,6 +62,10 @@
                 data-alt="@m.Alt"
                 data-type="@m.ContentType"
                 data-size="@m.SizeBytes"
+                data-source-id="@(m.SourceMediaId?.ToString() ?? "")"
+                data-source-url="@(m.SourceMediaId is int sid && urlById.TryGetValue(sid, out var su) ? su : "")"
+                data-cropjson="@m.CropJson"
+                data-isimg="@(mIsImg && mext != ".gif" && mext != ".svg" ? "1" : "")"
                 title="@T["media.clickHint"]">
             @if (mIsImg)
             {
@@ -86,9 +98,15 @@
             {
                 var rTags = MatCMS.Content.TagUtil.Split(m.Tags).ToList();
                 var sizeStr = m.SizeBytes < 1048576 ? (m.SizeBytes / 1024.0).ToString("0.#") + " KB" : (m.SizeBytes / 1048576.0).ToString("0.#") + " MB";
+                var rext = System.IO.Path.GetExtension(m.FileName ?? m.Url ?? "").ToLowerInvariant();
+                var rIsImg = rext is ".png" or ".jpg" or ".jpeg" or ".webp";
                 <tr class="media-row" data-search="@(m.FileName + " " + m.Tags)"
                     data-id="@m.Id" data-url="@m.Url" data-name="@m.FileName" data-tags="@m.Tags"
-                    data-alt="@m.Alt" data-type="@m.ContentType" data-size="@m.SizeBytes" style="cursor:pointer;">
+                    data-alt="@m.Alt" data-type="@m.ContentType" data-size="@m.SizeBytes"
+                    data-source-id="@(m.SourceMediaId?.ToString() ?? "")"
+                    data-source-url="@(m.SourceMediaId is int rsid && urlById.TryGetValue(rsid, out var rsu) ? rsu : "")"
+                    data-cropjson="@m.CropJson"
+                    data-isimg="@(rIsImg ? "1" : "")" style="cursor:pointer;">
                     <td><strong>@m.FileName</strong></td>
                     <td class="mono">@m.ContentType</td>
                     <td class="muted">@sizeStr</td>
@@ -110,6 +128,22 @@
         <div class="modal-body media-modal-body">
             <div class="media-preview">
                 <img id="mm-img" src="" alt="" />
+                <button type="button" class="btn btn-sm mm-crop-start" id="mm-crop-start" hidden>
+                    <i class="ti ti-crop" aria-hidden="true"></i> @T["media.crop"]
+                </button>
+                <div class="crop-tools" id="mm-crop-tools" hidden>
+                    <div class="crop-ratios">
+                        <button type="button" class="btn btn-sm btn-ghost" data-ratio="0">@T["media.cropFree"]</button>
+                        <button type="button" class="btn btn-sm btn-ghost" data-ratio="1">1:1</button>
+                        <button type="button" class="btn btn-sm btn-ghost" data-ratio="1.7777">16:9</button>
+                        <button type="button" class="btn btn-sm btn-ghost" data-ratio="1.3333">4:3</button>
+                    </div>
+                    <div class="crop-actions">
+                        <button type="button" class="btn btn-sm" id="mm-crop-save">@T["media.cropSave"]</button>
+                        <button type="button" class="btn btn-sm btn-ghost" id="mm-crop-cancel">@T["action.cancel"]</button>
+                    </div>
+                </div>
+                <div class="crop-note" id="mm-crop-note" hidden>@T["media.cropFromOriginal"]</div>
             </div>
             <div class="media-detail">
                 <div class="media-detail-name" id="mm-name"></div>
@@ -175,6 +209,7 @@
 </div>
 
 @section Scripts {
+    <script src="~/lib/cropper/cropper.min.js" asp-append-version="true"></script>
     <script>
         (function () {
             // ---- Upload ----
@@ -274,9 +309,84 @@
                 setTags(d.tags || ''); tagEntry.value = ''; hideEntry();
                 idEl.value = d.id; delIdEl.value = d.id;
                 infoEl.textContent = [d.type, fmtBytes(d.size)].filter(Boolean).join('  ·  ');
+                setupCrop(d);
                 modal.classList.add('open');
             }
-            function close() { modal.classList.remove('open'); }
+            function close() { resetCrop(); modal.classList.remove('open'); }
+
+            // ---- Crop (Cropper.js) ----
+            // Crop makes a NEW file; the original is never touched. For an image that IS already a crop we
+            // load its ORIGINAL into the cropper (so cropped-away area can be recovered) and pre-set the box.
+            var cropStartBtn = document.getElementById('mm-crop-start');
+            var cropTools = document.getElementById('mm-crop-tools');
+            var cropNote = document.getElementById('mm-crop-note');
+            var cropSaveBtn = document.getElementById('mm-crop-save');
+            var cropper = null;
+            var cropCtx = null;
+
+            function resetCrop() {
+                if (cropper) { try { cropper.destroy(); } catch (e) {} cropper = null; }
+                if (cropTools) cropTools.hidden = true;
+                if (cropStartBtn) cropStartBtn.hidden = !(cropCtx && cropCtx.isImg);
+                if (cropSaveBtn) cropSaveBtn.disabled = false;
+            }
+            function setupCrop(d) {
+                cropCtx = {
+                    isImg: d.isimg === '1',
+                    id: parseInt(d.id, 10),
+                    sourceId: d.sourceId ? parseInt(d.sourceId, 10) : parseInt(d.id, 10),
+                    displayUrl: d.url,
+                    sourceUrl: d.sourceUrl || d.url,
+                    cropjson: d.cropjson || ''
+                };
+                resetCrop();
+                if (cropNote) cropNote.hidden = !(cropCtx.isImg && d.sourceId);
+            }
+            function beginCrop() {
+                if (!cropCtx || !cropCtx.isImg || typeof Cropper === 'undefined') return;
+                cropStartBtn.hidden = true;
+                cropTools.hidden = false;
+                var base = cropCtx.sourceUrl;               // crop FROM the original
+                var init = function () {
+                    if (cropper) { try { cropper.destroy(); } catch (e) {} }
+                    cropper = new Cropper(img, {
+                        viewMode: 1, autoCropArea: 1, background: false, movable: false, zoomable: false, rotatable: false,
+                        ready: function () {
+                            if (!cropCtx.cropjson) return;
+                            try { var r = JSON.parse(cropCtx.cropjson); cropper.setData({ x: r.x, y: r.y, width: r.width, height: r.height }); } catch (e) {}
+                        }
+                    });
+                };
+                if (img.getAttribute('src') === base && img.complete) { init(); }
+                else { img.onload = function () { img.onload = null; init(); }; img.src = base; }
+            }
+
+            if (cropStartBtn) cropStartBtn.addEventListener('click', beginCrop);
+            document.getElementById('mm-crop-cancel').addEventListener('click', function () {
+                var url = cropCtx ? cropCtx.displayUrl : img.src;
+                resetCrop();
+                img.src = url; // back to the shown image
+            });
+            cropTools.querySelectorAll('[data-ratio]').forEach(function (b) {
+                b.addEventListener('click', function () {
+                    if (!cropper) return;
+                    var r = parseFloat(b.dataset.ratio);
+                    cropper.setAspectRatio(r > 0 ? r : NaN);
+                });
+            });
+            cropSaveBtn.addEventListener('click', function () {
+                if (!cropper || !cropCtx) return;
+                var data = cropper.getData(true); // rounded px, relative to the ORIGINAL we loaded
+                cropSaveBtn.disabled = true;
+                fetch('/admin/api/crop', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sourceId: cropCtx.sourceId, x: data.x, y: data.y, w: data.width, h: data.height })
+                }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+                  .then(function (res) {
+                      if (!res.ok) { alert(res.j.error || '@T["media.cropFailed"]'); cropSaveBtn.disabled = false; return; }
+                      window.location.reload();
+                  }).catch(function () { alert('@T["media.cropFailed"]'); cropSaveBtn.disabled = false; });
+            });
 
             document.querySelectorAll('.media-card, .media-row').forEach(function (c) {
                 c.addEventListener('click', function () { open(c); });

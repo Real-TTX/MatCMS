@@ -360,6 +360,7 @@ public class InstanceService
                 op.DoneAt = DateTime.UtcNow;
                 op.Outcome = r.Outcome;
                 op.Detail = r.Detail;
+                op.ResultJson = r.ResultJson;
                 var failed = string.Equals(r.Outcome, "failed", StringComparison.Ordinal);
                 Log(instance, failed ? InstanceEventKind.ContentOpFailed : InstanceEventKind.ContentOpApplied,
                     failed

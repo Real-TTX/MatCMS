@@ -107,8 +107,70 @@ public class ContentTools
             done = op.DoneAt != null,
             outcome = op.Outcome,
             detail = op.Detail,
+            // For a read op (list_pages/get_page): the content the instance serialized back, as raw JSON.
+            result = op.ResultJson is null ? null : (object?)JsonSerializer.Deserialize<JsonElement>(op.ResultJson),
             createdAt = op.CreatedAt,
             doneAt = op.DoneAt,
         };
+    }
+
+    // Read scope only — reading a site's content is not a write, so it does NOT require the restore right.
+    private static async Task<Instance> ResolveReadableAsync(McpContext me, AppDbContext db, string instanceId, CancellationToken ct)
+    {
+        var instance = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == instanceId, ct);
+        if (instance is null || !ApiKeyService.CanAccess(me.Key, instance))
+            throw new McpException("Instanz nicht gefunden.");
+        if (instance.Status != InstanceStatus.Approved)
+            throw new McpException("Instanz ist nicht freigegeben.");
+        return instance;
+    }
+
+    [McpServerTool(Name = "list_pages"), Description(
+        "Ask a connected site for its list of pages (slug, title, locale, published). Because the cloud cannot reach into a site, this is QUEUED: it returns an opId; the site answers on its next heartbeat (~a minute). Poll get_content_op(opId) — its `result` holds the page list once done.")]
+    public static async Task<object> ListPages(
+        McpContext me, AppDbContext db, InstanceService instances,
+        [Description("The instance id, as returned by list_instances.")] string instanceId,
+        CancellationToken ct)
+    {
+        var instance = await ResolveReadableAsync(me, db, instanceId, ct);
+        var op = await instances.EnqueueContentOpAsync(instance, "pages.list", "{}", overwrite: false, reason: "KI: Seiten lesen", ct);
+        return new { ok = true, opId = op.Id, queued = true, message = "Angefragt — Ergebnis via get_content_op(opId)." };
+    }
+
+    [McpServerTool(Name = "get_page"), Description(
+        "Ask a connected site for one page's blocks (to inspect before editing). QUEUED like list_pages: returns an opId; poll get_content_op(opId) whose `result` holds { title, slug, blocks:[{type,data}] } once the site has answered (~a minute).")]
+    public static async Task<object> GetPage(
+        McpContext me, AppDbContext db, InstanceService instances,
+        [Description("The instance id, as returned by list_instances.")] string instanceId,
+        [Description("The page slug to read, e.g. \"ueber-uns\".")] string slug,
+        CancellationToken ct)
+    {
+        var instance = await ResolveReadableAsync(me, db, instanceId, ct);
+        var payload = JsonSerializer.Serialize(new { slug = (slug ?? "").Trim() });
+        var op = await instances.EnqueueContentOpAsync(instance, "page.read", payload, overwrite: false, reason: "KI: Seite lesen", ct);
+        return new { ok = true, opId = op.Id, queued = true, message = "Angefragt — Ergebnis via get_content_op(opId)." };
+    }
+
+    [McpServerTool(Name = "update_page_blocks"), Description(
+        "Replace the blocks of an EXISTING page on a connected site (overwrite). Read it first with get_page, edit the blocks, then send the full new block list here. The site re-validates the blocks (unknown types/fields dropped) and replaces the page's content. QUEUED and applied on the next heartbeat; check get_content_op(opId). Requires a key with the restore right (this overwrites live content).")]
+    public static async Task<object> UpdatePageBlocks(
+        McpContext me, AppDbContext db, InstanceService instances,
+        [Description("The instance id, as returned by list_instances.")] string instanceId,
+        [Description("The slug of the existing page to update.")] string slug,
+        [Description("The FULL new JSON array of blocks (replaces all current blocks): [{\"type\":…,\"data\":{…}}, …].")] string blocksJson,
+        CancellationToken ct)
+    {
+        var instance = await ResolveWritableAsync(me, db, instanceId, ct);
+
+        JsonElement blocks;
+        try { blocks = JsonSerializer.Deserialize<JsonElement>(blocksJson); }
+        catch (JsonException) { throw new McpException("blocksJson ist kein gültiges JSON-Array."); }
+        if (blocks.ValueKind != JsonValueKind.Array)
+            throw new McpException("blocksJson muss ein JSON-Array sein.");
+
+        var payload = JsonSerializer.Serialize(new { slug = (slug ?? "").Trim(), blocks });
+        var op = await instances.EnqueueContentOpAsync(instance, "page.updateBlocks", payload,
+            overwrite: true, reason: "KI: Seitenblöcke ändern", ct);
+        return new { ok = true, opId = op.Id, queued = true, message = "Änderung eingereiht — wird beim nächsten Kontakt angewendet. Ergebnis via get_content_op." };
     }
 }

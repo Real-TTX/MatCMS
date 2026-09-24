@@ -872,10 +872,20 @@ the admin UI uses. There is no second restore path and no second backup format.
   The op carries **intent as JSON, never code**; the INSTANCE re-validates and applies it through its OWN
   writer (`MatCMS/Services/ContentOpApplier.cs` → `BlockGenerator.ValidateBlocks` + the add-only page
   writer) and reports on its next beat (`CloudState` holds the outcomes between beats). Add-only (slug
-  dedupe → `skipped-exists`), so a re-offer after a lost report is idempotent. The rest of Stage 2 (editing
-  existing content, which needs a read surface via R1/backups; posts/forms/settings ops; the
-  `BackupBeforeAiChange` profile flag for overwrite ops) is designed in `docs/mcp-stage2-content-channel.md`.
+  dedupe → `skipped-exists`), so a re-offer after a lost report is idempotent.
   **This bumped `CloudProtocol.Version` 14 → 15 — cloud and instances must deploy together.**
+- **MCP reads + edits (Stage 2, Increment 2 — built).** Reading existing content does NOT parse a backup in
+  the cloud (that would duplicate the content format the instance owns — the exact coupling the repo avoids).
+  Instead **reads flow through the same content-op channel**: `list_pages` / `get_page` enqueue a `pages.list`
+  / `page.read` op (NOT restore-gated — reading is not writing); the INSTANCE serializes its own content and
+  returns it in `ContentOpReport.ResultJson` (additive field), which the cloud stores on `ContentOp.ResultJson`
+  (migration `AddContentOpResult`) and `get_content_op` hands back to the client. Editing: `update_page_blocks`
+  enqueues a `page.updateBlocks` op (`Overwrite=true`, restore-gated) — the instance re-validates the new
+  blocks and REPLACES the page's top-level blocks. Reads/edits are therefore **asynchronous** (one heartbeat
+  round-trip): the tools return an `opId`, the client polls `get_content_op`. Still designed, not built:
+  `create_post`/`create_form`/`set_setting` (posts/forms need **HTML sanitisation** — `Post.ContentHtml` is
+  raw, an AI writing it verbatim is stored-XSS) and the `BackupBeforeAiChange` profile flag for overwrite
+  ops. See `docs/mcp-stage2-content-channel.md`.
 
 ## Backlog
 

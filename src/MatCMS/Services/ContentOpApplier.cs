@@ -34,6 +34,9 @@ public class ContentOpApplier
             return op.Kind switch
             {
                 "page.create" => await CreatePageAsync(op, ct),
+                "pages.list" => await ListPagesAsync(op, ct),
+                "page.read" => await ReadPageAsync(op, ct),
+                "page.updateBlocks" => await UpdatePageBlocksAsync(op, ct),
                 _ => Report(op, "failed", $"Unbekannte Aktion: {op.Kind}"),
             };
         }
@@ -91,6 +94,82 @@ public class ContentOpApplier
         return Report(op, "applied", $"Seite „{slug}“ mit {validated.Count} Block/Blöcken angelegt.");
     }
 
+    // --- Reads: the instance serializes its OWN content back (the cloud never parses the format) ----------
+
+    private async Task<ContentOpReport> ListPagesAsync(PendingContentOp op, CancellationToken ct)
+    {
+        var pages = await _db.Pages.AsNoTracking()
+            .OrderBy(p => p.Locale).ThenBy(p => p.NavOrder).ThenBy(p => p.Title)
+            .Select(p => new { slug = p.Slug, title = p.Title, locale = p.Locale, published = p.IsPublished, showInNav = p.ShowInNav })
+            .ToListAsync(ct);
+        return ReportResult(op, JsonSerializer.Serialize(new { pages }), $"{pages.Count} Seite(n).");
+    }
+
+    private async Task<ContentOpReport> ReadPageAsync(PendingContentOp op, CancellationToken ct)
+    {
+        var payload = JsonNode.Parse(op.PayloadJson) as JsonObject
+            ?? throw new InvalidOperationException("PayloadJson ist kein Objekt.");
+        var slug = Slugify(payload["slug"]?.GetValue<string>() ?? "");
+        if (string.IsNullOrWhiteSpace(slug)) return Report(op, "failed", "Kein Slug angegeben.");
+
+        var page = await _db.Pages.AsNoTracking()
+            .Where(p => p.Slug == slug && p.Locale == Localizer.DefaultCulture)
+            .Select(p => new { p.Id, p.Title, p.Slug, p.IsPublished })
+            .FirstOrDefaultAsync(ct);
+        if (page is null) return Report(op, "failed", $"Seite „{slug}“ nicht gefunden.");
+
+        // Top-level blocks in order. Nested/child blocks are out of scope for the v1 read (edits target the
+        // top-level list); DataJson is forwarded as-is so the AI sees the real field values.
+        var blocks = await _db.ContentBlocks.AsNoTracking()
+            .Where(b => b.PageId == page.Id && b.ParentId == null)
+            .OrderBy(b => b.SortOrder)
+            .Select(b => new { type = b.BlockType, dataJson = b.DataJson })
+            .ToListAsync(ct);
+
+        var result = new JsonObject
+        {
+            ["title"] = page.Title,
+            ["slug"] = page.Slug,
+            ["published"] = page.IsPublished,
+            ["blocks"] = new JsonArray(blocks.Select(b => (JsonNode)new JsonObject
+            {
+                ["type"] = b.type,
+                ["data"] = JsonNode.Parse(string.IsNullOrWhiteSpace(b.dataJson) ? "{}" : b.dataJson),
+            }).ToArray()),
+        };
+        return ReportResult(op, result.ToJsonString(), $"Seite „{slug}“ mit {blocks.Count} Block/Blöcken gelesen.");
+    }
+
+    private async Task<ContentOpReport> UpdatePageBlocksAsync(PendingContentOp op, CancellationToken ct)
+    {
+        var payload = JsonNode.Parse(op.PayloadJson) as JsonObject
+            ?? throw new InvalidOperationException("PayloadJson ist kein Objekt.");
+        var slug = Slugify(payload["slug"]?.GetValue<string>() ?? "");
+        if (string.IsNullOrWhiteSpace(slug)) return Report(op, "failed", "Kein Slug angegeben.");
+
+        var page = await _db.Pages
+            .Include(p => p.Blocks)
+            .FirstOrDefaultAsync(p => p.Slug == slug && p.Locale == Localizer.DefaultCulture, ct);
+        // Overwrite, so the page MUST already exist — this never creates one (that is page.create's job).
+        if (page is null) return Report(op, "failed", $"Seite „{slug}“ nicht gefunden.");
+
+        var blocksJson = payload["blocks"]?.ToJsonString() ?? "[]";
+        var validated = _blockGen.ValidateBlocks(blocksJson);
+        if (validated.Count == 0)
+            return Report(op, "failed", "Keine gültigen Blöcke — Seite unverändert gelassen.");
+
+        // Replace the whole top-level block list. Child blocks (if any) hang off their parents and are
+        // removed with them via the cascade; the new list is a flat set of validated top-level blocks.
+        _db.ContentBlocks.RemoveRange(page.Blocks);
+        var sort = 0;
+        foreach (var (type, _, data) in validated)
+            page.Blocks.Add(new ContentBlock { PageId = page.Id, BlockType = type, DataJson = data.ToJsonString(), SortOrder = sort++ });
+        page.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+
+        return Report(op, "applied", $"Seite „{slug}“: {validated.Count} Block/Blöcke ersetzt.");
+    }
+
     private async Task<int> NextNavOrderAsync(CancellationToken ct)
     {
         var max = await _db.Pages.Where(p => p.Locale == Localizer.DefaultCulture && p.ShowInNav)
@@ -100,6 +179,10 @@ public class ContentOpApplier
 
     private static ContentOpReport Report(PendingContentOp op, string outcome, string detail) =>
         new() { OpId = op.OpId, Outcome = outcome, Detail = detail };
+
+    /// <summary>A successful READ: the serialized content rides in <see cref="ContentOpReport.ResultJson"/>.</summary>
+    private static ContentOpReport ReportResult(PendingContentOp op, string resultJson, string detail) =>
+        new() { OpId = op.OpId, Outcome = "applied", Detail = detail, ResultJson = resultJson };
 
     /// <summary>Lowercase, ASCII, hyphen-separated — the same shape a slug has everywhere else on the site.
     /// Deliberately conservative: a model-supplied slug is normalised, never trusted verbatim.</summary>

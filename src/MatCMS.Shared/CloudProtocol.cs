@@ -382,6 +382,11 @@ public sealed class ContentOpReport
     /// <summary>Human detail for the operator: what was created (e.g. the page slug), why it was skipped,
     /// or the error. Shown verbatim.</summary>
     public string? Detail { get; set; }
+
+    /// <summary>For a READ op ("pages.list", "page.read"): the requested content, serialized by the INSTANCE
+    /// (which owns its content format — the cloud never parses it). The MCP client fetches it via
+    /// get_content_op. Null for a write op. Additive/optional, so an older peer simply never sets it.</summary>
+    public string? ResultJson { get; set; }
 }
 
 public sealed class MailRequest

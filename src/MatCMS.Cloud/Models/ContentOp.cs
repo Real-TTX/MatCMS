@@ -43,4 +43,8 @@ public class ContentOp
 
     /// <summary>Human detail from the instance (created slug, skip reason, or error). Shown verbatim.</summary>
     public string? Detail { get; set; }
+
+    /// <summary>For a READ op: the content the instance serialized back (it owns its format; the cloud only
+    /// stores and forwards it). Fetched by the MCP client via get_content_op. Null for a write op.</summary>
+    public string? ResultJson { get; set; }
 }

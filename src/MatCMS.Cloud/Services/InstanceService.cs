@@ -460,6 +460,7 @@ public class InstanceService
             instance.Hosting = InstanceHosting.Remote;
             instance.LocalContainerName = null;
             instance.LocalPort = null;
+            instance.ContainerState = null;
             // No container here means no claim on one. Clearing this is the whole point of re-running
             // the classification: a site that moved away must not keep a licence to be torn down.
             instance.CloudManaged = false;
@@ -469,6 +470,7 @@ public class InstanceService
             instance.Hosting = InstanceHosting.Local;
             instance.LocalContainerName = container.Name;
             instance.LocalPort = container.PublishedPort;
+            instance.ContainerState = container.State;
             instance.CloudManaged = container.CloudManaged;
         }
 

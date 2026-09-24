@@ -109,6 +109,12 @@
                         {
                             <span class="badge badge-on">@T["instances.online"]</span>
                         }
+                        else if (i.Hosting == InstanceHosting.Local && !string.IsNullOrEmpty(i.ContainerState)
+                                 && !string.Equals(i.ContainerState, "running", StringComparison.OrdinalIgnoreCase))
+                        {
+                            @* A local container we know is not running: "stopped", not the ambiguous "offline". *@
+                            <span class="badge badge-off">@T["instances.stopped"]</span>
+                        }
                         else
                         {
                             <span class="badge badge-err">@T["instances.offline"]</span>
@@ -211,6 +217,12 @@
                         else if (online)
                         {
                             <span class="badge badge-on">@T["instances.online"]</span>
+                        }
+                        else if (i.Hosting == InstanceHosting.Local && !string.IsNullOrEmpty(i.ContainerState)
+                                 && !string.Equals(i.ContainerState, "running", StringComparison.OrdinalIgnoreCase))
+                        {
+                            @* A local container we know is not running: "stopped", not the ambiguous "offline". *@
+                            <span class="badge badge-off">@T["instances.stopped"]</span>
                         }
                         else
                         {

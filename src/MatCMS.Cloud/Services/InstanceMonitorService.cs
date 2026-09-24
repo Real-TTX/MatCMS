@@ -80,6 +80,20 @@ public class InstanceMonitorService : BackgroundService
             .Where(i => i.Status == InstanceStatus.Approved)
             .ToListAsync(ct);
 
+        // Keep hosting + container state fresh from the daemon, not only from heartbeats: a STOPPED
+        // container sends no heartbeat, so without this its ContainerState would stay stale (it would look
+        // merely "offline"). Only when Docker is reachable; each miss degrades to what the last heartbeat
+        // saw. (Lists containers once per instance — fine for a handful of local sites.)
+        if (await docker.IsReachableAsync(ct))
+        {
+            foreach (var instance in all)
+            {
+                try { await instances.ClassifyAsync(instance, ct); }
+                catch (Exception ex) { _log.LogDebug(ex, "Reclassify failed for instance {Id}", instance.Id); }
+            }
+            await db.SaveChangesAsync(ct);
+        }
+
         // Periodic retention sweep (~hourly): prune time-based tiers for sites that stopped uploading.
         // Uploads prune themselves in BackupStore.StoreAsync, so this only has to catch the tail.
         if (++_ticksSinceSweep >= SweepEveryTicks)

@@ -116,6 +116,12 @@ public class Instance
     /// which container an "Update now" would recreate. Null while remote.</summary>
     public string? LocalContainerName { get; set; }
 
+    /// <summary>Docker container state for a LOCAL instance ("running", "exited", "paused", "created"…),
+    /// read from the daemon in <c>ClassifyAsync</c> and refreshed by the monitor so a STOPPED container
+    /// (which sends no heartbeat) is still shown correctly. Null while remote / unknown. This is what tells
+    /// "stopped by us" apart from "offline/unreachable" — a stopped container is not the same as a crash.</summary>
+    public string? ContainerState { get; set; }
+
     /// <summary>
     /// Host port the local container publishes, e.g. 9101. Used to offer a preview address for an
     /// instance that has no public URL configured yet - which is the normal state of a site that was

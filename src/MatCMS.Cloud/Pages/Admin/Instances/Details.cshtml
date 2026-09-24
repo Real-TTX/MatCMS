@@ -141,6 +141,14 @@
                     {
                         <span class="muted mono">· @T["instances.port"] @localPort</span>
                     }
+                    @if (string.Equals(Model.Item.ContainerState, "running", StringComparison.OrdinalIgnoreCase))
+                    {
+                        <span class="badge badge-on">@T["instances.running"]</span>
+                    }
+                    else if (!string.IsNullOrEmpty(Model.Item.ContainerState))
+                    {
+                        <span class="badge badge-err">@T["instances.stopped"] (@Model.Item.ContainerState)</span>
+                    }
                 }
                 else if (Model.Item.Hosting == InstanceHosting.Remote)
                 {
@@ -213,6 +221,28 @@
         {
             <div class="alert alert-info" style="margin-top:16px;">
                 @T["instances.updateRemote"] <code>docker compose pull &amp;&amp; docker compose up -d</code>
+            </div>
+        }
+
+        @* Start / Stop for a LOCAL container. Stop takes the customer's site OFFLINE, so it confirms;
+           Start does not. Only shown when the cloud can actually reach the container on its daemon. *@
+        @if (Model.Item.Hosting == InstanceHosting.Local && Model.Item.ContainerId is not null)
+        {
+            var running = string.Equals(Model.Item.ContainerState, "running", StringComparison.OrdinalIgnoreCase);
+            <div class="list-actions">
+                @if (running)
+                {
+                    <form class="inline-form" method="post" asp-page-handler="Stop" asp-route-id="@Model.Item.Id"
+                          onsubmit="return confirm('@T["instances.stopConfirm"]');">
+                        <button type="submit" class="btn btn-danger"><i class="ti ti-player-stop" aria-hidden="true"></i> @T["instances.stop"]</button>
+                    </form>
+                }
+                else
+                {
+                    <form class="inline-form" method="post" asp-page-handler="Start" asp-route-id="@Model.Item.Id">
+                        <button type="submit" class="btn"><i class="ti ti-player-play" aria-hidden="true"></i> @T["instances.start"]</button>
+                    </form>
+                }
             </div>
         }
     </div>

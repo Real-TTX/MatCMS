@@ -43,7 +43,12 @@ public enum InstanceEventKind
     /// and — like a restore — should be findable as such rather than buried among sync entries.</summary>
     ContentOpQueued = 19,
     ContentOpApplied = 20,
-    ContentOpFailed = 21
+    ContentOpFailed = 21,
+
+    /// <summary>The cloud started or stopped the instance's container via the Docker socket. Its own kinds
+    /// because turning a customer's site off/on is a notable, operator-initiated power action.</summary>
+    ContainerStarted = 22,
+    ContainerStopped = 23
 }
 
 /// <summary>Audit trail per instance: what happened, and whether a notification went out for it.

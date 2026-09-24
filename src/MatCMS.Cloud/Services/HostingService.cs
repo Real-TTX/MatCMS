@@ -116,7 +116,14 @@ public class HostingService
     /// </summary>
     public static string Normalise(string name)
     {
-        var parts = new string(name.ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : ' ').ToArray())
+        // Docker/compose stack names allow ONLY [a-z0-9-]. char.IsLetterOrDigit is true for 'ä'/'ö'/'ü'/'ß'
+        // (they are Unicode letters), so they used to slip through and produce an INVALID stack name —
+        // "Der Käseschneider" became "der-käseschneider" and Docker rejected it. Transliterate the German
+        // umlauts, then keep STRICTLY ASCII a-z0-9 (every other character becomes a separator), so nothing
+        // outside the allowed set can ever reach the stack name.
+        var lowered = name.ToLowerInvariant()
+            .Replace("ä", "ae").Replace("ö", "oe").Replace("ü", "ue").Replace("ß", "ss");
+        var parts = new string(lowered.Select(c => c is >= 'a' and <= 'z' or >= '0' and <= '9' ? c : ' ').ToArray())
             .Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var joined = string.Join('-', parts);
         return joined.Length == 0 ? "instanz" : joined;

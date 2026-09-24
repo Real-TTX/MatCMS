@@ -420,10 +420,11 @@ public class DetailsModel : PageModel, IAsyncPageFilter
     /// <summary>Starts / stops a LOCAL instance's container via the Docker socket. Reversible power action,
     /// so only the "looks like MatCMS" guard applies (in DockerHostService), not the managed-label one that
     /// gates removal. Re-classifies right after so the shown state is current without waiting for the monitor.</summary>
-    public Task<IActionResult> OnPostStartAsync(int id) => PowerAsync(id, start: true);
-    public Task<IActionResult> OnPostStopAsync(int id) => PowerAsync(id, start: false);
+    public Task<IActionResult> OnPostStartAsync(int id) => PowerAsync(id, DockerHostService.PowerAction.Start);
+    public Task<IActionResult> OnPostStopAsync(int id) => PowerAsync(id, DockerHostService.PowerAction.Stop);
+    public Task<IActionResult> OnPostRestartAsync(int id) => PowerAsync(id, DockerHostService.PowerAction.Restart);
 
-    private async Task<IActionResult> PowerAsync(int id, bool start)
+    private async Task<IActionResult> PowerAsync(int id, DockerHostService.PowerAction action)
     {
         var item = await _db.Instances.FindAsync(id);
         if (item is null) return RedirectToPage("Index");
@@ -433,12 +434,23 @@ public class DetailsModel : PageModel, IAsyncPageFilter
             return RedirectToPage(new { id });
         }
 
-        var result = start
-            ? await _docker.StartContainerAsync(item.ContainerId, HttpContext.RequestAborted)
-            : await _docker.StopContainerAsync(item.ContainerId, HttpContext.RequestAborted);
+        var result = action switch
+        {
+            DockerHostService.PowerAction.Start => await _docker.StartContainerAsync(item.ContainerId, HttpContext.RequestAborted),
+            DockerHostService.PowerAction.Stop => await _docker.StopContainerAsync(item.ContainerId, HttpContext.RequestAborted),
+            _ => await _docker.RestartContainerAsync(item.ContainerId, HttpContext.RequestAborted),
+        };
 
         if (result.Ok)
-            _instances.Log(item, start ? InstanceEventKind.ContainerStarted : InstanceEventKind.ContainerStopped, result.Message);
+        {
+            var kind = action switch
+            {
+                DockerHostService.PowerAction.Start => InstanceEventKind.ContainerStarted,
+                DockerHostService.PowerAction.Stop => InstanceEventKind.ContainerStopped,
+                _ => InstanceEventKind.ContainerRestarted,
+            };
+            _instances.Log(item, kind, result.Message);
+        }
 
         // Reflect the new container state at once (the monitor would otherwise take up to a tick, and a
         // stopped container never beats). Best effort — a failed re-classify just leaves the last state.

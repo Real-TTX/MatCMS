@@ -232,6 +232,10 @@
             <div class="list-actions">
                 @if (running)
                 {
+                    <form class="inline-form" method="post" asp-page-handler="Restart" asp-route-id="@Model.Item.Id"
+                          onsubmit="return confirm('@T["instances.restartConfirm"]');">
+                        <button type="submit" class="btn"><i class="ti ti-refresh" aria-hidden="true"></i> @T["instances.restart"]</button>
+                    </form>
                     <form class="inline-form" method="post" asp-page-handler="Stop" asp-route-id="@Model.Item.Id"
                           onsubmit="return confirm('@T["instances.stopConfirm"]');">
                         <button type="submit" class="btn btn-danger"><i class="ti ti-player-stop" aria-hidden="true"></i> @T["instances.stop"]</button>

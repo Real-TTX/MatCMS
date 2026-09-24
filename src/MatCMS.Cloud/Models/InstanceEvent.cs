@@ -48,7 +48,8 @@ public enum InstanceEventKind
     /// <summary>The cloud started or stopped the instance's container via the Docker socket. Its own kinds
     /// because turning a customer's site off/on is a notable, operator-initiated power action.</summary>
     ContainerStarted = 22,
-    ContainerStopped = 23
+    ContainerStopped = 23,
+    ContainerRestarted = 24
 }
 
 /// <summary>Audit trail per instance: what happened, and whether a notification went out for it.

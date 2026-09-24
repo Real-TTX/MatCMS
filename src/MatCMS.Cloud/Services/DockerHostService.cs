@@ -275,19 +275,24 @@ public class DockerHostService
     /// a remote instance: nothing on this host to tear down.</para>
     /// </summary>
     public sealed record ContainerActionResult(bool Ok, string Message);
+    public enum PowerAction { Start, Stop, Restart }
 
     /// <summary>Starts a stopped instance container. Guarded like every other socket action: only a container
     /// that positively looks like a MatCMS image, so the cloud's root-equivalent socket power can never touch
     /// something it did not identify. Reversible, so this is the lighter guard (image), not the managed-label
     /// one the destructive removal uses.</summary>
-    public async Task<ContainerActionResult> StartContainerAsync(string containerId, CancellationToken ct = default)
-        => await PowerAsync(containerId, start: true, ct);
+    public Task<ContainerActionResult> StartContainerAsync(string containerId, CancellationToken ct = default)
+        => PowerAsync(containerId, PowerAction.Start, ct);
 
     /// <summary>Stops a running instance container (graceful, 15 s before kill). Same guard as start.</summary>
-    public async Task<ContainerActionResult> StopContainerAsync(string containerId, CancellationToken ct = default)
-        => await PowerAsync(containerId, start: false, ct);
+    public Task<ContainerActionResult> StopContainerAsync(string containerId, CancellationToken ct = default)
+        => PowerAsync(containerId, PowerAction.Stop, ct);
 
-    private async Task<ContainerActionResult> PowerAsync(string containerId, bool start, CancellationToken ct)
+    /// <summary>Restarts an instance container (graceful, 15 s before kill). Same guard as start.</summary>
+    public Task<ContainerActionResult> RestartContainerAsync(string containerId, CancellationToken ct = default)
+        => PowerAsync(containerId, PowerAction.Restart, ct);
+
+    private async Task<ContainerActionResult> PowerAsync(string containerId, PowerAction action, CancellationToken ct)
     {
         var client = Client;
         if (client is null) return new(false, "Kein Docker-Zugriff konfiguriert.");
@@ -302,18 +307,25 @@ public class DockerHostService
 
         try
         {
-            if (start)
+            switch (action)
             {
-                var started = await client.Containers.StartContainerAsync(insp.ID, new ContainerStartParameters(), ct);
-                return new(true, started ? "Instanz gestartet." : "Instanz lief bereits.");
+                case PowerAction.Start:
+                    var started = await client.Containers.StartContainerAsync(insp.ID, new ContainerStartParameters(), ct);
+                    return new(true, started ? "Instanz gestartet." : "Instanz lief bereits.");
+                case PowerAction.Stop:
+                    var stopped = await client.Containers.StopContainerAsync(insp.ID,
+                        new ContainerStopParameters { WaitBeforeKillSeconds = 15 }, ct);
+                    return new(true, stopped ? "Instanz gestoppt." : "Instanz war bereits gestoppt.");
+                default: // Restart
+                    await client.Containers.RestartContainerAsync(insp.ID,
+                        new ContainerRestartParameters { WaitBeforeKillSeconds = 15 }, ct);
+                    return new(true, "Instanz neu gestartet.");
             }
-            var stopped = await client.Containers.StopContainerAsync(insp.ID,
-                new ContainerStopParameters { WaitBeforeKillSeconds = 15 }, ct);
-            return new(true, stopped ? "Instanz gestoppt." : "Instanz war bereits gestoppt.");
         }
         catch (Exception ex)
         {
-            return new(false, $"{(start ? "Start" : "Stopp")} fehlgeschlagen: {ex.Message}");
+            var verb = action switch { PowerAction.Start => "Start", PowerAction.Stop => "Stopp", _ => "Neustart" };
+            return new(false, $"{verb} fehlgeschlagen: {ex.Message}");
         }
     }
 

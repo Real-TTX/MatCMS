@@ -570,6 +570,8 @@
   "instances.start": "Starten",
   "instances.stop": "Stoppen",
   "instances.stopConfirm": "Instanz-Container stoppen? Die Website ist dann offline, bis sie wieder gestartet wird.",
+  "instances.restart": "Neu starten",
+  "instances.restartConfirm": "Instanz-Container neu starten? Die Website ist dabei kurz nicht erreichbar.",
   "instances.offline": "offline",
   "instances.local": "lokal",
   "instances.remote": "remote",

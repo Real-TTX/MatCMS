@@ -570,6 +570,8 @@
   "instances.start": "Start",
   "instances.stop": "Stop",
   "instances.stopConfirm": "Stop the instance container? The site will be offline until it is started again.",
+  "instances.restart": "Restart",
+  "instances.restartConfirm": "Restart the instance container? The site is briefly unreachable during the restart.",
   "instances.offline": "offline",
   "instances.local": "local",
   "instances.remote": "remote",

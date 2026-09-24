@@ -886,7 +886,11 @@ the admin UI uses. There is no second restore path and no second backup format.
 - **MCP posts + safety (Stage 2, Increment 3 — built).** `create_post` enqueues a `post.create` op; the
   instance applies it add-only, and — because `Post.ContentHtml`/excerpt are AI-supplied HTML rendered raw —
   **sanitises them first** via `MatCMS/Services/SafeHtml.cs` (the `HtmlSanitizer` library, NOT a hand-rolled
-  scrubber; drops scripts/`on*`/`javascript:`). The **`Profile.BackupBeforeAiChange`** flag (migration
+  scrubber; drops scripts/`on*`/`javascript:`). **The same sanitiser also runs in `BlockGenerator.ValidateBlocks`
+  on any `rich` (RichText) block field** — those are rendered raw (`@Html.Raw`), and that validator is the
+  one path every model-generated block goes through (in-app AI generators AND MCP `create_page`/`update_page_blocks`),
+  so a generated richtext block cannot carry a `<script>` onto a live page (verified end-to-end). The
+  **`Profile.BackupBeforeAiChange`** flag (migration
   `AddBackupBeforeAiChange`, checkbox on Profiles/Edit's KI tab) rides each write op as
   `PendingContentOp.BackupFirst` (set by `InstanceService` from the profile, only for write ops, read live at
   offer time — no revision bump); when set, the instance takes ONE local restore point

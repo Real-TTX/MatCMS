@@ -112,12 +112,23 @@ public class BlockGenerator
             if (obj["data"] is JsonObject d)
                 foreach (var kv in d)
                 {
-                    if (!textIds.ContainsKey(kv.Key)) continue;
+                    if (!textIds.TryGetValue(kv.Key, out var field)) continue;
                     if (kv.Value is JsonValue v && v.TryGetValue<string>(out var sv))
                     {
                         var val = sv.Trim();
                         if (val.Length == 0) continue;
-                        data[kv.Key] = val.Length > 3000 ? val[..3000] : val;
+                        if (val.Length > 3000) val = val[..3000];
+                        // A "rich" field is rendered RAW on the public site (@Html.Raw). Since this whole
+                        // method exists for MODEL-generated blocks (in-app AI generators AND the cloud's MCP
+                        // content ops), that value is untrusted HTML → SANITISE it, or a generated block is a
+                        // stored-XSS vector. Plain text/multiline fields are HTML-encoded on render, so they
+                        // are left as-is (sanitising them would corrupt legitimate text like "a < b").
+                        if (field.Kind == "rich")
+                        {
+                            val = SafeHtml.Sanitize(val);
+                            if (val.Length == 0) continue;
+                        }
+                        data[kv.Key] = val;
                     }
                 }
             if (data.Count == 0) continue;

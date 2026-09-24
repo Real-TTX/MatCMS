@@ -25,16 +25,17 @@
     var currentCulture = System.Globalization.CultureInfo.CurrentUICulture.Name.Split('-', 2)[0];
     if (string.IsNullOrEmpty(currentCulture)) currentCulture = MatCMS.Services.Localizer.ResourceFallbackCulture;
     var returnUrl = Context.Request.Path + Context.Request.QueryString;
-    // The Cloud segment of the topbar switch shows ONLY for a session that came FROM the cloud (SSO →
-    // amr=sso) — a direct login has no cloud context. It deep-links to THIS instance on the cloud (the
-    // cloud resolves the public id → Details via /Admin/Instances/Open), not the cloud home. Website +
-    // Admin stay for every logged-in admin, same as the public bar.
+    // The Cloud segment of the switch is shown whenever this instance is CLOUD-CONNECTED (a CloudUrl is
+    // configured) — NOT only for an SSO session. The three segments (Cloud | Website | Admin) must always
+    // be in the same control at the same place so switching back and forth is one predictable click, and
+    // the account/logout group to its right never moves. It deep-links to THIS instance on the cloud when
+    // the public id is known (the cloud resolves it → Details via /Admin/Instances/Open), else the cloud
+    // home; from a direct login you simply sign in at the cloud on arrival.
     var cloudUrl = (Site.Get(MatCMS.Services.SettingKeys.CloudUrl) ?? "").Trim().TrimEnd('/');
     var cloudId = (Site.Get(MatCMS.Services.SettingKeys.CloudInstanceId) ?? "").Trim();
-    var fromCloud = User.HasClaim("amr", "sso");
-    var cloudLink = fromCloud && !string.IsNullOrEmpty(cloudUrl)
-        ? (!string.IsNullOrEmpty(cloudId) ? $"{cloudUrl}/Admin/Instances/Open/{Uri.EscapeDataString(cloudId)}" : cloudUrl)
-        : null;
+    var cloudLink = string.IsNullOrEmpty(cloudUrl)
+        ? null
+        : (!string.IsNullOrEmpty(cloudId) ? $"{cloudUrl}/Admin/Instances/Open/{Uri.EscapeDataString(cloudId)}" : cloudUrl);
 }
 <!DOCTYPE html>
 <html lang="@currentCulture">
@@ -127,18 +128,14 @@
             </button>
             <div class="admin-topbar-title">@title</div>
             <div class="admin-topbar-right">
-                @* Same trailing group as the public admin bar: Website|Admin switch ("Admin" active here),
-                   the optional "zur Cloud" jump (only for a cloud/SSO session), then account + logout —
-                   account/logout always top-right. One control language everywhere. *@
+                @* One control language everywhere: the Cloud | Website | Admin switch ("Admin" active here,
+                   Cloud is a SEGMENT of the switch — not a separate button — so its place never shifts),
+                   then account + logout, always top-right in the same spot. *@
                 <div class="admin-topbar-tools">
                     <partial name="_ViewSwitch" model="@(new MatCMS.Shared.Web.ViewSwitch(
                         Active: "admin",
-                        CloudUrl: null, WebUrl: "/", AdminUrl: null,
+                        CloudUrl: cloudLink, WebUrl: "/", AdminUrl: null,
                         CloudLabel: T["adminbar.viewCloud"], WebLabel: T["adminbar.viewWebsite"], AdminLabel: T["adminbar.viewAdmin"]))" />
-                    @if (cloudLink is not null)
-                    {
-                        <a class="mab-stool mab-cloud" href="@cloudLink" title="@T["adminbar.viewCloud"]" aria-label="@T["adminbar.viewCloud"]"><i class="ti ti-cloud" aria-hidden="true"></i></a>
-                    }
                     <a class="mab-stool mab-account" asp-page="/Admin/Account/Index" title="@T["nav.account"]" aria-label="@T["nav.account"]"><i class="ti ti-user-circle" aria-hidden="true"></i></a>
                     <form method="post" asp-page="/Logout" style="margin:0;">
                         <button type="submit" class="mab-stool mab-out" title="@T["nav.logout"]" aria-label="@T["nav.logout"]"><i class="ti ti-logout-2" aria-hidden="true"></i></button>

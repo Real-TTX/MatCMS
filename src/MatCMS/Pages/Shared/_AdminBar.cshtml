@@ -1,15 +1,15 @@
 @inject MatCMS.Services.SiteContext Site
 @{
-    // "zur Cloud" is its OWN button (not a switch segment) and appears only for a session that came FROM
-    // the cloud (SSO → amr=sso) — a direct instance login has no cloud context. It deep-links to THIS
-    // instance's page on the cloud (the cloud resolves the public id → Details via /Admin/Instances/Open),
-    // so you land on the instance, not the cloud home. Website + Admin stay for every logged-in admin.
+    // Cloud is a SEGMENT of the switch (not a separate button), shown whenever this instance is
+    // cloud-connected (a CloudUrl is configured) — so the three views (Cloud | Website | Admin) are always
+    // the same control at the same place, and account/logout to its right never move. It deep-links to THIS
+    // instance's page on the cloud when the public id is known (cloud resolves it → Details via
+    // /Admin/Instances/Open), else the cloud home; from a direct login you sign in at the cloud on arrival.
     var cloudUrl = (Site.Get(MatCMS.Services.SettingKeys.CloudUrl) ?? "").Trim().TrimEnd('/');
     var cloudId = (Site.Get(MatCMS.Services.SettingKeys.CloudInstanceId) ?? "").Trim();
-    var fromCloud = ViewContext.HttpContext.User.HasClaim("amr", "sso");
-    var cloudLink = fromCloud && !string.IsNullOrEmpty(cloudUrl)
-        ? (!string.IsNullOrEmpty(cloudId) ? $"{cloudUrl}/Admin/Instances/Open/{Uri.EscapeDataString(cloudId)}" : cloudUrl)
-        : null;
+    var cloudLink = string.IsNullOrEmpty(cloudUrl)
+        ? null
+        : (!string.IsNullOrEmpty(cloudId) ? $"{cloudUrl}/Admin/Instances/Open/{Uri.EscapeDataString(cloudId)}" : cloudUrl);
     var editId = ViewContext.ViewData["AdminEditPageId"] as int?;
 }
 @* Admin bar over the LIVE site for logged-in back-office admins. First-party on the instance's own domain,
@@ -28,12 +28,8 @@
             }
             <partial name="_ViewSwitch" model="@(new MatCMS.Shared.Web.ViewSwitch(
                 Active: "web",
-                CloudUrl: null, WebUrl: null, AdminUrl: "/admin",
+                CloudUrl: cloudLink, WebUrl: null, AdminUrl: "/admin",
                 CloudLabel: T["adminbar.viewCloud"], WebLabel: T["adminbar.viewWebsite"], AdminLabel: T["adminbar.viewAdmin"]))" />
-            @if (cloudLink is not null)
-            {
-                <a class="mab-stool mab-cloud" href="@cloudLink" title="@T["adminbar.viewCloud"]" aria-label="@T["adminbar.viewCloud"]"><i class="ti ti-cloud" aria-hidden="true"></i></a>
-            }
             <a class="mab-stool mab-account" asp-page="/Admin/Account/Index" title="@T["nav.account"]" aria-label="@T["nav.account"]"><i class="ti ti-user-circle" aria-hidden="true"></i></a>
             <form method="post" asp-page="/Logout" class="mab-logout" style="margin:0;">
                 <button type="submit" class="mab-stool mab-out" title="@T["nav.logout"]" aria-label="@T["nav.logout"]"><i class="ti ti-logout-2" aria-hidden="true"></i></button>

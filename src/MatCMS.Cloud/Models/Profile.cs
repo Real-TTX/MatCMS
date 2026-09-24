@@ -185,6 +185,12 @@ public class Profile
     /// site. Empty = none. Rolled out only while <see cref="SyncAi"/> is on (rides the AiTransport group).</summary>
     public string? AiInstruction { get; set; }
 
+    /// <summary>Per-action AI guidance as a JSON map purpose→text ("pagegen"/"sitegen"/"theme"/"seo"). Each
+    /// entry is prepended to THAT action's built-in prompt on the instance (augments, never replaces), so an
+    /// operator can steer "how it builds pages" per action. Rolled out with <see cref="SyncAi"/> as
+    /// <c>ai.actionGuides</c>. Empty/"{}" = only the built-in defaults.</summary>
+    public string? AiActionGuidesJson { get; set; }
+
     /// <summary>When on, an assigned instance takes a LOCAL backup (a restore point) before applying any AI
     /// content op (MCP Stage 2) — the operator's safety switch for "let AI change my site, but keep a
     /// rollback". Rides on each op as <see cref="MatCMS.Shared.PendingContentOp.BackupFirst"/>. Independent

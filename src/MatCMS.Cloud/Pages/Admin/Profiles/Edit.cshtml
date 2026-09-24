@@ -421,6 +421,31 @@
                        inputmode="numeric" placeholder="@T["profiles.aiBudgetUnlimited"]" />
                 <div class="help">@T["profiles.aiBudgetHint"]</div>
             </div>
+            @{
+                var guides = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(
+                    string.IsNullOrWhiteSpace(Model.Item.AiActionGuidesJson) ? "{}" : Model.Item.AiActionGuidesJson!) ?? new();
+                string Guide(string k) => guides.TryGetValue(k, out var v) ? v : "";
+            }
+            <details class="card" style="margin-top:12px;">
+                <summary><strong>@T["profiles.aiGuidesHeading"]</strong></summary>
+                <div class="help" style="margin:.4rem 0 .6rem;">@T["profiles.aiGuidesHint"]</div>
+                <div class="form-field">
+                    <label for="guidePage">@T["profiles.aiGuidePage"]</label>
+                    <textarea id="guidePage" name="guidePage" rows="2" placeholder="@T["profiles.aiGuidePagePlaceholder"]">@Guide("pagegen")</textarea>
+                </div>
+                <div class="form-field">
+                    <label for="guideSite">@T["profiles.aiGuideSite"]</label>
+                    <textarea id="guideSite" name="guideSite" rows="2" placeholder="@T["profiles.aiGuideSitePlaceholder"]">@Guide("sitegen")</textarea>
+                </div>
+                <div class="form-field">
+                    <label for="guideTheme">@T["profiles.aiGuideTheme"]</label>
+                    <textarea id="guideTheme" name="guideTheme" rows="2" placeholder="@T["profiles.aiGuideThemePlaceholder"]">@Guide("theme")</textarea>
+                </div>
+                <div class="form-field">
+                    <label for="guideSeo">@T["profiles.aiGuideSeo"]</label>
+                    <textarea id="guideSeo" name="guideSeo" rows="2" placeholder="@T["profiles.aiGuideSeoPlaceholder"]">@Guide("seo")</textarea>
+                </div>
+            </details>
             <label class="checkbox-row" style="margin-top:10px;">
                 <input type="checkbox" name="backupBeforeAiChange" value="true" checked="@(Model.Item.BackupBeforeAiChange ? "checked" : null)" />
                 @T["profiles.aiBackupBefore"]

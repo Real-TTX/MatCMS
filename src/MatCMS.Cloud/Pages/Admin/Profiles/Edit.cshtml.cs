@@ -484,7 +484,8 @@ public class EditModel : PageModel
     /// <summary>Turns the AI group on for this profile and sets the monthly token budget per instance
     /// (empty/0 = unlimited). Saving this tab adds the group; the remove button takes it out. The
     /// provider key is NOT here — it lives centrally on the cloud (Einstellungen → KI).</summary>
-    public async Task<IActionResult> OnPostAiAsync(int id, bool enabled, string? budget, string? instruction, bool backupBeforeAiChange)
+    public async Task<IActionResult> OnPostAiAsync(int id, bool enabled, string? budget, string? instruction, bool backupBeforeAiChange,
+        string? guidePage, string? guideSite, string? guideTheme, string? guideSeo)
     {
         var profile = await _db.Profiles.FindAsync(id);
         if (profile is null) return RedirectToPage("Index");
@@ -499,6 +500,16 @@ public class EditModel : PageModel
         // Safety switch for MCP content ops: take a local backup on the site before applying an AI change.
         // Read live at heartbeat-offer time (not rolled out via config), so it needs no revision bump.
         profile.BackupBeforeAiChange = backupBeforeAiChange;
+
+        // Per-action guidance: keep only non-empty entries; store as a compact JSON map (null when all empty
+        // so an unset profile stays clean). Rolled out with the AI group; TouchAsync below bumps the revision.
+        var guides = new Dictionary<string, string>();
+        void Add(string key, string? val) { var t = (val ?? "").Trim(); if (t.Length > 0) guides[key] = t; }
+        Add("pagegen", guidePage);
+        Add("sitegen", guideSite);
+        Add("theme", guideTheme);
+        Add("seo", guideSeo);
+        profile.AiActionGuidesJson = guides.Count == 0 ? null : System.Text.Json.JsonSerializer.Serialize(guides);
 
         await _db.SaveChangesAsync();
         await _profiles.TouchAsync(id);

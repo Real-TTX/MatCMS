@@ -240,6 +240,27 @@ public class CloudSyncService
                 await SaveAsync(ct);
             }
 
+            // Per-action AI guidance (JSON map purpose→text). Same ride-with-the-AI-group + reset-when-
+            // cleared pattern as the global instruction above.
+            {
+                var guides = (config.AiActionGuidesJson ?? "").Trim();
+                var row = await _db.SiteSettings.FirstOrDefaultAsync(s => s.Key == SettingKeys.AiActionGuides, ct);
+                if (row is null)
+                {
+                    if (guides.Length > 0)
+                    {
+                        if (!_dryRun) _db.SiteSettings.Add(new SiteSetting { Key = SettingKeys.AiActionGuides, Value = guides });
+                        Report("setting", SettingKeys.AiActionGuides, "installed", guides);
+                    }
+                }
+                else if (row.Value != guides)
+                {
+                    if (!_dryRun) row.Value = guides;
+                    Report("setting", SettingKeys.AiActionGuides, "updated", guides);
+                }
+                await SaveAsync(ct);
+            }
+
             if (config.Users is not null)
             {
                 var plan = Plan(PayloadUsers, config.UsersMode, seeded);

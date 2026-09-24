@@ -35,9 +35,29 @@ public class AiService
         var context = (_site.Get(SettingKeys.AiInstruction) ?? "").Trim();
         if (context.Length > 0)
             msgs.Add(new AiMessage { Role = "system", Content = "Kontext dieser Website (immer beachten):\n" + context });
+        // Per-action operator guidance (rolled out from the profile, keyed by purpose): augments the
+        // built-in action prompt below WITHOUT replacing it, so "how it builds pages" can be steered per
+        // action without touching code. Empty / unknown purpose = nothing added.
+        var guide = ActionGuide(purpose);
+        if (guide.Length > 0)
+            msgs.Add(new AiMessage { Role = "system", Content = "Zusätzliche Vorgabe für diese Aktion (immer beachten):\n" + guide });
         msgs.AddRange(messages.Select(m => new AiMessage { Role = m.role, Content = m.content }));
         var req = new AiRequest { Purpose = purpose, MaxTokens = maxTokens, Messages = msgs };
         return await _cloud.CallAiAsync(req, ct);
+    }
+
+    /// <summary>The operator's extra guidance for one action ("pagegen"/"sitegen"/"theme"/"seo"), from the
+    /// rolled-out <c>ai.actionGuides</c> JSON map (purpose → text). Empty when unset or malformed.</summary>
+    private string ActionGuide(string purpose)
+    {
+        var json = (_site.Get(SettingKeys.AiActionGuides) ?? "").Trim();
+        if (json.Length == 0) return "";
+        try
+        {
+            var map = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+            return map != null && map.TryGetValue(purpose, out var g) ? (g ?? "").Trim() : "";
+        }
+        catch { return ""; }
     }
 
     /// <summary>Rewrites a single piece of prose to a given instruction, returning ONLY the rewritten

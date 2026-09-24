@@ -313,6 +313,9 @@ public class ProfileService
         {
             config.AiTransport = "cloud";
             config.AiInstruction = string.IsNullOrWhiteSpace(profile.AiInstruction) ? null : profile.AiInstruction.Trim();
+            // Per-action guidance map (empty/"{}" = only built-in defaults on the instance).
+            var guides = (profile.AiActionGuidesJson ?? "").Trim();
+            config.AiActionGuidesJson = guides is "" or "{}" ? null : guides;
         }
 
         if (profile.SyncUsers)

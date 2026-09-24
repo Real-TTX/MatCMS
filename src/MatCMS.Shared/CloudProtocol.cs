@@ -249,6 +249,11 @@ public sealed class InstanceConfig
     /// Rides with <see cref="AiTransport"/>; a site that predates the field simply ignores it.</summary>
     public string? AiInstruction { get; set; }
 
+    /// <summary>Per-action AI guidance as a JSON map purpose→text ("pagegen"/"sitegen"/"theme"/"seo"),
+    /// each augmenting that action's built-in prompt on the instance. Rides with <see cref="AiTransport"/>
+    /// like <see cref="AiInstruction"/>; a site that predates the field ignores it. Empty/null = none.</summary>
+    public string? AiActionGuidesJson { get; set; }
+
     /// <summary>When true, the instance removes the built-in default <c>admin</c> account — but ONLY if
     /// it still carries the default password (untouched) AND at least one OTHER Admin remains, so a
     /// provisioned site can shed its well-known default login without ever risking a lock-out. Default

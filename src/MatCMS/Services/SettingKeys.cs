@@ -109,6 +109,11 @@ public static class SettingKeys
     /// cloud profile — never edited on the instance.</summary>
     public const string AiInstruction = "ai.instruction";
 
+    /// <summary>Per-action AI guidance rolled out from the cloud profile: a JSON map purpose→text
+    /// ("pagegen"/"sitegen"/"theme"/"seo"), each augmenting that action's built-in prompt. Empty = none.
+    /// Set only via the cloud profile — never edited on the instance.</summary>
+    public const string AiActionGuides = "ai.actionGuides";
+
     /// <summary>Whether finished backups are handed to the connected cloud. Off unless somebody says
     /// otherwise — uploading a customer's whole site somewhere is a decision, not a default.</summary>
     public const string BackupToCloud = "backup.toCloud";

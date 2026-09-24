@@ -59,10 +59,11 @@
          no RID matrix in the publish output, no extra apt package in the Dockerfile, and a build on
          Windows behaves like the one inside the Linux container. -->
     <PackageReference Include="SixLabors.ImageSharp" Version="2.1.*" />
-    <!-- Sanitises HTML that did NOT come from a trusted admin — specifically rich content an AI supplies
-         via the cloud's MCP content ops (Post.ContentHtml is rendered raw, so unsanitised model output
-         would be stored XSS). See Services/SafeHtml.cs. -->
-    <PackageReference Include="HtmlSanitizer" Version="9.*" />
+    <!-- Lean HTML parser for Services/SafeHtml.cs, which sanitises AI-supplied rich content (rendered raw,
+         so unsanitised model output would be stored XSS). HtmlAgilityPack is a small parser with no CSS
+         engine and no persistent parser state — chosen over the AngleSharp-based HtmlSanitizer, whose
+         one-time ~30 MB footprint bloated each instance's working set. -->
+    <PackageReference Include="HtmlAgilityPack" Version="1.*" />
   </ItemGroup>
 
   <ItemGroup>

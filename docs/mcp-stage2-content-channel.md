@@ -193,40 +193,70 @@ Non-negotiables, all consistent with the existing rules:
 
 ---
 
-## 6. Phased implementation checklist
+## 6. Phased implementation checklist (per the decisions above — everything single-site via B)
 
-**Phase 2a — config via A (small, reuses everything):**
-- [ ] MCP tools `set_setting`, `add_component` writing profile rows + `ProfileService.TouchAsync`.
-- [ ] Decide single-instance-profile UX (does every instance get an implicit profile?).
-- [ ] No wire change; verify via `CloudSyncService.PreviewAsync`.
+Architecture A is **out of scope for the AI** now (fleet-only, operator-driven). All AI change is B.
 
-**Phase 2b — content read surface:**
-- [ ] Extend heartbeat or add a pull so the cloud has a page index (slug/title/locale/published).
-- [ ] `GET /api/v1/instances/{id}/pages` + MCP `list_pages` / `get_page`.
+**Phase 2a — content READ surface (R1, reuse backups):**
+- [ ] Cloud-side parser that reads the backup ZIP (`ContentTransferService`'s export format) into a
+      page/block/form/post model **without importing** — read-only.
+- [ ] MCP read tools over the freshest available (or freshly requested) backup: `list_pages`,
+      `get_page` (blocks), `list_posts`, `get_post`, `list_forms`, `get_form`.
+- [ ] Decide/refresh policy: use the newest backup, or auto-`request_backup` when stale, and tell the AI
+      "reading as of backup taken at T".
 
-**Phase 2c — content write via B (the core):**
-- [ ] Bump `CloudProtocol.Version` 14 → 15; add `PendingContentOp`, `ContentOpReport`, heartbeat fields.
-- [ ] Cloud `ContentOp` table + enqueue/report + `GET /api/instances/{id}/content-ops` + prune.
-- [ ] Instance `ContentSyncService` dispatching to `BlockGenerator` + add-only page writer +
-      `ContentTransferService`.
-- [ ] MCP tools `create_page`, `update_page_blocks`, `generate_site`, `get_sync_status` (CanRestore-gated).
-- [ ] Instance-side preview parity (a dry-run like `CloudSyncService.PreviewAsync`).
+**Phase 2b — the content-op channel (the core write path):**
+- [ ] Bump `CloudProtocol.Version` 14 → 15; add `PendingContentOp`, `ContentOpReport` + heartbeat fields
+      (`PendingContentOps`, `ContentOpReport`), in `MatCMS.Shared/CloudProtocol.cs`.
+- [ ] Cloud `ContentOp` table + enqueue/report + `GET /api/instances/{id}/content-ops` + prune + log
+      (`InstanceEventKind`).
+- [ ] Instance `ContentSyncService` pulling ops and dispatching to its OWN validated writers:
+      `BlockGenerator.ValidateBlocks` (blocks/pages), the add-only page writer, the post/form writers, and
+      `ContentTransferService.ImportAsync` for whole-fragment imports. Reports each op's outcome back.
 
-**Phase 2d — safety polish:**
-- [ ] Auto-backup before any `overwrite` op; op log entries; protocol-gate hiding.
+**Phase 2c — full op set (MCP tools, all CanRestore-gated for writes):**
+- [ ] `create_page`, `update_page_blocks`, `create_post`, `update_post`, `create_form`, `set_setting`
+      (single-site → op, never a profile row), `generate_page`, `generate_site` (reuse the instance AI
+      generators' validated path).
+
+**Phase 2d — safety:**
+- [ ] New profile flag `Profile.BackupBeforeAiChange` (+ migration); when on, the instance takes a backup
+      before applying an op. Add-only default + `CanRestore` gate for overwrite remain. Protocol-gate hides
+      the channel from instances older than v15; ops offered only to `Approved` instances.
 
 ---
 
-## 7. Open questions for Matthias
+## 7. Decisions (locked 2026-09-24) + the one remaining question
 
-1. **Grain of "change a website":** whole-page/whole-site generation (coarse, matches the existing AI
-   generators) vs. fine-grained block edits (`update_page_blocks`)? Recommend starting coarse.
-2. **Profiles for single instances:** do we make every instance own a profile so Architecture A can
-   target it, or keep A strictly fleet-level and put *all* single-site changes through B?
-3. **Content read surface:** heartbeat-reported page index (cheap, slightly stale) vs. cloud-triggered
-   snapshot pull (fresh, heavier)? Affects how "smart" the AI can be about existing content.
-4. **Overwrite policy:** should any overwrite op force a backup first (safer, slower) or trust
-   `CanRestore` + the add-only default?
-5. **Synchronicity expectation:** the AI must be told "queued, applied within ~a minute" — acceptable
-   UX, or do we want a faster push for local instances (which would break the outbound-only purity)?
-6. **Scope beyond pages:** posts, menus, forms, media — in scope for Stage 2 or a later stage?
+Matthias' decisions:
+
+1. **No per-instance profiles.** Giving each website its own profile would contradict the whole point of
+   profiles (grouping many instances under shared config). So **Architecture A stays strictly
+   fleet-level** — the operator's profile-rollout tool, not an AI-per-site path. **ALL single-site change
+   goes through Architecture B**, including single-site settings (`setting.set` is a `PendingContentOp`,
+   never a profile row — a profile row would change every sibling in that profile).
+2. **Grain: both, and the full surface.** The AI must be able to edit individual **blocks**, create
+   **pages**, and create/edit **forms, posts** (menus, media, …) — "essentially everything a backup
+   contains". So Stage 2 is not "coarse-only": it is fine-grained ops **plus** whole-page/site generation,
+   over the full content surface, all through B.
+3. **Backup-before-AI-change is a profile option.** A new profile flag (e.g. `Profile.BackupBeforeAiChange`)
+   — the instance already belongs to a (shared) profile, so the flag rides that, no per-site profile
+   needed. When on, the instance takes a backup before applying a content op (esp. any overwrite). This is
+   the safety switch; `CanRestore` + add-only default remain underneath.
+4. **Async is accepted.** Outbound-only stays; tools return "queued as op N", the outcome shows via the
+   report. No inbound push for local instances.
+
+**The one open question — the content READ surface.** To edit "block 3 on the About page" the AI must
+first SEE the current content. Two shapes (pick one, or a phased mix):
+- **(R1) Reuse backups:** the AI reads current content by pulling a **fresh backup** (`request_backup` →
+  download → the cloud parses the ZIP and exposes pages/blocks/forms/posts as read tools). Zero new wire
+  contract — the whole read surface is "what's in a backup", which is exactly the scope in decision 2. Cost:
+  a read means producing+transferring a backup (heavier, ~a minute of latency), and the cloud must parse the
+  backup format.
+- **(R2) A dedicated content read channel:** new heartbeat/pull endpoints returning page/block/form/post
+  JSON directly (lighter per-read, fresher), but a new slice of wire contract to design and version, partly
+  duplicating what the backup already serializes.
+
+Recommendation: **start with R1** (reuses the Stage-1 backup path we just built, matches "everything in a
+backup" exactly, no new wire contract for reads), add R2 later only if backup-latency per read proves
+annoying. This needs Matthias' nod before Phase 2b.

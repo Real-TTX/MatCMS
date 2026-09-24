@@ -237,6 +237,7 @@ public class InstanceService
             instance.Name = beat.SiteName!.Trim();
 
         await RecordSyncReportAsync(instance, beat, ct);
+        await RecordContentOpReportsAsync(instance, beat, ct);
         await ClassifyAsync(instance, ct);
 
         if (firstEver)
@@ -294,8 +295,85 @@ public class InstanceService
                         ? "Die Cloud sichert diese Website, bevor sie entfernt wird."
                         : "Die Cloud hat ein Backup angefordert."
                 }
+                : null,
+
+            // Content operations (AI changes) to apply. Only for an approved instance, and only one that
+            // speaks the contract that introduced them (v15) — an older instance ignores the field and
+            // would never report back, so an op offered to it would stand for ever. Offered on every beat
+            // until reported; add-only ops are idempotent, so a re-offer after a lost report is harmless.
+            ContentOps = instance.Status == InstanceStatus.Approved && beat.ProtocolVersion >= 15
+                ? await PendingContentOpsAsync(instance.Id, ct)
                 : null
         };
+    }
+
+    /// <summary>Enqueues a content operation for an instance (the MCP server's write path). The cloud only
+    /// records the intent; the instance applies it on its next beat through its own validated writers and
+    /// reports back. The returned row's <see cref="ContentOp.Id"/> is the op id the caller can poll on.</summary>
+    public async Task<ContentOp> EnqueueContentOpAsync(Instance instance, string kind, string payloadJson,
+        bool overwrite, string? reason, CancellationToken ct = default)
+    {
+        var op = new ContentOp
+        {
+            InstanceId = instance.Id,
+            Kind = kind,
+            PayloadJson = payloadJson,
+            Overwrite = overwrite,
+            Reason = reason
+        };
+        _db.ContentOps.Add(op);
+        Log(instance, InstanceEventKind.ContentOpQueued, $"KI-Änderung eingereiht ({kind}).");
+        await _db.SaveChangesAsync(ct);
+        return op;
+    }
+
+    /// <summary>The still-pending content ops for an instance, oldest first, as the wire DTO. Null (not an
+    /// empty list) when there are none, so the heartbeat response carries nothing.</summary>
+    private async Task<List<PendingContentOp>?> PendingContentOpsAsync(int instanceId, CancellationToken ct)
+    {
+        var ops = await _db.ContentOps.AsNoTracking()
+            .Where(o => o.InstanceId == instanceId && o.DoneAt == null)
+            .OrderBy(o => o.Id)
+            .Select(o => new PendingContentOp
+            {
+                OpId = o.Id,
+                Kind = o.Kind,
+                PayloadJson = o.PayloadJson,
+                Overwrite = o.Overwrite,
+                Reason = o.Reason
+            })
+            .ToListAsync(ct);
+        return ops.Count == 0 ? null : ops;
+    }
+
+    /// <summary>Folds the instance's reported content-op outcomes into their rows (so each is marked done and
+    /// stops being offered) and logs them, then prunes long-done ops so the table stays bounded — the same
+    /// "the report is what the cloud records, it computes nothing" shape as the sync report.</summary>
+    private async Task RecordContentOpReportsAsync(Instance instance, HeartbeatRequest beat, CancellationToken ct)
+    {
+        if (beat.ContentOpReports is { Count: > 0 })
+        {
+            foreach (var r in beat.ContentOpReports)
+            {
+                var op = await _db.ContentOps.FirstOrDefaultAsync(o => o.Id == r.OpId && o.InstanceId == instance.Id, ct);
+                if (op is null || op.DoneAt is not null) continue;   // unknown, or already recorded on an earlier beat
+                op.DoneAt = DateTime.UtcNow;
+                op.Outcome = r.Outcome;
+                op.Detail = r.Detail;
+                var failed = string.Equals(r.Outcome, "failed", StringComparison.Ordinal);
+                Log(instance, failed ? InstanceEventKind.ContentOpFailed : InstanceEventKind.ContentOpApplied,
+                    failed
+                        ? $"KI-Änderung fehlgeschlagen ({op.Kind}): {r.Detail}"
+                        : $"KI-Änderung angewendet ({op.Kind}): {r.Outcome}{(string.IsNullOrWhiteSpace(r.Detail) ? "" : " – " + r.Detail)}");
+            }
+        }
+
+        // Prune this instance's long-done ops (>2 days). A heartbeat is the only moment this table grows for
+        // a site, so this is the natural place to trim it.
+        var cutoff = DateTime.UtcNow - TimeSpan.FromDays(2);
+        await _db.ContentOps
+            .Where(o => o.InstanceId == instance.Id && o.DoneAt != null && o.DoneAt < cutoff)
+            .ExecuteDeleteAsync(ct);
     }
 
     /// <summary>Folds the instance's self-reported sync outcome into its record and logs the

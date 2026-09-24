@@ -36,7 +36,14 @@ public enum InstanceEventKind
     /// <summary>An operator uploaded a backup ZIP into the cloud for this instance. Its own kind
     /// because it enters a restorable file the site never produced — the trail should say where a
     /// backup that suddenly appears came from.</summary>
-    BackupUploaded = 18
+    BackupUploaded = 18,
+
+    /// <summary>A content operation (an AI change via the MCP server) was queued for / applied on /
+    /// failed on this instance. Its own kinds because these CHANGE a live site's content from outside,
+    /// and — like a restore — should be findable as such rather than buried among sync entries.</summary>
+    ContentOpQueued = 19,
+    ContentOpApplied = 20,
+    ContentOpFailed = 21
 }
 
 /// <summary>Audit trail per instance: what happened, and whether a notification went out for it.

@@ -32,6 +32,9 @@ public class AppDbContext : DbContext
     // Registered OAuth clients for the Authorization Code connector flow (native "Sign in", e.g. a ChatGPT GPT).
     public DbSet<OAuthClient> OAuthClients => Set<OAuthClient>();
 
+    // Pending/completed content operations (AI changes via the MCP server), per instance.
+    public DbSet<ContentOp> ContentOps => Set<ContentOp>();
+
     // Per-user instance scope for the "Operator" role (login users, not API keys).
     public DbSet<UserInstance> UserInstances => Set<UserInstance>();
 
@@ -119,6 +122,13 @@ public class AppDbContext : DbContext
             .OnDelete(DeleteBehavior.Cascade);
 
         b.Entity<InstanceEvent>().HasIndex(e => new { e.InstanceId, e.CreatedAt });
+
+        // Content ops cascade with their instance; the pending ones are looked up per instance on every
+        // heartbeat, so index (InstanceId, DoneAt) — the exact filter "still pending for this site".
+        b.Entity<ContentOp>()
+            .HasOne(o => o.Instance).WithMany()
+            .HasForeignKey(o => o.InstanceId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<ContentOp>().HasIndex(o => new { o.InstanceId, o.DoneAt });
 
         // The join code is what an enrolling instance is resolved by, so it must be unique and fast.
         b.Entity<Profile>().HasIndex(p => p.JoinCode).IsUnique();

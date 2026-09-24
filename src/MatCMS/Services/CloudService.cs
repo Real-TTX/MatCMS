@@ -52,6 +52,29 @@ public class CloudState
 
     public bool IsPending => string.Equals(Status, "Pending", StringComparison.OrdinalIgnoreCase);
     public bool OutOfSync => ConfigRevision > 0 && AppliedRevision != ConfigRevision;
+
+    // Outcomes of content ops applied while handling one heartbeat's response, held until the NEXT beat's
+    // request carries them back (same "report on the next beat" shape as the sync report). In-memory: a
+    // lost report means the cloud re-offers the op, and content ops are add-only/idempotent, so the worst
+    // case is a harmless re-apply — never a duplicate.
+    private readonly object _contentOpLock = new();
+    private readonly List<ContentOpReport> _contentOpReports = new();
+
+    public void AddContentOpReports(IEnumerable<ContentOpReport> reports)
+    {
+        lock (_contentOpLock) _contentOpReports.AddRange(reports);
+    }
+
+    public List<ContentOpReport>? TakeContentOpReports()
+    {
+        lock (_contentOpLock)
+        {
+            if (_contentOpReports.Count == 0) return null;
+            var copy = _contentOpReports.ToList();
+            _contentOpReports.Clear();
+            return copy;
+        }
+    }
 }
 
 /// <summary>
@@ -347,6 +370,26 @@ public class CloudService
                     await backups.ReportRestoreAsync(restore.BackupId, ok, error, ct);
                 }
             }
+
+            // Content operations (AI changes via the cloud's MCP server). AFTER a restore in the same beat,
+            // for the same reason the backup runs before it: an op must apply to the state the restore
+            // imposed, not the other way round. Each op is applied through the site's OWN validated writer;
+            // the outcomes are held and reported on the next beat (see CloudState.TakeContentOpReports).
+            if (answer?.ContentOps is { Count: > 0 } ops)
+            {
+                var applier = _services.GetService<ContentOpApplier>();
+                if (applier is not null)
+                {
+                    var reports = new List<ContentOpReport>(ops.Count);
+                    foreach (var op in ops)
+                    {
+                        var report = await applier.ApplyAsync(op, ct);
+                        reports.Add(report);
+                        _log.LogInformation("Applied content op {OpId} ({Kind}) → {Outcome}.", op.OpId, op.Kind, report.Outcome);
+                    }
+                    _state.AddContentOpReports(reports);
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -539,7 +582,9 @@ public class CloudService
             AppliedRevision = await _sync.AppliedRevisionAsync(ct),
             SyncError = await _sync.LastErrorAsync(ct),
             SyncReport = await _sync.LastReportAsync(ct),
-            SyncRunAt = await _sync.LastRunAtAsync(ct)
+            SyncRunAt = await _sync.LastRunAtAsync(ct),
+            // Outcomes of content ops applied while handling the previous beat's response, if any.
+            ContentOpReports = _state.TakeContentOpReports()
         };
     }
 

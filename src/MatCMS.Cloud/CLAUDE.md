@@ -861,8 +861,21 @@ the admin UI uses. There is no second restore path and no second backup format.
   and restore is gated on `CanRestore`. **Stage 1 mirrors the operator API's ACTIONS only**: `list_instances`,
   `get_instance`, `list_backups`, `request_backup`, `restore_backup` — all through the SAME
   `InstanceService`/`BackupStore` as the UI and REST. The raw backup **download/upload stays REST** on
-  purpose (streaming a multi-MB ZIP through a chat model is pointless). Changing a connected site's CONTENT is
-  **Stage 2**, a separate pull-based channel — designed in `docs/mcp-stage2-content-channel.md`, not built.
+  purpose (streaming a multi-MB ZIP through a chat model is pointless).
+- **MCP content ops (Stage 2, Increment 1 — built).** Changing a connected site's CONTENT does NOT ride the
+  profile rollout (content is per-site; abusing `Profile.Revision` would thrash every sibling). It is a
+  separate pull-based channel modelled on the pending-backup flow: `Mcp/ContentTools.cs` (`create_page`,
+  `get_content_op`, restore-right-gated) enqueues a `ContentOp` (`Models/ContentOp.cs`, table `ContentOps`,
+  migration `AddContentOps`); `InstanceService` offers the pending ops on the heartbeat response
+  (`HeartbeatResponse.ContentOps`, only to `Approved` instances speaking protocol ≥ 15) and folds the
+  instance's `ContentOpReports` back (marks each done, logs `InstanceEventKind.ContentOp*`, prunes >2 days).
+  The op carries **intent as JSON, never code**; the INSTANCE re-validates and applies it through its OWN
+  writer (`MatCMS/Services/ContentOpApplier.cs` → `BlockGenerator.ValidateBlocks` + the add-only page
+  writer) and reports on its next beat (`CloudState` holds the outcomes between beats). Add-only (slug
+  dedupe → `skipped-exists`), so a re-offer after a lost report is idempotent. The rest of Stage 2 (editing
+  existing content, which needs a read surface via R1/backups; posts/forms/settings ops; the
+  `BackupBeforeAiChange` profile flag for overwrite ops) is designed in `docs/mcp-stage2-content-channel.md`.
+  **This bumped `CloudProtocol.Version` 14 → 15 — cloud and instances must deploy together.**
 
 ## Backlog
 

@@ -15,7 +15,7 @@ public static class CloudProtocol
     /// <summary>Contract version. Bump on <b>every</b> change to the payloads in this file: the cloud
     /// badges an instance reporting an older one as "veraltet", and both sides read this constant, so
     /// one edit covers both.</summary>
-    public const int Version = 14;
+    public const int Version = 15;
 
     /// <summary>Header carrying the instance's bearer token.</summary>
     public const string TokenHeader = "X-MatCMS-Instance-Token";
@@ -113,6 +113,13 @@ public sealed class HeartbeatRequest
     /// report, which is why the cloud must treat it as "no information", not "nothing happened".</summary>
     public List<SyncItemReport>? SyncReport { get; set; }
 
+    /// <summary>Outcomes of the content operations (see <see cref="PendingContentOp"/>) this instance
+    /// pulled and applied since it last reported. Each entry lets the cloud mark that op done and stop
+    /// offering it. Null/empty from an instance that predates content ops — the cloud then simply keeps
+    /// the op pending (and the protocol gate stops it offering one to such an instance in the first
+    /// place). Rides on the beat, like <see cref="SyncReport"/>.</summary>
+    public List<ContentOpReport>? ContentOpReports { get; set; }
+
     /// <summary>
     /// When the instance finished that apply (UTC). The same report rides on every beat until the
     /// next apply, so this is what tells the cloud "this is a NEW run" — without it, a re-apply that
@@ -169,6 +176,14 @@ public sealed class HeartbeatResponse
     /// <summary>Current revision of the assigned profile. When it differs from what the instance
     /// applied, the instance pulls <c>/api/instances/{id}/config</c>. 0 = nothing to sync.</summary>
     public int ConfigRevision { get; set; }
+
+    /// <summary>Content operations the cloud wants this instance to apply — pages to create, blocks to
+    /// change, a site to generate (see <see cref="PendingContentOp"/>). Null/empty is the normal case,
+    /// so an instance that predates the field simply never applies one — the right way for an unknown
+    /// instruction about changing a live site to fail. Same pull shape as <see cref="Backup"/>: the
+    /// cloud only ASKS; the instance applies each op through its OWN validated writers and reports back
+    /// in <see cref="HeartbeatRequest.ContentOpReports"/>.</summary>
+    public List<PendingContentOp>? ContentOps { get; set; }
 }
 
 // --- Configuration payload ------------------------------------------------
@@ -316,6 +331,57 @@ public sealed class BackupReport
 
     /// <summary>Name of the file the instance produced, for the log entry.</summary>
     public string? FileName { get; set; }
+}
+
+/// <summary>
+/// One content change the cloud wants this instance to apply — the write side of Stage 2 (an AI, via the
+/// cloud's MCP server, changing a connected site). Built exactly like <see cref="PendingBackup"/>: it rides
+/// on the heartbeat, the cloud only ASKS, and the instance does the work with the SAME validated writers it
+/// uses for its own AI generators (never applying anything as code). Add-only by default; a destructive
+/// (overwrite) op is the "restore" of content and is gated cloud-side on the key's restore right.
+/// <para>Delivered in a batch (<see cref="HeartbeatResponse.ContentOps"/>) so several changes apply in one
+/// beat. Re-delivered until the matching <see cref="ContentOpReport"/> arrives; because add-only ops are
+/// idempotent (a create dedupes by slug), a lost report costs a harmless re-apply, not a duplicate.</para>
+/// </summary>
+public sealed class PendingContentOp
+{
+    /// <summary>Identifies THIS op; echoed in <see cref="ContentOpReport.OpId"/> so the cloud can mark it
+    /// done and stop offering it. A counter, for the same reason as <see cref="PendingBackup.RequestId"/>.</summary>
+    public int OpId { get; set; }
+
+    /// <summary>What to do. Increment 1: "page.create" | "page.generate" | "site.generate". The instance
+    /// dispatches on this and refuses a kind it does not know (reported as "failed"), never guessing.</summary>
+    public string Kind { get; set; } = "";
+
+    /// <summary>The op's parameters as JSON — shape depends on <see cref="Kind"/> (e.g. a page's title +
+    /// slug + blocks, or a generation briefing). A string, not a typed field, so a new kind needs no
+    /// contract change; the instance parses and RE-VALIDATES it with its own validators.</summary>
+    public string PayloadJson { get; set; } = "";
+
+    /// <summary>False = add-only (create what is missing, never overwrite — the safe default). True =
+    /// overwrite existing content; only ever set for a caller whose key may restore, and the instance
+    /// still applies it through its validated writer.</summary>
+    public bool Overwrite { get; set; }
+
+    /// <summary>Why the cloud is asking, in the site's language — written to the instance's log so its
+    /// operator sees that the cloud (an AI action) made this change.</summary>
+    public string? Reason { get; set; }
+}
+
+/// <summary>
+/// What an instance reports back after attempting a <see cref="PendingContentOp"/>. The cloud stores it and
+/// stops offering the op; it computes nothing itself, exactly like <see cref="SyncItemReport"/>.
+/// </summary>
+public sealed class ContentOpReport
+{
+    public int OpId { get; set; }
+
+    /// <summary>"applied" | "partial" | "skipped-exists" | "failed".</summary>
+    public string Outcome { get; set; } = "";
+
+    /// <summary>Human detail for the operator: what was created (e.g. the page slug), why it was skipped,
+    /// or the error. Shown verbatim.</summary>
+    public string? Detail { get; set; }
 }
 
 public sealed class MailRequest

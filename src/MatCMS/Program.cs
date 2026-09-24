@@ -202,6 +202,9 @@ builder.Services.AddSingleton<CloudState>();
 builder.Services.AddScoped<CloudService>();
 builder.Services.AddScoped<CloudSyncService>();
 builder.Services.AddScoped<CloudCatalogService>();
+// Applies cloud-offered content operations (AI changes via the MCP server) through the site's own
+// validated writers. Resolved on demand by CloudService while handling a heartbeat response.
+builder.Services.AddScoped<ContentOpApplier>();
 builder.Services.AddHostedService<CloudConnectionService>();
 // Meldet sich selbst an, wenn MatCms:Cloud:Url und :JoinCode gesetzt sind — der Weg, auf dem eine
 // aus der Cloud erzeugte Instanz ohne Zutun in ihr Profil findet.

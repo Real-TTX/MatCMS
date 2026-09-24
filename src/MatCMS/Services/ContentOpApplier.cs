@@ -34,6 +34,7 @@ public class ContentOpApplier
             return op.Kind switch
             {
                 "page.create" => await CreatePageAsync(op, ct),
+                "post.create" => await CreatePostAsync(op, ct),
                 "pages.list" => await ListPagesAsync(op, ct),
                 "page.read" => await ReadPageAsync(op, ct),
                 "page.updateBlocks" => await UpdatePageBlocksAsync(op, ct),
@@ -92,6 +93,39 @@ public class ContentOpApplier
         await _db.SaveChangesAsync(ct);
 
         return Report(op, "applied", $"Seite „{slug}“ mit {validated.Count} Block/Blöcken angelegt.");
+    }
+
+    private async Task<ContentOpReport> CreatePostAsync(PendingContentOp op, CancellationToken ct)
+    {
+        var payload = JsonNode.Parse(op.PayloadJson) as JsonObject
+            ?? throw new InvalidOperationException("PayloadJson ist kein Objekt.");
+
+        var title = (payload["title"]?.GetValue<string>() ?? "").Trim();
+        var slug = Slugify(payload["slug"]?.GetValue<string>() ?? title);
+        var publish = payload["publish"]?.GetValue<bool>() ?? true;
+        if (string.IsNullOrWhiteSpace(title)) return Report(op, "failed", "Kein Titel angegeben.");
+        if (string.IsNullOrWhiteSpace(slug)) return Report(op, "failed", "Kein gültiger Slug ableitbar.");
+
+        // Add-only by slug within the default locale.
+        if (await _db.Posts.AnyAsync(p => p.Slug == slug && p.Locale == Localizer.DefaultCulture, ct))
+            return Report(op, "skipped-exists", $"Beitrag „{slug}“ existiert bereits.");
+
+        // The body and teaser are AI-supplied HTML → SANITISE before it is ever stored (it is rendered raw
+        // on the public site). This is the whole reason SafeHtml exists.
+        var post = new Post
+        {
+            Title = title,
+            Slug = slug,
+            Excerpt = SafeHtml.Sanitize(payload["excerpt"]?.GetValue<string>()),
+            ContentHtml = SafeHtml.Sanitize(payload["contentHtml"]?.GetValue<string>()),
+            Tags = (payload["tags"]?.GetValue<string>() ?? "").Trim(),
+            Locale = Localizer.DefaultCulture,
+            IsPublished = publish,
+            PublishedAt = DateTime.UtcNow,
+        };
+        _db.Posts.Add(post);
+        await _db.SaveChangesAsync(ct);
+        return Report(op, "applied", $"Beitrag „{slug}“ angelegt{(publish ? " und veröffentlicht" : " (Entwurf)")}.");
     }
 
     // --- Reads: the instance serializes its OWN content back (the cloud never parses the format) ----------

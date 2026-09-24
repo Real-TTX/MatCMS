@@ -92,6 +92,8 @@
   "profiles.aiBudget": "Monthly token budget per instance",
   "profiles.aiBudgetUnlimited": "empty = unlimited",
   "profiles.aiBudgetHint": "The cloud grants and enforces it; the instance never sees the number. Over budget, AI features pause until the month rolls over.",
+  "profiles.aiBackupBefore": "Backup before AI change",
+  "profiles.aiBackupBeforeHint": "The site takes a local restore point before every AI content change (via MCP), so an unwanted change can be rolled back.",
   "profiles.aiRemoveConfirm": "Stop rolling AI out for this profile?",
   "nav.twofactor": "Two-factor",
   "login.2fa.pageTitle": "Two-factor verification",

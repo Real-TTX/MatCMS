@@ -185,6 +185,13 @@ public class Profile
     /// site. Empty = none. Rolled out only while <see cref="SyncAi"/> is on (rides the AiTransport group).</summary>
     public string? AiInstruction { get; set; }
 
+    /// <summary>When on, an assigned instance takes a LOCAL backup (a restore point) before applying any AI
+    /// content op (MCP Stage 2) — the operator's safety switch for "let AI change my site, but keep a
+    /// rollback". Rides on each op as <see cref="MatCMS.Shared.PendingContentOp.BackupFirst"/>. Independent
+    /// of <see cref="SyncBackup"/> (that rolls out the backup SCHEDULE); this is only about AI changes, so it
+    /// applies even to a site that does not push scheduled backups to the cloud.</summary>
+    public bool BackupBeforeAiChange { get; set; }
+
     /// <summary>
     /// Name of the template that should be the ACTIVE design on every assigned instance. Empty means
     /// "roll the templates out but leave the choice to the site" — switching the live design of a

@@ -484,7 +484,7 @@ public class EditModel : PageModel
     /// <summary>Turns the AI group on for this profile and sets the monthly token budget per instance
     /// (empty/0 = unlimited). Saving this tab adds the group; the remove button takes it out. The
     /// provider key is NOT here — it lives centrally on the cloud (Einstellungen → KI).</summary>
-    public async Task<IActionResult> OnPostAiAsync(int id, bool enabled, string? budget, string? instruction)
+    public async Task<IActionResult> OnPostAiAsync(int id, bool enabled, string? budget, string? instruction, bool backupBeforeAiChange)
     {
         var profile = await _db.Profiles.FindAsync(id);
         if (profile is null) return RedirectToPage("Index");
@@ -496,6 +496,9 @@ public class EditModel : PageModel
         profile.AiMonthlyTokenBudget = int.TryParse((budget ?? "").Trim(), out var b) && b > 0 ? b : null;
         // Always-on context prepended to every AI prompt on assigned sites (brand/tone/language/facts).
         profile.AiInstruction = string.IsNullOrWhiteSpace(instruction) ? null : instruction.Trim();
+        // Safety switch for MCP content ops: take a local backup on the site before applying an AI change.
+        // Read live at heartbeat-offer time (not rolled out via config), so it needs no revision bump.
+        profile.BackupBeforeAiChange = backupBeforeAiChange;
 
         await _db.SaveChangesAsync();
         await _profiles.TouchAsync(id);

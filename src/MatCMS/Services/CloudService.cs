@@ -380,6 +380,28 @@ public class CloudService
                 var applier = _services.GetService<ContentOpApplier>();
                 if (applier is not null)
                 {
+                    // Profile safety switch "Backup vor KI-Änderung": if any op in this batch asks for it,
+                    // take ONE local restore point before applying anything. Best effort — a failed backup
+                    // is logged and the ops still apply (the alternative, refusing every AI change because a
+                    // backup could not be written, is worse); the operator sees it in the log.
+                    if (ops.Any(o => o.BackupFirst))
+                    {
+                        try
+                        {
+                            var mgr = _services.GetService<BackupManager>();
+                            if (mgr is not null)
+                            {
+                                var cfg = await mgr.GetConfigAsync();
+                                var name = await mgr.RunAsync(cfg, "ai-pre");
+                                _log.LogInformation("Took a pre-AI-change backup {Name}.", name);
+                            }
+                        }
+                        catch (Exception bex)
+                        {
+                            _log.LogError(bex, "Pre-AI-change backup failed; applying content ops anyway.");
+                        }
+                    }
+
                     var reports = new List<ContentOpReport>(ops.Count);
                     foreach (var op in ops)
                     {

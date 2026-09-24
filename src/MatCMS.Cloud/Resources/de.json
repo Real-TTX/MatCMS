@@ -92,6 +92,8 @@
   "profiles.aiBudget": "Monatliches Token-Budget je Instanz",
   "profiles.aiBudgetUnlimited": "leer = unbegrenzt",
   "profiles.aiBudgetHint": "Die Cloud vergibt es und setzt es durch; die Instanz sieht die Zahl nicht. Über dem Budget pausieren die KI-Funktionen bis zum Monatswechsel.",
+  "profiles.aiBackupBefore": "Backup vor KI-Änderung",
+  "profiles.aiBackupBeforeHint": "Die Website legt vor jeder KI-Inhaltsänderung (über MCP) einen lokalen Wiederherstellungspunkt an — so lässt sich eine ungewollte Änderung zurücknehmen.",
   "profiles.aiRemoveConfirm": "KI für dieses Profil nicht mehr ausrollen?",
   "nav.twofactor": "Zwei-Faktor",
   "login.2fa.pageTitle": "Zwei-Faktor-Bestätigung",

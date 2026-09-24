@@ -421,6 +421,11 @@
                        inputmode="numeric" placeholder="@T["profiles.aiBudgetUnlimited"]" />
                 <div class="help">@T["profiles.aiBudgetHint"]</div>
             </div>
+            <label class="checkbox-row" style="margin-top:10px;">
+                <input type="checkbox" name="backupBeforeAiChange" value="true" checked="@(Model.Item.BackupBeforeAiChange ? "checked" : null)" />
+                @T["profiles.aiBackupBefore"]
+            </label>
+            <div class="help">@T["profiles.aiBackupBeforeHint"]</div>
         </div>
         <div class="list-actions">
             <button type="submit" class="btn">@T["settings.save"]</button>

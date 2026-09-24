@@ -302,7 +302,7 @@ public class InstanceService
             // would never report back, so an op offered to it would stand for ever. Offered on every beat
             // until reported; add-only ops are idempotent, so a re-offer after a lost report is harmless.
             ContentOps = instance.Status == InstanceStatus.Approved && beat.ProtocolVersion >= 15
-                ? await PendingContentOpsAsync(instance.Id, ct)
+                ? await PendingContentOpsAsync(instance.Id, instance.Profile?.BackupBeforeAiChange ?? false, ct)
                 : null
         };
     }
@@ -329,7 +329,7 @@ public class InstanceService
 
     /// <summary>The still-pending content ops for an instance, oldest first, as the wire DTO. Null (not an
     /// empty list) when there are none, so the heartbeat response carries nothing.</summary>
-    private async Task<List<PendingContentOp>?> PendingContentOpsAsync(int instanceId, CancellationToken ct)
+    private async Task<List<PendingContentOp>?> PendingContentOpsAsync(int instanceId, bool backupFirst, CancellationToken ct)
     {
         var ops = await _db.ContentOps.AsNoTracking()
             .Where(o => o.InstanceId == instanceId && o.DoneAt == null)
@@ -340,7 +340,10 @@ public class InstanceService
                 Kind = o.Kind,
                 PayloadJson = o.PayloadJson,
                 Overwrite = o.Overwrite,
-                Reason = o.Reason
+                Reason = o.Reason,
+                // From the profile's "Backup vor KI-Änderung" switch: the instance backs up before applying.
+                // Only for a WRITE op (overwrite, or a create) — a read never changes anything.
+                BackupFirst = backupFirst && (o.Overwrite || o.Kind == "page.create" || o.Kind == "post.create"),
             })
             .ToListAsync(ct);
         return ops.Count == 0 ? null : ops;

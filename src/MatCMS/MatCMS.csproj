@@ -52,6 +52,10 @@
          no RID matrix in the publish output, no extra apt package in the Dockerfile, and a build on
          Windows behaves like the one inside the Linux container. -->
     <PackageReference Include="SixLabors.ImageSharp" Version="2.1.*" />
+    <!-- Sanitises HTML that did NOT come from a trusted admin — specifically rich content an AI supplies
+         via the cloud's MCP content ops (Post.ContentHtml is rendered raw, so unsanitised model output
+         would be stored XSS). See Services/SafeHtml.cs. -->
+    <PackageReference Include="HtmlSanitizer" Version="9.*" />
   </ItemGroup>
 
   <ItemGroup>

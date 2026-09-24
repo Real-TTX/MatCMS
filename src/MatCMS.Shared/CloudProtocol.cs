@@ -366,6 +366,11 @@ public sealed class PendingContentOp
     /// <summary>Why the cloud is asking, in the site's language — written to the instance's log so its
     /// operator sees that the cloud (an AI action) made this change.</summary>
     public string? Reason { get; set; }
+
+    /// <summary>When true, the instance takes a local backup (a restore point) BEFORE applying this beat's
+    /// content ops. Set by the cloud from the profile's "Backup vor KI-Änderung" option. Additive/optional,
+    /// so an older instance simply never backs up first (default false).</summary>
+    public bool BackupFirst { get; set; }
 }
 
 /// <summary>

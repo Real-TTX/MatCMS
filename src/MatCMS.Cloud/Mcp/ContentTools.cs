@@ -84,6 +84,36 @@ public class ContentTools
         };
     }
 
+    [McpServerTool(Name = "create_post"), Description(
+        "Create a NEW blog post (\"Beitrag\") on a connected site (add-only: an existing slug is skipped). " +
+        "The body and teaser are HTML and are SANITISED by the instance before storage (scripts/handlers removed). " +
+        "Queued and applied on the next heartbeat (~a minute); check get_content_op(opId). Requires a key with the restore right.")]
+    public static async Task<object> CreatePost(
+        McpContext me, AppDbContext db, InstanceService instances,
+        [Description("The instance id, as returned by list_instances.")] string instanceId,
+        [Description("The post heading, e.g. \"Sommer-Angebote 2026\".")] string title,
+        [Description("Short teaser shown on cards/listings (plain text or simple HTML).")] string excerpt,
+        [Description("The post body as HTML (will be sanitised: only safe formatting/links/images survive).")] string contentHtml,
+        [Description("URL slug, lowercase, no spaces. Falls back to a slug of the title if empty.")] string? slug = null,
+        [Description("Comma-separated tags, e.g. \"angebot,sommer\".")] string? tags = null,
+        [Description("Publish immediately (true) or save as draft (false). Default true.")] bool publish = true,
+        CancellationToken ct = default)
+    {
+        var instance = await ResolveWritableAsync(me, db, instanceId, ct);
+        var payload = JsonSerializer.Serialize(new
+        {
+            title = (title ?? "").Trim(),
+            slug = (slug ?? "").Trim(),
+            excerpt = excerpt ?? "",
+            contentHtml = contentHtml ?? "",
+            tags = (tags ?? "").Trim(),
+            publish,
+        });
+        var op = await instances.EnqueueContentOpAsync(instance, "post.create", payload,
+            overwrite: false, reason: "KI: Beitrag anlegen", ct);
+        return new { ok = true, opId = op.Id, queued = true, message = "Beitrag eingereiht — wird beim nächsten Kontakt angelegt. Ergebnis via get_content_op." };
+    }
+
     [McpServerTool(Name = "get_content_op"), Description(
         "Get the status/outcome of a content operation (e.g. from create_page) by its opId: pending, or done with outcome (applied / skipped-exists / failed) and a detail message.")]
     public static async Task<object> GetContentOp(

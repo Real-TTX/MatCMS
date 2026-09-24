@@ -45,7 +45,7 @@
         {
             <h1>@T["oauthclients.consentTitle"]</h1>
             <p class="help" style="text-align:center;">@T["oauthclients.consentIntro", Model.ClientName]</p>
-            <div class="alert alert-error" style="text-align:left;">@T["device.warn"]</div>
+            <div class="alert alert-error" style="text-align:left;">@T["oauthclients.warn"]</div>
             @if (!string.IsNullOrEmpty(Model.AccountLabel))
             {
                 <p class="muted" style="text-align:center;">@T["sso.consent.asAccount", Model.AccountLabel]</p>

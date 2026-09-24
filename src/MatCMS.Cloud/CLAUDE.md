@@ -821,20 +821,6 @@ the admin UI uses. There is no second restore path and no second backup format.
   raw body, origin `api`, Kestrel cap lifted like the instance upload); `POST …/backups/{id}/restore`
   (gated on `CanRestore`). Restore is still only MARKED — the instance downloads and applies it on its
   next beat and reports back, which the list then shows.
-- **Device Authorization Grant (RFC 8628)** — a browserless client (a CLI, an agent, or ChatGPT) obtains
-  an operator key without one being pasted in. `POST /oauth/device_authorization` returns a `device_code`
-  + a human `user_code`; the operator confirms it at **`/device`** and the client polls the **device-code
-  branch of `/oauth/token`** to receive the raw `mck_` key once. `/device` (`Pages/Device.cshtml`) is
-  **Admin-only** (`[Authorize(Policy="Admin")]` + the same 2FA-mandate gate as `/oauth/authorize`) because
-  approval MINTS a full-access `AllInstances`+`CanRestore` key — an Admin capability; a bare `[Authorize]`
-  would let a scoped Operator escalate. `Services/DeviceCodes.cs` owns the flow: codes are **persisted**
-  (table `DeviceCodes`, so a restart mid-poll doesn't drop a pending grant), stored **SHA-256-only** like
-  every other handed-out secret, **single-use via an atomic `Approved→Consumed` compare-and-set**
-  (`ExecuteUpdateAsync`, so two concurrent polls can't double-mint), interval-throttled (`slow_down`), and
-  pruned on `InstanceMonitorService`'s hourly sweep. `/.well-known/oauth-authorization-server` (RFC 8414)
-  advertises the endpoints. The minted key is an ordinary `ApiKey`, revocable under **Admin → API-Schlüssel**.
-  The device branch of `/oauth/token` is authenticated by the device_code itself (no instance token), kept
-  separate from the SSO code exchange in the same handler.
 - **Authorization Code connector (native "Sign in")** — for a client that redirects a browser (a ChatGPT
   custom GPT action). Registered clients live in `OAuthClients` (`Models/OAuthClient.cs`,
   `Services/OAuthClientService.cs`: `client_id` `mcc_…`, secret `mcs_…` stored SHA-256-only, an **exact**
@@ -844,8 +830,10 @@ the admin UI uses. There is no second restore path and no second backup format.
   key), which issues a PKCE/redirect-bound single-use code (`OAuthCodes.IssueConnector`, memory); the client
   exchanges it at the **`authorization_code` branch of `/oauth/token`**, authenticated by its own secret
   (`client_secret_post` or HTTP Basic), and receives a full-access operator `mck_` key. Distinct from the
-  instance-SSO `/oauth/authorize` (client_id = instance PublicId, returns userinfo). Both this and the device
-  flow are surfaced from the **KI tab of *Einstellungen*** ("ChatGPT / Gerät verbinden").
+  instance-SSO `/oauth/authorize` (client_id = instance PublicId, returns userinfo). Surfaced from the
+  **KI tab of *Einstellungen*** ("ChatGPT verbinden"). (A Device Authorization Grant once lived here too but
+  was **removed** — nothing consumed it once the MCP server shipped: ChatGPT uses this connector's OAuth,
+  other MCP clients paste an operator key. Don't re-add it without a real browserless-CLI use case.)
 - **MCP server (`/mcp`)** — a remote **Model Context Protocol** server so an AI client (ChatGPT, Claude,
   Cursor) drives the cloud directly, instead of hand-wiring HTTP calls. Built INTO this app (official
   `ModelContextProtocol.AspNetCore` SDK, HTTP/streamable transport, `app.MapMcp("/mcp")`), **not** a
@@ -856,7 +844,7 @@ the admin UI uses. There is no second restore path and no second backup format.
   the key in `HttpContext.Items`, and `Mcp/McpContext` hands it to the tools; a missing/invalid key gets a
   401 whose `WWW-Authenticate` points at `/.well-known/oauth-protected-resource` (RFC 9728), which points at
   the connector auth server already advertised under `/.well-known/oauth-authorization-server` — so ChatGPT's
-  OAuth connector flow works against the SAME device/connector endpoints. Every tool is **scoped to the key**
+  OAuth connector flow works against the SAME connector endpoints. Every tool is **scoped to the key**
   (`ApiKeyService.CanAccess`, same opaque "nicht gefunden" for unknown vs out-of-scope as `ApiInstanceAsync`)
   and restore is gated on `CanRestore`. **Stage 1 mirrors the operator API's ACTIONS only**: `list_instances`,
   `get_instance`, `list_backups`, `request_backup`, `restore_backup` — all through the SAME

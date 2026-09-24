@@ -100,8 +100,6 @@ builder.Services.AddScoped<AdoptionService>();
 builder.Services.AddScoped<VersionService>();
 builder.Services.AddScoped<ApiKeyService>();
 builder.Services.AddScoped<OperatorScope>();
-// OAuth 2.0 Device Authorization Grant (RFC 8628): pending device/user codes, persisted (see DeviceCodes).
-builder.Services.AddScoped<DeviceCodes>();
 // OAuth 2.0 Authorization Code connector clients (native "Sign in", e.g. a ChatGPT custom GPT).
 builder.Services.AddScoped<OAuthClientService>();
 
@@ -180,19 +178,6 @@ builder.Services.AddRateLimiter(options =>
             _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = 120,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0
-            }));
-
-    // The Device Authorization endpoint (/oauth/device_authorization) is anonymous and starts a flow; its
-    // own per-IP budget bounds a flood of code requests. The polling side runs on /oauth/token under the
-    // instanceApi budget, and each grant is self-throttled by its own interval (slow_down).
-    options.AddPolicy("deviceAuth", ctx =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 30,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
             }));
@@ -680,28 +665,9 @@ app.MapPost("/api/instances/{publicId}/backups/taken", async (
 // page also carries the 2FA-required gate (this path is outside /admin) and the redirect_uri check.
 // token (back-channel, below): authenticated by the instance token like the heartbeat, redeems the code
 // and returns the user's identity. No JWT — a direct, token-authenticated TLS call.
-// device_authorization (RFC 8628): a browserless client (a CLI, an agent, or ChatGPT) starts here. It
-// gets a device_code to poll with and a human user_code to show; the operator confirms the user_code at
-// verification_uri (/device). Anonymous — the grant is worthless until an authenticated operator approves
-// it and the same client redeems it at /oauth/token. No client secret: the flow IS the authentication.
-app.MapPost("/oauth/device_authorization", async (HttpContext ctx, DeviceCodes devices) =>
-{
-    var form = await ctx.Request.ReadFormAsync();
-    var issued = await devices.IssueAsync(form["client_id"].ToString(), ctx.RequestAborted);
-    var baseUrl = $"{ctx.Request.Scheme}://{ctx.Request.Host}";
-    return Results.Ok(new
-    {
-        device_code = issued.DeviceCode,
-        user_code = issued.UserCode,
-        verification_uri = $"{baseUrl}/device",
-        verification_uri_complete = $"{baseUrl}/device?code={Uri.EscapeDataString(issued.UserCode)}",
-        expires_in = issued.ExpiresIn,
-        interval = issued.Interval,
-    });
-}).RequireRateLimiting("deviceAuth");
 
-// OAuth Authorization Server Metadata (RFC 8414) — lets a connector discover the device + token endpoints
-// instead of hard-coding them. Public, read-only, advertises only what this cloud actually implements.
+// OAuth Authorization Server Metadata (RFC 8414) — lets a connector discover the authorize + token
+// endpoints instead of hard-coding them. Public, read-only, advertises only what this cloud implements.
 app.MapGet("/.well-known/oauth-authorization-server", (HttpContext ctx) =>
 {
     var baseUrl = $"{ctx.Request.Scheme}://{ctx.Request.Host}";
@@ -711,35 +677,17 @@ app.MapGet("/.well-known/oauth-authorization-server", (HttpContext ctx) =>
         // The connector authorize endpoint (external "Sign in" clients). The instance-SSO /oauth/authorize
         // is internal and hardcoded by instances, so it is deliberately not advertised here.
         authorization_endpoint = $"{baseUrl}/oauth/c/authorize",
-        device_authorization_endpoint = $"{baseUrl}/oauth/device_authorization",
         token_endpoint = $"{baseUrl}/oauth/token",
-        grant_types_supported = new[] { "authorization_code", "urn:ietf:params:oauth:grant-type:device_code" },
+        grant_types_supported = new[] { "authorization_code" },
         code_challenge_methods_supported = new[] { "S256" },
         token_endpoint_auth_methods_supported = new[] { "client_secret_post", "client_secret_basic", "none" },
     });
 });
 
 app.MapPost("/oauth/token", async (HttpContext ctx, AppDbContext db, InstanceService instances, OAuthCodes codes,
-    DeviceCodes devices, ApiKeyService apiKeys, OAuthClientService clients) =>
+    ApiKeyService apiKeys, OAuthClientService clients) =>
 {
     var form = await ctx.Request.ReadFormAsync();
-
-    // Device Authorization Grant branch (RFC 8628): authenticated by the device_code secret itself, so it
-    // is handled entirely before the instance-token-authenticated SSO code exchange below. On the first
-    // poll after approval this mints and returns the operator key once (see DeviceCodes.RedeemAsync).
-    if (form["grant_type"].ToString() == "urn:ietf:params:oauth:grant-type:device_code")
-    {
-        var poll = await devices.RedeemAsync(form["device_code"].ToString(), apiKeys, ctx.RequestAborted);
-        return poll.Kind switch
-        {
-            DeviceCodes.PollKind.Ok => Results.Ok(new { access_token = poll.AccessToken, token_type = "Bearer", scope = "operator" }),
-            DeviceCodes.PollKind.AuthorizationPending => Results.Json(new { error = "authorization_pending" }, statusCode: StatusCodes.Status400BadRequest),
-            DeviceCodes.PollKind.SlowDown => Results.Json(new { error = "slow_down" }, statusCode: StatusCodes.Status400BadRequest),
-            DeviceCodes.PollKind.AccessDenied => Results.Json(new { error = "access_denied" }, statusCode: StatusCodes.Status400BadRequest),
-            DeviceCodes.PollKind.ExpiredToken => Results.Json(new { error = "expired_token" }, statusCode: StatusCodes.Status400BadRequest),
-            _ => Results.Json(new { error = "invalid_grant" }, statusCode: StatusCodes.Status400BadRequest),
-        };
-    }
 
     // Authorization Code branch for a registered connector client (a native "Sign in", e.g. a ChatGPT GPT).
     // Authenticated by the CLIENT's own id+secret (client_secret_post or HTTP Basic), then the code minted at

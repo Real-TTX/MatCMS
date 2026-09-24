@@ -197,14 +197,13 @@
         </div>
     </form>
 
-    @* Connect ChatGPT / a CLI / an agent to THIS cloud (device flow + native OAuth connector). Separate
-       from the relay above: that key lets the cloud call OpenAI; this grants a client access to /api/v1. *@
+    @* Connect ChatGPT (or an MCP client) to THIS cloud via the native OAuth connector. Separate from the
+       relay above: that key lets the cloud call OpenAI; this grants a client access to /api/v1 + /mcp. *@
     <div class="card">
         <h2>@T["settings.connectHeading"]</h2>
         <p class="muted">@T["settings.connectIntro"]</p>
         <div class="actions" style="margin:8px 0 4px;">
-            <a class="btn" href="/device" target="_blank" rel="noopener">@T["settings.connectDeviceBtn"]</a>
-            <a class="btn btn-ghost" asp-page="/Admin/OAuthClients/Index">@T["settings.connectClientsBtn"]</a>
+            <a class="btn" asp-page="/Admin/OAuthClients/Index">@T["settings.connectClientsBtn"]</a>
         </div>
         <div class="help">@T["settings.connectSteps"]</div>
         <p class="muted" style="margin-top:12px;">@T["settings.connectManage"] <a asp-page="/Admin/ApiKeys/Index">@T["nav.apikeys"]</a>.</p>

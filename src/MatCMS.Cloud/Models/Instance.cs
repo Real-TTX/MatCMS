@@ -48,6 +48,16 @@ public class Instance
     /// <summary>Admin-editable label. Defaults to the site name the instance reports.</summary>
     public string Name { get; set; } = "";
 
+    /// <summary>The operator set this name explicitly (on adoption or by renaming), so it must NOT be
+    /// overwritten by the site-name the instance reports on its heartbeat. Without this, an operator's
+    /// label was replaced by the fresh site's default ("MatCMS") on the very first beat.</summary>
+    public bool NamePinned { get; set; }
+
+    /// <summary>The operator set <see cref="Url"/> explicitly (they typed the domain when adopting), so the
+    /// heartbeat must NOT replace it with whatever the instance reports about itself. Without this, the
+    /// entered domain was gone the moment the site reported a different (e.g. internal) address.</summary>
+    public bool UrlPinned { get; set; }
+
     public InstanceStatus Status { get; set; } = InstanceStatus.Approved;
 
     /// <summary>The profile whose configuration and policy apply. Null = no configuration is pushed

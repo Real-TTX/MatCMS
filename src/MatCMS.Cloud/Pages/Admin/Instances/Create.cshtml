@@ -70,6 +70,11 @@
 
     <form method="post" asp-page-handler="Adopt">
         <div class="form-field">
+            <label for="DisplayName">@T["enroll.displayName"]</label>
+            <input id="DisplayName" name="DisplayName" value="@Model.DisplayName" placeholder="@T["enroll.displayNamePlaceholder"]" />
+            <div class="help">@T["enroll.displayNameHint"]</div>
+        </div>
+        <div class="form-field">
             <label for="InstanceUrl">@T["enroll.instanceUrl"]</label>
             <input id="InstanceUrl" name="InstanceUrl" value="@Model.InstanceUrl" placeholder="https://kunde.example.com" spellcheck="false" />
         </div>

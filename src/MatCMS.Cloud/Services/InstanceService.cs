@@ -223,7 +223,9 @@ public class InstanceService
         // Upgraded on the way IN, so everything downstream — frame, links, the mixed-content guard —
         // sees one address and cannot disagree about it. Reversible: switch the setting off and the
         // next heartbeat writes what the instance actually said.
-        if (SafeUrl(beat.Url) is string beatUrl) instance.Url = ForceHttps(beatUrl);
+        // Not when the operator pinned the URL (they typed the domain when adopting) — their input wins,
+        // otherwise the site reporting a different (e.g. internal) address would wipe the entered domain.
+        if (!instance.UrlPinned && SafeUrl(beat.Url) is string beatUrl) instance.Url = ForceHttps(beatUrl);
         // The reported site name only SEEDS the label — never overwrite a name an operator set here.
         // "Set" is anything other than the placeholder; the placeholder counts as "not set yet", so an
         // instance that enrolled before its site name was configured still picks it up instead of
@@ -233,7 +235,7 @@ public class InstanceService
         // operator BEFORE it ever beats, and "firstEver ||" overwrote exactly that name with the fresh
         // site's default ("MatCMS") on the very first heartbeat — and again whenever a restart or a
         // restore made the instance look first-ever. The label an operator typed must survive both.
-        if (instance.Name == PlaceholderName && !string.IsNullOrWhiteSpace(beat.SiteName))
+        if (!instance.NamePinned && instance.Name == PlaceholderName && !string.IsNullOrWhiteSpace(beat.SiteName))
             instance.Name = beat.SiteName!.Trim();
 
         await RecordSyncReportAsync(instance, beat, ct);

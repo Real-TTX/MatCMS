@@ -358,8 +358,12 @@ public class DetailsModel : PageModel, IAsyncPageFilter
         var item = await _db.Instances.FindAsync(id);
         if (item is null) return RedirectToPage("Index");
 
-        item.Name = string.IsNullOrWhiteSpace(name) ? item.Name : name.Trim();
-        item.Url = string.IsNullOrWhiteSpace(url) ? null : url.Trim();
+        // Operator edits win: a name typed here is pinned so the heartbeat's reported site name can't
+        // overwrite it. For the URL, a value pins it; clearing the field un-pins so the instance's
+        // reported address takes over again on the next beat.
+        if (!string.IsNullOrWhiteSpace(name)) { item.Name = name.Trim(); item.NamePinned = true; }
+        if (string.IsNullOrWhiteSpace(url)) { item.Url = null; item.UrlPinned = false; }
+        else { item.Url = url.Trim(); item.UrlPinned = true; }
         item.Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
         await _db.SaveChangesAsync();
 

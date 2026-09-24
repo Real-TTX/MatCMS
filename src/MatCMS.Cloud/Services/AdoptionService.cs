@@ -45,7 +45,7 @@ public class AdoptionService
     /// </summary>
     public async Task<AdoptResult> AdoptAsync(
         string instanceUrl, string username, string password, int? profileId,
-        HttpRequest? currentRequest, CancellationToken ct = default)
+        HttpRequest? currentRequest, CancellationToken ct = default, string? displayName = null)
     {
         var url = (instanceUrl ?? "").Trim().TrimEnd('/');
         if (url.Length == 0) return new(null, "Bitte die URL der Instanz angeben.");
@@ -58,7 +58,14 @@ public class AdoptionService
         if (string.IsNullOrWhiteSpace(cloudUrl))
             return new(null, "Die öffentliche URL dieser Cloud ist nicht gesetzt (Einstellungen → Allgemein).");
 
-        var (instance, token) = await _instances.CreateForAdoptionAsync(parsed.Host, profileId);
+        // The operator's input wins: a name they typed is pinned (never replaced by the site's reported
+        // name), and the domain they entered is pinned (never replaced by whatever the site reports).
+        var operatorName = (displayName ?? "").Trim();
+        var (instance, token) = await _instances.CreateForAdoptionAsync(
+            operatorName.Length > 0 ? operatorName : parsed.Host, profileId);
+        instance.NamePinned = operatorName.Length > 0;
+        instance.Url = url;
+        instance.UrlPinned = true;
 
         try
         {
@@ -88,8 +95,9 @@ public class AdoptionService
             }
 
             var info = await res.Content.ReadFromJsonAsync<LinkResponse>(ct);
-            if (!string.IsNullOrWhiteSpace(info?.SiteName)) instance.Name = info!.SiteName!.Trim();
-            instance.Url = string.IsNullOrWhiteSpace(info?.Url) ? url : info!.Url!.Trim();
+            // Only SEED name/URL from what the site reports when the operator did not pin them.
+            if (!instance.NamePinned && !string.IsNullOrWhiteSpace(info?.SiteName)) instance.Name = info!.SiteName!.Trim();
+            if (!instance.UrlPinned && !string.IsNullOrWhiteSpace(info?.Url)) instance.Url = info!.Url!.Trim();
             instance.Version = info?.Version;
             instance.ContainerId = info?.ContainerId;
             await _instances.ClassifyAsync(instance, ct);

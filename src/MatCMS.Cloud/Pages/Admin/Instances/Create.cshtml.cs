@@ -33,6 +33,7 @@ public class CreateModel : PageModel
     public string CloudUrl => _cloud.CanonicalBaseUrl(Request);
 
     [BindProperty] public string InstanceUrl { get; set; } = "";
+    [BindProperty] public string DisplayName { get; set; } = "";
     [BindProperty] public string Username { get; set; } = "";
     [BindProperty] public string Password { get; set; } = "";
     [BindProperty] public int? ProfileId { get; set; }
@@ -50,7 +51,7 @@ public class CreateModel : PageModel
     public async Task<IActionResult> OnPostAdoptAsync()
     {
         var result = await _adoption.AdoptAsync(
-            InstanceUrl, Username, Password, ProfileId, Request, HttpContext.RequestAborted);
+            InstanceUrl, Username, Password, ProfileId, Request, HttpContext.RequestAborted, DisplayName);
 
         if (result.Instance is null)
         {

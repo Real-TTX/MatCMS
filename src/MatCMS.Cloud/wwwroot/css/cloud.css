@@ -108,6 +108,40 @@
     text-align: center;
     padding: 0 18px;
 }
+/* Stopped instance: a MatCMS-themed placeholder instead of a dead iframe — the paused block-layout canvas
+   (the CMS grid) dimmed out, with a stop mark. Fills the .instance-tile-shot (which is position:relative). */
+.instance-tile-stopped {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: #cbb8a6;
+    background:
+        repeating-linear-gradient(0deg, rgba(255, 255, 255, .05) 0 1px, transparent 1px 28px),
+        repeating-linear-gradient(90deg, rgba(255, 255, 255, .05) 0 1px, transparent 1px 28px),
+        linear-gradient(135deg, #2a2622, #1a1714);
+}
+.instance-tile-stopped .its-mark {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, .30);
+    border: 1px solid rgba(255, 255, 255, .12);
+    color: #e0d5c8;
+}
+.instance-tile-stopped .its-mark .ti { font-size: 26px; }
+.instance-tile-stopped .its-text {
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+}
 .instance-tile-body { padding: 12px 14px; border-top: 1px solid var(--line); }
 .instance-tile-name { font-weight: 600; margin-bottom: 2px; }
 /* Assigned profile, right under the name: it decides what the instance receives. */

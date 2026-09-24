@@ -110,9 +110,21 @@ public class DetailsModel : PageModel, IAsyncPageFilter
     public bool Online => InstanceService.IsOnline(Item);
     public bool CanCloudUpdate => Item.Hosting == InstanceHosting.Local && Item.ContainerId is not null;
 
+    /// <summary>A LOCAL container the daemon says is not running. Authoritative over the heartbeat "online"
+    /// (which lags ~150 s), so a site we just stopped reads "gestoppt" at once instead of a stale "online".</summary>
+    public bool ContainerStopped =>
+        Item.Hosting == InstanceHosting.Local && !string.IsNullOrEmpty(Item.ContainerState)
+        && !string.Equals(Item.ContainerState, "running", StringComparison.OrdinalIgnoreCase);
+
     public async Task<IActionResult> OnGetAsync(int id)
     {
         if (!await LoadAsync(id)) return RedirectToPage("Index");
+
+        // Refresh hosting + container state LIVE from the daemon so the shown status and the
+        // Start/Stop/Restart buttons reflect reality now — not the last heartbeat (which lags 150 s) nor a
+        // value that went stale right after a change. Best effort: no daemon → keep the last known state.
+        try { await _instances.ClassifyAsync(Item, HttpContext.RequestAborted); await _db.SaveChangesAsync(); }
+        catch { /* keep last known state */ }
 
         if (Item.BackupRequestId > 0)
             RequestedBackup = await _db.CloudBackups.AsNoTracking()

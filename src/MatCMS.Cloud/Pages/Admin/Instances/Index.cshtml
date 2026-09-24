@@ -63,7 +63,18 @@
             <a class="instance-tile" asp-page="Details" asp-route-id="@i.Id"
                data-search="@(i.Name + " " + i.HostName + " " + i.Version + " " + i.Profile?.Name)" data-tags="@tags">
                 <div class="instance-tile-shot">
-                    @if (string.IsNullOrWhiteSpace(i.PreviewUrl))
+                    @if (i.Hosting == InstanceHosting.Local && !string.IsNullOrEmpty(i.ContainerState)
+                         && !string.Equals(i.ContainerState, "running", StringComparison.OrdinalIgnoreCase))
+                    {
+                        @* Stopped container: no live site to frame. A MatCMS-themed placeholder — the paused
+                           block-layout canvas (the CMS grid) dimmed out, with a stop mark — instead of the
+                           blank rectangle a dead iframe would leave. *@
+                        <div class="instance-tile-stopped" role="img" aria-label="@T["instances.stopped"]">
+                            <span class="its-mark"><i class="ti ti-player-stop-filled" aria-hidden="true"></i></span>
+                            <span class="its-text">@T["instances.stopped"]</span>
+                        </div>
+                    }
+                    else if (string.IsNullOrWhiteSpace(i.PreviewUrl))
                     {
                         <div class="instance-tile-empty">@T["instances.previewNoUrlShort"]</div>
                     }
@@ -105,15 +116,15 @@
                         {
                             <span class="badge badge-new">@T["instances.awaitingApproval"]</span>
                         }
-                        else if (online)
-                        {
-                            <span class="badge badge-on">@T["instances.online"]</span>
-                        }
                         else if (i.Hosting == InstanceHosting.Local && !string.IsNullOrEmpty(i.ContainerState)
                                  && !string.Equals(i.ContainerState, "running", StringComparison.OrdinalIgnoreCase))
                         {
-                            @* A local container we know is not running: "stopped", not the ambiguous "offline". *@
+                            @* Container not running → authoritative over the (150 s-lagging) heartbeat "online". *@
                             <span class="badge badge-off">@T["instances.stopped"]</span>
+                        }
+                        else if (online)
+                        {
+                            <span class="badge badge-on">@T["instances.online"]</span>
                         }
                         else
                         {
@@ -214,15 +225,15 @@
                         {
                             <span class="badge badge-off">@T["instances.pending"]</span>
                         }
-                        else if (online)
-                        {
-                            <span class="badge badge-on">@T["instances.online"]</span>
-                        }
                         else if (i.Hosting == InstanceHosting.Local && !string.IsNullOrEmpty(i.ContainerState)
                                  && !string.Equals(i.ContainerState, "running", StringComparison.OrdinalIgnoreCase))
                         {
-                            @* A local container we know is not running: "stopped", not the ambiguous "offline". *@
+                            @* Container not running → authoritative over the (150 s-lagging) heartbeat "online". *@
                             <span class="badge badge-off">@T["instances.stopped"]</span>
+                        }
+                        else if (online)
+                        {
+                            <span class="badge badge-on">@T["instances.online"]</span>
                         }
                         else
                         {

@@ -118,6 +118,11 @@
                 {
                     <span class="badge badge-err">@T["instances.rejected"]</span>
                 }
+                else if (Model.ContainerStopped)
+                {
+                    @* Container is not running → authoritative over the (lagging) heartbeat "online". *@
+                    <span class="badge badge-off">@T["instances.stopped"]</span>
+                }
                 else if (Model.Online)
                 {
                     <span class="badge badge-on">@T["instances.online"]</span>

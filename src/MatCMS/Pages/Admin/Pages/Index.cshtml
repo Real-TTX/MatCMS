@@ -98,12 +98,45 @@
         <a class="btn" asp-page="Create">@T["pages.create"]</a>
         @if (Model.AiEnabled)
         {
+            <button type="button" class="btn btn-ghost" id="ai-newpage-btn">
+                <i class="ti ti-sparkles" aria-hidden="true"></i> @T["pages.aiNewPageButton"]
+            </button>
             <button type="button" class="btn btn-ghost" id="ai-sitegen-btn" data-ai-url="@Url.Page(null, "AiGenerateSite")">
                 <i class="ti ti-sparkles" aria-hidden="true"></i> @T["pages.aiSiteGenButton"]
             </button>
         }
     </div>
 </div>
+
+@if (Model.AiEnabled)
+{
+    @* Einzelne (Unter-)Seite per KI: Titel + kurze Beschreibung → Seite als ENTWURF anlegen + Blöcke
+       generieren in einem Schritt → direkt im Editor öffnen (dort prüfen/veröffentlichen). Ein-Schuss,
+       ohne Vorschlags-Runde — der Editor IST die Vorschau. *@
+    <dialog id="ai-newpage-dialog" class="ai-dialog">
+        <h3>@T["pages.aiNewPageTitle"]</h3>
+        <form method="post" asp-page-handler="AiNewPage">
+            <label class="ai-instr-label" for="ai-newpage-title">@T["pages.aiNewPageName"]</label>
+            <input id="ai-newpage-title" name="title" required placeholder="@T["pages.aiNewPageNamePh"]" />
+            <label class="ai-instr-label" for="ai-newpage-brief">@T["pages.aiNewPageBrief"]</label>
+            <textarea id="ai-newpage-brief" name="briefing" rows="2" placeholder="@T["pages.aiNewPageBriefPh"]"></textarea>
+            <label class="checkbox-row" style="margin-top:8px;"><input type="checkbox" name="nav" value="true" /> @T["pages.aiNewPageNav"]</label>
+            <div class="ai-dialog-foot">
+                <button type="submit" class="btn btn-sm"><i class="ti ti-sparkles" aria-hidden="true"></i> @T["pages.aiNewPageCreate"]</button>
+                <button type="button" class="btn btn-sm btn-ghost" id="ai-newpage-cancel">@T["editor.aiCancel"]</button>
+            </div>
+        </form>
+    </dialog>
+    <script>
+        (function () {
+            var b = document.getElementById('ai-newpage-btn'), d = document.getElementById('ai-newpage-dialog');
+            var c = document.getElementById('ai-newpage-cancel');
+            if (!b || !d) return;
+            b.addEventListener('click', function () { d.showModal(); });
+            if (c) c.addEventListener('click', function () { d.close(); });
+        })();
+    </script>
+}
 
 @if (Model.AiEnabled)
 {

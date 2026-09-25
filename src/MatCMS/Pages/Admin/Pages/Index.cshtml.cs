@@ -217,4 +217,54 @@ public class IndexModel : PageModel
         TempData["Flash"] = $"{created} Seite(n) von der KI angelegt.";
         return RedirectToPage();
     }
+
+    /// <summary>One-shot: create a SINGLE (sub)page from a title + briefing and generate its blocks in one
+    /// step, then open it in the editor. Created as a DRAFT (add-only slug) so the operator reviews and
+    /// publishes; if the AI returns nothing, the empty page is still created so the operator is not stuck.</summary>
+    public async Task<IActionResult> OnPostAiNewPageAsync(string? title, string? briefing, bool nav)
+    {
+        if (!_ai.Enabled) { TempData["FlashError"] = "KI ist für diese Website nicht aktiviert."; return RedirectToPage(); }
+        title = (title ?? "").Trim();
+        if (title.Length == 0) { TempData["FlashError"] = "Bitte einen Titel für die Seite angeben."; return RedirectToPage(); }
+
+        var slugBase = Slugify(title);
+        if (slugBase.Length == 0 || IsReserved(slugBase))
+        {
+            TempData["FlashError"] = "Aus dem Titel lässt sich kein gültiger Slug bilden.";
+            return RedirectToPage();
+        }
+        var used = new HashSet<string>(
+            await _db.Pages.Where(p => p.Locale == Localizer.DefaultCulture).Select(p => p.Slug).ToListAsync(),
+            StringComparer.OrdinalIgnoreCase);
+        var slug = slugBase; var n = 2;
+        while (used.Contains(slug)) slug = $"{slugBase}-{n++}";
+
+        var (ok, text, error) = await _ai.GeneratePageAsync(
+            string.IsNullOrWhiteSpace(briefing) ? title : briefing!.Trim(), _blockGen.BuildSpecText(), HttpContext.RequestAborted);
+        var blocks = ok ? _blockGen.ValidateBlocks(text) : new();
+
+        var navOrder = nav ? (await _db.Pages.Select(p => (int?)p.NavOrder).MaxAsync() ?? 0) + 1 : 0;
+        var page = new PageEntity
+        {
+            Title = title,
+            Slug = slug,
+            Locale = Localizer.DefaultCulture,
+            IsPublished = false,   // draft: created for review, operator publishes after checking
+            ShowInNav = nav,
+            NavOrder = navOrder,
+            TranslationGroup = Guid.NewGuid().ToString("N"),
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+        var sort = 0;
+        foreach (var (type, _, data) in blocks)
+            page.Blocks.Add(new ContentBlock { BlockType = type, DataJson = data.ToJsonString(), SortOrder = sort++ });
+        _db.Pages.Add(page);
+        await _db.SaveChangesAsync();
+
+        TempData["Flash"] = blocks.Count > 0
+            ? $"Seite '{title}' per KI mit {blocks.Count} Block/Blöcken angelegt (Entwurf)."
+            : $"Seite '{title}' angelegt — die KI lieferte keine Blöcke; du kannst sie im Editor füllen.";
+        return RedirectToPage("Edit", new { id = page.Id });
+    }
 }

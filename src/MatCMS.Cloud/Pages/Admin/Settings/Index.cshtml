@@ -197,6 +197,31 @@
         </div>
     </form>
 
+    @* Verbrauch: cloud-weit + pro Instanz, laufender Monat (aus dem AiUsage-Ledger). *@
+    <div class="card">
+        <h2>@T["settings.aiUsage"] · @Model.AiPeriod</h2>
+        <div class="kv">
+            <div class="kv-label">@T["settings.aiUsageTotal"]</div>
+            <div class="kv-value">@Model.AiTokensTotal.ToString("N0") @T["settings.aiUsageTokens"] · @Model.AiCallsTotal @T["settings.aiUsageCalls"]</div>
+        </div>
+        @if (Model.AiUsage.Count > 0)
+        {
+            <table class="data" style="margin-top:10px;">
+                <thead><tr><th>@T["common.instance"]</th><th>@T["settings.aiUsageTokens"]</th><th>@T["settings.aiUsageCalls"]</th></tr></thead>
+                <tbody>
+                    @foreach (var r in Model.AiUsage)
+                    {
+                        <tr><td>@r.Instance</td><td class="mono">@r.Tokens.ToString("N0")</td><td class="mono">@r.Calls</td></tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <p class="muted">@T["settings.aiUsageEmpty"]</p>
+        }
+    </div>
+
     @* Connect ChatGPT (or an MCP client) to THIS cloud via the native OAuth connector. Separate from the
        relay above: that key lets the cloud call OpenAI; this grants a client access to /api/v1 + /mcp. *@
     <div class="card">

@@ -45,12 +45,28 @@ public class IndexModel : PageModel
     public int? NextPort { get; private set; }
     public int UsedPortCount { get; private set; }
 
+    // --- AI usage this month (cloud-wide + per instance), from the AiUsage ledger ---
+    public record AiUsageRow(string Instance, int Tokens, int Calls);
+    public string AiPeriod { get; private set; } = "";
+    public List<AiUsageRow> AiUsage { get; private set; } = new();
+    public long AiTokensTotal { get; private set; }
+    public int AiCallsTotal { get; private set; }
+
     public async Task OnGetAsync()
     {
         DockerReachable = await _docker.IsReachableAsync(HttpContext.RequestAborted);
         LocalCount = await _db.Instances.CountAsync(i => i.Hosting == InstanceHosting.Local);
         NextPort = await _hosting.NextFreePortAsync(HttpContext.RequestAborted);
         UsedPortCount = (await _hosting.UsedPortsAsync(HttpContext.RequestAborted))?.Count ?? 0;
+
+        AiPeriod = DateTime.UtcNow.ToString("yyyy-MM");
+        AiUsage = await (from u in _db.AiUsages.AsNoTracking()
+                         where u.Period == AiPeriod
+                         join i in _db.Instances on u.InstanceId equals i.Id
+                         orderby u.Tokens descending
+                         select new AiUsageRow(i.Name, u.Tokens, u.Calls)).ToListAsync();
+        AiTokensTotal = AiUsage.Sum(r => (long)r.Tokens);
+        AiCallsTotal = AiUsage.Sum(r => r.Calls);
     }
 
     public async Task<IActionResult> OnPostGeneralAsync(string? cloudName, string? canonicalUrl, bool forceHttps)

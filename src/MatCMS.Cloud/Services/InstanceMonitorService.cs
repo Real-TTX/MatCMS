@@ -32,6 +32,13 @@ public class InstanceMonitorService : BackgroundService
     private const int SweepEveryTicks = 60;
     private int _ticksSinceSweep = SweepEveryTicks;   // sweep on the first tick too
 
+    // Container-state refresh cadence. NOT every tick: a container's state only changes when someone
+    // starts/stops it, and both the start/stop handlers and the detail page refresh it immediately — the
+    // monitor is only a safety net for changes made OUTSIDE the cloud (a manual `docker stop`). Polling the
+    // daemon's full container list once a minute per instance was needless allocation churn.
+    private const int ReclassEveryTicks = 5;          // ~5 min
+    private int _ticksSinceReclass = ReclassEveryTicks;
+
     public InstanceMonitorService(IServiceScopeFactory scopes, ILogger<InstanceMonitorService> log)
     {
         _scopes = scopes;
@@ -80,18 +87,21 @@ public class InstanceMonitorService : BackgroundService
             .Where(i => i.Status == InstanceStatus.Approved)
             .ToListAsync(ct);
 
-        // Keep hosting + container state fresh from the daemon, not only from heartbeats: a STOPPED
-        // container sends no heartbeat, so without this its ContainerState would stay stale (it would look
-        // merely "offline"). Only when Docker is reachable; each miss degrades to what the last heartbeat
-        // saw. (Lists containers once per instance — fine for a handful of local sites.)
-        if (await docker.IsReachableAsync(ct))
+        // Keep hosting + container state fresh from the daemon for STOPPED containers (they send no
+        // heartbeat, so their state would otherwise stay stale). Only every ReclassEveryTicks, and only
+        // when Docker is reachable — the immediate paths (start/stop handler, detail page) cover the rest.
+        if (++_ticksSinceReclass >= ReclassEveryTicks)
         {
-            foreach (var instance in all)
+            _ticksSinceReclass = 0;
+            if (await docker.IsReachableAsync(ct))
             {
-                try { await instances.ClassifyAsync(instance, ct); }
-                catch (Exception ex) { _log.LogDebug(ex, "Reclassify failed for instance {Id}", instance.Id); }
+                foreach (var instance in all)
+                {
+                    try { await instances.ClassifyAsync(instance, ct); }
+                    catch (Exception ex) { _log.LogDebug(ex, "Reclassify failed for instance {Id}", instance.Id); }
+                }
+                await db.SaveChangesAsync(ct);
             }
-            await db.SaveChangesAsync(ct);
         }
 
         // Periodic retention sweep (~hourly): prune time-based tiers for sites that stopped uploading.

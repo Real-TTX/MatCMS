@@ -10,6 +10,12 @@
     <!-- Invariant globalization keeps the image small & formatting stable, but we still want to
          create named CultureInfo objects (de/en) for RequestLocalization. -->
     <PredefinedCulturesOnly>false</PredefinedCulturesOnly>
+    <!-- Workstation (background) GC instead of the ASP.NET default Server GC — the cloud is a single
+         low-traffic control-plane container. Server GC keeps a per-core heap and holds a high working set
+         after allocation bursts (heartbeats, Docker container-list polls) without returning it to the OS,
+         so idle RAM climbs to a high plateau. Same fix as the instance. Reversible. -->
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
     <!-- Default assembly version. InformationalVersion is supplied at build time
          via -p:InformationalVersion=<APP_VERSION> (see Dockerfile / GitHub Actions). -->
     <Version>1.0.0</Version>

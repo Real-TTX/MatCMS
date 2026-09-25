@@ -65,6 +65,17 @@ public class IndexModel : PageModel
         return RedirectToPage(new { tab = "general" });
     }
 
+    /// <summary>Removes OLD MatCMS images the host no longer needs (dangling, unused). Only MatCMS images,
+    /// only if not in use — see DockerHostService.PruneMatCmsImagesAsync.</summary>
+    public async Task<IActionResult> OnPostPruneImagesAsync()
+    {
+        var r = await _docker.PruneMatCmsImagesAsync(HttpContext.RequestAborted);
+        TempData["Flash"] = r.Removed == 0
+            ? "Keine alten MatCMS-Images zum Aufräumen."
+            : $"{r.Removed} altes/alte MatCMS-Image(s) entfernt (~{r.BytesReclaimed / (1024.0 * 1024.0):0.#} MB).";
+        return RedirectToPage(new { tab = "docker" });
+    }
+
     /// <summary>Eigenes Formular, eigener Handler — jede Karte speichert nur ihre eigenen Schlüssel.
     /// Bliebe das Kontingent am Allgemein-Handler hängen, würde ein Speichern dort den Wert leeren,
     /// weil das Formular ihn gar nicht mehr mitschickt.</summary>

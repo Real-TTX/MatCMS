@@ -507,6 +507,8 @@
   "settings.smtpTestHint": "Uses the last saved credentials — save first.",
   "settings.dockerLocalCount": "Detected as local",
   "settings.dockerConfigHint": "Set through the environment variable, not here. Without a mounted socket every instance stays remote.",
+  "settings.dockerPrune": "Clean up old MatCMS images",
+  "settings.dockerPruneHint": "Removes old, untagged MatCMS images left behind by updates — MatCMS only, and only if no container still uses them. Other images are untouched.",
   "profiles.isDefaultLabel": "Default profile",
   "profiles.isDefaultHint": "Catches instances that cannot be resolved to another profile. Exactly one profile is the default — setting it takes the flag off the current one.",
   "instances.filter": "Filter",

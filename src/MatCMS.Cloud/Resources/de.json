@@ -507,6 +507,8 @@
   "settings.smtpTestHint": "Sendet mit den zuletzt gespeicherten Zugangsdaten — vorher speichern.",
   "settings.dockerLocalCount": "Als lokal erkannt",
   "settings.dockerConfigHint": "Wird über die Umgebungsvariable gesetzt, nicht hier. Ohne gemounteten Socket bleibt jede Instanz remote.",
+  "settings.dockerPrune": "Alte MatCMS-Images aufräumen",
+  "settings.dockerPruneHint": "Entfernt alte, ungetaggte MatCMS-Images, die Updates hinterlassen — nur MatCMS, nur wenn kein Container sie noch nutzt. Andere Images bleiben unberührt.",
   "profiles.isDefaultLabel": "Standard-Profil",
   "profiles.isDefaultHint": "Fängt Instanzen auf, denen kein anderes Profil zugeordnet werden kann. Genau ein Profil ist Standard — beim Setzen wird es dem bisherigen entzogen.",
   "instances.filter": "Filter",

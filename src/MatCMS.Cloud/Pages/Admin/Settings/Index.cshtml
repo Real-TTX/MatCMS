@@ -380,6 +380,18 @@
             <div class="kv-value">@Model.LocalCount</div>
         </div>
         <div class="help">@T["settings.dockerConfigHint"]</div>
+
+        @if (Model.DockerConfigured && Model.DockerReachable)
+        {
+            @* Remove OLD MatCMS images left dangling by updates. Only MatCMS, only untagged, only if unused
+               (the service refuses images a container still needs) — never another app's layers. *@
+            <div class="list-actions" style="margin-top:14px;">
+                <form method="post" asp-page-handler="PruneImages">
+                    <button type="submit" class="btn btn-ghost"><i class="ti ti-trash" aria-hidden="true"></i> @T["settings.dockerPrune"]</button>
+                </form>
+            </div>
+            <div class="help">@T["settings.dockerPruneHint"]</div>
+        }
     </div>
 </div>
 

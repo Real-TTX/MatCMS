@@ -233,6 +233,15 @@ public class DockerHostService
             try { await client.Containers.RemoveContainerAsync(oldId, new ContainerRemoveParameters { Force = true }, ct); }
             catch (Exception ex) { _log.LogWarning(ex, "Old container {Id} could not be removed", oldId); }
 
+            // 5) The old image is now dangling (the new pull re-pointed the tag). Prune the OLD MatCMS images
+            //    it left behind so the host disk does not fill over successive updates. Best effort.
+            try
+            {
+                var pr = await PruneMatCmsImagesAsync(ct);
+                if (pr.Removed > 0) _log.LogInformation("Pruned {N} old MatCMS image(s) after updating {Name}.", pr.Removed, name);
+            }
+            catch (Exception ex) { _log.LogWarning(ex, "Post-update image prune failed for {Name}", name); }
+
             return new(true, $"Container '{name}' wurde auf das neue Image aktualisiert.");
         }
         catch (Exception ex)
@@ -240,6 +249,56 @@ public class DockerHostService
             _log.LogError(ex, "Update of {Name} failed", name);
             return new(false, ex.Message);
         }
+    }
+
+    public sealed record PruneResult(int Removed, long BytesReclaimed);
+
+    /// <summary>
+    /// Removes OLD MatCMS images the host no longer needs — the untagged ("dangling") images an update
+    /// leaves behind when a new pull re-points the tag. Deliberately narrow:
+    /// <list type="bullet">
+    /// <item>only UNTAGGED images (a tagged image is either in use or intentionally kept);</item>
+    /// <item>only ones attributable to MATCMS via their repo digest — another app's dangling layers are
+    ///       never touched, which is exactly what "nur MatCMS-Images" asks for;</item>
+    /// <item>delete with <c>Force=false</c>, so the daemon refuses (and we skip) any image a container
+    ///       still uses — an image can never be pulled out from under a running site.</item>
+    /// </list>
+    /// The reclaimed byte count is approximate (shared layers can overstate it).
+    /// </summary>
+    public async Task<PruneResult> PruneMatCmsImagesAsync(CancellationToken ct = default)
+    {
+        var client = Client;
+        if (client is null) return new(0, 0);
+
+        int removed = 0;
+        long bytes = 0;
+        try
+        {
+            var images = await client.Images.ListImagesAsync(new ImagesListParameters { All = false }, ct);
+            foreach (var img in images)
+            {
+                var tags = img.RepoTags ?? new List<string>();
+                var isTagged = tags.Any(t => !string.IsNullOrEmpty(t) && t != "<none>:<none>");
+                if (isTagged) continue;   // keep tagged images
+
+                var digests = img.RepoDigests ?? new List<string>();
+                var isMatCms = digests.Any(d => d.Contains("matcms", StringComparison.OrdinalIgnoreCase));
+                if (!isMatCms) continue;   // never touch another app's dangling layers
+
+                try
+                {
+                    await client.Images.DeleteImageAsync(img.ID, new ImageDeleteParameters { Force = false }, ct);
+                    removed++;
+                    bytes += img.Size;
+                }
+                catch { /* still used by a container → skip, safe */ }
+            }
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(ex, "MatCMS image prune failed");
+        }
+        return new(removed, bytes);
     }
 
     /// <summary>Splits "ghcr.io/real-ttx/matcms:latest" into repo + tag (default "latest"). A digest

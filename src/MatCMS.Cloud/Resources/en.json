@@ -459,6 +459,8 @@
   "apikeys.rightRestore": "restore",
   "apikeys.canRestore": "May restore live",
   "apikeys.canRestoreHint": "Without this, the key can only pull and upload backups. Restoring overwrites the LIVE site and must be granted on purpose.",
+  "apikeys.canManageProfiles": "May manage profiles",
+  "apikeys.canManageProfilesHint": "Allows creating and editing profiles and their payloads (settings, users, plugins, components, templates) and assigning instances via the API. A profile change affects every assigned instance.",
   "apikeys.reach": "Reach",
   "apikeys.reachAll": "All instances",
   "apikeys.reachN": "{0} instance(s)",

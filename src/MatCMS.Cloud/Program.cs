@@ -916,6 +916,10 @@ app.MapPost("/api/v1/instances/{publicId}/backups/{id:int}/restore", async (
     return Results.Ok(new { ok = true, id = row.Id, message = "Wiederherstellung vorgemerkt — die Instanz spielt sie beim nächsten Kontakt ein." });
 }).RequireRateLimiting("operatorApi");
 
+// Profile management over the operator API (list/read profiles, edit every payload, assign instances).
+// Lives in its own file to keep this one readable; same key auth + "operatorApi" rate limit.
+MatCMS.Cloud.Api.ProfileApi.MapProfileApi(app);
+
 // --- Catalogue ------------------------------------------------------------
 // The store, browsable by an approved instance itself ("Weiter durchsuchen…" in MatCMS). This is the
 // direct Store → instance path, with no profile involved: a site can pull a plugin, template or

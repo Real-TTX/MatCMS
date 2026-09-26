@@ -27,7 +27,7 @@ public class ApiKeyService
     /// the raw value cannot be recovered afterwards — the caller must show it now or never.
     /// </summary>
     public async Task<Created> CreateAsync(string name, bool canRestore, bool allInstances,
-        IEnumerable<int> instanceIds, CancellationToken ct = default)
+        IEnumerable<int> instanceIds, CancellationToken ct = default, bool canManageProfiles = false)
     {
         var raw = Tag + Base64Url(RandomNumberGenerator.GetBytes(32));
         var key = new ApiKey
@@ -36,6 +36,7 @@ public class ApiKeyService
             KeyHash = Hash(raw),
             Prefix = raw[..Math.Min(12, raw.Length)],
             CanRestore = canRestore,
+            CanManageProfiles = canManageProfiles,
             AllInstances = allInstances,
         };
         if (!allInstances)

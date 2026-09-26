@@ -29,6 +29,15 @@ public class ApiKey
     public bool CanRestore { get; set; }
 
     /// <summary>
+    /// Whether this key may MANAGE PROFILES over the API (create/edit profiles and their payloads —
+    /// settings, users, plugins, components, templates — and assign instances to a profile). Off by
+    /// default: a profile change pushes configuration to every instance assigned to it, so it is as
+    /// consequential as a restore and must be granted on purpose. Reading profiles needs only a valid
+    /// key; writing needs this right. Instance↔profile assignment ALSO honours the key's instance scope.
+    /// </summary>
+    public bool CanManageProfiles { get; set; }
+
+    /// <summary>
     /// True = every instance. False = only the instances listed in <see cref="Instances"/>.
     /// <para>A key with <c>AllInstances = false</c> and no scope rows can reach nothing — deliberately,
     /// so a mis-created key is inert rather than accidentally global.</para>

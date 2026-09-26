@@ -459,6 +459,8 @@
   "apikeys.rightRestore": "wiederherstellen",
   "apikeys.canRestore": "Darf live wiederherstellen",
   "apikeys.canRestoreHint": "Ohne Haken kann der Schlüssel nur Backups ziehen und hochladen. Das Wiederherstellen überschreibt die LIVE-Seite und muss bewusst erlaubt werden.",
+  "apikeys.canManageProfiles": "Darf Profile verwalten",
+  "apikeys.canManageProfilesHint": "Erlaubt das Anlegen und Ändern von Profilen und ihren Inhalten (Einstellungen, Benutzer, Plugins, Komponenten, Templates) sowie das Zuordnen von Instanzen über die API. Eine Profiländerung wirkt auf alle zugeordneten Instanzen.",
   "apikeys.reach": "Reichweite",
   "apikeys.reachAll": "Alle Instanzen",
   "apikeys.reachN": "{0} Instanz(en)",

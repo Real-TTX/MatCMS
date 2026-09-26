@@ -193,12 +193,18 @@ else
         .hero-carousel--slide { overflow: hidden; }
         .hero-carousel--slide .hero-carousel__track { display: flex; transition: transform .6s ease; }
         .hero-carousel--slide .hero-carousel__slide { flex: 0 0 100%; }
-        /* Overlay: uniform cover slides (a cycling hero reads better cropped than letterboxed). The
-           section's default hero padding would show the dark overlay backdrop as bars above/below a
-           full-width image ("black frame"), so a slideshow overlay drops the padding and goes edge to edge. */
-        .hero--overlay-slides { padding: 0; }
+        /* Overlay slideshow = a full-bleed background that FILLS the section, text overlaid. Themes may
+           give the overlay a min-height taller than a single image; an in-flow carousel then left a dark
+           strip below it. So the carousel and its slides are absolutely positioned to cover the whole
+           section (top AND bottom), with a min-height fallback for themes that set none. */
+        .hero--overlay-slides { padding: 0; min-height: clamp(360px, 60vh, 640px); }
+        .hero--overlay-slides .hero-carousel,
+        .hero--overlay-slides .hero-carousel__track,
+        .hero--overlay-slides .hero-carousel__slide { position: absolute; inset: 0; }
+        .hero--overlay-slides .hero-carousel--slide .hero-carousel__track { display: flex; }
+        .hero--overlay-slides .hero-carousel--slide .hero-carousel__slide { position: relative; inset: auto; flex: 0 0 100%; }
+        .hero--overlay-slides .hero-carousel__slide img { width: 100%; height: 100%; object-fit: cover; }
         .hero--overlay .hero-carousel { z-index: 0; }
-        .hero--overlay .hero-carousel__slide img { height: clamp(320px, 56vh, 60vh); object-fit: cover; }
         /* Navigation dots hidden by default (auto-advancing hero, cleaner look). */
         .hero-carousel__dots { display: none; position: absolute; left: 0; right: 0; bottom: 12px; z-index: 4;
             gap: 8px; justify-content: center; margin: 0; padding: 0; }

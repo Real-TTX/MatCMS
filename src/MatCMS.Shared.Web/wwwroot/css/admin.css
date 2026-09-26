@@ -112,8 +112,10 @@
     display: flex; align-items: center; justify-content: space-between;
     background: #fff; border-bottom: 1px solid var(--line);
     /* Fixed 67px so the back-office bar matches the cloud topbar AND the public admin bar exactly
-       (all three are 67px + 1px border). Content is centred rather than defining the height. */
-    height: 67px; box-sizing: border-box; padding: 0 32px; position: sticky; top: 0; z-index: 10;
+       (all three are 67px + 1px border). Content is centred rather than defining the height.
+       flex:none is load-bearing: .admin-main is a flex column, so without it a content-heavy page
+       lets flexbox SHRINK the topbar below 67px — the "topbar is a different height on some pages" bug. */
+    height: 67px; flex: none; box-sizing: border-box; padding: 0 32px; position: sticky; top: 0; z-index: 10;
 }
 .admin-topbar-title { font-family: var(--font-head); font-weight: 600; font-size: 20px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .admin-user { font-size: 14px; color: var(--muted); }

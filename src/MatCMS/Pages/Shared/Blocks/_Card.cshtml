@@ -1,4 +1,5 @@
 @model MatCMS.Content.BlockData
+@inject MatCMS.Services.MediaFocus Focus
 @{
     var icon = Model.Str("icon");
     var image = Model.Str("image");
@@ -23,7 +24,8 @@
 <article class="feat-card">
     @if (src.Length > 0)
     {
-        <div class="feat-card__img" style="background-image:url('@src')"></div>
+        var cfocus = Focus.Position(src);
+        <div class="feat-card__img" style="background-image:url('@src')@(string.IsNullOrEmpty(cfocus) ? "" : $";background-position:{cfocus}")"></div>
     }
     <div class="feat-card__body">
         @if (!string.IsNullOrWhiteSpace(icon))

@@ -148,6 +148,14 @@ public class BlockRegistry
                     Help = "block.hero.f.media.help" },
                 new BlockField { Id = "heroInterval", Label = "block.hero.f.interval", Type = FieldType.Select, Default = "5",
                     Options = [ new("3", "block.hero.opt.int.3"), new("4", "block.hero.opt.int.4"), new("5", "block.hero.opt.int.5"), new("7", "block.hero.opt.int.7") ] },
+                // Bildanzeige: "Füllen" (cover, randlos, kann beschneiden) oder "Einpassen" (contain, ganzes
+                // Bild sichtbar auf weichem, unscharfem Hintergrund — kein Beschnitt). Beim Beschneiden legt
+                // der Fokuspunkt des Bildes (Mediathek) fest, welcher Ausschnitt bleibt.
+                new BlockField { Id = "heroFit", Label = "block.hero.f.fit", Type = FieldType.Select, Default = "cover",
+                    Options = [ new("cover", "block.hero.opt.fit.cover"), new("contain", "block.hero.opt.fit.contain") ],
+                    Help = "block.hero.f.fit.help" },
+                new BlockField { Id = "heroWidth", Label = "block.hero.f.width", Type = FieldType.Select, Default = "full",
+                    Options = [ new("full", "block.hero.opt.width.full"), new("narrow", "block.hero.opt.width.narrow") ] },
             ]
         },
         new BlockDefinition

@@ -65,6 +65,8 @@
                 data-source-id="@(m.SourceMediaId?.ToString() ?? "")"
                 data-source-url="@(m.SourceMediaId is int sid && urlById.TryGetValue(sid, out var su) ? su : "")"
                 data-cropjson="@m.CropJson"
+                data-focalx="@(m.FocalX?.ToString() ?? "")"
+                data-focaly="@(m.FocalY?.ToString() ?? "")"
                 data-isimg="@(mIsImg && mext != ".gif" && mext != ".svg" ? "1" : "")"
                 title="@T["media.clickHint"]">
             @if (mIsImg)
@@ -106,6 +108,8 @@
                     data-source-id="@(m.SourceMediaId?.ToString() ?? "")"
                     data-source-url="@(m.SourceMediaId is int rsid && urlById.TryGetValue(rsid, out var rsu) ? rsu : "")"
                     data-cropjson="@m.CropJson"
+                    data-focalx="@(m.FocalX?.ToString() ?? "")"
+                    data-focaly="@(m.FocalY?.ToString() ?? "")"
                     data-isimg="@(rIsImg ? "1" : "")" style="cursor:pointer;">
                     <td><strong>@m.FileName</strong></td>
                     <td class="mono">@m.ContentType</td>
@@ -126,11 +130,21 @@
             <button type="button" class="modal-close" id="mm-close" aria-label="@T["action.close"]">✕</button>
         </div>
         <div class="modal-body media-modal-body">
-            <div class="media-preview">
+            <div class="media-preview" id="mm-preview">
                 <img id="mm-img" src="" alt="" />
-                <button type="button" class="btn btn-sm mm-crop-start" id="mm-crop-start" hidden>
-                    <i class="ti ti-crop" aria-hidden="true"></i> @T["media.crop"]
-                </button>
+                <span class="mm-focal-dot" id="mm-focal-dot" hidden aria-hidden="true"></span>
+                <div class="mm-preview-tools">
+                    <button type="button" class="btn btn-sm mm-crop-start" id="mm-crop-start" hidden>
+                        <i class="ti ti-crop" aria-hidden="true"></i> @T["media.crop"]
+                    </button>
+                    <button type="button" class="btn btn-sm btn-ghost mm-focal-start" id="mm-focal-start" hidden>
+                        <i class="ti ti-focus-2" aria-hidden="true"></i> @T["media.focal"]
+                    </button>
+                </div>
+                <div class="crop-note" id="mm-focal-note" hidden>@T["media.focalHint"]
+                    <button type="button" class="btn btn-sm btn-ghost" id="mm-focal-reset">@T["media.focalReset"]</button>
+                    <button type="button" class="btn btn-sm" id="mm-focal-done">@T["action.done"]</button>
+                </div>
                 <div class="crop-tools" id="mm-crop-tools" hidden>
                     <div class="crop-ratios">
                         <button type="button" class="btn btn-sm btn-ghost" data-ratio="0">@T["media.cropFree"]</button>
@@ -158,6 +172,8 @@
 
                 <form id="mm-save-form" method="post" asp-page-handler="Save" asp-route-tag="@Model.ActiveTag" class="media-detail-form">
                     <input type="hidden" name="id" id="mm-id" />
+                    <input type="hidden" name="focalX" id="mm-focalx" />
+                    <input type="hidden" name="focalY" id="mm-focaly" />
 
                     <div class="form-field">
                         <label for="mm-alt">@T["media.alt"]</label>
@@ -310,9 +326,48 @@
                 idEl.value = d.id; delIdEl.value = d.id;
                 infoEl.textContent = [d.type, fmtBytes(d.size)].filter(Boolean).join('  ·  ');
                 setupCrop(d);
+                setupFocal(d);
                 modal.classList.add('open');
             }
-            function close() { resetCrop(); modal.classList.remove('open'); }
+            function close() { resetCrop(); focalMode(false); modal.classList.remove('open'); }
+
+            // ---- Focal point (which spot stays visible when the image is cropped to fill a box) ----
+            var preview = document.getElementById('mm-preview');
+            var focalStartBtn = document.getElementById('mm-focal-start');
+            var focalNote = document.getElementById('mm-focal-note');
+            var focalDot = document.getElementById('mm-focal-dot');
+            var focalResetBtn = document.getElementById('mm-focal-reset');
+            var focalDoneBtn = document.getElementById('mm-focal-done');
+            var focalXEl = document.getElementById('mm-focalx');
+            var focalYEl = document.getElementById('mm-focaly');
+            // Pixel-place the marker on the actual image box (the preview centres the image with padding,
+            // so percent-of-container would drift). Re-run on image load and window resize.
+            function repositionDot() {
+                var x = focalXEl.value, y = focalYEl.value;
+                if (x === '' || y === '') { focalDot.hidden = true; return; }
+                focalDot.style.left = (img.offsetLeft + img.offsetWidth * (x / 100)) + 'px';
+                focalDot.style.top = (img.offsetTop + img.offsetHeight * (y / 100)) + 'px';
+                focalDot.hidden = false;
+            }
+            function focalMode(on) { preview.classList.toggle('focal-active', on); focalNote.hidden = !on; }
+            function setupFocal(d) {
+                focalMode(false);
+                focalStartBtn.hidden = d.isimg !== '1';
+                focalXEl.value = d.focalx || ''; focalYEl.value = d.focaly || '';
+                repositionDot();
+            }
+            focalStartBtn.addEventListener('click', function () { focalMode(true); });
+            focalDoneBtn.addEventListener('click', function () { focalMode(false); });
+            focalResetBtn.addEventListener('click', function () { focalXEl.value = ''; focalYEl.value = ''; focalDot.hidden = true; });
+            img.addEventListener('load', repositionDot);
+            window.addEventListener('resize', repositionDot);
+            img.addEventListener('click', function (e) {
+                if (!preview.classList.contains('focal-active')) return;
+                var r = img.getBoundingClientRect();
+                var x = Math.max(0, Math.min(100, Math.round(((e.clientX - r.left) / r.width) * 100)));
+                var y = Math.max(0, Math.min(100, Math.round(((e.clientY - r.top) / r.height) * 100)));
+                focalXEl.value = x; focalYEl.value = y; repositionDot();
+            });
 
             // ---- Crop (Cropper.js) ----
             // Crop makes a NEW file; the original is never touched. For an image that IS already a crop we

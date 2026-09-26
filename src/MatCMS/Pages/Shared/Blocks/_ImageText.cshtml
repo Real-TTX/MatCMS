@@ -1,4 +1,5 @@
 @model MatCMS.Content.BlockData
+@inject MatCMS.Services.MediaFocus Focus
 @{
     var image = Model.Str("image");
     var heading = Model.Str("heading");
@@ -11,6 +12,8 @@
         && image.IndexOfAny(new[] { '\'', '"', '(', ')', '\\', '\n', '\r' }) < 0)
         ? image : "";
     var hasImage = safeImage.Length > 0;
+    // Focal point from the media library so a cover-crop keeps the subject in view.
+    var focus = hasImage ? Focus.Position(safeImage) : null;
 }
 <section class="section imagetext-block">
     <div class="container">
@@ -18,7 +21,7 @@
             @if (hasImage)
             {
                 <div class="imagetext__media">
-                    <img src="@safeImage" alt="@heading" />
+                    <img src="@safeImage" alt="@heading"@(string.IsNullOrEmpty(focus) ? "" : $" style=\"object-position:{focus}\"") />
                 </div>
             }
             <div class="imagetext__body">

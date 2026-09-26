@@ -1,4 +1,5 @@
 @model MatCMS.Content.BlockData
+@inject MatCMS.Services.MediaFocus Focus
 @{
     var heading = Model.Str("heading");
     var sub = Model.Str("subheading");
@@ -48,6 +49,16 @@
         _ => ""
     };
 
+    // Per-image object-position: the hero's own focal choice (imagePosition) wins; otherwise fall back to
+    // the image's OWN focal point set in the media library, so a cover-crop keeps the subject in view.
+    string PosFor(string src) => objPos.Length > 0 ? objPos : (Focus.Position(src) ?? "");
+
+    // Bildanzeige: "Füllen" (cover) oder "Einpassen" (contain, ganzes Bild + weicher Hintergrund).
+    // Breite: optional begrenzt (nur Banner-Bildband). Klassen sitzen am bild-tragenden Element.
+    var fitCls = Model.StrOr("heroFit", "cover") == "contain" ? " hero--fit-contain" : "";
+    var widthCls = Model.Str("heroWidth") == "narrow" ? " hero--w-narrow" : "";
+    var singlePos = hasImage ? PosFor(safeImage) : "";
+
     // "overlay" fuses the title WITH the photo: the image is the section background, the text sits on
     // it over a gradient scrim. Only meaningful with an image; otherwise fall back to the banner.
     var heroStyle = Model.Str("heroStyle");
@@ -72,7 +83,8 @@
             var alt = System.Net.WebUtility.HtmlEncode(slides[i].Alt ?? "");
             var active = i == 0 ? " is-active" : "";
             var loading = i == 0 ? "eager" : "lazy";
-            var style = objPos.Length > 0 ? " style=\"object-position:" + objPos + "\"" : "";
+            var pos = PosFor(slides[i].Src);
+            var style = pos.Length > 0 ? " style=\"object-position:" + pos + "\"" : "";
             sb.Append("<div class=\"hero-carousel__slide" + active + "\"><img src=\"" + slides[i].Src + "\" alt=\"" + alt + "\" loading=\"" + loading + "\"" + style + "></div>");
         }
         sb.Append("</div></div>");
@@ -95,14 +107,14 @@
                         <a class="btn" href="@btnUrl">@btnText</a>
                     }
                 </div>
-                <div class="hero--split__img">
+                <div class="hero--split__img@(fitCls)">
                     @if (multi)
                     {
                         @Html.Raw(BuildCarousel(""))
                     }
                     else
                     {
-                        <img src="@safeImage" alt=""@(objPos.Length > 0 ? $" style=\"object-position:{objPos}\"" : "") />
+                        <img src="@safeImage" alt=""@(singlePos.Length > 0 ? $" style=\"object-position:{singlePos}\"" : "") />
                     }
                 </div>
             </div>
@@ -111,7 +123,7 @@
 }
 else if (overlay)
 {
-    <section class="hero hero--overlay@(centerCls)@(multi ? " hero--overlay-slides" : "")" style="--hero-bg:url('@safeImage')">
+    <section class="hero hero--overlay@(centerCls)@(multi ? " hero--overlay-slides" : "")@(fitCls)" style="--hero-bg:url('@safeImage')">
         @if (multi)
         {
             @* Cycling backdrop: the slides fill the frame (cover) and cross-fade/slide behind the text. *@
@@ -159,14 +171,14 @@ else
     </section>
     @if (hasImage)
     {
-        <div class="hero-image@(hCls)">
+        <div class="hero-image@(hCls)@(fitCls)@(widthCls)">
             @if (multi)
             {
                 @Html.Raw(BuildCarousel(""))
             }
             else
             {
-                <img src="@safeImage" alt=""@(objPos.Length > 0 ? $" style=\"object-position:{objPos}\"" : "") />
+                <img src="@safeImage" alt=""@(singlePos.Length > 0 ? $" style=\"object-position:{singlePos}\"" : "") />
             }
         </div>
     }

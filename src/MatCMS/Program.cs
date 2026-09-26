@@ -187,6 +187,7 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<TwoFactorService>();
 builder.Services.AddScoped<BlockRegistry>();
+builder.Services.AddScoped<MatCMS.Services.MediaFocus>();
 builder.Services.AddScoped<SiteContext>();
 builder.Services.AddScoped<ContentTransferService>();
 builder.Services.AddScoped<BackupManager>();

@@ -33,4 +33,11 @@ public class Media
     /// <summary>The crop rectangle used, as JSON {"x","y","width","height"} in ORIGINAL pixels — so
     /// "re-crop" can reopen the original with the last selection. Null for a normal upload.</summary>
     public string? CropJson { get; set; }
+
+    /// <summary>Focal point in PERCENT (0–100) — the spot that must stay visible when the image is
+    /// cropped to fit a box (object-fit: cover / a background). Null = centre (50/50). Set once per
+    /// image in the media library and honoured everywhere the image is shown cropped (hero, cards,
+    /// gallery, image+text …), so a face/subject is never cut off by the crop.</summary>
+    public int? FocalX { get; set; }
+    public int? FocalY { get; set; }
 }

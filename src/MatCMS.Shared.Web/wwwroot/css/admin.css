@@ -262,8 +262,14 @@ textarea.cp-sample-inp { resize: vertical; min-height: 0; }
 .modal-media { max-width: 860px; }
 .media-modal-body { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 24px; }
 .media-modal-body > .action-bar { grid-column: 1 / -1; margin-top: 4px; }
-.media-preview { display: flex; align-items: flex-start; justify-content: center; background: #f4f5f7; border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+.media-preview { position: relative; display: flex; align-items: flex-start; justify-content: center; background: #f4f5f7; border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
 .media-preview img { max-width: 100%; max-height: 420px; border-radius: 6px; }
+.media-preview.focal-active img { cursor: crosshair; }
+.mm-preview-tools { display: flex; gap: 8px; flex-wrap: wrap; }
+/* Focal-point marker: the spot that stays visible when the image is cropped to fill a box. */
+.mm-focal-dot { position: absolute; width: 20px; height: 20px; margin: -10px 0 0 -10px; border-radius: 50%;
+    border: 2px solid #fff; background: rgba(47,125,149,.75); box-shadow: 0 0 0 2px rgba(0,0,0,.4), 0 1px 6px rgba(0,0,0,.4);
+    pointer-events: none; z-index: 5; }
 .media-detail { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .media-detail-name { font-weight: 600; font-size: 14px; word-break: break-word; }
 .media-detail-form { display: flex; flex-direction: column; gap: 14px; margin: 0; }

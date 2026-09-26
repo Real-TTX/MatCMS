@@ -31,13 +31,17 @@ public class IndexModel : PageModel
             : all.Where(m => MatCMS.Content.TagUtil.Split(m.Tags).Contains(ActiveTag, StringComparer.OrdinalIgnoreCase)).ToList();
     }
 
-    public async Task<IActionResult> OnPostSaveAsync(int id, string? tags, string? alt)
+    public async Task<IActionResult> OnPostSaveAsync(int id, string? tags, string? alt, int? focalX, int? focalY)
     {
         var m = await _db.Media.FindAsync(id);
         if (m is not null)
         {
             m.Tags = MatCMS.Content.TagUtil.Normalize(tags);
             m.Alt = string.IsNullOrWhiteSpace(alt) ? null : alt.Trim();
+            // Focal point in percent (0–100); both must be present to count, else clear it (back to centre).
+            static int? Clamp(int? v) => v is null ? null : Math.Clamp(v.Value, 0, 100);
+            m.FocalX = (focalX is null || focalY is null) ? null : Clamp(focalX);
+            m.FocalY = (focalX is null || focalY is null) ? null : Clamp(focalY);
             await _db.SaveChangesAsync();
             TempData["Flash"] = "Medium gespeichert.";
         }

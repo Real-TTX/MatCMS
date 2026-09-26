@@ -111,7 +111,7 @@
 }
 else if (overlay)
 {
-    <section class="hero hero--overlay@(centerCls)" style="--hero-bg:url('@safeImage')">
+    <section class="hero hero--overlay@(centerCls)@(multi ? " hero--overlay-slides" : "")" style="--hero-bg:url('@safeImage')">
         @if (multi)
         {
             @* Cycling backdrop: the slides fill the frame (cover) and cross-fade/slide behind the text. *@
@@ -193,11 +193,15 @@ else
         .hero-carousel--slide { overflow: hidden; }
         .hero-carousel--slide .hero-carousel__track { display: flex; transition: transform .6s ease; }
         .hero-carousel--slide .hero-carousel__slide { flex: 0 0 100%; }
-        /* Overlay: uniform cover slides (a cycling hero reads better cropped than letterboxed). */
+        /* Overlay: uniform cover slides (a cycling hero reads better cropped than letterboxed). The
+           section's default hero padding would show the dark overlay backdrop as bars above/below a
+           full-width image ("black frame"), so a slideshow overlay drops the padding and goes edge to edge. */
+        .hero--overlay-slides { padding: 0; }
         .hero--overlay .hero-carousel { z-index: 0; }
         .hero--overlay .hero-carousel__slide img { height: clamp(320px, 56vh, 60vh); object-fit: cover; }
-        .hero-carousel__dots { position: absolute; left: 0; right: 0; bottom: 12px; z-index: 4;
-            display: flex; gap: 8px; justify-content: center; margin: 0; padding: 0; }
+        /* Navigation dots hidden by default (auto-advancing hero, cleaner look). */
+        .hero-carousel__dots { display: none; position: absolute; left: 0; right: 0; bottom: 12px; z-index: 4;
+            gap: 8px; justify-content: center; margin: 0; padding: 0; }
         .hero-carousel__dot { width: 9px; height: 9px; padding: 0; border: none; border-radius: 50%;
             cursor: pointer; background: rgba(255,255,255,.55); box-shadow: 0 1px 3px rgba(0,0,0,.35); }
         .hero-carousel__dot.is-active { background: #fff; }

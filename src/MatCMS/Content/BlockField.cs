@@ -38,6 +38,14 @@ public class BlockField
     /// currently equals <see cref="ShowWhenValue"/>. Null = always shown.</summary>
     public string? ShowWhenField { get; set; }
     public string? ShowWhenValue { get; set; }
+
+    /// <summary>Hide this field from the AI/MCP block generator. A <see cref="FieldType.List"/> field
+    /// normally makes its whole block a "repeater" that the generator skips entirely (a model cannot
+    /// fill an image list, and a half-filled list renders wrong). Marking an OPTIONAL list field
+    /// AiIgnore lets the block keep being AI-generated for its text fields, while the list is simply
+    /// left out of what the model is offered — used by the hero's optional slideshow images, which the
+    /// hero renders fine without.</summary>
+    public bool AiIgnore { get; set; }
 }
 
 public class SelectOption

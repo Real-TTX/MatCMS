@@ -8,12 +8,33 @@
     var align = Model.StrOr("align", "left");
     var imgH = Model.Str("imageHeight");
 
-    // Only allow a plain path or http(s) URL for the image source.
-    var safeImage = (!string.IsNullOrWhiteSpace(image)
-        && (image.StartsWith("/") || image.StartsWith("http://") || image.StartsWith("https://"))
-        && image.IndexOfAny(new[] { '\'', '"', '(', ')', '\\', '\n', '\r' }) < 0)
-        ? image : "";
+    // Only allow a plain path or http(s) URL for an image source (no quotes/parens/backslashes).
+    static string SafeSrc(string img) =>
+        (!string.IsNullOrWhiteSpace(img)
+            && (img.StartsWith("/") || img.StartsWith("http://") || img.StartsWith("https://"))
+            && img.IndexOfAny(new[] { '\'', '"', '(', ')', '\\', '\n', '\r' }) < 0)
+            ? img : "";
+
+    var safeImage = SafeSrc(image);
     var hasImage = safeImage.Length > 0;
+
+    // Slideshow: the primary "image" is the first slide, then any extra "images". From the second
+    // slide on the hero image becomes an auto-playing carousel; one image renders exactly as before.
+    var slides = new List<(string Src, string Alt)>();
+    if (hasImage) slides.Add((safeImage, ""));
+    foreach (var it in Model.List("images"))
+    {
+        var s = SafeSrc(it.Str("image"));
+        if (s.Length == 0) continue;
+        slides.Add((s, it.Str("alt")));
+    }
+    if (!hasImage && slides.Count > 0) { safeImage = slides[0].Src; hasImage = true; }
+    var multi = slides.Count > 1;
+
+    var mode = Model.StrOr("heroMedia", "crossfade");
+    if (mode is not ("crossfade" or "slide" or "kenburns")) mode = "crossfade";
+    if (!int.TryParse(Model.Str("heroInterval"), out var intSec) || intSec < 2 || intSec > 20) intSec = 5;
+    var intervalMs = intSec * 1000;
 
     // Focal point for the cropped banner. Friendly names map to object-position; a raw value like
     // "50% 78%" is passed through (sanitised to digits/%/keywords) so it can be fine-tuned per site.
@@ -36,6 +57,27 @@
     var hCls = imgH.Length > 0 ? " hero-image--" + imgH : "";
     var bgRaw = Model.Str("heroBg");
     var bgCls = (bgRaw is "soft" or "dark" or "accent") ? " hero--bg-" + bgRaw : "";
+
+    // Build the carousel markup (only used when there is more than one slide). Sources are already
+    // sanitised by SafeSrc, alt is HTML-encoded, mode is from a fixed set and the interval is numeric,
+    // so Html.Raw of this is safe. JS (hero-carousel.js) adds the dots and drives the animation.
+    string BuildCarousel(string extraCls)
+    {
+        var sb = new System.Text.StringBuilder();
+        var cls = "hero-carousel hero-carousel--" + mode + (string.IsNullOrEmpty(extraCls) ? "" : " " + extraCls);
+        sb.Append("<div class=\"" + cls + "\" data-hero-carousel data-mode=\"" + mode + "\" data-interval=\"" + intervalMs + "\">");
+        sb.Append("<div class=\"hero-carousel__track\">");
+        for (var i = 0; i < slides.Count; i++)
+        {
+            var alt = System.Net.WebUtility.HtmlEncode(slides[i].Alt ?? "");
+            var active = i == 0 ? " is-active" : "";
+            var loading = i == 0 ? "eager" : "lazy";
+            var style = objPos.Length > 0 ? " style=\"object-position:" + objPos + "\"" : "";
+            sb.Append("<div class=\"hero-carousel__slide" + active + "\"><img src=\"" + slides[i].Src + "\" alt=\"" + alt + "\" loading=\"" + loading + "\"" + style + "></div>");
+        }
+        sb.Append("</div></div>");
+        return sb.ToString();
+    }
 }
 @if (split)
 {
@@ -54,7 +96,14 @@
                     }
                 </div>
                 <div class="hero--split__img">
-                    <img src="@safeImage" alt=""@(objPos.Length > 0 ? $" style=\"object-position:{objPos}\"" : "") />
+                    @if (multi)
+                    {
+                        @Html.Raw(BuildCarousel(""))
+                    }
+                    else
+                    {
+                        <img src="@safeImage" alt=""@(objPos.Length > 0 ? $" style=\"object-position:{objPos}\"" : "") />
+                    }
                 </div>
             </div>
         </div>
@@ -63,9 +112,17 @@
 else if (overlay)
 {
     <section class="hero hero--overlay@(centerCls)" style="--hero-bg:url('@safeImage')">
-        @* A natural <img> (not a cover background) so the WHOLE photo is shown, never cropped — capped
-           to a sensible height; a blurred copy of the same photo fills the sides instead of empty bars. *@
-        <img class="hero-ov-img" src="@safeImage" alt="" />
+        @if (multi)
+        {
+            @* Cycling backdrop: the slides fill the frame (cover) and cross-fade/slide behind the text. *@
+            @Html.Raw(BuildCarousel("hero-carousel--overlay"))
+        }
+        else
+        {
+            @* A natural <img> (not a cover background) so the WHOLE photo is shown, never cropped — capped
+               to a sensible height; a blurred copy of the same photo fills the sides instead of empty bars. *@
+            <img class="hero-ov-img" src="@safeImage" alt="" />
+        }
         <div class="hero-ov-text">
             <div class="container">
                 <div class="hero__inner">
@@ -103,7 +160,52 @@ else
     @if (hasImage)
     {
         <div class="hero-image@(hCls)">
-            <img src="@safeImage" alt=""@(objPos.Length > 0 ? $" style=\"object-position:{objPos}\"" : "") />
+            @if (multi)
+            {
+                @Html.Raw(BuildCarousel(""))
+            }
+            else
+            {
+                <img src="@safeImage" alt=""@(objPos.Length > 0 ? $" style=\"object-position:{objPos}\"" : "") />
+            }
         </div>
     }
+}
+@if (multi)
+{
+    <style>
+        /* Hero slideshow. One .hero-carousel replaces the single <img>; the first slide stays in flow
+           to give the box its height, the rest stack on top (crossfade/kenburns) or ride a flex track
+           (slide). Slide <img>s inherit the hero's own height rules (.hero-image img / .hero--split__img
+           img) via the descendant selector, so the carousel is exactly as tall as a single image was. */
+        .hero-carousel { position: relative; width: 100%; }
+        .hero-carousel__track { position: relative; width: 100%; }
+        .hero-carousel__slide img { display: block; width: 100%; }
+        .hero-carousel--crossfade .hero-carousel__slide,
+        .hero-carousel--kenburns .hero-carousel__slide { opacity: 0; transition: opacity .9s ease; }
+        .hero-carousel--crossfade .hero-carousel__slide:not(:first-child),
+        .hero-carousel--kenburns .hero-carousel__slide:not(:first-child) { position: absolute; inset: 0; }
+        .hero-carousel--crossfade .hero-carousel__slide.is-active,
+        .hero-carousel--kenburns .hero-carousel__slide.is-active { opacity: 1; }
+        .hero-carousel--kenburns { overflow: hidden; }
+        .hero-carousel--kenburns .hero-carousel__slide.is-active img { animation: heroKenburns 8s ease forwards; }
+        @@keyframes heroKenburns { from { transform: scale(1); } to { transform: scale(1.09); } }
+        .hero-carousel--slide { overflow: hidden; }
+        .hero-carousel--slide .hero-carousel__track { display: flex; transition: transform .6s ease; }
+        .hero-carousel--slide .hero-carousel__slide { flex: 0 0 100%; }
+        /* Overlay: uniform cover slides (a cycling hero reads better cropped than letterboxed). */
+        .hero--overlay .hero-carousel { z-index: 0; }
+        .hero--overlay .hero-carousel__slide img { height: clamp(320px, 56vh, 60vh); object-fit: cover; }
+        .hero-carousel__dots { position: absolute; left: 0; right: 0; bottom: 12px; z-index: 4;
+            display: flex; gap: 8px; justify-content: center; margin: 0; padding: 0; }
+        .hero-carousel__dot { width: 9px; height: 9px; padding: 0; border: none; border-radius: 50%;
+            cursor: pointer; background: rgba(255,255,255,.55); box-shadow: 0 1px 3px rgba(0,0,0,.35); }
+        .hero-carousel__dot.is-active { background: #fff; }
+        @@media (prefers-reduced-motion: reduce) {
+            .hero-carousel--crossfade .hero-carousel__slide,
+            .hero-carousel--kenburns .hero-carousel__slide { transition: none; }
+            .hero-carousel--kenburns .hero-carousel__slide.is-active img { animation: none; }
+            .hero-carousel--slide .hero-carousel__track { transition: none; }
+        }
+    </style>
 }

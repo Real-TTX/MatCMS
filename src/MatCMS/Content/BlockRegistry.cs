@@ -129,6 +129,25 @@ public class BlockRegistry
                     Options = [ new("", "block.hero.opt.banner"), new("overlay", "block.hero.opt.overlay"), new("split", "block.hero.opt.split") ] },
                 new BlockField { Id = "heroBg", Label = "block.hero.f.bg", Type = FieldType.Select, Default = "",
                     Options = [ new("", "block.hero.opt.bg.none"), new("soft", "block.hero.opt.bg.soft"), new("dark", "block.hero.opt.bg.dark"), new("accent", "block.hero.opt.bg.accent") ] },
+                // Optional slideshow: from the SECOND image on, the hero image turns into an auto-playing
+                // carousel (the "Bild" above is the first slide). AiIgnore so the hero stays AI-generable
+                // for its text — the model never fills an image list. Empty = single image, exactly as before.
+                new BlockField
+                {
+                    Id = "images", Label = "block.hero.f.images", Type = FieldType.List, ItemLabel = "block.hero.item", AiIgnore = true,
+                    Help = "block.hero.f.images.help",
+                    ItemFields =
+                    [
+                        new BlockField { Id = "image", Label = "block.hero.f.image", Type = FieldType.Image },
+                        new BlockField { Id = "alt", Label = "block.f.alt", Type = FieldType.Text },
+                    ]
+                },
+                // How the slides change when there is more than one image. Ignored for a single image.
+                new BlockField { Id = "heroMedia", Label = "block.hero.f.media", Type = FieldType.Select, Default = "crossfade",
+                    Options = [ new("crossfade", "block.hero.opt.media.crossfade"), new("slide", "block.hero.opt.media.slide"), new("kenburns", "block.hero.opt.media.kenburns") ],
+                    Help = "block.hero.f.media.help" },
+                new BlockField { Id = "heroInterval", Label = "block.hero.f.interval", Type = FieldType.Select, Default = "5",
+                    Options = [ new("3", "block.hero.opt.int.3"), new("4", "block.hero.opt.int.4"), new("5", "block.hero.opt.int.5"), new("7", "block.hero.opt.int.7") ] },
             ]
         },
         new BlockDefinition

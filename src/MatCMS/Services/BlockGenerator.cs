@@ -33,7 +33,10 @@ public class BlockGenerator
         foreach (var def in _registry.All)
         {
             if (def.ChildOnly || def.IsContainer) continue;
-            if (def.Fields.Any(f => f.ItemFields.Count > 0)) continue;   // skip repeaters
+            // Skip repeaters — a model cannot fill an image/item list, and a half-filled list renders
+            // wrong. An AiIgnore list (e.g. the hero's optional slideshow images) does NOT count: the
+            // block renders fine without it and stays AI-generable for its text fields.
+            if (def.Fields.Any(f => f.ItemFields.Count > 0 && !f.AiIgnore)) continue;
             var fields = new List<GenField>();
             foreach (var f in def.Fields)
             {

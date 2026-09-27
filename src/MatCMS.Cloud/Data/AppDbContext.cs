@@ -53,6 +53,7 @@ public class AppDbContext : DbContext
     public DbSet<ProfileStoreComponent> ProfileStoreComponents => Set<ProfileStoreComponent>();
     public DbSet<ProfileStoreMailTemplate> ProfileStoreMailTemplates => Set<ProfileStoreMailTemplate>();
     public DbSet<ProfileGlobalUser> ProfileGlobalUsers => Set<ProfileGlobalUser>();
+    public DbSet<MatCMS.Cloud.Models.LogEntry> Logs => Set<MatCMS.Cloud.Models.LogEntry>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {

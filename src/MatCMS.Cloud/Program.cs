@@ -295,6 +295,10 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Record unhandled exceptions + 5xx responses to the log (Admin → Protokoll). Fail-safe; sits inside
+// the app's exception handler so the normal error page still renders.
+app.UseMiddleware<MatCMS.Cloud.Services.RequestLogMiddleware>();
+
 // --- Enforce "2FA required" for cloud accounts (Einstellungen → Sicherheit) ---
 // When the policy is on, a signed-in account (Admin or Operator) that has NOT set up 2FA is funnelled
 // to the enrolment page — forced setup, not a lock-out. Scoped to /admin so the user lookup only

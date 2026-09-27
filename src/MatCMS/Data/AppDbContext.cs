@@ -27,6 +27,7 @@ public class AppDbContext : DbContext
     // Public-site visitor accounts and their role vocabulary (the "guest area" login).
     public DbSet<SiteMember> SiteMembers => Set<SiteMember>();
     public DbSet<SiteRole> SiteRoles => Set<SiteRole>();
+    public DbSet<MatCMS.Models.LogEntry> Logs => Set<MatCMS.Models.LogEntry>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {

@@ -1,0 +1,72 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.Logs.IndexModel
+@{
+    ViewData["Title"] = T["logs.title"];
+    string LvlBadge(string lvl) => lvl switch { "Error" => "badge-err", "Warning" => "badge-new", _ => "badge-off" };
+}
+<div data-list data-list-page-size="50">
+    <div class="page-head">
+        <h1>@T["logs.title"]</h1>
+        <div class="list-toolbar">
+            <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+        </div>
+    </div>
+
+    <p class="muted">@T["logs.intro"]</p>
+
+    <div class="gallery-filter" style="margin-bottom:16px;">
+        <a class="gfilter @(Model.Level is null ? "active" : "")" asp-page="Index">@T["logs.all"] (@Model.Total)</a>
+        <a class="gfilter @(Model.Level == "Error" ? "active" : "")" asp-page="Index" asp-route-level="Error">@T["logs.errors"] (@Model.ErrorCount)</a>
+        <a class="gfilter @(Model.Level == "Warning" ? "active" : "")" asp-page="Index" asp-route-level="Warning">@T["logs.warnings"]</a>
+    </div>
+
+    <table class="data" data-list-table>
+        <thead>
+            <tr>
+                <th style="width:150px;">@T["logs.time"]</th>
+                <th style="width:90px;">@T["logs.level"]</th>
+                <th>@T["logs.message"]</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Entries.Count == 0)
+            {
+                <partial name="_EmptyRow" model='@T["logs.none"]' />
+            }
+            @foreach (var e in Model.Entries)
+            {
+                <tr data-search="@(e.Message + " " + e.Path + " " + e.Level)">
+                    <td class="muted mono">@e.CreatedAt.ToString("dd.MM.yyyy HH:mm:ss")</td>
+                    <td><span class="badge @LvlBadge(e.Level)">@e.Level</span></td>
+                    <td>
+                        <div>
+                            @if (e.StatusCode is int sc) { <span class="badge badge-off mono">@sc</span> }
+                            @if (!string.IsNullOrWhiteSpace(e.Method)) { <span class="mono muted">@e.Method</span> }
+                            <span class="mono">@e.Path</span>
+                        </div>
+                        <div>@e.Message</div>
+                        @if (!string.IsNullOrWhiteSpace(e.Exception))
+                        {
+                            <details>
+                                <summary class="muted">@T["logs.details"]</summary>
+                                <pre style="white-space:pre-wrap;font-size:12px;overflow:auto;max-height:320px;">@e.Exception</pre>
+                            </details>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+    <nav class="list-pager" data-list-pager aria-label="@T["list.pager"]"></nav>
+
+    <div class="list-actions">
+        @if (Model.Total > 0)
+        {
+            <form method="post" asp-page-handler="Clear" class="inline-form"
+                  onsubmit="return confirm('@T["logs.clearConfirm"]');">
+                <button type="submit" class="btn btn-danger">@T["logs.clear"]</button>
+            </form>
+        }
+    </div>
+</div>

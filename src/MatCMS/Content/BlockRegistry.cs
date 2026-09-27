@@ -522,7 +522,16 @@ public class BlockRegistry
                     Options = [ new("yes", "block.opt.yesno.yes"), new("no", "block.opt.yesno.no") ],
                     Help = "Klickbare Tag-Chips auf der Seite anzeigen, mit denen Besucher die Galerie weiter filtern können." },
                 new BlockField { Id = "layout", Label = "block.gallery.f.layout", Type = FieldType.Select, Default = "grid",
-                    Options = [ new("grid", "block.opt.layout.grid"), new("masonry", "block.opt.layout.masonry") ] },
+                    Options = [ new("grid", "block.opt.layout.grid"), new("masonry", "block.opt.layout.masonry"), new("carousel", "block.opt.layout.carousel") ] },
+                // Carousel only: how the slides are sized. "uniform" = same height & width (crops to fill,
+                // focal point decides the crop); "vary" = each slide keeps the image's aspect (variable
+                // width, WHOLE image, no crop). Plus optional auto-advance.
+                new BlockField { Id = "carouselFit", Label = "block.gallery.f.carouselFit", Type = FieldType.Select, Default = "uniform",
+                    Options = [ new("uniform", "block.gallery.opt.fit.uniform"), new("vary", "block.gallery.opt.fit.vary") ],
+                    ShowWhenField = "layout", ShowWhenValue = "carousel", Help = "block.gallery.f.carouselFit.help" },
+                new BlockField { Id = "autoplay", Label = "block.cards.f.autoplay", Type = FieldType.Select, Default = "off",
+                    Options = [ new("off", "block.cards.opt.autoplay.off"), new("on", "block.cards.opt.autoplay.on") ],
+                    ShowWhenField = "layout", ShowWhenValue = "carousel" },
                 new BlockField { Id = "columns", Label = "block.gallery.f.columns", Type = FieldType.Select, Default = "3",
                     Options = [ new("2", "block.opt.columns.2"), new("3", "block.opt.columns.3"), new("4", "block.opt.columns.4") ] },
                 // Default "no", and that is the whole point: an existing block carries no "strip" key,

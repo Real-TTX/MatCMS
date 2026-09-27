@@ -7,7 +7,7 @@
     var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     Array.prototype.slice.call(document.querySelectorAll("[data-carousel]")).forEach(function (wrap) {
-        var track = wrap.querySelector(".cards-grid");
+        var track = wrap.querySelector(".cards-grid, [data-carousel-track]");
         if (!track) return;
         var coverflow = wrap.classList.contains("is-coverflow");
 
@@ -24,8 +24,10 @@
         wrap.appendChild(prev); wrap.appendChild(next);
 
         function step() {
-            var card = track.querySelector(".feat-card");
-            return card ? card.getBoundingClientRect().width + 30 : Math.round(track.clientWidth * 0.8);
+            // Distance between the first two slides = one item + gap (works for any track/slide type).
+            var items = track.children;
+            if (items.length >= 2) return items[1].getBoundingClientRect().left - items[0].getBoundingClientRect().left;
+            return items.length ? items[0].getBoundingClientRect().width : Math.round(track.clientWidth * 0.8);
         }
         function update() {
             var can = scrollable();

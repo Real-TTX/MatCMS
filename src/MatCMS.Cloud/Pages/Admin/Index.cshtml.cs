@@ -13,14 +13,16 @@ public class IndexModel : PageModel
     private readonly ReleaseWatcher _releases;
     private readonly DockerHostService _docker;
     private readonly OperatorScope _scope;
+    private readonly VersionService _version;
 
-    public IndexModel(AppDbContext db, InstanceService instances, ReleaseWatcher releases, DockerHostService docker, OperatorScope scope)
+    public IndexModel(AppDbContext db, InstanceService instances, ReleaseWatcher releases, DockerHostService docker, OperatorScope scope, VersionService version)
     {
         _db = db;
         _instances = instances;
         _releases = releases;
         _docker = docker;
         _scope = scope;
+        _version = version;
     }
 
     public bool IsAdmin => _scope.IsAdmin;
@@ -39,6 +41,18 @@ public class IndexModel : PageModel
 
     public bool DockerConfigured => _docker.Configured;
     public bool DockerReachable { get; private set; }
+
+    public string CloudVersion => _version.Current;
+
+    // Instances that need a look, each with the reasons. Drives the "Aufmerksamkeit" panel.
+    public int SyncErrorCount => Instances.Count(i => !string.IsNullOrWhiteSpace(i.LastSyncError));
+    public int OutdatedCount => Instances.Count(InstanceService.IsOutdatedProtocol);
+    public bool IsOffline(Instance i) => i.HasConnected && !InstanceService.IsOnline(i);
+    public bool IsOutdated(Instance i) => InstanceService.IsOutdatedProtocol(i);
+    public bool HasSyncError(Instance i) => !string.IsNullOrWhiteSpace(i.LastSyncError);
+    public List<Instance> AttentionList => Instances
+        .Where(i => IsOffline(i) || HasSyncError(i) || HasUpdate(i) || IsOutdated(i))
+        .OrderBy(i => i.Name).ToList();
 
     public async Task OnGetAsync()
     {

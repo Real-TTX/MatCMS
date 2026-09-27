@@ -30,6 +30,14 @@
         <div class="n">@Model.PageCount</div>
         <div class="l">@T["dashboard.pages"]</div>
     </a>
+    <a class="stat" asp-page="/Admin/Posts/Index">
+        <div class="n">@Model.PostCount</div>
+        <div class="l">@T["dashboard.posts"]</div>
+    </a>
+    <a class="stat" asp-page="/Admin/Media/Index">
+        <div class="n">@Model.MediaCount</div>
+        <div class="l">@T["dashboard.media"]</div>
+    </a>
     <a class="stat" asp-page="/Admin/Forms/Index">
         <div class="n">@Model.UnreadCount</div>
         <div class="l">@T["dashboard.newSubmissions"]</div>
@@ -43,6 +51,65 @@
         <div class="l">@T["dashboard.users"]</div>
     </a>
 </div>
+
+<div class="card">
+    <h2>@T["dashboard.cloud"]</h2>
+    <div class="kv">
+        <div class="kv-label">@T["dashboard.cloudStatus"]</div>
+        <div class="kv-value">
+            @if (Model.CloudConnected)
+            {
+                <span class="badge badge-on">@T["dashboard.cloudConnected"]</span>
+                @if (Model.CloudOutOfSync)
+                {
+                    <span class="badge badge-new">@T["dashboard.cloudOutOfSync"]</span>
+                }
+                else
+                {
+                    <span class="badge badge-on">@T["dashboard.cloudSynced"]</span>
+                }
+            }
+            else
+            {
+                <span class="badge badge-off">@T["dashboard.cloudDisconnected"]</span>
+            }
+        </div>
+    </div>
+    @if (Model.CloudConnected && Model.CloudLastSync is not null)
+    {
+        <div class="kv">
+            <div class="kv-label">@T["dashboard.lastSync"]</div>
+            <div class="kv-value muted">@Model.CloudLastSync.Value.ToString("dd.MM.yyyy HH:mm") UTC</div>
+        </div>
+    }
+</div>
+
+@if (Model.RecentSubmissions.Count > 0)
+{
+    <div data-list>
+        <div class="page-head"><h2>@T["dashboard.recentSubmissions"]</h2></div>
+        <table class="data" data-list-table>
+            <thead>
+                <tr>
+                    <th style="width:160px;">@T["dashboard.time"]</th>
+                    <th>@T["dashboard.formLabel"]</th>
+                    <th style="width:110px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var s in Model.RecentSubmissions)
+                {
+                    <tr>
+                        <td class="muted mono">@s.CreatedAt.ToString("dd.MM.yyyy HH:mm")</td>
+                        <td>@(s.Form?.Name ?? "—")</td>
+                        <td>@if (!s.IsRead) { <span class="badge badge-new">@T["dashboard.unread"]</span> }</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="list-actions"><a class="btn btn-ghost" asp-page="/Admin/Forms/Index">@T["dashboard.allSubmissions"]</a></div>
+}
 
 <div class="card">
     <h2>@T["dashboard.quickstart"]</h2>

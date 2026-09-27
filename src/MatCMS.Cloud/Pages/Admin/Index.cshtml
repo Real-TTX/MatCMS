@@ -31,9 +31,41 @@
     </a>
 </div>
 
+@* Braucht Aufmerksamkeit: offline, Sync-Fehler, Update verfügbar, veraltetes Protokoll — auf einen Blick. *@
+<div class="card">
+    <h2>@T["dashboard.attention"]</h2>
+    @if (Model.AttentionList.Count == 0)
+    {
+        <p class="muted">✓ @T["dashboard.allClear"]</p>
+    }
+    else
+    {
+        <table class="data">
+            <tbody>
+                @foreach (var i in Model.AttentionList)
+                {
+                    <tr>
+                        <td style="width:220px;"><a asp-page="/Admin/Instances/Details" asp-route-id="@i.Id">@i.Name</a></td>
+                        <td>
+                            @if (Model.IsOffline(i)) { <span class="badge badge-err">@T["dashboard.attn.offline"]</span> }
+                            @if (Model.HasSyncError(i)) { <span class="badge badge-err">@T["dashboard.attn.syncError"]</span> }
+                            @if (Model.HasUpdate(i)) { <span class="badge badge-new">@T["dashboard.attn.update"]</span> }
+                            @if (Model.IsOutdated(i)) { <span class="badge badge-off">@T["dashboard.attn.outdated"]</span> }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
 <div class="card">
     <h2>@T["dashboard.releaseTitle"]</h2>
     <p class="muted">@T["dashboard.releaseText"] <code>@ReleaseWatcher.ImageRef</code></p>
+    <div class="kv">
+        <div class="kv-label">@T["dashboard.thisCloud"]</div>
+        <div class="kv-value mono">@Model.CloudVersion</div>
+    </div>
     <div class="kv">
         <div class="kv-label">@T["dashboard.latestRelease"]</div>
         <div class="kv-value mono">@(Model.LatestVersion ?? T["common.unknown"])</div>

@@ -51,6 +51,14 @@
                         {
                             <span class="badge badge-new">@T["apikeys.rightRestore"]</span>
                         }
+                        @if (k.CanManageProfiles)
+                        {
+                            <span class="badge badge-new">@T["apikeys.rightProfiles"]</span>
+                        }
+                        @if (k.CanManageStore)
+                        {
+                            <span class="badge badge-new">@T["apikeys.rightStore"]</span>
+                        }
                     </td>
                     <td class="muted">
                         @if (k.AllInstances)

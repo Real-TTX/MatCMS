@@ -87,6 +87,7 @@ builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<AiService>();
 builder.Services.AddScoped<InstanceService>();
 builder.Services.AddScoped<ProfileService>();
+builder.Services.AddScoped<StoreService>();
 builder.Services.AddScoped<MailSpool>();
 builder.Services.AddScoped<BackupStore>();
 // Used by the confirmation page AND by the watchdog that completes a delayed removal — which is
@@ -940,6 +941,11 @@ app.MapPost("/api/v1/instances/{publicId}/backups/{id:int}/restore", async (
 // Profile management over the operator API (list/read profiles, edit every payload, assign instances).
 // Lives in its own file to keep this one readable; same key auth + "operatorApi" rate limit.
 MatCMS.Cloud.Api.ProfileApi.MapProfileApi(app);
+
+// Store management over the operator API (the cloud-wide catalogue of templates/plugins/components/
+// mail-templates). Same key auth + "operatorApi" rate limit; writes need the CanManageStore right and
+// bump every profile that selected the changed entry.
+MatCMS.Cloud.Api.StoreApi.MapStoreApi(app);
 
 // --- Catalogue ------------------------------------------------------------
 // The store, browsable by an approved instance itself ("Weiter durchsuchen…" in MatCMS). This is the

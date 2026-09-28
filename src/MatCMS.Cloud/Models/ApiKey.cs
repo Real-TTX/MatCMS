@@ -38,6 +38,16 @@ public class ApiKey
     public bool CanManageProfiles { get; set; }
 
     /// <summary>
+    /// Whether this key may MANAGE THE STORE over the API (create/edit/remove the cloud-wide catalogue of
+    /// templates, plugins, components and mail-templates under <c>/api/v1/store</c>). Off by default: a
+    /// store entry is shared by every profile that selects it, so editing one reaches every instance of
+    /// every such profile — even more far-reaching than a single profile change — and must be granted on
+    /// purpose. Reading the store needs only a valid key; writing needs this right. The store is
+    /// cloud-wide and carries no per-instance scope, so this right ignores the key's instance list.
+    /// </summary>
+    public bool CanManageStore { get; set; }
+
+    /// <summary>
     /// True = every instance. False = only the instances listed in <see cref="Instances"/>.
     /// <para>A key with <c>AllInstances = false</c> and no scope rows can reach nothing — deliberately,
     /// so a mis-created key is inert rather than accidentally global.</para>

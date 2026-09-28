@@ -27,6 +27,7 @@ Klartext sichtbar). Rechte pro Schlüssel:
 | *(Basis)* | Instanzen listen, Backups ziehen/hochladen/listen, Profile **lesen**, Content-Ops lesen. |
 | **CanRestore** | Darf ein Backup **live** zurückspielen (`…/restore`) – überschreibt die Produktivseite. |
 | **CanManageProfiles** | Darf Profile und ihre Inhalte **schreiben** und Instanzen einem Profil zuordnen. |
+| **CanManageStore** | Darf den cloud-weiten **Store** (Templates/Plugins/Komponenten/Mail-Templates) **schreiben**. Eine Store-Änderung erreicht **jedes Profil**, das den Eintrag ausgewählt hat – deshalb ein eigenes Recht. Lesen braucht nur einen gültigen Schlüssel. Ignoriert den Instanz-Umfang (der Store ist cloud-weit). |
 | **Instanz-Umfang** | „Alle Instanzen" oder auf ausgewählte begrenzt. Eine unbekannte/außerhalb liegende Instanz gibt immer **404** (nicht 403), damit ein begrenzter Schlüssel keine Instanzen aufzählen kann. |
 
 Fehlerformat immer JSON: `{ "error": "…" }` mit passendem HTTP-Status (401/403/404/400/409).
@@ -132,7 +133,27 @@ Schreiben braucht **CanManageProfiles**. Lesen braucht nur einen gültigen Schl�
 
 ---
 
-## 5. MCP-Server (`/mcp`) – Inhalte per KI verwalten
+## 5. Store – der cloud-weite Katalog
+
+Der **Store** ist der globale Katalog aus **Templates, Plugins, Komponenten und Mail-Templates**, aus
+dem Profile auswählen und den Instanzen durchstöbern. Eine Änderung an einem Store-Eintrag erreicht
+**jedes Profil, das ihn ausgewählt hat** (die Cloud erhöht deren Revision automatisch), und rollt beim
+nächsten Heartbeat auf deren Instanzen aus. Das Entfernen aus dem Store stoppt nur künftige Rollouts;
+auf den Instanzen bleibt der Eintrag bestehen.
+
+Schreiben braucht **CanManageStore**. Lesen braucht nur einen gültigen Schlüssel. Identität je Typ:
+Template = `name`, Komponente = `type`, Mail-Template/Plugin = `key`. Ein `POST` ist ein **Upsert**
+(gleiche Identität aktualisiert, sonst neu); die Antwort enthält `created: true|false`.
+
+- `GET /api/v1/store` → `{ canManageStore, plugins[], templates[], components[], mailTemplates[] }` (je mit `usedBy`-Zähler).
+- **Templates:** `GET /api/v1/store/templates` · `GET …/templates/{name}` · `POST …/templates` `{ name, description?, accentColor?, secondaryColor?, headingFont?, bodyFont?, buttonStyle?, headingColor?, textColor?, backgroundColor?, altBackground?, containerWidth?, buttonRadius?, headerBackground?, headerTextColor?, headerPadding?, customCss?, customJs?, layoutHtml?, menuMapJson?, parametersJson?, paramValuesJson?, partsJson? }` (nur gesetzte Felder ändern sich) · `DELETE …/templates/{name}`
+- **Komponenten:** `GET …/components` · `GET …/components/{type}` · `POST …/components` `{ type, name, description?, icon?, fieldsJson?, templateHtml? }` (`fieldsJson` muss gültiges JSON sein) · `DELETE …/components/{type}`
+- **Mail-Templates:** `GET …/mail-templates` · `GET …/mail-templates/{key}` · `POST …/mail-templates` `{ key, name?, description?, subject, body?, enabled?, isHtml? }` · `DELETE …/mail-templates/{key}`
+- **Plugins (rohes ZIP-Bundle):** `GET …/plugins` · `GET …/plugins/{key}/download` · `POST …/plugins` (Body = das **rohe Plugin-ZIP**; Key/Name/Version werden aus `plugin.json` gelesen, Upsert nach Key, 64 MB) · `DELETE …/plugins/{key}`
+
+---
+
+## 6. MCP-Server (`/mcp`) – Inhalte per KI verwalten
 
 Für KI-Clients (ChatGPT, Claude, Cursor) bietet die Cloud einen **Model-Context-Protocol**-Server
 unter `/mcp` (streamable HTTP). Auth = **derselbe** `mck_…`-Schlüssel als `Authorization: Bearer …`.
@@ -152,7 +173,21 @@ Instanz beim nächsten Heartbeat über ihre **eigenen** Validierer anwendet (add
 | `create_page` | neue Seite anlegen (add-only) |
 | `update_page_blocks` | die Blöcke einer Seite ersetzen (CanRestore) |
 | `create_post` | neuen Beitrag anlegen (add-only) |
+| `create_form` | neues Formular anlegen (add-only; Felder als JSON-Array) — CanRestore |
+| `set_setting` | eine Site-Einstellung setzen (`cloud.*`-Schlüssel werden abgewiesen) — CanRestore |
+| `analyze_cleanup` | unbenutzte Medien/Komponenten + Plugins der Site ermitteln (async → `get_content_op`, `result` = Liste) — read |
+| `apply_cleanup` | gewählte unbenutzte Medien/Komponenten/Plugins löschen (Site re-prüft „noch unbenutzt") — **destruktiv**, CanRestore |
 | `get_content_op` | Status/Ergebnis einer Op abfragen: `pending` / `applied` / `skipped-exists` / `failed` |
+
+**Store-Tools** (verwalten den cloud-weiten Katalog direkt, ohne Instanz-Umlauf; **synchron**; Schreiben braucht **CanManageStore**):
+
+| Tool | Zweck |
+|---|---|
+| `list_store` | den Store auflisten (Templates/Komponenten/Mail-Templates/Plugins, mit `usedBy`) |
+| `upsert_store_template` / `delete_store_template` | ein Theme (Template) anlegen/ändern bzw. entfernen |
+| `upsert_store_component` / `delete_store_component` | eine Komponente anlegen/ändern bzw. entfernen |
+| `upsert_store_mail_template` / `delete_store_mail_template` | ein Mail-Template anlegen/ändern bzw. entfernen |
+| `delete_store_plugin` | ein Plugin aus dem Store entfernen (Hochladen bleibt REST: `POST /api/v1/store/plugins`) |
 
 **`create_page`** (Beispiel-Eingabe):
 ```json
@@ -174,7 +209,7 @@ Content-Ops.
 
 ---
 
-## 6. Block-Katalog
+## 7. Block-Katalog
 
 Blöcke, die eine MatCMS-Site kennt, mit ihren Feld-IDs. Spalte **KI-setzbar** = das Feld überlebt eine
 `create_page`/`update_page_blocks`-Content-Op (nur Text-/RichText-Felder). Bild-/Auswahl-/Link-Felder
@@ -478,7 +513,7 @@ Kind-Blöcke (`card`, `column`, `faq`, `step`, `service`, `leistung`, `reference
 
 ---
 
-## 7. Rezepte für eine KI
+## 8. Rezepte für eine KI
 
 - **Neue Unterseite mit Text anlegen:** `create_page` mit `hero` + `richtext`/`cards` → `opId` → `get_content_op` bis `applied`.
 - **Bestehende Seite umtexten:** `get_page` (async) → Blöcke anpassen → `update_page_blocks` (CanRestore).

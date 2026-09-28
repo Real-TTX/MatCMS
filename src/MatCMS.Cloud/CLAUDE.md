@@ -806,12 +806,15 @@ the admin UI uses. There is no second restore path and no second backup format.
 
 - **`ApiKey`** (`Models/ApiKey.cs`, `Services/ApiKeyService.cs`): stored as **SHA-256 only**, shown
   once, with a clear `Prefix` for the list — exactly like an instance token (`ApiKeyService.Hash`
-  mirrors `InstanceService.HashToken`). Two rights that were deliberate product decisions:
+  mirrors `InstanceService.HashToken`). Rights that were deliberate product decisions:
   **`CanRestore`** gates the one destructive call (pull/upload is the base right; overwriting a live
-  site must be granted on purpose), and **`AllInstances` + `ApiKeyInstance` scope** limits a key to
-  named instances. A scoped key with no rows reaches nothing, on purpose — a mis-created key is inert,
-  not accidentally global. Managed under **Admin → API-Schlüssel** (`Pages/Admin/ApiKeys/`); revoking
-  keeps the row (a key that could restore a site is worth an audit trail), deleting cascades its scope.
+  site must be granted on purpose), **`CanManageProfiles`** gates all profile writes + instance↔profile
+  assignment, **`CanManageStore`** gates all store writes (a store edit reaches every profile that
+  selected the entry — even wider than one profile — so it is its own right), and **`AllInstances` +
+  `ApiKeyInstance` scope** limits a key to named instances. A scoped key with no rows reaches nothing, on
+  purpose — a mis-created key is inert, not accidentally global. Managed under **Admin → API-Schlüssel**
+  (`Pages/Admin/ApiKeys/`); revoking keeps the row (a key that could restore a site is worth an audit
+  trail), deleting cascades its scope.
 - **Auth**: `Authorization: Bearer <key>`. `ApiCallerAsync` resolves the key or returns 401;
   `ApiInstanceAsync` resolves the target instance and returns the SAME 404 for "does not exist" and
   "outside this key's scope", so a scoped key cannot enumerate instances by 404-vs-403.
@@ -821,6 +824,17 @@ the admin UI uses. There is no second restore path and no second backup format.
   raw body, origin `api`, Kestrel cap lifted like the instance upload); `POST …/backups/{id}/restore`
   (gated on `CanRestore`). Restore is still only MARKED — the instance downloads and applies it on its
   next beat and reports back, which the list then shows.
+- **Profile management** (`Api/ProfileApi.cs`, `MapProfileApi`): list/read profiles and edit every payload
+  (settings, SMTP/translation groups, users, components, templates, mail-templates, plugins, AI flags) and
+  assign instances — mirrors the admin Profile pages field for field through the SAME `ProfileService`, so
+  every write bumps `TouchAsync`. Reads need any key; writes need **`CanManageProfiles`**.
+- **Store management** (`Api/StoreApi.cs`, `MapStoreApi`) over `/api/v1/store`: the cloud-wide catalogue of
+  templates/components/mail-templates/plugins. All writes go through **`Services/StoreService.cs`** (shared
+  with the MCP `StoreTools`), which maps the input AND bumps every profile that SELECTED the changed entry
+  (the same rule as the admin Store pages' `TouchUsersAsync` — without it a store edit reaches nobody).
+  Reads need any key; writes need **`CanManageStore`**. Plugin bundles travel as the raw ZIP (kept REST, not
+  MCP). One `dotnet ef` trap learned here: `migrations remove --no-build` operates on the STALE snapshot and
+  removed the wrong (previous) migration — build first, and verify the generated `Up()` before committing.
 - **Authorization Code connector (native "Sign in")** — for a client that redirects a browser (a ChatGPT
   custom GPT action). Registered clients live in `OAuthClients` (`Models/OAuthClient.cs`,
   `Services/OAuthClientService.cs`: `client_id` `mcc_…`, secret `mcs_…` stored SHA-256-only, an **exact**
@@ -883,7 +897,13 @@ the admin UI uses. There is no second restore path and no second backup format.
   `PendingContentOp.BackupFirst` (set by `InstanceService` from the profile, only for write ops, read live at
   offer time — no revision bump); when set, the instance takes ONE local restore point
   (`BackupManager.RunAsync(cfg, "ai-pre")`) before applying the beat's ops (best-effort: a failed backup is
-  logged and the ops still apply). Still not built: `create_form`, `set_setting` (single-site). See
+  logged and the ops still apply). **`create_form`** (add-only, field list as JSON), **`set_setting`**
+  (one site setting; refuses `SettingKeys.Cloud` keys, same guard as the sync applier) and the
+  **cloud-orchestrated cleanup** (`analyze_cleanup` read → `apply_cleanup` restore-gated) are now built too —
+  all content ops applied by `ContentOpApplier` (`form.create` / `setting.set` / `cleanup.analyze` /
+  `cleanup.apply`). Cleanup runs the instance's OWN `CleanupService` (the same one behind the CMS's
+  `Admin → Aufräumen` page), so "unused" is judged with the full content model, never a parsed backup;
+  `apply_cleanup` re-checks "still unused" before deleting and rides `BackupBeforeAiChange` for a pre-backup. See
   `docs/mcp-stage2-content-channel.md`.
 
 ## Backlog

@@ -20,7 +20,7 @@ public class CreateModel : PageModel
         Instances = await _db.Instances.AsNoTracking().OrderBy(i => i.Name).ToListAsync();
     }
 
-    public async Task<IActionResult> OnPostAsync(string name, bool canRestore, bool canManageProfiles, string scope, int[]? instanceIds)
+    public async Task<IActionResult> OnPostAsync(string name, bool canRestore, bool canManageProfiles, bool canManageStore, string scope, int[]? instanceIds)
     {
         // "selected" = scoped to the ticked instances; anything else = all instances.
         var allInstances = scope != "selected";
@@ -35,7 +35,7 @@ public class CreateModel : PageModel
             return Page();
         }
 
-        var created = await _keys.CreateAsync(name, canRestore, allInstances, ids, canManageProfiles: canManageProfiles);
+        var created = await _keys.CreateAsync(name, canRestore, allInstances, ids, canManageProfiles: canManageProfiles, canManageStore: canManageStore);
         // The raw key exists only here — handed to the list page to be shown exactly once.
         TempData["NewApiKey"] = created.RawKey;
         TempData["Flash"] = "API-Schlüssel erstellt.";

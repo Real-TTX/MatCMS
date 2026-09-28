@@ -451,6 +451,7 @@
   "logs.intro": "Unbehandelte Fehler und Server-Fehler (5xx) der Cloud. Automatisch begrenzt auf die neuesten Einträge.",
   "logs.source": "Quelle",
   "logs.sourceCloud": "Cloud",
+  "logs.allSources": "Alle Quellen",
   "logs.noneInstance": "Keine Fehler von dieser Instanz gemeldet – oder sie sendet noch keine (ältere Version).",
   "logs.all": "Alle",
   "logs.errors": "Fehler",

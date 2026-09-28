@@ -451,6 +451,7 @@
   "logs.intro": "Unhandled errors and server errors (5xx) of the cloud. Automatically capped to the newest entries.",
   "logs.source": "Source",
   "logs.sourceCloud": "Cloud",
+  "logs.allSources": "All sources",
   "logs.noneInstance": "No errors reported by this instance – or it does not send them yet (older version).",
   "logs.all": "All",
   "logs.errors": "Errors",

@@ -9,23 +9,26 @@
         <h1>@T["logs.title"]</h1>
         <div class="list-toolbar">
             <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+            @* Source: the cloud's own log, one connected instance's mirror, or everything combined.
+               Styled as a toolbar control (select.list-search) so it sits with the search, not as a
+               bare native <select>. *@
+            <form method="get" class="inline-form">
+                <select name="source" class="list-search" onchange="this.form.submit()" aria-label="@T["logs.source"]">
+                    <option value="cloud" selected="@Model.IsCloud">@T["logs.sourceCloud"]</option>
+                    <option value="all" selected="@Model.IsAll">@T["logs.allSources"]</option>
+                    @foreach (var i in Model.Instances)
+                    {
+                        <option value="@i.PublicId" selected="@(Model.Source == i.PublicId)">@i.Name</option>
+                    }
+                </select>
+                @* Keep the active level/category filter when switching source. *@
+                @if (Model.Level is not null) { <input type="hidden" name="level" value="@Model.Level" /> }
+                @if (Model.Category is not null) { <input type="hidden" name="category" value="@Model.Category" /> }
+            </form>
         </div>
     </div>
 
     <p class="muted">@T["logs.intro"]</p>
-
-    @* Source: the cloud's own log, or the mirrored log a connected instance piggybacks on its heartbeat. *@
-    <form method="get" class="form-row" style="margin-bottom:12px;align-items:center;gap:8px;">
-        <label for="log-source" class="kv-label">@T["logs.source"]</label>
-        <select id="log-source" name="source" onchange="this.form.submit()">
-            <option value="cloud" selected="@Model.IsCloud">@T["logs.sourceCloud"]</option>
-            @foreach (var i in Model.Instances)
-            {
-                <option value="@i.PublicId" selected="@(Model.Source == i.PublicId)">@i.Name</option>
-            }
-        </select>
-        @if (Model.Level is not null) { <input type="hidden" name="level" value="@Model.Level" /> }
-    </form>
 
     @if (Model.IsCloud)
     {
@@ -73,19 +76,21 @@
             <tr>
                 <th style="width:150px;">@T["logs.time"]</th>
                 <th style="width:90px;">@T["logs.level"]</th>
+                @if (Model.IsAll) { <th style="width:170px;">@T["logs.source"]</th> }
                 <th>@T["logs.message"]</th>
             </tr>
         </thead>
         <tbody>
             @if (Model.Rows.Count == 0)
             {
-                <partial name="_EmptyRow" model='@(Model.IsCloud ? T["logs.none"] : T["logs.noneInstance"])' />
+                <partial name="_EmptyRow" model='@(Model.IsInstance ? T["logs.noneInstance"] : T["logs.none"])' />
             }
             @foreach (var e in Model.Rows)
             {
-                <tr data-search="@(e.Message + " " + e.Path + " " + e.Level)">
+                <tr data-search="@(e.Message + " " + e.Path + " " + e.Level + " " + e.SourceLabel)">
                     <td class="muted mono">@e.Time.ToString("dd.MM.yyyy HH:mm:ss")</td>
                     <td><span class="badge @LvlBadge(e.Level)">@e.Level</span></td>
+                    @if (Model.IsAll) { <td><span class="badge badge-off">@(e.SourceLabel ?? T["logs.sourceCloud"])</span></td> }
                     <td>
                         <div>
                             @if (e.StatusCode is int sc) { <span class="badge badge-off mono">@sc</span> }
@@ -117,8 +122,9 @@
                 <button type="submit" class="btn btn-danger">@T["logs.clear"]</button>
             </form>
         }
-        @* On-demand full log (Variante B): ask the instance to upload its complete log with stack traces. *@
-        @if (!Model.IsCloud)
+        @* On-demand full log (Variante B): ask the instance to upload its complete log with stack traces.
+           Only for a single selected instance — not the cloud and not the combined view. *@
+        @if (Model.IsInstance)
         {
             @if (Model.FullLogPending)
             {

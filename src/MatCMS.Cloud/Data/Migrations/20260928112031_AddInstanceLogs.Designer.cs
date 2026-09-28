@@ -3,6 +3,7 @@ using System;
 using MatCMS.Cloud.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace MatCMS.Cloud.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260928112031_AddInstanceLogs")]
+    partial class AddInstanceLogs
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.12");
@@ -337,12 +340,6 @@ namespace MatCMS.Cloud.Data.Migrations
                     b.Property<int?>("LocalPort")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("LogFetchRequestId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime?>("LogFetchRequestedAt")
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -454,9 +451,6 @@ namespace MatCMS.Cloud.Data.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Category")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Exception")
                         .HasColumnType("TEXT");
 
                     b.Property<int>("InstanceId")

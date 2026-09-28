@@ -20,6 +20,11 @@ public class IndexModel : PageModel
     public bool SetupComplete { get; private set; }
     public List<MatCMS.Models.FormSubmission> RecentSubmissions { get; private set; } = new();
 
+    // Health at a glance: errors from the log (the new Protokoll) so the dashboard surfaces problems
+    // instead of them sitting unseen on the Protokoll page.
+    public int ErrorCount7d { get; private set; }
+    public List<MatCMS.Models.LogEntry> RecentErrors { get; private set; } = new();
+
     // Cloud connection status for the "at a glance" card.
     public bool CloudConnected => _cloud.Connected;
     public bool CloudOutOfSync => _cloud.OutOfSync;
@@ -38,5 +43,10 @@ public class IndexModel : PageModel
             .OrderByDescending(s => s.CreatedAt).Take(5).ToListAsync();
         SetupComplete = (await _db.SiteSettings.AsNoTracking()
             .FirstOrDefaultAsync(s => s.Key == MatCMS.Services.SettingKeys.SetupComplete))?.Value == "1";
+
+        var since = DateTime.UtcNow.AddDays(-7);
+        ErrorCount7d = await _db.Logs.CountAsync(l => l.Level == "Error" && l.CreatedAt >= since);
+        RecentErrors = await _db.Logs.AsNoTracking().Where(l => l.Level == "Error")
+            .OrderByDescending(l => l.Id).Take(5).ToListAsync();
     }
 }

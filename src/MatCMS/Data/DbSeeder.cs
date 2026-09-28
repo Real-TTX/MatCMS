@@ -221,7 +221,26 @@ public static class DbSeeder
 
         await MigrateLegacyContactAsync(db);
         await MigrateListBlocksAsync(db);
+        await MigrateFeaturesAsync(db);
         await UpgradeTemplatesAsync(db);
+    }
+
+    /// <summary>
+    /// One-time, idempotent rename of the "leistungen"/"leistung" block types to "features"/"feature"
+    /// (the code-hygiene rename to English internals). Runs on every startup, a no-op once done. The
+    /// field JSON is identical for old and new, so only the type string changes; a runtime alias in
+    /// <see cref="Content.BlockRegistry.Get"/> still resolves any old value that arrives later via a
+    /// backup or an older instance's cloud config.
+    /// </summary>
+    private static async Task MigrateFeaturesAsync(AppDbContext db)
+    {
+        var legacy = await db.ContentBlocks
+            .Where(b => b.BlockType == "leistungen" || b.BlockType == "leistung")
+            .ToListAsync();
+        if (legacy.Count == 0) return;
+        foreach (var b in legacy)
+            b.BlockType = b.BlockType == "leistungen" ? "features" : "feature";
+        await db.SaveChangesAsync();
     }
 
     /// <summary>Converts every stored template up to the current template schema version

@@ -126,6 +126,13 @@ public static class SettingKeys
     public const string SmtpFromName = "smtp.fromName";
     public const string SmtpSsl = "smtp.ssl";
 
+    // Log system (Admin → Protokoll). Request logging is opt-in because it can grow fast; retention is
+    // per category, in days (0 = keep, bounded only by the hard count cap). Read cached in the
+    // middleware and by the retention sweeper.
+    public const string LogRequests = "log.requests";                        // "on" = log EVERY HTTP request (category "webrequest")
+    public const string LogRetentionErrorsDays = "log.retentionErrorsDays";  // errors/5xx (category "request"); default 90
+    public const string LogRetentionRequestsDays = "log.retentionRequestsDays"; // full request log (category "webrequest"); default 14
+
     // MatCMS.Cloud link (Settings → Cloud). The cloud watches versions, notifies, and — when this
     // instance runs on ITS Docker host — can perform updates. Empty URL/id/token = fully offline.
     // The token is stored DataProtection-ENCRYPTED (see CloudService), never in the clear.

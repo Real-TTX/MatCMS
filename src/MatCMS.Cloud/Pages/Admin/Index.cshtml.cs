@@ -30,6 +30,14 @@ public class IndexModel : PageModel
     public List<Instance> Instances { get; private set; } = new();
     public List<InstanceEvent> RecentEvents { get; private set; } = new();
 
+    // Health at a glance from the new Protokoll: the cloud's own errors and, per instance, how many
+    // errors its heartbeat has mirrored — so problems on a connected site surface on the dashboard.
+    public int CloudErrorCount7d { get; private set; }
+    public Dictionary<int, int> InstanceErrorCounts { get; private set; } = new();
+    public int ErrorCount(Instance i) => InstanceErrorCounts.GetValueOrDefault(i.Id);
+    public List<Instance> InstancesWithErrors => Instances
+        .Where(i => ErrorCount(i) > 0).OrderByDescending(ErrorCount).ToList();
+
     public int OnlineCount => Instances.Count(InstanceService.IsOnline);
     public int OfflineCount => Instances.Count(i => i.HasConnected && !InstanceService.IsOnline(i));
     public int UpdateCount => Instances.Count(i => _releases.IsUpdateAvailableFor(i.Version));
@@ -68,6 +76,16 @@ public class IndexModel : PageModel
         Instances = await iq.OrderBy(i => i.Name).ToListAsync();
         RecentEvents = await eq.OrderByDescending(e => e.CreatedAt).Take(15).ToListAsync();
         DockerReachable = _scope.IsAdmin && await _docker.IsReachableAsync(HttpContext.RequestAborted);
+
+        var since = DateTime.UtcNow.AddDays(-7);
+        CloudErrorCount7d = await _db.Logs.CountAsync(l => l.Level == "Error" && l.CreatedAt >= since);
+        // Error counts from the mirrored instance logs, restricted to the instances this viewer may see.
+        var ids = Instances.Select(i => i.Id).ToList();
+        InstanceErrorCounts = await _db.InstanceLogs.AsNoTracking()
+            .Where(l => l.Level == "Error" && ids.Contains(l.InstanceId))
+            .GroupBy(l => l.InstanceId)
+            .Select(g => new { g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.Key, x => x.Count);
     }
 
     public bool HasUpdate(Instance i) => _releases.IsUpdateAvailableFor(i.Version);

@@ -54,6 +54,7 @@ public class AppDbContext : DbContext
     public DbSet<ProfileStoreMailTemplate> ProfileStoreMailTemplates => Set<ProfileStoreMailTemplate>();
     public DbSet<ProfileGlobalUser> ProfileGlobalUsers => Set<ProfileGlobalUser>();
     public DbSet<MatCMS.Cloud.Models.LogEntry> Logs => Set<MatCMS.Cloud.Models.LogEntry>();
+    public DbSet<InstanceLogEntry> InstanceLogs => Set<InstanceLogEntry>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -121,6 +122,8 @@ public class AppDbContext : DbContext
             .HasOne(o => o.Instance).WithMany()
             .HasForeignKey(o => o.InstanceId).OnDelete(DeleteBehavior.Cascade);
         b.Entity<ContentOp>().HasIndex(o => new { o.InstanceId, o.DoneAt });
+        // Dedup key for logs piggybacked on the heartbeat, plus the ordering the view reads back by.
+        b.Entity<InstanceLogEntry>().HasIndex(l => new { l.InstanceId, l.SourceId }).IsUnique();
 
         // The join code is what an enrolling instance is resolved by, so it must be unique and fast.
         b.Entity<Profile>().HasIndex(p => p.JoinCode).IsUnique();

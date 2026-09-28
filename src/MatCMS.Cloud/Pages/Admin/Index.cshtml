@@ -29,6 +29,10 @@
         <div class="n">@Model.UpdateCount</div>
         <div class="l">@T["dashboard.updates"]</div>
     </a>
+    <a class="stat" asp-page="/Admin/Logs/Index">
+        <div class="n">@Model.CloudErrorCount7d</div>
+        <div class="l">@T["dashboard.errors7d"]</div>
+    </a>
 </div>
 
 @* Braucht Aufmerksamkeit: offline, Sync-Fehler, Update verfügbar, veraltetes Protokoll — auf einen Blick. *@
@@ -58,6 +62,25 @@
         </table>
     }
 </div>
+
+@* Fehler-Übersicht aus dem Protokoll: gespiegelte Instanz-Fehler (Heartbeat) + eigene Cloud-Fehler. *@
+@if (Model.InstancesWithErrors.Count > 0)
+{
+    <div class="card">
+        <h2>@T["dashboard.errorsTitle"]</h2>
+        <table class="data">
+            <tbody>
+                @foreach (var i in Model.InstancesWithErrors)
+                {
+                    <tr>
+                        <td style="width:220px;"><a asp-page="/Admin/Logs/Index" asp-route-source="@i.PublicId">@i.Name</a></td>
+                        <td><span class="badge badge-err">@T["dashboard.errorsN", Model.ErrorCount(i)]</span></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
 
 <div class="card">
     <h2>@T["dashboard.releaseTitle"]</h2>

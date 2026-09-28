@@ -14,11 +14,59 @@
 
     <p class="muted">@T["logs.intro"]</p>
 
+    @* Source: the cloud's own log, or the mirrored log a connected instance piggybacks on its heartbeat. *@
+    <form method="get" class="form-row" style="margin-bottom:12px;align-items:center;gap:8px;">
+        <label for="log-source" class="kv-label">@T["logs.source"]</label>
+        <select id="log-source" name="source" onchange="this.form.submit()">
+            <option value="cloud" selected="@Model.IsCloud">@T["logs.sourceCloud"]</option>
+            @foreach (var i in Model.Instances)
+            {
+                <option value="@i.PublicId" selected="@(Model.Source == i.PublicId)">@i.Name</option>
+            }
+        </select>
+        @if (Model.Level is not null) { <input type="hidden" name="level" value="@Model.Level" /> }
+    </form>
+
+    @if (Model.IsCloud)
+    {
+        <details class="form-section" style="margin-bottom:16px;">
+            <summary style="cursor:pointer;font-weight:600;">@T["logs.config"]</summary>
+            <form method="post" asp-page-handler="SaveConfig" class="form-grid" style="margin-top:12px;">
+                <div class="checkbox-row">
+                    <input type="checkbox" id="requestsOn" name="requestsOn" value="true" checked="@Model.RequestsOn" />
+                    <label for="requestsOn">@T["logs.cfg.requests"]</label>
+                </div>
+                <div class="help">@T["logs.cfg.requests.help"]</div>
+                <div class="form-row">
+                    <div class="form-field">
+                        <label for="errorsDays">@T["logs.cfg.retentionErrors"]</label>
+                        <input type="number" id="errorsDays" name="errorsDays" min="0" max="3650" value="@Model.ErrorsDays" />
+                    </div>
+                    <div class="form-field">
+                        <label for="requestsDays">@T["logs.cfg.retentionRequests"]</label>
+                        <input type="number" id="requestsDays" name="requestsDays" min="0" max="3650" value="@Model.RequestsDays" />
+                    </div>
+                </div>
+                <div class="help">@T["logs.cfg.retention.help"]</div>
+                <div><button type="submit" class="btn">@T["common.save"]</button></div>
+            </form>
+        </details>
+    }
+
     <div class="gallery-filter" style="margin-bottom:16px;">
-        <a class="gfilter @(Model.Level is null ? "active" : "")" asp-page="Index">@T["logs.all"] (@Model.Total)</a>
-        <a class="gfilter @(Model.Level == "Error" ? "active" : "")" asp-page="Index" asp-route-level="Error">@T["logs.errors"] (@Model.ErrorCount)</a>
-        <a class="gfilter @(Model.Level == "Warning" ? "active" : "")" asp-page="Index" asp-route-level="Warning">@T["logs.warnings"]</a>
+        <a class="gfilter @(Model.Level is null ? "active" : "")" asp-page="Index" asp-route-source="@Model.Source" asp-route-category="@Model.Category">@T["logs.all"] (@Model.Total)</a>
+        <a class="gfilter @(Model.Level == "Error" ? "active" : "")" asp-page="Index" asp-route-source="@Model.Source" asp-route-category="@Model.Category" asp-route-level="Error">@T["logs.errors"] (@Model.ErrorCount)</a>
+        <a class="gfilter @(Model.Level == "Warning" ? "active" : "")" asp-page="Index" asp-route-source="@Model.Source" asp-route-category="@Model.Category" asp-route-level="Warning">@T["logs.warnings"]</a>
     </div>
+
+    @if (Model.HasRequestLog || Model.RequestsOn)
+    {
+        <div class="gallery-filter" style="margin-bottom:16px;">
+            <a class="gfilter @(Model.Category is null ? "active" : "")" asp-page="Index" asp-route-source="@Model.Source" asp-route-level="@Model.Level">@T["logs.cat.all"]</a>
+            <a class="gfilter @(Model.Category == "request" ? "active" : "")" asp-page="Index" asp-route-source="@Model.Source" asp-route-level="@Model.Level" asp-route-category="request">@T["logs.cat.errors"]</a>
+            <a class="gfilter @(Model.Category == "webrequest" ? "active" : "")" asp-page="Index" asp-route-source="@Model.Source" asp-route-level="@Model.Level" asp-route-category="webrequest">@T["logs.cat.requests"]</a>
+        </div>
+    }
 
     <table class="data" data-list-table>
         <thead>
@@ -29,14 +77,14 @@
             </tr>
         </thead>
         <tbody>
-            @if (Model.Entries.Count == 0)
+            @if (Model.Rows.Count == 0)
             {
-                <partial name="_EmptyRow" model='@T["logs.none"]' />
+                <partial name="_EmptyRow" model='@(Model.IsCloud ? T["logs.none"] : T["logs.noneInstance"])' />
             }
-            @foreach (var e in Model.Entries)
+            @foreach (var e in Model.Rows)
             {
                 <tr data-search="@(e.Message + " " + e.Path + " " + e.Level)">
-                    <td class="muted mono">@e.CreatedAt.ToString("dd.MM.yyyy HH:mm:ss")</td>
+                    <td class="muted mono">@e.Time.ToString("dd.MM.yyyy HH:mm:ss")</td>
                     <td><span class="badge @LvlBadge(e.Level)">@e.Level</span></td>
                     <td>
                         <div>
@@ -61,12 +109,28 @@
     <nav class="list-pager" data-list-pager aria-label="@T["list.pager"]"></nav>
 
     <div class="list-actions">
-        @if (Model.Total > 0)
+        @* Only the cloud's OWN log is clearable — an instance's mirror refills from its next beat. *@
+        @if (Model.IsCloud && Model.Total > 0)
         {
             <form method="post" asp-page-handler="Clear" class="inline-form"
                   onsubmit="return confirm('@T["logs.clearConfirm"]');">
                 <button type="submit" class="btn btn-danger">@T["logs.clear"]</button>
             </form>
+        }
+        @* On-demand full log (Variante B): ask the instance to upload its complete log with stack traces. *@
+        @if (!Model.IsCloud)
+        {
+            @if (Model.FullLogPending)
+            {
+                <span class="muted">@T["logs.fullPending"]</span>
+            }
+            else
+            {
+                <form method="post" asp-page-handler="RequestFullLog" class="inline-form">
+                    <input type="hidden" name="source" value="@Model.Source" />
+                    <button type="submit" class="btn">@T["logs.requestFull"]</button>
+                </form>
+            }
         }
     </div>
 </div>

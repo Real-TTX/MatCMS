@@ -412,6 +412,35 @@ public class CloudService
                     _state.AddContentOpReports(reports);
                 }
             }
+
+            // The cloud asked for this site's FULL log (Variante B). Upload the newest entries WITH stack
+            // traces; the cloud replaces its lean per-beat mirror with this snapshot. Best-effort — a
+            // failure just leaves the request pending, so the next beat offers it again.
+            if (answer?.LogFetch is { RequestId: > 0 } logReq)
+            {
+                try
+                {
+                    var entries = await _db.Logs.AsNoTracking()
+                        .OrderByDescending(l => l.Id).Take(1000)
+                        .Select(l => new LogReport
+                        {
+                            SourceId = l.Id,
+                            TimeUtc = l.CreatedAt,
+                            Level = l.Level,
+                            Message = l.Message,
+                            Category = l.Category,
+                            Path = l.Path,
+                            Method = l.Method,
+                            StatusCode = l.StatusCode,
+                            Exception = l.Exception
+                        }).ToListAsync(ct);
+                    var logClient = CreateClient(settings);
+                    await logClient.PostAsJsonAsync($"{settings.Url}/api/instances/{settings.InstanceId}/logs",
+                        new LogUpload { RequestId = logReq.RequestId, Entries = entries }, ct);
+                    _log.LogInformation("Uploaded full log ({Count} entries) to the cloud.", entries.Count);
+                }
+                catch (Exception lex) { _log.LogInformation(lex, "Full-log upload failed; the cloud will re-offer it."); }
+            }
         }
         catch (Exception ex)
         {
@@ -606,7 +635,25 @@ public class CloudService
             SyncReport = await _sync.LastReportAsync(ct),
             SyncRunAt = await _sync.LastRunAtAsync(ct),
             // Outcomes of content ops applied while handling the previous beat's response, if any.
-            ContentOpReports = _state.TakeContentOpReports()
+            ContentOpReports = _state.TakeContentOpReports(),
+            // Newest log entries (errors/5xx) piggybacked so the cloud can show this site's recent
+            // problems. Only the newest few — the cloud dedups by SourceId, so re-sends cost nothing —
+            // and without the stack blob (the overview, not the full log). See HeartbeatRequest.RecentLogs.
+            RecentLogs = await _db.Logs.AsNoTracking()
+                .OrderByDescending(l => l.Id)
+                .Take(25)
+                .Select(l => new LogReport
+                {
+                    SourceId = l.Id,
+                    TimeUtc = l.CreatedAt,
+                    Level = l.Level,
+                    Message = l.Message,
+                    Category = l.Category,
+                    Path = l.Path,
+                    Method = l.Method,
+                    StatusCode = l.StatusCode
+                })
+                .ToListAsync(ct)
         };
     }
 

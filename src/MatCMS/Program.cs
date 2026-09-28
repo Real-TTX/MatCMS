@@ -193,6 +193,7 @@ builder.Services.AddScoped<ContentTransferService>();
 builder.Services.AddScoped<BackupManager>();
 builder.Services.AddScoped<CloudBackupService>();
 builder.Services.AddHostedService<BackupSchedulerService>();
+builder.Services.AddHostedService<LogRetentionService>();
 builder.Services.AddHttpClient();
 // Stateless apart from the file cache it manages, so one instance for the whole app.
 builder.Services.AddSingleton<ThumbnailService>();

@@ -105,6 +105,12 @@ public static class SettingKeys
     public const string SmtpFromName = "smtp.fromName";
     public const string SmtpSsl = "smtp.ssl";
 
+    // Log system (Admin → Protokoll). Applies to the CLOUD's OWN log (instance logs are a mirror pruned
+    // on the heartbeat). Request logging is opt-in; retention is per category, in days (0 = keep).
+    public const string LogRequests = "log.requests";                        // "on" = log EVERY HTTP request (category "webrequest")
+    public const string LogRetentionErrorsDays = "log.retentionErrorsDays";  // errors/5xx (category "request"); default 90
+    public const string LogRetentionRequestsDays = "log.retentionRequestsDays"; // full request log (category "webrequest"); default 14
+
     public static readonly string[] Smtp =
     [
         SmtpHost, SmtpPort, SmtpUser, SmtpPassword, SmtpFromEmail, SmtpFromName, SmtpSsl

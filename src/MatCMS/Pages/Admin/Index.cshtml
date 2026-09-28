@@ -50,6 +50,10 @@
         <div class="n">@Model.UserCount</div>
         <div class="l">@T["dashboard.users"]</div>
     </a>
+    <a class="stat" asp-page="/Admin/Logs/Index">
+        <div class="n">@Model.ErrorCount7d</div>
+        <div class="l">@T["dashboard.errors7d"]</div>
+    </a>
 </div>
 
 <div class="card">
@@ -109,6 +113,33 @@
         </table>
     </div>
     <div class="list-actions"><a class="btn btn-ghost" asp-page="/Admin/Forms/Index">@T["dashboard.allSubmissions"]</a></div>
+}
+
+@if (Model.RecentErrors.Count > 0)
+{
+    <div data-list>
+        <div class="page-head"><h2>@T["dashboard.recentErrors"]</h2></div>
+        <table class="data" data-list-table>
+            <thead>
+                <tr>
+                    <th style="width:160px;">@T["dashboard.time"]</th>
+                    <th style="width:70px;"></th>
+                    <th>@T["logs.message"]</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var e in Model.RecentErrors)
+                {
+                    <tr>
+                        <td class="muted mono">@e.CreatedAt.ToString("dd.MM.yyyy HH:mm")</td>
+                        <td>@if (e.StatusCode is int sc) { <span class="badge badge-err mono">@sc</span> }</td>
+                        <td><span class="mono muted">@e.Path</span> @e.Message</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="list-actions"><a class="btn btn-ghost" asp-page="/Admin/Logs/Index">@T["dashboard.allLogs"]</a></div>
 }
 
 <div class="card">

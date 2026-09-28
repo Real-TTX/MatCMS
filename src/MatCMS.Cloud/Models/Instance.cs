@@ -208,6 +208,15 @@ public class Instance
     /// going on — never to end one.</summary>
     public DateTime? BackupRequestedAt { get; set; }
 
+    /// <summary>The outstanding FULL-log request (Variante B), or 0 for none. Same idea as
+    /// <see cref="BackupRequestId"/>: bumped, echoed on the upload, cleared when the file arrives, so a
+    /// stale upload cannot answer the current request. Offered on the heartbeat as
+    /// <see cref="MatCMS.Shared.PendingLogFetch"/> to instances speaking protocol ≥ 16.</summary>
+    public int LogFetchRequestId { get; set; }
+
+    /// <summary>When the operator asked for the full log — shown while the upload is pending.</summary>
+    public DateTime? LogFetchRequestedAt { get; set; }
+
     /// <summary>
     /// What the instance said went wrong, if it answered at all. Set means the request is over and
     /// failed: the cloud stops asking, says why, and offers to ask again.

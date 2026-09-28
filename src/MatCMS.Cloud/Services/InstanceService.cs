@@ -240,6 +240,7 @@ public class InstanceService
 
         await RecordSyncReportAsync(instance, beat, ct);
         await RecordContentOpReportsAsync(instance, beat, ct);
+        await RecordInstanceLogsAsync(instance, beat, ct);
         await ClassifyAsync(instance, ct);
 
         if (firstEver)
@@ -305,8 +306,55 @@ public class InstanceService
             // until reported; add-only ops are idempotent, so a re-offer after a lost report is harmless.
             ContentOps = instance.Status == InstanceStatus.Approved && beat.ProtocolVersion >= 15
                 ? await PendingContentOpsAsync(instance.Id, instance.Profile?.BackupBeforeAiChange ?? false, ct)
+                : null,
+
+            // Full-log request (Variante B). Only for an approved instance speaking the contract that
+            // introduced it (v16); offered on every beat until the upload arrives and clears the id.
+            LogFetch = instance.Status == InstanceStatus.Approved && beat.ProtocolVersion >= 16 && instance.LogFetchRequestId > 0
+                ? new PendingLogFetch { RequestId = instance.LogFetchRequestId }
                 : null
         };
+    }
+
+    /// <summary>Marks a full-log request for an instance (Variante B). Bumped, not reused, so a stale
+    /// upload cannot answer it. The instance uploads on its next beat and the file clears the request.</summary>
+    public async Task RequestFullLogAsync(Instance instance, CancellationToken ct = default)
+    {
+        instance.LogFetchRequestId += 1;
+        instance.LogFetchRequestedAt = DateTime.UtcNow;
+        Log(instance, InstanceEventKind.LogRequested, "Volles Protokoll angefordert.");
+        await _db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Stores an instance's uploaded FULL log (Variante B): replaces its mirror with the coherent
+    /// snapshot (with stack traces), capped, and clears the request if this upload answers it. A stale
+    /// upload (wrong/zero request id) is ignored so an offline site returning later cannot overwrite a
+    /// fresh mirror with an answer to a request nobody is waiting for.</summary>
+    public async Task<bool> StoreFullLogAsync(Instance instance, LogUpload upload, CancellationToken ct = default)
+    {
+        if (upload.RequestId <= 0 || upload.RequestId != instance.LogFetchRequestId) return false;
+
+        await _db.InstanceLogs.Where(l => l.InstanceId == instance.Id).ExecuteDeleteAsync(ct);
+        var entries = (upload.Entries ?? new()).OrderByDescending(e => e.SourceId).Take(1000);
+        foreach (var r in entries)
+            _db.InstanceLogs.Add(new InstanceLogEntry
+            {
+                InstanceId = instance.Id,
+                SourceId = r.SourceId,
+                TimeUtc = r.TimeUtc,
+                Level = Trim(r.Level) ?? "Error",
+                Message = Cap(r.Message, 1000) ?? "",
+                Category = Cap(r.Category, 100),
+                Path = Cap(r.Path, 500),
+                Method = Cap(r.Method, 10),
+                StatusCode = r.StatusCode,
+                Exception = Cap(r.Exception, 8000)
+            });
+        instance.LogFetchRequestId = 0;
+        instance.LogFetchRequestedAt = null;
+        Log(instance, InstanceEventKind.LogReceived, "Volles Protokoll empfangen.");
+        await _db.SaveChangesAsync(ct);
+        return true;
     }
 
     /// <summary>Enqueues a content operation for an instance (the MCP server's write path). The cloud only
@@ -381,6 +429,59 @@ public class InstanceService
             .Where(o => o.InstanceId == instance.Id && o.DoneAt != null && o.DoneAt < cutoff)
             .ExecuteDeleteAsync(ct);
     }
+
+    /// <summary>How many mirrored log entries to keep per instance. The instance sends only its newest
+    /// few each beat, so this is the depth of the cloud's overview — enough to see a run of errors, not
+    /// the full log (that would be the on-demand pull, still on the backlog).</summary>
+    private const int KeepLogsPerInstance = 300;
+
+    /// <summary>Stores the log entries an instance piggybacked on its beat (see
+    /// <see cref="HeartbeatRequest.RecentLogs"/>), deduped on (instance, SourceId) so the same newest
+    /// entries riding on successive beats are kept once, and prunes the mirror to the newest
+    /// <see cref="KeepLogsPerInstance"/> per instance. The prune runs against already-persisted rows
+    /// (raw delete), the new ones are saved with the beat — so the count may briefly exceed the cap by
+    /// one beat's worth, which the next beat trims.</summary>
+    private async Task RecordInstanceLogsAsync(Instance instance, HeartbeatRequest beat, CancellationToken ct)
+    {
+        if (beat.RecentLogs is { Count: > 0 })
+        {
+            var ids = beat.RecentLogs.Select(r => r.SourceId).ToList();
+            var have = (await _db.InstanceLogs
+                .Where(l => l.InstanceId == instance.Id && ids.Contains(l.SourceId))
+                .Select(l => l.SourceId).ToListAsync(ct)).ToHashSet();
+            foreach (var r in beat.RecentLogs)
+            {
+                if (!have.Add(r.SourceId)) continue;   // already stored, or a duplicate within this beat
+                _db.InstanceLogs.Add(new InstanceLogEntry
+                {
+                    InstanceId = instance.Id,
+                    SourceId = r.SourceId,
+                    TimeUtc = r.TimeUtc,
+                    Level = Trim(r.Level) ?? "Error",
+                    Message = Cap(r.Message, 1000) ?? "",
+                    Category = Cap(r.Category, 100),
+                    Path = Cap(r.Path, 500),
+                    Method = Cap(r.Method, 10),
+                    StatusCode = r.StatusCode
+                });
+            }
+        }
+
+        // Keep only the newest N per instance. Ordered by the cloud-side Id (insertion order), which is
+        // monotonic even if the instance's own ids restart after a restore — SourceId is not.
+        var cutId = await _db.InstanceLogs
+            .Where(l => l.InstanceId == instance.Id)
+            .OrderByDescending(l => l.Id)
+            .Skip(KeepLogsPerInstance)
+            .Select(l => l.Id)
+            .FirstOrDefaultAsync(ct);
+        if (cutId > 0)
+            await _db.InstanceLogs
+                .Where(l => l.InstanceId == instance.Id && l.Id <= cutId)
+                .ExecuteDeleteAsync(ct);
+    }
+
+    private static string? Cap(string? s, int max) => s is null ? null : (s.Length <= max ? s : s[..max]);
 
     /// <summary>Folds the instance's self-reported sync outcome into its record and logs the
     /// transitions — a sync that starts failing, and one that recovers, are both worth an entry.</summary>

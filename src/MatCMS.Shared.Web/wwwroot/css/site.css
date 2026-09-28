@@ -395,16 +395,18 @@ html.mat-langm-lock { overflow: hidden; }
 .column--tinted h3, .column--tinted .rich, .column--tinted .rich a { color: inherit; }
 .column--tinted h3 { border-bottom-color: currentColor; }
 
-/* ---------- Nested "Leistungen" container ---------- */
-.leistungen-block .leistungen-grid { display: grid; gap: 28px; margin-top: 8px; }
-.leistungen-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
-.leistungen-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
-.leistungen-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
-.leistung-card { border: 1px solid var(--line); padding: 28px; background: #fff; }
-.leistung-card__img { width: 100%; height: 180px; object-fit: cover; margin-bottom: 16px; }
-.leistung-card h3 { margin: 0 0 10px; }
-.leistung-card p { margin: 0; color: var(--muted); }
+/* ---------- Nested "features" container (formerly "leistungen"; old classes kept as aliases so a
+   template's CustomCss written against the old names still applies) ---------- */
+.features-block .features-grid, .leistungen-block .leistungen-grid { display: grid; gap: 28px; margin-top: 8px; }
+.features-grid.cols-2, .leistungen-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+.features-grid.cols-3, .leistungen-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.features-grid.cols-4, .leistungen-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+.feature-card, .leistung-card { border: 1px solid var(--line); padding: 28px; background: #fff; }
+.feature-card__img, .leistung-card__img { width: 100%; height: 180px; object-fit: cover; margin-bottom: 16px; }
+.feature-card h3, .leistung-card h3 { margin: 0 0 10px; }
+.feature-card p, .leistung-card p { margin: 0; color: var(--muted); }
 @media (max-width: 720px) {
+    .features-grid.cols-3, .features-grid.cols-4,
     .leistungen-grid.cols-3, .leistungen-grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
 }
 

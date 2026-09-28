@@ -15,7 +15,7 @@ public static class CloudProtocol
     /// <summary>Contract version. Bump on <b>every</b> change to the payloads in this file: the cloud
     /// badges an instance reporting an older one as "veraltet", and both sides read this constant, so
     /// one edit covers both.</summary>
-    public const int Version = 15;
+    public const int Version = 16;
 
     /// <summary>Header carrying the instance's bearer token.</summary>
     public const string TokenHeader = "X-MatCMS-Instance-Token";
@@ -126,6 +126,61 @@ public sealed class HeartbeatRequest
     /// happened to produce an identical report would silently vanish from the history.
     /// </summary>
     public DateTime? SyncRunAt { get; set; }
+
+    /// <summary>The instance's newest log entries (errors/5xx), piggybacked on the beat so the cloud
+    /// can show a site's recent problems without ever reaching in — the instance connects outbound, so
+    /// there is no way to "query" its log otherwise. Bounded (the instance sends only the newest few)
+    /// and deliberately WITHOUT the exception/stack blob: this is the overview, not the full log, and a
+    /// stack trace per entry on every 60 s beat would be wasteful. The cloud dedups by
+    /// <see cref="LogReport.SourceId"/>, so the same entries riding on successive beats are stored once.
+    /// Null/empty from an instance that predates this (protocol &lt; 16) or simply has no errors.</summary>
+    public List<LogReport>? RecentLogs { get; set; }
+}
+
+/// <summary>One log entry as it travels on the heartbeat — a lean projection of the instance's own
+/// LogEntry (no exception/stack blob; see <see cref="HeartbeatRequest.RecentLogs"/>).</summary>
+public sealed class LogReport
+{
+    /// <summary>The entry's id in the INSTANCE's own log table. The cloud dedups on
+    /// (instance, SourceId) so re-sends across beats do not pile up. (An instance whose DB was reset by
+    /// a restore starts its ids over; a handful of new entries may then collide with old stored ones —
+    /// acceptable for an ephemeral, pruned overview.)</summary>
+    public long SourceId { get; set; }
+
+    public DateTime TimeUtc { get; set; }
+
+    /// <summary>"Error" | "Warning" | "Info".</summary>
+    public string Level { get; set; } = "Error";
+
+    public string Message { get; set; } = "";
+    public string? Category { get; set; }
+    public string? Path { get; set; }
+    public string? Method { get; set; }
+    public int? StatusCode { get; set; }
+
+    /// <summary>Full exception text (type + message + stack), truncated. <b>Null on the heartbeat
+    /// piggyback</b> (the overview stays lean) — only populated in the on-demand FULL log upload
+    /// (<see cref="LogUpload"/>), which is what makes the stack trace worth carrying.</summary>
+    public string? Exception { get; set; }
+}
+
+/// <summary>The cloud asks an instance to upload its FULL log now (on-demand, protocol ≥ 16). Rides on
+/// the heartbeat response like <see cref="PendingBackup"/>: the cloud only ASKS; the instance uploads to
+/// <c>POST /api/instances/{id}/logs</c>, echoing <see cref="RequestId"/> so a stale upload from a site
+/// that was offline cannot answer a request it never saw.</summary>
+public sealed class PendingLogFetch
+{
+    public int RequestId { get; set; }
+}
+
+/// <summary>Body of the on-demand full-log upload (instance → cloud). The whole current log slice, with
+/// exception blobs, replacing the instance's mirror in the cloud for a coherent snapshot.</summary>
+public sealed class LogUpload
+{
+    /// <summary>Echoes <see cref="PendingLogFetch.RequestId"/> — a counter that survives JSON so the
+    /// cloud can tell "the log we asked for" from a spontaneous upload.</summary>
+    public int RequestId { get; set; }
+    public List<LogReport> Entries { get; set; } = new();
 }
 
 /// <summary>The cloud's answer. Pull-based: it only ever TELLS the instance what is pending; the
@@ -184,6 +239,13 @@ public sealed class HeartbeatResponse
     /// cloud only ASKS; the instance applies each op through its OWN validated writers and reports back
     /// in <see cref="HeartbeatRequest.ContentOpReports"/>.</summary>
     public List<PendingContentOp>? ContentOps { get; set; }
+
+    /// <summary>Set when an operator asked this instance for its FULL log (with stack traces). Null is
+    /// the normal case; an instance that predates the field (protocol &lt; 16) simply never uploads one.
+    /// The instance posts its log to <c>POST /api/instances/{id}/logs</c> and the cloud shows it under
+    /// the instance's source in Protokoll. Complements the lean per-beat overview
+    /// (<see cref="HeartbeatRequest.RecentLogs"/>).</summary>
+    public PendingLogFetch? LogFetch { get; set; }
 }
 
 // --- Configuration payload ------------------------------------------------

@@ -12,10 +12,10 @@
 
     var src = SafeSrc(image);
 }
-<div class="leistung-card">
+<div class="feature-card">
     @if (!string.IsNullOrEmpty(src))
     {
-        <img class="leistung-card__img" src="@src" alt="@title" loading="lazy" />
+        <img class="feature-card__img" src="@src" alt="@title" loading="lazy" />
     }
     @if (!string.IsNullOrWhiteSpace(title))
     {

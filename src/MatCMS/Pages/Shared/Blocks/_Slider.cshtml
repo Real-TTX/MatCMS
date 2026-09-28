@@ -1,0 +1,91 @@
+@model MatCMS.Content.BlockData
+@inject MatCMS.Services.Localizer T
+@inject MatCMS.Services.MediaFocus Focus
+@{
+    // Sliding showcase: one big image at a time with a peek of the neighbours, centred snap and italic
+    // captions — the look the hand-built ".kt-carousel" gallery had, now a first-class block. Desktop
+    // arrows come from carousel.js (data-carousel + [data-carousel-track]); touch swipes via CSS snap.
+    var heading = Model.Str("heading");
+    // "vary" = each slide keeps its aspect (variable width, whole image); "uniform" = equal width, cropped.
+    var vary = Model.StrOr("fit", "uniform") == "vary";
+    var height = Model.StrOr("height", "medium");
+    var showHint = Model.StrOr("hint", "yes") != "no";
+    var autoplay = Model.StrOr("autoplay", "off") == "on";
+    // Autoplay speed → interval in ms (read by carousel.js via data-interval).
+    var interval = Model.StrOr("speed", "normal") switch { "slow" => 6000, "fast" => 2500, _ => 4000 };
+    // Slide height in px (image height; the slide grows/shrinks with it).
+    var slideH = height switch { "small" => 340, "large" => 600, _ => 460 };
+
+    static string SafeSrc(string image) =>
+        (!string.IsNullOrWhiteSpace(image)
+            && (image.StartsWith("/") || image.StartsWith("http://") || image.StartsWith("https://"))
+            && image.IndexOfAny(new[] { '\'', '"', '(', ')', '\\', '\n', '\r' }) < 0)
+            ? image : "";
+
+    var items = new List<(string Src, string Alt, string Caption)>();
+    foreach (var item in Model.List("images"))
+    {
+        var src = SafeSrc(item.Str("image"));
+        if (src.Length == 0) continue;
+        items.Add((src, item.Str("alt"), item.Str("caption")));
+    }
+}
+<section class="section slider-block">
+    <div class="container">
+        @if (!string.IsNullOrWhiteSpace(heading))
+        {
+            <div class="section__intro"><h2>@heading</h2></div>
+        }
+        @if (items.Count > 0)
+        {
+            <div class="slider-gallery@(vary ? " is-vary" : "")" style="--slider-h:@(slideH)px" data-carousel data-prev="@T["carousel.prev"]" data-next="@T["carousel.next"]"@(autoplay ? $" data-autoplay data-interval=\"{interval}\"" : "")>
+                <div class="slider-track" data-carousel-track>
+                    @foreach (var it in items)
+                    {
+                        var focus = Focus.Position(it.Src);
+                        <figure class="slider-slide">
+                            <img src="@MatCMS.Services.ThumbnailService.Url(it.Src, 1400)" alt="@it.Alt" loading="lazy"@(string.IsNullOrEmpty(focus) ? "" : $" style=\"object-position:{focus}\"") />
+                            @if (!string.IsNullOrWhiteSpace(it.Caption))
+                            {
+                                <figcaption>@it.Caption</figcaption>
+                            }
+                        </figure>
+                    }
+                </div>
+                @if (showHint)
+                {
+                    <p class="slider-hint">@T["block.slider.hint.text"]</p>
+                }
+            </div>
+        }
+    </div>
+</section>
+<style>
+    /* Sliding showcase — one large slide with a peek of the neighbours, centred snap. Desktop arrows
+       (.carousel-btn) are injected by carousel.js; the strip already scrolls/snaps without JS.
+       --slider-h (set inline) is the image height; "is-vary" lets each slide keep its own width and
+       shows the WHOLE image (no crop) instead of equal-width cropped slides. */
+    .slider-gallery { position: relative; margin: 1.2rem 0 .4rem; }
+    .slider-track { display: flex; gap: 1.25rem; overflow-x: auto; scroll-snap-type: x mandatory;
+        scroll-behavior: smooth; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding: .5rem 2px 1rem; }
+    .slider-track::-webkit-scrollbar { display: none; }
+    .slider-slide { flex: 0 0 86%; scroll-snap-align: center; margin: 0; }
+    @@media (min-width: 768px) { .slider-slide { flex: 0 0 48%; } }
+    .slider-slide img { width: 100%; height: var(--slider-h, 460px); object-fit: cover; display: block;
+        border-radius: 4px; box-shadow: 0 18px 40px rgba(44, 40, 35, .18); }
+    /* Variable width, whole image: the slide sizes to the image, nothing is cropped. */
+    .slider-gallery.is-vary .slider-slide { flex: 0 0 auto; }
+    .slider-gallery.is-vary .slider-slide img { width: auto; max-width: 86vw; object-fit: contain;
+        background: var(--bg-alt, #f1efe9); }
+    .slider-slide figcaption { margin-top: .9rem; font-family: var(--font-head, serif); font-size: 1.35rem;
+        font-style: italic; text-align: center; color: var(--heading, #3A342B); }
+    .slider-hint { text-align: center; letter-spacing: .18em; text-transform: uppercase; font-size: .72rem;
+        color: var(--accent, #B8934E); margin: .25rem 0 0; }
+    .slider-gallery .carousel-btn { position: absolute; top: 40%; transform: translateY(-50%); z-index: 3;
+        width: 44px; height: 44px; border-radius: 50%; border: 1px solid #e2d6c3; background: #fff; cursor: pointer;
+        font-size: 22px; line-height: 1; box-shadow: 0 4px 14px rgba(0, 0, 0, .16);
+        display: flex; align-items: center; justify-content: center; }
+    .slider-gallery .carousel-btn[disabled] { opacity: .35; cursor: default; }
+    .slider-gallery .carousel-btn.prev { left: -6px; }
+    .slider-gallery .carousel-btn.next { right: -6px; }
+</style>

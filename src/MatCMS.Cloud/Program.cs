@@ -121,6 +121,7 @@ builder.Services.AddSingleton<BulkUpdateService>();
 builder.Services.AddHostedService<ReleaseWatcherService>();
 builder.Services.AddHostedService<InstanceMonitorService>();
 builder.Services.AddHostedService<MailSpoolService>();
+builder.Services.AddHostedService<LogRetentionService>();
 
 // Basic brute-force protection for the login endpoint (per client IP).
 // Behind a reverse proxy, enable ForwardedHeaders so the real client IP is used.
@@ -425,6 +426,22 @@ app.MapGet("/api/instances/{publicId}/config", async (
         return Results.Ok(new InstanceConfig { Revision = 0 });
 
     return Results.Ok(await profiles.BuildConfigAsync(instance.Profile, ctx.RequestAborted));
+}).RequireRateLimiting("instanceApi");
+
+// The full log an instance uploads on demand (Variante B). Authenticated by the instance token like the
+// heartbeat; the instance posts here after the beat offered it a PendingLogFetch. A stale/zero request id
+// is rejected inside StoreFullLogAsync so an offline site returning late cannot overwrite a fresh mirror.
+app.MapPost("/api/instances/{publicId}/logs", async (
+    HttpContext ctx, string publicId, LogUpload upload, InstanceService instances) =>
+{
+    var token = ctx.Request.Headers[CloudProtocol.TokenHeader].ToString();
+    var instance = await instances.AuthenticateAsync(publicId, token);
+    if (instance is null) return Results.Unauthorized();
+    if (instance.Status != MatCMS.Cloud.Models.InstanceStatus.Approved)
+        return Results.Json(new { error = "Instanz ist nicht freigegeben." }, statusCode: StatusCodes.Status403Forbidden);
+
+    var stored = await instances.StoreFullLogAsync(instance, upload, ctx.RequestAborted);
+    return Results.Ok(new { ok = stored });
 }).RequireRateLimiting("instanceApi");
 
 // One plugin bundle, fetched only when the instance's installed version differs. Kept out of the

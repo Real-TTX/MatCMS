@@ -49,7 +49,12 @@ public enum InstanceEventKind
     /// because turning a customer's site off/on is a notable, operator-initiated power action.</summary>
     ContainerStarted = 22,
     ContainerStopped = 23,
-    ContainerRestarted = 24
+    ContainerRestarted = 24,
+
+    /// <summary>An operator asked this instance for its full log (Variante B), and its arrival. Its own
+    /// kinds so the trail shows when a full log was pulled — separate from the always-on error overview.</summary>
+    LogRequested = 25,
+    LogReceived = 26
 }
 
 /// <summary>Audit trail per instance: what happened, and whether a notification went out for it.

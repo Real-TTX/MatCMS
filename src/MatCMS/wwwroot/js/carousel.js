@@ -79,7 +79,10 @@
             if (track.scrollLeft + track.clientWidth >= track.scrollWidth - 4) track.scrollTo({ left: 0, behavior: "smooth" });
             else track.scrollBy({ left: step(), behavior: "smooth" });
         }
-        function play() { if (auto && !timer) timer = setInterval(advance, 3500); }
+        // Autoplay speed: the block can set data-interval (ms); default 3500.
+        var interval = parseInt(wrap.getAttribute("data-interval"), 10);
+        if (!(interval > 0)) interval = 3500;
+        function play() { if (auto && !timer) timer = setInterval(advance, interval); }
         function pause() { if (timer) { clearInterval(timer); timer = null; } }
         if (auto) {
             ["mouseenter", "focusin", "pointerdown", "touchstart"].forEach(function (ev) { wrap.addEventListener(ev, pause, { passive: true }); });

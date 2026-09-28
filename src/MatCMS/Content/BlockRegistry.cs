@@ -37,10 +37,10 @@ public class BlockRegistry
     {
         ["section"] = "layout", ["columns"] = "layout", ["column"] = "layout", ["spacer"] = "layout",
         ["richtext"] = "text", ["quote"] = "text", ["faq"] = "text", ["accordion"] = "text",
-        ["image"] = "media", ["gallery"] = "media", ["logostrip"] = "media",
+        ["image"] = "media", ["gallery"] = "media", ["slider"] = "media", ["logostrip"] = "media",
         ["hero"] = "design", ["cta"] = "design", ["cards"] = "design", ["card"] = "design",
         ["herocta"] = "design", ["timeline"] = "design", ["step"] = "design", ["countup"] = "design",
-        ["leistungen"] = "design", ["leistung"] = "design", ["servicegrid"] = "design",
+        ["features"] = "design", ["feature"] = "design", ["servicegrid"] = "design",
         ["service"] = "design", ["imagetext"] = "design", ["posts"] = "design",
         ["references"] = "design", ["reference"] = "design",
         ["form"] = "form", ["memberlogin"] = "form",
@@ -75,8 +75,25 @@ public class BlockRegistry
         return list;
     }
 
-    public BlockDefinition? Get(string type) =>
-        All.FirstOrDefault(b => string.Equals(b.Type, type, StringComparison.OrdinalIgnoreCase));
+    /// <summary>Renamed block types: an OLD persisted/backup value → its current type. The startup
+    /// migration rewrites stored rows (see <c>DbSeeder.MigrateFeaturesAsync</c>), but a backup or an
+    /// older instance's cloud config can still carry the old string at runtime — this maps it so the
+    /// block still resolves and renders instead of silently vanishing.</summary>
+    private static readonly Dictionary<string, string> LegacyTypeAlias = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["leistungen"] = "features",
+        ["leistung"] = "feature",
+    };
+
+    /// <summary>Resolves a (possibly legacy) block type string to its current type.</summary>
+    public static string CanonicalType(string type) =>
+        LegacyTypeAlias.TryGetValue(type, out var t) ? t : type;
+
+    public BlockDefinition? Get(string type)
+    {
+        var canonical = CanonicalType(type);
+        return All.FirstOrDefault(b => string.Equals(b.Type, canonical, StringComparison.OrdinalIgnoreCase));
+    }
 
     // Feather-style 24x24 stroke icons (rendered inside <svg fill="none" stroke="currentColor">).
     private const string SvgHero = @"<rect x=""3"" y=""4"" width=""18"" height=""16"" rx=""2""/><path d=""M7 9h10""/><path d=""M7 13h6""/>";
@@ -86,6 +103,8 @@ public class BlockRegistry
     private const string SvgCta = @"<rect x=""3"" y=""8"" width=""18"" height=""8"" rx=""4""/><path d=""M11 12h4""/><path d=""M14 10l2 2-2 2""/>";
     private const string SvgMail = @"<rect x=""3"" y=""5"" width=""18"" height=""14"" rx=""2""/><path d=""M4 7l8 6 8-6""/>";
     private const string SvgImage = @"<rect x=""3"" y=""3"" width=""18"" height=""18"" rx=""2""/><circle cx=""8.5"" cy=""9"" r=""1.5""/><path d=""M21 16l-5-5L6 21""/>";
+    // Big centre slide with a peek of the neighbours + left/right chevrons (the sliding showcase).
+    private const string SvgSlider = @"<rect x=""7"" y=""5"" width=""10"" height=""14"" rx=""1""/><path d=""M4 8l-2 4 2 4""/><path d=""M20 8l2 4-2 4""/>";
     private const string SvgAccordion = @"<rect x=""3"" y=""4"" width=""18"" height=""5"" rx=""1""/><rect x=""3"" y=""13"" width=""18"" height=""7"" rx=""1""/><path d=""M17 6.5l-1.5 1.5""/>";
     private const string SvgQuote = @"<path d=""M7 7h4v4c0 2-1 3-3 4""/><path d=""M15 7h4v4c0 2-1 3-3 4""/>";
     private const string SvgImageText = @"<rect x=""3"" y=""4"" width=""8"" height=""16"" rx=""1""/><path d=""M14 7h6""/><path d=""M14 12h6""/><path d=""M14 17h4""/>";
@@ -412,12 +431,12 @@ public class BlockRegistry
         },
         new BlockDefinition
         {
-            Type = "leistungen",
-            Name = "block.leistungen.name",
-            Description = "block.leistungen.desc",
+            Type = "features",
+            Name = "block.features.name",
+            Description = "block.features.desc",
             Svg = SvgGrid,
-            Partial = "Blocks/_Leistungen",
-            AllowedChildren = ["leistung"],
+            Partial = "Blocks/_Features",
+            AllowedChildren = ["feature"],
             Fields =
             [
                 new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },
@@ -428,17 +447,17 @@ public class BlockRegistry
         },
         new BlockDefinition
         {
-            Type = "leistung",
-            Name = "block.leistung.name",
-            Description = "block.leistung.desc",
+            Type = "feature",
+            Name = "block.feature.name",
+            Description = "block.feature.desc",
             Svg = SvgText,
-            Partial = "Blocks/_Leistung",
+            Partial = "Blocks/_Feature",
             ChildOnly = true,
             Fields =
             [
                 new BlockField { Id = "title", Label = "block.f.title", Type = FieldType.Text },
                 new BlockField { Id = "text", Label = "block.f.text", Type = FieldType.Textarea },
-                new BlockField { Id = "image", Label = "block.leistung.f.image", Type = FieldType.Image },
+                new BlockField { Id = "image", Label = "block.feature.f.image", Type = FieldType.Image },
             ]
         },
         new BlockDefinition
@@ -554,6 +573,52 @@ public class BlockRegistry
         },
         new BlockDefinition
         {
+            // Sliding showcase: one large image at a time, a peek of the neighbours, centred snap and
+            // italic captions — the look the hand-built ".kt-carousel" gallery had. Distinct from the
+            // gallery block's carousel (a thumbnail strip): this is a full-width, one-at-a-time slider.
+            // Desktop arrows ride on carousel.js (data-carousel + [data-carousel-track]); touch swipes
+            // via CSS scroll-snap. Kept a first-class block so a page can drop it in without hand HTML.
+            Type = "slider",
+            Name = "block.slider.name",
+            Description = "block.slider.desc",
+            Svg = SvgSlider,
+            Partial = "Blocks/_Slider",
+            Fields =
+            [
+                new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },
+                // How each slide is sized. "uniform" = equal-width slides, image cropped to fill (focal
+                // point decides the crop); "vary" = each slide keeps the image's aspect (variable width,
+                // WHOLE image, no crop). Same semantics as the gallery carousel, so the labels are shared.
+                new BlockField { Id = "fit", Label = "block.slider.f.fit", Type = FieldType.Select, Default = "uniform",
+                    Options = [ new("uniform", "block.gallery.opt.fit.uniform"), new("vary", "block.gallery.opt.fit.vary") ],
+                    Help = "block.slider.f.fit.help" },
+                new BlockField { Id = "height", Label = "block.slider.f.height", Type = FieldType.Select, Default = "medium",
+                    Options = [ new("small", "block.opt.size.small"), new("medium", "block.opt.size.medium"), new("large", "block.opt.size.large") ] },
+                // "Laufende Bilder": auto-advance on by itself, pausing on hover/touch (carousel.js).
+                new BlockField { Id = "autoplay", Label = "block.cards.f.autoplay", Type = FieldType.Select, Default = "off",
+                    Options = [ new("off", "block.cards.opt.autoplay.off"), new("on", "block.cards.opt.autoplay.on") ] },
+                // Only meaningful while autoplay is on: how fast it advances (maps to an interval in ms).
+                new BlockField { Id = "speed", Label = "block.slider.f.speed", Type = FieldType.Select, Default = "normal",
+                    Options = [ new("slow", "block.slider.opt.speed.slow"), new("normal", "block.slider.opt.speed.normal"), new("fast", "block.slider.opt.speed.fast") ],
+                    ShowWhenField = "autoplay", ShowWhenValue = "on" },
+                // The "← wischen →" hint the hand-built gallery showed. Default on so it reads like the
+                // original; can be turned off now that desktop arrows make the gesture discoverable.
+                new BlockField { Id = "hint", Label = "block.slider.f.hint", Type = FieldType.Select, Default = "yes",
+                    Options = [ new("yes", "block.opt.yesno.yes"), new("no", "block.opt.yesno.no") ] },
+                new BlockField
+                {
+                    Id = "images", Label = "block.gallery.f.images", Type = FieldType.List, ItemLabel = "block.gallery.item",
+                    ItemFields =
+                    [
+                        new BlockField { Id = "image", Label = "block.gallery.f.image", Type = FieldType.Image },
+                        new BlockField { Id = "alt", Label = "block.f.alt", Type = FieldType.Text },
+                        new BlockField { Id = "caption", Label = "block.gallery.f.caption", Type = FieldType.Text },
+                    ]
+                },
+            ]
+        },
+        new BlockDefinition
+        {
             Type = "cards",
             Name = "block.cards.name",
             Description = "block.cards.desc",
@@ -606,9 +671,9 @@ public class BlockRegistry
             Svg = SvgColumns,
             Partial = "Blocks/_Section",
             // Generic grouping container: holds arbitrary content blocks AND other containers (cards,
-            // columns, service grid, accordion, leistungen) — nested containers render recursively.
+            // columns, service grid, accordion, features) — nested containers render recursively.
             AllowedChildren = ["richtext", "image", "imagetext", "cta", "quote", "html", "gallery", "logostrip", "spacer", "posts",
-                               "cards", "columns", "servicegrid", "accordion", "leistungen", "references", "section"],
+                               "cards", "columns", "servicegrid", "accordion", "features", "references", "section"],
             Fields =
             [
                 new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },

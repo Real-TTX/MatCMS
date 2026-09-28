@@ -4,7 +4,7 @@
     var intro = Model.Data.Str("intro");
     var columns = Model.Data.StrOr("columns", "3");
 }
-<section class="section leistungen-block">
+<section class="section features-block">
     <div class="container">
         @if (!string.IsNullOrWhiteSpace(heading) || !string.IsNullOrWhiteSpace(intro))
         {
@@ -19,7 +19,7 @@
                 }
             </div>
         }
-        <div class="leistungen-grid cols-@columns">
+        <div class="features-grid cols-@columns">
             @foreach (var child in Model.Children)
             {
                 @await Html.PartialAsync(child.Partial, child.Data)

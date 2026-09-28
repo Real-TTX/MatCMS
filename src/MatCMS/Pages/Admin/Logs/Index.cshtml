@@ -14,11 +14,43 @@
 
     <p class="muted">@T["logs.intro"]</p>
 
+    <details class="form-section" style="margin-bottom:16px;">
+        <summary style="cursor:pointer;font-weight:600;">@T["logs.config"]</summary>
+        <form method="post" asp-page-handler="SaveConfig" class="form-grid" style="margin-top:12px;">
+            <div class="checkbox-row">
+                <input type="checkbox" id="requestsOn" name="requestsOn" value="true" checked="@Model.RequestsOn" />
+                <label for="requestsOn">@T["logs.cfg.requests"]</label>
+            </div>
+            <div class="help">@T["logs.cfg.requests.help"]</div>
+            <div class="form-row">
+                <div class="form-field">
+                    <label for="errorsDays">@T["logs.cfg.retentionErrors"]</label>
+                    <input type="number" id="errorsDays" name="errorsDays" min="0" max="3650" value="@Model.ErrorsDays" />
+                </div>
+                <div class="form-field">
+                    <label for="requestsDays">@T["logs.cfg.retentionRequests"]</label>
+                    <input type="number" id="requestsDays" name="requestsDays" min="0" max="3650" value="@Model.RequestsDays" />
+                </div>
+            </div>
+            <div class="help">@T["logs.cfg.retention.help"]</div>
+            <div><button type="submit" class="btn">@T["action.save"]</button></div>
+        </form>
+    </details>
+
     <div class="gallery-filter" style="margin-bottom:16px;">
-        <a class="gfilter @(Model.Level is null ? "active" : "")" asp-page="Index">@T["logs.all"] (@Model.Total)</a>
-        <a class="gfilter @(Model.Level == "Error" ? "active" : "")" asp-page="Index" asp-route-level="Error">@T["logs.errors"] (@Model.ErrorCount)</a>
-        <a class="gfilter @(Model.Level == "Warning" ? "active" : "")" asp-page="Index" asp-route-level="Warning">@T["logs.warnings"]</a>
+        <a class="gfilter @(Model.Level is null ? "active" : "")" asp-page="Index" asp-route-category="@Model.Category">@T["logs.all"] (@Model.Total)</a>
+        <a class="gfilter @(Model.Level == "Error" ? "active" : "")" asp-page="Index" asp-route-level="Error" asp-route-category="@Model.Category">@T["logs.errors"] (@Model.ErrorCount)</a>
+        <a class="gfilter @(Model.Level == "Warning" ? "active" : "")" asp-page="Index" asp-route-level="Warning" asp-route-category="@Model.Category">@T["logs.warnings"]</a>
     </div>
+
+    @if (Model.HasRequestLog || Model.RequestsOn)
+    {
+        <div class="gallery-filter" style="margin-bottom:16px;">
+            <a class="gfilter @(Model.Category is null ? "active" : "")" asp-page="Index" asp-route-level="@Model.Level">@T["logs.cat.all"]</a>
+            <a class="gfilter @(Model.Category == "request" ? "active" : "")" asp-page="Index" asp-route-level="@Model.Level" asp-route-category="request">@T["logs.cat.errors"]</a>
+            <a class="gfilter @(Model.Category == "webrequest" ? "active" : "")" asp-page="Index" asp-route-level="@Model.Level" asp-route-category="webrequest">@T["logs.cat.requests"]</a>
+        </div>
+    }
 
     <table class="data" data-list-table>
         <thead>

@@ -20,11 +20,13 @@ public class ContentOpApplier
 {
     private readonly AppDbContext _db;
     private readonly BlockGenerator _blockGen;
+    private readonly CleanupService _cleanup;
 
-    public ContentOpApplier(AppDbContext db, BlockGenerator blockGen)
+    public ContentOpApplier(AppDbContext db, BlockGenerator blockGen, CleanupService cleanup)
     {
         _db = db;
         _blockGen = blockGen;
+        _cleanup = cleanup;
     }
 
     public async Task<ContentOpReport> ApplyAsync(PendingContentOp op, CancellationToken ct = default)
@@ -35,6 +37,10 @@ public class ContentOpApplier
             {
                 "page.create" => await CreatePageAsync(op, ct),
                 "post.create" => await CreatePostAsync(op, ct),
+                "form.create" => await CreateFormAsync(op, ct),
+                "setting.set" => await SetSettingAsync(op, ct),
+                "cleanup.analyze" => await AnalyzeCleanupAsync(op, ct),
+                "cleanup.apply" => await ApplyCleanupAsync(op, ct),
                 "pages.list" => await ListPagesAsync(op, ct),
                 "page.read" => await ReadPageAsync(op, ct),
                 "page.updateBlocks" => await UpdatePageBlocksAsync(op, ct),
@@ -126,6 +132,86 @@ public class ContentOpApplier
         _db.Posts.Add(post);
         await _db.SaveChangesAsync(ct);
         return Report(op, "applied", $"Beitrag „{slug}“ angelegt{(publish ? " und veröffentlicht" : " (Entwurf)")}.");
+    }
+
+    private async Task<ContentOpReport> CreateFormAsync(PendingContentOp op, CancellationToken ct)
+    {
+        var payload = JsonNode.Parse(op.PayloadJson) as JsonObject
+            ?? throw new InvalidOperationException("PayloadJson ist kein Objekt.");
+
+        var name = (payload["name"]?.GetValue<string>() ?? "").Trim();
+        var slug = Slugify(payload["slug"]?.GetValue<string>() ?? name);
+        if (string.IsNullOrWhiteSpace(name)) return Report(op, "failed", "Kein Name angegeben.");
+        if (string.IsNullOrWhiteSpace(slug)) return Report(op, "failed", "Kein gültiger Slug ableitbar.");
+
+        // Add-only: Slug is the reference key from a form block, so an existing form is left as it is.
+        if (await _db.Forms.AnyAsync(f => f.Slug == slug, ct))
+            return Report(op, "skipped-exists", $"Formular „{slug}“ existiert bereits.");
+
+        // The field definition travels as the "fields" array; it is a structured field list (not raw HTML),
+        // rendered by the form builder — stored as-is, defaulting to empty when absent.
+        var fields = payload["fields"];
+        var definitionJson = fields is JsonArray ? fields.ToJsonString() : "[]";
+        var successMessage = payload["successMessage"]?.GetValue<string>();
+        var submitLabel = payload["submitLabel"]?.GetValue<string>();
+
+        _db.Forms.Add(new Form
+        {
+            Name = name,
+            Slug = slug,
+            DefinitionJson = definitionJson,
+            SuccessMessage = string.IsNullOrWhiteSpace(successMessage) ? null : successMessage,
+            SubmitLabel = string.IsNullOrWhiteSpace(submitLabel) ? null : submitLabel,
+        });
+        await _db.SaveChangesAsync(ct);
+        return Report(op, "applied", $"Formular „{slug}“ angelegt.");
+    }
+
+    private async Task<ContentOpReport> SetSettingAsync(PendingContentOp op, CancellationToken ct)
+    {
+        var payload = JsonNode.Parse(op.PayloadJson) as JsonObject
+            ?? throw new InvalidOperationException("PayloadJson ist kein Objekt.");
+        var key = (payload["key"]?.GetValue<string>() ?? "").Trim();
+        var value = payload["value"]?.GetValue<string>() ?? "";
+        if (string.IsNullOrWhiteSpace(key)) return Report(op, "failed", "Kein Schlüssel angegeben.");
+
+        // The cloud-link keys live in the same table; letting an op set them would let a change hijack the
+        // instance's cloud connection. Same guard as the profile sync applier (CloudSyncService).
+        var forbidden = SettingKeys.Cloud.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (forbidden.Contains(key))
+            return Report(op, "failed", $"Schlüssel „{key}“ ist geschützt (Cloud-Verbindung) und kann nicht gesetzt werden.");
+
+        var row = await _db.SiteSettings.FirstOrDefaultAsync(s => s.Key == key, ct);
+        if (row is null) { _db.SiteSettings.Add(new SiteSetting { Key = key, Value = value }); }
+        else row.Value = value;
+        await _db.SaveChangesAsync(ct);
+        return Report(op, "applied", $"Einstellung „{key}“ gesetzt.");
+    }
+
+    // --- Cleanup (cloud-orchestrated "Aufräumen") ------------------------------------------------------
+    // The cloud only asks; the instance runs its OWN CleanupService (the same one the Admin page uses), so
+    // "unused" is judged with the full content model, never from a parsed backup.
+
+    /// <summary>Read op: returns the unused-media/component + plugin report so the operator can pick what
+    /// to delete. NOT restore-gated (reading is not writing).</summary>
+    private async Task<ContentOpReport> AnalyzeCleanupAsync(PendingContentOp op, CancellationToken ct)
+    {
+        var report = await _cleanup.AnalyzeAsync(ct);
+        return ReportResult(op, JsonSerializer.Serialize(report),
+            $"{report.UnusedMedia.Count} Medien unbenutzt ({report.UnusedComponents.Count} Komponenten), {report.Plugins.Count} Plugins.");
+    }
+
+    /// <summary>Write op (restore-gated on the cloud side): deletes exactly the passed selections.
+    /// CleanupService re-checks "still unused" before removing anything.</summary>
+    private async Task<ContentOpReport> ApplyCleanupAsync(PendingContentOp op, CancellationToken ct)
+    {
+        var payload = JsonNode.Parse(op.PayloadJson) as JsonObject
+            ?? throw new InvalidOperationException("PayloadJson ist kein Objekt.");
+        var mediaIds = (payload["mediaIds"] as JsonArray)?.Select(n => n!.GetValue<int>()).ToArray() ?? [];
+        var compTypes = (payload["componentTypes"] as JsonArray)?.Select(n => n!.GetValue<string>()).ToArray() ?? [];
+        var pluginKeys = (payload["pluginKeys"] as JsonArray)?.Select(n => n!.GetValue<string>()).ToArray() ?? [];
+        var (media, comps, plugins) = await _cleanup.DeleteAsync(mediaIds, compTypes, pluginKeys, ct);
+        return Report(op, "applied", $"Aufgeräumt: {media} Medien, {comps} Komponenten, {plugins} Plugins gelöscht.");
     }
 
     // --- Reads: the instance serializes its OWN content back (the cloud never parses the format) ----------

@@ -1,0 +1,156 @@
+@page
+@model MatCMS.Pages.Admin.Cleanup.IndexModel
+@{
+    ViewData["Title"] = T["cleanup.title"];
+    // Human-readable byte size — small helper so the view can label media weight.
+    string Hsize(long b) => b >= 1048576 ? $"{b / 1048576.0:0.#} MB" : b >= 1024 ? $"{b / 1024.0:0.#} KB" : $"{b} B";
+    // Bare file name from a /uploads/… URL (avoids System.IO.Path, which collides in the Razor scope).
+    string FileOf(string? url) => string.IsNullOrEmpty(url) ? "" : url[(url.LastIndexOf('/') + 1)..];
+    var r = Model.Report;
+}
+<div class="page-head">
+    <h1>@T["cleanup.title"]</h1>
+</div>
+<p class="muted">@T["cleanup.intro"]</p>
+
+@if (Model.Confirming)
+{
+    @* ---- Step 2: confirmation. Shows EXACTLY what will be deleted; a second, red submit + JS confirm. ---- *@
+    <div class="card">
+        <div class="form-section">
+            <h2>@T["cleanup.confirmTitle"]</h2>
+            <div class="help">@T["cleanup.confirmIntro"]</div>
+        </div>
+
+        @if (Model.SelMedia.Count > 0)
+        {
+            <div class="form-section">
+                <h3>@T["cleanup.media"] (@Model.SelMedia.Count · @Hsize(Model.SelMediaBytes))</h3>
+                <ul class="mono">@foreach (var m in Model.SelMedia) { <li>@(FileOf(m.Url)) <span class="muted">@Hsize(m.SizeBytes)</span></li> }</ul>
+            </div>
+        }
+        @if (Model.SelComponents.Count > 0)
+        {
+            <div class="form-section">
+                <h3>@T["cleanup.components"] (@Model.SelComponents.Count)</h3>
+                <ul>@foreach (var c in Model.SelComponents) { <li>@c.Name <span class="muted mono">@c.Type</span></li> }</ul>
+            </div>
+        }
+        @if (Model.SelPlugins.Count > 0)
+        {
+            <div class="form-section">
+                <h3>@T["cleanup.plugins"] (@Model.SelPlugins.Count)</h3>
+                <ul>@foreach (var p in Model.SelPlugins) { <li>@p.Name <span class="muted mono">@p.Key</span></li> }</ul>
+            </div>
+        }
+
+        <form method="post" asp-page-handler="Delete" onsubmit="return confirm('@T["cleanup.confirmJs"]');">
+            @foreach (var m in Model.SelMedia) { <input type="hidden" name="mediaIds" value="@m.Id" /> }
+            @foreach (var c in Model.SelComponents) { <input type="hidden" name="componentTypes" value="@c.Type" /> }
+            @foreach (var p in Model.SelPlugins) { <input type="hidden" name="pluginKeys" value="@p.Key" /> }
+            <div class="form-actions">
+                <button type="submit" class="btn btn-danger">@T["cleanup.finalDelete"]</button>
+                <a class="btn btn-ghost" asp-page="Index">@T["action.cancel"]</a>
+            </div>
+        </form>
+    </div>
+    return;
+}
+
+@if (r.UnusedMedia.Count == 0 && r.UnusedComponents.Count == 0 && r.Plugins.Count == 0)
+{
+    <div class="card"><p>@T["cleanup.nothing"]</p></div>
+    return;
+}
+
+<form method="post" asp-page-handler="Review">
+    @* ---- Media: unused, pre-ticked (safest signal) ---- *@
+    <div class="card">
+        <div class="form-section">
+            <h2>@T["cleanup.media"] <span class="muted">(@r.UnusedMedia.Count · @Hsize(r.UnusedMediaBytes))</span></h2>
+            <div class="help">@T["cleanup.mediaHelp"]</div>
+        </div>
+        @if (r.UnusedMedia.Count == 0)
+        {
+            <p class="muted">@T["cleanup.mediaNone"]</p>
+        }
+        else
+        {
+            <label class="checkbox-row"><input type="checkbox" data-check-all="media" checked /> <span>@T["cleanup.selectAll"]</span></label>
+            <table class="data">
+                <thead><tr><th style="width:40px;"></th><th style="width:64px;"></th><th>@T["cleanup.file"]</th><th style="width:100px;">@T["cleanup.size"]</th></tr></thead>
+                <tbody>
+                    @foreach (var m in r.UnusedMedia)
+                    {
+                        <tr>
+                            <td><input type="checkbox" name="mediaIds" value="@m.Id" data-check="media" checked /></td>
+                            <td><img src="@m.Url" alt="" style="width:56px;height:40px;object-fit:cover;border-radius:4px;" loading="lazy" /></td>
+                            <td><span class="mono">@(FileOf(m.Url))</span>@if (!string.IsNullOrWhiteSpace(m.Alt)) { <span class="muted"> — @m.Alt</span> }</td>
+                            <td class="muted mono">@Hsize(m.SizeBytes)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+
+    @* ---- Components: unused (no block of this type), pre-ticked ---- *@
+    <div class="card">
+        <div class="form-section">
+            <h2>@T["cleanup.components"] <span class="muted">(@r.UnusedComponents.Count)</span></h2>
+            <div class="help">@T["cleanup.componentsHelp"]</div>
+        </div>
+        @if (r.UnusedComponents.Count == 0)
+        {
+            <p class="muted">@T["cleanup.componentsNone"]</p>
+        }
+        else
+        {
+            <label class="checkbox-row"><input type="checkbox" data-check-all="comp" checked /> <span>@T["cleanup.selectAll"]</span></label>
+            @foreach (var c in r.UnusedComponents)
+            {
+                <label class="checkbox-row"><input type="checkbox" name="componentTypes" value="@c.Type" data-check="comp" checked /> <span>@c.Name <span class="muted mono">@c.Type</span></span></label>
+            }
+        }
+    </div>
+
+    @* ---- Plugins: NO safe auto-detection — manual choice only, never pre-ticked ---- *@
+    <div class="card">
+        <div class="form-section">
+            <h2>@T["cleanup.plugins"] <span class="muted">(@r.Plugins.Count)</span></h2>
+            <div class="help">@T["cleanup.pluginsHelp"]</div>
+        </div>
+        @if (r.Plugins.Count == 0)
+        {
+            <p class="muted">@T["cleanup.pluginsNone"]</p>
+        }
+        else
+        {
+            @foreach (var p in r.Plugins)
+            {
+                <label class="checkbox-row">
+                    <input type="checkbox" name="pluginKeys" value="@p.Key" />
+                    <span>@p.Name <span class="muted mono">@p.Key</span>
+                        <span class="badge @(p.Enabled ? "badge-on" : "badge-off")">@(p.Enabled ? T["cleanup.enabled"] : T["cleanup.disabled"])</span>
+                        @if (!string.IsNullOrWhiteSpace(p.Version)) { <span class="muted">v@p.Version</span> }
+                    </span>
+                </label>
+            }
+        }
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn">@T["cleanup.next"]</button>
+    </div>
+</form>
+
+@section Scripts {
+    <script>
+        // "Select all" toggles per group; each master reflects its group.
+        document.querySelectorAll('[data-check-all]').forEach(function (master) {
+            var group = master.getAttribute('data-check-all');
+            var boxes = document.querySelectorAll('[data-check="' + group + '"]');
+            master.addEventListener('change', function () { boxes.forEach(function (b) { b.checked = master.checked; }); });
+        });
+    </script>
+}

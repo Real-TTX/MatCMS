@@ -77,6 +77,7 @@
             <a class="@Active("/admin/users")" asp-page="/Admin/Users/Index">👤 @T["nav.users"]</a>
             <a class="@Active("/admin/backup")" asp-page="/Admin/Backup/Index">💾 @T["nav.backup"]</a>
             <a class="@Active("/admin/logs")" asp-page="/Admin/Logs/Index">📋 @T["nav.logs"]</a>
+            <a class="@Active("/admin/cleanup")" asp-page="/Admin/Cleanup/Index">🧹 @T["nav.cleanup"]</a>
             @if (Plugins.AdminMenu.Count > 0)
             {
                 <div class="admin-nav-plugins">

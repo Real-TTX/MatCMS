@@ -191,6 +191,7 @@ builder.Services.AddScoped<MatCMS.Services.MediaFocus>();
 builder.Services.AddScoped<SiteContext>();
 builder.Services.AddScoped<ContentTransferService>();
 builder.Services.AddScoped<BackupManager>();
+builder.Services.AddScoped<CleanupService>();
 builder.Services.AddScoped<CloudBackupService>();
 builder.Services.AddHostedService<BackupSchedulerService>();
 builder.Services.AddHostedService<LogRetentionService>();

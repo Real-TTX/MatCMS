@@ -15,7 +15,8 @@ namespace MatCMS.Cloud.Pages.Admin.Instances;
 public class MailModel : PageModel
 {
     private readonly AppDbContext _db;
-    public MailModel(AppDbContext db) => _db = db;
+    private readonly Services.OperatorScope _scope;
+    public MailModel(AppDbContext db, Services.OperatorScope scope) { _db = db; _scope = scope; }
 
     public SpooledMail Item { get; private set; } = new();
     public Instance? Owner { get; private set; }
@@ -30,6 +31,10 @@ public class MailModel : PageModel
 
     public async Task<IActionResult> OnGetAsync(int id, int mailId)
     {
+        // This page sits in /Admin/Instances, which Operators may enter — so it must check the scope itself,
+        // like Details does: a mail body can be a contact-form submission or a password-reset link. The same
+        // answer for "no such instance" and "not yours", so an Operator cannot probe ids.
+        if (!await _scope.CanAccessInstanceAsync(id)) return NotFound();
         var row = await _db.SpooledMails.AsNoTracking()
             .FirstOrDefaultAsync(m => m.Id == mailId && m.InstanceId == id);
         if (row is null) return RedirectToPage("Details", new { id, tab = "mail" });

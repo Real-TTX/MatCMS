@@ -18,19 +18,29 @@ namespace MatCMS.Cloud.Services;
 public class ContextSwitcher
 {
     private readonly AppDbContext _db;
+    private readonly OperatorScope _scope;
     private List<Instance>? _cache;
 
-    public ContextSwitcher(AppDbContext db) => _db = db;
+    public ContextSwitcher(AppDbContext db, OperatorScope scope) { _db = db; _scope = scope; }
 
     /// <summary>
-    /// Every instance worth switching to.
+    /// Every instance worth switching to — for an Operator only the ones assigned to it.
     /// <para>Rejected ones stay out — they were refused, so they are not somewhere to go. Offline ones
     /// stay IN: offline is exactly when somebody goes looking, and a list that hides them answers the
     /// wrong question.</para>
+    /// <para>The scope filter is load-bearing: this list sits in the LAYOUT, on every page, and it used to
+    /// show an Operator every site's name, address and state (found while testing the Operator dashboard —
+    /// an Operator with no instance at all saw the whole fleet here).</para>
     /// </summary>
-    public async Task<List<Instance>> InstancesAsync(CancellationToken ct = default) =>
-        _cache ??= await _db.Instances.AsNoTracking()
-            .Where(i => i.Status != InstanceStatus.Rejected)
-            .OrderBy(i => i.Name)
-            .ToListAsync(ct);
+    public async Task<List<Instance>> InstancesAsync(CancellationToken ct = default)
+    {
+        if (_cache is not null) return _cache;
+        var q = _db.Instances.AsNoTracking().Where(i => i.Status != InstanceStatus.Rejected);
+        if (!_scope.IsAdmin)
+        {
+            var allowed = await _scope.AllowedInstanceIdsAsync();
+            q = q.Where(i => allowed.Contains(i.Id));
+        }
+        return _cache = await q.OrderBy(i => i.Name).ToListAsync(ct);
+    }
 }

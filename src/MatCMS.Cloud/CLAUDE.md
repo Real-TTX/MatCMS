@@ -778,7 +778,13 @@ Design and increments: `docs/hosting-platform.md`. Increments 1–4 are built:
   late; the `proxy` payload carries the node's Matcad key → encrypted at rest, blanked when finished; pending
   provisioning routes are keyed per node (`InstanceService.PendingRouteKey`) because container names are only
   unique per host. Provisioning is ONE service call for UI/REST/MCP: `HostingService.ProvisionAsync`.
-  Not yet on nodes: bulk update, agent self-update. Docker.DotNet 3.125 HANGS on `tcp://` endpoints —
+  Bulk and auto-update run through `HostingActionsService.UpdateAsync` for this host AND nodes. **Agent
+  self-update** (`agent.update` job → `DockerHostService.SpawnContainerUpdateHelperAsync` → helper container
+  `--update-container <id>` from the agent's own image, with its socket bind / endpoint env and networks, label
+  `matcmscloud.agentupdater`): `UpdateContainerAsync(…, mustStayUp: 20 s)` rolls back when the new agent keeps
+  restarting or exits — an agent that does not come up would take its whole node out of reach. A tag no registry
+  knows falls back to a different local image under that tag (like the cloud self-update). The node page badges
+  an agent whose version differs from the cloud's (`NodeService.AgentOutdated`). Docker.DotNet 3.125 HANGS on `tcp://` endpoints —
   `DockerHostService` translates them to `http://`; the agent uses a fresh Docker client per beat and per job
   (a client once got stuck after an archive extract) and bounds its daemon calls.
 - **Moving between hosts (increment 5, `Services/Nodes/MigrationService.cs`)** copies the DATA VOLUME 1:1 —

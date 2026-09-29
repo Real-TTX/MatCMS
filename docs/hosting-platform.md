@@ -391,6 +391,13 @@ guards move in increment 5), bulk update / auto-update of node instances (the Ho
 and updating the agent itself (for now: pull the image and recreate the agent container by hand; the agent
 reports its version, so a stale one is visible).
 
+*All three are built since (2026-09-29):* teardown with increment 5; bulk and auto-update go through
+`HostingActionsService.UpdateAsync` for both hosts; and the **agent self-update** — the `agent.update` job makes
+the agent start a one-shot helper from its own image (`--update-container <id>`, same socket/endpoint and
+networks), which pulls, recreates and ROLLS BACK unless the new agent keeps running for 20 s. Tested in a dind
+node: a new image that cannot start → old agent back; a new image that starts and crash-loops → caught by the
+run check, old agent back; the real GHCR `latest` → agent reconnects with the new version.
+
 ### Built (2026-09-29): Increment 5 — moving between hosts, removal on nodes
 
 **Flow** (`Services/Nodes/MigrationService.cs`, run by `MigrationWorker` in the background, one move at a time,

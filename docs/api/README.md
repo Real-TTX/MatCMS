@@ -199,7 +199,7 @@ sie laufen als Auftrag auf dem Node, der Aufruf wartet auf das Ergebnis (`contai
 - `GET /api/v1/nodes/{id}` – wie oben plus `containers` (die gemeldeten MatCMS-Container)
 - `PUT /api/v1/nodes/{id}` `{ name?, portFrom?, portTo?, provider?, matcadUrl?, matcadToken?, clearMatcadToken?, caddyAdminUrl?, caddyServer?, upstream?, network?, upstreamHost? }` – Teil-Update; der Proxy wird **vom Node aus** angesprochen (**alle Instanzen**)
 - `POST /api/v1/nodes/{id}/test-proxy` – Proxy-Test, läuft auf dem Node (**CanManageHosting**)
-- `POST /api/v1/nodes/{id}/revoke` | `activate` | `token` (neuer Token + Befehl; der alte gilt sofort nicht mehr) – (**alle Instanzen**)
+- `POST /api/v1/nodes/{id}/revoke` | `activate` | `token` (neuer Token + Befehl; der alte gilt sofort nicht mehr) | `update-agent` (der Agent aktualisiert sich selbst über einen Helfer-Container, mit Rollback; `GET …/nodes/{id}` zeigt danach `agentVersion`, `agentOutdated`) – (**alle Instanzen**)
 - `DELETE /api/v1/nodes/{id}` – Eintrag löschen; die Websites laufen weiter, die Cloud steuert sie nur nicht mehr (**alle Instanzen**)
 - `GET /api/v1/nodes/{id}/jobs?take=50` → `[{ id, kind, state: pending|running|done|failed, message, requestedBy, createdAt, startedAt, finishedAt }]`
 - `POST /api/v1/hosting/instances` `{ name, nodeId? ("local"/leer = dieser Host), profileId? (leer = Standardprofil), domain?, imageTag?, pushCanonical? }` → `{ ok, containerName, port, domainFailed, message }` – **neue Website anlegen** (Hosting-Modul an; **CanManageHosting + alle Instanzen**). Die Instanz erscheint in `GET /api/v1/instances`, sobald sie sich mit dem Join-Code ihres Profils angemeldet hat (meist < 1 Min.).
@@ -286,6 +286,7 @@ Instanz beim nächsten Heartbeat über ihre **eigenen** Validierer anwendet (add
 | `update_node` | Name, Portbereich, Proxy eines Nodes ändern (alle Instanzen) |
 | `set_node_revoked` / `rotate_node_token` / `delete_node` | sperren/freigeben, neuer Token, löschen (alle Instanzen) |
 | `test_node_proxy` | Proxy-Test auf dem Node |
+| `update_node_agent` | Agent eines Nodes aktualisieren (Helfer-Container, Rollback, Node ~1 Min. getrennt) |
 | `list_node_jobs` | Auftragsverlauf eines Nodes (z. B. ein noch laufendes Update verfolgen) |
 | `create_instance` | **Neue Website anlegen** — auf diesem Host oder einem Node, optional mit Domain (alle Instanzen) |
 | `migrate_instance` | **Website umziehen** auf einen anderen Host (Daten 1:1, Domain zieht mit; offline währenddessen) — vorher bestätigen |

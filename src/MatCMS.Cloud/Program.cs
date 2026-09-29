@@ -23,6 +23,23 @@ if (args.Length >= 2 && args[0] == "--self-update")
     return;
 }
 
+// --- Container-update helper mode ---
+// "dotnet MatCMS.Cloud.dll --update-container <id>" is the one-shot helper a node-agent starts to update ITSELF
+// (it cannot replace the container it runs in): pull, recreate, and roll back unless the new container keeps
+// running. No web app, no database — like the self-update helper.
+if (args.Length >= 2 && args[0] == "--update-container")
+{
+    var helperConfig = new ConfigurationBuilder()
+        .AddInMemoryCollection(new Dictionary<string, string?> { ["MatCmsCloud:Docker:Endpoint"] = "unix:///var/run/docker.sock" })
+        .AddEnvironmentVariables().Build();
+    using var helperLogs = LoggerFactory.Create(b => b.AddSimpleConsole(o => { o.SingleLine = true; o.TimestampFormat = "HH:mm:ss "; }));
+    using var helperDocker = new DockerHostService(helperConfig, helperLogs.CreateLogger<DockerHostService>());
+    var r = await helperDocker.UpdateContainerAsync(args[1], mustStayUp: TimeSpan.FromSeconds(20));
+    Console.WriteLine((r.Ok ? "OK: " : "FEHLER: ") + r.Message);
+    Environment.ExitCode = r.Ok ? 0 : 1;
+    return;
+}
+
 // --- Node-agent mode (Hosting increment 4) ---
 // "dotnet MatCMS.Cloud.dll --node-agent" runs this image as the agent of ANOTHER Docker host: no web app, no
 // database — only the engine, its own daemon and an outbound connection to the cloud (NodeAgentRunner).

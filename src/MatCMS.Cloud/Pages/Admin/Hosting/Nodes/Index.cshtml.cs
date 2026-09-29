@@ -15,8 +15,11 @@ public class IndexModel : PageModel
 {
     private readonly AppDbContext _db;
     private readonly DockerHostService _docker;
+    private readonly VersionService _version;
 
-    public IndexModel(AppDbContext db, DockerHostService docker) { _db = db; _docker = docker; }
+    public IndexModel(AppDbContext db, DockerHostService docker, VersionService version) { _db = db; _docker = docker; _version = version; }
+
+    public string CloudVersion => _version.Current;
 
     public List<Node> Items { get; private set; } = new();
     public Dictionary<int, int> Counts { get; private set; } = new();

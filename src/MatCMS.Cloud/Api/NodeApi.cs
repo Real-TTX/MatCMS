@@ -104,13 +104,13 @@ public static class NodeApi
             return Results.Ok(new { id = node.PublicId, name = node.Name, token, command = nodes.AgentCommand(node, token!) });
         }).RequireRateLimiting("operatorApi");
 
-        app.MapGet("/api/v1/nodes/{id}", async (HttpContext ctx, string id, ApiKeyService keys, AppDbContext db) =>
+        app.MapGet("/api/v1/nodes/{id}", async (HttpContext ctx, string id, ApiKeyService keys, AppDbContext db, VersionService version) =>
         {
             var (_, error) = await CallerAsync(ctx, keys, cloudWide: false);
             if (error is not null) return error;
             var n = await db.Nodes.AsNoTracking().FirstOrDefaultAsync(x => x.PublicId == id);
             if (n is null) return NotFound();
-            return Results.Ok(NodeService.PublicJson(n, await db.Instances.CountAsync(i => i.NodeId == n.Id), withInventory: true));
+            return Results.Ok(NodeService.PublicJson(n, await db.Instances.CountAsync(i => i.NodeId == n.Id), withInventory: true, version.Current));
         }).RequireRateLimiting("operatorApi");
 
         app.MapPut("/api/v1/nodes/{id}", async (HttpContext ctx, string id, ApiKeyService keys, AppDbContext db, NodeService nodes,
@@ -141,11 +141,15 @@ public static class NodeApi
                 case "token":
                     var token = await nodes.RotateTokenAsync(n, ctx.RequestAborted);
                     return Results.Ok(new { ok = true, token, command = nodes.AgentCommand(n, token) });
+                case "update-agent":
+                    var u = await nodes.UpdateAgentAsync(n, ctx.RequestAborted);
+                    return u.Ok ? Results.Ok(new { ok = true, message = u.Message })
+                                : Results.Json(new { ok = false, error = u.Message }, statusCode: StatusCodes.Status409Conflict);
                 case "test-proxy":
                     var r = await proxy.TestAsync(n, ctx.RequestAborted);
                     return Results.Ok(new { ok = r.Ok, provider = r.Kind, message = r.Message });
                 default:
-                    return Results.Json(new { error = "Unbekannte Aktion. Erlaubt: revoke, activate, token, test-proxy." }, statusCode: StatusCodes.Status400BadRequest);
+                    return Results.Json(new { error = "Unbekannte Aktion. Erlaubt: revoke, activate, token, update-agent, test-proxy." }, statusCode: StatusCodes.Status400BadRequest);
             }
         }).RequireRateLimiting("operatorApi");
 

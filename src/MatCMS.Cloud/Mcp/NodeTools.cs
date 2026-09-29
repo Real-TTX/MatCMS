@@ -53,12 +53,12 @@ public class NodeTools
 
     [McpServerTool(Name = "get_node"), Description(
         "One node in detail, including the MatCMS containers its agent reports (name, image, state, port). Requires the hosting right.")]
-    public static async Task<object> GetNode(McpContext me, AppDbContext db,
+    public static async Task<object> GetNode(McpContext me, AppDbContext db, VersionService version,
         [Description("The node id, as returned by list_nodes.")] string nodeId, CancellationToken ct)
     {
         RequireHosting(me);
         var n = await ResolveAsync(db, nodeId, ct);
-        return NodeService.PublicJson(n, await db.Instances.CountAsync(i => i.NodeId == n.Id, ct), withInventory: true);
+        return NodeService.PublicJson(n, await db.Instances.CountAsync(i => i.NodeId == n.Id, ct), withInventory: true, version.Current);
     }
 
     [McpServerTool(Name = "create_node"), Description(
@@ -111,6 +111,18 @@ public class NodeTools
         var n = await ResolveAsync(db, nodeId, ct);
         var token = await nodes.RotateTokenAsync(n, ct);
         return new { ok = true, token, command = nodes.AgentCommand(n, token) };
+    }
+
+    [McpServerTool(Name = "update_node_agent"), Description(
+        "Update a node's agent to the newest image of its tag: the agent starts a helper container that swaps it and rolls back if the new agent does not keep running. The node is briefly disconnected (about a minute); its sites keep running. get_node then shows the new agentVersion (agentOutdated = false once it matches the cloud). Requires the hosting right on an all-instances key.")]
+    public static async Task<object> UpdateNodeAgent(McpContext me, AppDbContext db, NodeService nodes,
+        [Description("The node id.")] string nodeId, CancellationToken ct)
+    {
+        RequireCloudWide(me);
+        var n = await ResolveAsync(db, nodeId, ct);
+        var r = await nodes.UpdateAgentAsync(n, ct);
+        if (!r.Ok) throw new McpException(r.Message);
+        return new { ok = true, message = r.Message };
     }
 
     [McpServerTool(Name = "delete_node"), Description(

@@ -147,13 +147,14 @@ public class NodeService
     }
 
     /// <summary>What the API/MCP show about a node — never the token, never the Matcad key.</summary>
-    public static object PublicJson(Node n, int instanceCount, bool withInventory)
+    public static object PublicJson(Node n, int instanceCount, bool withInventory, string? cloudVersion = null)
     {
         var now = DateTime.UtcNow;
         return new
         {
             id = n.PublicId, name = n.Name, revoked = n.Revoked, online = n.IsOnline(now),
             lastSeenAt = n.LastSeenAt, agentVersion = n.AgentVersion, hostName = n.HostName,
+            agentOutdated = cloudVersion is null ? (bool?)null : AgentOutdated(n, cloudVersion),
             dockerVersion = n.DockerVersion, dockerError = n.DockerError, instances = instanceCount,
             portFrom = n.PortFrom, portTo = n.PortTo,
             proxy = new
@@ -165,6 +166,21 @@ public class NodeService
             containers = withInventory ? Inventory(n).Select(c => new { id = c.Id[..Math.Min(12, c.Id.Length)], c.Name, c.Image, c.State, c.PublishedPort, c.CloudManaged }) : null,
         };
     }
+
+    /// <summary>
+    /// The agent speaks the cloud's own version when both run the same image — the normal state, since the agent IS
+    /// the cloud image. A different version means the agent was left behind by a cloud update (or is ahead of it).
+    /// "local" builds compare as unknown rather than raising a false alarm.
+    /// </summary>
+    public static bool AgentOutdated(Node n, string cloudVersion) =>
+        !string.IsNullOrEmpty(n.AgentVersion) && !n.AgentVersion.StartsWith("local", StringComparison.OrdinalIgnoreCase)
+        && !cloudVersion.StartsWith("local", StringComparison.OrdinalIgnoreCase)
+        && !string.Equals(n.AgentVersion, cloudVersion, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Asks the agent to update ITSELF: it pulls its image tag and a helper swaps its container (with
+    /// rollback if the new agent does not keep running). The new version shows on its next beat.</summary>
+    public Task<JobOutcome> UpdateAgentAsync(Node node, CancellationToken ct = default) =>
+        RunAsync(node, NodeJobKinds.AgentUpdate, new { }, null, TimeSpan.FromSeconds(30), ct);
 
     // ---- The agent's heartbeat ----------------------------------------------------------------------
 

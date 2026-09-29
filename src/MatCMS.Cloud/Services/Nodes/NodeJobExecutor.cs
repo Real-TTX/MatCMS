@@ -119,6 +119,15 @@ public static class NodeJobExecutor
                     report.ResultJson = Serialize(r);
                     break;
                 }
+                case NodeJobKinds.AgentUpdate:
+                {
+                    // The agent's own container — the same detection the cloud uses for its self-update.
+                    var self = SelfContainer.Current;
+                    if (self is null) { report.Ok = false; report.Message = "Der Agent läuft nicht erkennbar in einem Container."; break; }
+                    var r = await docker.SpawnContainerUpdateHelperAsync(self, ct);
+                    report.Ok = r.Ok; report.Message = r.Message;
+                    break;
+                }
                 default:
                     report.Ok = false;
                     report.Message = $"Auftrag „{job.Kind}“ kennt dieser Node nicht (Agent-Version zu alt?).";

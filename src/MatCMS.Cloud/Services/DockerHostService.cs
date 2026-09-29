@@ -173,7 +173,8 @@ public class DockerHostService : IDisposable
         // The agent itself and a cloud on the same host are "matcms-cloud" images — infrastructure, not sites.
         return list.Where(c => LooksLikeMatCms(c.Image ?? "", c.Labels)
                                && !(c.Image ?? "").Contains("matcms-cloud", StringComparison.OrdinalIgnoreCase)
-                               && !(c.Labels?.ContainsKey(UpdaterLabel) ?? false))
+                               && !(c.Labels?.ContainsKey(UpdaterLabel) ?? false)
+                               && !(c.Labels?.ContainsKey(AgentUpdaterLabel) ?? false))
             .Select(ToInfo).ToList();
     }
 
@@ -227,6 +228,77 @@ public class DockerHostService : IDisposable
     // copy consistent (SQLite) and guarantees the identity never runs twice.
 
     /// <summary>What the target needs to rebuild the container: taken from the SOURCE container itself.</summary>
+    /// <summary>Label on the helper that updates a node-agent — kept apart from the cloud's own updater label, so a
+    /// node on the cloud's host never mistakes one for the other.</summary>
+    public const string AgentUpdaterLabel = "matcmscloud.agentupdater";
+
+    /// <summary>
+    /// Updates the node-agent from OUTSIDE: like the cloud, an agent cannot replace the container it runs in (the
+    /// process dies half-way). So it starts a one-shot helper — its own image, its daemon access (socket bind and/or
+    /// the endpoint variable), its networks — which runs <c>--update-container &lt;id&gt;</c>: pull, recreate, and roll
+    /// back if the new agent does not keep running (<see cref="UpdateContainerAsync"/> with a run check).
+    /// </summary>
+    public async Task<SpawnResult> SpawnContainerUpdateHelperAsync(string targetId, CancellationToken ct = default)
+    {
+        var client = Client;
+        if (client is null) return new(false, "Kein Docker-Zugriff konfiguriert.");
+        ContainerInspectResponse self;
+        try { self = await client.Containers.InspectContainerAsync(targetId, ct); }
+        catch (Exception ex) { return new(false, $"Eigener Container nicht gefunden: {ex.Message}"); }
+        if (!LooksLikeMatCms(self.Config?.Image ?? "", self.Config?.Labels))
+            return new(false, $"Abgelehnt: '{self.Config?.Image}' sieht nicht nach MatCMS aus.");
+
+        var helpers = await client.Containers.ListContainersAsync(new ContainersListParameters
+        {
+            All = true,
+            Filters = new Dictionary<string, IDictionary<string, bool>> { ["label"] = new Dictionary<string, bool> { [AgentUpdaterLabel + "=true"] = true } }
+        }, ct);
+        foreach (var h in helpers)
+        {
+            if (string.Equals(h.State, "running", StringComparison.OrdinalIgnoreCase)) return new(false, "Ein Agent-Update läuft bereits.");
+            try { await client.Containers.RemoveContainerAsync(h.ID, new ContainerRemoveParameters { Force = true }, ct); } catch { }
+        }
+
+        // The image the agent RUNS (by id) — its updater is known to work; the tag when containerd dropped the record.
+        var helperImage = self.Image;
+        try { await client.Images.InspectImageAsync(self.Image, ct); }
+        catch (DockerApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound) { helperImage = self.Config?.Image ?? ""; }
+
+        // Daemon access exactly as the agent has it: the socket bind and the endpoint variable, nothing else of its
+        // configuration (the node token stays in the agent).
+        var binds = (self.HostConfig?.Binds ?? new List<string>()).Where(b => b.Contains("docker.sock")).ToList();
+        var env = (self.Config?.Env ?? new List<string>()).Where(e => e.StartsWith("MatCmsCloud__Docker__", StringComparison.Ordinal)).ToList();
+        if (!env.Any(e => e.StartsWith("MatCmsCloud__Docker__Endpoint=", StringComparison.Ordinal)))
+            env.Add("MatCmsCloud__Docker__Endpoint=unix:///var/run/docker.sock");
+
+        var name = (self.Name ?? "").TrimStart('/');
+        try
+        {
+            var created = await client.Containers.CreateContainerAsync(new CreateContainerParameters
+            {
+                Name = $"{name}-updater",
+                Image = helperImage,
+                Cmd = new List<string> { "dotnet", "MatCMS.Cloud.dll", "--update-container", self.ID },
+                Env = env,
+                Labels = new Dictionary<string, string> { [AgentUpdaterLabel] = "true" },
+                HostConfig = new HostConfig { Binds = binds, RestartPolicy = new RestartPolicy { Name = RestartPolicyKind.No } },
+                // Same networks: a daemon reached over TCP (a dind/remote endpoint) must be reachable for the helper too.
+                NetworkingConfig = new NetworkingConfig
+                {
+                    EndpointsConfig = (self.NetworkSettings?.Networks ?? new Dictionary<string, EndpointSettings>())
+                        .ToDictionary(kv => kv.Key, _ => new EndpointSettings())
+                },
+            }, ct);
+            await client.Containers.StartContainerAsync(created.ID, new ContainerStartParameters(), ct);
+            return new(true, "Agent-Update gestartet — der Agent wird in etwa einer Minute neu gestartet und meldet dann seine neue Version.");
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex, "Starting the agent update helper failed");
+            return new(false, $"Helfer konnte nicht gestartet werden: {ex.Message}");
+        }
+    }
+
     public sealed record ExportInfo(string Image, List<string> Env, string Name, string Volume, long Bytes);
 
     /// <summary>Writes a tar of the instance's <c>/app/appdata</c> to <paramref name="sink"/>. The container must be
@@ -408,7 +480,10 @@ public class DockerHostService : IDisposable
     /// <para>Note: a compose-managed container keeps its <c>com.docker.compose.*</c> labels (they live
     /// in the container config we copy), so <c>docker compose</c> still recognises it afterwards.</para>
     /// </summary>
-    public async Task<UpdateResult> UpdateContainerAsync(string containerId, CancellationToken ct = default)
+    /// <param name="mustStayUp">Optional run check: the new container must keep running (no restart) for this long,
+    /// otherwise it is rolled back like a failed start. Used for the node-agent — an agent that does not come up
+    /// takes its whole node out of reach, and it has no HTTP port to health-check.</param>
+    public async Task<UpdateResult> UpdateContainerAsync(string containerId, CancellationToken ct = default, TimeSpan? mustStayUp = null)
     {
         var client = Client;
         if (client is null) return new(false, "Kein Docker-Zugriff konfiguriert.");
@@ -427,12 +502,21 @@ public class DockerHostService : IDisposable
 
         try
         {
-            // 1) Pull. A no-op when the digest is already local, so this is safe to run repeatedly.
-            await client.Images.CreateImageAsync(
-                new ImagesCreateParameters { FromImage = repo, Tag = tag },
-                null,
-                new Progress<JSONMessage>(),
-                ct);
+            // 1) Pull. A no-op when the digest is already local, so this is safe to run repeatedly. A tag no registry
+            //    knows (a local build) cannot be pulled — then a DIFFERENT local image under that tag is the update,
+            //    exactly as for the cloud's own self-update.
+            try
+            {
+                await client.Images.CreateImageAsync(
+                    new ImagesCreateParameters { FromImage = repo, Tag = tag },
+                    null,
+                    new Progress<JSONMessage>(),
+                    ct);
+            }
+            catch (Exception pullEx) when (!ct.IsCancellationRequested)
+            {
+                _log.LogWarning(pullEx, "Pull of {Image} failed — trying the local image under that tag", image);
+            }
 
             var pulled = await client.Images.InspectImageAsync(image, ct);
             if (pulled.ID == insp.Image)
@@ -451,6 +535,8 @@ public class DockerHostService : IDisposable
                 var created = await client.Containers.CreateContainerAsync(RecreateParams(insp, name), ct);
                 newId = created.ID;
                 await client.Containers.StartContainerAsync(newId, new ContainerStartParameters(), ct);
+                if (mustStayUp is { } window && await StaysUpAsync(client, newId, window, ct) is { } why)
+                    throw new InvalidOperationException("Der neue Container lief nicht stabil: " + why);
             }
             catch (Exception ex)
             {
@@ -1312,6 +1398,21 @@ public class DockerHostService : IDisposable
     {
         var s = (id ?? "").Replace("sha256:", "", StringComparison.OrdinalIgnoreCase);
         return s.Length > 12 ? s[..12] : s;
+    }
+
+    /// <summary>Null = it kept running for the whole window; otherwise why not. Any restart counts — a crash-looping
+    /// container under "unless-stopped" never shows "exited", only restarts (learned from the cloud self-update).</summary>
+    private static async Task<string?> StaysUpAsync(DockerClient client, string id, TimeSpan window, CancellationToken ct)
+    {
+        var until = DateTime.UtcNow + window;
+        while (DateTime.UtcNow < until)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(1), ct);
+            var i = await client.Containers.InspectContainerAsync(id, ct);
+            if (i.RestartCount > 0 || i.State?.Restarting == true) return "er startet immer wieder neu.";
+            if (i.State?.Running != true) return $"er hat sich beendet (Exit-Code {i.State?.ExitCode}).";
+        }
+        return null;
     }
 
     private static async Task<bool> ImageExistsAsync(DockerClient client, string image, CancellationToken ct)

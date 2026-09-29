@@ -45,7 +45,16 @@
     <div class="card">
         <div class="kv"><div class="kv-label">@T["nodes.id"]</div><div class="kv-value mono">@n.PublicId</div></div>
         <div class="kv"><div class="kv-label">@T["nodes.host"]</div><div class="kv-value mono">@(n.HostName ?? "—")</div></div>
-        <div class="kv"><div class="kv-label">@T["nodes.agent"]</div><div class="kv-value mono">@(n.AgentVersion ?? "—")</div></div>
+        <div class="kv">
+            <div class="kv-label">@T["nodes.agent"]</div>
+            <div class="kv-value">
+                <span class="mono">@(n.AgentVersion ?? "—")</span>
+                @if (Model.AgentOutdated)
+                {
+                    <span class="badge badge-new">@T["nodes.agentOutdated", Model.CloudVersion]</span>
+                }
+            </div>
+        </div>
         <div class="kv"><div class="kv-label">@T["nodes.docker"]</div><div class="kv-value mono">@(n.DockerVersion ?? "—")</div></div>
         @if (!string.IsNullOrEmpty(n.DockerError))
         {
@@ -57,6 +66,12 @@
     </div>
 
     <div class="list-actions">
+        @if (on)
+        {
+            <form class="inline-form" method="post" asp-page-handler="UpdateAgent" asp-route-id="@n.Id" onsubmit="return confirm('@T["nodes.updateAgentConfirm"]');">
+                <button type="submit" class="btn @(Model.AgentOutdated ? "" : "btn-ghost")">@T["nodes.updateAgent"]</button>
+            </form>
+        }
         <form class="inline-form" method="post" asp-page-handler="Rotate" asp-route-id="@n.Id" onsubmit="return confirm('@T["nodes.rotateConfirm"]');">
             <button type="submit" class="btn btn-ghost">@T["nodes.rotate"]</button>
         </form>

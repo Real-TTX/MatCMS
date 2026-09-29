@@ -66,7 +66,13 @@
                         }
                     </td>
                     <td class="mono muted">@(n.HostName ?? "—")</td>
-                    <td class="mono muted">@(n.AgentVersion ?? "—")</td>
+                    <td class="mono muted">
+                        @(n.AgentVersion ?? "—")
+                        @if (MatCMS.Cloud.Services.Nodes.NodeService.AgentOutdated(n, Model.CloudVersion))
+                        {
+                            <span class="badge badge-new">@T["nodes.outdated"]</span>
+                        }
+                    </td>
                     <td class="mono muted">@(n.DockerVersion ?? "—")</td>
                     <td class="mono">@(Model.Counts.TryGetValue(n.Id, out var c) ? c : 0)</td>
                     <td class="mono muted">@(n.LastSeenAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss") ?? "—")</td>

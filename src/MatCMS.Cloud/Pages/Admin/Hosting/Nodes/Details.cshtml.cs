@@ -19,8 +19,13 @@ public class DetailsModel : PageModel
     private readonly AppDbContext _db;
     private readonly NodeService _nodes;
     private readonly ProxyService _proxy;
+    private readonly VersionService _version;
 
-    public DetailsModel(AppDbContext db, NodeService nodes, ProxyService proxy) { _db = db; _nodes = nodes; _proxy = proxy; }
+    public DetailsModel(AppDbContext db, NodeService nodes, ProxyService proxy, VersionService version)
+    { _db = db; _nodes = nodes; _proxy = proxy; _version = version; }
+
+    public string CloudVersion => _version.Current;
+    public bool AgentOutdated => NodeService.AgentOutdated(Item, CloudVersion);
 
     public Node Item { get; private set; } = null!;
     public string? Command { get; private set; }
@@ -81,6 +86,15 @@ public class DetailsModel : PageModel
         var r = await _proxy.TestAsync(n, HttpContext.RequestAborted);
         TempData[r.Ok ? "Flash" : "FlashError"] = "Gespeichert. " + r.Message;
         return Back(id, "proxy");
+    }
+
+    public async Task<IActionResult> OnPostUpdateAgentAsync(int id)
+    {
+        var n = await _db.Nodes.FindAsync(id);
+        if (n is null) return RedirectToPage("Index");
+        var r = await _nodes.UpdateAgentAsync(n, HttpContext.RequestAborted);
+        TempData[r.Ok ? "Flash" : "FlashError"] = r.Message;
+        return Back(id, "overview");
     }
 
     public async Task<IActionResult> OnPostRotateAsync(int id)

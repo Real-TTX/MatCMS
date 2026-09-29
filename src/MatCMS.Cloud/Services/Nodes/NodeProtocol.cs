@@ -79,6 +79,8 @@ public static class NodeJobKinds
     public const string Retire = "container.retire";
     public const string TeardownInfo = "container.teardownInfo";
     public const string Remove = "container.remove";
+    /// <summary>The agent updates ITSELF (through a helper container, see DockerHostService.SpawnContainerUpdateHelperAsync).</summary>
+    public const string AgentUpdate = "agent.update";
 }
 
 /// <summary>Payload of the container.* jobs.</summary>

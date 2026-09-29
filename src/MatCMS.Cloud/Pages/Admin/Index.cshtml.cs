@@ -26,12 +26,13 @@ public class IndexModel : PageModel
     private readonly CloudContext _cloud;
     private readonly EmailService _mail;
     private readonly IMemoryCache _cache;
+    private readonly Localizer _t;
 
     public IndexModel(AppDbContext db, InstanceService instances, ReleaseWatcher releases, DockerHostService docker, OperatorScope scope,
-        VersionService version, CloudContext cloud, EmailService mail, IMemoryCache cache)
+        VersionService version, CloudContext cloud, EmailService mail, IMemoryCache cache, Localizer t)
     {
         _db = db; _instances = instances; _releases = releases; _docker = docker; _scope = scope;
-        _version = version; _cloud = cloud; _mail = mail; _cache = cache;
+        _version = version; _cloud = cloud; _mail = mail; _cache = cache; _t = t;
     }
 
     public bool IsAdmin => _scope.IsAdmin;
@@ -158,44 +159,47 @@ public class IndexModel : PageModel
         BuildAttention(lastBackup, moves);
     }
 
+    // Built here (they need the data), WORDED through the localizer — the admin also runs in English.
     private void BuildAttention(Dictionary<int, DateTime> lastBackup, List<InstanceMigration> moves)
     {
         string Inst(Instance i, string tab = "overview") => Url.Page("/Admin/Instances/Details", new { id = i.Id, tab })!;
         var a = AttentionItems;
         var now = DateTime.UtcNow;
+        string L(string key, params object[] args) => args.Length == 0 ? _t["dashboard.attn." + key] : _t["dashboard.attn." + key, args];
+        void Add(string level, string icon, string title, string key, string url, params object[] args) => a.Add(new(level, icon, title, L(key, args), url));
 
         foreach (var m in moves)
         {
             var i = Instances.FirstOrDefault(x => x.Id == m.InstanceId);
             if (i is null) continue;
-            a.Add(m.State == "running"
-                ? new("info", "🚚", i.Name, $"Umzug läuft: {m.FromName} → {m.ToName} ({m.Step})", Inst(i, "hosting"))
-                : new("err", "🚚", i.Name, $"Umzug {(m.State == "rolled-back" ? "zurückgerollt" : "fehlgeschlagen")}: {m.FromName} → {m.ToName}", Inst(i, "hosting")));
+            if (m.State == "running") Add("info", "🚚", i.Name, "moveRunning", Inst(i, "hosting"), m.FromName, m.ToName, m.Step);
+            else Add("err", "🚚", i.Name, m.State == "rolled-back" ? "moveRolledBack" : "moveFailed", Inst(i, "hosting"), m.FromName, m.ToName);
         }
         foreach (var i in Instances)
         {
-            if (IsOffline(i)) a.Add(new("err", "🔴", i.Name, $"offline seit {i.LastHeartbeatUtc:dd.MM. HH:mm} UTC", Inst(i)));
-            else if (IsStopped(i)) a.Add(new("warn", "⏸️", i.Name, $"Container gestoppt ({i.ContainerState})", Inst(i, "hosting")));
-            if (HasSyncError(i)) a.Add(new("err", "⚠️", i.Name, "Sync-Fehler: " + i.LastSyncError, Inst(i, "config")));
-            if (!string.IsNullOrEmpty(i.ProxyError)) a.Add(new("err", "🌐", i.Name, "Domain/Route: " + i.ProxyError, Inst(i, "hosting")));
-            if (InstanceService.IsOutdatedProtocol(i)) a.Add(new("warn", "🧓", i.Name, "veraltetes Protokoll — Instanz aktualisieren", Inst(i)));
+            if (IsOffline(i)) Add("err", "🔴", i.Name, "offline", Inst(i), $"{i.LastHeartbeatUtc:dd.MM. HH:mm} UTC");
+            else if (IsStopped(i)) Add("warn", "⏸️", i.Name, "stopped", Inst(i, "hosting"), i.ContainerState ?? "");
+            if (HasSyncError(i)) Add("err", "⚠️", i.Name, "syncError", Inst(i, "config"), i.LastSyncError!);
+            if (!string.IsNullOrEmpty(i.ProxyError)) Add("err", "🌐", i.Name, "proxyError", Inst(i, "hosting"), i.ProxyError);
+            if (InstanceService.IsOutdatedProtocol(i)) Add("warn", "🧓", i.Name, "outdated", Inst(i));
             if (lastBackup.TryGetValue(i.Id, out var lb) && now - lb > StaleBackup)
-                a.Add(new("warn", "💾", i.Name, $"letztes Cloud-Backup vor {(int)(now - lb).TotalDays} Tagen", Inst(i, "backup")));
-            if (HasUpdate(i)) a.Add(new("info", "⬆️", i.Name, $"Update auf {LatestVersion} verfügbar (läuft {i.Version ?? "?"})", Inst(i, HostingActionsService.CanAct(i) ? "hosting" : "overview")));
+                Add("warn", "💾", i.Name, "backupStale", Inst(i, "backup"), (int)(now - lb).TotalDays);
+            if (HasUpdate(i)) Add("info", "⬆️", i.Name, "update", Inst(i, HostingActionsService.CanAct(i) ? "hosting" : "overview"), LatestVersion ?? "", i.Version ?? "?");
         }
         if (_scope.IsAdmin)
         {
             foreach (var n in Nodes)
             {
                 var url = Url.Page("/Admin/Hosting/Nodes/Details", new { id = n.Id })!;
-                if (n.LastSeenAt is not null && !n.IsOnline(now)) a.Add(new("err", "🖧", "Node " + n.Name, $"nicht verbunden seit {n.LastSeenAt:dd.MM. HH:mm} UTC", url));
-                else if (!string.IsNullOrEmpty(n.DockerError)) a.Add(new("err", "🖧", "Node " + n.Name, "Docker: " + n.DockerError, url));
-                if (Services.Nodes.NodeService.AgentOutdated(n, CloudVersion)) a.Add(new("info", "🖧", "Node " + n.Name, $"Agent {n.AgentVersion} ≠ Cloud {CloudVersion} — Agent aktualisieren", url));
+                var title = L("node", n.Name);
+                if (n.LastSeenAt is not null && !n.IsOnline(now)) Add("err", "🖧", title, "nodeOffline", url, $"{n.LastSeenAt:dd.MM. HH:mm} UTC");
+                else if (!string.IsNullOrEmpty(n.DockerError)) Add("err", "🖧", title, "nodeDocker", url, n.DockerError);
+                if (Services.Nodes.NodeService.AgentOutdated(n, CloudVersion)) Add("info", "🖧", title, "agentOutdated", url, n.AgentVersion ?? "", CloudVersion);
             }
-            if (CloudUpdateAvailable) a.Add(new("info", "☁️", "Cloud", $"Update auf {CloudLatest} verfügbar", Url.Page("/Admin/Hosting/Index")!));
-            if (!MailConfigured) a.Add(new("warn", "✉️", "Benachrichtigungen", "Kein SMTP eingerichtet — es werden keine Mails verschickt", Url.Page("/Admin/Settings/Index", new { tab = "smtp" })!));
-            if (DockerConfigured && !DockerReachable) a.Add(new("err", "🐳", "Docker", "Der Docker-Daemon dieser Cloud antwortet nicht", Url.Page("/Admin/Settings/Index", new { tab = "docker" })!));
-            if (!string.IsNullOrWhiteSpace(ReleaseError)) a.Add(new("warn", "📦", "Release-Prüfung", ReleaseError!, Url.Page("/Admin/Index")!));
+            if (CloudUpdateAvailable) Add("info", "☁️", L("cloud.title"), "cloudUpdate", Url.Page("/Admin/Hosting/Index")!, CloudLatest ?? "");
+            if (!MailConfigured) Add("warn", "✉️", L("smtp.title"), "smtp", Url.Page("/Admin/Settings/Index", new { tab = "smtp" })!);
+            if (DockerConfigured && !DockerReachable) Add("err", "🐳", "Docker", "docker", Url.Page("/Admin/Settings/Index", new { tab = "docker" })!);
+            if (!string.IsNullOrWhiteSpace(ReleaseError)) a.Add(new("warn", "📦", L("release.title"), ReleaseError!, Url.Page("/Admin/Index")!));
         }
         // Errors first, then warnings, then information; within a level, by name.
         AttentionItems = a.OrderBy(x => x.Level switch { "err" => 0, "warn" => 1, _ => 2 }).ThenBy(x => x.Title).ToList();

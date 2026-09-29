@@ -40,6 +40,7 @@ public class BlockRegistry
         ["image"] = "media", ["gallery"] = "media", ["slider"] = "media", ["logostrip"] = "media",
         ["hero"] = "design", ["cta"] = "design", ["cards"] = "design", ["card"] = "design",
         ["herocta"] = "design", ["timeline"] = "design", ["step"] = "design", ["countup"] = "design",
+        ["pricing"] = "design", ["plan"] = "design", ["comparison"] = "design",
         ["features"] = "design", ["feature"] = "design", ["servicegrid"] = "design",
         ["service"] = "design", ["imagetext"] = "design", ["posts"] = "design",
         ["references"] = "design", ["reference"] = "design",
@@ -112,6 +113,7 @@ public class BlockRegistry
     private const string SvgLogoStrip = @"<rect x=""3"" y=""9"" width=""5"" height=""6"" rx=""1""/><rect x=""10"" y=""9"" width=""5"" height=""6"" rx=""1""/><rect x=""17"" y=""9"" width=""4"" height=""6"" rx=""1""/>";
     private const string SvgReferences = @"<rect x=""3"" y=""4"" width=""8"" height=""7"" rx=""1""/><rect x=""3"" y=""14"" width=""8"" height=""6"" rx=""1""/><path d=""M14 6h7""/><path d=""M14 10h5""/><path d=""M14 16h7""/><path d=""M14 20h5""/>";
     private const string SvgForm = @"<rect x=""4"" y=""3"" width=""16"" height=""18"" rx=""2""/><path d=""M8 8h8""/><path d=""M8 12h8""/><path d=""M8 16h4""/>";
+
 
     // Name / Description / field Label / option Label / ItemLabel hold LOCALIZATION KEYS
     // (not display text). They are resolved at render time via the Localizer (@T[...]); the
@@ -516,6 +518,102 @@ public class BlockRegistry
                 new BlockField { Id = "icon", Label = "block.card.f.icon", Type = FieldType.Text, Help = "block.card.f.icon.help" },
                 new BlockField { Id = "title", Label = "block.f.title", Type = FieldType.Text },
                 new BlockField { Id = "text", Label = "block.f.text", Type = FieldType.Textarea },
+            ]
+        },
+        new BlockDefinition
+        {
+            Type = "pricing",
+            Name = "block.pricing.name",
+            Description = "block.pricing.desc",
+            Svg = SvgColumns,
+            Partial = "Blocks/_Pricing",
+            AllowedChildren = ["plan"],
+            Fields =
+            [
+                new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Textarea,
+                    Placeholder = "Transparente Website *Pakete*", Help = "block.f.gradientHeading.help" },
+                new BlockField { Id = "intro", Label = "block.f.intro", Type = FieldType.Textarea },
+                new BlockField { Id = "colors", Label = "block.f.colors", Type = FieldType.Select, Default = "accent",
+                    Options = [ new("accent", "block.opt.colors.accent"), new("vivid", "block.opt.colors.vivid") ] },
+                new BlockField { Id = "extrasHeading", Label = "block.pricing.f.extrasHeading", Type = FieldType.Text, Placeholder = "Zubuchbare Leistungen" },
+                new BlockField { Id = "extrasIntro", Label = "block.pricing.f.extrasIntro", Type = FieldType.Textarea },
+                new BlockField { Id = "extras", Label = "block.pricing.f.extras", Type = FieldType.Textarea, Help = "block.f.onePerLine.help" },
+            ]
+        },
+        new BlockDefinition
+        {
+            Type = "plan",
+            Name = "block.plan.name",
+            Description = "block.plan.desc",
+            Svg = SvgText,
+            Partial = "Blocks/_Plan",
+            ChildOnly = true,
+            Fields =
+            [
+                new BlockField { Id = "name", Label = "block.plan.f.name", Type = FieldType.Text, Placeholder = "Starter" },
+                new BlockField { Id = "desc", Label = "block.f.text", Type = FieldType.Textarea },
+                new BlockField { Id = "priceOld", Label = "block.herocta.f.priceOld", Type = FieldType.Text, Placeholder = "1.200 €" },
+                new BlockField { Id = "price", Label = "block.plan.f.price", Type = FieldType.Text, Placeholder = "950 €" },
+                new BlockField { Id = "priceNote", Label = "block.plan.f.priceNote", Type = FieldType.Text, Placeholder = "einmalig" },
+                new BlockField { Id = "badge", Label = "block.plan.f.badge", Type = FieldType.Text, Placeholder = "Jahresstart-Special" },
+                new BlockField { Id = "saving", Label = "block.plan.f.saving", Type = FieldType.Text, Placeholder = "250 € Preisvorteil" },
+                new BlockField { Id = "features", Label = "block.plan.f.features", Type = FieldType.Textarea, Help = "block.f.onePerLine.help" },
+                new BlockField { Id = "buttonText", Label = "block.f.buttonText", Type = FieldType.Text },
+                new BlockField { Id = "buttonUrl", Label = "block.f.buttonUrl", Type = FieldType.Url, Placeholder = "/kontakt" },
+                // Default "no": the card that is recommended is a decision, not something every new plan claims.
+                new BlockField { Id = "highlight", Label = "block.plan.f.highlight", Type = FieldType.Select, Default = "no",
+                    Options = [ new("no", "block.opt.yesno.no"), new("yes", "block.opt.yesno.yes") ] },
+                new BlockField { Id = "highlightLabel", Label = "block.plan.f.highlightLabel", Type = FieldType.Text,
+                    Placeholder = "Beliebt", ShowWhenField = "highlight", ShowWhenValue = "yes" },
+            ]
+        },
+        new BlockDefinition
+        {
+            Type = "comparison",
+            Name = "block.comparison.name",
+            Description = "block.comparison.desc",
+            Svg = SvgColumns,
+            Partial = "Blocks/_Comparison",
+            // Two fixed sides rather than a container with two children: the block IS the contrast, and a
+            // third column or a missing one would not be a comparison any more. The sides share their field
+            // names under a prefix (pro*/con*), so the partial renders both with one piece of markup.
+            Fields =
+            [
+                new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Textarea,
+                    Placeholder = "Warum *wir* perfekt für Gründer sind", Help = "block.f.gradientHeading.help" },
+                new BlockField { Id = "intro", Label = "block.f.intro", Type = FieldType.Textarea },
+                new BlockField { Id = "colors", Label = "block.f.colors", Type = FieldType.Select, Default = "accent",
+                    Options = [ new("accent", "block.opt.colors.accent"), new("vivid", "block.opt.colors.vivid") ] },
+                new BlockField { Id = "proBadge", Label = "block.comparison.f.proBadge", Type = FieldType.Text },
+                new BlockField { Id = "proTitle", Label = "block.comparison.f.proTitle", Type = FieldType.Text },
+                new BlockField { Id = "proText", Label = "block.comparison.f.proText", Type = FieldType.Textarea },
+                new BlockField
+                {
+                    Id = "proItems", Label = "block.comparison.f.proItems", Type = FieldType.List, ItemLabel = "block.comparison.item",
+                    ItemFields =
+                    [
+                        new BlockField { Id = "title", Label = "block.f.title", Type = FieldType.Text },
+                        new BlockField { Id = "text", Label = "block.f.text", Type = FieldType.Textarea },
+                    ]
+                },
+                new BlockField { Id = "proTotalLabel", Label = "block.comparison.f.proTotalLabel", Type = FieldType.Text },
+                new BlockField { Id = "proTotalValue", Label = "block.comparison.f.proTotalValue", Type = FieldType.Text },
+                new BlockField { Id = "proNote", Label = "block.comparison.f.proNote", Type = FieldType.Text },
+                new BlockField { Id = "conBadge", Label = "block.comparison.f.conBadge", Type = FieldType.Text },
+                new BlockField { Id = "conTitle", Label = "block.comparison.f.conTitle", Type = FieldType.Text },
+                new BlockField { Id = "conText", Label = "block.comparison.f.conText", Type = FieldType.Textarea },
+                new BlockField
+                {
+                    Id = "conItems", Label = "block.comparison.f.conItems", Type = FieldType.List, ItemLabel = "block.comparison.item",
+                    ItemFields =
+                    [
+                        new BlockField { Id = "title", Label = "block.f.title", Type = FieldType.Text },
+                        new BlockField { Id = "text", Label = "block.f.text", Type = FieldType.Textarea },
+                    ]
+                },
+                new BlockField { Id = "conTotalLabel", Label = "block.comparison.f.conTotalLabel", Type = FieldType.Text },
+                new BlockField { Id = "conTotalValue", Label = "block.comparison.f.conTotalValue", Type = FieldType.Text },
+                new BlockField { Id = "conNote", Label = "block.comparison.f.conNote", Type = FieldType.Text },
             ]
         },
         new BlockDefinition

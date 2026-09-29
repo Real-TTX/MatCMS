@@ -1,0 +1,66 @@
+@model MatCMS.Content.BlockData
+@{
+    var heading = Model.Str("heading");
+    var intro = Model.Str("intro");
+    var colors = Model.StrOr("colors", "accent") == "vivid" ? "vivid" : "accent";
+}
+<section class="section cmp-block pr--@colors">
+    <div class="container">
+        @if (!string.IsNullOrWhiteSpace(heading) || !string.IsNullOrWhiteSpace(intro))
+        {
+            <div class="section__intro">
+                @if (!string.IsNullOrWhiteSpace(heading)) { <h2 class="pr-title">@Html.Raw(GradientHeading(heading))</h2> }
+                @if (!string.IsNullOrWhiteSpace(intro)) { <p>@intro</p> }
+            </div>
+        }
+        <div class="cmp-sides">
+            @foreach (var side in new[] { "pro", "con" })
+            {
+                var badge = Model.Str(side + "Badge");
+                var title = Model.Str(side + "Title");
+                var text = Model.Str(side + "Text");
+                var items = Model.List(side + "Items");
+                var totalLabel = Model.Str(side + "TotalLabel");
+                var totalValue = Model.Str(side + "TotalValue");
+                var note = Model.Str(side + "Note");
+                <div class="cmp-side cmp--@side">
+                    @if (!string.IsNullOrWhiteSpace(badge)) { <span class="cmp-badge">@badge</span> }
+                    @if (!string.IsNullOrWhiteSpace(title))
+                    {
+                        <h3 class="cmp-title"><i class="cmp-mark" aria-hidden="true"></i>@title</h3>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(text)) { <p class="cmp-text">@text</p> }
+                    @if (items.Count > 0)
+                    {
+                        <ul class="cmp-items">
+                            @foreach (var it in items)
+                            {
+                                <li>
+                                    <i class="cmp-mark" aria-hidden="true"></i>
+                                    <div>
+                                        @if (!string.IsNullOrWhiteSpace(it.Str("title"))) { <strong>@it.Str("title")</strong> }
+                                        @if (!string.IsNullOrWhiteSpace(it.Str("text"))) { <span>@it.Str("text")</span> }
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(totalLabel) || !string.IsNullOrWhiteSpace(totalValue))
+                    {
+                        <div class="cmp-total"><span>@totalLabel</span><strong>@totalValue</strong></div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(note)) { <p class="cmp-note">@note</p> }
+                </div>
+            }
+        </div>
+    </div>
+</section>
+@functions {
+    // HTML-encodes the heading and turns *…* into the gradient span — the herocta convention.
+    static string GradientHeading(string s)
+    {
+        var enc = System.Net.WebUtility.HtmlEncode(s);
+        enc = System.Text.RegularExpressions.Regex.Replace(enc, "\\*(.+?)\\*", "<span class=\"hc-grad\">$1</span>");
+        return enc.Replace("\r\n", "\n").Replace("\n", "<br>");
+    }
+}

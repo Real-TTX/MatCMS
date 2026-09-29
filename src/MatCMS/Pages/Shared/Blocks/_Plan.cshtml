@@ -1,0 +1,50 @@
+@model MatCMS.Content.BlockData
+@{
+    var name = Model.Str("name");
+    var desc = Model.Str("desc");
+    var priceOld = Model.Str("priceOld");
+    var price = Model.Str("price");
+    var priceNote = Model.Str("priceNote");
+    var badge = Model.Str("badge");
+    var saving = Model.Str("saving");
+    var features = (Model.Str("features") ?? "").Replace("\r\n", "\n").Split('\n')
+        .Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
+    var buttonText = Model.Str("buttonText");
+    var buttonUrl = Model.StrOr("buttonUrl", "#");
+    var highlight = Model.Str("highlight") == "yes";
+    var highlightLabel = Model.Str("highlightLabel");
+}
+@* Rendered by the pricing block for each of its plans; the colour variables come from there. *@
+<div class="pr-plan@(highlight ? " is-featured" : "")">
+    @if (highlight && !string.IsNullOrWhiteSpace(highlightLabel)) { <span class="pr-flag">@highlightLabel</span> }
+    <div class="pr-head">
+        @if (!string.IsNullOrWhiteSpace(name)) { <h3 class="pr-name">@name</h3> }
+        @if (!string.IsNullOrWhiteSpace(desc)) { <p class="pr-desc">@desc</p> }
+    </div>
+    @if (!string.IsNullOrWhiteSpace(price) || !string.IsNullOrWhiteSpace(priceOld))
+    {
+        <div class="pr-price">
+            @if (!string.IsNullOrWhiteSpace(priceOld)) { <s class="pr-old">@priceOld</s> }
+            @if (!string.IsNullOrWhiteSpace(price)) { <span class="pr-new">@price</span> }
+            @if (!string.IsNullOrWhiteSpace(priceNote)) { <span class="pr-note">@priceNote</span> }
+        </div>
+    }
+    @if (!string.IsNullOrWhiteSpace(badge) || !string.IsNullOrWhiteSpace(saving))
+    {
+        <div class="pr-offer">
+            @if (!string.IsNullOrWhiteSpace(badge)) { <span class="pr-badge">@badge</span> }
+            @if (!string.IsNullOrWhiteSpace(saving)) { <span class="pr-saving">@saving</span> }
+        </div>
+    }
+    @if (features.Count > 0)
+    {
+        <ul class="pr-features">
+            @foreach (var f in features) { <li><i class="pr-check" aria-hidden="true"></i>@f</li> }
+        </ul>
+    }
+    @if (!string.IsNullOrWhiteSpace(buttonText))
+    {
+        <span class="pr-spacer"></span>
+        <a class="pr-btn" href="@buttonUrl">@buttonText</a>
+    }
+</div>

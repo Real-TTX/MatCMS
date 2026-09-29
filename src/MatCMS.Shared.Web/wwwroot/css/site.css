@@ -992,6 +992,76 @@ html.mat-langm-lock { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) { .tl-step.is-in .tl-seg-fill, .tl-rail-fill { transition: none; } }
 
 /* =========================================================================
+   Blocks: pricing (+ plan) and comparison. Share .pr--accent/.pr--vivid and the *Wort* gradient
+   (.hc-grad) with herocta, so a page built from the three reads as one design.
+   ========================================================================= */
+.pr--vivid { --hcg: linear-gradient(92deg,#3b6fff,#8b5cf6 60%,#c026d3); --hcg-solid:#7c5cff; }
+.pr--accent { --hcg: linear-gradient(92deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #ffffff)); --hcg-solid: var(--accent); }
+.pr-title { font-family: var(--font-head), sans-serif; font-weight: 800; letter-spacing: -0.02em; font-size: clamp(30px, 4.2vw, 50px); line-height: 1.08; }
+/* A check drawn in CSS: no icon font on the public site, and it takes the block's colour. */
+.pr-check { display: inline-block; flex: none; width: 7px; height: 13px; margin: 2px 12px 0 5px; border: solid var(--hcg-solid); border-width: 0 2.5px 2.5px 0; transform: rotate(45deg); }
+.pr-plans { display: grid; grid-template-columns: repeat(var(--pr-cols, 3), minmax(0, 1fr)); gap: 30px; align-items: stretch; }
+.pr-plan { position: relative; display: flex; flex-direction: column; background: #fff; border: 1px solid var(--line, #e6e6e6); border-radius: 20px; padding: 34px 32px; box-shadow: 0 10px 30px color-mix(in srgb, var(--ink,#14151a) 6%, transparent); }
+/* The recommended plan: lifted, framed in the block colour, with a flag on its top edge. */
+.pr-plan.is-featured { border: 2px solid var(--hcg-solid); transform: translateY(-14px); box-shadow: 0 24px 60px color-mix(in srgb, var(--hcg-solid) 22%, transparent); }
+.pr-flag { position: absolute; top: 0; left: 50%; transform: translate(-50%, -50%); padding: 6px 16px; border-radius: 999px; background: var(--hcg); color: #fff; font-size: 13px; font-weight: 700; letter-spacing: .02em; white-space: nowrap; }
+.pr-head { text-align: center; }
+.pr-name { font-family: var(--font-head), sans-serif; font-size: 22px; font-weight: 700; margin: 0 0 8px; }
+.pr-desc { color: var(--muted, #55606e); font-size: 15px; line-height: 1.55; margin: 0; }
+.pr-price { display: flex; flex-direction: column; align-items: center; margin: 26px 0 6px; line-height: 1; }
+.pr-old { font-family: var(--font-head), sans-serif; font-weight: 800; font-size: 30px; color: #a2a9b4; text-decoration: none; background: linear-gradient(transparent 46%, #e5484d 46%, #e5484d 58%, transparent 58%); padding: 0 4px; margin-bottom: 8px; }
+.pr-new { font-family: var(--font-head), sans-serif; font-weight: 800; font-size: clamp(40px, 4.4vw, 54px); letter-spacing: -0.02em; background: var(--hcg); -webkit-background-clip: text; background-clip: text; color: transparent; padding-bottom: 4px; }
+.pr-note { margin-top: 10px; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--hcg-solid); }
+.pr-offer { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 16px; text-align: center; }
+.pr-badge { padding: 5px 12px; border-radius: 999px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: #0f7a55; background: #e3f7ee; }
+.pr-saving { font-weight: 600; color: #0f7a55; font-size: 15px; }
+.pr-features { list-style: none; margin: 28px 0 0; padding: 0; display: grid; gap: 13px; }
+.pr-features li { display: flex; align-items: flex-start; color: var(--ink, #1a1a1a); font-size: 15px; line-height: 1.45; }
+/* The spacer grows, pinning every button to the card's foot so the buttons line up however long the lists are. */
+.pr-spacer { flex: 1 0 30px; }
+.pr-btn { display: block; text-align: center; padding: 14px 20px; border-radius: 12px; font-weight: 700; text-decoration: none; color: var(--ink, #1a1a1a); background: color-mix(in srgb, var(--ink,#14151a) 7%, #fff); transition: transform .15s ease, box-shadow .15s ease; }
+.pr-plan.is-featured .pr-btn { color: #fff; background: var(--hcg); box-shadow: 0 12px 30px color-mix(in srgb, var(--hcg-solid) 35%, transparent); }
+.pr-btn:hover { transform: translateY(-2px); }
+.pr-extras { margin-top: 64px; padding: 44px 40px; border: 1px solid var(--line, #e6e6e6); border-radius: 24px; background: color-mix(in srgb, var(--hcg-solid) 4%, #fff); text-align: center; }
+.pr-extras h3 { font-family: var(--font-head), sans-serif; font-size: 26px; margin: 0 0 8px; }
+.pr-extras-intro { color: var(--muted, #55606e); margin: 0 0 26px; }
+.pr-extras-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; text-align: left; }
+.pr-extras-list li { display: flex; align-items: center; padding: 14px 18px; border-radius: 12px; background: #fff; border: 1px solid var(--line, #e6e6e6); font-weight: 600; }
+.pr-extras-list .pr-check { margin-top: -4px; }
+@media (max-width: 900px) {
+    .pr-plans { grid-template-columns: 1fr; max-width: 460px; margin: 0 auto; }
+    .pr-plan.is-featured { transform: none; margin-top: 12px; }
+    .pr-extras-list { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 560px) { .pr-extras { padding: 30px 20px; } .pr-extras-list { grid-template-columns: 1fr; } }
+
+/* Comparison: the "pro" side in green with checks and a frame in the block colour, the "con" side in red with crosses. */
+.cmp-sides { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; align-items: start; }
+.cmp-side { background: #fff; border: 1px solid var(--line, #e6e6e6); border-radius: 22px; padding: 32px; }
+.cmp--pro { border: 2px solid color-mix(in srgb, var(--hcg-solid) 55%, transparent); box-shadow: 0 20px 50px color-mix(in srgb, var(--hcg-solid) 14%, transparent); }
+.cmp-badge { display: inline-block; padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; margin-bottom: 14px; background: #eef0f3; color: #4b5563; }
+.cmp--pro .cmp-badge { background: var(--hcg); color: #fff; }
+.cmp-title { display: flex; align-items: flex-start; font-family: var(--font-head), sans-serif; font-size: 22px; line-height: 1.3; margin: 0 0 10px; }
+.cmp-text { color: var(--muted, #55606e); margin: 0 0 22px; line-height: 1.6; }
+.cmp-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.cmp-items li { display: flex; align-items: flex-start; padding: 16px 18px; border-radius: 14px; border: 1px solid; line-height: 1.5; }
+.cmp-items strong { display: block; margin-bottom: 2px; }
+.cmp-items span { color: var(--muted, #55606e); font-size: 15px; }
+.cmp--pro .cmp-items li { background: #effaf4; border-color: #bfe8d2; }
+.cmp--con .cmp-items li { background: #fdf1f2; border-color: #f4c6ca; }
+/* The mark: a check on the pro side, a cross on the con side — both pure CSS. */
+.cmp-mark { position: relative; flex: none; width: 18px; height: 18px; margin: 3px 14px 0 0; }
+.cmp--pro .cmp-mark::before { content: ""; position: absolute; left: 5px; top: 0; width: 6px; height: 12px; border: solid #16a34a; border-width: 0 2.5px 2.5px 0; transform: rotate(45deg); }
+.cmp--con .cmp-mark::before, .cmp--con .cmp-mark::after { content: ""; position: absolute; left: 8px; top: 1px; width: 2.5px; height: 16px; border-radius: 2px; background: #e5484d; transform: rotate(45deg); }
+.cmp--con .cmp-mark::after { transform: rotate(-45deg); }
+.cmp-total { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 22px; padding: 16px 20px; border-radius: 14px; font-size: 14px; }
+.cmp-total strong { font-size: 20px; white-space: nowrap; }
+.cmp--pro .cmp-total { background: #effaf4; color: #0f7a55; }
+.cmp--con .cmp-total { background: #fdf1f2; color: #b4232a; }
+.cmp-note { margin: 12px 0 0; text-align: center; font-size: 13px; color: var(--muted, #55606e); }
+@media (max-width: 860px) { .cmp-sides { grid-template-columns: 1fr; } .cmp-side { padding: 24px; } }
+
+/* =========================================================================
    Hero: Cursor-Pfeil (gestrichelt), erscheint in Button-Nähe und folgt der Maus.
    ========================================================================= */
 .hc-cursor { position: absolute; inset: 0; z-index: 5; width: 100%; height: 100%; pointer-events: none; opacity: 0; transition: opacity .16s ease; overflow: visible; filter: drop-shadow(0 1px 1px rgba(255,255,255,.7)); }

@@ -318,8 +318,8 @@ Content-Ops.
 Blöcke, die eine MatCMS-Site kennt, mit ihren Feld-IDs. Spalte **KI-setzbar** = das Feld überlebt eine
 `create_page`/`update_page_blocks`-Content-Op (nur Text-/RichText-Felder). Bild-/Auswahl-/Link-Felder
 setzt man über den Editor oder Backup/Restore. Container-Blöcke (`section`, `columns`, `cards`,
-`accordion`, `leistungen`, `servicegrid`, `timeline`, `references`, `logostrip`, `gallery`) enthalten
-Kind-Blöcke (`card`, `column`, `faq`, `step`, `service`, `leistung`, `reference` …).
+`accordion`, `features`, `servicegrid`, `timeline`, `pricing`, `references`) enthalten
+Kind-Blöcke (`card`, `column`, `faq`, `step`, `service`, `feature`, `plan`, `reference` …).
 
 > ¹ „KI-setzbar" = über den Content-Op-Kanal setzbar (Textfelder). Der Katalog wird aus
 > `src/MatCMS/Content/BlockRegistry.cs` erzeugt (`tools/gen-api-blocks.js`) und kann bei einer
@@ -476,7 +476,7 @@ Kind-Blöcke (`card`, `column`, `faq`, `step`, `service`, `leistung`, `reference
 | `alt` | Text | ✅ | Alternativtext |
 | `url` | Url | — | Link (optional) |
 
-### `leistungen` — Leistungen (Container)
+### `features` — Leistungen (Container)
 
 | Feld | Typ | KI-setzbar¹ | Bezeichnung |
 |---|---|:--:|---|
@@ -484,7 +484,7 @@ Kind-Blöcke (`card`, `column`, `faq`, `step`, `service`, `leistung`, `reference
 | `intro` | Textarea | ✅ | Einleitung |
 | `columns` | Select | — | Spaltenanzahl |
 
-### `leistung` — Leistung
+### `feature` — Leistung
 
 | Feld | Typ | KI-setzbar¹ | Bezeichnung |
 |---|---|:--:|---|
@@ -525,6 +525,60 @@ Kind-Blöcke (`card`, `column`, `faq`, `step`, `service`, `leistung`, `reference
 | `title` | Text | ✅ | Titel |
 | `text` | Textarea | ✅ | Text |
 
+### `pricing` — Preistabelle
+
+| Feld | Typ | KI-setzbar¹ | Bezeichnung |
+|---|---|:--:|---|
+| `heading` | Textarea | ✅ | Überschrift |
+| `intro` | Textarea | ✅ | Einleitung |
+| `colors` | Select | — | Farben |
+| `extrasHeading` | Text | ✅ | Überschrift Zusatzleistungen |
+| `extrasIntro` | Textarea | ✅ | Text Zusatzleistungen |
+| `extras` | Textarea | ✅ | Zusatzleistungen |
+
+### `plan` — Paket
+
+| Feld | Typ | KI-setzbar¹ | Bezeichnung |
+|---|---|:--:|---|
+| `name` | Text | ✅ | Paketname |
+| `desc` | Textarea | ✅ | Text |
+| `priceOld` | Text | ✅ | Alter Preis (durchgestrichen) |
+| `price` | Text | ✅ | Preis |
+| `priceNote` | Text | ✅ | Hinweis unter dem Preis |
+| `badge` | Text | ✅ | Aktions-Kennzeichnung |
+| `saving` | Text | ✅ | Preisvorteil |
+| `features` | Textarea | ✅ | Leistungen |
+| `buttonText` | Text | ✅ | Button-Text |
+| `buttonUrl` | Url | — | Button-Link |
+| `highlight` | Select | — | Hervorheben |
+| `highlightLabel` | Text | ✅ | Text der Hervorhebung |
+
+### `comparison` — Vergleich (Pro/Contra)
+
+| Feld | Typ | KI-setzbar¹ | Bezeichnung |
+|---|---|:--:|---|
+| `heading` | Textarea | ✅ | Überschrift |
+| `intro` | Textarea | ✅ | Einleitung |
+| `colors` | Select | — | Farben |
+| `proBadge` | Text | ✅ | Pro: Kennzeichnung |
+| `proTitle` | Text | ✅ | Pro: Überschrift |
+| `proText` | Textarea | ✅ | Pro: Text |
+| `proItems` | List | — | Pro: Punkte |
+| `title` | Text | ✅ | Titel |
+| `text` | Textarea | ✅ | Text |
+| `proTotalLabel` | Text | ✅ | Pro: Summenzeile (Text) |
+| `proTotalValue` | Text | ✅ | Pro: Summenzeile (Betrag) |
+| `proNote` | Text | ✅ | Pro: Fußnote |
+| `conBadge` | Text | ✅ | Contra: Kennzeichnung |
+| `conTitle` | Text | ✅ | Contra: Überschrift |
+| `conText` | Textarea | ✅ | Contra: Text |
+| `conItems` | List | — | Contra: Punkte |
+| `title` | Text | ✅ | Titel |
+| `text` | Textarea | ✅ | Text |
+| `conTotalLabel` | Text | ✅ | Contra: Summenzeile (Text) |
+| `conTotalValue` | Text | ✅ | Contra: Summenzeile (Betrag) |
+| `conNote` | Text | ✅ | Contra: Fußnote |
+
 ### `gallery` — Galerie
 
 | Feld | Typ | KI-setzbar¹ | Bezeichnung |
@@ -534,8 +588,25 @@ Kind-Blöcke (`card`, `column`, `faq`, `step`, `service`, `leistung`, `reference
 | `tags` | MultiSelect | — | Tag |
 | `showFilter` | Select | — | Tag-Filter anzeigen |
 | `layout` | Select | — | Layout |
+| `carouselFit` | Select | — | Bildgröße im Carousel |
+| `autoplay` | Select | — | Automatisch bewegen |
 | `columns` | Select | — | Spalten |
 | `strip` | Select | — | Bildstreifen in der Großansicht |
+| `images` | List | — | Bilder |
+| `image` | Image | — | Bild |
+| `alt` | Text | ✅ | Alternativtext |
+| `caption` | Text | ✅ | Bildunterschrift |
+
+### `slider` — Slider (Großansicht)
+
+| Feld | Typ | KI-setzbar¹ | Bezeichnung |
+|---|---|:--:|---|
+| `heading` | Text | ✅ | Überschrift |
+| `fit` | Select | — | Bildzuschnitt |
+| `height` | Select | — | Höhe |
+| `autoplay` | Select | — | Automatisch bewegen |
+| `speed` | Select | — | Geschwindigkeit |
+| `hint` | Select | — | Wisch-Hinweis anzeigen |
 | `images` | List | — | Bilder |
 | `image` | Image | — | Bild |
 | `alt` | Text | ✅ | Alternativtext |

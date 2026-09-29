@@ -11,6 +11,18 @@ using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+
+// --- Self-update helper mode ---
+// "dotnet MatCMS.Cloud.dll --self-update <cloudContainerId>" is the one-shot helper container that replaces
+// the cloud's own container (see CloudUpdaterService / DockerHostService.SelfUpdateAsync). It must leave
+// BEFORE the web app is built: the helper shares the data volume with the cloud it is replacing and must
+// never run migrations, start hosted services or open that database.
+if (args.Length >= 2 && args[0] == "--self-update")
+{
+    Environment.ExitCode = await SelfUpdateRunner.RunAsync(args[1]);
+    return;
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 // --- Storage locations (persisted via Docker volume at /app/appdata) ---
@@ -88,6 +100,8 @@ builder.Services.AddScoped<AiService>();
 builder.Services.AddScoped<InstanceService>();
 builder.Services.AddScoped<ProfileService>();
 builder.Services.AddScoped<StoreService>();
+builder.Services.AddScoped<HostingActionsService>();
+builder.Services.AddScoped<CloudUpdaterService>();
 builder.Services.AddScoped<MailSpool>();
 builder.Services.AddScoped<BackupStore>();
 // Used by the confirmation page AND by the watchdog that completes a delayed removal — which is
@@ -952,6 +966,10 @@ MatCMS.Cloud.Api.ProfileApi.MapProfileApi(app);
 // mail-templates). Same key auth + "operatorApi" rate limit; writes need the CanManageStore right and
 // bump every profile that selected the changed entry.
 MatCMS.Cloud.Api.StoreApi.MapStoreApi(app);
+
+// Hosting over the operator API: module switch, container status/actions/logs per instance, and the
+// cloud's own self-update — everything the Hosting UI can do, so an AI agent can do it too.
+MatCMS.Cloud.Api.HostingApi.MapHostingApi(app);
 
 // --- Catalogue ------------------------------------------------------------
 // The store, browsable by an approved instance itself ("Weiter durchsuchen…" in MatCMS). This is the

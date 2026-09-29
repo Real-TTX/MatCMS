@@ -46,6 +46,10 @@
 
 <div class="tabs" role="tablist">
     <button type="button" class="tab active" data-tab="overview">@T["instances.tabOverview"]</button>
+    @if (Model.ShowHostingTab)
+    {
+        <button type="button" class="tab" data-tab="hosting">@T["hosting.tab"]</button>
+    }
     <button type="button" class="tab" data-tab="preview">@T["instances.tabPreview"]</button>
     <button type="button" class="tab" data-tab="config">@T["instances.tabConfig"]</button>
     <button type="button" class="tab" data-tab="events">@T["instances.tabEvents"]</button>
@@ -213,13 +217,13 @@
             <div class="kv-value muted">@T["instances.contentCounts", Model.Item.PageCount, Model.Item.PluginCount, Model.Item.UserCount]</div>
         </div>
 
-        @if (Model.HasUpdate && Model.CanCloudUpdate)
+        @* Container ACTIONS live on the Hosting tab now; the overview only points there. A remote instance
+           has no actions here, so it keeps the command to run on its own host. *@
+        @if (Model.ShowHostingTab)
         {
-            <div class="list-actions">
-                <form class="inline-form" method="post" asp-page-handler="Update" asp-route-id="@Model.Item.Id"
-                      onsubmit="return confirm('@T["instances.updateConfirm"]');">
-                    <button type="submit" class="btn"><i class="ti ti-refresh" aria-hidden="true"></i> @T["instances.updateNow"]</button>
-                </form>
+            <div class="help" style="margin-top:16px;">
+                @if (Model.HasUpdate) { <span class="badge badge-new">@T["instances.updateAvailable"]</span> }
+                @T["hosting.overviewHint"] <a href="?tab=hosting" data-goto-tab="hosting">@T["hosting.tab"] →</a>
             </div>
         }
         else if (Model.HasUpdate)
@@ -228,18 +232,49 @@
                 @T["instances.updateRemote"] <code>docker compose pull &amp;&amp; docker compose up -d</code>
             </div>
         }
+    </div>
+</div>
 
-        @* Start / Stop for a LOCAL container. Stop takes the customer's site OFFLINE, so it confirms;
-           Start does not. Only shown when the cloud can actually reach the container on its daemon. *@
-        @if (Model.Item.Hosting == InstanceHosting.Local && Model.Item.ContainerId is not null)
-        {
-            var running = string.Equals(Model.Item.ContainerState, "running", StringComparison.OrdinalIgnoreCase);
+@* ============ HOSTING ============ *@
+@if (Model.ShowHostingTab)
+{
+    var c = Model.Container;
+    var running = string.Equals(Model.Item.ContainerState, "running", StringComparison.OrdinalIgnoreCase);
+    <div class="tab-panel" data-panel="hosting" hidden>
+        <div class="card">
+            <h2>@T["hosting.container"]</h2>
+            @if (c is null)
+            {
+                <p class="muted">@T["hosting.noDetails"]</p>
+            }
+            else
+            {
+                <div class="kv"><div class="kv-label">@T["hosting.name"]</div><div class="kv-value mono">@c.Name</div></div>
+                <div class="kv"><div class="kv-label">@T["hosting.state"]</div><div class="kv-value">
+                    <span class="badge @(running ? "badge-on" : "badge-err")">@c.State</span>
+                    @if (!string.IsNullOrEmpty(c.Health)) { <span class="badge badge-off">@T["hosting.health"]: @c.Health</span> }
+                </div></div>
+                <div class="kv"><div class="kv-label">@T["hosting.startedAt"]</div><div class="kv-value muted">@(c.StartedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss") ?? "—")</div></div>
+                <div class="kv"><div class="kv-label">@T["hosting.restarts"]</div><div class="kv-value muted">@c.RestartCount</div></div>
+                <div class="kv"><div class="kv-label">@T["hosting.image"]</div><div class="kv-value muted mono">@c.Image</div></div>
+                <div class="kv"><div class="kv-label">@T["hosting.port"]</div><div class="kv-value muted mono">@(c.PublishedPort?.ToString() ?? "—")</div></div>
+                <div class="kv"><div class="kv-label">@T["hosting.managed"]</div><div class="kv-value">
+                    <span class="badge @(c.CloudManaged ? "badge-on" : "badge-off")">@(c.CloudManaged ? T["hosting.managedYes"] : T["hosting.managedNo"])</span>
+                </div></div>
+            }
+
+            @* Stop takes the customer's site OFFLINE and update restarts it, so both confirm; start does not. *@
             <div class="list-actions">
+                <form class="inline-form" method="post" asp-page-handler="Update" asp-route-id="@Model.Item.Id"
+                      onsubmit="return confirm('@T["instances.updateConfirm"]');">
+                    <button type="submit" class="btn @(Model.HasUpdate ? "" : "btn-ghost")"><i class="ti ti-refresh" aria-hidden="true"></i>
+                        @(Model.HasUpdate ? T["instances.updateNow"] : T["hosting.repull"])</button>
+                </form>
                 @if (running)
                 {
                     <form class="inline-form" method="post" asp-page-handler="Restart" asp-route-id="@Model.Item.Id"
                           onsubmit="return confirm('@T["instances.restartConfirm"]');">
-                        <button type="submit" class="btn"><i class="ti ti-refresh" aria-hidden="true"></i> @T["instances.restart"]</button>
+                        <button type="submit" class="btn"><i class="ti ti-rotate-clockwise" aria-hidden="true"></i> @T["instances.restart"]</button>
                     </form>
                     <form class="inline-form" method="post" asp-page-handler="Stop" asp-route-id="@Model.Item.Id"
                           onsubmit="return confirm('@T["instances.stopConfirm"]');">
@@ -253,9 +288,24 @@
                     </form>
                 }
             </div>
-        }
+            <div class="help">@T["hosting.apiHint"]</div>
+        </div>
+
+        <div class="card">
+            <h2>@T["hosting.logs"]</h2>
+            <div class="list-actions" style="margin-top:0;">
+                <select id="hosting-log-tail" class="list-search" aria-label="@T["hosting.logLines"]">
+                    <option value="200">200 @T["hosting.lines"]</option>
+                    <option value="500">500 @T["hosting.lines"]</option>
+                    <option value="2000">2000 @T["hosting.lines"]</option>
+                </select>
+                <button type="button" class="btn" id="hosting-log-load"
+                        data-url="@Url.Page("Details", "Logs", new { id = Model.Item.Id })">@T["hosting.loadLogs"]</button>
+            </div>
+            <pre id="hosting-log-out" class="mono" style="white-space:pre-wrap;font-size:12px;max-height:520px;overflow:auto;" hidden></pre>
+        </div>
     </div>
-</div>
+}
 
 @* ============ PREVIEW ============ *@
 <div class="tab-panel" data-panel="preview" hidden>
@@ -815,6 +865,26 @@
             tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.tab); }); });
             var want = new URLSearchParams(location.search).get('tab');
             if (want) show(want);
+            // In-page link to a tab (e.g. overview → Hosting) switches without a reload.
+            document.querySelectorAll('[data-goto-tab]').forEach(function (a) {
+                a.addEventListener('click', function (e) { e.preventDefault(); show(a.dataset.gotoTab); });
+            });
+        })();
+
+        // Hosting tab: container logs on demand (one Docker call per click, not per page view).
+        (function () {
+            var btn = document.getElementById('hosting-log-load');
+            if (!btn) return;
+            var out = document.getElementById('hosting-log-out');
+            var tail = document.getElementById('hosting-log-tail');
+            btn.addEventListener('click', function () {
+                btn.disabled = true;
+                fetch(btn.dataset.url + '&tail=' + encodeURIComponent(tail.value), { credentials: 'same-origin' })
+                    .then(function (r) { return r.text(); })
+                    .then(function (t) { out.textContent = t; out.hidden = false; out.scrollTop = out.scrollHeight; })
+                    .catch(function (e) { out.textContent = '⚠ ' + e; out.hidden = false; })
+                    .finally(function () { btn.disabled = false; });
+            });
         })();
     </script>
 }

@@ -59,6 +59,10 @@
                         {
                             <span class="badge badge-new">@T["apikeys.rightStore"]</span>
                         }
+                        @if (k.CanManageHosting)
+                        {
+                            <span class="badge badge-new">@T["apikeys.rightHosting"]</span>
+                        }
                     </td>
                     <td class="muted">
                         @if (k.AllInstances)

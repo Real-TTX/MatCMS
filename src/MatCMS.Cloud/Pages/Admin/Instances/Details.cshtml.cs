@@ -19,19 +19,26 @@ public class DetailsModel : PageModel, IAsyncPageFilter
     private readonly AppDbContext _db;
     private readonly InstanceService _instances;
     private readonly ReleaseWatcher _releases;
-    private readonly DockerHostService _docker;
+    private readonly HostingActionsService _hosting;
     private readonly BackupStore _backups;
     private readonly OperatorScope _scope;
 
-    public DetailsModel(AppDbContext db, InstanceService instances, ReleaseWatcher releases, DockerHostService docker, BackupStore backups, OperatorScope scope)
+    public DetailsModel(AppDbContext db, InstanceService instances, ReleaseWatcher releases, HostingActionsService hosting, BackupStore backups, OperatorScope scope)
     {
         _db = db;
         _instances = instances;
         _releases = releases;
-        _docker = docker;
+        _hosting = hosting;
         _backups = backups;
         _scope = scope;
     }
+
+    /// <summary>The Hosting tab exists for an instance whose container this cloud can reach — independent of
+    /// the Hosting module switch, because these actions predate it and must not vanish when it is off.</summary>
+    public bool ShowHostingTab => HostingActionsService.IsLocal(Item);
+
+    /// <summary>Live container details for the Hosting tab (null when not local or the daemon is silent).</summary>
+    public DockerHostService.ContainerDetails? Container { get; private set; }
 
     /// <summary>Admin-only, even on one's own instance: enrollment decisions, profile assignment and
     /// token rotation are fleet/operator-config matters, not day-to-day instance management.</summary>
@@ -125,6 +132,9 @@ public class DetailsModel : PageModel, IAsyncPageFilter
         // value that went stale right after a change. Best effort: no daemon → keep the last known state.
         try { await _instances.ClassifyAsync(Item, HttpContext.RequestAborted); await _db.SaveChangesAsync(); }
         catch { /* keep last known state */ }
+
+        if (ShowHostingTab)
+            Container = await _hosting.DetailsAsync(Item, HttpContext.RequestAborted);
 
         if (Item.BackupRequestId > 0)
             RequestedBackup = await _db.CloudBackups.AsNoTracking()
@@ -394,44 +404,20 @@ public class DetailsModel : PageModel, IAsyncPageFilter
         return Page();
     }
 
-    /// <summary>Runs the update for a LOCAL instance: pull + recreate the container. Blocking on
-    /// purpose — the operator clicked it and wants the outcome, not a fire-and-forget.</summary>
+    // Container actions live in HostingActionsService now (shared with the operator API and the MCP tools,
+    // so an AI agent can do exactly what this tab does). The handlers only translate the outcome into a
+    // flash and land back on the Hosting tab.
+
+    /// <summary>Pull + recreate a LOCAL instance's container. Blocking on purpose — the operator wants the outcome.</summary>
     public async Task<IActionResult> OnPostUpdateAsync(int id)
     {
         var item = await _db.Instances.FindAsync(id);
         if (item is null) return RedirectToPage("Index");
-
-        if (item.Hosting != InstanceHosting.Local || item.ContainerId is null)
-        {
-            TempData["FlashError"] = "Diese Instanz läuft nicht auf diesem Docker-Host — Update dort ausführen.";
-            return RedirectToPage(new { id });
-        }
-
-        _instances.Log(item, InstanceEventKind.UpdateStarted, "Update über die Cloud gestartet.", notified: true);
-        await _db.SaveChangesAsync();
-
-        var result = await _docker.UpdateContainerAsync(item.ContainerId, HttpContext.RequestAborted);
-        _instances.Log(item,
-            result.Ok ? InstanceEventKind.UpdateSucceeded : InstanceEventKind.UpdateFailed,
-            result.Message, notified: true);
-
-        // The container was just recreated on the new image but has not beaten back yet, so its
-        // reported Version is still the OLD one — which left "Update verfügbar" (and the button)
-        // standing until the next heartbeat, inviting a second, pointless update. Move the version
-        // forward optimistically so the badge clears at once; the next heartbeat reports the real
-        // version and corrects this if anything went wrong.
-        if (result.Ok && _releases.LatestVersion is string latest)
-            item.Version = latest;
-        await _db.SaveChangesAsync();
-
-        if (result.Ok) TempData["Flash"] = result.Message;
-        else TempData["FlashError"] = result.Message;
-        return RedirectToPage(new { id });
+        return Flash(await _hosting.UpdateAsync(item, HttpContext.RequestAborted), id);
     }
 
-    /// <summary>Starts / stops a LOCAL instance's container via the Docker socket. Reversible power action,
-    /// so only the "looks like MatCMS" guard applies (in DockerHostService), not the managed-label one that
-    /// gates removal. Re-classifies right after so the shown state is current without waiting for the monitor.</summary>
+    /// <summary>Start / stop / restart. Reversible, so only the "looks like MatCMS" guard applies, not the
+    /// managed-label one that gates removal.</summary>
     public Task<IActionResult> OnPostStartAsync(int id) => PowerAsync(id, DockerHostService.PowerAction.Start);
     public Task<IActionResult> OnPostStopAsync(int id) => PowerAsync(id, DockerHostService.PowerAction.Stop);
     public Task<IActionResult> OnPostRestartAsync(int id) => PowerAsync(id, DockerHostService.PowerAction.Restart);
@@ -440,38 +426,23 @@ public class DetailsModel : PageModel, IAsyncPageFilter
     {
         var item = await _db.Instances.FindAsync(id);
         if (item is null) return RedirectToPage("Index");
-        if (item.Hosting != InstanceHosting.Local || item.ContainerId is null)
-        {
-            TempData["FlashError"] = "Diese Instanz läuft nicht auf diesem Docker-Host.";
-            return RedirectToPage(new { id });
-        }
+        return Flash(await _hosting.PowerAsync(item, action, HttpContext.RequestAborted), id);
+    }
 
-        var result = action switch
-        {
-            DockerHostService.PowerAction.Start => await _docker.StartContainerAsync(item.ContainerId, HttpContext.RequestAborted),
-            DockerHostService.PowerAction.Stop => await _docker.StopContainerAsync(item.ContainerId, HttpContext.RequestAborted),
-            _ => await _docker.RestartContainerAsync(item.ContainerId, HttpContext.RequestAborted),
-        };
+    private IActionResult Flash(HostingActionsService.ActionResult r, int id)
+    {
+        TempData[r.Ok ? "Flash" : "FlashError"] = r.Message;
+        return RedirectToPage(new { id, tab = "hosting" });
+    }
 
-        if (result.Ok)
-        {
-            var kind = action switch
-            {
-                DockerHostService.PowerAction.Start => InstanceEventKind.ContainerStarted,
-                DockerHostService.PowerAction.Stop => InstanceEventKind.ContainerStopped,
-                _ => InstanceEventKind.ContainerRestarted,
-            };
-            _instances.Log(item, kind, result.Message);
-        }
-
-        // Reflect the new container state at once (the monitor would otherwise take up to a tick, and a
-        // stopped container never beats). Best effort — a failed re-classify just leaves the last state.
-        try { await _instances.ClassifyAsync(item, HttpContext.RequestAborted); } catch { /* keep last state */ }
-        await _db.SaveChangesAsync();
-
-        if (result.Ok) TempData["Flash"] = result.Message;
-        else TempData["FlashError"] = result.Message;
-        return RedirectToPage(new { id });
+    /// <summary>Container logs for the Hosting tab, fetched on demand (a Docker call per page view would be
+    /// waste). A GET handler taking <c>id</c>, so the page filter's scope check covers it like every POST.</summary>
+    public async Task<IActionResult> OnGetLogsAsync(int id, int tail = 200)
+    {
+        var item = await _db.Instances.AsNoTracking().FirstOrDefaultAsync(i => i.Id == id);
+        if (item is null) return NotFound();
+        var (ok, text) = await _hosting.LogsAsync(item, tail, HttpContext.RequestAborted);
+        return Content(ok ? (text.Length == 0 ? "(keine Ausgabe)" : text) : "⚠ " + text, "text/plain; charset=utf-8");
     }
 
     // Das frühere OnPostDelete ist absichtlich weg. Es löschte nur die Zeile — der Container lief

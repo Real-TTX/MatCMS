@@ -698,6 +698,41 @@ What each mode can do:
 - **Remote** — notify only, plus the exact command (`docker compose pull && docker compose up -d`).
   A guided/agent-driven remote update is backlog.
 
+### Hosting module, Hosting tab and the cloud self-update
+
+Design and increments: `docs/hosting-platform.md`. Increments 1 + 2 are built:
+
+- **One service per capability, three surfaces** (UI, `/api/v1`, MCP — the API-first rule):
+  `Services/HostingActionsService.cs` (container status/start/stop/restart/update/logs of an instance on
+  this daemon), `Services/CloudUpdaterService.cs` (the cloud's own update), REST `Api/HostingApi.cs`, MCP
+  `Mcp/HostingTools.cs`. The Details page handlers only translate outcomes into flashes. Key right
+  **`CanManageHosting`**; the cloud-WIDE actions (module switch, self-update) additionally require an
+  all-instances key.
+- **The Hosting tab** (instance Details) exists for every LOCAL instance **regardless of the module
+  switch** `hosting.enabled` — these actions predate the module, and hiding them behind it would have
+  taken restart/update away from anyone with the module off. The switch governs the **Hosting menu**
+  (`Pages/Admin/Hosting`, Admin-only) and provisioning. Container logs are fetched on demand
+  (`OnGetLogsAsync`) — read frame by frame from the multiplexed stream so stdout/stderr keep their order.
+- **The self-update** cannot run inside the cloud (stopping its own container kills the process
+  half-way). `DockerHostService.SpawnSelfUpdateHelperAsync` starts a one-shot **helper container** (the
+  RUNNING image by id, socket + data volume mounted, label `matcmscloud.updater`, same networks);
+  `Program.cs` sees `--self-update <id>` and runs `SelfUpdateRunner` **before the web app is built** — the
+  helper must never migrate, start hosted services or open the database. `SelfUpdateAsync` = pull (or the
+  newer LOCAL image when the tag has no registry) → stop → **snapshot the SQLite file** (after the stop,
+  so it is consistent) → park → recreate (`RecreateParams`, shared with the instance update) → **health
+  check** (running AND HTTP < 500 on :8080 within 120 s; redirects NOT followed, so "HTTPS erzwingen"
+  does not fail it) → remove the old one. On failure it rolls back the container AND restores the DB
+  snapshot — deleting a WAL/SHM the new version wrote, which would otherwise be replayed into the old
+  schema. Progress goes to `appdata/self-update.json` (`SelfUpdateState`), a FILE on the shared volume
+  because three processes write it and the helper must not touch the DB. Refused when `/app/appdata` is
+  not a mount (recreating would lose every instance link) or no socket is mounted.
+- `SelfContainer` finds the cloud's own container id (the CMS's `ContainerIdentity` logic, plus the
+  `MatCmsCloud__SelfContainerId` override). `RecreateParams` drops a Docker-auto-assigned hostname (= the
+  OLD short id) so the recreated container reports its own — for instance updates too.
+- Fleet-wide pages are folder-locked to `Admin` in `Program.cs` (`/Admin/Cleanup`, `/Admin/Logs`,
+  `/Admin/Hosting`): `/Admin` itself is `AdminOrOperator`, and hiding a nav link does not stop an
+  Operator typing the URL. Any NEW fleet-wide page needs the same line.
+
 ### Removing an instance — who owns the container
 
 `Instances/Delete` is the only way out. It offers **three destructive ways** (remove the container and

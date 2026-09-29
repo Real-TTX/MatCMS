@@ -15,13 +15,18 @@ public class IndexModel : PageModel
     private readonly VersionService _version;
     private readonly ReleaseWatcher _releases;
     private readonly DockerHostService _docker;
+    private readonly CloudUpdaterService _updater;
 
-    public IndexModel(VersionService version, ReleaseWatcher releases, DockerHostService docker)
+    public IndexModel(VersionService version, ReleaseWatcher releases, DockerHostService docker, CloudUpdaterService updater)
     {
         _version = version;
         _releases = releases;
         _docker = docker;
+        _updater = updater;
     }
+
+    /// <summary>Version + self-update card. Only Admins may start an update (this page is not Admin-only).</summary>
+    public CloudUpdateCard Card { get; private set; } = null!;
 
     public string Current => _version.Current;
     public string ImageRef => _version.ImageRef;
@@ -50,7 +55,19 @@ public class IndexModel : PageModel
             // result. Both talk to a registry, so — like the self-check — this is on demand, never on
             // plain page load.
             await _releases.RefreshAsync(HttpContext.RequestAborted);
-            Check = await _version.CheckAsync(HttpContext.RequestAborted);
         }
+        // The card's own registry check replaces the former separate _version.CheckAsync — one call, one answer.
+        Card = new CloudUpdateCard(await _updater.StatusAsync(check, HttpContext.RequestAborted), User.IsInRole("Admin"));
+        Check = null;
+    }
+
+    /// <summary>Starts the self-update. Admin-only — enforced here, not just by hiding the button, because
+    /// this page is reachable for Operators.</summary>
+    public async Task<IActionResult> OnPostSelfUpdateAsync()
+    {
+        if (!User.IsInRole("Admin")) return Forbid();
+        var r = await _updater.StartAsync(HttpContext.RequestAborted);
+        TempData[r.Ok ? "Flash" : "FlashError"] = r.Message;
+        return RedirectToPage();
     }
 }

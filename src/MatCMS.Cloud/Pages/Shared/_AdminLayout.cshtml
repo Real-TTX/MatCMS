@@ -52,6 +52,11 @@
                server-side blocked (AuthorizeFolder "Admin" in Program.cs). *@
             @if (isAdmin)
             {
+                @* The Hosting module's own menu — only while the module is switched on (Einstellungen → Hosting). *@
+                @if (Cloud.Flag(MatCMS.Cloud.Services.SettingKeys.HostingEnabled))
+                {
+                    <a class="@Active("/admin/hosting")" asp-page="/Admin/Hosting/Index">🏗️ @T["hosting.title"]</a>
+                }
                 <a class="@Active("/admin/profiles")" asp-page="/Admin/Profiles/Index">🧩 @T["nav.profiles"]</a>
                 <a class="@Active("/admin/store")" asp-page="/Admin/Store/Index">📦 @T["nav.store"]</a>
                 <a class="@Active("/admin/mail")" asp-page="/Admin/Mail/Index">✉️ @T["spool.title"]</a>

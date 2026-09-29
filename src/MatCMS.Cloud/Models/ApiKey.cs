@@ -48,6 +48,16 @@ public class ApiKey
     public bool CanManageStore { get; set; }
 
     /// <summary>
+    /// Whether this key may drive HOSTING over the API: start/stop/restart/update an instance's container,
+    /// read its container logs, switch the Hosting module, and — together with <see cref="AllInstances"/> —
+    /// update the cloud itself. Off by default: restarting a live site or replacing the cloud's own
+    /// container is at least as consequential as a restore. Container actions still honour the key's
+    /// instance scope; the cloud-wide ones (module switch, self-update) additionally require an
+    /// all-instances key, because they reach far more than any scoped list.
+    /// </summary>
+    public bool CanManageHosting { get; set; }
+
+    /// <summary>
     /// True = every instance. False = only the instances listed in <see cref="Instances"/>.
     /// <para>A key with <c>AllInstances = false</c> and no scope rows can reach nothing — deliberately,
     /// so a mis-created key is inert rather than accidentally global.</para>

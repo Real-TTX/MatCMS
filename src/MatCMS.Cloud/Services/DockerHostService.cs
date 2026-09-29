@@ -1,3 +1,6 @@
+using System.Globalization;
+using System.Text;
+using System.Text.RegularExpressions;
 using Docker.DotNet;
 using Docker.DotNet.Models;
 
@@ -190,22 +193,7 @@ public class DockerHostService
             string? newId = null;
             try
             {
-                var create = new CreateContainerParameters(insp.Config)
-                {
-                    Name = name,
-                    HostConfig = insp.HostConfig,
-                    // Copy only the network membership + aliases. Carrying the old EndpointSettings
-                    // wholesale would re-assert the previous IP/MAC and can be rejected by the daemon.
-                    NetworkingConfig = new NetworkingConfig
-                    {
-                        EndpointsConfig = (insp.NetworkSettings?.Networks ?? new Dictionary<string, EndpointSettings>())
-                            .ToDictionary(
-                                kv => kv.Key,
-                                kv => new EndpointSettings { Aliases = kv.Value?.Aliases })
-                    }
-                };
-
-                var created = await client.Containers.CreateContainerAsync(create, ct);
+                var created = await client.Containers.CreateContainerAsync(RecreateParams(insp, name), ct);
                 newId = created.ID;
                 await client.Containers.StartContainerAsync(newId, new ContainerStartParameters(), ct);
             }
@@ -299,6 +287,36 @@ public class DockerHostService
             _log.LogWarning(ex, "MatCMS image prune failed");
         }
         return new(removed, bytes);
+    }
+
+    /// <summary>
+    /// The create parameters that rebuild a container from its own inspected config — same name, env,
+    /// volumes, ports, labels, restart policy, networks. Shared by the instance update and the cloud
+    /// self-update so both recreate identically.
+    /// <para>Two deliberate edits to the copy: networks carry only membership + aliases (the old
+    /// EndpointSettings would re-assert the previous IP/MAC and can be rejected), and a hostname that
+    /// Docker AUTO-assigned (= the old short id) is dropped so the new container gets its own — otherwise
+    /// the new container would report the OLD id as its hostname, and anything falling back to the
+    /// hostname to identify itself would name a container that no longer exists. A hostname the operator
+    /// set explicitly (compose <c>hostname:</c>) is kept.</para>
+    /// </summary>
+    private static CreateContainerParameters RecreateParams(ContainerInspectResponse insp, string name)
+    {
+        var cfg = insp.Config;
+        if (cfg is not null && !string.IsNullOrEmpty(cfg.Hostname) && !string.IsNullOrEmpty(insp.ID)
+            && insp.ID.StartsWith(cfg.Hostname, StringComparison.OrdinalIgnoreCase))
+            cfg.Hostname = "";
+
+        return new CreateContainerParameters(cfg)
+        {
+            Name = name,
+            HostConfig = insp.HostConfig,
+            NetworkingConfig = new NetworkingConfig
+            {
+                EndpointsConfig = (insp.NetworkSettings?.Networks ?? new Dictionary<string, EndpointSettings>())
+                    .ToDictionary(kv => kv.Key, kv => new EndpointSettings { Aliases = kv.Value?.Aliases })
+            }
+        };
     }
 
     /// <summary>Splits "ghcr.io/real-ttx/matcms:latest" into repo + tag (default "latest"). A digest
@@ -521,6 +539,478 @@ public class DockerHostService
         return new(true, removeVolumes && removed.Count > 0
             ? $"Container und Datenträger entfernt ({string.Join(", ", removed)})."
             : "Container entfernt.", removed);
+    }
+
+    // ---- Container inspection + logs (Hosting tab) --------------------------------------------------
+
+    /// <summary>What the Hosting tab shows about a container, read live from the daemon.</summary>
+    public sealed record ContainerDetails(
+        string Id, string Name, string Image, string ImageId, string State, DateTime? StartedAt,
+        long RestartCount, int? PublishedPort, bool CloudManaged, string? Health);
+
+    /// <summary>Live details of an instance's container, or null when it is not on this daemon.</summary>
+    public async Task<ContainerDetails?> GetContainerDetailsAsync(string? containerId, CancellationToken ct = default)
+    {
+        var client = Client;
+        var found = await FindContainerAsync(containerId, ct);
+        if (client is null || found is null) return null;
+        try
+        {
+            var i = await client.Containers.InspectContainerAsync(found.Id, ct);
+            // StartedAt is a string in some Docker.DotNet versions and a DateTime in others; going through
+            // Convert.ToString keeps this independent of which one is referenced.
+            DateTime? started = DateTime.TryParse(Convert.ToString(i.State?.StartedAt, CultureInfo.InvariantCulture),
+                CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var s)
+                && s.Year > 1 ? s : null;
+            return new ContainerDetails(i.ID, (i.Name ?? "").TrimStart('/'), i.Config?.Image ?? found.Image,
+                i.Image ?? "", i.State?.Status ?? found.State, started, i.RestartCount,
+                found.PublishedPort, found.CloudManaged, i.State?.Health?.Status);
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(ex, "Inspecting container {Id} failed", found.Id);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// The last <paramref name="tail"/> lines of a container's stdout + stderr, with timestamps. Read frame
+    /// by frame from the multiplexed stream, so both streams stay in the order the container wrote them
+    /// (reading them separately and concatenating would put every error after every normal line). Same
+    /// "looks like MatCMS" guard as the power actions — the socket must never be used to read an
+    /// unrelated container.
+    /// </summary>
+    public async Task<(bool Ok, string Text)> GetContainerLogsAsync(string containerId, int tail, CancellationToken ct = default)
+    {
+        var client = Client;
+        if (client is null) return (false, "Kein Docker-Zugriff konfiguriert.");
+
+        ContainerInspectResponse insp;
+        try { insp = await client.Containers.InspectContainerAsync(containerId, ct); }
+        catch (Exception ex) { return (false, $"Container nicht gefunden: {ex.Message}"); }
+        if (!LooksLikeMatCms(insp.Config?.Image ?? "", insp.Config?.Labels))
+            return (false, $"Abgelehnt: '{insp.Config?.Image}' sieht nicht nach einer MatCMS-Instanz aus.");
+
+        tail = Math.Clamp(tail, 1, 5000);
+        try
+        {
+            using var stream = await client.Containers.GetContainerLogsAsync(insp.ID, insp.Config?.Tty ?? false,
+                new ContainerLogsParameters { ShowStdout = true, ShowStderr = true, Timestamps = true, Tail = tail.ToString(CultureInfo.InvariantCulture) }, ct);
+
+            var sb = new StringBuilder();
+            var decoder = Encoding.UTF8.GetDecoder();   // a multi-byte char may straddle two frames
+            var buf = new byte[16 * 1024];
+            var chars = new char[Encoding.UTF8.GetMaxCharCount(buf.Length)];
+            while (true)
+            {
+                var r = await stream.ReadOutputAsync(buf, 0, buf.Length, ct);
+                if (r.EOF) break;
+                var n = decoder.GetChars(buf, 0, r.Count, chars, 0);
+                sb.Append(chars, 0, n);
+            }
+            return (true, sb.ToString());
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(ex, "Reading logs of {Id} failed", insp.ID);
+            return (false, $"Logs nicht lesbar: {ex.Message}");
+        }
+    }
+
+    // ---- Cloud self-update --------------------------------------------------------------------------
+    //
+    // A process cannot replace the container it is running in: the moment it stops "itself" it is gone,
+    // half-way through. So the cloud starts a short-lived HELPER container (same image, "--self-update"
+    // mode, socket + data volume mounted) and the helper does the swap from outside — the instance
+    // update's pull → park → recreate → rollback, plus two things an instance update does not need:
+    // a real HEALTH CHECK (the cloud migrates its database on start; "the container started" is not
+    // "the cloud works"), and a DATABASE SNAPSHOT taken after the old cloud stopped, put back on
+    // rollback, so a new version that migrated the schema and then failed never leaves the old code
+    // facing a newer schema.
+
+    /// <summary>Label on the helper container, so a running update is recognisable and never doubled.</summary>
+    public const string UpdaterLabel = "matcmscloud.updater";
+
+    /// <summary>Where the data volume sits inside both the cloud and the helper container.</summary>
+    public const string ContainerDataDir = "/app/appdata";
+
+    public sealed record SpawnResult(bool Ok, string Message);
+
+    /// <summary>
+    /// Starts the helper that will update the cloud container <paramref name="selfContainerId"/>. Returns as
+    /// soon as the helper runs — the swap itself happens after this request has answered.
+    /// <para>Refuses when the data directory is not a mount: recreating a container whose data lives in its
+    /// own writable layer would silently throw every instance link away.</para>
+    /// </summary>
+    public async Task<SpawnResult> SpawnSelfUpdateHelperAsync(string selfContainerId, CancellationToken ct = default)
+    {
+        var client = Client;
+        if (client is null) return new(false, "Kein Docker-Zugriff konfiguriert.");
+
+        ContainerInspectResponse self;
+        try { self = await client.Containers.InspectContainerAsync(selfContainerId, ct); }
+        catch (Exception ex) { return new(false, $"Eigener Container nicht gefunden: {ex.Message}"); }
+        if (!LooksLikeMatCms(self.Config?.Image ?? "", self.Config?.Labels))
+            return new(false, $"Abgelehnt: '{self.Config?.Image}' sieht nicht nach MatCMS aus.");
+
+        var sock = self.Mounts?.FirstOrDefault(m => m.Destination == "/var/run/docker.sock");
+        if (sock is null || string.IsNullOrWhiteSpace(sock.Source))
+            return new(false, "Der Docker-Socket ist nicht in den Cloud-Container gemountet.");
+        var data = self.Mounts?.FirstOrDefault(m => m.Destination == ContainerDataDir);
+        if (data is null)
+            return new(false, $"{ContainerDataDir} ist kein Volume/Mount — ein Neuaufbau würde alle Daten verlieren. Abgebrochen.");
+
+        // One update at a time. A finished helper from an earlier run is cleared away; a running one wins.
+        var helpers = await client.Containers.ListContainersAsync(new ContainersListParameters
+        {
+            All = true,
+            Filters = new Dictionary<string, IDictionary<string, bool>>
+            {
+                ["label"] = new Dictionary<string, bool> { [UpdaterLabel + "=true"] = true }
+            }
+        }, ct);
+        foreach (var h in helpers)
+        {
+            if (string.Equals(h.State, "running", StringComparison.OrdinalIgnoreCase))
+                return new(false, "Ein Cloud-Update läuft bereits.");
+            try { await client.Containers.RemoveContainerAsync(h.ID, new ContainerRemoveParameters { Force = true }, ct); } catch { }
+        }
+
+        // Which image the helper runs. Preferably the one the cloud RUNS (by id): its updater is the code
+        // that is known to work right now. But with the containerd image store (the default in newer
+        // Docker), moving the tag to a newer image — a `docker compose pull` done before clicking update,
+        // or a local rebuild — drops the old image's record: the container keeps running, yet its image id
+        // can no longer be referenced. Then fall back to the TAG, i.e. the new image, which carries the
+        // updater too. (Found by the local test, not by reasoning.)
+        var helperImage = self.Image;
+        try { await client.Images.InspectImageAsync(self.Image, ct); }
+        catch (DockerApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            helperImage = self.Config?.Image ?? "";
+            try { await client.Images.InspectImageAsync(helperImage, ct); }
+            catch (Exception) { return new(false, $"Weder das laufende Image noch '{helperImage}' ist lokal vorhanden."); }
+        }
+
+        var name = (self.Name ?? "").TrimStart('/');
+        var binds = new List<string>
+        {
+            $"{sock.Source}:/var/run/docker.sock",
+            string.Equals(data.Type, "volume", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(data.Name)
+                ? $"{data.Name}:{ContainerDataDir}"
+                : $"{data.Source}:{ContainerDataDir}",
+        };
+
+        try
+        {
+            var created = await client.Containers.CreateContainerAsync(new CreateContainerParameters
+            {
+                Name = $"{name}-updater",
+                Image = helperImage,
+                Cmd = new List<string> { "dotnet", "MatCMS.Cloud.dll", "--self-update", self.ID },
+                Env = new List<string> { "MatCmsCloud__Docker__Endpoint=unix:///var/run/docker.sock" },
+                Labels = new Dictionary<string, string> { [UpdaterLabel] = "true" },
+                HostConfig = new HostConfig
+                {
+                    Binds = binds,
+                    RestartPolicy = new RestartPolicy { Name = RestartPolicyKind.No },
+                },
+                // Same networks as the cloud, so the helper can health-check the new cloud by its address.
+                NetworkingConfig = new NetworkingConfig
+                {
+                    EndpointsConfig = (self.NetworkSettings?.Networks ?? new Dictionary<string, EndpointSettings>())
+                        .ToDictionary(kv => kv.Key, _ => new EndpointSettings())
+                },
+            }, ct);
+            await client.Containers.StartContainerAsync(created.ID, new ContainerStartParameters(), ct);
+            return new(true, "Update gestartet — die Cloud wird in 1–2 Minuten neu gestartet.");
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex, "Starting the self-update helper failed");
+            return new(false, $"Helper konnte nicht gestartet werden: {ex.Message}");
+        }
+    }
+
+    /// <summary>The newest self-update helper container, if any: whether it still runs, and its exit code.
+    /// Lets the status tell "the helper is working" apart from "the helper died without a result" — e.g. a
+    /// new image that cannot even start its runtime, which must read as failed, not as forever running.</summary>
+    public async Task<(bool Exists, bool Running, long ExitCode)> GetUpdaterHelperStateAsync(CancellationToken ct = default)
+    {
+        var client = Client;
+        if (client is null) return (false, false, 0);
+        try
+        {
+            var list = await client.Containers.ListContainersAsync(new ContainersListParameters
+            {
+                All = true,
+                Filters = new Dictionary<string, IDictionary<string, bool>>
+                {
+                    ["label"] = new Dictionary<string, bool> { [UpdaterLabel + "=true"] = true }
+                }
+            }, ct);
+            var h = list.OrderByDescending(c => c.Created).FirstOrDefault();
+            if (h is null) return (false, false, 0);
+            var running = string.Equals(h.State, "running", StringComparison.OrdinalIgnoreCase);
+            if (running) return (true, true, 0);
+            var i = await client.Containers.InspectContainerAsync(h.ID, ct);
+            return (true, false, i.State?.ExitCode ?? 0);
+        }
+        catch { return (false, false, 0); }
+    }
+
+    public sealed record SelfUpdateResult(bool Ok, string State, string Message, string? ToImage = null);
+
+    /// <summary>Data directory as the HELPER sees it (its working dir is the image's /app).</summary>
+    private static string HelperDataDir => Path.Combine(Directory.GetCurrentDirectory(), "appdata");
+
+    /// <summary>
+    /// Runs INSIDE the helper container: replaces the cloud container <paramref name="targetId"/> with one on
+    /// the newest image, health-checks it, and rolls back — container AND database — if it does not come up.
+    /// <paramref name="log"/> receives every step (the runner mirrors it into <see cref="SelfUpdateState"/>).
+    /// </summary>
+    public async Task<SelfUpdateResult> SelfUpdateAsync(string targetId, Action<string> log, CancellationToken ct = default)
+    {
+        var client = Client;
+        if (client is null) return new(false, "failed", "Kein Docker-Zugriff im Helper.");
+
+        // Let the request that started us deliver its response before the cloud goes down.
+        await Task.Delay(TimeSpan.FromSeconds(5), ct);
+
+        ContainerInspectResponse insp;
+        try { insp = await client.Containers.InspectContainerAsync(targetId, ct); }
+        catch (Exception ex) { return new(false, "failed", $"Cloud-Container nicht gefunden: {ex.Message}"); }
+
+        var image = insp.Config?.Image ?? "";
+        if (!LooksLikeMatCms(image, insp.Config?.Labels))
+            return new(false, "failed", $"Abgelehnt: '{image}' sieht nicht nach MatCMS aus.");
+
+        var name = (insp.Name ?? "").TrimStart('/');
+        var oldId = insp.ID;
+        var (repo, tag) = SplitImage(image);
+        log($"Ziel: {name} ({Short(oldId)}), Image {image}.");
+
+        // 1) Pull. A cloud built locally (dev compose: matcms-cloud:latest) has no registry behind its tag —
+        //    then the tag may already point at a newer LOCAL build, which is just as valid a target.
+        try
+        {
+            await client.Images.CreateImageAsync(new ImagesCreateParameters { FromImage = repo, Tag = tag }, null, new Progress<JSONMessage>(), ct);
+            log("Image gezogen.");
+        }
+        catch (Exception ex) { log($"Pull nicht möglich ({ex.Message}) — verwende das lokale Image."); }
+
+        ImageInspectResponse target;
+        try { target = await client.Images.InspectImageAsync(image, ct); }
+        catch (Exception ex) { return new(false, "failed", $"Image '{image}' nicht vorhanden: {ex.Message}"); }
+        if (target.ID == insp.Image)
+            return new(true, "current", "Bereits aktuell — kein neueres Image vorhanden. Nichts verändert.", target.ID);
+        log($"Neues Image {Short(target.ID)} (bisher {Short(insp.Image)}).");
+
+        // 2) Stop the old cloud gracefully, THEN snapshot its database — a stopped process has flushed and
+        //    released it, so the copy is consistent.
+        try { await client.Containers.StopContainerAsync(oldId, new ContainerStopParameters { WaitBeforeKillSeconds = 30 }, ct); }
+        catch (Exception ex) { return new(false, "failed", $"Alte Cloud ließ sich nicht stoppen: {ex.Message}"); }
+        log("Alte Cloud gestoppt.");
+        var (backupDir, dbPath) = BackupDatabase(insp, log);
+
+        var parked = $"{name}-matcmscloud-old";
+        string? newId = null;
+        try
+        {
+            await RemoveStaleParkedAsync(client, parked, oldId, log, ct);
+            await client.Containers.RenameContainerAsync(oldId, new ContainerRenameParameters { NewName = parked }, ct);
+
+            var created = await client.Containers.CreateContainerAsync(RecreateParams(insp, name), ct);
+            newId = created.ID;
+            await client.Containers.StartContainerAsync(newId, new ContainerStartParameters(), ct);
+            log($"Neue Cloud gestartet ({Short(newId)}) — warte auf den Health-Check …");
+
+            var (healthy, why) = await WaitHealthyAsync(client, newId, TimeSpan.FromSeconds(120), ct);
+            if (!healthy) throw new InvalidOperationException(why);
+            log("Health-Check bestanden.");
+        }
+        catch (Exception ex)
+        {
+            log($"FEHLER: {ex.Message} — Rollback.");
+            var ok = await RollbackSelfAsync(client, oldId, newId, name, backupDir, dbPath, log, ct);
+            return new(false, ok ? "rolled-back" : "failed",
+                ok ? $"Update fehlgeschlagen ({ex.Message}); die alte Cloud läuft wieder."
+                   : $"Update UND Rollback fehlgeschlagen ({ex.Message}) — Container {Short(oldId)} manuell prüfen!",
+                target.ID);
+        }
+
+        // 3) Success — the old container, old images and all but the newest DB snapshots can go.
+        try { await client.Containers.RemoveContainerAsync(oldId, new ContainerRemoveParameters { Force = true }, ct); }
+        catch (Exception ex) { log($"Alter Container nicht entfernt: {ex.Message}"); }
+        try { var pr = await PruneMatCmsImagesAsync(ct); if (pr.Removed > 0) log($"{pr.Removed} alte(s) Image(s) entfernt."); }
+        catch { /* best effort */ }
+        PruneDbBackups(log);
+        return new(true, "succeeded", $"Cloud auf Image {Short(target.ID)} aktualisiert.", target.ID);
+    }
+
+    // Redirects are NOT followed: a cloud with "HTTPS erzwingen" answers the plain-http probe with a redirect,
+    // which is a perfectly healthy answer — following it into TLS on the container IP would fail and roll
+    // back a working update.
+    private static readonly HttpClient Probe = new(new HttpClientHandler { AllowAutoRedirect = false })
+    { Timeout = TimeSpan.FromSeconds(4) };
+
+    /// <summary>Healthy = the container is running AND answers HTTP on its app port (8080) with anything
+    /// below 500. A container that exits, or never answers within <paramref name="timeout"/>, is not.</summary>
+    private static async Task<(bool Ok, string Why)> WaitHealthyAsync(DockerClient client, string id, TimeSpan timeout, CancellationToken ct)
+    {
+        var until = DateTime.UtcNow + timeout;
+        var last = "keine Antwort";
+        while (DateTime.UtcNow < until)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(3), ct);
+            ContainerInspectResponse i;
+            try { i = await client.Containers.InspectContainerAsync(id, ct); }
+            catch (Exception ex) { last = ex.Message; continue; }
+
+            // A crashing cloud does not stay "exited": it inherits the old container's restart policy
+            // (unless-stopped), so Docker keeps restarting it and it never even gets an address. Waiting for
+            // "exited" therefore sat out the whole timeout (found by the local rollback test: 2 min down
+            // instead of seconds). Any restart of a container that is seconds old means it crashed.
+            if (i.RestartCount > 0 || i.State is { Restarting: true }
+                || (i.State is { Running: false } && i.State.Status is "exited" or "dead" or "restarting"))
+                return (false, $"Der neue Container startet nicht (Status {i.State?.Status}, Exit-Code {i.State?.ExitCode}, Neustarts {i.RestartCount}).");
+
+            var ip = i.NetworkSettings?.Networks?.Values
+                .Select(n => n?.IPAddress).FirstOrDefault(a => !string.IsNullOrEmpty(a));
+            if (string.IsNullOrEmpty(ip)) { last = "noch keine Netzwerkadresse"; continue; }
+
+            try
+            {
+                using var resp = await Probe.GetAsync($"http://{ip}:8080/login", ct);
+                if ((int)resp.StatusCode < 500) return (true, "");
+                last = $"HTTP {(int)resp.StatusCode}";
+            }
+            catch (Exception ex) { last = ex.Message; }
+        }
+        return (false, $"Health-Check nach {timeout.TotalSeconds:0} s nicht bestanden ({last}).");
+    }
+
+    private async Task<bool> RollbackSelfAsync(DockerClient client, string oldId, string? newId, string name,
+        string? backupDir, string? dbPath, Action<string> log, CancellationToken ct)
+    {
+        if (newId is not null)
+        {
+            try { await client.Containers.RemoveContainerAsync(newId, new ContainerRemoveParameters { Force = true }, ct); log("Neuer Container entfernt."); }
+            catch (Exception ex) { log($"Neuer Container nicht entfernbar: {ex.Message}"); }
+
+            // The new version may already have migrated the schema — the OLD code must get the database
+            // back exactly as it left it. Only needed once a new container existed; before that nothing
+            // could have touched the file.
+            if (backupDir is not null && dbPath is not null) RestoreDatabase(backupDir, dbPath, log);
+        }
+        try
+        {
+            var info = await client.Containers.InspectContainerAsync(oldId, ct);
+            if ((info.Name ?? "").TrimStart('/') != name)
+                await client.Containers.RenameContainerAsync(oldId, new ContainerRenameParameters { NewName = name }, ct);
+            await client.Containers.StartContainerAsync(oldId, new ContainerStartParameters(), ct);
+            log("Alte Cloud wieder gestartet.");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            log($"Rollback fehlgeschlagen: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>A parked container left by an earlier interrupted run would block the rename. It is stale by
+    /// definition — a cloud (<paramref name="keepId"/>) is running and asked for this update — but it is only
+    /// removed when it positively is a MatCMS container.</summary>
+    private async Task RemoveStaleParkedAsync(DockerClient client, string parked, string keepId, Action<string> log, CancellationToken ct)
+    {
+        try
+        {
+            var i = await client.Containers.InspectContainerAsync(parked, ct);
+            if (i.ID == keepId) return;
+            if (!LooksLikeMatCms(i.Config?.Image ?? "", i.Config?.Labels))
+                throw new InvalidOperationException($"'{parked}' existiert und ist kein MatCMS-Container.");
+            await client.Containers.RemoveContainerAsync(i.ID, new ContainerRemoveParameters { Force = true }, ct);
+            log($"Verwaisten Container '{parked}' entfernt.");
+        }
+        catch (DockerContainerNotFoundException) { /* the normal case */ }
+    }
+
+    /// <summary>The cloud's SQLite file as the helper sees it — only when it lives on the data volume
+    /// (the helper mounts nothing else). Read from the cloud container's own connection string.</summary>
+    private static string? ResolveDbPath(ContainerInspectResponse insp)
+    {
+        const string key = "ConnectionStrings__Default=";
+        var cs = insp.Config?.Env?.FirstOrDefault(e => e.StartsWith(key, StringComparison.OrdinalIgnoreCase))?[key.Length..]
+                 ?? "Data Source=appdata/matcmscloud.db";
+        var m = Regex.Match(cs, @"Data Source\s*=\s*([^;]+)", RegexOptions.IgnoreCase);
+        if (!m.Success) return null;
+        var p = m.Groups[1].Value.Trim();
+        var full = Path.GetFullPath(Path.IsPathRooted(p) ? p : Path.Combine(Directory.GetCurrentDirectory(), p));
+        var data = Path.GetFullPath(HelperDataDir).TrimEnd('/') + "/";
+        return full.StartsWith(data, StringComparison.Ordinal) ? full : null;
+    }
+
+    private static (string? Dir, string? Db) BackupDatabase(ContainerInspectResponse insp, Action<string> log)
+    {
+        var db = ResolveDbPath(insp);
+        if (db is null) { log("WARNUNG: Datenbank liegt nicht im Datenvolume — keine DB-Sicherung vor dem Update."); return (null, null); }
+        try
+        {
+            var dir = Path.Combine(HelperDataDir, "self-update", "pre-" + DateTime.UtcNow.ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture));
+            Directory.CreateDirectory(dir);
+            var n = 0;
+            foreach (var suffix in new[] { "", "-wal", "-shm" })
+            {
+                var src = db + suffix;
+                if (!File.Exists(src)) continue;
+                File.Copy(src, Path.Combine(dir, Path.GetFileName(src)), overwrite: true);
+                n++;
+            }
+            log($"Datenbank gesichert ({n} Datei(en)).");
+            return (dir, db);
+        }
+        catch (Exception ex)
+        {
+            log($"WARNUNG: DB-Sicherung fehlgeschlagen: {ex.Message}");
+            return (null, null);
+        }
+    }
+
+    private static void RestoreDatabase(string backupDir, string dbPath, Action<string> log)
+    {
+        try
+        {
+            foreach (var suffix in new[] { "", "-wal", "-shm" })
+            {
+                var dst = dbPath + suffix;
+                var src = Path.Combine(backupDir, Path.GetFileName(dst));
+                if (File.Exists(src)) File.Copy(src, dst, overwrite: true);
+                // A WAL/SHM the NEW version wrote must not be replayed by the old one. The main file itself
+                // is never deleted — only replaced.
+                else if (suffix.Length > 0 && File.Exists(dst)) File.Delete(dst);
+            }
+            log("Datenbank auf den Stand vor dem Update zurückgesetzt.");
+        }
+        catch (Exception ex) { log($"WARNUNG: DB-Rücksicherung fehlgeschlagen: {ex.Message}"); }
+    }
+
+    /// <summary>Keeps the three newest pre-update snapshots; older ones only cost disk.</summary>
+    private static void PruneDbBackups(Action<string> log)
+    {
+        try
+        {
+            var root = Path.Combine(HelperDataDir, "self-update");
+            if (!Directory.Exists(root)) return;
+            foreach (var d in Directory.GetDirectories(root, "pre-*").OrderByDescending(x => x, StringComparer.Ordinal).Skip(3))
+                try { Directory.Delete(d, recursive: true); } catch { }
+        }
+        catch (Exception ex) { log($"Alte DB-Sicherungen nicht aufgeräumt: {ex.Message}"); }
+    }
+
+    private static string Short(string? id)
+    {
+        var s = (id ?? "").Replace("sha256:", "", StringComparison.OrdinalIgnoreCase);
+        return s.Length > 12 ? s[..12] : s;
     }
 
     /// <summary>Safety guard for the destructive path: the image name (or a compose service label)

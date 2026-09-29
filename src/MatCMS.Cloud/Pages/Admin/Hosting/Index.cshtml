@@ -1,0 +1,57 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.Hosting.IndexModel
+@{
+    ViewData["Title"] = T["hosting.title"];
+}
+<div class="page-head">
+    <h1>@T["hosting.title"]</h1>
+    <div class="list-toolbar">
+        @if (Model.ModuleEnabled)
+        {
+            <a class="btn btn-sm" asp-page="/Admin/Instances/New">@T["hosting.newInstance"]</a>
+        }
+        <a class="btn btn-sm btn-ghost" href="?check=true">@T["cloudupdate.check"]</a>
+    </div>
+</div>
+<p class="muted">@T["hosting.intro"]</p>
+
+@if (!Model.ModuleEnabled)
+{
+    <div class="alert alert-info">@T["hosting.moduleOff"] <a asp-page="/Admin/Settings/Index" asp-route-tab="hosting">@T["nav.settings"] → @T["hosting.title"]</a></div>
+}
+
+<partial name="_CloudUpdateCard" model="Model.Card" />
+
+<div class="card">
+    <h2>@T["hosting.localInstances"]</h2>
+    <table class="data">
+        <thead>
+            <tr>
+                <th>@T["cleanup.instance"]</th>
+                <th>@T["hosting.name"]</th>
+                <th style="width:110px;">@T["hosting.state"]</th>
+                <th style="width:80px;">@T["hosting.port"]</th>
+                <th style="width:110px;">@T["hosting.managed"]</th>
+                <th style="width:140px;">@T["hosting.version"]</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Local.Count == 0)
+            {
+                <partial name="_EmptyRow" model='@T["hosting.noLocal"]' />
+            }
+            @foreach (var i in Model.Local)
+            {
+                var up = string.Equals(i.ContainerState, "running", StringComparison.OrdinalIgnoreCase);
+                <tr>
+                    <td><a asp-page="/Admin/Instances/Details" asp-route-id="@i.Id" asp-route-tab="hosting">@i.Name</a></td>
+                    <td class="mono muted">@(i.LocalContainerName ?? "—")</td>
+                    <td><span class="badge @(up ? "badge-on" : "badge-err")">@(i.ContainerState ?? "—")</span></td>
+                    <td class="mono muted">@(i.LocalPort?.ToString() ?? "—")</td>
+                    <td><span class="badge @(i.CloudManaged ? "badge-on" : "badge-off")">@(i.CloudManaged ? T["hosting.managedYes"] : T["hosting.managedNo"])</span></td>
+                    <td class="mono muted">@(i.Version ?? "—")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

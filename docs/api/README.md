@@ -28,6 +28,7 @@ Klartext sichtbar). Rechte pro Schlüssel:
 | **CanRestore** | Darf ein Backup **live** zurückspielen (`…/restore`) – überschreibt die Produktivseite. |
 | **CanManageProfiles** | Darf Profile und ihre Inhalte **schreiben** und Instanzen einem Profil zuordnen. |
 | **CanManageStore** | Darf den cloud-weiten **Store** (Templates/Plugins/Komponenten/Mail-Templates) **schreiben**. Eine Store-Änderung erreicht **jedes Profil**, das den Eintrag ausgewählt hat – deshalb ein eigenes Recht. Lesen braucht nur einen gültigen Schlüssel. Ignoriert den Instanz-Umfang (der Store ist cloud-weit). |
+| **CanManageHosting** | Darf **Container** von Instanzen starten/stoppen/neu starten/aktualisieren und ihre **Logs** lesen (im Instanz-Umfang). Mit einem Schlüssel für **alle Instanzen** zusätzlich: Hosting-Modul schalten und die **Cloud selbst aktualisieren**. |
 | **Instanz-Umfang** | „Alle Instanzen" oder auf ausgewählte begrenzt. Eine unbekannte/außerhalb liegende Instanz gibt immer **404** (nicht 403), damit ein begrenzter Schlüssel keine Instanzen aufzählen kann. |
 
 Fehlerformat immer JSON: `{ "error": "…" }` mit passendem HTTP-Status (401/403/404/400/409).
@@ -153,7 +154,23 @@ Template = `name`, Komponente = `type`, Mail-Template/Plugin = `key`. Ein `POST`
 
 ---
 
-## 6. MCP-Server (`/mcp`) – Inhalte per KI verwalten
+## 6. Hosting – Container & Cloud-Update
+
+Alles, was der **Hosting-Tab** einer Instanz und die Seite **Hosting** können, geht auch per API. Container-
+Aktionen wirken sofort (die Cloud spricht mit ihrem eigenen Docker-Daemon) und nur auf Instanzen, die auf
+**diesem** Docker-Host laufen (`local: true`); eine Instanz woanders antwortet mit `409`.
+
+- `GET /api/v1/hosting` → `{ enabled, dockerConfigured, dockerReachable, canManageHosting }`
+- `PUT /api/v1/hosting` `{ enabled }` – Hosting-Modul schalten (**CanManageHosting + alle Instanzen**). Steuert Menüpunkt + Provisionierung; Container-Aktionen gehen immer.
+- `GET /api/v1/instances/{publicId}/container` → `{ hosting, local, cloudManaged, containerState, localPort, container:{ name, image, state, startedAt, restartCount, publishedPort, health } }`
+- `POST /api/v1/instances/{publicId}/container/{action}` mit `action` = `start` | `stop` | `restart` | `update` (**CanManageHosting**). `update` zieht das neueste Image und erstellt den Container neu (mit Rollback) – blockierend.
+- `GET /api/v1/instances/{publicId}/container/logs?tail=200` → `{ logs }` – stdout/stderr mit Zeitstempeln, 1–5000 Zeilen (**CanManageHosting**).
+- `GET /api/v1/cloud/update?check=true` → `{ current, latest, updateAvailable, canSelfUpdate, blocker, lastRun:{ state, message, log[] } }`
+- `POST /api/v1/cloud/update` → `202` – **aktualisiert die Cloud selbst** (**CanManageHosting + alle Instanzen**). Ein Helfer-Container tauscht den Cloud-Container, prüft ihn per Health-Check und rollt bei Fehlern **Container und Datenbank** zurück. Die Cloud ist ~1–2 Min. weg; danach `GET …/cloud/update` → `lastRun.state` = `succeeded` | `current` | `rolled-back` | `failed`.
+
+---
+
+## 7. MCP-Server (`/mcp`) – Inhalte per KI verwalten
 
 Für KI-Clients (ChatGPT, Claude, Cursor) bietet die Cloud einen **Model-Context-Protocol**-Server
 unter `/mcp` (streamable HTTP). Auth = **derselbe** `mck_…`-Schlüssel als `Authorization: Bearer …`.
@@ -189,6 +206,18 @@ Instanz beim nächsten Heartbeat über ihre **eigenen** Validierer anwendet (add
 | `upsert_store_mail_template` / `delete_store_mail_template` | ein Mail-Template anlegen/ändern bzw. entfernen |
 | `delete_store_plugin` | ein Plugin aus dem Store entfernen (Hochladen bleibt REST: `POST /api/v1/store/plugins`) |
 
+**Hosting-Tools** (wirken sofort; Rechte wie REST-Abschnitt 6):
+
+| Tool | Zweck |
+|---|---|
+| `get_hosting_status` | Hosting-Modul an/aus, Docker erreichbar |
+| `set_hosting_enabled` | Hosting-Modul schalten (Hosting-Recht + alle Instanzen) |
+| `get_container_status` | Container-Zustand einer Instanz (lokal?, Image, Start, Neustarts, Health) |
+| `container_action` | `start` / `stop` / `restart` / `update` des Instanz-Containers — vorher mit dem Nutzer bestätigen |
+| `get_container_logs` | letzte Zeilen stdout/stderr des Instanz-Containers |
+| `get_cloud_update_status` | Cloud-Version, neueste Version, ob Selbst-Update möglich ist, Verlauf des letzten Updates |
+| `update_cloud` | **Cloud selbst aktualisieren** (Helfer-Container, Health-Check, Rollback) — vorher bestätigen; Hosting-Recht + alle Instanzen |
+
 **`create_page`** (Beispiel-Eingabe):
 ```json
 {
@@ -209,7 +238,7 @@ Content-Ops.
 
 ---
 
-## 7. Block-Katalog
+## 8. Block-Katalog
 
 Blöcke, die eine MatCMS-Site kennt, mit ihren Feld-IDs. Spalte **KI-setzbar** = das Feld überlebt eine
 `create_page`/`update_page_blocks`-Content-Op (nur Text-/RichText-Felder). Bild-/Auswahl-/Link-Felder
@@ -513,7 +542,7 @@ Kind-Blöcke (`card`, `column`, `faq`, `step`, `service`, `leistung`, `reference
 
 ---
 
-## 8. Rezepte für eine KI
+## 9. Rezepte für eine KI
 
 - **Neue Unterseite mit Text anlegen:** `create_page` mit `hero` + `richtext`/`cards` → `opId` → `get_content_op` bis `applied`.
 - **Bestehende Seite umtexten:** `get_page` (async) → Blöcke anpassen → `update_page_blocks` (CanRestore).

@@ -28,7 +28,7 @@ public class ApiKeyService
     /// </summary>
     public async Task<Created> CreateAsync(string name, bool canRestore, bool allInstances,
         IEnumerable<int> instanceIds, CancellationToken ct = default, bool canManageProfiles = false,
-        bool canManageStore = false)
+        bool canManageStore = false, bool canManageHosting = false)
     {
         var raw = Tag + Base64Url(RandomNumberGenerator.GetBytes(32));
         var key = new ApiKey
@@ -39,6 +39,7 @@ public class ApiKeyService
             CanRestore = canRestore,
             CanManageProfiles = canManageProfiles,
             CanManageStore = canManageStore,
+            CanManageHosting = canManageHosting,
             AllInstances = allInstances,
         };
         if (!allInstances)

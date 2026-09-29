@@ -1,0 +1,58 @@
+@model MatCMS.Cloud.Services.CloudUpdateCard
+@* The cloud's own version + self-update, shared by About and Hosting so the two can never disagree about
+   whether an update is possible. The hosting page provides the "SelfUpdate" handler and "?check=true". *@
+@{
+    var s = Model.Status;
+    var run = s.LastRun;
+    string RunBadge(string? st) => st switch
+    {
+        "succeeded" or "current" => "badge-on",
+        "rolled-back" or "failed" => "badge-err",
+        _ => "badge-new",
+    };
+}
+<div class="card">
+    <h2>@T["cloudupdate.title"]</h2>
+    <div class="kv"><div class="kv-label">@T["cloudupdate.running"]</div><div class="kv-value mono">@s.Current</div></div>
+    <div class="kv"><div class="kv-label">@T["about.image"]</div><div class="kv-value mono muted">@s.ImageRef</div></div>
+    <div class="kv"><div class="kv-label">@T["cloudupdate.latest"]</div><div class="kv-value">
+        @if (s.Latest is not null)
+        {
+            <span class="mono">@s.Latest</span>
+            <span class="badge @(s.UpdateAvailable == true ? "badge-new" : "badge-on")">@(s.UpdateAvailable == true ? T["cloudupdate.available"] : T["cloudupdate.upToDate"])</span>
+        }
+        else if (s.CheckError is not null) { <span class="badge badge-err" title="@s.CheckError">@T["cloudupdate.checkFailed"]</span> }
+        else { <a href="?check=true">@T["cloudupdate.check"]</a> }
+    </div></div>
+
+    @if (Model.CanAct)
+    {
+        @if (s.CanSelfUpdate)
+        {
+            <form method="post" asp-page-handler="SelfUpdate" class="list-actions"
+                  onsubmit="return confirm('@T["cloudupdate.confirm"]');">
+                <button type="submit" class="btn @(s.UpdateAvailable == true ? "" : "btn-ghost")"><i class="ti ti-cloud-download" aria-hidden="true"></i> @T["cloudupdate.now"]</button>
+            </form>
+            <div class="help">@T["cloudupdate.help"]</div>
+        }
+        else
+        {
+            <div class="help">@T["cloudupdate.blocked"] <strong>@s.Blocker</strong> @T["cloudupdate.manual"] <code>docker compose pull &amp;&amp; docker compose up -d</code></div>
+        }
+    }
+
+    @if (run is not null)
+    {
+        <div class="kv" style="margin-top:12px;"><div class="kv-label">@T["cloudupdate.lastRun"]</div><div class="kv-value">
+            <span class="badge @RunBadge(run.State)">@T["cloudupdate.state." + run.State]</span>
+            <span class="muted">@((run.FinishedAt ?? run.StartedAt)?.ToLocalTime().ToString("dd.MM.yyyy HH:mm"))</span>
+            @if (!string.IsNullOrEmpty(run.Message)) { <div>@run.Message</div> }
+        </div></div>
+        @if (run.Log.Count > 0)
+        {
+            <details><summary class="muted">@T["cloudupdate.log"]</summary>
+                <pre class="mono" style="white-space:pre-wrap;font-size:12px;max-height:320px;overflow:auto;">@string.Join("\n", run.Log)</pre>
+            </details>
+        }
+    }
+</div>

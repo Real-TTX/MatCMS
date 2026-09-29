@@ -10,40 +10,8 @@
     </div>
 </div>
 
-<div class="card">
-    <h2>@T["about.thisCloud"]</h2>
-    <div class="kv">
-        <div class="kv-label">@T["about.runningVersion"]</div>
-        <div class="kv-value mono">@Model.Current</div>
-    </div>
-    <div class="kv">
-        <div class="kv-label">@T["about.image"]</div>
-        <div class="kv-value mono">@Model.ImageRef</div>
-    </div>
-    @if (Model.Check is not null)
-    {
-        <div class="kv">
-            <div class="kv-label">@T["about.latest"]</div>
-            <div class="kv-value">
-                @if (Model.Check.Error is not null)
-                {
-                    <span class="badge badge-err">@Model.Check.Error</span>
-                }
-                else if (Model.Check.UpdateAvailable)
-                {
-                    <span class="badge badge-new">@T["about.updateAvailable", Model.Check.Latest ?? "?"]</span>
-                }
-                else
-                {
-                    <span class="badge badge-on">@T["about.upToDate"]</span>
-                    <span class="muted mono">@Model.Check.Latest</span>
-                }
-            </div>
-        </div>
-    }
-    <div class="help">@T["about.updateVia"]</div>
-    <div class="code-block"><code>@Model.UpdateCommand</code></div>
-</div>
+@* The cloud's own version + self-update: the same card the Hosting page shows. *@
+<partial name="_CloudUpdateCard" model="Model.Card" />
 
 <div class="card">
     <h2>@T["about.instanceImage"]</h2>

@@ -29,6 +29,24 @@
             <div class="help">@T["instances.newProfileHint"]</div>
         </div>
 
+        @if (Model.Nodes.Count > 0)
+        {
+            @* Nur wenn es überhaupt Nodes gibt — sonst ist "Dieser Host" die einzige Antwort und die Frage
+               überflüssig. *@
+            <div class="form-field">
+                <label for="nodeId">@T["nodes.where"]</label>
+                <select id="nodeId" name="nodeId">
+                    <option value="" disabled="@(Model.NextPort is null ? "disabled" : null)">@T["nodes.thisHost"]@(Model.NextPort is null ? " — " + T["settings.hostingNoPort"] : "")</option>
+                    @foreach (var n in Model.Nodes)
+                    {
+                        var on = n.IsOnline(DateTime.UtcNow);
+                        <option value="@n.Id" disabled="@(on ? null : "disabled")" selected="@(Model.NextPort is null && on ? "selected" : null)">@n.Name@(on ? "" : " — " + T["nodes.offline"])</option>
+                    }
+                </select>
+                <div class="help">@T["nodes.whereHint"]</div>
+            </div>
+        }
+
         <div class="form-field">
             <label for="imageTag">@T["instances.newVersion"]</label>
             <input id="imageTag" name="imageTag" value="latest" spellcheck="false" />
@@ -41,8 +59,6 @@
             </div>
         </div>
 
-        @* Mit Matcad entsteht die Route aus den Labels; ohne muss jemand sagen, wohin. Die Frage wird
-           deshalb nur dann gestellt, wenn sie eine Antwort braucht. *@
         <div class="form-field">
             <label for="domain">@T["instances.newDomain"]</label>
             @* Optional in every mode: without it the site is reachable on its host port. *@
@@ -51,7 +67,7 @@
         </div>
 
         <div class="kv">
-            <div class="kv-label">@T["settings.hostingNextPort"]</div>
+            <div class="kv-label">@T["settings.hostingNextPort"]@(Model.Nodes.Count > 0 ? " (" + T["nodes.thisHost"] + ")" : "")</div>
             <div class="kv-value">
                 @if (Model.NextPort is int np)
                 {
@@ -68,7 +84,7 @@
     @* .form-actions, not .list-actions: this row belongs to a form, not to a list — same class the
        CMS uses for the same thing. *@
     <div class="form-actions">
-        <button type="submit" class="btn" disabled="@(Model.NextPort is null ? "disabled" : null)">@T["instances.newCreate"]</button>
+        <button type="submit" class="btn" disabled="@(Model.CanCreate ? null : "disabled")">@T["instances.newCreate"]</button>
         <a class="btn btn-ghost" asp-page="Index">@T["action.back"]</a>
     </div>
 </form>

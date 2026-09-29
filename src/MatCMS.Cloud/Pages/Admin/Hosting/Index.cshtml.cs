@@ -27,6 +27,7 @@ public class IndexModel : PageModel
     public bool ModuleEnabled => _cloud.Flag(SettingKeys.HostingEnabled);
     public CloudUpdateCard Card { get; private set; } = null!;
     public List<Instance> Local { get; private set; } = new();
+    public int NodeCount { get; private set; }
 
     public async Task OnGetAsync(bool check = false)
     {
@@ -34,8 +35,10 @@ public class IndexModel : PageModel
         // registry is unreachable.
         Card = new CloudUpdateCard(await _updater.StatusAsync(check, HttpContext.RequestAborted), CanAct: true);
         Local = await _db.Instances.AsNoTracking()
-            .Where(i => i.Hosting == InstanceHosting.Local)
+            .Include(i => i.Node)
+            .Where(i => i.Hosting == InstanceHosting.Local || i.Hosting == InstanceHosting.Node)
             .OrderBy(i => i.Name).ToListAsync();
+        NodeCount = await _db.Nodes.CountAsync();
     }
 
     public async Task<IActionResult> OnPostSelfUpdateAsync()

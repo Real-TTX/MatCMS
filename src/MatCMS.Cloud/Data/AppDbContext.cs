@@ -32,6 +32,10 @@ public class AppDbContext : DbContext
     // Pending/completed content operations (AI changes via the MCP server), per instance.
     public DbSet<ContentOp> ContentOps => Set<ContentOp>();
 
+    // Hosting increment 4: remote Docker hosts (node-agents) and the jobs they pull.
+    public DbSet<Node> Nodes => Set<Node>();
+    public DbSet<NodeJob> NodeJobs => Set<NodeJob>();
+
     // Per-user instance scope for the "Operator" role (login users, not API keys).
     public DbSet<UserInstance> UserInstances => Set<UserInstance>();
 
@@ -122,6 +126,18 @@ public class AppDbContext : DbContext
             .HasOne(o => o.Instance).WithMany()
             .HasForeignKey(o => o.InstanceId).OnDelete(DeleteBehavior.Cascade);
         b.Entity<ContentOp>().HasIndex(o => new { o.InstanceId, o.DoneAt });
+
+        b.Entity<Node>().HasIndex(n => n.PublicId).IsUnique();
+        b.Entity<Node>().HasIndex(n => n.Name).IsUnique();
+        b.Entity<NodeJob>()
+            .HasOne(j => j.Node).WithMany()
+            .HasForeignKey(j => j.NodeId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<NodeJob>().HasIndex(j => new { j.NodeId, j.State });
+        // Deleting a node forgets where its instances ran; the instances themselves stay (they are sites,
+        // not the node's property) and fall back to remote on their next beat.
+        b.Entity<Instance>()
+            .HasOne(i => i.Node).WithMany()
+            .HasForeignKey(i => i.NodeId).OnDelete(DeleteBehavior.SetNull);
         // Dedup key for logs piggybacked on the heartbeat, plus the ordering the view reads back by.
         b.Entity<InstanceLogEntry>().HasIndex(l => new { l.InstanceId, l.SourceId }).IsUnique();
 

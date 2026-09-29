@@ -1,0 +1,22 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.Hosting.Nodes.CreateModel
+@{
+    ViewData["Title"] = T["nodes.add"];
+}
+<div class="page-head">
+    <h1>@T["nodes.add"]</h1>
+</div>
+
+<form method="post">
+    <div class="card">
+        <div class="form-field">
+            <label for="name">@T["common.name"]</label>
+            <input id="name" name="name" required placeholder="hetzner-1" spellcheck="false" />
+            <div class="help">@T["nodes.createHint"]</div>
+        </div>
+    </div>
+    <div class="form-actions">
+        <button type="submit" class="btn">@T["nodes.create"]</button>
+        <a class="btn btn-ghost" asp-page="Index">@T["action.back"]</a>
+    </div>
+</form>

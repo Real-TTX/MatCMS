@@ -113,31 +113,175 @@ public class DockerHostService
             var list = await client.Containers.ListContainersAsync(
                 new ContainersListParameters { All = true }, ct);
 
-            var match = list.FirstOrDefault(c =>
-                c.ID.StartsWith(id, StringComparison.OrdinalIgnoreCase) ||
-                id.StartsWith(c.ID, StringComparison.OrdinalIgnoreCase));
-            if (match is null) return null;
-
-            var name = (match.Names?.FirstOrDefault() ?? "").TrimStart('/');
-
-            // Prefer the mapping of the container's own HTTP port (8080 in the MatCMS image); fall
-            // back to any published TCP port. IPv6 duplicates of the same mapping are ignored.
-            var published = (match.Ports ?? new List<Port>())
-                .Where(p => p.PublicPort > 0 && (p.Type is null || p.Type == "tcp"))
-                .OrderByDescending(p => p.PrivatePort == 8080)
-                .Select(p => (int?)p.PublicPort)
-                .FirstOrDefault();
-
-            var managed = match.Labels is not null
-                && match.Labels.TryGetValue(ManagedLabel, out var flag)
-                && string.Equals(flag, "true", StringComparison.OrdinalIgnoreCase);
-
-            return new ContainerInfo(match.ID, name, match.Image ?? "", match.State ?? "", published, managed);
+            var match = list.FirstOrDefault(c => IdMatches(c.ID, id));
+            return match is null ? null : ToInfo(match);
         }
         catch (Exception ex)
         {
             _log.LogWarning(ex, "Listing containers failed");
             return null;
+        }
+    }
+
+    /// <summary>Prefix match in both directions — an instance may only know the short 12-character id.</summary>
+    public static bool IdMatches(string fullId, string reported) =>
+        reported.Length >= 12 &&
+        (fullId.StartsWith(reported, StringComparison.OrdinalIgnoreCase) ||
+         reported.StartsWith(fullId, StringComparison.OrdinalIgnoreCase));
+
+    private static ContainerInfo ToInfo(ContainerListResponse c)
+    {
+        var name = (c.Names?.FirstOrDefault() ?? "").TrimStart('/');
+
+        // Prefer the mapping of the container's own HTTP port (8080 in the MatCMS image); fall
+        // back to any published TCP port. IPv6 duplicates of the same mapping are ignored.
+        var published = (c.Ports ?? new List<Port>())
+            .Where(p => p.PublicPort > 0 && (p.Type is null || p.Type == "tcp"))
+            .OrderByDescending(p => p.PrivatePort == 8080)
+            .Select(p => (int?)p.PublicPort)
+            .FirstOrDefault();
+
+        var managed = c.Labels is not null
+            && c.Labels.TryGetValue(ManagedLabel, out var flag)
+            && string.Equals(flag, "true", StringComparison.OrdinalIgnoreCase);
+
+        return new ContainerInfo(c.ID, name, c.Image ?? "", c.State ?? "", published, managed);
+    }
+
+    // ---- Node engine (Hosting increment 4) ----------------------------------------------------------
+    //
+    // What a node-agent needs beyond the actions above. Deliberately HERE and not in the agent: the cloud's
+    // own host and every node run the same code, so a guard added once holds everywhere.
+
+    /// <summary>The MatCMS containers on this daemon — what a node reports as its inventory. Null = no daemon.
+    /// Filtered by the same <see cref="LooksLikeMatCms"/> guard as every action: the cloud has no business
+    /// learning about the other containers on somebody's host.</summary>
+    public async Task<List<ContainerInfo>?> ListMatCmsContainersAsync(CancellationToken ct = default)
+    {
+        var client = Client;
+        if (client is null) return null;
+        var list = await client.Containers.ListContainersAsync(new ContainersListParameters { All = true }, ct);
+        // The agent itself and a cloud on the same host are "matcms-cloud" images — infrastructure, not sites.
+        return list.Where(c => LooksLikeMatCms(c.Image ?? "", c.Labels)
+                               && !(c.Image ?? "").Contains("matcms-cloud", StringComparison.OrdinalIgnoreCase)
+                               && !(c.Labels?.ContainsKey(UpdaterLabel) ?? false))
+            .Select(ToInfo).ToList();
+    }
+
+    /// <summary>Daemon version ("27.3.1") and the HOST's name (not the container's), or the error when the
+    /// daemon cannot be reached.</summary>
+    public async Task<(string? Version, string? HostName, string? Error)> DaemonInfoAsync(CancellationToken ct = default)
+    {
+        var client = Client;
+        if (client is null) return (null, null, Configured ? "Docker-Endpunkt nicht nutzbar." : "Kein Docker-Zugriff konfiguriert.");
+        try { var i = await client.System.GetSystemInfoAsync(ct); return (i.ServerVersion, i.Name, null); }
+        catch (Exception ex) { return (null, null, ex.Message); }
+    }
+
+    /// <summary>All published host ports on this daemon (stopped containers included — they claim theirs again
+    /// on start), or null when it cannot be asked. Null and empty are two different answers.</summary>
+    public async Task<HashSet<int>?> UsedPortsAsync(CancellationToken ct = default)
+    {
+        var client = Client;
+        if (client is null) return null;
+        try
+        {
+            var list = await client.Containers.ListContainersAsync(new ContainersListParameters { All = true }, ct);
+            return list.SelectMany(c => c.Ports ?? new List<Port>())
+                .Where(p => p.PublicPort > 0).Select(p => (int)p.PublicPort).ToHashSet();
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(ex, "Belegte Ports konnten nicht ermittelt werden.");
+            return null;
+        }
+    }
+
+    /// <summary>The first free port in [from, to], or null (none free, or no daemon — never a guess, which
+    /// would only fail later when the container refuses to start).</summary>
+    public async Task<int?> NextFreePortAsync(int from, int to, CancellationToken ct = default)
+    {
+        if (from > to) (from, to) = (to, from);
+        var used = await UsedPortsAsync(ct);
+        if (used is null) return null;
+        for (var port = from; port <= to; port++)
+            if (!used.Contains(port)) return port;
+        return null;
+    }
+
+    /// <summary>What a new instance container is made of. The name is decided by the cloud (its naming pattern);
+    /// labels and the port are decided HERE, on the host that owns them.</summary>
+    public sealed record InstanceContainerSpec(string ContainerName, string VolumeName, string Image, List<string> Env,
+        int PortFrom, int PortTo);
+
+    public sealed record CreateContainerResult(bool Ok, string? Error, string? ContainerId, int? Port, string? ContainerName);
+
+    /// <summary>
+    /// Pulls the image, creates the instance container (stamped <see cref="ManagedLabel"/> + the labels compose
+    /// writes) and starts it. A container that fails after creation is removed again — a stopped leftover with
+    /// the right name would block the next attempt. The volume is deliberately kept: it may hold site data
+    /// from the first second, and deleting data is no job for an error path.
+    /// </summary>
+    public async Task<CreateContainerResult> CreateInstanceContainerAsync(InstanceContainerSpec spec, CancellationToken ct = default)
+    {
+        var client = Client;
+        if (client is null) return new(false, "Docker ist nicht erreichbar.", null, null, null);
+        if (!LooksLikeMatCms(spec.Image, null))
+            return new(false, $"Abgelehnt: '{spec.Image}' ist kein MatCMS-Image.", null, null, null);
+
+        var port = await NextFreePortAsync(spec.PortFrom, spec.PortTo, ct);
+        if (port is null) return new(false, $"Kein freier Port zwischen {spec.PortFrom} und {spec.PortTo}.", null, null, null);
+
+        string? createdId = null;
+        try
+        {
+            // Pull first — otherwise creating fails with a message that reads like a bad call, not a missing image.
+            await client.Images.CreateImageAsync(new ImagesCreateParameters { FromImage = spec.Image }, null, new Progress<JSONMessage>(), ct);
+
+            var labels = new Dictionary<string, string>
+            {
+                [ManagedLabel] = "true",
+                // The labels compose writes itself: Docker Desktop, Dockhand, Portainer group by them without
+                // knowing anything about us. working_dir/config_files stay OUT — there is no file behind this.
+                ["com.docker.compose.project"] = spec.ContainerName,
+                ["com.docker.compose.service"] = "web",
+                ["com.docker.compose.container-number"] = "1",
+                ["com.docker.compose.oneoff"] = "False",
+            };
+            // No matcad.* labels: routes are created through Matcad's REST API (ProxyService). With label
+            // discovery on, Matcad would otherwise build a SECOND route for the same host that cannot be
+            // changed or removed without recreating the container.
+
+            var created = await client.Containers.CreateContainerAsync(new CreateContainerParameters
+            {
+                Name = spec.ContainerName,
+                Image = spec.Image,
+                Labels = labels,
+                Env = spec.Env,
+                HostConfig = new HostConfig
+                {
+                    PortBindings = new Dictionary<string, IList<PortBinding>>
+                    {
+                        ["8080/tcp"] = new List<PortBinding> { new() { HostPort = port.Value.ToString(CultureInfo.InvariantCulture) } }
+                    },
+                    Binds = new List<string> { spec.VolumeName + ":/app/appdata" },
+                    RestartPolicy = new RestartPolicy { Name = RestartPolicyKind.UnlessStopped },
+                },
+            }, ct);
+            createdId = created.ID;
+            await client.Containers.StartContainerAsync(createdId, new ContainerStartParameters(), ct);
+            _log.LogInformation("Instanz {Name} angelegt: Container {Id} auf Port {Port}.", spec.ContainerName, createdId, port);
+            return new(true, null, createdId, port, spec.ContainerName);
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex, "Anlegen von {Name} fehlgeschlagen.", spec.ContainerName);
+            if (createdId is not null)
+            {
+                try { await client.Containers.RemoveContainerAsync(createdId, new ContainerRemoveParameters { Force = true }, CancellationToken.None); }
+                catch (Exception cleanup) { _log.LogWarning(cleanup, "Der halb gebaute Container {Id} blieb stehen.", createdId); }
+            }
+            return new(false, ex.Message, null, null, null);
         }
     }
 

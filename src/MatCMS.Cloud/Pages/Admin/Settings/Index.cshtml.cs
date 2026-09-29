@@ -42,6 +42,7 @@ public class IndexModel : PageModel
     /// <summary>How many instances the cloud found on its own daemon — the practical answer to
     /// "is the socket doing anything for me?".</summary>
     public int LocalCount { get; private set; }
+    public MatCMS.Cloud.Services.Proxy.ProxyFieldsView ProxyFields => _proxy.FieldsView();
 
     /// <summary>Der Port, den die nächste Instanz bekäme — die einzige Art, die Vergabe zu prüfen,
     /// ohne etwas anzulegen. Null heißt: Bereich voll oder Daemon nicht erreichbar.</summary>
@@ -142,7 +143,7 @@ public class IndexModel : PageModel
     {
         await SaveHostingAsync(hostingEnabled, hostingMode, matcadUrl, matcadToken, clearMatcadToken, portFrom, portTo, namePattern,
             caddyAdminUrl, caddyServer, proxyUpstream, proxyNetwork, proxyUpstreamHost);
-        var r = await _proxy.TestAsync(HttpContext.RequestAborted);
+        var r = await _proxy.TestAsync(null, HttpContext.RequestAborted);
         TempData[r.Ok ? "Flash" : "FlashError"] = "Gespeichert. " + r.Message;
         return RedirectToPage(new { tab = "hosting" });
     }

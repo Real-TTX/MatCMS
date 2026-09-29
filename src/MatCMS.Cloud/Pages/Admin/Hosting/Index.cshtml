@@ -10,6 +10,7 @@
         {
             <a class="btn btn-sm" asp-page="/Admin/Instances/New">@T["hosting.newInstance"]</a>
         }
+        <a class="btn btn-sm btn-ghost" asp-page="/Admin/Hosting/Nodes/Index">@T["nodes.title"] (@(Model.NodeCount + 1))</a>
         <a class="btn btn-sm btn-ghost" href="?check=true">@T["cloudupdate.check"]</a>
     </div>
 </div>
@@ -23,11 +24,12 @@
 <partial name="_CloudUpdateCard" model="Model.Card" />
 
 <div class="card">
-    <h2>@T["hosting.localInstances"]</h2>
+    <h2>@T["hosting.hostedInstances"]</h2>
     <table class="data">
         <thead>
             <tr>
                 <th>@T["cleanup.instance"]</th>
+                <th>@T["nodes.hostColumn"]</th>
                 <th>@T["hosting.name"]</th>
                 <th style="width:110px;">@T["hosting.state"]</th>
                 <th style="width:80px;">@T["hosting.port"]</th>
@@ -45,6 +47,7 @@
                 var up = string.Equals(i.ContainerState, "running", StringComparison.OrdinalIgnoreCase);
                 <tr>
                     <td><a asp-page="/Admin/Instances/Details" asp-route-id="@i.Id" asp-route-tab="hosting">@i.Name</a></td>
+                    <td>@if (i.Node is { } nd) { <a asp-page="/Admin/Hosting/Nodes/Details" asp-route-id="@nd.Id">@nd.Name</a> } else { <span class="muted">@T["nodes.thisHost"]</span> }</td>
                     <td class="mono muted">@(i.LocalContainerName ?? "—")</td>
                     <td><span class="badge @(up ? "badge-on" : "badge-err")">@(i.ContainerState ?? "—")</span></td>
                     <td class="mono muted">@(i.LocalPort?.ToString() ?? "—")</td>

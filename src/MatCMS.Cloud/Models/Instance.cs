@@ -14,7 +14,13 @@ public enum InstanceHosting
     Local = 1,
 
     /// <summary>Runs on a different host (or the cloud has no Docker access). Notify only.</summary>
-    Remote = 2
+    Remote = 2,
+
+    /// <summary>Found in the container inventory of a connected node (<see cref="Instance.NodeId"/>): the cloud
+    /// acts on it through that node's agent (jobs), not through its own daemon. Kept apart from
+    /// <see cref="Local"/> on purpose — every path that talks to the cloud's OWN daemon (removal, bulk update,
+    /// the guessed preview URL) must not silently apply to a container on another machine.</summary>
+    Node = 3
 }
 
 /// <summary>Where an instance stands in the enrollment flow.</summary>
@@ -131,6 +137,12 @@ public class Instance
 
     public InstanceHosting Hosting { get; set; } = InstanceHosting.Unknown;
 
+    /// <summary>The node whose agent reported this instance's container (<see cref="InstanceHosting.Node"/>).
+    /// Null = the cloud's own host or not hosted at all. Re-derived on every heartbeat like
+    /// <see cref="Hosting"/>, so a site that moved never keeps pointing at the old node.</summary>
+    public int? NodeId { get; set; }
+    public Node? Node { get; set; }
+
     /// <summary>Container name resolved on the local daemon - shown so an operator can see exactly
     /// which container an "Update now" would recreate. Null while remote.</summary>
     public string? LocalContainerName { get; set; }
@@ -175,13 +187,17 @@ public class Instance
     /// falls back to the port guess (or null), so no unsafe scheme can ever reach an href/src.</para></summary>
     public string? PreviewUrl =>
         IsHttpUrl(Url) ? Url
-        : LocalPort is not null ? $"http://localhost:{LocalPort}"
+        : GuessablePort ? $"http://localhost:{LocalPort}"
         : null;
 
     /// <summary>True when the preview address is only a guess from the port mapping — the UI says so
     /// rather than letting an operator wonder why a blank frame appeared. A non-http(s) reported URL
     /// counts as "no usable URL" here too, so it degrades to the guess rather than being shown.</summary>
-    public bool PreviewIsGuessed => !IsHttpUrl(Url) && LocalPort is not null;
+    public bool PreviewIsGuessed => !IsHttpUrl(Url) && GuessablePort;
+
+    // "localhost:<port>" is only a sensible guess for the cloud's OWN host — a port on a node is on
+    // another machine entirely.
+    private bool GuessablePort => LocalPort is not null && Hosting != InstanceHosting.Node;
 
     /// <summary>Whether <paramref name="u"/> is an absolute http/https URL — the only schemes safe to
     /// emit as an href/src from an instance-reported value.</summary>

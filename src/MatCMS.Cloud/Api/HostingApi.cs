@@ -20,6 +20,7 @@ public static class HostingApi
     private static async Task<(ApiKey? key, IResult? error)> CallerAsync(HttpContext ctx, ApiKeyService keys)
     {
         var key = await keys.AuthenticateAsync(ctx.Request.Headers.Authorization.ToString(), ctx.RequestAborted);
+        if (key is not null) ctx.Items[Services.Nodes.NodeService.ApiKeyItem] = key;   // "who asked" in node job history
         return key is null
             ? (null, Results.Json(new { error = "Ungültiger oder fehlender API-Schlüssel." }, statusCode: StatusCodes.Status401Unauthorized))
             : (key, null);
@@ -39,6 +40,8 @@ public static class HostingApi
     {
         hosting = i.Hosting.ToString().ToLowerInvariant(),
         local = HostingActionsService.IsLocal(i),
+        onNode = HostingActionsService.IsOnNode(i),
+        canAct = HostingActionsService.CanAct(i),
         cloudManaged = i.CloudManaged,
         containerState = i.ContainerState,
         localPort = i.LocalPort,
@@ -125,6 +128,29 @@ public static class HostingApi
                       : Results.Json(new { ok = false, error = text }, statusCode: StatusCodes.Status409Conflict);
         }).RequireRateLimiting("operatorApi");
 
+        // ---- Provisioning (increment 4: here or on a node) -------------------------------------------
+        app.MapPost("/api/v1/hosting/instances", async (HttpContext ctx, ApiKeyService keys, AppDbContext db, HostingService hosting,
+            ProvisionDto b) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            // Creates a site no scope list could name yet — cloud-wide.
+            if (RequireCloudWide(key!) is { } g) return g;
+
+            int? nodeId = null;
+            if (!string.IsNullOrWhiteSpace(b.NodeId) && b.NodeId != "local")
+            {
+                var node = await db.Nodes.AsNoTracking().FirstOrDefaultAsync(n => n.PublicId == b.NodeId);
+                if (node is null) return Results.Json(new { error = "Node nicht gefunden." }, statusCode: StatusCodes.Status404NotFound);
+                nodeId = node.Id;
+            }
+            var profileId = b.ProfileId ?? (await db.Profiles.AsNoTracking().Where(p => p.IsDefault).Select(p => (int?)p.Id).FirstOrDefaultAsync()) ?? 0;
+            var r = await hosting.ProvisionAsync(b.Name, profileId, b.Domain, b.ImageTag, nodeId, b.PushCanonical ?? true, ctx.RequestAborted);
+            return r.Ok
+                ? Results.Ok(new { ok = true, containerName = r.ContainerName, port = r.Port, domainFailed = r.DomainFailed, message = r.Message })
+                : Results.Json(new { ok = false, error = r.Message }, statusCode: StatusCodes.Status409Conflict);
+        }).RequireRateLimiting("operatorApi");
+
         // ---- Reverse proxy (increment 3) --------------------------------------------------------------
         app.MapGet("/api/v1/hosting/proxy", async (HttpContext ctx, ApiKeyService keys, Services.Proxy.ProxyService proxy) =>
         {
@@ -149,7 +175,7 @@ public static class HostingApi
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
             if (RequireHosting(key!) is { } g) return g;
-            var r = await proxy.TestAsync(ctx.RequestAborted);
+            var r = await proxy.TestAsync(null, ctx.RequestAborted);
             return Results.Ok(new { ok = r.Ok, provider = r.Kind, message = r.Message });
         }).RequireRateLimiting("operatorApi");
 
@@ -226,4 +252,7 @@ public static class HostingApi
 
     public record HostingSwitchDto(bool Enabled);
     public record DomainDto(string Domain, bool? PushCanonical);
+    /// <param name="NodeId">A node's id, or null/"local" for this cloud's own host.</param>
+    /// <param name="ProfileId">Null = the default profile.</param>
+    public record ProvisionDto(string Name, int? ProfileId, string? Domain, string? ImageTag, string? NodeId, bool? PushCanonical);
 }

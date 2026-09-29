@@ -2,20 +2,24 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using MatCMS.Cloud.Data;
 using MatCMS.Cloud.Models;
+using MatCMS.Cloud.Services.Nodes;
 using Microsoft.EntityFrameworkCore;
 
 namespace MatCMS.Cloud.Services.Proxy;
 
 /// <summary>A route created at provisioning, waiting for its instance to enroll (see
-/// <see cref="SettingKeys.HostingPendingRoutePrefix"/>; adopted in <c>InstanceService.ClassifyAsync</c>).</summary>
+/// <see cref="InstanceService.PendingRouteKey"/>; adopted in <c>InstanceService.ClassifyAsync</c>).</summary>
 public sealed record PendingRoute(string Domain, string Provider, string? RouteId, bool PushCanonical);
 
 /// <summary>
-/// Publishing an instance under a domain on the configured reverse proxy (Hosting increment 3). One
-/// implementation behind the Hosting tab, the operator API and the MCP tools. It owns the three things a
-/// provider does not: checking the domain, making the container REACHABLE for the proxy (joining the proxy's
-/// network, or pointing at the host port), and recording the result on the instance — whose
-/// <see cref="Instance.Url"/> is then pinned to the domain.
+/// Publishing an instance under a domain on a reverse proxy (Hosting increment 3). One implementation behind
+/// the Hosting tab, the operator API and the MCP tools. It owns what needs the database: checking the domain,
+/// the record on the instance — whose <see cref="Instance.Url"/> is then pinned to the domain — and the
+/// canonical-URL push.
+/// <para>The proxy work itself (provider calls, joining the proxy's network) is <see cref="ProxyEngine"/> and
+/// runs WHERE the site runs: in-process for the cloud's own host with the cloud-wide settings, as a
+/// <c>proxy</c> job on a node with that node's settings (increment 4). The proxy of a node therefore never has
+/// to be reachable from the cloud.</para>
 /// <para>MatCMS itself is untouched by any of this (it keeps running without a cloud); the optional push of
 /// <c>site.canonicalUrl</c>/<c>site.behindHttpsProxy</c> goes through the ordinary content-op channel.</para>
 /// </summary>
@@ -26,14 +30,16 @@ public class ProxyService
     private readonly SecretProtector _secrets;
     private readonly DockerHostService _docker;
     private readonly InstanceService _instances;
+    private readonly NodeService _nodes;
     private readonly IHttpClientFactory _http;
 
     public ProxyService(AppDbContext db, CloudContext cloud, SecretProtector secrets, DockerHostService docker,
-        InstanceService instances, IHttpClientFactory http)
+        InstanceService instances, NodeService nodes, IHttpClientFactory http)
     {
-        _db = db; _cloud = cloud; _secrets = secrets; _docker = docker; _instances = instances; _http = http;
+        _db = db; _cloud = cloud; _secrets = secrets; _docker = docker; _instances = instances; _nodes = nodes; _http = http;
     }
 
+    /// <summary>The settings of the cloud's OWN host ("Dieser Host") — cloud-wide hosting.* keys.</summary>
     public ProxySettings Settings => new(
         ProxyKinds.Normalise(_cloud.Get(SettingKeys.HostingMode)),
         _cloud.Get(SettingKeys.HostingMatcadUrl),
@@ -44,19 +50,18 @@ public class ProxyService
         _cloud.Get(SettingKeys.HostingProxyNetwork),
         _cloud.Get(SettingKeys.HostingProxyUpstreamHost));
 
-    /// <summary>The provider for <paramref name="kind"/> (default: the configured one).</summary>
-    public IProxyProvider Provider(string? kind = null)
+    private HttpClient Http()
     {
-        var s = Settings;
         var http = _http.CreateClient("proxy");
         http.Timeout = TimeSpan.FromSeconds(15);
-        return ProxyKinds.Normalise(kind ?? s.Kind) switch
-        {
-            ProxyKinds.Matcad => new MatcadProvider(http, s.MatcadUrl ?? "", s.MatcadToken),
-            ProxyKinds.Caddy => new CaddyProvider(http, s.CaddyAdminUrl ?? "", s.CaddyServer),
-            _ => new NoProxyProvider(),
-        };
+        return http;
     }
+
+    /// <summary>The provider of the cloud's own host (default: the configured one).</summary>
+    public IProxyProvider Provider(string? kind = null) => ProxyEngine.Provider(Settings, Http(), kind);
+
+    /// <summary>Whether publishing on this host/node creates routes (false = "no proxy", domains are recorded).</summary>
+    public bool ManagesRoutes(Node? node) => (node is null ? Settings.Kind : ProxyKinds.Normalise(node.ProxyKind)) != ProxyKinds.None;
 
     private static readonly Regex HostRx = new(@"^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$", RegexOptions.Compiled);
 
@@ -71,8 +76,8 @@ public class ProxyService
         return HostRx.IsMatch(s) ? s : null;
     }
 
-    /// <summary>A partial update of the proxy configuration for the API/MCP (null = keep). The Matcad token is
-    /// encrypted like on the settings page and never read back.</summary>
+    /// <summary>A partial update of the proxy configuration of the cloud's own host for the API/MCP (null =
+    /// keep). The Matcad token is encrypted like on the settings page and never read back.</summary>
     public sealed record ProxyConfigInput(string? Provider, string? MatcadUrl, string? MatcadToken, bool ClearMatcadToken,
         string? CaddyAdminUrl, string? CaddyServer, string? Upstream, string? Network, string? UpstreamHost);
 
@@ -97,57 +102,48 @@ public class ProxyService
         var s = Settings;
         return new
         {
-            provider = s.Kind, managesRoutes = Provider().ManagesRoutes,
+            provider = s.Kind, managesRoutes = s.Kind != ProxyKinds.None,
             matcadUrl = s.MatcadUrl, matcadTokenSet = !string.IsNullOrEmpty(s.MatcadToken),
             caddyAdminUrl = s.CaddyAdminUrl, caddyServer = s.CaddyServer,
             upstream = s.UpstreamMode, network = s.Network, upstreamHost = s.UpstreamHost,
         };
     }
 
+    /// <summary>The cloud's own host for <c>_ProxyFields.cshtml</c>.</summary>
+    public ProxyFieldsView FieldsView()
+    {
+        var s = Settings;
+        return new(s.Kind, s.MatcadUrl, !string.IsNullOrEmpty(s.MatcadToken), s.CaddyAdminUrl, s.CaddyServer, s.UpstreamMode, s.Network, s.UpstreamHost);
+    }
+
+    /// <summary>A node for <c>_ProxyFields.cshtml</c> — same shape as the cloud's own host.</summary>
+    public static ProxyFieldsView FieldsView(Node n) => new(ProxyKinds.Normalise(n.ProxyKind), n.MatcadUrl, !string.IsNullOrEmpty(n.MatcadTokenEnc),
+        n.CaddyAdminUrl, string.IsNullOrWhiteSpace(n.CaddyServer) ? "srv0" : n.CaddyServer, UpstreamModes.Normalise(n.ProxyUpstream), n.ProxyNetwork, n.ProxyUpstreamHost);
+
     public sealed record TestResult(bool Ok, string Message, string Kind);
 
-    /// <summary>Provider reachable, plus — for the network mode — the proxy network actually exists.</summary>
-    public async Task<TestResult> TestAsync(CancellationToken ct = default)
+    /// <summary>Runs one proxy operation where it belongs: in-process for the cloud's own host, as a job on the
+    /// node otherwise (with THAT node's settings).</summary>
+    private async Task<ProxyOpResult> RunAsync(Node? node, Func<ProxySettings, ProxyOp> build, int? instanceId, CancellationToken ct)
     {
-        var s = Settings;
-        var p = Provider();
-        if (!p.ManagesRoutes) return new(true, "Kein Proxy: Instanzen sind über ihren Host-Port erreichbar; Domains werden nur vermerkt.", s.Kind);
-        if (p is MatcadProvider && string.IsNullOrWhiteSpace(s.MatcadUrl)) return new(false, "Keine Matcad-Adresse eingetragen.", s.Kind);
-        if (p is CaddyProvider && string.IsNullOrWhiteSpace(s.CaddyAdminUrl)) return new(false, "Keine Caddy-Admin-Adresse eingetragen.", s.Kind);
-
-        var r = await p.TestAsync(ct);
-        var msg = r.Error ?? "";
-        if (s.UpstreamMode == UpstreamModes.Network)
-        {
-            if (string.IsNullOrWhiteSpace(s.Network)) return new(false, msg + " Kein Proxy-Netz eingetragen (Modus „Netzwerk“).", s.Kind);
-            if (!await _docker.NetworkExistsAsync(s.Network!, ct)) return new(false, msg + $" Das Docker-Netz „{s.Network}“ existiert nicht.", s.Kind);
-            msg += $" Netz „{s.Network}“ vorhanden.";
-        }
-        else if (string.IsNullOrWhiteSpace(s.UpstreamHost))
-            return new(false, msg + " Kein Upstream-Host eingetragen (Modus „Host-Port“).", s.Kind);
-        return new(r.Ok, msg.Trim(), s.Kind);
+        if (node is null) return await ProxyEngine.ExecuteAsync(build(Settings), Http(), _docker, ct);
+        var r = await _nodes.RunAsync(node, NodeJobKinds.Proxy, build(_nodes.ProxySettingsFor(node)), instanceId, TimeSpan.FromSeconds(45), ct);
+        if (!r.Finished) return new(false, r.Message);
+        return NodeJobExecutor.Deserialize<ProxyOpResult>(r.ResultJson) ?? new(false, r.Message);
     }
 
-    /// <summary>
-    /// The address the proxy must forward to — and, in network mode, the step that makes it resolvable:
-    /// the container is connected to the proxy's network (live). Container name and port come from the
-    /// daemon, never from a display name.
-    /// </summary>
-    private async Task<(string? Upstream, string? Error)> UpstreamAsync(string containerId, int? localPort, CancellationToken ct)
+    /// <summary>Provider reachable, plus — for the network mode — the proxy network actually exists. For
+    /// <paramref name="node"/> null: the cloud's own host.</summary>
+    public async Task<TestResult> TestAsync(Node? node = null, CancellationToken ct = default)
     {
-        var s = Settings;
-        if (s.UpstreamMode == UpstreamModes.HostPort)
-        {
-            if (string.IsNullOrWhiteSpace(s.UpstreamHost)) return (null, "Kein Upstream-Host eingetragen (Modus „Host-Port“).");
-            if (localPort is null) return (null, "Der Container veröffentlicht keinen Host-Port.");
-            return ($"http://{s.UpstreamHost!.Trim()}:{localPort}", null);
-        }
-        if (string.IsNullOrWhiteSpace(s.Network)) return (null, "Kein Proxy-Netz eingetragen (Modus „Netzwerk“).");
-        var (ok, msg, name) = await _docker.ConnectToNetworkAsync(containerId, s.Network!, ct);
-        if (!ok || string.IsNullOrEmpty(name)) return (null, msg);
-        // 8080 is the container's own port (the image EXPOSEs it; never changed) — not the host port.
-        return ($"http://{name}:8080", null);
+        var kind = node is null ? Settings.Kind : ProxyKinds.Normalise(node.ProxyKind);
+        var r = await RunAsync(node, s => new ProxyOp("test", s), null, ct);
+        return new(r.Ok, r.Message, kind);
     }
+
+    /// <summary>The node an instance runs on, or null for the cloud's own host. The route lives where the site does.</summary>
+    private async Task<Node?> NodeOfAsync(Instance inst, CancellationToken ct) =>
+        HostingActionsService.IsOnNode(inst) ? await _db.Nodes.FindAsync(new object[] { inst.NodeId! }, ct) : null;
 
     // The label in the proxy's own UI. Instances are often simply called "MatCMS…" — no "MatCMS MatCMS".
     private static string RouteName(string name) =>
@@ -164,40 +160,28 @@ public class ProxyService
         if (await _db.Instances.AnyAsync(i => i.Id != inst.Id && i.ProxyDomain == domain, ct))
             return new(false, $"„{domain}“ ist bereits einer anderen Instanz zugeordnet.");
 
-        var s = Settings;
-        var provider = Provider();
+        var node = await NodeOfAsync(inst, ct);
+        var kind = node is null ? Settings.Kind : ProxyKinds.Normalise(node.ProxyKind);
+        var manages = kind != ProxyKinds.None;
+        if (manages && !HostingActionsService.CanAct(inst))
+            return Fail(inst, "Diese Instanz läuft weder auf dem Docker-Host dieser Cloud noch auf einem verbundenen Node — ihre Route kann nicht angelegt werden.");
+
         string? routeId = null;
-
-        if (provider.ManagesRoutes)
+        if (manages || inst.ProxyRouteId is not null)
         {
-            if (!HostingActionsService.IsLocal(inst))
-                return Fail(inst, "Diese Instanz läuft nicht auf dem Docker-Host dieser Cloud — ihre Route kann hier nicht angelegt werden.");
-
-            // A route left behind by a DIFFERENT provider (the setting changed since) goes first.
-            if (inst.ProxyRouteId is not null && inst.ProxyProvider is not null && inst.ProxyProvider != s.Kind)
-                await Provider(inst.ProxyProvider).DeleteAsync(inst.ProxyRouteId, ct);
-
-            var (upstream, err) = await UpstreamAsync(inst.ContainerId!, inst.LocalPort, ct);
-            if (upstream is null) return Fail(inst, err ?? "Upstream nicht ermittelbar.");
-
-            var existing = inst.ProxyProvider == s.Kind ? inst.ProxyRouteId : null;
-            var r = await provider.UpsertAsync(existing, inst.PublicId, RouteName(inst.Name), domain, upstream, ct);
+            var r = await RunAsync(node, s => new ProxyOp("publish", s, inst.ContainerId, inst.LocalPort, domain,
+                inst.PublicId, RouteName(inst.Name), RouteId: inst.ProxyRouteId, OldKind: inst.ProxyProvider), inst.Id, ct);
             if (!r.Ok)
             {
-                if (r.RouteId is not null) { inst.ProxyRouteId = r.RouteId; inst.ProxyProvider = s.Kind; }
-                return Fail(inst, r.Error ?? "Route konnte nicht angelegt werden.");
+                if (r.RouteId is not null) { inst.ProxyRouteId = r.RouteId; inst.ProxyProvider = kind; }
+                return Fail(inst, r.Message);
             }
-            routeId = r.RouteId;
-        }
-        else if (inst.ProxyRouteId is not null && inst.ProxyProvider is not null)
-        {
-            // Switched to "no proxy": the old provider's route must not linger pointing at the site.
-            await Provider(inst.ProxyProvider).DeleteAsync(inst.ProxyRouteId, ct);
+            routeId = manages ? r.RouteId : null;
         }
 
         var moved = inst.ProxyDomain is not null && inst.ProxyDomain != domain;
         inst.ProxyDomain = domain;
-        inst.ProxyProvider = s.Kind;
+        inst.ProxyProvider = kind;
         inst.ProxyRouteId = routeId;
         inst.ProxyError = null;
         inst.ProxyPublishedAt = DateTime.UtcNow;
@@ -205,7 +189,7 @@ public class ProxyService
         inst.UrlPinned = true;
         _instances.Log(inst, InstanceEventKind.DomainPublished,
             (moved ? "Domain geändert auf " : "Domain veröffentlicht: ") + domain +
-            (provider.ManagesRoutes ? $" (Route über {s.Kind})." : " (kein Proxy — nur vermerkt)."));
+            (manages ? $" (Route über {kind}{(node is null ? "" : $", Node „{node.Name}“")})." : " (kein Proxy — nur vermerkt)."));
         await _db.SaveChangesAsync(ct);
 
         var note = await PushCanonicalAsync(inst, pushCanonical ? "https://" + domain : null, pushCanonical, ct);
@@ -219,8 +203,9 @@ public class ProxyService
         if (inst.ProxyDomain is null && inst.ProxyRouteId is null) return new(true, "Keine Domain veröffentlicht.");
         if (inst.ProxyRouteId is not null && inst.ProxyProvider is not null)
         {
-            var r = await Provider(inst.ProxyProvider).DeleteAsync(inst.ProxyRouteId, ct);
-            if (!r.Ok) return Fail(inst, r.Error ?? "Route konnte nicht entfernt werden.");
+            var node = await NodeOfAsync(inst, ct);
+            var r = await RunAsync(node, s => new ProxyOp("delete", s, Kind: inst.ProxyProvider, RouteId: inst.ProxyRouteId), inst.Id, ct);
+            if (!r.Ok) return Fail(inst, r.Message);
         }
         var old = inst.ProxyDomain;
         inst.ProxyDomain = null; inst.ProxyProvider = null; inst.ProxyRouteId = null; inst.ProxyError = null; inst.ProxyPublishedAt = null;
@@ -239,16 +224,21 @@ public class ProxyService
     {
         bool? exists = null;
         if (checkProvider && inst.ProxyRouteId is not null && inst.ProxyProvider is not null)
-            exists = await Provider(inst.ProxyProvider).ExistsAsync(inst.ProxyRouteId, ct);
+        {
+            var node = await NodeOfAsync(inst, ct);
+            var r = await RunAsync(node, s => new ProxyOp("exists", s, Kind: inst.ProxyProvider, RouteId: inst.ProxyRouteId), inst.Id, ct);
+            exists = r.Ok ? r.Exists : null;
+        }
         return new(inst.ProxyDomain, inst.ProxyProvider, inst.ProxyRouteId, inst.ProxyError, inst.ProxyPublishedAt, exists);
     }
 
     /// <summary>
     /// Provisioning: the container exists but its instance row does not yet (it appears when the site enrolls
-    /// with the join code). The route only needs the container, so it is created now and remembered under the
-    /// container name; <c>InstanceService.ClassifyAsync</c> adopts it on the first beat.
+    /// with the join code). The route only needs the container, so it is created now — on the host that runs
+    /// it — and remembered under the container name; <c>InstanceService.ClassifyAsync</c> adopts it on the
+    /// first beat.
     /// </summary>
-    public async Task<PublishResult> PublishForNewContainerAsync(string containerId, string containerName, int? localPort,
+    public async Task<PublishResult> PublishForNewContainerAsync(Node? node, string containerId, string containerName, int? localPort,
         string? rawDomain, bool pushCanonical, CancellationToken ct = default)
     {
         var domain = NormaliseDomain(rawDomain);
@@ -256,23 +246,21 @@ public class ProxyService
         if (await _db.Instances.AnyAsync(i => i.ProxyDomain == domain, ct))
             return new(false, $"„{domain}“ ist bereits einer anderen Instanz zugeordnet.");
 
-        var s = Settings;
-        var provider = Provider();
+        var kind = node is null ? Settings.Kind : ProxyKinds.Normalise(node.ProxyKind);
+        var manages = kind != ProxyKinds.None;
         string? routeId = null;
-        if (provider.ManagesRoutes)
+        if (manages)
         {
-            var (upstream, err) = await UpstreamAsync(containerId, localPort, ct);
-            if (upstream is null) return new(false, err ?? "Upstream nicht ermittelbar.");
-            var r = await provider.UpsertAsync(null, containerName, RouteName(containerName), domain, upstream, ct);
-            if (!r.Ok) return new(false, r.Error ?? "Route konnte nicht angelegt werden.");
+            var r = await RunAsync(node, s => new ProxyOp("publish", s, containerId, localPort, domain, containerName, RouteName(containerName)), null, ct);
+            if (!r.Ok) return new(false, r.Message);
             routeId = r.RouteId;
         }
         await _cloud.SaveAsync(new Dictionary<string, string?>
         {
-            [SettingKeys.HostingPendingRoutePrefix + containerName] =
-                JsonSerializer.Serialize(new PendingRoute(domain, s.Kind, routeId, pushCanonical))
+            [InstanceService.PendingRouteKey(node?.Id, containerName)] =
+                JsonSerializer.Serialize(new PendingRoute(domain, kind, routeId, pushCanonical))
         });
-        return new(true, provider.ManagesRoutes ? $"Route „{domain}“ angelegt." : $"Domain „{domain}“ vermerkt.", domain);
+        return new(true, manages ? $"Route „{domain}“ angelegt." : $"Domain „{domain}“ vermerkt.", domain);
     }
 
     private PublishResult Fail(Instance inst, string error)

@@ -1,0 +1,92 @@
+@model MatCMS.Cloud.Services.Proxy.ProxyFieldsView
+@* The reverse-proxy fields — ONE partial for "Dieser Host" (Einstellungen → Hosting) and for every node
+   (Hosting → Nodes → Proxy & Ports), so the two forms cannot drift. The field names are what both save
+   handlers read. Three equal ways; "kein Proxy" first because it needs nothing installed — the container is
+   then reachable on its host port and a domain is only recorded. *@
+@{
+    var pk = Model.Kind;
+    var um = Model.Upstream;
+}
+<div data-proxy-fields>
+    <div class="form-field">
+        <label for="hostingMode">@T["settings.hostingProxy"]</label>
+        <select id="hostingMode" name="hostingMode" data-hosting-mode>
+            <option value="none" selected="@(pk == "none" ? "selected" : null)">@T["settings.hostingProxyNone"]</option>
+            <option value="matcad" selected="@(pk == "matcad" ? "selected" : null)">@T["settings.hostingProxyMatcad"]</option>
+            <option value="caddy" selected="@(pk == "caddy" ? "selected" : null)">@T["settings.hostingProxyCaddy"]</option>
+        </select>
+        <div class="help">@T["settings.hostingProxyHint"]</div>
+    </div>
+
+    <div data-proxy-only="matcad" hidden="@(pk == "matcad" ? null : "hidden")">
+        <div class="form-field">
+            <label for="matcadUrl">@T["settings.hostingMatcadUrl"]</label>
+            <input id="matcadUrl" name="matcadUrl" value="@Model.MatcadUrl" placeholder="http://matcad:4433" spellcheck="false" />
+            <div class="help">@T["settings.hostingMatcadUrlHint"]</div>
+        </div>
+        <div class="form-field">
+            <label for="matcadToken">@T["settings.hostingMatcadToken"]</label>
+            <input id="matcadToken" name="matcadToken" type="password" autocomplete="new-password" placeholder="@T["settings.smtpPasswordKeep"]" />
+            @* Leer heißt KEEP — sonst würde jedes Speichern der anderen Felder das Geheimnis löschen, nur weil
+               das Feld leer gerendert wird. *@
+            @if (Model.MatcadTokenSet)
+            {
+                <label class="checkbox-row">
+                    <input type="checkbox" name="clearMatcadToken" value="true" /> @T["settings.smtpPasswordClear"]
+                </label>
+            }
+        </div>
+    </div>
+
+    <div data-proxy-only="caddy" hidden="@(pk == "caddy" ? null : "hidden")">
+        <div class="form-field">
+            <label for="caddyAdminUrl">@T["settings.hostingCaddyAdminUrl"]</label>
+            <input id="caddyAdminUrl" name="caddyAdminUrl" value="@Model.CaddyAdminUrl" placeholder="http://caddy:2019" spellcheck="false" />
+        </div>
+        <div class="form-field">
+            <label for="caddyServer">@T["settings.hostingCaddyServer"]</label>
+            <input id="caddyServer" name="caddyServer" value="@Model.CaddyServer" placeholder="srv0" spellcheck="false" />
+            <div class="help">@T["settings.hostingCaddyServerHint"]</div>
+        </div>
+    </div>
+
+    @* Wie der Proxy den Container überhaupt erreicht — gilt für Matcad und Caddy gleichermaßen. *@
+    <div data-proxy-only="matcad caddy" hidden="@(pk == "none" ? "hidden" : null)">
+        <div class="form-field">
+            <label for="proxyUpstream">@T["settings.hostingUpstream"]</label>
+            <select id="proxyUpstream" name="proxyUpstream" data-upstream-mode>
+                <option value="network" selected="@(um == "network" ? "selected" : null)">@T["settings.hostingUpstreamNetwork"]</option>
+                <option value="hostport" selected="@(um == "hostport" ? "selected" : null)">@T["settings.hostingUpstreamHostPort"]</option>
+            </select>
+            <div class="help">@T["settings.hostingUpstreamHint"]</div>
+        </div>
+        <div class="form-field" data-upstream-only="network" hidden="@(um == "network" ? null : "hidden")">
+            <label for="proxyNetwork">@T["settings.hostingProxyNetwork"]</label>
+            <input id="proxyNetwork" name="proxyNetwork" value="@Model.Network" placeholder="main" spellcheck="false" />
+        </div>
+        <div class="form-field" data-upstream-only="hostport" hidden="@(um == "hostport" ? null : "hidden")">
+            <label for="proxyUpstreamHost">@T["settings.hostingProxyUpstreamHost"]</label>
+            <input id="proxyUpstreamHost" name="proxyUpstreamHost" value="@Model.UpstreamHost" placeholder="host.docker.internal" spellcheck="false" />
+        </div>
+    </div>
+</div>
+<script>
+    (function () {
+        // Only the fields of the chosen provider/upstream mode are shown — otherwise the form asks for access
+        // data of a way that was just deselected. Scoped to this block, so it works wherever it is rendered.
+        var root = document.currentScript.previousElementSibling;
+        var mode = root.querySelector('[data-hosting-mode]');
+        var up = root.querySelector('[data-upstream-mode]');
+        function sync() {
+            root.querySelectorAll('[data-proxy-only]').forEach(function (el) {
+                el.hidden = el.getAttribute('data-proxy-only').split(' ').indexOf(mode.value) < 0;
+            });
+            root.querySelectorAll('[data-upstream-only]').forEach(function (el) {
+                el.hidden = el.getAttribute('data-upstream-only') !== up.value;
+            });
+        }
+        mode.addEventListener('change', sync);
+        up.addEventListener('change', sync);
+        sync();
+    })();
+</script>

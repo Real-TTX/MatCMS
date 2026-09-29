@@ -37,12 +37,12 @@ public class DetailsModel : PageModel, IAsyncPageFilter
     }
 
     /// <summary>The configured proxy provider ("none" | "matcad" | "caddy") and whether it routes at all.</summary>
-    public string ProxyKind => _proxy.Settings.Kind;
-    public bool ProxyRoutes => _proxy.Provider().ManagesRoutes;
+    public string ProxyKind => Item.Node is { } pn ? MatCMS.Cloud.Services.Proxy.ProxyKinds.Normalise(pn.ProxyKind) : _proxy.Settings.Kind;
+    public bool ProxyRoutes => _proxy.ManagesRoutes(Item.Node);
 
     /// <summary>The Hosting tab exists for an instance whose container this cloud can reach — independent of
     /// the Hosting module switch, because these actions predate it and must not vanish when it is off.</summary>
-    public bool ShowHostingTab => HostingActionsService.IsLocal(Item);
+    public bool ShowHostingTab => HostingActionsService.CanAct(Item);
 
     /// <summary>Live container details for the Hosting tab (null when not local or the daemon is silent).</summary>
     public DockerHostService.ContainerDetails? Container { get; private set; }
@@ -122,12 +122,12 @@ public class DetailsModel : PageModel, IAsyncPageFilter
     public string? LatestVersion => _releases.LatestVersion;
     public bool HasUpdate => _releases.IsUpdateAvailableFor(Item.Version);
     public bool Online => InstanceService.IsOnline(Item);
-    public bool CanCloudUpdate => Item.Hosting == InstanceHosting.Local && Item.ContainerId is not null;
+    public bool CanCloudUpdate => HostingActionsService.CanAct(Item);
 
     /// <summary>A LOCAL container the daemon says is not running. Authoritative over the heartbeat "online"
     /// (which lags ~150 s), so a site we just stopped reads "gestoppt" at once instead of a stale "online".</summary>
     public bool ContainerStopped =>
-        Item.Hosting == InstanceHosting.Local && !string.IsNullOrEmpty(Item.ContainerState)
+        (Item.Hosting is InstanceHosting.Local or InstanceHosting.Node) && !string.IsNullOrEmpty(Item.ContainerState)
         && !string.Equals(Item.ContainerState, "running", StringComparison.OrdinalIgnoreCase);
 
     public async Task<IActionResult> OnGetAsync(int id)
@@ -165,7 +165,7 @@ public class DetailsModel : PageModel, IAsyncPageFilter
 
     private async Task<bool> LoadAsync(int id)
     {
-        var item = await _db.Instances.Include(i => i.Profile).FirstOrDefaultAsync(i => i.Id == id);
+        var item = await _db.Instances.Include(i => i.Profile).Include(i => i.Node).FirstOrDefaultAsync(i => i.Id == id);
         if (item is null) return false;
         Item = item;
         Events = await _db.InstanceEvents.AsNoTracking()

@@ -275,7 +275,7 @@ public class InstanceService
             CloudPublicUrl = _cloud.Get(SettingKeys.CanonicalUrl),
             LatestVersion = _releases.LatestVersion,
             UpdateAvailable = IsUpdateAvailable(instance),
-            CloudCanUpdate = instance.Hosting == InstanceHosting.Local,
+            CloudCanUpdate = instance.Hosting is InstanceHosting.Local or InstanceHosting.Node,
             DisplayName = instance.Name,
             ProfileName = instance.Profile?.Name,
             // A pending instance is told 0 so it never even asks for configuration.
@@ -556,26 +556,42 @@ public class InstanceService
         var before = instance.Hosting;
 
         var container = await _docker.FindContainerAsync(instance.ContainerId, ct);
-        if (container is null)
-        {
-            instance.Hosting = InstanceHosting.Remote;
-            instance.LocalContainerName = null;
-            instance.LocalPort = null;
-            instance.ContainerState = null;
-            // No container here means no claim on one. Clearing this is the whole point of re-running
-            // the classification: a site that moved away must not keep a licence to be torn down.
-            instance.CloudManaged = false;
-        }
-        else
+        var onNode = container is null ? await FindOnNodeAsync(instance.ContainerId, ct) : null;
+        if (container is not null)
         {
             instance.Hosting = InstanceHosting.Local;
+            instance.NodeId = null;
             instance.LocalContainerName = container.Name;
             instance.LocalPort = container.PublishedPort;
             instance.ContainerState = container.State;
             instance.CloudManaged = container.CloudManaged;
 
             if (instance.ProxyDomain is null && !string.IsNullOrEmpty(container.Name))
-                await AdoptPendingRouteAsync(instance, container.Name, ct);
+                await AdoptPendingRouteAsync(instance, PendingRouteKey(null, container.Name), ct);
+        }
+        else if (onNode is { } hit)
+        {
+            // Found in the inventory a connected node reported: the cloud acts on it through that node's agent.
+            instance.Hosting = InstanceHosting.Node;
+            instance.NodeId = hit.NodeId;
+            instance.LocalContainerName = hit.Container.Name;
+            instance.LocalPort = hit.Container.PublishedPort;
+            instance.ContainerState = hit.Container.State;
+            instance.CloudManaged = hit.Container.CloudManaged;
+
+            if (instance.ProxyDomain is null && !string.IsNullOrEmpty(hit.Container.Name))
+                await AdoptPendingRouteAsync(instance, PendingRouteKey(hit.NodeId, hit.Container.Name), ct);
+        }
+        else
+        {
+            instance.Hosting = InstanceHosting.Remote;
+            instance.NodeId = null;
+            instance.LocalContainerName = null;
+            instance.LocalPort = null;
+            instance.ContainerState = null;
+            // No container here means no claim on one. Clearing this is the whole point of re-running
+            // the classification: a site that moved away must not keep a licence to be torn down.
+            instance.CloudManaged = false;
         }
 
         if (before != InstanceHosting.Unknown && before != instance.Hosting)
@@ -589,9 +605,35 @@ public class InstanceService
     /// <c>ProxyService.PublishForNewContainerAsync</c>. Deliberately here and not in ProxyService: nothing
     /// is called on the proxy any more, the route already exists; only the record moves onto the instance.
     /// </summary>
-    private async Task AdoptPendingRouteAsync(Instance instance, string containerName, CancellationToken ct)
+    /// <summary>Where a route created at provisioning waits for its instance. Container names are only unique per
+    /// Docker host, so a node's routes carry the node in the key.</summary>
+    public static string PendingRouteKey(int? nodeId, string containerName) =>
+        SettingKeys.HostingPendingRoutePrefix + (nodeId is null ? "" : $"node{nodeId}/") + containerName;
+
+    /// <summary>
+    /// Looks the reported container up in the inventories of the nodes that reported recently. Only nodes seen
+    /// within the last minutes count — an inventory from a node that went silent says where a container WAS.
+    /// </summary>
+    private async Task<(int NodeId, Nodes.NodeContainer Container)?> FindOnNodeAsync(string? containerId, CancellationToken ct)
     {
-        var key = SettingKeys.HostingPendingRoutePrefix + containerName;
+        if (string.IsNullOrWhiteSpace(containerId)) return null;
+        var id = containerId.Trim().ToLowerInvariant();
+        if (id.Length < 12) return null;
+        var cut = DateTime.UtcNow.AddMinutes(-5);
+        var nodes = await _db.Nodes.AsNoTracking()
+            .Where(n => !n.Revoked && n.InventoryAt != null && n.InventoryAt > cut)
+            .Select(n => new { n.Id, n.InventoryJson }).ToListAsync(ct);
+        foreach (var n in nodes)
+        {
+            var list = Nodes.NodeJobExecutor.Deserialize<List<Nodes.NodeContainer>>(n.InventoryJson);
+            var c = list?.FirstOrDefault(c => DockerHostService.IdMatches(c.Id, id));
+            if (c is not null) return (n.Id, c);
+        }
+        return null;
+    }
+
+    private async Task AdoptPendingRouteAsync(Instance instance, string key, CancellationToken ct)
+    {
         var row = await _db.CloudSettings.FirstOrDefaultAsync(s => s.Key == key, ct);
         if (row is null || string.IsNullOrWhiteSpace(row.Value)) return;
 
@@ -623,6 +665,7 @@ public class InstanceService
     {
         InstanceHosting.Local => "lokal",
         InstanceHosting.Remote => "remote",
+        InstanceHosting.Node => "auf einem Node",
         _ => "unbekannt"
     };
 

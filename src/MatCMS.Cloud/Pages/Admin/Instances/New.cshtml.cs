@@ -29,8 +29,11 @@ public class NewModel : PageModel
     }
 
     public List<Profile> Profiles { get; private set; } = [];
-    /// <summary>True when a real proxy (Matcad/Caddy) will route the domain; false = it is only recorded.</summary>
-    public bool ProxyRoutes => _proxy.Provider().ManagesRoutes;
+    public List<Node> Nodes { get; private set; } = [];
+    /// <summary>True when a real proxy (Matcad/Caddy) will route the domain on this host or a node; false = it is only recorded.</summary>
+    public bool ProxyRoutes => _proxy.ManagesRoutes(null) || Nodes.Any(n => _proxy.ManagesRoutes(n));
+    /// <summary>Somewhere to create it: this host has a free port, or a node is connected.</summary>
+    public bool CanCreate => NextPort is not null || Nodes.Any(n => n.IsOnline(DateTime.UtcNow));
     public int? NextPort { get; private set; }
 
     /// <summary>Die neueste bekannte Version als Vorschlag. "latest" bleibt möglich, aber ein
@@ -47,55 +50,23 @@ public class NewModel : PageModel
     private async Task LoadAsync()
     {
         Profiles = await _db.Profiles.AsNoTracking().OrderBy(p => p.Name).ToListAsync();
+        Nodes = await _db.Nodes.AsNoTracking().Where(n => !n.Revoked).OrderBy(n => n.Name).ToListAsync();
         NextPort = await _hosting.NextFreePortAsync(HttpContext.RequestAborted);
     }
 
-    public async Task<IActionResult> OnPostAsync(string? name, int profileId, string? domain, string? imageTag)
+    public async Task<IActionResult> OnPostAsync(string? name, int profileId, string? domain, string? imageTag, int? nodeId)
     {
         if (!_hosting.Enabled) return RedirectToPage("Index");
 
-        if (string.IsNullOrWhiteSpace(name))
+        // One path for UI, API and MCP (HostingService.ProvisionAsync). The instance appears in the list when
+        // IT enrolls — not now; the route set up here is adopted on its first beat.
+        var r = await _hosting.ProvisionAsync(name, profileId, domain, imageTag, nodeId, pushCanonical: true, HttpContext.RequestAborted);
+        if (!r.Ok)
         {
-            TempData["FlashError"] = "Bitte einen Namen angeben.";
+            TempData["FlashError"] = r.Message;
             return RedirectToPage();
         }
-
-        // Der Join-Code kommt vom PROFIL — er ist der Weg, auf dem die neue Instanz dort landet und
-        // ihre Templates, Plugins und Benutzer bekommt.
-        var profile = await _db.Profiles.AsNoTracking().FirstOrDefaultAsync(p => p.Id == profileId);
-        if (profile is null)
-        {
-            TempData["FlashError"] = "Bitte ein Profil wählen.";
-            return RedirectToPage();
-        }
-
-        var result = await _hosting.CreateAsync(
-            new HostingService.CreateRequest(name.Trim(), domain?.Trim(), imageTag ?? "", profile.JoinCode),
-            HttpContext.RequestAborted);
-
-        if (!result.Ok)
-        {
-            TempData["FlashError"] = $"Anlegen fehlgeschlagen: {result.Error}";
-            return RedirectToPage();
-        }
-
-        // Die Instanz taucht in der Liste auf, sobald SIE sich meldet — nicht schon jetzt. Hier wird
-        // kein Datensatz angelegt: die Anmeldung ist der Moment, in dem eine Instanz existiert, und
-        // zwei Wege, wie ein Eintrag entsteht, wären zwei Wahrheiten.
-        var msg = $"„{result.ContainerName}“ läuft auf Port {result.Port}. Sie meldet sich in den nächsten Minuten selbst an.";
-        if (!string.IsNullOrWhiteSpace(domain) && result.ContainerId is not null && result.ContainerName is not null)
-        {
-            // The route only needs the container, so it is created now; the instance adopts it when it enrolls.
-            var pr = await _proxy.PublishForNewContainerAsync(result.ContainerId, result.ContainerName, result.Port,
-                domain, pushCanonical: true, HttpContext.RequestAborted);
-            if (!pr.Ok)
-            {
-                TempData["FlashError"] = msg + $" Die Domain wurde NICHT eingerichtet: {pr.Message} — im Hosting-Tab der Instanz erneut veröffentlichen.";
-                return RedirectToPage("Index");
-            }
-            msg += " " + pr.Message;
-        }
-        TempData["Flash"] = msg;
+        TempData[r.DomainFailed ? "FlashError" : "Flash"] = r.Message;
         return RedirectToPage("Index");
     }
 }

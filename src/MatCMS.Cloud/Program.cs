@@ -23,6 +23,18 @@ if (args.Length >= 2 && args[0] == "--self-update")
     return;
 }
 
+// --- Node-agent mode (Hosting increment 4) ---
+// "dotnet MatCMS.Cloud.dll --node-agent" runs this image as the agent of ANOTHER Docker host: no web app, no
+// database — only the engine, its own daemon and an outbound connection to the cloud (NodeAgentRunner).
+if (args.Length >= 1 && args[0] == "--node-agent")
+{
+    using var stopAgent = new CancellationTokenSource();
+    Console.CancelKeyPress += (_, e) => { e.Cancel = true; stopAgent.Cancel(); };
+    AppDomain.CurrentDomain.ProcessExit += (_, _) => stopAgent.Cancel();   // docker stop = SIGTERM
+    Environment.ExitCode = await MatCMS.Cloud.Services.Nodes.NodeAgentRunner.RunAsync(stopAgent.Token);
+    return;
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 // --- Storage locations (persisted via Docker volume at /app/appdata) ---
@@ -103,6 +115,8 @@ builder.Services.AddScoped<StoreService>();
 builder.Services.AddScoped<HostingActionsService>();
 builder.Services.AddScoped<CloudUpdaterService>();
 builder.Services.AddScoped<MatCMS.Cloud.Services.Proxy.ProxyService>();
+builder.Services.AddScoped<MatCMS.Cloud.Services.Nodes.NodeService>();
+builder.Services.AddSingleton<MatCMS.Cloud.Services.Nodes.NodeSignal>();
 builder.Services.AddScoped<MailSpool>();
 builder.Services.AddScoped<BackupStore>();
 // Used by the confirmation page AND by the watchdog that completes a delayed removal — which is
@@ -195,6 +209,19 @@ builder.Services.AddRateLimiter(options =>
             _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = 120,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+
+    // Node-agent heartbeats (/api/nodes/...): token-authenticated, anonymous at the transport level. An idle
+    // agent long-polls (~2/min), but every finished job triggers an immediate beat, so a burst of container
+    // actions needs headroom — its own budget, not the instances'.
+    options.AddPolicy("nodeApi", ctx =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 300,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
             }));
@@ -971,6 +998,7 @@ MatCMS.Cloud.Api.StoreApi.MapStoreApi(app);
 // Hosting over the operator API: module switch, container status/actions/logs per instance, and the
 // cloud's own self-update — everything the Hosting UI can do, so an AI agent can do it too.
 MatCMS.Cloud.Api.HostingApi.MapHostingApi(app);
+MatCMS.Cloud.Api.NodeApi.MapNodeApi(app);
 
 // --- Catalogue ------------------------------------------------------------
 // The store, browsable by an approved instance itself ("Weiter durchsuchen…" in MatCMS). This is the

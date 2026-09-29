@@ -1,5 +1,5 @@
-using Docker.DotNet;
-using Docker.DotNet.Models;
+using MatCMS.Cloud.Data;
+using MatCMS.Cloud.Services.Nodes;
 
 namespace MatCMS.Cloud.Services;
 
@@ -16,13 +16,17 @@ public class HostingService
 {
     private readonly CloudContext _cloud;
     private readonly DockerHostService _docker;
-    private readonly ILogger<HostingService> _log;
+    private readonly AppDbContext _db;
+    private readonly NodeService _nodes;
+    private readonly Proxy.ProxyService _proxy;
 
-    public HostingService(CloudContext cloud, DockerHostService docker, ILogger<HostingService> log)
+    public HostingService(CloudContext cloud, DockerHostService docker, AppDbContext db, NodeService nodes, Proxy.ProxyService proxy)
     {
         _cloud = cloud;
         _docker = docker;
-        _log = log;
+        _db = db;
+        _nodes = nodes;
+        _proxy = proxy;
     }
 
     /// <summary>Vorgabe, wenn kein Bereich eingestellt ist.</summary>
@@ -54,51 +58,26 @@ public class HostingService
     /// Vermutung wäre hier schlechter als ein ehrliches "weiß ich nicht", weil sie erst beim Starten
     /// des Containers auffliegt.</para>
     /// </summary>
-    public async Task<int?> NextFreePortAsync(CancellationToken ct = default)
+    public Task<int?> NextFreePortAsync(CancellationToken ct = default)
     {
-        var used = await UsedPortsAsync(ct);
-        if (used is null) return null;
-
         var (from, to) = PortRange;
-        for (var port = from; port <= to; port++)
-        {
-            if (!used.Contains(port)) return port;
-        }
-        _log.LogWarning("Kein freier Port zwischen {From} und {To} — {Count} sind belegt.", from, to, used.Count);
-        return null;
+        return _docker.NextFreePortAsync(from, to, ct);
     }
 
     /// <summary>Alle auf dem Host veröffentlichten Ports, oder null wenn der Daemon nicht erreichbar
     /// ist. Null und leer sind hier zwei verschiedene Antworten.</summary>
-    public async Task<HashSet<int>?> UsedPortsAsync(CancellationToken ct = default)
-    {
-        var client = _docker.ClientOrNull;
-        if (client is null) return null;
-
-        try
-        {
-            var list = await client.Containers.ListContainersAsync(new ContainersListParameters { All = true }, ct);
-            return list
-                .SelectMany(c => c.Ports ?? new List<Port>())
-                .Where(p => p.PublicPort > 0)
-                .Select(p => (int)p.PublicPort)
-                .ToHashSet();
-        }
-        catch (Exception ex)
-        {
-            _log.LogWarning(ex, "Belegte Ports konnten nicht ermittelt werden.");
-            return null;
-        }
-    }
+    public Task<HashSet<int>?> UsedPortsAsync(CancellationToken ct = default) => _docker.UsedPortsAsync(ct);
 
     // --- Anlegen ---------------------------------------------------------------------------------
 
     /// <param name="Name">Anzeigename; daraus wird der Container- und Volume-Name abgeleitet.</param>
     /// <param name="Domain">Optional. Published after creation by <c>ProxyService</c> through the configured
     /// provider (route + certificate), or only recorded when no proxy is configured.</param>
-    public sealed record CreateRequest(string Name, string? Domain, string ImageTag, string JoinCode);
+    /// <param name="NodeId">Null = on this cloud's own Docker host.</param>
+    public sealed record CreateRequest(string Name, string? Domain, string ImageTag, string JoinCode, int? NodeId = null);
 
-    public sealed record CreateResult(bool Ok, string? Error, string? ContainerId, int? Port, string? ContainerName);
+    /// <param name="Node">Where it was created (null = this host) — the domain is published there too.</param>
+    public sealed record CreateResult(bool Ok, string? Error, string? ContainerId, int? Port, string? ContainerName, Models.Node? Node = null);
 
     public const string DefaultNamePattern = "matcms-instance-{name}";
 
@@ -142,108 +121,86 @@ public class HostingService
     }
 
     /// <summary>
-    /// Legt einen neuen MatCMS-Container an und startet ihn.
-    ///
-    /// <para>Scheitert etwas nach dem Erzeugen, wird der halb gebaute Container wieder entfernt. Ein
-    /// gestoppter Rest mit richtigem Namen wäre schlimmer als gar keiner: der nächste Versuch mit
-    /// demselben Namen liefe darauf auf.</para>
-    ///
-    /// <para>Das Volume bleibt bewusst stehen. Es enthält ab der ersten Sekunde Daten der Website,
-    /// und etwas zu löschen, das Inhalte tragen könnte, ist keine Aufräumarbeit für einen
-    /// Fehlerpfad.</para>
+    /// Legt einen neuen MatCMS-Container an und startet ihn — auf dem Docker-Host dieser Cloud oder, mit
+    /// <see cref="CreateRequest.NodeId"/>, auf einem verbundenen Node. Beide Wege laufen durch DIESELBE
+    /// Engine-Methode (<see cref="DockerHostService.CreateInstanceContainerAsync"/>): hier im Prozess, auf dem
+    /// Node als Auftrag. Label, Portwahl und das Aufräumen eines halb gebauten Containers liegen deshalb dort.
     /// </summary>
     public async Task<CreateResult> CreateAsync(CreateRequest req, CancellationToken ct = default)
     {
         if (!Enabled) return new(false, "Hosting ist in den Einstellungen nicht eingeschaltet.", null, null, null);
 
-        var client = _docker.ClientOrNull;
-        if (client is null) return new(false, "Docker ist nicht erreichbar.", null, null, null);
+        Models.Node? node = null;
+        if (req.NodeId is { } nid)
+        {
+            node = await _db.Nodes.FindAsync(new object[] { nid }, ct);
+            if (node is null) return new(false, "Node nicht gefunden.", null, null, null);
+        }
+        else if (_docker.ClientOrNull is null) return new(false, "Docker ist nicht erreichbar.", null, null, null);
 
         var stack = StackName(req.Name);
-        var containerName = stack;
-        var volumeName = stack + "-data";
-
-        // No domain requirement any more: the container runs and is reachable on its host port either way,
-        // and a domain given at provisioning is published by ProxyService right after (route or record).
-        // It used to be REQUIRED without Matcad — and then thrown away.
-
-        var port = await NextFreePortAsync(ct);
-        if (port is null) return new(false, "Kein freier Port im eingestellten Bereich.", null, null, null);
-
         var image = "ghcr.io/real-ttx/matcms:" + (string.IsNullOrWhiteSpace(req.ImageTag) ? "latest" : req.ImageTag.Trim());
-        string? createdId = null;
-        try
+        var (from, to) = node is null ? PortRange : (node.PortFrom, node.PortTo);
+        var spec = new DockerHostService.InstanceContainerSpec(stack, stack + "-data", image, new List<string>
         {
-            // Erst ziehen. Ohne das schlüge das Erzeugen mit einer Meldung fehl, die nach einem
-            // Fehler im Aufruf aussieht statt nach einem fehlenden Image.
-            await client.Images.CreateImageAsync(
-                new ImagesCreateParameters { FromImage = image }, null, new Progress<JSONMessage>(), ct);
+            // Damit sie sich selbst anmeldet und ihr Profil bekommt. Auf einem Node muss diese Adresse von
+            // DORT erreichbar sein — deshalb die öffentliche Adresse der Cloud, nie ein interner Name.
+            "MatCms__Cloud__Url=" + (_cloud.Get(SettingKeys.CanonicalUrl) ?? ""),
+            "MatCms__Cloud__JoinCode=" + req.JoinCode,
+            // Sie startet hinter einem Proxy — ohne das baut sie http-Adressen und wäre in der Cloud weder
+            // einbettbar noch richtig verlinkt.
+            "MatCms__Proxy__TrustAll=true",
+        }, from, to);
 
-            var labels = new Dictionary<string, string>
-            {
-                [DockerHostService.ManagedLabel] = "true",
-                // Die Labels, die Compose selbst schreibt. Jede Verwaltungsoberfläche — Docker
-                // Desktop, Dockhand, Portainer — gruppiert danach, ohne von uns etwas zu wissen.
-                // Deshalb dieser Weg und nicht das API eines bestimmten Werkzeugs.
-                ["com.docker.compose.project"] = stack,
-                ["com.docker.compose.service"] = "web",
-                ["com.docker.compose.container-number"] = "1",
-                ["com.docker.compose.oneoff"] = "False",
-                // working_dir und config_files bleiben WEG: sie zeigen auf die Datei, aus der ein
-                // Stack entstand. Ohne Datei dort wäre das eine Lüge gegenüber docker compose.
-            };
-            // Keine matcad.*-Labels mehr: die Route legt ProxyService über Matcads REST-API an. Mit
-            // eingeschalteter Label-Erkennung baute Matcad sonst eine ZWEITE Route für denselben Host,
-            // die sich weder ändern noch entfernen lässt, ohne den Container neu zu erzeugen.
-
-            var create = new CreateContainerParameters
-            {
-                Name = containerName,
-                Image = image,
-                Labels = labels,
-                Env = new List<string>
-                {
-                    // Damit sie sich selbst anmeldet und ihr Profil bekommt.
-                    "MatCms__Cloud__Url=" + (_cloud.Get(SettingKeys.CanonicalUrl) ?? ""),
-                    "MatCms__Cloud__JoinCode=" + req.JoinCode,
-                    // Sie startet hinter einem Proxy — ohne das baut sie http-Adressen und wäre in
-                    // der Cloud weder einbettbar noch richtig verlinkt.
-                    "MatCms__Proxy__TrustAll=true",
-                },
-                HostConfig = new HostConfig
-                {
-                    PortBindings = new Dictionary<string, IList<PortBinding>>
-                    {
-                        ["8080/tcp"] = new List<PortBinding> { new() { HostPort = port.Value.ToString() } }
-                    },
-                    Binds = new List<string> { volumeName + ":/app/appdata" },
-                    RestartPolicy = new RestartPolicy { Name = RestartPolicyKind.UnlessStopped },
-                },
-            };
-
-            var created = await client.Containers.CreateContainerAsync(create, ct);
-            createdId = created.ID;
-            await client.Containers.StartContainerAsync(createdId, new ContainerStartParameters(), ct);
-
-            _log.LogInformation("Instanz {Name} angelegt: Container {Id} auf Port {Port}.", containerName, createdId, port);
-            return new(true, null, createdId, port, containerName);
-        }
-        catch (Exception ex)
+        // No domain requirement: the container runs and is reachable on its host port either way, and a domain
+        // given at provisioning is published by ProxyService right after (route or record).
+        DockerHostService.CreateContainerResult r;
+        if (node is null) r = await _docker.CreateInstanceContainerAsync(spec, ct);
+        else
         {
-            _log.LogError(ex, "Anlegen von {Name} fehlgeschlagen.", containerName);
-            if (createdId is not null)
-            {
-                try
-                {
-                    await client.Containers.RemoveContainerAsync(createdId,
-                        new ContainerRemoveParameters { Force = true }, CancellationToken.None);
-                }
-                catch (Exception cleanup)
-                {
-                    _log.LogWarning(cleanup, "Der halb gebaute Container {Id} blieb stehen.", createdId);
-                }
-            }
-            return new(false, ex.Message, null, null, null);
+            // Pulling an image on a fresh host can take a while.
+            var job = await _nodes.RunAsync(node, NodeJobKinds.Create, spec, null, TimeSpan.FromMinutes(5), ct);
+            r = job.Finished
+                ? NodeJobExecutor.Deserialize<DockerHostService.CreateContainerResult>(job.ResultJson) ?? new(false, job.Message, null, null, null)
+                : new(false, job.Message, null, null, null);
         }
+        return new(r.Ok, r.Error, r.ContainerId, r.Port, r.ContainerName, node);
+    }
+
+    public sealed record ProvisionResult(bool Ok, string Message, string? ContainerName = null, int? Port = null, bool DomainFailed = false);
+
+    /// <summary>
+    /// Provisioning as ONE step for the UI, the API and the MCP tool: container (here or on a node), then the
+    /// domain on the same host. No instance row is created here — the site appears when IT enrolls with its
+    /// profile's join code; two ways a record comes into being would be two truths. A route set up now is
+    /// adopted on that first beat.
+    /// </summary>
+    public async Task<ProvisionResult> ProvisionAsync(string? name, int profileId, string? domain, string? imageTag, int? nodeId,
+        bool pushCanonical, CancellationToken ct = default)
+    {
+        if (!Enabled) return new(false, "Hosting ist in den Einstellungen nicht eingeschaltet.");
+        if (string.IsNullOrWhiteSpace(name)) return new(false, "Bitte einen Namen angeben.");
+        // The join code comes from the PROFILE — it is how the new site lands there and gets its templates,
+        // plugins and users.
+        var profile = await _db.Profiles.FindAsync(new object[] { profileId }, ct);
+        if (profile is null) return new(false, "Bitte ein Profil wählen.");
+        if (!string.IsNullOrWhiteSpace(domain) && Proxy.ProxyService.NormaliseDomain(domain) is null)
+            return new(false, "Keine gültige Domain (nur ein Hostname, z. B. shop.example.de).");
+
+        var result = await CreateAsync(new CreateRequest(name.Trim(), domain?.Trim(), imageTag ?? "", profile.JoinCode, nodeId), ct);
+        if (!result.Ok) return new(false, $"Anlegen fehlgeschlagen: {result.Error}");
+
+        var where = result.Node is null ? "" : $" auf Node „{result.Node.Name}“";
+        var msg = $"„{result.ContainerName}“ läuft{where} auf Port {result.Port}. Sie meldet sich in den nächsten Minuten selbst an.";
+        if (!string.IsNullOrWhiteSpace(domain) && result.ContainerId is not null && result.ContainerName is not null)
+        {
+            var pr = await _proxy.PublishForNewContainerAsync(result.Node, result.ContainerId, result.ContainerName, result.Port,
+                domain, pushCanonical, ct);
+            if (!pr.Ok)
+                return new(true, msg + $" Die Domain wurde NICHT eingerichtet: {pr.Message} — im Hosting-Tab der Instanz erneut veröffentlichen.",
+                    result.ContainerName, result.Port, DomainFailed: true);
+            msg += " " + pr.Message;
+        }
+        return new(true, msg, result.ContainerName, result.Port);
     }
 }

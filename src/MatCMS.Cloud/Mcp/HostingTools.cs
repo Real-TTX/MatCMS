@@ -72,6 +72,7 @@ public class HostingTools
         return new
         {
             local = HostingActionsService.IsLocal(inst),
+            onNode = HostingActionsService.IsOnNode(inst),
             hosting = inst.Hosting.ToString().ToLowerInvariant(),
             containerState = inst.ContainerState,
             container = d is null ? null : new
@@ -148,7 +149,7 @@ public class HostingTools
     public static async Task<object> TestProxy(McpContext me, Services.Proxy.ProxyService proxy, CancellationToken ct)
     {
         RequireHosting(me);
-        var r = await proxy.TestAsync(ct);
+        var r = await proxy.TestAsync(null, ct);
         return new { ok = r.Ok, provider = r.Kind, message = r.Message };
     }
 

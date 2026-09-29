@@ -140,9 +140,17 @@
         <div class="kv">
             <div class="kv-label">@T["instances.hosting"]</div>
             <div class="kv-value">
-                @if (Model.Item.Hosting == InstanceHosting.Local)
+                @if (Model.Item.Hosting is InstanceHosting.Local or InstanceHosting.Node)
                 {
-                    <span class="badge badge-on">@T["instances.local"]</span>
+                    @if (Model.Item.Node is { } hn)
+                    {
+                        <span class="badge badge-on">@T["nodes.onNode"]</span>
+                        <a asp-page="/Admin/Hosting/Nodes/Details" asp-route-id="@hn.Id">@hn.Name</a>
+                    }
+                    else
+                    {
+                        <span class="badge badge-on">@T["instances.local"]</span>
+                    }
                     <span class="muted mono">@Model.Item.LocalContainerName</span>
                     @* The published host port is what the operator needs to reach the container
                        directly — shown here rather than buried in the preview tab. *@

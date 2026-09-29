@@ -1,0 +1,84 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.Hosting.Nodes.IndexModel
+@{
+    ViewData["Title"] = T["nodes.title"];
+    var now = DateTime.UtcNow;
+}
+<div data-list>
+    <div class="page-head">
+        <h1>@T["nodes.title"]</h1>
+        <div class="list-toolbar">
+            <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+        </div>
+    </div>
+
+    <p class="help">@T["nodes.intro"]</p>
+
+    <table class="data" data-list-table>
+        <thead>
+            <tr>
+                <th>@T["common.name"]</th>
+                <th>@T["common.status"]</th>
+                <th>@T["nodes.host"]</th>
+                <th>@T["nodes.agent"]</th>
+                <th>@T["nodes.docker"]</th>
+                <th style="width:90px;">@T["nodes.sites"]</th>
+                <th>@T["nodes.lastSeen"]</th>
+            </tr>
+        </thead>
+        <tbody>
+            @* "Dieser Host" is not a row in the database — it is the cloud's own daemon — but it is where sites
+               run too, so it is listed first, and configured where it always was. *@
+            <tr data-search="@T["nodes.thisHost"]">
+                <td><a asp-page="/Admin/Settings/Index" asp-route-tab="hosting"><strong>@T["nodes.thisHost"]</strong></a></td>
+                <td><span class="badge @(Model.LocalReachable ? "badge-on" : "badge-off")">@(Model.LocalReachable ? T["nodes.online"] : T["settings.dockerUnreachable"])</span></td>
+                <td class="muted">@T["nodes.thisHostHint"]</td>
+                <td class="muted">—</td>
+                <td class="muted">—</td>
+                <td class="mono">@Model.LocalCount</td>
+                <td class="muted">—</td>
+            </tr>
+            @foreach (var n in Model.Items)
+            {
+                var on = n.IsOnline(now);
+                <tr data-search="@(n.Name + " " + n.HostName)">
+                    <td><a asp-page="Details" asp-route-id="@n.Id"><strong>@n.Name</strong></a></td>
+                    <td>
+                        @if (n.Revoked)
+                        {
+                            <span class="badge badge-err">@T["nodes.revoked"]</span>
+                        }
+                        else if (n.LastSeenAt is null)
+                        {
+                            <span class="badge badge-new">@T["nodes.neverSeen"]</span>
+                        }
+                        else if (on)
+                        {
+                            <span class="badge badge-on">@T["nodes.online"]</span>
+                        }
+                        else
+                        {
+                            <span class="badge badge-err">@T["nodes.offline"]</span>
+                        }
+                        @if (!string.IsNullOrEmpty(n.DockerError))
+                        {
+                            <span class="badge badge-err" title="@n.DockerError">@T["nodes.dockerError"]</span>
+                        }
+                    </td>
+                    <td class="mono muted">@(n.HostName ?? "—")</td>
+                    <td class="mono muted">@(n.AgentVersion ?? "—")</td>
+                    <td class="mono muted">@(n.DockerVersion ?? "—")</td>
+                    <td class="mono">@(Model.Counts.TryGetValue(n.Id, out var c) ? c : 0)</td>
+                    <td class="mono muted">@(n.LastSeenAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss") ?? "—")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+</div>
+
+<div class="list-actions">
+    <a class="btn" asp-page="Create">@T["nodes.add"]</a>
+    <a class="btn btn-ghost" asp-page="/Admin/Hosting/Index">@T["action.back"]</a>
+</div>
+<div class="help">@T["nodes.apiHint"]</div>

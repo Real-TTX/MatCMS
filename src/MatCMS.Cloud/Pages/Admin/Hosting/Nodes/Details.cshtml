@@ -1,0 +1,192 @@
+@page "{id:int}"
+@model MatCMS.Cloud.Pages.Admin.Hosting.Nodes.DetailsModel
+@{
+    var n = Model.Item;
+    ViewData["Title"] = n.Name;
+    var now = DateTime.UtcNow;
+    var on = n.IsOnline(now);
+}
+<div class="page-head">
+    <h1>@n.Name</h1>
+    <div class="list-toolbar">
+        @if (n.Revoked)
+        {
+            <span class="badge badge-err">@T["nodes.revoked"]</span>
+        }
+        else if (n.LastSeenAt is null)
+        {
+            <span class="badge badge-new">@T["nodes.neverSeen"]</span>
+        }
+        else
+        {
+            <span class="badge @(on ? "badge-on" : "badge-err")">@(on ? T["nodes.online"] : T["nodes.offline"])</span>
+        }
+    </div>
+</div>
+
+@* The one moment the token is visible (after creating or rotating) — it is stored as a hash only. *@
+@if (Model.Command is not null)
+{
+    <div class="alert alert-success">
+        <strong>@T["nodes.commandTitle"]</strong>
+        <div class="help">@T["nodes.commandOnce"]</div>
+        <pre class="mono is-secret" style="margin:.5rem 0 0;white-space:pre-wrap;word-break:break-all;">@Model.Command</pre>
+    </div>
+}
+
+<div class="tabs" role="tablist">
+    <button type="button" class="tab active" data-tab="overview">@T["nodes.tabOverview"]</button>
+    <button type="button" class="tab" data-tab="proxy">@T["nodes.tabProxy"]</button>
+    <button type="button" class="tab" data-tab="containers">@T["nodes.tabContainers"] (@Model.Containers.Count)</button>
+    <button type="button" class="tab" data-tab="jobs">@T["nodes.tabJobs"]</button>
+</div>
+
+<div class="tab-panel" data-panel="overview">
+    <div class="card">
+        <div class="kv"><div class="kv-label">@T["nodes.id"]</div><div class="kv-value mono">@n.PublicId</div></div>
+        <div class="kv"><div class="kv-label">@T["nodes.host"]</div><div class="kv-value mono">@(n.HostName ?? "—")</div></div>
+        <div class="kv"><div class="kv-label">@T["nodes.agent"]</div><div class="kv-value mono">@(n.AgentVersion ?? "—")</div></div>
+        <div class="kv"><div class="kv-label">@T["nodes.docker"]</div><div class="kv-value mono">@(n.DockerVersion ?? "—")</div></div>
+        @if (!string.IsNullOrEmpty(n.DockerError))
+        {
+            <div class="kv"><div class="kv-label">@T["nodes.dockerError"]</div><div class="kv-value"><span class="badge badge-err">@n.DockerError</span></div></div>
+        }
+        <div class="kv"><div class="kv-label">@T["nodes.lastSeen"]</div><div class="kv-value mono">@(n.LastSeenAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss") ?? "—")</div></div>
+        <div class="kv"><div class="kv-label">@T["nodes.created"]</div><div class="kv-value mono">@n.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div></div>
+        <div class="help">@T["nodes.agentHint"]</div>
+    </div>
+
+    <div class="list-actions">
+        <form class="inline-form" method="post" asp-page-handler="Rotate" asp-route-id="@n.Id" onsubmit="return confirm('@T["nodes.rotateConfirm"]');">
+            <button type="submit" class="btn btn-ghost">@T["nodes.rotate"]</button>
+        </form>
+        <form class="inline-form" method="post" asp-page-handler="Revoke" asp-route-id="@n.Id" asp-route-revoked="@(!n.Revoked)"
+              onsubmit="return @(n.Revoked ? "true" : $"confirm('{T["nodes.revokeConfirm"]}')");">
+            <button type="submit" class="btn btn-ghost">@(n.Revoked ? T["nodes.activate"] : T["nodes.revoke"])</button>
+        </form>
+        <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@n.Id" onsubmit="return confirm('@T["nodes.deleteConfirm"]');">
+            <button type="submit" class="btn btn-danger">@T["action.delete"]</button>
+        </form>
+    </div>
+</div>
+
+<div class="tab-panel" data-panel="proxy" hidden>
+    <form method="post" asp-page-handler="Save" asp-route-id="@n.Id">
+        <div class="card">
+            <h2>@T["nodes.general"]</h2>
+            <div class="form-field">
+                <label for="name">@T["common.name"]</label>
+                <input id="name" name="name" value="@n.Name" required />
+            </div>
+            <div class="form-row">
+                <div class="form-field">
+                    <label for="portFrom">@T["settings.hostingPortFrom"]</label>
+                    <input id="portFrom" name="portFrom" type="number" min="1" max="65535" value="@n.PortFrom" />
+                </div>
+                <div class="form-field">
+                    <label for="portTo">@T["settings.hostingPortTo"]</label>
+                    <input id="portTo" name="portTo" type="number" min="1" max="65535" value="@n.PortTo" />
+                </div>
+            </div>
+            <div class="help">@T["nodes.portsHint"]</div>
+        </div>
+        <div class="card">
+            <h2>@T["settings.hostingRouting"]</h2>
+            <partial name="_ProxyFields" model="Model.ProxyFields" />
+            <div class="help">@T["nodes.proxyHint"]</div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn">@T["common.save"]</button>
+            <button type="submit" class="btn btn-ghost" formaction="@Url.Page("Details", "ProxyTest", new { id = n.Id })">@T["settings.hostingProxyTest"]</button>
+        </div>
+    </form>
+</div>
+
+<div class="tab-panel" data-panel="containers" hidden>
+    <p class="help">@T["nodes.containersHint"] @(n.InventoryAt is { } at ? "(" + at.ToLocalTime().ToString("dd.MM. HH:mm:ss") + ")" : "")</p>
+    <table class="data">
+        <thead>
+            <tr>
+                <th>@T["hosting.name"]</th>
+                <th>@T["hosting.image"]</th>
+                <th style="width:110px;">@T["hosting.state"]</th>
+                <th style="width:80px;">@T["hosting.port"]</th>
+                <th style="width:110px;">@T["hosting.managed"]</th>
+                <th>@T["cleanup.instance"]</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Containers.Count == 0)
+            {
+                <partial name="_EmptyRow" model='@T["nodes.noContainers"]' />
+            }
+            @foreach (var c in Model.Containers)
+            {
+                var up = string.Equals(c.State, "running", StringComparison.OrdinalIgnoreCase);
+                <tr>
+                    <td class="mono">@c.Name</td>
+                    <td class="mono muted">@c.Image</td>
+                    <td><span class="badge @(up ? "badge-on" : "badge-err")">@c.State</span></td>
+                    <td class="mono muted">@(c.PublishedPort?.ToString() ?? "—")</td>
+                    <td><span class="badge @(c.CloudManaged ? "badge-on" : "badge-off")">@(c.CloudManaged ? T["hosting.managedYes"] : T["hosting.managedNo"])</span></td>
+                    <td>
+                        @if (Model.InstancesByContainer.TryGetValue(c.Id, out var inst))
+                        {
+                            <a asp-page="/Admin/Instances/Details" asp-route-id="@inst.Id" asp-route-tab="hosting">@inst.Name</a>
+                        }
+                        else
+                        {
+                            <span class="muted">@T["nodes.notEnrolled"]</span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<div class="tab-panel" data-panel="jobs" hidden>
+    <table class="data">
+        <thead>
+            <tr>
+                <th style="width:70px;">#</th>
+                <th>@T["nodes.jobKind"]</th>
+                <th style="width:100px;">@T["common.status"]</th>
+                <th>@T["nodes.jobMessage"]</th>
+                <th>@T["nodes.jobBy"]</th>
+                <th style="width:150px;">@T["nodes.jobAt"]</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Jobs.Count == 0)
+            {
+                <partial name="_EmptyRow" model='@T["nodes.noJobs"]' />
+            }
+            @foreach (var j in Model.Jobs)
+            {
+                var badge = j.State switch
+                {
+                    MatCMS.Cloud.Models.NodeJobState.Done => "badge-on",
+                    MatCMS.Cloud.Models.NodeJobState.Failed => "badge-err",
+                    _ => "badge-new",
+                };
+                <tr>
+                    <td class="mono muted">@j.Id</td>
+                    <td class="mono">@j.Kind</td>
+                    <td><span class="badge @badge">@T["nodes.state." + j.State.ToString().ToLowerInvariant()]</span></td>
+                    <td class="muted">@j.Message</td>
+                    <td class="mono muted">@j.RequestedBy</td>
+                    <td class="mono muted">@j.CreatedAt.ToLocalTime().ToString("dd.MM. HH:mm:ss")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<div class="list-actions">
+    <a class="btn btn-ghost" asp-page="Index">@T["action.back"]</a>
+</div>
+
+@section Scripts {
+    <partial name="_TabsScript" />
+}

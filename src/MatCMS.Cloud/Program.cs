@@ -199,6 +199,12 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AuthorizeFolder("/Admin/ApiKeys", "Admin");
     options.Conventions.AuthorizeFolder("/Admin/Backups", "Admin");
     options.Conventions.AuthorizeFolder("/Admin/Mail", "Admin");
+    // Fleet-wide pages: they list and act on EVERY instance, not only an Operator's assigned ones, so an
+    // Operator (scoped to its instances) must not reach them by URL. The nav already hid them; the
+    // folder lock is what actually enforces it.
+    options.Conventions.AuthorizeFolder("/Admin/Cleanup", "Admin");
+    options.Conventions.AuthorizeFolder("/Admin/Logs", "Admin");
+    options.Conventions.AuthorizeFolder("/Admin/Hosting", "Admin");
     // Creating and removing instances stays with admins; an Operator only runs its assigned ones.
     options.Conventions.AuthorizePage("/Admin/Instances/New", "Admin");
     options.Conventions.AuthorizePage("/Admin/Instances/Create", "Admin");

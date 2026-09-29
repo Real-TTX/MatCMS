@@ -3,6 +3,8 @@
 @{
     ViewData["Title"] = T["dashboard.title"];
     var dashUser = User.FindFirst("DisplayName")?.Value ?? User.Identity?.Name ?? "Admin";
+    var maxDay = Math.Max(1, Model.ErrorsPerDay.Max(d => d.Count));
+    string Hsize(long b) => b >= 1L << 30 ? $"{b / (double)(1L << 30):0.0} GB" : b >= 1 << 20 ? $"{b / 1048576.0:0} MB" : $"{b / 1024} KB";
 }
 <div class="page-head">
     <h1>@T["dashboard.title"]</h1>
@@ -25,95 +27,176 @@
     </div>
 }
 
-<div class="stat-grid">
+@* ---- Tiles: the numbers first, each leading to where it is dealt with. ---- *@
+<div class="stat-grid dash-tiles">
     <a class="stat" asp-page="/Admin/Pages/Index">
         <div class="n">@Model.PageCount</div>
         <div class="l">@T["dashboard.pages"]</div>
+        <div class="s">@T["dashboard.drafts", Model.PageDrafts]</div>
     </a>
     <a class="stat" asp-page="/Admin/Posts/Index">
         <div class="n">@Model.PostCount</div>
         <div class="l">@T["dashboard.posts"]</div>
+        <div class="s">@T["dashboard.drafts", Model.PostDrafts]</div>
     </a>
     <a class="stat" asp-page="/Admin/Media/Index">
         <div class="n">@Model.MediaCount</div>
         <div class="l">@T["dashboard.media"]</div>
+        <div class="s">@Hsize(Model.MediaBytes)</div>
     </a>
-    <a class="stat" asp-page="/Admin/Forms/Index">
+    <a class="stat @(Model.UnreadCount > 0 ? "is-warn" : "")" asp-page="/Admin/Forms/Index">
         <div class="n">@Model.UnreadCount</div>
         <div class="l">@T["dashboard.newSubmissions"]</div>
-    </a>
-    <a class="stat" asp-page="/Admin/Forms/Index">
-        <div class="n">@Model.SubmissionCount</div>
-        <div class="l">@T["dashboard.totalSubmissions"]</div>
+        <div class="s">@T["dashboard.ofTotal", Model.SubmissionCount]</div>
     </a>
     <a class="stat" asp-page="/Admin/Users/Index">
         <div class="n">@Model.UserCount</div>
         <div class="l">@T["dashboard.users"]</div>
+        <div class="s">@T["dashboard.members", Model.MemberCount]</div>
     </a>
-    <a class="stat" asp-page="/Admin/Logs/Index">
+    <a class="stat @(Model.ErrorCount7d > 0 ? "is-warn" : "")" asp-page="/Admin/Logs/Index">
         <div class="n">@Model.ErrorCount7d</div>
         <div class="l">@T["dashboard.errors7d"]</div>
+        <div class="dash-bars" aria-hidden="true">
+            @foreach (var d in Model.ErrorsPerDay)
+            {
+                <span style="height:@(d.Count == 0 ? 2 : 4 + 22 * d.Count / maxDay)px" title="@d.Day.ToString("ddd dd.MM."): @d.Count"></span>
+            }
+        </div>
     </a>
 </div>
 
-<div class="card">
-    <h2>@T["dashboard.cloud"]</h2>
-    <div class="kv">
-        <div class="kv-label">@T["dashboard.cloudStatus"]</div>
-        <div class="kv-value">
-            @if (Model.CloudConnected)
-            {
-                <span class="badge badge-on">@T["dashboard.cloudConnected"]</span>
-                @if (Model.CloudOutOfSync)
+<div class="dash-grid">
+    @* ---- Everything that needs a look, most serious first. ---- *@
+    <div class="card">
+        <h2>@T["dashboard.attention"] @if (Model.AttentionItems.Count > 0) { <span class="muted">(@Model.AttentionItems.Count)</span> }</h2>
+        @if (Model.AttentionItems.Count == 0)
+        {
+            <p class="muted">✓ @T["dashboard.allClear"]</p>
+        }
+        else
+        {
+            <table class="data dash-attention">
+                <colgroup><col class="dash-icon-col" /><col /></colgroup>
+                <tbody>
+                    @foreach (var x in Model.AttentionItems)
+                    {
+                        <tr class="lvl-@x.Level">
+                            <td class="dash-icon">@x.Icon</td>
+                            <td><a href="@x.Url"><strong>@x.Title</strong></a><div class="muted">@x.Text</div></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+
+    <div class="card">
+        <h2>@T["dashboard.website"]</h2>
+        <div class="kv">
+            <div class="kv-label">@T["dashboard.siteName"]</div>
+            <div class="kv-value">
+                @(Model.SiteName ?? "—")
+                @if (Model.Maintenance) { <span class="badge badge-new">@T["dashboard.maintenanceOn"]</span> }
+            </div>
+        </div>
+        <div class="kv">
+            <div class="kv-label">@T["dashboard.address"]</div>
+            <div class="kv-value">
+                @if (Model.CanonicalUrl is { } url) { <a href="@url" target="_blank" rel="noopener" class="mono">@url</a> }
+                else { <a asp-page="/Admin/Settings/Index" asp-route-tab="general" class="muted">@T["dashboard.noAddress"]</a> }
+            </div>
+        </div>
+        <div class="kv">
+            <div class="kv-label">@T["dashboard.template"]</div>
+            <div class="kv-value"><a asp-page="/Admin/Templates/Index">@(Model.ActiveTemplate ?? T["dashboard.noTemplate"])</a></div>
+        </div>
+        <div class="kv">
+            <div class="kv-label">@T["dashboard.languages"]</div>
+            <div class="kv-value mono">@Model.Languages</div>
+        </div>
+        <div class="kv">
+            <div class="kv-label">@T["dashboard.version"]</div>
+            <div class="kv-value">
+                <span class="mono">@Model.Version</span>
+                @if (Model.UpdateAvailable) { <span class="badge badge-new">@T["dashboard.updateTo", Model.LatestVersion ?? ""]</span> }
+            </div>
+        </div>
+        <div class="kv">
+            <div class="kv-label">@T["dashboard.backup"]</div>
+            <div class="kv-value">
+                <a asp-page="/Admin/Backup/Index">
+                    @(Model.LastBackup is { } lb ? T["dashboard.lastBackup", lb.ToLocalTime().ToString("dd.MM.yyyy HH:mm"), Model.BackupCount] : T["dashboard.noBackup"])
+                </a>
+                <span class="badge @(Model.BackupScheduled ? "badge-on" : "badge-off")">@(Model.BackupScheduled ? T["dashboard.scheduled"] : T["dashboard.notScheduled"])</span>
+            </div>
+        </div>
+        <div class="kv">
+            <div class="kv-label">@T["dashboard.mail"]</div>
+            <div class="kv-value">
+                @if (Model.MailConfigured) { <span class="badge badge-on">@T["dashboard.mailOk"]</span> }
+                else { <a class="badge badge-err" asp-page="/Admin/Settings/Index" asp-route-tab="smtp">@T["dashboard.mailMissing"]</a> }
+            </div>
+        </div>
+        @* The cloud is optional — one line, and "nicht verbunden" is a perfectly normal state for a standalone site. *@
+        <div class="kv">
+            <div class="kv-label">@T["dashboard.cloud"]</div>
+            <div class="kv-value">
+                @if (Model.CloudConnected)
                 {
-                    <span class="badge badge-new">@T["dashboard.cloudOutOfSync"]</span>
+                    <span class="badge badge-on">@T["dashboard.cloudConnected"]</span>
+                    <span class="badge @(Model.CloudOutOfSync ? "badge-new" : "badge-on")">@(Model.CloudOutOfSync ? T["dashboard.cloudOutOfSync"] : T["dashboard.cloudSynced"])</span>
+                    @if (Model.CloudLastSync is { } ls) { <span class="muted">@ls.ToLocalTime().ToString("dd.MM. HH:mm")</span> }
                 }
                 else
                 {
-                    <span class="badge badge-on">@T["dashboard.cloudSynced"]</span>
+                    <span class="muted">@T["dashboard.cloudStandalone"]</span>
                 }
-            }
-            else
-            {
-                <span class="badge badge-off">@T["dashboard.cloudDisconnected"]</span>
-            }
+            </div>
         </div>
     </div>
-    @if (Model.CloudConnected && Model.CloudLastSync is not null)
-    {
-        <div class="kv">
-            <div class="kv-label">@T["dashboard.lastSync"]</div>
-            <div class="kv-value muted">@Model.CloudLastSync.Value.ToString("dd.MM.yyyy HH:mm") UTC</div>
-        </div>
-    }
 </div>
 
-@if (Model.RecentSubmissions.Count > 0)
-{
-    <div data-list>
-        <div class="page-head"><h2>@T["dashboard.recentSubmissions"]</h2></div>
-        <table class="data" data-list-table>
-            <thead>
-                <tr>
-                    <th style="width:160px;">@T["dashboard.time"]</th>
-                    <th>@T["dashboard.formLabel"]</th>
-                    <th style="width:110px;"></th>
-                </tr>
-            </thead>
+<div class="dash-grid">
+    <div class="card">
+        <h2>@T["dashboard.recentlyEdited"]</h2>
+        <table class="data">
             <tbody>
-                @foreach (var s in Model.RecentSubmissions)
+                @if (Model.RecentlyEdited.Count == 0)
+                {
+                    <partial name="_EmptyRow" model='@T["dashboard.nothingEdited"]' />
+                }
+                @foreach (var e in Model.RecentlyEdited)
                 {
                     <tr>
-                        <td class="muted mono">@s.CreatedAt.ToString("dd.MM.yyyy HH:mm")</td>
-                        <td>@(s.Form?.Name ?? "—")</td>
-                        <td>@if (!s.IsRead) { <span class="badge badge-new">@T["dashboard.unread"]</span> }</td>
+                        <td style="width:34px;">@(e.Kind == "page" ? "📄" : "📝")</td>
+                        <td><a href="@e.Url">@e.Title</a> @if (!e.Published) { <span class="badge badge-off">@T["dashboard.draft"]</span> }</td>
+                        <td class="muted mono nowrap">@e.UpdatedAt.ToLocalTime().ToString("dd.MM. HH:mm")</td>
                     </tr>
                 }
             </tbody>
         </table>
     </div>
-    <div class="list-actions"><a class="btn btn-ghost" asp-page="/Admin/Forms/Index">@T["dashboard.allSubmissions"]</a></div>
-}
+
+    <div class="card">
+        <h2>@T["dashboard.recentSubmissions"]</h2>
+        <table class="data">
+            <tbody>
+                @if (Model.RecentSubmissions.Count == 0)
+                {
+                    <partial name="_EmptyRow" model='@T["dashboard.noSubmissions"]' />
+                }
+                @foreach (var s in Model.RecentSubmissions)
+                {
+                    <tr>
+                        <td><a asp-page="/Admin/Forms/Index">@(s.Form?.Name ?? "—")</a> @if (!s.IsRead) { <span class="badge badge-new">@T["dashboard.unread"]</span> }</td>
+                        <td class="muted mono nowrap">@s.CreatedAt.ToLocalTime().ToString("dd.MM. HH:mm")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
 
 @if (Model.RecentErrors.Count > 0)
 {
@@ -131,7 +214,7 @@
                 @foreach (var e in Model.RecentErrors)
                 {
                     <tr>
-                        <td class="muted mono">@e.CreatedAt.ToString("dd.MM.yyyy HH:mm")</td>
+                        <td class="muted mono">@e.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
                         <td>@if (e.StatusCode is int sc) { <span class="badge badge-err mono">@sc</span> }</td>
                         <td><span class="mono muted">@e.Path</span> @e.Message</td>
                     </tr>
@@ -142,9 +225,11 @@
     <div class="list-actions"><a class="btn btn-ghost" asp-page="/Admin/Logs/Index">@T["dashboard.allLogs"]</a></div>
 }
 
-<div class="card">
-    <h2>@T["dashboard.quickstart"]</h2>
-    <p class="muted">
-        @Html.Raw(T["dashboard.quickstartText"])
-    </p>
-</div>
+@* The quickstart is for a fresh site; once it has content it would only take room. *@
+@if (Model.PageCount < 3)
+{
+    <div class="card">
+        <h2>@T["dashboard.quickstart"]</h2>
+        <p class="muted">@Html.Raw(T["dashboard.quickstartText"])</p>
+    </div>
+}

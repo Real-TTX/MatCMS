@@ -573,11 +573,50 @@ public class InstanceService
             instance.LocalPort = container.PublishedPort;
             instance.ContainerState = container.State;
             instance.CloudManaged = container.CloudManaged;
+
+            if (instance.ProxyDomain is null && !string.IsNullOrEmpty(container.Name))
+                await AdoptPendingRouteAsync(instance, container.Name, ct);
         }
 
         if (before != InstanceHosting.Unknown && before != instance.Hosting)
             Log(instance, InstanceEventKind.HostingChanged,
                 $"Hosting-Erkennung geändert: {Describe(before)} → {Describe(instance.Hosting)}.");
+    }
+
+    /// <summary>
+    /// A route created while the site was being provisioned (the container existed, its instance row did
+    /// not) is taken over the first time the new instance is seen on its container — see
+    /// <c>ProxyService.PublishForNewContainerAsync</c>. Deliberately here and not in ProxyService: nothing
+    /// is called on the proxy any more, the route already exists; only the record moves onto the instance.
+    /// </summary>
+    private async Task AdoptPendingRouteAsync(Instance instance, string containerName, CancellationToken ct)
+    {
+        var key = SettingKeys.HostingPendingRoutePrefix + containerName;
+        var row = await _db.CloudSettings.FirstOrDefaultAsync(s => s.Key == key, ct);
+        if (row is null || string.IsNullOrWhiteSpace(row.Value)) return;
+
+        Proxy.PendingRoute? p;
+        try { p = System.Text.Json.JsonSerializer.Deserialize<Proxy.PendingRoute>(row.Value); } catch { p = null; }
+        _db.CloudSettings.Remove(row);
+        if (p is null) return;
+
+        instance.ProxyDomain = p.Domain;
+        instance.ProxyProvider = p.Provider;
+        instance.ProxyRouteId = p.RouteId;
+        instance.ProxyError = null;
+        instance.ProxyPublishedAt = DateTime.UtcNow;
+        instance.Url = "https://" + p.Domain;
+        instance.UrlPinned = true;
+        Log(instance, InstanceEventKind.DomainPublished, $"Bei der Provisionierung angelegte Domain übernommen: {p.Domain}.");
+
+        if (p.PushCanonical && instance.Status == InstanceStatus.Approved)
+        {
+            var url = "https://" + p.Domain;
+            await EnqueueContentOpAsync(instance, "setting.set",
+                System.Text.Json.JsonSerializer.Serialize(new { key = "site.canonicalUrl", value = url }), overwrite: true, reason: "Hosting: öffentliche Adresse", ct);
+            await EnqueueContentOpAsync(instance, "setting.set",
+                System.Text.Json.JsonSerializer.Serialize(new { key = "site.behindHttpsProxy", value = "1" }), overwrite: true, reason: "Hosting: hinter HTTPS-Proxy", ct);
+        }
     }
 
     public static string Describe(InstanceHosting hosting) => hosting switch

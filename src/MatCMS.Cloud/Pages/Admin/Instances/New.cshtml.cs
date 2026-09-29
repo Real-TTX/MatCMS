@@ -18,16 +18,19 @@ public class NewModel : PageModel
     private readonly AppDbContext _db;
     private readonly HostingService _hosting;
     private readonly ReleaseWatcher _releases;
+    private readonly MatCMS.Cloud.Services.Proxy.ProxyService _proxy;
 
-    public NewModel(AppDbContext db, HostingService hosting, ReleaseWatcher releases)
+    public NewModel(AppDbContext db, HostingService hosting, ReleaseWatcher releases, MatCMS.Cloud.Services.Proxy.ProxyService proxy)
     {
         _db = db;
         _hosting = hosting;
         _releases = releases;
+        _proxy = proxy;
     }
 
     public List<Profile> Profiles { get; private set; } = [];
-    public bool UsesMatcad => _hosting.UsesMatcad;
+    /// <summary>True when a real proxy (Matcad/Caddy) will route the domain; false = it is only recorded.</summary>
+    public bool ProxyRoutes => _proxy.Provider().ManagesRoutes;
     public int? NextPort { get; private set; }
 
     /// <summary>Die neueste bekannte Version als Vorschlag. "latest" bleibt möglich, aber ein
@@ -79,7 +82,20 @@ public class NewModel : PageModel
         // Die Instanz taucht in der Liste auf, sobald SIE sich meldet — nicht schon jetzt. Hier wird
         // kein Datensatz angelegt: die Anmeldung ist der Moment, in dem eine Instanz existiert, und
         // zwei Wege, wie ein Eintrag entsteht, wären zwei Wahrheiten.
-        TempData["Flash"] = $"„{result.ContainerName}“ läuft auf Port {result.Port}. Sie meldet sich in den nächsten Minuten selbst an.";
+        var msg = $"„{result.ContainerName}“ läuft auf Port {result.Port}. Sie meldet sich in den nächsten Minuten selbst an.";
+        if (!string.IsNullOrWhiteSpace(domain) && result.ContainerId is not null && result.ContainerName is not null)
+        {
+            // The route only needs the container, so it is created now; the instance adopts it when it enrolls.
+            var pr = await _proxy.PublishForNewContainerAsync(result.ContainerId, result.ContainerName, result.Port,
+                domain, pushCanonical: true, HttpContext.RequestAborted);
+            if (!pr.Ok)
+            {
+                TempData["FlashError"] = msg + $" Die Domain wurde NICHT eingerichtet: {pr.Message} — im Hosting-Tab der Instanz erneut veröffentlichen.";
+                return RedirectToPage("Index");
+            }
+            msg += " " + pr.Message;
+        }
+        TempData["Flash"] = msg;
         return RedirectToPage("Index");
     }
 }

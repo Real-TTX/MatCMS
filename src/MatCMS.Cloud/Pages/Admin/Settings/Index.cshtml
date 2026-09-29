@@ -294,23 +294,30 @@
             </div>
         </div>
 
-        @* Wie eine neue Instanz erreichbar wird. Zwei Wege, und der zweite ist kein Notbehelf: ohne
-           Matcad läuft der Container trotzdem, nur muss dann jemand sagen, unter welcher Domain. *@
+        @* Wie eine Instanz unter einer Domain erreichbar wird. Drei gleichwertige Wege; „kein Proxy“ steht
+           oben, weil er nichts Installiertes voraussetzt — der Container ist dann über seinen Host-Port da,
+           und eine Domain wird nur vermerkt. *@
+        @{
+            var pk = MatCMS.Cloud.Services.Proxy.ProxyKinds.Normalise(Model.Get(SettingKeys.HostingMode));
+            var um = MatCMS.Cloud.Services.Proxy.UpstreamModes.Normalise(Model.Get(SettingKeys.HostingProxyUpstream));
+        }
         <div class="card">
             <h2>@T["settings.hostingRouting"]</h2>
             <div class="form-field">
-                <label for="hostingMode">@T["settings.hostingMode"]</label>
+                <label for="hostingMode">@T["settings.hostingProxy"]</label>
                 <select id="hostingMode" name="hostingMode" data-hosting-mode>
-                    @* Der Weg ohne Zusatzangaben steht oben und ist die Vorgabe. *@
-                    <option value="docker" selected="@(Model.Get(SettingKeys.HostingMode) != "matcad" ? "selected" : null)">@T["settings.hostingModeDocker"]</option>
-                    <option value="matcad" selected="@(Model.Get(SettingKeys.HostingMode) == "matcad" ? "selected" : null)">@T["settings.hostingModeMatcad"]</option>
+                    <option value="none" selected="@(pk == "none" ? "selected" : null)">@T["settings.hostingProxyNone"]</option>
+                    <option value="matcad" selected="@(pk == "matcad" ? "selected" : null)">@T["settings.hostingProxyMatcad"]</option>
+                    <option value="caddy" selected="@(pk == "caddy" ? "selected" : null)">@T["settings.hostingProxyCaddy"]</option>
                 </select>
-                <div class="help">@T["settings.hostingModeHint"]</div>
+                <div class="help">@T["settings.hostingProxyHint"]</div>
             </div>
-            <div data-matcad-only hidden="@(Model.Get(SettingKeys.HostingMode) == "matcad" ? null : "hidden")">
+
+            <div data-proxy-only="matcad" hidden="@(pk == "matcad" ? null : "hidden")">
                 <div class="form-field">
                     <label for="matcadUrl">@T["settings.hostingMatcadUrl"]</label>
                     <input id="matcadUrl" name="matcadUrl" value="@Model.Get(SettingKeys.HostingMatcadUrl)" placeholder="http://matcad:8080" spellcheck="false" />
+                    <div class="help">@T["settings.hostingMatcadUrlHint"]</div>
                 </div>
                 <div class="form-field">
                     <label for="matcadToken">@T["settings.hostingMatcadToken"]</label>
@@ -325,6 +332,43 @@
                     }
                 </div>
             </div>
+
+            <div data-proxy-only="caddy" hidden="@(pk == "caddy" ? null : "hidden")">
+                <div class="form-field">
+                    <label for="caddyAdminUrl">@T["settings.hostingCaddyAdminUrl"]</label>
+                    <input id="caddyAdminUrl" name="caddyAdminUrl" value="@Model.Get(SettingKeys.HostingCaddyAdminUrl)" placeholder="http://caddy:2019" spellcheck="false" />
+                </div>
+                <div class="form-field">
+                    <label for="caddyServer">@T["settings.hostingCaddyServer"]</label>
+                    <input id="caddyServer" name="caddyServer" value="@Model.Get(SettingKeys.HostingCaddyServer)" placeholder="srv0" spellcheck="false" />
+                    <div class="help">@T["settings.hostingCaddyServerHint"]</div>
+                </div>
+            </div>
+
+            @* Wie der Proxy den Container überhaupt erreicht — gilt für Matcad und Caddy gleichermaßen. *@
+            <div data-proxy-only="matcad caddy" hidden="@(pk == "none" ? "hidden" : null)">
+                <div class="form-field">
+                    <label for="proxyUpstream">@T["settings.hostingUpstream"]</label>
+                    <select id="proxyUpstream" name="proxyUpstream" data-upstream-mode>
+                        <option value="network" selected="@(um == "network" ? "selected" : null)">@T["settings.hostingUpstreamNetwork"]</option>
+                        <option value="hostport" selected="@(um == "hostport" ? "selected" : null)">@T["settings.hostingUpstreamHostPort"]</option>
+                    </select>
+                    <div class="help">@T["settings.hostingUpstreamHint"]</div>
+                </div>
+                <div class="form-field" data-upstream-only="network" hidden="@(um == "network" ? null : "hidden")">
+                    <label for="proxyNetwork">@T["settings.hostingProxyNetwork"]</label>
+                    <input id="proxyNetwork" name="proxyNetwork" value="@Model.Get(SettingKeys.HostingProxyNetwork)" placeholder="main" spellcheck="false" />
+                </div>
+                <div class="form-field" data-upstream-only="hostport" hidden="@(um == "hostport" ? null : "hidden")">
+                    <label for="proxyUpstreamHost">@T["settings.hostingProxyUpstreamHost"]</label>
+                    <input id="proxyUpstreamHost" name="proxyUpstreamHost" value="@Model.Get(SettingKeys.HostingProxyUpstreamHost)" placeholder="host.docker.internal" spellcheck="false" />
+                </div>
+            </div>
+
+            <div class="list-actions">
+                <button type="submit" class="btn btn-ghost" formaction="@Url.Page("Index", "ProxyTest")">@T["settings.hostingProxyTest"]</button>
+            </div>
+            <div class="help">@T["settings.hostingProxyApiHint"]</div>
         </div>
 
         @* Der Portbereich gilt für beide Wege: auch eine Instanz hinter Matcad braucht einen Port auf
@@ -434,12 +478,26 @@
             tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.tab); }); });
             // Die Matcad-Felder nur zeigen, wenn sie etwas bewirken — sonst fragt die Seite nach
             // Zugangsdaten für einen Weg, den man gerade abgewählt hat.
+            // Proxy provider: show only the fields of the chosen provider ([data-proxy-only] lists them).
             var mode = document.querySelector('[data-hosting-mode]');
-            var matcadOnly = document.querySelector('[data-matcad-only]');
-            if (mode && matcadOnly) {
-                var syncMode = function () { matcadOnly.hidden = mode.value === 'docker'; };
+            if (mode) {
+                var syncMode = function () {
+                    document.querySelectorAll('[data-proxy-only]').forEach(function (el) {
+                        el.hidden = el.getAttribute('data-proxy-only').split(' ').indexOf(mode.value) < 0;
+                    });
+                };
                 mode.addEventListener('change', syncMode);
                 syncMode();
+            }
+            var up = document.querySelector('[data-upstream-mode]');
+            if (up) {
+                var syncUp = function () {
+                    document.querySelectorAll('[data-upstream-only]').forEach(function (el) {
+                        el.hidden = el.getAttribute('data-upstream-only') !== up.value;
+                    });
+                };
+                up.addEventListener('change', syncUp);
+                syncUp();
             }
 
             // Spiegelt HostingService.Normalise: klein, alles Nicht-Alphanumerische zu Bindestrichen.

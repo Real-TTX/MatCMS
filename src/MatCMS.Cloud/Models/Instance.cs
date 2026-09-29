@@ -89,6 +89,25 @@ public class Instance
     /// <summary>Public URL of the site, for the "open" link. Reported by the instance, editable.</summary>
     public string? Url { get; set; }
 
+    // --- Reverse-proxy route (Hosting increment 3, docs/hosting-platform.md) ---
+
+    /// <summary>The domain this cloud published for the instance (bare host, lowercase), or null. When set,
+    /// <see cref="Url"/> is pinned to it — the domain is the answer to "where is this site", not whatever
+    /// internal address the instance happens to report.</summary>
+    public string? ProxyDomain { get; set; }
+
+    /// <summary>Which provider published <see cref="ProxyDomain"/> ("none" | "matcad" | "caddy"). Kept per
+    /// instance so an unpublish still reaches the right proxy after the cloud-wide setting changed.</summary>
+    public string? ProxyProvider { get; set; }
+
+    /// <summary>The provider's own id for the route (Matcad route id, Caddy <c>@id</c>); null for "none".</summary>
+    public string? ProxyRouteId { get; set; }
+
+    /// <summary>The last proxy error for this instance, or null when the last action succeeded.</summary>
+    public string? ProxyError { get; set; }
+
+    public DateTime? ProxyPublishedAt { get; set; }
+
     public string? Notes { get; set; }
 
     // --- Last heartbeat -----------------------------------------------------

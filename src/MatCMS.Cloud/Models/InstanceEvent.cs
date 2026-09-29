@@ -54,7 +54,13 @@ public enum InstanceEventKind
     /// <summary>An operator asked this instance for its full log (Variante B), and its arrival. Its own
     /// kinds so the trail shows when a full log was pulled — separate from the always-on error overview.</summary>
     LogRequested = 25,
-    LogReceived = 26
+    LogReceived = 26,
+
+    /// <summary>The cloud published / removed a domain route for the instance on the reverse proxy, or a
+    /// proxy call failed. Its own kinds: a domain change moves where a customer's site is reachable.</summary>
+    DomainPublished = 27,
+    DomainUnpublished = 28,
+    DomainFailed = 29
 }
 
 /// <summary>Audit trail per instance: what happened, and whether a notification went out for it.

@@ -291,6 +291,56 @@
             <div class="help">@T["hosting.apiHint"]</div>
         </div>
 
+        @* Domain on the reverse proxy. With "kein Proxy" the domain is only recorded (routing is somebody
+           else's), with Matcad/Caddy the route + certificate are created. *@
+        <div class="card">
+            <h2>@T["hosting.domain"]</h2>
+            @if (Model.Item.ProxyDomain is not null)
+            {
+                <div class="kv"><div class="kv-label">@T["hosting.domain"]</div><div class="kv-value">
+                    <a href="https://@Model.Item.ProxyDomain" target="_blank" rel="noopener" class="mono">@Model.Item.ProxyDomain</a>
+                    <span class="badge badge-off">@T["hosting.via"] @Model.Item.ProxyProvider</span>
+                </div></div>
+                <div class="kv"><div class="kv-label">@T["hosting.publishedAt"]</div><div class="kv-value muted">@(Model.Item.ProxyPublishedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—")</div></div>
+            }
+            else
+            {
+                <p class="muted">@T["hosting.noDomain"]</p>
+            }
+            @if (!string.IsNullOrEmpty(Model.Item.ProxyError))
+            {
+                <div class="alert alert-error">@T["hosting.proxyError"] @Model.Item.ProxyError</div>
+            }
+
+            <form method="post" asp-page-handler="PublishDomain" asp-route-id="@Model.Item.Id">
+                <div class="form-field">
+                    <label for="proxy-domain">@(Model.Item.ProxyDomain is null ? T["hosting.publish"] : T["hosting.changeDomain"])</label>
+                    <input id="proxy-domain" name="domain" value="@Model.Item.ProxyDomain" placeholder="kunde.beispiel.de" spellcheck="false" required />
+                    <div class="help">@(Model.ProxyRoutes ? T["hosting.publishHintRoute", Model.ProxyKind] : T["hosting.publishHintNone"])</div>
+                </div>
+                <label class="checkbox-row"><input type="checkbox" name="pushCanonical" value="true" checked /> @T["hosting.pushCanonical"]</label>
+                <div class="list-actions">
+                    <button type="submit" class="btn"><i class="ti ti-world-upload" aria-hidden="true"></i> @(Model.Item.ProxyDomain is null ? T["hosting.publishBtn"] : T["hosting.changeBtn"])</button>
+                </div>
+            </form>
+            @if (Model.Item.ProxyDomain is not null)
+            {
+                <div class="list-actions">
+                    @if (Model.Item.ProxyRouteId is not null)
+                    {
+                        <form class="inline-form" method="post" asp-page-handler="CheckDomain" asp-route-id="@Model.Item.Id">
+                            <button type="submit" class="btn btn-ghost">@T["hosting.checkRoute"]</button>
+                        </form>
+                    }
+                    <form class="inline-form" method="post" asp-page-handler="UnpublishDomain" asp-route-id="@Model.Item.Id"
+                          onsubmit="return confirm('@T["hosting.unpublishConfirm"]');">
+                        <input type="hidden" name="pushCanonical" value="true" />
+                        <button type="submit" class="btn btn-danger">@T["hosting.unpublishBtn"]</button>
+                    </form>
+                </div>
+            }
+        </div>
+
         <div class="card">
             <h2>@T["hosting.logs"]</h2>
             <div class="list-actions" style="margin-top:0;">

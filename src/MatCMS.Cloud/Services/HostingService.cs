@@ -31,12 +31,6 @@ public class HostingService
 
     public bool Enabled => _cloud.Flag(SettingKeys.HostingEnabled);
 
-    /// <summary>True nur, wenn Matcad AUSDRÜCKLICH gewählt wurde. Nicht gesetzt heißt: kein Matcad.
-    /// <para>Andersherum wäre es die falsche Vorgabe — eine frisch aufgesetzte Cloud hätte dann einen
-    /// Weg voreingestellt, der ohne Adresse und Zugangsschlüssel gar nicht funktionieren kann.</para>
-    /// </summary>
-    public bool UsesMatcad => _cloud.Get(SettingKeys.HostingMode) == "matcad";
-
     public (int From, int To) PortRange
     {
         get
@@ -100,7 +94,8 @@ public class HostingService
     // --- Anlegen ---------------------------------------------------------------------------------
 
     /// <param name="Name">Anzeigename; daraus wird der Container- und Volume-Name abgeleitet.</param>
-    /// <param name="Domain">Nur ohne Matcad nötig — dort trägt sie der Betreiber selbst ein.</param>
+    /// <param name="Domain">Optional. Published after creation by <c>ProxyService</c> through the configured
+    /// provider (route + certificate), or only recorded when no proxy is configured.</param>
     public sealed record CreateRequest(string Name, string? Domain, string ImageTag, string JoinCode);
 
     public sealed record CreateResult(bool Ok, string? Error, string? ContainerId, int? Port, string? ContainerName);
@@ -168,8 +163,9 @@ public class HostingService
         var containerName = stack;
         var volumeName = stack + "-data";
 
-        if (!UsesMatcad && string.IsNullOrWhiteSpace(req.Domain))
-            return new(false, "Ohne Matcad muss eine Domain angegeben werden.", null, null, null);
+        // No domain requirement any more: the container runs and is reachable on its host port either way,
+        // and a domain given at provisioning is published by ProxyService right after (route or record).
+        // It used to be REQUIRED without Matcad — and then thrown away.
 
         var port = await NextFreePortAsync(ct);
         if (port is null) return new(false, "Kein freier Port im eingestellten Bereich.", null, null, null);
@@ -196,13 +192,9 @@ public class HostingService
                 // working_dir und config_files bleiben WEG: sie zeigen auf die Datei, aus der ein
                 // Stack entstand. Ohne Datei dort wäre das eine Lüge gegenüber docker compose.
             };
-            if (UsesMatcad)
-            {
-                // Matcad liest diese Labels und richtet die Route selbst ein.
-                labels["matcad.enable"] = "true";
-                if (!string.IsNullOrWhiteSpace(req.Domain)) labels["matcad.host"] = req.Domain!.Trim();
-                labels["matcad.port"] = "8080";
-            }
+            // Keine matcad.*-Labels mehr: die Route legt ProxyService über Matcads REST-API an. Mit
+            // eingeschalteter Label-Erkennung baute Matcad sonst eine ZWEITE Route für denselben Host,
+            // die sich weder ändern noch entfernen lässt, ohne den Container neu zu erzeugen.
 
             var create = new CreateContainerParameters
             {

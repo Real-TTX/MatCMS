@@ -19,8 +19,10 @@ public class IndexModel : PageModel
     private readonly DockerHostService _docker;
     private readonly SecretProtector _secrets;
     private readonly HostingService _hosting;
+    private readonly MatCMS.Cloud.Services.Proxy.ProxyService _proxy;
 
-    public IndexModel(AppDbContext db, CloudContext cloud, EmailService mail, DockerHostService docker, SecretProtector secrets, HostingService hosting)
+    public IndexModel(AppDbContext db, CloudContext cloud, EmailService mail, DockerHostService docker, SecretProtector secrets,
+        HostingService hosting, MatCMS.Cloud.Services.Proxy.ProxyService proxy)
     {
         _db = db;
         _cloud = cloud;
@@ -28,6 +30,7 @@ public class IndexModel : PageModel
         _docker = docker;
         _secrets = secrets;
         _hosting = hosting;
+        _proxy = proxy;
     }
 
     public string Get(string key) => _cloud.Get(key) ?? "";
@@ -121,16 +124,45 @@ public class IndexModel : PageModel
 
     public async Task<IActionResult> OnPostHostingAsync(
         bool hostingEnabled, string? hostingMode, string? matcadUrl, string? matcadToken, bool clearMatcadToken,
-        string? portFrom, string? portTo, string? namePattern)
+        string? portFrom, string? portTo, string? namePattern,
+        string? caddyAdminUrl, string? caddyServer, string? proxyUpstream, string? proxyNetwork, string? proxyUpstreamHost)
+    {
+        await SaveHostingAsync(hostingEnabled, hostingMode, matcadUrl, matcadToken, clearMatcadToken, portFrom, portTo, namePattern,
+            caddyAdminUrl, caddyServer, proxyUpstream, proxyNetwork, proxyUpstreamHost);
+        TempData["Flash"] = "Hosting-Einstellungen gespeichert.";
+        return RedirectToPage(new { tab = "hosting" });
+    }
+
+    /// <summary>"Speichern &amp; Verbindung testen": the same form, posted here — saves first, so what is
+    /// tested is exactly what is stored (a test of unsaved values would pass and then not be in effect).</summary>
+    public async Task<IActionResult> OnPostProxyTestAsync(
+        bool hostingEnabled, string? hostingMode, string? matcadUrl, string? matcadToken, bool clearMatcadToken,
+        string? portFrom, string? portTo, string? namePattern,
+        string? caddyAdminUrl, string? caddyServer, string? proxyUpstream, string? proxyNetwork, string? proxyUpstreamHost)
+    {
+        await SaveHostingAsync(hostingEnabled, hostingMode, matcadUrl, matcadToken, clearMatcadToken, portFrom, portTo, namePattern,
+            caddyAdminUrl, caddyServer, proxyUpstream, proxyNetwork, proxyUpstreamHost);
+        var r = await _proxy.TestAsync(HttpContext.RequestAborted);
+        TempData[r.Ok ? "Flash" : "FlashError"] = "Gespeichert. " + r.Message;
+        return RedirectToPage(new { tab = "hosting" });
+    }
+
+    private async Task SaveHostingAsync(
+        bool hostingEnabled, string? hostingMode, string? matcadUrl, string? matcadToken, bool clearMatcadToken,
+        string? portFrom, string? portTo, string? namePattern,
+        string? caddyAdminUrl, string? caddyServer, string? proxyUpstream, string? proxyNetwork, string? proxyUpstreamHost)
     {
         await _cloud.SaveAsync(new Dictionary<string, string?>
         {
-            [SettingKeys.HostingEnabled] = hostingEnabled ? "1" : "0"
-            ,
-            // Nur ein ausdrückliches "matcad" schaltet Matcad ein; alles andere — auch ein leerer
-            // oder unbekannter Wert — bleibt beim reinen Container. Der Weg, der ohne weitere Angaben
-            // funktioniert, ist die richtige Vorgabe.
-            [SettingKeys.HostingMode] = hostingMode == "matcad" ? "matcad" : "docker",
+            [SettingKeys.HostingEnabled] = hostingEnabled ? "1" : "0",
+            // Only a known provider name is stored; anything else — also the historical "docker" — means
+            // "no proxy", the setting that needs nothing installed.
+            [SettingKeys.HostingMode] = MatCMS.Cloud.Services.Proxy.ProxyKinds.Normalise(hostingMode),
+            [SettingKeys.HostingCaddyAdminUrl] = caddyAdminUrl?.Trim().TrimEnd('/'),
+            [SettingKeys.HostingCaddyServer] = caddyServer?.Trim(),
+            [SettingKeys.HostingProxyUpstream] = MatCMS.Cloud.Services.Proxy.UpstreamModes.Normalise(proxyUpstream),
+            [SettingKeys.HostingProxyNetwork] = proxyNetwork?.Trim(),
+            [SettingKeys.HostingProxyUpstreamHost] = proxyUpstreamHost?.Trim(),
             [SettingKeys.HostingMatcadUrl] = matcadUrl?.Trim().TrimEnd('/'),
             // Wie beim SMTP-Passwort: leer BEHÄLT, nur der ausdrückliche Haken löscht. Sonst würde
             // ein Speichern der Portfelder den Schlüssel wegwerfen, weil das Feld leer gerendert wird.
@@ -143,8 +175,6 @@ public class IndexModel : PageModel
             [SettingKeys.HostingPortTo] = Port(portTo),
             [SettingKeys.HostingNamePattern] = namePattern?.Trim(),
         });
-        TempData["Flash"] = "Hosting-Einstellungen gespeichert.";
-        return RedirectToPage(new { tab = "hosting" });
     }
 
     /// <summary>Ein Port oder nichts — 1024 bis 65535, alles andere wird verworfen statt gespeichert.</summary>

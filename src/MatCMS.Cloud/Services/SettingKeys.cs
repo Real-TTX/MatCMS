@@ -43,10 +43,39 @@ public static class SettingKeys
     /// </summary>
     public const string HostingEnabled = "hosting.enabled";
 
-    /// <summary>"matcad" oder "docker": ob eine neue Instanz ihre Route von Matcad bekommt oder als
-    /// reiner Container startet, dem der Betreiber selbst eine Domain zuweist. Ein String und kein
-    /// Schalter, weil es später eine dritte Antwort geben kann.</summary>
+    /// <summary>Welcher Reverse-Proxy die Routen der Instanzen führt: "none" (kein Proxy — die Instanz ist
+    /// über ihren Host-Port erreichbar, eine Domain wird nur vermerkt), "matcad" (über das Matcad-REST-API)
+    /// oder "caddy" (direkt über die Admin-API eines Caddy). Früher "docker"/"matcad"; "docker" wird als
+    /// "none" gelesen. Ein String und kein Schalter, genau weil es inzwischen die dritte Antwort gibt.</summary>
     public const string HostingMode = "hosting.mode";
+
+    /// <summary>Admin-API eines Caddy für den Provider "caddy", z. B. http://caddy:2019.</summary>
+    public const string HostingCaddyAdminUrl = "hosting.caddyAdminUrl";
+
+    /// <summary>Name des HTTP-Servers in der Caddy-Konfiguration, in den die Routen kommen (ein per
+    /// Caddyfile erzeugter heißt "srv0"). Er sollte auf :443 lauschen — nur dann holt Caddy selbst das
+    /// Zertifikat. Fremde Routen darin bleiben unangetastet; die eigenen tragen eine @id.</summary>
+    public const string HostingCaddyServer = "hosting.caddyServer";
+
+    /// <summary>Wie der Proxy den Instanz-Container erreicht: "network" = über ein gemeinsames
+    /// Docker-Netz (<see cref="HostingProxyNetwork"/>) per Containername und Port 8080 — die Cloud hängt
+    /// den Container dafür live in dieses Netz; "hostport" = über den veröffentlichten Host-Port auf
+    /// <see cref="HostingProxyUpstreamHost"/>.</summary>
+    public const string HostingProxyUpstream = "hosting.proxyUpstream";
+
+    /// <summary>Das Docker-Netz, in dem der Proxy (Caddy/Matcads Caddy) läuft — für den Modus "network".</summary>
+    public const string HostingProxyNetwork = "hosting.proxyNetwork";
+
+    /// <summary>Host, unter dem der Proxy die Host-Ports erreicht — für den Modus "hostport",
+    /// z. B. host.docker.internal oder die IP des Docker-Hosts.</summary>
+    public const string HostingProxyUpstreamHost = "hosting.proxyUpstreamHost";
+
+    /// <summary>Optionale E-Mail für ACME (Let's Encrypt), die Matcad pro Route mitbekommt.</summary>
+
+    /// <summary>Präfix für eine bei der Provisionierung schon angelegte Route, deren Instanz sich noch
+    /// nicht gemeldet hat: <c>hosting.pendingRoute:&lt;containername&gt;</c> → JSON. Die Instanz-Zeile
+    /// entsteht erst beim Join; die Route braucht sie nicht und wird sofort angelegt, danach übernommen.</summary>
+    public const string HostingPendingRoutePrefix = "hosting.pendingRoute:";
 
     /// <summary>Adresse des Matcad-API, das die Route einrichtet.</summary>
     public const string HostingMatcadUrl = "hosting.matcadUrl";

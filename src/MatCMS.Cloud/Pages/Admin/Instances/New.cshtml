@@ -45,9 +45,9 @@
            deshalb nur dann gestellt, wenn sie eine Antwort braucht. *@
         <div class="form-field">
             <label for="domain">@T["instances.newDomain"]</label>
-            <input id="domain" name="domain" placeholder="kunde.beispiel.de" spellcheck="false"
-                   required="@(Model.UsesMatcad ? null : "required")" />
-            <div class="help">@(Model.UsesMatcad ? T["instances.newDomainMatcad"] : T["instances.newDomainPlain"])</div>
+            @* Optional in every mode: without it the site is reachable on its host port. *@
+            <input id="domain" name="domain" placeholder="kunde.beispiel.de" spellcheck="false" />
+            <div class="help">@(Model.ProxyRoutes ? T["instances.newDomainMatcad"] : T["instances.newDomainPlain"])</div>
         </div>
 
         <div class="kv">

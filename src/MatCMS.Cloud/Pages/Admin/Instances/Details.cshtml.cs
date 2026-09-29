@@ -22,8 +22,10 @@ public class DetailsModel : PageModel, IAsyncPageFilter
     private readonly HostingActionsService _hosting;
     private readonly BackupStore _backups;
     private readonly OperatorScope _scope;
+    private readonly MatCMS.Cloud.Services.Proxy.ProxyService _proxy;
 
-    public DetailsModel(AppDbContext db, InstanceService instances, ReleaseWatcher releases, HostingActionsService hosting, BackupStore backups, OperatorScope scope)
+    public DetailsModel(AppDbContext db, InstanceService instances, ReleaseWatcher releases, HostingActionsService hosting, BackupStore backups, OperatorScope scope,
+        MatCMS.Cloud.Services.Proxy.ProxyService proxy)
     {
         _db = db;
         _instances = instances;
@@ -31,7 +33,12 @@ public class DetailsModel : PageModel, IAsyncPageFilter
         _hosting = hosting;
         _backups = backups;
         _scope = scope;
+        _proxy = proxy;
     }
+
+    /// <summary>The configured proxy provider ("none" | "matcad" | "caddy") and whether it routes at all.</summary>
+    public string ProxyKind => _proxy.Settings.Kind;
+    public bool ProxyRoutes => _proxy.Provider().ManagesRoutes;
 
     /// <summary>The Hosting tab exists for an instance whose container this cloud can reach — independent of
     /// the Hosting module switch, because these actions predate it and must not vanish when it is off.</summary>
@@ -433,6 +440,39 @@ public class DetailsModel : PageModel, IAsyncPageFilter
     {
         TempData[r.Ok ? "Flash" : "FlashError"] = r.Message;
         return RedirectToPage(new { id, tab = "hosting" });
+    }
+
+    // ---- Domain on the reverse proxy (Hosting increment 3) — logic in ProxyService, shared with REST + MCP ----
+
+    public async Task<IActionResult> OnPostPublishDomainAsync(int id, string? domain, bool pushCanonical)
+    {
+        var item = await _db.Instances.FindAsync(id);
+        if (item is null) return RedirectToPage("Index");
+        var r = await _proxy.PublishAsync(item, domain, pushCanonical, HttpContext.RequestAborted);
+        return Flash(new HostingActionsService.ActionResult(r.Ok, r.Message), id);
+    }
+
+    public async Task<IActionResult> OnPostUnpublishDomainAsync(int id, bool pushCanonical)
+    {
+        var item = await _db.Instances.FindAsync(id);
+        if (item is null) return RedirectToPage("Index");
+        var r = await _proxy.UnpublishAsync(item, pushCanonical, HttpContext.RequestAborted);
+        return Flash(new HostingActionsService.ActionResult(r.Ok, r.Message), id);
+    }
+
+    /// <summary>Asks the provider whether the route still exists — it can have been removed by hand there.</summary>
+    public async Task<IActionResult> OnPostCheckDomainAsync(int id)
+    {
+        var item = await _db.Instances.FindAsync(id);
+        if (item is null) return RedirectToPage("Index");
+        var s = await _proxy.StatusAsync(item, checkProvider: true, HttpContext.RequestAborted);
+        var msg = s.RouteExists switch
+        {
+            true => $"Route für „{s.Domain}“ ist beim Proxy vorhanden.",
+            false => $"Route für „{s.Domain}“ fehlt beim Proxy — bitte erneut veröffentlichen.",
+            _ => s.RouteId is null ? "Kein Proxy-Routing (nur vermerkt) — nichts zu prüfen." : "Der Proxy konnte nicht befragt werden.",
+        };
+        return Flash(new HostingActionsService.ActionResult(s.RouteExists != false, msg), id);
     }
 
     /// <summary>Container logs for the Hosting tab, fetched on demand (a Docker call per page view would be

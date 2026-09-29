@@ -617,6 +617,52 @@ public class DockerHostService
         }
     }
 
+    // ---- Reverse-proxy reachability (Hosting increment 3) ------------------------------------------
+
+    /// <summary>Whether a Docker network of that name exists on this daemon.</summary>
+    public async Task<bool> NetworkExistsAsync(string network, CancellationToken ct = default)
+    {
+        var client = Client;
+        if (client is null || string.IsNullOrWhiteSpace(network)) return false;
+        try { await client.Networks.InspectNetworkAsync(network, ct); return true; }
+        catch { return false; }
+    }
+
+    /// <summary>
+    /// Connects an instance container to the proxy's network, LIVE — no recreate, the site keeps running. A
+    /// proxy that addresses containers by name (Caddy, Matcad's Caddy) can only resolve them on a network it
+    /// shares with them, and a provisioned instance starts on the default bridge. Already connected = done.
+    /// Same "looks like MatCMS" guard as every other socket action.
+    /// </summary>
+    public async Task<(bool Ok, string Message, string? ContainerName)> ConnectToNetworkAsync(string containerId, string network, CancellationToken ct = default)
+    {
+        var client = Client;
+        if (client is null) return (false, "Kein Docker-Zugriff konfiguriert.", null);
+
+        ContainerInspectResponse insp;
+        try { insp = await client.Containers.InspectContainerAsync(containerId, ct); }
+        catch (Exception ex) { return (false, $"Container nicht gefunden: {ex.Message}", null); }
+        if (!LooksLikeMatCms(insp.Config?.Image ?? "", insp.Config?.Labels))
+            return (false, $"Abgelehnt: '{insp.Config?.Image}' sieht nicht nach einer MatCMS-Instanz aus.", null);
+
+        var name = (insp.Name ?? "").TrimStart('/');
+        if (insp.NetworkSettings?.Networks?.ContainsKey(network) == true)
+            return (true, "Bereits im Netz.", name);
+        try
+        {
+            await client.Networks.ConnectNetworkAsync(network, new NetworkConnectParameters { Container = insp.ID }, ct);
+            return (true, $"Mit Netz '{network}' verbunden.", name);
+        }
+        catch (DockerApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return (false, $"Docker-Netz '{network}' existiert nicht.", name);
+        }
+        catch (Exception ex)
+        {
+            return (false, $"Verbinden mit '{network}' fehlgeschlagen: {ex.Message}", name);
+        }
+    }
+
     // ---- Cloud self-update --------------------------------------------------------------------------
     //
     // A process cannot replace the container it is running in: the moment it stops "itself" it is gone,

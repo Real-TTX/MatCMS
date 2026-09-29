@@ -131,8 +131,8 @@ Introduce `IProxyProvider` *(new)* per node:
 | Provider | Routing | Used when |
 |---|---|---|
 | `NoProxy` (default) | published host port, `Instance.LocalPort` as today | no proxy on the node — **today's mode** |
-| `MatcadProvider` | domain + TLS via `matcad.*` labels (`matcad.enable/host/port`) | Matcad runs on the node |
-| `CaddyProvider` | domain + TLS by driving a plain Caddy directly (admin API / Caddyfile), no Matcad in between | a stock Caddy runs on the node |
+| `MatcadProvider` | domain + TLS via Matcad's REST API (`/api/v1/routes`, `X-Api-Key`) — *built that way; the `matcad.*` labels originally planned here were dropped, see "Built: Increment 3"* | Matcad runs on the node |
+| `CaddyProvider` | domain + TLS by driving a plain Caddy directly (admin API, own `@id` routes only), no Matcad in between | a stock Caddy runs on the node |
 
 **Decided (2026-09-29): all three are first-class and selectable per node.** None is privileged in the
 code; `NoProxy` is only the default because it needs nothing installed.
@@ -212,7 +212,7 @@ Decide after reading `../MatOS/README.md` and `../MatOS/src/MatOS.Web/{Api,Docke
 |---|---|---|---|
 | **1** | Hosting toggle + menu + **instance Hosting tab** surfacing *existing* actions (start/stop/restart/update/container logs) for instances on the local daemon | UI + setting; reuses `DockerHostService` | — |
 | **2** | **Cloud self-updater** (helper-container, §3.7a) | updater mode + UI button | — |
-| **3** | **`IProxyProvider`** with `NoProxy` (default) + `MatcadProvider`; domain/TLS per instance | provider layer, address resolution | 1 |
+| **3** | **`IProxyProvider`** with `NoProxy` (default) + `MatcadProvider` + `CaddyProvider`; domain/TLS per instance — *built* | provider layer, address resolution | 1 |
 | **4** | **Node model + node-agent** (outbound protocol, enrolment, local node becomes node #1) | `MatCMS.Hosting` lib, node-agent image, `Node` table, protocol DTOs | 1 |
 | **5** | **Migration between nodes** incl. proxy update | migration job pipeline | 3, 4 |
 | **6** | Multi-cloud (only if §3.6 (b) is wanted) | federation | product decision |
@@ -249,6 +249,56 @@ status/logs/restart via REST, MCP and UI; Operator blocked from the fleet pages;
 
 **Bootstrapping:** a cloud can only update itself once it RUNS a version that contains the updater. The
 first deploy of this version is therefore still the manual `docker compose pull && docker compose up -d`.
+
+### Built (2026-09-29): Increment 3 — reverse-proxy providers, domain per instance
+
+- **Layer:** `Services/Proxy/` — `IProxyProvider` (`TestAsync`, `UpsertAsync`, `DeleteAsync`, `ExistsAsync`)
+  with `NoProxyProvider`, `MatcadProvider`, `CaddyProvider`; `ProxyService` owns everything above the
+  provider (domain validation + uniqueness, upstream resolution, publish/move/unpublish, status, the
+  canonical-URL push, provisioning). Cloud-wide settings for now (`hosting.mode` = `none|matcad|caddy`,
+  `hosting.caddy*`, `hosting.proxy*`); in increment 4 each node carries its own copy of exactly
+  `ProxySettings`.
+- **Upstream modes:** `network` — the cloud attaches the container LIVE to the proxy's Docker network
+  (`DockerHostService.ConnectToNetworkAsync`) and routes to `http://<container>:8080`; `hostport` — the proxy
+  goes to `http://<upstreamHost>:<published port>`. Container name and port always come from the daemon.
+- **Record:** `Instance.ProxyDomain/ProxyProvider/ProxyRouteId/ProxyError/ProxyPublishedAt` (migration
+  `AddInstanceProxy`). Publishing pins `Instance.Url = https://<domain>`; with `pushCanonical` a
+  `setting.set` content op tells the site `site.canonicalUrl` + `site.behindHttpsProxy`.
+- **Surfaces:** Einstellungen → Hosting (provider, fields per provider, "Speichern und Verbindung testen"),
+  the Domain card on the instance's Hosting tab (publish/move/check/unpublish), provisioning with a domain;
+  REST `/api/v1/hosting/proxy[/test]`, `/api/v1/instances/{id}/domain`; MCP `get_proxy_config`,
+  `configure_proxy`, `test_proxy`, `get_domain_status`, `publish_domain`, `unpublish_domain`.
+- **Provisioning:** the route is created right after the container (it only needs the container) and parked
+  under `hosting.pendingRoute:<container name>`; `InstanceService.ClassifyAsync` adopts it on the new site's
+  first beat. The adopted route keeps its container-name id; a later move reuses it (no duplicate).
+
+Rules that the implementation relies on:
+- **Route first, record second.** Unpublish deletes the route and only then clears the record, so a proxy
+  that is down never leaves a route behind that the cloud has forgotten. Delete is idempotent (404 = gone).
+- **Changing the provider** removes the old provider's route on the next publish; switching to `none`
+  removes it too. Already published domains do not move by themselves.
+- **Caddy is edited surgically:** only routes with `@id` `matcms-…` via `/id/…`, inserted at the top of the
+  server's routes — never `/load`, which would replace everyone else's config. A missing server is created
+  listening on `:443` (Caddy only obtains certificates automatically there).
+- **Matcad via its API, not labels:** labels are fixed at container creation (a domain change would mean
+  recreating the site), Matcad's label discovery is off by default, and a label route cannot be edited or
+  removed from outside. Provisioning therefore stamps **no** `matcad.*` labels any more — with discovery on
+  they would have produced a second route for the same host. Matcad keeps a per-route ACME e-mail only
+  for wildcard routes, so the cloud has no such field; Matcad's own global setting applies.
+
+**Tested end to end against real containers** (test cloud, current CMS instance, stock `caddy:2`, Matcad
+built from its current source + `matcad-caddy`): HTTPS 200 through both proxies (`*.localhost`, internal
+CA); Caddy starting from an empty config (server created); move = same route patched; a foreign route in
+Caddy untouched; route deleted by hand detected (`routeExists: false`) and recreated on republish;
+provider switch Caddy → Matcad → none cleans up behind itself; host-port mode; canonical URL + "behind
+HTTPS proxy" arriving on the site; provisioning with a domain + adoption on the first beat; UI settings
+save + test flash, Details publish/unpublish; REST, MCP and the key-right matrix (no hosting right →
+403 on writes, scoped key → 403 on cloud-wide config and 404 outside its scope).
+
+Two findings: a Matcad from before its REST API (image older than 08/2026) answers `/api/v1/*` with a
+redirect to its login page — `MatcadProvider` now says so instead of reporting a JSON parser error; and
+Matcad's Caddy admin address is hard-wired to `http://caddy:2019` (its `Matcad__Caddy__AdminUrl` env var
+is not read), so its Caddy must be reachable under that name.
 
 ---
 

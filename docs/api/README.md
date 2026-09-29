@@ -168,6 +168,24 @@ Aktionen wirken sofort (die Cloud spricht mit ihrem eigenen Docker-Daemon) und n
 - `GET /api/v1/cloud/update?check=true` → `{ current, latest, updateAvailable, canSelfUpdate, blocker, lastRun:{ state, message, log[] } }`
 - `POST /api/v1/cloud/update` → `202` – **aktualisiert die Cloud selbst** (**CanManageHosting + alle Instanzen**). Ein Helfer-Container tauscht den Cloud-Container, prüft ihn per Health-Check und rollt bei Fehlern **Container und Datenbank** zurück. Die Cloud ist ~1–2 Min. weg; danach `GET …/cloud/update` → `lastRun.state` = `succeeded` | `current` | `rolled-back` | `failed`.
 
+### Reverse-Proxy & Domains
+
+Der Proxy ist **optional**: `provider` = `none` (kein Proxy – Instanzen über ihren Host-Port, eine Domain wird nur
+vermerkt), `matcad` (Route über Matcads REST-API) oder `caddy` (Route direkt über Caddys Admin-API, nur eigene
+`@id`-Routen `matcms-…`, fremde Routen bleiben unberührt). `upstream` sagt, wie der Proxy die Instanz erreicht:
+`network` (die Cloud hängt den Container an das Docker-Netz `network` des Proxys, Ziel `http://<container>:8080`)
+oder `hostport` (Ziel `http://<upstreamHost>:<Host-Port>`).
+
+- `GET /api/v1/hosting/proxy` → `{ provider, managesRoutes, matcadUrl, matcadTokenSet, caddyAdminUrl, caddyServer, upstream, network, upstreamHost }` – der Matcad-Schlüssel wird **nie** zurückgegeben.
+- `PUT /api/v1/hosting/proxy` `{ provider?, matcadUrl?, matcadToken?, clearMatcadToken?, caddyAdminUrl?, caddyServer?, upstream?, network?, upstreamHost? }` – Teil-Update, weggelassen = unverändert (**CanManageHosting + alle Instanzen**). Schon veröffentlichte Domains wandern **nicht** mit – nach einem Provider-Wechsel neu veröffentlichen.
+- `POST /api/v1/hosting/proxy/test` → `{ ok, provider, message }` – Proxy erreichbar? Netz vorhanden? (**CanManageHosting**)
+- `GET /api/v1/instances/{publicId}/domain?check=true` → `{ domain, provider, routeId, error, publishedAt, routeExists }` – `check` fragt den Proxy, ob die Route noch existiert.
+- `PUT /api/v1/instances/{publicId}/domain` `{ domain, pushCanonical? = true }` – veröffentlichen bzw. umziehen (Route + TLS; ohne Proxy nur vermerkt). Der DNS-Eintrag muss schon auf den Proxy zeigen. `pushCanonical` setzt auf der Site `site.canonicalUrl = https://<domain>` + „hinter HTTPS-Proxy“ (beim nächsten Heartbeat). `400` = keine gültige Domain, `409` = Domain vergeben / Instanz nicht auf diesem Docker-Host / Proxy-Fehler (**CanManageHosting**, Schlüssel-Umfang).
+- `DELETE /api/v1/instances/{publicId}/domain?pushCanonical=true` – Route entfernen (erst die Route, dann der Eintrag; idempotent) (**CanManageHosting**, Schlüssel-Umfang).
+
+Beim **Anlegen** einer Instanz mit Domain (Hosting → Neue Instanz) wird die Route sofort angelegt und beim ersten
+Heartbeat der neuen Instanz übernommen.
+
 ---
 
 ## 7. MCP-Server (`/mcp`) – Inhalte per KI verwalten
@@ -217,6 +235,12 @@ Instanz beim nächsten Heartbeat über ihre **eigenen** Validierer anwendet (add
 | `get_container_logs` | letzte Zeilen stdout/stderr des Instanz-Containers |
 | `get_cloud_update_status` | Cloud-Version, neueste Version, ob Selbst-Update möglich ist, Verlauf des letzten Updates |
 | `update_cloud` | **Cloud selbst aktualisieren** (Helfer-Container, Health-Check, Rollback) — vorher bestätigen; Hosting-Recht + alle Instanzen |
+| `get_proxy_config` | Reverse-Proxy-Konfiguration (Provider, Adressen, Upstream-Modus; ohne Schlüssel) |
+| `configure_proxy` | Proxy einstellen (Teil-Update; Hosting-Recht + alle Instanzen) |
+| `test_proxy` | Proxy erreichbar? Netz vorhanden? |
+| `get_domain_status` | Domain einer Instanz, Provider, Route noch vorhanden? |
+| `publish_domain` | Instanz unter einer Domain veröffentlichen/umziehen (Route + TLS) |
+| `unpublish_domain` | Domain entfernen — Site ist darunter danach nicht mehr erreichbar, vorher bestätigen |
 
 **`create_page`** (Beispiel-Eingabe):
 ```json

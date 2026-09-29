@@ -700,7 +700,7 @@ What each mode can do:
 
 ### Hosting module, Hosting tab and the cloud self-update
 
-Design and increments: `docs/hosting-platform.md`. Increments 1 + 2 are built:
+Design and increments: `docs/hosting-platform.md`. Increments 1–3 are built:
 
 - **One service per capability, three surfaces** (UI, `/api/v1`, MCP — the API-first rule):
   `Services/HostingActionsService.cs` (container status/start/stop/restart/update/logs of an instance on
@@ -732,6 +732,20 @@ Design and increments: `docs/hosting-platform.md`. Increments 1 + 2 are built:
 - Fleet-wide pages are folder-locked to `Admin` in `Program.cs` (`/Admin/Cleanup`, `/Admin/Logs`,
   `/Admin/Hosting`): `/Admin` itself is `AdminOrOperator`, and hiding a nav link does not stop an
   Operator typing the URL. Any NEW fleet-wide page needs the same line.
+- **Reverse proxy is OPTIONAL** (`Services/Proxy/`): provider `none` (default — sites on their host port, a
+  domain is only recorded) / `matcad` (Matcad's REST API, `X-Api-Key`) / `caddy` (Caddy admin API).
+  `ProxyService` is the one place that publishes/moves/unpublishes a domain — UI (Einstellungen → Hosting,
+  the Domain card on the Hosting tab, provisioning), REST `/api/v1/hosting/proxy`, `/api/v1/instances/{id}/domain`
+  and the MCP proxy/domain tools all call it. Traps: **route first, record second** (unpublish deletes the
+  route before clearing `Instance.Proxy*`, so a proxy that is down never leaves an orphan the cloud forgot);
+  **Caddy is edited surgically** — only `@id` `matcms-…` routes via `/id/…`, never `/load` (it would replace
+  everyone else's config); **no `matcad.*` labels** on provisioned containers any more (Matcad with label
+  discovery on would build a second, unremovable route for the same host). Upstream `network` attaches the
+  container live to the proxy's Docker network; `hostport` goes via `upstreamHost:<published port>`.
+  Provisioning parks the route under `hosting.pendingRoute:<container>`; `InstanceService.ClassifyAsync`
+  adopts it on the first beat. `pushCanonical` sends `site.canonicalUrl` + `site.behindHttpsProxy` as
+  `setting.set` content ops (Approved instances only). The settings are cloud-wide until increment 4 gives
+  each node its own `ProxySettings`.
 
 ### Removing an instance — who owns the container
 

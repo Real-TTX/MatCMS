@@ -29,30 +29,43 @@ public static class ContainerIdentity
         }
     }
 
+    private static readonly Regex ContainersPath = new("/containers/([0-9a-f]{64})/", RegexOptions.Compiled);
+
     private static string? Resolve()
     {
-        // 1) cgroup v1: lines look like "…:/docker/<64-hex>" (or /kubepods/…/<64-hex>).
-        //    cgroup v2 usually has no id here, which is why mountinfo follows.
-        foreach (var path in new[] { "/proc/self/cgroup", "/proc/self/mountinfo" })
+        // Docker sets the hostname to the SHORT container id unless the operator overrode it. Only
+        // accepted when it actually looks like one, so a real host name ("web-01") is never mistaken
+        // for a container id.
+        var host = Environment.MachineName?.Trim().ToLowerInvariant() ?? "";
+        var shortId = ShortId.IsMatch(host) ? host : null;
+
+        // Candidates, best first: ids in Docker's ".../containers/<64-hex>/..." paths (the bind mounts it
+        // injects — hostname, hosts, resolv.conf — the reliable source under cgroup v2), then any other
+        // 64-hex (cgroup v1 "…:/docker/<64-hex>", /kubepods/…).
+        //
+        // NOT simply "the first 64-hex in the file": nested (Docker in Docker, some LXC/VM setups) mountinfo
+        // also carries the ids of OUTER volumes, and the first one found was exactly such an id — the cloud
+        // then looked for a container that does not exist and the site could not be managed.
+        var preferred = new List<string>();
+        var other = new List<string>();
+        foreach (var path in new[] { "/proc/self/mountinfo", "/proc/self/cgroup" })
         {
             try
             {
                 if (!File.Exists(path)) continue;
                 foreach (var line in File.ReadLines(path))
                 {
-                    // mountinfo carries ".../docker/containers/<64-hex>/hostname" for the bind mounts
-                    // Docker injects, which is the reliable source under cgroup v2.
-                    var m = Sha.Match(line);
-                    if (m.Success) return m.Value;
+                    foreach (Match m in ContainersPath.Matches(line)) preferred.Add(m.Groups[1].Value);
+                    foreach (Match m in Sha.Matches(line)) other.Add(m.Value);
                 }
             }
             catch { /* not readable (non-Linux, hardened runtime) → try the next source */ }
         }
+        var candidates = preferred.Concat(other).Distinct().ToList();
 
-        // 2) Fallback: Docker sets the hostname to the SHORT container id unless the operator
-        //    overrode it. Only accept it when it actually looks like one, so a real host name
-        //    ("web-01") is never mistaken for a container id.
-        var host = Environment.MachineName?.Trim().ToLowerInvariant() ?? "";
-        return ShortId.IsMatch(host) ? host : null;
+        // The short id from the hostname decides between several candidates when it can.
+        if (shortId is not null && candidates.FirstOrDefault(c => c.StartsWith(shortId, StringComparison.Ordinal)) is { } agreed)
+            return agreed;
+        return candidates.FirstOrDefault() ?? shortId;
     }
 }

@@ -662,6 +662,23 @@ login same-site; it is not used by this flow.
   opt-in auto-update. Both mails are idempotent — `Instance.OfflineNotified` fires once per outage,
   `Instance.UpdateNotifiedVersion` once per release. Mail goes out through `EmailService` (MailKit,
   same as MatCMS: implicit SSL on 465, STARTTLS otherwise).
+- **Who is told is the notification MATRIX** (`Services/NotificationService.cs`, page *Benachrichtigungen*,
+  `/api/v1/notifications`, MCP `get_/set_notifications`; stored as `CloudSetting notify.matrix`): rows =
+  `g:admins`, `g:operators`, `u:<id>`, `e:<address>`; columns = `NotifyEvents` (offline, update, updateFailed,
+  migration, nodeOffline, removal). It is the ONLY place an event becomes addresses — `EmailService` no longer
+  resolves recipients (its old "list, else EVERY user" fallback would have mailed Operators about foreign sites).
+  The load-bearing rule: an Operator — group row or single-user row — hears only about instances in its
+  `UserInstance` scope and NEVER about fleet events (`NotifyEvents.FleetOnly`), enforced in `RecipientsAsync`,
+  not only hidden in the UI (tested with a smuggled cell). The update summary is grouped per recipient's
+  instance set, so an Operator's summary names only its own sites. Profiles keep `NotifyOffline/NotifyUpdate`
+  as "this profile's sites raise it at all" and `NotifyRecipients` as ADDITIONAL addresses (was: replacement).
+  Before the matrix is first saved it is derived from the legacy `notify.*` keys, so nobody silently loses mail.
+  Node outages notify once per outage (`Node.OfflineNotified`, re-armed by the next beat).
+- **Admin navigation**: Hosting is an optional module, so it is its own sidebar GROUP (`.admin-nav-label`/
+  `.admin-nav-sub`, shared admin.css) that only exists while `hosting.enabled` is on — Übersicht, Nodes, Updates,
+  Domains, Einstellungen (proxy/ports/name pattern of "Dieser Host"), Neue Instanz. *Einstellungen → Hosting*
+  holds only the switch. API keys are the *API* tab of Einstellungen (`/Admin/ApiKeys` only forwards and keeps
+  the row handlers); security is a card on *Allgemein*; fleet cleanup is a button on the instance list.
 
 ### Local vs. remote instances
 

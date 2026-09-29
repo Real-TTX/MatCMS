@@ -215,6 +215,19 @@ Auftragsverlauf. Ein nicht verbundener Node antwortet sofort mit `409` „nicht 
 
 ---
 
+## 6b. Benachrichtigungen – wer bekommt was
+
+Die Benachrichtigungs-Matrix: Zeilen sind Empfänger, Spalten Ereignisse.
+Zeilen-Schlüssel: `g:admins` (alle Admins), `g:operators` (alle Operatoren — **nur ihre Instanzen**), `u:<Benutzer-ID>`, `e:<Adresse>`.
+Ereignisse: `offline`, `update`, `updateFailed`, `migration`, `nodeOffline`, `removal`. `nodeOffline` und `removal` betreffen die ganze Cloud und gehen **nie** an Operatoren.
+
+- `GET /api/v1/notifications` → `{ events, fleetOnlyEvents, rowKinds, users:[{ key, username, displayName, email, role }], rows:[{ key, events[] }] }` (Schlüssel für **alle Instanzen**)
+- `PUT /api/v1/notifications` `{ rows:[{ key, events[] }] }` – ersetzt die ganze Matrix; unbekannte Ereignisse/Schlüssel werden verworfen (**alle Instanzen + CanManageProfiles**)
+
+Ein Profil kann Offline-/Update-Meldungen für seine Instanzen abschalten; seine „zusätzlichen Empfänger“ bekommen die Meldungen seiner Instanzen **zusätzlich**.
+
+---
+
 ## 7. MCP-Server (`/mcp`) – Inhalte per KI verwalten
 
 Für KI-Clients (ChatGPT, Claude, Cursor) bietet die Cloud einen **Model-Context-Protocol**-Server
@@ -277,6 +290,7 @@ Instanz beim nächsten Heartbeat über ihre **eigenen** Validierer anwendet (add
 | `create_instance` | **Neue Website anlegen** — auf diesem Host oder einem Node, optional mit Domain (alle Instanzen) |
 | `migrate_instance` | **Website umziehen** auf einen anderen Host (Daten 1:1, Domain zieht mit; offline währenddessen) — vorher bestätigen |
 | `get_migrations` | Umzüge einer Website mit Zustand, Schritt und Protokoll |
+| `get_notifications` / `set_notifications` | Benachrichtigungs-Matrix lesen / komplett ersetzen (Abschnitt 6b) |
 
 **`create_page`** (Beispiel-Eingabe):
 ```json

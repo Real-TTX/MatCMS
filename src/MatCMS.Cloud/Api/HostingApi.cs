@@ -125,6 +125,74 @@ public static class HostingApi
                       : Results.Json(new { ok = false, error = text }, statusCode: StatusCodes.Status409Conflict);
         }).RequireRateLimiting("operatorApi");
 
+        // ---- Reverse proxy (increment 3) --------------------------------------------------------------
+        app.MapGet("/api/v1/hosting/proxy", async (HttpContext ctx, ApiKeyService keys, Services.Proxy.ProxyService proxy) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            return Results.Ok(proxy.PublicConfig());
+        }).RequireRateLimiting("operatorApi");
+
+        app.MapPut("/api/v1/hosting/proxy", async (HttpContext ctx, ApiKeyService keys, Services.Proxy.ProxyService proxy,
+            Services.Proxy.ProxyService.ProxyConfigInput b) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            // The proxy setting decides where EVERY published site is routed — cloud-wide.
+            if (RequireCloudWide(key!) is { } g) return g;
+            await proxy.UpdateSettingsAsync(b);
+            return Results.Ok(proxy.PublicConfig());
+        }).RequireRateLimiting("operatorApi");
+
+        app.MapPost("/api/v1/hosting/proxy/test", async (HttpContext ctx, ApiKeyService keys, Services.Proxy.ProxyService proxy) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireHosting(key!) is { } g) return g;
+            var r = await proxy.TestAsync(ctx.RequestAborted);
+            return Results.Ok(new { ok = r.Ok, provider = r.Kind, message = r.Message });
+        }).RequireRateLimiting("operatorApi");
+
+        app.MapGet("/api/v1/instances/{publicId}/domain", async (HttpContext ctx, string publicId, bool? check,
+            ApiKeyService keys, AppDbContext db, Services.Proxy.ProxyService proxy) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            var inst = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == publicId);
+            if (inst is null || !ApiKeyService.CanAccess(key!, inst)) return NotFoundInstance();
+            var s = await proxy.StatusAsync(inst, check ?? true, ctx.RequestAborted);
+            return Results.Ok(new { domain = s.Domain, provider = s.Provider, routeId = s.RouteId, error = s.Error, publishedAt = s.PublishedAt, routeExists = s.RouteExists });
+        }).RequireRateLimiting("operatorApi");
+
+        app.MapPut("/api/v1/instances/{publicId}/domain", async (HttpContext ctx, string publicId, DomainDto b,
+            ApiKeyService keys, AppDbContext db, Services.Proxy.ProxyService proxy) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireHosting(key!) is { } g) return g;
+            var inst = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == publicId);
+            if (inst is null || !ApiKeyService.CanAccess(key!, inst)) return NotFoundInstance();
+            if (Services.Proxy.ProxyService.NormaliseDomain(b.Domain) is null)
+                return Results.Json(new { ok = false, error = "Keine gültige Domain (nur ein Hostname, z. B. shop.example.de — ohne Pfad, Port oder *)." },
+                    statusCode: StatusCodes.Status400BadRequest);
+            var r = await proxy.PublishAsync(inst, b.Domain, b.PushCanonical ?? true, ctx.RequestAborted);
+            return r.Ok ? Results.Ok(new { ok = true, domain = r.Domain, message = r.Message })
+                        : Results.Json(new { ok = false, error = r.Message }, statusCode: StatusCodes.Status409Conflict);
+        }).RequireRateLimiting("operatorApi");
+
+        app.MapDelete("/api/v1/instances/{publicId}/domain", async (HttpContext ctx, string publicId, bool? pushCanonical,
+            ApiKeyService keys, AppDbContext db, Services.Proxy.ProxyService proxy) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireHosting(key!) is { } g) return g;
+            var inst = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == publicId);
+            if (inst is null || !ApiKeyService.CanAccess(key!, inst)) return NotFoundInstance();
+            var r = await proxy.UnpublishAsync(inst, pushCanonical ?? true, ctx.RequestAborted);
+            return r.Ok ? Results.Ok(new { ok = true, message = r.Message })
+                        : Results.Json(new { ok = false, error = r.Message }, statusCode: StatusCodes.Status409Conflict);
+        }).RequireRateLimiting("operatorApi");
+
         // ---- Cloud self-update -----------------------------------------------------------------------
         app.MapGet("/api/v1/cloud/update", async (HttpContext ctx, bool? check, ApiKeyService keys, CloudUpdaterService updater) =>
         {
@@ -157,4 +225,5 @@ public static class HostingApi
     }
 
     public record HostingSwitchDto(bool Enabled);
+    public record DomainDto(string Domain, bool? PushCanonical);
 }

@@ -116,6 +116,83 @@ public class HostingTools
         return new { ok = true, tail, logs = text };
     }
 
+    [McpServerTool(Name = "get_proxy_config"), Description(
+        "The reverse-proxy configuration of this cloud: provider (none = no proxy, sites are reached on their host port; matcad; caddy), its address, how the proxy reaches an instance (upstream 'network' = attach the container to a shared Docker network, 'hostport' = upstreamHost:hostPort), and whether a Matcad API key is set (the key itself is never returned). Any valid key.")]
+    public static object GetProxyConfig(McpContext me, Services.Proxy.ProxyService proxy)
+    {
+        _ = me.Key;
+        return proxy.PublicConfig();
+    }
+
+    [McpServerTool(Name = "configure_proxy"), Description(
+        "Change the reverse-proxy configuration. Every parameter is optional; omitted ones keep their value. Changing the provider does NOT move already published domains — republish them (publish_domain) afterwards. Run test_proxy after a change. Requires the hosting right on an all-instances key.")]
+    public static async Task<object> ConfigureProxy(McpContext me, Services.Proxy.ProxyService proxy,
+        [Description("none, matcad or caddy.")] string? provider = null,
+        [Description("Matcad base URL, e.g. http://matcad:8080.")] string? matcadUrl = null,
+        [Description("Matcad API key (X-Api-Key). Stored encrypted, never returned.")] string? matcadToken = null,
+        [Description("true = delete the stored Matcad API key.")] bool clearMatcadToken = false,
+        [Description("Caddy admin API URL, e.g. http://caddy:2019.")] string? caddyAdminUrl = null,
+        [Description("Caddy HTTP server name to add routes to (default srv0).")] string? caddyServer = null,
+        [Description("network or hostport.")] string? upstream = null,
+        [Description("Docker network shared by the proxy and the instances (upstream=network).")] string? network = null,
+        [Description("Host/IP the proxy reaches published host ports on (upstream=hostport), e.g. host.docker.internal.")] string? upstreamHost = null)
+    {
+        RequireCloudWide(me);
+        await proxy.UpdateSettingsAsync(new(provider, matcadUrl, matcadToken, clearMatcadToken, caddyAdminUrl, caddyServer,
+            upstream, network, upstreamHost));
+        return proxy.PublicConfig();
+    }
+
+    [McpServerTool(Name = "test_proxy"), Description(
+        "Check that the configured reverse proxy answers and (upstream=network) that the proxy network exists. Requires the hosting right.")]
+    public static async Task<object> TestProxy(McpContext me, Services.Proxy.ProxyService proxy, CancellationToken ct)
+    {
+        RequireHosting(me);
+        var r = await proxy.TestAsync(ct);
+        return new { ok = r.Ok, provider = r.Kind, message = r.Message };
+    }
+
+    [McpServerTool(Name = "get_domain_status"), Description(
+        "The public domain of an instance: domain, via which proxy provider, route id, last error, publish time, and (check=true) whether the route still exists at the proxy. Any valid key within its instance scope.")]
+    public static async Task<object> GetDomainStatus(McpContext me, AppDbContext db, Services.Proxy.ProxyService proxy,
+        [Description("The instance id, as returned by list_instances.")] string instanceId,
+        [Description("Ask the proxy whether the route still exists (default true).")] bool check = true,
+        CancellationToken ct = default)
+    {
+        var inst = await ResolveAsync(me, db, instanceId, ct);
+        var s = await proxy.StatusAsync(inst, check, ct);
+        return new { domain = s.Domain, provider = s.Provider, routeId = s.RouteId, error = s.Error, publishedAt = s.PublishedAt, routeExists = s.RouteExists };
+    }
+
+    [McpServerTool(Name = "publish_domain"), Description(
+        "Publish an instance under a domain (or move it to a new one): with a managing proxy (matcad/caddy) a route with TLS is created/updated for the instance's container; with provider 'none' the domain is only recorded. The domain's DNS must already point at the proxy host. pushCanonical (default true) also sets the site's canonical URL to https://<domain>. Requires the hosting right; honours the key's instance scope.")]
+    public static async Task<object> PublishDomain(McpContext me, AppDbContext db, Services.Proxy.ProxyService proxy,
+        [Description("The instance id, as returned by list_instances.")] string instanceId,
+        [Description("A single hostname, e.g. shop.example.de (no scheme, path, port or wildcard).")] string domain,
+        [Description("Also set the site's canonical URL (default true).")] bool pushCanonical = true,
+        CancellationToken ct = default)
+    {
+        RequireHosting(me);
+        var inst = await ResolveAsync(me, db, instanceId, ct);
+        var r = await proxy.PublishAsync(inst, domain, pushCanonical, ct);
+        if (!r.Ok) throw new McpException(r.Message);
+        return new { ok = true, domain = r.Domain, message = r.Message };
+    }
+
+    [McpServerTool(Name = "unpublish_domain"), Description(
+        "Remove an instance's public domain: deletes the proxy route (the site is then no longer reachable under it — confirm with the user first) and clears the record. pushCanonical (default true) also clears the site's canonical URL. Requires the hosting right; honours the key's instance scope.")]
+    public static async Task<object> UnpublishDomain(McpContext me, AppDbContext db, Services.Proxy.ProxyService proxy,
+        [Description("The instance id, as returned by list_instances.")] string instanceId,
+        [Description("Also clear the site's canonical URL (default true).")] bool pushCanonical = true,
+        CancellationToken ct = default)
+    {
+        RequireHosting(me);
+        var inst = await ResolveAsync(me, db, instanceId, ct);
+        var r = await proxy.UnpublishAsync(inst, pushCanonical, ct);
+        if (!r.Ok) throw new McpException(r.Message);
+        return new { ok = true, message = r.Message };
+    }
+
     [McpServerTool(Name = "get_cloud_update_status"), Description(
         "The cloud's own version, the newest published version, whether a self-update can run here (and why not), and how the last self-update went (state + step log). Any valid key.")]
     public static async Task<object> GetCloudUpdateStatus(McpContext me, CloudUpdaterService updater, CancellationToken ct)

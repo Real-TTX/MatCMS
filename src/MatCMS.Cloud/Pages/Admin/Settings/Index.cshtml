@@ -10,11 +10,11 @@
 
 <div class="tabs" role="tablist">
     <button type="button" class="tab active" data-tab="general">@T["settings.tabGeneral"]</button>
-    <button type="button" class="tab" data-tab="security">@T["settings.tabSecurity"]</button>
     <button type="button" class="tab" data-tab="notifications">@T["settings.tabNotifications"]</button>
     <button type="button" class="tab" data-tab="smtp">@T["settings.tabSmtp"]</button>
     <button type="button" class="tab" data-tab="ai">@T["settings.tabAi"]</button>
     <button type="button" class="tab" data-tab="backup">@T["backups.title"]</button>
+    <button type="button" class="tab" data-tab="api">@T["settings.tabApi"]</button>
     <button type="button" class="tab" data-tab="hosting">@T["settings.tabHosting"]</button>
     <button type="button" class="tab" data-tab="docker">@T["settings.tabDocker"]</button>
 </div>
@@ -41,10 +41,9 @@
             <div><button type="submit" class="btn">@T["settings.save"]</button></div>
         </div>
     </form>
-</div>
 
-@* ============ SICHERHEIT ============ *@
-<div class="tab-panel" data-panel="security" hidden>
+    @* Sicherheit gehört zum Allgemeinen — eigene Karte, eigenes Formular, damit ein Speichern hier nie die
+       übrigen Schlüssel anfasst. *@
     <form method="post" asp-page-handler="Security">
         <div class="card">
             <h2>@T["settings.securityHeading"]</h2>
@@ -57,6 +56,13 @@
             <div style="margin-top:14px;"><button type="submit" class="btn">@T["settings.save"]</button></div>
         </div>
     </form>
+</div>
+
+@* ============ API ============ *@
+@* Die API-Schlüssel (Operator-API + MCP) leben hier und nicht als eigener Menüpunkt: sie sind Konfiguration der
+   Cloud. Anlegen bleibt eine eigene Seite, die hierher zurückführt. *@
+<div class="tab-panel" data-panel="api" hidden>
+    <partial name="_ApiKeyList" model="Model.ApiKeys" />
 </div>
 
 @* ============ NOTIFICATIONS ============ *@
@@ -276,76 +282,9 @@
                 @T["settings.hostingEnabled"]
             </label>
             <div class="help">@T["settings.hostingEnabledHint"]</div>
-            @* Der Haken allein genügt nicht — ohne erreichbaren Daemon kann die Cloud nichts anlegen,
-               und das gehört hier gesagt und nicht erst beim ersten Fehlschlag. *@
-            <div class="kv" style="margin-top:12px;">
-                <div class="kv-label">Docker</div>
-                <div class="kv-value">
-                    @if (Model.DockerReachable)
-                    {
-                        <span class="badge badge-on">@T["settings.dockerOk"]</span>
-                    }
-                    else
-                    {
-                        <span class="badge badge-err">@T["settings.dockerUnreachable"]</span>
-                        <span class="muted">@T["settings.hostingNeedsDocker"]</span>
-                    }
-                </div>
-            </div>
-        </div>
-
-        <div class="card">
-            <h2>@T["settings.hostingRouting"]</h2>
-            <partial name="_ProxyFields" model="Model.ProxyFields" />
-
-            <div class="list-actions">
-                <button type="submit" class="btn btn-ghost" formaction="@Url.Page("Index", "ProxyTest")">@T["settings.hostingProxyTest"]</button>
-            </div>
-            <div class="help">@T["settings.hostingProxyApiHint"]</div>
-        </div>
-
-        @* Der Portbereich gilt für beide Wege: auch eine Instanz hinter Matcad braucht einen Port auf
-           dem Host, unter dem der Proxy sie findet. *@
-        <div class="card">
-            <h2>@T["settings.hostingPorts"]</h2>
-            <div class="form-grid">
-                <div class="form-row">
-                    <div class="form-field">
-                        <label for="portFrom">@T["settings.hostingPortFrom"]</label>
-                        <input id="portFrom" name="portFrom" value="@Model.Get(SettingKeys.HostingPortFrom)" placeholder="9201" inputmode="numeric" />
-                    </div>
-                    <div class="form-field">
-                        <label for="portTo">@T["settings.hostingPortTo"]</label>
-                        <input id="portTo" name="portTo" value="@Model.Get(SettingKeys.HostingPortTo)" placeholder="9299" inputmode="numeric" />
-                    </div>
-                </div>
-            </div>
-            <div class="form-field">
-                <label for="namePattern">@T["settings.hostingNamePattern"]</label>
-                <input id="namePattern" name="namePattern" value="@Model.Get(SettingKeys.HostingNamePattern)" placeholder="@MatCMS.Cloud.Services.HostingService.DefaultNamePattern" spellcheck="false" />
-                <div class="help">@T["settings.hostingNamePatternHint"]</div>
-                @* Vorschau, weil ein Muster mit Platzhalter erst dann eindeutig ist, wenn man das
-                   Ergebnis sieht — besonders bei der Normalisierung, die Punkte und Leerzeichen
-                   schluckt. *@
-                <div class="help mono" data-name-preview></div>
-            </div>
-            <div class="help">@T["settings.hostingPortsHint"]</div>
-            @* Zeigt die Vergabe, bevor sie zum ersten Mal etwas anlegt — ein Bereich, in dem nichts
-               mehr frei ist, soll hier auffallen und nicht beim Erzeugen. *@
-            <div class="kv" style="margin-top:12px;">
-                <div class="kv-label">@T["settings.hostingNextPort"]</div>
-                <div class="kv-value">
-                    @if (Model.NextPort is int np)
-                    {
-                        <span class="mono">@np</span>
-                        <span class="muted">@T["settings.hostingPortsUsed", Model.UsedPortCount]</span>
-                    }
-                    else
-                    {
-                        <span class="badge badge-err">@T["settings.hostingNoPort"]</span>
-                    }
-                </div>
-            </div>
+            @* Hosting ist ein optionales Modul: hier wird es nur eingeschaltet. Alles Weitere — Proxy, Ports,
+               Nodes, Domains — steht in seiner eigenen Menügruppe. *@
+            <div class="help">@T["settings.hostingMoved"] <a asp-page="/Admin/Hosting/Settings">@T["hosting.title"] → @T["hosting.navSettings"]</a></div>
             <div style="margin-top:14px;"><button type="submit" class="btn">@T["settings.save"]</button></div>
         </div>
     </form>
@@ -409,24 +348,6 @@
                 panels.forEach(function (p) { p.hidden = p.dataset.panel !== name; });
             }
             tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.tab); }); });
-            // Spiegelt HostingService.Normalise: klein, alles Nicht-Alphanumerische zu Bindestrichen.
-            // Zwei Umsetzungen derselben Regel — die hier zeigt nur an, entschieden wird im Dienst.
-            var pat = document.getElementById('namePattern');
-            var prev = document.querySelector('[data-name-preview]');
-            if (pat && prev) {
-                var demo = 'Meine Seite.de';
-                var slug = demo.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-                var syncPreview = function () {
-                    var p = (pat.value || pat.placeholder || '').trim();
-                    var out = /{name}/i.test(p) ? p.replace(/{name}/ig, slug)
-                            : p.indexOf('$NAME') >= 0 ? p.split('$NAME').join(slug)
-                            : (p.replace(/-+$/, '') + '-' + slug);
-                    prev.textContent = '„' + demo + '" → ' + out.toLowerCase();
-                };
-                pat.addEventListener('input', syncPreview);
-                syncPreview();
-            }
-
             var want = new URLSearchParams(location.search).get('tab');
             if (want) show(want);
         })();

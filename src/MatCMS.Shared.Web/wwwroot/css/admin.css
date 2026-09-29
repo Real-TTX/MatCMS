@@ -65,6 +65,19 @@
 .admin-nav a.active { background: var(--accent); color: #fff; }
 /* Thin divider between logical nav groups (Inhalt / Konfiguration / Verwaltung). */
 .admin-nav-sep { height: 1px; background: #dfe1e6; margin: 5px 6px; flex-shrink: 0; }
+/* A labelled group (e.g. the cloud's optional Hosting module): a quiet heading and indented links, so an
+   optional area reads as ONE block rather than a handful of loose top-level items. */
+.admin-nav-label { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #8a8f98; padding: 6px 11px 2px; }
+.admin-nav a.admin-nav-sub { padding-left: 26px; font-size: 13px; }
+
+/* Cleanup (Aufräumen): media, components and plugins are ONE list shape — fixed columns, so the three tables
+   line up under each other; only media carries a thumbnail. */
+table.cleanup-list { table-layout: fixed; }
+table.cleanup-list .cleanup-check { width: 40px; }
+table.cleanup-list .cleanup-thumb { width: 68px; }
+table.cleanup-list .cleanup-thumb img { width: 56px; height: 40px; object-fit: cover; border-radius: 4px; display: block; }
+table.cleanup-list .cleanup-info { width: 170px; }
+table.cleanup-list td { overflow: hidden; text-overflow: ellipsis; }
 
 .admin-nav-foot { border-top: 1px solid #dfe1e6; margin-top: 8px; padding-top: 8px; display: flex; flex-direction: column; gap: 1px; }
 .admin-nav-foot a, .admin-nav-foot .linklike {

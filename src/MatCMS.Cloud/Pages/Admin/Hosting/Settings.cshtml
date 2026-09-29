@@ -1,0 +1,115 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.Hosting.SettingsModel
+@using MatCMS.Cloud.Services
+@{
+    ViewData["Title"] = T["hosting.navSettings"];
+}
+<div class="page-head">
+    <h1>@T["hosting.navSettings"]</h1>
+</div>
+<p class="help">@T["hosting.settingsIntro"]</p>
+
+@if (!Model.ModuleEnabled)
+{
+    <div class="alert alert-info">@T["hosting.moduleOff"] <a asp-page="/Admin/Settings/Index" asp-route-tab="hosting">@T["nav.settings"] → @T["hosting.title"]</a></div>
+}
+
+<form method="post" asp-page-handler="Save">
+    <div class="card">
+        <h2>@T["nodes.thisHost"]</h2>
+        @* Ohne erreichbaren Daemon kann die Cloud hier nichts anlegen — das gehört hier gesagt und nicht erst
+           beim ersten Fehlschlag. *@
+        <div class="kv">
+            <div class="kv-label">Docker</div>
+            <div class="kv-value">
+                @if (Model.DockerReachable)
+                {
+                    <span class="badge badge-on">@T["settings.dockerOk"]</span>
+                }
+                else
+                {
+                    <span class="badge badge-err">@T["settings.dockerUnreachable"]</span>
+                    <span class="muted">@T["settings.hostingNeedsDocker"]</span>
+                }
+            </div>
+        </div>
+        <div class="help">@T["hosting.settingsNodesHint"] <a asp-page="/Admin/Hosting/Nodes/Index">@T["nodes.title"]</a></div>
+    </div>
+
+    <div class="card">
+        <h2>@T["settings.hostingRouting"]</h2>
+        <partial name="_ProxyFields" model="Model.ProxyFields" />
+        <div class="list-actions">
+            <button type="submit" class="btn btn-ghost" formaction="@Url.Page("Settings", "ProxyTest")">@T["settings.hostingProxyTest"]</button>
+        </div>
+        <div class="help">@T["settings.hostingProxyApiHint"]</div>
+    </div>
+
+    @* Der Portbereich gilt für beide Wege: auch eine Instanz hinter einem Proxy braucht einen Port auf dem Host,
+       unter dem der Proxy sie findet (Modus „Host-Port“). *@
+    <div class="card">
+        <h2>@T["settings.hostingPorts"]</h2>
+        <div class="form-grid">
+            <div class="form-row">
+                <div class="form-field">
+                    <label for="portFrom">@T["settings.hostingPortFrom"]</label>
+                    <input id="portFrom" name="portFrom" value="@Model.Get(SettingKeys.HostingPortFrom)" placeholder="9201" inputmode="numeric" />
+                </div>
+                <div class="form-field">
+                    <label for="portTo">@T["settings.hostingPortTo"]</label>
+                    <input id="portTo" name="portTo" value="@Model.Get(SettingKeys.HostingPortTo)" placeholder="9299" inputmode="numeric" />
+                </div>
+            </div>
+        </div>
+        <div class="form-field">
+            <label for="namePattern">@T["settings.hostingNamePattern"]</label>
+            <input id="namePattern" name="namePattern" value="@Model.Get(SettingKeys.HostingNamePattern)" placeholder="@HostingService.DefaultNamePattern" spellcheck="false" />
+            <div class="help">@T["settings.hostingNamePatternHint"]</div>
+            @* Vorschau, weil ein Muster mit Platzhalter erst dann eindeutig ist, wenn man das Ergebnis sieht —
+               besonders bei der Normalisierung, die Punkte und Leerzeichen schluckt. *@
+            <div class="help mono" data-name-preview></div>
+        </div>
+        <div class="help">@T["settings.hostingPortsHint"]</div>
+        <div class="kv" style="margin-top:12px;">
+            <div class="kv-label">@T["settings.hostingNextPort"]</div>
+            <div class="kv-value">
+                @if (Model.NextPort is int np)
+                {
+                    <span class="mono">@np</span>
+                    <span class="muted">@T["settings.hostingPortsUsed", Model.UsedPortCount]</span>
+                }
+                else
+                {
+                    <span class="badge badge-err">@T["settings.hostingNoPort"]</span>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn">@T["settings.save"]</button>
+    </div>
+</form>
+
+@section Scripts {
+    <script>
+        // Spiegelt HostingService.Normalise: klein, alles Nicht-Alphanumerische zu Bindestrichen. Zwei Umsetzungen
+        // derselben Regel — die hier zeigt nur an, entschieden wird im Dienst.
+        (function () {
+            var pat = document.getElementById('namePattern');
+            var prev = document.querySelector('[data-name-preview]');
+            if (!pat || !prev) return;
+            var demo = 'Meine Seite.de';
+            var slug = demo.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+            function sync() {
+                var p = (pat.value || pat.placeholder || '').trim();
+                var out = /{name}/i.test(p) ? p.replace(/{name}/ig, slug)
+                        : p.indexOf('$NAME') >= 0 ? p.split('$NAME').join(slug)
+                        : (p.replace(/-+$/, '') + '-' + slug);
+                prev.textContent = '„' + demo + '" → ' + out.toLowerCase();
+            }
+            pat.addEventListener('input', sync);
+            sync();
+        })();
+    </script>
+}

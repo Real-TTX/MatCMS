@@ -42,12 +42,9 @@ public class IndexModel : PageModel
     /// <summary>How many instances the cloud found on its own daemon — the practical answer to
     /// "is the socket doing anything for me?".</summary>
     public int LocalCount { get; private set; }
-    public MatCMS.Cloud.Services.Proxy.ProxyFieldsView ProxyFields => _proxy.FieldsView();
 
-    /// <summary>Der Port, den die nächste Instanz bekäme — die einzige Art, die Vergabe zu prüfen,
-    /// ohne etwas anzulegen. Null heißt: Bereich voll oder Daemon nicht erreichbar.</summary>
-    public int? NextPort { get; private set; }
-    public int UsedPortCount { get; private set; }
+    /// <summary>The API tab: the operator keys (list + the one-time display of a just-created key).</summary>
+    public Pages.Admin.ApiKeys.ApiKeyListView ApiKeys { get; private set; } = null!;
 
     // --- AI usage this month (cloud-wide + per instance), from the AiUsage ledger ---
     public record AiUsageRow(string Instance, int Tokens, int Calls);
@@ -60,8 +57,9 @@ public class IndexModel : PageModel
     {
         DockerReachable = await _docker.IsReachableAsync(HttpContext.RequestAborted);
         LocalCount = await _db.Instances.CountAsync(i => i.Hosting == InstanceHosting.Local);
-        NextPort = await _hosting.NextFreePortAsync(HttpContext.RequestAborted);
-        UsedPortCount = (await _hosting.UsedPortsAsync(HttpContext.RequestAborted))?.Count ?? 0;
+        ApiKeys = new Pages.Admin.ApiKeys.ApiKeyListView(
+            await _db.ApiKeys.Include(k => k.Instances).AsNoTracking().OrderByDescending(k => k.CreatedAt).ToListAsync(),
+            TempData["NewApiKey"] as string);
 
         AiPeriod = DateTime.UtcNow.ToString("yyyy-MM");
         AiUsage = await (from u in _db.AiUsages.AsNoTracking()
@@ -123,64 +121,14 @@ public class IndexModel : PageModel
         return RedirectToPage(new { tab = "backup" });
     }
 
-    public async Task<IActionResult> OnPostHostingAsync(
-        bool hostingEnabled, string? hostingMode, string? matcadUrl, string? matcadToken, bool clearMatcadToken,
-        string? portFrom, string? portTo, string? namePattern,
-        string? caddyAdminUrl, string? caddyServer, string? proxyUpstream, string? proxyNetwork, string? proxyUpstreamHost)
+    /// <summary>Only the module switch lives here — Hosting is optional and its configuration is in its own menu
+    /// group (Hosting → Einstellungen).</summary>
+    public async Task<IActionResult> OnPostHostingAsync(bool hostingEnabled)
     {
-        await SaveHostingAsync(hostingEnabled, hostingMode, matcadUrl, matcadToken, clearMatcadToken, portFrom, portTo, namePattern,
-            caddyAdminUrl, caddyServer, proxyUpstream, proxyNetwork, proxyUpstreamHost);
-        TempData["Flash"] = "Hosting-Einstellungen gespeichert.";
+        await _cloud.SaveAsync(new Dictionary<string, string?> { [SettingKeys.HostingEnabled] = hostingEnabled ? "1" : "0" });
+        TempData["Flash"] = hostingEnabled ? "Hosting eingeschaltet — die Menügruppe „Hosting“ ist jetzt da." : "Hosting ausgeschaltet.";
         return RedirectToPage(new { tab = "hosting" });
     }
-
-    /// <summary>"Speichern &amp; Verbindung testen": the same form, posted here — saves first, so what is
-    /// tested is exactly what is stored (a test of unsaved values would pass and then not be in effect).</summary>
-    public async Task<IActionResult> OnPostProxyTestAsync(
-        bool hostingEnabled, string? hostingMode, string? matcadUrl, string? matcadToken, bool clearMatcadToken,
-        string? portFrom, string? portTo, string? namePattern,
-        string? caddyAdminUrl, string? caddyServer, string? proxyUpstream, string? proxyNetwork, string? proxyUpstreamHost)
-    {
-        await SaveHostingAsync(hostingEnabled, hostingMode, matcadUrl, matcadToken, clearMatcadToken, portFrom, portTo, namePattern,
-            caddyAdminUrl, caddyServer, proxyUpstream, proxyNetwork, proxyUpstreamHost);
-        var r = await _proxy.TestAsync(null, HttpContext.RequestAborted);
-        TempData[r.Ok ? "Flash" : "FlashError"] = "Gespeichert. " + r.Message;
-        return RedirectToPage(new { tab = "hosting" });
-    }
-
-    private async Task SaveHostingAsync(
-        bool hostingEnabled, string? hostingMode, string? matcadUrl, string? matcadToken, bool clearMatcadToken,
-        string? portFrom, string? portTo, string? namePattern,
-        string? caddyAdminUrl, string? caddyServer, string? proxyUpstream, string? proxyNetwork, string? proxyUpstreamHost)
-    {
-        await _cloud.SaveAsync(new Dictionary<string, string?>
-        {
-            [SettingKeys.HostingEnabled] = hostingEnabled ? "1" : "0",
-            // Only a known provider name is stored; anything else — also the historical "docker" — means
-            // "no proxy", the setting that needs nothing installed.
-            [SettingKeys.HostingMode] = MatCMS.Cloud.Services.Proxy.ProxyKinds.Normalise(hostingMode),
-            [SettingKeys.HostingCaddyAdminUrl] = caddyAdminUrl?.Trim().TrimEnd('/'),
-            [SettingKeys.HostingCaddyServer] = caddyServer?.Trim(),
-            [SettingKeys.HostingProxyUpstream] = MatCMS.Cloud.Services.Proxy.UpstreamModes.Normalise(proxyUpstream),
-            [SettingKeys.HostingProxyNetwork] = proxyNetwork?.Trim(),
-            [SettingKeys.HostingProxyUpstreamHost] = proxyUpstreamHost?.Trim(),
-            [SettingKeys.HostingMatcadUrl] = matcadUrl?.Trim().TrimEnd('/'),
-            // Wie beim SMTP-Passwort: leer BEHÄLT, nur der ausdrückliche Haken löscht. Sonst würde
-            // ein Speichern der Portfelder den Schlüssel wegwerfen, weil das Feld leer gerendert wird.
-            [SettingKeys.HostingMatcadToken] = clearMatcadToken ? ""
-                : string.IsNullOrEmpty(matcadToken) ? Get(SettingKeys.HostingMatcadToken)
-                : _secrets.Protect(matcadToken),
-            // Nur ein gültiger Bereich wird gespeichert. Ein verdrehter oder unsinniger würde beim
-            // Anlegen entweder nie einen freien Port finden oder einen belegten vorschlagen.
-            [SettingKeys.HostingPortFrom] = Port(portFrom),
-            [SettingKeys.HostingPortTo] = Port(portTo),
-            [SettingKeys.HostingNamePattern] = namePattern?.Trim(),
-        });
-    }
-
-    /// <summary>Ein Port oder nichts — 1024 bis 65535, alles andere wird verworfen statt gespeichert.</summary>
-    private static string Port(string? raw) =>
-        int.TryParse(raw, out var p) && p >= 1024 && p <= 65535 ? p.ToString() : "";
 
     /// <summary>Security policy card. Its own form, so saving it never touches the other settings.</summary>
     public async Task<IActionResult> OnPostSecurityAsync(bool require2fa)
@@ -192,7 +140,7 @@ public class IndexModel : PageModel
         TempData["Flash"] = require2fa
             ? "Zwei-Faktor-Pflicht ist AKTIV — Konten ohne 2FA werden zur Einrichtung geführt."
             : "Sicherheitseinstellungen gespeichert.";
-        return RedirectToPage(new { tab = "security" });
+        return RedirectToPage(new { tab = "general" });
     }
 
     public async Task<IActionResult> OnPostNotificationsAsync(

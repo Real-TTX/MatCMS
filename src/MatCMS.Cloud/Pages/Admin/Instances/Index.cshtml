@@ -318,7 +318,18 @@
 }
 <div class="list-actions">
     <button type="button" class="btn" data-add-menu="@addMenu.Id">@addMenu.ButtonLabel</button>
-    <a class="btn btn-ghost" asp-page="UpdateAll" title="Alle lokalen Instanzen mit Update nacheinander aktualisieren"><i class="ti ti-refresh" aria-hidden="true"></i> Alle aktualisieren</a>
+    @* With the Hosting module on, updating containers is in its menu group (Hosting → Updates). Off, the
+       cloud still updates its local instances — so the button stays here then, rather than vanishing. *@
+    @if (!Model.HostingEnabled)
+    {
+        <a class="btn btn-ghost" asp-page="UpdateAll" title="@T["instances.updateAllHint"]"><i class="ti ti-refresh" aria-hidden="true"></i> @T["instances.updateAll"]</a>
+    }
+    @* Fleet-wide cleanup is an action on the instances, so it sits with the other fleet action — not as a
+       sidebar area of its own. Admin-only like the page itself (folder lock in Program.cs). *@
+    @if (User.IsInRole("Admin"))
+    {
+        <a class="btn btn-ghost" asp-page="/Admin/Cleanup/Index" title="@T["instances.cleanupHint"]"><i class="ti ti-eraser" aria-hidden="true"></i> @T["nav.cleanup"]</a>
+    }
 </div>
 <partial name="_AddMenu" model="addMenu with { WithButton = false }" />
 

@@ -1,0 +1,81 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.Hosting.DomainsModel
+@{
+    ViewData["Title"] = T["hosting.navDomains"];
+}
+<div data-list>
+    <div class="page-head">
+        <h1>@T["hosting.navDomains"]</h1>
+        <div class="list-toolbar">
+            <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+            <form method="post" asp-page-handler="Check" class="inline-form">
+                <button type="submit" class="btn btn-sm btn-ghost">@T["domains.checkAll"]</button>
+            </form>
+        </div>
+    </div>
+    <p class="help">@T["domains.intro"]</p>
+
+    <table class="data" data-list-table>
+        <thead>
+            <tr>
+                <th>@T["hosting.domain"]</th>
+                <th>@T["cleanup.instance"]</th>
+                <th>@T["nodes.hostColumn"]</th>
+                <th style="width:110px;">@T["domains.provider"]</th>
+                <th>@T["domains.route"]</th>
+                <th style="width:150px;">@T["hosting.publishedAt"]</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Items.Count == 0)
+            {
+                <partial name="_EmptyRow" model='@T["domains.none"]' />
+            }
+            @foreach (var i in Model.Items)
+            {
+                <tr data-search="@(i.ProxyDomain + " " + i.Name + " " + i.Node?.Name)">
+                    <td><a href="https://@i.ProxyDomain" target="_blank" rel="noopener" class="mono">@i.ProxyDomain</a></td>
+                    <td><a asp-page="/Admin/Instances/Details" asp-route-id="@i.Id" asp-route-tab="hosting">@i.Name</a></td>
+                    <td>@if (i.Node is { } n) { <a asp-page="/Admin/Hosting/Nodes/Details" asp-route-id="@n.Id">@n.Name</a> } else { <span class="muted">@T["nodes.thisHost"]</span> }</td>
+                    <td><span class="badge @(i.ProxyProvider == "none" ? "badge-off" : "badge-on")">@(i.ProxyProvider ?? "—")</span></td>
+                    <td>
+                        <span class="mono muted">@(i.ProxyRouteId ?? T["domains.recordOnly"])</span>
+                        @if (Model.Checked.TryGetValue(i.Id, out var ok))
+                        {
+                            <span class="badge @(ok == true ? "badge-on" : ok == false ? "badge-err" : "badge-off")">@(ok == true ? T["domains.routeOk"] : ok == false ? T["domains.routeMissing"] : T["domains.routeUnknown"])</span>
+                        }
+                        @if (!string.IsNullOrEmpty(i.ProxyError))
+                        {
+                            <span class="badge badge-err" title="@i.ProxyError">@T["hosting.proxyError"]</span>
+                        }
+                    </td>
+                    <td class="mono muted">@(i.ProxyPublishedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+</div>
+
+@if (Model.Pending.Count > 0)
+{
+    @* Routes created at provisioning whose site has not enrolled yet — they are adopted on its first beat. *@
+    <div class="card">
+        <h2>@T["domains.pending"]</h2>
+        <table class="data">
+            <thead><tr><th>@T["hosting.domain"]</th><th>@T["hosting.name"]</th><th>@T["domains.provider"]</th><th>@T["domains.route"]</th></tr></thead>
+            <tbody>
+                @foreach (var (key, r) in Model.Pending)
+                {
+                    <tr>
+                        <td class="mono">@r.Domain</td>
+                        <td class="mono muted">@key</td>
+                        <td>@r.Provider</td>
+                        <td class="mono muted">@(r.RouteId ?? T["domains.recordOnly"])</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+<div class="help">@T["domains.apiHint"]</div>

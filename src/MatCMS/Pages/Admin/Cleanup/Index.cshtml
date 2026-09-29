@@ -8,6 +8,9 @@
     string FileOf(string? url) => string.IsNullOrEmpty(url) ? "" : url[(url.LastIndexOf('/') + 1)..];
     var r = Model.Report;
 }
+@* All three lists — media, components, plugins — are ONE shape, in the selection and in the confirmation:
+   [checkbox] · name · identifier · info. Only media carries a thumbnail in front: that is the one kind you
+   recognise by looking at it; for components and plugins a picture would only be noise. *@
 <div class="page-head">
     <h1>@T["cleanup.title"]</h1>
 </div>
@@ -24,24 +27,47 @@
 
         @if (Model.SelMedia.Count > 0)
         {
-            <div class="form-section">
-                <h3>@T["cleanup.media"] (@Model.SelMedia.Count · @Hsize(Model.SelMediaBytes))</h3>
-                <ul class="mono">@foreach (var m in Model.SelMedia) { <li>@(FileOf(m.Url)) <span class="muted">@Hsize(m.SizeBytes)</span></li> }</ul>
-            </div>
+            <h3>@T["cleanup.media"] <span class="muted">(@Model.SelMedia.Count · @Hsize(Model.SelMediaBytes))</span></h3>
+            <table class="data cleanup-list">
+                <thead><tr><th class="cleanup-thumb"></th><th>@T["cleanup.name"]</th><th>@T["cleanup.ident"]</th><th class="cleanup-info">@T["cleanup.info"]</th></tr></thead>
+                <tbody>
+                    @foreach (var m in Model.SelMedia)
+                    {
+                        <tr>
+                            <td class="cleanup-thumb"><img src="@m.Url" alt="" loading="lazy" /></td>
+                            <td>@(FileOf(m.Url))</td>
+                            <td class="muted">@m.Alt</td>
+                            <td class="cleanup-info muted mono">@Hsize(m.SizeBytes)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
         }
         @if (Model.SelComponents.Count > 0)
         {
-            <div class="form-section">
-                <h3>@T["cleanup.components"] (@Model.SelComponents.Count)</h3>
-                <ul>@foreach (var c in Model.SelComponents) { <li>@c.Name <span class="muted mono">@c.Type</span></li> }</ul>
-            </div>
+            <h3>@T["cleanup.components"] <span class="muted">(@Model.SelComponents.Count)</span></h3>
+            <table class="data cleanup-list">
+                <thead><tr><th>@T["cleanup.name"]</th><th>@T["cleanup.ident"]</th><th class="cleanup-info">@T["cleanup.info"]</th></tr></thead>
+                <tbody>
+                    @foreach (var c in Model.SelComponents)
+                    {
+                        <tr><td>@c.Name</td><td class="muted mono">@c.Type</td><td class="cleanup-info muted">—</td></tr>
+                    }
+                </tbody>
+            </table>
         }
         @if (Model.SelPlugins.Count > 0)
         {
-            <div class="form-section">
-                <h3>@T["cleanup.plugins"] (@Model.SelPlugins.Count)</h3>
-                <ul>@foreach (var p in Model.SelPlugins) { <li>@p.Name <span class="muted mono">@p.Key</span></li> }</ul>
-            </div>
+            <h3>@T["cleanup.plugins"] <span class="muted">(@Model.SelPlugins.Count)</span></h3>
+            <table class="data cleanup-list">
+                <thead><tr><th>@T["cleanup.name"]</th><th>@T["cleanup.ident"]</th><th class="cleanup-info">@T["cleanup.info"]</th></tr></thead>
+                <tbody>
+                    @foreach (var p in Model.SelPlugins)
+                    {
+                        <tr><td>@p.Name</td><td class="muted mono">@p.Key</td><td class="cleanup-info muted">@(string.IsNullOrWhiteSpace(p.Version) ? "—" : "v" + p.Version)</td></tr>
+                    }
+                </tbody>
+            </table>
         }
 
         <form method="post" asp-page-handler="Delete" onsubmit="return confirm('@T["cleanup.confirmJs"]');">
@@ -70,28 +96,33 @@
             <h2>@T["cleanup.media"] <span class="muted">(@r.UnusedMedia.Count · @Hsize(r.UnusedMediaBytes))</span></h2>
             <div class="help">@T["cleanup.mediaHelp"]</div>
         </div>
-        @if (r.UnusedMedia.Count == 0)
-        {
-            <p class="muted">@T["cleanup.mediaNone"]</p>
-        }
-        else
-        {
-            <label class="checkbox-row"><input type="checkbox" data-check-all="media" checked /> <span>@T["cleanup.selectAll"]</span></label>
-            <table class="data">
-                <thead><tr><th style="width:40px;"></th><th style="width:64px;"></th><th>@T["cleanup.file"]</th><th style="width:100px;">@T["cleanup.size"]</th></tr></thead>
-                <tbody>
-                    @foreach (var m in r.UnusedMedia)
-                    {
-                        <tr>
-                            <td><input type="checkbox" name="mediaIds" value="@m.Id" data-check="media" checked /></td>
-                            <td><img src="@m.Url" alt="" style="width:56px;height:40px;object-fit:cover;border-radius:4px;" loading="lazy" /></td>
-                            <td><span class="mono">@(FileOf(m.Url))</span>@if (!string.IsNullOrWhiteSpace(m.Alt)) { <span class="muted"> — @m.Alt</span> }</td>
-                            <td class="muted mono">@Hsize(m.SizeBytes)</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        }
+        <table class="data cleanup-list">
+            <thead>
+                <tr>
+                    <th class="cleanup-check"><input type="checkbox" data-check-all="media" checked="@(r.UnusedMedia.Count > 0 ? "checked" : null)" title="@T["cleanup.selectAll"]" aria-label="@T["cleanup.selectAll"]" /></th>
+                    <th class="cleanup-thumb"></th>
+                    <th>@T["cleanup.name"]</th>
+                    <th>@T["cleanup.ident"]</th>
+                    <th class="cleanup-info">@T["cleanup.info"]</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (r.UnusedMedia.Count == 0)
+                {
+                    <partial name="_EmptyRow" model='@T["cleanup.mediaNone"]' />
+                }
+                @foreach (var m in r.UnusedMedia)
+                {
+                    <tr>
+                        <td class="cleanup-check"><input type="checkbox" name="mediaIds" value="@m.Id" data-check="media" checked /></td>
+                        <td class="cleanup-thumb"><img src="@m.Url" alt="" loading="lazy" /></td>
+                        <td>@(FileOf(m.Url))</td>
+                        <td class="muted">@m.Alt</td>
+                        <td class="cleanup-info muted mono">@Hsize(m.SizeBytes)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
     </div>
 
     @* ---- Components: unused (no block of this type), pre-ticked ---- *@
@@ -100,18 +131,31 @@
             <h2>@T["cleanup.components"] <span class="muted">(@r.UnusedComponents.Count)</span></h2>
             <div class="help">@T["cleanup.componentsHelp"]</div>
         </div>
-        @if (r.UnusedComponents.Count == 0)
-        {
-            <p class="muted">@T["cleanup.componentsNone"]</p>
-        }
-        else
-        {
-            <label class="checkbox-row"><input type="checkbox" data-check-all="comp" checked /> <span>@T["cleanup.selectAll"]</span></label>
-            @foreach (var c in r.UnusedComponents)
-            {
-                <label class="checkbox-row"><input type="checkbox" name="componentTypes" value="@c.Type" data-check="comp" checked /> <span>@c.Name <span class="muted mono">@c.Type</span></span></label>
-            }
-        }
+        <table class="data cleanup-list">
+            <thead>
+                <tr>
+                    <th class="cleanup-check"><input type="checkbox" data-check-all="comp" checked="@(r.UnusedComponents.Count > 0 ? "checked" : null)" title="@T["cleanup.selectAll"]" aria-label="@T["cleanup.selectAll"]" /></th>
+                    <th>@T["cleanup.name"]</th>
+                    <th>@T["cleanup.ident"]</th>
+                    <th class="cleanup-info">@T["cleanup.info"]</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (r.UnusedComponents.Count == 0)
+                {
+                    <partial name="_EmptyRow" model='@T["cleanup.componentsNone"]' />
+                }
+                @foreach (var c in r.UnusedComponents)
+                {
+                    <tr>
+                        <td class="cleanup-check"><input type="checkbox" name="componentTypes" value="@c.Type" data-check="comp" checked /></td>
+                        <td>@c.Name</td>
+                        <td class="muted mono">@c.Type</td>
+                        <td class="cleanup-info muted">—</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
     </div>
 
     @* ---- Plugins: NO safe auto-detection — manual choice only, never pre-ticked ---- *@
@@ -120,23 +164,34 @@
             <h2>@T["cleanup.plugins"] <span class="muted">(@r.Plugins.Count)</span></h2>
             <div class="help">@T["cleanup.pluginsHelp"]</div>
         </div>
-        @if (r.Plugins.Count == 0)
-        {
-            <p class="muted">@T["cleanup.pluginsNone"]</p>
-        }
-        else
-        {
-            @foreach (var p in r.Plugins)
-            {
-                <label class="checkbox-row">
-                    <input type="checkbox" name="pluginKeys" value="@p.Key" />
-                    <span>@p.Name <span class="muted mono">@p.Key</span>
-                        <span class="badge @(p.Enabled ? "badge-on" : "badge-off")">@(p.Enabled ? T["cleanup.enabled"] : T["cleanup.disabled"])</span>
-                        @if (!string.IsNullOrWhiteSpace(p.Version)) { <span class="muted">v@p.Version</span> }
-                    </span>
-                </label>
-            }
-        }
+        <table class="data cleanup-list">
+            <thead>
+                <tr>
+                    <th class="cleanup-check"><input type="checkbox" data-check-all="plugin" title="@T["cleanup.selectAll"]" aria-label="@T["cleanup.selectAll"]" /></th>
+                    <th>@T["cleanup.name"]</th>
+                    <th>@T["cleanup.ident"]</th>
+                    <th class="cleanup-info">@T["cleanup.info"]</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (r.Plugins.Count == 0)
+                {
+                    <partial name="_EmptyRow" model='@T["cleanup.pluginsNone"]' />
+                }
+                @foreach (var p in r.Plugins)
+                {
+                    <tr>
+                        <td class="cleanup-check"><input type="checkbox" name="pluginKeys" value="@p.Key" data-check="plugin" /></td>
+                        <td>@p.Name</td>
+                        <td class="muted mono">@p.Key</td>
+                        <td class="cleanup-info">
+                            <span class="badge @(p.Enabled ? "badge-on" : "badge-off")">@(p.Enabled ? T["cleanup.enabled"] : T["cleanup.disabled"])</span>
+                            @if (!string.IsNullOrWhiteSpace(p.Version)) { <span class="muted">v@p.Version</span> }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
     </div>
 
     <div class="form-actions">
@@ -146,11 +201,16 @@
 
 @section Scripts {
     <script>
-        // "Select all" toggles per group; each master reflects its group.
+        // "Select all" in each table's header toggles its group; each master reflects its group.
         document.querySelectorAll('[data-check-all]').forEach(function (master) {
             var group = master.getAttribute('data-check-all');
             var boxes = document.querySelectorAll('[data-check="' + group + '"]');
             master.addEventListener('change', function () { boxes.forEach(function (b) { b.checked = master.checked; }); });
+            boxes.forEach(function (b) {
+                b.addEventListener('change', function () {
+                    master.checked = Array.prototype.every.call(boxes, function (x) { return x.checked; });
+                });
+            });
         });
     </script>
 }

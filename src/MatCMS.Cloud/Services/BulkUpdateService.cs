@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 namespace MatCMS.Cloud.Services;
 
 /// <summary>
-/// Runs a "update all local instances" job in the background and exposes its live progress, so the UI
+/// Runs an "update all instances the cloud can reach" job (its own host and connected nodes) in the background and exposes its live progress, so the UI
 /// can show a per-instance status (from → to) and an overall bar while the updates run one after
 /// another. A singleton: one job's state has to outlive the request that started it and be readable by
 /// the polling requests that follow.
@@ -73,7 +73,9 @@ public class BulkUpdateService
         {
             using var scope = _scopes.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var instances = scope.ServiceProvider.GetRequiredService<InstanceService>();
+            // The same update the Hosting tab runs — on the cloud's own daemon OR through a node's agent — so a
+            // bulk run and a single click can never differ in guards, rollback or bookkeeping.
+            var hosting = scope.ServiceProvider.GetRequiredService<HostingActionsService>();
             var latest = _releases.LatestVersion ?? "?";
 
             var list = await db.Instances
@@ -88,33 +90,19 @@ public class BulkUpdateService
             {
                 var item = run.Items.First(x => x.PublicId == i.PublicId);
 
-                if (i.Hosting != InstanceHosting.Local || i.ContainerId is null)
+                if (!HostingActionsService.CanAct(i))
                 {
                     item.Status = "skipped";
-                    item.Message = "Läuft nicht auf diesem Docker-Host.";
+                    item.Message = "Läuft weder auf diesem Docker-Host noch auf einem verbundenen Node.";
                     continue;
                 }
 
                 item.Status = "updating";
                 try
                 {
-                    var result = await _docker.UpdateContainerAsync(i.ContainerId);
-                    if (result.Ok)
-                    {
-                        item.Status = "done";
-                        item.Message = result.Message;
-                        // Same optimistic bump as the single update: the container is on the new image
-                        // but has not beaten back yet, so move the version forward now.
-                        i.Version = latest;
-                        instances.Log(i, InstanceEventKind.UpdateSucceeded, result.Message, notified: true);
-                    }
-                    else
-                    {
-                        item.Status = "failed";
-                        item.Message = result.Message;
-                        instances.Log(i, InstanceEventKind.UpdateFailed, result.Message, notified: true);
-                    }
-                    await db.SaveChangesAsync();
+                    var result = await hosting.UpdateAsync(i);
+                    item.Status = result.Ok ? "done" : "failed";
+                    item.Message = result.Message;
                 }
                 catch (Exception ex)
                 {

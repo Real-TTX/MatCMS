@@ -28,12 +28,13 @@ public class UpdateAllModel : PageModel
     public string? LatestVersion => _releases.LatestVersion;
     public string? RunId { get; private set; }
 
-    /// <summary>Approved, LOCAL (updatable by the cloud) instances that are behind the latest release.</summary>
+    /// <summary>Approved instances the cloud can update itself — on its own host or through a node — that are behind
+    /// the latest release.</summary>
     private async Task<List<Instance>> LoadCandidatesAsync()
     {
         var local = await _db.Instances.AsNoTracking()
             .Where(i => i.Status == InstanceStatus.Approved
-                        && i.Hosting == InstanceHosting.Local && i.ContainerId != null)
+                        && (i.Hosting == InstanceHosting.Local || (i.Hosting == InstanceHosting.Node && i.NodeId != null)) && i.ContainerId != null)
             .OrderBy(i => i.Name)
             .ToListAsync();
         return local.Where(i => _instances.IsUpdateAvailable(i)).ToList();

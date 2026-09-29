@@ -71,6 +71,8 @@ public class InstanceMonitorService : BackgroundService
         var instances = sp.GetRequiredService<InstanceService>();
         var releases = sp.GetRequiredService<ReleaseWatcher>();
         var docker = sp.GetRequiredService<DockerHostService>();
+        // Auto-update runs the SAME update as the Hosting tab — here or through a node's agent.
+        var hosting = sp.GetRequiredService<HostingActionsService>();
         var mail = sp.GetRequiredService<EmailService>();
         var removals = sp.GetRequiredService<InstanceRemovalService>();
 
@@ -172,23 +174,18 @@ public class InstanceMonitorService : BackgroundService
                     updates.Add((instance.Name, instance.Version, instance.Hosting, policy.Recipients));
             }
 
-            // --- 3) auto-update (local only, opt-in) ------------------------
+            // --- 3) auto-update (this host or a node, opt-in) ---------------
             // Attempted ONCE per available version. "Update available" stays true until the instance
             // has restarted and reported its new version, so without the mark this would re-run the
             // update — and mail about every failure — on every 60 s tick, forever.
-            if (autoUpdate && instance.Hosting == InstanceHosting.Local
-                && instance.ContainerId is not null && instances.IsUpdateAvailable(instance)
+            if (autoUpdate && HostingActionsService.CanAct(instance) && instances.IsUpdateAvailable(instance)
                 && instance.AutoUpdateAttemptedVersion != latest)
             {
                 instance.AutoUpdateAttemptedVersion = latest;
-                instances.Log(instance, InstanceEventKind.UpdateStarted,
-                    $"Automatisches Update auf {latest} gestartet.", notified: true);
                 await db.SaveChangesAsync(ct);
 
-                var result = await docker.UpdateContainerAsync(instance.ContainerId, ct);
-                instances.Log(instance,
-                    result.Ok ? InstanceEventKind.UpdateSucceeded : InstanceEventKind.UpdateFailed,
-                    result.Message, notified: true);
+                // Logs started/succeeded/failed itself, and moves the version forward on success.
+                var result = await hosting.UpdateAsync(instance, ct);
 
                 // Cleared on success so the next release is attempted again; kept on failure so a
                 // broken update is reported once and then left to a human.

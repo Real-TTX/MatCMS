@@ -1,0 +1,71 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.Cleanup.IndexModel
+@{
+    ViewData["Title"] = T["cleanup.title"];
+    string Kb(long b) => b >= 1048576 ? $"{b / 1048576.0:0.#} MB" : $"{Math.Round(b / 1024.0)} KB";
+}
+<div class="page-head">
+    <h1>@T["cleanup.title"]</h1>
+    <div class="list-toolbar">
+        <form method="post" asp-page-handler="AnalyzeAll" class="inline-form">
+            <button type="submit" class="btn">@T["cleanup.analyzeAll"]</button>
+        </form>
+    </div>
+</div>
+<p class="muted">@T["cleanup.fleetIntro"]</p>
+
+<table class="data">
+    <thead>
+        <tr>
+            <th>@T["cleanup.instance"]</th>
+            <th>@T["cleanup.analysis"]</th>
+            <th style="width:120px;">@T["cleanup.media"]</th>
+            <th style="width:110px;">@T["cleanup.components"]</th>
+            <th style="width:90px;">@T["cleanup.plugins"]</th>
+            <th style="width:200px;"></th>
+        </tr>
+    </thead>
+    <tbody>
+        @if (Model.Rows.Count == 0)
+        {
+            <partial name="_EmptyRow" model='@T["cleanup.noInstances"]' />
+        }
+        @foreach (var r in Model.Rows)
+        {
+            <tr>
+                <td>@r.Name @if (!r.Approved) { <span class="badge badge-off">@T["cleanup.notApproved"]</span> }</td>
+                <td>
+                    @switch (r.State)
+                    {
+                        case "done": <span class="muted mono" title="@r.AnalyzedAt?.ToLocalTime()">@r.AnalyzedAt?.ToLocalTime().ToString("dd.MM. HH:mm")</span>; break;
+                        case "pending": <span class="badge badge-new">@T["cleanup.stPending"]</span>; break;
+                        case "failed": <span class="badge badge-err" title="@r.Detail">@T["cleanup.stFailed"]</span>; break;
+                        default: <span class="muted">@T["cleanup.stNone"]</span>; break;
+                    }
+                </td>
+                <td>@if (r.State == "done") { <text>@r.Media <span class="muted">(@Kb(r.MediaBytes))</span></text> } else { <text>–</text> }</td>
+                <td>@(r.State == "done" ? r.Comps.ToString() : "–")</td>
+                <td>@(r.State == "done" ? r.Plugins.ToString() : "–")</td>
+                <td>
+                    <div class="actions">
+                        @if (r.State == "done" && (r.Media > 0 || r.Comps > 0 || r.Plugins > 0))
+                        {
+                            <a class="btn btn-sm" asp-page="Instance" asp-route-publicId="@r.PublicId">@T["cleanup.review"]</a>
+                        }
+                        @if (r.ApplyPending)
+                        {
+                            <span class="badge badge-new">@T["cleanup.applyPending"]</span>
+                        }
+                        @if (r.Approved)
+                        {
+                            <form method="post" asp-page-handler="AnalyzeOne" class="inline-form">
+                                <input type="hidden" name="publicId" value="@r.PublicId" />
+                                <button type="submit" class="btn btn-sm btn-ghost">@T["cleanup.analyzeOne"]</button>
+                            </form>
+                        }
+                    </div>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>

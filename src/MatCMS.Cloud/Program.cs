@@ -117,6 +117,9 @@ builder.Services.AddScoped<CloudUpdaterService>();
 builder.Services.AddScoped<MatCMS.Cloud.Services.Proxy.ProxyService>();
 builder.Services.AddScoped<MatCMS.Cloud.Services.Nodes.NodeService>();
 builder.Services.AddSingleton<MatCMS.Cloud.Services.Nodes.NodeSignal>();
+builder.Services.AddScoped<MatCMS.Cloud.Services.Nodes.MigrationService>();
+builder.Services.AddSingleton<MatCMS.Cloud.Services.Nodes.MigrationQueue>();
+builder.Services.AddHostedService<MatCMS.Cloud.Services.Nodes.MigrationWorker>();
 builder.Services.AddScoped<MailSpool>();
 builder.Services.AddScoped<BackupStore>();
 // Used by the confirmation page AND by the watchdog that completes a delayed removal — which is

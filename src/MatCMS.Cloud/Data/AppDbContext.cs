@@ -35,6 +35,8 @@ public class AppDbContext : DbContext
     // Hosting increment 4: remote Docker hosts (node-agents) and the jobs they pull.
     public DbSet<Node> Nodes => Set<Node>();
     public DbSet<NodeJob> NodeJobs => Set<NodeJob>();
+    // Hosting increment 5: moves between hosts.
+    public DbSet<InstanceMigration> InstanceMigrations => Set<InstanceMigration>();
 
     // Per-user instance scope for the "Operator" role (login users, not API keys).
     public DbSet<UserInstance> UserInstances => Set<UserInstance>();
@@ -133,6 +135,11 @@ public class AppDbContext : DbContext
             .HasOne(j => j.Node).WithMany()
             .HasForeignKey(j => j.NodeId).OnDelete(DeleteBehavior.Cascade);
         b.Entity<NodeJob>().HasIndex(j => new { j.NodeId, j.State });
+        b.Entity<InstanceMigration>()
+            .HasOne(m => m.Instance).WithMany()
+            .HasForeignKey(m => m.InstanceId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<InstanceMigration>().HasIndex(m => new { m.InstanceId, m.State });
+        b.Entity<InstanceMigration>().HasIndex(m => m.TransferId);
         // Deleting a node forgets where its instances ran; the instances themselves stay (they are sites,
         // not the node's property) and fall back to remote on their next beat.
         b.Entity<Instance>()

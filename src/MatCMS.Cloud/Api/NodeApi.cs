@@ -45,6 +45,35 @@ public static class NodeApi
             return Results.Ok(await nodes.HeartbeatAsync(node, req, ctx.RequestAborted));
         }).RequireRateLimiting("nodeApi").DisableAntiforgery();
 
+        // ---- Data transfer of a move (increment 5) ----------------------------------------------------------
+        // Still outbound only: the SOURCE agent uploads, the TARGET agent downloads. Each is allowed exactly for
+        // the one running move it takes part in, and only in its own role — a node cannot read another site's data.
+        app.MapPut("/api/nodes/{publicId}/transfers/{transferId}", async (HttpContext ctx, string publicId, string transferId,
+            NodeService nodes, AppDbContext db) =>
+        {
+            var node = await nodes.AuthenticateAsync(publicId, ctx.Request.Headers[NodeProtocol.TokenHeader].ToString(), ctx.RequestAborted);
+            if (node is null || node.Revoked) return Results.Unauthorized();
+            var ok = await db.InstanceMigrations.AnyAsync(m => m.TransferId == transferId && m.State == "running" && m.FromNodeId == node.Id);
+            if (!ok) return Results.NotFound();
+            // A site's data volume dwarfs Kestrel's default body cap.
+            var size = ctx.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>();
+            if (size is { IsReadOnly: false }) size.MaxRequestBodySize = null;
+            var bytes = await new FileNodeTransfer().UploadAsync(transferId, ctx.Request.Body, ctx.RequestAborted);
+            return Results.Ok(new { bytes });
+        }).RequireRateLimiting("nodeApi").DisableAntiforgery();
+
+        app.MapGet("/api/nodes/{publicId}/transfers/{transferId}", async (HttpContext ctx, string publicId, string transferId,
+            NodeService nodes, AppDbContext db) =>
+        {
+            var node = await nodes.AuthenticateAsync(publicId, ctx.Request.Headers[NodeProtocol.TokenHeader].ToString(), ctx.RequestAborted);
+            if (node is null || node.Revoked) return Results.Unauthorized();
+            var ok = await db.InstanceMigrations.AnyAsync(m => m.TransferId == transferId && m.State == "running" && m.ToNodeId == node.Id);
+            if (!ok) return Results.NotFound();
+            var path = FileNodeTransfer.PathFor(transferId);
+            if (!File.Exists(path)) return Results.NotFound();
+            return Results.File(path, "application/x-tar");
+        }).RequireRateLimiting("nodeApi");
+
         // ---- Operator REST ----------------------------------------------------------------------------------
         app.MapGet("/api/v1/nodes", async (HttpContext ctx, ApiKeyService keys, AppDbContext db, DockerHostService docker,
             Services.Proxy.ProxyService proxy) =>

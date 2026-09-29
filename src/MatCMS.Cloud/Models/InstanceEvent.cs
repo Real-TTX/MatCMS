@@ -60,7 +60,11 @@ public enum InstanceEventKind
     /// proxy call failed. Its own kinds: a domain change moves where a customer's site is reachable.</summary>
     DomainPublished = 27,
     DomainUnpublished = 28,
-    DomainFailed = 29
+    DomainFailed = 29,
+    // Hosting increment 5: moving between hosts.
+    MigrationStarted = 30,
+    MigrationSucceeded = 31,
+    MigrationFailed = 32
 }
 
 /// <summary>Audit trail per instance: what happened, and whether a notification went out for it.

@@ -37,7 +37,9 @@ public static class NodeAgentRunner
             .AddEnvironmentVariables().Build();
         using var loggers = LoggerFactory.Create(b => b.AddSimpleConsole(o => { o.SingleLine = true; o.TimestampFormat = "HH:mm:ss "; }));
         var log = loggers.CreateLogger("NodeAgent");
-        var docker = new DockerHostService(dockerConfig, loggers.CreateLogger<DockerHostService>());
+        // A FRESH engine (and Docker client) per beat and per job — see DockerHostService.Dispose: a client whose
+        // connection pool got stuck once would otherwise silence the agent for good.
+        DockerHostService NewDocker() => new(dockerConfig, loggers.CreateLogger<DockerHostService>());
 
         var version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "local";
         var plus = version.IndexOf('+'); if (plus > 0) version = version[..plus];
@@ -46,6 +48,10 @@ public static class NodeAgentRunner
         using var cloud = new HttpClient { Timeout = NodeProtocol.LongPoll + TimeSpan.FromSeconds(20) };
         cloud.DefaultRequestHeaders.Add(NodeProtocol.TokenHeader, token);
         using var proxyHttp = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+        // Moving a site streams its whole data volume — no fixed timeout; the job's own cancellation ends it.
+        using var transferHttp = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+        transferHttp.DefaultRequestHeaders.Add(NodeProtocol.TokenHeader, token);
+        var transfer = new HttpNodeTransfer(transferHttp, cloudUrl, nodeId);
         var url = $"{cloudUrl}/api/nodes/{Uri.EscapeDataString(nodeId)}/heartbeat";
 
         var reports = new ConcurrentQueue<NodeJobReport>();
@@ -55,13 +61,20 @@ public static class NodeAgentRunner
 
         while (!stop.IsCancellationRequested)
         {
-            var (dockerVersion, hostName, dockerError) = await docker.DaemonInfoAsync(stop);
+            // Bounded: a daemon call that never returns must not silence the agent — it then beats WITHOUT an
+            // inventory and reports why, instead of disappearing from the cloud.
+            using var docker = NewDocker();
+            using var dockerCts = CancellationTokenSource.CreateLinkedTokenSource(stop);
+            dockerCts.CancelAfter(TimeSpan.FromSeconds(20));
+            string? dockerVersion = null, hostName = null, dockerError;
+            try { (dockerVersion, hostName, dockerError) = await docker.DaemonInfoAsync(dockerCts.Token); }
+            catch (OperationCanceledException) when (!stop.IsCancellationRequested) { dockerError = "Docker-Daemon antwortet nicht (20 s)."; }
             List<NodeContainer>? containers = null;
             if (dockerError is null)
             {
                 try
                 {
-                    containers = (await docker.ListMatCmsContainersAsync(stop) ?? new())
+                    containers = (await docker.ListMatCmsContainersAsync(dockerCts.Token) ?? new())
                         .Select(c => new NodeContainer { Id = c.Id, Name = c.Name, Image = c.Image, State = c.State, PublishedPort = c.PublishedPort, CloudManaged = c.CloudManaged })
                         .ToList();
                 }
@@ -104,7 +117,8 @@ public static class NodeAgentRunner
                     log.LogInformation("Auftrag {Id}: {Kind}", job.Id, job.Kind);
                     _ = Task.Run(async () =>
                     {
-                        var rep = await NodeJobExecutor.ExecuteAsync(job, docker, proxyHttp, stop);
+                        using var jobDocker = NewDocker();
+                        var rep = await NodeJobExecutor.ExecuteAsync(job, jobDocker, proxyHttp, transfer, stop);
                         log.LogInformation("Auftrag {Id} {Result}: {Message}", job.Id, rep.Ok ? "ok" : "FEHLER", rep.Message);
                         reports.Enqueue(rep);
                         var old = Interlocked.Exchange(ref wake, new CancellationTokenSource());

@@ -557,6 +557,22 @@ public class InstanceService
 
         var container = await _docker.FindContainerAsync(instance.ContainerId, ct);
         var onNode = container is null ? await FindOnNodeAsync(instance.ContainerId, ct) : null;
+
+        // Fallback: the reported id matches nothing, but the host name is Docker's SHORT container id. Older
+        // instances read the first 64-hex from mountinfo, which under nested Docker (dind, some LXC/VM setups)
+        // is an OUTER volume id — the site then looked unmanageable although its container was right there.
+        var shortId = instance.HostName?.Trim().ToLowerInvariant();
+        if (container is null && onNode is null && shortId is { Length: 12 } && shortId.All(Uri.IsHexDigit)
+            && !string.Equals(shortId, instance.ContainerId, StringComparison.OrdinalIgnoreCase))
+        {
+            container = await _docker.FindContainerAsync(shortId, ct);
+            onNode = container is null ? await FindOnNodeAsync(shortId, ct) : null;
+        }
+
+        // What the cloud acts on from here is the id the DAEMON confirmed — not a guess the instance made.
+        if (container is not null) instance.ContainerId = container.Id;
+        else if (onNode is { } confirmed) instance.ContainerId = confirmed.Container.Id;
+
         if (container is not null)
         {
             instance.Hosting = InstanceHosting.Local;

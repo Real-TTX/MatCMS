@@ -18,7 +18,7 @@ namespace MatCMS.Cloud.Services;
 /// unreachable) every method degrades gracefully and every instance stays remote — the cloud then
 /// only notifies.</para>
 /// </summary>
-public class DockerHostService
+public class DockerHostService : IDisposable
 {
     private readonly ILogger<DockerHostService> _log;
     private readonly string _endpoint;
@@ -29,9 +29,18 @@ public class DockerHostService
     {
         _log = log;
         _endpoint = (config["MatCmsCloud:Docker:Endpoint"] ?? "").Trim();
+        // Docker.DotNet 3.125 HANGS on "tcp://host:2375" (the notation every Docker doc uses) — no error, no
+        // timeout; found when a node-agent talked to a remote daemon and never beat. "http://" is the same thing
+        // without TLS and works, so the familiar form is accepted and translated.
+        if (_endpoint.StartsWith("tcp://", StringComparison.OrdinalIgnoreCase))
+            _endpoint = "http://" + _endpoint[6..];
     }
 
     public bool Configured => _endpoint.Length > 0;
+
+    /// <summary>The cloud keeps one instance for its lifetime; the node-agent uses one per beat and per job, so a
+    /// connection pool that got stuck (seen after an archive extract over http) dies with its client.</summary>
+    public void Dispose() => _client?.Dispose();
 
     /// <summary>
     /// The label <see cref="HostingService"/> stamps on every container the cloud creates ITSELF.
@@ -209,6 +218,77 @@ public class DockerHostService
         return null;
     }
 
+    // ---- Moving an instance between hosts (Hosting increment 5) -----------------------------------------
+    //
+    // A move copies the DATA VOLUME 1:1 rather than going through backup/restore: a backup restored into a
+    // fresh container keeps the FRESH container's cloud link (ContentTransferService preserves cloud.*), so the
+    // site would come back as a new instance. The volume carries its own link, so the same instance simply beats
+    // from the new host and the cloud reclassifies it. The source is stopped before the export, which makes the
+    // copy consistent (SQLite) and guarantees the identity never runs twice.
+
+    /// <summary>What the target needs to rebuild the container: taken from the SOURCE container itself.</summary>
+    public sealed record ExportInfo(string Image, List<string> Env, string Name, string Volume, long Bytes);
+
+    /// <summary>Writes a tar of the instance's <c>/app/appdata</c> to <paramref name="sink"/>. The container must be
+    /// stopped (refused otherwise — a running SQLite database would be copied mid-write) and must be ours: only
+    /// a container carrying <see cref="ManagedLabel"/> is moved, because the move retires or removes it.</summary>
+    public async Task<(bool Ok, string Message, ExportInfo? Info)> ExportDataAsync(string containerId, Func<Stream, CancellationToken, Task<long>> sink, CancellationToken ct = default)
+    {
+        var client = Client;
+        if (client is null) return (false, "Kein Docker-Zugriff konfiguriert.", null);
+        ContainerInspectResponse insp;
+        try { insp = await client.Containers.InspectContainerAsync(containerId, ct); }
+        catch (Exception ex) { return (false, $"Container nicht gefunden: {ex.Message}", null); }
+        var labels = insp.Config?.Labels;
+        if (!LooksLikeMatCms(insp.Config?.Image ?? "", labels))
+            return (false, $"Abgelehnt: '{insp.Config?.Image}' sieht nicht nach einer MatCMS-Instanz aus.", null);
+        if (labels is null || !labels.TryGetValue(ManagedLabel, out var flag) || !string.Equals(flag, "true", StringComparison.OrdinalIgnoreCase))
+            return (false, "Dieser Container wurde nicht von dieser Cloud angelegt und wird nicht umgezogen.", null);
+        if (insp.State?.Running == true)
+            return (false, "Der Container läuft noch — er muss für den Umzug gestoppt sein.", null);
+        var volume = insp.Mounts?.FirstOrDefault(m => m.Destination == ContainerDataDir && string.Equals(m.Type, "volume", StringComparison.OrdinalIgnoreCase))?.Name;
+        if (string.IsNullOrEmpty(volume))
+            return (false, $"Unter {ContainerDataDir} hängt kein benannter Datenträger — nichts, was sich umziehen ließe.", null);
+
+        try
+        {
+            var archive = await client.Containers.GetArchiveFromContainerAsync(insp.ID,
+                new GetArchiveFromContainerParameters { Path = ContainerDataDir }, false, ct);
+            await using var tar = archive.Stream;
+            var bytes = await sink(tar, ct);
+            return (true, $"Daten exportiert ({(bytes >= 1 << 20 ? $"{bytes / 1048576.0:0.0} MB" : $"{bytes / 1024} KB")}).",
+                new ExportInfo(insp.Config?.Image ?? "", insp.Config?.Env?.ToList() ?? new(), (insp.Name ?? "").TrimStart('/'), volume, bytes));
+        }
+        catch (Exception ex) { return (false, "Export fehlgeschlagen: " + ex.Message, null); }
+    }
+
+    /// <summary>
+    /// Retires the old copy after a move: renamed (<c>&lt;name&gt;-moved-&lt;date&gt;</c>, frees the name) and its
+    /// restart policy set to "no", so neither a host reboot nor Docker ever starts it again — two containers
+    /// with the same cloud identity would fight over the instance record. Its volume stays: nothing is deleted
+    /// that the operator did not ask to delete.
+    /// </summary>
+    public async Task<ContainerActionResult> RetireContainerAsync(string containerId, CancellationToken ct = default)
+    {
+        var client = Client;
+        if (client is null) return new(false, "Kein Docker-Zugriff konfiguriert.");
+        ContainerInspectResponse insp;
+        try { insp = await client.Containers.InspectContainerAsync(containerId, ct); }
+        catch (Exception ex) { return new(false, $"Container nicht gefunden: {ex.Message}"); }
+        if (!LooksLikeMatCms(insp.Config?.Image ?? "", insp.Config?.Labels))
+            return new(false, $"Abgelehnt: '{insp.Config?.Image}' sieht nicht nach einer MatCMS-Instanz aus.");
+        try
+        {
+            if (insp.State?.Running == true)
+                await client.Containers.StopContainerAsync(insp.ID, new ContainerStopParameters { WaitBeforeKillSeconds = 15 }, ct);
+            await client.Containers.UpdateContainerAsync(insp.ID, new ContainerUpdateParameters { RestartPolicy = new RestartPolicy { Name = RestartPolicyKind.No } }, ct);
+            var newName = $"{(insp.Name ?? "").TrimStart('/')}-moved-{DateTime.UtcNow:yyyyMMddHHmm}";
+            await client.Containers.RenameContainerAsync(insp.ID, new ContainerRenameParameters { NewName = newName }, ct);
+            return new(true, $"Alte Kopie stillgelegt als „{newName}“ (gestoppt, startet nicht mehr von selbst; Datenträger bleibt).");
+        }
+        catch (Exception ex) { return new(false, "Stilllegen fehlgeschlagen: " + ex.Message); }
+    }
+
     /// <summary>What a new instance container is made of. The name is decided by the cloud (its naming pattern);
     /// labels and the port are decided HERE, on the host that owns them.</summary>
     public sealed record InstanceContainerSpec(string ContainerName, string VolumeName, string Image, List<string> Env,
@@ -222,12 +302,24 @@ public class DockerHostService
     /// the right name would block the next attempt. The volume is deliberately kept: it may hold site data
     /// from the first second, and deleting data is no job for an error path.
     /// </summary>
-    public async Task<CreateContainerResult> CreateInstanceContainerAsync(InstanceContainerSpec spec, CancellationToken ct = default)
+    public async Task<CreateContainerResult> CreateInstanceContainerAsync(InstanceContainerSpec spec, CancellationToken ct = default,
+        Func<CancellationToken, Task<Stream>>? seed = null)
     {
         var client = Client;
         if (client is null) return new(false, "Docker ist nicht erreichbar.", null, null, null);
         if (!LooksLikeMatCms(spec.Image, null))
             return new(false, $"Abgelehnt: '{spec.Image}' ist kein MatCMS-Image.", null, null, null);
+        // A move seeds the volume with the old site's data. Into an EXISTING volume that would lay one site's
+        // files over another's — so a seeded create insists on a volume that does not exist yet.
+        if (seed is not null)
+        {
+            try
+            {
+                await client.Volumes.InspectAsync(spec.VolumeName, ct);
+                return new(false, $"Der Datenträger „{spec.VolumeName}“ existiert auf diesem Host schon (eine alte Kopie?) — erst entfernen.", null, null, null);
+            }
+            catch (DockerApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound) { }
+        }
 
         var port = await NextFreePortAsync(spec.PortFrom, spec.PortTo, ct);
         if (port is null) return new(false, $"Kein freier Port zwischen {spec.PortFrom} und {spec.PortTo}.", null, null, null);
@@ -236,7 +328,13 @@ public class DockerHostService
         try
         {
             // Pull first — otherwise creating fails with a message that reads like a bad call, not a missing image.
-            await client.Images.CreateImageAsync(new ImagesCreateParameters { FromImage = spec.Image }, null, new Progress<JSONMessage>(), ct);
+            // A moved site keeps its image, which may be a tag no registry knows (a local build) — then an image
+            // already present on this host is good enough.
+            try { await client.Images.CreateImageAsync(new ImagesCreateParameters { FromImage = spec.Image }, null, new Progress<JSONMessage>(), ct); }
+            catch (Exception) when (seed is not null)
+            {
+                if (!await ImageExistsAsync(client, spec.Image, ct)) throw;
+            }
 
             var labels = new Dictionary<string, string>
             {
@@ -269,6 +367,13 @@ public class DockerHostService
                 },
             }, ct);
             createdId = created.ID;
+            if (seed is not null)
+            {
+                // The archive of /app/appdata starts with "appdata/", so it is unpacked into /app — into the
+                // created, not yet started container, whose volume is mounted there already.
+                await using var tar = await seed(ct);
+                await client.Containers.ExtractArchiveToContainerAsync(createdId, new ContainerPathStatParameters { Path = "/app" }, tar, ct);
+            }
             await client.Containers.StartContainerAsync(createdId, new ContainerStartParameters(), ct);
             _log.LogInformation("Instanz {Name} angelegt: Container {Id} auf Port {Port}.", spec.ContainerName, createdId, port);
             return new(true, null, createdId, port, spec.ContainerName);
@@ -280,6 +385,12 @@ public class DockerHostService
             {
                 try { await client.Containers.RemoveContainerAsync(createdId, new ContainerRemoveParameters { Force = true }, CancellationToken.None); }
                 catch (Exception cleanup) { _log.LogWarning(cleanup, "Der halb gebaute Container {Id} blieb stehen.", createdId); }
+                // The one exception to "an error path deletes no data": a SEEDED volume was created by this very
+                // call (it was checked not to exist) and holds only a COPY — the original is untouched on the
+                // source. Left behind it would block every retry of the move.
+                if (seed is not null)
+                    try { await client.Volumes.RemoveAsync(spec.VolumeName, force: false, CancellationToken.None); }
+                    catch (Exception cleanup) { _log.LogWarning(cleanup, "Der Datenträger {Volume} der fehlgeschlagenen Übernahme blieb stehen.", spec.VolumeName); }
             }
             return new(false, ex.Message, null, null, null);
         }
@@ -1201,6 +1312,11 @@ public class DockerHostService
     {
         var s = (id ?? "").Replace("sha256:", "", StringComparison.OrdinalIgnoreCase);
         return s.Length > 12 ? s[..12] : s;
+    }
+
+    private static async Task<bool> ImageExistsAsync(DockerClient client, string image, CancellationToken ct)
+    {
+        try { await client.Images.InspectImageAsync(image, ct); return true; } catch { return false; }
     }
 
     /// <summary>Safety guard for the destructive path: the image name (or a compose service label)

@@ -21,11 +21,31 @@ public class NodeService
     private readonly CloudContext _cloud;
     private readonly IHttpContextAccessor _http;
     private readonly ILogger<NodeService> _log;
+    private readonly DockerHostService _docker;
+    private readonly IHttpClientFactory _httpFactory;
 
     public NodeService(AppDbContext db, SecretProtector secrets, NodeSignal signal, CloudContext cloud,
-        IHttpContextAccessor http, ILogger<NodeService> log)
+        IHttpContextAccessor http, ILogger<NodeService> log, DockerHostService docker, IHttpClientFactory httpFactory)
     {
         _db = db; _secrets = secrets; _signal = signal; _cloud = cloud; _http = http; _log = log;
+        _docker = docker; _httpFactory = httpFactory;
+    }
+
+    /// <summary>
+    /// Runs a job on <paramref name="node"/> — or, for null, on "Dieser Host": the SAME executor in-process, with
+    /// the cloud's own daemon and the transfer file written directly. Lets code that spans two hosts (moving a
+    /// site) stay one code path instead of a branch per host.
+    /// </summary>
+    public async Task<JobOutcome> RunOnAsync(Node? node, string kind, object payload, int? instanceId, TimeSpan timeout, CancellationToken ct = default)
+    {
+        if (node is not null) return await RunAsync(node, kind, payload, instanceId, timeout, ct);
+        var http = _httpFactory.CreateClient("proxy");
+        http.Timeout = TimeSpan.FromSeconds(15);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(timeout);
+        var r = await NodeJobExecutor.ExecuteAsync(new NodeJobOffer { Kind = kind, PayloadJson = NodeJobExecutor.Serialize(payload) },
+            _docker, http, new FileNodeTransfer(), cts.Token);
+        return new(true, r.Ok, r.Message ?? "", r.ResultJson, 0);
     }
 
     // ---- Enrolment & configuration ----------------------------------------------------------------
@@ -281,9 +301,14 @@ public class NodeService
     /// </summary>
     public async Task<JobOutcome> RunAsync(Node node, string kind, object payload, int? instanceId, TimeSpan timeout, CancellationToken ct = default)
     {
-        if (node.Revoked) return new(true, false, $"Node „{node.Name}“ ist gesperrt.", null, 0);
-        if (!node.IsOnline(DateTime.UtcNow))
-            return new(true, false, $"Node „{node.Name}“ ist nicht verbunden (zuletzt gesehen: {(node.LastSeenAt?.ToLocalTime().ToString("dd.MM. HH:mm") ?? "nie")}).", null, 0);
+        // Read the node's state FRESH: callers may hold the entity for minutes (a move loads it once at the
+        // start), and a stale LastSeenAt declared a perfectly connected node "nicht verbunden" mid-move.
+        var fresh = await _db.Nodes.AsNoTracking().Where(n => n.Id == node.Id)
+            .Select(n => new { n.Revoked, n.LastSeenAt }).FirstOrDefaultAsync(ct);
+        if (fresh is null) return new(true, false, $"Node „{node.Name}“ ist nicht mehr eingetragen.", null, 0);
+        if (fresh.Revoked) return new(true, false, $"Node „{node.Name}“ ist gesperrt.", null, 0);
+        if (!(fresh.LastSeenAt is { } seen && DateTime.UtcNow - seen < Node.OfflineAfter))
+            return new(true, false, $"Node „{node.Name}“ ist nicht verbunden (zuletzt gesehen: {(fresh.LastSeenAt?.ToLocalTime().ToString("dd.MM. HH:mm") ?? "nie")}).", null, 0);
 
         var job = await EnqueueAsync(node, kind, payload, instanceId, ct);
         var done = _signal.JobTask(job.Id);

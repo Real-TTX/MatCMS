@@ -218,6 +218,25 @@ public class ProxyService
         return new(true, $"Domain „{old}“ entfernt.{note}");
     }
 
+    /// <summary>
+    /// After a move: the route leaves with the site. The old route is deleted on the OLD host first, then the
+    /// domain is published on the host the instance now runs on (<paramref name="inst"/> is already classified
+    /// there). That order is deliberate: when both hosts share one proxy, publishing first would update the
+    /// very route (same id) the delete would then remove.
+    /// </summary>
+    public async Task<PublishResult> MoveRouteAsync(Instance inst, Node? from, CancellationToken ct = default)
+    {
+        if (inst.ProxyDomain is not { } domain) return new(true, "Keine Domain.");
+        if (inst.ProxyRouteId is not null && inst.ProxyProvider is not null)
+        {
+            var r = await RunAsync(from, s => new ProxyOp("delete", s, Kind: inst.ProxyProvider, RouteId: inst.ProxyRouteId), inst.Id, ct);
+            if (!r.Ok) return new(false, "Alte Route nicht entfernt: " + r.Message);
+        }
+        inst.ProxyRouteId = null;
+        inst.ProxyProvider = null;
+        return await PublishAsync(inst, domain, pushCanonical: false, ct);
+    }
+
     public sealed record DomainStatus(string? Domain, string? Provider, string? RouteId, string? Error, DateTime? PublishedAt, bool? RouteExists);
 
     public async Task<DomainStatus> StatusAsync(Instance inst, bool checkProvider, CancellationToken ct = default)

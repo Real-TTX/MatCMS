@@ -151,6 +151,40 @@ public static class HostingApi
                 : Results.Json(new { ok = false, error = r.Message }, statusCode: StatusCodes.Status409Conflict);
         }).RequireRateLimiting("operatorApi");
 
+        // ---- Moving between hosts (increment 5) ---------------------------------------------------------
+        app.MapPost("/api/v1/instances/{publicId}/migrate", async (HttpContext ctx, string publicId, MigrateDto b,
+            ApiKeyService keys, AppDbContext db, Services.Nodes.MigrationService migrations) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireHosting(key!) is { } g) return g;
+            // Removing the old copy deletes its data volume — the destructive half needs the restore right too.
+            if (b.RemoveSource == true && !key!.CanRestore)
+                return Results.Json(new { error = "Die alte Kopie entfernen braucht zusätzlich das Wiederherstellen-Recht." }, statusCode: StatusCodes.Status403Forbidden);
+            var inst = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == publicId);
+            if (inst is null || !ApiKeyService.CanAccess(key!, inst)) return NotFoundInstance();
+            Node? node = null;
+            if (!string.IsNullOrWhiteSpace(b.Target) && b.Target != "local")
+            {
+                node = await db.Nodes.FirstOrDefaultAsync(n => n.PublicId == b.Target);
+                if (node is null) return Results.Json(new { error = "Ziel-Node nicht gefunden." }, statusCode: StatusCodes.Status404NotFound);
+            }
+            var (m, err) = await migrations.StartAsync(inst, node, b.RemoveSource ?? false, "api:" + key!.Name, ctx.RequestAborted);
+            return m is null
+                ? Results.Json(new { ok = false, error = err }, statusCode: StatusCodes.Status409Conflict)
+                : Results.Json(new { ok = true, migration = Services.Nodes.MigrationService.Json(m) }, statusCode: StatusCodes.Status202Accepted);
+        }).RequireRateLimiting("operatorApi");
+
+        app.MapGet("/api/v1/instances/{publicId}/migrations", async (HttpContext ctx, string publicId, ApiKeyService keys, AppDbContext db,
+            Services.Nodes.MigrationService migrations) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            var inst = await db.Instances.AsNoTracking().FirstOrDefaultAsync(i => i.PublicId == publicId);
+            if (inst is null || !ApiKeyService.CanAccess(key!, inst)) return NotFoundInstance();
+            return Results.Ok((await migrations.HistoryAsync(inst.Id, 10, ctx.RequestAborted)).Select(Services.Nodes.MigrationService.Json));
+        }).RequireRateLimiting("operatorApi");
+
         // ---- Reverse proxy (increment 3) --------------------------------------------------------------
         app.MapGet("/api/v1/hosting/proxy", async (HttpContext ctx, ApiKeyService keys, Services.Proxy.ProxyService proxy) =>
         {
@@ -252,6 +286,8 @@ public static class HostingApi
 
     public record HostingSwitchDto(bool Enabled);
     public record DomainDto(string Domain, bool? PushCanonical);
+    /// <param name="Target">A node id, or "local" for this cloud's own host.</param>
+    public record MigrateDto(string Target, bool? RemoveSource);
     /// <param name="NodeId">A node's id, or null/"local" for this cloud's own host.</param>
     /// <param name="ProfileId">Null = the default profile.</param>
     public record ProvisionDto(string Name, int? ProfileId, string? Domain, string? ImageTag, string? NodeId, bool? PushCanonical);

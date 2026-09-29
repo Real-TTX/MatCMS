@@ -15,7 +15,7 @@ public static class NodeJobExecutor
     public static string Serialize(object o) => JsonSerializer.Serialize(o, Json);
     public static T? Deserialize<T>(string? s) => string.IsNullOrEmpty(s) ? default : JsonSerializer.Deserialize<T>(s, Json);
 
-    public static async Task<NodeJobReport> ExecuteAsync(NodeJobOffer job, DockerHostService docker, HttpClient proxyHttp, CancellationToken ct)
+    public static async Task<NodeJobReport> ExecuteAsync(NodeJobOffer job, DockerHostService docker, HttpClient proxyHttp, INodeTransfer transfer, CancellationToken ct)
     {
         var report = new NodeJobReport { JobId = job.Id };
         try
@@ -73,6 +73,48 @@ public static class NodeJobExecutor
                 {
                     var op = Deserialize<ProxyOp>(job.PayloadJson)!;
                     var r = await ProxyEngine.ExecuteAsync(op, proxyHttp, docker, ct);
+                    report.Ok = r.Ok; report.Message = r.Message;
+                    report.ResultJson = Serialize(r);
+                    break;
+                }
+                case NodeJobKinds.Export:
+                {
+                    var p = Deserialize<ExportJob>(job.PayloadJson)!;
+                    var (ok, msg, info) = await docker.ExportDataAsync(p.ContainerId, (s, c) => transfer.UploadAsync(p.TransferId, s, c), ct);
+                    report.Ok = ok; report.Message = msg;
+                    report.ResultJson = info is null ? null : Serialize(info);
+                    break;
+                }
+                case NodeJobKinds.Import:
+                {
+                    var p = Deserialize<ImportJob>(job.PayloadJson)!;
+                    var r = await docker.CreateInstanceContainerAsync(p.Spec, ct, c => transfer.DownloadAsync(p.TransferId, c));
+                    report.Ok = r.Ok;
+                    report.Message = r.Ok ? $"Container {r.ContainerName} mit übertragenen Daten auf Port {r.Port} gestartet." : r.Error;
+                    report.ResultJson = Serialize(r);
+                    break;
+                }
+                case NodeJobKinds.Retire:
+                {
+                    var p = Deserialize<ContainerJob>(job.PayloadJson)!;
+                    var r = await docker.RetireContainerAsync(p.ContainerId, ct);
+                    report.Ok = r.Ok; report.Message = r.Message;
+                    break;
+                }
+                case NodeJobKinds.TeardownInfo:
+                {
+                    var p = Deserialize<ContainerJob>(job.PayloadJson)!;
+                    var t = await docker.InspectTeardownAsync(p.ContainerId, ct);
+                    report.Ok = true;
+                    report.ResultJson = t is null ? null : Serialize(t);
+                    break;
+                }
+                case NodeJobKinds.Remove:
+                {
+                    // The node re-checks the managed label itself (RemoveInstanceContainerAsync) — the cloud's
+                    // confirmation alone never deletes a container.
+                    var p = Deserialize<ContainerJob>(job.PayloadJson)!;
+                    var r = await docker.RemoveInstanceContainerAsync(p.ContainerId, p.RemoveVolumes, ct);
                     report.Ok = r.Ok; report.Message = r.Message;
                     report.ResultJson = Serialize(r);
                     break;

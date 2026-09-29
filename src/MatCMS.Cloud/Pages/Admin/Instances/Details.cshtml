@@ -349,6 +349,49 @@
             }
         </div>
 
+        @* Umziehen (Hosting-Inkrement 5): auf einen anderen Host — dieser Host oder ein Node. Die Daten
+           ziehen 1:1 mit (Datenträger), die Website behält ihre Identität, die Domain zieht mit. *@
+        <div class="card">
+            <h2>@T["migrate.title"]</h2>
+            @if (Model.Migrations.FirstOrDefault() is { } last)
+            {
+                var badge = last.State switch { "succeeded" => "badge-on", "running" => "badge-new", _ => "badge-err" };
+                <div class="kv">
+                    <div class="kv-label">@T["migrate.last"]</div>
+                    <div class="kv-value">
+                        <span class="badge @badge">@T["migrate.state." + last.State]</span>
+                        <span class="muted">@last.FromName → @last.ToName · @last.StartedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span>
+                    </div>
+                </div>
+                <pre class="mono" style="white-space:pre-wrap;font-size:12px;max-height:260px;overflow:auto;" @(last.Running ? "data-migration-running" : "")>@last.Log</pre>
+            }
+            @if (!Model.Item.CloudManaged)
+            {
+                <div class="help">@T["migrate.notManaged"]</div>
+            }
+            else if (Model.Migrations.FirstOrDefault()?.Running != true)
+            {
+                <form method="post" asp-page-handler="Migrate" asp-route-id="@Model.Item.Id"
+                      onsubmit="return confirm('@T["migrate.confirm"]');">
+                    <div class="form-field">
+                        <label for="migrateTarget">@T["migrate.target"]</label>
+                        <select id="migrateTarget" name="target" required>
+                            @foreach (var (value, label, ok) in Model.MoveTargets)
+                            {
+                                <option value="@value" disabled="@(ok ? null : "disabled")">@label</option>
+                            }
+                        </select>
+                        <div class="help">@T["migrate.hint"]</div>
+                    </div>
+                    <label class="checkbox-row"><input type="checkbox" name="removeSource" value="true" /> @T["migrate.removeSource"]</label>
+                    <div class="help">@T["migrate.removeSourceHint"]</div>
+                    <div class="list-actions">
+                        <button type="submit" class="btn" disabled="@(Model.MoveTargets.Any(t => t.Ok) ? null : "disabled")">@T["migrate.start"]</button>
+                    </div>
+                </form>
+            }
+        </div>
+
         <div class="card">
             <h2>@T["hosting.logs"]</h2>
             <div class="list-actions" style="margin-top:0;">
@@ -943,6 +986,14 @@
                     .catch(function (e) { out.textContent = '⚠ ' + e; out.hidden = false; })
                     .finally(function () { btn.disabled = false; });
             });
+        })();
+
+        // A move runs in the background for minutes: while it does, the Hosting tab follows it.
+        (function () {
+            if (!document.querySelector('[data-migration-running]')) return;
+            setTimeout(function () {
+                var u = new URL(location.href); u.searchParams.set('tab', 'hosting'); location.replace(u.toString());
+            }, 5000);
         })();
     </script>
 }

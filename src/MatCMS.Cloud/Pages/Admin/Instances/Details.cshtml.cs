@@ -25,7 +25,7 @@ public class DetailsModel : PageModel, IAsyncPageFilter
     private readonly MatCMS.Cloud.Services.Proxy.ProxyService _proxy;
 
     public DetailsModel(AppDbContext db, InstanceService instances, ReleaseWatcher releases, HostingActionsService hosting, BackupStore backups, OperatorScope scope,
-        MatCMS.Cloud.Services.Proxy.ProxyService proxy)
+        MatCMS.Cloud.Services.Proxy.ProxyService proxy, MatCMS.Cloud.Services.Nodes.MigrationService migrations, DockerHostService docker)
     {
         _db = db;
         _instances = instances;
@@ -34,6 +34,51 @@ public class DetailsModel : PageModel, IAsyncPageFilter
         _backups = backups;
         _scope = scope;
         _proxy = proxy;
+        _migrations = migrations;
+        _docker = docker;
+    }
+
+    private readonly MatCMS.Cloud.Services.Nodes.MigrationService _migrations;
+    private readonly DockerHostService _docker;
+
+    /// <summary>The instance's moves, newest first (the Hosting tab shows the last one with its log).</summary>
+    public List<InstanceMigration> Migrations { get; private set; } = new();
+
+    /// <summary>Where it could move: "Dieser Host" (value "local") and every node — except where it runs now.
+    /// Unreachable ones are listed but disabled, so the operator sees why a target is missing.</summary>
+    public List<(string Value, string Label, bool Ok)> MoveTargets { get; private set; } = new();
+
+    private async Task LoadMoveAsync()
+    {
+        Migrations = await _migrations.HistoryAsync(Item.Id, 5, HttpContext.RequestAborted);
+        MoveTargets.Clear();
+        if (Item.NodeId is not null)
+        {
+            var ok = await _docker.IsReachableAsync(HttpContext.RequestAborted);
+            MoveTargets.Add(("local", "Dieser Host" + (ok ? "" : " — Docker nicht erreichbar"), ok));
+        }
+        var now = DateTime.UtcNow;
+        foreach (var n in await _db.Nodes.AsNoTracking().Where(n => !n.Revoked && n.Id != Item.NodeId).OrderBy(n => n.Name).ToListAsync())
+        {
+            var on = n.IsOnline(now);
+            MoveTargets.Add((n.Id.ToString(), n.Name + (on ? "" : " — nicht verbunden"), on));
+        }
+    }
+
+    /// <summary>Starts a move (runs in the background; the tab then follows its log).</summary>
+    public async Task<IActionResult> OnPostMigrateAsync(int id, string? target, bool removeSource)
+    {
+        var item = await _db.Instances.FindAsync(id);
+        if (item is null) return RedirectToPage("Index");
+        Node? node = null;
+        if (target != "local")
+        {
+            node = int.TryParse(target, out var nid) ? await _db.Nodes.FindAsync(nid) : null;
+            if (node is null) { TempData["FlashError"] = "Bitte ein Ziel wählen."; return RedirectToPage(new { id, tab = "hosting" }); }
+        }
+        var (m, err) = await _migrations.StartAsync(item, node, removeSource, "ui:" + User.Identity?.Name, HttpContext.RequestAborted);
+        TempData[m is null ? "FlashError" : "Flash"] = err ?? $"Umzug nach „{m!.ToName}“ gestartet — die Website ist dabei kurz offline.";
+        return RedirectToPage(new { id, tab = "hosting" });
     }
 
     /// <summary>The configured proxy provider ("none" | "matcad" | "caddy") and whether it routes at all.</summary>
@@ -141,7 +186,10 @@ public class DetailsModel : PageModel, IAsyncPageFilter
         catch { /* keep last known state */ }
 
         if (ShowHostingTab)
+        {
             Container = await _hosting.DetailsAsync(Item, HttpContext.RequestAborted);
+            await LoadMoveAsync();
+        }
 
         if (Item.BackupRequestId > 0)
             RequestedBackup = await _db.CloudBackups.AsNoTracking()

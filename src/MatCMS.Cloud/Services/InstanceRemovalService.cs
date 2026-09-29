@@ -33,12 +33,36 @@ public class InstanceRemovalService
     private readonly BackupStore _backups;
     private readonly InstanceService _instances;
     private readonly ILogger<InstanceRemovalService> _log;
+    private readonly Nodes.NodeService _nodes;
 
     public InstanceRemovalService(
         AppDbContext db, DockerHostService docker, BackupStore backups,
-        InstanceService instances, ILogger<InstanceRemovalService> log)
+        InstanceService instances, ILogger<InstanceRemovalService> log, Nodes.NodeService nodes)
     {
-        _db = db; _docker = docker; _backups = backups; _instances = instances; _log = log;
+        _db = db; _docker = docker; _backups = backups; _instances = instances; _log = log; _nodes = nodes;
+    }
+
+    /// <summary>
+    /// What a teardown would touch, read from the daemon that runs the container — the cloud's own, or a node's
+    /// (Hosting increment 5). Same answer, same guards: the node inspects and later removes with the very engine
+    /// methods the cloud uses, so the managed label is checked ON the node too.
+    /// </summary>
+    public async Task<DockerHostService.TeardownTarget?> InspectAsync(Instance item, CancellationToken ct = default)
+    {
+        if (!HostingActionsService.IsOnNode(item)) return await _docker.InspectTeardownAsync(item.ContainerId, ct);
+        var node = await _db.Nodes.FindAsync(new object[] { item.NodeId! }, ct);
+        if (node is null) return null;
+        var r = await _nodes.RunAsync(node, Nodes.NodeJobKinds.TeardownInfo, new Nodes.ContainerJob(item.ContainerId!), item.Id, TimeSpan.FromSeconds(20), ct);
+        return r.Ok ? Nodes.NodeJobExecutor.Deserialize<DockerHostService.TeardownTarget>(r.ResultJson) : null;
+    }
+
+    private async Task<DockerHostService.TeardownResult> RemoveAsync(Instance item, string containerId, bool withVolumes, CancellationToken ct)
+    {
+        if (!HostingActionsService.IsOnNode(item)) return await _docker.RemoveInstanceContainerAsync(containerId, withVolumes, ct);
+        var node = await _db.Nodes.FindAsync(new object[] { item.NodeId! }, ct);
+        if (node is null) return new(false, "Der Node ist nicht mehr eingetragen.", []);
+        var r = await _nodes.RunAsync(node, Nodes.NodeJobKinds.Remove, new Nodes.ContainerJob(containerId, RemoveVolumes: withVolumes), item.Id, TimeSpan.FromMinutes(3), ct);
+        return Nodes.NodeJobExecutor.Deserialize<DockerHostService.TeardownResult>(r.ResultJson) ?? new(false, r.Message, []);
     }
 
     // The ways, as they travel in the form. Strings rather than the numbers of an enum, for the same
@@ -90,7 +114,7 @@ public class InstanceRemovalService
     public async Task<Outcome> TearDownAsync(
         Instance item, string mode, string? expectedContainerId, CancellationToken ct = default)
     {
-        var target = await _docker.InspectTeardownAsync(item.ContainerId, ct);
+        var target = await InspectAsync(item, ct);
         if (target is null)
             return new Outcome(false,
                 "Zu dieser Instanz gibt es auf diesem Host keinen Container. Es wurde nichts entfernt.", false);
@@ -111,7 +135,7 @@ public class InstanceRemovalService
         _log.LogWarning("Teardown of instance {Name} ({PublicId}): container {Container}, volumes {Volumes}",
             item.Name, item.PublicId, target.Id, withVolumes ? string.Join(", ", target.Volumes) : "(kept)");
 
-        var result = await _docker.RemoveInstanceContainerAsync(target.Id, withVolumes, ct);
+        var result = await RemoveAsync(item, target.Id, withVolumes, ct);
         if (!result.Ok) return new Outcome(false, result.Message, false);
 
         var name = item.Name;
@@ -143,7 +167,7 @@ public class InstanceRemovalService
         // Checked NOW as well as later. Not because the later check could be skipped, but because an
         // operator who cannot have this way should be told so while they are still looking at the
         // page, rather than six hours later in an event log.
-        var target = await _docker.InspectTeardownAsync(item.ContainerId, ct);
+        var target = await InspectAsync(item, ct);
         if (target is null)
             return new Outcome(false,
                 "Zu dieser Instanz gibt es auf diesem Host keinen Container. Es wurde nichts vorgemerkt.", false);
@@ -226,7 +250,7 @@ public class InstanceRemovalService
         if (backup is null) return null;
 
         // 2) Still the same container? Asked before the backup is moved.
-        var target = await _docker.InspectTeardownAsync(item.ContainerId, ct);
+        var target = await InspectAsync(item, ct);
         if (target is null || !target.CloudManaged
             || !string.Equals(target.Id, item.PendingRemovalContainerId, StringComparison.Ordinal))
         {

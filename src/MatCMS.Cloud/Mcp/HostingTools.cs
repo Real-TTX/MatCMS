@@ -194,6 +194,35 @@ public class HostingTools
         return new { ok = true, message = r.Message };
     }
 
+    [McpServerTool(Name = "migrate_instance"), Description(
+        "Move a site to another host ('local' = this cloud's own Docker host, or a node id from list_nodes). The data volume is copied 1:1, so the site keeps its identity, content and cloud link; its domain route moves along (DNS must then point at the new host). The site is OFFLINE during the move (minutes, depending on its size) — confirm with the user first. Runs in the background; poll get_migrations. removeSource=true deletes the old container AND its data afterwards (needs the restore right as well); default keeps it stopped and renamed as a way back. Requires the hosting right; honours the key's instance scope.")]
+    public static async Task<object> MigrateInstance(McpContext me, AppDbContext db, Services.Nodes.MigrationService migrations,
+        [Description("The instance id, as returned by list_instances.")] string instanceId,
+        [Description("'local' or a node id.")] string target,
+        [Description("Delete the old copy (container + data) after a successful move. Default false.")] bool removeSource = false,
+        CancellationToken ct = default)
+    {
+        RequireHosting(me);
+        if (removeSource && !me.Key.CanRestore)
+            throw new McpException("Die alte Kopie entfernen braucht zusätzlich das Wiederherstellen-Recht.");
+        var inst = await ResolveAsync(me, db, instanceId, ct);
+        Node? node = null;
+        if (target != "local")
+            node = await db.Nodes.FirstOrDefaultAsync(n => n.PublicId == target, ct) ?? throw new McpException("Ziel-Node nicht gefunden.");
+        var (m, err) = await migrations.StartAsync(inst, node, removeSource, "mcp:" + me.Key.Name, ct);
+        if (m is null) throw new McpException(err ?? "Umzug nicht möglich.");
+        return new { ok = true, migration = Services.Nodes.MigrationService.Json(m) };
+    }
+
+    [McpServerTool(Name = "get_migrations"), Description(
+        "The moves of a site, newest first: state (running/succeeded/failed/rolled-back), current step, source and target, and the step log. Any valid key within its instance scope.")]
+    public static async Task<object> GetMigrations(McpContext me, AppDbContext db, Services.Nodes.MigrationService migrations,
+        [Description("The instance id, as returned by list_instances.")] string instanceId, CancellationToken ct = default)
+    {
+        var inst = await ResolveAsync(me, db, instanceId, ct);
+        return (await migrations.HistoryAsync(inst.Id, 10, ct)).Select(Services.Nodes.MigrationService.Json);
+    }
+
     [McpServerTool(Name = "get_cloud_update_status"), Description(
         "The cloud's own version, the newest published version, whether a self-update can run here (and why not), and how the last self-update went (state + step log). Any valid key.")]
     public static async Task<object> GetCloudUpdateStatus(McpContext me, CloudUpdaterService updater, CancellationToken ct)

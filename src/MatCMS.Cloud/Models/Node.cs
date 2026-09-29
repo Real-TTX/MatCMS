@@ -103,8 +103,9 @@ public class NodeJob
     /// operator was told is still waiting must not fire by surprise minutes later when the node returns.</summary>
     public static readonly TimeSpan PendingTimeout = TimeSpan.FromMinutes(2);
 
-    /// <summary>Picked up but never reported within this → failed.</summary>
-    public static readonly TimeSpan RunningTimeout = TimeSpan.FromMinutes(15);
+    /// <summary>Picked up but never reported within this → failed. Generous: moving a large site streams its whole
+    /// data volume inside one job.</summary>
+    public static readonly TimeSpan RunningTimeout = TimeSpan.FromMinutes(60);
 
     /// <summary>History kept per node (pruned on write).</summary>
     public const int KeepPerNode = 200;

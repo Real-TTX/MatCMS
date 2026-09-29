@@ -85,7 +85,7 @@ public class DeleteModel : PageModel
         var item = await _db.Instances.AsNoTracking().FirstOrDefaultAsync(i => i.Id == id);
         if (item is null) return RedirectToPage("Index");
         Item = item;
-        Target = await _docker.InspectTeardownAsync(item.ContainerId, HttpContext.RequestAborted);
+        Target = await _removals.InspectAsync(item, HttpContext.RequestAborted);
         BackupCount = await _db.CloudBackups.CountAsync(b => b.InstanceId == id);
 
         // Only interesting while something is waiting on it; asked here so the wait can say what it

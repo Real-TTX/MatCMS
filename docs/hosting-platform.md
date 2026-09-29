@@ -1,6 +1,6 @@
 # Hosting platform — MatCMS.Cloud as a hosting control plane
 
-Status: **Increments 1–4 built and tested (2026-09-29); 5 (migration between nodes) designed only; 6 dropped.** This document designs turning MatCMS.Cloud from a control plane
+Status: **Increments 1–5 built and tested (2026-09-29); 6 dropped.** This document designs turning MatCMS.Cloud from a control plane
 that *watches* instances into one that can also *host* them: an activatable Hosting module, a per-instance
 Hosting tab, optional reverse-proxy management, a separable hosting engine with multiple nodes, moving
 instances between nodes, and a cloud self-updater. It ends with a cut into deployable increments and the
@@ -153,8 +153,10 @@ A migration job pipeline, all steps reported back:
 5. Source node: stop, then remove the old container **only after** the target reported healthy (the
    "backup survives or nothing is removed" rule from the removal flow).
 
-Volume-level transfer (rsync of the data volume) is a later optimisation; backup/restore reuses code that
-is already trusted and tested.
+*Built differently (see "Built: Increment 5"):* the data VOLUME is copied 1:1 instead of backup/restore.
+The plan above had a flaw that only building it exposed: a backup restored into a fresh container keeps the
+FRESH container's cloud link (`ImportAsync` preserves `cloud.*`), so the site would have arrived as a NEW
+instance. The volume carries its own link, so the same instance simply beats from the new host.
 
 ### 3.6 Multi-cloud — **needs product clarification before design**
 
@@ -214,7 +216,7 @@ Decide after reading `../MatOS/README.md` and `../MatOS/src/MatOS.Web/{Api,Docke
 | **2** | **Cloud self-updater** (helper-container, §3.7a) | updater mode + UI button | — |
 | **3** | **`IProxyProvider`** with `NoProxy` (default) + `MatcadProvider` + `CaddyProvider`; domain/TLS per instance — *built* | provider layer, address resolution | 1 |
 | **4** | **Node model + node-agent** (outbound protocol, enrolment, local node stays "Dieser Host") — *built; agent = cloud image in `--node-agent` mode, see its spec* | `Node`/`NodeJob` tables, protocol DTOs, agent mode | 1 |
-| **5** | **Migration between nodes** incl. proxy update | migration job pipeline | 3, 4 |
+| **5** | **Migration between nodes** incl. proxy update — *built (volume copy, see below)* | migration job pipeline | 3, 4 |
 | **6** | Multi-cloud (only if §3.6 (b) is wanted) | federation | product decision |
 
 Increments 1 and 2 are small, independent and immediately useful; 4 is the large structural step and
@@ -388,6 +390,54 @@ dropped once the job is finished.
 guards move in increment 5), bulk update / auto-update of node instances (the Hosting tab's update works),
 and updating the agent itself (for now: pull the image and recreate the agent container by hand; the agent
 reports its version, so a stale one is visible).
+
+### Built (2026-09-29): Increment 5 — moving between hosts, removal on nodes
+
+**Flow** (`Services/Nodes/MigrationService.cs`, run by `MigrationWorker` in the background, one move at a time,
+every step written to `InstanceMigrations` — migration `AddInstanceMigrations`): stop the source → export the
+data volume (`DockerHostService.ExportDataAsync`, Docker's archive API on the STOPPED container, so SQLite is
+consistent) → the source host uploads it to the cloud (`PUT /api/nodes/{id}/transfers/{transferId}`) → the target
+host downloads it and creates the same container (image, env, name, volume name taken from the source) with the
+data unpacked into the volume BEFORE the first start (`CreateInstanceContainerAsync(…, seed)`) → wait until the
+INSTANCE beats from the target (not "the container started") → move the proxy route (delete at the old host
+first, then publish at the new — with one shared proxy the other order would update and then delete the same
+route id) → retire the source (`RetireContainerAsync`: renamed `<name>-moved-<date>`, restart policy "no",
+volume kept — the way back) or, if asked, remove container + volume. All hosts go through
+`NodeService.RunOnAsync`, so local → node, node → node and node → local are one code path.
+
+**The rule every failure path obeys:** one cloud identity never runs twice. A rollback removes the target
+container (and its copied volume) FIRST and only then starts the source again; if the target cannot be removed
+the source stays stopped and the move says so. A cloud restart mid-move rolls back — except past verification,
+where the site already runs (and may hold new content) on the target: then the move stands and only the tidy-up
+is flagged. The transfer endpoints accept exactly the source (upload) and the target (download) of the one
+RUNNING move; the file is deleted as soon as the target has it.
+
+**Removal on nodes:** `InstanceRemovalService` inspects and removes through the node (`container.teardownInfo`,
+`container.remove` — the node re-checks the managed label itself); the Delete page, including "backup first",
+now works for node instances.
+
+**Surfaces:** "Umziehen" card on the Hosting tab (target, "alte Kopie entfernen", step log that follows itself);
+REST `POST /api/v1/instances/{id}/migrate`, `GET …/migrations`; MCP `migrate_instance`, `get_migrations`.
+Removing the old copy additionally needs the restore right (it deletes data).
+
+**Tested for real with two Docker daemons** (the cloud's own + a `docker:dind` node reached over TCP): Dieser Host
+→ node in 28 s (marker page present on the target, same instance id, old copy retired with restart policy "no",
+route removed from the local Caddy); node → Dieser Host blocked by the retired copy's volume → clean rollback
+(source started again on the node); back with "remove old copy" in 19 s (route recreated, HTTPS 200, node
+container AND volume gone); a move started from the UI form; teardown of a node instance through the Delete
+page; rights and transfer guards.
+
+**Four findings the test forced:**
+1. **Docker.DotNet hangs forever on `tcp://`** (no error, no timeout) — the agent never beat. `tcp://` is now
+   translated to the equivalent `http://`, and the agent's daemon calls are time-bounded.
+2. **A Docker client could get stuck after an archive extract over http** — every later call waited. The agent now
+   uses a fresh client per beat and per job.
+3. **Nested Docker reported the wrong container id**: the CMS took the first 64-hex in `mountinfo`, which under
+   dind (and some LXC/VM setups) is an OUTER volume id. The CMS now prefers ids from Docker's `…/containers/<id>/`
+   paths and cross-checks with the hostname; and the cloud falls back to the reported host name (Docker's short
+   id) and then stores the id the DAEMON confirmed, so existing instances are fixed without a CMS rollout.
+4. **A long-running caller held a stale node** and declared a connected node "nicht verbunden" mid-move —
+   `NodeService.RunAsync` now reads the node's state fresh.
 
 ---
 

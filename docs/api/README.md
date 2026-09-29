@@ -204,6 +204,12 @@ sie laufen als Auftrag auf dem Node, der Aufruf wartet auf das Ergebnis (`contai
 - `GET /api/v1/nodes/{id}/jobs?take=50` → `[{ id, kind, state: pending|running|done|failed, message, requestedBy, createdAt, startedAt, finishedAt }]`
 - `POST /api/v1/hosting/instances` `{ name, nodeId? ("local"/leer = dieser Host), profileId? (leer = Standardprofil), domain?, imageTag?, pushCanonical? }` → `{ ok, containerName, port, domainFailed, message }` – **neue Website anlegen** (Hosting-Modul an; **CanManageHosting + alle Instanzen**). Die Instanz erscheint in `GET /api/v1/instances`, sobald sie sich mit dem Join-Code ihres Profils angemeldet hat (meist < 1 Min.).
 
+### Umziehen zwischen Hosts
+
+- `POST /api/v1/instances/{publicId}/migrate` `{ target: "local" | <Node-ID>, removeSource?: false }` → `202 { migration:{ id, state, step, from, to, log[] } }` – zieht die Website auf einen anderen Host (**CanManageHosting**, Schlüssel-Umfang; `removeSource: true` braucht zusätzlich **CanRestore**). Der Datenträger wird 1:1 kopiert: Inhalte, Uploads, Benutzer und die Cloud-Verbindung bleiben, die Instanz behält ihre ID. Die Domain zieht mit (DNS danach auf den neuen Host zeigen lassen). **Die Website ist währenddessen offline.** Ohne `removeSource` wird die alte Kopie stillgelegt (gestoppt, umbenannt `…-moved-<Datum>`, startet nie mehr von selbst). Scheitert etwas, läuft die Website wieder an der alten Stelle (`rolled-back`).
+- `GET /api/v1/instances/{publicId}/migrations` → `[{ id, state: running|succeeded|failed|rolled-back, step, from, to, removeSource, bytes, requestedBy, startedAt, finishedAt, log[] }]` – zum Verfolgen (neueste zuerst).
+- Entfernen (Container + Datenträger) einer Instanz auf einem Node geht jetzt genauso wie lokal über *Instanz → Entfernen*.
+
 Antwortet ein Node nicht rechtzeitig, kommt `409` mit „läuft noch (Auftrag #…)“ — das Ergebnis steht dann im
 Auftragsverlauf. Ein nicht verbundener Node antwortet sofort mit `409` „nicht verbunden“.
 
@@ -269,6 +275,8 @@ Instanz beim nächsten Heartbeat über ihre **eigenen** Validierer anwendet (add
 | `test_node_proxy` | Proxy-Test auf dem Node |
 | `list_node_jobs` | Auftragsverlauf eines Nodes (z. B. ein noch laufendes Update verfolgen) |
 | `create_instance` | **Neue Website anlegen** — auf diesem Host oder einem Node, optional mit Domain (alle Instanzen) |
+| `migrate_instance` | **Website umziehen** auf einen anderen Host (Daten 1:1, Domain zieht mit; offline währenddessen) — vorher bestätigen |
+| `get_migrations` | Umzüge einer Website mit Zustand, Schritt und Protokoll |
 
 **`create_page`** (Beispiel-Eingabe):
 ```json

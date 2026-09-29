@@ -761,7 +761,20 @@ Design and increments: `docs/hosting-platform.md`. Increments 1–4 are built:
   late; the `proxy` payload carries the node's Matcad key → encrypted at rest, blanked when finished; pending
   provisioning routes are keyed per node (`InstanceService.PendingRouteKey`) because container names are only
   unique per host. Provisioning is ONE service call for UI/REST/MCP: `HostingService.ProvisionAsync`.
-  Not yet on nodes: teardown (unregister only), bulk update, agent self-update.
+  Not yet on nodes: bulk update, agent self-update. Docker.DotNet 3.125 HANGS on `tcp://` endpoints —
+  `DockerHostService` translates them to `http://`; the agent uses a fresh Docker client per beat and per job
+  (a client once got stuck after an archive extract) and bounds its daemon calls.
+- **Moving between hosts (increment 5, `Services/Nodes/MigrationService.cs`)** copies the DATA VOLUME 1:1 —
+  NOT backup/restore, which would give the site a new identity (a restore keeps the fresh container's `cloud.*`).
+  Stop → export (archive API, stopped container) → source uploads / target downloads via
+  `/api/nodes/{id}/transfers/{transferId}` (only the running move's own source/target) → target creates the
+  same container seeded before first start → verified by the INSTANCE beating from the target → proxy route moved
+  (delete old host first, then publish) → source retired (renamed, restart "no") or removed on request. The
+  invariant: one identity never runs twice — rollback removes the target BEFORE restarting the source; if it
+  cannot, the source stays stopped. `MigrationWorker` runs moves one at a time and settles interrupted ones on
+  startup (rollback, except past verification). Teardown on nodes goes through `InstanceRemovalService`
+  (`InspectAsync`/`RemoveAsync` pick the host). Classification falls back to the reported host name (Docker's
+  short id) and stores the id the DAEMON confirmed — nested Docker made old CMS versions report an outer volume id.
 
 ### Removing an instance — who owns the container
 

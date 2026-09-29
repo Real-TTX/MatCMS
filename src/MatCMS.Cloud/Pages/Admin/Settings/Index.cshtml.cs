@@ -143,18 +143,12 @@ public class IndexModel : PageModel
         return RedirectToPage(new { tab = "general" });
     }
 
-    public async Task<IActionResult> OnPostNotificationsAsync(
-        string? recipients, bool notifyOffline, bool notifyUpdate, bool autoUpdateLocal)
+    /// <summary>The automatic-update rule (who is TOLD about updates is the notification matrix).</summary>
+    public async Task<IActionResult> OnPostUpdatesAsync(bool autoUpdateLocal)
     {
-        await _cloud.SaveAsync(new Dictionary<string, string?>
-        {
-            [SettingKeys.NotifyRecipients] = recipients?.Trim(),
-            [SettingKeys.NotifyOffline] = notifyOffline ? "1" : "0",
-            [SettingKeys.NotifyUpdate] = notifyUpdate ? "1" : "0",
-            [SettingKeys.AutoUpdateLocal] = autoUpdateLocal ? "1" : "0"
-        });
-        TempData["Flash"] = "Benachrichtigungen gespeichert.";
-        return RedirectToPage(new { tab = "notifications" });
+        await _cloud.SaveAsync(new Dictionary<string, string?> { [SettingKeys.AutoUpdateLocal] = autoUpdateLocal ? "1" : "0" });
+        TempData["Flash"] = "Update-Einstellungen gespeichert.";
+        return RedirectToPage(new { tab = "general" });
     }
 
     public async Task<IActionResult> OnPostSmtpAsync(

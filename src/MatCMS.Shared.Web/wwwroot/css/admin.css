@@ -79,6 +79,11 @@ table.cleanup-list .cleanup-thumb img { width: 56px; height: 40px; object-fit: c
 table.cleanup-list .cleanup-info { width: 170px; }
 table.cleanup-list td { overflow: hidden; text-overflow: ellipsis; }
 
+/* A matrix table (recipients × events): centred tick columns, group rows set apart, the "+" row last. */
+table.notify-matrix .notify-cell { width: 96px; text-align: center; }
+table.notify-matrix tr.notify-group td { background: #f6f7f9; }
+table.notify-matrix tr.notify-add td { border-top: 2px solid #e2e5ea; }
+
 .admin-nav-foot { border-top: 1px solid #dfe1e6; margin-top: 8px; padding-top: 8px; display: flex; flex-direction: column; gap: 1px; }
 .admin-nav-foot a, .admin-nav-foot .linklike {
     text-decoration: none; color: #6b7078; font-size: 13px; padding: 5px 11px;

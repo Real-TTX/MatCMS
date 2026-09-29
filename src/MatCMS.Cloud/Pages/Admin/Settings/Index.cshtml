@@ -10,7 +10,6 @@
 
 <div class="tabs" role="tablist">
     <button type="button" class="tab active" data-tab="general">@T["settings.tabGeneral"]</button>
-    <button type="button" class="tab" data-tab="notifications">@T["settings.tabNotifications"]</button>
     <button type="button" class="tab" data-tab="smtp">@T["settings.tabSmtp"]</button>
     <button type="button" class="tab" data-tab="ai">@T["settings.tabAi"]</button>
     <button type="button" class="tab" data-tab="backup">@T["backups.title"]</button>
@@ -56,33 +55,11 @@
             <div style="margin-top:14px;"><button type="submit" class="btn">@T["settings.save"]</button></div>
         </div>
     </form>
-</div>
-
-@* ============ API ============ *@
-@* Die API-Schlüssel (Operator-API + MCP) leben hier und nicht als eigener Menüpunkt: sie sind Konfiguration der
-   Cloud. Anlegen bleibt eine eigene Seite, die hierher zurückführt. *@
-<div class="tab-panel" data-panel="api" hidden>
-    <partial name="_ApiKeyList" model="Model.ApiKeys" />
-</div>
-
-@* ============ NOTIFICATIONS ============ *@
-<div class="tab-panel" data-panel="notifications" hidden>
-    <form method="post" asp-page-handler="Notifications">
+    @* Automatisches Update ist eine Betriebsregel, keine Benachrichtigung — deshalb hier und nicht in der
+       Benachrichtigungs-Matrix. Pro Profil lässt es sich abweichend setzen. *@
+    <form method="post" asp-page-handler="Updates">
         <div class="card">
-            <h2>@T["settings.notifications"]</h2>
-            <div class="form-field">
-                <label>@T["settings.recipients"]</label>
-                <input name="recipients" value="@Model.Get(SettingKeys.NotifyRecipients)" placeholder="ops@@beispiel.de, admin@@beispiel.de" />
-                <div class="help">@T["settings.recipientsHint"]</div>
-            </div>
-            <label class="checkbox-row">
-                <input type="checkbox" name="notifyOffline" value="true" checked="@(Model.Flag(SettingKeys.NotifyOffline) ? "checked" : null)" />
-                @T["settings.notifyOffline"]
-            </label>
-            <label class="checkbox-row">
-                <input type="checkbox" name="notifyUpdate" value="true" checked="@(Model.Flag(SettingKeys.NotifyUpdate) ? "checked" : null)" />
-                @T["settings.notifyUpdate"]
-            </label>
+            <h2>@T["settings.updatesHeading"]</h2>
             <label class="checkbox-row">
                 <input type="checkbox" name="autoUpdateLocal" value="true" checked="@(Model.Flag(SettingKeys.AutoUpdateLocal) ? "checked" : null)" />
                 @T["settings.autoUpdateLocal"]
@@ -91,6 +68,13 @@
             <div style="margin-top:14px;"><button type="submit" class="btn">@T["settings.save"]</button></div>
         </div>
     </form>
+</div>
+
+@* ============ API ============ *@
+@* Die API-Schlüssel (Operator-API + MCP) leben hier und nicht als eigener Menüpunkt: sie sind Konfiguration der
+   Cloud. Anlegen bleibt eine eigene Seite, die hierher zurückführt. *@
+<div class="tab-panel" data-panel="api" hidden>
+    <partial name="_ApiKeyList" model="Model.ApiKeys" />
 </div>
 
 @* ============ SMTP ============ *@

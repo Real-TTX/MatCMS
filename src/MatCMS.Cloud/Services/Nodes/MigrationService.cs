@@ -27,12 +27,13 @@ public class MigrationService
     private readonly ProxyService _proxy;
     private readonly DockerHostService _docker;
     private readonly MigrationQueue _queue;
+    private readonly NotificationService _notify;
     private readonly ILogger<MigrationService> _log;
 
     public MigrationService(AppDbContext db, NodeService nodes, InstanceService instances, ProxyService proxy,
-        DockerHostService docker, MigrationQueue queue, ILogger<MigrationService> log)
+        DockerHostService docker, MigrationQueue queue, ILogger<MigrationService> log, NotificationService notify)
     {
-        _db = db; _nodes = nodes; _instances = instances; _proxy = proxy; _docker = docker; _queue = queue; _log = log;
+        _db = db; _nodes = nodes; _instances = instances; _proxy = proxy; _docker = docker; _queue = queue; _log = log; _notify = notify;
     }
 
     /// <summary>How long the target gets to prove it runs: its first beat (every ~60 s) after a cold start.</summary>
@@ -243,6 +244,10 @@ public class MigrationService
         }
         await _db.SaveChangesAsync(CancellationToken.None);
         FileNodeTransfer.Delete(m.TransferId);
+        if (inst is not null)
+            await _notify.SendAsync(NotifyEvents.Migration, inst,
+                $"[MatCMS.Cloud] Umzug von {inst.Name}: {(state == "succeeded" ? "abgeschlossen" : state == "rolled-back" ? "zurückgerollt" : "FEHLGESCHLAGEN")}",
+                $"{m.FromName} → {m.ToName}\r\n\r\n{m.Log}", CancellationToken.None);
     }
 
     /// <summary>After a restart of the cloud: a move that was running is over. Where the source was stopped and the

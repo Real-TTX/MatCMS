@@ -95,13 +95,17 @@ public static class SettingKeys
     public const string HostingNamePattern = "hosting.namePattern";
 
     // --- Notifications ------------------------------------------------------
-    /// <summary>Where notification mails go (comma-separated). Empty = every cloud user's e-mail.</summary>
+    /// <summary>The notification matrix (JSON, <c>NotificationService</c>): who gets which event. Once saved it
+    /// replaces the three keys below, which stay only so the first load can translate them into it.</summary>
+    public const string NotifyMatrix = "notify.matrix";
+
+    /// <summary>LEGACY (pre-matrix): where notification mails went. Empty = every cloud user's e-mail.</summary>
     public const string NotifyRecipients = "notify.recipients";
 
-    /// <summary>"1" = mail when an instance stops sending heartbeats (dead-man switch).</summary>
+    /// <summary>LEGACY (pre-matrix): "1" = mail when an instance stops sending heartbeats.</summary>
     public const string NotifyOffline = "notify.offline";
 
-    /// <summary>"1" = mail when a newer MatCMS release appears for a connected instance.</summary>
+    /// <summary>LEGACY (pre-matrix): "1" = mail when a newer MatCMS release appears.</summary>
     public const string NotifyUpdate = "notify.update";
 
     /// <summary>"1" = update LOCAL instances automatically as soon as a new release is found.
@@ -152,6 +156,6 @@ public static class SettingKeys
 
     public static readonly string[] Notifications =
     [
-        NotifyRecipients, NotifyOffline, NotifyUpdate, AutoUpdateLocal
+        NotifyMatrix, NotifyRecipients, NotifyOffline, NotifyUpdate, AutoUpdateLocal
     ];
 }

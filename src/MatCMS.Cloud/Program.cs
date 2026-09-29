@@ -116,6 +116,7 @@ builder.Services.AddScoped<HostingActionsService>();
 builder.Services.AddScoped<CloudUpdaterService>();
 builder.Services.AddScoped<MatCMS.Cloud.Services.Proxy.ProxyService>();
 builder.Services.AddScoped<MatCMS.Cloud.Services.Nodes.NodeService>();
+builder.Services.AddScoped<NotificationService>();
 builder.Services.AddSingleton<MatCMS.Cloud.Services.Nodes.NodeSignal>();
 builder.Services.AddScoped<MatCMS.Cloud.Services.Nodes.MigrationService>();
 builder.Services.AddSingleton<MatCMS.Cloud.Services.Nodes.MigrationQueue>();
@@ -250,6 +251,8 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AuthorizeFolder("/Admin/Cleanup", "Admin");
     options.Conventions.AuthorizeFolder("/Admin/Logs", "Admin");
     options.Conventions.AuthorizeFolder("/Admin/Hosting", "Admin");
+    // The notification matrix decides who hears about the WHOLE fleet — Admin-only like the other fleet pages.
+    options.Conventions.AuthorizeFolder("/Admin/Notifications", "Admin");
     // Creating and removing instances stays with admins; an Operator only runs its assigned ones.
     options.Conventions.AuthorizePage("/Admin/Instances/New", "Admin");
     options.Conventions.AuthorizePage("/Admin/Instances/Create", "Admin");
@@ -1002,6 +1005,7 @@ MatCMS.Cloud.Api.StoreApi.MapStoreApi(app);
 // cloud's own self-update — everything the Hosting UI can do, so an AI agent can do it too.
 MatCMS.Cloud.Api.HostingApi.MapHostingApi(app);
 MatCMS.Cloud.Api.NodeApi.MapNodeApi(app);
+MatCMS.Cloud.Api.NotificationApi.MapNotificationApi(app);
 
 // --- Catalogue ------------------------------------------------------------
 // The store, browsable by an approved instance itself ("Weiter durchsuchen…" in MatCMS). This is the

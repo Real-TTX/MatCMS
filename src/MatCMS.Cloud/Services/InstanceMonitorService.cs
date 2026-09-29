@@ -75,13 +75,14 @@ public class InstanceMonitorService : BackgroundService
         var hosting = sp.GetRequiredService<HostingActionsService>();
         var mail = sp.GetRequiredService<EmailService>();
         var removals = sp.GetRequiredService<InstanceRemovalService>();
+        // Who hears about what is the notification matrix's business — the ONLY place events become addresses.
+        var notify = sp.GetRequiredService<NotificationService>();
+        var matrix = notify.Load();
 
         var settings = await db.CloudSettings.AsNoTracking()
             .ToDictionaryAsync(s => s.Key, s => s.Value, StringComparer.OrdinalIgnoreCase, ct);
         bool Flag(string key) =>
             settings.TryGetValue(key, out var v) && (v ?? "").Trim().ToLowerInvariant() is "1" or "true" or "on" or "yes";
-
-        var globalRecipients = settings.TryGetValue(SettingKeys.NotifyRecipients, out var gr) ? gr : null;
 
         // Only APPROVED instances are watched. One that is still waiting for approval, or was turned
         // away, must not raise offline alarms — it was never promised to be up.
@@ -118,28 +119,43 @@ public class InstanceMonitorService : BackgroundService
                 catch (Exception ex) { _log.LogWarning(ex, "Retention sweep failed for instance {Id}", instance.Id); }
             }
         }
-        // Recipients ride along per mail: two instances on different profiles can have different
-        // notification targets, so one global list at send time would be wrong.
-        var pending = new List<(string subject, string body, string? recipients)>();
+        // Each mail carries its EVENT and the instance it is about; the recipients are resolved from the matrix
+        // at send time — per instance, because an Operator only hears about its own sites.
+        var pending = new List<(string Event, Instance? Instance, string Subject, string Body)>();
 
         // --- 0) removals waiting for a backup ---------------------------------
         // Before the loop below, and over its OWN list: a waiting instance need not be approved (it
         // can have been rejected, or still be pending, in which case no backup will ever arrive and
         // the wait simply goes on saying so), and it has to be looked at even while it is offline.
-        await CompleteRemovalsAsync(removals, instances, db, pending, globalRecipients, ct);
+        await CompleteRemovalsAsync(removals, instances, db, pending, ct);
+
+        // --- 0b) nodes that went silent -------------------------------------
+        // Infrastructure: a node that stops beating takes every site on it out of the cloud's reach. Once per
+        // outage, like the instance alarm; the node's next beat re-arms it (NodeService.HeartbeatAsync).
+        var silentCut = DateTime.UtcNow - 2 * Node.OfflineAfter;
+        foreach (var node in await db.Nodes.Where(n => !n.Revoked && !n.OfflineNotified && n.LastSeenAt != null && n.LastSeenAt < silentCut).ToListAsync(ct))
+        {
+            node.OfflineNotified = true;
+            var sites = await db.Instances.CountAsync(i => i.NodeId == node.Id, ct);
+            pending.Add((NotifyEvents.NodeOffline, null,
+                $"[MatCMS.Cloud] Node {node.Name} ist nicht erreichbar",
+                $"Der Node \"{node.Name}\" ({node.HostName ?? "?"}) meldet sich seit {node.LastSeenAt:yyyy-MM-dd HH:mm} UTC nicht mehr.\r\n" +
+                $"Websites auf diesem Node: {sites} — die Cloud kann sie bis dahin nicht steuern.\r\n\r\n" +
+                "Auf dem Host prüfen: docker ps (läuft der Agent-Container?), docker logs <agent>."));
+        }
 
         // Update notices are COLLECTED, not mailed one by one: a release drop otherwise sent a
         // separate mail for every instance ("richtiger Spam"). They are grouped by recipient list
         // below into one summary per target — recipients can differ per profile, so a single global
         // mail would reach the wrong people.
         var latestVersion = releases.LatestVersion;
-        var updates = new List<(string Name, string? Old, InstanceHosting Hosting, string? Recipients)>();
+        var updates = new List<(Instance Instance, string? Old)>();
 
         foreach (var instance in all)
         {
             // Policy comes from the instance's profile; the global settings are only the fallback
             // for an instance that has none.
-            var policy = ProfileService.PolicyFor(instance.Profile, Flag, globalRecipients);
+            var policy = ProfileService.PolicyFor(instance.Profile, Flag);
             var notifyOffline = policy.NotifyOffline;
             var notifyUpdate = policy.NotifyUpdate;
             var autoUpdate = policy.AutoUpdateLocal;
@@ -152,13 +168,12 @@ public class InstanceMonitorService : BackgroundService
                     $"Kein Heartbeat seit {since:yyyy-MM-dd HH:mm} UTC.", notified: !notifyOffline);
                 instance.OfflineNotified = true;
                 if (notifyOffline)
-                    pending.Add((
+                    pending.Add((NotifyEvents.Offline, instance,
                         $"[MatCMS.Cloud] {instance.Name} ist offline",
                         $"Die Instanz \"{instance.Name}\" meldet sich nicht mehr.\r\n" +
                         $"Letzter Heartbeat: {since:yyyy-MM-dd HH:mm} UTC\r\n" +
                         $"Version: {instance.Version ?? "unbekannt"}\r\n" +
-                        $"Host: {instance.HostName ?? "unbekannt"} ({InstanceService.Describe(instance.Hosting)})",
-                        policy.Recipients));
+                        $"Host: {instance.HostName ?? "unbekannt"} ({InstanceService.Describe(instance.Hosting)})"));
             }
 
             // --- 2) update available ----------------------------------------
@@ -171,7 +186,7 @@ public class InstanceMonitorService : BackgroundService
                     $"Neue Version {latest} verfügbar (läuft {instance.Version ?? "?"}).", notified: !notifyUpdate);
                 // Collected, not sent here — see the grouping after the loop.
                 if (notifyUpdate)
-                    updates.Add((instance.Name, instance.Version, instance.Hosting, policy.Recipients));
+                    updates.Add((instance, instance.Version));
             }
 
             // --- 3) auto-update (this host or a node, opt-in) ---------------
@@ -191,34 +206,40 @@ public class InstanceMonitorService : BackgroundService
                 // broken update is reported once and then left to a human.
                 if (result.Ok) instance.AutoUpdateAttemptedVersion = null;
                 else
-                    pending.Add((
+                    pending.Add((NotifyEvents.UpdateFailed, instance,
                         $"[MatCMS.Cloud] Update von {instance.Name} fehlgeschlagen",
-                        $"Das automatische Update ist fehlgeschlagen:\r\n\r\n{result.Message}",
-                        policy.Recipients));
+                        $"Das automatische Update ist fehlgeschlagen:\r\n\r\n{result.Message}"));
             }
         }
 
-        // One summary per distinct recipient list: "Site: alte Version → neue Version", instead of a
-        // separate mail per instance. Grouped so two profiles with different notification targets each
-        // get their own summary, and an empty key (no per-profile override) falls back at send time.
-        foreach (var group in updates.GroupBy(u => u.Recipients ?? ""))
+        // ONE summary per recipient instead of a mail per instance ("richtiger Spam") — and per recipient, not
+        // per list: an Operator's summary names only its own sites, so recipients are grouped by the exact set
+        // of instances they may hear about, and each group gets one mail.
+        var perRecipient = new Dictionary<string, List<(Instance Instance, string? Old)>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var u in updates)
+            foreach (var to in await notify.RecipientsAsync(NotifyEvents.Update, u.Instance, matrix, ct))
+            {
+                if (!perRecipient.TryGetValue(to, out var list)) perRecipient[to] = list = new();
+                list.Add(u);
+            }
+        var summaries = new List<(List<string> To, string Subject, string Body)>();
+        foreach (var group in perRecipient.GroupBy(kv => string.Join(",", kv.Value.Select(x => x.Instance.Id).OrderBy(x => x))))
         {
-            var items = group.ToList();
+            var items = group.First().Value;
             var n = items.Count;
             var lines = string.Join("\r\n", items.Select(u =>
-                $"• {u.Name}: {u.Old ?? "unbekannt"} → {latestVersion} [{InstanceService.Describe(u.Hosting)}]"));
-            pending.Add((
+                $"• {u.Instance.Name}: {u.Old ?? "unbekannt"} → {latestVersion} [{InstanceService.Describe(u.Instance.Hosting)}]"));
+            summaries.Add((group.Select(kv => kv.Key).ToList(),
                 $"[MatCMS.Cloud] Update {latestVersion} verfügbar ({n} Instanz{(n == 1 ? "" : "en")})",
                 $"Für folgende Instanz{(n == 1 ? "" : "en")} ist die neue Version {latestVersion} verfügbar:\r\n\r\n" +
                 lines + "\r\n\r\n" +
-                "Lokale Instanzen kann die Cloud selbst aktualisieren (Instanz → „Jetzt aktualisieren“). " +
-                "Für entfernte Instanzen dort ausführen: docker compose pull && docker compose up -d",
-                group.Key.Length == 0 ? null : group.Key));
+                "Instanzen auf diesem Host oder einem Node kann die Cloud selbst aktualisieren (Instanz → Hosting → Update). " +
+                "Für entfernte Instanzen dort ausführen: docker compose pull && docker compose up -d"));
         }
 
         await db.SaveChangesAsync(ct);
 
-        if (pending.Count == 0) return;
+        if (pending.Count == 0 && summaries.Count == 0) return;
 
         if (!await mail.IsConfiguredAsync())
         {
@@ -226,17 +247,19 @@ public class InstanceMonitorService : BackgroundService
             return;
         }
 
-        var fallback = await mail.ResolveRecipientsAsync();
-        foreach (var (subject, body, overrideRecipients) in pending)
+        foreach (var (ev, inst, subject, body) in pending)
         {
-            var to = EmailService.ParseRecipients(overrideRecipients);
-            if (to.Count == 0) to = fallback;
+            var to = await notify.RecipientsAsync(ev, inst, matrix, ct);
             if (to.Count == 0)
             {
-                _log.LogInformation("Notification '{Subject}' suppressed — no recipients", subject);
+                _log.LogInformation("Notification '{Subject}' ({Event}) suppressed — nobody subscribed", subject, ev);
                 continue;
             }
-
+            var (ok, error) = await mail.SendAsync(to, subject, body);
+            if (!ok) _log.LogWarning("Notification '{Subject}' could not be sent: {Error}", subject, error);
+        }
+        foreach (var (to, subject, body) in summaries)
+        {
             var (ok, error) = await mail.SendAsync(to, subject, body);
             if (!ok) _log.LogWarning("Notification '{Subject}' could not be sent: {Error}", subject, error);
         }
@@ -253,14 +276,12 @@ public class InstanceMonitorService : BackgroundService
     /// is patient and one that is stuck — while a "for safety, remove it anyway" timer would destroy
     /// exactly the site this way exists to protect.</para>
     ///
-    /// <para>Recipients come from the global notification settings rather than the instance's
-    /// profile: the instance may have none, it is about to stop existing, and the person waiting on
-    /// this is the operator of the cloud rather than of the site.</para>
+    /// <para>A fleet event ("Entfernen" in the matrix), not an instance one: the instance is about to stop
+    /// existing, and the person waiting on this runs the cloud rather than the site.</para>
     /// </summary>
     private async Task CompleteRemovalsAsync(
         InstanceRemovalService removals, InstanceService instances, AppDbContext db,
-        List<(string subject, string body, string? recipients)> pending,
-        string? globalRecipients, CancellationToken ct)
+        List<(string Event, Instance? Instance, string Subject, string Body)> pending, CancellationToken ct)
     {
         var waiting = await removals.PendingAsync(ct);
         foreach (var instance in waiting)
@@ -273,11 +294,10 @@ public class InstanceMonitorService : BackgroundService
             if (outcome is { Removed: true })
             {
                 _log.LogWarning("Delayed removal of {Name} completed: {Message}", name, outcome.Message);
-                pending.Add((
+                pending.Add((NotifyEvents.Removal, null,
                     $"[MatCMS.Cloud] {name} wurde nach dem Backup entfernt",
                     $"Das Backup der Instanz \"{name}\" ist eingetroffen und liegt im Archiv.\r\n" +
-                    $"Erst danach wurde sie entfernt.\r\n\r\n{outcome.Message}",
-                    globalRecipients));
+                    $"Erst danach wurde sie entfernt.\r\n\r\n{outcome.Message}"));
                 continue;
             }
 
@@ -304,15 +324,14 @@ public class InstanceMonitorService : BackgroundService
                 $"Entfernen wartet weiterhin: {problem}");
             await db.SaveChangesAsync(ct);
 
-            pending.Add((
+            pending.Add((NotifyEvents.Removal, null,
                 $"[MatCMS.Cloud] Entfernen von {name} wartet weiterhin",
                 $"Das Entfernen der Instanz \"{name}\" wurde vorgemerkt, ist aber noch nicht geschehen.\r\n" +
                 $"Vorgemerkt am: {instance.PendingRemovalAt:yyyy-MM-dd HH:mm} UTC\r\n\r\n" +
                 $"{problem}\r\n\r\n" +
                 "Es wurde nichts entfernt, und es wird auch nichts entfernt, solange das Backup nicht " +
                 "hier ist. In der Cloud lässt sich das Backup erneut anfordern oder das Entfernen " +
-                "zurücknehmen.",
-                globalRecipients));
+                "zurücknehmen."));
         }
     }
 }

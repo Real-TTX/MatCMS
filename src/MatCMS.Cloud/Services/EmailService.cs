@@ -62,22 +62,8 @@ public class EmailService
             .Split([',', ';', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .ToList();
 
-    /// <summary>The addresses notifications go to: the configured list, or every cloud user's e-mail
-    /// when it is empty (so a fresh install still reaches somebody).</summary>
-    public async Task<List<string>> ResolveRecipientsAsync()
-    {
-        var configured = await _db.CloudSettings.AsNoTracking()
-            .Where(s => s.Key == SettingKeys.NotifyRecipients)
-            .Select(s => s.Value).FirstOrDefaultAsync();
-
-        var list = ParseRecipients(configured);
-        if (list.Count > 0) return list;
-
-        return await _db.Users.AsNoTracking()
-            .Where(u => u.Email != null && u.Email != "")
-            .Select(u => u.Email!)
-            .ToListAsync();
-    }
+    // Who a notification goes to is NotificationService's (the matrix) — deliberately not here any more: the old
+    // "configured list, else EVERY user" fallback would mail an Operator about sites it has no business seeing.
 
     /// <summary>Sends a plain-text mail using the saved SMTP config. Returns (ok, error); never throws.</summary>
     public async Task<(bool ok, string? error)> SendAsync(

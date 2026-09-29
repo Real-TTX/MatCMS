@@ -182,6 +182,7 @@ public class NodeService
     {
         var now = DateTime.UtcNow;
         node.LastSeenAt = now;
+        node.OfflineNotified = false;   // back — the next outage may notify again
         node.AgentVersion = Trunc(req.AgentVersion, 100);
         node.HostName = Trunc(req.HostName, 200);
         node.DockerVersion = Trunc(req.DockerVersion, 50);

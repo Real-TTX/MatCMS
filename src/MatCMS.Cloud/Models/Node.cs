@@ -26,6 +26,9 @@ public class Node
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? LastSeenAt { get; set; }
 
+    /// <summary>The "Node offline" notification went out for the current outage; the next beat re-arms it.</summary>
+    public bool OfflineNotified { get; set; }
+
     // --- Reported by the agent ----------------------------------------------
     public string? AgentVersion { get; set; }
     public string? HostName { get; set; }

@@ -1,0 +1,90 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.Notifications.IndexModel
+@using MatCMS.Cloud.Services
+@{
+    ViewData["Title"] = T["notify.title"];
+    var events = NotifyEvents.All;
+}
+<div class="page-head">
+    <h1>@T["notify.title"]</h1>
+</div>
+<p class="help">@T["notify.intro"]</p>
+@if (!Model.MailConfigured)
+{
+    <div class="alert alert-info">@T["notify.noSmtp"] <a asp-page="/Admin/Settings/Index" asp-route-tab="smtp">@T["nav.settings"] → SMTP</a></div>
+}
+
+@* One form for the whole matrix: a cell is "row|event". Own addresses travel as "rows" so an address with
+   nothing ticked is kept (removing is its own button); "+" adds one; the trash button removes one. *@
+<form method="post">
+    @* The DEFAULT button (Enter in the "+" field): browsers submit with the FIRST submit button in the form —
+       without this one that would be the trash button of the first address. *@
+    <button type="submit" style="position:absolute;left:-9999px;" tabindex="-1" aria-hidden="true"></button>
+    <table class="data notify-matrix">
+        <thead>
+            <tr>
+                <th>@T["notify.recipient"]</th>
+                @foreach (var e in events)
+                {
+                    <th class="notify-cell">@T["notify.event." + e]</th>
+                }
+                <th class="notify-cell"></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var r in Model.Rows)
+            {
+                <tr class="@(r.Kind == "group" ? "notify-group" : "")">
+                    <td>
+                        @if (r.Kind == "group") { <strong>👥 @r.Label</strong> }
+                        else if (r.Kind == "email") { <span class="mono">✉️ @r.Label</span> }
+                        else { <span>👤 @r.Label</span> }
+                        @if (!string.IsNullOrEmpty(r.Sub)) { <div class="muted" style="font-size:12px;">@r.Sub</div> }
+                        @if (r.NoEmail) { <div class="muted" style="font-size:12px;">@T["notify.noEmail"]</div> }
+                        @if (r.Kind == "email") { <input type="hidden" name="rows" value="@r.Key" /> }
+                    </td>
+                    @foreach (var e in events)
+                    {
+                        <td class="notify-cell">
+                            @if (r.OperatorScoped && NotifyEvents.FleetOnly.Contains(e))
+                            {
+                                @* Fleet events never reach an Operator — it only ever hears about its own sites. *@
+                                <span class="muted" title="@T["notify.fleetOnly"]">—</span>
+                            }
+                            else if (r.NoEmail)
+                            {
+                                <span class="muted">—</span>
+                            }
+                            else
+                            {
+                                <input type="checkbox" name="cell" value="@(r.Key + "|" + e)" checked="@(r.Events.Contains(e) ? "checked" : null)"
+                                       aria-label="@r.Label: @T["notify.event." + e]" />
+                            }
+                        </td>
+                    }
+                    <td class="notify-cell">
+                        @if (r.Kind == "email")
+                        {
+                            <button type="submit" name="remove" value="@r.Key" class="btn btn-sm btn-danger btn-icon" formnovalidate
+                                    title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
+                        }
+                    </td>
+                </tr>
+            }
+            <tr class="notify-add">
+                <td colspan="@(events.Length + 1)">
+                    <input type="email" name="newEmail" placeholder="@T["notify.addPlaceholder"]" aria-label="@T["notify.addPlaceholder"]" style="max-width:340px;" />
+                    <span class="help" style="display:inline;">@T["notify.addHint"]</span>
+                </td>
+                <td class="notify-cell">
+                    <button type="submit" class="btn btn-sm" title="@T["notify.add"]" aria-label="@T["notify.add"]">+</button>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <div class="help">@T["notify.profileHint"]</div>
+    <div class="form-actions">
+        <button type="submit" class="btn">@T["settings.save"]</button>
+    </div>
+</form>
+<div class="help">@T["notify.apiHint"]</div>

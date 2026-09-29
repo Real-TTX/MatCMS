@@ -451,10 +451,10 @@ public class ProfileService
     /// has no profile. This is the single place that decides which of the two wins.</summary>
     public sealed record Policy(bool AutoUpdateLocal, bool NotifyOffline, bool NotifyUpdate, string? Recipients);
 
-    public static Policy PolicyFor(Profile? profile, Func<string, bool> globalFlag, string? globalRecipients) =>
+    // WHO is told is the notification matrix (NotificationService); the policy only says whether this instance
+    // raises the event at all — a profile can switch it off for its sites. Without a profile both are on.
+    public static Policy PolicyFor(Profile? profile, Func<string, bool> globalFlag) =>
         profile is null
-            ? new Policy(globalFlag(SettingKeys.AutoUpdateLocal), globalFlag(SettingKeys.NotifyOffline),
-                         globalFlag(SettingKeys.NotifyUpdate), globalRecipients)
-            : new Policy(profile.AutoUpdateLocal, profile.NotifyOffline, profile.NotifyUpdate,
-                         string.IsNullOrWhiteSpace(profile.NotifyRecipients) ? globalRecipients : profile.NotifyRecipients);
+            ? new Policy(globalFlag(SettingKeys.AutoUpdateLocal), true, true, null)
+            : new Policy(profile.AutoUpdateLocal, profile.NotifyOffline, profile.NotifyUpdate, profile.NotifyRecipients);
 }

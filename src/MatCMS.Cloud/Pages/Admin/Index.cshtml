@@ -4,6 +4,8 @@
 @{
     ViewData["Title"] = T["dashboard.title"];
     var dashUser = User.FindFirst("DisplayName")?.Value ?? User.Identity?.Name ?? "Admin";
+    var maxDay = Math.Max(1, Model.ErrorsPerDay.Max(d => d.Cloud + d.Sites));
+    string Hsize(long b) => b >= 1L << 30 ? $"{b / (double)(1L << 30):0.0} GB" : b >= 1 << 20 ? $"{b / 1048576.0:0} MB" : $"{b / 1024} KB";
 }
 <div class="page-head">
     <h1>@T["dashboard.title"]</h1>
@@ -12,117 +14,182 @@
     </div>
 </div>
 
-<div class="stat-grid">
+@* ---- Tiles: the numbers first, each one leading to where it is dealt with. ---- *@
+<div class="stat-grid dash-tiles">
     <a class="stat" asp-page="/Admin/Instances/Index">
         <div class="n">@Model.Instances.Count</div>
         <div class="l">@T["dashboard.instances"]</div>
+        <div class="s">@T["dashboard.hostSplit", Model.LocalCount, Model.NodeInstanceCount, Model.RemoteCount]</div>
     </a>
-    <a class="stat" asp-page="/Admin/Instances/Index">
-        <div class="n">@Model.OnlineCount</div>
+    <a class="stat @(Model.OfflineCount > 0 ? "is-err" : "")" asp-page="/Admin/Instances/Index">
+        <div class="n">@Model.OnlineCount<span class="of">/@Model.Instances.Count</span></div>
         <div class="l">@T["dashboard.online"]</div>
+        <div class="s">@T["dashboard.offlineStopped", Model.OfflineCount, Model.StoppedCount]</div>
     </a>
-    <a class="stat" asp-page="/Admin/Instances/Index">
-        <div class="n">@Model.OfflineCount</div>
-        <div class="l">@T["dashboard.offline"]</div>
-    </a>
-    <a class="stat" asp-page="/Admin/Instances/Index">
+    <a class="stat @(Model.UpdateCount > 0 ? "is-warn" : "")" asp-page="@(Model.IsAdmin && Model.HostingOn ? "/Admin/Instances/UpdateAll" : "/Admin/Instances/Index")">
         <div class="n">@Model.UpdateCount</div>
         <div class="l">@T["dashboard.updates"]</div>
+        <div class="s">@T["dashboard.latest", Model.LatestVersion ?? "—"]</div>
     </a>
-    <a class="stat" asp-page="/Admin/Logs/Index">
-        <div class="n">@Model.CloudErrorCount7d</div>
+    <a class="stat @(Model.SyncErrorCount > 0 ? "is-err" : Model.OutOfSyncCount > 0 ? "is-warn" : "")" asp-page="/Admin/Instances/Index">
+        <div class="n">@(Model.Instances.Count - Model.OutOfSyncCount - Model.SyncErrorCount)</div>
+        <div class="l">@T["dashboard.inSync"]</div>
+        <div class="s">@T["dashboard.syncSplit", Model.OutOfSyncCount, Model.SyncErrorCount]</div>
+    </a>
+    <a class="stat @(Model.ErrorTotal7d > 0 ? "is-warn" : "")" asp-page="/Admin/Logs/Index">
+        <div class="n">@Model.ErrorTotal7d</div>
         <div class="l">@T["dashboard.errors7d"]</div>
+        @* Seven bars, one per day: tall = many errors that day. The tooltip names both sources. *@
+        <div class="dash-bars" aria-hidden="true">
+            @foreach (var d in Model.ErrorsPerDay)
+            {
+                var total = d.Cloud + d.Sites;
+                <span style="height:@(total == 0 ? 2 : 4 + 22 * total / maxDay)px" title="@d.Day.ToString("ddd dd.MM.") — @T["dashboard.errorsDay", d.Cloud, d.Sites]"></span>
+            }
+        </div>
     </a>
+    @if (Model.IsAdmin && Model.HostingOn)
+    {
+        <a class="stat @(Model.Nodes.Count > Model.NodesOnline ? "is-err" : "")" asp-page="/Admin/Hosting/Nodes/Index">
+            <div class="n">@Model.NodesOnline<span class="of">/@Model.Nodes.Count</span></div>
+            <div class="l">@T["nodes.title"]</div>
+            <div class="s">@T["dashboard.domains", Model.DomainCount]</div>
+        </a>
+    }
 </div>
 
-@* Braucht Aufmerksamkeit: offline, Sync-Fehler, Update verfügbar, veraltetes Protokoll — auf einen Blick. *@
-<div class="card">
-    <h2>@T["dashboard.attention"]</h2>
-    @if (Model.AttentionList.Count == 0)
+<div class="dash-grid">
+    @* ---- Everything that needs a look, errors first — one list instead of one card per kind. ---- *@
+    <div class="card">
+        <h2>@T["dashboard.attention"] @if (Model.AttentionItems.Count > 0) { <span class="muted">(@Model.AttentionItems.Count)</span> }</h2>
+        @if (Model.AttentionItems.Count == 0)
+        {
+            <p class="muted">✓ @T["dashboard.allClear"]</p>
+        }
+        else
+        {
+            <table class="data dash-attention">
+                <colgroup><col class="dash-icon-col" /><col /></colgroup>
+                <tbody>
+                    @foreach (var x in Model.AttentionItems.Take(25))
+                    {
+                        <tr class="lvl-@x.Level">
+                            <td class="dash-icon">@x.Icon</td>
+                            <td><a href="@x.Url"><strong>@x.Title</strong></a><div class="muted">@x.Text</div></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            @if (Model.AttentionItems.Count > 25)
+            {
+                <div class="help">@T["dashboard.more", Model.AttentionItems.Count - 25]</div>
+            }
+        }
+    </div>
+
+    @if (Model.IsAdmin)
     {
-        <p class="muted">✓ @T["dashboard.allClear"]</p>
+        <div class="card">
+            <h2>@T["dashboard.system"]</h2>
+            <div class="kv">
+                <div class="kv-label">@T["dashboard.thisCloud"]</div>
+                <div class="kv-value">
+                    <span class="mono">@Model.CloudVersion</span>
+                    @if (Model.CloudUpdateAvailable)
+                    {
+                        <a class="badge badge-new" asp-page="/Admin/Hosting/Index">@T["dashboard.cloudUpdate", Model.CloudLatest ?? ""]</a>
+                    }
+                </div>
+            </div>
+            <div class="kv">
+                <div class="kv-label">@T["dashboard.latestRelease"]</div>
+                <div class="kv-value">
+                    <span class="mono">@(Model.LatestVersion ?? T["common.unknown"])</span>
+                    <span class="muted">· @T["dashboard.lastCheck"] @(Model.LastReleaseCheck is null ? T["common.never"] : Model.LastReleaseCheck.Value.ToLocalTime().ToString("dd.MM. HH:mm"))</span>
+                </div>
+            </div>
+            <div class="kv">
+                <div class="kv-label">@T["dashboard.dockerAccess"]</div>
+                <div class="kv-value">
+                    @if (!Model.DockerConfigured) { <span class="badge badge-off">@T["dashboard.dockerOff"]</span> }
+                    else if (Model.DockerReachable) { <span class="badge badge-on">@T["dashboard.dockerOk"]</span> }
+                    else { <span class="badge badge-err">@T["dashboard.dockerUnreachable"]</span> }
+                </div>
+            </div>
+            <div class="kv">
+                <div class="kv-label">@T["hosting.title"]</div>
+                <div class="kv-value">
+                    @if (Model.HostingOn)
+                    {
+                        <a asp-page="/Admin/Hosting/Index">@T["dashboard.hostingOn", Model.NodesOnline, Model.Nodes.Count, Model.DomainCount]</a>
+                    }
+                    else
+                    {
+                        <span class="muted">@T["dashboard.hostingOff"]</span>
+                    }
+                </div>
+            </div>
+            <div class="kv">
+                <div class="kv-label">@T["notify.title"]</div>
+                <div class="kv-value">
+                    @if (Model.MailConfigured) { <a asp-page="/Admin/Notifications/Index">@T["dashboard.notifyRows", Model.NotifyRowCount]</a> }
+                    else { <span class="badge badge-err">@T["dashboard.noSmtp"]</span> }
+                </div>
+            </div>
+            <div class="kv">
+                <div class="kv-label">@T["backups.title"]</div>
+                <div class="kv-value"><a asp-page="/Admin/Backups/Index">@T["dashboard.backups", Model.BackupCount, Hsize(Model.BackupBytes)]</a></div>
+            </div>
+        </div>
     }
-    else
-    {
+</div>
+
+<div class="dash-grid">
+    <div class="card">
+        <h2>@T["dashboard.recentSyncs"]</h2>
         <table class="data">
+            <thead><tr><th style="width:120px;">@T["common.time"]</th><th>@T["common.instance"]</th><th style="width:60px;">Rev.</th><th>@T["dashboard.syncResult"]</th></tr></thead>
             <tbody>
-                @foreach (var i in Model.AttentionList)
+                @if (Model.RecentSyncs.Count == 0)
+                {
+                    <partial name="_EmptyRow" model='@T["dashboard.noSyncs"]' />
+                }
+                @foreach (var r in Model.RecentSyncs)
                 {
                     <tr>
-                        <td style="width:220px;"><a asp-page="/Admin/Instances/Details" asp-route-id="@i.Id">@i.Name</a></td>
+                        <td class="muted mono nowrap">@r.RanAt.ToLocalTime().ToString("dd.MM. HH:mm")</td>
+                        <td><a asp-page="/Admin/Instances/Details" asp-route-id="@r.InstanceId" asp-route-tab="config">@(r.Instance?.Name ?? "—")</a></td>
+                        <td class="mono muted">@r.Revision</td>
                         <td>
-                            @if (Model.IsOffline(i)) { <span class="badge badge-err">@T["dashboard.attn.offline"]</span> }
-                            @if (Model.HasSyncError(i)) { <span class="badge badge-err">@T["dashboard.attn.syncError"]</span> }
-                            @if (Model.HasUpdate(i)) { <span class="badge badge-new">@T["dashboard.attn.update"]</span> }
-                            @if (Model.IsOutdated(i)) { <span class="badge badge-off">@T["dashboard.attn.outdated"]</span> }
+                            @if (!string.IsNullOrEmpty(r.Error)) { <span class="badge badge-err" title="@r.Error">@T["common.error"]</span> }
+                            @if (r.Installed > 0) { <span class="badge badge-on">+@r.Installed</span> }
+                            @if (r.Updated > 0) { <span class="badge badge-new">~@r.Updated</span> }
+                            @if (r.Failed > 0) { <span class="badge badge-err">✗@r.Failed</span> }
+                            @if (string.IsNullOrEmpty(r.Error) && r.Installed + r.Updated + r.Failed == 0) { <span class="muted">@T["dashboard.syncNoChange"]</span> }
                         </td>
                     </tr>
                 }
             </tbody>
         </table>
-    }
-</div>
+    </div>
 
-@* Fehler-Übersicht aus dem Protokoll: gespiegelte Instanz-Fehler (Heartbeat) + eigene Cloud-Fehler. *@
-@if (Model.InstancesWithErrors.Count > 0)
-{
     <div class="card">
         <h2>@T["dashboard.errorsTitle"]</h2>
         <table class="data">
             <tbody>
+                @if (Model.InstancesWithErrors.Count == 0)
+                {
+                    <partial name="_EmptyRow" model='@T["dashboard.noErrors"]' />
+                }
                 @foreach (var i in Model.InstancesWithErrors)
                 {
                     <tr>
-                        <td style="width:220px;"><a asp-page="/Admin/Logs/Index" asp-route-source="@i.PublicId">@i.Name</a></td>
-                        <td><span class="badge badge-err">@T["dashboard.errorsN", Model.ErrorCount(i)]</span></td>
+                        <td><a asp-page="/Admin/Logs/Index" asp-route-source="@i.PublicId">@i.Name</a></td>
+                        <td style="width:140px;"><span class="badge badge-err">@T["dashboard.errorsN", Model.ErrorCount(i)]</span></td>
                     </tr>
                 }
             </tbody>
         </table>
-    </div>
-}
-
-<div class="card">
-    <h2>@T["dashboard.releaseTitle"]</h2>
-    <p class="muted">@T["dashboard.releaseText"] <code>@ReleaseWatcher.ImageRef</code></p>
-    <div class="kv">
-        <div class="kv-label">@T["dashboard.thisCloud"]</div>
-        <div class="kv-value mono">@Model.CloudVersion</div>
-    </div>
-    <div class="kv">
-        <div class="kv-label">@T["dashboard.latestRelease"]</div>
-        <div class="kv-value mono">@(Model.LatestVersion ?? T["common.unknown"])</div>
-    </div>
-    <div class="kv">
-        <div class="kv-label">@T["dashboard.lastCheck"]</div>
-        <div class="kv-value muted">
-            @(Model.LastReleaseCheck is null ? T["common.never"] : Model.LastReleaseCheck.Value.ToString("dd.MM.yyyy HH:mm") + " UTC")
-        </div>
-    </div>
-    @if (!string.IsNullOrWhiteSpace(Model.ReleaseError))
-    {
-        <div class="kv">
-            <div class="kv-label">@T["common.error"]</div>
-            <div class="kv-value"><span class="badge badge-err">@Model.ReleaseError</span></div>
-        </div>
-    }
-    <div class="kv">
-        <div class="kv-label">@T["dashboard.dockerAccess"]</div>
-        <div class="kv-value">
-            @if (!Model.DockerConfigured)
-            {
-                <span class="badge badge-off">@T["dashboard.dockerOff"]</span>
-            }
-            else if (Model.DockerReachable)
-            {
-                <span class="badge badge-on">@T["dashboard.dockerOk"]</span>
-                <span class="muted">@T["dashboard.dockerLocalCount", Model.LocalCount]</span>
-            }
-            else
-            {
-                <span class="badge badge-err">@T["dashboard.dockerUnreachable"]</span>
-            }
-        </div>
     </div>
 </div>
 
@@ -151,7 +218,7 @@
                 @foreach (var e in Model.RecentEvents)
                 {
                     <tr data-search="@((e.Instance?.Name ?? "") + " " + e.Message)">
-                        <td class="muted mono">@e.CreatedAt.ToString("dd.MM.yyyy HH:mm")</td>
+                        <td class="muted mono">@e.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
                         <td>@(e.Instance?.Name ?? "—")</td>
                         <td>@e.Message</td>
                     </tr>

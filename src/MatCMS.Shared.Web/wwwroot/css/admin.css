@@ -536,6 +536,31 @@ textarea.code { font-family: var(--font-mono, ui-monospace, monospace); font-siz
 .stat .n { font-family: var(--font-head); font-size: 34px; font-weight: 700; color: var(--black); }
 .stat .l { color: var(--muted); font-size: 14px; text-transform: uppercase; letter-spacing: .06em; }
 .stat a { text-decoration: none; }
+/* Dashboard additions: a sub-line under the label, a quiet "/total", a coloured top edge when a tile needs a
+   look, a 7-day bar strip, and a two-column grid for the cards below the tiles (one column on narrow screens). */
+a.stat { text-decoration: none; color: inherit; display: block; }
+.stat .s { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+.stat .n .of { font-size: 18px; color: var(--muted); font-weight: 600; }
+.stat.is-warn { border-top: 3px solid #e0a100; }
+.stat.is-err { border-top: 3px solid #d64545; }
+.dash-bars { display: flex; align-items: flex-end; gap: 3px; height: 28px; margin-top: 6px; }
+.dash-bars span { flex: 1; background: #d64545; opacity: .75; border-radius: 2px 2px 0 0; min-height: 2px; }
+.dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; align-items: start; }
+.dash-grid > .card { margin-bottom: 0; }
+.dash-grid + .dash-grid, .stat-grid + .dash-grid, .dash-grid + [data-list] { margin-top: 16px; }
+/* Fixed layout: a long message wraps inside the card instead of widening the table past it. */
+table.dash-attention { table-layout: fixed; width: 100%; }
+/* table.data narrows its LAST column to fit row buttons (width 1%, nowrap) — here the last column is the
+   message, which must take the room and wrap. */
+table.data.dash-attention td:last-child { width: auto; white-space: normal; overflow-wrap: anywhere; }
+table.dash-attention col.dash-icon-col { width: 44px; }
+table.dash-attention td.dash-icon { font-size: 18px; text-align: center; padding-left: 6px; padding-right: 6px; }
+/* Dashboard tiles: narrower minimum, so six fit one row on a normal screen. */
+.stat-grid.dash-tiles { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+td.nowrap, th.nowrap { white-space: nowrap; }
+table.dash-attention tr.lvl-err td:first-child { box-shadow: inset 3px 0 0 #d64545; }
+table.dash-attention tr.lvl-warn td:first-child { box-shadow: inset 3px 0 0 #e0a100; }
+table.dash-attention tr.lvl-info td:first-child { box-shadow: inset 3px 0 0 #7a8ca3; }
 
 table.data { width: 100%; border-collapse: collapse; background: #fff; }
 table.data th, table.data td { text-align: left; padding: 13px 16px; border-bottom: 1px solid var(--line); font-size: 14.5px; vertical-align: middle; }

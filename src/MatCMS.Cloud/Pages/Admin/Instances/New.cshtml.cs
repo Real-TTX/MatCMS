@@ -42,7 +42,7 @@ public class NewModel : PageModel
 
     public async Task<IActionResult> OnGetAsync()
     {
-        if (!_hosting.Enabled) return RedirectToPage("Index");
+        if (!_hosting.Enabled) return RedirectToPage("/Admin/Hosting/Settings");
         await LoadAsync();
         return Page();
     }
@@ -56,7 +56,7 @@ public class NewModel : PageModel
 
     public async Task<IActionResult> OnPostAsync(string? name, int profileId, string? domain, string? imageTag, int? nodeId)
     {
-        if (!_hosting.Enabled) return RedirectToPage("Index");
+        if (!_hosting.Enabled) return RedirectToPage("/Admin/Hosting/Settings");
 
         // One path for UI, API and MCP (HostingService.ProvisionAsync). The instance appears in the list when
         // IT enrolls — not now; the route set up here is adopted on its first beat.

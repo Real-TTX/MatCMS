@@ -196,9 +196,9 @@ public class IndexModel : PageModel
                 else if (!string.IsNullOrEmpty(n.DockerError)) Add("err", "🖧", title, "nodeDocker", url, n.DockerError);
                 if (Services.Nodes.NodeService.AgentOutdated(n, CloudVersion)) Add("info", "🖧", title, "agentOutdated", url, n.AgentVersion ?? "", CloudVersion);
             }
-            if (CloudUpdateAvailable) Add("info", "☁️", L("cloud.title"), "cloudUpdate", Url.Page("/Admin/Hosting/Index")!, CloudLatest ?? "");
+            if (CloudUpdateAvailable) Add("info", "☁️", L("cloud.title"), "cloudUpdate", Url.Page("/Admin/Hosting/Updates")!, CloudLatest ?? "");
             if (!MailConfigured) Add("warn", "✉️", L("smtp.title"), "smtp", Url.Page("/Admin/Settings/Index", new { tab = "smtp" })!);
-            if (DockerConfigured && !DockerReachable) Add("err", "🐳", "Docker", "docker", Url.Page("/Admin/Settings/Index", new { tab = "docker" })!);
+            if (DockerConfigured && !DockerReachable) Add("err", "🐳", "Docker", "docker", Url.Page("/Admin/Hosting/Docker")!);
             if (!string.IsNullOrWhiteSpace(ReleaseError)) a.Add(new("warn", "📦", L("release.title"), ReleaseError!, Url.Page("/Admin/Index")!));
         }
         // Errors first, then warnings, then information; within a level, by name.

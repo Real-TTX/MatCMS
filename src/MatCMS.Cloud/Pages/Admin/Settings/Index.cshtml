@@ -14,8 +14,6 @@
     <button type="button" class="tab" data-tab="ai">@T["settings.tabAi"]</button>
     <button type="button" class="tab" data-tab="backup">@T["backups.title"]</button>
     <button type="button" class="tab" data-tab="api">@T["settings.tabApi"]</button>
-    <button type="button" class="tab" data-tab="hosting">@T["settings.tabHosting"]</button>
-    <button type="button" class="tab" data-tab="docker">@T["settings.tabDocker"]</button>
 </div>
 
 @* ============ GENERAL ============ *@
@@ -46,7 +44,6 @@
     <form method="post" asp-page-handler="Security">
         <div class="card">
             <h2>@T["settings.securityHeading"]</h2>
-            <p class="muted">@T["settings.securityIntro"]</p>
             <label class="checkbox-row">
                 <input type="checkbox" name="require2fa" value="true" checked="@(Model.Flag(SettingKeys.Require2fa) ? "checked" : null)" />
                 @T["settings.require2fa"]
@@ -55,24 +52,9 @@
             <div style="margin-top:14px;"><button type="submit" class="btn">@T["settings.save"]</button></div>
         </div>
     </form>
-    @* Automatisches Update ist eine Betriebsregel, keine Benachrichtigung — deshalb hier und nicht in der
-       Benachrichtigungs-Matrix. Pro Profil lässt es sich abweichend setzen. *@
-    <form method="post" asp-page-handler="Updates">
-        <div class="card">
-            <h2>@T["settings.updatesHeading"]</h2>
-            <label class="checkbox-row">
-                <input type="checkbox" name="autoUpdateLocal" value="true" checked="@(Model.Flag(SettingKeys.AutoUpdateLocal) ? "checked" : null)" />
-                @T["settings.autoUpdateLocal"]
-            </label>
-            <div class="help">@T["settings.autoUpdateLocalHint"]</div>
-            <div style="margin-top:14px;"><button type="submit" class="btn">@T["settings.save"]</button></div>
-        </div>
-    </form>
 </div>
 
 @* ============ API ============ *@
-@* Die API-Schlüssel (Operator-API + MCP) leben hier und nicht als eigener Menüpunkt: sie sind Konfiguration der
-   Cloud. Anlegen bleibt eine eigene Seite, die hierher zurückführt. *@
 <div class="tab-panel" data-panel="api" hidden>
     <partial name="_ApiKeyList" model="Model.ApiKeys" />
 </div>
@@ -149,7 +131,6 @@
     <form method="post" asp-page-handler="Ai">
         <div class="card">
             <h2>@T["settings.aiHeading"]</h2>
-            <p class="muted">@T["settings.aiIntro"]</p>
             <div class="form-grid">
                 <div class="form-row">
                     <div class="form-field">
@@ -212,16 +193,14 @@
         }
     </div>
 
-    @* Connect ChatGPT (or an MCP client) to THIS cloud via the native OAuth connector. Separate from the
-       relay above: that key lets the cloud call OpenAI; this grants a client access to /api/v1 + /mcp. *@
+    @* Connect ChatGPT to THIS cloud via the native OAuth connector. Separate from the relay above: that key
+       lets the cloud call OpenAI; this grants a client access to the cloud. *@
     <div class="card">
         <h2>@T["settings.connectHeading"]</h2>
-        <p class="muted">@T["settings.connectIntro"]</p>
         <div class="actions" style="margin:8px 0 4px;">
             <a class="btn" asp-page="/Admin/OAuthClients/Index">@T["settings.connectClientsBtn"]</a>
+            <a class="btn btn-ghost" href="?tab=api">@T["nav.apikeys"]</a>
         </div>
-        <div class="help">@T["settings.connectSteps"]</div>
-        <p class="muted" style="margin-top:12px;">@T["settings.connectManage"] <a asp-page="/Admin/ApiKeys/Index">@T["nav.apikeys"]</a>.</p>
     </div>
 </div>
 
@@ -252,72 +231,6 @@
             <div><button type="submit" class="btn">@T["settings.save"]</button></div>
         </div>
     </form>
-</div>
-
-@* ============ HOSTING ============ *@
-@* Eigener Reiter, weil hier mehr hinkommt als ein Haken: das Anlegen neuer Instanzen und was daran
-   hängt (Adressvergabe, Image, Volumes). Der Haken ist das Tor davor. *@
-<div class="tab-panel" data-panel="hosting" hidden>
-    <form method="post" asp-page-handler="Hosting">
-        <div class="card">
-            <h2>@T["settings.tabHosting"]</h2>
-            <label class="checkbox-row">
-                <input type="checkbox" name="hostingEnabled" value="true" checked="@(Model.Flag(SettingKeys.HostingEnabled) ? "checked" : null)" />
-                @T["settings.hostingEnabled"]
-            </label>
-            <div class="help">@T["settings.hostingEnabledHint"]</div>
-            @* Hosting ist ein optionales Modul: hier wird es nur eingeschaltet. Alles Weitere — Proxy, Ports,
-               Nodes, Domains — steht in seiner eigenen Menügruppe. *@
-            <div class="help">@T["settings.hostingMoved"] <a asp-page="/Admin/Hosting/Settings">@T["hosting.title"] → @T["hosting.navSettings"]</a></div>
-            <div style="margin-top:14px;"><button type="submit" class="btn">@T["settings.save"]</button></div>
-        </div>
-    </form>
-</div>
-
-@* ============ DOCKER ============ *@
-<div class="tab-panel" data-panel="docker" hidden>
-    <div class="card">
-        <h2>@T["settings.docker"]</h2>
-        <p class="muted">@T["settings.dockerHint"]</p>
-        <div class="kv">
-            <div class="kv-label">@T["common.status"]</div>
-            <div class="kv-value">
-                @if (!Model.DockerConfigured)
-                {
-                    <span class="badge badge-off">@T["settings.dockerOff"]</span>
-                }
-                else if (Model.DockerReachable)
-                {
-                    <span class="badge badge-on">@T["settings.dockerOk"]</span>
-                }
-                else
-                {
-                    <span class="badge badge-err">@T["settings.dockerUnreachable"]</span>
-                }
-            </div>
-        </div>
-        <div class="kv">
-            <div class="kv-label">@T["settings.dockerEndpoint"]</div>
-            <div class="kv-value mono">MatCmsCloud__Docker__Endpoint</div>
-        </div>
-        <div class="kv">
-            <div class="kv-label">@T["settings.dockerLocalCount"]</div>
-            <div class="kv-value">@Model.LocalCount</div>
-        </div>
-        <div class="help">@T["settings.dockerConfigHint"]</div>
-
-        @if (Model.DockerConfigured && Model.DockerReachable)
-        {
-            @* Remove OLD MatCMS images left dangling by updates. Only MatCMS, only untagged, only if unused
-               (the service refuses images a container still needs) — never another app's layers. *@
-            <div class="list-actions" style="margin-top:14px;">
-                <form method="post" asp-page-handler="PruneImages">
-                    <button type="submit" class="btn btn-ghost"><i class="ti ti-trash" aria-hidden="true"></i> @T["settings.dockerPrune"]</button>
-                </form>
-            </div>
-            <div class="help">@T["settings.dockerPruneHint"]</div>
-        }
-    </div>
 </div>
 
 @section Scripts {

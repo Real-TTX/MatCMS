@@ -37,6 +37,8 @@ public class DockerHostService : IDisposable
     }
 
     public bool Configured => _endpoint.Length > 0;
+    /// <summary>The endpoint in use (after the tcp→http translation), for display. Empty when unset.</summary>
+    public string Endpoint => _endpoint;
 
     /// <summary>The cloud keeps one instance for its lifetime; the node-agent uses one per beat and per job, so a
     /// connection pool that got stuck (seen after an archive extract over http) dies with its client.</summary>

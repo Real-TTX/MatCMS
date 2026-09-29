@@ -8,40 +8,26 @@ using Microsoft.EntityFrameworkCore;
 namespace MatCMS.Cloud.Pages.Admin.Settings;
 
 /// <summary>
-/// One page, three independent forms (general / notifications / SMTP). Each form saves ONLY its own
-/// keys — that is why <see cref="SettingKeys"/> groups them into separate arrays.
+/// The cloud's own settings: general + security, SMTP, AI, backups, API keys. Each form saves ONLY its own keys.
+/// Everything about hosts and containers is under Hosting — the old tabs here redirect there.
 /// </summary>
 public class IndexModel : PageModel
 {
     private readonly AppDbContext _db;
     private readonly CloudContext _cloud;
     private readonly EmailService _mail;
-    private readonly DockerHostService _docker;
     private readonly SecretProtector _secrets;
-    private readonly HostingService _hosting;
-    private readonly MatCMS.Cloud.Services.Proxy.ProxyService _proxy;
 
-    public IndexModel(AppDbContext db, CloudContext cloud, EmailService mail, DockerHostService docker, SecretProtector secrets,
-        HostingService hosting, MatCMS.Cloud.Services.Proxy.ProxyService proxy)
+    public IndexModel(AppDbContext db, CloudContext cloud, EmailService mail, SecretProtector secrets)
     {
         _db = db;
         _cloud = cloud;
         _mail = mail;
-        _docker = docker;
         _secrets = secrets;
-        _hosting = hosting;
-        _proxy = proxy;
     }
 
     public string Get(string key) => _cloud.Get(key) ?? "";
     public bool Flag(string key) => _cloud.Flag(key);
-
-    public bool DockerConfigured => _docker.Configured;
-    public bool DockerReachable { get; private set; }
-
-    /// <summary>How many instances the cloud found on its own daemon — the practical answer to
-    /// "is the socket doing anything for me?".</summary>
-    public int LocalCount { get; private set; }
 
     /// <summary>The API tab: the operator keys (list + the one-time display of a just-created key).</summary>
     public Pages.Admin.ApiKeys.ApiKeyListView ApiKeys { get; private set; } = null!;
@@ -53,10 +39,11 @@ public class IndexModel : PageModel
     public long AiTokensTotal { get; private set; }
     public int AiCallsTotal { get; private set; }
 
-    public async Task OnGetAsync()
+    public async Task<IActionResult> OnGetAsync(string? tab)
     {
-        DockerReachable = await _docker.IsReachableAsync(HttpContext.RequestAborted);
-        LocalCount = await _db.Instances.CountAsync(i => i.Hosting == InstanceHosting.Local);
+        // These tabs moved to Hosting; old links and bookmarks land where the thing is now.
+        if (tab == "hosting") return RedirectToPage("/Admin/Hosting/Settings");
+        if (tab == "docker") return RedirectToPage("/Admin/Hosting/Docker");
         ApiKeys = new Pages.Admin.ApiKeys.ApiKeyListView(
             await _db.ApiKeys.Include(k => k.Instances).AsNoTracking().OrderByDescending(k => k.CreatedAt).ToListAsync(),
             TempData["NewApiKey"] as string);
@@ -69,6 +56,7 @@ public class IndexModel : PageModel
                          select new AiUsageRow(i.Name, u.Tokens, u.Calls)).ToListAsync();
         AiTokensTotal = AiUsage.Sum(r => (long)r.Tokens);
         AiCallsTotal = AiUsage.Sum(r => r.Calls);
+        return Page();
     }
 
     public async Task<IActionResult> OnPostGeneralAsync(string? cloudName, string? canonicalUrl, bool forceHttps)
@@ -81,17 +69,6 @@ public class IndexModel : PageModel
         });
         TempData["Flash"] = "Einstellungen gespeichert.";
         return RedirectToPage(new { tab = "general" });
-    }
-
-    /// <summary>Removes OLD MatCMS images the host no longer needs (dangling, unused). Only MatCMS images,
-    /// only if not in use — see DockerHostService.PruneMatCmsImagesAsync.</summary>
-    public async Task<IActionResult> OnPostPruneImagesAsync()
-    {
-        var r = await _docker.PruneMatCmsImagesAsync(HttpContext.RequestAborted);
-        TempData["Flash"] = r.Removed == 0
-            ? "Keine alten MatCMS-Images zum Aufräumen."
-            : $"{r.Removed} altes/alte MatCMS-Image(s) entfernt (~{r.BytesReclaimed / (1024.0 * 1024.0):0.#} MB).";
-        return RedirectToPage(new { tab = "docker" });
     }
 
     /// <summary>Eigenes Formular, eigener Handler — jede Karte speichert nur ihre eigenen Schlüssel.
@@ -121,15 +98,6 @@ public class IndexModel : PageModel
         return RedirectToPage(new { tab = "backup" });
     }
 
-    /// <summary>Only the module switch lives here — Hosting is optional and its configuration is in its own menu
-    /// group (Hosting → Einstellungen).</summary>
-    public async Task<IActionResult> OnPostHostingAsync(bool hostingEnabled)
-    {
-        await _cloud.SaveAsync(new Dictionary<string, string?> { [SettingKeys.HostingEnabled] = hostingEnabled ? "1" : "0" });
-        TempData["Flash"] = hostingEnabled ? "Hosting eingeschaltet — die Menügruppe „Hosting“ ist jetzt da." : "Hosting ausgeschaltet.";
-        return RedirectToPage(new { tab = "hosting" });
-    }
-
     /// <summary>Security policy card. Its own form, so saving it never touches the other settings.</summary>
     public async Task<IActionResult> OnPostSecurityAsync(bool require2fa)
     {
@@ -140,14 +108,6 @@ public class IndexModel : PageModel
         TempData["Flash"] = require2fa
             ? "Zwei-Faktor-Pflicht ist AKTIV — Konten ohne 2FA werden zur Einrichtung geführt."
             : "Sicherheitseinstellungen gespeichert.";
-        return RedirectToPage(new { tab = "general" });
-    }
-
-    /// <summary>The automatic-update rule (who is TOLD about updates is the notification matrix).</summary>
-    public async Task<IActionResult> OnPostUpdatesAsync(bool autoUpdateLocal)
-    {
-        await _cloud.SaveAsync(new Dictionary<string, string?> { [SettingKeys.AutoUpdateLocal] = autoUpdateLocal ? "1" : "0" });
-        TempData["Flash"] = "Update-Einstellungen gespeichert.";
         return RedirectToPage(new { tab = "general" });
     }
 

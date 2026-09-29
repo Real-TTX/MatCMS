@@ -6,10 +6,8 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 namespace MatCMS.Cloud.Pages.Admin.Hosting;
 
 /// <summary>
-/// How "Dieser Host" (the cloud's own Docker daemon) hosts sites: reverse proxy, port range, naming pattern.
-/// Part of the Hosting module's own menu group — Einstellungen → Hosting holds nothing but the module switch,
-/// because Hosting is optional and its configuration belongs to it, not to the cloud's general settings.
-/// Nodes carry their own copy of the same fields (Hosting → Nodes → Proxy &amp; Ports, same partial).
+/// Hosting → Einstellungen: the module switch, and how "Dieser Host" (the cloud's own Docker daemon) hosts sites —
+/// reverse proxy, port range, naming pattern. Nodes carry their own copy of the same fields (same partial).
 /// </summary>
 public class SettingsModel : PageModel
 {
@@ -39,6 +37,15 @@ public class SettingsModel : PageModel
         DockerReachable = await _docker.IsReachableAsync(HttpContext.RequestAborted);
         NextPort = await _hosting.NextFreePortAsync(HttpContext.RequestAborted);
         UsedPortCount = (await _hosting.UsedPortsAsync(HttpContext.RequestAborted))?.Count ?? 0;
+    }
+
+    /// <summary>The module switch. Off hides provisioning, Nodes and Domains; the container actions on local
+    /// instances, Updates and Docker stay, because they predate the module.</summary>
+    public async Task<IActionResult> OnPostModuleAsync(bool hostingEnabled)
+    {
+        await _cloud.SaveAsync(new Dictionary<string, string?> { [SettingKeys.HostingEnabled] = hostingEnabled ? "1" : "0" });
+        TempData["Flash"] = hostingEnabled ? "Hosting eingeschaltet." : "Hosting ausgeschaltet.";
+        return RedirectToPage();
     }
 
     public async Task<IActionResult> OnPostSaveAsync(

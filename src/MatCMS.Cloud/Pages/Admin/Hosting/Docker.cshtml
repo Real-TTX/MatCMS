@@ -1,0 +1,54 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.Hosting.DockerModel
+@{
+    ViewData["Title"] = T["hosting.title"];
+}
+<partial name="_HostingTabs" model='"docker"' />
+
+<div class="card">
+    <h2>@T["nodes.thisHost"]</h2>
+    <div class="kv">
+        <div class="kv-label">@T["common.status"]</div>
+        <div class="kv-value">
+            @if (!Model.DockerConfigured)
+            {
+                <span class="badge badge-off">@T["settings.dockerOff"]</span>
+            }
+            else if (Model.DockerReachable)
+            {
+                <span class="badge badge-on">@T["settings.dockerOk"]</span>
+            }
+            else
+            {
+                <span class="badge badge-err">@T["settings.dockerUnreachable"]</span>
+            }
+        </div>
+    </div>
+    @if (Model.Daemon is { } d)
+    {
+        <div class="kv"><div class="kv-label">@T["nodes.docker"]</div><div class="kv-value mono">@d.Version</div></div>
+        <div class="kv"><div class="kv-label">@T["nodes.host"]</div><div class="kv-value mono">@d.HostName</div></div>
+    }
+    <div class="kv">
+        <div class="kv-label">@T["settings.dockerEndpoint"]</div>
+        <div class="kv-value mono">@(Model.Endpoint ?? "—")</div>
+    </div>
+    <div class="kv">
+        <div class="kv-label">@T["settings.dockerLocalCount"]</div>
+        <div class="kv-value">@Model.LocalCount</div>
+    </div>
+    @if (!Model.DockerConfigured)
+    {
+        <div class="help">@T["settings.dockerConfigHint"]</div>
+    }
+
+    @if (Model.DockerConfigured && Model.DockerReachable)
+    {
+        @* Removes OLD MatCMS images left dangling by updates. Only MatCMS, only untagged, only if unused (the
+           service refuses images a container still needs) — never another app's layers. *@
+        <form method="post" asp-page-handler="PruneImages" class="list-actions">
+            <button type="submit" class="btn btn-ghost"><i class="ti ti-trash" aria-hidden="true"></i> @T["settings.dockerPrune"]</button>
+        </form>
+        <div class="help">@T["settings.dockerPruneHint"]</div>
+    }
+</div>

@@ -26,7 +26,7 @@
         <div class="l">@T["dashboard.online"]</div>
         <div class="s">@T["dashboard.offlineStopped", Model.OfflineCount, Model.StoppedCount]</div>
     </a>
-    <a class="stat @(Model.UpdateCount > 0 ? "is-warn" : "")" asp-page="@(Model.IsAdmin && Model.HostingOn ? "/Admin/Instances/UpdateAll" : "/Admin/Instances/Index")">
+    <a class="stat @(Model.UpdateCount > 0 ? "is-warn" : "")" asp-page="@(Model.IsAdmin ? "/Admin/Hosting/Updates" : "/Admin/Instances/Index")">
         <div class="n">@Model.UpdateCount</div>
         <div class="l">@T["dashboard.updates"]</div>
         <div class="s">@T["dashboard.latest", Model.LatestVersion ?? "—"]</div>

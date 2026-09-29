@@ -14,18 +14,16 @@ public class IndexModel : PageModel
 {
     private readonly VersionService _version;
     private readonly ReleaseWatcher _releases;
-    private readonly DockerHostService _docker;
     private readonly CloudUpdaterService _updater;
 
-    public IndexModel(VersionService version, ReleaseWatcher releases, DockerHostService docker, CloudUpdaterService updater)
+    public IndexModel(VersionService version, ReleaseWatcher releases, CloudUpdaterService updater)
     {
         _version = version;
         _releases = releases;
-        _docker = docker;
         _updater = updater;
     }
 
-    /// <summary>Version + self-update card. Only Admins may start an update (this page is not Admin-only).</summary>
+    /// <summary>Version card, read-only: the self-update is started from Hosting → Updates.</summary>
     public CloudUpdateCard Card { get; private set; } = null!;
 
     public string Current => _version.Current;
@@ -38,14 +36,10 @@ public class IndexModel : PageModel
     public string? InstanceLatest => _releases.LatestVersion;
     public DateTime? InstanceChecked => _releases.LastCheckedUtc;
 
-    public bool DockerConfigured => _docker.Configured;
-    public bool DockerReachable { get; private set; }
-
     public VersionService.UpdateCheck? Check { get; private set; }
 
     public async Task OnGetAsync(bool check = false)
     {
-        DockerReachable = await _docker.IsReachableAsync(HttpContext.RequestAborted);
         if (check)
         {
             // Force BOTH checks, not just the cloud's own image. The instance-facing release cache
@@ -57,17 +51,7 @@ public class IndexModel : PageModel
             await _releases.RefreshAsync(HttpContext.RequestAborted);
         }
         // The card's own registry check replaces the former separate _version.CheckAsync — one call, one answer.
-        Card = new CloudUpdateCard(await _updater.StatusAsync(check, HttpContext.RequestAborted), User.IsInRole("Admin"));
+        Card = new CloudUpdateCard(await _updater.StatusAsync(check, HttpContext.RequestAborted), CanAct: false);
         Check = null;
-    }
-
-    /// <summary>Starts the self-update. Admin-only — enforced here, not just by hiding the button, because
-    /// this page is reachable for Operators.</summary>
-    public async Task<IActionResult> OnPostSelfUpdateAsync()
-    {
-        if (!User.IsInRole("Admin")) return Forbid();
-        var r = await _updater.StartAsync(HttpContext.RequestAborted);
-        TempData[r.Ok ? "Flash" : "FlashError"] = r.Message;
-        return RedirectToPage();
     }
 }

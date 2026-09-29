@@ -8,7 +8,6 @@
 <div class="page-head">
     <h1>@T["notify.title"]</h1>
 </div>
-<p class="help">@T["notify.intro"]</p>
 @if (!Model.MailConfigured)
 {
     <div class="alert alert-info">@T["notify.noSmtp"] <a asp-page="/Admin/Settings/Index" asp-route-tab="smtp">@T["nav.settings"] → SMTP</a></div>
@@ -87,4 +86,3 @@
         <button type="submit" class="btn">@T["settings.save"]</button>
     </div>
 </form>
-<div class="help">@T["notify.apiHint"]</div>

@@ -274,7 +274,6 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AuthorizePage("/Admin/Instances/New", "Admin");
     options.Conventions.AuthorizePage("/Admin/Instances/Create", "Admin");
     options.Conventions.AuthorizePage("/Admin/Instances/Delete", "Admin");
-    options.Conventions.AuthorizePage("/Admin/Instances/UpdateAll", "Admin");
     // The thumbnail renderers of the (Admin-only) Profile and Store pages — they read profile/store content by id,
     // which an Operator has no business browsing.
     options.Conventions.AuthorizePage("/Admin/ComponentPreview", "Admin");

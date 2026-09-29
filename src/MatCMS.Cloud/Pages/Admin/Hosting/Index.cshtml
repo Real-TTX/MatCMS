@@ -3,29 +3,16 @@
 @{
     ViewData["Title"] = T["hosting.title"];
 }
-<div class="page-head">
-    <h1>@T["hosting.title"]</h1>
-    <div class="list-toolbar">
-        @if (Model.ModuleEnabled)
-        {
-            <a class="btn btn-sm" asp-page="/Admin/Instances/New">@T["hosting.newInstance"]</a>
-        }
-        <a class="btn btn-sm btn-ghost" asp-page="/Admin/Hosting/Nodes/Index">@T["nodes.title"] (@(Model.NodeCount + 1))</a>
-        <a class="btn btn-sm btn-ghost" href="?check=true">@T["cloudupdate.check"]</a>
+<div data-list>
+    <partial name="_HostingTabs" model='"overview"' />
+    <div class="page-head">
+        <h1>@T["hosting.title"]</h1>
+        <div class="list-toolbar">
+            <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+        </div>
     </div>
-</div>
-<p class="muted">@T["hosting.intro"]</p>
 
-@if (!Model.ModuleEnabled)
-{
-    <div class="alert alert-info">@T["hosting.moduleOff"] <a asp-page="/Admin/Settings/Index" asp-route-tab="hosting">@T["nav.settings"] → @T["hosting.title"]</a></div>
-}
-
-<partial name="_CloudUpdateCard" model="Model.Card" />
-
-<div class="card">
-    <h2>@T["hosting.hostedInstances"]</h2>
-    <table class="data">
+    <table class="data" data-list-table>
         <thead>
             <tr>
                 <th>@T["cleanup.instance"]</th>
@@ -33,6 +20,7 @@
                 <th>@T["hosting.name"]</th>
                 <th style="width:110px;">@T["hosting.state"]</th>
                 <th style="width:80px;">@T["hosting.port"]</th>
+                <th>@T["hosting.domain"]</th>
                 <th style="width:110px;">@T["hosting.managed"]</th>
                 <th style="width:140px;">@T["hosting.version"]</th>
             </tr>
@@ -45,16 +33,25 @@
             @foreach (var i in Model.Local)
             {
                 var up = string.Equals(i.ContainerState, "running", StringComparison.OrdinalIgnoreCase);
-                <tr>
+                <tr data-search="@(i.Name + " " + i.LocalContainerName + " " + i.ProxyDomain + " " + i.Node?.Name)">
                     <td><a asp-page="/Admin/Instances/Details" asp-route-id="@i.Id" asp-route-tab="hosting">@i.Name</a></td>
                     <td>@if (i.Node is { } nd) { <a asp-page="/Admin/Hosting/Nodes/Details" asp-route-id="@nd.Id">@nd.Name</a> } else { <span class="muted">@T["nodes.thisHost"]</span> }</td>
                     <td class="mono muted">@(i.LocalContainerName ?? "—")</td>
                     <td><span class="badge @(up ? "badge-on" : "badge-err")">@(i.ContainerState ?? "—")</span></td>
                     <td class="mono muted">@(i.LocalPort?.ToString() ?? "—")</td>
+                    <td class="mono muted">@(i.ProxyDomain ?? "—")</td>
                     <td><span class="badge @(i.CloudManaged ? "badge-on" : "badge-off")">@(i.CloudManaged ? T["hosting.managedYes"] : T["hosting.managedNo"])</span></td>
                     <td class="mono muted">@(i.Version ?? "—")</td>
                 </tr>
             }
         </tbody>
     </table>
+    <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
 </div>
+
+@if (Model.ModuleEnabled)
+{
+    <div class="list-actions">
+        <a class="btn" asp-page="/Admin/Instances/New">@T["hosting.newInstance"]</a>
+    </div>
+}

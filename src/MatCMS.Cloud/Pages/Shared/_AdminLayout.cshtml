@@ -7,12 +7,10 @@
     var title = ViewData["Title"] as string ?? "Admin";
     string Active(string path) =>
         Context.Request.Path.StartsWithSegments(path, StringComparison.OrdinalIgnoreCase) ? "active" : "";
-    // For a group's own start page, which is the PREFIX of its sub-pages: active only on itself.
-    // "Instanzen" — except for the two instance pages that live in the Hosting group while it is shown.
-    bool hostingOn = Cloud.Flag(MatCMS.Cloud.Services.SettingKeys.HostingEnabled);
+    // "Neue Instanz" is reached from Hosting and belongs to it; the rest of /admin/instances is "Instanzen".
     string ActiveInstances() =>
-        hostingOn && ActiveExact("/admin/instances/new", "/admin/instances/updateall") != "" ? ""
-        : Active("/admin/instances") + Active("/admin/cleanup");
+        ActiveExact("/admin/instances/new") != "" ? "" : Active("/admin/instances") + Active("/admin/cleanup");
+    string ActiveHosting() => Active("/admin/hosting") + ActiveExact("/admin/instances/new");
     string ActiveExact(params string[] paths) =>
         paths.Any(p => string.Equals(Context.Request.Path.Value?.TrimEnd('/'), p, StringComparison.OrdinalIgnoreCase)) ? "active" : "";
     var displayName = User.FindFirst("DisplayName")?.Value ?? User.Identity?.Name ?? "Admin";
@@ -55,31 +53,22 @@
         </div>
         @{ var isAdmin = User.IsInRole("Admin"); }
         <nav class="admin-nav">
+            @* Hosting is ONE item and the first: everything about hosts, containers, images and domains is in its
+               tabs. It is Admin-only (fleet-wide); an Operator only manages its own instances. The fleet areas below
+               are hidden AND server-side blocked (AuthorizeFolder "Admin" in Program.cs). *@
+            @if (isAdmin)
+            {
+                <a class="@ActiveHosting()" asp-page="/Admin/Hosting/Index">🏗️ @T["hosting.title"]</a>
+            }
             <a class="@ActiveInstances()" asp-page="/Admin/Instances/Index">🖥️ @T["nav.instances"]</a>
-            @* Fleet-wide areas — an Operator only manages its own instances, so these are hidden and
-               server-side blocked (AuthorizeFolder "Admin" in Program.cs). *@
             @if (isAdmin)
             {
                 <a class="@Active("/admin/profiles")" asp-page="/Admin/Profiles/Index">🧩 @T["nav.profiles"]</a>
                 <a class="@Active("/admin/store")" asp-page="/Admin/Store/Index">📦 @T["nav.store"]</a>
                 <a class="@Active("/admin/mail")" asp-page="/Admin/Mail/Index">✉️ @T["spool.title"]</a>
                 <a class="@Active("/admin/backups")" asp-page="/Admin/Backups/Index">💾 @T["backups.title"]</a>
-                @* Hosting is an optional MODULE, so it is its own group — and only there while it is switched
-                   on (Einstellungen → Hosting holds nothing but that switch). Everything that belongs to running
-                   sites lives under it: the hosts, the domains, how this host routes and names new sites. *@
-                @if (hostingOn)
-                {
-                    <div class="admin-nav-sep" role="separator"></div>
-                    <div class="admin-nav-label">🏗️ @T["hosting.title"]</div>
-                    <a class="admin-nav-sub @ActiveExact("/admin/hosting", "/admin/hosting/index")" asp-page="/Admin/Hosting/Index">@T["hosting.navOverview"]</a>
-                    <a class="admin-nav-sub @Active("/admin/hosting/nodes")" asp-page="/Admin/Hosting/Nodes/Index">@T["nodes.title"]</a>
-                    <a class="admin-nav-sub @ActiveExact("/admin/instances/updateall")" asp-page="/Admin/Instances/UpdateAll">@T["hosting.navUpdates"]</a>
-                    <a class="admin-nav-sub @Active("/admin/hosting/domains")" asp-page="/Admin/Hosting/Domains">@T["hosting.navDomains"]</a>
-                    <a class="admin-nav-sub @Active("/admin/hosting/settings")" asp-page="/Admin/Hosting/Settings">@T["hosting.navSettings"]</a>
-                    <a class="admin-nav-sub @ActiveExact("/admin/instances/new")" asp-page="/Admin/Instances/New">@T["hosting.newInstance"]</a>
-                }
                 <div class="admin-nav-sep" role="separator"></div>
-                <a class="@Active("/admin/settings")" asp-page="/Admin/Settings/Index">⚙️ @T["nav.settings"]</a>
+                <a class="@(Active("/admin/settings") + Active("/admin/apikeys") + Active("/admin/oauthclients"))" asp-page="/Admin/Settings/Index">⚙️ @T["nav.settings"]</a>
                 <a class="@Active("/admin/notifications")" asp-page="/Admin/Notifications/Index">🔔 @T["notify.title"]</a>
                 <a class="@Active("/admin/users")" asp-page="/Admin/Users/Index">👤 @T["nav.users"]</a>
                 <a class="@Active("/admin/logs")" asp-page="/Admin/Logs/Index">📋 @T["nav.logs"]</a>

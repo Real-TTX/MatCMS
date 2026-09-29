@@ -266,7 +266,7 @@ first deploy of this version is therefore still the manual `docker compose pull 
 - **Record:** `Instance.ProxyDomain/ProxyProvider/ProxyRouteId/ProxyError/ProxyPublishedAt` (migration
   `AddInstanceProxy`). Publishing pins `Instance.Url = https://<domain>`; with `pushCanonical` a
   `setting.set` content op tells the site `site.canonicalUrl` + `site.behindHttpsProxy`.
-- **Surfaces:** Einstellungen → Hosting (provider, fields per provider, "Speichern und Verbindung testen"),
+- **Surfaces:** Hosting → Einstellungen (provider, fields per provider, "Speichern und Verbindung testen"),
   the Domain card on the instance's Hosting tab (publish/move/check/unpublish), provisioning with a domain;
   REST `/api/v1/hosting/proxy[/test]`, `/api/v1/instances/{id}/domain`; MCP `get_proxy_config`,
   `configure_proxy`, `test_proxy`, `get_domain_status`, `publish_domain`, `unpublish_domain`.

@@ -1,11 +1,12 @@
 @page
 @model MatCMS.Cloud.Pages.Admin.Hosting.DomainsModel
 @{
-    ViewData["Title"] = T["hosting.navDomains"];
+    ViewData["Title"] = T["hosting.title"];
 }
 <div data-list>
+    <partial name="_HostingTabs" model='"domains"' />
     <div class="page-head">
-        <h1>@T["hosting.navDomains"]</h1>
+        <h1>@T["hosting.title"]</h1>
         <div class="list-toolbar">
             <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
             <form method="post" asp-page-handler="Check" class="inline-form">
@@ -13,7 +14,6 @@
             </form>
         </div>
     </div>
-    <p class="help">@T["domains.intro"]</p>
 
     <table class="data" data-list-table>
         <thead>
@@ -78,4 +78,3 @@
         </table>
     </div>
 }
-<div class="help">@T["domains.apiHint"]</div>

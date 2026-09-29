@@ -1,18 +1,18 @@
 @page
 @model MatCMS.Cloud.Pages.Admin.Hosting.Nodes.IndexModel
 @{
-    ViewData["Title"] = T["nodes.title"];
+    ViewData["Title"] = T["hosting.title"];
     var now = DateTime.UtcNow;
 }
 <div data-list>
+    <partial name="_HostingTabs" model='"nodes"' />
     <div class="page-head">
-        <h1>@T["nodes.title"]</h1>
+        <h1>@T["hosting.title"]</h1>
         <div class="list-toolbar">
             <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
         </div>
     </div>
 
-    <p class="help">@T["nodes.intro"]</p>
 
     <table class="data" data-list-table>
         <thead>
@@ -30,7 +30,7 @@
             @* "Dieser Host" is not a row in the database — it is the cloud's own daemon — but it is where sites
                run too, so it is listed first, and configured where it always was. *@
             <tr data-search="@T["nodes.thisHost"]">
-                <td><a asp-page="/Admin/Settings/Index" asp-route-tab="hosting"><strong>@T["nodes.thisHost"]</strong></a></td>
+                <td><a asp-page="/Admin/Hosting/Settings"><strong>@T["nodes.thisHost"]</strong></a></td>
                 <td><span class="badge @(Model.LocalReachable ? "badge-on" : "badge-off")">@(Model.LocalReachable ? T["nodes.online"] : T["settings.dockerUnreachable"])</span></td>
                 <td class="muted">@T["nodes.thisHostHint"]</td>
                 <td class="muted">—</td>
@@ -85,6 +85,4 @@
 
 <div class="list-actions">
     <a class="btn" asp-page="Create">@T["nodes.add"]</a>
-    <a class="btn btn-ghost" asp-page="/Admin/Hosting/Index">@T["action.back"]</a>
 </div>
-<div class="help">@T["nodes.apiHint"]</div>

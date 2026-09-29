@@ -2,47 +2,32 @@
 @model MatCMS.Cloud.Pages.Admin.Hosting.SettingsModel
 @using MatCMS.Cloud.Services
 @{
-    ViewData["Title"] = T["hosting.navSettings"];
+    ViewData["Title"] = T["hosting.title"];
 }
-<div class="page-head">
-    <h1>@T["hosting.navSettings"]</h1>
-</div>
-<p class="help">@T["hosting.settingsIntro"]</p>
+<partial name="_HostingTabs" model='"settings"' />
 
-@if (!Model.ModuleEnabled)
-{
-    <div class="alert alert-info">@T["hosting.moduleOff"] <a asp-page="/Admin/Settings/Index" asp-route-tab="hosting">@T["nav.settings"] → @T["hosting.title"]</a></div>
-}
-
-<form method="post" asp-page-handler="Save">
+@* The module switch has its own form, so switching it never re-saves (or blanks) the fields below. *@
+<form method="post" asp-page-handler="Module">
     <div class="card">
-        <h2>@T["nodes.thisHost"]</h2>
-        @* Ohne erreichbaren Daemon kann die Cloud hier nichts anlegen — das gehört hier gesagt und nicht erst
-           beim ersten Fehlschlag. *@
-        <div class="kv">
-            <div class="kv-label">Docker</div>
-            <div class="kv-value">
-                @if (Model.DockerReachable)
-                {
-                    <span class="badge badge-on">@T["settings.dockerOk"]</span>
-                }
-                else
-                {
-                    <span class="badge badge-err">@T["settings.dockerUnreachable"]</span>
-                    <span class="muted">@T["settings.hostingNeedsDocker"]</span>
-                }
-            </div>
-        </div>
-        <div class="help">@T["hosting.settingsNodesHint"] <a asp-page="/Admin/Hosting/Nodes/Index">@T["nodes.title"]</a></div>
+        <h2>@T["hosting.module"]</h2>
+        <label class="checkbox-row">
+            <input type="checkbox" name="hostingEnabled" value="true" checked="@(Model.ModuleEnabled ? "checked" : null)" />
+            @T["settings.hostingEnabled"]
+        </label>
+        <div class="help">@T["settings.hostingEnabledHint"]</div>
+        <div style="margin-top:14px;"><button type="submit" class="btn">@T["settings.save"]</button></div>
     </div>
+</form>
 
+@if (Model.ModuleEnabled)
+{
+<form method="post" asp-page-handler="Save">
     <div class="card">
         <h2>@T["settings.hostingRouting"]</h2>
         <partial name="_ProxyFields" model="Model.ProxyFields" />
         <div class="list-actions">
             <button type="submit" class="btn btn-ghost" formaction="@Url.Page("Settings", "ProxyTest")">@T["settings.hostingProxyTest"]</button>
         </div>
-        <div class="help">@T["settings.hostingProxyApiHint"]</div>
     </div>
 
     @* Der Portbereich gilt für beide Wege: auch eine Instanz hinter einem Proxy braucht einen Port auf dem Host,
@@ -90,6 +75,7 @@
         <button type="submit" class="btn">@T["settings.save"]</button>
     </div>
 </form>
+}
 
 @section Scripts {
     <script>

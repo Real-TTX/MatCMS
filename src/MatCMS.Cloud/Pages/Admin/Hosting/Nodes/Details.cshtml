@@ -62,7 +62,6 @@
         }
         <div class="kv"><div class="kv-label">@T["nodes.lastSeen"]</div><div class="kv-value mono">@(n.LastSeenAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss") ?? "—")</div></div>
         <div class="kv"><div class="kv-label">@T["nodes.created"]</div><div class="kv-value mono">@n.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div></div>
-        <div class="help">@T["nodes.agentHint"]</div>
     </div>
 
     <div class="list-actions">
@@ -118,7 +117,7 @@
 </div>
 
 <div class="tab-panel" data-panel="containers" hidden>
-    <p class="help">@T["nodes.containersHint"] @(n.InventoryAt is { } at ? "(" + at.ToLocalTime().ToString("dd.MM. HH:mm:ss") + ")" : "")</p>
+    @if (n.InventoryAt is { } at) { <p class="help">@T["nodes.containersHint"] @at.ToLocalTime().ToString("dd.MM. HH:mm:ss")</p> }
     <table class="data">
         <thead>
             <tr>

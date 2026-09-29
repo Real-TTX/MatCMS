@@ -674,11 +674,17 @@ login same-site; it is not used by this flow.
   as "this profile's sites raise it at all" and `NotifyRecipients` as ADDITIONAL addresses (was: replacement).
   Before the matrix is first saved it is derived from the legacy `notify.*` keys, so nobody silently loses mail.
   Node outages notify once per outage (`Node.OfflineNotified`, re-armed by the next beat).
-- **Admin navigation**: Hosting is an optional module, so it is its own sidebar GROUP (`.admin-nav-label`/
-  `.admin-nav-sub`, shared admin.css) that only exists while `hosting.enabled` is on — Übersicht, Nodes, Updates,
-  Domains, Einstellungen (proxy/ports/name pattern of "Dieser Host"), Neue Instanz. *Einstellungen → Hosting*
-  holds only the switch. API keys are the *API* tab of Einstellungen (`/Admin/ApiKeys` only forwards and keeps
-  the row handlers); security is a card on *Allgemein*; fleet cleanup is a button on the instance list.
+- **Admin navigation**: **Hosting is ONE sidebar item, the first** (Admin-only), and everything about hosts,
+  containers, images and domains lives in its TABS — link-tabs (`_HostingTabs.cshtml`, `a.tab`), because each is its
+  own page with its own handlers: Übersicht (sites on this host + nodes, "Neue Instanz"), Updates (cloud self-update,
+  bulk "update all", the auto-update rule), Nodes, Domains, Docker (daemon status, image prune), Einstellungen (the
+  module switch `hosting.enabled` + proxy/ports/name pattern of "Dieser Host"). The switch hides only Nodes, Domains
+  and provisioning; Updates and Docker stay, because updating sites on this host predates the module. *Einstellungen*
+  holds only the cloud's own configuration (Allgemein incl. Sicherheit, SMTP, KI, Backups, API); its old `?tab=hosting`
+  / `?tab=docker` redirect into Hosting. *About* shows the version read-only. Notifications has its own item; fleet
+  cleanup and "Alle aktualisieren" (a shortcut into Hosting → Updates) are buttons on the instance list.
+  **No "also via API/MCP" footers and no narrating page intros** — the user removed them deliberately; the API is
+  documented in `docs/api`, not on every page.
 
 ### Local vs. remote instances
 
@@ -751,7 +757,7 @@ Design and increments: `docs/hosting-platform.md`. Increments 1–4 are built:
   Operator typing the URL. Any NEW fleet-wide page needs the same line.
 - **Reverse proxy is OPTIONAL** (`Services/Proxy/`): provider `none` (default — sites on their host port, a
   domain is only recorded) / `matcad` (Matcad's REST API, `X-Api-Key`) / `caddy` (Caddy admin API).
-  `ProxyService` is the one place that publishes/moves/unpublishes a domain — UI (Einstellungen → Hosting,
+  `ProxyService` is the one place that publishes/moves/unpublishes a domain — UI (Hosting → Einstellungen,
   the Domain card on the Hosting tab, provisioning), REST `/api/v1/hosting/proxy`, `/api/v1/instances/{id}/domain`
   and the MCP proxy/domain tools all call it. Traps: **route first, record second** (unpublish deletes the
   route before clearing `Instance.Proxy*`, so a proxy that is down never leaves an orphan the cloud forgot);

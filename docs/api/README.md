@@ -186,6 +186,27 @@ oder `hostport` (Ziel `http://<upstreamHost>:<Host-Port>`).
 Beim **Anlegen** einer Instanz mit Domain (Hosting → Neue Instanz) wird die Route sofort angelegt und beim ersten
 Heartbeat der neuen Instanz übernommen.
 
+### Nodes & Provisionierung
+
+Ein **Node** ist ein weiterer Docker-Host. Dort läuft ein Agent (das Cloud-Image im Modus `--node-agent`), der sich
+**von dort aus** mit der Cloud verbindet und Aufträge abholt — die Cloud greift nie auf einen Host zu. „Dieser Host“
+(`local`) ist der Docker-Daemon der Cloud selbst und wird wie bisher über `/api/v1/hosting/proxy` eingestellt.
+Container-Aktionen, Logs, Update und Domains (Abschnitte oben) funktionieren für Instanzen auf einem Node genauso;
+sie laufen als Auftrag auf dem Node, der Aufruf wartet auf das Ergebnis (`container` → `onNode: true`).
+
+- `GET /api/v1/nodes` → `{ local:{…}, nodes:[{ id, name, revoked, online, lastSeenAt, agentVersion, hostName, dockerVersion, dockerError, instances, portFrom, portTo, proxy:{…} }] }` (**CanManageHosting**)
+- `POST /api/v1/nodes` `{ name }` → `{ id, token, command }` – Token und fertiger `docker run`-Befehl **nur in dieser Antwort** (**CanManageHosting + alle Instanzen**)
+- `GET /api/v1/nodes/{id}` – wie oben plus `containers` (die gemeldeten MatCMS-Container)
+- `PUT /api/v1/nodes/{id}` `{ name?, portFrom?, portTo?, provider?, matcadUrl?, matcadToken?, clearMatcadToken?, caddyAdminUrl?, caddyServer?, upstream?, network?, upstreamHost? }` – Teil-Update; der Proxy wird **vom Node aus** angesprochen (**alle Instanzen**)
+- `POST /api/v1/nodes/{id}/test-proxy` – Proxy-Test, läuft auf dem Node (**CanManageHosting**)
+- `POST /api/v1/nodes/{id}/revoke` | `activate` | `token` (neuer Token + Befehl; der alte gilt sofort nicht mehr) – (**alle Instanzen**)
+- `DELETE /api/v1/nodes/{id}` – Eintrag löschen; die Websites laufen weiter, die Cloud steuert sie nur nicht mehr (**alle Instanzen**)
+- `GET /api/v1/nodes/{id}/jobs?take=50` → `[{ id, kind, state: pending|running|done|failed, message, requestedBy, createdAt, startedAt, finishedAt }]`
+- `POST /api/v1/hosting/instances` `{ name, nodeId? ("local"/leer = dieser Host), profileId? (leer = Standardprofil), domain?, imageTag?, pushCanonical? }` → `{ ok, containerName, port, domainFailed, message }` – **neue Website anlegen** (Hosting-Modul an; **CanManageHosting + alle Instanzen**). Die Instanz erscheint in `GET /api/v1/instances`, sobald sie sich mit dem Join-Code ihres Profils angemeldet hat (meist < 1 Min.).
+
+Antwortet ein Node nicht rechtzeitig, kommt `409` mit „läuft noch (Auftrag #…)“ — das Ergebnis steht dann im
+Auftragsverlauf. Ein nicht verbundener Node antwortet sofort mit `409` „nicht verbunden“.
+
 ---
 
 ## 7. MCP-Server (`/mcp`) – Inhalte per KI verwalten
@@ -241,6 +262,13 @@ Instanz beim nächsten Heartbeat über ihre **eigenen** Validierer anwendet (add
 | `get_domain_status` | Domain einer Instanz, Provider, Route noch vorhanden? |
 | `publish_domain` | Instanz unter einer Domain veröffentlichen/umziehen (Route + TLS) |
 | `unpublish_domain` | Domain entfernen — Site ist darunter danach nicht mehr erreichbar, vorher bestätigen |
+| `list_nodes` / `get_node` | Docker-Hosts (dieser Host + Nodes) mit Status, Versionen, Websites; `get_node` mit Containern |
+| `create_node` | Node anlegen → Token + `docker run`-Befehl einmalig (alle Instanzen) |
+| `update_node` | Name, Portbereich, Proxy eines Nodes ändern (alle Instanzen) |
+| `set_node_revoked` / `rotate_node_token` / `delete_node` | sperren/freigeben, neuer Token, löschen (alle Instanzen) |
+| `test_node_proxy` | Proxy-Test auf dem Node |
+| `list_node_jobs` | Auftragsverlauf eines Nodes (z. B. ein noch laufendes Update verfolgen) |
+| `create_instance` | **Neue Website anlegen** — auf diesem Host oder einem Node, optional mit Domain (alle Instanzen) |
 
 **`create_page`** (Beispiel-Eingabe):
 ```json

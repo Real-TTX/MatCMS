@@ -700,7 +700,7 @@ What each mode can do:
 
 ### Hosting module, Hosting tab and the cloud self-update
 
-Design and increments: `docs/hosting-platform.md`. Increments 1–3 are built:
+Design and increments: `docs/hosting-platform.md`. Increments 1–4 are built:
 
 - **One service per capability, three surfaces** (UI, `/api/v1`, MCP — the API-first rule):
   `Services/HostingActionsService.cs` (container status/start/stop/restart/update/logs of an instance on
@@ -744,8 +744,24 @@ Design and increments: `docs/hosting-platform.md`. Increments 1–3 are built:
   container live to the proxy's Docker network; `hostport` goes via `upstreamHost:<published port>`.
   Provisioning parks the route under `hosting.pendingRoute:<container>`; `InstanceService.ClassifyAsync`
   adopts it on the first beat. `pushCanonical` sends `site.canonicalUrl` + `site.behindHttpsProxy` as
-  `setting.set` content ops (Approved instances only). The settings are cloud-wide until increment 4 gives
-  each node its own `ProxySettings`.
+  `setting.set` content ops (Approved instances only). The cloud-wide settings are "Dieser Host"'s; every
+  node carries its own copy (`Node.ProxyKind…`), edited through the SAME partial `_ProxyFields.cshtml`.
+- **Nodes (increment 4, `Services/Nodes/`)** — further Docker hosts. The node-agent is **this image** in
+  `--node-agent` mode (`Program.cs` leaves before the web app is built, like `--self-update`): no DB, only
+  the engine, its daemon and an OUTBOUND long poll to `POST /api/nodes/{id}/heartbeat` (`X-MatCMS-Node-Token`,
+  SHA-256 stored, shown once). The protocol is cloud-internal (`NodeProtocol`, not `MatCMS.Shared`) — instances
+  never see it, `CloudProtocol.Version` does not move. "Dieser Host" is **virtual** (`Instance.NodeId` null); a
+  site found in a node's inventory is `InstanceHosting.Node` — kept apart from `Local` so everything that talks
+  to the cloud's OWN daemon (removal, bulk/auto update, the `localhost:<port>` preview guess) cannot silently
+  hit another machine. Callers keep one shape: `HostingActionsService`, `ProxyService`, `HostingService` call
+  `NodeService.RunAsync` (enqueue → the long poll wakes the agent via `NodeSignal` → wait for the report,
+  "läuft noch" past the timeout). The agent executes through the same engine (`NodeJobExecutor` →
+  `DockerHostService`, `ProxyEngine`), so the guards run ON the node. Traps: a job is handed out ONCE (a lost
+  report is a failed job, never a second container); a pending job expires after 2 min so a "stop" never fires
+  late; the `proxy` payload carries the node's Matcad key → encrypted at rest, blanked when finished; pending
+  provisioning routes are keyed per node (`InstanceService.PendingRouteKey`) because container names are only
+  unique per host. Provisioning is ONE service call for UI/REST/MCP: `HostingService.ProvisionAsync`.
+  Not yet on nodes: teardown (unregister only), bulk update, agent self-update.
 
 ### Removing an instance — who owns the container
 

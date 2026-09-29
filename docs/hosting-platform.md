@@ -1,6 +1,6 @@
 # Hosting platform — MatCMS.Cloud as a hosting control plane
 
-Status: **Increments 1 and 2 built and tested (2026-09-29); 3–6 designed only.** This document designs turning MatCMS.Cloud from a control plane
+Status: **Increments 1–4 built and tested (2026-09-29); 5 (migration between nodes) designed only; 6 dropped.** This document designs turning MatCMS.Cloud from a control plane
 that *watches* instances into one that can also *host* them: an activatable Hosting module, a per-instance
 Hosting tab, optional reverse-proxy management, a separable hosting engine with multiple nodes, moving
 instances between nodes, and a cloud self-updater. It ends with a cut into deployable increments and the
@@ -213,7 +213,7 @@ Decide after reading `../MatOS/README.md` and `../MatOS/src/MatOS.Web/{Api,Docke
 | **1** | Hosting toggle + menu + **instance Hosting tab** surfacing *existing* actions (start/stop/restart/update/container logs) for instances on the local daemon | UI + setting; reuses `DockerHostService` | — |
 | **2** | **Cloud self-updater** (helper-container, §3.7a) | updater mode + UI button | — |
 | **3** | **`IProxyProvider`** with `NoProxy` (default) + `MatcadProvider` + `CaddyProvider`; domain/TLS per instance — *built* | provider layer, address resolution | 1 |
-| **4** | **Node model + node-agent** (outbound protocol, enrolment, local node becomes node #1) | `MatCMS.Hosting` lib, node-agent image, `Node` table, protocol DTOs | 1 |
+| **4** | **Node model + node-agent** (outbound protocol, enrolment, local node stays "Dieser Host") — *built; agent = cloud image in `--node-agent` mode, see its spec* | `Node`/`NodeJob` tables, protocol DTOs, agent mode | 1 |
 | **5** | **Migration between nodes** incl. proxy update | migration job pipeline | 3, 4 |
 | **6** | Multi-cloud (only if §3.6 (b) is wanted) | federation | product decision |
 
@@ -299,6 +299,95 @@ Two findings: a Matcad from before its REST API (image older than 08/2026) answe
 redirect to its login page — `MatcadProvider` now says so instead of reporting a JSON parser error; and
 Matcad's Caddy admin address is hard-wired to `http://caddy:2019` (its `Matcad__Caddy__AdminUrl` env var
 is not read), so its Caddy must be reachable under that name.
+
+### Spec: Increment 4 — nodes + node-agent
+
+**Goal:** one cloud, many Docker hosts. Every host other than the cloud's own runs a small **node-agent**
+that connects OUT to the cloud, pulls jobs and executes them with the same engine code the cloud uses on
+its own daemon. Instances on a node get the full Hosting tab (status, start/stop/restart, update, logs,
+domain) and can be provisioned there.
+
+**Packaging decision (deviates from §3.2 on purpose):** the node-agent is **the cloud image itself** in a
+second mode — `dotnet MatCMS.Cloud.dll --node-agent`, entered before the web app is built, exactly like
+the `--self-update` helper. The engine (`DockerHostService`, the proxy providers) already runs without
+ASP.NET/EF there, so this *is* "one engine, two packagings" without a library extraction, a third
+Dockerfile, a new CI workflow or a second GHCR package — and an agent can never run an engine version the
+cloud does not know. Price: the agent image is the cloud's size. A slim `matcms-node` image can be cut
+from the same entry point later without touching the protocol.
+
+**The local node stays virtual.** "Dieser Host" is the cloud's own daemon, `Instance.NodeId = null`,
+configured by the existing cloud-wide settings (hosting.*). No row, no migration of existing instances —
+a single-host setup sees nothing new. Remote hosts are rows in `Nodes`.
+
+**Model** *(new)*: `Node` (PublicId, Name, TokenHash, Revoked, LastSeenAt, AgentVersion, HostName,
+DockerVersion, DockerError, InventoryJson + InventoryAt, own proxy settings = exactly `ProxySettings`,
+own port range); `NodeJob` (NodeId, InstanceId?, Kind, PayloadJson, State pending/running/done/failed,
+Message, ResultJson, timestamps); `Instance.NodeId`; `InstanceHosting.Node`.
+
+**Protocol** (cloud-internal — both ends are this project, so it lives here, not in `MatCMS.Shared`, and
+**instances are not affected**: `CloudProtocol.Version` does not move): `POST /api/nodes/{publicId}/heartbeat`
+with `X-MatCMS-Node-Token`. Request: agent version, host name, Docker version/error, the MatCMS containers
+on the host (only those `LooksLikeMatCms` accepts — the cloud has no business listing other containers),
+and job reports. Response: jobs to run. **Long poll:** with nothing to hand out and nothing reported, the
+cloud holds the request up to 25 s and answers the moment a job is enqueued — so a button on the Hosting
+tab takes about a second on a node, while the connection stays outbound. The agent runs jobs concurrently
+and beats again as soon as one finishes.
+
+**Jobs:** `container.details`, `container.logs`, `container.power` (start/stop/restart),
+`container.update`, `instance.create`, `proxy.test`, `proxy.publish`, `proxy.delete`, `proxy.exists`.
+A job is handed out ONCE (pending → running); one that is not reported within 15 min fails, one that no
+agent picked up within 2 min expires ("Node nicht erreichbar" — short, so a "stop" that was reported as still waiting never fires by surprise when the node returns). The cloud waits for short jobs
+synchronously (the UI and API keep their shape) and answers "läuft noch" with the job id past the
+timeout. Destructive teardown on nodes is **not** in this increment — only unregistering; the removal
+guards will move with increment 5.
+
+**Security:** the node token is shown once and stored SHA-256; revoking answers the heartbeat with 403;
+a node only ever receives jobs for itself; the agent executes only the listed kinds, through the engine
+whose guards (`LooksLikeMatCms`, `ManagedLabel`) therefore run ON the node. The Matcad key travels in the
+`proxy.*` job to the node that must use it (over the same TLS link), never back.
+
+**Classification:** an instance's reported container id is looked up on the cloud's own daemon first,
+then in the inventories of nodes seen within the last 5 minutes → `Hosting = Node`, `NodeId`.
+A node's beat refreshes container state/port of its instances at once (a stopped site does not beat).
+
+**Surfaces:** Hosting → Nodes (list incl. "Dieser Host", create → token + `docker run` command once,
+detail with status/inventory/proxy & ports/jobs, rotate token, revoke, delete), node select when
+provisioning; REST `/api/v1/nodes…` and `POST /api/v1/hosting/instances` (provisioning was UI-only until
+now); MCP `list_nodes`, `get_node`, `create_node`, `update_node`, `set_node_revoked`, `delete_node`,
+`rotate_node_token`, `test_node_proxy`, `list_node_jobs`, `create_instance`.
+
+### Built (2026-09-29): Increment 4 — nodes + node-agent
+
+As specified above. Code: `Models/Node.cs` (`Node`, `NodeJob`; migration `AddNodes`), `Services/Nodes/`
+(`NodeProtocol`, `NodeService` = management + heartbeat + `RunAsync`, `NodeSignal` = in-memory wake-ups,
+`NodeJobExecutor` = what the agent runs, `NodeAgentRunner` = the agent loop), `Services/Proxy/ProxyEngine.cs`
+(the provider + upstream part of `ProxyService`, run in-process for "Dieser Host" and as the `proxy` job on
+a node), `DockerHostService` engine section (inventory, daemon info, free port, `CreateInstanceContainerAsync`
+— moved out of `HostingService` so both hosts create containers with the same code), `HostingService.ProvisionAsync`
+(provisioning as one step for UI/REST/MCP), `Api/NodeApi.cs`, `Mcp/NodeTools.cs`, pages `Admin/Hosting/Nodes/*`,
+the shared `_ProxyFields.cshtml` (the Settings page and every node use the same fields).
+
+**Tested end to end** (test cloud WITHOUT a Docker socket, so every action had to go through the node; agent =
+the same image with `--node-agent`; stock `caddy:2` on the node side): enrolment via REST with the printed
+`docker run` command; agent reports host, versions and inventory; node proxy configured and tested FROM the
+node (0.3 s round trip — the long poll answers at once); provisioning on the node with a domain (2 s,
+route created on the node's Caddy, adopted on the first beat); instance classified `node`; HTTPS 200 through
+the node's proxy; logs 0.2 s, restart 1.1 s, stop/start with the right state, update, domain move — all via
+REST, MCP and the UI pages. Failure paths: wrong/missing token 401, revoked node 403 (agent backs off), agent
+gone → the first call waits its timeout and says "läuft noch", after the offline threshold calls fail at once
+("nicht verbunden"), and the job that was never picked up expired instead of firing when the agent returned.
+Key-right matrix (no hosting right 403; scoped hosting key may read and test, but not create/change/delete
+nodes or provision). Regression of the local path (cloud with socket, provisioning + domain on "Dieser Host").
+
+Two decisions the test made: a pending job expires after **2 min**, not 10 (a connected agent picks a job
+up within a second; an old pending job means the node was gone, and a "stop" must not fire by surprise when
+it returns); and the `proxy` job payload — which carries the node's Matcad key — is **encrypted at rest** and
+dropped once the job is finished.
+
+**Not in this increment (deliberately):** destructive teardown on nodes (only unregistering — the removal
+guards move in increment 5), bulk update / auto-update of node instances (the Hosting tab's update works),
+and updating the agent itself (for now: pull the image and recreate the agent container by hand; the agent
+reports its version, so a stale one is visible).
 
 ---
 

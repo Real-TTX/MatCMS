@@ -55,7 +55,7 @@
 <div class="card">
         <h2>@T["hostdash.hosts"]</h2>
         <table class="data">
-            <thead><tr><th>@T["nodes.hostColumn"]</th><th>@T["hostdash.sites"]</th><th>CPU</th><th>RAM</th></tr></thead>
+            <thead><tr><th>@T["nodes.hostColumn"]</th><th>@T["hostdash.sites"]</th><th>@T["hostdash.resources"]</th></tr></thead>
             <tbody>
                 @foreach (var h in d.Hosts)
                 {
@@ -72,8 +72,10 @@
                             </div>
                         </td>
                         <td class="mono">@h.Running<span class="muted">/@h.Total</span></td>
-                        <td><partial name="_UsageBar" model="@(new UsageBar(h.Cpu, (h.Cpus ?? 0) * 100.0, h.Cpus is int c ? $"{h.Cpu:0.#} % · {c} CPU" : $"{h.Cpu:0.#} %"))" /></td>
-                        <td><partial name="_UsageBar" model="@(new UsageBar(h.Mem, h.MemTotal ?? 0, h.MemTotal is long mt ? $"{HostFmt.Bytes(h.Mem)} / {HostFmt.Bytes(mt)}" : HostFmt.Bytes(h.Mem)))" /></td>
+                        <td class="usage-cell">
+                            <partial name="_UsageBar" model="@(new UsageBar(h.Cpu, (h.Cpus ?? 0) * 100.0, h.Cpus is int c ? $"{h.Cpu:0.#} % · {c} CPU" : $"{h.Cpu:0.#} %", "CPU"))" />
+                            <partial name="_UsageBar" model="@(new UsageBar(h.Mem, h.MemTotal ?? 0, h.MemTotal is long mt ? $"{HostFmt.Bytes(h.Mem)} / {HostFmt.Bytes(mt)}" : HostFmt.Bytes(h.Mem), "RAM"))" />
+                        </td>
                     </tr>
                 }
             </tbody>

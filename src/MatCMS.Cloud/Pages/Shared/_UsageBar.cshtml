@@ -6,6 +6,7 @@
     var cls = pct >= 90 ? " is-full" : pct >= 70 ? " is-high" : "";
 }
 <div class="quota-row usage-row">
+    @if (Model.Label is not null) { <span class="usage-label">@Model.Label</span> }
     @if (Model.Whole > 0)
     {
         <div class="quota-bar@(cls)"><span style="width:@(pct)%"></span></div>

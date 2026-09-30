@@ -119,7 +119,7 @@ public static class HostFmt
 
 /// <summary>Model of <c>_UsageBar.cshtml</c>: a proportion as a bar with its text beside it. Whole ≤ 0 = unknown
 /// (the text alone is shown).</summary>
-public sealed record UsageBar(double Part, double Whole, string Text);
+public sealed record UsageBar(double Part, double Whole, string Text, string? Label = null);
 
 /// <summary>The one JSON shape of the hosting overview and the image list, shared by REST and MCP.</summary>
 public static class HostingOverviewJson

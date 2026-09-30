@@ -25,8 +25,7 @@
                 <th>@T["cleanup.instance"]</th>
                 <th>@T["nodes.hostColumn"]</th>
                 <th>@T["hosting.state"]</th>
-                <th>CPU</th>
-                <th>RAM</th>
+                <th>@T["hostdash.resources"]</th>
                 <th>@T["hosting.domain"]</th>
                 <th>@T["hosting.version"]</th>
             </tr>
@@ -55,13 +54,13 @@
                         <span class="badge @(s.Running ? "badge-on" : "badge-err")">@s.State</span>
                         @if (!string.IsNullOrEmpty(s.Status)) { <div class="muted">@s.Status</div> }
                     </td>
-                    <td>
-                        @if (s.Cpu is double cpu) { <partial name="_UsageBar" model="@(new UsageBar(cpu, (s.Host.Cpus ?? 0) * 100.0, $"{cpu:0.#} %"))" /> }
-                        else { <span class="muted">—</span> }
-                    </td>
-                    <td>
-                        @if (s.Mem is long mem) { <partial name="_UsageBar" model="@(new UsageBar(mem, s.MemLimit ?? 0, HostFmt.Bytes(mem)))" /> }
-                        else { <span class="muted">—</span> }
+                    <td class="usage-cell">
+                        @if (s.Cpu is null && s.Mem is null) { <span class="muted">—</span> }
+                        else
+                        {
+                            <partial name="_UsageBar" model="@(new UsageBar(s.Cpu ?? 0, (s.Host.Cpus ?? 0) * 100.0, s.Cpu is double cpu ? $"{cpu:0.#} %" : "—", "CPU"))" />
+                            <partial name="_UsageBar" model="@(new UsageBar(s.Mem ?? 0, s.MemLimit ?? 0, s.Mem is long mem ? HostFmt.Bytes(mem) : "—", "RAM"))" />
+                        }
                     </td>
                     <td class="mono muted">@(i?.ProxyDomain ?? "—")</td>
                     <td class="mono muted">

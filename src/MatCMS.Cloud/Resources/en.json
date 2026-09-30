@@ -1232,6 +1232,7 @@
   "hostdash.cloudCurrent": "Cloud is up to date",
   "hostdash.domainsHint": "published",
   "hostdash.hosts": "Hosts",
+  "hostdash.resources": "Resources",
   "hostdash.sites": "Instances",
   "hostdash.instanceRelease": "Latest instance version",
   "hostdash.on": "on",

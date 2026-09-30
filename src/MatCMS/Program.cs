@@ -353,6 +353,11 @@ if (bool.TryParse(builder.Configuration["MatCms:Proxy:TrustAll"], out var trustA
     // Clearing both lists is what makes the headers count from ANY hop — see the warning above.
     fwd.KnownNetworks.Clear();
     fwd.KnownProxies.Clear();
+    // Two hops: behind the cloud's edge the chain is visitor → edge → host proxy, and the host proxy (trusting the
+    // edge) forwards "visitor, edge". With the default of one hop the edge would be taken for the visitor. Not a
+    // new exposure: the host proxy replaces an X-Forwarded-For from anybody it does not trust, and trust-all could
+    // already be faked by whoever reaches the container directly — the warning above stands.
+    fwd.ForwardLimit = 2;
 }
 else if (knownProxy.Length > 0)
 {

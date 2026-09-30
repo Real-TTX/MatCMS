@@ -134,3 +134,21 @@
         document.querySelectorAll('[data-add-menu-dialog].open').forEach(close);
     });
 })();
+
+// Scrollable tab bars: bring the active tab into view — on a phone the active one may sit past the edge (a
+// link-tab page like Hosting → Einstellungen), and a click on a half-visible tab should reveal it fully.
+(function () {
+    function reveal(bar, tab, smooth) {
+        if (!tab || bar.scrollWidth <= bar.clientWidth) return;
+        var left = tab.offsetLeft - bar.offsetLeft, right = left + tab.offsetWidth;
+        var to = left < bar.scrollLeft ? left - 16 : right > bar.scrollLeft + bar.clientWidth ? right - bar.clientWidth + 16 : null;
+        if (to !== null) bar.scrollTo({ left: to, behavior: smooth ? 'smooth' : 'auto' });
+    }
+    document.querySelectorAll('.tabs').forEach(function (bar) {
+        reveal(bar, bar.querySelector('.tab.active'), false);
+        bar.addEventListener('click', function (e) {
+            var t = e.target.closest('.tab');
+            if (t) setTimeout(function () { reveal(bar, t, true); }, 0);
+        });
+    });
+})();

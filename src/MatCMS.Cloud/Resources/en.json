@@ -1320,5 +1320,6 @@
   "wildcard.credentialsHint": "Caddy only: one line per field of the DNS module, names as in its description (github.com/caddy-dns/<module>) — e.g. hetzner: auth_api_token=…, cloudflare: api_token=…, netcup: customer_number, api_key, api_password. Stored encrypted, never shown again. With Matcad they stay in Matcad.",
   "wildcard.active": "active",
   "edge.trustedIps": "Edge IP addresses",
-  "edge.trustedIpsHint": "The address the edge's requests arrive from at the hosts (public IP of the cloud server or its private-network address), comma-separated. Every Caddy host then trusts them, so the real visitor IP arrives."
+  "edge.trustedIpsHint": "The address the edge's requests arrive from at the hosts (public IP of the cloud server or its private-network address), comma-separated. Every Caddy host then trusts them, so the real visitor IP arrives.",
+  "picker.title": "Choose instance"
 }

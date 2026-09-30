@@ -20,7 +20,18 @@
         <span class="inst-picker-name">@currentName</span>
         <i class="ti ti-chevron-down inst-picker-caret" aria-hidden="true"></i>
     </button>
-    <div class="inst-picker-menu" data-inst-menu hidden role="listbox" aria-label="@T["instances.title"]">
+    <div class="inst-picker-menu" data-inst-menu hidden role="dialog" aria-label="@T["picker.title"]">
+        @* On a phone the menu is a full-screen dialog: this head (title + close) only shows there. The search is
+           for both — with many sites, scrolling a list of thumbnails is the slow way to find one. *@
+        <div class="inst-picker-head">
+            <strong>@T["picker.title"]</strong>
+            <button type="button" class="inst-picker-close" data-inst-close aria-label="@T["action.close"]"><i class="ti ti-x" aria-hidden="true"></i></button>
+        </div>
+        @if (instances.Count > 4)
+        {
+            <input type="search" class="inst-picker-search" data-inst-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+        }
+        <div class="inst-picker-list" role="listbox" aria-label="@T["instances.title"]">
         @* The cloud itself. No thumbnail — it is the page you are already in, not a site to preview. *@
         <a class="inst-picker-item inst-picker-cloud@(current is null ? " is-current" : "")"
            role="option" aria-selected="@(current is null ? "true" : "false")"
@@ -81,6 +92,7 @@
                 </span>
             </a>
         }
+        </div>
     </div>
 </div>
 

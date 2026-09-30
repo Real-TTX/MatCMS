@@ -1320,5 +1320,6 @@
   "wildcard.credentialsHint": "Nur für Caddy: eine Zeile je Feld des DNS-Moduls, die Namen stehen in dessen Beschreibung (github.com/caddy-dns/<modul>) — z. B. hetzner: auth_api_token=…, cloudflare: api_token=…, netcup: customer_number, api_key, api_password. Verschlüsselt gespeichert, nie wieder angezeigt. Bei Matcad bleiben sie in Matcad.",
   "wildcard.active": "eingerichtet",
   "edge.trustedIps": "IP-Adressen des Edge",
-  "edge.trustedIpsHint": "Von welcher Adresse die Anfragen des Edge bei den Hosts ankommen (öffentliche IP des Cloud-Servers oder seine Adresse im privaten Netz), durch Komma getrennt. Jeder Caddy-Host vertraut ihnen dann, damit die echte Besucher-IP ankommt."
+  "edge.trustedIpsHint": "Von welcher Adresse die Anfragen des Edge bei den Hosts ankommen (öffentliche IP des Cloud-Servers oder seine Adresse im privaten Netz), durch Komma getrennt. Jeder Caddy-Host vertraut ihnen dann, damit die echte Besucher-IP ankommt.",
+  "picker.title": "Instanz wählen"
 }

@@ -12,11 +12,16 @@
     var menu = picker.querySelector('[data-inst-menu]');
     if (!toggle || !menu) return;
 
+    var search = menu.querySelector('[data-inst-search]');
+    var close = menu.querySelector('[data-inst-close]');
     var loaded = false;
     function open(on) {
         menu.hidden = !on;
         toggle.setAttribute('aria-expanded', on ? 'true' : 'false');
         picker.classList.toggle('is-open', on);
+        // Full-screen on a phone: the page behind must not scroll along under the finger.
+        document.body.classList.toggle('inst-picker-open', on);
+        if (on && search) { search.value = ''; filter(); if (window.matchMedia('(min-width: 861px)').matches) search.focus(); }
         // First open fills the thumbnails. Doing it on page load would fetch every customer site just
         // to draw a menu nobody may open.
         if (on && !loaded) {
@@ -26,6 +31,15 @@
             });
         }
     }
+
+    function filter() {
+        var q = (search && search.value || '').trim().toLowerCase();
+        menu.querySelectorAll('.inst-picker-item').forEach(function (a) {
+            a.hidden = q.length > 0 && a.textContent.toLowerCase().indexOf(q) < 0;
+        });
+    }
+    if (search) search.addEventListener('input', filter);
+    if (close) close.addEventListener('click', function (e) { e.stopPropagation(); open(false); });
 
     toggle.addEventListener('click', function (e) {
         e.stopPropagation();          // the document handler below would close it again immediately

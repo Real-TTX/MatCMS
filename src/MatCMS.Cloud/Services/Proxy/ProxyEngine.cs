@@ -13,7 +13,8 @@ public sealed record ProxyOp(
     string? ContainerId = null, int? LocalPort = null,
     string? Host = null, string? RouteKey = null, string? Name = null,
     string? Kind = null, string? RouteId = null, string? OldKind = null,
-    string? Upstream = null, bool RewriteHost = false);
+    string? Upstream = null, bool RewriteHost = false,
+    string? DnsProvider = null, Dictionary<string, string>? Dns = null, List<string>? Trusted = null);
 
 public sealed record ProxyOpResult(bool Ok, string Message, string? RouteId = null, bool? Exists = null);
 
@@ -44,11 +45,19 @@ public static class ProxyEngine
                 "publish" => await PublishAsync(op, http, docker, ct),
                 "delete" => await DeleteAsync(op, http, ct),
                 "exists" => new(true, "", Exists: await Provider(op.Settings, http, op.Kind).ExistsAsync(op.RouteId ?? "", ct)),
+                // Wildcard certificate for *.{Host} (Host = the base domain), removing it, trusting the edge.
+                "wildcard" => Result(await Provider(op.Settings, http).EnsureWildcardAsync(op.RouteId, op.Host ?? "", op.DnsProvider ?? "",
+                    op.Dns ?? new(), op.Upstream ?? "https://" + op.Host, ct), "Wildcard-Zertifikat eingerichtet."),
+                "unwildcard" => Result(await Provider(op.Settings, http, op.Kind).DeleteWildcardAsync(op.RouteId ?? "", op.Host ?? "", ct), "Wildcard-Zertifikat entfernt."),
+                "trust" => Result(await Provider(op.Settings, http).SetTrustedProxiesAsync(op.Trusted ?? new(), ct), "Edge als vertrauenswürdiger Proxy eingetragen."),
                 _ => new(false, $"Unbekannte Proxy-Operation „{op.Op}“."),
             };
         }
         catch (Exception ex) { return new(false, "Proxy-Fehler: " + ex.Message); }
     }
+
+    private static ProxyOpResult Result(ProxyResult r, string okMessage) =>
+        r.Ok ? new(true, r.Error ?? okMessage, r.RouteId) : new(false, r.Error ?? "Fehlgeschlagen.", r.RouteId);
 
     private static async Task<ProxyOpResult> TestAsync(ProxySettings s, HttpClient http, DockerHostService docker, CancellationToken ct)
     {

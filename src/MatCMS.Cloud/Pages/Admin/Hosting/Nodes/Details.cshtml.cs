@@ -54,14 +54,27 @@ public class DetailsModel : PageModel
 
     /// <summary>Instances on this node without an automatic address yet.</summary>
     public int MissingHostAddresses { get; private set; }
+    public ProxyService.WildcardConfig Wildcard => _proxy.WildcardFor(Item);
 
-    public async Task<IActionResult> OnPostAddressesAsync(int id, bool autoDomainEnabled, string? autoDomainBase, string? address)
+    public async Task<IActionResult> OnPostAddressesAsync(int id, bool autoDomainEnabled, string? autoDomainBase, string? address,
+        bool wildcard, string? dnsProvider, string? dnsCredentials)
     {
         var n = await _db.Nodes.FindAsync(id);
         if (n is null) return RedirectToPage("Index");
         var err = await _nodes.UpdateAsync(n, new NodeService.NodeInput(AutoDomainBase: autoDomainBase ?? "", AutoDomainEnabled: autoDomainEnabled,
             Address: address ?? ""), HttpContext.RequestAborted);
-        TempData[err is null ? "Flash" : "FlashError"] = err ?? "Adressen gespeichert.";
+        if (err is not null) { TempData["FlashError"] = err; return Back(id, "proxy"); }
+        var msg = "Adressen gespeichert.";
+        if (wildcard || n.WildcardEnabled || n.WildcardRouteId is not null)
+        {
+            // Runs ON the node (its proxy is reached from there).
+            var w = await _proxy.SetWildcardAsync(n, wildcard && autoDomainEnabled, dnsProvider, dnsCredentials, HttpContext.RequestAborted);
+            if (!w.Ok) { TempData["FlashError"] = msg + " Wildcard-Zertifikat: " + w.Message; return Back(id, "proxy"); }
+            msg += " " + w.Message;
+        }
+        var t = await _proxy.ApplyTrustAsync(n, HttpContext.RequestAborted);
+        if (!t.Ok && _proxy.EdgeEnabled) msg += " Hinweis: " + t.Message;
+        TempData["Flash"] = msg;
         return Back(id, "proxy");
     }
 

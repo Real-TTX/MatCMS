@@ -151,4 +151,46 @@ public sealed class MatcadProvider : IProxyProvider
         }
         catch { return null; }
     }
+
+    /// <summary>
+    /// Matcad does wildcards itself: a wildcard route <c>*.{baseDomain}</c> with one of ITS DNS providers gets one
+    /// certificate, and Matcad serves every concrete host route under it from that certificate. The provider and its
+    /// credentials are set up in Matcad (they stay there); <paramref name="dnsProvider"/> names it. Unknown names under
+    /// the wildcard are redirected to <paramref name="fallbackUrl"/>.
+    /// </summary>
+    public async Task<ProxyResult> EnsureWildcardAsync(string? existingId, string baseDomain, string dnsProvider,
+        IReadOnlyDictionary<string, string> credentials, string fallbackUrl, CancellationToken ct = default)
+    {
+        try
+        {
+            using var req = Req(HttpMethod.Get, "/api/v1/providers");
+            using var res = await _http.SendAsync(req, ct);
+            if (!res.IsSuccessStatusCode) return new(false, $"Matcad antwortete {(int)res.StatusCode} auf /providers.");
+            var list = System.Text.Json.Nodes.JsonNode.Parse(await res.Content.ReadAsStringAsync(ct))?.AsArray();
+            var wanted = dnsProvider.Trim();
+            var match = list?.FirstOrDefault(p => string.Equals(p?["name"]?.GetValue<string>(), wanted, StringComparison.OrdinalIgnoreCase))
+                        ?? list?.FirstOrDefault(p => string.Equals(p?["type"]?.GetValue<string>(), wanted, StringComparison.OrdinalIgnoreCase));
+            if (match?["id"] is not { } pid) return new(false, $"In Matcad gibt es keinen DNS-Anbieter „{wanted}“ — dort unter Provider anlegen und hier seinen Namen eintragen.");
+
+            long? id = long.TryParse(existingId, out var n) ? n : null;
+            var body = new
+            {
+                id, host = "*." + baseDomain, wildcard = true, target = "redirect", upstream = (string?)null, insecureSkipVerify = false,
+                fallbackUrl, redirectPermanent = false, authenticationId = (long?)null, providerId = pid.GetValue<long>(),
+                acmeEmail = (string?)null, enabled = true, name = "MatCMS Wildcard " + baseDomain,
+            };
+            using var post = Req(HttpMethod.Post, "/api/v1/routes", body);
+            using var pr = await _http.SendAsync(post, ct);
+            var text = await pr.Content.ReadAsStringAsync(ct);
+            if (!pr.IsSuccessStatusCode) return new(false, $"Matcad antwortete {(int)pr.StatusCode}: {text}");
+            var rid = System.Text.Json.Nodes.JsonNode.Parse(text)?["route"]?["id"]?.ToString();
+            return new(true, null, rid);
+        }
+        catch (Exception ex) { return new(false, $"Matcad nicht erreichbar: {ex.Message}"); }
+    }
+
+    public Task<ProxyResult> DeleteWildcardAsync(string id, string baseDomain, CancellationToken ct = default) => DeleteAsync(id, ct);
+
+    public Task<ProxyResult> SetTrustedProxiesAsync(IReadOnlyList<string> ranges, CancellationToken ct = default) =>
+        Task.FromResult(new ProxyResult(false, "Matcad lässt sich die vertrauenswürdigen Proxys nicht von außen setzen — in Matcad selbst einstellen."));
 }

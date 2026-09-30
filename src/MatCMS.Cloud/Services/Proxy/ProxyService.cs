@@ -165,7 +165,7 @@ public class ProxyService
 
     /// <summary>Partial update of the edge settings for UI/API/MCP (null = keep).</summary>
     public sealed record EdgeConfigInput(bool? Enabled, bool? UseHostProxy, string? Provider, string? MatcadUrl, string? MatcadToken,
-        bool ClearMatcadToken, string? CaddyAdminUrl, string? CaddyServer);
+        bool ClearMatcadToken, string? CaddyAdminUrl, string? CaddyServer, string? TrustedIps = null);
 
     public async Task UpdateEdgeAsync(EdgeConfigInput b)
     {
@@ -178,6 +178,7 @@ public class ProxyService
         else if (!string.IsNullOrEmpty(b.MatcadToken)) d[SettingKeys.HostingEdgeMatcadToken] = _secrets.Protect(b.MatcadToken);
         if (b.CaddyAdminUrl is not null) d[SettingKeys.HostingEdgeCaddyAdminUrl] = b.CaddyAdminUrl.Trim().TrimEnd('/');
         if (b.CaddyServer is not null) d[SettingKeys.HostingEdgeCaddyServer] = b.CaddyServer.Trim();
+        if (b.TrustedIps is not null) d[SettingKeys.HostingEdgeTrustedIps] = b.TrustedIps.Trim();
         if (d.Count > 0) await _cloud.SaveAsync(d);
     }
 
@@ -191,6 +192,7 @@ public class ProxyService
             caddyAdminUrl = s.CaddyAdminUrl, caddyServer = s.CaddyServer,
             // A host's automatic address as the edge's target needs a Host header rewrite — only Caddy does that.
             forwardsToHostAddress = s.Kind == ProxyKinds.Caddy,
+            trustedIps = EdgeTrustedIps,
         };
     }
 
@@ -231,6 +233,119 @@ public class ProxyService
             if (!await _db.Instances.AnyAsync(x => x.Id != exceptInstanceId && (x.HostDomain == candidate || x.ProxyDomain == candidate), ct))
                 return candidate;
         }
+    }
+
+    // ---- Wildcard certificate per host + trusting the edge ------------------------------------------------------
+
+    public sealed record WildcardConfig(bool Enabled, string? DnsProvider, bool CredentialsSet, string? RouteId, string? Error);
+
+    public WildcardConfig WildcardFor(Node? node) => node is null
+        ? new(_cloud.Flag(SettingKeys.HostingWildcardEnabled), _cloud.Get(SettingKeys.HostingWildcardDnsProvider),
+            !string.IsNullOrEmpty(_cloud.Get(SettingKeys.HostingWildcardDnsCredentials)), _cloud.Get(SettingKeys.HostingWildcardRouteId) is { Length: > 0 } r ? r : null,
+            _cloud.Get(SettingKeys.HostingWildcardError) is { Length: > 0 } e ? e : null)
+        : new(node.WildcardEnabled, node.DnsProvider, !string.IsNullOrEmpty(node.DnsCredentialsEnc), node.WildcardRouteId, node.WildcardError);
+
+    /// <summary>Parses "key=value" lines (the credentials field) into a map; blank lines and lines without "=" are skipped.</summary>
+    public static Dictionary<string, string> ParseCredentials(string? text) =>
+        (text ?? "").Replace("\r\n", "\n").Split('\n').Select(l => l.Trim()).Where(l => l.Contains('='))
+            .Select(l => (Key: l[..l.IndexOf('=')].Trim(), Value: l[(l.IndexOf('=') + 1)..].Trim()))
+            .Where(p => p.Key.Length > 0).GroupBy(p => p.Key).ToDictionary(g => g.Key, g => g.Last().Value);
+
+    private Dictionary<string, string> CredentialsOf(Node? node)
+    {
+        var enc = node is null ? _cloud.Get(SettingKeys.HostingWildcardDnsCredentials) : node.DnsCredentialsEnc;
+        try { return string.IsNullOrEmpty(enc) ? new() : JsonSerializer.Deserialize<Dictionary<string, string>>(_secrets.Unprotect(enc) ?? "") ?? new(); }
+        catch { return new(); }
+    }
+
+    /// <summary>
+    /// Saves the wildcard setting of a host and applies it there: on = one certificate for *.{base} via the DNS
+    /// challenge (needs automatic addresses with a base domain and a proxy on the host), off = removes what the cloud
+    /// set up. Empty <paramref name="credentialsText"/> keeps the stored credentials (they are never shown again).
+    /// </summary>
+    public async Task<PublishResult> SetWildcardAsync(Node? node, bool enabled, string? dnsProvider, string? credentialsText, CancellationToken ct = default)
+    {
+        var creds = ParseCredentials(credentialsText);
+        var keepCreds = creds.Count == 0;
+        string? encCreds = keepCreds ? null : _secrets.Protect(JsonSerializer.Serialize(creds));
+        if (node is null)
+        {
+            var d = new Dictionary<string, string?>
+            {
+                [SettingKeys.HostingWildcardEnabled] = enabled ? "1" : "0",
+                [SettingKeys.HostingWildcardDnsProvider] = dnsProvider?.Trim(),
+            };
+            if (!keepCreds) d[SettingKeys.HostingWildcardDnsCredentials] = encCreds;
+            await _cloud.SaveAsync(d);
+        }
+        else
+        {
+            node.WildcardEnabled = enabled;
+            node.DnsProvider = string.IsNullOrWhiteSpace(dnsProvider) ? null : dnsProvider.Trim();
+            if (!keepCreds) node.DnsCredentialsEnc = encCreds;
+            await _db.SaveChangesAsync(ct);
+        }
+        return await ApplyWildcardAsync(node, ct);
+    }
+
+    /// <summary>Brings the host's proxy in line with its wildcard setting (also used after the base domain changed).</summary>
+    public async Task<PublishResult> ApplyWildcardAsync(Node? node, CancellationToken ct = default)
+    {
+        var cfg = WildcardFor(node);
+        var baseDomain = AutoBase(node);
+        var kind = node is null ? Settings.Kind : ProxyKinds.Normalise(node.ProxyKind);
+        ProxyOpResult r;
+        if (cfg.Enabled)
+        {
+            if (baseDomain is null) return await RecordWildcardAsync(node, cfg.RouteId, "Erst automatische Adressen mit einer Basis-Domain einschalten.");
+            if (kind == ProxyKinds.None) return await RecordWildcardAsync(node, cfg.RouteId, "Auf diesem Host ist kein Proxy eingerichtet.");
+            if (string.IsNullOrWhiteSpace(cfg.DnsProvider)) return await RecordWildcardAsync(node, cfg.RouteId, "Bitte den DNS-Anbieter angeben.");
+            var fallback = _cloud.Get(SettingKeys.CanonicalUrl) is { Length: > 0 } u ? u : "https://" + baseDomain;
+            var creds = CredentialsOf(node);
+            r = await RunAsync(node, x => new ProxyOp("wildcard", x, Host: baseDomain, RouteId: cfg.RouteId, Upstream: fallback,
+                DnsProvider: cfg.DnsProvider, Dns: creds), null, ct);
+            return await RecordWildcardAsync(node, r.Ok ? r.RouteId ?? cfg.RouteId : cfg.RouteId, r.Ok ? null : r.Message, r.Ok ? r.Message : null);
+        }
+        if (cfg.RouteId is null) return await RecordWildcardAsync(node, null, null, "Kein Wildcard-Zertifikat eingerichtet.");
+        r = await RunAsync(node, x => new ProxyOp("unwildcard", x, Kind: kind, Host: baseDomain ?? "", RouteId: cfg.RouteId), null, ct);
+        return await RecordWildcardAsync(node, r.Ok ? null : cfg.RouteId, r.Ok ? null : r.Message, r.Ok ? r.Message : null);
+    }
+
+    private async Task<PublishResult> RecordWildcardAsync(Node? node, string? routeId, string? error, string? okMessage = null)
+    {
+        if (node is null)
+            await _cloud.SaveAsync(new Dictionary<string, string?> { [SettingKeys.HostingWildcardRouteId] = routeId ?? "", [SettingKeys.HostingWildcardError] = error ?? "" });
+        else { node.WildcardRouteId = routeId; node.WildcardError = error; await _db.SaveChangesAsync(); }
+        return error is null ? new(true, okMessage ?? "Gespeichert.") : new(false, error);
+    }
+
+    /// <summary>The edge's source addresses as the nodes see them (from the edge settings).</summary>
+    public List<string> EdgeTrustedIps => (_cloud.Get(SettingKeys.HostingEdgeTrustedIps) ?? "")
+        .Split(new[] { ',', ' ', '\n', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Where(ip => System.Net.IPAddress.TryParse(ip.Split('/')[0], out _)).Distinct().ToList();
+
+    /// <summary>Tells the proxy of one host to trust the edge (Caddy: trusted_proxies), or to stop trusting it when the
+    /// edge is off. Only for hosts with a proxy; Matcad reports that it cannot be set from here.</summary>
+    public async Task<ProxyOpResult> ApplyTrustAsync(Node? node, CancellationToken ct = default)
+    {
+        var kind = node is null ? Settings.Kind : ProxyKinds.Normalise(node.ProxyKind);
+        if (kind == ProxyKinds.None) return new(true, "Kein Proxy.");
+        var ranges = EdgeEnabled ? EdgeTrustedIps : new List<string>();
+        return await RunAsync(node, x => new ProxyOp("trust", x, Trusted: ranges), null, ct);
+    }
+
+    /// <summary><see cref="ApplyTrustAsync"/> on this host and every node; returns the failures by host name.</summary>
+    public async Task<List<string>> ApplyTrustEverywhereAsync(CancellationToken ct = default)
+    {
+        var errors = new List<string>();
+        var r = await ApplyTrustAsync(null, ct);
+        if (!r.Ok) errors.Add("Dieser Host: " + r.Message);
+        foreach (var n in await _db.Nodes.Where(n => !n.Revoked).ToListAsync(ct))
+        {
+            var nr = await ApplyTrustAsync(n, ct);
+            if (!nr.Ok) errors.Add($"{n.Name}: {nr.Message}");
+        }
+        return errors;
     }
 
     public sealed record TestResult(bool Ok, string Message, string Kind);
@@ -416,6 +531,8 @@ public class ProxyService
         if (inst.ProxyDomain is null) { inst.Url = "https://" + address; inst.UrlPinned = true; }
         _instances.Log(inst, InstanceEventKind.DomainPublished, $"Host-Adresse angelegt: {address}{(node is null ? "" : $" (Node „{node.Name}“)")}.");
         await _db.SaveChangesAsync(ct);
+        // The first route may just have created the proxy's server — trust the edge there too (best effort).
+        if (EdgeEnabled && EdgeTrustedIps.Count > 0) await ApplyTrustAsync(node, ct);
 
         var note = "";
         if (repointEdge && inst.ProxyDomain is { } d && inst.ProxyVia == ProxyVia.Edge && EdgeSettings.Kind == ProxyKinds.Caddy)
@@ -620,7 +737,11 @@ public class ProxyService
         {
             var address = await FreeHostAddressAsync(instanceName, baseDomain, null, ct);
             var r = await RunAsync(node, x => new ProxyOp("publish", x, containerId, localPort, address, "host-" + containerName, RouteName(instanceName)), null, ct);
-            if (r.Ok) { hostDomain = address; hostRouteId = r.RouteId; notes.Add($"Host-Adresse „{address}“ angelegt."); }
+            if (r.Ok)
+            {
+                hostDomain = address; hostRouteId = r.RouteId; notes.Add($"Host-Adresse „{address}“ angelegt.");
+                if (EdgeEnabled && EdgeTrustedIps.Count > 0) await ApplyTrustAsync(node, ct);
+            }
             else notes.Add($"Host-Adresse NICHT angelegt: {r.Message}");
         }
 

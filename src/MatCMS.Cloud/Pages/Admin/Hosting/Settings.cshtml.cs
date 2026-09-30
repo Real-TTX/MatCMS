@@ -35,6 +35,8 @@ public class SettingsModel : PageModel
     public bool EdgeUsesHostProxy => _proxy.EdgeUsesHostProxy;
     public string EdgeKind => _proxy.EdgeSettings.Kind;
     public ProxyFieldsView EdgeFields => _proxy.EdgeFieldsView();
+    public ProxyService.WildcardConfig Wildcard => _proxy.WildcardFor(null);
+    public string EdgeTrustedIps => Get(SettingKeys.HostingEdgeTrustedIps);
     public ProxyFieldsView ProxyFields => _proxy.FieldsView();
     public bool DockerReachable { get; private set; }
 
@@ -52,7 +54,7 @@ public class SettingsModel : PageModel
         DomainsOnOtherWay = await _proxy.CustomerDomainsOnOtherWayCountAsync(HttpContext.RequestAborted);
     }
 
-    public async Task<IActionResult> OnPostAutoDomainAsync(bool enabled, string? baseDomain)
+    public async Task<IActionResult> OnPostAutoDomainAsync(bool enabled, string? baseDomain, bool wildcard, string? dnsProvider, string? dnsCredentials)
     {
         if (enabled && ProxyService.NormaliseDomain(baseDomain) is null)
         {
@@ -60,7 +62,16 @@ public class SettingsModel : PageModel
             return RedirectToPage();
         }
         await _proxy.SetAutoDomainAsync(enabled, baseDomain);
-        TempData["Flash"] = enabled ? "Automatische Adressen eingeschaltet — neue Instanzen bekommen ihre Adresse beim Anlegen." : "Automatische Adressen ausgeschaltet.";
+        var msg = enabled ? "Automatische Adressen eingeschaltet — neue Instanzen bekommen ihre Adresse beim Anlegen." : "Automatische Adressen ausgeschaltet.";
+        // The wildcard follows the base domain; switching it (or the domain) applies it at the proxy right away.
+        var before = _proxy.WildcardFor(null);
+        if (wildcard || before.Enabled || before.RouteId is not null)
+        {
+            var w = await _proxy.SetWildcardAsync(null, wildcard && enabled, dnsProvider, dnsCredentials, HttpContext.RequestAborted);
+            if (!w.Ok) { TempData["FlashError"] = msg + " Wildcard-Zertifikat: " + w.Message; return RedirectToPage(); }
+            msg += " " + w.Message;
+        }
+        TempData["Flash"] = msg;
         return RedirectToPage();
     }
 
@@ -73,15 +84,18 @@ public class SettingsModel : PageModel
     }
 
     public async Task<IActionResult> OnPostEdgeAsync(bool enabled, bool useHostProxy, string? provider, string? matcadUrl, string? matcadToken,
-        bool clearMatcadToken, string? caddyAdminUrl, string? caddyServer)
+        bool clearMatcadToken, string? caddyAdminUrl, string? caddyServer, string? trustedIps)
     {
+        await _cloud.SaveAsync(new Dictionary<string, string?> { [SettingKeys.HostingEdgeTrustedIps] = trustedIps?.Trim() });
         // Only the switches when the edge is the host's proxy — its own fields keep what they had.
         await _proxy.UpdateEdgeAsync(useHostProxy
             ? new ProxyService.EdgeConfigInput(enabled, true, null, null, null, false, null, null)
             : new ProxyService.EdgeConfigInput(enabled, false, provider, matcadUrl ?? "", matcadToken, clearMatcadToken, caddyAdminUrl ?? "", caddyServer ?? ""));
-        TempData["Flash"] = enabled
-            ? "Edge-Proxy eingeschaltet — neu veröffentlichte Kundendomains laufen über ihn."
-            : "Edge-Proxy ausgeschaltet.";
+        // Every Caddy host trusts the edge while it is on (the visitor's IP survives the second proxy), and stops when off.
+        var trustErrors = await _proxy.ApplyTrustEverywhereAsync(HttpContext.RequestAborted);
+        var msg = enabled ? "Edge-Proxy eingeschaltet — neu veröffentlichte Kundendomains laufen über ihn." : "Edge-Proxy ausgeschaltet.";
+        if (trustErrors.Count > 0) { TempData["FlashError"] = msg + " Vertrauenswürdiger Proxy nicht überall gesetzt: " + string.Join(" · ", trustErrors); return RedirectToPage(); }
+        TempData["Flash"] = msg;
         return RedirectToPage();
     }
 

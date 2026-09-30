@@ -72,4 +72,16 @@ public interface IProxyProvider
 
     /// <summary>Whether the route still exists at the provider; null when that cannot be told.</summary>
     Task<bool?> ExistsAsync(string routeId, CancellationToken ct = default);
+
+    /// <summary>One certificate for <c>*.{baseDomain}</c> via the DNS challenge. <paramref name="fallbackUrl"/> = where
+    /// a request for an unknown name under the wildcard is sent (Matcad needs a target for its wildcard route).</summary>
+    Task<ProxyResult> EnsureWildcardAsync(string? existingId, string baseDomain, string dnsProvider,
+        IReadOnlyDictionary<string, string> credentials, string fallbackUrl, CancellationToken ct = default) =>
+        Task.FromResult(new ProxyResult(false, "Ohne Proxy gibt es keine Zertifikate — auf diesem Host erst einen Proxy einrichten."));
+
+    Task<ProxyResult> DeleteWildcardAsync(string id, string baseDomain, CancellationToken ct = default) => Task.FromResult(new ProxyResult(true));
+
+    /// <summary>Trust <paramref name="ranges"/> (the edge) as a proxy, so the visitor's address survives. Empty = remove.</summary>
+    Task<ProxyResult> SetTrustedProxiesAsync(IReadOnlyList<string> ranges, CancellationToken ct = default) =>
+        Task.FromResult(new ProxyResult(false, "Dieser Proxy lässt sich von der Cloud aus keine vertrauenswürdigen Proxys setzen."));
 }

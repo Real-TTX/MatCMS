@@ -796,8 +796,22 @@ Design and increments: `docs/hosting-platform.md`. Increments 1–4 are built:
     re-points an edge route that depends on it. Teardown (`InstanceRemovalService`) now deletes all routes after
     the container (best effort, failures reported) — before, routes outlived their site.
   - Hosting → Domains lists EVERY address (host addresses + customer domains with their way and target + pending).
-  - Known gap: through two proxies the node Caddy sees the EDGE as client unless its `trusted_proxies` names the
-    edge — the instance's login rate limit then counts all edge visitors as one. Not configured automatically.
+  - **Wildcard certificate per host** (`hosting.wildcard.*` / `Node.Wildcard*`, `ProxyService.SetWildcardAsync`, op
+    `wildcard` run ON the host): one certificate for `*.<base>` via DNS-01 instead of one per instance (Let's
+    Encrypt ~50/week/domain). Caddy: an automation policy (`@id matcms-wildcard-…`) with the DNS module + the
+    credentials the operator enters as key=value lines (field names are the MODULE's — hetzner: auth_api_token;
+    encrypted, never shown again), the wildcard on `certificates.automate`, and `prefer_wildcard` where the Caddy
+    still has that switch (2.8/2.9; newer ones use the wildcard on their own and answer "unknown field", which is not
+    an error). The module must be in that Caddy (`caddy add-package github.com/caddy-dns/<name>`), else a clear
+    message. Levels of the tls app are only created when the PATH is missing — a refused content is reported as is.
+    Matcad: a wildcard route `*.<base>` with the DNS provider named as in Matcad (redirect to the cloud URL for
+    unknown names); its credentials stay in Matcad. Tested against Caddy 2.11 with the hetzner module; the Matcad
+    path is untested.
+  - **Visitor IP through two proxies:** the edge's source IPs (`hosting.edge.trustedIps`) are set as
+    `trusted_proxies` on every Caddy host (on edge save, node address save, and after a host route may have created
+    the server); Matcad cannot be set from outside. The CMS takes TWO hops under `MatCms:Proxy:TrustAll`
+    (`ForwardLimit = 2`): the host proxy forwards "visitor, edge" and resets an X-Forwarded-For from anybody it does
+    not trust.
 - **Nodes (increment 4, `Services/Nodes/`)** — further Docker hosts. The node-agent is **this image** in
   `--node-agent` mode (`Program.cs` leaves before the web app is built, like `--self-update`): no DB, only
   the engine, its daemon and an OUTBOUND long poll to `POST /api/nodes/{id}/heartbeat` (`X-MatCMS-Node-Token`,

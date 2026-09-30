@@ -379,6 +379,31 @@ public static class HostingApi
             return Results.Ok(new { created = r.Created, failed = r.Failed, errors = r.Errors });
         }).RequireRateLimiting("operatorApi");
 
+        // ---- Wildcard certificate per host (nodeId omitted = this cloud's own host) ------------------------
+        app.MapGet("/api/v1/hosting/wildcard", async (HttpContext ctx, string? nodeId, ApiKeyService keys, AppDbContext db, Services.Proxy.ProxyService proxy) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            Node? node = null;
+            if (!string.IsNullOrEmpty(nodeId) && (node = await db.Nodes.FirstOrDefaultAsync(n => n.PublicId == nodeId)) is null)
+                return Results.Json(new { error = "Node nicht gefunden." }, statusCode: StatusCodes.Status404NotFound);
+            var w = proxy.WildcardFor(node);
+            return Results.Ok(new { enabled = w.Enabled, dnsProvider = w.DnsProvider, credentialsSet = w.CredentialsSet, id = w.RouteId, error = w.Error });
+        }).RequireRateLimiting("operatorApi");
+
+        app.MapPut("/api/v1/hosting/wildcard", async (HttpContext ctx, string? nodeId, WildcardDto b, ApiKeyService keys, AppDbContext db, Services.Proxy.ProxyService proxy) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireCloudWide(key!) is { } g) return g;
+            Node? node = null;
+            if (!string.IsNullOrEmpty(nodeId) && (node = await db.Nodes.FirstOrDefaultAsync(n => n.PublicId == nodeId)) is null)
+                return Results.Json(new { error = "Node nicht gefunden." }, statusCode: StatusCodes.Status404NotFound);
+            var creds = b.Credentials is null ? null : string.Join("\n", b.Credentials.Select(kv => kv.Key + "=" + kv.Value));
+            var r = await proxy.SetWildcardAsync(node, b.Enabled, b.DnsProvider, creds, ctx.RequestAborted);
+            return r.Ok ? Results.Ok(new { ok = true, message = r.Message }) : Results.Json(new { ok = false, error = r.Message }, statusCode: StatusCodes.Status409Conflict);
+        }).RequireRateLimiting("operatorApi");
+
         // ---- Edge proxy for customer domains ------------------------------------------------------------
         app.MapGet("/api/v1/hosting/edge", async (HttpContext ctx, ApiKeyService keys, Services.Proxy.ProxyService proxy) =>
         {
@@ -394,7 +419,8 @@ public static class HostingApi
             if (error is not null) return error;
             if (RequireCloudWide(key!) is { } g) return g;
             await proxy.UpdateEdgeAsync(b);
-            return Results.Ok(new { ok = true, edge = proxy.PublicEdgeConfig(), domainsOnOtherWay = await proxy.CustomerDomainsOnOtherWayCountAsync(ctx.RequestAborted) });
+            var trustErrors = await proxy.ApplyTrustEverywhereAsync(ctx.RequestAborted);
+            return Results.Ok(new { ok = true, edge = proxy.PublicEdgeConfig(), domainsOnOtherWay = await proxy.CustomerDomainsOnOtherWayCountAsync(ctx.RequestAborted), trustErrors });
         }).RequireRateLimiting("operatorApi");
 
         app.MapPost("/api/v1/hosting/edge/test", async (HttpContext ctx, ApiKeyService keys, Services.Proxy.ProxyService proxy) =>
@@ -461,3 +487,6 @@ public sealed record StartUpdatesDto(List<string>? InstanceIds);
 
 /// <summary>Body of <c>PUT /api/v1/hosting/auto-domain</c>.</summary>
 public sealed record AutoDomainDto(bool Enabled, string? BaseDomain);
+
+/// <summary>Body of <c>PUT /api/v1/hosting/wildcard</c>. <c>Credentials</c> null = keep the stored ones.</summary>
+public sealed record WildcardDto(bool Enabled, string? DnsProvider, Dictionary<string, string>? Credentials);

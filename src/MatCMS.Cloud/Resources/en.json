@@ -1311,5 +1311,14 @@
   "profiles.recommended": "recommended",
   "profiles.recommendedValue": "Recommended value: {0}",
   "profiles.recommendedMissing": "{0} recommended setting(s) missing in this profile:",
-  "profiles.recommendedAdd": "Add"
+  "profiles.recommendedAdd": "Add",
+  "wildcard.enable": "One wildcard certificate for all addresses (DNS challenge)",
+  "wildcard.provider": "DNS provider",
+  "wildcard.providerHint": "Caddy: the DNS module, e.g. hetzner, cloudflare or netcup — it must be built into this Caddy. Matcad: the name of the DNS provider as set up in Matcad.",
+  "wildcard.credentials": "Credentials",
+  "wildcard.credentialsKeep": "stored – leave empty to keep",
+  "wildcard.credentialsHint": "Caddy only: one line per field of the DNS module, names as in its description (github.com/caddy-dns/<module>) — e.g. hetzner: auth_api_token=…, cloudflare: api_token=…, netcup: customer_number, api_key, api_password. Stored encrypted, never shown again. With Matcad they stay in Matcad.",
+  "wildcard.active": "active",
+  "edge.trustedIps": "Edge IP addresses",
+  "edge.trustedIpsHint": "The address the edge's requests arrive from at the hosts (public IP of the cloud server or its private-network address), comma-separated. Every Caddy host then trusts them, so the real visitor IP arrives."
 }

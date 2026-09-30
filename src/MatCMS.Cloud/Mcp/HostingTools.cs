@@ -285,6 +285,22 @@ public class HostingTools
         return new { ok = true, missing = await proxy.MissingHostAddressCountAsync(null, ct) };
     }
 
+    [McpServerTool(Name = "configure_wildcard"), Description(
+        "One wildcard certificate for *.<base domain> of a host's automatic addresses via the DNS challenge, instead of one certificate per instance. Caddy: dnsProvider = the Caddy DNS module (hetzner, cloudflare, netcup …, compiled into that Caddy) and credentials its fields (e.g. api_token); Matcad: dnsProvider = the name of a DNS provider set up in Matcad (credentials stay there, pass none). nodeId omitted = this cloud's own host. Requires the hosting right on an all-instances key.")]
+    public static async Task<object> ConfigureWildcard(McpContext me, AppDbContext db, Services.Proxy.ProxyService proxy,
+        bool enabled, string? dnsProvider = null,
+        [Description("Key/value credentials for the Caddy DNS module; omit to keep the stored ones (never returned).")] Dictionary<string, string>? credentials = null,
+        [Description("The node id; omit for this cloud's own host.")] string? nodeId = null, CancellationToken ct = default)
+    {
+        RequireCloudWide(me);
+        Node? node = null;
+        if (nodeId is not null) node = await db.Nodes.FirstOrDefaultAsync(n => n.PublicId == nodeId, ct) ?? throw new McpException("Node nicht gefunden.");
+        var creds = credentials is null ? null : string.Join("\n", credentials.Select(kv => kv.Key + "=" + kv.Value));
+        var r = await proxy.SetWildcardAsync(node, enabled, dnsProvider, creds, ct);
+        if (!r.Ok) throw new McpException(r.Message);
+        return new { ok = true, message = r.Message };
+    }
+
     [McpServerTool(Name = "get_edge_config"), Description(
         "The central edge proxy for customer domains: whether it is on, whether it is the same proxy as this cloud's host, its provider and addresses (never the Matcad key). With Caddy the edge forwards to a site's automatic host address; with Matcad to node-address:port. Any valid key.")]
     public static object GetEdgeConfig(McpContext me, Services.Proxy.ProxyService proxy)
@@ -298,11 +314,14 @@ public class HostingTools
     public static async Task<object> ConfigureEdge(McpContext me, Services.Proxy.ProxyService proxy,
         bool? enabled = null, bool? useHostProxy = null, [Description("caddy or matcad (only when useHostProxy is false).")] string? provider = null,
         string? caddyAdminUrl = null, string? caddyServer = null, string? matcadUrl = null,
-        [Description("Stored encrypted, never returned.")] string? matcadToken = null, bool clearMatcadToken = false, CancellationToken ct = default)
+        [Description("Stored encrypted, never returned.")] string? matcadToken = null, bool clearMatcadToken = false,
+        [Description("The edge's source addresses as the nodes see them (comma-separated IPs). Every Caddy host is told to trust them, so the visitor's IP survives the second proxy.")] string? trustedIps = null,
+        CancellationToken ct = default)
     {
         RequireCloudWide(me);
-        await proxy.UpdateEdgeAsync(new(enabled, useHostProxy, provider, matcadUrl, matcadToken, clearMatcadToken, caddyAdminUrl, caddyServer));
-        return new { edge = proxy.PublicEdgeConfig(), domainsOnOtherWay = await proxy.CustomerDomainsOnOtherWayCountAsync(ct) };
+        await proxy.UpdateEdgeAsync(new(enabled, useHostProxy, provider, matcadUrl, matcadToken, clearMatcadToken, caddyAdminUrl, caddyServer, trustedIps));
+        var trustErrors = await proxy.ApplyTrustEverywhereAsync(ct);
+        return new { edge = proxy.PublicEdgeConfig(), domainsOnOtherWay = await proxy.CustomerDomainsOnOtherWayCountAsync(ct), trustErrors };
     }
 
     [McpServerTool(Name = "test_edge"), Description("Whether the edge proxy is reachable with its configured address. Requires the hosting right.")]

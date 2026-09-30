@@ -86,6 +86,19 @@ public static class SettingKeys
     /// <summary>The central edge proxy for customer domains (runs on the cloud's host). useHostProxy = the edge is
     /// the very proxy "Dieser Host" already uses (the common case: one Caddy on the cloud server); otherwise it
     /// has its own provider fields below.</summary>
+    /// <summary>Wildcard certificate for "Dieser Host" (see <c>Node.WildcardEnabled</c> for the meaning of the fields).
+    /// dnsCredentials is SecretProtector-encrypted JSON.</summary>
+    public const string HostingWildcardEnabled = "hosting.wildcard.enabled";
+    public const string HostingWildcardDnsProvider = "hosting.wildcard.dnsProvider";
+    public const string HostingWildcardDnsCredentials = "hosting.wildcard.dnsCredentials";
+    public const string HostingWildcardRouteId = "hosting.wildcard.routeId";
+    public const string HostingWildcardError = "hosting.wildcard.error";
+
+    /// <summary>The addresses the edge's requests come FROM, as a node sees them (public IP of the cloud server, or its
+    /// private-network address). Every Caddy host is told to trust them (trusted_proxies), so the visitor's IP
+    /// survives the second proxy.</summary>
+    public const string HostingEdgeTrustedIps = "hosting.edge.trustedIps";
+
     public const string HostingEdgeEnabled = "hosting.edge.enabled";
     public const string HostingEdgeUseHostProxy = "hosting.edge.useHostProxy";
     public const string HostingEdgeMode = "hosting.edge.mode";

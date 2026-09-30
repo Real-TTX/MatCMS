@@ -1,0 +1,29 @@
+@model MatCMS.Cloud.Services.Proxy.ProxyService.WildcardConfig
+@* The wildcard-certificate fields of one host — the same partial for "Dieser Host" and every node. Inside the
+   automatic-addresses form, because a wildcard only exists for a base domain. Credentials are never rendered back:
+   empty keeps what is stored. *@
+<label class="checkbox-row">
+    <input type="checkbox" name="wildcard" value="true" data-reveal="wildcard-fields" checked="@(Model.Enabled ? "checked" : null)" />
+    @T["wildcard.enable"]
+</label>
+<div data-reveal-target="wildcard-fields" hidden="@(Model.Enabled ? null : "hidden")">
+    <div class="form-field">
+        <label for="dnsProvider">@T["wildcard.provider"]</label>
+        <input id="dnsProvider" name="dnsProvider" value="@Model.DnsProvider" placeholder="hetzner" spellcheck="false" />
+        <div class="help">@T["wildcard.providerHint"]</div>
+    </div>
+    <div class="form-field">
+        <label for="dnsCredentials">@T["wildcard.credentials"]</label>
+        <textarea id="dnsCredentials" name="dnsCredentials" rows="3" spellcheck="false" autocomplete="off"
+                  placeholder="@(Model.CredentialsSet ? T["wildcard.credentialsKeep"] : "auth_api_token=…")"></textarea>
+        <div class="help">@T["wildcard.credentialsHint"]</div>
+    </div>
+    @if (Model.Error is { } err)
+    {
+        <div class="alert alert-error">@err</div>
+    }
+    else if (Model.RouteId is { } rid)
+    {
+        <div class="kv"><div class="kv-label">@T["common.status"]</div><div class="kv-value"><span class="badge badge-on">@T["wildcard.active"]</span> <span class="mono muted">@rid</span></div></div>
+    }
+</div>

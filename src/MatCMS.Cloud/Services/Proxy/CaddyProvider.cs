@@ -156,4 +156,153 @@ public sealed class CaddyProvider : IProxyProvider
         }
         catch { return null; }
     }
+
+    // ---- Wildcard certificate (DNS-01) and trusted proxies ---------------------------------------------------
+    // Surgical like the routes: only objects with our own @id are created/removed, and the few server/app fields
+    // touched (automatic_https.prefer_wildcard, trusted_proxies) are set by path, never by replacing the config.
+
+    public static string WildcardIdFor(string baseDomain) => "matcms-wildcard-" + baseDomain.Replace('.', '-');
+
+    /// <summary>
+    /// One certificate for <c>*.{baseDomain}</c> via the DNS challenge: an automation policy with the DNS module and
+    /// its credentials, the wildcard on the "automate" list (so Caddy obtains it without waiting for a request), and
+    /// <c>automatic_https.prefer_wildcard</c> on the server so each host route under it uses THAT certificate instead
+    /// of getting its own. The DNS module must be compiled into this Caddy (xcaddy --with github.com/caddy-dns/…);
+    /// Caddy refuses the policy otherwise, which is reported as such.
+    /// </summary>
+    public async Task<ProxyResult> EnsureWildcardAsync(string? existingId, string baseDomain, string dnsProvider,
+        IReadOnlyDictionary<string, string> credentials, string fallbackUrl, CancellationToken ct = default)
+    {
+        var id = WildcardIdFor(baseDomain);
+        var subject = "*." + baseDomain;
+        var provider = new JsonObject { ["name"] = dnsProvider.Trim().ToLowerInvariant() };
+        foreach (var (k, v) in credentials) provider[k] = v;
+        var policy = new JsonObject
+        {
+            ["@id"] = id,
+            ["subjects"] = new JsonArray(subject),
+            ["issuers"] = new JsonArray(new JsonObject
+            {
+                ["module"] = "acme",
+                ["challenges"] = new JsonObject { ["dns"] = new JsonObject { ["provider"] = provider } },
+            }),
+        };
+        try
+        {
+            // 1) the policy — replace ours in place, else append (creating the path level by level).
+            var (gs, _) = await SendAsync(HttpMethod.Get, "/id/" + id, null, ct);
+            ProxyResult r;
+            if (gs == HttpStatusCode.OK)
+            {
+                var (ps, pb) = await SendAsync(HttpMethod.Patch, "/id/" + id, policy.ToJsonString(), ct);
+                r = ps == HttpStatusCode.OK ? new(true) : new(false, DnsErr(ps, pb, dnsProvider));
+            }
+            else r = await AppendAsync("/config/apps/tls/automation/policies", policy,
+                ("/config/apps/tls/automation", new JsonObject { ["policies"] = new JsonArray(policy.DeepClone()) }),
+                ("/config/apps/tls", new JsonObject { ["automation"] = new JsonObject { ["policies"] = new JsonArray(policy.DeepClone()) } }), ct);
+            if (!r.Ok) return r.Error?.Contains("DNS-Modul") == true ? r : new(false, DnsErr(HttpStatusCode.BadRequest, r.Error ?? "", dnsProvider));
+
+            // 2) have Caddy obtain the wildcard right away.
+            var (ls, lb) = await SendAsync(HttpMethod.Get, "/config/apps/tls/certificates/automate", null, ct);
+            var list = ls == HttpStatusCode.OK && !IsNullBody(lb) ? JsonNode.Parse(lb)?.AsArray() : null;
+            if (list is null || !list.Any(x => x?.GetValue<string>() == subject))
+            {
+                var a = await AppendAsync("/config/apps/tls/certificates/automate", JsonValue.Create(subject)!,
+                    ("/config/apps/tls/certificates", new JsonObject { ["automate"] = new JsonArray(subject) }), ct);
+                if (!a.Ok) return a;
+            }
+
+            // 3) host routes under the wildcard use it instead of fetching their own (Caddy ≥ 2.8).
+            var (ws, wb) = await SendAsync(HttpMethod.Put, ServerPath + "/automatic_https/prefer_wildcard", "true", ct);
+            if (ws != HttpStatusCode.OK)
+            {
+                var (w2, w2b) = await SendAsync(HttpMethod.Put, ServerPath + "/automatic_https", "{\"prefer_wildcard\":true}", ct);
+                // Caddy 2.8/2.9 have the switch; newer versions dropped it and use a managed wildcard for the names
+                // under it on their own — their "unknown field" is not a failure. Anything else is reported.
+                if (w2 != HttpStatusCode.OK && !w2b.Contains("prefer_wildcard", StringComparison.OrdinalIgnoreCase))
+                    return new(true, $"Wildcard-Richtlinie angelegt, aber prefer_wildcard nicht gesetzt ({Err(w2, w2b)}).", id);
+            }
+            return new(true, null, id);
+        }
+        catch (Exception ex) { return new(false, $"Caddy-Admin-API nicht erreichbar: {ex.Message}"); }
+    }
+
+    public async Task<ProxyResult> DeleteWildcardAsync(string id, string baseDomain, CancellationToken ct = default)
+    {
+        try
+        {
+            var (s, b) = await SendAsync(HttpMethod.Delete, "/id/" + id, null, ct);
+            if (!(s == HttpStatusCode.OK || s == HttpStatusCode.NotFound || b.Contains("unknown object ID", StringComparison.OrdinalIgnoreCase)))
+                return new(false, Err(s, b));
+            var subject = "*." + baseDomain;
+            var (ls, lb) = await SendAsync(HttpMethod.Get, "/config/apps/tls/certificates/automate", null, ct);
+            if (ls == HttpStatusCode.OK && !IsNullBody(lb) && JsonNode.Parse(lb)?.AsArray() is { } list)
+                for (var i = list.Count - 1; i >= 0; i--)
+                    if (list[i]?.GetValue<string>() == subject)
+                        await SendAsync(HttpMethod.Delete, $"/config/apps/tls/certificates/automate/{i}", null, ct);
+            return new(true);
+        }
+        catch (Exception ex) { return new(false, $"Caddy-Admin-API nicht erreichbar: {ex.Message}"); }
+    }
+
+    /// <summary>
+    /// Makes the server trust <paramref name="ranges"/> (the edge) as a proxy: Caddy then keeps the visitor's address
+    /// the edge put in X-Forwarded-For instead of replacing it with the edge's own. Empty = remove the setting. Only
+    /// the addresses named — trusting more would let anybody claim any address.
+    /// </summary>
+    public async Task<ProxyResult> SetTrustedProxiesAsync(IReadOnlyList<string> ranges, CancellationToken ct = default)
+    {
+        try
+        {
+            var (ss, sb) = await SendAsync(HttpMethod.Get, ServerPath, null, ct);
+            if (ss != HttpStatusCode.OK || IsNullBody(sb)) return new(true, "Server noch nicht angelegt — wird beim nächsten Veröffentlichen gesetzt.");
+            if (ranges.Count == 0)
+            {
+                await SendAsync(HttpMethod.Delete, ServerPath + "/trusted_proxies", null, ct);
+                return new(true);
+            }
+            var body = new JsonObject { ["source"] = "static", ["ranges"] = new JsonArray(ranges.Select(r => (JsonNode)JsonValue.Create(r)!).ToArray()) }.ToJsonString();
+            var (ps, pb) = await SendAsync(HttpMethod.Put, ServerPath + "/trusted_proxies", body, ct);
+            if (ps != HttpStatusCode.OK) (ps, pb) = await SendAsync(HttpMethod.Patch, ServerPath + "/trusted_proxies", body, ct);
+            return ps == HttpStatusCode.OK ? new(true) : new(false, Err(ps, pb));
+        }
+        catch (Exception ex) { return new(false, $"Caddy-Admin-API nicht erreichbar: {ex.Message}"); }
+    }
+
+    /// <summary>POSTs <paramref name="item"/> onto the array at <paramref name="path"/>; when a level of the path does
+    /// not exist yet, PUTs the given fallback object at the first level that works instead.</summary>
+    private async Task<ProxyResult> AppendAsync(string path, JsonNode item, (string Path, JsonObject Body) level1, CancellationToken ct) =>
+        await AppendAsync(path, item, level1, null, ct);
+
+    private async Task<ProxyResult> AppendAsync(string path, JsonNode item, (string Path, JsonObject Body) level1,
+        (string Path, JsonObject Body)? level2, CancellationToken ct)
+    {
+        var (s, b) = await SendAsync(HttpMethod.Post, path, item.ToJsonString(), ct);
+        if (s == HttpStatusCode.OK) return new(true);
+        // Only a MISSING path is a reason to create a level higher up; anything else (Caddy refusing the content,
+        // e.g. an unknown field of a DNS module) is the answer and must not be buried under a follow-up error.
+        var missing = s == HttpStatusCode.NotFound || b.Contains("invalid traversal path", StringComparison.OrdinalIgnoreCase)
+                      || b.Contains("not found", StringComparison.OrdinalIgnoreCase) || IsNullBody(b);
+        if (!missing) return new(false, Err(s, b));
+        var (s1, b1) = await SendAsync(HttpMethod.Put, level1.Path, level1.Body.ToJsonString(), ct);
+        if (s1 == HttpStatusCode.OK) return new(true);
+        if (level2 is { } l2)
+        {
+            var (s2, b2) = await SendAsync(HttpMethod.Put, l2.Path, l2.Body.ToJsonString(), ct);
+            if (s2 == HttpStatusCode.OK) return new(true);
+            return new(false, Err(s2, b2));
+        }
+        return new(false, Err(s1, b1));
+    }
+
+    private static string DnsErr(HttpStatusCode s, string body, string provider)
+    {
+        if (body.Contains("unknown module", StringComparison.OrdinalIgnoreCase) || body.Contains("module not registered", StringComparison.OrdinalIgnoreCase))
+            return $"Dieser Caddy kennt das DNS-Modul „{provider}“ nicht — Caddy mit dem Modul bauen (xcaddy build --with github.com/caddy-dns/{provider}, oder im offiziellen Image: caddy add-package github.com/caddy-dns/{provider}).";
+        // The field names differ per module (hetzner: auth_api_token, cloudflare: api_token …) — say which one it refused.
+        var m = System.Text.RegularExpressions.Regex.Match(body, @"unknown field (?:&quot;|"")([^&""]+)");
+        if (m.Success)
+            return $"Das DNS-Modul „{provider}“ kennt das Feld „{m.Groups[1].Value}“ nicht — die Feldnamen stehen in der Beschreibung des Moduls (github.com/caddy-dns/{provider}).";
+        return body.StartsWith("Caddy") ? body : Err(s, body);
+    }
 }

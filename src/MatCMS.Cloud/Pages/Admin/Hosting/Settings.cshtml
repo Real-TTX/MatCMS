@@ -104,6 +104,7 @@
                 <input id="autoBase" name="baseDomain" value="@Model.AutoDomainBase" placeholder="cloud.example.de" spellcheck="false" />
                 <div class="help">@T["autodomain.baseHint"]</div>
             </div>
+            <partial name="_WildcardFields" model="Model.Wildcard" />
         </div>
         <div class="list-actions">
             <button type="submit" class="btn">@T["settings.save"]</button>
@@ -166,6 +167,11 @@
             {
                 <div class="help">@T["edge.matcadNote"]</div>
             }
+            <div class="form-field">
+                <label for="edgeTrustedIps">@T["edge.trustedIps"]</label>
+                <input id="edgeTrustedIps" name="trustedIps" value="@Model.EdgeTrustedIps" placeholder="203.0.113.10, 10.0.0.2" spellcheck="false" />
+                <div class="help">@T["edge.trustedIpsHint"]</div>
+            </div>
         </div>
         <div class="list-actions">
             <button type="submit" class="btn">@T["settings.save"]</button>

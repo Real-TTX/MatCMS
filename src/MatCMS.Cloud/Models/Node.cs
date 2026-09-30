@@ -70,6 +70,18 @@ public class Node
     /// when the edge forwards to <c>address:port</c> instead of the node's automatic address.</summary>
     public string? Address { get; set; }
 
+    /// <summary>One wildcard certificate for <c>*.{AutoDomainBase}</c> via the DNS challenge, instead of one
+    /// certificate per instance (Let's Encrypt allows ~50 new ones per week and domain). Caddy: DnsProvider = the
+    /// Caddy DNS module (hetzner, cloudflare, netcup …) and its credentials; Matcad: DnsProvider = the name of the
+    /// DNS provider as set up in Matcad (its credentials stay there).</summary>
+    public bool WildcardEnabled { get; set; }
+    public string? DnsProvider { get; set; }
+    /// <summary>JSON key/value map, SecretProtector-encrypted, never rendered back.</summary>
+    public string? DnsCredentialsEnc { get; set; }
+    /// <summary>The proxy's id for the wildcard (Caddy policy @id / Matcad route id) and the last error.</summary>
+    public string? WildcardRouteId { get; set; }
+    public string? WildcardError { get; set; }
+
     public int PortFrom { get; set; } = 9201;
     public int PortTo { get; set; } = 9299;
 

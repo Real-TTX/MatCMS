@@ -14,6 +14,26 @@
 
     var search = menu.querySelector('[data-inst-search]');
     var close = menu.querySelector('[data-inst-close]');
+    // Thumbnails: desktop only, and only once an entry is visible in the menu. A phone never loads them — the
+    // dialog is for choosing, and a dozen live websites in one page is more than a phone browser will carry.
+    var desktop = window.matchMedia('(min-width: 861px)');
+    var io = null;
+    function watchThumbnails() {
+        if (!desktop.matches) return;
+        var frames = menu.querySelectorAll('iframe[data-src]');
+        if (!('IntersectionObserver' in window)) { frames.forEach(load); return; }
+        io = io || new IntersectionObserver(function (entries) {
+            entries.forEach(function (e) { if (e.isIntersecting) { load(e.target); io.unobserve(e.target); } });
+        }, { root: menu, rootMargin: '60px' });   // on the desktop the MENU is the scroller
+        frames.forEach(function (fr) { io.observe(fr); });
+    }
+    function load(fr) {
+        var src = fr.getAttribute('data-src');
+        if (!src) return;
+        fr.removeAttribute('data-src');
+        fr.addEventListener('load', function () { fr.classList.add('is-loaded'); });
+        fr.src = src;
+    }
     var loaded = false;
     function open(on) {
         menu.hidden = !on;
@@ -22,14 +42,9 @@
         // Full-screen on a phone: the page behind must not scroll along under the finger.
         document.body.classList.toggle('inst-picker-open', on);
         if (on && search) { search.value = ''; filter(); if (window.matchMedia('(min-width: 861px)').matches) search.focus(); }
-        // First open fills the thumbnails. Doing it on page load would fetch every customer site just
-        // to draw a menu nobody may open.
-        if (on && !loaded) {
-            loaded = true;
-            menu.querySelectorAll('iframe[data-src]').forEach(function (fr) {
-                fr.src = fr.getAttribute('data-src');
-            });
-        }
+        // Thumbnails are watched from the first open on (never on page load: that would fetch every customer site
+        // just to draw a menu nobody may open).
+        if (on && !loaded) { loaded = true; watchThumbnails(); }
     }
 
     function filter() {

@@ -54,16 +54,16 @@
                role="option" aria-selected="@(i.Id == Model ? "true" : "false")"
                href="@Url.Page("/Admin/Instances/Details", new { id = i.Id })">
                 <span class="inst-picker-shot">
+                    @* The initial is always underneath: it is what a phone shows, and what the desktop shows until the
+                       thumbnail has loaded (or when there is none). *@
+                    <span class="inst-picker-noshot">@if (hasUrl) { <span class="inst-picker-initial">@((i.Name ?? "?").Trim().FirstOrDefault().ToString().ToUpperInvariant())</span> } else { <i class="ti ti-world-off" aria-hidden="true"></i> }</span>
                     @if (hasUrl)
                     {
-                        @* data-src, not src: opening a page must not fetch every customer site at once.
-                           The frames are filled the first time the menu is opened. *@
+                        @* data-src, not src: every thumbnail is a whole customer website with its scripts. They are loaded
+                           only on the desktop and only when their entry scrolls into view (context-picker.js) — loading
+                           all of them at once made phone browsers give up ("can't show this page"). *@
                         <iframe data-src="@i.PreviewUrl" title="@i.Name" tabindex="-1" scrolling="no"
                                 referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts"></iframe>
-                    }
-                    else
-                    {
-                        <span class="inst-picker-noshot"><i class="ti ti-world-off" aria-hidden="true"></i></span>
                     }
                 </span>
                 <span class="inst-picker-meta">

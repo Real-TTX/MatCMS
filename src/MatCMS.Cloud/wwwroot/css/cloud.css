@@ -530,3 +530,9 @@ body.cu-screen { min-height: 100vh; display: flex; align-items: center; justify-
     .inst-picker-shot iframe { transform: scale(.0542); }
     body.inst-picker-open { overflow: hidden; }
 }
+
+/* Thumbnail frame over the initial: invisible until it has actually loaded, never on a phone. */
+.inst-picker-shot iframe { opacity: 0; transition: opacity .2s ease; }
+.inst-picker-shot iframe.is-loaded { opacity: 1; }
+.inst-picker-initial { font-weight: 700; font-size: 18px; color: var(--accent, #2563eb); }
+@media (max-width: 860px) { .inst-picker-shot iframe { display: none; } }

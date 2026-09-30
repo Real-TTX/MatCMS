@@ -1,0 +1,52 @@
+@model MatCMS.Content.ContainerBlockModel
+@{
+    var heading = Model.Data.Str("heading");
+    var intro = Model.Data.Str("intro");
+    var colors = Model.Data.StrOr("colors", "accent") == "vivid" ? "vivid" : "accent";
+    var cols = Model.Data.StrOr("columns", "3") == "2" ? 2 : 3;
+    var scroll = Model.Data.Str("motion") == "scroll";
+    // Round-robin into columns: every column gets its share whatever the lengths, and in scroll mode each column is
+    // its own strip.
+    var columns = Enumerable.Range(0, cols).Select(c => Model.Children.Where((_, i) => i % cols == c).ToList()).ToList();
+}
+@* Reviews in columns. "static" = masonry that simply stands; "scroll" = every column drifts slowly (alternating
+   direction), faded at the top and bottom, paused under the pointer — and not at all for visitors who asked their
+   system for reduced motion. *@
+<section class="section tm-block pr--@colors">
+    <div class="container">
+        @if (!string.IsNullOrWhiteSpace(heading) || !string.IsNullOrWhiteSpace(intro))
+        {
+            <div class="section__intro">
+                @if (!string.IsNullOrWhiteSpace(heading)) { <h2 class="pr-title">@Html.Raw(GradientText(heading))</h2> }
+                @if (!string.IsNullOrWhiteSpace(intro)) { <p>@intro</p> }
+            </div>
+        }
+        <div class="tm-grid@(scroll ? " tm--scroll" : "")" style="--tm-cols:@cols">
+            @for (var c = 0; c < columns.Count; c++)
+            {
+                var list = columns[c];
+                // Duration grows with the column's length so every column drifts at a similar speed.
+                <div class="tm-col@(c % 2 == 1 ? " tm-col--reverse" : "")" style="--tm-dur:@(Math.Max(20, list.Count * 9))s">
+                    <div class="tm-track">
+                        @foreach (var t in list) { @await Html.PartialAsync("Blocks/_Testimonial", t.Data) }
+                        @if (scroll)
+                        {
+                            @* The second copy makes the loop seamless (the track moves by exactly its first half). *@
+                            <div class="tm-dup" aria-hidden="true">
+                                @foreach (var t in list) { @await Html.PartialAsync("Blocks/_Testimonial", t.Data) }
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</section>
+@functions {
+    static string GradientText(string s)
+    {
+        var enc = System.Net.WebUtility.HtmlEncode(s);
+        enc = System.Text.RegularExpressions.Regex.Replace(enc, "\\*(.+?)\\*", "<span class=\"hc-grad\">$1</span>");
+        return enc.Replace("\r\n", "\n").Replace("\n", "<br>");
+    }
+}

@@ -1,0 +1,28 @@
+@model MatCMS.Content.BlockData
+@{
+    var name = Model.Str("name");
+    var role = Model.Str("role");
+    var text = Model.Str("text");
+    var rating = int.TryParse(Model.StrOr("rating", "5"), out var r) ? Math.Clamp(r, 0, 5) : 5;
+    var image = Model.Str("image");
+    var src = !string.IsNullOrWhiteSpace(image) && (image.StartsWith("/") || image.StartsWith("https://") || image.StartsWith("http://"))
+              && image.IndexOfAny(new[] { '\'', '"', '(', ')', '\\', '\n', '\r' }) < 0 ? image : "";
+    // Without a photo: the initial on a colour derived from the name — stable per person, different between people.
+    var initial = string.IsNullOrWhiteSpace(name) ? "?" : name.Trim()[..1].ToUpperInvariant();
+    var hue = string.IsNullOrEmpty(name) ? 220 : Math.Abs(name.Aggregate(17, (h, ch) => unchecked(h * 31 + ch))) % 360;
+}
+<figure class="tm-card">
+    <figcaption class="tm-head">
+        @if (src.Length > 0) { <img class="tm-avatar" src="@src" alt="" loading="lazy" /> }
+        else { <span class="tm-avatar tm-avatar--initial" style="--tm-hue:@hue" aria-hidden="true">@initial</span> }
+        <span class="tm-who">
+            @if (!string.IsNullOrWhiteSpace(name)) { <strong>@name</strong> }
+            @if (!string.IsNullOrWhiteSpace(role)) { <span>@role</span> }
+        </span>
+    </figcaption>
+    @if (rating > 0)
+    {
+        <div class="tm-stars" role="img" aria-label="@rating / 5">@for (var i = 0; i < 5; i++) { <span class="@(i < rating ? "on" : "")">★</span> }</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(text)) { <blockquote class="tm-text">@text</blockquote> }
+</figure>

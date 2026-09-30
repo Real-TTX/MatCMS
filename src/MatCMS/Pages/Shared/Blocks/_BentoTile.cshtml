@@ -1,0 +1,26 @@
+@model MatCMS.Content.BlockData
+@{
+    var title = Model.Str("title");
+    var text = Model.Str("text");
+    // Tabler icon name (a-z, 0-9, - only), like the service block.
+    var iconRaw = Model.Str("icon").Trim().ToLowerInvariant();
+    var icon = System.Text.RegularExpressions.Regex.IsMatch(iconRaw, "^[a-z0-9-]+$") ? iconRaw : "";
+    var size = Model.StrOr("size", "normal") switch { "wide" => "wide", "tall" => "tall", "big" => "big", _ => "normal" };
+    var url = Model.Str("url").Trim();
+    var safeUrl = url.StartsWith("/") || url.StartsWith("https://") || url.StartsWith("http://") || url.StartsWith("#") ? url : "";
+}
+@* Rendered by the bento block for each of its tiles; the colour variables come from there. A link covers the whole
+   tile (an overlay, so the tile's own markup stays one element whether it links or not). *@
+<div class="bento-tile bento--@size@(safeUrl.Length > 0 ? " bento--link" : "")">
+    @if (icon.Length > 0) { <span class="bento-icon" aria-hidden="true"><i class="ti ti-@icon"></i></span> }
+    @if (!string.IsNullOrWhiteSpace(title)) { <h3 class="bento-title">@Html.Raw(GradientText(title))</h3> }
+    @if (!string.IsNullOrWhiteSpace(text)) { <p class="bento-text">@text</p> }
+    @if (safeUrl.Length > 0) { <a class="bento-cover" href="@safeUrl" aria-label="@title"></a> }
+</div>
+@functions {
+    static string GradientText(string s)
+    {
+        var enc = System.Net.WebUtility.HtmlEncode(s);
+        return System.Text.RegularExpressions.Regex.Replace(enc, "\\*(.+?)\\*", "<span class=\"hc-grad\">$1</span>");
+    }
+}

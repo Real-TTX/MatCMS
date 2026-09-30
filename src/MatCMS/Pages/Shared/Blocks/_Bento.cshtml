@@ -1,0 +1,34 @@
+@model MatCMS.Content.ContainerBlockModel
+@{
+    var heading = Model.Data.Str("heading");
+    var intro = Model.Data.Str("intro");
+    var colors = Model.Data.StrOr("colors", "accent") == "vivid" ? "vivid" : "accent";
+}
+@* Tiles of different sizes in one grid (normal, wide = two columns, tall = two rows, big = both). Shares the colour
+   variables and the *Wort* gradient with herocta/pricing/comparison. *@
+<section class="section bento-block pr--@colors">
+    <div class="container">
+        @if (!string.IsNullOrWhiteSpace(heading) || !string.IsNullOrWhiteSpace(intro))
+        {
+            <div class="section__intro">
+                @if (!string.IsNullOrWhiteSpace(heading)) { <h2 class="pr-title">@Html.Raw(GradientText(heading))</h2> }
+                @if (!string.IsNullOrWhiteSpace(intro)) { <p>@intro</p> }
+            </div>
+        }
+        <div class="bento-grid">
+            @foreach (var tile in Model.Children)
+            {
+                @await Html.PartialAsync("Blocks/_BentoTile", tile.Data)
+            }
+        </div>
+    </div>
+</section>
+@functions {
+    // HTML-encodes the text and turns *…* into the gradient span — the herocta convention.
+    static string GradientText(string s)
+    {
+        var enc = System.Net.WebUtility.HtmlEncode(s);
+        enc = System.Text.RegularExpressions.Regex.Replace(enc, "\\*(.+?)\\*", "<span class=\"hc-grad\">$1</span>");
+        return enc.Replace("\r\n", "\n").Replace("\n", "<br>");
+    }
+}

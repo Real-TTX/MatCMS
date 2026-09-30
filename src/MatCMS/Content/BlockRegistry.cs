@@ -41,6 +41,7 @@ public class BlockRegistry
         ["hero"] = "design", ["cta"] = "design", ["cards"] = "design", ["card"] = "design",
         ["herocta"] = "design", ["timeline"] = "design", ["step"] = "design", ["countup"] = "design",
         ["pricing"] = "design", ["plan"] = "design", ["comparison"] = "design",
+        ["bento"] = "design", ["bentotile"] = "design", ["testimonials"] = "design", ["testimonial"] = "design",
         ["features"] = "design", ["feature"] = "design", ["servicegrid"] = "design",
         ["service"] = "design", ["imagetext"] = "design", ["posts"] = "design",
         ["references"] = "design", ["reference"] = "design",
@@ -565,6 +566,85 @@ public class BlockRegistry
                     Options = [ new("no", "block.opt.yesno.no"), new("yes", "block.opt.yesno.yes") ] },
                 new BlockField { Id = "highlightLabel", Label = "block.plan.f.highlightLabel", Type = FieldType.Text,
                     Placeholder = "Beliebt", ShowWhenField = "highlight", ShowWhenValue = "yes" },
+            ]
+        },
+        new BlockDefinition
+        {
+            Type = "bento",
+            Name = "block.bento.name",
+            Description = "block.bento.desc",
+            Svg = SvgGrid,
+            Partial = "Blocks/_Bento",
+            AllowedChildren = ["bentotile"],
+            Fields =
+            [
+                new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Textarea,
+                    Placeholder = "Websites, die *wirken*", Help = "block.f.gradientHeading.help" },
+                new BlockField { Id = "intro", Label = "block.f.intro", Type = FieldType.Textarea },
+                new BlockField { Id = "colors", Label = "block.f.colors", Type = FieldType.Select, Default = "accent",
+                    Options = [ new("accent", "block.opt.colors.accent"), new("vivid", "block.opt.colors.vivid") ] },
+            ]
+        },
+        new BlockDefinition
+        {
+            Type = "bentotile",
+            Name = "block.bentotile.name",
+            Description = "block.bentotile.desc",
+            Svg = SvgText,
+            Partial = "Blocks/_BentoTile",
+            ChildOnly = true,
+            Fields =
+            [
+                new BlockField { Id = "icon", Label = "block.service.f.icon", Type = FieldType.Text,
+                    Placeholder = "rocket", Help = "Tabler-Icon-Name ohne \"ti-\" (z. B. rocket, search, gauge, shield). Leer = kein Icon." },
+                new BlockField { Id = "title", Label = "block.f.title", Type = FieldType.Text,
+                    Placeholder = "Alles aus einer *Hand*", Help = "block.f.gradientHeading.help" },
+                new BlockField { Id = "text", Label = "block.f.text", Type = FieldType.Textarea },
+                // How much room the tile takes in the 3-column grid. Default "normal": a new tile never pushes the
+                // others around until somebody decides it should be the big one.
+                new BlockField { Id = "size", Label = "block.bentotile.f.size", Type = FieldType.Select, Default = "normal",
+                    Options = [ new("normal", "block.opt.bento.normal"), new("wide", "block.opt.bento.wide"), new("tall", "block.opt.bento.tall"), new("big", "block.opt.bento.big") ] },
+                new BlockField { Id = "url", Label = "block.f.buttonUrl", Type = FieldType.Url },
+            ]
+        },
+        new BlockDefinition
+        {
+            Type = "testimonials",
+            Name = "block.testimonials.name",
+            Description = "block.testimonials.desc",
+            Svg = SvgQuote,
+            Partial = "Blocks/_Testimonials",
+            AllowedChildren = ["testimonial"],
+            Fields =
+            [
+                new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Textarea,
+                    Placeholder = "Was unsere *Kunden* sagen", Help = "block.f.gradientHeading.help" },
+                new BlockField { Id = "intro", Label = "block.f.intro", Type = FieldType.Textarea },
+                new BlockField { Id = "colors", Label = "block.f.colors", Type = FieldType.Select, Default = "accent",
+                    Options = [ new("accent", "block.opt.colors.accent"), new("vivid", "block.opt.colors.vivid") ] },
+                new BlockField { Id = "columns", Label = "block.columns.f.columns", Type = FieldType.Select, Default = "3",
+                    Options = [ new("2", "block.opt.columns.2"), new("3", "block.opt.columns.3") ] },
+                // Default "static": moving text is a decision (and many visitors find it harder to read).
+                new BlockField { Id = "motion", Label = "block.testimonials.f.motion", Type = FieldType.Select, Default = "static",
+                    Options = [ new("static", "block.opt.motion.static"), new("scroll", "block.opt.motion.scroll") ] },
+            ]
+        },
+        new BlockDefinition
+        {
+            Type = "testimonial",
+            Name = "block.testimonial.name",
+            Description = "block.testimonial.desc",
+            Svg = SvgQuote,
+            Partial = "Blocks/_Testimonial",
+            ChildOnly = true,
+            Fields =
+            [
+                new BlockField { Id = "name", Label = "block.testimonial.f.name", Type = FieldType.Text },
+                new BlockField { Id = "role", Label = "block.testimonial.f.role", Type = FieldType.Text, Placeholder = "Geschäftsführer" },
+                new BlockField { Id = "text", Label = "block.testimonial.f.text", Type = FieldType.Textarea },
+                new BlockField { Id = "rating", Label = "block.testimonial.f.rating", Type = FieldType.Select, Default = "5",
+                    Options = [ new("5", "block.opt.stars.5"), new("4", "block.opt.stars.4"), new("3", "block.opt.stars.3"), new("0", "block.opt.stars.0") ] },
+                new BlockField { Id = "image", Label = "block.testimonial.f.image", Type = FieldType.Image, AiIgnore = true },
             ]
         },
         new BlockDefinition

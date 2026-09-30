@@ -337,8 +337,8 @@ Content-Ops.
 Blöcke, die eine MatCMS-Site kennt, mit ihren Feld-IDs. Spalte **KI-setzbar** = das Feld überlebt eine
 `create_page`/`update_page_blocks`-Content-Op (nur Text-/RichText-Felder). Bild-/Auswahl-/Link-Felder
 setzt man über den Editor oder Backup/Restore. Container-Blöcke (`section`, `columns`, `cards`,
-`accordion`, `features`, `servicegrid`, `timeline`, `pricing`, `references`) enthalten
-Kind-Blöcke (`card`, `column`, `faq`, `step`, `service`, `feature`, `plan`, `reference` …).
+`accordion`, `features`, `servicegrid`, `timeline`, `pricing`, `bento`, `testimonials`, `references`) enthalten
+Kind-Blöcke (`card`, `column`, `faq`, `step`, `service`, `feature`, `plan`, `bentotile`, `testimonial`, `reference` …).
 
 > ¹ „KI-setzbar" = über den Content-Op-Kanal setzbar (Textfelder). Der Katalog wird aus
 > `src/MatCMS/Content/BlockRegistry.cs` erzeugt (`tools/gen-api-blocks.js`) und kann bei einer
@@ -571,6 +571,44 @@ Kind-Blöcke (`card`, `column`, `faq`, `step`, `service`, `feature`, `plan`, `re
 | `buttonUrl` | Url | — | Button-Link |
 | `highlight` | Select | — | Hervorheben |
 | `highlightLabel` | Text | ✅ | Text der Hervorhebung |
+
+### `bento` — Bento-Raster
+
+| Feld | Typ | KI-setzbar¹ | Bezeichnung |
+|---|---|:--:|---|
+| `heading` | Textarea | ✅ | Überschrift |
+| `intro` | Textarea | ✅ | Einleitung |
+| `colors` | Select | — | Farben |
+
+### `bentotile` — Kachel
+
+| Feld | Typ | KI-setzbar¹ | Bezeichnung |
+|---|---|:--:|---|
+| `icon` | Text | ✅ | Icon (Tabler-Name) |
+| `title` | Text | ✅ | Titel |
+| `text` | Textarea | ✅ | Text |
+| `size` | Select | — | Größe |
+| `url` | Url | — | Button-Link |
+
+### `testimonials` — Kundenstimmen
+
+| Feld | Typ | KI-setzbar¹ | Bezeichnung |
+|---|---|:--:|---|
+| `heading` | Textarea | ✅ | Überschrift |
+| `intro` | Textarea | ✅ | Einleitung |
+| `colors` | Select | — | Farben |
+| `columns` | Select | — | Spaltenanzahl |
+| `motion` | Select | — | Bewegung |
+
+### `testimonial` — Kundenstimme
+
+| Feld | Typ | KI-setzbar¹ | Bezeichnung |
+|---|---|:--:|---|
+| `name` | Text | ✅ | Name |
+| `role` | Text | ✅ | Rolle / Firma |
+| `text` | Textarea | ✅ | Bewertungstext |
+| `rating` | Select | — | Sterne |
+| `image` | Image | — | Foto (optional – sonst Initiale) |
 
 ### `comparison` — Vergleich (Pro/Contra)
 

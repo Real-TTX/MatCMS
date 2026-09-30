@@ -412,7 +412,7 @@ public class ProxyService
         var wasEdge = inst.ProxyVia == ProxyVia.Edge;
         var edge = EdgeSettings;
         var kind = viaEdge ? edge.Kind : node is null ? Settings.Kind : ProxyKinds.Normalise(node.ProxyKind);
-        if (viaEdge && kind == ProxyKinds.None) return Fail(inst, "Der Edge-Proxy ist eingeschaltet, aber für ihn ist kein Proxy eingerichtet (Hosting → Einstellungen).");
+        if (viaEdge && kind == ProxyKinds.None) return Fail(inst, "Der Edge-Proxy ist eingeschaltet, aber für ihn ist kein Proxy eingerichtet (Hosting → Proxy).");
         var manages = kind != ProxyKinds.None;
         if (manages && !HostingActionsService.CanAct(inst))
             return Fail(inst, "Diese Instanz läuft weder auf dem Docker-Host dieser Cloud noch auf einem verbundenen Node — ihre Route kann nicht angelegt werden.");

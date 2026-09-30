@@ -696,8 +696,10 @@ login same-site; it is not used by this flow.
   resources, the **Images** section with the cleanup — every tag, and the version: the `matcms.version` label both
   Dockerfiles now bake in, else the release tag GHCR has under the image's digest (`GhcrClient.ResolveDigestsAsync`,
   newest 30 releases, cached per digest), else what a container on it reports; "lokal gebaut" when no digest names a
-  registry host), **Einstellungen** (module switch `hosting.enabled`, auto-update,
-  proxy/ports/name pattern of "Dieser Host"). The switch hides only Nodes, Domains and provisioning. Data for dashboard
+  registry host), **Proxy** (everything routing a name to a site: the reverse proxy of "Dieser Host", its automatic
+  host addresses + wildcard certificate, the cloud-wide edge proxy; a node's own proxy stays on the node's page),
+  **Einstellungen** (module switch `hosting.enabled`, auto-update, ports/name pattern of "Dieser Host"). The switch
+  hides only Nodes, Domains, Proxy and provisioning. Data for dashboard
   and Instanzen is ONE service, `HostingOverviewService` (this host live via `DockerHostService.StatsAsync` — ~1 s per
   sample, cached 15 s; nodes from the inventory, whose agent samples usage at most once a minute and reports host size,
   `Node.Cpus/MemTotal`, migration `AddNodeResources`), also `/api/v1/hosting/overview` + MCP `get_hosting_overview`;
@@ -766,7 +768,7 @@ Design and increments: `docs/hosting-platform.md`. Increments 1–4 are built:
   Operator typing the URL. Any NEW fleet-wide page needs the same line.
 - **Reverse proxy is OPTIONAL** (`Services/Proxy/`): provider `none` (default — sites on their host port, a
   domain is only recorded) / `matcad` (Matcad's REST API, `X-Api-Key`) / `caddy` (Caddy admin API).
-  `ProxyService` is the one place that publishes/moves/unpublishes a domain — UI (Hosting → Einstellungen,
+  `ProxyService` is the one place that publishes/moves/unpublishes a domain — UI (Hosting → Proxy,
   the Domain card on the Hosting tab, provisioning), REST `/api/v1/hosting/proxy`, `/api/v1/instances/{id}/domain`
   and the MCP proxy/domain tools all call it. Traps: **route first, record second** (unpublish deletes the
   route before clearing `Instance.Proxy*`, so a proxy that is down never leaves an orphan the cloud forgot);

@@ -506,7 +506,7 @@
   "hosting.publish": "Domain veröffentlichen",
   "hosting.changeDomain": "Domain ändern",
   "hosting.publishHintRoute": "Die Route samt Zertifikat wird bei {0} angelegt. Der DNS-Eintrag der Domain muss schon auf den Proxy zeigen.",
-  "hosting.publishHintNone": "Kein Proxy eingerichtet (Hosting → Einstellungen): Die Domain wird nur vermerkt, die Route richtet man selbst ein.",
+  "hosting.publishHintNone": "Kein Proxy eingerichtet (Hosting → Proxy): Die Domain wird nur vermerkt, die Route richtet man selbst ein.",
   "hosting.pushCanonical": "Die Website-Adresse der Instanz ebenfalls auf https://… setzen",
   "hosting.publishBtn": "Veröffentlichen",
   "hosting.changeBtn": "Domain umziehen",

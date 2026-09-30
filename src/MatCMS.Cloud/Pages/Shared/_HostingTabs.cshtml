@@ -1,7 +1,7 @@
 @model string
 @inject MatCMS.Cloud.Services.CloudContext Cloud
 @* Hosting is ONE menu item; its areas are tabs. Each tab is its own page (they are long and have their own
-   handlers), so the tabs are links — the same look as the in-page tabs elsewhere. Nodes and Domains belong to
+   handlers), so the tabs are links — the same look as the in-page tabs elsewhere. Nodes, Domains and Proxy belong to
    the optional module and only appear while it is switched on; the dashboard (with the updates), Instanzen and
    Docker are there regardless, because running and updating the sites on this host predates the module. *@
 @{
@@ -18,6 +18,7 @@
     @if (on)
     {
         <a class="@Cls("domains")" asp-page="/Admin/Hosting/Domains">@T["hosting.navDomains"]</a>
+        <a class="@Cls("proxy")" asp-page="/Admin/Hosting/Proxy">Proxy</a>
     }
     <a class="@Cls("docker")" asp-page="/Admin/Hosting/Docker">Docker</a>
     <a class="@Cls("settings")" asp-page="/Admin/Hosting/Settings">@T["hosting.navSettings"]</a>

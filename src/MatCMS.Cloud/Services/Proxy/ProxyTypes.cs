@@ -37,7 +37,7 @@ public sealed record ProxySettings(
     string? CaddyAdminUrl, string CaddyServer,
     string UpstreamMode, string? Network, string? UpstreamHost);
 
-/// <summary>What <c>_ProxyFields.cshtml</c> renders — the same fields for "Dieser Host" (Hosting → Einstellungen)
+/// <summary>What <c>_ProxyFields.cshtml</c> renders — the same fields for "Dieser Host" (Hosting → Proxy)
 /// and for every node, so the two forms cannot drift. The Matcad key is never rendered, only whether one is set.</summary>
 public sealed record ProxyFieldsView(string Kind, string? MatcadUrl, bool MatcadTokenSet, string? CaddyAdminUrl, string? CaddyServer,
     string Upstream, string? Network, string? UpstreamHost);

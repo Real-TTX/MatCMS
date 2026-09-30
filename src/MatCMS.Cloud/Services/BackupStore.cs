@@ -29,16 +29,17 @@ public class BackupStore
     public const int DefaultQuotaGb = 2;
 
     /// <summary>
-    /// The cloud-wide default quota in GB — what an instance gets when its profile does not say
-    /// otherwise.
+    /// The fallback quota in GB — what an instance gets when its own profile sets none: the DEFAULT PROFILE's
+    /// quota, else the built-in <see cref="DefaultQuotaGb"/>. Backup policy is a profile matter; there is no
+    /// separate cloud-wide number any more (the old one was moved into the default profile at startup, see
+    /// <c>DbSeeder</c>). The default profile is also what catches instances without a profile.
     /// <para>Read per call rather than cached: it is asked for once per upload and once per page view,
     /// and a stale value would go on deleting to a limit the operator has already changed.</para>
     /// </summary>
     public async Task<double> DefaultQuotaGbAsync(CancellationToken ct = default)
     {
-        var row = await _db.CloudSettings.AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Key == SettingKeys.BackupQuotaGb, ct);
-        return ParseGb(row?.Value) is double v && v > 0 ? v : DefaultQuotaGb;
+        var gb = await _db.Profiles.AsNoTracking().Where(p => p.IsDefault).Select(p => p.BackupQuotaGb).FirstOrDefaultAsync(ct);
+        return gb is double v && v > 0 ? v : DefaultQuotaGb;
     }
 
     /// <summary>Parses a GB value that a human typed — accepting a comma OR a dot as the decimal mark,
@@ -183,8 +184,8 @@ public class BackupStore
         }
     }
 
-    /// <summary>Resolved retention numbers for one instance: profile value if set, else the
-    /// cloud-wide default, else 0 (that tier off). 0 everywhere = retention disabled, quota only.</summary>
+    /// <summary>Resolved retention numbers for one instance: its profile's value if set, else the default
+    /// profile's, else 0 (that tier off). 0 everywhere = retention disabled, quota only.</summary>
     public sealed record Retention(int KeepDaily, int KeepWeekly, int KeepMonthly, int MaxCount)
     {
         public bool Any => KeepDaily > 0 || KeepWeekly > 0 || KeepMonthly > 0 || MaxCount > 0;
@@ -194,19 +195,15 @@ public class BackupStore
     {
         var prof = await _db.Instances.AsNoTracking()
             .Where(i => i.Id == instanceId).Select(i => i.Profile).FirstOrDefaultAsync(ct);
-        var settings = await _db.CloudSettings.AsNoTracking()
-            .ToDictionaryAsync(s => s.Key, s => s.Value, ct);
+        var def = await _db.Profiles.AsNoTracking().FirstOrDefaultAsync(p => p.IsDefault, ct);
 
-        int Resolve(int? profileVal, string key)
-        {
-            if (profileVal is int p && p >= 0) return p;                 // profile wins (0 = off on purpose)
-            return settings.TryGetValue(key, out var v) && int.TryParse(v, out var n) && n >= 0 ? n : 0;
-        }
+        // Own profile wins (0 = off on purpose), then the default profile, then off.
+        static int Resolve(int? own, int? fallback) => own is int p && p >= 0 ? p : fallback is int d && d >= 0 ? d : 0;
         return new Retention(
-            Resolve(prof?.BackupKeepDaily, SettingKeys.BackupKeepDaily),
-            Resolve(prof?.BackupKeepWeekly, SettingKeys.BackupKeepWeekly),
-            Resolve(prof?.BackupKeepMonthly, SettingKeys.BackupKeepMonthly),
-            Resolve(prof?.BackupMaxCount, SettingKeys.BackupMaxCount));
+            Resolve(prof?.BackupKeepDaily, def?.BackupKeepDaily),
+            Resolve(prof?.BackupKeepWeekly, def?.BackupKeepWeekly),
+            Resolve(prof?.BackupKeepMonthly, def?.BackupKeepMonthly),
+            Resolve(prof?.BackupMaxCount, def?.BackupMaxCount));
     }
 
     private static bool IsAuto(CloudBackup b) =>

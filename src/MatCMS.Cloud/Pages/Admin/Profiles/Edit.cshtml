@@ -105,17 +105,17 @@
                 <label for="backupQuotaGb">@T["profiles.backupQuota"]</label>
                 <input id="backupQuotaGb" name="backupQuotaGb" value="@(Model.Item.BackupQuotaGb?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "")"
                        placeholder="@Model.GlobalQuotaGb" inputmode="decimal" />
-                <div class="help">@T["profiles.backupQuotaHint", Model.GlobalQuotaGb] Nachkommastellen erlaubt (0,1 = 100 MB).</div>
+                <div class="help">@(Model.Item.IsDefault ? T["profiles.backupQuotaHintDefault", Model.GlobalQuotaGb] : T["profiles.backupQuotaHint", Model.GlobalQuotaGb]) @T["profiles.backupQuotaDecimals"]</div>
             </div>
             <div class="form-field">
                 <label>Backup-Aufbewahrung (automatische Backups)</label>
                 <div class="form-row">
-                    <div class="form-field"><label for="bkd">Täglich</label><input id="bkd" name="backupKeepDaily" value="@(Model.Item.BackupKeepDaily?.ToString() ?? "")" placeholder="Standard" inputmode="numeric" /></div>
-                    <div class="form-field"><label for="bkw">Wöchentlich</label><input id="bkw" name="backupKeepWeekly" value="@(Model.Item.BackupKeepWeekly?.ToString() ?? "")" placeholder="Standard" inputmode="numeric" /></div>
-                    <div class="form-field"><label for="bkm">Monatlich</label><input id="bkm" name="backupKeepMonthly" value="@(Model.Item.BackupKeepMonthly?.ToString() ?? "")" placeholder="Standard" inputmode="numeric" /></div>
-                    <div class="form-field"><label for="bmc">Max. Anzahl</label><input id="bmc" name="backupMaxCount" value="@(Model.Item.BackupMaxCount?.ToString() ?? "")" placeholder="Standard" inputmode="numeric" /></div>
+                    <div class="form-field"><label for="bkd">Täglich</label><input id="bkd" name="backupKeepDaily" value="@(Model.Item.BackupKeepDaily?.ToString() ?? "")" placeholder="@(MatCMS.Cloud.Pages.Admin.Profiles.EditModel.Fallback(Model.DefaultProfile?.BackupKeepDaily) ?? T["hostdash.off"])" inputmode="numeric" /></div>
+                    <div class="form-field"><label for="bkw">Wöchentlich</label><input id="bkw" name="backupKeepWeekly" value="@(Model.Item.BackupKeepWeekly?.ToString() ?? "")" placeholder="@(MatCMS.Cloud.Pages.Admin.Profiles.EditModel.Fallback(Model.DefaultProfile?.BackupKeepWeekly) ?? T["hostdash.off"])" inputmode="numeric" /></div>
+                    <div class="form-field"><label for="bkm">Monatlich</label><input id="bkm" name="backupKeepMonthly" value="@(Model.Item.BackupKeepMonthly?.ToString() ?? "")" placeholder="@(MatCMS.Cloud.Pages.Admin.Profiles.EditModel.Fallback(Model.DefaultProfile?.BackupKeepMonthly) ?? T["hostdash.off"])" inputmode="numeric" /></div>
+                    <div class="form-field"><label for="bmc">Max. Anzahl</label><input id="bmc" name="backupMaxCount" value="@(Model.Item.BackupMaxCount?.ToString() ?? "")" placeholder="@(MatCMS.Cloud.Pages.Admin.Profiles.EditModel.Fallback(Model.DefaultProfile?.BackupMaxCount) ?? T["hostdash.off"])" inputmode="numeric" /></div>
                 </div>
-                <div class="help">Wie viele der EIGENEN (automatischen) Backups die Cloud behält: je Tag/Woche/Monat das neueste, höchstens „Max. Anzahl". Leer = Cloud-Standard, 0 = aus. Manuell/über API hochgeladene Backups werden nie automatisch gelöscht.</div>
+                <div class="help">Wie viele der EIGENEN (automatischen) Backups die Cloud behält: je Tag/Woche/Monat das neueste, höchstens „Max. Anzahl". @(Model.Item.IsDefault ? "Leer = aus. Dieses Standardprofil ist der Rückfall für alle anderen Profile." : "Leer = Wert des Standardprofils, 0 = aus.") Manuell/über API hochgeladene Backups werden nie automatisch gelöscht.</div>
             </div>
             <div class="form-field">
                 <label for="notifyRecipients">@T["profiles.extraRecipients"]</label>
@@ -270,7 +270,13 @@
                     @foreach (var s in Model.OtherSettings)
                     {
                         <tr data-search="@(s.IsSecret ? s.Key : s.Key + " " + s.Value)">
-                            <td><a asp-page="Setting" asp-route-profileId="@Model.Item.Id" asp-route-id="@s.Id"><span class="mono">@s.Key</span></a></td>
+                            <td>
+                                <a asp-page="Setting" asp-route-profileId="@Model.Item.Id" asp-route-id="@s.Id"><span class="mono">@s.Key</span></a>
+                                @if (MatCMS.Cloud.Services.InstanceSettingCatalog.Find(s.Key)?.Recommended is { } rec)
+                                {
+                                    <span class="badge @(s.Value == rec ? "badge-on" : "badge-new")" title="@T["profiles.recommendedValue", rec]">@T["profiles.recommended"]</span>
+                                }
+                            </td>
                             <td class="muted">@s.Value</td>
                             <td>
                                 <div class="actions">
@@ -285,6 +291,14 @@
             </tbody>
         </table>
         <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+        @if (Model.MissingRecommended.Count > 0)
+        {
+            @* Recommended rows the profile does not carry — added on click, never silently. *@
+            <form method="post" asp-page-handler="AddRecommended" asp-route-id="@Model.Item.Id" class="alert alert-info" style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;">
+                <span>@T["profiles.recommendedMissing", Model.MissingRecommended.Count] <span class="mono muted">@string.Join(", ", Model.MissingRecommended.Select(e => e.Key))</span></span>
+                <button type="submit" class="btn btn-sm">@T["profiles.recommendedAdd"]</button>
+            </form>
+        }
         @* Two steps, because "which setting" and "where from" are two questions. Only SMTP has a
            global side to take from — free key/value settings exist nowhere but in the profile, so
            asking them the second question would offer an option that cannot be answered. *@

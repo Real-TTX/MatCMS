@@ -98,6 +98,8 @@ Schreiben braucht **CanManageProfiles**. Lesen braucht nur einen gültigen Schl�
 ### Freie Einstellungen (Key/Value)
 - `POST /api/v1/profiles/{id}/settings` `{ key, value }` – **Gruppen-Keys** (smtp.*, translate.*, backup.*, ai.*, mail.transport) werden abgelehnt; dafür die Gruppen-Endpunkte nutzen.
 - `DELETE /api/v1/profiles/{id}/settings/{key}`
+- `GET /api/v1/profiles/{id}/settings/recommended` → `{ recommended:[{ key, value, label }], missing:[key] }`; `POST …` ergänzt die fehlenden (bestehende Zeilen bleiben unverändert) → `{ added }`. Neue Profile starten schon mit ihnen.
+- Backup-Kontingent/-Aufbewahrung gibt es nur noch im Profil; das **Standardprofil** ist der Rückfall für alle anderen Profile und für Instanzen ohne Profil (danach eingebaut: 2 GB, Aufbewahrung aus).
 
 ### Gruppen SMTP / Übersetzung
 - `PUT /api/v1/profiles/{id}/smtp` `{ mailSource: "global"|"own"|"cloud", host?, port?, user?, password?, fromEmail?, fromName?, ssl? }` – Passwort wird verschlüsselt gespeichert; leer lassen behält das gespeicherte.

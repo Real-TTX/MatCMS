@@ -223,6 +223,29 @@ public static class ProfileApi
             return Results.Ok(new { ok = true });
         }).RequireRateLimiting("operatorApi");
 
+        // ---- Recommended settings: what is missing, and add it (existing rows are never changed) ----
+        app.MapGet("/api/v1/profiles/{id:int}/settings/recommended", async (HttpContext ctx, int id, ApiKeyService keys, ProfileService profiles, AppDbContext db) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (!await db.Profiles.AnyAsync(x => x.Id == id)) return NotFoundProfile();
+            var missing = await profiles.MissingRecommendedAsync(id);
+            return Results.Ok(new
+            {
+                recommended = InstanceSettingCatalog.Recommended.Select(e => new { key = e.Key, value = e.Recommended, label = e.Label }),
+                missing = missing.Select(e => e.Key),
+            });
+        }).RequireRateLimiting("operatorApi");
+
+        app.MapPost("/api/v1/profiles/{id:int}/settings/recommended", async (HttpContext ctx, int id, ApiKeyService keys, ProfileService profiles, AppDbContext db) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireManage(key!) is { } g) return g;
+            if (!await db.Profiles.AnyAsync(x => x.Id == id)) return NotFoundProfile();
+            return Results.Ok(new { added = await profiles.AddRecommendedAsync(id) });
+        }).RequireRateLimiting("operatorApi");
+
         // ---- Free settings --------------------------------------------------------
         app.MapPost("/api/v1/profiles/{id:int}/settings", async (HttpContext ctx, int id, ApiKeyService keys, ProfileService profiles, AppDbContext db, SettingDto b) =>
         {

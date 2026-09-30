@@ -12,6 +12,8 @@ public static class SettingKeys
     /// <summary>How many GB of backups ONE instance may occupy. Beyond it the oldest is dropped, so
     /// this is the number that decides how far back a site can be restored — not a technical limit
     /// but a policy, which is why it belongs in the settings and not in a constant.</summary>
+    /// <summary>LEGACY — the old cloud-wide backup defaults. Only read once by DbSeeder, which moves them into the
+    /// default profile; quota and retention now resolve profile → default profile → built-in.</summary>
     public const string BackupQuotaGb = "backup.quotaGb";
     // Cloud-wide retention defaults (used when a profile leaves the field empty). All optional; 0 = off.
     public const string BackupKeepDaily = "backup.keepDaily";

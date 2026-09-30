@@ -190,6 +190,11 @@ public class EditModel : PageModel
     /// actually do rather than just being blank.</summary>
     public double GlobalQuotaGb { get; private set; } = BackupStore.DefaultQuotaGb;
 
+    /// <summary>What an empty field falls back to: the default profile's value for every other profile, the
+    /// built-in value (quota) or "off" (retention) for the default profile itself.</summary>
+    public Profile? DefaultProfile { get; private set; }
+    public static string? Fallback(int? v) => v?.ToString();
+
     public List<ProfileSetting> OtherSettings =>
         Settings.Where(s => !ProfileService.IsGroupKey(s.Key)).OrderBy(s => s.Key).ToList();
 
@@ -202,7 +207,9 @@ public class EditModel : PageModel
     public async Task<IActionResult> OnGetAsync(int id)
     {
         if (!await LoadAsync(id)) return RedirectToPage("Index");
-        GlobalQuotaGb = await _backups.DefaultQuotaGbAsync();
+        DefaultProfile = Item.IsDefault ? null : await _db.Profiles.AsNoTracking().FirstOrDefaultAsync(p => p.IsDefault);
+        MissingRecommended = await _profiles.MissingRecommendedAsync(Item.Id);
+        GlobalQuotaGb = Item.IsDefault ? BackupStore.DefaultQuotaGb : await _backups.DefaultQuotaGbAsync();
         return Page();
     }
 
@@ -530,6 +537,16 @@ public class EditModel : PageModel
     }
 
     // --- Settings payload ---------------------------------------------------
+
+    /// <summary>Recommended settings this profile does not carry.</summary>
+    public List<InstanceSettingCatalog.Entry> MissingRecommended { get; private set; } = new();
+
+    public async Task<IActionResult> OnPostAddRecommendedAsync(int id)
+    {
+        var added = await _profiles.AddRecommendedAsync(id);
+        TempData["Flash"] = added == 0 ? "Alle empfohlenen Einstellungen sind bereits vorhanden." : $"{added} empfohlene Einstellung(en) ergänzt.";
+        return RedirectToPage(new { id, tab = "settings" });
+    }
 
     public async Task<IActionResult> OnPostDeleteSettingAsync(int id, int settingId)
     {

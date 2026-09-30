@@ -44,6 +44,12 @@ public class IndexModel : PageModel
         // These tabs moved to Hosting; old links and bookmarks land where the thing is now.
         if (tab == "hosting") return RedirectToPage("/Admin/Hosting/Settings");
         if (tab == "docker") return RedirectToPage("/Admin/Hosting/Docker");
+        // Backup quota and retention are a profile matter now; the default profile holds the fallback.
+        if (tab == "backup")
+        {
+            var def = await _db.Profiles.AsNoTracking().Where(p => p.IsDefault).Select(p => (int?)p.Id).FirstOrDefaultAsync();
+            return def is int pid ? RedirectToPage("/Admin/Profiles/Edit", new { id = pid }) : RedirectToPage("/Admin/Profiles/Index");
+        }
         ApiKeys = new Pages.Admin.ApiKeys.ApiKeyListView(
             await _db.ApiKeys.Include(k => k.Instances).AsNoTracking().OrderByDescending(k => k.CreatedAt).ToListAsync(),
             TempData["NewApiKey"] as string);
@@ -69,33 +75,6 @@ public class IndexModel : PageModel
         });
         TempData["Flash"] = "Einstellungen gespeichert.";
         return RedirectToPage(new { tab = "general" });
-    }
-
-    /// <summary>Eigenes Formular, eigener Handler — jede Karte speichert nur ihre eigenen Schlüssel.
-    /// Bliebe das Kontingent am Allgemein-Handler hängen, würde ein Speichern dort den Wert leeren,
-    /// weil das Formular ihn gar nicht mehr mitschickt.</summary>
-    public async Task<IActionResult> OnPostBackupAsync(
-        string? backupQuotaGb,
-        string? backupKeepDaily, string? backupKeepWeekly, string? backupKeepMonthly, string? backupMaxCount)
-    {
-        // Store the quota as an invariant-culture string so it reads back the same regardless of the
-        // server locale; fractional allowed (0.1 = 100 MB), comma or dot on input.
-        var quota = BackupStore.ParseGb(backupQuotaGb) is double gb && gb > 0
-            ? gb.ToString(System.Globalization.CultureInfo.InvariantCulture) : "";
-        // Retention tiers: a number (incl. 0 = off) is stored; anything else is left empty, which the
-        // resolver reads as "off" for the cloud-wide default.
-        static string Tier(string? s) => int.TryParse(s, out var n) && n >= 0 ? n.ToString() : "";
-
-        await _cloud.SaveAsync(new Dictionary<string, string?>
-        {
-            [SettingKeys.BackupQuotaGb] = quota,
-            [SettingKeys.BackupKeepDaily] = Tier(backupKeepDaily),
-            [SettingKeys.BackupKeepWeekly] = Tier(backupKeepWeekly),
-            [SettingKeys.BackupKeepMonthly] = Tier(backupKeepMonthly),
-            [SettingKeys.BackupMaxCount] = Tier(backupMaxCount),
-        });
-        TempData["Flash"] = "Backup-Einstellungen gespeichert.";
-        return RedirectToPage(new { tab = "backup" });
     }
 
     /// <summary>Security policy card. Its own form, so saving it never touches the other settings.</summary>

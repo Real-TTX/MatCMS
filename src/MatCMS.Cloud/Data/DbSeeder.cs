@@ -56,6 +56,39 @@ public static class DbSeeder
                 AutoApprove = true
             });
             await db.SaveChangesAsync();
+            // The first profile starts with the recommended settings, like every profile created later.
+            var first = await db.Profiles.FirstAsync();
+            foreach (var e in InstanceSettingCatalog.Recommended)
+                db.ProfileSettings.Add(new ProfileSetting { ProfileId = first.Id, Key = e.Key, Value = e.Recommended });
+            await db.SaveChangesAsync();
         }
+
+        await MoveBackupDefaultsIntoProfileAsync(db);
+    }
+
+    /// <summary>
+    /// Backup quota and retention used to have a cloud-wide default under Einstellungen → Backups. They are a
+    /// profile matter now: the DEFAULT profile's values are the fallback for every other profile. Once, at startup,
+    /// any old cloud-wide value is copied into the default profile — only into a field it does not set itself, so
+    /// nobody's quota or retention changes — and the old setting row is removed. Idempotent.
+    /// </summary>
+    private static async Task MoveBackupDefaultsIntoProfileAsync(AppDbContext db)
+    {
+        var keys = new[] { SettingKeys.BackupQuotaGb, SettingKeys.BackupKeepDaily, SettingKeys.BackupKeepWeekly,
+                           SettingKeys.BackupKeepMonthly, SettingKeys.BackupMaxCount };
+        var rows = await db.CloudSettings.Where(s => keys.Contains(s.Key)).ToListAsync();
+        if (rows.Count == 0) return;
+        var def = await db.Profiles.FirstOrDefaultAsync(p => p.IsDefault);
+        if (def is null) return;                       // keep the rows until there is a profile to hold them
+        string? V(string k) => rows.FirstOrDefault(r => r.Key == k)?.Value;
+        static int? Tier(string? s) => int.TryParse(s, out var n) && n >= 0 ? n : null;
+
+        if (def.BackupQuotaGb is null && BackupStore.ParseGb(V(SettingKeys.BackupQuotaGb)) is double gb && gb > 0) def.BackupQuotaGb = gb;
+        def.BackupKeepDaily ??= Tier(V(SettingKeys.BackupKeepDaily));
+        def.BackupKeepWeekly ??= Tier(V(SettingKeys.BackupKeepWeekly));
+        def.BackupKeepMonthly ??= Tier(V(SettingKeys.BackupKeepMonthly));
+        def.BackupMaxCount ??= Tier(V(SettingKeys.BackupMaxCount));
+        db.CloudSettings.RemoveRange(rows);
+        await db.SaveChangesAsync();
     }
 }

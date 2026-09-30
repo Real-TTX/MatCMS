@@ -25,7 +25,11 @@ public static class InstanceSettingCatalog
     /// <param name="Key">The key as the instance stores it.</param>
     /// <param name="Label">What it is, in the operator's words.</param>
     /// <param name="Hint">Only where the key alone is genuinely unclear — otherwise empty.</param>
-    public sealed record Entry(string Key, string Label, string Hint = "");
+    /// <param name="Recommended">The value a profile should carry for a site to use everything the cloud offers.
+    /// Non-null = a new profile starts with this row, and an existing one is offered to add it. Only for keys whose
+    /// right value is the SAME on every site — nothing that depends on a site's own address (canonical URL,
+    /// "hinter HTTPS-Proxy": those are set per instance when hosting publishes its domain or host address).</param>
+    public sealed record Entry(string Key, string Label, string Hint = "", string? Recommended = null);
 
     public sealed record Group(string Name, IReadOnlyList<Entry> Entries);
 
@@ -40,7 +44,8 @@ public static class InstanceSettingCatalog
             new Entry("FooterText", "Fußzeilen-Text"),
             new Entry("ContactRecipient", "Empfänger für Formular-Mails"),
             new Entry("antispam.level", "Spamschutz für Formulare (Standard)",
-                "0 = aus, 1 = unsichtbar (empfohlen), 2 = zusätzlich Rechennachweis, 3 = zusätzlich Sicherheitsfrage. Standard für alle Formulare; ein Formular kann eine eigene Stufe wählen."),
+                "0 = aus, 1 = unsichtbar (empfohlen), 2 = zusätzlich Rechennachweis, 3 = zusätzlich Sicherheitsfrage. Standard für alle Formulare; ein Formular kann eine eigene Stufe wählen.",
+                Recommended: "1"),
             new Entry("site.behindHttpsProxy", "Hinter HTTPS-Proxy",
                 "1 = an. Nötig, wenn ein Proxy die Verschlüsselung beendet: sonst baut die Website alle absoluten Adressen mit http und ein https-Browser weist sie ab."),
             new Entry("site.canonicalUrl", "Kanonische URL",
@@ -48,7 +53,8 @@ public static class InstanceSettingCatalog
             new Entry("site.embedAuth", "Login im Cloud-iFrame",
                 "1 = an. Erlaubt die Anmeldung im eingebetteten Cloud-Rahmen (Cookies SameSite=None; Secure). Erfordert HTTPS auf der Instanz; wirkt nach dem nächsten Neustart der Instanz."),
             new Entry("sso.enabled", "Anmeldung mit Cloud-Konto",
-                "1 = an. Zeigt auf der Anmeldeseite den Knopf „Mit Cloud-Konto anmelden“ und schaltet den SSO-Ablauf frei. Wirkt nur, wenn die Instanz mit dieser Cloud verbunden ist; der lokale Login bleibt daneben bestehen."),
+                "1 = an. Zeigt auf der Anmeldeseite den Knopf „Mit Cloud-Konto anmelden“ und schaltet den SSO-Ablauf frei. Wirkt nur, wenn die Instanz mit dieser Cloud verbunden ist; der lokale Login bleibt daneben bestehen.",
+                Recommended: "1"),
         ]),
         new Group("Sicherheit", [
             new Entry("security.require2fa", "Zwei-Faktor-Pflicht",
@@ -63,7 +69,7 @@ public static class InstanceSettingCatalog
         new Group("Seiten & Fehler", [
             new Entry("error.notFoundPage", "Seite für 404"),
             new Entry("error.errorPage", "Seite für Fehler"),
-            new Entry("sitemap.enabled", "Sitemap ausliefern", "1 = an, 0 = aus"),
+            new Entry("sitemap.enabled", "Sitemap ausliefern", "1 = an, 0 = aus", Recommended: "1"),
         ]),
         new Group("Wartungsmodus", [
             new Entry("maintenance.enabled", "Wartungsmodus", "1 = an, 0 = aus"),
@@ -83,6 +89,9 @@ public static class InstanceSettingCatalog
     ];
 
     public static IEnumerable<Entry> All => Groups.SelectMany(g => g.Entries);
+
+    /// <summary>The recommended rows (see <see cref="Entry.Recommended"/>).</summary>
+    public static IEnumerable<Entry> Recommended => All.Where(e => e.Recommended is not null);
 
     public static Entry? Find(string? key) =>
         key is null ? null : All.FirstOrDefault(e => string.Equals(e.Key, key, StringComparison.OrdinalIgnoreCase));

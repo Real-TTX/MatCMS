@@ -1112,7 +1112,7 @@
   "backup.plugins": "Plugins (Code & Dateien)",
   "backup.pluginAssets": "Plugin-Uploads (Bilder, CSS, JS der Plugins)",
   "profiles.backupQuota": "Cloud-Speicher für Backups (GB)",
-  "profiles.backupQuotaHint": "Je Instanz dieses Profils. Leer = der Standard der Cloud ({0} GB). Ist eine Instanz voll, fällt beim nächsten Upload ihr ältestes Backup weg.",
+  "profiles.backupQuotaHint": "Je Instanz dieses Profils. Leer = das Kontingent des Standardprofils ({0} GB). Ist eine Instanz voll, fällt beim nächsten Upload ihr ältestes Backup weg.",
   "backups.used": "Belegt",
   "backups.quota": "Erlaubt",
   "backups.quotaFromProfile": "aus Profil „{0}“",
@@ -1305,5 +1305,11 @@
   "domains.kindHost": "Host-Adresse",
   "domains.viaEdge": "über Edge",
   "domains.viaHost": "am Host",
-  "domains.way": "Weg"
+  "domains.way": "Weg",
+  "profiles.backupQuotaHintDefault": "Je Instanz. Dieses Standardprofil ist der Rückfall für alle anderen Profile und für Instanzen ohne Profil. Leer = {0} GB.",
+  "profiles.backupQuotaDecimals": "Nachkommastellen erlaubt (0,1 = 100 MB).",
+  "profiles.recommended": "empfohlen",
+  "profiles.recommendedValue": "Empfohlener Wert: {0}",
+  "profiles.recommendedMissing": "{0} empfohlene Einstellung(en) fehlen in diesem Profil:",
+  "profiles.recommendedAdd": "Ergänzen"
 }

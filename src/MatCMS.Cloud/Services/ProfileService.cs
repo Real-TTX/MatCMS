@@ -50,7 +50,33 @@ public class ProfileService
         };
         _db.Profiles.Add(profile);
         await _db.SaveChangesAsync();
+        // A new profile starts with the recommended settings — rows like any other, so they can be changed or
+        // deleted; they are only the starting point that makes every cloud feature work out of the box.
+        foreach (var e in InstanceSettingCatalog.Recommended)
+            _db.ProfileSettings.Add(new ProfileSetting { ProfileId = profile.Id, Key = e.Key, Value = e.Recommended });
+        await _db.SaveChangesAsync();
         return profile;
+    }
+
+    /// <summary>The recommended settings a profile does not carry (neither with the recommended nor any other value).</summary>
+    public async Task<List<InstanceSettingCatalog.Entry>> MissingRecommendedAsync(int profileId)
+    {
+        var keys = await _db.ProfileSettings.Where(s => s.ProfileId == profileId).Select(s => s.Key).ToListAsync();
+        return InstanceSettingCatalog.Recommended
+            .Where(e => !keys.Any(k => string.Equals(k, e.Key, StringComparison.OrdinalIgnoreCase))).ToList();
+    }
+
+    /// <summary>Adds the missing recommended rows (never touching a row that exists, whatever its value) and bumps the
+    /// revision so they roll out. Returns how many were added.</summary>
+    public async Task<int> AddRecommendedAsync(int profileId)
+    {
+        var missing = await MissingRecommendedAsync(profileId);
+        foreach (var e in missing)
+            _db.ProfileSettings.Add(new ProfileSetting { ProfileId = profileId, Key = e.Key, Value = e.Recommended });
+        if (missing.Count == 0) return 0;
+        await _db.SaveChangesAsync();
+        await TouchAsync(profileId);
+        return missing.Count;
     }
 
     /// <summary>

@@ -392,16 +392,27 @@ written **empty** on purpose: they name items that exist on one site and nowhere
 distributing them would leave every other instance backing up nothing, silently.
 
 **The backup QUOTA is not part of that group and is not rolled out.** `Profile.BackupQuotaGb` (a
-column, empty = the cloud-wide default in *Einstellungen → Allgemein*) is what the CLOUD grants each
+column, empty = the DEFAULT PROFILE's value, then the built-in 2 GB) is what the CLOUD grants each
 instance in the profile, so one customer can be given more room than another. An instance neither
 needs nor should be told the number: it decides which of its uploads get pushed out again, and that
 belongs to the side holding the disk. It lives with the profile's policy fields rather than on the
 backup group's page for a practical reason too — opening that page switches the rollout ON, so an
 operator who only wanted to grant more space would have started backing up their sites.
-`BackupStore.QuotaBytesAsync(instanceId)` resolves profile → default; an instance with no profile
-falls back to the default, which is a real state (pending, or profile deleted) and must never mean
+`BackupStore.QuotaBytesAsync(instanceId)` resolves profile → default profile → built-in; an instance with no
+profile falls back to the default profile, which is a real state (pending, or profile deleted) and must never mean
 "no quota". The quota is a **fractional GB `double`** (0.1 = 100 MB) — `BackupStore.ParseGb` accepts a
 comma or a dot so a German-entered "0,1" and "0.1" mean the same, and it is stored invariant.
+
+**There is no cloud-wide backup default any more** (the Einstellungen tab is gone; `?tab=backup` redirects to the
+default profile). Backup policy is a profile matter: the default profile is the fallback for every profile and for
+instances without one. `DbSeeder.MoveBackupDefaultsIntoProfileAsync` moved the old `backup.*` CloudSettings into the
+default profile once — only into fields it did not set — and deleted the rows.
+
+**Recommended profile settings** (`InstanceSettingCatalog.Entry.Recommended`: `sso.enabled`, `antispam.level`,
+`sitemap.enabled`): a new profile starts with them as ordinary rows (deletable); an existing profile shows "N
+empfohlene Einstellungen fehlen — Ergänzen" (`ProfileService.AddRecommendedAsync`, never touches an existing row;
+REST `GET|POST /api/v1/profiles/{id}/settings/recommended`). Nothing address-dependent is recommended:
+`site.canonicalUrl`/`site.behindHttpsProxy` are pushed per instance when hosting publishes a domain or host address.
 
 **Retention is separate from — and layered on top of — the quota.** `BackupStore.EnforceRetentionAsync`
 (run after every upload and by `InstanceMonitorService`'s ~hourly sweep) first applies a classic
@@ -410,7 +421,7 @@ comma or a dot so a German-entered "0,1" and "0.1" mean the same, and it is stor
 `MaxCount` — then the disk quota drops the oldest surviving AUTO backups until it fits. Two invariants:
 **manual/API uploads are never auto-deleted** (only `auto` backups are ever pruned), and the very
 newest auto backup and the last backup overall are always kept. The numbers live per profile
-(`Profile.BackupKeep*`/`BackupMaxCount`, null = fall back) with cloud-wide defaults in `SettingKeys.BackupKeep*`;
+(`Profile.BackupKeep*`/`BackupMaxCount`, null = fall back) to the DEFAULT PROFILE's values, else off;
 **all zero = retention off, quota only** — which is exactly the old behaviour, so nothing prunes by
 surprise until an operator sets a tier.
 

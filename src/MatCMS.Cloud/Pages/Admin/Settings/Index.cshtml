@@ -12,7 +12,6 @@
     <button type="button" class="tab active" data-tab="general">@T["settings.tabGeneral"]</button>
     <button type="button" class="tab" data-tab="smtp">@T["settings.tabSmtp"]</button>
     <button type="button" class="tab" data-tab="ai">@T["settings.tabAi"]</button>
-    <button type="button" class="tab" data-tab="backup">@T["backups.title"]</button>
     <button type="button" class="tab" data-tab="api">@T["settings.tabApi"]</button>
 </div>
 
@@ -202,35 +201,6 @@
             <a class="btn btn-ghost" href="?tab=api">@T["nav.apikeys"]</a>
         </div>
     </div>
-</div>
-
-@* ============ BACKUP ============ *@
-@* Eigener Reiter: Backups sind ein Bereich mit eigener Seite, eigener Belegung und eigenem
-   Kontingent — als eine Zeile unter "Allgemein" war das die einzige Einstellung, die man dort
-   suchen musste, obwohl sie zu etwas anderem gehört. *@
-<div class="tab-panel" data-panel="backup" hidden>
-    <form method="post" asp-page-handler="Backup">
-        <div class="card">
-            <h2>@T["backups.title"]</h2>
-            <div class="form-field">
-                <label>@T["settings.backupQuota"]</label>
-                <input name="backupQuotaGb" value="@Model.Get(SettingKeys.BackupQuotaGb)"
-                       placeholder="@MatCMS.Cloud.Services.BackupStore.DefaultQuotaGb" inputmode="decimal" />
-                <div class="help">@T["settings.backupQuotaHint"] Nachkommastellen erlaubt (0,1 = 100 MB).</div>
-            </div>
-            <div class="form-field">
-                <label>Aufbewahrung automatischer Backups (Standard)</label>
-                <div class="form-row">
-                    <div class="form-field"><label>Täglich</label><input name="backupKeepDaily" value="@Model.Get(SettingKeys.BackupKeepDaily)" placeholder="aus" inputmode="numeric" /></div>
-                    <div class="form-field"><label>Wöchentlich</label><input name="backupKeepWeekly" value="@Model.Get(SettingKeys.BackupKeepWeekly)" placeholder="aus" inputmode="numeric" /></div>
-                    <div class="form-field"><label>Monatlich</label><input name="backupKeepMonthly" value="@Model.Get(SettingKeys.BackupKeepMonthly)" placeholder="aus" inputmode="numeric" /></div>
-                    <div class="form-field"><label>Max. Anzahl</label><input name="backupMaxCount" value="@Model.Get(SettingKeys.BackupMaxCount)" placeholder="aus" inputmode="numeric" /></div>
-                </div>
-                <div class="help">Je Tag/Woche/Monat wird das neueste Backup behalten (klassisches Großvater-Vater-Sohn). Leer/0 = aus. Betrifft nur die von den Instanzen selbst erstellten Backups — manuell oder über die API hochgeladene werden nie automatisch gelöscht. Pro Profil überschreibbar.</div>
-            </div>
-            <div><button type="submit" class="btn">@T["settings.save"]</button></div>
-        </div>
-    </form>
 </div>
 
 @section Scripts {

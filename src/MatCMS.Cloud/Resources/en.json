@@ -1112,7 +1112,7 @@
   "backup.plugins": "Plugins (code & files)",
   "backup.pluginAssets": "Plugin uploads (plugin images, CSS, JS)",
   "profiles.backupQuota": "Cloud backup storage (GB)",
-  "profiles.backupQuotaHint": "Per instance in this profile. Empty = the cloud default ({0} GB). When an instance is full, the next upload drops its oldest backup.",
+  "profiles.backupQuotaHint": "Per instance of this profile. Empty = the default profile's quota ({0} GB). When an instance is full, its oldest backup goes at the next upload.",
   "backups.used": "Used",
   "backups.quota": "Allowed",
   "backups.quotaFromProfile": "from profile \"{0}\"",
@@ -1305,5 +1305,11 @@
   "domains.kindHost": "Host address",
   "domains.viaEdge": "via edge",
   "domains.viaHost": "at the host",
-  "domains.way": "Route"
+  "domains.way": "Route",
+  "profiles.backupQuotaHintDefault": "Per instance. This default profile is the fallback for every other profile and for instances without one. Empty = {0} GB.",
+  "profiles.backupQuotaDecimals": "Decimals allowed (0.1 = 100 MB).",
+  "profiles.recommended": "recommended",
+  "profiles.recommendedValue": "Recommended value: {0}",
+  "profiles.recommendedMissing": "{0} recommended setting(s) missing in this profile:",
+  "profiles.recommendedAdd": "Add"
 }

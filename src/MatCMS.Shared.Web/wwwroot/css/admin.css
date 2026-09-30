@@ -513,6 +513,8 @@ button.icon-current-preview.is-empty { background: var(--bg-alt); color: var(--m
 
 /* Form section sub-heading + code textareas (template editor) */
 .form-section { margin: 22px 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+/* A hint inside a section head is a sentence, not a label — in capitals it becomes a wall that is hard to read. */
+.form-section .help { text-transform: none; letter-spacing: normal; font-size: 13.5px; }
 .form-section:first-of-type { margin-top: 4px; }
 textarea.code { font-family: var(--font-mono, ui-monospace, monospace); font-size: 13px; line-height: 1.5; white-space: pre; overflow-wrap: normal; }
 
@@ -545,7 +547,8 @@ a.stat { text-decoration: none; color: inherit; display: block; }
 .stat.is-err { border-top: 3px solid #d64545; }
 .dash-bars { display: flex; align-items: flex-end; gap: 3px; height: 28px; margin-top: 6px; }
 .dash-bars span { flex: 1; background: #d64545; opacity: .75; border-radius: 2px 2px 0 0; min-height: 2px; }
-.dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; align-items: start; }
+/* min(380px, 100%): a card never demands more room than a phone has (the fixed 380px widened the page). */
+.dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr)); gap: 16px; align-items: start; }
 .dash-grid > .card { margin-bottom: 0; }
 .dash-grid + .dash-grid, .stat-grid + .dash-grid, .dash-grid + [data-list] { margin-top: 16px; }
 /* Fixed layout: a long message wraps inside the card instead of widening the table past it. */
@@ -736,7 +739,9 @@ a.tab { display: inline-block; text-decoration: none; }
 .head-icon svg { width: 22px; height: 22px; }
 
 /* List action button (always at the end of a list) */
-.list-actions { margin-top: 22px; display: flex; gap: 12px; }
+/* Wraps: on a phone three buttons side by side are wider than the screen, and a row that cannot wrap widens the
+   whole page (it then scrolls sideways, the topbar icons slide off). */
+.list-actions { margin-top: 22px; display: flex; gap: 12px; flex-wrap: wrap; }
 
 /* Drag & drop */
 .block-item .drag-handle {

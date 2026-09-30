@@ -8,13 +8,8 @@
 }
 <div class="page-head">
     <h1>@T["dashboard.title"]</h1>
-    <div class="dash-actions" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-        <span class="muted">@T["dashboard.welcome"] <strong>@dashUser</strong></span>
-        <a class="btn btn-sm" href="/" target="_blank" rel="noopener"><i class="ti ti-external-link" aria-hidden="true"></i> @T["dashboard.viewSite"]</a>
-        <form method="post" asp-page="/Logout" class="inline-form" style="margin:0;">
-            <button type="submit" class="btn btn-sm btn-ghost"><i class="ti ti-logout" aria-hidden="true"></i> @T["nav.logout"]</button>
-        </form>
-    </div>
+    @* Only the greeting: "Website" and "Abmelden" are in the topbar already (the view switch and the logout icon). *@
+    <span class="muted">@T["dashboard.welcome"] <strong>@dashUser</strong></span>
 </div>
 
 @if (!Model.SetupComplete)

@@ -494,3 +494,17 @@ body.cu-screen { min-height: 100vh; display: flex; align-items: center; justify-
 /* "Ressourcen": CPU and RAM stacked in one cell, each with its short label in front. */
 .usage-cell .usage-row + .usage-row { margin-top: 6px; }
 .usage-label { flex: 0 0 32px; font-size: 11px; font-weight: 600; letter-spacing: .04em; color: var(--muted, #6b7280); }
+
+/* Phone topbar: the switcher and the page title SHRINK (ellipsis) and the icons on the right keep their room.
+   Without this a long title ("Benachrichtigungen", "ChatGPT-Connector") made the bar wider than the screen, and
+   every page could be dragged sideways. */
+@media (max-width: 860px) {
+    .admin-topbar { column-gap: 10px; }
+    .inst-head { flex: 1 1 auto; min-width: 0; gap: 8px; }
+    /* The picker sits in .inst-ctx — that wrapper is the flex item, and it must not shrink under its button. */
+    .inst-head .inst-ctx, .inst-head .inst-picker { flex: 0 0 auto; }
+    .inst-head .admin-topbar-title { flex: 1 1 auto; min-width: 0; }
+    .inst-picker-btn { max-width: 150px; }
+    .admin-topbar-right { flex: 0 0 auto; }
+}
+@media (max-width: 420px) { .inst-picker-btn { max-width: 110px; } .admin-topbar-title { font-size: 15px; } }

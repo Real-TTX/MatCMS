@@ -52,6 +52,7 @@
     }
     <button type="button" class="tab" data-tab="preview">@T["instances.tabPreview"]</button>
     <button type="button" class="tab" data-tab="config">@T["instances.tabConfig"]</button>
+    <button type="button" class="tab" data-tab="stats">@T["stats.title"]</button>
     <button type="button" class="tab" data-tab="events">@T["instances.tabEvents"]</button>
     <button type="button" class="tab" data-tab="mail">@T["spool.title"]</button>
     <button type="button" class="tab" data-tab="backup">@T["backups.title"]</button>
@@ -886,6 +887,25 @@
             </tbody>
         </table>
     </div>
+</div>
+
+<div class="tab-panel" data-panel="stats" hidden>
+    <div class="page-head">
+        <h2>@T["stats.title"]</h2>
+        <div class="list-toolbar">
+            <div class="gallery-filter stats-period">
+                @foreach (var d in StatsService.Periods)
+                {
+                    <a class="gfilter @(Model.StatsDays == d ? "active" : "")" asp-page="Details" asp-route-id="@Model.Item.Id" asp-route-days="@d" asp-route-tab="stats">@T["stats.lastDays", d]</a>
+                }
+            </div>
+        </div>
+    </div>
+    @if (Model.StatsUnsupported)
+    {
+        <div class="card"><span class="badge badge-off">@T["stats.unsupported"]</span></div>
+    }
+    @await Html.PartialAsync("_SiteStats", new MatCMS.Shared.Web.SiteStats(Model.Stats, StatsLabels.For(T), Model.Item.PreviewUrl))
 </div>
 
 <div class="tab-panel" data-panel="events" hidden>

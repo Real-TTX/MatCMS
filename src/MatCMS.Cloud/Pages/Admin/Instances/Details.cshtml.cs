@@ -25,8 +25,10 @@ public class DetailsModel : PageModel, IAsyncPageFilter
     private readonly MatCMS.Cloud.Services.Proxy.ProxyService _proxy;
 
     public DetailsModel(AppDbContext db, InstanceService instances, ReleaseWatcher releases, HostingActionsService hosting, BackupStore backups, OperatorScope scope,
-        MatCMS.Cloud.Services.Proxy.ProxyService proxy, MatCMS.Cloud.Services.Nodes.MigrationService migrations, DockerHostService docker)
+        MatCMS.Cloud.Services.Proxy.ProxyService proxy, MatCMS.Cloud.Services.Nodes.MigrationService migrations, DockerHostService docker,
+        StatsService stats)
     {
+        _stats = stats;
         _db = db;
         _instances = instances;
         _releases = releases;
@@ -40,6 +42,13 @@ public class DetailsModel : PageModel, IAsyncPageFilter
 
     private readonly MatCMS.Cloud.Services.Nodes.MigrationService _migrations;
     private readonly DockerHostService _docker;
+    private readonly StatsService _stats;
+
+    /// <summary>The Statistik tab: the site's visitor statistics for the chosen period (?days=).</summary>
+    public StatsSummary Stats { get; private set; } = null!;
+    public int StatsDays { get; private set; } = 30;
+    /// <summary>An instance older than protocol 17 counts nothing the cloud could receive.</summary>
+    public bool StatsUnsupported => Item.ProtocolVersion > 0 && Item.ProtocolVersion < 17;
 
     /// <summary>The instance's moves, newest first (the Hosting tab shows the last one with its log).</summary>
     public List<InstanceMigration> Migrations { get; private set; } = new();
@@ -178,9 +187,11 @@ public class DetailsModel : PageModel, IAsyncPageFilter
         (Item.Hosting is InstanceHosting.Local or InstanceHosting.Node) && !string.IsNullOrEmpty(Item.ContainerState)
         && !string.Equals(Item.ContainerState, "running", StringComparison.OrdinalIgnoreCase);
 
-    public async Task<IActionResult> OnGetAsync(int id)
+    public async Task<IActionResult> OnGetAsync(int id, int? days)
     {
         if (!await LoadAsync(id)) return RedirectToPage("Index");
+        StatsDays = StatsService.NormalisePeriod(days);
+        Stats = await _stats.SummaryAsync(id, StatsDays, HttpContext.RequestAborted);
 
         // Refresh hosting + container state LIVE from the daemon so the shown status and the
         // Start/Stop/Restart buttons reflect reality now — not the last heartbeat (which lags 150 s) nor a

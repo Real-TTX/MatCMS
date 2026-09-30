@@ -685,6 +685,20 @@ login same-site; it is not used by this flow.
   as "this profile's sites raise it at all" and `NotifyRecipients` as ADDITIONAL addresses (was: replacement).
   Before the matrix is first saved it is derived from the legacy `notify.*` keys, so nobody silently loses mail.
   Node outages notify once per outage (`Node.OfflineNotified`, re-armed by the next beat).
+- **Visitor statistics** (protocol 17): the SITE counts (`MatCMS/Services/StatsCollector.cs` — in memory, flushed
+  per minute into `StatCounters`, cookie-less, visitors via a daily in-memory salt, no address stored) and sends
+  daily counters (`StatDayReport`, generic `day × kind × key → count`, `MatCMS.Shared/SiteStats.cs`) on the beat —
+  only to a cloud answering `StatsAccepted`, from the day before `StatsHaveUntil` (a day may have been sent before
+  it was over), 14 days per beat while backfilling, every 10 min once caught up, top 50 keys per kind and day. The
+  cloud REPLACES each received day (`InstanceStats`, cascade with the instance, 400 days) and moves
+  `Instance.StatsHaveUntil` — a column, not MAX(Day), so an empty day still advances the backfill (the site always
+  sends the window's last day, even empty). Shown by the SHARED `_SiteStats` view from the shared `StatsSummary`,
+  so the site's Admin → Statistik and the cloud's figures cannot disagree: instance Details → tab **Statistik**,
+  sidebar **Statistik** (all visible sites side by side, sum on top via `Compact`; Operators scoped), REST
+  `/api/v1/stats` + `/api/v1/instances/{id}/stats`, MCP `get_stats` — all through `Services/StatsService.cs`.
+  `stats.enabled`/`stats.retentionDays` and the `log.*` keys are rollable (catalog group "Protokoll & Statistik").
+  Log/statistics SETTINGS live under Einstellungen (tab Protokoll here, "Protokoll & Statistik" on the site); the
+  log and statistics pages only show.
 - **Admin navigation**: **Hosting is ONE sidebar item, the first** (Admin-only), and everything about hosts,
   containers, images and domains lives in its TABS — link-tabs (`_HostingTabs.cshtml`, `a.tab`, scrollable on phones),
   each its own page: **Übersicht** = the module's dashboard (tiles, the Hosts table with a stacked CPU/RAM "Ressourcen"

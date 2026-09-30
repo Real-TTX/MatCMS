@@ -240,6 +240,18 @@ Ein Profil kann Offline-/Update-Meldungen für seine Instanzen abschalten; seine
 
 ---
 
+## 6c. Besucherstatistik
+
+Jede Website zählt ihren Verkehr selbst (ohne Cookies, ohne gespeicherte IP) und schickt der Cloud Tageszähler mit dem Heartbeat.
+Zeitraum `days` = 7, 30 (Standard), 90 oder 365. Jeder Schlüssel, begrenzt auf seine Instanzen.
+
+- `GET /api/v1/stats?days=30` → `{ days, total:{ views, visitors, bots, notFound, serverErrors, previousViews }, instances:[{ id, name, hasData, views, visitors, notFound, serverErrors, previousViews }] }`
+- `GET /api/v1/instances/{id}/stats?days=30` → `{ id, name, stats:{ from, to, views, visitors, bots, notFound, serverErrors, previousViews, previousVisitors, days:[{ day, views, visitors }], topPages:[{ path, views }], referrers:[{ host, views }], notFoundPages:[{ path, hits }], devices:[{ device, views }] } }`
+
+`previousViews` ist der gleich lange Zeitraum davor (null = keine Daten). Bots zählen nicht als Aufrufe. Die Cloud bekommt pro Tag die 50 häufigsten Seiten/Herkünfte/404-Pfade; die ganze Liste hat nur die Website selbst.
+
+---
+
 ## 7. MCP-Server (`/mcp`) – Inhalte per KI verwalten
 
 Für KI-Clients (ChatGPT, Claude, Cursor) bietet die Cloud einen **Model-Context-Protocol**-Server
@@ -311,6 +323,7 @@ Instanz beim nächsten Heartbeat über ihre **eigenen** Validierer anwendet (add
 | `migrate_instance` | **Website umziehen** auf einen anderen Host (Daten 1:1, Domain zieht mit; offline währenddessen) — vorher bestätigen |
 | `get_migrations` | Umzüge einer Website mit Zustand, Schritt und Protokoll |
 | `get_notifications` / `set_notifications` | Benachrichtigungs-Matrix lesen / komplett ersetzen (Abschnitt 6b) |
+| `get_stats` | Besucherstatistik: ohne `instanceId` alle Sites im Vergleich, mit `instanceId` Verlauf, Top-Seiten, Herkunft, 404, Geräte (Abschnitt 6c) |
 
 **`create_page`** (Beispiel-Eingabe):
 ```json

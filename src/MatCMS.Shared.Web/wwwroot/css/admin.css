@@ -1482,3 +1482,5 @@ table.data.stats-table td:last-child, table.data.stats-table th:last-child { wid
 table.stats-table td.stats-key { overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 12%, transparent) var(--share, 0%), transparent var(--share, 0%)); }
 .stats-period { display: flex; flex-wrap: wrap; gap: 6px; }
+.dash-bars.stats-spark { width: 160px; margin-top: 0; gap: 2px; }
+table.data th.num, table.data td.num { text-align: right; }

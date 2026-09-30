@@ -82,6 +82,13 @@ public static class InstanceSettingCatalog
             new Entry("code.bodyEnd", "Code vor </body>"),
             new Entry("analytics.ga4", "GA4 Mess-ID", "G-XXXXXXX — erzeugt das Snippet selbst"),
         ]),
+        new Group("Protokoll & Statistik", [
+            new Entry("stats.enabled", "Besucherstatistik", "1 = an (Standard), 0 = aus. Ohne Cookies, ohne gespeicherte IP."),
+            new Entry("stats.retentionDays", "Statistik aufbewahren (Tage)", "Standard 400"),
+            new Entry("log.requests", "Request-Log", "on = jede Anfrage protokollieren, off = nur Fehler"),
+            new Entry("log.retentionErrorsDays", "Fehler aufbewahren (Tage)", "Standard 90"),
+            new Entry("log.retentionRequestsDays", "Requests aufbewahren (Tage)", "Standard 14"),
+        ]),
         new Group("Sprache", [
             new Entry("i18n.default", "Standardsprache",
                 "Welche Sprachen eine Website anbietet, wird bewusst nicht verteilt — nur die Voreinstellung."),

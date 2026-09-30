@@ -61,6 +61,7 @@
                 <a class="@ActiveHosting()" asp-page="/Admin/Hosting/Index">🏗️ @T["hosting.title"]</a>
             }
             <a class="@ActiveInstances()" asp-page="/Admin/Instances/Index">🖥️ @T["nav.instances"]</a>
+            <a class="@Active("/admin/stats")" asp-page="/Admin/Stats/Index">📊 @T["stats.title"]</a>
             @if (isAdmin)
             {
                 <a class="@Active("/admin/profiles")" asp-page="/Admin/Profiles/Index">🧩 @T["nav.profiles"]</a>

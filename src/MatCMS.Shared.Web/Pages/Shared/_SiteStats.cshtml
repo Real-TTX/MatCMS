@@ -111,12 +111,15 @@
     </div>
 </div>
 
+@if (!Model.Compact)
+{
 <div class="dash-grid">
     @{ Table(L.TopPages, L.Page, s.TopPages, link: true, device: false); }
     @{ Table(L.Referrers, L.Source, s.Referrers, link: false, device: false); }
     @{ Table(L.NotFoundPages, L.Page, s.NotFoundPages, link: false, device: false); }
     @{ Table(L.Devices, L.Devices, s.Devices, link: false, device: true); }
 </div>
+}
 
 @functions {
     static string F(double v) => v.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);

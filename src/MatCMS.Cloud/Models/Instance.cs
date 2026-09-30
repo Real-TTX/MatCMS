@@ -269,6 +269,12 @@ public class Instance
     /// <summary>When the operator asked for the full log — shown while the upload is pending.</summary>
     public DateTime? LogFetchRequestedAt { get; set; }
 
+    /// <summary>The newest statistics day received from this instance (<c>yyyy-MM-dd</c>), null = none yet. Told back
+    /// on every beat (<see cref="MatCMS.Shared.HeartbeatResponse.StatsHaveUntil"/>) so the site knows where to resume.
+    /// A column rather than MAX(Day) over the rows: a day without traffic has no rows, and the backfill must still move
+    /// past it.</summary>
+    public string? StatsHaveUntil { get; set; }
+
     /// <summary>
     /// What the instance said went wrong, if it answered at all. Set means the request is over and
     /// failed: the cloud stops asking, says why, and offers to ask again.

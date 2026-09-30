@@ -12,7 +12,9 @@ namespace MatCMS.Shared.Web;
 /// <param name="L">Wording.</param>
 /// <param name="SiteUrl">Base address the top pages link to (the cloud knows the site's address); null = relative
 /// links, which is right on the site itself. No links at all for 404 paths — they lead nowhere by definition.</param>
-public sealed record SiteStats(StatsSummary Summary, SiteStatsLabels L, string? SiteUrl = null);
+/// <param name="Compact">Tiles and chart only — for a sum over several sites, whose top lists would mix paths of
+/// different sites into one meaningless list.</param>
+public sealed record SiteStats(StatsSummary Summary, SiteStatsLabels L, string? SiteUrl = null, bool Compact = false);
 
 public sealed record SiteStatsLabels(
     string Views, string Visitors, string Bots, string NotFound, string ServerErrors,

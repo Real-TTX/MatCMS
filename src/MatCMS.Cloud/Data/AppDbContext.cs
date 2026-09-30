@@ -61,6 +61,7 @@ public class AppDbContext : DbContext
     public DbSet<ProfileGlobalUser> ProfileGlobalUsers => Set<ProfileGlobalUser>();
     public DbSet<MatCMS.Cloud.Models.LogEntry> Logs => Set<MatCMS.Cloud.Models.LogEntry>();
     public DbSet<InstanceLogEntry> InstanceLogs => Set<InstanceLogEntry>();
+    public DbSet<InstanceStat> InstanceStats => Set<InstanceStat>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -147,6 +148,11 @@ public class AppDbContext : DbContext
             .HasForeignKey(i => i.NodeId).OnDelete(DeleteBehavior.SetNull);
         // Dedup key for logs piggybacked on the heartbeat, plus the ordering the view reads back by.
         b.Entity<InstanceLogEntry>().HasIndex(l => new { l.InstanceId, l.SourceId }).IsUnique();
+        // Visitor statistics go with their instance; a day is replaced as a whole, so the key is unique.
+        b.Entity<InstanceStat>()
+            .HasOne(s => s.Instance).WithMany()
+            .HasForeignKey(s => s.InstanceId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<InstanceStat>().HasIndex(s => new { s.InstanceId, s.Day, s.Kind, s.Key }).IsUnique();
 
         // The join code is what an enrolling instance is resolved by, so it must be unique and fast.
         b.Entity<Profile>().HasIndex(p => p.JoinCode).IsUnique();

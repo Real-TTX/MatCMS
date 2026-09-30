@@ -241,6 +241,7 @@ public class InstanceService
         await RecordSyncReportAsync(instance, beat, ct);
         await RecordContentOpReportsAsync(instance, beat, ct);
         await RecordInstanceLogsAsync(instance, beat, ct);
+        await RecordStatsAsync(instance, beat, ct);
         await ClassifyAsync(instance, ct);
 
         if (firstEver)
@@ -312,8 +313,47 @@ public class InstanceService
             // introduced it (v16); offered on every beat until the upload arrives and clears the id.
             LogFetch = instance.Status == InstanceStatus.Approved && beat.ProtocolVersion >= 16 && instance.LogFetchRequestId > 0
                 ? new PendingLogFetch { RequestId = instance.LogFetchRequestId }
-                : null
+                : null,
+
+            // Visitor statistics: this cloud takes them, and this is where the site should resume.
+            StatsAccepted = true,
+            StatsHaveUntil = instance.StatsHaveUntil
         };
+    }
+
+    /// <summary>A heartbeat carries at most this many days (the site sends 14); more is refused as a whole.</summary>
+    private const int MaxStatDaysPerBeat = 31;
+    public const int StatsKeepDays = 400;
+
+    /// <summary>Stores the statistics days the site sent (<see cref="HeartbeatRequest.Stats"/>): each day REPLACES the
+    /// stored one — the site sends a day as it has it now, so a repeat or a lost response is harmless — and
+    /// <see cref="Instance.StatsHaveUntil"/> moves to the newest day received. Kinds and keys are bounded here too;
+    /// the site is trusted to count, not to decide how big the cloud's table gets.</summary>
+    private async Task RecordStatsAsync(Instance instance, HeartbeatRequest beat, CancellationToken ct)
+    {
+        if (beat.Stats is not { Count: > 0 } days || days.Count > MaxStatDaysPerBeat) return;
+        var valid = days.Where(d => DateOnly.TryParseExact(d.Day, "yyyy-MM-dd", out var day)
+                                    && day <= DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1)).ToList();
+        if (valid.Count == 0) return;
+        var names = valid.Select(d => d.Day).Distinct().ToList();
+        await _db.InstanceStats.Where(x => x.InstanceId == instance.Id && names.Contains(x.Day)).ExecuteDeleteAsync(ct);
+        foreach (var d in valid.GroupBy(d => d.Day).Select(g => g.Last()))
+        {
+            var counts = (d.Counts ?? new())
+                .Where(c => c.Count > 0 && !string.IsNullOrEmpty(c.Kind) && c.Kind.Length <= 4)
+                .GroupBy(c => (c.Kind, Key: Cap(c.Key, 200) ?? ""))
+                .Select(g => new { g.Key.Kind, g.Key.Key, Count = g.Sum(c => c.Count) })
+                .GroupBy(c => c.Kind)
+                .SelectMany(g => g.OrderByDescending(c => c.Count).Take(StatKinds.WireTopPerKind * 2));
+            foreach (var c in counts)
+                _db.InstanceStats.Add(new InstanceStat { InstanceId = instance.Id, Day = d.Day, Kind = c.Kind, Key = c.Key, Count = c.Count });
+        }
+        // The cloud keeps as long as a site does by default; a site's own shorter setting governs only the site.
+        var cut = StatKinds.DayOf(DateTime.UtcNow.AddDays(-StatsKeepDays));
+        await _db.InstanceStats.Where(x => x.InstanceId == instance.Id && string.Compare(x.Day, cut) < 0).ExecuteDeleteAsync(ct);
+        var newest = names.Max(StringComparer.Ordinal)!;
+        if (instance.StatsHaveUntil is null || string.CompareOrdinal(newest, instance.StatsHaveUntil) > 0)
+            instance.StatsHaveUntil = newest;
     }
 
     /// <summary>Marks a full-log request for an instance (Variante B). Bumped, not reused, so a stale

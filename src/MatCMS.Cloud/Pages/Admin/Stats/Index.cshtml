@@ -1,0 +1,79 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.Stats.IndexModel
+@using MatCMS.Cloud.Services
+@{
+    ViewData["Title"] = T["stats.title"];
+    static string N(long n) => n.ToString("#,0", System.Globalization.CultureInfo.InvariantCulture).Replace(",", "\u202F");
+    static string Trend(long now, long? before)
+    {
+        if (before is not long b || b == 0) return "";
+        var pct = Math.Round((now - b) * 100.0 / b);
+        return (pct >= 0 ? "+" : "−") + Math.Abs(pct).ToString("0", System.Globalization.CultureInfo.InvariantCulture) + " %";
+    }
+}
+<div data-list data-list-page-size="50">
+    <div class="page-head">
+        <h1>@T["stats.title"]</h1>
+        <div class="list-toolbar">
+            <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+            <div class="gallery-filter stats-period">
+                @foreach (var d in StatsService.Periods)
+                {
+                    <a class="gfilter @(Model.Days == d ? "active" : "")" asp-page="Index" asp-route-days="@d">@T["stats.lastDays", d]</a>
+                }
+            </div>
+        </div>
+    </div>
+
+    @await Html.PartialAsync("_SiteStats", new MatCMS.Shared.Web.SiteStats(Model.Total, StatsLabels.For(T), Compact: true))
+
+    <table class="data stats-fleet" data-list-table style="margin-top:16px;">
+        <thead>
+            <tr>
+                <th>@T["nav.instances"]</th>
+                <th class="num">@T["stats.views"]</th>
+                <th class="num">@T["stats.visitors"]</th>
+                <th class="num">@T["stats.notFound"]</th>
+                <th class="num">@T["stats.serverErrors"]</th>
+                <th>@T["stats.chart"]</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Rows.Count == 0)
+            {
+                <partial name="_EmptyRow" model='@T["stats.empty"]' />
+            }
+            @foreach (var r in Model.Rows)
+            {
+                // At most 31 bars: a year is drawn in weekly-ish buckets, not 365 hairlines.
+                var size = Math.Max(1, (int)Math.Ceiling(r.ViewsPerDay.Count / 31.0));
+                var bars = r.ViewsPerDay.Chunk(size).Select(c => c.Sum()).ToList();
+                var max = Math.Max(1, bars.Count == 0 ? 1 : bars.Max());
+                <tr data-search="@r.Instance.Name">
+                    <td><a asp-page="/Admin/Instances/Details" asp-route-id="@r.Instance.Id" asp-route-tab="stats" asp-route-days="@Model.Days"><strong>@r.Instance.Name</strong></a></td>
+                    @if (!r.HasData)
+                    {
+                        <td colspan="5" class="muted"><em>@T[r.Instance.ProtocolVersion is > 0 and < 17 ? "stats.unsupported" : "stats.empty"]</em></td>
+                    }
+                    else
+                    {
+                        <td class="num mono">@N(r.Views) @if (Trend(r.Views, r.PreviousViews) is { Length: > 0 } t) { <span class="muted">(@t)</span> }</td>
+                        <td class="num mono">@N(r.Visitors)</td>
+                        <td class="num mono">@N(r.NotFound)</td>
+                        <td class="num mono">@N(r.ServerErrors)</td>
+                        <td>
+                            <div class="dash-bars is-views stats-spark" aria-hidden="true">
+                                @foreach (var v in bars)
+                                {
+                                    <span style="height:@(v == 0 ? 2 : 4 + 22 * v / max)px"></span>
+                                }
+                            </div>
+                        </td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+    <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+    <nav class="list-pager" data-list-pager aria-label="@T["list.pager"]"></nav>
+</div>

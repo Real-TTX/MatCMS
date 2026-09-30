@@ -114,6 +114,23 @@ public class Instance
 
     public DateTime? ProxyPublishedAt { get; set; }
 
+    /// <summary>How <see cref="ProxyDomain"/> is routed: "host" = at the proxy of the host the site runs on (the
+    /// only way before the edge existed, so null reads as "host"), "edge" = at the cloud's central edge proxy,
+    /// which forwards to the host. Kept per instance so an unpublish reaches the right proxy after the switch.</summary>
+    public string? ProxyVia { get; set; }
+
+    // --- Automatic host address ("Automatische Adressen", per host) ---
+    // A technical address under the host's base domain (name.server1.example.de), routed at THAT host's proxy.
+    // Separate from ProxyDomain: the customer domain can sit at the edge and forward here, so a move only has to
+    // re-point the edge while the host address itself changes with the host.
+
+    /// <summary>The host address (bare host), or null.</summary>
+    public string? HostDomain { get; set; }
+    public string? HostProvider { get; set; }
+    public string? HostRouteId { get; set; }
+    public string? HostRouteError { get; set; }
+    public DateTime? HostPublishedAt { get; set; }
+
     public string? Notes { get; set; }
 
     // --- Last heartbeat -----------------------------------------------------

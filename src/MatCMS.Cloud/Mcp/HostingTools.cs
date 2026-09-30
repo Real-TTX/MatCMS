@@ -208,7 +208,7 @@ public class HostingTools
     }
 
     [McpServerTool(Name = "get_domain_status"), Description(
-        "The public domain of an instance: domain, via which proxy provider, route id, last error, publish time, and (check=true) whether the route still exists at the proxy. Any valid key within its instance scope.")]
+        "The addresses of an instance: its customer domain (via 'edge' = the cloud's central edge proxy, or 'host' = the proxy of the host it runs on; provider, route id, last error, publish time) and its automatic host address (name.<host base domain>), and (check=true) whether the routes still exist at the proxies. Any valid key within its instance scope.")]
     public static async Task<object> GetDomainStatus(McpContext me, AppDbContext db, Services.Proxy.ProxyService proxy,
         [Description("The instance id, as returned by list_instances.")] string instanceId,
         [Description("Ask the proxy whether the route still exists (default true).")] bool check = true,
@@ -216,11 +216,11 @@ public class HostingTools
     {
         var inst = await ResolveAsync(me, db, instanceId, ct);
         var s = await proxy.StatusAsync(inst, check, ct);
-        return new { domain = s.Domain, provider = s.Provider, routeId = s.RouteId, error = s.Error, publishedAt = s.PublishedAt, routeExists = s.RouteExists };
+        return Services.Proxy.ProxyService.StatusJson(s);
     }
 
     [McpServerTool(Name = "publish_domain"), Description(
-        "Publish an instance under a domain (or move it to a new one): with a managing proxy (matcad/caddy) a route with TLS is created/updated for the instance's container; with provider 'none' the domain is only recorded. The domain's DNS must already point at the proxy host. pushCanonical (default true) also sets the site's canonical URL to https://<domain>. Requires the hosting right; honours the key's instance scope.")]
+        "Publish an instance under a customer domain (or move it to a new one). With the edge proxy switched on the route is created at the edge (DNS points at the cloud server) and forwards to the site's host; otherwise at the proxy of the host the site runs on (DNS points at that host); with provider 'none' the domain is only recorded. pushCanonical (default true) also sets the site's canonical URL to https://<domain>. Requires the hosting right; honours the key's instance scope.")]
     public static async Task<object> PublishDomain(McpContext me, AppDbContext db, Services.Proxy.ProxyService proxy,
         [Description("The instance id, as returned by list_instances.")] string instanceId,
         [Description("A single hostname, e.g. shop.example.de (no scheme, path, port or wildcard).")] string domain,
@@ -247,6 +247,81 @@ public class HostingTools
         if (!r.Ok) throw new McpException(r.Message);
         return new { ok = true, message = r.Message };
     }
+
+    [McpServerTool(Name = "publish_host_address"), Description(
+        "Create (or renew) the automatic host address of an instance — name.<base domain> at the proxy of the host it runs on (automatic addresses must be switched on for that host). Without a customer domain it becomes the site's address. Requires the hosting right; honours the key's instance scope.")]
+    public static async Task<object> PublishHostAddress(McpContext me, AppDbContext db, Services.Proxy.ProxyService proxy,
+        [Description("The instance id, as returned by list_instances.")] string instanceId,
+        [Description("Also set the site's canonical URL when it has no customer domain (default true).")] bool pushCanonical = true,
+        CancellationToken ct = default)
+    {
+        RequireHosting(me);
+        var inst = await ResolveAsync(me, db, instanceId, ct);
+        var r = await proxy.PublishHostAddressAsync(inst, pushCanonical, ct: ct);
+        if (!r.Ok) throw new McpException(r.Message);
+        return new { ok = true, hostAddress = r.Domain, message = r.Message };
+    }
+
+    [McpServerTool(Name = "remove_host_address"), Description(
+        "Remove the automatic host address of an instance (deletes its route at the host's proxy). A customer domain at the edge is re-pointed to host:port. Requires the hosting right; honours the key's instance scope.")]
+    public static async Task<object> RemoveHostAddress(McpContext me, AppDbContext db, Services.Proxy.ProxyService proxy,
+        [Description("The instance id, as returned by list_instances.")] string instanceId, CancellationToken ct = default)
+    {
+        RequireHosting(me);
+        var inst = await ResolveAsync(me, db, instanceId, ct);
+        var r = await proxy.RemoveHostAddressAsync(inst, pushCanonical: true, ct);
+        if (!r.Ok) throw new McpException(r.Message);
+        return new { ok = true, message = r.Message };
+    }
+
+    [McpServerTool(Name = "set_auto_domain"), Description(
+        "Switch automatic addresses on or off for THIS cloud's own host (every new instance there gets name.<baseDomain>; needs a wildcard DNS record *.<baseDomain> to this server and a proxy). For nodes use update_node(autoDomainEnabled, autoDomainBase); create_missing_host_addresses fills in existing instances. Requires the hosting right on an all-instances key.")]
+    public static async Task<object> SetAutoDomain(McpContext me, Services.Proxy.ProxyService proxy,
+        bool enabled, [Description("e.g. cloud.example.de")] string? baseDomain = null, CancellationToken ct = default)
+    {
+        RequireCloudWide(me);
+        if (enabled && Services.Proxy.ProxyService.NormaliseDomain(baseDomain) is null) throw new McpException("Keine gültige Basis-Domain.");
+        await proxy.SetAutoDomainAsync(enabled, baseDomain);
+        return new { ok = true, missing = await proxy.MissingHostAddressCountAsync(null, ct) };
+    }
+
+    [McpServerTool(Name = "get_edge_config"), Description(
+        "The central edge proxy for customer domains: whether it is on, whether it is the same proxy as this cloud's host, its provider and addresses (never the Matcad key). With Caddy the edge forwards to a site's automatic host address; with Matcad to node-address:port. Any valid key.")]
+    public static object GetEdgeConfig(McpContext me, Services.Proxy.ProxyService proxy)
+    {
+        _ = me.Key;
+        return proxy.PublicEdgeConfig();
+    }
+
+    [McpServerTool(Name = "configure_edge"), Description(
+        "Configure the central edge proxy for customer domains. enabled = customer domains are routed at the edge (DNS to the cloud server), which forwards to the site's host; useHostProxy = the edge is the proxy this cloud's host already uses (default). Omitted parameters keep their value. Switching does not move existing domains — call move_domains_to_edge_setting. Requires the hosting right on an all-instances key.")]
+    public static async Task<object> ConfigureEdge(McpContext me, Services.Proxy.ProxyService proxy,
+        bool? enabled = null, bool? useHostProxy = null, [Description("caddy or matcad (only when useHostProxy is false).")] string? provider = null,
+        string? caddyAdminUrl = null, string? caddyServer = null, string? matcadUrl = null,
+        [Description("Stored encrypted, never returned.")] string? matcadToken = null, bool clearMatcadToken = false, CancellationToken ct = default)
+    {
+        RequireCloudWide(me);
+        await proxy.UpdateEdgeAsync(new(enabled, useHostProxy, provider, matcadUrl, matcadToken, clearMatcadToken, caddyAdminUrl, caddyServer));
+        return new { edge = proxy.PublicEdgeConfig(), domainsOnOtherWay = await proxy.CustomerDomainsOnOtherWayCountAsync(ct) };
+    }
+
+    [McpServerTool(Name = "test_edge"), Description("Whether the edge proxy is reachable with its configured address. Requires the hosting right.")]
+    public static async Task<object> TestEdge(McpContext me, Services.Proxy.ProxyService proxy, CancellationToken ct)
+    {
+        RequireHosting(me);
+        var r = await proxy.TestEdgeAsync(ct);
+        return new { ok = r.Ok, provider = r.Kind, message = r.Message };
+    }
+
+    [McpServerTool(Name = "move_domains_to_edge_setting"), Description(
+        "Re-publish every customer domain that is still routed the other way than the edge switch says (edge on → move to the edge, off → back to the host proxies). Each old route is removed first. DNS of moved domains must point at the new entry (the cloud server for the edge). Confirm with the user first. Requires the hosting right on an all-instances key.")]
+    public static async Task<object> MoveDomainsToEdgeSetting(McpContext me, Services.Proxy.ProxyService proxy, CancellationToken ct)
+    {
+        RequireCloudWide(me);
+        var r = await proxy.MoveCustomerDomainsToCurrentWayAsync(ct);
+        return new { moved = r.Created, failed = r.Failed, errors = r.Errors };
+    }
+
 
     [McpServerTool(Name = "migrate_instance"), Description(
         "Move a site to another host ('local' = this cloud's own Docker host, or a node id from list_nodes). The data volume is copied 1:1, so the site keeps its identity, content and cloud link; its domain route moves along (DNS must then point at the new host). The site is OFFLINE during the move (minutes, depending on its size) — confirm with the user first. Runs in the background; poll get_migrations. removeSource=true deletes the old container AND its data afterwards (needs the restore right as well); default keeps it stopped and renamed as a way back. Requires the hosting right; honours the key's instance scope.")]

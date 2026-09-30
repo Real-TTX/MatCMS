@@ -61,6 +61,15 @@ public class Node
     public string? ProxyNetwork { get; set; }
     public string? ProxyUpstreamHost { get; set; }
 
+    /// <summary>"Automatische Adressen": every instance on this node gets <c>name.{AutoDomainBase}</c> at the node's
+    /// proxy. Needs a wildcard DNS record <c>*.{AutoDomainBase}</c> pointing at the node.</summary>
+    public bool AutoDomainEnabled { get; set; }
+    public string? AutoDomainBase { get; set; }
+
+    /// <summary>How the cloud's EDGE proxy reaches this node (IP or host name, public or private network) — used
+    /// when the edge forwards to <c>address:port</c> instead of the node's automatic address.</summary>
+    public string? Address { get; set; }
+
     public int PortFrom { get; set; } = 9201;
     public int PortTo { get; set; } = 9299;
 

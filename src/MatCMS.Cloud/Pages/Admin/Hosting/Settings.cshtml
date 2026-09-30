@@ -84,13 +84,125 @@
         </div>
     </div>
 
-    <div class="form-actions">
+    <div class="form-actions" style="margin-bottom:24px;">
         <button type="submit" class="btn">@T["settings.save"]</button>
+    </div>
+</form>
+
+@* Automatic host addresses for "Dieser Host": every site gets name.<base> at this host's proxy. Needs a wildcard
+   DNS record *.<base> pointing at this server. Its own form: switching it never re-saves the proxy above. *@
+<form method="post" asp-page-handler="AutoDomain">
+    <div class="card">
+        <h2>@T["autodomain.title"]</h2>
+        <label class="checkbox-row">
+            <input type="checkbox" name="enabled" value="true" data-reveal="autodomain-fields" checked="@(Model.AutoDomainEnabled ? "checked" : null)" />
+            @T["autodomain.enable"]
+        </label>
+        <div data-reveal-target="autodomain-fields" hidden="@(Model.AutoDomainEnabled ? null : "hidden")">
+            <div class="form-field">
+                <label for="autoBase">@T["autodomain.base"]</label>
+                <input id="autoBase" name="baseDomain" value="@Model.AutoDomainBase" placeholder="cloud.example.de" spellcheck="false" />
+                <div class="help">@T["autodomain.baseHint"]</div>
+            </div>
+        </div>
+        <div class="list-actions">
+            <button type="submit" class="btn">@T["settings.save"]</button>
+            @if (Model.AutoDomainEnabled && Model.MissingHostAddresses > 0)
+            {
+                <button type="submit" class="btn btn-ghost" formaction="@Url.Page("Settings", "AutoDomainBackfill")">@T["autodomain.backfill", Model.MissingHostAddresses]</button>
+            }
+        </div>
+    </div>
+</form>
+
+@* The central edge proxy for customer domains. Off = a customer domain is routed at the proxy of the site's host. *@
+<form method="post" asp-page-handler="Edge">
+    <div class="card">
+        <h2>@T["edge.title"]</h2>
+        <label class="checkbox-row">
+            <input type="checkbox" name="enabled" value="true" data-reveal="edge-fields" checked="@(Model.EdgeEnabled ? "checked" : null)" />
+            @T["edge.enable"]
+        </label>
+        <div class="help">@T["edge.enableHint"]</div>
+        <div data-reveal-target="edge-fields" hidden="@(Model.EdgeEnabled ? null : "hidden")">
+            <label class="checkbox-row">
+                <input type="checkbox" name="useHostProxy" value="true" data-reveal="edge-own" data-reveal-invert checked="@(Model.EdgeUsesHostProxy ? "checked" : null)" />
+                @T["edge.useHostProxy"]
+            </label>
+            <div data-reveal-target="edge-own" hidden="@(Model.EdgeUsesHostProxy ? "hidden" : null)">
+                <div class="form-field">
+                    <label for="edgeMode">@T["settings.hostingProxy"]</label>
+                    <select id="edgeMode" name="provider" data-edge-mode>
+                        <option value="caddy" selected="@(Model.EdgeFields.Kind == "caddy" ? "selected" : null)">@T["settings.hostingProxyCaddy"]</option>
+                        <option value="matcad" selected="@(Model.EdgeFields.Kind == "matcad" ? "selected" : null)">@T["settings.hostingProxyMatcad"]</option>
+                    </select>
+                </div>
+                <div data-edge-only="caddy">
+                    <div class="form-field">
+                        <label for="edgeCaddyAdminUrl">@T["settings.hostingCaddyAdminUrl"]</label>
+                        <input id="edgeCaddyAdminUrl" name="caddyAdminUrl" value="@Model.EdgeFields.CaddyAdminUrl" placeholder="http://caddy:2019" spellcheck="false" />
+                    </div>
+                    <div class="form-field">
+                        <label for="edgeCaddyServer">@T["settings.hostingCaddyServer"]</label>
+                        <input id="edgeCaddyServer" name="caddyServer" value="@Model.EdgeFields.CaddyServer" placeholder="srv0" spellcheck="false" />
+                    </div>
+                </div>
+                <div data-edge-only="matcad">
+                    <div class="form-field">
+                        <label for="edgeMatcadUrl">@T["settings.hostingMatcadUrl"]</label>
+                        <input id="edgeMatcadUrl" name="matcadUrl" value="@Model.EdgeFields.MatcadUrl" placeholder="http://matcad:4433" spellcheck="false" />
+                    </div>
+                    <div class="form-field">
+                        <label for="edgeMatcadToken">@T["settings.hostingMatcadToken"]</label>
+                        <input id="edgeMatcadToken" name="matcadToken" type="password" autocomplete="new-password" placeholder="@T["settings.smtpPasswordKeep"]" />
+                        @if (Model.EdgeFields.MatcadTokenSet)
+                        {
+                            <label class="checkbox-row"><input type="checkbox" name="clearMatcadToken" value="true" /> @T["settings.smtpPasswordClear"]</label>
+                        }
+                    </div>
+                </div>
+            </div>
+            @if (Model.EdgeKind == "matcad")
+            {
+                <div class="help">@T["edge.matcadNote"]</div>
+            }
+        </div>
+        <div class="list-actions">
+            <button type="submit" class="btn">@T["settings.save"]</button>
+            @if (Model.EdgeEnabled)
+            {
+                <button type="submit" class="btn btn-ghost" formaction="@Url.Page("Settings", "EdgeTest")">@T["settings.hostingProxyTest"]</button>
+            }
+            @if (Model.DomainsOnOtherWay > 0)
+            {
+                <button type="submit" class="btn btn-ghost" formaction="@Url.Page("Settings", "EdgeMove")"
+                        onclick="return confirm('@T["edge.moveConfirm"]');">@T[Model.EdgeEnabled ? "edge.moveToEdge" : "edge.moveToHost", Model.DomainsOnOtherWay]</button>
+            }
+        </div>
     </div>
 </form>
 }
 
 @section Scripts {
+    <script>
+        // A switch reveals its fields ([data-reveal] → [data-reveal-target]); data-reveal-invert = shown while OFF.
+        (function () {
+            document.querySelectorAll('[data-reveal]').forEach(function (box) {
+                var target = document.querySelector('[data-reveal-target="' + box.getAttribute('data-reveal') + '"]');
+                if (!target) return;
+                var inv = box.hasAttribute('data-reveal-invert');
+                function sync() { target.hidden = inv ? box.checked : !box.checked; }
+                box.addEventListener('change', sync);
+                sync();
+            });
+            var mode = document.querySelector('[data-edge-mode]');
+            if (mode) {
+                var sync = function () { document.querySelectorAll('[data-edge-only]').forEach(function (el) { el.hidden = el.getAttribute('data-edge-only') !== mode.value; }); };
+                mode.addEventListener('change', sync);
+                sync();
+            }
+        })();
+    </script>
     <script>
         // Spiegelt HostingService.Normalise: klein, alles Nicht-Alphanumerische zu Bindestrichen. Zwei Umsetzungen
         // derselben Regel — die hier zeigt nur an, entschieden wird im Dienst.

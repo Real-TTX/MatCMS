@@ -767,6 +767,26 @@ Design and increments: `docs/hosting-platform.md`. Increments 1–4 are built:
   adopts it on the first beat. `pushCanonical` sends `site.canonicalUrl` + `site.behindHttpsProxy` as
   `setting.set` content ops (Approved instances only). The cloud-wide settings are "Dieser Host"'s; every
   node carries its own copy (`Node.ProxyKind…`), edited through the SAME partial `_ProxyFields.cshtml`.
+- **Two optional address layers (both off by default, `ProxyService`):**
+  - **Automatische Adressen, per host** (`hosting.autoDomain.*` for "Dieser Host", `Node.AutoDomainEnabled/AutoDomainBase`
+    per node): every instance gets `name.<base>` at THAT host's proxy (`Instance.HostDomain/HostRouteId/HostProvider`,
+    route key `host-<publicId>`). The name comes from the CONTAINER (`HostingService.SlugFromStack`), not the site
+    name the instance reports (often just "MatCMS"). Created at provisioning (`ProvisionRoutesAsync` → PendingRoute,
+    adopted on the first beat) or later (instance card, "Adressen für N bestehende Instanzen anlegen", API/MCP).
+    Needs a wildcard DNS record `*.<base>` to the host.
+  - **Edge-Proxy for customer domains, cloud-wide** (`hosting.edge.*`; default: the SAME proxy "Dieser Host" uses):
+    `PublishAsync` routes the customer domain at the edge (`Instance.ProxyVia = "edge"`, key `edge-<publicId>`,
+    in-process — the edge sits on the cloud's host) instead of the site's host. Target, in order: the host address
+    over https with the Host header rewritten (Caddy only — Matcad forwards the visitor's Host unchanged and REFUSES
+    `rewriteHost`), a site on this host derived from its container, a node site at `Node.Address:port`. A move
+    re-points the edge route (no DNS change); the host address is deleted on the old host and recreated under the new
+    host's base. Switching the edge never moves existing domains silently: `MoveCustomerDomainsToCurrentWayAsync`
+    ("N Kundendomains umstellen", confirm) removes each old route first. Removing or recreating a host address
+    re-points an edge route that depends on it. Teardown (`InstanceRemovalService`) now deletes all routes after
+    the container (best effort, failures reported) — before, routes outlived their site.
+  - Hosting → Domains lists EVERY address (host addresses + customer domains with their way and target + pending).
+  - Known gap: through two proxies the node Caddy sees the EDGE as client unless its `trusted_proxies` names the
+    edge — the instance's login rate limit then counts all edge visitors as one. Not configured automatically.
 - **Nodes (increment 4, `Services/Nodes/`)** — further Docker hosts. The node-agent is **this image** in
   `--node-agent` mode (`Program.cs` leaves before the web app is built, like `--self-update`): no DB, only
   the engine, its daemon and an OUTBOUND long poll to `POST /api/nodes/{id}/heartbeat` (`X-MatCMS-Node-Token`,

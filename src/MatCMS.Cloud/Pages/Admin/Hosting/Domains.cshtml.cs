@@ -10,10 +10,10 @@ using Microsoft.EntityFrameworkCore;
 namespace MatCMS.Cloud.Pages.Admin.Hosting;
 
 /// <summary>
-/// Every domain the cloud has published — per instance, with the host it runs on, the provider and the route —
-/// plus the routes created at provisioning that still wait for their site to enroll. The one place to answer
-/// "what is routed where?" without opening each instance. Publishing and removing stay on the instance's own
-/// Hosting tab (and /api/v1/instances/{id}/domain); here routes can be CHECKED against the proxy.
+/// EVERY address the cloud routes — the automatic host addresses (name.server1…, at a host's proxy) and the
+/// customer domains (at the edge or at the host's proxy), plus the routes created at provisioning that still wait
+/// for their site to enroll. The one place to answer "what is routed where?" without opening each instance.
+/// Publishing and removing stay on the instance's own Hosting tab (and the API); here routes can be CHECKED.
 /// </summary>
 public class DomainsModel : PageModel
 {
@@ -22,18 +22,39 @@ public class DomainsModel : PageModel
 
     public DomainsModel(AppDbContext db, ProxyService proxy) { _db = db; _proxy = proxy; }
 
-    public List<Instance> Items { get; private set; } = new();
+    /// <param name="Kind">"host" = automatic host address, "custom" = customer domain.</param>
+    /// <param name="Way">"edge" | "host" | "record" (customer domain only recorded, no proxy).</param>
+    public sealed record Row(string Domain, string Kind, Instance Instance, string Way, string? Provider, string? RouteId,
+        string? Error, DateTime? PublishedAt, string? Target);
+
+    public List<Row> Rows { get; private set; } = new();
     public List<(string Key, PendingRoute Route)> Pending { get; private set; } = new();
 
-    /// <summary>After "Alle prüfen": instance id → does the route still exist at the proxy (null = not asked / unknown).</summary>
-    public Dictionary<int, bool?> Checked { get; private set; } = new();
+    /// <summary>After "Alle prüfen": "kind:instanceId" → does the route still exist at the proxy (null = unknown).</summary>
+    public Dictionary<string, bool?> Checked { get; private set; } = new();
 
     public async Task OnGetAsync() => await LoadAsync();
 
     private async Task LoadAsync()
     {
-        Items = await _db.Instances.Include(i => i.Node).Where(i => i.ProxyDomain != null)
-            .OrderBy(i => i.ProxyDomain).ToListAsync();
+        var items = await _db.Instances.Include(i => i.Node)
+            .Where(i => i.ProxyDomain != null || i.HostDomain != null).ToListAsync();
+        foreach (var i in items)
+        {
+            if (i.HostDomain is { } hd)
+                Rows.Add(new(hd, "host", i, "host", i.HostProvider, i.HostRouteId, i.HostRouteError, i.HostPublishedAt, null));
+            if (i.ProxyDomain is { } d)
+            {
+                var way = i.ProxyVia == ProxyVia.Edge ? "edge" : i.ProxyRouteId is null ? "record" : "host";
+                // Where the edge forwards to — the host address when there is one (Caddy), else host:port.
+                var target = way != "edge" ? null
+                    : i.HostDomain is not null && i.ProxyProvider == ProxyKinds.Caddy ? i.HostDomain
+                    : i.Node?.Address is { Length: > 0 } a ? $"{a}:{i.LocalPort}" : i.LocalContainerName;
+                Rows.Add(new(d, "custom", i, way, i.ProxyProvider, i.ProxyRouteId, i.ProxyError, i.ProxyPublishedAt, target));
+            }
+        }
+        Rows = Rows.OrderBy(r => r.Domain, StringComparer.OrdinalIgnoreCase).ToList();
+
         var rows = await _db.CloudSettings.AsNoTracking()
             .Where(s => s.Key.StartsWith(SettingKeys.HostingPendingRoutePrefix)).ToListAsync();
         foreach (var r in rows)
@@ -45,11 +66,15 @@ public class DomainsModel : PageModel
     }
 
     /// <summary>Asks each proxy whether the routes are still there (they can be removed by hand at the proxy).
-    /// One call per routed domain, on the host it lives on.</summary>
+    /// One status call per instance covers both of its routes.</summary>
     public async Task OnPostCheckAsync()
     {
         await LoadAsync();
-        foreach (var i in Items.Where(i => i.ProxyRouteId is not null))
-            Checked[i.Id] = (await _proxy.StatusAsync(i, checkProvider: true, HttpContext.RequestAborted)).RouteExists;
+        foreach (var inst in Rows.Where(r => r.RouteId is not null).Select(r => r.Instance).Distinct())
+        {
+            var s = await _proxy.StatusAsync(inst, checkProvider: true, HttpContext.RequestAborted);
+            if (inst.ProxyRouteId is not null) Checked["custom:" + inst.Id] = s.RouteExists;
+            if (inst.HostRouteId is not null) Checked["host:" + inst.Id] = s.HostRouteExists;
+        }
     }
 }

@@ -282,7 +282,7 @@ public static class HostingApi
             var inst = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == publicId);
             if (inst is null || !ApiKeyService.CanAccess(key!, inst)) return NotFoundInstance();
             var s = await proxy.StatusAsync(inst, check ?? true, ctx.RequestAborted);
-            return Results.Ok(new { domain = s.Domain, provider = s.Provider, routeId = s.RouteId, error = s.Error, publishedAt = s.PublishedAt, routeExists = s.RouteExists });
+            return Results.Ok(Services.Proxy.ProxyService.StatusJson(s));
         }).RequireRateLimiting("operatorApi");
 
         app.MapPut("/api/v1/instances/{publicId}/domain", async (HttpContext ctx, string publicId, DomainDto b,
@@ -312,6 +312,108 @@ public static class HostingApi
             var r = await proxy.UnpublishAsync(inst, pushCanonical ?? true, ctx.RequestAborted);
             return r.Ok ? Results.Ok(new { ok = true, message = r.Message })
                         : Results.Json(new { ok = false, error = r.Message }, statusCode: StatusCodes.Status409Conflict);
+        }).RequireRateLimiting("operatorApi");
+
+        // ---- Automatic host address of one instance ----------------------------------------------------
+        app.MapPost("/api/v1/instances/{publicId}/host-address", async (HttpContext ctx, string publicId, bool? pushCanonical,
+            ApiKeyService keys, AppDbContext db, Services.Proxy.ProxyService proxy) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireHosting(key!) is { } g) return g;
+            var inst = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == publicId);
+            if (inst is null || !ApiKeyService.CanAccess(key!, inst)) return NotFoundInstance();
+            var r = await proxy.PublishHostAddressAsync(inst, pushCanonical ?? true, ct: ctx.RequestAborted);
+            return r.Ok ? Results.Ok(new { ok = true, hostAddress = r.Domain, message = r.Message })
+                        : Results.Json(new { ok = false, error = r.Message }, statusCode: StatusCodes.Status409Conflict);
+        }).RequireRateLimiting("operatorApi");
+
+        app.MapDelete("/api/v1/instances/{publicId}/host-address", async (HttpContext ctx, string publicId, bool? pushCanonical,
+            ApiKeyService keys, AppDbContext db, Services.Proxy.ProxyService proxy) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireHosting(key!) is { } g) return g;
+            var inst = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == publicId);
+            if (inst is null || !ApiKeyService.CanAccess(key!, inst)) return NotFoundInstance();
+            var r = await proxy.RemoveHostAddressAsync(inst, pushCanonical ?? true, ctx.RequestAborted);
+            return r.Ok ? Results.Ok(new { ok = true, message = r.Message })
+                        : Results.Json(new { ok = false, error = r.Message }, statusCode: StatusCodes.Status409Conflict);
+        }).RequireRateLimiting("operatorApi");
+
+        // ---- Automatic addresses of "Dieser Host" + backfill (nodes: PUT /api/v1/nodes/{id} autoDomainEnabled/-Base) ----
+        app.MapGet("/api/v1/hosting/auto-domain", async (HttpContext ctx, ApiKeyService keys, CloudContext cloud, Services.Proxy.ProxyService proxy) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            return Results.Ok(new
+            {
+                enabled = cloud.Flag(SettingKeys.HostingAutoDomainEnabled), baseDomain = cloud.Get(SettingKeys.HostingAutoDomainBase),
+                missing = await proxy.MissingHostAddressCountAsync(null, ctx.RequestAborted)
+            });
+        }).RequireRateLimiting("operatorApi");
+
+        app.MapPut("/api/v1/hosting/auto-domain", async (HttpContext ctx, AutoDomainDto b, ApiKeyService keys, Services.Proxy.ProxyService proxy) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireCloudWide(key!) is { } g) return g;
+            if (b.Enabled && Services.Proxy.ProxyService.NormaliseDomain(b.BaseDomain) is null)
+                return Results.Json(new { ok = false, error = "Keine gültige Basis-Domain (z. B. cloud.example.de)." }, statusCode: StatusCodes.Status400BadRequest);
+            await proxy.SetAutoDomainAsync(b.Enabled, b.BaseDomain);
+            return Results.Ok(new { ok = true });
+        }).RequireRateLimiting("operatorApi");
+
+        app.MapPost("/api/v1/hosting/host-addresses", async (HttpContext ctx, string? nodeId, ApiKeyService keys, AppDbContext db, Services.Proxy.ProxyService proxy) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireCloudWide(key!) is { } g) return g;
+            Node? node = null;
+            if (!string.IsNullOrEmpty(nodeId))
+            {
+                node = await db.Nodes.FirstOrDefaultAsync(n => n.PublicId == nodeId);
+                if (node is null) return Results.Json(new { error = "Node nicht gefunden." }, statusCode: StatusCodes.Status404NotFound);
+            }
+            var r = await proxy.PublishMissingHostAddressesAsync(node, ctx.RequestAborted);
+            return Results.Ok(new { created = r.Created, failed = r.Failed, errors = r.Errors });
+        }).RequireRateLimiting("operatorApi");
+
+        // ---- Edge proxy for customer domains ------------------------------------------------------------
+        app.MapGet("/api/v1/hosting/edge", async (HttpContext ctx, ApiKeyService keys, Services.Proxy.ProxyService proxy) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            return Results.Ok(proxy.PublicEdgeConfig());
+        }).RequireRateLimiting("operatorApi");
+
+        app.MapPut("/api/v1/hosting/edge", async (HttpContext ctx, ApiKeyService keys, Services.Proxy.ProxyService proxy,
+            Services.Proxy.ProxyService.EdgeConfigInput b) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireCloudWide(key!) is { } g) return g;
+            await proxy.UpdateEdgeAsync(b);
+            return Results.Ok(new { ok = true, edge = proxy.PublicEdgeConfig(), domainsOnOtherWay = await proxy.CustomerDomainsOnOtherWayCountAsync(ctx.RequestAborted) });
+        }).RequireRateLimiting("operatorApi");
+
+        app.MapPost("/api/v1/hosting/edge/test", async (HttpContext ctx, ApiKeyService keys, Services.Proxy.ProxyService proxy) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireHosting(key!) is { } g) return g;
+            var r = await proxy.TestEdgeAsync(ctx.RequestAborted);
+            return Results.Ok(new { ok = r.Ok, provider = r.Kind, message = r.Message });
+        }).RequireRateLimiting("operatorApi");
+
+        // Moves customer domains published before the switch onto the way it now says (edge on → edge, off → host).
+        app.MapPost("/api/v1/hosting/edge/move", async (HttpContext ctx, ApiKeyService keys, Services.Proxy.ProxyService proxy) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireCloudWide(key!) is { } g) return g;
+            var r = await proxy.MoveCustomerDomainsToCurrentWayAsync(ctx.RequestAborted);
+            return Results.Ok(new { moved = r.Created, failed = r.Failed, errors = r.Errors });
         }).RequireRateLimiting("operatorApi");
 
         // ---- Cloud self-update -----------------------------------------------------------------------
@@ -356,3 +458,6 @@ public static class HostingApi
 
 /// <summary>Body of <c>POST /api/v1/hosting/updates</c>. <c>InstanceIds</c> null or missing = every candidate.</summary>
 public sealed record StartUpdatesDto(List<string>? InstanceIds);
+
+/// <summary>Body of <c>PUT /api/v1/hosting/auto-domain</c>.</summary>
+public sealed record AutoDomainDto(bool Enabled, string? BaseDomain);

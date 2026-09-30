@@ -149,11 +149,12 @@ public class MigrationService
             m.Log += Line($"Website meldet sich von „{m.ToName}“ (Port {inst.LocalPort}).");
 
             // 5) Proxy: the route leaves with the site. A failure here does not undo the move — the site runs.
-            if (inst.ProxyDomain is { } domain)
+            // A customer domain at the EDGE is only re-pointed (no DNS change); the host address follows the host.
+            if (inst.ProxyDomain is not null || inst.HostDomain is not null || _proxy.AutoBase(await _db.Nodes.FindAsync(new object[] { inst.NodeId ?? 0 }, ct)) is not null)
             {
-                await StepAsync(m, "proxy", $"Domain „{domain}“ umziehen …", ct);
+                await StepAsync(m, "proxy", "Adressen umziehen …", ct);
                 var pr = await _proxy.MoveRouteAsync(inst, from, ct);
-                m.Log += Line(pr.Ok ? pr.Message + " DNS muss auf den neuen Host zeigen." : "WARNUNG: Domain nicht umgezogen: " + pr.Message + " — im Hosting-Tab erneut veröffentlichen.");
+                m.Log += Line(pr.Ok ? pr.Message : "WARNUNG: Adressen nicht vollständig umgezogen: " + pr.Message + " — im Hosting-Tab erneut veröffentlichen.");
             }
 
             // 6) The old copy: retired by default (a way back), removed only when asked for.

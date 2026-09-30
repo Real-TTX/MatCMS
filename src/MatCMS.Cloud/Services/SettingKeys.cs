@@ -77,6 +77,21 @@ public static class SettingKeys
     /// entsteht erst beim Join; die Route braucht sie nicht und wird sofort angelegt, danach übernommen.</summary>
     public const string HostingPendingRoutePrefix = "hosting.pendingRoute:";
 
+    /// <summary>"Automatische Adressen" for "Dieser Host": flag + base domain (e.g. cloud.example.de).</summary>
+    public const string HostingAutoDomainEnabled = "hosting.autoDomain.enabled";
+    public const string HostingAutoDomainBase = "hosting.autoDomain.base";
+
+    /// <summary>The central edge proxy for customer domains (runs on the cloud's host). useHostProxy = the edge is
+    /// the very proxy "Dieser Host" already uses (the common case: one Caddy on the cloud server); otherwise it
+    /// has its own provider fields below.</summary>
+    public const string HostingEdgeEnabled = "hosting.edge.enabled";
+    public const string HostingEdgeUseHostProxy = "hosting.edge.useHostProxy";
+    public const string HostingEdgeMode = "hosting.edge.mode";
+    public const string HostingEdgeCaddyAdminUrl = "hosting.edge.caddyAdminUrl";
+    public const string HostingEdgeCaddyServer = "hosting.edge.caddyServer";
+    public const string HostingEdgeMatcadUrl = "hosting.edge.matcadUrl";
+    public const string HostingEdgeMatcadToken = "hosting.edge.matcadToken";
+
     /// <summary>Adresse des Matcad-API, das die Route einrichtet.</summary>
     public const string HostingMatcadUrl = "hosting.matcadUrl";
 

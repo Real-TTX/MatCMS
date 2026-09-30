@@ -70,8 +70,11 @@ public sealed class MatcadProvider : IProxyProvider
         catch (Exception ex) { return new(false, $"Matcad nicht erreichbar: {ex.Message}"); }
     }
 
-    public async Task<ProxyResult> UpsertAsync(string? existingId, string routeKey, string name, string host, string upstream, CancellationToken ct = default)
+    public async Task<ProxyResult> UpsertAsync(string? existingId, string routeKey, string name, string host, string upstream, bool rewriteHost = false, CancellationToken ct = default)
     {
+        // Matcad forwards the visitor's Host header unchanged and has no setting to replace it — a route to another
+        // proxy's host-matched route would land on the wrong (or no) site. The cloud then forwards to address:port.
+        if (rewriteHost) return new(false, "Matcad kann den Host-Header nicht umschreiben — als Edge leitet Matcad nur auf Node-Adresse:Port weiter.");
         long? id = long.TryParse(existingId, out var n) ? n : null;
         var r = await PostRouteAsync(id, name, host, upstream, ct);
         // The route may have been deleted in Matcad in the meantime — then create it anew instead of failing.

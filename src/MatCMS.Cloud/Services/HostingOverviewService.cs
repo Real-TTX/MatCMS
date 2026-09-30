@@ -137,7 +137,7 @@ public static class HostingOverviewJson
         {
             instanceId = s.Instance?.PublicId, name = s.Instance?.Name, container = s.ContainerName,
             node = s.Host.NodeId is null ? null : s.Host.Name, state = s.State, status = s.Status,
-            cpuPercent = s.Cpu, memBytes = s.Mem, memLimit = s.MemLimit, port = s.Port, domain = s.Instance?.ProxyDomain,
+            cpuPercent = s.Cpu, memBytes = s.Mem, memLimit = s.MemLimit, port = s.Port, domain = s.Instance?.ProxyDomain, hostAddress = s.Instance?.HostDomain,
             version = s.Instance?.Version, updateAvailable = s.UpdateAvailable,
         }),
     };

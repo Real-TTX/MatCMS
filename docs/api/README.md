@@ -185,7 +185,10 @@ oder `hostport` (Ziel `http://<upstreamHost>:<Host-Port>`).
 - `GET /api/v1/hosting/proxy` → `{ provider, managesRoutes, matcadUrl, matcadTokenSet, caddyAdminUrl, caddyServer, upstream, network, upstreamHost }` – der Matcad-Schlüssel wird **nie** zurückgegeben.
 - `PUT /api/v1/hosting/proxy` `{ provider?, matcadUrl?, matcadToken?, clearMatcadToken?, caddyAdminUrl?, caddyServer?, upstream?, network?, upstreamHost? }` – Teil-Update, weggelassen = unverändert (**CanManageHosting + alle Instanzen**). Schon veröffentlichte Domains wandern **nicht** mit – nach einem Provider-Wechsel neu veröffentlichen.
 - `POST /api/v1/hosting/proxy/test` → `{ ok, provider, message }` – Proxy erreichbar? Netz vorhanden? (**CanManageHosting**)
-- `GET /api/v1/instances/{publicId}/domain?check=true` → `{ domain, provider, routeId, error, publishedAt, routeExists }` – `check` fragt den Proxy, ob die Route noch existiert.
+- `GET /api/v1/instances/{publicId}/domain?check=true` → `{ domain, via, provider, routeId, error, publishedAt, routeExists, hostAddress, hostRouteId, hostError, hostRouteExists }` – Kundendomain (`via` = `edge` | `host`) und automatische Host-Adresse; `check` fragt die Proxys, ob die Routen noch existieren.
+- `POST /api/v1/instances/{publicId}/host-address` `?pushCanonical=true` / `DELETE …` – automatische Host-Adresse (`name.<Basis-Domain>` am Proxy des Hosts) anlegen/erneuern bzw. entfernen; eine Kundendomain am Edge wird mit umgestellt (**CanManageHosting**).
+- `GET|PUT /api/v1/hosting/auto-domain` `{ enabled, baseDomain }` – automatische Adressen für „Dieser Host“ (Nodes: `PUT /api/v1/nodes/{id}` mit `autoDomainEnabled`, `autoDomainBase`, `address`). `POST /api/v1/hosting/host-addresses?nodeId=` legt fehlende Adressen für bestehende Instanzen an (**CanManageHosting + alle Instanzen**).
+- `GET|PUT /api/v1/hosting/edge` `{ enabled?, useHostProxy?, provider?, caddyAdminUrl?, caddyServer?, matcadUrl?, matcadToken?, clearMatcadToken? }` – zentraler Edge-Proxy für Kundendomains; `POST …/edge/test`; `POST …/edge/move` stellt vor dem Umschalten veröffentlichte Kundendomains auf den aktuellen Weg um (**CanManageHosting + alle Instanzen**). Mit Caddy leitet der Edge auf die Host-Adresse (HTTPS, Host-Header umgeschrieben), mit Matcad auf Node-Adresse:Port.
 - `PUT /api/v1/instances/{publicId}/domain` `{ domain, pushCanonical? = true }` – veröffentlichen bzw. umziehen (Route + TLS; ohne Proxy nur vermerkt). Der DNS-Eintrag muss schon auf den Proxy zeigen. `pushCanonical` setzt auf der Site `site.canonicalUrl = https://<domain>` + „hinter HTTPS-Proxy“ (beim nächsten Heartbeat). `400` = keine gültige Domain, `409` = Domain vergeben / Instanz nicht auf diesem Docker-Host / Proxy-Fehler (**CanManageHosting**, Schlüssel-Umfang).
 - `DELETE /api/v1/instances/{publicId}/domain?pushCanonical=true` – Route entfernen (erst die Route, dann der Eintrag; idempotent) (**CanManageHosting**, Schlüssel-Umfang).
 
@@ -278,6 +281,9 @@ Instanz beim nächsten Heartbeat über ihre **eigenen** Validierer anwendet (add
 | `set_hosting_enabled` | Hosting-Modul schalten (Hosting-Recht + alle Instanzen) |
 | `get_hosting_overview` | Hosts mit Größe/Last + alle Container mit CPU/RAM/Host/Update (Hosting-Recht + alle Instanzen) |
 | `list_update_candidates` / `start_instance_updates` / `get_update_run` | Instanzen mit Update / (Teil-)Update starten (Hosting-Recht) / Fortschritt |
+| `publish_host_address` / `remove_host_address` | automatische Host-Adresse einer Instanz (Hosting-Recht) |
+| `set_auto_domain` / `create_missing_host_addresses` | automatische Adressen für „Dieser Host“ / fehlende nachziehen (Hosting-Recht + alle Instanzen) |
+| `get_edge_config` / `configure_edge` / `test_edge` / `move_domains_to_edge_setting` | Edge-Proxy für Kundendomains (Hosting-Recht + alle Instanzen) |
 | `list_images` / `prune_images` | MatCMS-Images auf dem Cloud-Host / alte unbenutzte entfernen (Hosting-Recht + alle Instanzen) |
 | `get_container_status` | Container-Zustand einer Instanz (lokal?, Image, Start, Neustarts, Health) |
 | `container_action` | `start` / `stop` / `restart` / `update` des Instanz-Containers — vorher mit dem Nutzer bestätigen |

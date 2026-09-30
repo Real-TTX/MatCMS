@@ -84,6 +84,9 @@ public class DetailsModel : PageModel, IAsyncPageFilter
     /// <summary>The configured proxy provider ("none" | "matcad" | "caddy") and whether it routes at all.</summary>
     public string ProxyKind => Item.Node is { } pn ? MatCMS.Cloud.Services.Proxy.ProxyKinds.Normalise(pn.ProxyKind) : _proxy.Settings.Kind;
     public bool ProxyRoutes => _proxy.ManagesRoutes(Item.Node);
+    public bool EdgeEnabled => _proxy.EdgeEnabled;
+    /// <summary>The base domain of the host's automatic addresses, or null when switched off there.</summary>
+    public string? HostAutoBase => HostingActionsService.CanAct(Item) ? _proxy.AutoBase(Item.Node) : null;
 
     /// <summary>The Hosting tab exists for an instance whose container this cloud can reach — independent of
     /// the Hosting module switch, because these actions predate it and must not vanish when it is off.</summary>
@@ -497,6 +500,22 @@ public class DetailsModel : PageModel, IAsyncPageFilter
         var item = await _db.Instances.FindAsync(id);
         if (item is null) return RedirectToPage("Index");
         var r = await _proxy.PublishAsync(item, domain, pushCanonical, HttpContext.RequestAborted);
+        return Flash(new HostingActionsService.ActionResult(r.Ok, r.Message), id);
+    }
+
+    public async Task<IActionResult> OnPostPublishHostAddressAsync(int id)
+    {
+        var item = await _db.Instances.FindAsync(id);
+        if (item is null) return RedirectToPage("Index");
+        var r = await _proxy.PublishHostAddressAsync(item, pushCanonical: true, ct: HttpContext.RequestAborted);
+        return Flash(new HostingActionsService.ActionResult(r.Ok, r.Message), id);
+    }
+
+    public async Task<IActionResult> OnPostRemoveHostAddressAsync(int id)
+    {
+        var item = await _db.Instances.FindAsync(id);
+        if (item is null) return RedirectToPage("Index");
+        var r = await _proxy.RemoveHostAddressAsync(item, pushCanonical: true, HttpContext.RequestAborted);
         return Flash(new HostingActionsService.ActionResult(r.Ok, r.Message), id);
     }
 

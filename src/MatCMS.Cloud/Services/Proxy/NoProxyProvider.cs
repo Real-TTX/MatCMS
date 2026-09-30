@@ -13,7 +13,7 @@ public sealed class NoProxyProvider : IProxyProvider
 
     public Task<ProxyResult> TestAsync(CancellationToken ct = default) => Task.FromResult(new ProxyResult(true));
 
-    public Task<ProxyResult> UpsertAsync(string? existingId, string routeKey, string name, string host, string upstream, CancellationToken ct = default)
+    public Task<ProxyResult> UpsertAsync(string? existingId, string routeKey, string name, string host, string upstream, bool rewriteHost = false, CancellationToken ct = default)
         => Task.FromResult(new ProxyResult(true));
 
     public Task<ProxyResult> DeleteAsync(string routeId, CancellationToken ct = default) => Task.FromResult(new ProxyResult(true));

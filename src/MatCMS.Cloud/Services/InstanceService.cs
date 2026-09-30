@@ -658,18 +658,35 @@ public class InstanceService
         _db.CloudSettings.Remove(row);
         if (p is null) return;
 
-        instance.ProxyDomain = p.Domain;
-        instance.ProxyProvider = p.Provider;
-        instance.ProxyRouteId = p.RouteId;
-        instance.ProxyError = null;
-        instance.ProxyPublishedAt = DateTime.UtcNow;
-        instance.Url = "https://" + p.Domain;
+        // The host address (automatic, per host) and the customer domain (at the host or the edge) — either may
+        // be missing. The customer domain wins as the site's address.
+        if (p.HostDomain is not null)
+        {
+            instance.HostDomain = p.HostDomain;
+            instance.HostProvider = p.HostProvider;
+            instance.HostRouteId = p.HostRouteId;
+            instance.HostRouteError = null;
+            instance.HostPublishedAt = DateTime.UtcNow;
+            Log(instance, InstanceEventKind.DomainPublished, $"Bei der Provisionierung angelegte Host-Adresse übernommen: {p.HostDomain}.");
+        }
+        if (p.Domain is not null)
+        {
+            instance.ProxyDomain = p.Domain;
+            instance.ProxyProvider = p.Provider;
+            instance.ProxyRouteId = p.RouteId;
+            instance.ProxyVia = p.Via ?? Proxy.ProxyVia.Host;
+            instance.ProxyError = null;
+            instance.ProxyPublishedAt = DateTime.UtcNow;
+            Log(instance, InstanceEventKind.DomainPublished, $"Bei der Provisionierung angelegte Domain übernommen: {p.Domain}.");
+        }
+        var address = p.Domain ?? p.HostDomain;
+        if (address is null) return;
+        instance.Url = "https://" + address;
         instance.UrlPinned = true;
-        Log(instance, InstanceEventKind.DomainPublished, $"Bei der Provisionierung angelegte Domain übernommen: {p.Domain}.");
 
         if (p.PushCanonical && instance.Status == InstanceStatus.Approved)
         {
-            var url = "https://" + p.Domain;
+            var url = "https://" + address;
             await EnqueueContentOpAsync(instance, "setting.set",
                 System.Text.Json.JsonSerializer.Serialize(new { key = "site.canonicalUrl", value = url }), overwrite: true, reason: "Hosting: öffentliche Adresse", ct);
             await EnqueueContentOpAsync(instance, "setting.set",

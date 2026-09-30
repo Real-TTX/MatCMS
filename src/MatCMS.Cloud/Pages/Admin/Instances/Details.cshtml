@@ -298,15 +298,46 @@
             </div>
         </div>
 
-        @* Domain on the reverse proxy. With "kein Proxy" the domain is only recorded (routing is somebody
-           else's), with Matcad/Caddy the route + certificate are created. *@
+        @* Addresses: the automatic host address (per host, name.<base> at the host's proxy) and the customer domain
+           (at the edge or the host's proxy). With "kein Proxy" a customer domain is only recorded. *@
         <div class="card">
-            <h2>@T["hosting.domain"]</h2>
+            <h2>@T["hosting.addresses"]</h2>
+            @if (Model.Item.HostDomain is { } hd)
+            {
+                <div class="kv"><div class="kv-label">@T["hosting.hostAddress"]</div><div class="kv-value">
+                    <a href="https://@hd" target="_blank" rel="noopener" class="mono">@hd</a>
+                    <span class="badge badge-off">@Model.Item.HostProvider</span>
+                </div></div>
+            }
+            @if (!string.IsNullOrEmpty(Model.Item.HostRouteError))
+            {
+                <div class="alert alert-error">@T["hosting.proxyError"] @Model.Item.HostRouteError</div>
+            }
+            @if (Model.HostAutoBase is not null || Model.Item.HostDomain is not null)
+            {
+                <div class="list-actions">
+                    @if (Model.HostAutoBase is not null)
+                    {
+                        <form class="inline-form" method="post" asp-page-handler="PublishHostAddress" asp-route-id="@Model.Item.Id">
+                            <button type="submit" class="btn btn-ghost">@(Model.Item.HostDomain is null ? T["hosting.hostAddressCreate"] : T["hosting.hostAddressRenew"])</button>
+                        </form>
+                    }
+                    @if (Model.Item.HostDomain is not null)
+                    {
+                        <form class="inline-form" method="post" asp-page-handler="RemoveHostAddress" asp-route-id="@Model.Item.Id"
+                              onsubmit="return confirm('@T["hosting.hostAddressRemoveConfirm"]');">
+                            <button type="submit" class="btn btn-ghost">@T["hosting.hostAddressRemove"]</button>
+                        </form>
+                    }
+                </div>
+            }
+
             @if (Model.Item.ProxyDomain is not null)
             {
                 <div class="kv"><div class="kv-label">@T["hosting.domain"]</div><div class="kv-value">
                     <a href="https://@Model.Item.ProxyDomain" target="_blank" rel="noopener" class="mono">@Model.Item.ProxyDomain</a>
-                    <span class="badge badge-off">@T["hosting.via"] @Model.Item.ProxyProvider</span>
+                    <span class="badge @(Model.Item.ProxyVia == "edge" ? "badge-on" : "badge-off")">@(Model.Item.ProxyVia == "edge" ? T["domains.viaEdge"] : T["domains.viaHost"])</span>
+                    <span class="badge badge-off">@Model.Item.ProxyProvider</span>
                 </div></div>
                 <div class="kv"><div class="kv-label">@T["hosting.publishedAt"]</div><div class="kv-value muted">@(Model.Item.ProxyPublishedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—")</div></div>
             }
@@ -323,11 +354,11 @@
                 <div class="form-field">
                     <label for="proxy-domain">@(Model.Item.ProxyDomain is null ? T["hosting.publish"] : T["hosting.changeDomain"])</label>
                     <input id="proxy-domain" name="domain" value="@Model.Item.ProxyDomain" placeholder="kunde.beispiel.de" spellcheck="false" required />
-                    <div class="help">@(Model.ProxyRoutes ? T["hosting.publishHintRoute", Model.ProxyKind] : T["hosting.publishHintNone"])</div>
+                    <div class="help">@(Model.EdgeEnabled ? T["hosting.publishHintEdge"] : Model.ProxyRoutes ? T["hosting.publishHintRoute", Model.ProxyKind] : T["hosting.publishHintNone"])</div>
                 </div>
                 <label class="checkbox-row"><input type="checkbox" name="pushCanonical" value="true" checked /> @T["hosting.pushCanonical"]</label>
                 <div class="list-actions">
-                    <button type="submit" class="btn"><i class="ti ti-world-upload" aria-hidden="true"></i> @(Model.Item.ProxyDomain is null ? T["hosting.publishBtn"] : T["hosting.changeBtn"])</button>
+                    <button type="submit" class="btn">@(Model.Item.ProxyDomain is null ? T["hosting.publishBtn"] : T["hosting.changeBtn"])</button>
                 </div>
             </form>
             @if (Model.Item.ProxyDomain is not null)

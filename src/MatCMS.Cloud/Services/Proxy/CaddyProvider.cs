@@ -70,23 +70,35 @@ public sealed class CaddyProvider : IProxyProvider
         catch (Exception ex) { return new(false, $"Caddy-Admin-API nicht erreichbar: {ex.Message}"); }
     }
 
-    public async Task<ProxyResult> UpsertAsync(string? existingId, string routeKey, string name, string host, string upstream, CancellationToken ct = default)
+    public async Task<ProxyResult> UpsertAsync(string? existingId, string routeKey, string name, string host, string upstream, bool rewriteHost = false, CancellationToken ct = default)
     {
         // Keep an id we already own: a route created at provisioning was keyed by the container name, and
         // re-deriving it from the instance id later would add a SECOND route for the same host.
         var id = !string.IsNullOrWhiteSpace(existingId) && existingId.StartsWith("matcms-", StringComparison.Ordinal)
             ? existingId : RouteIdFor(routeKey);
-        // Caddy's reverse_proxy wants "host:port", not a URL.
-        var dial = upstream.Replace("http://", "", StringComparison.OrdinalIgnoreCase).TrimEnd('/');
+        // Caddy's reverse_proxy wants "host:port", not a URL. An https:// target (another proxy — the edge forwarding
+        // to a host's automatic address) is dialled on 443 with TLS; the certificate is checked against that name.
+        var https = upstream.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+        var target = upstream.Replace("https://", "", StringComparison.OrdinalIgnoreCase)
+            .Replace("http://", "", StringComparison.OrdinalIgnoreCase).TrimEnd('/');
+        var targetHost = target.Contains(':') ? target[..target.LastIndexOf(':')] : target;
+        var dial = https && !target.Contains(':') ? target + ":443" : target;
+        var proxy = new JsonObject
+        {
+            ["handler"] = "reverse_proxy",
+            ["upstreams"] = new JsonArray(new JsonObject { ["dial"] = dial }),
+        };
+        if (https)
+            proxy["transport"] = new JsonObject { ["protocol"] = "http", ["tls"] = new JsonObject { ["server_name"] = targetHost } };
+        // The host proxy matches on its own name for the site, not on the customer's; the customer's name still
+        // travels as X-Forwarded-Host, which Caddy sets by itself.
+        if (rewriteHost)
+            proxy["headers"] = new JsonObject { ["request"] = new JsonObject { ["set"] = new JsonObject { ["Host"] = new JsonArray(targetHost) } } };
         var route = new JsonObject
         {
             ["@id"] = id,
             ["match"] = new JsonArray(new JsonObject { ["host"] = new JsonArray(host) }),
-            ["handle"] = new JsonArray(new JsonObject
-            {
-                ["handler"] = "reverse_proxy",
-                ["upstreams"] = new JsonArray(new JsonObject { ["dial"] = dial }),
-            }),
+            ["handle"] = new JsonArray(proxy),
             ["terminal"] = true,
         }.ToJsonString();
 

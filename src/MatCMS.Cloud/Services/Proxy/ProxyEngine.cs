@@ -5,11 +5,15 @@ namespace MatCMS.Cloud.Services.Proxy;
 /// <param name="Kind">delete/exists: the provider the route was created with (may differ from the current one).</param>
 /// <param name="OldKind">publish: the provider of the route currently on record; a route of a DIFFERENT
 /// provider is deleted first (the setting changed since).</param>
+/// <param name="Upstream">publish: a fixed target (the edge forwarding to a host address or to node-address:port).
+/// Null = derive it from the container, as a host proxy does.</param>
+/// <param name="RewriteHost">publish: send the target's host name as the Host header (see IProxyProvider).</param>
 public sealed record ProxyOp(
     string Op, ProxySettings Settings,
     string? ContainerId = null, int? LocalPort = null,
     string? Host = null, string? RouteKey = null, string? Name = null,
-    string? Kind = null, string? RouteId = null, string? OldKind = null);
+    string? Kind = null, string? RouteId = null, string? OldKind = null,
+    string? Upstream = null, bool RewriteHost = false);
 
 public sealed record ProxyOpResult(bool Ok, string Message, string? RouteId = null, bool? Exists = null);
 
@@ -98,12 +102,17 @@ public static class ProxyEngine
             await Provider(s, http, op.OldKind).DeleteAsync(op.RouteId, ct);
         if (!provider.ManagesRoutes) return new(true, "Kein Proxy — Domain nur vermerkt.");
 
-        if (string.IsNullOrEmpty(op.ContainerId)) return new(false, "Kein Container angegeben.");
-        var (upstream, err) = await UpstreamAsync(s, docker, op.ContainerId, op.LocalPort, ct);
-        if (upstream is null) return new(false, err ?? "Upstream nicht ermittelbar.");
+        var upstream = op.Upstream;
+        if (upstream is null)
+        {
+            if (string.IsNullOrEmpty(op.ContainerId)) return new(false, "Kein Container angegeben.");
+            var (derived, err) = await UpstreamAsync(s, docker, op.ContainerId, op.LocalPort, ct);
+            if (derived is null) return new(false, err ?? "Upstream nicht ermittelbar.");
+            upstream = derived;
+        }
 
         var existing = op.OldKind == s.Kind ? op.RouteId : null;
-        var r = await provider.UpsertAsync(existing, op.RouteKey ?? op.ContainerId, op.Name ?? "MatCMS", op.Host ?? "", upstream, ct);
+        var r = await provider.UpsertAsync(existing, op.RouteKey ?? op.ContainerId ?? "", op.Name ?? "MatCMS", op.Host ?? "", upstream, op.RewriteHost, ct);
         return r.Ok ? new(true, $"Route über {s.Kind} angelegt.", r.RouteId)
                     : new(false, r.Error ?? "Route konnte nicht angelegt werden.", r.RouteId);
     }

@@ -73,7 +73,7 @@ public class IndexModel : PageModel
         Busy = await _updater.BusyWithAsync(ct);
 
         Data = await _overview.BuildAsync(ct);
-        DomainCount = await _db.Instances.CountAsync(i => i.ProxyDomain != null, ct);
+        DomainCount = await _db.Instances.CountAsync(i => i.ProxyDomain != null, ct) + await _db.Instances.CountAsync(i => i.HostDomain != null, ct);
         Candidates = await _updates.CandidatesAsync(ct: ct);
     }
 

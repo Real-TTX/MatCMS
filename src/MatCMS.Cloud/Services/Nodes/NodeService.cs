@@ -97,7 +97,7 @@ public class NodeService
     public sealed record NodeInput(string? Name = null, int? PortFrom = null, int? PortTo = null,
         string? Provider = null, string? MatcadUrl = null, string? MatcadToken = null, bool ClearMatcadToken = false,
         string? CaddyAdminUrl = null, string? CaddyServer = null, string? Upstream = null, string? Network = null,
-        string? UpstreamHost = null);
+        string? UpstreamHost = null, bool? AutoDomainEnabled = null, string? AutoDomainBase = null, string? Address = null);
 
     public async Task<string?> UpdateAsync(Node node, NodeInput b, CancellationToken ct = default)
     {
@@ -120,6 +120,18 @@ public class NodeService
         if (b.Upstream is not null) node.ProxyUpstream = UpstreamModes.Normalise(b.Upstream);
         if (b.Network is not null) node.ProxyNetwork = Clean(b.Network);
         if (b.UpstreamHost is not null) node.ProxyUpstreamHost = Clean(b.UpstreamHost);
+        if (b.AutoDomainBase is not null)
+        {
+            var baseDomain = Proxy.ProxyService.NormaliseDomain(b.AutoDomainBase);
+            if (baseDomain is null && b.AutoDomainBase.Trim().Length > 0) return "Keine gültige Basis-Domain (z. B. server1.example.de).";
+            node.AutoDomainBase = baseDomain;
+        }
+        if (b.AutoDomainEnabled is bool ad)
+        {
+            if (ad && string.IsNullOrEmpty(node.AutoDomainBase)) return "Für automatische Adressen bitte eine Basis-Domain angeben.";
+            node.AutoDomainEnabled = ad;
+        }
+        if (b.Address is not null) node.Address = Clean(b.Address);
         await _db.SaveChangesAsync(ct);
         return null;
     }
@@ -157,6 +169,8 @@ public class NodeService
             agentOutdated = cloudVersion is null ? (bool?)null : AgentOutdated(n, cloudVersion),
             dockerVersion = n.DockerVersion, dockerError = n.DockerError, instances = instanceCount,
             portFrom = n.PortFrom, portTo = n.PortTo,
+            autoDomain = new { enabled = n.AutoDomainEnabled, baseDomain = n.AutoDomainBase },
+            address = n.Address,
             proxy = new
             {
                 provider = ProxyKinds.Normalise(n.ProxyKind), matcadUrl = n.MatcadUrl, matcadTokenSet = !string.IsNullOrEmpty(n.MatcadTokenEnc),

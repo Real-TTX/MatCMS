@@ -25,6 +25,16 @@ public class SettingsModel : PageModel
     public string Get(string key) => _cloud.Get(key) ?? "";
     public bool ModuleEnabled => _cloud.Flag(SettingKeys.HostingEnabled);
     public bool AutoUpdate => _cloud.Flag(SettingKeys.AutoUpdateLocal);
+
+    // Automatic host addresses of "Dieser Host" + the edge proxy.
+    public bool AutoDomainEnabled => _cloud.Flag(SettingKeys.HostingAutoDomainEnabled);
+    public string AutoDomainBase => Get(SettingKeys.HostingAutoDomainBase);
+    public int MissingHostAddresses { get; private set; }
+    public int DomainsOnOtherWay { get; private set; }
+    public bool EdgeEnabled => _proxy.EdgeEnabled;
+    public bool EdgeUsesHostProxy => _proxy.EdgeUsesHostProxy;
+    public string EdgeKind => _proxy.EdgeSettings.Kind;
+    public ProxyFieldsView EdgeFields => _proxy.EdgeFieldsView();
     public ProxyFieldsView ProxyFields => _proxy.FieldsView();
     public bool DockerReachable { get; private set; }
 
@@ -38,6 +48,56 @@ public class SettingsModel : PageModel
         DockerReachable = await _docker.IsReachableAsync(HttpContext.RequestAborted);
         NextPort = await _hosting.NextFreePortAsync(HttpContext.RequestAborted);
         UsedPortCount = (await _hosting.UsedPortsAsync(HttpContext.RequestAborted))?.Count ?? 0;
+        if (AutoDomainEnabled) MissingHostAddresses = await _proxy.MissingHostAddressCountAsync(null, HttpContext.RequestAborted);
+        DomainsOnOtherWay = await _proxy.CustomerDomainsOnOtherWayCountAsync(HttpContext.RequestAborted);
+    }
+
+    public async Task<IActionResult> OnPostAutoDomainAsync(bool enabled, string? baseDomain)
+    {
+        if (enabled && ProxyService.NormaliseDomain(baseDomain) is null)
+        {
+            TempData["FlashError"] = "Bitte eine gültige Basis-Domain angeben, z. B. cloud.example.de.";
+            return RedirectToPage();
+        }
+        await _proxy.SetAutoDomainAsync(enabled, baseDomain);
+        TempData["Flash"] = enabled ? "Automatische Adressen eingeschaltet — neue Instanzen bekommen ihre Adresse beim Anlegen." : "Automatische Adressen ausgeschaltet.";
+        return RedirectToPage();
+    }
+
+    /// <summary>Host addresses for the sites this host already runs.</summary>
+    public async Task<IActionResult> OnPostAutoDomainBackfillAsync()
+    {
+        var r = await _proxy.PublishMissingHostAddressesAsync(null, HttpContext.RequestAborted);
+        TempData[r.Failed == 0 ? "Flash" : "FlashError"] = $"{r.Created} Adresse(n) angelegt." + (r.Failed > 0 ? $" {r.Failed} fehlgeschlagen: " + string.Join(" · ", r.Errors) : "");
+        return RedirectToPage();
+    }
+
+    public async Task<IActionResult> OnPostEdgeAsync(bool enabled, bool useHostProxy, string? provider, string? matcadUrl, string? matcadToken,
+        bool clearMatcadToken, string? caddyAdminUrl, string? caddyServer)
+    {
+        // Only the switches when the edge is the host's proxy — its own fields keep what they had.
+        await _proxy.UpdateEdgeAsync(useHostProxy
+            ? new ProxyService.EdgeConfigInput(enabled, true, null, null, null, false, null, null)
+            : new ProxyService.EdgeConfigInput(enabled, false, provider, matcadUrl ?? "", matcadToken, clearMatcadToken, caddyAdminUrl ?? "", caddyServer ?? ""));
+        TempData["Flash"] = enabled
+            ? "Edge-Proxy eingeschaltet — neu veröffentlichte Kundendomains laufen über ihn."
+            : "Edge-Proxy ausgeschaltet.";
+        return RedirectToPage();
+    }
+
+    /// <summary>Moves the customer domains published before the switch onto the way it now says (edge or host).</summary>
+    public async Task<IActionResult> OnPostEdgeMoveAsync()
+    {
+        var r = await _proxy.MoveCustomerDomainsToCurrentWayAsync(HttpContext.RequestAborted);
+        TempData[r.Failed == 0 ? "Flash" : "FlashError"] = $"{r.Created} Domain(s) umgestellt." + (r.Failed > 0 ? $" {r.Failed} fehlgeschlagen: " + string.Join(" · ", r.Errors) : "");
+        return RedirectToPage();
+    }
+
+    public async Task<IActionResult> OnPostEdgeTestAsync()
+    {
+        var r = await _proxy.TestEdgeAsync(HttpContext.RequestAborted);
+        TempData[r.Ok ? "Flash" : "FlashError"] = r.Message;
+        return RedirectToPage();
     }
 
     /// <summary>The module switch. Off hides provisioning, Nodes and Domains; the container actions on local

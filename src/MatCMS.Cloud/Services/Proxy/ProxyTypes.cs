@@ -61,8 +61,11 @@ public interface IProxyProvider
     Task<ProxyResult> TestAsync(CancellationToken ct = default);
 
     /// <summary>Creates or updates the route <paramref name="host"/> → <paramref name="upstream"/>
-    /// (<c>http://host:port</c>). <paramref name="existingId"/> = the id from a previous publish, if any.</summary>
-    Task<ProxyResult> UpsertAsync(string? existingId, string routeKey, string name, string host, string upstream, CancellationToken ct = default);
+    /// (<c>http://host:port</c>, or <c>https://host</c> when the target is another proxy). <paramref name="existingId"/>
+    /// = the id from a previous publish, if any. <paramref name="rewriteHost"/> = send the upstream's host name as the
+    /// Host header (the edge forwarding to a host's automatic address — the host proxy matches on THAT name); a
+    /// provider that cannot do it must refuse rather than route to the wrong site.</summary>
+    Task<ProxyResult> UpsertAsync(string? existingId, string routeKey, string name, string host, string upstream, bool rewriteHost = false, CancellationToken ct = default);
 
     /// <summary>Removes the route. A route that is already gone counts as success.</summary>
     Task<ProxyResult> DeleteAsync(string routeId, CancellationToken ct = default);

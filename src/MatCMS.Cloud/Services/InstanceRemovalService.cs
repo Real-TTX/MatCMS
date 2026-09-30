@@ -34,12 +34,13 @@ public class InstanceRemovalService
     private readonly InstanceService _instances;
     private readonly ILogger<InstanceRemovalService> _log;
     private readonly Nodes.NodeService _nodes;
+    private readonly Proxy.ProxyService _proxy;
 
     public InstanceRemovalService(
         AppDbContext db, DockerHostService docker, BackupStore backups,
-        InstanceService instances, ILogger<InstanceRemovalService> log, Nodes.NodeService nodes)
+        InstanceService instances, ILogger<InstanceRemovalService> log, Nodes.NodeService nodes, Proxy.ProxyService proxy)
     {
-        _db = db; _docker = docker; _backups = backups; _instances = instances; _log = log; _nodes = nodes;
+        _db = db; _docker = docker; _backups = backups; _instances = instances; _log = log; _nodes = nodes; _proxy = proxy;
     }
 
     /// <summary>
@@ -56,7 +57,22 @@ public class InstanceRemovalService
         return r.Ok ? Nodes.NodeJobExecutor.Deserialize<DockerHostService.TeardownTarget>(r.ResultJson) : null;
     }
 
+    /// <summary>Removes the container, then — once it is really gone — every proxy route the cloud made for the site.
+    /// Best effort for the routes: a proxy that is down must not keep a removal from finishing; what could not be
+    /// deleted is logged by name, because a route left behind points a domain at nothing.</summary>
     private async Task<DockerHostService.TeardownResult> RemoveAsync(Instance item, string containerId, bool withVolumes, CancellationToken ct)
+    {
+        var r = await RemoveContainerAsync(item, containerId, withVolumes, ct);
+        if (!r.Ok) return r;
+        if (await _proxy.RemoveAllRoutesAsync(item, ct) is { } routeErrors)
+        {
+            _log.LogWarning("Routes of removed instance {Name} not deleted: {Errors}", item.Name, routeErrors);
+            return r with { Message = r.Message + " Routen nicht entfernt: " + routeErrors };
+        }
+        return r;
+    }
+
+    private async Task<DockerHostService.TeardownResult> RemoveContainerAsync(Instance item, string containerId, bool withVolumes, CancellationToken ct)
     {
         if (!HostingActionsService.IsOnNode(item)) return await _docker.RemoveInstanceContainerAsync(containerId, withVolumes, ct);
         var node = await _db.Nodes.FindAsync(new object[] { item.NodeId! }, ct);

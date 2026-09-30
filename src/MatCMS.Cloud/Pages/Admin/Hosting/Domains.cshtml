@@ -9,6 +9,12 @@
         <h1>@T["hosting.title"]</h1>
         <div class="list-toolbar">
             <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+            <select class="list-search" data-list-filter aria-label="@T["domains.kind"]">
+                <option value="">@T["hostdash.filterAll"]</option>
+                <option value="custom">@T["domains.kindCustom"]</option>
+                <option value="host">@T["domains.kindHost"]</option>
+                <option value="edge">@T["domains.viaEdge"]</option>
+            </select>
             <form method="post" asp-page-handler="Check" class="inline-form">
                 <button type="submit" class="btn btn-sm btn-ghost">@T["domains.checkAll"]</button>
             </form>
@@ -19,37 +25,44 @@
         <thead>
             <tr>
                 <th>@T["hosting.domain"]</th>
+                <th>@T["domains.kind"]</th>
                 <th>@T["cleanup.instance"]</th>
                 <th>@T["nodes.hostColumn"]</th>
-                <th style="width:110px;">@T["domains.provider"]</th>
+                <th>@T["domains.way"]</th>
                 <th>@T["domains.route"]</th>
                 <th style="width:150px;">@T["hosting.publishedAt"]</th>
             </tr>
         </thead>
         <tbody>
-            @if (Model.Items.Count == 0)
+            @if (Model.Rows.Count == 0)
             {
                 <partial name="_EmptyRow" model='@T["domains.none"]' />
             }
-            @foreach (var i in Model.Items)
+            @foreach (var r in Model.Rows)
             {
-                <tr data-search="@(i.ProxyDomain + " " + i.Name + " " + i.Node?.Name)">
-                    <td><a href="https://@i.ProxyDomain" target="_blank" rel="noopener" class="mono">@i.ProxyDomain</a></td>
+                var i = r.Instance;
+                <tr data-search="@(r.Domain + " " + i.Name + " " + i.Node?.Name)" data-tags="@(r.Kind + (r.Way == "edge" ? " edge" : ""))">
+                    <td class="nowrap"><a href="https://@r.Domain" target="_blank" rel="noopener" class="mono">@r.Domain</a></td>
+                    <td><span class="badge @(r.Kind == "custom" ? "badge-on" : "badge-off")">@(r.Kind == "custom" ? T["domains.kindCustom"] : T["domains.kindHost"])</span></td>
                     <td><a asp-page="/Admin/Instances/Details" asp-route-id="@i.Id" asp-route-tab="hosting">@i.Name</a></td>
-                    <td>@if (i.Node is { } n) { <a asp-page="/Admin/Hosting/Nodes/Details" asp-route-id="@n.Id">@n.Name</a> } else { <span class="muted">@T["nodes.thisHost"]</span> }</td>
-                    <td><span class="badge @(i.ProxyProvider == "none" ? "badge-off" : "badge-on")">@(i.ProxyProvider ?? "—")</span></td>
+                    <td class="nowrap">@if (i.Node is { } n) { <a asp-page="/Admin/Hosting/Nodes/Details" asp-route-id="@n.Id">@n.Name</a> } else { <span class="muted">@T["nodes.thisHost"]</span> }</td>
                     <td>
-                        <span class="mono muted">@(i.ProxyRouteId ?? T["domains.recordOnly"])</span>
-                        @if (Model.Checked.TryGetValue(i.Id, out var ok))
+                        <span class="badge @(r.Way == "edge" ? "badge-on" : "badge-off")">@(r.Way switch { "edge" => T["domains.viaEdge"], "record" => T["domains.recordOnly"], _ => T["domains.viaHost"] })</span>
+                        @if (r.Provider is { } pv && r.Way != "record") { <span class="muted">@pv</span> }
+                        @if (r.Target is { } tg) { <div class="mono muted">→ @tg</div> }
+                    </td>
+                    <td>
+                        <span class="mono muted">@(r.RouteId ?? "—")</span>
+                        @if (Model.Checked.TryGetValue(r.Kind + ":" + i.Id, out var ok))
                         {
                             <span class="badge @(ok == true ? "badge-on" : ok == false ? "badge-err" : "badge-off")">@(ok == true ? T["domains.routeOk"] : ok == false ? T["domains.routeMissing"] : T["domains.routeUnknown"])</span>
                         }
-                        @if (!string.IsNullOrEmpty(i.ProxyError))
+                        @if (!string.IsNullOrEmpty(r.Error))
                         {
-                            <span class="badge badge-err" title="@i.ProxyError">@T["hosting.proxyError"]</span>
+                            <span class="badge badge-err" title="@r.Error">@T["hosting.proxyError"]</span>
                         }
                     </td>
-                    <td class="mono muted">@(i.ProxyPublishedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—")</td>
+                    <td class="mono muted">@(r.PublishedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—")</td>
                 </tr>
             }
         </tbody>
@@ -63,16 +76,30 @@
     <div class="card">
         <h2>@T["domains.pending"]</h2>
         <table class="data">
-            <thead><tr><th>@T["hosting.domain"]</th><th>@T["hosting.name"]</th><th>@T["domains.provider"]</th><th>@T["domains.route"]</th></tr></thead>
+            <thead><tr><th>@T["hosting.domain"]</th><th>@T["domains.kind"]</th><th>@T["hosting.name"]</th><th>@T["domains.way"]</th><th>@T["domains.route"]</th></tr></thead>
             <tbody>
-                @foreach (var (key, r) in Model.Pending)
+                @foreach (var (key, p) in Model.Pending)
                 {
-                    <tr>
-                        <td class="mono">@r.Domain</td>
-                        <td class="mono muted">@key</td>
-                        <td>@r.Provider</td>
-                        <td class="mono muted">@(r.RouteId ?? T["domains.recordOnly"])</td>
-                    </tr>
+                    @if (p.HostDomain is { } hd)
+                    {
+                        <tr>
+                            <td class="mono">@hd</td>
+                            <td><span class="badge badge-off">@T["domains.kindHost"]</span></td>
+                            <td class="mono muted">@key</td>
+                            <td>@T["domains.viaHost"] <span class="muted">@p.HostProvider</span></td>
+                            <td class="mono muted">@(p.HostRouteId ?? "—")</td>
+                        </tr>
+                    }
+                    @if (p.Domain is { } d)
+                    {
+                        <tr>
+                            <td class="mono">@d</td>
+                            <td><span class="badge badge-on">@T["domains.kindCustom"]</span></td>
+                            <td class="mono muted">@key</td>
+                            <td>@(p.Via == "edge" ? T["domains.viaEdge"] : T["domains.viaHost"]) <span class="muted">@p.Provider</span></td>
+                            <td class="mono muted">@(p.RouteId ?? T["domains.recordOnly"])</td>
+                        </tr>
+                    }
                 }
             </tbody>
         </table>

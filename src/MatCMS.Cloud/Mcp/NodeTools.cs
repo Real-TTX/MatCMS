@@ -81,14 +81,28 @@ public class NodeTools
         string? matcadUrl = null, [Description("Stored encrypted, never returned.")] string? matcadToken = null, bool clearMatcadToken = false,
         string? caddyAdminUrl = null, string? caddyServer = null,
         [Description("network or hostport.")] string? upstream = null, string? network = null, string? upstreamHost = null,
+        [Description("Automatic addresses: every instance on this node gets name.<autoDomainBase> at the node's proxy.")] bool? autoDomainEnabled = null,
+        [Description("Base domain for automatic addresses, e.g. server1.example.de (needs a wildcard DNS record *.<base> to the node).")] string? autoDomainBase = null,
+        [Description("How the cloud's edge proxy reaches this node (IP or host name) when it forwards to address:port.")] string? address = null,
         CancellationToken ct = default)
     {
         RequireCloudWide(me);
         var n = await ResolveAsync(db, nodeId, ct);
         var err = await nodes.UpdateAsync(n, new NodeService.NodeInput(name, portFrom, portTo, provider, matcadUrl, matcadToken, clearMatcadToken,
-            caddyAdminUrl, caddyServer, upstream, network, upstreamHost), ct);
+            caddyAdminUrl, caddyServer, upstream, network, upstreamHost, autoDomainEnabled, autoDomainBase, address), ct);
         if (err is not null) throw new McpException(err);
         return NodeService.PublicJson(n, await db.Instances.CountAsync(i => i.NodeId == n.Id, ct), withInventory: false);
+    }
+
+    [McpServerTool(Name = "create_missing_host_addresses"), Description(
+        "Create the automatic host address (name.<base domain>) for every instance on a host that has none yet — after switching automatic addresses on for a host that already runs sites. nodeId omitted = this cloud's own host. Requires the hosting right on an all-instances key.")]
+    public static async Task<object> CreateMissingHostAddresses(McpContext me, AppDbContext db, Services.Proxy.ProxyService proxy,
+        [Description("The node id; omit for this cloud's own host.")] string? nodeId = null, CancellationToken ct = default)
+    {
+        RequireCloudWide(me);
+        var n = nodeId is null ? null : await ResolveAsync(db, nodeId, ct);
+        var r = await proxy.PublishMissingHostAddressesAsync(n, ct);
+        return new { created = r.Created, failed = r.Failed, errors = r.Errors };
     }
 
     [McpServerTool(Name = "set_node_revoked"), Description(

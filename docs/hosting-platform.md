@@ -448,6 +448,25 @@ page; rights and transfer guards.
 
 ---
 
+### Built (2026-09-30): Automatic addresses + edge proxy
+
+Two independent, optional switches (both off by default, so existing setups do not change):
+
+| Automatische Adressen (per host) | Edge (cloud-wide) | Result |
+|---|---|---|
+| off | off | as before: port, or a customer domain at the host's proxy |
+| on | off | every instance has `name.serverX…`; a customer domain points at its node |
+| off | on | the edge forwards to `host-address:port` (reachable ports / private network) |
+| on | on | the edge forwards to `name.serverX…` — moves need no DNS change |
+
+The target setup this enables: one server runs the cloud and the edge (80/443, customer domains + wildcard
+`*.cloud…`), further servers are nodes (Docker + agent, wildcard `*.serverX…` each). Verified against a real
+Caddy: host route, edge route (TLS to the host address, Host header rewritten), removing/recreating the host
+address re-points the edge, switching the edge off moves the domain back to the host proxy, teardown deletes both
+routes. Wildcard certificates (DNS-01) are not configured by the cloud; per-host certificates via HTTP-01 hit
+Let's Encrypt's 50/week-per-domain limit with many sites — use Matcad with a DNS provider or a Caddy with a DNS
+plugin on the node for a wildcard.
+
 ## 6. Decisions (2026-09-29)
 
 | # | Question | Decision |

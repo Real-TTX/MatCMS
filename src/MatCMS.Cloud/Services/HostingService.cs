@@ -120,6 +120,24 @@ public class HostingService
         return (pattern.TrimEnd('-') + "-" + slug).ToLowerInvariant();
     }
 
+    /// <summary>The name part of a stack/container name — the reverse of <see cref="StackName"/>: with the pattern
+    /// "matcms-instance-{name}", "matcms-instance-kunde-a" gives "kunde-a". Null when the container does not follow
+    /// the pattern (started by hand, or the pattern changed since).</summary>
+    public static string? SlugFromStack(string? containerName, string? pattern)
+    {
+        if (string.IsNullOrWhiteSpace(containerName)) return null;
+        if (string.IsNullOrWhiteSpace(pattern)) pattern = DefaultNamePattern;
+        var p = pattern.ToLowerInvariant().Replace("$name", "{name}");
+        var at = p.IndexOf("{name}", StringComparison.Ordinal);
+        string prefix, suffix;
+        if (at < 0) { prefix = p.TrimEnd('-') + "-"; suffix = ""; }
+        else { prefix = p[..at]; suffix = p[(at + 6)..]; }
+        var c = containerName.ToLowerInvariant();
+        if (!c.StartsWith(prefix, StringComparison.Ordinal) || !c.EndsWith(suffix, StringComparison.Ordinal)) return null;
+        var slug = c[prefix.Length..(c.Length - suffix.Length)].Trim('-');
+        return slug.Length == 0 ? null : slug;
+    }
+
     /// <summary>
     /// Legt einen neuen MatCMS-Container an und startet ihn — auf dem Docker-Host dieser Cloud oder, mit
     /// <see cref="CreateRequest.NodeId"/>, auf einem verbundenen Node. Beide Wege laufen durch DIESELBE
@@ -192,14 +210,16 @@ public class HostingService
 
         var where = result.Node is null ? "" : $" auf Node „{result.Node.Name}“";
         var msg = $"„{result.ContainerName}“ läuft{where} auf Port {result.Port}. Sie meldet sich in den nächsten Minuten selbst an.";
-        if (!string.IsNullOrWhiteSpace(domain) && result.ContainerId is not null && result.ContainerName is not null)
+        // Routes right away: the automatic host address when the host has the feature on, and the customer domain
+        // when one was given. Both are adopted by the instance's first beat.
+        if (result.ContainerId is not null && result.ContainerName is not null)
         {
-            var pr = await _proxy.PublishForNewContainerAsync(result.Node, result.ContainerId, result.ContainerName, result.Port,
-                domain, pushCanonical, ct);
+            var pr = await _proxy.ProvisionRoutesAsync(result.Node, result.ContainerId, result.ContainerName, result.Port,
+                name.Trim(), domain, pushCanonical, ct);
             if (!pr.Ok)
                 return new(true, msg + $" Die Domain wurde NICHT eingerichtet: {pr.Message} — im Hosting-Tab der Instanz erneut veröffentlichen.",
                     result.ContainerName, result.Port, DomainFailed: true);
-            msg += " " + pr.Message;
+            if (pr.Message.Length > 0) msg += " " + pr.Message;
         }
         return new(true, msg, result.ContainerName, result.Port);
     }

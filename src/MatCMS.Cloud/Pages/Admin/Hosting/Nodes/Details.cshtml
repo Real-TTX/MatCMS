@@ -114,6 +114,37 @@
             <button type="submit" class="btn btn-ghost" formaction="@Url.Page("Details", "ProxyTest", new { id = n.Id })">@T["settings.hostingProxyTest"]</button>
         </div>
     </form>
+
+    @* How this node is addressed: its automatic addresses (name.<base>, at the node's proxy) and the address under
+       which the cloud's edge reaches it. Own form, so saving it never re-posts the proxy key above. *@
+    <form method="post" asp-page-handler="Addresses" asp-route-id="@n.Id">
+        <div class="card">
+            <h2>@T["autodomain.title"]</h2>
+            <label class="checkbox-row">
+                <input type="checkbox" name="autoDomainEnabled" value="true" data-reveal="node-auto" checked="@(n.AutoDomainEnabled ? "checked" : null)" />
+                @T["autodomain.enable"]
+            </label>
+            <div data-reveal-target="node-auto" hidden="@(n.AutoDomainEnabled ? null : "hidden")">
+                <div class="form-field">
+                    <label for="autoDomainBase">@T["autodomain.base"]</label>
+                    <input id="autoDomainBase" name="autoDomainBase" value="@n.AutoDomainBase" placeholder="server1.example.de" spellcheck="false" />
+                    <div class="help">@T["autodomain.baseHint"]</div>
+                </div>
+            </div>
+            <div class="form-field">
+                <label for="nodeAddress">@T["edge.nodeAddress"]</label>
+                <input id="nodeAddress" name="address" value="@n.Address" placeholder="10.0.0.3" spellcheck="false" />
+                <div class="help">@T["edge.nodeAddressHint"]</div>
+            </div>
+            <div class="list-actions">
+                <button type="submit" class="btn">@T["common.save"]</button>
+                @if (n.AutoDomainEnabled && Model.MissingHostAddresses > 0)
+                {
+                    <button type="submit" class="btn btn-ghost" formaction="@Url.Page("Details", "AddressBackfill", new { id = n.Id })">@T["autodomain.backfill", Model.MissingHostAddresses]</button>
+                }
+            </div>
+        </div>
+    </form>
 </div>
 
 <div class="tab-panel" data-panel="containers" hidden>
@@ -203,4 +234,14 @@
 
 @section Scripts {
     <partial name="_TabsScript" />
+    <script>
+        // A switch reveals its fields ([data-reveal] → [data-reveal-target]).
+        document.querySelectorAll('[data-reveal]').forEach(function (box) {
+            var target = document.querySelector('[data-reveal-target="' + box.getAttribute('data-reveal') + '"]');
+            if (!target) return;
+            var sync = function () { target.hidden = !box.checked; };
+            box.addEventListener('change', sync);
+            sync();
+        });
+    </script>
 }

@@ -48,7 +48,30 @@ public class DetailsModel : PageModel
             if (hit is not null) InstancesByContainer[c.Id] = hit;
         }
         Jobs = await _nodes.JobsAsync(n.Id, 50, HttpContext.RequestAborted);
+        if (n.AutoDomainEnabled) MissingHostAddresses = await _proxy.MissingHostAddressCountAsync(n, HttpContext.RequestAborted);
         return Page();
+    }
+
+    /// <summary>Instances on this node without an automatic address yet.</summary>
+    public int MissingHostAddresses { get; private set; }
+
+    public async Task<IActionResult> OnPostAddressesAsync(int id, bool autoDomainEnabled, string? autoDomainBase, string? address)
+    {
+        var n = await _db.Nodes.FindAsync(id);
+        if (n is null) return RedirectToPage("Index");
+        var err = await _nodes.UpdateAsync(n, new NodeService.NodeInput(AutoDomainBase: autoDomainBase ?? "", AutoDomainEnabled: autoDomainEnabled,
+            Address: address ?? ""), HttpContext.RequestAborted);
+        TempData[err is null ? "Flash" : "FlashError"] = err ?? "Adressen gespeichert.";
+        return Back(id, "proxy");
+    }
+
+    public async Task<IActionResult> OnPostAddressBackfillAsync(int id)
+    {
+        var n = await _db.Nodes.FindAsync(id);
+        if (n is null) return RedirectToPage("Index");
+        var r = await _proxy.PublishMissingHostAddressesAsync(n, HttpContext.RequestAborted);
+        TempData[r.Failed == 0 ? "Flash" : "FlashError"] = $"{r.Created} Adresse(n) angelegt." + (r.Failed > 0 ? $" {r.Failed} fehlgeschlagen: " + string.Join(" · ", r.Errors) : "");
+        return Back(id, "proxy");
     }
 
     private IActionResult Back(int id, string tab) => RedirectToPage(new { id, tab });

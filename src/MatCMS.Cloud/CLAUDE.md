@@ -676,11 +676,16 @@ login same-site; it is not used by this flow.
   Node outages notify once per outage (`Node.OfflineNotified`, re-armed by the next beat).
 - **Admin navigation**: **Hosting is ONE sidebar item, the first** (Admin-only), and everything about hosts,
   containers, images and domains lives in its TABS — link-tabs (`_HostingTabs.cshtml`, `a.tab`, scrollable on phones),
-  each its own page: **Übersicht** = the module's dashboard (tiles, the Hosts table with CPU/RAM bars, and the Updates
-  card: cloud version + self-update, instances behind the release + "N aktualisieren" whose progress
-  `_BulkProgress` shows in place), **Nodes**, **Instanzen** (every MatCMS container on every host with state, CPU, RAM,
+  each its own page: **Übersicht** = the module's dashboard (tiles, the Hosts table with a stacked CPU/RAM "Ressourcen"
+  column, and the Updates card: cloud version + self-update, and WHAT needs an update — instances behind the release,
+  node agents behind the cloud — linking to **Hosting → Updates**, the one page that RUNS instance updates: a checkbox
+  per candidate, all ticked, select-all toggle, partial runs, progress via `_BulkProgress`; selection and start live
+  in `InstanceUpdatesService`, also `/api/v1/hosting/updates` + MCP `start_instance_updates`), **Nodes**, **Instanzen** (every MatCMS container on every host with state, CPU, RAM,
   domain, version — containers without a record are listed as "nicht verbunden"), **Domains**, **Docker** (daemon,
-  resources, the **Images** section with the cleanup), **Einstellungen** (module switch `hosting.enabled`, auto-update,
+  resources, the **Images** section with the cleanup — every tag, and the version: the `matcms.version` label both
+  Dockerfiles now bake in, else the release tag GHCR has under the image's digest (`GhcrClient.ResolveDigestsAsync`,
+  newest 30 releases, cached per digest), else what a container on it reports; "lokal gebaut" when no digest names a
+  registry host), **Einstellungen** (module switch `hosting.enabled`, auto-update,
   proxy/ports/name pattern of "Dieser Host"). The switch hides only Nodes, Domains and provisioning. Data for dashboard
   and Instanzen is ONE service, `HostingOverviewService` (this host live via `DockerHostService.StatsAsync` — ~1 s per
   sample, cached 15 s; nodes from the inventory, whose agent samples usage at most once a minute and reports host size,

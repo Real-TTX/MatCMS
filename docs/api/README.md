@@ -177,7 +177,10 @@ vermerkt), `matcad` (Route über Matcads REST-API) oder `caddy` (Route direkt ü
 oder `hostport` (Ziel `http://<upstreamHost>:<Host-Port>`).
 
 - `GET /api/v1/hosting/overview` → `{ hosts:[{ node, thisHost, online, cpus, memTotal, sitesRunning, sitesTotal, cpuPercent, memBytes, … }], instances:[{ instanceId, name, container, node, state, status, cpuPercent, memBytes, memLimit, port, domain, version, updateAvailable }] }` – das Hosting-Dashboard; Node-Werte = letzte Messung des Agents (ca. minütlich), `instanceId` null = Container ohne Cloud-Verbindung (**CanManageHosting + alle Instanzen**).
-- `GET /api/v1/hosting/images` → `{ images:[{ id, tag, size, created, inUse, dangling }], prunable, prunableBytes }` – MatCMS-Images auf dem Cloud-Host (**CanManageHosting + alle Instanzen**).
+- `GET /api/v1/hosting/updates` → `{ latest, instances:[{ instanceId, name, node, version }] }` – Instanzen, die die Cloud selbst aktualisieren kann und die hinter dem neuesten Release liegen (im Instanz-Umfang des Schlüssels).
+- `POST /api/v1/hosting/updates` `{ instanceIds? }` → `{ runId, count }` – aktualisiert die genannten (weggelassen = alle) nacheinander mit Rollback; Ids ohne Update werden übergangen; 409, solange die Cloud sich selbst aktualisiert (**CanManageHosting**).
+- `GET /api/v1/hosting/updates/{runId}` → `{ done, total, completed, items:[{ name, from, to, status, message }] }` – Fortschritt.
+- `GET /api/v1/hosting/images` → `{ images:[{ id, repo, tags, version, size, created, inUse, dangling }], prunable, prunableBytes }` (`version` aus dem Label `matcms.version`, null bei älteren Images) – MatCMS-Images auf dem Cloud-Host (**CanManageHosting + alle Instanzen**).
 - `POST /api/v1/hosting/images/prune` → `{ removed, bytesReclaimed }` – nur alte, ungetaggte, unbenutzte MatCMS-Images (**CanManageHosting + alle Instanzen**).
 - `GET /api/v1/hosting/proxy` → `{ provider, managesRoutes, matcadUrl, matcadTokenSet, caddyAdminUrl, caddyServer, upstream, network, upstreamHost }` – der Matcad-Schlüssel wird **nie** zurückgegeben.
 - `PUT /api/v1/hosting/proxy` `{ provider?, matcadUrl?, matcadToken?, clearMatcadToken?, caddyAdminUrl?, caddyServer?, upstream?, network?, upstreamHost? }` – Teil-Update, weggelassen = unverändert (**CanManageHosting + alle Instanzen**). Schon veröffentlichte Domains wandern **nicht** mit – nach einem Provider-Wechsel neu veröffentlichen.
@@ -274,6 +277,7 @@ Instanz beim nächsten Heartbeat über ihre **eigenen** Validierer anwendet (add
 | `get_hosting_status` | Hosting-Modul an/aus, Docker erreichbar |
 | `set_hosting_enabled` | Hosting-Modul schalten (Hosting-Recht + alle Instanzen) |
 | `get_hosting_overview` | Hosts mit Größe/Last + alle Container mit CPU/RAM/Host/Update (Hosting-Recht + alle Instanzen) |
+| `list_update_candidates` / `start_instance_updates` / `get_update_run` | Instanzen mit Update / (Teil-)Update starten (Hosting-Recht) / Fortschritt |
 | `list_images` / `prune_images` | MatCMS-Images auf dem Cloud-Host / alte unbenutzte entfernen (Hosting-Recht + alle Instanzen) |
 | `get_container_status` | Container-Zustand einer Instanz (lokal?, Image, Start, Neustarts, Health) |
 | `container_action` | `start` / `stop` / `restart` / `update` des Instanz-Containers — vorher mit dem Nutzer bestätigen |

@@ -132,6 +132,7 @@ builder.Services.AddScoped<StoreService>();
 builder.Services.AddScoped<HostingActionsService>();
 builder.Services.AddScoped<CloudUpdaterService>();
 builder.Services.AddScoped<HostingOverviewService>();
+builder.Services.AddScoped<InstanceUpdatesService>();
 builder.Services.AddScoped<MatCMS.Cloud.Services.Proxy.ProxyService>();
 builder.Services.AddScoped<MatCMS.Cloud.Services.Nodes.NodeService>();
 builder.Services.AddScoped<NotificationService>();

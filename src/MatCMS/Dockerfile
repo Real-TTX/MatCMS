@@ -27,6 +27,14 @@ RUN dotnet publish src/MatCMS/MatCMS.csproj -c Release -o /app/publish /p:UseApp
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 
+# The version travels WITH the image, not only inside the app: a pulled image carries just the tag it was pulled
+# by (usually :latest), and the OCI version label it inherits from the base image is Ubuntu's ("24.04"). The cloud
+# reads matcms.version to show which build an image really is (Hosting → Docker → Images).
+ARG APP_VERSION=local
+LABEL matcms.version=${APP_VERSION}
+LABEL org.opencontainers.image.version=${APP_VERSION}
+LABEL org.opencontainers.image.title="MatCMS"
+
 COPY --from=build /app/publish .
 
 # Writable folders for the SQLite DB, data-protection keys and uploads.

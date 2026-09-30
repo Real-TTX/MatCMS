@@ -67,7 +67,7 @@
             </div>
         </div>
         <table class="data" style="margin-top:12px;">
-            <thead><tr><th>@T["docker.image"]</th><th>@T["docker.size"]</th><th>@T["docker.created"]</th><th>@T["docker.inUse"]</th></tr></thead>
+            <thead><tr><th>@T["docker.image"]</th><th>@T["hosting.version"]</th><th>@T["docker.size"]</th><th>@T["docker.created"]</th><th>@T["docker.inUse"]</th></tr></thead>
             <tbody>
                 @if (images.Count == 0)
                 {
@@ -77,9 +77,20 @@
                 {
                     <tr>
                         <td>
-                            <span class="mono">@i.Tag</span>
-                            @if (i.Dangling && i.InUse == 0) { <span class="badge badge-new">@T["docker.old"]</span> }
-                            <div class="mono muted">@(i.Id.Replace("sha256:", "")[..12])</div>
+                            <span class="mono">@i.Repo</span>
+                            <div>
+                                @foreach (var t in i.Tags) { <span class="badge badge-off mono">@(t.Contains(':') ? t[(t.LastIndexOf(':') + 1)..] : t)</span> }
+                                @if (i.Tags.Count == 0) { <span class="badge badge-off">@T["docker.untagged"]</span> }
+                                @if (i.Dangling && i.InUse == 0) { <span class="badge badge-new">@T["docker.old"]</span> }
+                                <span class="mono muted">@(i.Id.Replace("sha256:", "")[..12])</span>
+                            </div>
+                        </td>
+                        <td class="mono">
+                            @if (i.Version is { } v) { @v }
+                            else if (Model.RegistryVersion.TryGetValue(i.Id, out var gv)) { @gv }
+                            else if (Model.ReportedVersion.TryGetValue(i.Id, out var rv)) { @rv <div class="muted" style="font-family:inherit;">@T["docker.versionReported"]</div> }
+                            else if (i.LocalBuild) { <span class="muted">@T["docker.localBuild"]</span> }
+                            else { <span class="muted">@T["common.unknown"]</span> }
                         </td>
                         <td class="mono">@HostFmt.Bytes(i.Size)</td>
                         <td class="mono muted">@i.Created.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>

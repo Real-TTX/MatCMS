@@ -216,6 +216,37 @@ public static class HostingApi
             return Results.Json(new { removed = r.Removed, bytesReclaimed = r.BytesReclaimed });
         }).RequireRateLimiting("operatorApi");
 
+        // Instance updates: the candidates, a run for a chosen subset, its progress. Scoped to the key — a scoped key
+        // sees and updates only its own instances. Starting needs the hosting right.
+        app.MapGet("/api/v1/hosting/updates", async (HttpContext ctx, ApiKeyService keys, InstanceUpdatesService updates, ReleaseWatcher releases) =>
+        {
+            var (key, err) = await CallerAsync(ctx, keys);
+            if (err is not null) return err;
+            var list = await updates.CandidatesAsync(i => ApiKeyService.CanAccess(key!, i), ctx.RequestAborted);
+            return Results.Json(new
+            {
+                latest = releases.LatestVersion,
+                instances = list.Select(i => new { instanceId = i.PublicId, name = i.Name, node = i.Node?.Name, version = i.Version }),
+            });
+        }).RequireRateLimiting("operatorApi");
+
+        app.MapPost("/api/v1/hosting/updates", async (HttpContext ctx, StartUpdatesDto? b, ApiKeyService keys, InstanceUpdatesService updates) =>
+        {
+            var (key, err) = await CallerAsync(ctx, keys);
+            if (err is not null) return err;
+            if (RequireHosting(key!) is { } denied) return denied;
+            var r = await updates.StartAsync(b?.InstanceIds, i => ApiKeyService.CanAccess(key!, i), ctx.RequestAborted);
+            return r.Ok ? Results.Json(new { runId = r.RunId, count = r.Count })
+                : Results.Json(new { error = r.Error }, statusCode: StatusCodes.Status409Conflict);
+        }).RequireRateLimiting("operatorApi");
+
+        app.MapGet("/api/v1/hosting/updates/{runId}", async (HttpContext ctx, string runId, ApiKeyService keys, InstanceUpdatesService updates) =>
+        {
+            var (key, err) = await CallerAsync(ctx, keys);
+            if (err is not null) return err;
+            return updates.Progress(runId) is { } p ? Results.Json(p) : Results.Json(new { error = "Lauf nicht gefunden." }, statusCode: StatusCodes.Status404NotFound);
+        }).RequireRateLimiting("operatorApi");
+
         app.MapGet("/api/v1/hosting/proxy", async (HttpContext ctx, ApiKeyService keys, Services.Proxy.ProxyService proxy) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
@@ -322,3 +353,6 @@ public static class HostingApi
     /// <param name="ProfileId">Null = the default profile.</param>
     public record ProvisionDto(string Name, int? ProfileId, string? Domain, string? ImageTag, string? NodeId, bool? PushCanonical);
 }
+
+/// <summary>Body of <c>POST /api/v1/hosting/updates</c>. <c>InstanceIds</c> null or missing = every candidate.</summary>
+public sealed record StartUpdatesDto(List<string>? InstanceIds);

@@ -243,7 +243,23 @@ public class DockerHostService : IDisposable
 
     /// <summary>One MatCMS image on this daemon. <paramref name="Dangling"/> = untagged, left behind when a pull
     /// re-pointed its tag — what <see cref="PruneMatCmsImagesAsync"/> removes when no container uses it.</summary>
-    public sealed record ImageInfo(string Id, string Tag, long Size, DateTime Created, int InUse, bool Dangling);
+    /// <param name="Tags">Every tag the image carries here — a pulled image usually has only the one it was pulled by.</param>
+    /// <param name="Version">The build it is, from the <c>matcms.version</c> label our Dockerfiles bake in. Null for
+    /// an image built before that label existed; the page then falls back to the version a container on it reports.
+    /// Deliberately NOT <c>org.opencontainers.image.version</c> alone: an older image inherits the base image's
+    /// ("24.04").</param>
+    /// <param name="ContainerIds">The containers using it (running or not).</param>
+    /// <param name="Digests">The registry digests it was pulled as (<c>repo@sha256:…</c>) — what lets the cloud ask
+    /// the registry which release tag it is.</param>
+    public sealed record ImageInfo(string Id, List<string> Tags, string Repo, long Size, DateTime Created, int InUse, bool Dangling,
+        string? Version, List<string> ContainerIds, List<string> Digests)
+    {
+        public string Tag => Tags.FirstOrDefault() ?? Repo + ":<none>";
+
+        /// <summary>Never came from a registry: no digest names a registry host ("ghcr.io/…"). Docker Desktop gives
+        /// local builds a digest too ("matcms@sha256:…"), so "has a digest" alone does not decide it.</summary>
+        public bool LocalBuild => !Digests.Any(d => d.Split('/')[0] is var host && d.Contains('/') && (host.Contains('.') || host.Contains(':')));
+    }
 
     /// <summary>The MatCMS images on this daemon (instances and the cloud itself), newest first. Same attribution
     /// rule as the prune: by tag or repo digest naming MatCMS — another app's images are never listed.</summary>
@@ -255,7 +271,7 @@ public class DockerHostService : IDisposable
         {
             var images = await client.Images.ListImagesAsync(new ImagesListParameters { All = false }, ct);
             var containers = await client.Containers.ListContainersAsync(new ContainersListParameters { All = true }, ct);
-            var use = containers.GroupBy(c => c.ImageID ?? "").ToDictionary(g => g.Key, g => g.Count());
+            var use = containers.GroupBy(c => c.ImageID ?? "").ToDictionary(g => g.Key, g => g.Select(c => c.ID).ToList());
             return images
                 .Select(img =>
                 {
@@ -264,8 +280,11 @@ public class DockerHostService : IDisposable
                     var isMatCms = tags.Any(t => t.Contains("matcms", StringComparison.OrdinalIgnoreCase))
                                    || digests.Any(d => d.Contains("matcms", StringComparison.OrdinalIgnoreCase));
                     if (!isMatCms) return null;
-                    var name = tags.FirstOrDefault() ?? (digests.FirstOrDefault()?.Split('@')[0] + ":<none>");
-                    return new ImageInfo(img.ID, name, img.Size, img.Created, use.GetValueOrDefault(img.ID), tags.Count == 0);
+                    var repo = tags.Count > 0 ? SplitImage(tags[0]).repo : (digests.FirstOrDefault()?.Split('@')[0] ?? "");
+                    string? version = null;
+                    if (img.Labels is not null && img.Labels.TryGetValue("matcms.version", out var v) && !string.IsNullOrWhiteSpace(v)) version = v;
+                    var users = use.GetValueOrDefault(img.ID) ?? new List<string>();
+                    return new ImageInfo(img.ID, tags, repo, img.Size, img.Created, users.Count, tags.Count == 0, version, users, digests.ToList());
                 })
                 .Where(i => i is not null).Select(i => i!)
                 .OrderByDescending(i => i.Created).ToList();

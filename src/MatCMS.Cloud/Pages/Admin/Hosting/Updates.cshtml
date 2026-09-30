@@ -1,0 +1,88 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.Hosting.UpdatesModel
+@{
+    ViewData["Title"] = T["hosting.title"];
+}
+<partial name="_HostingTabs" model='"overview"' />
+
+@if (Model.RunId is not null)
+{
+    <partial name="_BulkProgress" model="Model.RunId" />
+}
+else
+{
+    <form method="post" asp-page-handler="Start" data-update-form>
+        <div class="card">
+            <h2>@T["updates.title"]</h2>
+            <div class="kv">
+                <div class="kv-label">@T["hostdash.instanceRelease"]</div>
+                <div class="kv-value mono">@(Model.LatestVersion ?? T["common.unknown"])</div>
+            </div>
+            <table class="data" style="margin-top:12px;">
+                <thead>
+                    <tr>
+                        <th style="width:40px;"><input type="checkbox" data-check-all checked aria-label="@T["updates.checkAll"]" /></th>
+                        <th>@T["common.instance"]</th>
+                        <th>@T["nodes.hostColumn"]</th>
+                        <th>@T["updates.from"]</th>
+                        <th></th>
+                        <th>@T["updates.to"]</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Candidates.Count == 0)
+                    {
+                        <partial name="_EmptyRow" model='@T["updates.none"]' />
+                    }
+                    @foreach (var i in Model.Candidates)
+                    {
+                        <tr>
+                            <td><input type="checkbox" name="ids" value="@i.PublicId" checked data-check-item aria-label="@i.Name" /></td>
+                            <td><a asp-page="/Admin/Instances/Details" asp-route-id="@i.Id" asp-route-tab="hosting">@i.Name</a></td>
+                            <td>@(i.Node?.Name ?? T["nodes.thisHost"])</td>
+                            <td class="mono muted">@(i.Version ?? "?")</td>
+                            <td class="muted">→</td>
+                            <td class="mono">@Model.LatestVersion</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            @if (Model.Candidates.Count > 0)
+            {
+                <div class="list-actions">
+                    <button type="submit" class="btn" data-update-submit
+                            data-label="@T["updates.startSelected"]">@T["updates.startSelected", Model.Candidates.Count]</button>
+                    <button type="button" class="btn btn-ghost" data-toggle-all
+                            data-all="@T["updates.checkAll"]" data-none="@T["updates.checkNone"]">@T["updates.checkNone"]</button>
+                </div>
+            }
+        </div>
+    </form>
+
+    <script>
+        // Selection: all ticked by default. The header box and the button both toggle every row; the submit button
+        // names how many will be updated and is disabled at zero, so a click never does "nothing" silently.
+        (function () {
+            var form = document.querySelector('[data-update-form]');
+            if (!form) return;
+            var items = form.querySelectorAll('[data-check-item]');
+            var head = form.querySelector('[data-check-all]');
+            var toggle = form.querySelector('[data-toggle-all]');
+            var submit = form.querySelector('[data-update-submit]');
+            function sync() {
+                var n = 0; items.forEach(function (c) { if (c.checked) n++; });
+                if (head) { head.checked = n === items.length && n > 0; head.indeterminate = n > 0 && n < items.length; }
+                if (toggle) toggle.textContent = n === items.length ? toggle.dataset.none : toggle.dataset.all;
+                if (submit) { submit.textContent = submit.dataset.label.replace('{0}', n); submit.disabled = n === 0; }
+            }
+            function setAll(v) { items.forEach(function (c) { c.checked = v; }); sync(); }
+            if (head) head.addEventListener('change', function () { setAll(head.checked); });
+            if (toggle) toggle.addEventListener('click', function () {
+                var all = Array.prototype.every.call(items, function (c) { return c.checked; });
+                setAll(!all);
+            });
+            items.forEach(function (c) { c.addEventListener('change', sync); });
+            sync();
+        })();
+    </script>
+}

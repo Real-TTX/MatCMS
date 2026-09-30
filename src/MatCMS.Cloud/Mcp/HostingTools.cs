@@ -87,6 +87,34 @@ public class HostingTools
         return new { removed = r.Removed, bytesReclaimed = r.BytesReclaimed };
     }
 
+    [McpServerTool(Name = "list_update_candidates"), Description(
+        "Instances the cloud can update itself (on its own host or a node) that run an older version than the latest release, within the key's instance scope. Any valid key.")]
+    public static async Task<object> ListUpdateCandidates(McpContext me, InstanceUpdatesService updates, ReleaseWatcher releases, CancellationToken ct)
+    {
+        var list = await updates.CandidatesAsync(i => ApiKeyService.CanAccess(me.Key, i), ct);
+        return new { latest = releases.LatestVersion, instances = list.Select(i => new { instanceId = i.PublicId, name = i.Name, node = i.Node?.Name, version = i.Version }) };
+    }
+
+    [McpServerTool(Name = "start_instance_updates"), Description(
+        "Update instances one after another, each with rollback on failure. Pass the instance ids to update a subset, or none to update every candidate. Ids that need no update are skipped. Refused while the cloud updates itself. Returns a runId for get_update_run. Requires the hosting right.")]
+    public static async Task<object> StartInstanceUpdates(McpContext me, InstanceUpdatesService updates,
+        [Description("Instance ids (from list_update_candidates); omit for all candidates.")] string[]? instanceIds, CancellationToken ct)
+    {
+        RequireHosting(me);
+        var r = await updates.StartAsync(instanceIds, i => ApiKeyService.CanAccess(me.Key, i), ct);
+        if (!r.Ok) throw new McpException(r.Error ?? "Start nicht möglich.");
+        return new { runId = r.RunId, count = r.Count };
+    }
+
+    [McpServerTool(Name = "get_update_run"), Description(
+        "Progress of an instance update run started with start_instance_updates: done flag, completed/total and per instance its status (pending, updating, done, failed, skipped) with message. Any valid key.")]
+    public static object GetUpdateRun(McpContext me, InstanceUpdatesService updates,
+        [Description("The runId returned by start_instance_updates.")] string runId)
+    {
+        _ = me.Key;
+        return updates.Progress(runId) ?? throw new McpException("Lauf nicht gefunden.");
+    }
+
     [McpServerTool(Name = "get_container_status"), Description(
         "Live container status of an instance: whether it runs on this cloud's Docker host (local), its container name/image/state, start time, restart count, published port, health. Any valid key within its instance scope.")]
     public static async Task<object> GetContainerStatus(McpContext me, AppDbContext db, HostingActionsService hosting,

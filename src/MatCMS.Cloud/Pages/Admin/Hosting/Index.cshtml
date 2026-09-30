@@ -9,7 +9,7 @@
     var hostsOnline = d.Hosts.Count(h => h.Online);
     var memUsed = d.Hosts.Sum(h => h.Mem);
     var memTotal = d.Hosts.Where(h => h.MemTotal is not null).Sum(h => h.MemTotal!.Value);
-    var updates = Model.Candidates.Count + (Model.CloudUpdateAvailable ? 1 : 0);
+    var updates = Model.Candidates.Count + Model.OutdatedAgents.Count + (Model.CloudUpdateAvailable ? 1 : 0);
     string HostName(HostingOverviewService.HostRow h) => h.NodeId is null ? T["nodes.thisHost"] : h.Name;
 }
 <partial name="_HostingTabs" model='"overview"' />
@@ -45,11 +45,6 @@
         </a>
     }
 </div>
-
-@if (Model.RunId is not null)
-{
-    <partial name="_BulkProgress" model="Model.RunId" />
-}
 
 @* ---- Hosts: where the sites run and how loaded each machine is — full width, it has four columns of bars. ---- *@
 <div class="card">
@@ -116,10 +111,10 @@
             <div class="kv-value"><a asp-page="Settings"><span class="badge @(Model.AutoUpdate ? "badge-on" : "badge-off")">@(Model.AutoUpdate ? T["hostdash.on"] : T["hostdash.off"])</span></a></div>
         </div>
 
-        @if (Model.Candidates.Count > 0)
+        @if (Model.Candidates.Count > 0 || Model.OutdatedAgents.Count > 0)
         {
             <table class="data" style="margin-top:12px;">
-                <thead><tr><th>@T["common.instance"]</th><th>@T["nodes.hostColumn"]</th><th>@T["updates.from"]</th></tr></thead>
+                <thead><tr><th>@T["updates.what"]</th><th>@T["nodes.hostColumn"]</th><th>@T["updates.from"]</th></tr></thead>
                 <tbody>
                     @foreach (var i in Model.Candidates)
                     {
@@ -127,6 +122,14 @@
                             <td><a asp-page="/Admin/Instances/Details" asp-route-id="@i.Id" asp-route-tab="hosting">@i.Name</a></td>
                             <td>@(i.Node?.Name ?? T["nodes.thisHost"])</td>
                             <td class="mono muted">@(i.Version ?? "?")</td>
+                        </tr>
+                    }
+                    @foreach (var h in Model.OutdatedAgents)
+                    {
+                        <tr>
+                            <td><a asp-page="Nodes/Details" asp-route-id="@h.NodeId">@T["updates.agentOf", h.Name]</a></td>
+                            <td>@h.Name</td>
+                            <td class="mono muted">@(h.AgentVersion ?? "?")</td>
                         </tr>
                     }
                 </tbody>
@@ -143,11 +146,9 @@
             <div class="help">@T["cloudupdate.blocked"] <strong>@Model.CloudStatus.Blocker</strong></div>
         }
         <div class="list-actions">
-            @if (Model.Candidates.Count > 0 && Model.RunId is null)
+            @if (Model.Candidates.Count > 0)
             {
-                <form method="post" asp-page-handler="Start" class="inline-form">
-                    <button type="submit" class="btn">@T["updates.start", Model.Candidates.Count]</button>
-                </form>
+                <a class="btn" asp-page="Updates">@T["updates.open", Model.Candidates.Count]</a>
             }
             @if (Model.CloudStatus.CanSelfUpdate && Model.Busy is null)
             {

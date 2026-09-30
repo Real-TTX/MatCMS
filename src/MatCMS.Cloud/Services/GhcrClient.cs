@@ -81,6 +81,69 @@ public class GhcrClient
             return new([], ex.Message);
         }
     }
+
+    /// <summary>
+    /// Which release tag a pulled image IS: maps manifest digests (as a local image's RepoDigests carry them,
+    /// <c>sha256:…</c>) to the newest release tag with that digest. A locally pulled image only keeps the tag it
+    /// was pulled by — ":latest" — so this is the only way to name the build of an image that predates the
+    /// <c>matcms.version</c> label. Looks at the newest <paramref name="maxTags"/> releases only (one HEAD request
+    /// each); anything older stays unresolved. Never throws.
+    /// </summary>
+    public async Task<Dictionary<string, string>> ResolveDigestsAsync(string owner, string repo, IReadOnlyCollection<string> digests,
+        int maxTags = 30, CancellationToken ct = default)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (digests.Count == 0) return result;
+        try
+        {
+            var list = await ListTagsAsync(owner, repo, ct);
+            if (!list.Ok) return result;
+            var releases = list.Tags.Where(t => ReleaseVersion.Parse(t) is not null)
+                .OrderByDescending(t => ReleaseVersion.Parse(t)!.Value, Comparer<(int, int, int)>.Create((a, b) => ReleaseVersion.Compare(a, b)))
+                .Take(maxTags).ToList();
+
+            var client = _http.CreateClient();
+            client.Timeout = TimeSpan.FromSeconds(8);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("MatCMS-Cloud");
+            using var tokRes = await client.GetAsync($"https://ghcr.io/token?scope=repository:{owner}/{repo}:pull&service=ghcr.io", ct);
+            if (!tokRes.IsSuccessStatusCode) return result;
+            using var tokDoc = JsonDocument.Parse(await tokRes.Content.ReadAsStringAsync(ct));
+            var token = tokDoc.RootElement.TryGetProperty("token", out var t) ? t.GetString() : null;
+
+            var wanted = new HashSet<string>(digests, StringComparer.OrdinalIgnoreCase);
+            // In parallel (bounded): thirty sequential round trips to GHCR took the page close to ten seconds.
+            var found = new System.Collections.Concurrent.ConcurrentDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            using var gate = new SemaphoreSlim(8);
+            await Task.WhenAll(releases.Select(async tag =>
+            {
+                await gate.WaitAsync(ct);
+                try
+                {
+                var req = new HttpRequestMessage(HttpMethod.Head, $"https://ghcr.io/v2/{owner}/{repo}/manifests/{tag}");
+                if (!string.IsNullOrEmpty(token)) req.Headers.Authorization = new("Bearer", token);
+                // Every manifest kind CI can push (multi-arch index or single manifest, OCI or Docker) — the registry
+                // answers with the digest of what it stores, which is exactly what a pull records locally.
+                foreach (var mt in new[] { "application/vnd.oci.image.index.v1+json", "application/vnd.docker.distribution.manifest.list.v2+json",
+                                           "application/vnd.oci.image.manifest.v1+json", "application/vnd.docker.distribution.manifest.v2+json" })
+                    req.Headers.Accept.ParseAdd(mt);
+                using var res = await client.SendAsync(req, ct);
+                if (!res.IsSuccessStatusCode || !res.Headers.TryGetValues("Docker-Content-Digest", out var dv)) return;
+                var digest = dv.FirstOrDefault();
+                // Several tags can share a digest (a rebuild of nothing); the NEWEST release name wins.
+                if (digest is not null && wanted.Contains(digest))
+                    found.AddOrUpdate(digest, tag, (_, old) => ReleaseVersion.IsNewer(tag, old) ? tag : old);
+                }
+                catch { /* one tag that fails is one tag not resolved */ }
+                finally { gate.Release(); }
+            }));
+            foreach (var kv in found) result[kv.Key] = kv.Value;
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(ex, "GHCR digest lookup failed for {Owner}/{Repo}", owner, repo);
+        }
+        return result;
+    }
 }
 
 /// <summary>Comparison of the release tags both MatCMS and this app produce:

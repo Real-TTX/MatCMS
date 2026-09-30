@@ -28,6 +28,7 @@ public class AppDbContext : DbContext
     public DbSet<SiteMember> SiteMembers => Set<SiteMember>();
     public DbSet<SiteRole> SiteRoles => Set<SiteRole>();
     public DbSet<MatCMS.Models.LogEntry> Logs => Set<MatCMS.Models.LogEntry>();
+    public DbSet<StatCounter> StatCounters => Set<StatCounter>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -48,6 +49,8 @@ public class AppDbContext : DbContext
         b.Entity<Menu>().HasIndex(m => m.Key).IsUnique();
         b.Entity<SiteMember>().HasIndex(m => m.Username).IsUnique();
         b.Entity<SiteRole>().HasIndex(r => r.Name).IsUnique();
+        // The upsert target of the statistics flush (INSERT … ON CONFLICT), and what every period query walks.
+        b.Entity<StatCounter>().HasIndex(c => new { c.Day, c.Kind, c.Key }).IsUnique();
 
         // Template files: one name per template, and they go with the template when it is deleted.
         b.Entity<TemplateAsset>().HasIndex(a => new { a.TemplateId, a.Name }).IsUnique();

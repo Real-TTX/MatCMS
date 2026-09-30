@@ -14,6 +14,7 @@
     <button type="button" class="tab" data-tab="smtp">@T["settings.tabMail"]</button>
     <button type="button" class="tab" data-tab="errors">@T["settings.tabErrors"]</button>
     <button type="button" class="tab" data-tab="security">@T["settings.tabSecurity"]</button>
+    <button type="button" class="tab" data-tab="logs">@T["settings.tabLogs"]</button>
     <button type="button" class="tab" data-tab="code">@T["settings.tabCode"]</button>
     <button type="button" class="tab" data-tab="maintenance">@T["settings.maint.tab"]</button>
     <button type="button" class="tab" data-tab="languages">@T["settings.tabLanguages"]</button>
@@ -472,6 +473,50 @@
                     }
                 </select>
             </div>
+            <div><button type="submit" class="btn">@T["settings.save"]</button></div>
+        </div>
+    </form>
+</div>
+
+@* ============ PROTOKOLL & STATISTIK ============ *@
+@* The log and statistics pages only SHOW; what is recorded and for how long is set here. *@
+@{
+    int Num(string key, int fallback) => int.TryParse(V(key), out var n) && n >= 0 ? n : fallback;
+}
+<div class="tab-panel" data-panel="logs" hidden>
+    <form method="post" asp-page-handler="Logs">
+        <div class="card">
+            <h2>@T["stats.title"]</h2>
+            <label class="checkbox-row">
+                <input type="checkbox" name="statsOn" value="true" checked="@(V(SettingKeys.StatsEnabled) != "0")" />
+                @T["settings.statsOn"]
+            </label>
+            <div class="help">@T["settings.statsOnHelp"]</div>
+            <div class="form-field">
+                <label for="statsDays">@T["settings.statsRetention"]</label>
+                <input type="number" id="statsDays" name="statsDays" min="7" max="3650" value="@Num(SettingKeys.StatsRetentionDays, StatsFlushService.DefaultRetentionDays)" />
+            </div>
+        </div>
+        <div class="card">
+            <h2>@T["logs.title"]</h2>
+            <label class="checkbox-row">
+                <input type="checkbox" name="requestsOn" value="true" checked="@(V(SettingKeys.LogRequests) == "on")" />
+                @T["logs.cfg.requests"]
+            </label>
+            <div class="help">@T["logs.cfg.requests.help"]</div>
+            <div class="form-grid">
+                <div class="form-row">
+                    <div class="form-field">
+                        <label for="errorsDays">@T["logs.cfg.retentionErrors"]</label>
+                        <input type="number" id="errorsDays" name="errorsDays" min="0" max="3650" value="@Num(SettingKeys.LogRetentionErrorsDays, 90)" />
+                    </div>
+                    <div class="form-field">
+                        <label for="requestsDays">@T["logs.cfg.retentionRequests"]</label>
+                        <input type="number" id="requestsDays" name="requestsDays" min="0" max="3650" value="@Num(SettingKeys.LogRetentionRequestsDays, 14)" />
+                    </div>
+                </div>
+            </div>
+            <div class="help">@T["logs.cfg.retention.help"]</div>
             <div><button type="submit" class="btn">@T["settings.save"]</button></div>
         </div>
     </form>

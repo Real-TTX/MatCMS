@@ -547,6 +547,7 @@ a.stat { text-decoration: none; color: inherit; display: block; }
 .stat.is-err { border-top: 3px solid #d64545; }
 .dash-bars { display: flex; align-items: flex-end; gap: 3px; height: 28px; margin-top: 6px; }
 .dash-bars span { flex: 1; background: #d64545; opacity: .75; border-radius: 2px 2px 0 0; min-height: 2px; }
+.dash-bars.is-views span { background: var(--accent); }
 /* min(380px, 100%): a card never demands more room than a phone has (the fixed 380px widened the page). */
 .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr)); gap: 16px; align-items: start; }
 .dash-grid > .card { margin-bottom: 0; }
@@ -558,8 +559,8 @@ table.dash-attention { table-layout: fixed; width: 100%; }
 table.data.dash-attention td:last-child { width: auto; white-space: normal; overflow-wrap: anywhere; }
 table.dash-attention col.dash-icon-col { width: 44px; }
 table.dash-attention td.dash-icon { font-size: 18px; text-align: center; padding-left: 6px; padding-right: 6px; }
-/* Dashboard tiles: narrower minimum, so six fit one row on a normal screen. */
-.stat-grid.dash-tiles { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+/* Dashboard tiles: narrower minimum, so seven fit one row on a normal screen. */
+.stat-grid.dash-tiles { grid-template-columns: repeat(auto-fit, minmax(125px, 1fr)); }
 td.nowrap, th.nowrap, .nowrap { white-space: nowrap; }
 table.dash-attention tr.lvl-err td:first-child { box-shadow: inset 3px 0 0 #d64545; }
 table.dash-attention tr.lvl-warn td:first-child { box-shadow: inset 3px 0 0 #e0a100; }
@@ -1461,3 +1462,23 @@ a.tab { display: inline-block; text-decoration: none; }
 .ai-preview-tab .ai-preview-tab-nav { opacity: .6; font-size: 11px; margin-left: 4px; }
 .ai-dialog-foot { display: flex; gap: 10px; margin-top: 14px; }
 @media (max-width: 560px) { .ai-cols { grid-template-columns: 1fr; } }
+
+/* Statistics (_SiteStats, shared by the CMS and the cloud). The chart is an inline SVG stretched to the card. */
+.stats-chart { display: block; width: 100%; height: 170px; }
+.stats-chart .hit { fill: transparent; }
+.stats-chart g:hover .hit { fill: rgba(0, 0, 0, .035); }
+.stats-chart .views { fill: color-mix(in srgb, var(--accent) 30%, #fff); }
+.stats-chart .visitors { fill: var(--accent); }
+.stats-chart .axis { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.stats-chart-axis { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 12.5px; margin-top: 6px; }
+.stats-legend i { display: inline-block; width: 10px; height: 10px; margin: 0 4px 0 10px; vertical-align: -1px; }
+.stats-legend i.views { background: color-mix(in srgb, var(--accent) 30%, #fff); }
+.stats-legend i.visitors { background: var(--accent); }
+.stats-chart-card { margin-top: 16px; }
+.stats-chart-card + .dash-grid { margin-top: 16px; }
+/* The share of a row is drawn behind its label, so a top list reads like a bar chart without being one. */
+table.stats-table { table-layout: fixed; width: 100%; }
+table.data.stats-table td:last-child, table.data.stats-table th:last-child { width: 90px; text-align: right; }
+table.stats-table td.stats-key { overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 12%, transparent) var(--share, 0%), transparent var(--share, 0%)); }
+.stats-period { display: flex; flex-wrap: wrap; gap: 6px; }

@@ -20,10 +20,11 @@ public class IndexModel : PageModel
     private readonly EmailService _mail;
     private readonly VersionService _version;
     private readonly Localizer _t;
+    private readonly StatsService _stats;
 
-    public IndexModel(AppDbContext db, CloudState cloud, BackupManager backups, EmailService mail, VersionService version, Localizer t)
+    public IndexModel(AppDbContext db, CloudState cloud, BackupManager backups, EmailService mail, VersionService version, Localizer t, StatsService stats)
     {
-        _db = db; _cloud = cloud; _backups = backups; _mail = mail; _version = version; _t = t;
+        _db = db; _cloud = cloud; _backups = backups; _mail = mail; _version = version; _t = t; _stats = stats;
     }
 
     // ---- Tiles ------------------------------------------------------------------------------------------
@@ -38,6 +39,8 @@ public class IndexModel : PageModel
     public int SubmissionCount { get; private set; }
     public int UnreadCount { get; private set; }
     public List<(DateTime Day, int Count)> ErrorsPerDay { get; private set; } = new();
+    /// <summary>Visitor statistics of the last 7 days, for the tile that leads to Admin → Statistik.</summary>
+    public MatCMS.Shared.StatsSummary Stats7d { get; private set; } = null!;
     public int ErrorCount7d => ErrorsPerDay.Sum(d => d.Count);
 
     // ---- Website / system ------------------------------------------------------------------------------
@@ -109,6 +112,7 @@ public class IndexModel : PageModel
         var days = (await _db.Logs.AsNoTracking().Where(l => l.Level == "Error" && l.CreatedAt >= from).Select(l => l.CreatedAt).ToListAsync())
             .GroupBy(d => d.Date).ToDictionary(g => g.Key, g => g.Count());
         for (var d = from; d <= DateTime.UtcNow.Date; d = d.AddDays(1)) ErrorsPerDay.Add((d, days.GetValueOrDefault(d)));
+        Stats7d = await _stats.SummaryAsync(7);
         RecentErrors = await _db.Logs.AsNoTracking().Where(l => l.Level == "Error").OrderByDescending(l => l.Id).Take(5).ToListAsync();
 
         // What was worked on last — the fastest way back into an edit.

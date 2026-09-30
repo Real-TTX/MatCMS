@@ -4,6 +4,7 @@
     ViewData["Title"] = T["dashboard.title"];
     var dashUser = User.FindFirst("DisplayName")?.Value ?? User.Identity?.Name ?? "Admin";
     var maxDay = Math.Max(1, Model.ErrorsPerDay.Max(d => d.Count));
+    var maxViews = Math.Max(1, Model.Stats7d.Days.Max(d => d.Views));
     string Hsize(long b) => b >= 1L << 30 ? $"{b / (double)(1L << 30):0.0} GB" : b >= 1 << 20 ? $"{b / 1048576.0:0} MB" : $"{b / 1024} KB";
 }
 <div class="page-head">
@@ -48,6 +49,16 @@
         <div class="n">@Model.UserCount</div>
         <div class="l">@T["dashboard.users"]</div>
         <div class="s">@T["dashboard.members", Model.MemberCount]</div>
+    </a>
+    <a class="stat" asp-page="/Admin/Stats/Index" asp-route-days="7">
+        <div class="n">@Model.Stats7d.Views</div>
+        <div class="l">@T["dashboard.views7d"]</div>
+        <div class="dash-bars is-views" aria-hidden="true">
+            @foreach (var d in Model.Stats7d.Days)
+            {
+                <span style="height:@(d.Views == 0 ? 2 : 4 + 22 * d.Views / maxViews)px" title="@d.Day.ToString("ddd dd.MM."): @d.Views"></span>
+            }
+        </div>
     </a>
     <a class="stat @(Model.ErrorCount7d > 0 ? "is-warn" : "")" asp-page="/Admin/Logs/Index">
         <div class="n">@Model.ErrorCount7d</div>

@@ -84,7 +84,7 @@ public class IndexModel : PageModel
         SmtpConfigured = !string.IsNullOrWhiteSpace(
             (await _db.SiteSettings.AsNoTracking().FirstOrDefaultAsync(x => x.Key == SettingKeys.SmtpHost))?.Value);
         var existing = await _db.SiteSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
-        foreach (var key in SettingKeys.All.Concat(SettingKeys.Smtp).Concat(SettingKeys.Errors).Concat(SettingKeys.Code).Concat(SettingKeys.Maintenance).Concat(SettingKeys.Translate).Concat(SettingKeys.Security))
+        foreach (var key in SettingKeys.All.Concat(SettingKeys.Smtp).Concat(SettingKeys.Errors).Concat(SettingKeys.Code).Concat(SettingKeys.Maintenance).Concat(SettingKeys.Translate).Concat(SettingKeys.Security).Concat(SettingKeys.Logs))
             Values[key] = existing.TryGetValue(key, out var v) ? v : "";
         CurrentActive = Localizer.ParseActive(existing.TryGetValue(SettingKeys.Languages, out var lv) ? lv : "")
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -277,6 +277,20 @@ public class IndexModel : PageModel
             ? "Zwei-Faktor-Pflicht ist AKTIV — Admins ohne 2FA werden zur Einrichtung geführt."
             : "Sicherheitseinstellungen gespeichert.";
         return RedirectToPage(new { tab = "security" });
+    }
+
+    /// <summary>What the site records (errors, optionally every request, visitor statistics) and how long it keeps
+    /// it. Typed parameters: two checkboxes and three numbers, none of which may be stored as posted.</summary>
+    public async Task<IActionResult> OnPostLogsAsync(bool requestsOn, int errorsDays, int requestsDays, bool statsOn, int statsDays)
+    {
+        Values[SettingKeys.LogRequests] = requestsOn ? "on" : "off";
+        Values[SettingKeys.LogRetentionErrorsDays] = Math.Clamp(errorsDays, 0, 3650).ToString();
+        Values[SettingKeys.LogRetentionRequestsDays] = Math.Clamp(requestsDays, 0, 3650).ToString();
+        Values[SettingKeys.StatsEnabled] = statsOn ? "1" : "0";
+        Values[SettingKeys.StatsRetentionDays] = Math.Clamp(statsDays, 7, 3650).ToString();
+        await SaveKeysAsync(SettingKeys.Logs);
+        TempData["Flash"] = "Protokoll & Statistik gespeichert.";
+        return RedirectToPage(new { tab = "logs" });
     }
 
     public async Task<IActionResult> OnPostCodeAsync()

@@ -15,7 +15,7 @@ public static class CloudProtocol
     /// <summary>Contract version. Bump on <b>every</b> change to the payloads in this file: the cloud
     /// badges an instance reporting an older one as "veraltet", and both sides read this constant, so
     /// one edit covers both.</summary>
-    public const int Version = 16;
+    public const int Version = 17;
 
     /// <summary>Header carrying the instance's bearer token.</summary>
     public const string TokenHeader = "X-MatCMS-Instance-Token";
@@ -135,6 +135,12 @@ public sealed class HeartbeatRequest
     /// <see cref="LogReport.SourceId"/>, so the same entries riding on successive beats are stored once.
     /// Null/empty from an instance that predates this (protocol &lt; 16) or simply has no errors.</summary>
     public List<LogReport>? RecentLogs { get; set; }
+
+    /// <summary>Visitor statistics: the daily counters of the days the cloud does not have yet (or not complete —
+    /// today and yesterday are re-sent), at most a couple of weeks per beat and only the top
+    /// <see cref="StatKinds.WireTopPerKind"/> keys per kind. Sent only to a cloud that said it takes them
+    /// (<see cref="HeartbeatResponse.StatsAccepted"/>), and throttled once caught up. Null = nothing this beat.</summary>
+    public List<StatDayReport>? Stats { get; set; }
 }
 
 /// <summary>One log entry as it travels on the heartbeat — a lean projection of the instance's own
@@ -246,6 +252,15 @@ public sealed class HeartbeatResponse
     /// the instance's source in Protokoll. Complements the lean per-beat overview
     /// (<see cref="HeartbeatRequest.RecentLogs"/>).</summary>
     public PendingLogFetch? LogFetch { get; set; }
+
+    /// <summary>True from a cloud that stores visitor statistics (protocol ≥ 17). An instance never sends its
+    /// counters to a cloud that did not say so — an older one would just drop them.</summary>
+    public bool StatsAccepted { get; set; }
+
+    /// <summary>The newest day the cloud holds statistics for from this instance (<c>yyyy-MM-dd</c>), null = none.
+    /// The instance sends from the day BEFORE it onwards — that day may have been sent before it was over — so
+    /// a new link backfills and a normal beat only refreshes the last two days.</summary>
+    public string? StatsHaveUntil { get; set; }
 }
 
 // --- Configuration payload ------------------------------------------------

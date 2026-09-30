@@ -13,6 +13,8 @@
     <!-- A Razor Class Library does not get the ASP.NET shared framework by itself, and the compiled
          partial in Pages/Shared needs it. -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <!-- The statistics view renders the shared StatsSummary. -->
+    <ProjectReference Include="..\MatCMS.Shared\MatCMS.Shared.csproj" />
   </ItemGroup>
 
   <!-- The admin shell, shared instead of copied. These files used to live twice, byte-identical, in

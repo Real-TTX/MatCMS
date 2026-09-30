@@ -1,0 +1,28 @@
+@page
+@model MatCMS.Pages.Admin.Stats.IndexModel
+@{
+    ViewData["Title"] = T["stats.title"];
+    var labels = new SiteStatsLabels(
+        T["stats.views"], T["stats.visitors"], T["stats.bots"], T["stats.notFound"], T["stats.serverErrors"],
+        T["stats.vsPrevious"], T["stats.chart"], T["stats.topPages"], T["stats.referrers"], T["stats.notFoundPages"],
+        T["stats.devices"], T["stats.page"], T["stats.source"], T["stats.count"], T["stats.empty"], T["stats.other"],
+        T["stats.desktop"], T["stats.mobile"], T["stats.tablet"]);
+}
+<div class="page-head">
+    <h1>@T["stats.title"]</h1>
+    <div class="list-toolbar">
+        <div class="gallery-filter stats-period">
+            @foreach (var d in StatsService.Periods)
+            {
+                <a class="gfilter @(Model.Days == d ? "active" : "")" asp-page="Index" asp-route-days="@d">@T["stats.lastDays", d]</a>
+            }
+        </div>
+    </div>
+</div>
+
+@if (!Model.Enabled)
+{
+    <div class="card"><span class="badge badge-off">@T["stats.off"]</span> <a asp-page="/Admin/Settings/Index" asp-route-tab="logs">@T["nav.settings"]</a></div>
+}
+
+@await Html.PartialAsync("_SiteStats", new SiteStats(Model.Summary, labels))

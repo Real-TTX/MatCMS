@@ -195,6 +195,10 @@ builder.Services.AddScoped<CleanupService>();
 builder.Services.AddScoped<CloudBackupService>();
 builder.Services.AddHostedService<BackupSchedulerService>();
 builder.Services.AddHostedService<LogRetentionService>();
+// Visitor statistics: counted in memory per request, written once a minute (Admin → Statistik).
+builder.Services.AddSingleton<StatsCollector>();
+builder.Services.AddScoped<StatsService>();
+builder.Services.AddHostedService<StatsFlushService>();
 builder.Services.AddHttpClient();
 // Stateless apart from the file cache it manages, so one instance for the whole app.
 builder.Services.AddSingleton<ThumbnailService>();
@@ -522,6 +526,9 @@ app.UseAuthorization();
 // Record unhandled exceptions + 5xx responses to the log (Admin → Protokoll). Fail-safe; sits inside
 // the app's exception handler so the normal error page still renders.
 app.UseMiddleware<MatCMS.Services.RequestLogMiddleware>();
+// Visitor statistics — after authentication (the site's own people are not counted) and inside the status-code
+// re-execution, so a 404 is counted under its real path and its /_status re-run is skipped.
+app.UseMiddleware<MatCMS.Services.StatsMiddleware>();
 
 // --- Enforce "2FA required" (Settings → Sicherheit, cloud-rollable) ---------
 // When the policy is on, a signed-in admin who has NOT set up 2FA is funnelled to the enrolment page —

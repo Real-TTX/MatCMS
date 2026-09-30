@@ -1,0 +1,124 @@
+@model MatCMS.Shared.Web.SiteStats
+@using MatCMS.Shared
+@* Shared by the CMS (Admin → Statistik) and the cloud (a site's statistics). No tag helpers in this library —
+   plain HTML only. The chart is an inline SVG: no chart library, nothing to load, and it prints. *@
+@{
+    var s = Model.Summary;
+    var L = Model.L;
+    // A narrow no-break space groups thousands in either admin language without a culture lookup
+    // (both apps run with invariant globalization).
+    static string N(long n) => n.ToString("#,0", System.Globalization.CultureInfo.InvariantCulture).Replace(",", " ");
+    string Trend(long now, long? before)
+    {
+        if (before is not long b) return "";
+        if (b == 0) return now == 0 ? "" : string.Format(L.VsPrevious, "+" + N(now));
+        var pct = (now - b) * 100.0 / b;
+        return string.Format(L.VsPrevious, (pct >= 0 ? "+" : "−") + Math.Abs(Math.Round(pct)).ToString("0", System.Globalization.CultureInfo.InvariantCulture) + " %");
+    }
+    string Device(string key) => key switch { "mobile" => L.Mobile, "tablet" => L.Tablet, "desktop" => L.Desktop, StatKinds.Other => L.Other, _ => key };
+    string Href(string path) => (Model.SiteUrl?.TrimEnd('/') ?? "") + path;
+
+    var max = Math.Max(1, s.Days.Count == 0 ? 1 : s.Days.Max(d => d.Views));
+    var n = Math.Max(1, s.Days.Count);
+    const double W = 1000, H = 160;
+    var slot = W / n;
+    var bar = Math.Max(1, slot * 0.72);
+}
+@{
+    void Table(string title, string col, List<StatsEntry> rows, bool link, bool device)
+    {
+        var total = Math.Max(1, rows.Sum(r => r.Count));
+        <div class="card">
+            <h2>@title</h2>
+            <table class="data stats-table">
+                <thead><tr><th>@col</th><th class="num">@L.Count</th></tr></thead>
+                <tbody>
+                    @if (rows.Count == 0)
+                    {
+                        <tr><td colspan="99" class="muted"><em>@L.Empty</em></td></tr>
+                    }
+                    @foreach (var r in rows)
+                    {
+                        var label = device ? Device(r.Key) : r.Key == StatKinds.Other ? L.Other : r.Key;
+                        <tr>
+                            <td class="stats-key" style="--share:@F(r.Count * 100.0 / total)%">
+                                @if (link && r.Key != StatKinds.Other)
+                                {
+                                    <a class="mono" href="@Href(r.Key)" target="_blank" rel="noopener">@label</a>
+                                }
+                                else
+                                {
+                                    <span class="@(device ? "" : "mono")">@label</span>
+                                }
+                            </td>
+                            <td class="num mono">@N(r.Count)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+<div class="stat-grid dash-tiles">
+    <div class="stat">
+        <div class="n">@N(s.Views)</div>
+        <div class="l">@L.Views</div>
+        @if (Trend(s.Views, s.PreviousViews) is { Length: > 0 } tv) { <div class="s">@tv</div> }
+    </div>
+    <div class="stat">
+        <div class="n">@N(s.Visitors)</div>
+        <div class="l">@L.Visitors</div>
+        @if (Trend(s.Visitors, s.PreviousVisitors) is { Length: > 0 } tr) { <div class="s">@tr</div> }
+    </div>
+    <div class="stat @(s.NotFound > 0 ? "is-warn" : "")">
+        <div class="n">@N(s.NotFound)</div>
+        <div class="l">@L.NotFound</div>
+    </div>
+    <div class="stat @(s.ServerErrors > 0 ? "is-err" : "")">
+        <div class="n">@N(s.ServerErrors)</div>
+        <div class="l">@L.ServerErrors</div>
+    </div>
+    <div class="stat">
+        <div class="n">@N(s.Bots)</div>
+        <div class="l">@L.Bots</div>
+    </div>
+</div>
+
+<div class="card stats-chart-card">
+    <h2>@L.Chart</h2>
+    <svg class="stats-chart" viewBox="0 0 @W @(H + 2)" preserveAspectRatio="none" role="img" aria-label="@L.Chart">
+        @for (var i = 0; i < s.Days.Count; i++)
+        {
+            var d = s.Days[i];
+            var x = i * slot + (slot - bar) / 2;
+            var hv = d.Views * H / max;
+            var hu = d.Visitors * H / max;
+            <g>
+                <title>@d.Day.ToString("dd.MM.yyyy"): @N(d.Views) @L.Views · @N(d.Visitors) @L.Visitors</title>
+                @* A full-height hit area, so an empty day still shows its tooltip. *@
+                <rect x="@F(i * slot)" y="0" width="@F(slot)" height="@H" class="hit" />
+                <rect x="@F(x)" y="@F(H - hv)" width="@F(bar)" height="@F(hv)" class="views" />
+                <rect x="@F(x)" y="@F(H - hu)" width="@F(bar)" height="@F(hu)" class="visitors" />
+            </g>
+        }
+        <line x1="0" y1="@H" x2="@W" y2="@H" class="axis" />
+    </svg>
+    <div class="stats-chart-axis">
+        <span>@s.From.ToString("dd.MM.")</span>
+        <span class="stats-legend"><i class="views"></i>@L.Views <i class="visitors"></i>@L.Visitors · max @N(max)</span>
+        <span>@s.To.ToString("dd.MM.")</span>
+    </div>
+</div>
+
+<div class="dash-grid">
+    @{ Table(L.TopPages, L.Page, s.TopPages, link: true, device: false); }
+    @{ Table(L.Referrers, L.Source, s.Referrers, link: false, device: false); }
+    @{ Table(L.NotFoundPages, L.Page, s.NotFoundPages, link: false, device: false); }
+    @{ Table(L.Devices, L.Devices, s.Devices, link: false, device: true); }
+</div>
+
+@functions {
+    static string F(double v) => v.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+}
+

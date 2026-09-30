@@ -133,6 +133,11 @@ public static class SettingKeys
     public const string LogRetentionErrorsDays = "log.retentionErrorsDays";  // errors/5xx (category "request"); default 90
     public const string LogRetentionRequestsDays = "log.retentionRequestsDays"; // full request log (category "webrequest"); default 14
 
+    // Visitor statistics (Admin → Statistik). On unless switched off: cookie-less, only daily counts, no address
+    // stored. Retention in days (default 400 — a year plus the same weeks of the year before, for comparison).
+    public const string StatsEnabled = "stats.enabled";              // "0" = off; anything else = on
+    public const string StatsRetentionDays = "stats.retentionDays";
+
     // MatCMS.Cloud link (Settings → Cloud). The cloud watches versions, notifies, and — when this
     // instance runs on ITS Docker host — can perform updates. Empty URL/id/token = fully offline.
     // The token is stored DataProtection-ENCRYPTED (see CloudService), never in the clear.
@@ -185,6 +190,9 @@ public static class SettingKeys
 
     /// <summary>Security-policy keys (managed on the Settings → Sicherheit tab).</summary>
     public static readonly string[] Security = [Require2fa];
+
+    // Settings → Protokoll & Statistik.
+    public static readonly string[] Logs = [LogRequests, LogRetentionErrorsDays, LogRetentionRequestsDays, StatsEnabled, StatsRetentionDays];
 
     /// <summary>Custom-code / tracking keys (managed on the Settings → Code tab).</summary>
     public static readonly string[] Code = [AnalyticsGa4, CodeHead, CodeBodyStart, CodeBodyEnd];

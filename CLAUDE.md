@@ -59,7 +59,10 @@ together by hand:
    component editor: tabs, fields, field designer and live preview) **with its script,
    `js/component-editor.js`** — what the two applications differ in rides along as `data-`
    attributes on `#field-rows` (field types, the script's own wording, the preview's theme), never
-   as a branch on which application is rendering.
+   as a branch on which application is rendering. `_SiteStats.cshtml` renders the visitor statistics
+   (tiles, SVG chart, top lists) for the CMS's Admin → Statistik and the cloud's view of a site alike,
+   from a `StatsSummary` that `src/MatCMS.Shared/SiteStats.cs` computes once — so the two pages cannot
+   disagree about a number (this is why `MatCMS.Shared.Web` references `MatCMS.Shared`).
    The shared views take their **wording as strings, not `@T[…]`** — a shared view cannot reference
    either application's `Localizer` type — so each app keeps a thin adapter that looks the keys up
    (`_IconPicker.cshtml`, and the `@{ }` block of the pages using `_ComponentEditor`). The library

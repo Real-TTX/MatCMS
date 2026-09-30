@@ -50,6 +50,13 @@ public class CloudState
     /// </summary>
     public string? ObservedBaseUrl { get; set; }
 
+    // Visitor statistics towards the cloud: whether it takes them, the newest day it holds, and when we last sent
+    // (once caught up, every 10 minutes is plenty — the cloud's page is not a live counter). In-memory: after a
+    // restart the first beat learns both again and the next one sends.
+    public bool StatsAccepted { get; set; }
+    public string? StatsHaveUntil { get; set; }
+    public DateTime? StatsLastSentUtc { get; set; }
+
     public bool IsPending => string.Equals(Status, "Pending", StringComparison.OrdinalIgnoreCase);
     public bool OutOfSync => ConfigRevision > 0 && AppliedRevision != ConfigRevision;
 
@@ -321,6 +328,9 @@ public class CloudService
             _state.CloudCanUpdate = answer?.CloudCanUpdate ?? false;
             _state.DisplayName = answer?.DisplayName;
             _state.ProfileName = answer?.ProfileName;
+            if (beat.Stats is not null) _state.StatsLastSentUtc = DateTime.UtcNow;
+            _state.StatsAccepted = answer?.StatsAccepted ?? false;
+            _state.StatsHaveUntil = answer?.StatsHaveUntil;
             // Gespeichert und nicht nur im Zustand gehalten: die CSP wird bei jeder Anfrage gesetzt,
             // auch direkt nach einem Neustart, bevor der erste Herzschlag durch ist.
             // Nur schreiben, wenn sich etwas ändert — und dann auch wirklich speichern. Der Block
@@ -653,8 +663,26 @@ public class CloudService
                     Method = l.Method,
                     StatusCode = l.StatusCode
                 })
-                .ToListAsync(ct)
+                .ToListAsync(ct),
+            Stats = await BuildStatsAsync(ct)
         };
+    }
+
+    /// <summary>The statistics days the cloud lacks — see <see cref="HeartbeatRequest.Stats"/>. From the day before
+    /// the newest one it has (that day may have been sent before it was over), a fortnight per beat while it
+    /// catches up, and every 10 minutes once it has.</summary>
+    private async Task<List<StatDayReport>?> BuildStatsAsync(CancellationToken ct)
+    {
+        if (!_state.StatsAccepted) return null;
+        var stats = _services.GetService<StatsService>();
+        if (stats is null) return null;
+        var yesterday = StatKinds.DayOf(DateTime.UtcNow.AddDays(-1));
+        var have = _state.StatsHaveUntil;
+        var caughtUp = have is not null && string.CompareOrdinal(have, yesterday) >= 0;
+        if (caughtUp && _state.StatsLastSentUtc is DateTime last && DateTime.UtcNow - last < TimeSpan.FromMinutes(10)) return null;
+        var from = have is null ? null : StatKinds.DayOf(StatKinds.ParseDay(have).AddDays(-1).ToDateTime(TimeOnly.MinValue));
+        try { return await stats.DaysForCloudAsync(from, 14, ct); }
+        catch (Exception ex) { _log.LogWarning(ex, "Statistik für die Cloud konnte nicht gelesen werden"); return null; }
     }
 
     /// <summary>

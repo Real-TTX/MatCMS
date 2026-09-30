@@ -646,7 +646,6 @@
   "logs.details": "Details anzeigen",
   "logs.clear": "Protokoll leeren",
   "logs.clearConfirm": "Alle Protokoll-Einträge löschen?",
-  "logs.config": "Einstellungen",
   "logs.cfg.requests": "Jeden Aufruf protokollieren (Request-Log)",
   "logs.cfg.requests.help": "Zusätzlich zu Fehlern jede HTTP-Anfrage der Cloud aufzeichnen (Kategorie „Requests“). Statische Dateien werden ausgelassen. Kann viele Einträge erzeugen – Aufbewahrung unten begrenzen.",
   "logs.cfg.retentionErrors": "Fehler aufbewahren (Tage)",

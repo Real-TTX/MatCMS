@@ -36,11 +36,6 @@ public class IndexModel : PageModel
     public bool FullLogPending { get; private set; }
     public List<(string PublicId, string Name)> Instances { get; private set; } = new();
 
-    // Config (Cloud's own log only).
-    public bool RequestsOn { get; private set; }
-    public int ErrorsDays { get; private set; }
-    public int RequestsDays { get; private set; }
-
     private const int Keep = 2000;
     private const int Show = 300;
 
@@ -57,7 +52,6 @@ public class IndexModel : PageModel
 
         if (IsCloud)
         {
-            await LoadConfigAsync();
             await LoadCloudAsync();
         }
         else if (IsAll)
@@ -66,16 +60,6 @@ public class IndexModel : PageModel
             return RedirectToPage("Index");
 
         return Page();
-    }
-
-    private async Task LoadConfigAsync()
-    {
-        var map = await _db.CloudSettings.AsNoTracking()
-            .Where(s => s.Key == SettingKeys.LogRequests || s.Key == SettingKeys.LogRetentionErrorsDays || s.Key == SettingKeys.LogRetentionRequestsDays)
-            .ToDictionaryAsync(s => s.Key, s => s.Value);
-        RequestsOn = map.GetValueOrDefault(SettingKeys.LogRequests) == "on";
-        ErrorsDays = int.TryParse(map.GetValueOrDefault(SettingKeys.LogRetentionErrorsDays), out var e) ? e : 90;
-        RequestsDays = int.TryParse(map.GetValueOrDefault(SettingKeys.LogRetentionRequestsDays), out var r) ? r : 14;
     }
 
     private async Task LoadCloudAsync()
@@ -160,22 +144,6 @@ public class IndexModel : PageModel
             TempData["Flash"] = "Volles Protokoll angefordert – die Instanz lädt es beim nächsten Kontakt hoch.";
         }
         return RedirectToPage(new { source });
-    }
-
-    public async Task<IActionResult> OnPostSaveConfigAsync(bool requestsOn, int errorsDays, int requestsDays)
-    {
-        async Task SetAsync(string key, string value)
-        {
-            var row = await _db.CloudSettings.FirstOrDefaultAsync(s => s.Key == key);
-            if (row is null) _db.CloudSettings.Add(new Models.CloudSetting { Key = key, Value = value });
-            else row.Value = value;
-        }
-        await SetAsync(SettingKeys.LogRequests, requestsOn ? "on" : "off");
-        await SetAsync(SettingKeys.LogRetentionErrorsDays, Math.Clamp(errorsDays, 0, 3650).ToString());
-        await SetAsync(SettingKeys.LogRetentionRequestsDays, Math.Clamp(requestsDays, 0, 3650).ToString());
-        await _db.SaveChangesAsync();
-        TempData["Flash"] = "Protokoll-Einstellungen gespeichert.";
-        return RedirectToPage();
     }
 
     /// <summary>Clears the cloud's OWN log. An instance's mirror is not clearable here — it refills from

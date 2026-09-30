@@ -13,6 +13,36 @@
     <button type="button" class="tab" data-tab="smtp">@T["settings.tabSmtp"]</button>
     <button type="button" class="tab" data-tab="ai">@T["settings.tabAi"]</button>
     <button type="button" class="tab" data-tab="api">@T["settings.tabApi"]</button>
+    <button type="button" class="tab" data-tab="logs">@T["logs.title"]</button>
+</div>
+
+@* ============ PROTOKOLL ============ *@
+@* The log page only SHOWS; what the cloud records and how long it keeps it is configured here. *@
+<div class="tab-panel" data-panel="logs" hidden>
+    <form method="post" asp-page-handler="Logs">
+        <div class="card">
+            <h2>@T["logs.title"]</h2>
+            <label class="checkbox-row">
+                <input type="checkbox" name="requestsOn" value="true" checked="@(Model.Get(SettingKeys.LogRequests) == "on" ? "checked" : null)" />
+                @T["logs.cfg.requests"]
+            </label>
+            <div class="help">@T["logs.cfg.requests.help"]</div>
+            <div class="form-grid">
+                <div class="form-row">
+                    <div class="form-field">
+                        <label for="errorsDays">@T["logs.cfg.retentionErrors"]</label>
+                        <input type="number" id="errorsDays" name="errorsDays" min="0" max="3650" value="@Model.Days(SettingKeys.LogRetentionErrorsDays, 90)" />
+                    </div>
+                    <div class="form-field">
+                        <label for="requestsDays">@T["logs.cfg.retentionRequests"]</label>
+                        <input type="number" id="requestsDays" name="requestsDays" min="0" max="3650" value="@Model.Days(SettingKeys.LogRetentionRequestsDays, 14)" />
+                    </div>
+                </div>
+            </div>
+            <div class="help">@T["logs.cfg.retention.help"]</div>
+            <div style="margin-top:14px;"><button type="submit" class="btn">@T["settings.save"]</button></div>
+        </div>
+    </form>
 </div>
 
 @* ============ GENERAL ============ *@

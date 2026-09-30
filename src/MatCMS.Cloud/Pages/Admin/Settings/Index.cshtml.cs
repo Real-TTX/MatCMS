@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace MatCMS.Cloud.Pages.Admin.Settings;
 
 /// <summary>
-/// The cloud's own settings: general + security, SMTP, AI, backups, API keys. Each form saves ONLY its own keys.
+/// The cloud's own settings: general + security, SMTP, AI, API keys, log. Each form saves ONLY its own keys.
 /// Everything about hosts and containers is under Hosting — the old tabs here redirect there.
 /// </summary>
 public class IndexModel : PageModel
@@ -130,6 +130,21 @@ public class IndexModel : PageModel
         });
         TempData["Flash"] = "KI-Einstellungen gespeichert.";
         return RedirectToPage(new { tab = "ai" });
+    }
+
+    public int Days(string key, int fallback) => int.TryParse(Get(key), out var d) && d >= 0 ? d : fallback;
+
+    /// <summary>What the cloud records in its own log and how long it keeps it. The log page only shows.</summary>
+    public async Task<IActionResult> OnPostLogsAsync(bool requestsOn, int errorsDays, int requestsDays)
+    {
+        await _cloud.SaveAsync(new Dictionary<string, string?>
+        {
+            [SettingKeys.LogRequests] = requestsOn ? "on" : "off",
+            [SettingKeys.LogRetentionErrorsDays] = Math.Clamp(errorsDays, 0, 3650).ToString(),
+            [SettingKeys.LogRetentionRequestsDays] = Math.Clamp(requestsDays, 0, 3650).ToString(),
+        });
+        TempData["Flash"] = "Protokoll-Einstellungen gespeichert.";
+        return RedirectToPage(new { tab = "logs" });
     }
 
     public async Task<IActionResult> OnPostSmtpTestAsync(string? testTo)

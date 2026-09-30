@@ -646,7 +646,6 @@
   "logs.details": "Show details",
   "logs.clear": "Clear logs",
   "logs.clearConfirm": "Delete all log entries?",
-  "logs.config": "Settings",
   "logs.cfg.requests": "Log every request (request log)",
   "logs.cfg.requests.help": "In addition to errors, record every HTTP request to the cloud (category “Requests”). Static files are skipped. Can create many entries – cap the retention below.",
   "logs.cfg.retentionErrors": "Keep errors (days)",

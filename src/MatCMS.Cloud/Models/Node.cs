@@ -37,6 +37,11 @@ public class Node
     /// <summary>Why the agent cannot talk to its daemon (no socket, permission denied), or null.</summary>
     public string? DockerError { get; set; }
 
+    /// <summary>The host's size as the agent reported it (CPU count, total memory in bytes). Null for an agent
+    /// that predates the field.</summary>
+    public int? Cpus { get; set; }
+    public long? MemTotal { get; set; }
+
     /// <summary>The MatCMS containers on the host as last reported (JSON list of
     /// <c>NodeContainer</c>). Classification looks instances up here.</summary>
     public string? InventoryJson { get; set; }

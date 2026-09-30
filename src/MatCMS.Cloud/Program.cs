@@ -131,6 +131,7 @@ builder.Services.AddScoped<ProfileService>();
 builder.Services.AddScoped<StoreService>();
 builder.Services.AddScoped<HostingActionsService>();
 builder.Services.AddScoped<CloudUpdaterService>();
+builder.Services.AddScoped<HostingOverviewService>();
 builder.Services.AddScoped<MatCMS.Cloud.Services.Proxy.ProxyService>();
 builder.Services.AddScoped<MatCMS.Cloud.Services.Nodes.NodeService>();
 builder.Services.AddScoped<NotificationService>();
@@ -403,6 +404,26 @@ app.Use(async (ctx, next) =>
                 }
             }
         }
+    }
+    await next();
+});
+
+// --- While the cloud updates itself, the back office is closed ---
+// Every /admin request (page or form post) lands on the full-screen update page instead: an action taken now
+// would either be cut off by the restart or run against the container that is about to be replaced. The state
+// is the helper's FILE, read at most every 2 s. A run that started more than 15 minutes ago no longer locks —
+// a helper that died without writing its result must not close the admin for good (the update page itself
+// then reports the run as failed).
+app.Use(async (ctx, next) =>
+{
+    var p = ctx.Request.Path.Value ?? "/";
+    if (p.StartsWith("/admin", StringComparison.OrdinalIgnoreCase)
+        && !p.StartsWith("/admin/cloudupdate", StringComparison.OrdinalIgnoreCase)
+        && ctx.User?.Identity?.IsAuthenticated == true
+        && MatCMS.Cloud.Services.SelfUpdateLock.IsLocked(Path.Combine(app.Environment.ContentRootPath, "appdata")))
+    {
+        ctx.Response.Redirect("/admin/cloudupdate");
+        return;
     }
     await next();
 });

@@ -203,6 +203,8 @@ public class NodeService
         node.HostName = Trunc(req.HostName, 200);
         node.DockerVersion = Trunc(req.DockerVersion, 50);
         node.DockerError = Trunc(req.DockerError, 500);
+        if (req.Cpus is int cpus) node.Cpus = cpus;
+        if (req.MemTotal is long mem) node.MemTotal = mem;
 
         if (req.Containers is not null)
         {

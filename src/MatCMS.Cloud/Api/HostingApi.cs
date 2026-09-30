@@ -186,6 +186,36 @@ public static class HostingApi
         }).RequireRateLimiting("operatorApi");
 
         // ---- Reverse proxy (increment 3) --------------------------------------------------------------
+        // Hosting dashboard data: every host with its size and load, every MatCMS container with what it uses.
+        // Cloud-wide (it lists every site), so it needs the hosting right on an all-instances key.
+        app.MapGet("/api/v1/hosting/overview", async (HttpContext ctx, ApiKeyService keys, HostingOverviewService overview) =>
+        {
+            var (key, err) = await CallerAsync(ctx, keys);
+            if (err is not null) return err;
+            if (RequireCloudWide(key!) is { } denied) return denied;
+            return Results.Json(HostingOverviewJson.Overview(await overview.BuildAsync(ctx.RequestAborted)));
+        }).RequireRateLimiting("operatorApi");
+
+        app.MapGet("/api/v1/hosting/images", async (HttpContext ctx, ApiKeyService keys, DockerHostService docker) =>
+        {
+            var (key, err) = await CallerAsync(ctx, keys);
+            if (err is not null) return err;
+            if (RequireCloudWide(key!) is { } denied) return denied;
+            var list = await docker.ListMatCmsImagesAsync(ctx.RequestAborted);
+            return list is null ? Results.Json(new { error = "Docker-Daemon nicht erreichbar." }, statusCode: StatusCodes.Status503ServiceUnavailable)
+                : Results.Json(HostingOverviewJson.Images(list));
+        }).RequireRateLimiting("operatorApi");
+
+        // Removes only old, untagged MatCMS images no container uses — the same call as Hosting → Docker.
+        app.MapPost("/api/v1/hosting/images/prune", async (HttpContext ctx, ApiKeyService keys, DockerHostService docker) =>
+        {
+            var (key, err) = await CallerAsync(ctx, keys);
+            if (err is not null) return err;
+            if (RequireCloudWide(key!) is { } denied) return denied;
+            var r = await docker.PruneMatCmsImagesAsync(ctx.RequestAborted);
+            return Results.Json(new { removed = r.Removed, bytesReclaimed = r.BytesReclaimed });
+        }).RequireRateLimiting("operatorApi");
+
         app.MapGet("/api/v1/hosting/proxy", async (HttpContext ctx, ApiKeyService keys, Services.Proxy.ProxyService proxy) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);

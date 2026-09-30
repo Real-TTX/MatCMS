@@ -19,6 +19,19 @@
     </div>
 </form>
 
+@* Automatic updates are an operating rule, not a notification — who is TOLD about updates is the matrix. *@
+<form method="post" asp-page-handler="Auto">
+    <div class="card">
+        <h2>@T["updates.auto"]</h2>
+        <label class="checkbox-row">
+            <input type="checkbox" name="autoUpdate" value="true" checked="@(Model.AutoUpdate ? "checked" : null)" />
+            @T["settings.autoUpdateLocal"]
+        </label>
+        <div class="help">@T["settings.autoUpdateLocalHint"]</div>
+        <div style="margin-top:14px;"><button type="submit" class="btn">@T["settings.save"]</button></div>
+    </div>
+</form>
+
 @if (Model.ModuleEnabled)
 {
 <form method="post" asp-page-handler="Save">

@@ -322,8 +322,8 @@
        the run lives. Admin-only like both pages (folder locks in Program.cs). *@
     @if (User.IsInRole("Admin"))
     {
-        <a class="btn btn-ghost" asp-page="/Admin/Hosting/Updates" title="@T["instances.updateAllHint"]"><i class="ti ti-refresh" aria-hidden="true"></i> @T["instances.updateAll"]</a>
-        <a class="btn btn-ghost" asp-page="/Admin/Cleanup/Index" title="@T["instances.cleanupHint"]"><i class="ti ti-eraser" aria-hidden="true"></i> @T["nav.cleanup"]</a>
+        <a class="btn btn-ghost" asp-page="/Admin/Hosting/Index" asp-fragment="updates" title="@T["instances.updateAllHint"]">@T["instances.updateAll"]</a>
+        <a class="btn btn-ghost" asp-page="/Admin/Cleanup/Index" title="@T["instances.cleanupHint"]">@T["nav.cleanup"]</a>
     }
 </div>
 <partial name="_AddMenu" model="addMenu with { WithButton = false }" />

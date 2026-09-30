@@ -48,6 +48,9 @@ public class BulkUpdateService
 
     private readonly ConcurrentDictionary<string, Run> _runs = new();
 
+    /// <summary>A bulk update is still working through its list — the cloud must not restart under it.</summary>
+    public bool AnyRunning => _runs.Values.Any(r => !r.Done);
+
     public Run? Get(string id) => id is not null && _runs.TryGetValue(id, out var r) ? r : null;
 
     /// <summary>Starts a job for the given instance ids and returns its id at once; the work runs on a

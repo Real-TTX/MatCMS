@@ -53,3 +53,28 @@ public class SelfUpdateState
         catch { /* best effort — the container logs still carry every line */ }
     }
 }
+
+/// <summary>Whether a self-update is in flight right now, for the back-office lock in <c>Program.cs</c>. Reads the
+/// state file at most every two seconds; a run older than <see cref="MaxLock"/> never locks (see there).</summary>
+public static class SelfUpdateLock
+{
+    public static readonly TimeSpan MaxLock = TimeSpan.FromMinutes(15);
+    private static DateTime _readAt = DateTime.MinValue;
+    private static bool _locked;
+    private static readonly object Gate = new();
+
+    public static bool IsLocked(string dataDir)
+    {
+        lock (Gate)
+        {
+            if (DateTime.UtcNow - _readAt < TimeSpan.FromSeconds(2)) return _locked;
+            var s = SelfUpdateState.Load(dataDir);
+            _locked = s is { InFlight: true } && s.StartedAt > DateTime.UtcNow - MaxLock;
+            _readAt = DateTime.UtcNow;
+            return _locked;
+        }
+    }
+
+    /// <summary>Called right after a run was requested, so the very next request already sees the lock.</summary>
+    public static void Invalidate() { lock (Gate) _readAt = DateTime.MinValue; }
+}

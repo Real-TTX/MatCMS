@@ -61,6 +61,32 @@ public class HostingTools
         return new { ok = true, enabled };
     }
 
+    [McpServerTool(Name = "get_hosting_overview"), Description(
+        "Hosting dashboard: every host (this cloud's Docker host and each node) with online state, CPU count, total RAM, running/total sites and summed CPU/RAM use; and every MatCMS container on them with instance, host, state, CPU %, RAM, domain, version and whether an update is available. Node figures are the agent's last sample (about once a minute). Requires the hosting right on an all-instances key.")]
+    public static async Task<object> GetHostingOverview(McpContext me, HostingOverviewService overview, CancellationToken ct)
+    {
+        RequireCloudWide(me);
+        return HostingOverviewJson.Overview(await overview.BuildAsync(ct));
+    }
+
+    [McpServerTool(Name = "list_images"), Description(
+        "The MatCMS Docker images on this cloud's host: tag, size, created, how many containers use each, and which are old (untagged) and unused — what prune_images would remove. Requires the hosting right on an all-instances key.")]
+    public static async Task<object> ListImages(McpContext me, DockerHostService docker, CancellationToken ct)
+    {
+        RequireCloudWide(me);
+        var list = await docker.ListMatCmsImagesAsync(ct) ?? throw new McpException("Docker-Daemon nicht erreichbar.");
+        return HostingOverviewJson.Images(list);
+    }
+
+    [McpServerTool(Name = "prune_images"), Description(
+        "Remove old MatCMS images on this cloud's host: only untagged ones left behind by updates, only MatCMS images, and never one a container still uses. Returns how many were removed and the approximate bytes reclaimed. Requires the hosting right on an all-instances key.")]
+    public static async Task<object> PruneImages(McpContext me, DockerHostService docker, CancellationToken ct)
+    {
+        RequireCloudWide(me);
+        var r = await docker.PruneMatCmsImagesAsync(ct);
+        return new { removed = r.Removed, bytesReclaimed = r.BytesReclaimed };
+    }
+
     [McpServerTool(Name = "get_container_status"), Description(
         "Live container status of an instance: whether it runs on this cloud's Docker host (local), its container name/image/state, start time, restart count, published port, health. Any valid key within its instance scope.")]
     public static async Task<object> GetContainerStatus(McpContext me, AppDbContext db, HostingActionsService hosting,

@@ -1,0 +1,83 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.Hosting.InstancesModel
+@using MatCMS.Cloud.Services
+@{
+    ViewData["Title"] = T["hosting.title"];
+}
+<div data-list>
+    <partial name="_HostingTabs" model='"instances"' />
+    <div class="page-head">
+        <h1>@T["hosting.title"]</h1>
+        <div class="list-toolbar">
+            <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+            <select class="list-search" data-list-filter aria-label="@T["common.status"]">
+                <option value="">@T["hostdash.filterAll"]</option>
+                <option value="running">@T["hostdash.filterRunning"]</option>
+                <option value="stopped">@T["hostdash.filterStopped"]</option>
+                <option value="update">@T["hostdash.filterUpdate"]</option>
+            </select>
+        </div>
+    </div>
+
+    <table class="data" data-list-table>
+        <thead>
+            <tr>
+                <th>@T["cleanup.instance"]</th>
+                <th>@T["nodes.hostColumn"]</th>
+                <th>@T["hosting.state"]</th>
+                <th>CPU</th>
+                <th>RAM</th>
+                <th>@T["hosting.domain"]</th>
+                <th>@T["hosting.version"]</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Data.Sites.Count == 0)
+            {
+                <partial name="_EmptyRow" model='@T["hosting.noLocal"]' />
+            }
+            @foreach (var s in Model.Data.Sites)
+            {
+                var i = s.Instance;
+                var tags = (s.Running ? "running" : "stopped") + (s.UpdateAvailable ? " update" : "");
+                var hostName = s.Host.NodeId is null ? T["nodes.thisHost"] : s.Host.Name;
+                <tr data-search="@(i?.Name + " " + s.ContainerName + " " + hostName + " " + i?.ProxyDomain)" data-tags="@tags">
+                    <td>
+                        @if (i is not null) { <a asp-page="/Admin/Instances/Details" asp-route-id="@i.Id" asp-route-tab="hosting"><strong>@i.Name</strong></a> }
+                        else { <strong>@s.ContainerName</strong> <span class="badge badge-off">@T["hostdash.notConnected"]</span> }
+                        <div class="mono muted">@s.ContainerName@(s.Port is int p ? " · :" + p : "")</div>
+                    </td>
+                    <td class="nowrap">
+                        @if (s.Host.NodeId is int nid) { <a asp-page="Nodes/Details" asp-route-id="@nid">@hostName</a> }
+                        else { @hostName }
+                    </td>
+                    <td class="nowrap">
+                        <span class="badge @(s.Running ? "badge-on" : "badge-err")">@s.State</span>
+                        @if (!string.IsNullOrEmpty(s.Status)) { <div class="muted">@s.Status</div> }
+                    </td>
+                    <td>
+                        @if (s.Cpu is double cpu) { <partial name="_UsageBar" model="@(new UsageBar(cpu, (s.Host.Cpus ?? 0) * 100.0, $"{cpu:0.#} %"))" /> }
+                        else { <span class="muted">—</span> }
+                    </td>
+                    <td>
+                        @if (s.Mem is long mem) { <partial name="_UsageBar" model="@(new UsageBar(mem, s.MemLimit ?? 0, HostFmt.Bytes(mem)))" /> }
+                        else { <span class="muted">—</span> }
+                    </td>
+                    <td class="mono muted">@(i?.ProxyDomain ?? "—")</td>
+                    <td class="mono muted">
+                        @(i?.Version ?? "—")
+                        @if (s.UpdateAvailable) { <span class="badge badge-new">@T["instances.updateAvailable"]</span> }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+</div>
+
+@if (Model.ModuleEnabled)
+{
+    <div class="list-actions">
+        <a class="btn" asp-page="/Admin/Instances/New">@T["hosting.newInstance"]</a>
+    </div>
+}

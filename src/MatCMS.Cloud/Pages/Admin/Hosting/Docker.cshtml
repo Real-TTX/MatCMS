@@ -1,7 +1,9 @@
 @page
 @model MatCMS.Cloud.Pages.Admin.Hosting.DockerModel
+@using MatCMS.Cloud.Services
 @{
     ViewData["Title"] = T["hosting.title"];
+    var prunable = Model.Prunable;
 }
 <partial name="_HostingTabs" model='"docker"' />
 
@@ -29,6 +31,10 @@
         <div class="kv"><div class="kv-label">@T["nodes.docker"]</div><div class="kv-value mono">@d.Version</div></div>
         <div class="kv"><div class="kv-label">@T["nodes.host"]</div><div class="kv-value mono">@d.HostName</div></div>
     }
+    @if (Model.Resources is { } r)
+    {
+        <div class="kv"><div class="kv-label">@T["docker.resources"]</div><div class="kv-value">@r.Cpus CPU · @HostFmt.Bytes(r.MemTotal) RAM <span class="muted">@r.Os</span></div></div>
+    }
     <div class="kv">
         <div class="kv-label">@T["settings.dockerEndpoint"]</div>
         <div class="kv-value mono">@(Model.Endpoint ?? "—")</div>
@@ -41,14 +47,52 @@
     {
         <div class="help">@T["settings.dockerConfigHint"]</div>
     }
-
-    @if (Model.DockerConfigured && Model.DockerReachable)
-    {
-        @* Removes OLD MatCMS images left dangling by updates. Only MatCMS, only untagged, only if unused (the
-           service refuses images a container still needs) — never another app's layers. *@
-        <form method="post" asp-page-handler="PruneImages" class="list-actions">
-            <button type="submit" class="btn btn-ghost"><i class="ti ti-trash" aria-hidden="true"></i> @T["settings.dockerPrune"]</button>
-        </form>
-        <div class="help">@T["settings.dockerPruneHint"]</div>
-    }
 </div>
+
+@if (Model.Images is { } images)
+{
+    @* Images: what an update leaves behind piles up here. Only MatCMS images are listed and only unused, untagged
+       ones are removed — never another app's layers, never an image a container still runs on. *@
+    <div class="card">
+        <h2>@T["docker.images"]</h2>
+        <div class="kv">
+            <div class="kv-label">@T["docker.imagesTotal"]</div>
+            <div class="kv-value">@images.Count · @HostFmt.Bytes(images.Sum(i => i.Size))</div>
+        </div>
+        <div class="kv">
+            <div class="kv-label">@T["docker.imagesPrunable"]</div>
+            <div class="kv-value">
+                @if (prunable.Count == 0) { <span class="badge badge-on">@T["docker.imagesClean"]</span> }
+                else { <span class="badge badge-new">@prunable.Count · ~@HostFmt.Bytes(prunable.Sum(i => i.Size))</span> }
+            </div>
+        </div>
+        <table class="data" style="margin-top:12px;">
+            <thead><tr><th>@T["docker.image"]</th><th>@T["docker.size"]</th><th>@T["docker.created"]</th><th>@T["docker.inUse"]</th></tr></thead>
+            <tbody>
+                @if (images.Count == 0)
+                {
+                    <partial name="_EmptyRow" model='@T["docker.noImages"]' />
+                }
+                @foreach (var i in images)
+                {
+                    <tr>
+                        <td>
+                            <span class="mono">@i.Tag</span>
+                            @if (i.Dangling && i.InUse == 0) { <span class="badge badge-new">@T["docker.old"]</span> }
+                            <div class="mono muted">@(i.Id.Replace("sha256:", "")[..12])</div>
+                        </td>
+                        <td class="mono">@HostFmt.Bytes(i.Size)</td>
+                        <td class="mono muted">@i.Created.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                        <td>@if (i.InUse > 0) { <span class="badge badge-on">@T["docker.containers", i.InUse]</span> } else { <span class="muted">—</span> }</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        @if (prunable.Count > 0)
+        {
+            <form method="post" asp-page-handler="PruneImages" class="list-actions">
+                <button type="submit" class="btn">@T["settings.dockerPrune"]</button>
+            </form>
+        }
+    </div>
+}

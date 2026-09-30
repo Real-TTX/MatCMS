@@ -7,12 +7,21 @@
     <h1>@T["nodes.add"]</h1>
 </div>
 
+@* The whole way to a new host, in three steps — so nobody has to guess what comes after "anlegen". *@
+<div class="card">
+    <h2>@T["nodes.stepsTitle"]</h2>
+    <ol class="steps-list">
+        <li>@T["nodes.step1"]</li>
+        <li>@T["nodes.step2"]</li>
+        <li>@T["nodes.step3"]</li>
+    </ol>
+</div>
+
 <form method="post">
     <div class="card">
         <div class="form-field">
             <label for="name">@T["common.name"]</label>
             <input id="name" name="name" required placeholder="hetzner-1" spellcheck="false" />
-            <div class="help">@T["nodes.createHint"]</div>
         </div>
     </div>
     <div class="form-actions">

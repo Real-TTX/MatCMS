@@ -14,13 +14,43 @@ public class CloudUpdaterService
 {
     private readonly DockerHostService _docker;
     private readonly VersionService _version;
+    private readonly Data.AppDbContext _db;
+    private readonly BulkUpdateService _bulk;
     private readonly string _dataDir;
 
-    public CloudUpdaterService(DockerHostService docker, VersionService version, IWebHostEnvironment env)
+    public CloudUpdaterService(DockerHostService docker, VersionService version, Data.AppDbContext db, BulkUpdateService bulk, IWebHostEnvironment env)
     {
         _docker = docker;
         _version = version;
+        _db = db;
+        _bulk = bulk;
         _dataDir = Path.Combine(env.ContentRootPath, "appdata");
+    }
+
+    /// <summary>The current run as the helper writes it (a file on the shared volume — readable while the new
+    /// version starts). Null = never updated.</summary>
+    public SelfUpdateState? LastRun() => SelfUpdateState.Load(_dataDir);
+
+    /// <summary>
+    /// Work the cloud's own restart would cut off: a bulk update in the middle of its list, a move between hosts
+    /// (the data streams THROUGH the cloud), or a node job still pending or running (its report could never be
+    /// folded in). Null = nothing is running. Checked before a self-update starts — on every surface.
+    /// </summary>
+    public async Task<string?> BusyWithAsync(CancellationToken ct = default)
+    {
+        if (_bulk.AnyRunning) return "Gerade läuft „Alle aktualisieren“ — erst danach kann die Cloud sich selbst aktualisieren.";
+        if (await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AnyAsync(_db.InstanceMigrations, m => m.State == "running", ct))
+            return "Gerade zieht eine Instanz auf einen anderen Host um — erst danach kann die Cloud sich selbst aktualisieren.";
+        // Within the same windows the node service expires jobs in: a job for a node that went offline stays
+        // "pending" in the table until that node beats again, and must not block the cloud for ever.
+        var now = DateTime.UtcNow;
+        var pendingCut = now - Models.NodeJob.PendingTimeout;
+        var runningCut = now - Models.NodeJob.RunningTimeout;
+        if (await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AnyAsync(_db.NodeJobs,
+                j => (j.State == Models.NodeJobState.Pending && j.CreatedAt >= pendingCut)
+                  || (j.State == Models.NodeJobState.Running && j.StartedAt >= runningCut), ct))
+            return "Auf einem Node läuft noch ein Auftrag — erst danach kann die Cloud sich selbst aktualisieren.";
+        return null;
     }
 
     /// <param name="Latest">Null unless a registry check was requested (it is a network call).</param>
@@ -79,6 +109,7 @@ public class CloudUpdaterService
     {
         var s = await StatusAsync(checkRegistry: false, ct);
         if (s.Blocker is not null) return new(false, s.Blocker);
+        if (await BusyWithAsync(ct) is { } busy) return new(false, busy);
 
         // Written BEFORE the helper starts, so the "läuft" state is visible at once and survives the
         // restart the helper is about to cause.
@@ -90,6 +121,7 @@ public class CloudUpdaterService
             Log = { $"{DateTime.UtcNow:HH:mm:ss} Update angefordert (Version {_version.Current})." }
         };
         state.Save(_dataDir);
+        SelfUpdateLock.Invalidate();
 
         var r = await _docker.SpawnSelfUpdateHelperAsync(s.SelfContainerId!, ct);
         if (!r.Ok)
@@ -99,6 +131,7 @@ public class CloudUpdaterService
             state.FinishedAt = DateTime.UtcNow;
             state.Log.Add($"{DateTime.UtcNow:HH:mm:ss} {r.Message}");
             state.Save(_dataDir);
+            SelfUpdateLock.Invalidate();
         }
         return r;
     }

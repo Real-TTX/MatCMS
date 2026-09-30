@@ -1,0 +1,78 @@
+@model string
+@* Live progress of "Alle aktualisieren" (BulkUpdateService). The bar on top, the table below with a status icon per
+   instance; an error or warning gets a framed attention row under its line, on success the message sits in the
+   icon's tooltip. The hosting page answers "?handler=Status&run=…". *@
+<div class="card" data-run="@Model"
+     data-labels='@System.Text.Json.JsonSerializer.Serialize(new {
+         pending = T["updates.st.pending"], updating = T["updates.st.updating"], done = T["updates.st.done"],
+         failed = T["updates.st.failed"], skipped = T["updates.st.skipped"],
+         finished = T["updates.finished"], finishedErr = T["updates.finishedErr"] })'>
+    <h2>@T["instances.updateAll"]</h2>
+    <div class="ua-progress">
+        <div class="ua-progress-head">
+            <span id="ua-state" class="badge badge-new">@T["updates.running"]</span>
+            <span class="ua-count"><span id="ua-done">0</span>&nbsp;/&nbsp;<span id="ua-total">?</span></span>
+        </div>
+        <div class="quota-bar ua-bar"><span id="ua-bar" style="width:0%"></span></div>
+    </div>
+    <table class="data ua-table" style="margin-top:16px;">
+        <thead><tr><th>@T["common.instance"]</th><th>@T["updates.from"]</th><th></th><th>@T["updates.to"]</th><th class="ua-th-status">@T["common.status"]</th></tr></thead>
+        <tbody id="ua-rows">
+            <tr><td colspan="99" class="muted"><em>@T["updates.starting"]</em></td></tr>
+        </tbody>
+    </table>
+    <div class="list-actions">
+        <a class="btn btn-ghost" href="?" id="ua-back" hidden>@T["action.back"]</a>
+    </div>
+</div>
+<script>
+    (function () {
+        var card = document.querySelector('[data-run]');
+        var run = card.getAttribute('data-run');
+        var L = JSON.parse(card.getAttribute('data-labels'));
+        var esc = function (s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; };
+        var STAT = {
+            pending:  { icon: 'ti-clock',                 cls: 'uas-pending',  label: L.pending,  attn: false },
+            updating: { icon: 'ti-loader-2',              cls: 'uas-updating', label: L.updating, attn: false },
+            done:     { icon: 'ti-circle-check-filled',   cls: 'uas-done',     label: L.done,     attn: false },
+            failed:   { icon: 'ti-alert-circle-filled',   cls: 'uas-failed',   label: L.failed,   attn: true },
+            skipped:  { icon: 'ti-alert-triangle-filled', cls: 'uas-warn',     label: L.skipped,  attn: true }
+        };
+        function render(d) {
+            document.getElementById('ua-total').textContent = d.total;
+            document.getElementById('ua-done').textContent = d.completed;
+            document.getElementById('ua-bar').style.width = (d.total ? Math.round(d.completed * 100 / d.total) : 0) + '%';
+            var html = '';
+            (d.items || []).forEach(function (i) {
+                var s = STAT[i.status] || { icon: 'ti-point', cls: 'uas-pending', label: i.status, attn: false };
+                var msg = i.message || '';
+                var title = (!s.attn && msg) ? msg : s.label;
+                var spin = i.status === 'updating' ? ' ua-spin' : '';
+                html += '<tr class="ua-row"><td><strong>' + esc(i.name) + '</strong></td>' +
+                    '<td class="muted mono">' + esc(i.from || '?') + '</td><td class="muted">→</td>' +
+                    '<td class="mono">' + esc(i.to) + '</td>' +
+                    '<td class="ua-status"><i class="ti ' + s.icon + ' ' + s.cls + spin + '" title="' + esc(title) + '" aria-label="' + esc(s.label) + '"></i></td></tr>';
+                if (s.attn && msg) {
+                    html += '<tr class="ua-attn-row"><td colspan="99"><div class="ua-attn ua-attn-' + (i.status === 'failed' ? 'err' : 'warn') + '">' +
+                        '<i class="ti ' + (i.status === 'failed' ? 'ti-alert-circle' : 'ti-alert-triangle') + '" aria-hidden="true"></i>' +
+                        '<span>' + esc(msg) + '</span></div></td></tr>';
+                }
+            });
+            if (html) document.getElementById('ua-rows').innerHTML = html;
+            if (d.done) {
+                var st = document.getElementById('ua-state');
+                var failed = (d.items || []).some(function (i) { return i.status === 'failed'; });
+                st.className = 'badge ' + (failed ? 'badge-err' : 'badge-on');
+                st.textContent = failed ? L.finishedErr : L.finished;
+                document.getElementById('ua-back').hidden = false;
+            }
+        }
+        function poll() {
+            fetch('?handler=Status&run=' + encodeURIComponent(run), { headers: { 'X-Requested-With': 'fetch' } })
+                .then(function (r) { return r.json(); })
+                .then(function (d) { if (!d.found) return; render(d); if (!d.done) setTimeout(poll, 1500); })
+                .catch(function () { setTimeout(poll, 2000); });
+        }
+        poll();
+    })();
+</script>

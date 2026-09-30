@@ -1,0 +1,14 @@
+@model MatCMS.Cloud.Services.UsageBar
+@* A proportion — CPU or memory against what the host (or the container's limit) has. Amber from 70 %, red from 90 %:
+   the point where a site starts to feel slow, and the point where the host starts to swap or kill. *@
+@{
+    var pct = MatCMS.Cloud.Services.HostFmt.Pct(Model.Part, Model.Whole);
+    var cls = pct >= 90 ? " is-full" : pct >= 70 ? " is-high" : "";
+}
+<div class="quota-row usage-row">
+    @if (Model.Whole > 0)
+    {
+        <div class="quota-bar@(cls)"><span style="width:@(pct)%"></span></div>
+    }
+    <span class="quota-pct">@Model.Text</span>
+</div>

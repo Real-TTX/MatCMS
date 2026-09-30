@@ -87,7 +87,7 @@ public class DockerHostService : IDisposable
     /// this cloud created it. Read from the SAME listing that decides local/remote, so it costs
     /// nothing extra and can never disagree with it.</param>
     public sealed record ContainerInfo(
-        string Id, string Name, string Image, string State, int? PublishedPort, bool CloudManaged = false);
+        string Id, string Name, string Image, string State, int? PublishedPort, bool CloudManaged = false, string? Status = null);
 
     /// <summary>True when the daemon answers. Cheap ping, used by the settings/status UI.</summary>
     public async Task<bool> IsReachableAsync(CancellationToken ct = default)
@@ -156,7 +156,7 @@ public class DockerHostService : IDisposable
             && c.Labels.TryGetValue(ManagedLabel, out var flag)
             && string.Equals(flag, "true", StringComparison.OrdinalIgnoreCase);
 
-        return new ContainerInfo(c.ID, name, c.Image ?? "", c.State ?? "", published, managed);
+        return new ContainerInfo(c.ID, name, c.Image ?? "", c.State ?? "", published, managed, c.Status);
     }
 
     // ---- Node engine (Hosting increment 4) ----------------------------------------------------------
@@ -178,6 +178,103 @@ public class DockerHostService : IDisposable
                                && !(c.Labels?.ContainsKey(UpdaterLabel) ?? false)
                                && !(c.Labels?.ContainsKey(AgentUpdaterLabel) ?? false))
             .Select(ToInfo).ToList();
+    }
+
+    /// <summary>What a container uses right now. <paramref name="MemLimit"/> is the container's limit, which
+    /// without a limit set is the host's whole memory.</summary>
+    public sealed record ContainerStats(double CpuPercent, long MemBytes, long MemLimit);
+
+    /// <summary>
+    /// CPU and memory of the given containers, sampled in parallel. Docker needs about a second per sample
+    /// (CPU is a delta between two readings), so this is for pages that show usage, never for a hot path.
+    /// Stopped containers and ones that do not answer within the bound are simply missing from the result.
+    /// </summary>
+    public async Task<Dictionary<string, ContainerStats>> StatsAsync(IEnumerable<string> containerIds, CancellationToken ct = default)
+    {
+        var result = new System.Collections.Concurrent.ConcurrentDictionary<string, ContainerStats>();
+        var client = Client;
+        if (client is null) return new();
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(TimeSpan.FromSeconds(6));
+        await Task.WhenAll(containerIds.Distinct().Select(async id =>
+        {
+            try
+            {
+                var sink = new LastValue<ContainerStatsResponse>();
+                // Stream=false: ONE reading — which the daemon takes a second apart from its previous one, so
+                // PreCPUStats is filled and the CPU share can be computed. (OneShot would skip that wait and
+                // leave PreCPUStats empty.)
+                await client.Containers.GetContainerStatsAsync(id, new ContainerStatsParameters { Stream = false }, sink, cts.Token);
+                if (sink.Value is { } s && Compute(s) is { } st) result[id] = st;
+            }
+            catch { /* stopped, gone or slow — no number rather than a wrong one */ }
+        }));
+        return new(result);
+    }
+
+    private static ContainerStats? Compute(ContainerStatsResponse s)
+    {
+        if (s.CPUStats?.CPUUsage is null || s.MemoryStats is null) return null;
+        var cpuDelta = (double)s.CPUStats.CPUUsage.TotalUsage - (s.PreCPUStats?.CPUUsage?.TotalUsage ?? 0);
+        var sysDelta = (double)s.CPUStats.SystemUsage - (s.PreCPUStats?.SystemUsage ?? 0);
+        var cpus = s.CPUStats.OnlineCPUs > 0 ? s.CPUStats.OnlineCPUs : (uint)(s.CPUStats.CPUUsage.PercpuUsage?.Count ?? 1);
+        var cpu = cpuDelta > 0 && sysDelta > 0 ? cpuDelta / sysDelta * cpus * 100.0 : 0;
+        // Page cache is not "used" memory — docker stats subtracts it the same way (cgroup v2: inactive_file,
+        // v1: cache).
+        var stats = s.MemoryStats.Stats;
+        ulong cache = 0;
+        if (stats is not null && (stats.TryGetValue("inactive_file", out cache) || stats.TryGetValue("cache", out cache))) { }
+        var used = (long)(s.MemoryStats.Usage > cache ? s.MemoryStats.Usage - cache : s.MemoryStats.Usage);
+        return new ContainerStats(Math.Round(cpu, 1), used, (long)s.MemoryStats.Limit);
+    }
+
+    /// <summary>IProgress that keeps the last value synchronously — <see cref="Progress{T}"/> posts to the thread
+    /// pool and could still be pending when the call returns.</summary>
+    private sealed class LastValue<T> : IProgress<T> { public T? Value; public void Report(T value) => Value = value; }
+
+    /// <summary>The host's size: CPU count and total memory. Null when the daemon cannot be asked.</summary>
+    public async Task<(int Cpus, long MemTotal, string? Os)?> HostResourcesAsync(CancellationToken ct = default)
+    {
+        var client = Client;
+        if (client is null) return null;
+        try { var i = await client.System.GetSystemInfoAsync(ct); return ((int)i.NCPU, i.MemTotal, i.OperatingSystem); }
+        catch { return null; }
+    }
+
+    /// <summary>One MatCMS image on this daemon. <paramref name="Dangling"/> = untagged, left behind when a pull
+    /// re-pointed its tag — what <see cref="PruneMatCmsImagesAsync"/> removes when no container uses it.</summary>
+    public sealed record ImageInfo(string Id, string Tag, long Size, DateTime Created, int InUse, bool Dangling);
+
+    /// <summary>The MatCMS images on this daemon (instances and the cloud itself), newest first. Same attribution
+    /// rule as the prune: by tag or repo digest naming MatCMS — another app's images are never listed.</summary>
+    public async Task<List<ImageInfo>?> ListMatCmsImagesAsync(CancellationToken ct = default)
+    {
+        var client = Client;
+        if (client is null) return null;
+        try
+        {
+            var images = await client.Images.ListImagesAsync(new ImagesListParameters { All = false }, ct);
+            var containers = await client.Containers.ListContainersAsync(new ContainersListParameters { All = true }, ct);
+            var use = containers.GroupBy(c => c.ImageID ?? "").ToDictionary(g => g.Key, g => g.Count());
+            return images
+                .Select(img =>
+                {
+                    var tags = (img.RepoTags ?? new List<string>()).Where(t => !string.IsNullOrEmpty(t) && t != "<none>:<none>").ToList();
+                    var digests = img.RepoDigests ?? new List<string>();
+                    var isMatCms = tags.Any(t => t.Contains("matcms", StringComparison.OrdinalIgnoreCase))
+                                   || digests.Any(d => d.Contains("matcms", StringComparison.OrdinalIgnoreCase));
+                    if (!isMatCms) return null;
+                    var name = tags.FirstOrDefault() ?? (digests.FirstOrDefault()?.Split('@')[0] + ":<none>");
+                    return new ImageInfo(img.ID, name, img.Size, img.Created, use.GetValueOrDefault(img.ID), tags.Count == 0);
+                })
+                .Where(i => i is not null).Select(i => i!)
+                .OrderByDescending(i => i.Created).ToList();
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(ex, "Listing MatCMS images failed");
+            return null;
+        }
     }
 
     /// <summary>Daemon version ("27.3.1") and the HOST's name (not the container's), or the error when the

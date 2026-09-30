@@ -675,35 +675,28 @@ login same-site; it is not used by this flow.
   Before the matrix is first saved it is derived from the legacy `notify.*` keys, so nobody silently loses mail.
   Node outages notify once per outage (`Node.OfflineNotified`, re-armed by the next beat).
 - **Admin navigation**: **Hosting is ONE sidebar item, the first** (Admin-only), and everything about hosts,
-  containers, images and domains lives in its TABS — link-tabs (`_HostingTabs.cshtml`, `a.tab`), because each is its
-  own page with its own handlers: Übersicht (sites on this host + nodes, "Neue Instanz"), Updates (cloud self-update,
-  bulk "update all", the auto-update rule), Nodes, Domains, Docker (daemon status, image prune), Einstellungen (the
-  module switch `hosting.enabled` + proxy/ports/name pattern of "Dieser Host"). The switch hides only Nodes, Domains
-  and provisioning; Updates and Docker stay, because updating sites on this host predates the module. *Einstellungen*
-  holds only the cloud's own configuration (Allgemein incl. Sicherheit, SMTP, KI, Backups, API); its old `?tab=hosting`
-  / `?tab=docker` redirect into Hosting. *About* shows the version read-only. Notifications has its own item; fleet
-  cleanup and "Alle aktualisieren" (a shortcut into Hosting → Updates) are buttons on the instance list.
-  **No "also via API/MCP" footers and no narrating page intros** — the user removed them deliberately; the API is
-  documented in `docs/api`, not on every page.
-
-### Local vs. remote instances
-
-An instance is **local** when it runs on the same Docker daemon the cloud can reach; otherwise it is
-**remote**. This is detected, never asked (`InstanceService.ClassifyAsync`, re-run on **every**
-heartbeat so a moved site degrades to remote instead of leaving the cloud pointing at a container
-that is now something else):
-
-1. The heartbeat reports the instance's own container id (`/proc/self/cgroup` / hostname) and image
-   reference.
-2. `DockerHostService.FindContainerAsync` enumerates containers over the mounted engine socket
-   (**Docker.DotNet**; `MatCmsCloud__Docker__Endpoint`, `unix:///var/run/docker.sock`, or
-   `npipe://./pipe/docker_engine` on Windows) and matches the id **by prefix** — an instance often
-   only knows the short 12-character form.
-3. Match → **local**; no match, no socket, or an unusable endpoint → **remote**. Docker access is
-   entirely optional and every method degrades to notify-only.
-
-What each mode can do:
-
+  containers, images and domains lives in its TABS — link-tabs (`_HostingTabs.cshtml`, `a.tab`, scrollable on phones),
+  each its own page: **Übersicht** = the module's dashboard (tiles, the Hosts table with CPU/RAM bars, and the Updates
+  card: cloud version + self-update, instances behind the release + "N aktualisieren" whose progress
+  `_BulkProgress` shows in place), **Nodes**, **Instanzen** (every MatCMS container on every host with state, CPU, RAM,
+  domain, version — containers without a record are listed as "nicht verbunden"), **Domains**, **Docker** (daemon,
+  resources, the **Images** section with the cleanup), **Einstellungen** (module switch `hosting.enabled`, auto-update,
+  proxy/ports/name pattern of "Dieser Host"). The switch hides only Nodes, Domains and provisioning. Data for dashboard
+  and Instanzen is ONE service, `HostingOverviewService` (this host live via `DockerHostService.StatsAsync` — ~1 s per
+  sample, cached 15 s; nodes from the inventory, whose agent samples usage at most once a minute and reports host size,
+  `Node.Cpus/MemTotal`, migration `AddNodeResources`), also `/api/v1/hosting/overview` + MCP `get_hosting_overview`;
+  images via `/api/v1/hosting/images(/prune)` + MCP `list_images`/`prune_images`.
+  *Einstellungen* holds only the cloud's own configuration (Allgemein incl. Sicherheit, SMTP, KI, Backups, API); its old
+  `?tab=hosting`/`?tab=docker` redirect into Hosting. *About* shows the version read-only.
+  **No "also via API/MCP" footers and no narrating page intros; no icons inside action buttons.**
+- **Cloud self-update screen**: starting the self-update (dashboard) opens `Pages/Admin/CloudUpdate` — layout-less,
+  full screen, spinner + the helper's log, polling `?handler=State` (failed polls = "startet neu"; a 5 s abort bound,
+  because a request to a stopping container can hang). While `SelfUpdateState` is in flight, a middleware in
+  `Program.cs` redirects EVERY /admin request there (`SelfUpdateLock`, file read at most every 2 s, never longer than
+  15 min so a dead helper cannot close the admin). Success reloads into Hosting; failure/rollback stays readable.
+  `CloudUpdaterService.BusyWithAsync` refuses to start while a bulk update runs, a move is running, or a node job is
+  pending/running (within the node service's own expiry windows) — on every surface, since UI/API/MCP all call
+  `StartAsync`; the bulk start in turn refuses while the cloud updates itself.
 - **Local** — `DockerHostService.UpdateContainerAsync`: pull the configured image, and if the digest
   actually changed, stop the container, park it under `<name>-matcmscloud-old`, recreate it from its
   own inspected config (env, volumes, ports, labels, network aliases) and start it. Any failure

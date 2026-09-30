@@ -28,6 +28,12 @@ public class DockerModel : PageModel
     public bool DockerReachable { get; private set; }
     public (string? Version, string? HostName)? Daemon { get; private set; }
     public int LocalCount { get; private set; }
+    public (int Cpus, long MemTotal, string? Os)? Resources { get; private set; }
+
+    /// <summary>The MatCMS images on this daemon; null = could not be listed.</summary>
+    public List<DockerHostService.ImageInfo>? Images { get; private set; }
+    /// <summary>What the cleanup would remove: untagged and used by no container.</summary>
+    public List<DockerHostService.ImageInfo> Prunable => Images?.Where(i => i.Dangling && i.InUse == 0).ToList() ?? new();
 
     public async Task OnGetAsync()
     {
@@ -36,6 +42,8 @@ public class DockerModel : PageModel
         {
             var info = await _docker.DaemonInfoAsync(HttpContext.RequestAborted);
             if (info.Error is null) Daemon = (info.Version, info.HostName);
+            Resources = await _docker.HostResourcesAsync(HttpContext.RequestAborted);
+            Images = await _docker.ListMatCmsImagesAsync(HttpContext.RequestAborted);
         }
         LocalCount = await _db.Instances.CountAsync(i => i.Hosting == InstanceHosting.Local);
     }

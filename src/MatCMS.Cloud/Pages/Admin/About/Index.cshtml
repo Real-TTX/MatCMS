@@ -9,7 +9,7 @@
         <a class="btn btn-sm" asp-page="Index" asp-route-check="true">@T["about.checkUpdates"]</a>
         @if (User.IsInRole("Admin"))
         {
-            <a class="btn btn-sm btn-ghost" asp-page="/Admin/Hosting/Updates">@T["hosting.title"] → @T["hosting.navUpdates"]</a>
+            <a class="btn btn-sm btn-ghost" asp-page="/Admin/Hosting/Index" asp-fragment="updates">@T["hosting.title"] → @T["hosting.navUpdates"]</a>
         }
     </div>
 </div>

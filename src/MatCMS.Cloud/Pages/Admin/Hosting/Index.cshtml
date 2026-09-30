@@ -1,57 +1,159 @@
 @page
 @model MatCMS.Cloud.Pages.Admin.Hosting.IndexModel
+@using MatCMS.Cloud.Services
 @{
     ViewData["Title"] = T["hosting.title"];
+    var d = Model.Data;
+    var sites = d.Sites;
+    var running = sites.Count(s => s.Running);
+    var hostsOnline = d.Hosts.Count(h => h.Online);
+    var memUsed = d.Hosts.Sum(h => h.Mem);
+    var memTotal = d.Hosts.Where(h => h.MemTotal is not null).Sum(h => h.MemTotal!.Value);
+    var updates = Model.Candidates.Count + (Model.CloudUpdateAvailable ? 1 : 0);
+    string HostName(HostingOverviewService.HostRow h) => h.NodeId is null ? T["nodes.thisHost"] : h.Name;
 }
-<div data-list>
-    <partial name="_HostingTabs" model='"overview"' />
-    <div class="page-head">
-        <h1>@T["hosting.title"]</h1>
-        <div class="list-toolbar">
-            <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
-        </div>
-    </div>
+<partial name="_HostingTabs" model='"overview"' />
 
-    <table class="data" data-list-table>
-        <thead>
-            <tr>
-                <th>@T["cleanup.instance"]</th>
-                <th>@T["nodes.hostColumn"]</th>
-                <th>@T["hosting.name"]</th>
-                <th style="width:110px;">@T["hosting.state"]</th>
-                <th style="width:80px;">@T["hosting.port"]</th>
-                <th>@T["hosting.domain"]</th>
-                <th style="width:110px;">@T["hosting.managed"]</th>
-                <th style="width:140px;">@T["hosting.version"]</th>
-            </tr>
-        </thead>
-        <tbody>
-            @if (Model.Local.Count == 0)
-            {
-                <partial name="_EmptyRow" model='@T["hosting.noLocal"]' />
-            }
-            @foreach (var i in Model.Local)
-            {
-                var up = string.Equals(i.ContainerState, "running", StringComparison.OrdinalIgnoreCase);
-                <tr data-search="@(i.Name + " " + i.LocalContainerName + " " + i.ProxyDomain + " " + i.Node?.Name)">
-                    <td><a asp-page="/Admin/Instances/Details" asp-route-id="@i.Id" asp-route-tab="hosting">@i.Name</a></td>
-                    <td>@if (i.Node is { } nd) { <a asp-page="/Admin/Hosting/Nodes/Details" asp-route-id="@nd.Id">@nd.Name</a> } else { <span class="muted">@T["nodes.thisHost"]</span> }</td>
-                    <td class="mono muted">@(i.LocalContainerName ?? "—")</td>
-                    <td><span class="badge @(up ? "badge-on" : "badge-err")">@(i.ContainerState ?? "—")</span></td>
-                    <td class="mono muted">@(i.LocalPort?.ToString() ?? "—")</td>
-                    <td class="mono muted">@(i.ProxyDomain ?? "—")</td>
-                    <td><span class="badge @(i.CloudManaged ? "badge-on" : "badge-off")">@(i.CloudManaged ? T["hosting.managedYes"] : T["hosting.managedNo"])</span></td>
-                    <td class="mono muted">@(i.Version ?? "—")</td>
-                </tr>
-            }
-        </tbody>
-    </table>
-    <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+@* ---- Tiles: the numbers first, each leading to where it is dealt with. ---- *@
+<div class="stat-grid dash-tiles">
+    <a class="stat @(running < sites.Count ? "is-warn" : "")" asp-page="Instances">
+        <div class="n">@running<span class="of">/@sites.Count</span></div>
+        <div class="l">@T["hostdash.sitesRunning"]</div>
+        <div class="s">@T["hostdash.sitesStopped", sites.Count - running]</div>
+    </a>
+    <a class="stat @(hostsOnline < d.Hosts.Count ? "is-err" : "")" asp-page="@(Model.ModuleEnabled ? "Nodes/Index" : "Docker")">
+        <div class="n">@hostsOnline<span class="of">/@d.Hosts.Count</span></div>
+        <div class="l">@T["hostdash.hostsOnline"]</div>
+        <div class="s">@T["hostdash.hostsSplit", d.Hosts.Count - 1]</div>
+    </a>
+    <div class="stat">
+        <div class="n">@HostFmt.Bytes(memUsed)</div>
+        <div class="l">@T["hostdash.memory"]</div>
+        <div class="s">@(memTotal > 0 ? T["hostdash.ofTotal", HostFmt.Bytes(memTotal)] : "—")</div>
+    </div>
+    <a class="stat @(updates > 0 ? "is-warn" : "")" href="#updates">
+        <div class="n">@updates</div>
+        <div class="l">@T["hosting.navUpdates"]</div>
+        <div class="s">@(Model.CloudUpdateAvailable ? T["hostdash.cloudUpdate"] : T["hostdash.cloudCurrent"])</div>
+    </a>
+    @if (Model.ModuleEnabled)
+    {
+        <a class="stat" asp-page="Domains">
+            <div class="n">@Model.DomainCount</div>
+            <div class="l">@T["hosting.navDomains"]</div>
+            <div class="s">@T["hostdash.domainsHint"]</div>
+        </a>
+    }
 </div>
 
-@if (Model.ModuleEnabled)
+@if (Model.RunId is not null)
 {
-    <div class="list-actions">
-        <a class="btn" asp-page="/Admin/Instances/New">@T["hosting.newInstance"]</a>
-    </div>
+    <partial name="_BulkProgress" model="Model.RunId" />
 }
+
+@* ---- Hosts: where the sites run and how loaded each machine is — full width, it has four columns of bars. ---- *@
+<div class="card">
+        <h2>@T["hostdash.hosts"]</h2>
+        <table class="data">
+            <thead><tr><th>@T["nodes.hostColumn"]</th><th>@T["hostdash.sites"]</th><th>CPU</th><th>RAM</th></tr></thead>
+            <tbody>
+                @foreach (var h in d.Hosts)
+                {
+                    <tr>
+                        <td>
+                            @if (h.NodeId is int nid) { <a asp-page="Nodes/Details" asp-route-id="@nid" class="nowrap"><strong>@h.Name</strong></a> }
+                            else { <a asp-page="Docker" class="nowrap"><strong>@HostName(h)</strong></a> }
+                            <div class="nowrap">
+                                @if (h.Revoked) { <span class="badge badge-err">@T["nodes.revoked"]</span> }
+                                else if (h.Online) { <span class="badge badge-on">@T["nodes.online"]</span> }
+                                else { <span class="badge badge-err">@(h.NodeId is null ? T["settings.dockerUnreachable"] : T["nodes.offline"])</span> }
+                                @if (h.AgentOutdated) { <span class="badge badge-new">@T["nodes.outdated"]</span> }
+                                <span class="muted mono">@(h.DockerVersion ?? "")</span>
+                            </div>
+                        </td>
+                        <td class="mono">@h.Running<span class="muted">/@h.Total</span></td>
+                        <td><partial name="_UsageBar" model="@(new UsageBar(h.Cpu, (h.Cpus ?? 0) * 100.0, h.Cpus is int c ? $"{h.Cpu:0.#} % · {c} CPU" : $"{h.Cpu:0.#} %"))" /></td>
+                        <td><partial name="_UsageBar" model="@(new UsageBar(h.Mem, h.MemTotal ?? 0, h.MemTotal is long mt ? $"{HostFmt.Bytes(h.Mem)} / {HostFmt.Bytes(mt)}" : HostFmt.Bytes(h.Mem)))" /></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+</div>
+
+<div class="dash-grid">
+    @* ---- Updates: the cloud itself and the sites it can update. ---- *@
+    <div class="card" id="updates">
+        <h2>@T["hosting.navUpdates"]</h2>
+        <div class="kv">
+            <div class="kv-label">@T["cloudupdate.title"]</div>
+            <div class="kv-value">
+                <span class="mono">@Model.CloudCurrent</span>
+                @if (Model.CloudUpdateAvailable) { <span class="muted">→</span> <span class="mono">@Model.CloudLatest</span> <span class="badge badge-new">@T["cloudupdate.available"]</span> }
+                else if (Model.CloudCheckError is not null) { <span class="badge badge-err" title="@Model.CloudCheckError">@T["cloudupdate.checkFailed"]</span> }
+                else if (Model.CloudLatest is not null) { <span class="badge badge-on">@T["cloudupdate.upToDate"]</span> }
+            </div>
+        </div>
+        @if (Model.CloudStatus.LastRun is { } lr)
+        {
+            var ok = lr.State is "succeeded" or "current";
+            <div class="kv">
+                <div class="kv-label">@T["cloudupdate.lastRun"]</div>
+                <div class="kv-value">
+                    <span class="badge @(ok ? "badge-on" : lr.InFlight ? "badge-new" : "badge-err")" title="@lr.Message">@T["cloudupdate.state." + lr.State]</span>
+                    <span class="muted">@((lr.FinishedAt ?? lr.StartedAt)?.ToLocalTime().ToString("dd.MM.yyyy HH:mm"))</span>
+                    @if (!ok && !lr.InFlight && !string.IsNullOrEmpty(lr.Message)) { <div class="muted">@lr.Message</div> }
+                </div>
+            </div>
+        }
+        <div class="kv">
+            <div class="kv-label">@T["hostdash.instanceRelease"]</div>
+            <div class="kv-value mono">@(Model.LatestInstanceVersion ?? T["common.unknown"])</div>
+        </div>
+        <div class="kv">
+            <div class="kv-label">@T["updates.auto"]</div>
+            <div class="kv-value"><a asp-page="Settings"><span class="badge @(Model.AutoUpdate ? "badge-on" : "badge-off")">@(Model.AutoUpdate ? T["hostdash.on"] : T["hostdash.off"])</span></a></div>
+        </div>
+
+        @if (Model.Candidates.Count > 0)
+        {
+            <table class="data" style="margin-top:12px;">
+                <thead><tr><th>@T["common.instance"]</th><th>@T["nodes.hostColumn"]</th><th>@T["updates.from"]</th></tr></thead>
+                <tbody>
+                    @foreach (var i in Model.Candidates)
+                    {
+                        <tr>
+                            <td><a asp-page="/Admin/Instances/Details" asp-route-id="@i.Id" asp-route-tab="hosting">@i.Name</a></td>
+                            <td>@(i.Node?.Name ?? T["nodes.thisHost"])</td>
+                            <td class="mono muted">@(i.Version ?? "?")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <p class="muted" style="margin-top:12px;">@T["updates.none"]</p>
+        }
+
+        @if (Model.Busy is not null) { <div class="help">@Model.Busy</div> }
+        else if (!Model.CloudStatus.CanSelfUpdate && Model.CloudUpdateAvailable)
+        {
+            <div class="help">@T["cloudupdate.blocked"] <strong>@Model.CloudStatus.Blocker</strong></div>
+        }
+        <div class="list-actions">
+            @if (Model.Candidates.Count > 0 && Model.RunId is null)
+            {
+                <form method="post" asp-page-handler="Start" class="inline-form">
+                    <button type="submit" class="btn">@T["updates.start", Model.Candidates.Count]</button>
+                </form>
+            }
+            @if (Model.CloudStatus.CanSelfUpdate && Model.Busy is null)
+            {
+                <form method="post" asp-page-handler="SelfUpdate" class="inline-form" onsubmit="return confirm('@T["cloudupdate.confirm"]');">
+                    <button type="submit" class="btn @(Model.CloudUpdateAvailable ? "" : "btn-ghost")">@T["cloudupdate.now"]</button>
+                </form>
+            }
+            <a class="btn btn-ghost" href="?check=true">@T["cloudupdate.check"]</a>
+        </div>
+    </div>
+</div>

@@ -23,6 +23,10 @@ public sealed class NodeHeartbeatRequest
     public string? DockerVersion { get; set; }
     public string? DockerError { get; set; }
 
+    /// <summary>The host's size. Additive: an older agent sends neither and the cloud shows "—".</summary>
+    public int? Cpus { get; set; }
+    public long? MemTotal { get; set; }
+
     /// <summary>The MatCMS containers on the host; null = could not be listed (keep the last inventory).</summary>
     public List<NodeContainer>? Containers { get; set; }
 
@@ -40,6 +44,13 @@ public sealed class NodeContainer
     public string State { get; set; } = "";
     public int? PublishedPort { get; set; }
     public bool CloudManaged { get; set; }
+
+    // Additive (older agents send none): Docker's status line ("Up 3 hours") and the last usage sample, taken
+    // at most once a minute — a sample costs the daemon a second per container.
+    public string? Status { get; set; }
+    public double? CpuPercent { get; set; }
+    public long? MemBytes { get; set; }
+    public long? MemLimit { get; set; }
 }
 
 public sealed class NodeJobReport

@@ -2,18 +2,21 @@
 @inject MatCMS.Cloud.Services.CloudContext Cloud
 @* Hosting is ONE menu item; its areas are tabs. Each tab is its own page (they are long and have their own
    handlers), so the tabs are links — the same look as the in-page tabs elsewhere. Nodes and Domains belong to
-   the optional module and only appear while it is switched on; Docker and Updates are there regardless,
-   because updating the sites on this host predates the module. *@
+   the optional module and only appear while it is switched on; the dashboard (with the updates), Instanzen and
+   Docker are there regardless, because running and updating the sites on this host predates the module. *@
 @{
     var on = Cloud.Flag(MatCMS.Cloud.Services.SettingKeys.HostingEnabled);
     string Cls(string key) => key == Model ? "tab active" : "tab";
 }
 <nav class="tabs">
     <a class="@Cls("overview")" asp-page="/Admin/Hosting/Index">@T["hosting.navOverview"]</a>
-    <a class="@Cls("updates")" asp-page="/Admin/Hosting/Updates">@T["hosting.navUpdates"]</a>
     @if (on)
     {
         <a class="@Cls("nodes")" asp-page="/Admin/Hosting/Nodes/Index">@T["nodes.title"]</a>
+    }
+    <a class="@Cls("instances")" asp-page="/Admin/Hosting/Instances">@T["nav.instances"]</a>
+    @if (on)
+    {
         <a class="@Cls("domains")" asp-page="/Admin/Hosting/Domains">@T["hosting.navDomains"]</a>
     }
     <a class="@Cls("docker")" asp-page="/Admin/Hosting/Docker">Docker</a>

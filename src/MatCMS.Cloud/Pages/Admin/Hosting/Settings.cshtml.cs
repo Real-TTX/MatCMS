@@ -24,6 +24,7 @@ public class SettingsModel : PageModel
 
     public string Get(string key) => _cloud.Get(key) ?? "";
     public bool ModuleEnabled => _cloud.Flag(SettingKeys.HostingEnabled);
+    public bool AutoUpdate => _cloud.Flag(SettingKeys.AutoUpdateLocal);
     public ProxyFieldsView ProxyFields => _proxy.FieldsView();
     public bool DockerReachable { get; private set; }
 
@@ -45,6 +46,13 @@ public class SettingsModel : PageModel
     {
         await _cloud.SaveAsync(new Dictionary<string, string?> { [SettingKeys.HostingEnabled] = hostingEnabled ? "1" : "0" });
         TempData["Flash"] = hostingEnabled ? "Hosting eingeschaltet." : "Hosting ausgeschaltet.";
+        return RedirectToPage();
+    }
+
+    public async Task<IActionResult> OnPostAutoAsync(bool autoUpdate)
+    {
+        await _cloud.SaveAsync(new Dictionary<string, string?> { [SettingKeys.AutoUpdateLocal] = autoUpdate ? "1" : "0" });
+        TempData["Flash"] = autoUpdate ? "Automatische Updates eingeschaltet." : "Automatische Updates ausgeschaltet.";
         return RedirectToPage();
     }
 

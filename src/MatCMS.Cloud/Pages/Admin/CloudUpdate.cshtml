@@ -1,0 +1,90 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.CloudUpdateModel
+@inject MatCMS.Cloud.Services.CloudContext Cloud
+@{
+    Layout = null;
+    var run = Model.Run!;
+}
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@T["cloudupdate.screen.title"] – @Cloud.CloudName</title>
+    <link href="https://fonts.googleapis.com/css2?family=Geologica:wght@@500;600;700&family=Inter:wght@@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/admin.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/cloud.css" asp-append-version="true" />
+    <link rel="icon" href="@Cloud.LogoUrl" />
+</head>
+@* No sidebar, no links: while the cloud swaps its own container there is nothing that could safely be done. *@
+<body class="admin cu-screen">
+    <main class="cu-box"
+          data-labels='@System.Text.Json.JsonSerializer.Serialize(new {
+              restarting = T["cloudupdate.screen.restarting"], working = T["cloudupdate.screen.working"],
+              done = T["cloudupdate.screen.done"], current = T["cloudupdate.screen.current"],
+              rolledBack = T["cloudupdate.screen.rolledBack"], failed = T["cloudupdate.screen.failed"] })'>
+        <img class="cu-logo" src="@Cloud.LogoUrl" alt="@Cloud.CloudName" />
+        <h1>@T["cloudupdate.screen.title"]</h1>
+        <p class="muted">@T["cloudupdate.screen.wait"]</p>
+
+        <div class="cu-status">
+            <span class="cu-spinner" data-cu-spinner aria-hidden="true"></span>
+            <span data-cu-phase>@T["cloudupdate.screen.working"]</span>
+        </div>
+        <div class="cu-version mono muted">@run.FromVersion → <span data-cu-version>…</span></div>
+
+        <pre class="cu-log mono" data-cu-log>@string.Join("\n", run.Log)</pre>
+
+        <div class="cu-actions" data-cu-actions hidden>
+            <a class="btn" href="/admin/hosting">@T["cloudupdate.screen.back"]</a>
+        </div>
+    </main>
+
+    <script>
+        (function () {
+            var box = document.querySelector('.cu-box');
+            var L = JSON.parse(box.getAttribute('data-labels'));
+            var phase = document.querySelector('[data-cu-phase]');
+            var log = document.querySelector('[data-cu-log]');
+            var ver = document.querySelector('[data-cu-version]');
+            var spin = document.querySelector('[data-cu-spinner]');
+            var actions = document.querySelector('[data-cu-actions]');
+            var finished = false;
+            log.scrollTop = log.scrollHeight;
+
+            function show(d) {
+                if (d.log && d.log.length) {
+                    var atEnd = log.scrollTop + log.clientHeight >= log.scrollHeight - 8;
+                    log.textContent = d.log.join('\n');
+                    if (atEnd) log.scrollTop = log.scrollHeight;
+                }
+                if (d.inFlight) { phase.textContent = L.working; return; }
+                // Finished — the page that answers may already be the NEW version.
+                finished = true;
+                ver.textContent = d.version;
+                spin.classList.add('is-' + (d.state === 'succeeded' || d.state === 'current' ? 'ok' : 'err'));
+                var text = { succeeded: L.done, current: L.current, 'rolled-back': L.rolledBack }[d.state] || L.failed;
+                phase.textContent = text + (d.message && d.state !== 'succeeded' ? ' ' + d.message : '');
+                if (d.state === 'succeeded' || d.state === 'current') {
+                    setTimeout(function () { location.href = '/admin/hosting'; }, 3000);
+                } else {
+                    actions.hidden = false;   // a failure is read, not reloaded away
+                }
+            }
+            function poll() {
+                if (finished) return;
+                // Bounded: a request to a container that is shutting down can hang instead of failing.
+                var ctl = new AbortController(); var t = setTimeout(function () { ctl.abort(); }, 5000);
+                fetch('?handler=State', { headers: { 'X-Requested-With': 'fetch' }, cache: 'no-store', signal: ctl.signal })
+                    .finally(function () { clearTimeout(t); })
+                    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+                    .then(function (d) { show(d); if (!finished) setTimeout(poll, 2000); })
+                    // Expected for a minute or two: the old container is gone and the new one not up yet.
+                    .catch(function () { phase.textContent = L.restarting; setTimeout(poll, 2500); });
+            }
+            poll();
+        })();
+    </script>
+</body>
+</html>

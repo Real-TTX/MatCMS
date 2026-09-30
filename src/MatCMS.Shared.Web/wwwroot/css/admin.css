@@ -557,7 +557,7 @@ table.dash-attention col.dash-icon-col { width: 44px; }
 table.dash-attention td.dash-icon { font-size: 18px; text-align: center; padding-left: 6px; padding-right: 6px; }
 /* Dashboard tiles: narrower minimum, so six fit one row on a normal screen. */
 .stat-grid.dash-tiles { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
-td.nowrap, th.nowrap { white-space: nowrap; }
+td.nowrap, th.nowrap, .nowrap { white-space: nowrap; }
 table.dash-attention tr.lvl-err td:first-child { box-shadow: inset 3px 0 0 #d64545; }
 table.dash-attention tr.lvl-warn td:first-child { box-shadow: inset 3px 0 0 #e0a100; }
 table.dash-attention tr.lvl-info td:first-child { box-shadow: inset 3px 0 0 #7a8ca3; }

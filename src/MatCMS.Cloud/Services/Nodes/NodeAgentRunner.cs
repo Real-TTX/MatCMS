@@ -57,6 +57,11 @@ public static class NodeAgentRunner
         var reports = new ConcurrentQueue<NodeJobReport>();
         var wake = new CancellationTokenSource();
         var backoff = TimeSpan.FromSeconds(2);
+        // Usage is sampled at most once a minute and carried on the beats in between: a sample takes the daemon
+        // about a second, and an idle agent beats every few seconds whenever jobs finish.
+        var stats = new Dictionary<string, DockerHostService.ContainerStats>();
+        var statsAt = DateTime.MinValue;
+        (int Cpus, long MemTotal, string? Os)? host = null;
         log.LogInformation("MatCMS-Node-Agent {Version} → {Cloud} (Node {Node}).", version, cloudUrl, nodeId);
 
         while (!stop.IsCancellationRequested)
@@ -74,8 +79,23 @@ public static class NodeAgentRunner
             {
                 try
                 {
-                    containers = (await docker.ListMatCmsContainersAsync(dockerCts.Token) ?? new())
-                        .Select(c => new NodeContainer { Id = c.Id, Name = c.Name, Image = c.Image, State = c.State, PublishedPort = c.PublishedPort, CloudManaged = c.CloudManaged })
+                    var list = await docker.ListMatCmsContainersAsync(dockerCts.Token) ?? new();
+                    if (DateTime.UtcNow - statsAt > TimeSpan.FromSeconds(60))
+                    {
+                        stats = await docker.StatsAsync(list.Where(c => c.State == "running").Select(c => c.Id), dockerCts.Token);
+                        host = await docker.HostResourcesAsync(dockerCts.Token) ?? host;
+                        statsAt = DateTime.UtcNow;
+                    }
+                    containers = list
+                        .Select(c =>
+                        {
+                            var st = c.State == "running" && stats.TryGetValue(c.Id, out var v) ? v : null;
+                            return new NodeContainer
+                            {
+                                Id = c.Id, Name = c.Name, Image = c.Image, State = c.State, PublishedPort = c.PublishedPort, CloudManaged = c.CloudManaged,
+                                Status = c.Status, CpuPercent = st?.CpuPercent, MemBytes = st?.MemBytes, MemLimit = st?.MemLimit,
+                            };
+                        })
                         .ToList();
                 }
                 catch (Exception ex) { dockerError = ex.Message; }
@@ -90,6 +110,7 @@ public static class NodeAgentRunner
             {
                 ProtocolVersion = NodeProtocol.Version, AgentVersion = version, HostName = hostName ?? Environment.MachineName,
                 DockerVersion = dockerVersion, DockerError = dockerError, Containers = containers, Reports = sending,
+                Cpus = host?.Cpus, MemTotal = host?.MemTotal,
                 // Only an idle agent may be held: with reports in flight, or a job about to finish, the cloud
                 // must answer at once.
                 Wait = sending.Count == 0,

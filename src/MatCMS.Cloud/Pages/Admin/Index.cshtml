@@ -21,22 +21,22 @@
         <div class="l">@T["dashboard.instances"]</div>
         <div class="s">@T["dashboard.hostSplit", Model.LocalCount, Model.NodeInstanceCount, Model.RemoteCount]</div>
     </a>
-    <a class="stat @(Model.OfflineCount > 0 ? "is-err" : "")" asp-page="/Admin/Instances/Index">
+    <a class="stat @(Model.OfflineCount > 0 ? "is-err" : "")" asp-page="/Admin/Instances/Index" asp-route-filter="@(Model.OfflineCount > 0 ? "offline" : null)">
         <div class="n">@Model.OnlineCount<span class="of">/@Model.Instances.Count</span></div>
         <div class="l">@T["dashboard.online"]</div>
         <div class="s">@T["dashboard.offlineStopped", Model.OfflineCount, Model.StoppedCount]</div>
     </a>
-    <a class="stat @(Model.UpdateCount > 0 ? "is-warn" : "")" asp-page="@(Model.IsAdmin ? "/Admin/Hosting/Index" : "/Admin/Instances/Index")">
+    <a class="stat @(Model.UpdateCount > 0 ? "is-warn" : "")" asp-page="@(Model.IsAdmin ? "/Admin/Hosting/Updates" : "/Admin/Instances/Index")" asp-route-filter="@(Model.IsAdmin ? null : "update")">
         <div class="n">@Model.UpdateCount</div>
         <div class="l">@T["dashboard.updates"]</div>
         <div class="s">@T["dashboard.latest", Model.LatestVersion ?? "—"]</div>
     </a>
-    <a class="stat @(Model.SyncErrorCount > 0 ? "is-err" : Model.OutOfSyncCount > 0 ? "is-warn" : "")" asp-page="/Admin/Instances/Index">
+    <a class="stat @(Model.SyncErrorCount > 0 ? "is-err" : Model.OutOfSyncCount > 0 ? "is-warn" : "")" asp-page="/Admin/Instances/Index" asp-route-filter="@(Model.SyncErrorCount > 0 ? "syncfailed" : Model.OutOfSyncCount > 0 ? "drift" : null)">
         <div class="n">@(Model.Instances.Count - Model.OutOfSyncCount - Model.SyncErrorCount)</div>
         <div class="l">@T["dashboard.inSync"]</div>
         <div class="s">@T["dashboard.syncSplit", Model.OutOfSyncCount, Model.SyncErrorCount]</div>
     </a>
-    <a class="stat @(Model.ErrorTotal7d > 0 ? "is-warn" : "")" asp-page="/Admin/Logs/Index">
+    <a class="stat @(Model.ErrorTotal7d > 0 ? "is-warn" : "")" asp-page="/Admin/Logs/Index" asp-route-source="all" asp-route-level="Error">
         <div class="n">@Model.ErrorTotal7d</div>
         <div class="l">@T["dashboard.errors7d"]</div>
         @* Seven bars, one per day: tall = many errors that day. The tooltip names both sources. *@
@@ -60,36 +60,38 @@
 
 <div class="dash-grid">
     @* ---- Everything that needs a look, errors first — one list instead of one card per kind. ---- *@
-    <div class="card">
+    <div class="card dash-card">
         <h2>@T["dashboard.attention"] @if (Model.AttentionItems.Count > 0) { <span class="muted">(@Model.AttentionItems.Count)</span> }</h2>
-        @if (Model.AttentionItems.Count == 0)
-        {
-            <p class="muted">✓ @T["dashboard.allClear"]</p>
-        }
-        else
-        {
-            <table class="data dash-attention">
-                <colgroup><col class="dash-icon-col" /><col /></colgroup>
-                <tbody>
-                    @foreach (var x in Model.AttentionItems.Take(25))
-                    {
-                        <tr class="lvl-@x.Level">
-                            <td class="dash-icon">@x.Icon</td>
-                            <td><a href="@x.Url"><strong>@x.Title</strong></a><div class="muted">@x.Text</div></td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-            @if (Model.AttentionItems.Count > 25)
+        <div class="dash-card-body">
+            @if (Model.AttentionItems.Count == 0)
             {
-                <div class="help">@T["dashboard.more", Model.AttentionItems.Count - 25]</div>
+                <p class="muted">✓ @T["dashboard.allClear"]</p>
             }
+            else
+            {
+                <table class="data dash-attention">
+                    <colgroup><col class="dash-icon-col" /><col /></colgroup>
+                    <tbody>
+                        @foreach (var x in Model.AttentionItems.Take(IndexModel.CardRows))
+                        {
+                            <tr class="lvl-@x.Level">
+                                <td class="dash-icon">@x.Icon</td>
+                                <td><a href="@x.Url"><strong>@x.Title</strong></a><div class="muted dash-clip">@x.Text</div></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+        @if (Model.AttentionItems.Count > IndexModel.CardRows)
+        {
+            <div class="dash-card-foot"><a class="btn btn-ghost" asp-page="/Admin/Attention/Index">@T["dashboard.showAll", Model.AttentionItems.Count]</a></div>
         }
     </div>
 
     @if (Model.IsAdmin)
     {
-        <div class="card">
+        <div class="card dash-card">
             <h2>@T["dashboard.system"]</h2>
             <div class="kv">
                 <div class="kv-label">@T["dashboard.thisCloud"]</div>
@@ -145,10 +147,11 @@
 </div>
 
 <div class="dash-grid">
-    <div class="card">
+    <div class="card dash-card">
         <h2>@T["dashboard.recentSyncs"]</h2>
+        <div class="dash-card-body">
         <table class="data">
-            <thead><tr><th style="width:120px;">@T["common.time"]</th><th>@T["common.instance"]</th><th style="width:60px;">Rev.</th><th>@T["dashboard.syncResult"]</th></tr></thead>
+            <thead><tr><th style="width:150px;">@T["common.time"]</th><th>@T["common.instance"]</th><th style="width:30%;">@T["dashboard.syncResult"]</th></tr></thead>
             <tbody>
                 @if (Model.RecentSyncs.Count == 0)
                 {
@@ -159,7 +162,6 @@
                     <tr>
                         <td class="muted mono nowrap">@r.RanAt.ToLocalTime().ToString("dd.MM. HH:mm")</td>
                         <td><a asp-page="/Admin/Instances/Details" asp-route-id="@r.InstanceId" asp-route-tab="config">@(r.Instance?.Name ?? "—")</a></td>
-                        <td class="mono muted">@r.Revision</td>
                         <td>
                             @if (!string.IsNullOrEmpty(r.Error)) { <span class="badge badge-err" title="@r.Error">@T["common.error"]</span> }
                             @if (r.Installed > 0) { <span class="badge badge-on">+@r.Installed</span> }
@@ -171,25 +173,36 @@
                 }
             </tbody>
         </table>
+        </div>
+        @if (Model.SyncRunCount > IndexModel.CardRows)
+        {
+            <div class="dash-card-foot"><a class="btn btn-ghost" asp-page="/Admin/Syncs/Index">@T["dashboard.showAll", Model.SyncRunCount]</a></div>
+        }
     </div>
 
-    <div class="card">
+    <div class="card dash-card">
         <h2>@T["dashboard.errorsTitle"]</h2>
+        <div class="dash-card-body">
         <table class="data">
             <tbody>
-                @if (Model.InstancesWithErrors.Count == 0)
+                @if (Model.InstancesWithErrorsAll.Count == 0)
                 {
                     <partial name="_EmptyRow" model='@T["dashboard.noErrors"]' />
                 }
-                @foreach (var i in Model.InstancesWithErrors)
+                @foreach (var i in Model.InstancesWithErrorsAll.Take(IndexModel.CardRows))
                 {
                     <tr>
-                        <td><a asp-page="/Admin/Logs/Index" asp-route-source="@i.PublicId">@i.Name</a></td>
+                        <td><a asp-page="/Admin/Logs/Index" asp-route-source="@i.PublicId" asp-route-level="Error">@i.Name</a></td>
                         <td style="width:140px;"><span class="badge badge-err">@T["dashboard.errorsN", Model.ErrorCount(i)]</span></td>
                     </tr>
                 }
             </tbody>
         </table>
+        </div>
+        @if (Model.InstancesWithErrorsAll.Count > 0)
+        {
+            <div class="dash-card-foot"><a class="btn btn-ghost" asp-page="/Admin/Logs/Index" asp-route-source="all" asp-route-level="Error">@T["dashboard.allErrors"]</a></div>
+        }
     </div>
 </div>
 

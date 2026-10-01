@@ -40,7 +40,7 @@
         <div class="l">@T["dashboard.media"]</div>
         <div class="s">@Hsize(Model.MediaBytes)</div>
     </a>
-    <a class="stat @(Model.UnreadCount > 0 ? "is-warn" : "")" asp-page="/Admin/Forms/Index">
+    <a class="stat @(Model.UnreadCount > 0 ? "is-warn" : "")" asp-page="/Admin/Forms/Inbox" asp-route-filter="@(Model.UnreadCount > 0 ? "unread" : null)">
         <div class="n">@Model.UnreadCount</div>
         <div class="l">@T["dashboard.newSubmissions"]</div>
         <div class="s">@T["dashboard.ofTotal", Model.SubmissionCount]</div>
@@ -60,7 +60,7 @@
             }
         </div>
     </a>
-    <a class="stat @(Model.ErrorCount7d > 0 ? "is-warn" : "")" asp-page="/Admin/Logs/Index">
+    <a class="stat @(Model.ErrorCount7d > 0 ? "is-warn" : "")" asp-page="/Admin/Logs/Index" asp-route-level="@(Model.ErrorCount7d > 0 ? "Error" : null)">
         <div class="n">@Model.ErrorCount7d</div>
         <div class="l">@T["dashboard.errors7d"]</div>
         <div class="dash-bars" aria-hidden="true">
@@ -74,30 +74,38 @@
 
 <div class="dash-grid">
     @* ---- Everything that needs a look, most serious first. ---- *@
-    <div class="card">
+    @* A short list, so "Alle anzeigen" opens the rest in place (rows with class dash-extra). *@
+    <div class="card dash-card">
         <h2>@T["dashboard.attention"] @if (Model.AttentionItems.Count > 0) { <span class="muted">(@Model.AttentionItems.Count)</span> }</h2>
-        @if (Model.AttentionItems.Count == 0)
+        <div class="dash-card-body">
+            @if (Model.AttentionItems.Count == 0)
+            {
+                <p class="muted">✓ @T["dashboard.allClear"]</p>
+            }
+            else
+            {
+                <table class="data dash-attention">
+                    <colgroup><col class="dash-icon-col" /><col /></colgroup>
+                    <tbody>
+                        @for (var n = 0; n < Model.AttentionItems.Count; n++)
+                        {
+                            var x = Model.AttentionItems[n];
+                            <tr class="lvl-@x.Level@(n >= IndexModel.CardRows ? " dash-extra" : "")" hidden="@(n >= IndexModel.CardRows)">
+                                <td class="dash-icon">@x.Icon</td>
+                                <td><a href="@x.Url"><strong>@x.Title</strong></a><div class="muted dash-clip">@x.Text</div></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+        @if (Model.AttentionItems.Count > IndexModel.CardRows)
         {
-            <p class="muted">✓ @T["dashboard.allClear"]</p>
-        }
-        else
-        {
-            <table class="data dash-attention">
-                <colgroup><col class="dash-icon-col" /><col /></colgroup>
-                <tbody>
-                    @foreach (var x in Model.AttentionItems)
-                    {
-                        <tr class="lvl-@x.Level">
-                            <td class="dash-icon">@x.Icon</td>
-                            <td><a href="@x.Url"><strong>@x.Title</strong></a><div class="muted">@x.Text</div></td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+            <div class="dash-card-foot"><button type="button" class="btn btn-ghost" data-dash-expand data-more="@T["dashboard.showAll", Model.AttentionItems.Count]" data-less="@T["dashboard.showLess"]">@T["dashboard.showAll", Model.AttentionItems.Count]</button></div>
         }
     </div>
 
-    <div class="card">
+    <div class="card dash-card">
         <h2>@T["dashboard.website"]</h2>
         <div class="kv">
             <div class="kv-label">@T["dashboard.siteName"]</div>
@@ -164,17 +172,19 @@
 </div>
 
 <div class="dash-grid">
-    <div class="card">
+    <div class="card dash-card">
         <h2>@T["dashboard.recentlyEdited"]</h2>
+        <div class="dash-card-body">
         <table class="data">
             <tbody>
                 @if (Model.RecentlyEdited.Count == 0)
                 {
                     <partial name="_EmptyRow" model='@T["dashboard.nothingEdited"]' />
                 }
-                @foreach (var e in Model.RecentlyEdited)
+                @for (var n = 0; n < Model.RecentlyEdited.Count; n++)
                 {
-                    <tr>
+                    var e = Model.RecentlyEdited[n];
+                    <tr class="@(n >= IndexModel.CardRows ? "dash-extra" : null)" hidden="@(n >= IndexModel.CardRows)">
                         <td style="width:34px;">@(e.Kind == "page" ? "📄" : "📝")</td>
                         <td><a href="@e.Url">@e.Title</a> @if (!e.Published) { <span class="badge badge-off">@T["dashboard.draft"]</span> }</td>
                         <td class="muted mono nowrap">@e.UpdatedAt.ToLocalTime().ToString("dd.MM. HH:mm")</td>
@@ -182,10 +192,20 @@
                 }
             </tbody>
         </table>
+        </div>
+        @if (Model.RecentlyEdited.Count > IndexModel.CardRows)
+        {
+            <div class="dash-card-foot">
+                <button type="button" class="btn btn-ghost" data-dash-expand data-more="@T["dashboard.showMore"]" data-less="@T["dashboard.showLess"]">@T["dashboard.showMore"]</button>
+                <a class="btn btn-ghost" asp-page="/Admin/Pages/Index">@T["nav.pages"]</a>
+                <a class="btn btn-ghost" asp-page="/Admin/Posts/Index">@T["nav.posts"]</a>
+            </div>
+        }
     </div>
 
-    <div class="card">
+    <div class="card dash-card">
         <h2>@T["dashboard.recentSubmissions"]</h2>
+        <div class="dash-card-body">
         <table class="data">
             <tbody>
                 @if (Model.RecentSubmissions.Count == 0)
@@ -195,12 +215,20 @@
                 @foreach (var s in Model.RecentSubmissions)
                 {
                     <tr>
-                        <td><a asp-page="/Admin/Forms/Index">@(s.Form?.Name ?? "—")</a> @if (!s.IsRead) { <span class="badge badge-new">@T["dashboard.unread"]</span> }</td>
+                        <td><a asp-page="/Admin/Forms/Submissions" asp-route-id="@s.FormId">@(s.Form?.Name ?? "—")</a> @if (!s.IsRead) { <span class="badge badge-new">@T["dashboard.unread"]</span> }</td>
                         <td class="muted mono nowrap">@s.CreatedAt.ToLocalTime().ToString("dd.MM. HH:mm")</td>
                     </tr>
                 }
             </tbody>
         </table>
+        </div>
+        @if (Model.SubmissionCount > 0)
+        {
+            <div class="dash-card-foot">
+                <a class="btn btn-ghost" asp-page="/Admin/Forms/Inbox">@T["dashboard.showAll", Model.SubmissionCount]</a>
+                @if (Model.UnreadCount > 0) { <a class="btn btn-ghost" asp-page="/Admin/Forms/Inbox" asp-route-filter="unread">@T["dashboard.showUnread", Model.UnreadCount]</a> }
+            </div>
+        }
     </div>
 </div>
 
@@ -228,7 +256,7 @@
             </tbody>
         </table>
     </div>
-    <div class="list-actions"><a class="btn btn-ghost" asp-page="/Admin/Logs/Index">@T["dashboard.allLogs"]</a></div>
+    <div class="list-actions"><a class="btn btn-ghost" asp-page="/Admin/Logs/Index" asp-route-level="Error">@T["dashboard.allLogs"]</a></div>
 }
 
 @* The quickstart is for a fresh site; once it has content it would only take room. *@

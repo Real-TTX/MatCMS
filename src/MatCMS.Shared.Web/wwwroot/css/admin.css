@@ -1494,3 +1494,21 @@ table.stats-table td.stats-key { overflow: hidden; text-overflow: ellipsis; whit
 .stats-period { display: flex; flex-wrap: wrap; gap: 6px; }
 .dash-bars.stats-spark { width: 160px; margin-top: 0; gap: 2px; }
 table.data th.num, table.data td.num { text-align: right; }
+
+/* Dashboard cards of one row are the same height: each shows a fixed number of rows and ends in its "Alle anzeigen"
+   footer, so a busy card does not stretch its row and a quiet one does not leave a hole. On a phone they stack and
+   simply grow; an expanded card (in-place "Alle anzeigen") grows too. */
+.dash-grid > .card.dash-card { display: flex; flex-direction: column; height: 530px; }
+.dash-card table.data td { padding-top: 8px; padding-bottom: 8px; }
+/* One line per row in a card (the full text is on the list page), so six rows always fit. */
+.dash-card table.data:not(.dash-attention) { table-layout: fixed; width: 100%; }
+.dash-card table.data:not(.dash-attention) td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* table.data narrows its last column to fit row buttons; a card's last column is content and takes its share. */
+.dash-card table.data:not(.dash-attention) td:last-child, .dash-card table.data:not(.dash-attention) th:last-child { width: auto; }
+.dash-card > .dash-card-body { flex: 1 1 auto; min-height: 0; overflow: hidden; }
+.dash-card > .dash-card-foot { flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 8px; padding-top: 12px; margin-top: auto; border-top: 1px solid var(--line); }
+.dash-grid > .card.dash-card.expanded { height: auto; min-height: 530px; }
+.dash-card.expanded > .dash-card-body { overflow: visible; }
+@media (max-width: 860px) { .dash-grid > .card.dash-card, .dash-grid > .card.dash-card.expanded { height: auto; min-height: 0; } .dash-card > .dash-card-body { overflow: visible; } }
+/* A long message in a dashboard card stays two lines; the full text is on the list page. */
+.dash-card .dash-clip { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }

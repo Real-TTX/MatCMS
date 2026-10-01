@@ -28,6 +28,8 @@ public class IndexModel : PageModel
     }
 
     // ---- Tiles ------------------------------------------------------------------------------------------
+    /// <summary>Rows a dashboard card shows; the rest is behind its "Alle anzeigen".</summary>
+    public const int CardRows = 6;
     public int PageCount { get; private set; }
     public int PageDrafts { get; private set; }
     public int PostCount { get; private set; }
@@ -89,7 +91,7 @@ public class IndexModel : PageModel
         SubmissionCount = await _db.FormSubmissions.CountAsync();
         UnreadCount = await _db.FormSubmissions.CountAsync(s => !s.IsRead);
         RecentSubmissions = await _db.FormSubmissions.AsNoTracking().Include(s => s.Form)
-            .OrderByDescending(s => s.CreatedAt).Take(6).ToListAsync();
+            .OrderByDescending(s => s.CreatedAt).Take(CardRows).ToListAsync();
 
         var settings = await _db.SiteSettings.AsNoTracking().ToDictionaryAsync(s => s.Key, s => s.Value);
         string? Get(string k) => settings.TryGetValue(k, out var v) && !string.IsNullOrWhiteSpace(v) ? v : null;
@@ -116,13 +118,13 @@ public class IndexModel : PageModel
         RecentErrors = await _db.Logs.AsNoTracking().Where(l => l.Level == "Error").OrderByDescending(l => l.Id).Take(5).ToListAsync();
 
         // What was worked on last — the fastest way back into an edit.
-        var pages = await _db.Pages.AsNoTracking().OrderByDescending(p => p.UpdatedAt).Take(6)
+        var pages = await _db.Pages.AsNoTracking().OrderByDescending(p => p.UpdatedAt).Take(30)
             .Select(p => new { p.Id, p.Title, p.IsPublished, p.UpdatedAt }).ToListAsync();
-        var posts = await _db.Posts.AsNoTracking().OrderByDescending(p => p.UpdatedAt).Take(6)
+        var posts = await _db.Posts.AsNoTracking().OrderByDescending(p => p.UpdatedAt).Take(30)
             .Select(p => new { p.Id, p.Title, p.IsPublished, p.UpdatedAt }).ToListAsync();
         RecentlyEdited = pages.Select(p => new Edited("page", p.Title, p.IsPublished, p.UpdatedAt, Url.Page("/Admin/Pages/Edit", new { id = p.Id })!))
             .Concat(posts.Select(p => new Edited("post", p.Title, p.IsPublished, p.UpdatedAt, Url.Page("/Admin/Posts/Edit", new { id = p.Id })!)))
-            .OrderByDescending(e => e.UpdatedAt).Take(6).ToList();
+            .OrderByDescending(e => e.UpdatedAt).Take(30).ToList();
 
         BuildAttention();
     }
@@ -140,12 +142,12 @@ public class IndexModel : PageModel
         if (!BackupScheduled && LastBackup is null) Add("warn", "💾", "backupNone", Url.Page("/Admin/Backup/Index")!);
         else if (LastBackup is { } lb && DateTime.UtcNow - lb > StaleBackup) Add("warn", "💾", "backupStale", Url.Page("/Admin/Backup/Index")!, (int)(DateTime.UtcNow - lb).TotalDays);
         if (!MailConfigured) Add("warn", "✉️", "mail", Settings("smtp"));
-        if (UnreadCount > 0) Add("info", "📨", "unread", Url.Page("/Admin/Forms/Index")!, UnreadCount);
+        if (UnreadCount > 0) Add("info", "📨", "unread", Url.Page("/Admin/Forms/Inbox", new { filter = "unread" })!, UnreadCount);
         if (UpdateAvailable) Add("info", "⬆️", "update", Settings("cloud"), LatestVersion ?? "", Version);
         if (CloudConnected && !string.IsNullOrWhiteSpace(CloudSyncError))
             a.Add(new("err", "☁️", _t["dashboard.attn.syncError.title"], CloudSyncError!, Settings("cloud")));
         else if (CloudOutOfSync) Add("info", "☁️", "syncPending", Settings("cloud"));
-        if (ErrorCount7d > 0) Add("warn", "🐞", "errors", Url.Page("/Admin/Logs/Index")!, ErrorCount7d);
+        if (ErrorCount7d > 0) Add("warn", "🐞", "errors", Url.Page("/Admin/Logs/Index", new { level = "Error" })!, ErrorCount7d);
         AttentionItems = a.OrderBy(x => x.Level switch { "err" => 0, "warn" => 1, _ => 2 }).ToList();
     }
 }

@@ -130,6 +130,8 @@ builder.Services.AddScoped<InstanceService>();
 builder.Services.AddScoped<StatsService>();
 builder.Services.AddScoped<HostImagesService>();
 builder.Services.AddScoped<ProfileOpsService>();
+builder.Services.AddScoped<AttentionService>();
+builder.Services.AddScoped<SyncHistoryService>();
 builder.Services.AddScoped<ProfileService>();
 builder.Services.AddScoped<StoreService>();
 builder.Services.AddScoped<HostingActionsService>();
@@ -1052,6 +1054,7 @@ MatCMS.Cloud.Api.HostingApi.MapHostingApi(app);
 MatCMS.Cloud.Api.NodeApi.MapNodeApi(app);
 MatCMS.Cloud.Api.NotificationApi.MapNotificationApi(app);
 MatCMS.Cloud.Api.StatsApi.MapStatsApi(app);
+MatCMS.Cloud.Api.OverviewApi.MapOverviewApi(app);
 
 // --- Catalogue ------------------------------------------------------------
 // The store, browsable by an approved instance itself ("Weiter durchsuchen…" in MatCMS). This is the

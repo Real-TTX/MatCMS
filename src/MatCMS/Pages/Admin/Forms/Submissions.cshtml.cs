@@ -56,7 +56,7 @@ public class SubmissionsModel : PageModel
         return RedirectToPage(new { id });
     }
 
-    private static List<Field> ParseFields(string? json)
+    internal static List<Field> ParseFields(string? json)
     {
         if (string.IsNullOrWhiteSpace(json)) return new();
         try

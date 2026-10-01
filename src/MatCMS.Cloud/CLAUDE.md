@@ -699,6 +699,14 @@ login same-site; it is not used by this flow.
   `stats.enabled`/`stats.retentionDays` and the `log.*` keys are rollable (catalog group "Protokoll & Statistik").
   Log/statistics SETTINGS live under Einstellungen (tab Protokoll here, "Protokoll & Statistik" on the site); the
   log and statistics pages only show.
+- **Dashboard cards** (both apps, shared CSS `.dash-card`): the cards of a row have ONE fixed height (530 px, auto on a
+  phone), show `CardRows` (6) one-line rows and end in "Alle anzeigen (N)". A long list links to its page, already
+  filtered — `admin-list.js` takes `?filter=<tag>` and `?q=` from the address for a `[data-list]` page, so tiles link
+  to e.g. `Instances?filter=offline`; a short list opens in place (`[data-dash-expand]`, extra rows carry the CLASS
+  `dash-extra` — Razor renders a `data-` attribute even when its value is null). Pages behind the cards: cloud
+  **Admin/Attention** (all of `AttentionService` — shared with the card, `/api/v1/attention`, MCP `get_attention`) and
+  **Admin/Syncs** (`SyncHistoryService`, `/api/v1/syncs`, MCP `list_sync_runs`); CMS **Forms/Inbox** (every form's
+  submissions, filter unread/read/form). Neither is in the sidebar; they are where the dashboard leads.
 - **Admin navigation**: **Hosting is ONE sidebar item, the first** (Admin-only), and everything about hosts,
   containers, images and domains lives in its TABS — link-tabs (`_HostingTabs.cshtml`, `a.tab`, scrollable on phones),
   each its own page: **Übersicht** = the module's dashboard (tiles, the Hosts table with a stacked CPU/RAM "Ressourcen"

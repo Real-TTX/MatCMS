@@ -79,6 +79,15 @@
             page = 0; apply();
         }
 
+        // Presets from the address: ?filter=<tag> selects that option of the list's filter (when it has one), ?q=
+        // fills the search — so a dashboard card or tile can link straight to "the list, already filtered".
+        var params = new URLSearchParams(location.search);
+        if (filter && params.has('filter')) {
+            var want = params.get('filter');
+            if (Array.prototype.some.call(filter.options, function (o) { return o.value === want; })) filter.value = want;
+        }
+        if (search && params.has('q')) search.value = params.get('q');
+
         if (search) search.addEventListener('input', function () { page = 0; apply(); });
         if (filter) filter.addEventListener('change', function () { page = 0; apply(); });
         if (toggle) {
@@ -150,5 +159,19 @@
             var t = e.target.closest('.tab');
             if (t) setTimeout(function () { reveal(bar, t, true); }, 0);
         });
+    });
+})();
+
+// Dashboard cards: a card shows its first few rows; [data-dash-expand] shows the rest in place (rows
+// with class dash-extra — a class, because Razor renders a data- attribute even when its value is null), for
+// short lists that have no page of their own. A long list links to its page instead.
+(function () {
+    document.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-dash-expand]');
+        if (!b) return;
+        var card = b.closest('.dash-card');
+        var open = card.classList.toggle('expanded');
+        card.querySelectorAll('.dash-extra').forEach(function (r) { r.hidden = !open; });
+        b.textContent = open ? b.getAttribute('data-less') : b.getAttribute('data-more');
     });
 })();

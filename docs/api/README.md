@@ -240,6 +240,13 @@ Ein Profil kann Offline-/Update-Meldungen für seine Instanzen abschalten; seine
 
 ---
 
+## 6b2. Dashboard-Listen
+
+- `GET /api/v1/attention` → `{ count, items:[{ level, kind, title, text, instanceId, url }] }` – was Aufmerksamkeit braucht, Fehler zuerst (`level` = err | warn | info). Auf die Instanzen des Schlüssels begrenzt; Zeilen zu Nodes und zur Cloud selbst nur mit einem Schlüssel für **alle Instanzen**.
+- `GET /api/v1/syncs?take=100` → `{ runs:[{ ranAt, instanceId, instance, revision, outcome, error, installed, updated, failed }] }` – wie die Instanzen ihre Profile übernommen haben, neueste zuerst; `outcome` = error | failed | changes | nochange.
+
+---
+
 ## 6c. Besucherstatistik
 
 Jede Website zählt ihren Verkehr selbst (ohne Cookies, ohne gespeicherte IP) und schickt der Cloud Tageszähler mit dem Heartbeat.
@@ -323,6 +330,7 @@ Instanz beim nächsten Heartbeat über ihre **eigenen** Validierer anwendet (add
 | `migrate_instance` | **Website umziehen** auf einen anderen Host (Daten 1:1, Domain zieht mit; offline währenddessen) — vorher bestätigen |
 | `get_migrations` | Umzüge einer Website mit Zustand, Schritt und Protokoll |
 | `get_notifications` / `set_notifications` | Benachrichtigungs-Matrix lesen / komplett ersetzen (Abschnitt 6b) |
+| `get_attention` / `list_sync_runs` | was Aufmerksamkeit braucht / Verlauf der Profil-Übernahmen (Abschnitt 6b2) |
 | `get_stats` | Besucherstatistik: ohne `instanceId` alle Sites im Vergleich, mit `instanceId` Verlauf, Top-Seiten, Herkunft, 404, Geräte (Abschnitt 6c) |
 
 **Profil-Tools** (dieselben Operationen wie Abschnitt 4, über denselben Dienst; Lesen mit jedem Schlüssel, Schreiben braucht **CanManageProfiles**, Instanz-Aufrufe sind auf den Schlüssel begrenzt). Jede Änderung zählt die Revision hoch, die Instanzen übernehmen sie beim nächsten Heartbeat:

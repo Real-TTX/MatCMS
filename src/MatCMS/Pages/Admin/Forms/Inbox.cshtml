@@ -1,0 +1,59 @@
+@page
+@model MatCMS.Pages.Admin.Forms.InboxModel
+@{
+    ViewData["Title"] = T["inbox.title"];
+    var unread = Model.Items.Count(i => !i.IsRead);
+}
+<div data-list data-list-page-size="50">
+    <div class="page-head">
+        <h1>@T["inbox.title"]</h1>
+        <div class="list-toolbar">
+            <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+            <select class="list-search" data-list-filter aria-label="@T["inbox.filter"]">
+                <option value="">@T["inbox.filterAll"] (@Model.Items.Count)</option>
+                <option value="unread">@T["inbox.filterUnread"] (@unread)</option>
+                <option value="read">@T["inbox.filterRead"] (@(Model.Items.Count - unread))</option>
+                @foreach (var f in Model.Forms)
+                {
+                    <option value="form-@f.Id">@f.Name</option>
+                }
+            </select>
+        </div>
+    </div>
+
+    <table class="data" data-list-table>
+        <thead>
+            <tr>
+                <th style="width:140px;">@T["inbox.date"]</th>
+                <th>@T["inbox.form"]</th>
+                <th>@T["inbox.content"]</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Items.Count == 0)
+            {
+                <partial name="_EmptyRow" model='@T["dashboard.noSubmissions"]' />
+            }
+            @foreach (var s in Model.Items)
+            {
+                <tr data-tags="@(s.IsRead ? "read" : "unread") form-@s.FormId" data-search="@(s.FormName + " " + s.Summary)">
+                    <td class="muted mono nowrap">@s.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                    <td class="nowrap"><a asp-page="Submissions" asp-route-id="@s.FormId">@s.FormName</a> @if (!s.IsRead) { <span class="badge badge-new">@T["dashboard.unread"]</span> }</td>
+                    <td class="muted">@s.Summary</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+    <nav class="list-pager" data-list-pager aria-label="@T["list.pager"]"></nav>
+</div>
+
+<div class="list-actions">
+    @if (unread > 0)
+    {
+        <form method="post" asp-page-handler="MarkAllRead" class="inline-form">
+            <button type="submit" class="btn btn-ghost">@T["inbox.markAllRead"]</button>
+        </form>
+    }
+    @if (Model.Total > InboxModel.Show) { <span class="muted">@T["inbox.limited", InboxModel.Show, Model.Total]</span> }
+</div>

@@ -1,0 +1,38 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.Attention.IndexModel
+@{
+    ViewData["Title"] = T["dashboard.attention"];
+}
+<div data-list data-list-page-size="50">
+    <div class="page-head">
+        <h1>@T["dashboard.attention"]</h1>
+        <div class="list-toolbar">
+            <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+            <select class="list-search" data-list-filter aria-label="@T["common.status"]">
+                <option value="">@T["attention.filterAll"] (@Model.Items.Count)</option>
+                <option value="err">@T["attention.filterErr"] (@Model.Items.Count(i => i.Level == "err"))</option>
+                <option value="warn">@T["attention.filterWarn"] (@Model.Items.Count(i => i.Level == "warn"))</option>
+                <option value="info">@T["attention.filterInfo"] (@Model.Items.Count(i => i.Level == "info"))</option>
+            </select>
+        </div>
+    </div>
+
+    <table class="data dash-attention" data-list-table>
+        <colgroup><col class="dash-icon-col" /><col /></colgroup>
+        <tbody>
+            @if (Model.Items.Count == 0)
+            {
+                <partial name="_EmptyRow" model='@("✓ " + T["dashboard.allClear"])' />
+            }
+            @foreach (var x in Model.Items)
+            {
+                <tr class="lvl-@x.Level" data-tags="@x.Level @x.Kind" data-search="@(x.Title + " " + x.Text)">
+                    <td class="dash-icon">@x.Icon</td>
+                    <td><a href="@x.Url"><strong>@x.Title</strong></a><div class="muted">@x.Text</div></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+    <nav class="list-pager" data-list-pager aria-label="@T["list.pager"]"></nav>
+</div>

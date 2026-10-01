@@ -1,0 +1,49 @@
+@page
+@model MatCMS.Cloud.Pages.Admin.Syncs.IndexModel
+@using MatCMS.Cloud.Services
+@{
+    ViewData["Title"] = T["syncs.title"];
+    int Count(string o) => Model.Runs.Count(r => SyncHistoryService.Outcome(r) == o);
+}
+<div data-list data-list-page-size="50">
+    <div class="page-head">
+        <h1>@T["syncs.title"]</h1>
+        <div class="list-toolbar">
+            <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+            <select class="list-search" data-list-filter aria-label="@T["common.status"]">
+                <option value="">@T["syncs.filterAll"] (@Model.Runs.Count)</option>
+                <option value="error">@T["syncs.filterError"] (@Count("error"))</option>
+                <option value="failed">@T["syncs.filterFailed"] (@Count("failed"))</option>
+                <option value="changes">@T["syncs.filterChanges"] (@Count("changes"))</option>
+                <option value="nochange">@T["syncs.filterNoChange"] (@Count("nochange"))</option>
+            </select>
+        </div>
+    </div>
+
+    <table class="data" data-list-table>
+        <thead><tr><th style="width:140px;">@T["common.time"]</th><th>@T["common.instance"]</th><th style="width:60px;">Rev.</th><th>@T["dashboard.syncResult"]</th></tr></thead>
+        <tbody>
+            @if (Model.Runs.Count == 0)
+            {
+                <partial name="_EmptyRow" model='@T["dashboard.noSyncs"]' />
+            }
+            @foreach (var r in Model.Runs)
+            {
+                <tr data-tags="@SyncHistoryService.Outcome(r)" data-search="@(r.Instance?.Name + " " + r.Error)">
+                    <td class="muted mono nowrap">@r.RanAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                    <td><a asp-page="/Admin/Instances/Details" asp-route-id="@r.InstanceId" asp-route-tab="config">@(r.Instance?.Name ?? "—")</a></td>
+                    <td class="mono muted">@r.Revision</td>
+                    <td>
+                        @if (!string.IsNullOrEmpty(r.Error)) { <span class="badge badge-err" title="@r.Error">@T["common.error"]</span> <span class="muted">@r.Error</span> }
+                        @if (r.Installed > 0) { <span class="badge badge-on">+@r.Installed</span> }
+                        @if (r.Updated > 0) { <span class="badge badge-new">~@r.Updated</span> }
+                        @if (r.Failed > 0) { <span class="badge badge-err">✗@r.Failed</span> }
+                        @if (string.IsNullOrEmpty(r.Error) && r.Installed + r.Updated + r.Failed == 0) { <span class="muted">@T["dashboard.syncNoChange"]</span> }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+    <nav class="list-pager" data-list-pager aria-label="@T["list.pager"]"></nav>
+</div>

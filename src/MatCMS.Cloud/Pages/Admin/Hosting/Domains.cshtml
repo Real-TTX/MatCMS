@@ -45,7 +45,7 @@
                     <td class="nowrap"><a href="https://@r.Domain" target="_blank" rel="noopener" class="mono">@r.Domain</a></td>
                     <td><span class="badge @(r.Kind == "custom" ? "badge-on" : "badge-off")">@(r.Kind == "custom" ? T["domains.kindCustom"] : T["domains.kindHost"])</span></td>
                     <td><a asp-page="/Admin/Instances/Details" asp-route-id="@i.Id" asp-route-tab="hosting">@i.Name</a></td>
-                    <td class="nowrap">@if (i.Node is { } n) { <a asp-page="/Admin/Hosting/Nodes/Details" asp-route-id="@n.Id">@n.Name</a> } else { <span class="muted">@T["nodes.thisHost"]</span> }</td>
+                    <td class="nowrap">@if (i.Node is { } n) { <a asp-page="/Admin/Hosting/Nodes/Details" asp-route-id="@n.Id">@n.Name</a> } else { <a asp-page="/Admin/Hosting/Nodes/Details" class="muted">@T["nodes.thisHost"]</a> }</td>
                     <td>
                         <span class="badge @(r.Way == "edge" ? "badge-on" : "badge-off")">@(r.Way switch { "edge" => T["domains.viaEdge"], "record" => T["domains.recordOnly"], _ => T["domains.viaHost"] })</span>
                         @if (r.Provider is { } pv && r.Way != "record") { <span class="muted">@pv</span> }

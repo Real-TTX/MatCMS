@@ -705,19 +705,27 @@ login same-site; it is not used by this flow.
   column, and the Updates card: cloud version + self-update, and WHAT needs an update — instances behind the release,
   node agents behind the cloud — linking to **Hosting → Updates**, the one page that RUNS instance updates: a checkbox
   per candidate, all ticked, select-all toggle, partial runs, progress via `_BulkProgress`; selection and start live
-  in `InstanceUpdatesService`, also `/api/v1/hosting/updates` + MCP `start_instance_updates`), **Nodes**, **Instanzen** (every MatCMS container on every host with state, CPU, RAM,
-  domain, version — containers without a record are listed as "nicht verbunden"), **Domains**, **Docker** (daemon,
-  resources, the **Images** section with the cleanup — every tag, and the version: the `matcms.version` label both
-  Dockerfiles now bake in, else the release tag GHCR has under the image's digest (`GhcrClient.ResolveDigestsAsync`,
-  newest 30 releases, cached per digest), else what a container on it reports; "lokal gebaut" when no digest names a
-  registry host), **Proxy** (everything routing a name to a site: the reverse proxy of "Dieser Host", its automatic
-  host addresses + wildcard certificate, the cloud-wide edge proxy; a node's own proxy stays on the node's page),
-  **Einstellungen** (module switch `hosting.enabled`, auto-update, ports/name pattern of "Dieser Host"). The switch
-  hides only Nodes, Domains, Proxy and provisioning. Data for dashboard
+  in `InstanceUpdatesService`, also `/api/v1/hosting/updates` + MCP `start_instance_updates`), **Hosts** (the list, "Dieser Host" first),
+  **Instanzen** (every MatCMS container on every host with state, CPU, RAM, domain, version — containers without a
+  record are listed as "nicht verbunden"; the table is `_HostSites`, shared with a host's Container tab), **Domains**,
+  **Edge-Proxy** (the one proxy concern spanning hosts) and **Einstellungen** (module switch `hosting.enabled`,
+  auto-update). The switch hides Domains, Edge-Proxy, adding nodes and provisioning.
+  **Everything that belongs to ONE machine is on that host's page** — `Hosting/Nodes/Details`, no id = "Dieser Host"
+  (virtual, configured as cloud settings), else the node (configured on its row); same tabs, same partials, handlers
+  branch on `id`: Übersicht (state, size, load, Docker/agent version, agent update), Container (`_HostSites`),
+  **Docker** (the images with the cleanup, fetched when the tab opens — `?handler=Images`, because for a node it is a
+  round trip to its agent, jobs `images.list`/`images.prune`; an older agent answers "unknown job" and the tab says
+  to update it), Proxy (`_ProxyFields`, automatic addresses + wildcard, a node's edge address), Einstellungen (ports,
+  "Dieser Host"'s name pattern; a node's name, token, revoke, delete) and a node's Aufträge. Image versions come from
+  `HostImagesService` for every host: the `matcms.version` label both Dockerfiles bake in, else the release tag GHCR
+  has under the image's digest (`GhcrClient.ResolveDigestsAsync`, newest 30 releases, cached per digest), else what a
+  container on it reports; "lokal gebaut" when no digest names a registry host. The old `Hosting/Docker` redirects
+  to "Dieser Host"'s Docker tab. `_TabsScript` binds only `.tab[data-tab]`, because a host page carries the link-tabs
+  of Hosting above its own. Data for dashboard
   and Instanzen is ONE service, `HostingOverviewService` (this host live via `DockerHostService.StatsAsync` — ~1 s per
   sample, cached 15 s; nodes from the inventory, whose agent samples usage at most once a minute and reports host size,
   `Node.Cpus/MemTotal`, migration `AddNodeResources`), also `/api/v1/hosting/overview` + MCP `get_hosting_overview`;
-  images via `/api/v1/hosting/images(/prune)` + MCP `list_images`/`prune_images`.
+  images via `/api/v1/hosting/images(/prune)?node=<id>` + MCP `list_images`/`prune_images` (`nodeId`, absent = this host).
   *Einstellungen* holds only the cloud's own configuration (Allgemein incl. Sicherheit, SMTP, KI, Backups, API); its old
   `?tab=hosting`/`?tab=docker` redirect into Hosting. *About* shows the version read-only.
   **No "also via API/MCP" footers and no narrating page intros; no icons inside action buttons.**

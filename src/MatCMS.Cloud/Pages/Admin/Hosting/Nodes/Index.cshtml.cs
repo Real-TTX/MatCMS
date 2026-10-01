@@ -7,8 +7,8 @@ using Microsoft.EntityFrameworkCore;
 namespace MatCMS.Cloud.Pages.Admin.Hosting.Nodes;
 
 /// <summary>
-/// The Docker hosts sites can run on: "Dieser Host" (the cloud's own daemon, configured under Einstellungen →
-/// Hosting) and every node. Admin-only through the /Admin/Hosting folder lock. Everything here also exists as
+/// Hosting → Hosts: the Docker hosts sites can run on — "Dieser Host" (the cloud's own daemon) and every node. Each
+/// has the same page (Nodes/Details, no id = "Dieser Host"). Adding a node belongs to the optional module. Admin-only through the /Admin/Hosting folder lock. Everything here also exists as
 /// /api/v1/nodes and the MCP node tools.
 /// </summary>
 public class IndexModel : PageModel
@@ -17,7 +17,12 @@ public class IndexModel : PageModel
     private readonly DockerHostService _docker;
     private readonly VersionService _version;
 
-    public IndexModel(AppDbContext db, DockerHostService docker, VersionService version) { _db = db; _docker = docker; _version = version; }
+    private readonly CloudContext _cloud;
+
+    public IndexModel(AppDbContext db, DockerHostService docker, VersionService version, CloudContext cloud)
+    { _db = db; _docker = docker; _version = version; _cloud = cloud; }
+
+    public bool ModuleEnabled => _cloud.Flag(SettingKeys.HostingEnabled);
 
     public string CloudVersion => _version.Current;
 

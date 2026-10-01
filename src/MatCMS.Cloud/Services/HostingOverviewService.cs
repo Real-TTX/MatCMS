@@ -142,9 +142,11 @@ public static class HostingOverviewJson
         }),
     };
 
-    public static object Images(List<DockerHostService.ImageInfo> list) => new
+    /// <param name="versions">Resolved versions per image id (label, registry or reported — HostImagesService); null =
+    /// the label only.</param>
+    public static object Images(List<DockerHostService.ImageInfo> list, IReadOnlyDictionary<string, string>? versions = null) => new
     {
-        images = list.Select(i => new { id = i.Id, repo = i.Repo, tags = i.Tags, version = i.Version, size = i.Size, created = i.Created, inUse = i.InUse, dangling = i.Dangling }),
+        images = list.Select(i => new { id = i.Id, repo = i.Repo, tags = i.Tags, version = versions?.GetValueOrDefault(i.Id) ?? i.Version, size = i.Size, created = i.Created, inUse = i.InUse, dangling = i.Dangling }),
         prunable = list.Count(i => i.Dangling && i.InUse == 0),
         prunableBytes = list.Where(i => i.Dangling && i.InUse == 0).Sum(i => i.Size),
     };

@@ -19,58 +19,7 @@
         </div>
     </div>
 
-    <table class="data" data-list-table>
-        <thead>
-            <tr>
-                <th>@T["cleanup.instance"]</th>
-                <th>@T["nodes.hostColumn"]</th>
-                <th>@T["hosting.state"]</th>
-                <th>@T["hostdash.resources"]</th>
-                <th>@T["hosting.domain"]</th>
-                <th>@T["hosting.version"]</th>
-            </tr>
-        </thead>
-        <tbody>
-            @if (Model.Data.Sites.Count == 0)
-            {
-                <partial name="_EmptyRow" model='@T["hosting.noLocal"]' />
-            }
-            @foreach (var s in Model.Data.Sites)
-            {
-                var i = s.Instance;
-                var tags = (s.Running ? "running" : "stopped") + (s.UpdateAvailable ? " update" : "");
-                var hostName = s.Host.NodeId is null ? T["nodes.thisHost"] : s.Host.Name;
-                <tr data-search="@(i?.Name + " " + s.ContainerName + " " + hostName + " " + i?.ProxyDomain)" data-tags="@tags">
-                    <td>
-                        @if (i is not null) { <a asp-page="/Admin/Instances/Details" asp-route-id="@i.Id" asp-route-tab="hosting"><strong>@i.Name</strong></a> }
-                        else { <strong>@s.ContainerName</strong> <span class="badge badge-off">@T["hostdash.notConnected"]</span> }
-                        <div class="mono muted">@s.ContainerName@(s.Port is int p ? " · :" + p : "")</div>
-                    </td>
-                    <td class="nowrap">
-                        @if (s.Host.NodeId is int nid) { <a asp-page="Nodes/Details" asp-route-id="@nid">@hostName</a> }
-                        else { @hostName }
-                    </td>
-                    <td class="nowrap">
-                        <span class="badge @(s.Running ? "badge-on" : "badge-err")">@s.State</span>
-                        @if (!string.IsNullOrEmpty(s.Status)) { <div class="muted">@s.Status</div> }
-                    </td>
-                    <td class="usage-cell">
-                        @if (s.Cpu is null && s.Mem is null) { <span class="muted">—</span> }
-                        else
-                        {
-                            <partial name="_UsageBar" model="@(new UsageBar(s.Cpu ?? 0, (s.Host.Cpus ?? 0) * 100.0, s.Cpu is double cpu ? $"{cpu:0.#} %" : "—", "CPU"))" />
-                            <partial name="_UsageBar" model="@(new UsageBar(s.Mem ?? 0, s.MemLimit ?? 0, s.Mem is long mem ? HostFmt.Bytes(mem) : "—", "RAM"))" />
-                        }
-                    </td>
-                    <td class="mono muted">@(i?.ProxyDomain ?? "—")</td>
-                    <td class="mono muted">
-                        @(i?.Version ?? "—")
-                        @if (s.UpdateAvailable) { <span class="badge badge-new">@T["instances.updateAvailable"]</span> }
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
+    <partial name="_HostSites" model="(Model.Data.Sites, true)" />
     <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
 </div>
 

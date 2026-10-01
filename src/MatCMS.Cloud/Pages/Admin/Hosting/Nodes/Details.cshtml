@@ -1,26 +1,25 @@
-@page "{id:int}"
+@page "{id:int?}"
 @model MatCMS.Cloud.Pages.Admin.Hosting.Nodes.DetailsModel
+@using MatCMS.Cloud.Services
 @{
     var n = Model.Item;
-    ViewData["Title"] = n.Name;
+    var h = Model.Host;
+    var name = n?.Name ?? T["nodes.thisHost"];
+    ViewData["Title"] = name;
     var now = DateTime.UtcNow;
-    var on = n.IsOnline(now);
+    var on = n?.IsOnline(now) ?? (h?.Online ?? false);
+    // "Dieser Host": proxy and port settings only matter while the module provisions and routes sites.
+    var showProxy = n is not null || Model.ModuleEnabled;
 }
+<partial name="_HostingTabs" model='"nodes"' />
+
 <div class="page-head">
-    <h1>@n.Name</h1>
+    <h1>@name</h1>
     <div class="list-toolbar">
-        @if (n.Revoked)
-        {
-            <span class="badge badge-err">@T["nodes.revoked"]</span>
-        }
-        else if (n.LastSeenAt is null)
-        {
-            <span class="badge badge-new">@T["nodes.neverSeen"]</span>
-        }
-        else
-        {
-            <span class="badge @(on ? "badge-on" : "badge-err")">@(on ? T["nodes.online"] : T["nodes.offline"])</span>
-        }
+        @if (n?.Revoked == true) { <span class="badge badge-err">@T["nodes.revoked"]</span> }
+        else if (n is not null && n.LastSeenAt is null) { <span class="badge badge-new">@T["nodes.neverSeen"]</span> }
+        else if (n is null && !(h?.Online ?? false)) { <span class="badge badge-err">@T["settings.dockerUnreachable"]</span> }
+        else { <span class="badge @(on ? "badge-on" : "badge-err")">@(on ? T["nodes.online"] : T["nodes.offline"])</span> }
     </div>
 </div>
 
@@ -36,161 +35,205 @@
 
 <div class="tabs" role="tablist">
     <button type="button" class="tab active" data-tab="overview">@T["nodes.tabOverview"]</button>
-    <button type="button" class="tab" data-tab="proxy">@T["nodes.tabProxy"]</button>
-    <button type="button" class="tab" data-tab="containers">@T["nodes.tabContainers"] (@Model.Containers.Count)</button>
-    <button type="button" class="tab" data-tab="jobs">@T["nodes.tabJobs"]</button>
+    <button type="button" class="tab" data-tab="containers">@T["nodes.tabContainers"] (@Model.Sites.Count)</button>
+    <button type="button" class="tab" data-tab="docker">Docker</button>
+    @if (showProxy) { <button type="button" class="tab" data-tab="proxy">Proxy</button> }
+    @if (showProxy) { <button type="button" class="tab" data-tab="settings">@T["hosting.navSettings"]</button> }
+    @if (n is not null) { <button type="button" class="tab" data-tab="jobs">@T["nodes.tabJobs"]</button> }
 </div>
 
+@* ============ ÜBERSICHT ============ *@
 <div class="tab-panel" data-panel="overview">
     <div class="card">
-        <div class="kv"><div class="kv-label">@T["nodes.id"]</div><div class="kv-value mono">@n.PublicId</div></div>
-        <div class="kv"><div class="kv-label">@T["nodes.host"]</div><div class="kv-value mono">@(n.HostName ?? "—")</div></div>
-        <div class="kv">
-            <div class="kv-label">@T["nodes.agent"]</div>
-            <div class="kv-value">
-                <span class="mono">@(n.AgentVersion ?? "—")</span>
-                @if (Model.AgentOutdated)
-                {
-                    <span class="badge badge-new">@T["nodes.agentOutdated", Model.CloudVersion]</span>
-                }
+        @if (n is not null)
+        {
+            <div class="kv"><div class="kv-label">@T["nodes.id"]</div><div class="kv-value mono">@n.PublicId</div></div>
+            <div class="kv"><div class="kv-label">@T["nodes.host"]</div><div class="kv-value mono">@(n.HostName ?? "—")</div></div>
+            <div class="kv">
+                <div class="kv-label">@T["nodes.agent"]</div>
+                <div class="kv-value">
+                    <span class="mono">@(n.AgentVersion ?? "—")</span>
+                    @if (Model.AgentOutdated) { <span class="badge badge-new">@T["nodes.agentOutdated", Model.CloudVersion]</span> }
+                </div>
             </div>
-        </div>
-        <div class="kv"><div class="kv-label">@T["nodes.docker"]</div><div class="kv-value mono">@(n.DockerVersion ?? "—")</div></div>
-        @if (!string.IsNullOrEmpty(n.DockerError))
-        {
-            <div class="kv"><div class="kv-label">@T["nodes.dockerError"]</div><div class="kv-value"><span class="badge badge-err">@n.DockerError</span></div></div>
         }
-        <div class="kv"><div class="kv-label">@T["nodes.lastSeen"]</div><div class="kv-value mono">@(n.LastSeenAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss") ?? "—")</div></div>
-        <div class="kv"><div class="kv-label">@T["nodes.created"]</div><div class="kv-value mono">@n.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div></div>
-    </div>
-
-    <div class="list-actions">
-        @if (on)
+        else
         {
+            <div class="kv"><div class="kv-label">@T["nodes.host"]</div><div class="kv-value muted">@T["nodes.thisHostHint"]</div></div>
+            <div class="kv"><div class="kv-label">@T["settings.dockerEndpoint"]</div><div class="kv-value mono">@(Model.Endpoint ?? "—")</div></div>
+        }
+        <div class="kv"><div class="kv-label">@T["nodes.docker"]</div><div class="kv-value mono">@(h?.DockerVersion ?? n?.DockerVersion ?? "—")</div></div>
+        @if (!string.IsNullOrEmpty(n?.DockerError ?? h?.Error))
+        {
+            <div class="kv"><div class="kv-label">@T["nodes.dockerError"]</div><div class="kv-value"><span class="badge badge-err">@(n?.DockerError ?? h?.Error)</span></div></div>
+        }
+        @if (h is not null)
+        {
+            <div class="kv"><div class="kv-label">@T["hostdash.sites"]</div><div class="kv-value mono">@h.Running<span class="muted">/@h.Total</span></div></div>
+            <div class="kv">
+                <div class="kv-label">@T["hostdash.resources"]</div>
+                <div class="kv-value usage-cell" style="min-width:240px;">
+                    <partial name="_UsageBar" model="@(new UsageBar(h.Cpu, (h.Cpus ?? 0) * 100.0, h.Cpus is int c ? $"{h.Cpu:0.#} % · {c} CPU" : $"{h.Cpu:0.#} %", "CPU"))" />
+                    <partial name="_UsageBar" model="@(new UsageBar(h.Mem, h.MemTotal ?? 0, h.MemTotal is long mt ? $"{HostFmt.Bytes(h.Mem)} / {HostFmt.Bytes(mt)}" : HostFmt.Bytes(h.Mem), "RAM"))" />
+                </div>
+            </div>
+        }
+        @if (n is not null)
+        {
+            <div class="kv"><div class="kv-label">@T["nodes.lastSeen"]</div><div class="kv-value mono">@(n.LastSeenAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss") ?? "—")</div></div>
+            <div class="kv"><div class="kv-label">@T["nodes.created"]</div><div class="kv-value mono">@n.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div></div>
+        }
+    </div>
+    @if (n is not null && on)
+    {
+        <div class="list-actions">
             <form class="inline-form" method="post" asp-page-handler="UpdateAgent" asp-route-id="@n.Id" onsubmit="return confirm('@T["nodes.updateAgentConfirm"]');">
                 <button type="submit" class="btn @(Model.AgentOutdated ? "" : "btn-ghost")">@T["nodes.updateAgent"]</button>
             </form>
-        }
-        <form class="inline-form" method="post" asp-page-handler="Rotate" asp-route-id="@n.Id" onsubmit="return confirm('@T["nodes.rotateConfirm"]');">
-            <button type="submit" class="btn btn-ghost">@T["nodes.rotate"]</button>
-        </form>
-        <form class="inline-form" method="post" asp-page-handler="Revoke" asp-route-id="@n.Id" asp-route-revoked="@(!n.Revoked)"
-              onsubmit="return @(n.Revoked ? "true" : $"confirm('{T["nodes.revokeConfirm"]}')");">
-            <button type="submit" class="btn btn-ghost">@(n.Revoked ? T["nodes.activate"] : T["nodes.revoke"])</button>
-        </form>
-        <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@n.Id" onsubmit="return confirm('@T["nodes.deleteConfirm"]');">
-            <button type="submit" class="btn btn-danger">@T["action.delete"]</button>
-        </form>
-    </div>
+        </div>
+    }
 </div>
 
+@* ============ CONTAINER ============ *@
+<div class="tab-panel" data-panel="containers" hidden>
+    <div data-list>
+        <partial name="_HostSites" model="(Model.Sites, false)" />
+        <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+    </div>
+    @if (Model.ModuleEnabled && (n is null || !n.Revoked))
+    {
+        <div class="list-actions"><a class="btn" asp-page="/Admin/Instances/New">@T["hosting.newInstance"]</a></div>
+    }
+</div>
+
+@* ============ DOCKER ============ *@
+<div class="tab-panel" data-panel="docker" hidden>
+    <div data-images data-src="@Url.Page("/Admin/Hosting/Nodes/Details", MatCMS.Cloud.Pages.Admin.Hosting.Nodes.DetailsModel.Route(n?.Id, "Images"))"><div class="card muted">…</div></div>
+</div>
+
+@if (showProxy)
+{
+@* ============ PROXY ============ *@
 <div class="tab-panel" data-panel="proxy" hidden>
-    <form method="post" asp-page-handler="Save" asp-route-id="@n.Id">
-        <div class="card">
-            <h2>@T["nodes.general"]</h2>
-            <div class="form-field">
-                <label for="name">@T["common.name"]</label>
-                <input id="name" name="name" value="@n.Name" required />
-            </div>
-            <div class="form-row">
-                <div class="form-field">
-                    <label for="portFrom">@T["settings.hostingPortFrom"]</label>
-                    <input id="portFrom" name="portFrom" type="number" min="1" max="65535" value="@n.PortFrom" />
-                </div>
-                <div class="form-field">
-                    <label for="portTo">@T["settings.hostingPortTo"]</label>
-                    <input id="portTo" name="portTo" type="number" min="1" max="65535" value="@n.PortTo" />
-                </div>
-            </div>
-            <div class="help">@T["nodes.portsHint"]</div>
-        </div>
+    <form method="post" action="@Url.Page("/Admin/Hosting/Nodes/Details", MatCMS.Cloud.Pages.Admin.Hosting.Nodes.DetailsModel.Route(n?.Id, "Proxy"))">
+        @Html.AntiForgeryToken()
         <div class="card">
             <h2>@T["settings.hostingRouting"]</h2>
             <partial name="_ProxyFields" model="Model.ProxyFields" />
-            <div class="help">@T["nodes.proxyHint"]</div>
-        </div>
-        <div class="form-actions">
-            <button type="submit" class="btn">@T["common.save"]</button>
-            <button type="submit" class="btn btn-ghost" formaction="@Url.Page("Details", "ProxyTest", new { id = n.Id })">@T["settings.hostingProxyTest"]</button>
+            @if (n is not null) { <div class="help">@T["nodes.proxyHint"]</div> }
+            <div class="list-actions">
+                <button type="submit" class="btn">@T["common.save"]</button>
+                <button type="submit" class="btn btn-ghost" formaction="@Url.Page("/Admin/Hosting/Nodes/Details", MatCMS.Cloud.Pages.Admin.Hosting.Nodes.DetailsModel.Route(n?.Id, "ProxyTest"))">@T["settings.hostingProxyTest"]</button>
+            </div>
         </div>
     </form>
 
-    @* How this node is addressed: its automatic addresses (name.<base>, at the node's proxy) and the address under
-       which the cloud's edge reaches it. Own form, so saving it never re-posts the proxy key above. *@
-    <form method="post" asp-page-handler="Addresses" asp-route-id="@n.Id">
+    @* How this host is addressed: its automatic addresses (name.<base>, at this host's proxy) and — for a node — the
+       address under which the cloud's edge reaches it. Own form, so saving it never re-posts the proxy key above. *@
+    <form method="post" action="@Url.Page("/Admin/Hosting/Nodes/Details", MatCMS.Cloud.Pages.Admin.Hosting.Nodes.DetailsModel.Route(n?.Id, "Addresses"))">
+        @Html.AntiForgeryToken()
         <div class="card">
             <h2>@T["autodomain.title"]</h2>
             <label class="checkbox-row">
-                <input type="checkbox" name="autoDomainEnabled" value="true" data-reveal="node-auto" checked="@(n.AutoDomainEnabled ? "checked" : null)" />
+                <input type="checkbox" name="autoDomainEnabled" value="true" data-reveal="host-auto" checked="@(Model.AutoDomainEnabled ? "checked" : null)" />
                 @T["autodomain.enable"]
             </label>
-            <div data-reveal-target="node-auto" hidden="@(n.AutoDomainEnabled ? null : "hidden")">
+            <div data-reveal-target="host-auto" hidden="@(Model.AutoDomainEnabled ? null : "hidden")">
                 <div class="form-field">
                     <label for="autoDomainBase">@T["autodomain.base"]</label>
-                    <input id="autoDomainBase" name="autoDomainBase" value="@n.AutoDomainBase" placeholder="server1.example.de" spellcheck="false" />
+                    <input id="autoDomainBase" name="autoDomainBase" value="@Model.AutoDomainBase" placeholder="@(n is null ? "cloud.example.de" : "server1.example.de")" spellcheck="false" />
                     <div class="help">@T["autodomain.baseHint"]</div>
                 </div>
                 <partial name="_WildcardFields" model="Model.Wildcard" />
             </div>
-            <div class="form-field">
-                <label for="nodeAddress">@T["edge.nodeAddress"]</label>
-                <input id="nodeAddress" name="address" value="@n.Address" placeholder="10.0.0.3" spellcheck="false" />
-                <div class="help">@T["edge.nodeAddressHint"]</div>
-            </div>
+            @if (n is not null)
+            {
+                <div class="form-field">
+                    <label for="nodeAddress">@T["edge.nodeAddress"]</label>
+                    <input id="nodeAddress" name="address" value="@n.Address" placeholder="10.0.0.3" spellcheck="false" />
+                    <div class="help">@T["edge.nodeAddressHint"]</div>
+                </div>
+            }
             <div class="list-actions">
                 <button type="submit" class="btn">@T["common.save"]</button>
-                @if (n.AutoDomainEnabled && Model.MissingHostAddresses > 0)
+                @if (Model.AutoDomainEnabled && Model.MissingHostAddresses > 0)
                 {
-                    <button type="submit" class="btn btn-ghost" formaction="@Url.Page("Details", "AddressBackfill", new { id = n.Id })">@T["autodomain.backfill", Model.MissingHostAddresses]</button>
+                    <button type="submit" class="btn btn-ghost" formaction="@Url.Page("/Admin/Hosting/Nodes/Details", MatCMS.Cloud.Pages.Admin.Hosting.Nodes.DetailsModel.Route(n?.Id, "AddressBackfill"))">@T["autodomain.backfill", Model.MissingHostAddresses]</button>
                 }
             </div>
         </div>
     </form>
 </div>
 
-<div class="tab-panel" data-panel="containers" hidden>
-    @if (n.InventoryAt is { } at) { <p class="help">@T["nodes.containersHint"] @at.ToLocalTime().ToString("dd.MM. HH:mm:ss")</p> }
-    <table class="data">
-        <thead>
-            <tr>
-                <th>@T["hosting.name"]</th>
-                <th>@T["hosting.image"]</th>
-                <th style="width:110px;">@T["hosting.state"]</th>
-                <th style="width:80px;">@T["hosting.port"]</th>
-                <th style="width:110px;">@T["hosting.managed"]</th>
-                <th>@T["cleanup.instance"]</th>
-            </tr>
-        </thead>
-        <tbody>
-            @if (Model.Containers.Count == 0)
+@* ============ EINSTELLUNGEN ============ *@
+<div class="tab-panel" data-panel="settings" hidden>
+    <form method="post" action="@Url.Page("/Admin/Hosting/Nodes/Details", MatCMS.Cloud.Pages.Admin.Hosting.Nodes.DetailsModel.Route(n?.Id, "Settings"))">
+        @Html.AntiForgeryToken()
+        <div class="card">
+            @if (n is not null)
             {
-                <partial name="_EmptyRow" model='@T["nodes.noContainers"]' />
+                <div class="form-field">
+                    <label for="name">@T["common.name"]</label>
+                    <input id="name" name="name" value="@n.Name" required />
+                </div>
             }
-            @foreach (var c in Model.Containers)
+            @* Der Portbereich gilt für beide Wege: auch eine Instanz hinter einem Proxy braucht einen Port auf dem Host,
+               unter dem der Proxy sie findet (Modus „Host-Port“). *@
+            <div class="form-row">
+                <div class="form-field">
+                    <label for="portFrom">@T["settings.hostingPortFrom"]</label>
+                    <input id="portFrom" name="portFrom" inputmode="numeric" value="@(n?.PortFrom.ToString() ?? Model.Get(SettingKeys.HostingPortFrom))" placeholder="9201" />
+                </div>
+                <div class="form-field">
+                    <label for="portTo">@T["settings.hostingPortTo"]</label>
+                    <input id="portTo" name="portTo" inputmode="numeric" value="@(n?.PortTo.ToString() ?? Model.Get(SettingKeys.HostingPortTo))" placeholder="9299" />
+                </div>
+            </div>
+            <div class="help">@T[n is null ? "settings.hostingPortsHint" : "nodes.portsHint"]</div>
+            @if (n is null)
             {
-                var up = string.Equals(c.State, "running", StringComparison.OrdinalIgnoreCase);
-                <tr>
-                    <td class="mono">@c.Name</td>
-                    <td class="mono muted">@c.Image</td>
-                    <td><span class="badge @(up ? "badge-on" : "badge-err")">@c.State</span></td>
-                    <td class="mono muted">@(c.PublishedPort?.ToString() ?? "—")</td>
-                    <td><span class="badge @(c.CloudManaged ? "badge-on" : "badge-off")">@(c.CloudManaged ? T["hosting.managedYes"] : T["hosting.managedNo"])</span></td>
-                    <td>
-                        @if (Model.InstancesByContainer.TryGetValue(c.Id, out var inst))
-                        {
-                            <a asp-page="/Admin/Instances/Details" asp-route-id="@inst.Id" asp-route-tab="hosting">@inst.Name</a>
-                        }
-                        else
-                        {
-                            <span class="muted">@T["nodes.notEnrolled"]</span>
-                        }
-                    </td>
-                </tr>
+                <div class="form-field">
+                    <label for="namePattern">@T["settings.hostingNamePattern"]</label>
+                    <input id="namePattern" name="namePattern" value="@Model.Get(SettingKeys.HostingNamePattern)" placeholder="@HostingService.DefaultNamePattern" spellcheck="false" />
+                    <div class="help">@T["settings.hostingNamePatternHint"]</div>
+                    <div class="help mono" data-name-preview></div>
+                </div>
+                <div class="kv" style="margin-top:12px;">
+                    <div class="kv-label">@T["settings.hostingNextPort"]</div>
+                    <div class="kv-value">
+                        @if (Model.NextPort is int np) { <span class="mono">@np</span> <span class="muted">@T["settings.hostingPortsUsed", Model.UsedPortCount]</span> }
+                        else { <span class="badge badge-err">@T["settings.hostingNoPort"]</span> }
+                    </div>
+                </div>
             }
-        </tbody>
-    </table>
-</div>
+            <div style="margin-top:14px;"><button type="submit" class="btn">@T["common.save"]</button></div>
+        </div>
+    </form>
 
+    @if (n is not null)
+    {
+        <div class="card">
+            <h2>@T["nodes.agent"]</h2>
+            <div class="list-actions">
+                <form class="inline-form" method="post" asp-page-handler="Rotate" asp-route-id="@n.Id" onsubmit="return confirm('@T["nodes.rotateConfirm"]');">
+                    <button type="submit" class="btn btn-ghost">@T["nodes.rotate"]</button>
+                </form>
+                <form class="inline-form" method="post" asp-page-handler="Revoke" asp-route-id="@n.Id" asp-route-revoked="@(!n.Revoked)"
+                      onsubmit="return @(n.Revoked ? "true" : $"confirm('{T["nodes.revokeConfirm"]}')");">
+                    <button type="submit" class="btn btn-ghost">@(n.Revoked ? T["nodes.activate"] : T["nodes.revoke"])</button>
+                </form>
+                <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@n.Id" onsubmit="return confirm('@T["nodes.deleteConfirm"]');">
+                    <button type="submit" class="btn btn-danger">@T["action.delete"]</button>
+                </form>
+            </div>
+        </div>
+    }
+</div>
+}
+
+@if (n is not null)
+{
+@* ============ AUFTRÄGE ============ *@
 <div class="tab-panel" data-panel="jobs" hidden>
     <table class="data">
         <thead>
@@ -228,21 +271,53 @@
         </tbody>
     </table>
 </div>
-
-<div class="list-actions">
-    <a class="btn btn-ghost" asp-page="Index">@T["action.back"]</a>
-</div>
+}
 
 @section Scripts {
     <partial name="_TabsScript" />
     <script>
-        // A switch reveals its fields ([data-reveal] → [data-reveal-target]).
-        document.querySelectorAll('[data-reveal]').forEach(function (box) {
-            var target = document.querySelector('[data-reveal-target="' + box.getAttribute('data-reveal') + '"]');
-            if (!target) return;
-            var sync = function () { target.hidden = !box.checked; };
-            box.addEventListener('change', sync);
-            sync();
-        });
+        (function () {
+            // A switch reveals its fields ([data-reveal] → [data-reveal-target]).
+            document.querySelectorAll('[data-reveal]').forEach(function (box) {
+                var target = document.querySelector('[data-reveal-target="' + box.getAttribute('data-reveal') + '"]');
+                if (!target) return;
+                var sync = function () { target.hidden = !box.checked; };
+                box.addEventListener('change', sync);
+                sync();
+            });
+
+            // Docker tab: the images are fetched when the tab is first shown — for a node that is a job its agent
+            // runs, which should not slow down every visit of the page.
+            var box = document.querySelector('[data-images]');
+            var loaded = false;
+            function loadImages() {
+                if (loaded || !box) return;
+                loaded = true;
+                fetch(box.getAttribute('data-src'), { credentials: 'same-origin' })
+                    .then(function (r) { return r.ok ? r.text() : Promise.reject(r.status); })
+                    .then(function (html) { box.innerHTML = html; })
+                    .catch(function () { loaded = false; box.innerHTML = '<div class="card"><span class="badge badge-err">@T["common.error"]</span></div>'; });
+            }
+            var tab = document.querySelector('.tab[data-tab="docker"]');
+            if (tab) tab.addEventListener('click', loadImages);
+            if (box && !box.closest('.tab-panel').hidden) loadImages();
+
+            // Spiegelt HostingService.Normalise: klein, alles Nicht-Alphanumerische zu Bindestrichen. Nur Anzeige.
+            var pat = document.getElementById('namePattern');
+            var prev = document.querySelector('[data-name-preview]');
+            if (pat && prev) {
+                var demo = 'Meine Seite.de';
+                var slug = demo.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+                var sync = function () {
+                    var p = (pat.value || pat.placeholder || '').trim();
+                    var out = /{name}/i.test(p) ? p.replace(/{name}/ig, slug)
+                            : p.indexOf('$NAME') >= 0 ? p.split('$NAME').join(slug)
+                            : (p.replace(/-+$/, '') + '-' + slug);
+                    prev.textContent = '„' + demo + '" → ' + out.toLowerCase();
+                };
+                pat.addEventListener('input', sync);
+                sync();
+            }
+        })();
     </script>
 }

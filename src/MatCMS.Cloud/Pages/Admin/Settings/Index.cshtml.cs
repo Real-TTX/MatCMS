@@ -43,7 +43,7 @@ public class IndexModel : PageModel
     {
         // These tabs moved to Hosting; old links and bookmarks land where the thing is now.
         if (tab == "hosting") return RedirectToPage("/Admin/Hosting/Settings");
-        if (tab == "docker") return RedirectToPage("/Admin/Hosting/Docker");
+        if (tab == "docker") return RedirectToPage("/Admin/Hosting/Nodes/Details", new { tab = "docker" });
         // Backup quota and retention are a profile matter now; the default profile holds the fallback.
         if (tab == "backup")
         {

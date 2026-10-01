@@ -182,8 +182,8 @@ oder `hostport` (Ziel `http://<upstreamHost>:<Host-Port>`).
 - `GET /api/v1/hosting/updates` → `{ latest, instances:[{ instanceId, name, node, version }] }` – Instanzen, die die Cloud selbst aktualisieren kann und die hinter dem neuesten Release liegen (im Instanz-Umfang des Schlüssels).
 - `POST /api/v1/hosting/updates` `{ instanceIds? }` → `{ runId, count }` – aktualisiert die genannten (weggelassen = alle) nacheinander mit Rollback; Ids ohne Update werden übergangen; 409, solange die Cloud sich selbst aktualisiert (**CanManageHosting**).
 - `GET /api/v1/hosting/updates/{runId}` → `{ done, total, completed, items:[{ name, from, to, status, message }] }` – Fortschritt.
-- `GET /api/v1/hosting/images` → `{ images:[{ id, repo, tags, version, size, created, inUse, dangling }], prunable, prunableBytes }` (`version` aus dem Label `matcms.version`, null bei älteren Images) – MatCMS-Images auf dem Cloud-Host (**CanManageHosting + alle Instanzen**).
-- `POST /api/v1/hosting/images/prune` → `{ removed, bytesReclaimed }` – nur alte, ungetaggte, unbenutzte MatCMS-Images (**CanManageHosting + alle Instanzen**).
+- `GET /api/v1/hosting/images?node=<Node-ID>` → `{ images:[{ id, repo, tags, version, size, created, inUse, dangling }], prunable, prunableBytes }` – MatCMS-Images eines Hosts; ohne `node` (oder `local`) der Cloud-Host. `version` aus dem Label `matcms.version`, sonst aus GHCR über den Digest, sonst was ein Container darauf meldet; null = unbekannt. Für einen Node braucht es einen aktuellen Agent (**CanManageHosting + alle Instanzen**).
+- `POST /api/v1/hosting/images/prune?node=<Node-ID>` → `{ removed, bytesReclaimed }` – nur alte, ungetaggte, unbenutzte MatCMS-Images (**CanManageHosting + alle Instanzen**).
 - `GET /api/v1/hosting/proxy` → `{ provider, managesRoutes, matcadUrl, matcadTokenSet, caddyAdminUrl, caddyServer, upstream, network, upstreamHost }` – der Matcad-Schlüssel wird **nie** zurückgegeben.
 - `PUT /api/v1/hosting/proxy` `{ provider?, matcadUrl?, matcadToken?, clearMatcadToken?, caddyAdminUrl?, caddyServer?, upstream?, network?, upstreamHost? }` – Teil-Update, weggelassen = unverändert (**CanManageHosting + alle Instanzen**). Schon veröffentlichte Domains wandern **nicht** mit – nach einem Provider-Wechsel neu veröffentlichen.
 - `POST /api/v1/hosting/proxy/test` → `{ ok, provider, message }` – Proxy erreichbar? Netz vorhanden? (**CanManageHosting**)
@@ -300,7 +300,7 @@ Instanz beim nächsten Heartbeat über ihre **eigenen** Validierer anwendet (add
 | `set_auto_domain` / `create_missing_host_addresses` | automatische Adressen für „Dieser Host“ / fehlende nachziehen (Hosting-Recht + alle Instanzen) |
 | `configure_wildcard` | Wildcard-Zertifikat eines Hosts per DNS-Challenge (Hosting-Recht + alle Instanzen) |
 | `get_edge_config` / `configure_edge` / `test_edge` / `move_domains_to_edge_setting` | Edge-Proxy für Kundendomains (Hosting-Recht + alle Instanzen) |
-| `list_images` / `prune_images` | MatCMS-Images auf dem Cloud-Host / alte unbenutzte entfernen (Hosting-Recht + alle Instanzen) |
+| `list_images` / `prune_images` | MatCMS-Images eines Hosts (`nodeId`, ohne = Cloud-Host) / alte unbenutzte entfernen (Hosting-Recht + alle Instanzen) |
 | `get_container_status` | Container-Zustand einer Instanz (lokal?, Image, Start, Neustarts, Health) |
 | `container_action` | `start` / `stop` / `restart` / `update` des Instanz-Containers — vorher mit dem Nutzer bestätigen |
 | `get_container_logs` | letzte Zeilen stdout/stderr des Instanz-Containers |

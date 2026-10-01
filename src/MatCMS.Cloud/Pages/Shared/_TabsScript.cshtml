@@ -2,7 +2,7 @@
    ?tab=<name> deep-links one. Shared so every tabbed page behaves the same. *@
 <script>
     (function () {
-        var tabs = document.querySelectorAll('.tab');
+        var tabs = document.querySelectorAll('.tab[data-tab]');   // not the link-tabs (a.tab) of a section above
         var panels = document.querySelectorAll('.tab-panel');
         function show(name) {
             tabs.forEach(function (t) { t.classList.toggle('active', t.dataset.tab === name); });

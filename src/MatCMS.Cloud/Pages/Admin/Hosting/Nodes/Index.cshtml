@@ -27,10 +27,10 @@
             </tr>
         </thead>
         <tbody>
-            @* "Dieser Host" is not a row in the database — it is the cloud's own daemon — but it is where sites
-               run too, so it is listed first, and configured where it always was. *@
+            @* "Dieser Host" is not a row in the database — it is the cloud's own daemon — but it is a host like the
+               others, so it is listed first and has the same page. *@
             <tr data-search="@T["nodes.thisHost"]">
-                <td><a asp-page="/Admin/Hosting/Settings"><strong>@T["nodes.thisHost"]</strong></a></td>
+                <td><a asp-page="Details"><strong>@T["nodes.thisHost"]</strong></a></td>
                 <td><span class="badge @(Model.LocalReachable ? "badge-on" : "badge-off")">@(Model.LocalReachable ? T["nodes.online"] : T["settings.dockerUnreachable"])</span></td>
                 <td class="muted">@T["nodes.thisHostHint"]</td>
                 <td class="muted">—</td>
@@ -83,6 +83,9 @@
     <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
 </div>
 
-<div class="list-actions">
-    <a class="btn" asp-page="Create">@T["nodes.add"]</a>
-</div>
+@if (Model.ModuleEnabled)
+{
+    <div class="list-actions">
+        <a class="btn" asp-page="Create">@T["nodes.add"]</a>
+    </div>
+}

@@ -6,7 +6,7 @@
 }
 <partial name="_HostingTabs" model='"settings"' />
 
-@* The module switch has its own form, so switching it never re-saves (or blanks) the fields below. *@
+@* Only what applies to hosting as a whole. A host's proxy, ports and naming are on its page (Hosting → Hosts). *@
 <form method="post" asp-page-handler="Module">
     <div class="card">
         <h2>@T["hosting.module"]</h2>
@@ -31,73 +31,3 @@
         <div style="margin-top:14px;"><button type="submit" class="btn">@T["settings.save"]</button></div>
     </div>
 </form>
-
-@if (Model.ModuleEnabled)
-{
-<form method="post" asp-page-handler="Save">
-    @* Der Portbereich gilt für beide Wege: auch eine Instanz hinter einem Proxy braucht einen Port auf dem Host,
-       unter dem der Proxy sie findet (Modus „Host-Port“). *@
-    <div class="card">
-        <h2>@T["settings.hostingPorts"]</h2>
-        <div class="form-grid">
-            <div class="form-row">
-                <div class="form-field">
-                    <label for="portFrom">@T["settings.hostingPortFrom"]</label>
-                    <input id="portFrom" name="portFrom" value="@Model.Get(SettingKeys.HostingPortFrom)" placeholder="9201" inputmode="numeric" />
-                </div>
-                <div class="form-field">
-                    <label for="portTo">@T["settings.hostingPortTo"]</label>
-                    <input id="portTo" name="portTo" value="@Model.Get(SettingKeys.HostingPortTo)" placeholder="9299" inputmode="numeric" />
-                </div>
-            </div>
-        </div>
-        <div class="form-field">
-            <label for="namePattern">@T["settings.hostingNamePattern"]</label>
-            <input id="namePattern" name="namePattern" value="@Model.Get(SettingKeys.HostingNamePattern)" placeholder="@HostingService.DefaultNamePattern" spellcheck="false" />
-            <div class="help">@T["settings.hostingNamePatternHint"]</div>
-            @* Vorschau, weil ein Muster mit Platzhalter erst dann eindeutig ist, wenn man das Ergebnis sieht —
-               besonders bei der Normalisierung, die Punkte und Leerzeichen schluckt. *@
-            <div class="help mono" data-name-preview></div>
-        </div>
-        <div class="help">@T["settings.hostingPortsHint"]</div>
-        <div class="kv" style="margin-top:12px;">
-            <div class="kv-label">@T["settings.hostingNextPort"]</div>
-            <div class="kv-value">
-                @if (Model.NextPort is int np)
-                {
-                    <span class="mono">@np</span>
-                    <span class="muted">@T["settings.hostingPortsUsed", Model.UsedPortCount]</span>
-                }
-                else
-                {
-                    <span class="badge badge-err">@T["settings.hostingNoPort"]</span>
-                }
-            </div>
-        </div>
-        <div style="margin-top:14px;"><button type="submit" class="btn">@T["settings.save"]</button></div>
-    </div>
-</form>
-}
-
-@section Scripts {
-    <script>
-        // Spiegelt HostingService.Normalise: klein, alles Nicht-Alphanumerische zu Bindestrichen. Zwei Umsetzungen
-        // derselben Regel — die hier zeigt nur an, entschieden wird im Dienst.
-        (function () {
-            var pat = document.getElementById('namePattern');
-            var prev = document.querySelector('[data-name-preview]');
-            if (!pat || !prev) return;
-            var demo = 'Meine Seite.de';
-            var slug = demo.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-            function sync() {
-                var p = (pat.value || pat.placeholder || '').trim();
-                var out = /{name}/i.test(p) ? p.replace(/{name}/ig, slug)
-                        : p.indexOf('$NAME') >= 0 ? p.split('$NAME').join(slug)
-                        : (p.replace(/-+$/, '') + '-' + slug);
-                prev.textContent = '„' + demo + '" → ' + out.toLowerCase();
-            }
-            pat.addEventListener('input', sync);
-            sync();
-        })();
-    </script>
-}

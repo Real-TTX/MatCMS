@@ -119,6 +119,21 @@ public static class NodeJobExecutor
                     report.ResultJson = Serialize(r);
                     break;
                 }
+                case NodeJobKinds.ImagesList:
+                {
+                    var list = await docker.ListMatCmsImagesAsync(ct);
+                    report.Ok = list is not null;
+                    report.Message = list is null ? "Docker-Daemon des Nodes nicht erreichbar." : "";
+                    report.ResultJson = list is null ? null : Serialize(list);
+                    break;
+                }
+                case NodeJobKinds.ImagesPrune:
+                {
+                    var r = await docker.PruneMatCmsImagesAsync(ct);
+                    report.Ok = true; report.Message = $"{r.Removed} Image(s) entfernt.";
+                    report.ResultJson = Serialize(r);
+                    break;
+                }
                 case NodeJobKinds.AgentUpdate:
                 {
                     // The agent's own container — the same detection the cloud uses for its self-update.

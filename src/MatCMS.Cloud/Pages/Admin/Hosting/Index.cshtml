@@ -56,8 +56,7 @@
                 {
                     <tr>
                         <td>
-                            @if (h.NodeId is int nid) { <a asp-page="Nodes/Details" asp-route-id="@nid" class="nowrap"><strong>@h.Name</strong></a> }
-                            else { <a asp-page="Docker" class="nowrap"><strong>@HostName(h)</strong></a> }
+                            <a asp-page="Nodes/Details" asp-route-id="@h.NodeId" class="nowrap"><strong>@HostName(h)</strong></a>
                             <div class="nowrap">
                                 @if (h.Revoked) { <span class="badge badge-err">@T["nodes.revoked"]</span> }
                                 else if (h.Online) { <span class="badge badge-on">@T["nodes.online"]</span> }

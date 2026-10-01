@@ -198,7 +198,7 @@ public class IndexModel : PageModel
             }
             if (CloudUpdateAvailable) Add("info", "☁️", L("cloud.title"), "cloudUpdate", Url.Page("/Admin/Hosting/Index", null, null, "updates")!, CloudLatest ?? "");
             if (!MailConfigured) Add("warn", "✉️", L("smtp.title"), "smtp", Url.Page("/Admin/Settings/Index", new { tab = "smtp" })!);
-            if (DockerConfigured && !DockerReachable) Add("err", "🐳", "Docker", "docker", Url.Page("/Admin/Hosting/Docker")!);
+            if (DockerConfigured && !DockerReachable) Add("err", "🐳", "Docker", "docker", Url.Page("/Admin/Hosting/Nodes/Details", new { tab = "docker" })!);
             if (!string.IsNullOrWhiteSpace(ReleaseError)) a.Add(new("warn", "📦", L("release.title"), ReleaseError!, Url.Page("/Admin/Index")!));
         }
         // Errors first, then warnings, then information; within a level, by name.

@@ -70,21 +70,29 @@ public class HostingTools
     }
 
     [McpServerTool(Name = "list_images"), Description(
-        "The MatCMS Docker images on this cloud's host: tag, size, created, how many containers use each, and which are old (untagged) and unused — what prune_images would remove. Requires the hosting right on an all-instances key.")]
-    public static async Task<object> ListImages(McpContext me, DockerHostService docker, CancellationToken ct)
+        "The MatCMS Docker images on one host — this cloud's host or a node: tag, version, size, created, how many containers use each, and which are old (untagged) and unused — what prune_images would remove. Requires the hosting right on an all-instances key.")]
+    public static async Task<object> ListImages(McpContext me, AppDbContext db, HostImagesService images,
+        [Description("Node id (from list_nodes); omit or 'local' for this cloud's host.")] string? nodeId = null, CancellationToken ct = default)
     {
         RequireCloudWide(me);
-        var list = await docker.ListMatCmsImagesAsync(ct) ?? throw new McpException("Docker-Daemon nicht erreichbar.");
-        return HostingOverviewJson.Images(list);
+        var (n, missing) = await Api.HostingApi.HostAsync(db, nodeId);
+        if (missing) throw new McpException("Node nicht gefunden.");
+        var r = await images.ListAsync(n, ct);
+        if (r.Images is null) throw new McpException(r.Error ?? "Images nicht lesbar.");
+        return HostingOverviewJson.Images(r.Images, r.Versions);
     }
 
     [McpServerTool(Name = "prune_images"), Description(
-        "Remove old MatCMS images on this cloud's host: only untagged ones left behind by updates, only MatCMS images, and never one a container still uses. Returns how many were removed and the approximate bytes reclaimed. Requires the hosting right on an all-instances key.")]
-    public static async Task<object> PruneImages(McpContext me, DockerHostService docker, CancellationToken ct)
+        "Remove old MatCMS images on one host — this cloud's host or a node: only untagged ones left behind by updates, only MatCMS images, and never one a container still uses. Returns how many were removed and the approximate bytes reclaimed. Requires the hosting right on an all-instances key.")]
+    public static async Task<object> PruneImages(McpContext me, AppDbContext db, HostImagesService images,
+        [Description("Node id (from list_nodes); omit or 'local' for this cloud's host.")] string? nodeId = null, CancellationToken ct = default)
     {
         RequireCloudWide(me);
-        var r = await docker.PruneMatCmsImagesAsync(ct);
-        return new { removed = r.Removed, bytesReclaimed = r.BytesReclaimed };
+        var (n, missing) = await Api.HostingApi.HostAsync(db, nodeId);
+        if (missing) throw new McpException("Node nicht gefunden.");
+        var (ok, message, r) = await images.PruneAsync(n, ct);
+        if (!ok) throw new McpException(message);
+        return new { removed = r?.Removed ?? 0, bytesReclaimed = r?.BytesReclaimed ?? 0 };
     }
 
     [McpServerTool(Name = "list_update_candidates"), Description(

@@ -266,7 +266,7 @@ first deploy of this version is therefore still the manual `docker compose pull 
 - **Record:** `Instance.ProxyDomain/ProxyProvider/ProxyRouteId/ProxyError/ProxyPublishedAt` (migration
   `AddInstanceProxy`). Publishing pins `Instance.Url = https://<domain>`; with `pushCanonical` a
   `setting.set` content op tells the site `site.canonicalUrl` + `site.behindHttpsProxy`.
-- **Surfaces:** Hosting → Proxy (provider, fields per provider, "Speichern und Verbindung testen"),
+- **Surfaces:** each host's page, tab Proxy (Hosting → Hosts; provider, fields per provider, "Speichern und Verbindung testen"),
   the Domain card on the instance's Hosting tab (publish/move/check/unpublish), provisioning with a domain;
   REST `/api/v1/hosting/proxy[/test]`, `/api/v1/instances/{id}/domain`; MCP `get_proxy_config`,
   `configure_proxy`, `test_proxy`, `get_domain_status`, `publish_domain`, `unpublish_domain`.
@@ -352,7 +352,7 @@ whose guards (`LooksLikeMatCms`, `ManagedLabel`) therefore run ON the node. The 
 then in the inventories of nodes seen within the last 5 minutes → `Hosting = Node`, `NodeId`.
 A node's beat refreshes container state/port of its instances at once (a stopped site does not beat).
 
-**Surfaces:** Hosting → Nodes (list incl. "Dieser Host", create → token + `docker run` command once,
+**Surfaces:** Hosting → Hosts (list incl. "Dieser Host", one page per host with Übersicht/Container/Docker/Proxy/Einstellungen/Aufträge, create → token + `docker run` command once,
 detail with status/inventory/proxy & ports/jobs, rotate token, revoke, delete), node select when
 provisioning; REST `/api/v1/nodes…` and `POST /api/v1/hosting/instances` (provisioning was UI-only until
 now); MCP `list_nodes`, `get_node`, `create_node`, `update_node`, `set_node_revoked`, `delete_node`,

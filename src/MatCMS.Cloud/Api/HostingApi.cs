@@ -53,6 +53,14 @@ public static class HostingApi
         },
     };
 
+    /// <summary>A host by its API name: absent / "local" = this cloud's host (node null), else a node's public id.</summary>
+    internal static async Task<(Node? Node, bool Missing)> HostAsync(AppDbContext db, string? node)
+    {
+        if (string.IsNullOrWhiteSpace(node) || node == "local") return (null, false);
+        var n = await db.Nodes.FirstOrDefaultAsync(x => x.PublicId == node);
+        return (n, n is null);
+    }
+
     public static void MapHostingApi(this WebApplication app)
     {
         // ---- Module switch ---------------------------------------------------------------------------
@@ -196,24 +204,30 @@ public static class HostingApi
             return Results.Json(HostingOverviewJson.Overview(await overview.BuildAsync(ctx.RequestAborted)));
         }).RequireRateLimiting("operatorApi");
 
-        app.MapGet("/api/v1/hosting/images", async (HttpContext ctx, ApiKeyService keys, DockerHostService docker) =>
+        // The MatCMS images of ONE host: ?node=<node id> (as in /api/v1/nodes), absent or "local" = this cloud's host.
+        app.MapGet("/api/v1/hosting/images", async (HttpContext ctx, ApiKeyService keys, AppDbContext db, HostImagesService images, string? node) =>
         {
             var (key, err) = await CallerAsync(ctx, keys);
             if (err is not null) return err;
             if (RequireCloudWide(key!) is { } denied) return denied;
-            var list = await docker.ListMatCmsImagesAsync(ctx.RequestAborted);
-            return list is null ? Results.Json(new { error = "Docker-Daemon nicht erreichbar." }, statusCode: StatusCodes.Status503ServiceUnavailable)
-                : Results.Json(HostingOverviewJson.Images(list));
+            var (n, missing) = await HostAsync(db, node);
+            if (missing) return Results.Json(new { error = "Node nicht gefunden." }, statusCode: StatusCodes.Status404NotFound);
+            var r = await images.ListAsync(n, ctx.RequestAborted);
+            return r.Images is null ? Results.Json(new { error = r.Error }, statusCode: StatusCodes.Status503ServiceUnavailable)
+                : Results.Json(HostingOverviewJson.Images(r.Images, r.Versions));
         }).RequireRateLimiting("operatorApi");
 
-        // Removes only old, untagged MatCMS images no container uses — the same call as Hosting → Docker.
-        app.MapPost("/api/v1/hosting/images/prune", async (HttpContext ctx, ApiKeyService keys, DockerHostService docker) =>
+        // Removes only old, untagged MatCMS images no container uses — the same call as the host page's Docker tab.
+        app.MapPost("/api/v1/hosting/images/prune", async (HttpContext ctx, ApiKeyService keys, AppDbContext db, HostImagesService images, string? node) =>
         {
             var (key, err) = await CallerAsync(ctx, keys);
             if (err is not null) return err;
             if (RequireCloudWide(key!) is { } denied) return denied;
-            var r = await docker.PruneMatCmsImagesAsync(ctx.RequestAborted);
-            return Results.Json(new { removed = r.Removed, bytesReclaimed = r.BytesReclaimed });
+            var (n, missing) = await HostAsync(db, node);
+            if (missing) return Results.Json(new { error = "Node nicht gefunden." }, statusCode: StatusCodes.Status404NotFound);
+            var (ok, message, r) = await images.PruneAsync(n, ctx.RequestAborted);
+            return ok ? Results.Json(new { removed = r?.Removed ?? 0, bytesReclaimed = r?.BytesReclaimed ?? 0 })
+                : Results.Json(new { error = message }, statusCode: StatusCodes.Status502BadGateway);
         }).RequireRateLimiting("operatorApi");
 
         // Instance updates: the candidates, a run for a chosen subset, its progress. Scoped to the key — a scoped key

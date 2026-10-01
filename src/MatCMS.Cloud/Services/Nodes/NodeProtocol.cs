@@ -92,6 +92,10 @@ public static class NodeJobKinds
     public const string Remove = "container.remove";
     /// <summary>The agent updates ITSELF (through a helper container, see DockerHostService.SpawnContainerUpdateHelperAsync).</summary>
     public const string AgentUpdate = "agent.update";
+    /// <summary>The MatCMS images on the node (the host page's Docker tab) and removing the old unused ones. An older
+    /// agent answers "unknown job", which the page shows as "update the agent".</summary>
+    public const string ImagesList = "images.list";
+    public const string ImagesPrune = "images.prune";
 }
 
 /// <summary>Payload of the container.* jobs.</summary>

@@ -1,0 +1,75 @@
+@model MatCMS.Cloud.Pages.Admin.Hosting.Nodes.DetailsModel
+@using MatCMS.Cloud.Services
+@* The host's MatCMS images — fetched when the Docker tab opens (for a node a round trip to its agent). What an update
+   leaves behind piles up here; the cleanup removes only untagged MatCMS images no container uses, never another
+   app's layers. *@
+@{
+    var r = Model.Images!;
+    var prunable = r.Prunable;
+}
+@if (r.Images is not { } images)
+{
+    <div class="card">
+        <span class="badge badge-err">@r.Error</span>
+        @if (Model.AgentOutdated) { <div class="help">@T["nodes.agentOutdated", Model.CloudVersion]</div> }
+    </div>
+}
+else
+{
+    <div class="card">
+        <h2>@T["docker.images"]</h2>
+        <div class="kv">
+            <div class="kv-label">@T["docker.imagesTotal"]</div>
+            <div class="kv-value">@images.Count · @HostFmt.Bytes(images.Sum(i => i.Size))</div>
+        </div>
+        <div class="kv">
+            <div class="kv-label">@T["docker.imagesPrunable"]</div>
+            <div class="kv-value">
+                @if (prunable.Count == 0) { <span class="badge badge-on">@T["docker.imagesClean"]</span> }
+                else { <span class="badge badge-new">@prunable.Count · ~@HostFmt.Bytes(prunable.Sum(i => i.Size))</span> }
+            </div>
+        </div>
+        <table class="data" style="margin-top:12px;">
+            <thead><tr><th>@T["docker.image"]</th><th>@T["hosting.version"]</th><th>@T["docker.size"]</th><th>@T["docker.created"]</th><th>@T["docker.inUse"]</th></tr></thead>
+            <tbody>
+                @if (images.Count == 0)
+                {
+                    <partial name="_EmptyRow" model='@T["docker.noImages"]' />
+                }
+                @foreach (var i in images)
+                {
+                    <tr>
+                        <td>
+                            <span class="mono">@i.Repo</span>
+                            <div>
+                                @foreach (var t in i.Tags) { <span class="badge badge-off mono">@(t.Contains(':') ? t[(t.LastIndexOf(':') + 1)..] : t)</span> }
+                                @if (i.Tags.Count == 0) { <span class="badge badge-off">@T["docker.untagged"]</span> }
+                                @if (i.Dangling && i.InUse == 0) { <span class="badge badge-new">@T["docker.old"]</span> }
+                                <span class="mono muted">@(i.Id.Replace("sha256:", "")[..12])</span>
+                            </div>
+                        </td>
+                        <td class="mono">
+                            @if (r.Versions.TryGetValue(i.Id, out var v))
+                            {
+                                @v
+                                @if (r.Reported.Contains(i.Id)) { <div class="muted" style="font-family:inherit;">@T["docker.versionReported"]</div> }
+                            }
+                            else if (i.LocalBuild) { <span class="muted">@T["docker.localBuild"]</span> }
+                            else { <span class="muted">@T["common.unknown"]</span> }
+                        </td>
+                        <td class="mono">@HostFmt.Bytes(i.Size)</td>
+                        <td class="mono muted">@i.Created.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                        <td>@if (i.InUse > 0) { <span class="badge badge-on">@T["docker.containers", i.InUse]</span> } else { <span class="muted">—</span> }</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        @if (prunable.Count > 0)
+        {
+            <form method="post" action="@Url.Page("/Admin/Hosting/Nodes/Details", MatCMS.Cloud.Pages.Admin.Hosting.Nodes.DetailsModel.Route(Model.Item?.Id, "PruneImages"))" class="list-actions">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn">@T["settings.dockerPrune"]</button>
+            </form>
+        }
+    </div>
+}

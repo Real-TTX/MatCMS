@@ -35,7 +35,9 @@
                 <tbody>
                     @if (rows.Count == 0)
                     {
-                        <tr><td colspan="99" class="muted"><em>@L.Empty</em></td></tr>
+                        @* colspan 2, not the usual 99: this table has a fixed layout, where a colspan of 99 makes 99 columns and squeezes
+                           the two real ones to nothing. *@
+                        <tr><td colspan="2" class="muted stats-empty"><em>@L.Empty</em></td></tr>
                     }
                     @foreach (var r in rows)
                     {
@@ -87,6 +89,12 @@
 
 <div class="card stats-chart-card">
     <h2>@L.Chart</h2>
+    @if (s.Views == 0 && s.Visitors == 0)
+    {
+        <p class="muted stats-chart-empty"><em>@L.Empty</em></p>
+    }
+    else
+    {
     <svg class="stats-chart" viewBox="0 0 @W @(H + 2)" preserveAspectRatio="none" role="img" aria-label="@L.Chart">
         @for (var i = 0; i < s.Days.Count; i++)
         {
@@ -109,6 +117,7 @@
         <span class="stats-legend"><i class="views"></i>@L.Views <i class="visitors"></i>@L.Visitors · max @N(max)</span>
         <span>@s.To.ToString("dd.MM.")</span>
     </div>
+    }
 </div>
 
 @if (!Model.Compact)

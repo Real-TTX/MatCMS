@@ -209,6 +209,12 @@ body.nav-open .admin-menu-toggle span:nth-child(3) { transform: translateY(-6px)
 .field-row .fr-label { flex: 1 1 auto; min-width: 0; }
 .field-row .fr-type { flex: 0 0 170px; width: 170px; }
 .field-row .fr-label, .field-row .fr-type { height: 34px; }
+/* On a phone the label takes its own line; type and the trash button share the next one. */
+@media (max-width: 600px) {
+    .field-row { flex-wrap: wrap; }
+    .field-row .fr-label { flex: 1 1 100%; }
+    .field-row .fr-type { flex: 1 1 auto; width: auto; min-width: 0; }
+}
 
 /* Component designer: live preview + debug */
 .component-preview .cp-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
@@ -941,7 +947,10 @@ a.tab { display: inline-block; text-decoration: none; }
    identical to the block editor (no full-width centered takeover). */
 
 @media (max-width: 900px) {
-    .live-editor { grid-template-columns: 1fr; height: auto; }
+    /* minmax(0, …), not 1fr: a 1fr track never gets narrower than its widest content, and one long block title
+       pushed the whole stacked editor off a phone screen. */
+    .live-editor { grid-template-columns: minmax(0, 1fr); height: auto; }
+    .le-sidebar .block-item > * { min-width: 0; }
     .le-preview { height: 72vh; }
     .le-sidebar { border-right: none; border-bottom: 1px solid var(--line); }
 }
@@ -1101,7 +1110,7 @@ a.tab { display: inline-block; text-decoration: none; }
     table.data { display: block; overflow-x: auto; white-space: nowrap; }
 
     /* Live editor stacks; give the panel the full width */
-    .live-editor { grid-template-columns: 1fr; height: auto; }
+    .live-editor { grid-template-columns: minmax(0, 1fr); height: auto; }
     .le-preview { height: 70vh; }
     .form-builder.editing .le-panel { max-width: none; }
 }
@@ -1114,7 +1123,8 @@ a.tab { display: inline-block; text-decoration: none; }
     .media-preview img { max-height: 240px; }
     .stat-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
     .opt-row { grid-template-columns: 1fr; }
-    .color-grid { grid-template-columns: 1fr 1fr; }
+    /* One column: a colour field (swatch, hex, clear button) does not fit twice next to each other. */
+    .color-grid { grid-template-columns: minmax(0, 1fr); }
     .block-item { flex-wrap: wrap; }
     .block-item .actions { width: 100%; justify-content: flex-start; }
     .page-head .btn { flex: 1 1 auto; text-align: center; }

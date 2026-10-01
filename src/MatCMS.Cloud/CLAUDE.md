@@ -1001,7 +1001,9 @@ the admin UI uses. There is no second restore path and no second backup format.
 - **Profile management** (`Api/ProfileApi.cs`, `MapProfileApi`): list/read profiles and edit every payload
   (settings, SMTP/translation groups, users, components, templates, mail-templates, plugins, AI flags) and
   assign instances — mirrors the admin Profile pages field for field through the SAME `ProfileService`, so
-  every write bumps `TouchAsync`. Reads need any key; writes need **`CanManageProfiles`**.
+  every write bumps `TouchAsync`. Reads need any key; writes need **`CanManageProfiles`**. The work is
+  **`Services/ProfileOpsService.cs`**, shared with the MCP **`Mcp/ProfileTools.cs`** (30 tools, same operations; plugin
+  upload/download stays REST) — `ProfileApi` is transport only (key, rights, status codes), so the two cannot drift.
 - **Store management** (`Api/StoreApi.cs`, `MapStoreApi`) over `/api/v1/store`: the cloud-wide catalogue of
   templates/components/mail-templates/plugins. All writes go through **`Services/StoreService.cs`** (shared
   with the MCP `StoreTools`), which maps the input AND bumps every profile that SELECTED the changed entry

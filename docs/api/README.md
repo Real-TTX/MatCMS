@@ -325,6 +325,24 @@ Instanz beim nächsten Heartbeat über ihre **eigenen** Validierer anwendet (add
 | `get_notifications` / `set_notifications` | Benachrichtigungs-Matrix lesen / komplett ersetzen (Abschnitt 6b) |
 | `get_stats` | Besucherstatistik: ohne `instanceId` alle Sites im Vergleich, mit `instanceId` Verlauf, Top-Seiten, Herkunft, 404, Geräte (Abschnitt 6c) |
 
+**Profil-Tools** (dieselben Operationen wie Abschnitt 4, über denselben Dienst; Lesen mit jedem Schlüssel, Schreiben braucht **CanManageProfiles**, Instanz-Aufrufe sind auf den Schlüssel begrenzt). Jede Änderung zählt die Revision hoch, die Instanzen übernehmen sie beim nächsten Heartbeat:
+
+| Tool | Zweck |
+|---|---|
+| `list_profiles` / `get_profile` | Profile auflisten / eines vollständig lesen (Geheimnisse maskiert) |
+| `create_profile` / `update_profile` / `delete_profile` | anlegen / Richtlinie ändern (nur übergebene Felder) / löschen (Instanzen fallen aufs Standardprofil) |
+| `duplicate_profile` / `set_default_profile` / `rotate_join_code` / `republish_profile` | kopieren / Standard setzen / neuer Join-Code / erneut ausrollen |
+| `set_profile_ai` | KI-Freigabe, Monatsbudget, Anweisung, Backup vor KI-Änderung |
+| `get_recommended_settings` / `add_recommended_settings` | empfohlene Einstellungen und fehlende ergänzen |
+| `set_profile_setting` / `delete_profile_setting` | freie Einstellung (Gruppenschlüssel werden abgewiesen) |
+| `set_profile_smtp` / `disable_profile_smtp`, `set_profile_translation` / `disable_profile_translation` | Gruppen ein-/ausschalten (gespeicherte Werte bleiben) |
+| `upsert_profile_user` / `delete_profile_user` | Benutzer (auf den Sites nur hinzufügen, Passwort wird gehasht) |
+| `upsert_profile_component` / `delete_profile_component` | Komponenten |
+| `upsert_profile_template` / `delete_profile_template` | Templates |
+| `upsert_profile_mail_template` / `delete_profile_mail_template` | Mail-Templates |
+| `delete_profile_plugin` | Plugin entfernen (Hochladen bleibt REST) |
+| `get_instance_profile` / `assign_instance_profile` / `resync_instance` | Zuordnung einer Instanz lesen / setzen oder entfernen / Neu-Übernahme anstoßen |
+
 **`create_page`** (Beispiel-Eingabe):
 ```json
 {

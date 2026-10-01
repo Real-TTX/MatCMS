@@ -129,6 +129,7 @@ builder.Services.AddScoped<AiService>();
 builder.Services.AddScoped<InstanceService>();
 builder.Services.AddScoped<StatsService>();
 builder.Services.AddScoped<HostImagesService>();
+builder.Services.AddScoped<ProfileOpsService>();
 builder.Services.AddScoped<ProfileService>();
 builder.Services.AddScoped<StoreService>();
 builder.Services.AddScoped<HostingActionsService>();

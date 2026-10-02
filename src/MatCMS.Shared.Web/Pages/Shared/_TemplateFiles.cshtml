@@ -95,7 +95,8 @@
 
 @* .tpl-tree ist derselbe Baum, nur mit breiterer linker Spalte: an jeder Zeile hängt hier zusätzlich
    das Abzeichen "angepasst / leer", und in 230 Pixeln lag es über dem Dateinamen. *@
-<div class="pf-tree tpl-tree" data-tf>
+@* data-fe: on a phone file-editor-mobile.js turns tree + editor into two steps (list, then the file full screen). *@
+<div class="pf-tree tpl-tree" data-tf data-fe>
     @* Links: der Baum. Vollständig vom Skript gezeichnet, weil die Zeilen ihren Zustand
        (angepasst / leer) beim Tippen ändern müssen, ohne dass die Seite neu lädt. *@
     <aside class="pf-side">
@@ -182,6 +183,7 @@
     </div>
 </div>
 
+<script src="/_content/MatCMS.Shared.Web/js/file-editor-mobile.js"></script>
 <script>
     (function () {
         var FILES = @Html.Raw(metaJson);
@@ -630,6 +632,8 @@
                 }
                 showRaw(raw);
                 render();
+                // On a phone the keyboard would cover a file the user only opened to read (file-editor-mobile.js).
+                if (focus && window.MatFE && window.MatFE.noAutoFocus()) focus = false;
                 if (focus) {
                     if (raw) stores[i].focus();
                     else if (cm) { refresh(); cm.focus(); }

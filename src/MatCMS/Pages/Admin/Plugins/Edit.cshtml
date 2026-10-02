@@ -195,7 +195,8 @@
             @* Reiter 2: der Editor — Baum und Datei zusammen, denn ohne den Baum wäre nicht zu
                sehen, WELCHE Datei im Feld steht. *@
             <div class="tab-panel" data-pf-panel="editor" hidden>
-            <div class="pf-tree">
+            @* data-fe: on a phone file-editor-mobile.js shows the tree and the open file as two steps. *@
+            <div class="pf-tree" data-fe>
                 @* EIN Baum, eine Wurzel: das Plugin. Darunter hängen die Systemdatei plugin.csx,
                    der Systemordner assets/ und die eigenen Ordner und Dateien — eingerückt, auf-
                    und zuklappbar. Zwei nebeneinanderstehende Listen mit je eigener Kopfzeile waren
@@ -355,6 +356,7 @@
 </dialog>
 
 @section Scripts {
+    <script src="~/_content/MatCMS.Shared.Web/js/file-editor-mobile.js" asp-append-version="true"></script>
     <script>
 (function () {
             var root = document.querySelector('[data-plugin-files]');
@@ -1568,7 +1570,8 @@
                 editor.hidden = false;
                 if (empty) empty.hidden = true;
                 render();
-                if (!quiet) content.focus();
+                // On a phone the keyboard would cover a file the user only opened to read (file-editor-mobile.js).
+                if (!quiet && !(window.MatFE && window.MatFE.noAutoFocus())) content.focus();
             }
 
             // Beim Tippen, nicht beim Wechseln: wer eine andere Datei öffnet oder das Formular

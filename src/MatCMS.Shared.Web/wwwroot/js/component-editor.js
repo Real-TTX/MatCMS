@@ -54,6 +54,17 @@
     // selbst. Siehe den Wächter weiter unten.
     var expectLoad = false;
 
+    // A new srcdoc on a frame that is IN the document is a navigation, and the browser files every one of them in
+    // the page's history: after typing a while, "back" (the Android back button, the swipe, the toolbar) stepped
+    // through old previews instead of leaving the page. A frame that is (re)inserted replaces its entry instead — so
+    // the content goes in while the frame is detached. Same element, so listeners and attributes stay.
+    function writeFrame(f, html) {
+        var parent = f.parentNode, next = f.nextSibling;
+        if (parent) parent.removeChild(f);
+        f.srcdoc = html;
+        if (parent) parent.insertBefore(f, next);
+    }
+
     function slug(s) {
         return (s || "").trim().toLowerCase()
             .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss")
@@ -217,7 +228,7 @@
         var out = substitute(tpl, fields);
         seal();
         expectLoad = true;
-        frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8">' +
+        writeFrame(frame, '<!doctype html><html><head><meta charset="utf-8">' +
             // Was der Sandkasten NICHT verhindert, ist der Verweis, der den Rahmen SELBST woandershin
             // trägt — genau der gemeldete Fehler: nach einem Klick stand die ganze Website in der
             // Vorschau. <base target="_blank"> schickt jeden Verweis ohne eigenes Ziel in ein neues
@@ -231,7 +242,7 @@
             // zeigte also gerade NICHT, wie der Block auf der Website aussieht.
             '<link rel="stylesheet" href="/_content/MatCMS.Shared.Web/css/site.css">' +
             '<style>' + themeCss() + '</style>' +
-            '</head><body>' + out + '</body></html>';
+            '</head><body>' + out + '</body></html>');
         updateDebug(tpl, fields, out);
     }
     function updateDebug(tpl, fields, out) {

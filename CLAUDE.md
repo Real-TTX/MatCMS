@@ -63,6 +63,12 @@ together by hand:
    (tiles, SVG chart, top lists) for the CMS's Admin → Statistik and the cloud's view of a site alike,
    from a `StatsSummary` that `src/MatCMS.Shared/SiteStats.cs` computes once — so the two pages cannot
    disagree about a number (this is why `MatCMS.Shared.Web` references `MatCMS.Shared`).
+   `js/file-editor-mobile.js` turns every file tree marked `data-fe` (template editor in CMS and cloud, plugin
+   editor) into two steps on a phone — the list, then the open file full screen with back/save in its menu bar,
+   wrapped lines and a key bar — as a LAYER over the editors: it only moves what is shown and asks nothing of their
+   logic but `window.MatFE.noAutoFocus()` before they focus a just-opened file. Previews write their frame with
+   `writeFrame` (detach, set srcdoc, re-insert): a srcdoc change on an attached frame is a history entry, and
+   "back" used to step through old previews.
    The shared views take their **wording as strings, not `@T[…]`** — a shared view cannot reference
    either application's `Localizer` type — so each app keeps a thin adapter that looks the keys up
    (`_IconPicker.cshtml`, and the `@{ }` block of the pages using `_ComponentEditor`). The library

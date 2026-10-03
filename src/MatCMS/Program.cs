@@ -198,6 +198,7 @@ builder.Services.AddHostedService<LogRetentionService>();
 // Visitor statistics: counted in memory per request, written once a minute (Admin → Statistik).
 builder.Services.AddSingleton<StatsCollector>();
 builder.Services.AddScoped<StatsService>();
+builder.Services.AddScoped<AttentionService>();
 builder.Services.AddHostedService<StatsFlushService>();
 builder.Services.AddHttpClient();
 // Stateless apart from the file cache it manages, so one instance for the whole app.

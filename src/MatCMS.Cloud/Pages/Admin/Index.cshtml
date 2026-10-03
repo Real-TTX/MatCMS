@@ -83,7 +83,7 @@
                 </table>
             }
         </div>
-        @if (Model.AttentionItems.Count > IndexModel.CardRows)
+        @if (Model.AttentionItems.Count > 0)
         {
             <div class="dash-card-foot"><a class="btn btn-ghost" asp-page="/Admin/Attention/Index">@T["dashboard.showAll", Model.AttentionItems.Count]</a></div>
         }

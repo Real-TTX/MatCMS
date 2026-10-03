@@ -31,8 +31,12 @@ public sealed class AttentionService
     }
 
     /// <summary>One line. <paramref name="Level"/>: err | warn | info. <paramref name="Kind"/>: what it is about (offline,
-    /// syncError, update, …) — the filter of the full page. <paramref name="InstanceId"/>: the site's public id, if any.</summary>
-    public sealed record Item(string Level, string Kind, string Icon, string Title, string Text, string Url, string? InstanceId);
+    /// syncError, update, …) — the filter of the full page. <paramref name="InstanceId"/>: the site's public id, if any.
+    /// <paramref name="Detail"/>: what it comes down to — last contact, last backup, versions, the failed step …
+    /// <paramref name="LastError"/>: for a line about one site, the newest error that site reported (14 days), because
+    /// "offline" or "sync error" alone rarely says why.</summary>
+    public sealed record Item(string Level, string Kind, string Icon, string Title, string Text, string Url, string? InstanceId,
+        string? Detail = null, string? LastError = null);
 
     /// <summary>A site that uploads to the cloud but has not for this long is worth a line — one that never used cloud
     /// backups is not (it may back up elsewhere).</summary>
@@ -67,6 +71,18 @@ public sealed class AttentionService
             .Where(m => ids.Contains(m.InstanceId) && (m.State == "running" || (m.State != "succeeded" && m.StartedAt > recentCut)))
             .OrderByDescending(m => m.Id).ToListAsync(ct);
 
+        // The newest error each site reported — read once for all of them.
+        var errCut = DateTime.UtcNow.AddDays(-14);
+        var newestErr = (await _db.InstanceLogs.AsNoTracking()
+                .Where(l => ids.Contains(l.InstanceId) && l.Level == "Error" && l.TimeUtc >= errCut)
+                .GroupBy(l => l.InstanceId).Select(g => g.Max(l => l.Id)).ToListAsync(ct)) is var maxIds && maxIds.Count > 0
+            ? await _db.InstanceLogs.AsNoTracking().Where(l => maxIds.Contains(l.Id)).ToDictionaryAsync(l => l.InstanceId, ct)
+            : new Dictionary<int, InstanceLogEntry>();
+        string? LastErr(Instance i) => newestErr.TryGetValue(i.Id, out var e)
+            ? _t["attention.detail.lastError", Local(e.TimeUtc), (e.StatusCode is int sc ? sc + " " : "") + (string.IsNullOrEmpty(e.Path) ? "" : e.Path + " · ") + e.Message]
+            : null;
+        string D(string key, params object[] args) => _t["attention.detail." + key, args];
+
         var a = new List<Item>();
         var now = DateTime.UtcNow;
         string Page(string page, object? values = null, string? fragment = null) =>
@@ -75,25 +91,30 @@ public sealed class AttentionService
         string L(string key, params object[] args) => args.Length == 0 ? _t["dashboard.attn." + key] : _t["dashboard.attn." + key, args];
         void Add(string level, string kind, string icon, string title, string url, string? instanceId, params object[] args) =>
             a.Add(new(level, kind, icon, title, L(kind, args), url, instanceId));
+        // The same, with what it comes down to — and for a site its newest reported error.
+        void AddI(Instance i, string level, string kind, string icon, string url, string? detail, params object[] args) =>
+            a.Add(new(level, kind, icon, i.Name, L(kind, args), url, i.PublicId, detail, LastErr(i)));
+        void AddD(string level, string kind, string icon, string title, string url, string? detail, params object[] args) =>
+            a.Add(new(level, kind, icon, title, L(kind, args), url, null, detail));
 
         foreach (var m in moves)
         {
             var i = instances.FirstOrDefault(x => x.Id == m.InstanceId);
             if (i is null) continue;
-            if (m.State == "running") Add("info", "moveRunning", "🚚", i.Name, Inst(i, "hosting"), i.PublicId, m.FromName, m.ToName, m.Step);
-            else Add("err", m.State == "rolled-back" ? "moveRolledBack" : "moveFailed", "🚚", i.Name, Inst(i, "hosting"), i.PublicId, m.FromName, m.ToName);
+            if (m.State == "running") AddI(i, "info", "moveRunning", "🚚", Inst(i, "hosting"), D("since", Local(m.StartedAt)), m.FromName, m.ToName, m.Step);
+            else AddI(i, "err", m.State == "rolled-back" ? "moveRolledBack" : "moveFailed", "🚚", Inst(i, "hosting"), LastLogLine(m.Log), m.FromName, m.ToName);
         }
         foreach (var i in instances)
         {
-            if (IsOffline(i)) Add("err", "offline", "🔴", i.Name, Inst(i), i.PublicId, $"{i.LastHeartbeatUtc:dd.MM. HH:mm} UTC");
-            else if (IsStopped(i)) Add("warn", "stopped", "⏸️", i.Name, Inst(i, "hosting"), i.PublicId, i.ContainerState ?? "");
-            if (!string.IsNullOrWhiteSpace(i.LastSyncError)) Add("err", "syncError", "⚠️", i.Name, Inst(i, "config"), i.PublicId, i.LastSyncError!);
-            if (!string.IsNullOrEmpty(i.ProxyError)) Add("err", "proxyError", "🌐", i.Name, Inst(i, "hosting"), i.PublicId, i.ProxyError);
-            if (InstanceService.IsOutdatedProtocol(i)) Add("warn", "outdated", "🧓", i.Name, Inst(i), i.PublicId);
+            if (IsOffline(i)) AddI(i, "err", "offline", "🔴", Inst(i), D("lastSeen", i.LastHeartbeatUtc is DateTime hb ? Local(hb) : "—", i.Url ?? "—"), $"{i.LastHeartbeatUtc:dd.MM. HH:mm} UTC");
+            else if (IsStopped(i)) AddI(i, "warn", "stopped", "⏸️", Inst(i, "hosting"), D("container", i.ContainerState ?? "?"), i.ContainerState ?? "");
+            if (!string.IsNullOrWhiteSpace(i.LastSyncError)) AddI(i, "err", "syncError", "⚠️", Inst(i, "config"), D("sync", i.LastSyncRunAt is DateTime sr ? Local(sr) : "—", i.AppliedRevision), i.LastSyncError!);
+            if (!string.IsNullOrEmpty(i.ProxyError)) AddI(i, "err", "proxyError", "🌐", Inst(i, "hosting"), D("domain", i.ProxyDomain ?? "—"), i.ProxyError);
+            if (InstanceService.IsOutdatedProtocol(i)) AddI(i, "warn", "outdated", "🧓", Inst(i), D("protocol", i.ProtocolVersion, InstanceService.CurrentProtocolVersion, i.Version ?? "?"));
             if (lastBackup.TryGetValue(i.Id, out var lb) && now - lb > StaleBackup)
-                Add("warn", "backupStale", "💾", i.Name, Inst(i, "backup"), i.PublicId, (int)(now - lb).TotalDays);
+                AddI(i, "warn", "backupStale", "💾", Inst(i, "backup"), D("lastBackup", Local(lb)), (int)(now - lb).TotalDays);
             if (_releases.IsUpdateAvailableFor(i.Version))
-                Add("info", "update", "⬆️", i.Name, Inst(i, HostingActionsService.CanAct(i) ? "hosting" : "overview"), i.PublicId, _releases.LatestVersion ?? "", i.Version ?? "?");
+                AddI(i, "info", "update", "⬆️", Inst(i, HostingActionsService.CanAct(i) ? "hosting" : "overview"), HostingActionsService.CanAct(i) ? D("updateHere") : D("updateRemote"), _releases.LatestVersion ?? "", i.Version ?? "?");
         }
         if (fleet)
         {
@@ -102,17 +123,20 @@ public sealed class AttentionService
             {
                 var url = Page("/Admin/Hosting/Nodes/Details", new { id = n.Id });
                 var title = L("node", n.Name);
-                if (n.LastSeenAt is not null && !n.IsOnline(now)) Add("err", "nodeOffline", "🖧", title, url, null, $"{n.LastSeenAt:dd.MM. HH:mm} UTC");
-                else if (!string.IsNullOrEmpty(n.DockerError)) Add("err", "nodeDocker", "🖧", title, url, null, n.DockerError);
-                if (Nodes.NodeService.AgentOutdated(n, cloudVersion)) Add("info", "agentOutdated", "🖧", title, url, null, n.AgentVersion ?? "", cloudVersion);
+                if (n.LastSeenAt is not null && !n.IsOnline(now)) AddD("err", "nodeOffline", "🖧", title, url, D("node", n.HostName ?? "—", n.Address ?? "—"), $"{n.LastSeenAt:dd.MM. HH:mm} UTC");
+                else if (!string.IsNullOrEmpty(n.DockerError)) AddD("err", "nodeDocker", "🖧", title, url, D("node", n.HostName ?? "—", n.Address ?? "—"), n.DockerError);
+                if (Nodes.NodeService.AgentOutdated(n, cloudVersion)) AddD("info", "agentOutdated", "🖧", title, url, D("agent"), n.AgentVersion ?? "", cloudVersion);
             }
             var check = await CloudUpdateAsync(ct);
-            if (check is { Error: null, UpdateAvailable: true }) Add("info", "cloudUpdate", "☁️", L("cloud.title"), Page("/Admin/Hosting/Index", fragment: "updates"), null, check.Latest ?? "");
+            if (check is { Error: null, UpdateAvailable: true }) AddD("info", "cloudUpdate", "☁️", L("cloud.title"), Page("/Admin/Hosting/Index", fragment: "updates"), D("running", check.Current), check.Latest ?? "");
             if (!await _mail.IsConfiguredAsync()) Add("warn", "smtp", "✉️", L("smtp.title"), Page("/Admin/Settings/Index", new { tab = "smtp" }), null);
-            if (_docker.Configured && !await _docker.IsReachableAsync(ct)) Add("err", "docker", "🐳", "Docker", Page("/Admin/Hosting/Nodes/Details", new { tab = "docker" }), null);
+            if (_docker.Configured && !await _docker.IsReachableAsync(ct)) AddD("err", "docker", "🐳", "Docker", Page("/Admin/Hosting/Nodes/Details", new { tab = "docker" }), D("endpoint", _docker.Endpoint ?? "—"));
             if (!string.IsNullOrWhiteSpace(_releases.LastError)) a.Add(new("warn", "release", "📦", L("release.title"), _releases.LastError!, Page("/Admin/Index"), null));
         }
         // Errors first, then warnings, then information; within a level, by name.
+        static string Local(DateTime utc) => utc.ToLocalTime().ToString("dd.MM.yyyy HH:mm");
+        static string? LastLogLine(string? log) => string.IsNullOrWhiteSpace(log) ? null
+            : log.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(l => l.Trim()).LastOrDefault(l => l.Length > 0);
         return a.OrderBy(x => x.Level switch { "err" => 0, "warn" => 1, _ => 2 }).ThenBy(x => x.Title).ToList();
     }
 }

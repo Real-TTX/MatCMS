@@ -704,7 +704,9 @@ login same-site; it is not used by this flow.
   filtered — `admin-list.js` takes `?filter=<tag>` and `?q=` from the address for a `[data-list]` page, so tiles link
   to e.g. `Instances?filter=offline`; a short list opens in place (`[data-dash-expand]`, extra rows carry the CLASS
   `dash-extra` — Razor renders a `data-` attribute even when its value is null). Pages behind the cards: cloud
-  **Admin/Attention** (all of `AttentionService` — shared with the card, `/api/v1/attention`, MCP `get_attention`) and
+  **Admin/Attention** (all of `AttentionService` — shared with the card, `/api/v1/attention`, MCP `get_attention`; every
+  line carries `Detail` — what it comes down to — and, for a site, `LastError`, its newest reported error; the CMS has the
+  same page over its own `Services/AttentionService.cs`) and
   **Admin/Syncs** (`SyncHistoryService`, `/api/v1/syncs`, MCP `list_sync_runs`); CMS **Forms/Inbox** (every form's
   submissions, filter unread/read/form). Neither is in the sidebar; they are where the dashboard leads.
 - **Admin navigation**: **Hosting is ONE sidebar item, the first** (Admin-only), and everything about hosts,

@@ -1,5 +1,5 @@
 @page
-@model MatCMS.Cloud.Pages.Admin.Attention.IndexModel
+@model MatCMS.Pages.Admin.Attention.IndexModel
 @{
     ViewData["Title"] = T["dashboard.attention"];
 }
@@ -8,7 +8,7 @@
         <h1>@T["dashboard.attention"]</h1>
         <div class="list-toolbar">
             <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
-            <select class="list-search" data-list-filter aria-label="@T["common.status"]">
+            <select class="list-search" data-list-filter aria-label="@T["attention.filter"]">
                 <option value="">@T["attention.filterAll"] (@Model.Items.Count)</option>
                 <option value="err">@T["attention.filterErr"] (@Model.Items.Count(i => i.Level == "err"))</option>
                 <option value="warn">@T["attention.filterWarn"] (@Model.Items.Count(i => i.Level == "warn"))</option>

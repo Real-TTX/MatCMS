@@ -21,9 +21,11 @@ public class IndexModel : PageModel
     private readonly VersionService _version;
     private readonly Localizer _t;
     private readonly StatsService _stats;
+    private readonly AttentionService _attention;
 
-    public IndexModel(AppDbContext db, CloudState cloud, BackupManager backups, EmailService mail, VersionService version, Localizer t, StatsService stats)
+    public IndexModel(AppDbContext db, CloudState cloud, BackupManager backups, EmailService mail, VersionService version, Localizer t, StatsService stats, AttentionService attention)
     {
+        _attention = attention;
         _db = db; _cloud = cloud; _backups = backups; _mail = mail; _version = version; _t = t; _stats = stats;
     }
 
@@ -71,9 +73,8 @@ public class IndexModel : PageModel
     public List<MatCMS.Models.FormSubmission> RecentSubmissions { get; private set; } = new();
     public List<MatCMS.Models.LogEntry> RecentErrors { get; private set; } = new();
 
-    /// <summary>One line that needs a look. <paramref name="Level"/>: err | warn | info.</summary>
-    public sealed record Attention(string Level, string Icon, string Title, string Text, string Url);
-    public List<Attention> AttentionItems { get; private set; } = new();
+    /// <summary>What needs a look — the same list as Admin/Attention (AttentionService).</summary>
+    public List<AttentionService.Item> AttentionItems { get; private set; } = new();
 
     /// <summary>A scheduled backup that has not run for this long is worth a line.</summary>
     public static readonly TimeSpan StaleBackup = TimeSpan.FromDays(7);
@@ -126,28 +127,6 @@ public class IndexModel : PageModel
             .Concat(posts.Select(p => new Edited("post", p.Title, p.IsPublished, p.UpdatedAt, Url.Page("/Admin/Posts/Edit", new { id = p.Id })!)))
             .OrderByDescending(e => e.UpdatedAt).Take(30).ToList();
 
-        BuildAttention();
-    }
-
-    // The lines are built here (they need the data) but WORDED through the localizer like every other string —
-    // the admin runs in German or English, and a list half in the other language reads like a bug.
-    private void BuildAttention()
-    {
-        var a = AttentionItems;
-        string Settings(string tab) => Url.Page("/Admin/Settings/Index", new { tab })!;
-        void Add(string level, string icon, string key, string url, params object[] args) =>
-            a.Add(new(level, icon, _t["dashboard.attn." + key + ".title"], args.Length == 0 ? _t["dashboard.attn." + key] : _t["dashboard.attn." + key, args], url));
-        if (!SetupComplete) Add("info", "🧭", "setup", Url.Page("/Admin/Setup/Index")!);
-        if (Maintenance) Add("warn", "🚧", "maintenance", Settings("maintenance"));
-        if (!BackupScheduled && LastBackup is null) Add("warn", "💾", "backupNone", Url.Page("/Admin/Backup/Index")!);
-        else if (LastBackup is { } lb && DateTime.UtcNow - lb > StaleBackup) Add("warn", "💾", "backupStale", Url.Page("/Admin/Backup/Index")!, (int)(DateTime.UtcNow - lb).TotalDays);
-        if (!MailConfigured) Add("warn", "✉️", "mail", Settings("smtp"));
-        if (UnreadCount > 0) Add("info", "📨", "unread", Url.Page("/Admin/Forms/Inbox", new { filter = "unread" })!, UnreadCount);
-        if (UpdateAvailable) Add("info", "⬆️", "update", Settings("cloud"), LatestVersion ?? "", Version);
-        if (CloudConnected && !string.IsNullOrWhiteSpace(CloudSyncError))
-            a.Add(new("err", "☁️", _t["dashboard.attn.syncError.title"], CloudSyncError!, Settings("cloud")));
-        else if (CloudOutOfSync) Add("info", "☁️", "syncPending", Settings("cloud"));
-        if (ErrorCount7d > 0) Add("warn", "🐞", "errors", Url.Page("/Admin/Logs/Index", new { level = "Error" })!, ErrorCount7d);
-        AttentionItems = a.OrderBy(x => x.Level switch { "err" => 0, "warn" => 1, _ => 2 }).ToList();
+        AttentionItems = await _attention.BuildAsync(HttpContext.RequestAborted);
     }
 }

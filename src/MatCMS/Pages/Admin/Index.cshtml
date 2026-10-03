@@ -74,7 +74,6 @@
 
 <div class="dash-grid">
     @* ---- Everything that needs a look, most serious first. ---- *@
-    @* A short list, so "Alle anzeigen" opens the rest in place (rows with class dash-extra). *@
     <div class="card dash-card">
         <h2>@T["dashboard.attention"] @if (Model.AttentionItems.Count > 0) { <span class="muted">(@Model.AttentionItems.Count)</span> }</h2>
         <div class="dash-card-body">
@@ -87,10 +86,9 @@
                 <table class="data dash-attention">
                     <colgroup><col class="dash-icon-col" /><col /></colgroup>
                     <tbody>
-                        @for (var n = 0; n < Model.AttentionItems.Count; n++)
+                        @foreach (var x in Model.AttentionItems.Take(IndexModel.CardRows))
                         {
-                            var x = Model.AttentionItems[n];
-                            <tr class="lvl-@x.Level@(n >= IndexModel.CardRows ? " dash-extra" : "")" hidden="@(n >= IndexModel.CardRows)">
+                            <tr class="lvl-@x.Level">
                                 <td class="dash-icon">@x.Icon</td>
                                 <td><a href="@x.Url"><strong>@x.Title</strong></a><div class="muted dash-clip">@x.Text</div></td>
                             </tr>
@@ -99,9 +97,9 @@
                 </table>
             }
         </div>
-        @if (Model.AttentionItems.Count > IndexModel.CardRows)
+        @if (Model.AttentionItems.Count > 0)
         {
-            <div class="dash-card-foot"><button type="button" class="btn btn-ghost" data-dash-expand data-more="@T["dashboard.showAll", Model.AttentionItems.Count]" data-less="@T["dashboard.showLess"]">@T["dashboard.showAll", Model.AttentionItems.Count]</button></div>
+            <div class="dash-card-foot"><a class="btn btn-ghost" asp-page="/Admin/Attention/Index">@T["dashboard.showAll", Model.AttentionItems.Count]</a></div>
         }
     </div>
 

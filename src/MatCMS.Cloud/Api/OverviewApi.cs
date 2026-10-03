@@ -16,7 +16,7 @@ public static class OverviewApi
     public static object AttentionDto(List<AttentionService.Item> items) => new
     {
         count = items.Count,
-        items = items.Select(x => new { level = x.Level, kind = x.Kind, title = x.Title, text = x.Text, instanceId = x.InstanceId, url = x.Url }),
+        items = items.Select(x => new { level = x.Level, kind = x.Kind, title = x.Title, text = x.Text, detail = x.Detail, lastError = x.LastError, instanceId = x.InstanceId, url = x.Url }),
     };
 
     public static object SyncsDto(List<InstanceSyncRun> runs) => new

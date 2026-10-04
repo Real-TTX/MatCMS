@@ -6,28 +6,32 @@
 @* Nur die Überschrift: alle Aktionen dieser Seite stehen unten in EINER Reihe — dieselbe Ordnung
    wie im Plugin-Editor. Oben stand ein "Zurück", unten ein "Abbrechen" — zwei Beschriftungen für
    denselben Weg an zwei Orten. *@
-<div class="page-head">
+<div class="page-head post-head">
     <h1>@(Model.IsNew ? T["posts.newTitle"] : T["posts.editTitle"])</h1>
+    @* Aus Link übernehmen: ein dezenter Knopf oben rechts, die Eingabe im Dialog. Er liest einen
+       Beitrag (Instagram, Facebook, jede Seite mit Vorschau-Daten) EINMAL und füllt die Felder;
+       gespeichert wird erst mit "Speichern". Die Bilder liegen danach in der Mediathek (Tag "import"). *@
+    <button type="button" class="btn btn-ghost btn-sm post-import-open" id="pi-open"><i class="ti ti-link" aria-hidden="true"></i> @T["posts.import.heading"]</button>
 </div>
+
+<dialog class="mat-dialog post-import" id="pi-dialog"
+        data-url="@Url.Page(null, "ImportLink", new { id = Model.PostId })"
+        data-busy="@T["posts.import.busy"]" data-done="@T["posts.import.done"]"
+        data-overwrite="@T["posts.import.overwrite"]" data-failed="@T["posts.import.failed"]">
+    <h3 class="post-import__title">@T["posts.import.heading"]</h3>
+    <div class="post-import__row field">
+        <input type="url" id="pi-url" placeholder="@T["posts.import.placeholder"]" inputmode="url" autocomplete="off" />
+        <button type="button" class="btn" id="pi-go">@T["posts.import.button"]</button>
+    </div>
+    <div class="help">@T["posts.import.hint"]</div>
+    <div id="pi-status" class="post-import__status" role="status" hidden></div>
+    <div class="post-import__foot">
+        <button type="button" class="btn btn-ghost btn-sm" id="pi-close">@T["action.close"]</button>
+    </div>
+</dialog>
 
 <form method="post" asp-route-id="@Model.PostId" id="post-form" class="form-grid" style="max-width:860px;">
     <div asp-validation-summary="All" class="alert alert-error" style="display:@(ViewData.ModelState.IsValid ? "none" : "block")"></div>
-
-    @* Aus Link übernehmen: liest einen Beitrag (Instagram, Facebook, jede Seite mit Vorschau-Daten)
-       EINMAL und füllt die Felder darunter. Gespeichert wird erst mit "Speichern" — bis dahin ist
-       alles änderbar. Die Bilder liegen danach schon in der Mediathek (Tag "import"). *@
-    <div class="card post-import" id="pi-box"
-         data-url="@Url.Page(null, "ImportLink", new { id = Model.PostId })"
-         data-busy="@T["posts.import.busy"]" data-done="@T["posts.import.done"]"
-         data-overwrite="@T["posts.import.overwrite"]" data-failed="@T["posts.import.failed"]">
-        <label for="pi-url">@T["posts.import.heading"]</label>
-        <div class="post-import__row">
-            <input type="url" id="pi-url" placeholder="@T["posts.import.placeholder"]" inputmode="url" autocomplete="off" />
-            <button type="button" class="btn" id="pi-go">@T["posts.import.button"]</button>
-        </div>
-        <div class="help">@T["posts.import.hint"]</div>
-        <div id="pi-status" class="post-import__status" role="status" hidden></div>
-    </div>
 
     <div class="field">
         <label>@T["posts.heading"]</label>
@@ -170,7 +174,12 @@
         .att-chip { display:inline-flex; align-items:center; gap:6px; background:var(--bg-alt,#f1efe9); border:1px solid #e2d6c3; border-radius:8px; padding:6px 10px; font-size:13px; }
         .att-chip a { text-decoration:none; color:var(--accent,#b23a2e); }
         .att-chip button { border:0; background:none; cursor:pointer; color:#a00; font-weight:700; }
-        .post-import { margin:0; }
+        /* Aligned with the form below (860 px), small on every screen — a side door, not the main entrance. */
+        .post-head { max-width:860px; margin-bottom:8px; }
+        .page-head .post-import-open { margin-left:auto; width:auto; flex:0 0 auto; display:inline-flex; align-items:center; gap:6px; }
+        .post-import { width:min(620px, 92vw); }
+        .post-import__title { margin:0 0 12px; }
+        .post-import__foot { display:flex; justify-content:flex-end; margin-top:14px; }
         .post-import__row { display:flex; gap:8px; }
         .post-import__row input { flex:1; min-width:0; }
         .post-import__status { margin-top:10px; font-size:14px; }
@@ -276,7 +285,9 @@
 
         // ---- Aus Link übernehmen ----
         (function () {
-            var box = document.getElementById('pi-box'); if (!box) return;
+            var box = document.getElementById('pi-dialog'); if (!box) return;
+            document.getElementById('pi-open').addEventListener('click', function () { box.showModal(); document.getElementById('pi-url').focus(); });
+            document.getElementById('pi-close').addEventListener('click', function () { box.close(); });
             var input = document.getElementById('pi-url'), go = document.getElementById('pi-go'), status = document.getElementById('pi-status');
             var token = document.querySelector('#post-form input[name="__RequestVerificationToken"]');
             function show(text, isError, notes) {
@@ -314,6 +325,8 @@
                             window.MatPostGallery.add(d.images, d.title);
                         }
                         show(box.dataset.done.replace('{0}', d.via).replace('{1}', (d.images || []).length), false, d.notes);
+                        // Nothing to read beyond the success line: the filled form behind is the result.
+                        if (!d.notes || !d.notes.length) box.close();
                     })
                     .catch(function () { show(box.dataset.failed, true); })
                     .finally(function () { go.disabled = false; });

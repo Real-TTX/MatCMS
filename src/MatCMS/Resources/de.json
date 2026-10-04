@@ -1220,7 +1220,7 @@
   "posts.import.button": "Übernehmen",
   "posts.import.hint": "Instagram, Facebook oder jede andere Seite: Link einfügen und übernehmen – Text, Bilder, Datum und Quelle landen unten im Formular. Die Bilder werden in die Mediathek kopiert. Gespeichert wird erst mit „Speichern“.",
   "posts.import.busy": "Wird übernommen …",
-  "posts.import.done": "Übernommen über {0}: {1} Bilder. Bitte prüfen und speichern.",
+  "posts.import.done": "Übernommen über {0} – Bilder: {1}. Bitte prüfen und speichern.",
   "posts.import.overwrite": "Titel, Kurztext oder Text sind schon ausgefüllt. Mit dem Inhalt aus dem Link überschreiben? (Bilder und Quelle werden in jedem Fall ergänzt.)",
   "posts.import.failed": "Der Link konnte nicht übernommen werden.",
   "posts.gallery": "Galerie",

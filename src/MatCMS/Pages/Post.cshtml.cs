@@ -9,7 +9,12 @@ namespace MatCMS.Pages;
 public class PostModel : PageModel
 {
     private readonly AppDbContext _db;
-    public PostModel(AppDbContext db) => _db = db;
+    private readonly MatCMS.Services.SiteContext _site;
+    public PostModel(AppDbContext db, MatCMS.Services.SiteContext site)
+    {
+        _db = db;
+        _site = site;
+    }
 
     public Post Current { get; private set; } = default!;
     public List<(string Url, string Name, bool IsImage)> Attachments { get; } = new();
@@ -27,6 +32,20 @@ public class PostModel : PageModel
         Current = post;
         ViewData["Title"] = post.Title;
         ViewData["MetaDescription"] = post.Excerpt;
+        // Encoded by the layout (attribute values), so plain strings are right here.
+        // The configured canonical address wins over the request: behind a proxy the request says http.
+        var origin = _site.CanonicalBaseUrl(Request).TrimEnd('/');
+        var meta = new List<KeyValuePair<string, string>>
+        {
+            new("og:type", "article"),
+            new("og:title", post.Title),
+            new("og:url", origin + "/blog/" + post.Slug),
+            new("article:published_time", DateTime.SpecifyKind(post.PublishedAt, DateTimeKind.Utc).ToString("yyyy-MM-ddTHH:mm:ssZ")),
+        };
+        if (!string.IsNullOrWhiteSpace(post.Excerpt)) meta.Add(new("og:description", post.Excerpt));
+        if (!string.IsNullOrWhiteSpace(post.TitleImage) && (post.TitleImage.StartsWith('/') || post.TitleImage.StartsWith("http")))
+            meta.Add(new("og:image", post.TitleImage.StartsWith('/') ? origin + post.TitleImage : post.TitleImage));
+        ViewData["HeadMeta"] = meta;
 
         try
         {

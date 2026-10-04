@@ -235,7 +235,7 @@ public sealed class PostImportService
         foreach (Match m in Regex.Matches(html, @"<meta\b[^>]*>", RegexOptions.IgnoreCase))
         {
             var tag = m.Value;
-            var key = Attr(tag, "property") ?? Attr(tag, "name");
+            var key = Attr(tag, "property") ?? Attr(tag, "name") ?? Attr(tag, "itemprop");
             var val = Attr(tag, "content");
             if (key is not null && val is not null) meta.Add((key.ToLowerInvariant(), WebUtility.HtmlDecode(val).Trim()));
         }
@@ -255,6 +255,9 @@ public sealed class PostImportService
         var site = First("og:site_name") ?? HostOf(pageUrl);
         var source = AbsoluteUrl(pageUrl, First("og:url") ?? "") ?? pageUrl;
 
+        // Read BEFORE the caption is cut out of the preview text below — the date stands in front of it.
+        var date = FindDate(html, desc, First);
+
         // Instagram's preview text reads 'N likes, M comments - name on 1. Oktober 2026: "caption"'.
         // Only the caption belongs into the post; the title of such a preview is just "name on Instagram".
         if (platform == "instagram")
@@ -263,9 +266,52 @@ public sealed class PostImportService
             if (q.Success) desc = q.Groups[1].Value.Trim();
             title = null;
         }
-        return new Fetched(platform, desc, title, ParseDate(First("article:published_time", "og:updated_time")),
+        return new Fetched(platform, desc, title, date,
             source, platform switch { "instagram" => "Instagram", "facebook" => "Facebook", _ => site }, images,
             new List<string>(), "Öffentliche Vorschau-Daten");
+    }
+
+    private static readonly string[] MonthsDe =
+        ["januar", "februar", "märz", "april", "mai", "juni", "juli", "august", "september", "oktober", "november", "dezember"];
+    private static readonly string[] MonthsEn =
+        ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+
+    /// <summary>The publication date from whatever the page offers, most reliable first: the article
+    /// meta tags, structured data (JSON-LD), a Unix timestamp in the page's own data (Instagram and
+    /// Facebook embed "taken_at" / "publish_time"), the date spelled out in a preview text ("am 1.
+    /// Oktober 2026", "on October 1, 2026"), a &lt;time datetime&gt;, and only then og:updated_time —
+    /// which is when the page last changed, not when it was written. Public for testing.</summary>
+    public static DateTime? FindDate(string html, string desc, Func<string[], string?> meta)
+    {
+        if (ParseDate(meta(new[] { "article:published_time", "og:published_time", "datepublished", "publish_date", "date" })) is { } d1) return d1;
+
+        var ld = Regex.Match(html, "\"(?:datePublished|uploadDate|dateCreated)\"\\s*:\\s*\"([^\"]+)\"");
+        if (ld.Success && ParseDate(ld.Groups[1].Value) is { } d2) return d2;
+
+        var ts = Regex.Match(html, "\"(?:taken_at_timestamp|taken_at|publish_time|creation_time|created_time)\"\\s*:\\s*(\\d{10})\\b");
+        if (ts.Success && long.TryParse(ts.Groups[1].Value, out var unix))
+        {
+            var d3 = DateTimeOffset.FromUnixTimeSeconds(unix).UtcDateTime;
+            // A number that is not a plausible post date (before Instagram existed, or in the future) is
+            // something else that happens to have ten digits.
+            if (d3.Year >= 2005 && d3 <= DateTime.UtcNow.AddDays(1)) return d3;
+        }
+
+        var text = (desc ?? "").ToLowerInvariant();
+        var de = Regex.Match(text, @"(\d{1,2})\.\s*(" + string.Join("|", MonthsDe) + @")\s+(\d{4})");
+        if (de.Success && Day(de.Groups[3].Value, Array.IndexOf(MonthsDe, de.Groups[2].Value) + 1, de.Groups[1].Value) is { } d5) return d5;
+        var en = Regex.Match(text, @"(" + string.Join("|", MonthsEn) + @")\s+(\d{1,2}),\s*(\d{4})");
+        if (en.Success && Day(en.Groups[3].Value, Array.IndexOf(MonthsEn, en.Groups[1].Value) + 1, en.Groups[2].Value) is { } d6) return d6;
+
+        var time = Regex.Match(html, "<time\\b[^>]*\\bdatetime\\s*=\\s*[\"']([^\"']+)[\"']", RegexOptions.IgnoreCase);
+        if (time.Success && ParseDate(time.Groups[1].Value) is { } d4) return d4;
+
+        return ParseDate(meta(new[] { "og:updated_time" }));
+
+        // Noon UTC: a date without a time must not slide to the previous day in any time zone.
+        static DateTime? Day(string y, int m, string d) =>
+            int.TryParse(y, out var yy) && int.TryParse(d, out var dd) && m is >= 1 and <= 12 && dd >= 1 && dd <= DateTime.DaysInMonth(yy, m)
+                ? new DateTime(yy, m, dd, 12, 0, 0, DateTimeKind.Utc) : null;
     }
 
     // ---- text → title / teaser / body ------------------------------------------------------------

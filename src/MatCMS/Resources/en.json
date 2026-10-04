@@ -1220,7 +1220,7 @@
   "posts.import.button": "Take over",
   "posts.import.hint": "Instagram, Facebook or any other page: paste the link and take it over – text, images, date and source land in the form below. The images are copied into the media library. Nothing is saved until you click “Save”.",
   "posts.import.busy": "Taking over …",
-  "posts.import.done": "Taken over via {0}: {1} images. Please check and save.",
+  "posts.import.done": "Taken over via {0} – images: {1}. Please check and save.",
   "posts.import.overwrite": "Title, teaser or text are already filled in. Overwrite them with the content from the link? (Images and source are added either way.)",
   "posts.import.failed": "The link could not be taken over.",
   "posts.gallery": "Gallery",

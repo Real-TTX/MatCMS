@@ -114,6 +114,15 @@
     {
         <meta name="description" content="@metaDescription" />
     }
+    @* Preview data a page sets for itself (a blog post: og:* + article:published_time), so a shared
+       link shows title, image and date — and "Beitrag aus Link" can read them from another MatCMS. *@
+    @if (ViewData["HeadMeta"] is IEnumerable<KeyValuePair<string, string>> headMeta)
+    {
+        foreach (var hm in headMeta)
+        {
+            <meta property="@hm.Key" content="@hm.Value" />
+        }
+    }
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="@fontsHref" rel="stylesheet" />

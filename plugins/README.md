@@ -28,8 +28,9 @@ Store der Cloud oder einen Bundle-Import.
 - **Nie den Key eines Plugins wiederverwenden, das auf Instanzen schon anders existiert.**
 - Plugin-Daten in `SiteSettings` werden von **jedem Restore ersetzt** — vor einem Live-Restore die
   Live-Daten in den Build übernehmen.
-- Neu per Restore/Store/Import angekommen = **deaktiviert**; ein Restore mit neuerem Code startet das
-  Plugin nicht neu (aus- und wieder einschalten).
+- Per **Store oder Bundle-Import** angekommen = **deaktiviert** (Code von außen, erst prüfen). Ein
+  **Restore** stellt den Zustand aus dem Backup wieder her (an/aus) und startet die Plugins neu — ab
+  MatCMS mit Commit „Restore stellt Plugins vollständig wieder her“; ältere Instanzen: neu = aus.
 - MatCMS läuft mit `InvariantGlobalization`: deutsche Zahlen/Monate von Hand formatieren.
 - Block-CSS über `AddHeadHtml` kommt im `<head>` nach dem Template-CSS — Templates überschreiben mit
   höherer Spezifität (`body .x{…}`).

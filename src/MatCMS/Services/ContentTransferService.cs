@@ -16,7 +16,7 @@ namespace MatCMS.Services;
 /// <c>plugin-assets/{key}/</c> folder per plugin with the files uploaded into that plugin.
 /// Admin users (incl. password hashes) are an OPT-IN section (off by default) — sensitive, meant for
 /// full migrations; on restore they UPSERT by username so the current admin can't be locked out.
-/// Plugins UPSERT by <c>Key</c> and a newly created one comes back DISABLED (see the import below).
+/// Plugins UPSERT by <c>Key</c> and come back switched on or off exactly as in the backup (see the import below).
 /// On restore, only the sections present are replaced; missing sections/assets are left untouched.
 /// Legacy plain-JSON backups are also accepted.
 /// </summary>
@@ -26,11 +26,13 @@ public class ContentTransferService
 
     private readonly AppDbContext _db;
     private readonly IWebHostEnvironment _env;
+    private readonly PluginRunner _plugins;
 
-    public ContentTransferService(AppDbContext db, IWebHostEnvironment env)
+    public ContentTransferService(AppDbContext db, IWebHostEnvironment env, PluginRunner plugins)
     {
         _db = db;
         _env = env;
+        _plugins = plugins;
     }
 
     private static readonly JsonSerializerOptions WriteOpts = new()
@@ -959,15 +961,19 @@ public class ContentTransferService
         // be authored on the site itself, and wiping the ones a backup happens not to carry would destroy
         // exactly the work this section was added to protect.
         //
-        // A plugin that is NEW here comes back DISABLED. Plugin code runs server-side, and a restore is
-        // not a review — the same rule the cloud rollout follows ("imported plugins stay disabled"). An
-        // EXISTING plugin keeps whatever state it has: it was already reviewed and switched on here, and
-        // a nightly restore that silently turned the site's plugins off would be its own outage.
+        // A restore restores the site AS IT WAS — including whether each plugin was switched on. It used
+        // to land every new plugin disabled and leave existing ones as they were, which made a restore
+        // anything but a restore: a site rebuilt from its own backup came back with its reviews block
+        // or its booking form missing until somebody found the switch. Whoever may restore may already
+        // replace every page, user-visible script and template of the site, so the switch is no extra
+        // privilege on top. Bundle imports and the cloud rollout are a different matter (code arriving
+        // from outside) and still land disabled. A backup that does not say (no "Enabled" field) keeps
+        // the old behaviour: new = off, existing = unchanged.
         if (dto.Plugins is not null)
         {
             var existingPlugins = await _db.Plugins.ToListAsync();
             var n = 0;
-            var disabled = 0;
+            var enabled = 0;
             foreach (var p in dto.Plugins)
             {
                 var key = (p.Key ?? "").Trim();
@@ -978,8 +984,9 @@ public class ContentTransferService
                     row = new Plugin { Key = key, Enabled = false, CreatedAt = p.CreatedAt == default ? DateTime.UtcNow : p.CreatedAt };
                     _db.Plugins.Add(row);
                     existingPlugins.Add(row);   // same key twice in one backup updates one row, no duplicate insert
-                    disabled++;
                 }
+                if (p.Enabled is bool on) row.Enabled = on;
+                if (row.Enabled) enabled++;
                 row.Name = string.IsNullOrWhiteSpace(p.Name) ? key : p.Name!;
                 row.Description = p.Description ?? "";
                 row.Version = p.Version ?? "";
@@ -994,7 +1001,7 @@ public class ContentTransferService
                 n++;
             }
             await _db.SaveChangesAsync();
-            summary.Add(disabled > 0 ? $"{n} Plugins ({disabled} deaktiviert)" : $"{n} Plugins");
+            summary.Add($"{n} Plugins ({enabled} aktiv)");
         }
 
         // Users: UPSERT by username (never a replace-all) so the current admin can't be locked out.
@@ -1038,6 +1045,13 @@ public class ContentTransferService
         }
 
         await tx.CommitAsync();
+
+        // The plugin registry is filled by RUNNING the plugins, not read from the table. Without a
+        // re-run the site kept serving the code from before the restore — and a plugin the backup
+        // switched on stayed absent — until the next restart or plugin save.
+        if (dto.Plugins is not null)
+            await _plugins.RunAllAsync();
+
         return summary.Count == 0 ? "Nichts importiert" : string.Join(", ", summary) + " wiederhergestellt";
     }
 
@@ -1246,9 +1260,9 @@ public class ContentTransferService
         /// Bestand gelesen — siehe <see cref="MatCMS.Services.PluginMapping"/>.</summary>
         public string? MappingJson { get; set; }
         public string? ConfigJson { get; set; }
-        /// <summary>State at the time of the backup. Recorded for the record only — the import never
-        /// applies it (a new plugin lands disabled, an existing one keeps its own state).</summary>
-        public bool Enabled { get; set; }
+        /// <summary>State at the time of the backup — restored as it was. Nullable on purpose: a file
+        /// without the field (hand-built) says nothing, and must not read as "off".</summary>
+        public bool? Enabled { get; set; }
         public DateTime CreatedAt { get; set; }
     }
 

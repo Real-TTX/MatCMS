@@ -1,0 +1,15 @@
+{
+  "Key": "google-reviews",
+  "Name": "Google Bewertungen",
+  "Version": "1.3",
+  "Description": "Zeigt Google-Rezensionen als Block – in drei Modi: manuell (ohne Key), Google-Embed (kostenloser Key) oder Places-API (Key + Billing). Einstellungen unter „Google Bewertungen\".",
+  "DefaultConfig": {
+    "mode": "manual",
+    "placeId": "",
+    "apiKey": "",
+    "embedKey": "",
+    "maxReviews": "6",
+    "minRating": "0",
+    "refreshHours": "12"
+  }
+}

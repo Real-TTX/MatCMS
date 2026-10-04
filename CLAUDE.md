@@ -108,7 +108,15 @@ src/MatCMS.Shared/               # the cloud↔instance contract, referenced by 
 src/MatCMS.Shared.Web/           # the shared admin shell (RCL): css, admin-list.js, vendor libs
 src/MatCMS/                      # each app keeps its own Dockerfile, compose,
 src/MatCMS.Cloud/                #   run-*.ps1, VERSION and appdata/ volume
+plugins/                         # plugin SOURCES (plugin.csx + meta.json each) + pack.ps1 → store bundle
 ```
+
+**MatCMS ships no plugins.** The seeder used to create three (a todo demo, Bewertungen, Google
+Bewertungen) and re-wrote the two review plugins' code on every start — a site could never keep its own
+fix to one, and an improved version under the same key was silently reverted by the next restart. Their
+sources now live in `plugins/` (see its README) and reach a site through the cloud's store or a bundle
+import; rows already on existing instances are left untouched. Do not add a plugin back into the
+seeder. `plugins/` is not in any workflow's `paths:` — it is not compiled into an image.
 
 `docker compose up -d --build` inside either app folder still works — but the **build context is the
 repo root** (`context: ../..` + `dockerfile: src/<app>/Dockerfile`), because the image needs the two

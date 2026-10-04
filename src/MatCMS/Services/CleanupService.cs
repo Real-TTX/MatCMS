@@ -182,8 +182,8 @@ public class CleanupService
         { Add(c.TemplateHtml); Add(c.FieldsJson); }
 
         foreach (var p in await _db.Posts.AsNoTracking()
-            .Select(p => new { p.TitleImage, p.ContentHtml, p.Excerpt, p.AttachmentsJson }).ToListAsync(ct))
-        { Add(p.TitleImage); Add(p.ContentHtml); Add(p.Excerpt); Add(p.AttachmentsJson); }
+            .Select(p => new { p.TitleImage, p.ContentHtml, p.Excerpt, p.AttachmentsJson, p.GalleryJson }).ToListAsync(ct))
+        { Add(p.TitleImage); Add(p.ContentHtml); Add(p.Excerpt); Add(p.AttachmentsJson); Add(p.GalleryJson); }
 
         foreach (var v in await _db.SiteSettings.AsNoTracking().Select(s => s.Value).ToListAsync(ct)) Add(v);
         foreach (var u in await _db.MenuItems.AsNoTracking().Select(m => m.Url).ToListAsync(ct)) Add(u);

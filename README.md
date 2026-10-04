@@ -31,6 +31,10 @@ side by side and can be watched and updated centrally from the [cloud control pl
   design, form, embed, plugin and custom blocks
 - **Nested blocks** (columns, sections, card grids with child elements)
 - **Posts/blog**, menus, a media library and reusable **components**
+- **Post from a link** — paste an Instagram, Facebook or any other link in the post editor: text,
+  date, source and every image (1:N, e.g. a carousel, shown as swipe gallery or grid) are taken over once
+  and the images copied into the media library. Full Instagram/Facebook posts need the site's own Meta
+  token (Settings → Social Media); without it the public preview data is used.
 
 **Templates & design**
 - **Templates** per page type (header/footer/layout parts), maintained in one place

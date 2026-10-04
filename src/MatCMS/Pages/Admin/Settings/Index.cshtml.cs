@@ -84,7 +84,7 @@ public class IndexModel : PageModel
         SmtpConfigured = !string.IsNullOrWhiteSpace(
             (await _db.SiteSettings.AsNoTracking().FirstOrDefaultAsync(x => x.Key == SettingKeys.SmtpHost))?.Value);
         var existing = await _db.SiteSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
-        foreach (var key in SettingKeys.All.Concat(SettingKeys.Smtp).Concat(SettingKeys.Errors).Concat(SettingKeys.Code).Concat(SettingKeys.Maintenance).Concat(SettingKeys.Translate).Concat(SettingKeys.Security).Concat(SettingKeys.Logs))
+        foreach (var key in SettingKeys.All.Concat(SettingKeys.Smtp).Concat(SettingKeys.Errors).Concat(SettingKeys.Code).Concat(SettingKeys.Maintenance).Concat(SettingKeys.Translate).Concat(SettingKeys.Security).Concat(SettingKeys.Logs).Concat(SettingKeys.Social))
             Values[key] = existing.TryGetValue(key, out var v) ? v : "";
         CurrentActive = Localizer.ParseActive(existing.TryGetValue(SettingKeys.Languages, out var lv) ? lv : "")
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -339,6 +339,41 @@ public class IndexModel : PageModel
                 : $"Test fehlgeschlagen: {error}";
         }
         return RedirectToPage(new { tab = "smtp" });
+    }
+
+    /// <summary>Social Media tab: which access tokens are stored. The tokens themselves are never
+    /// rendered back (like the cloud token) — a field left empty keeps the stored one.</summary>
+    public bool HasInstagramToken => !string.IsNullOrWhiteSpace(Values.GetValueOrDefault(SettingKeys.SocialInstagramToken));
+    public bool HasFacebookToken => !string.IsNullOrWhiteSpace(Values.GetValueOrDefault(SettingKeys.SocialFacebookToken));
+
+    public async Task<IActionResult> OnPostSocialAsync(string? instagramToken, string? facebookToken, bool removeInstagram, bool removeFacebook)
+    {
+        async Task Put(string key, string? fresh, bool remove)
+        {
+            var row = await _db.SiteSettings.FirstOrDefaultAsync(s => s.Key == key);
+            var value = remove ? "" : (fresh ?? "").Trim();
+            if (!remove && value.Length == 0) return;   // empty field = keep what is stored
+            if (row is null) _db.SiteSettings.Add(new SiteSetting { Key = key, Value = value });
+            else row.Value = value;
+            // A new or removed Instagram token starts its refresh clock afresh.
+            if (key == SettingKeys.SocialInstagramToken)
+            {
+                var at = await _db.SiteSettings.FirstOrDefaultAsync(s => s.Key == SettingKeys.SocialInstagramRefreshedAt);
+                if (at is not null) _db.SiteSettings.Remove(at);
+            }
+        }
+        await Put(SettingKeys.SocialInstagramToken, instagramToken, removeInstagram);
+        await Put(SettingKeys.SocialFacebookToken, facebookToken, removeFacebook);
+        await _db.SaveChangesAsync();
+        TempData["Flash"] = "Social-Media-Zugang gespeichert.";
+        return RedirectToPage(new { tab = "social" });
+    }
+
+    public async Task<IActionResult> OnPostSocialTestAsync(string platform, [FromServices] PostImportService import)
+    {
+        var (ok, message) = await import.TestAsync(platform == "facebook" ? "facebook" : "instagram", HttpContext.RequestAborted);
+        TempData[ok ? "Flash" : "FlashError"] = message;
+        return RedirectToPage(new { tab = "social" });
     }
 
     private async Task SaveKeysAsync(IEnumerable<string> keys)

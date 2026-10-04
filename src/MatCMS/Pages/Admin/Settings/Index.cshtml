@@ -18,6 +18,7 @@
     <button type="button" class="tab" data-tab="code">@T["settings.tabCode"]</button>
     <button type="button" class="tab" data-tab="maintenance">@T["settings.maint.tab"]</button>
     <button type="button" class="tab" data-tab="languages">@T["settings.tabLanguages"]</button>
+    <button type="button" class="tab" data-tab="social">@T["settings.tabSocial"]</button>
     <button type="button" class="tab" data-tab="cloud">@T["settings.tabCloud"]</button>
 </div>
 
@@ -579,6 +580,51 @@
             </div>
 
             <div><button type="submit" class="btn">@T["action.save"]</button></div>
+        </div>
+    </form>
+</div>
+
+@* ============ SOCIAL MEDIA (Beitrag aus Link) ============ *@
+<div class="tab-panel" data-panel="social" hidden>
+    <form method="post" asp-page-handler="Social">
+        <div class="card">
+            <h2>@T["settings.social.heading"]</h2>
+            <p class="muted">@T["settings.social.intro"]</p>
+            <div class="form-grid">
+                <div class="form-field">
+                    <label>@T["settings.social.instagram"]
+                        <span class="badge @(Model.HasInstagramToken ? "badge-on" : "badge-off")">@(Model.HasInstagramToken ? T["settings.social.stored"] : T["settings.social.none"])</span></label>
+                    <input type="password" name="instagramToken" autocomplete="new-password" spellcheck="false"
+                           placeholder="@(Model.HasInstagramToken ? T["settings.social.replace"] : "IGAA…")" />
+                    <div class="help">@T["settings.social.instagramHelp"]</div>
+                    @if (Model.HasInstagramToken)
+                    {
+                        <label class="checkbox-row"><input type="checkbox" name="removeInstagram" value="true" /> @T["settings.social.remove"]</label>
+                    }
+                </div>
+                <div class="form-field">
+                    <label>@T["settings.social.facebook"]
+                        <span class="badge @(Model.HasFacebookToken ? "badge-on" : "badge-off")">@(Model.HasFacebookToken ? T["settings.social.stored"] : T["settings.social.none"])</span></label>
+                    <input type="password" name="facebookToken" autocomplete="new-password" spellcheck="false"
+                           placeholder="@(Model.HasFacebookToken ? T["settings.social.replace"] : "EAA…")" />
+                    <div class="help">@T["settings.social.facebookHelp"]</div>
+                    @if (Model.HasFacebookToken)
+                    {
+                        <label class="checkbox-row"><input type="checkbox" name="removeFacebook" value="true" /> @T["settings.social.remove"]</label>
+                    }
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn">@T["action.save"]</button>
+                @if (Model.HasInstagramToken)
+                {
+                    <button type="submit" class="btn btn-ghost" formaction="@Url.Page(null, "SocialTest", new { platform = "instagram" })">@T["settings.social.testInstagram"]</button>
+                }
+                @if (Model.HasFacebookToken)
+                {
+                    <button type="submit" class="btn btn-ghost" formaction="@Url.Page(null, "SocialTest", new { platform = "facebook" })">@T["settings.social.testFacebook"]</button>
+                }
+            </div>
         </div>
     </form>
 </div>

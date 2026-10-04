@@ -340,6 +340,7 @@ public class ContentTransferService
                 {
                     Title = p.Title, Slug = p.Slug, TitleImage = p.TitleImage, Excerpt = p.Excerpt,
                     ContentHtml = p.ContentHtml, Tags = p.Tags, AttachmentsJson = p.AttachmentsJson,
+                    GalleryJson = p.GalleryJson, GalleryLayout = p.GalleryLayout, SourceUrl = p.SourceUrl, SourceName = p.SourceName,
                     Locale = p.Locale, IsPublished = p.IsPublished,
                     PublishedAt = p.PublishedAt, CreatedAt = p.CreatedAt, UpdatedAt = p.UpdatedAt
                 }).ToList();
@@ -943,6 +944,10 @@ public class ContentTransferService
                     Title = p.Title ?? "", Slug = p.Slug!, TitleImage = p.TitleImage,
                     Excerpt = p.Excerpt ?? "", ContentHtml = p.ContentHtml ?? "", Tags = p.Tags ?? "",
                     AttachmentsJson = string.IsNullOrWhiteSpace(p.AttachmentsJson) ? "[]" : p.AttachmentsJson!,
+                    // Backups older than the gallery carry none of these four — they read as "no gallery, no source".
+                    GalleryJson = string.IsNullOrWhiteSpace(p.GalleryJson) ? "[]" : p.GalleryJson!,
+                    GalleryLayout = p.GalleryLayout == "grid" ? "grid" : "carousel",
+                    SourceUrl = p.SourceUrl, SourceName = p.SourceName,
                     Locale = string.IsNullOrWhiteSpace(p.Locale) ? "de" : p.Locale!,
                     IsPublished = p.IsPublished,
                     PublishedAt = p.PublishedAt == default ? DateTime.UtcNow : p.PublishedAt,
@@ -1275,6 +1280,10 @@ public class ContentTransferService
         public string? ContentHtml { get; set; }
         public string? Tags { get; set; }
         public string? AttachmentsJson { get; set; }
+        public string? GalleryJson { get; set; }
+        public string? GalleryLayout { get; set; }
+        public string? SourceUrl { get; set; }
+        public string? SourceName { get; set; }
         public string? Locale { get; set; }
         public bool IsPublished { get; set; }
         public DateTime PublishedAt { get; set; }

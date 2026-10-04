@@ -54,7 +54,7 @@ public static class TemplateSchema
     /// Built-in default layout for the blog detail page. Faithful to the original fixed markup, so a
     /// template that doesn't customise the part renders exactly as before. Available tokens:
     /// {{post_image}} {{post_date}} {{post_title}} {{post_excerpt}} {{post_body}} {{post_tags}}
-    /// {{post_attachments}}.
+    /// {{post_attachments}} {{post_gallery}} {{post_source}}.
     /// </summary>
     public const string DefaultPostPart =
         """
@@ -65,6 +65,8 @@ public static class TemplateSchema
             <h1 class="post-title">{{post_title}}</h1>
             {{post_excerpt}}
             <div class="rich post-body">{{post_body}}</div>
+            {{post_gallery}}
+            {{post_source}}
             {{post_attachments}}
           </div>
         </article>

@@ -95,7 +95,7 @@
                         {
                             <a href="/blog/@p.Slug" class="blog-post__imglink"><div class="blog-post__img" style="background-image:url('@img')"></div></a>
                         }
-                        <p class="blog-post__meta">@p.PublishedAt.ToLocalTime().ToString("dd. MMMM yyyy")</p>
+                        <p class="blog-post__meta">@MatCMS.Content.GermanDate.Long(p.PublishedAt.ToLocalTime())</p>
                         <h2 class="blog-post__title"><a href="/blog/@p.Slug">@p.Title</a></h2>
                         @if (!string.IsNullOrWhiteSpace(p.Tags))
                         {

@@ -26,6 +26,19 @@ public class Post
     /// <summary>Optional attachments (images/files) as a JSON array of {url,name}.</summary>
     public string AttachmentsJson { get; set; } = "[]";
 
+    /// <summary>Images shown as a gallery in the post (1:N, e.g. an Instagram carousel), as a JSON array
+    /// of {url,alt}. Separate from <see cref="AttachmentsJson"/>, which is a download list.</summary>
+    public string GalleryJson { get; set; } = "[]";
+
+    /// <summary>How the gallery is shown: "carousel" (swipe, like Instagram) or "grid".</summary>
+    public string GalleryLayout { get; set; } = "carousel";
+
+    /// <summary>Where the post was taken from (e.g. the Instagram post), shown as "Quelle: …". Optional.</summary>
+    public string? SourceUrl { get; set; }
+
+    /// <summary>Label for <see cref="SourceUrl"/>, e.g. "Instagram · @name". Empty = the host name.</summary>
+    public string? SourceName { get; set; }
+
     /// <summary>Content locale (matches the page locale scheme).</summary>
     public string Locale { get; set; } = "de";
 

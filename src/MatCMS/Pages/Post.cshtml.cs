@@ -13,6 +13,7 @@ public class PostModel : PageModel
 
     public Post Current { get; private set; } = default!;
     public List<(string Url, string Name, bool IsImage)> Attachments { get; } = new();
+    public List<(string Url, string Alt)> Gallery { get; } = new();
 
     public async Task<IActionResult> OnGetAsync(string slug)
     {
@@ -42,6 +43,19 @@ public class PostModel : PageModel
             }
         }
         catch { /* ignore malformed attachments */ }
+
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(
+                string.IsNullOrWhiteSpace(post.GalleryJson) ? "[]" : post.GalleryJson);
+            foreach (var el in doc.RootElement.EnumerateArray())
+            {
+                var url = el.TryGetProperty("url", out var u) ? u.GetString() : null;
+                if (string.IsNullOrWhiteSpace(url)) continue;
+                Gallery.Add((url!, el.TryGetProperty("alt", out var a) ? a.GetString() ?? "" : ""));
+            }
+        }
+        catch { /* ignore a malformed gallery */ }
 
         return Page();
     }

@@ -12,10 +12,12 @@ public class EditModel : PageModel
 {
     private readonly AppDbContext _db;
     private readonly AiService _ai;
-    public EditModel(AppDbContext db, AiService ai)
+    private readonly PostImportService _import;
+    public EditModel(AppDbContext db, AiService ai, PostImportService import)
     {
         _db = db;
         _ai = ai;
+        _import = import;
     }
 
     public int PostId { get; private set; }
@@ -42,6 +44,10 @@ public class EditModel : PageModel
         public string ContentHtml { get; set; } = "";
         public string Tags { get; set; } = "";
         public string AttachmentsJson { get; set; } = "[]";
+        public string GalleryJson { get; set; } = "[]";
+        public string GalleryLayout { get; set; } = "carousel";
+        public string? SourceUrl { get; set; }
+        public string? SourceName { get; set; }
         public bool IsPublished { get; set; }
         public string PublishedAt { get; set; } = "";  // yyyy-MM-dd
     }
@@ -63,6 +69,9 @@ public class EditModel : PageModel
             Title = p.Title, Slug = p.Slug, TitleImage = p.TitleImage, Excerpt = p.Excerpt,
             ContentHtml = p.ContentHtml, Tags = p.Tags,
             AttachmentsJson = string.IsNullOrWhiteSpace(p.AttachmentsJson) ? "[]" : p.AttachmentsJson,
+            GalleryJson = string.IsNullOrWhiteSpace(p.GalleryJson) ? "[]" : p.GalleryJson,
+            GalleryLayout = p.GalleryLayout == "grid" ? "grid" : "carousel",
+            SourceUrl = p.SourceUrl, SourceName = p.SourceName,
             IsPublished = p.IsPublished, PublishedAt = p.PublishedAt.ToString("yyyy-MM-dd")
         };
         return Page();
@@ -100,6 +109,11 @@ public class EditModel : PageModel
         p.ContentHtml = Input.ContentHtml ?? "";
         p.Tags = MatCMS.Content.TagUtil.Normalize(Input.Tags);
         p.AttachmentsJson = string.IsNullOrWhiteSpace(Input.AttachmentsJson) ? "[]" : Input.AttachmentsJson;
+        p.GalleryJson = CleanGallery(Input.GalleryJson);
+        p.GalleryLayout = Input.GalleryLayout == "grid" ? "grid" : "carousel";
+        // Only an http(s) link is a source; anything else (javascript:, a typo) is dropped, not stored.
+        p.SourceUrl = PostImportService.NormalizeUrl(Input.SourceUrl);
+        p.SourceName = p.SourceUrl is null || string.IsNullOrWhiteSpace(Input.SourceName) ? null : Input.SourceName.Trim();
         p.IsPublished = Input.IsPublished;
         p.Locale = "de";
         p.PublishedAt = DateTime.TryParse(Input.PublishedAt, out var d)
@@ -137,6 +151,40 @@ public class EditModel : PageModel
         return proposed.Length == 0
             ? new JsonResult(new { ok = false, error = "Die KI hatte keinen Vorschlag." })
             : new JsonResult(new { ok = true, proposed });
+    }
+
+    /// <summary>"Aus Link übernehmen": reads the post behind a link once and hands the editor its
+    /// fields. Nothing is saved here — the images are already in the media library, everything else
+    /// arrives in the form and is saved (or changed, or dropped) with the normal save.</summary>
+    public async Task<IActionResult> OnPostImportLinkAsync(string? url)
+    {
+        var r = await _import.ImportAsync(url, HttpContext.RequestAborted);
+        return new JsonResult(new
+        {
+            ok = r.Ok, error = r.Error, title = r.Title, excerpt = r.Excerpt, html = r.Html,
+            date = r.PublishedAt?.ToString("yyyy-MM-dd"), sourceUrl = r.SourceUrl, sourceName = r.SourceName,
+            images = r.Images, notes = r.Notes, via = r.Via
+        });
+    }
+
+    /// <summary>Keeps only well-formed gallery entries pointing at a local or http(s) image.</summary>
+    private static string CleanGallery(string? json)
+    {
+        var list = new List<object>();
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(string.IsNullOrWhiteSpace(json) ? "[]" : json);
+            foreach (var el in doc.RootElement.EnumerateArray())
+            {
+                var u = el.TryGetProperty("url", out var uv) ? uv.GetString() ?? "" : "";
+                if (!(u.StartsWith('/') || u.StartsWith("https://") || u.StartsWith("http://"))
+                    || u.IndexOfAny(new[] { '"', '\'', '<', '>' }) >= 0) continue;
+                var alt = el.TryGetProperty("alt", out var av) ? av.GetString() ?? "" : "";
+                list.Add(new { url = u, alt });
+            }
+        }
+        catch { /* malformed → empty gallery */ }
+        return System.Text.Json.JsonSerializer.Serialize(list);
     }
 
     private static string StripHtml(string s) =>

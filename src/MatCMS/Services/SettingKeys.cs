@@ -203,6 +203,18 @@ public static class SettingKeys
     /// <summary>Machine-translation keys (managed on the Settings → Sprachen tab).</summary>
     public static readonly string[] Translate = [TranslateProvider, TranslateApiKey, TranslateUrl];
 
+    // "Beitrag aus Link": access to the site's OWN Instagram / Facebook accounts through Meta's API, so
+    // a post can be taken over completely (full caption, every carousel image). Without them the import
+    // falls back to the public preview data, which Meta mostly withholds. Per site, never rolled out —
+    // a token names one account. The Instagram token is long-lived (60 days) and is refreshed by the
+    // import itself; RefreshedAt records when, so it is not refreshed on every call.
+    public const string SocialInstagramToken = "social.instagram.token";
+    public const string SocialInstagramRefreshedAt = "social.instagram.refreshedAt";
+    public const string SocialFacebookToken = "social.facebook.token";
+
+    /// <summary>Social access keys edited on Settings → Social Media (RefreshedAt is written by the import).</summary>
+    public static readonly string[] Social = [SocialInstagramToken, SocialFacebookToken];
+
     /// <summary>MatCMS.Cloud link keys (managed on the Settings → Cloud tab). Deliberately NOT part
     /// of any generic save path — the token needs encrypting, so CloudService owns these. Also the
     /// deny-list for pushed settings: a profile must never be able to rewrite the cloud link.</summary>

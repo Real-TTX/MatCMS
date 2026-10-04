@@ -201,6 +201,15 @@ builder.Services.AddScoped<StatsService>();
 builder.Services.AddScoped<AttentionService>();
 builder.Services.AddHostedService<StatsFlushService>();
 builder.Services.AddHttpClient();
+// "Beitrag aus Link": its own client, because the URL comes from a person — the handler refuses
+// internal addresses at connect time (see PostImportService.CreateHandler).
+builder.Services.AddHttpClient(PostImportService.HttpClientName, c =>
+{
+    c.Timeout = TimeSpan.FromSeconds(25);
+    c.DefaultRequestHeaders.UserAgent.ParseAdd("MatCMS-Import/1.0 (+https://github.com/real-ttx/matcms)");
+    c.DefaultRequestHeaders.AcceptLanguage.ParseAdd("de-DE,de;q=0.9,en;q=0.6");
+}).ConfigurePrimaryHttpMessageHandler(PostImportService.CreateHandler);
+builder.Services.AddScoped<PostImportService>();
 // Stateless apart from the file cache it manages, so one instance for the whole app.
 builder.Services.AddSingleton<ThumbnailService>();
 builder.Services.AddScoped<VersionService>();

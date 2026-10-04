@@ -13,6 +13,22 @@
 <form method="post" asp-route-id="@Model.PostId" id="post-form" class="form-grid" style="max-width:860px;">
     <div asp-validation-summary="All" class="alert alert-error" style="display:@(ViewData.ModelState.IsValid ? "none" : "block")"></div>
 
+    @* Aus Link übernehmen: liest einen Beitrag (Instagram, Facebook, jede Seite mit Vorschau-Daten)
+       EINMAL und füllt die Felder darunter. Gespeichert wird erst mit "Speichern" — bis dahin ist
+       alles änderbar. Die Bilder liegen danach schon in der Mediathek (Tag "import"). *@
+    <div class="card post-import" id="pi-box"
+         data-url="@Url.Page(null, "ImportLink", new { id = Model.PostId })"
+         data-busy="@T["posts.import.busy"]" data-done="@T["posts.import.done"]"
+         data-overwrite="@T["posts.import.overwrite"]" data-failed="@T["posts.import.failed"]">
+        <label for="pi-url">@T["posts.import.heading"]</label>
+        <div class="post-import__row">
+            <input type="url" id="pi-url" placeholder="@T["posts.import.placeholder"]" inputmode="url" autocomplete="off" />
+            <button type="button" class="btn" id="pi-go">@T["posts.import.button"]</button>
+        </div>
+        <div class="help">@T["posts.import.hint"]</div>
+        <div id="pi-status" class="post-import__status" role="status" hidden></div>
+    </div>
+
     <div class="field">
         <label>@T["posts.heading"]</label>
         <input asp-for="Input.Title" placeholder="@T["posts.headingPlaceholder"]" required />
@@ -34,6 +50,21 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <div class="field">
+        <label>@T["posts.gallery"] <span class="muted">@T["posts.galleryHint"]</span></label>
+        <div id="gal-list" class="gal-list"></div>
+        <div class="gal-actions">
+            <button type="button" class="btn btn-ghost btn-sm" id="gal-add">@T["posts.galleryAdd"]</button>
+            <label class="gal-layout">@T["posts.galleryLayout"]
+                <select asp-for="Input.GalleryLayout">
+                    <option value="carousel">@T["posts.galleryCarousel"]</option>
+                    <option value="grid">@T["posts.galleryGrid"]</option>
+                </select>
+            </label>
+        </div>
+        <input type="hidden" asp-for="Input.GalleryJson" id="gal-json" />
     </div>
 
     <div class="field">
@@ -103,6 +134,14 @@
         <input type="date" asp-for="Input.PublishedAt" />
     </div>
 
+    <div class="field">
+        <label>@T["posts.source"] <span class="muted">@T["posts.sourceHint"]</span></label>
+        <div class="src-row">
+            <input asp-for="Input.SourceUrl" id="src-url" type="url" placeholder="https://www.instagram.com/p/…" />
+            <input asp-for="Input.SourceName" id="src-name" placeholder="@T["posts.sourceNamePlaceholder"]" />
+        </div>
+    </div>
+
     @* Speichern, Ansehen, Zurück — dieselbe Ordnung wie in Plugins/Edit. "Ansehen" stand oben in
        der Kopfzeile und war damit von dem Knopf getrennt, der den Beitrag erst speichert; das
        "Abbrechen" hier unten führte ohnehin schon zur Liste und heißt jetzt wie überall "Zurück".
@@ -131,6 +170,22 @@
         .att-chip { display:inline-flex; align-items:center; gap:6px; background:var(--bg-alt,#f1efe9); border:1px solid #e2d6c3; border-radius:8px; padding:6px 10px; font-size:13px; }
         .att-chip a { text-decoration:none; color:var(--accent,#b23a2e); }
         .att-chip button { border:0; background:none; cursor:pointer; color:#a00; font-weight:700; }
+        .post-import { margin:0; }
+        .post-import__row { display:flex; gap:8px; }
+        .post-import__row input { flex:1; min-width:0; }
+        .post-import__status { margin-top:10px; font-size:14px; }
+        .post-import__status.is-error { color:#a3271c; }
+        .post-import__status ul { margin:6px 0 0; padding-left:18px; color:var(--muted,#6b6257); }
+        .gal-list { display:flex; flex-wrap:wrap; gap:10px; }
+        .gal-item { position:relative; width:112px; }
+        .gal-item img { width:112px; height:112px; object-fit:cover; border-radius:8px; display:block; border:1px solid var(--line,#ddd); }
+        .gal-item .gal-tools { display:flex; justify-content:space-between; margin-top:4px; }
+        .gal-item button { border:1px solid var(--line,#ddd); background:#fff; border-radius:6px; cursor:pointer; font-size:12px; padding:2px 7px; }
+        .gal-item .gal-first { position:absolute; left:6px; top:6px; background:rgba(0,0,0,.6); color:#fff; font-size:11px; padding:1px 6px; border-radius:4px; }
+        .gal-actions { display:flex; flex-wrap:wrap; align-items:center; gap:14px; margin-top:8px; }
+        .gal-layout { display:inline-flex; align-items:center; gap:8px; font-weight:400; margin:0; }
+        .src-row { display:grid; grid-template-columns:2fr 1fr; gap:8px; }
+        @@media (max-width:640px) { .post-import__row, .src-row { display:grid; grid-template-columns:1fr; } }
     </style>
     <script>
         (function () {
@@ -179,6 +234,92 @@
                 }, { multiple: true });
             });
             renderAtts();
+        })();
+
+        // ---- Gallery (1:N images) ----
+        window.MatPostGallery = (function () {
+            var json = document.getElementById('gal-json'), list = document.getElementById('gal-list');
+            var items = [];
+            try { items = JSON.parse(json.value || '[]') || []; } catch (e) { items = []; }
+            function btn(label, title, fn) {
+                var b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.title = title;
+                b.addEventListener('click', fn); return b;
+            }
+            function render() {
+                json.value = JSON.stringify(items);
+                list.innerHTML = '';
+                items.forEach(function (it, i) {
+                    var box = document.createElement('div'); box.className = 'gal-item';
+                    var img = document.createElement('img'); img.src = it.url; img.alt = it.alt || ''; img.loading = 'lazy';
+                    box.appendChild(img);
+                    if (i === 0) { var f = document.createElement('span'); f.className = 'gal-first'; f.textContent = '1'; box.appendChild(f); }
+                    var tools = document.createElement('div'); tools.className = 'gal-tools';
+                    tools.appendChild(btn('←', '@T["posts.galleryLeft"]', function () { if (i > 0) { items.splice(i - 1, 0, items.splice(i, 1)[0]); render(); } }));
+                    tools.appendChild(btn('×', '@T["posts.galleryRemove"]', function () { items.splice(i, 1); render(); }));
+                    tools.appendChild(btn('→', '@T["posts.galleryRight"]', function () { if (i < items.length - 1) { items.splice(i + 1, 0, items.splice(i, 1)[0]); render(); } }));
+                    box.appendChild(tools); list.appendChild(box);
+                });
+            }
+            document.getElementById('gal-add').addEventListener('click', function () {
+                if (!window.openMediaPicker) return;
+                window.openMediaPicker(function (urls) {
+                    (Array.isArray(urls) ? urls : [urls]).forEach(function (u) { if (u) items.push({ url: u, alt: '' }); });
+                    render();
+                }, { multiple: true });
+            });
+            render();
+            return {
+                count: function () { return items.length; },
+                add: function (urls, alt) { urls.forEach(function (u) { items.push({ url: u, alt: alt || '' }); }); render(); }
+            };
+        })();
+
+        // ---- Aus Link übernehmen ----
+        (function () {
+            var box = document.getElementById('pi-box'); if (!box) return;
+            var input = document.getElementById('pi-url'), go = document.getElementById('pi-go'), status = document.getElementById('pi-status');
+            var token = document.querySelector('#post-form input[name="__RequestVerificationToken"]');
+            function show(text, isError, notes) {
+                status.hidden = false; status.className = 'post-import__status' + (isError ? ' is-error' : '');
+                status.textContent = text;
+                if (notes && notes.length) {
+                    var ul = document.createElement('ul');
+                    notes.forEach(function (n) { var li = document.createElement('li'); li.textContent = n; ul.appendChild(li); });
+                    status.appendChild(ul);
+                }
+            }
+            function val(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; }
+            function set(id, v) { var el = document.getElementById(id); if (el && v != null) el.value = v; }
+            function run() {
+                var url = input.value.trim(); if (!url) { input.focus(); return; }
+                go.disabled = true; show(box.dataset.busy, false);
+                var fd = new FormData(); fd.append('url', url); if (token) fd.append('__RequestVerificationToken', token.value);
+                fetch(box.dataset.url, { method: 'POST', body: fd, credentials: 'same-origin' })
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) {
+                        if (!d.ok) { show(d.error || box.dataset.failed, true, d.notes); return; }
+                        var ed = document.getElementById('rt-editor');
+                        var filled = val('Input_Title') || val('Input_Excerpt') || (ed && ed.textContent.trim());
+                        var overwrite = !filled || window.confirm(box.dataset.overwrite);
+                        if (overwrite) {
+                            if (d.title) set('Input_Title', d.title);
+                            if (d.excerpt) set('Input_Excerpt', d.excerpt);
+                            if (d.html && ed) { ed.innerHTML = d.html; document.getElementById('rt-hidden').value = d.html; }
+                            if (d.date) set('Input_PublishedAt', d.date);
+                        }
+                        set('src-url', d.sourceUrl); set('src-name', d.sourceName);
+                        if (d.images && d.images.length) {
+                            var ti = document.getElementById('ti-url');
+                            if (ti && !ti.value) { ti.value = d.images[0]; ti.dispatchEvent(new Event('input')); }
+                            window.MatPostGallery.add(d.images, d.title);
+                        }
+                        show(box.dataset.done.replace('{0}', d.via).replace('{1}', (d.images || []).length), false, d.notes);
+                    })
+                    .catch(function () { show(box.dataset.failed, true); })
+                    .finally(function () { go.disabled = false; });
+            }
+            go.addEventListener('click', run);
+            input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); run(); } });
         })();
 
         // ---- Tag picker (chips + suggestions), syncs the hidden Input.Tags field ----

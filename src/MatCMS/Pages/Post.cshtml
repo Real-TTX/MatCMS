@@ -8,6 +8,38 @@
         (!string.IsNullOrWhiteSpace(s) && (s.StartsWith("/") || s.StartsWith("http")) && s.IndexOfAny(new[] { '"', '\'', '<', '>' }) < 0) ? s! : "";
     var titleImg = SafeImg(p.TitleImage);
 
+    // ---- Gallery (1:N images, e.g. an Instagram carousel). Rendered by the gallery BLOCK's own view,
+    //      so swiping, desktop arrows, the lightbox and thumbnails are the ones the rest of the site
+    //      uses — a second gallery implementation would only drift from the first. ----
+    var galleryHtml = "";
+    if (Model.Gallery.Count > 0)
+    {
+        var data = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            layout = p.GalleryLayout == "grid" ? "grid" : "carousel",
+            columns = Model.Gallery.Count >= 3 ? "3" : Model.Gallery.Count.ToString(),
+            carouselFit = "vary",
+            showFilter = "no",
+            images = Model.Gallery.Select(g => new { image = g.Url, alt = string.IsNullOrWhiteSpace(g.Alt) ? p.Title : g.Alt, caption = "" })
+        });
+        var part = await Html.PartialAsync("Blocks/_Gallery", new MatCMS.Content.BlockData(data));
+        using var sw = new System.IO.StringWriter();
+        part.WriteTo(sw, System.Text.Encodings.Web.HtmlEncoder.Default);
+        galleryHtml = "<div class=\"post-gallery\">" + sw + "</div>";
+        // The title image opening the gallery would be shown twice in a row — the gallery has it.
+        if (string.Equals(titleImg, Model.Gallery[0].Url, StringComparison.Ordinal)) titleImg = "";
+    }
+
+    var sourceHtml = "";
+    var srcUrl = SafeImg(p.SourceUrl);
+    if (srcUrl.StartsWith("http"))
+    {
+        var label = string.IsNullOrWhiteSpace(p.SourceName)
+            ? (Uri.TryCreate(srcUrl, UriKind.Absolute, out var su) ? su.Host.Replace("www.", "") : srcUrl)
+            : p.SourceName!;
+        sourceHtml = $"<p class=\"post-source\">{Enc(T["posts.sourceLabel"])}: <a href=\"{Enc(srcUrl)}\" target=\"_blank\" rel=\"noopener nofollow\">{Enc(label)} ↗</a></p>";
+    }
+
     // ---- Build the token values for the template's "post" layout part. Everything dynamic is
     //      HTML-encoded here; only the post body (trusted stored HTML) is inserted raw. ----
     var heroHtml = titleImg.Length > 0
@@ -46,17 +78,23 @@
     var tokens = new Dictionary<string, string>(StringComparer.Ordinal)
     {
         ["post_image"] = heroHtml,
-        ["post_date"] = Enc(p.PublishedAt.ToLocalTime().ToString("dd. MMMM yyyy")),
+        ["post_date"] = Enc(MatCMS.Content.GermanDate.Long(p.PublishedAt.ToLocalTime())),
         ["post_title"] = Enc(p.Title),
         ["post_excerpt"] = excerptHtml,
         ["post_body"] = p.ContentHtml ?? "",
         ["post_tags"] = tagsHtml,
         ["post_attachments"] = attHtml,
+        ["post_gallery"] = galleryHtml,
+        ["post_source"] = sourceHtml,
     };
 
     // The active template may override the blog-detail layout ("post" part); otherwise the built-in
     // default is used. Both go through the same token renderer, so output is identical when unset.
     var partHtml = MatCMS.Content.TemplateSchema.EffectivePart(Site.ActiveTemplate, MatCMS.Content.TemplateSchema.PartPost);
+    // A template whose post layout predates the gallery and the source has no place for them; they
+    // follow the body there instead of silently not appearing.
+    if (!partHtml.Contains("{{post_gallery}}")) tokens["post_body"] += galleryHtml;
+    if (!partHtml.Contains("{{post_source}}")) tokens["post_body"] += sourceHtml;
     var rendered = MatCMS.Content.TemplateSchema.RenderPost(partHtml, tokens);
 }
 @Html.Raw(rendered)
@@ -75,4 +113,11 @@
     .post-attachments { margin-top: 34px; border-top: 1px solid #e7ddce; padding-top: 20px; }
     .post-attachments .att-list { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 16px; }
     .post-attachments a { text-decoration: none; color: var(--accent); font-weight: 600; }
+    /* The gallery block brings its own section + container; inside a post it sits in the text column. */
+    .post-gallery { margin: 26px 0; }
+    .post-gallery .section { padding: 0; }
+    .post-gallery .container { padding: 0; max-width: none; }
+    .post-source { margin-top: 26px; font-size: 14px; opacity: .85; }
+    .post-source a { color: var(--accent); text-decoration: none; }
+    .post-source a:hover { text-decoration: underline; }
 </style>

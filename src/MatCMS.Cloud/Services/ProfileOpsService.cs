@@ -480,8 +480,11 @@ public sealed class ProfileOpsService
     {
         if (profileId is int pid && !await ExistsAsync(pid)) return NoProfile;
         inst.ProfileId = profileId;
-        // Force a re-pull even if revision numbers coincide (mirrors the admin assignment handler).
-        inst.ResyncRequestedAt = DateTime.UtcNow;
+        // Force a re-apply even if revision numbers coincide (mirrors the admin assignment handler):
+        // the instance compares only the number, so a reset on this side alone is overwritten by its
+        // next beat — it has to be TOLD, via ResyncRequested.
+        inst.AppliedRevision = 0;
+        inst.ResyncRequestedAt = profileId is null ? null : DateTime.UtcNow;
         inst.LastSyncError = null;
         _instances.Log(inst, InstanceEventKind.SyncApplied, "Profil über die API zugewiesen.");
         await _db.SaveChangesAsync();
@@ -495,10 +498,13 @@ public sealed class ProfileOpsService
         return Result.Done();
     }
 
-    /// <summary>There is no cloud-side apply — the instance is made to re-pull its configuration on its next beat.</summary>
+    /// <summary>There is no cloud-side apply — the instance is told on its next beat (ResyncRequested) to
+    /// forget what it applied and pull its configuration again. The same path as the Details button.</summary>
     public async Task<Result> ResyncAsync(Instance inst)
     {
-        inst.AppliedRevision = 0;
+        if (inst.ProfileId is null)
+            return Result.Done(new { ok = false, message = "Der Instanz ist kein Profil zugewiesen — es gibt nichts neu zu synchronisieren." });
+        inst.ResyncRequestedAt = DateTime.UtcNow;
         inst.LastSyncError = null;
         await _db.SaveChangesAsync();
         return Result.Done(new { ok = true, message = "Neu-Synchronisierung vorgemerkt — die Instanz zieht die Konfiguration beim nächsten Kontakt." });

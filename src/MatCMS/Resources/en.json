@@ -576,6 +576,7 @@
   "ev2.desktop": "Desktop",
   "ev2.tablet": "Tablet",
   "ev2.phone": "Phone",
+  "ev2.landscape": "Landscape",
   "ev2.settings": "Page settings",
   "ev2.settingsAdvanced": "Advanced (CSS, template parameters)",
   "ev2.settingsDirty": "Saving reloads the editor – unsaved changes to the blocks are lost. Use “Save” at the top right first.",

@@ -49,7 +49,9 @@
     <link rel="stylesheet" href="~/css/editor-v2.css" asp-append-version="true" />
     <link rel="icon" href="@Site.FaviconUrl" />
 </head>
-<body class="ev2" data-page-id="@p.Id"
+@* .admin: the back office's own scope — without it the slim admin buttons (.admin .btn) and every
+   other admin-scoped rule stay off, and the editor drifts away from the rest of the application. *@
+<body class="admin ev2" data-page-id="@p.Id"
       data-render-url="@Url.Page("Edit", "RenderPreview", new { id = p.Id })"
       data-save-url="@Url.Page("Edit", "SaveAll", new { id = p.Id })"
       data-meta-url="@Url.Page("Edit", "Meta", new { id = p.Id, back = "json" })">
@@ -63,7 +65,7 @@
             <i class="ti ti-arrow-left" aria-hidden="true"></i>
             <span>@T["ev2.back"]<small>@T["ev2.backSub"]</small></span>
         </a>
-        <button type="button" class="ev2-ico ev2-tree-toggle" id="ev2-tree-toggle" title="@T["ev2.tree"]" aria-label="@T["ev2.tree"]"><i class="ti ti-list-tree"></i></button>
+        <button type="button" class="btn btn-ghost btn-icon ev2-tree-toggle" id="ev2-tree-toggle" title="@T["ev2.tree"]" aria-label="@T["ev2.tree"]"><i class="ti ti-list-tree"></i></button>
         <div class="ev2-title">
             @* The title is the page switcher: one click to the next page, as in the classic editor. *@
             <button type="button" class="ev2-title-btn" id="ev2-pages-open" title="@T["ev2.switchPage"] — @Model.PublicUrl" aria-haspopup="true">
@@ -77,16 +79,18 @@
         </div>
         <span class="ev2-status" id="ev2-status" aria-live="polite"></span>
         <div class="ev2-sp"></div>
-        <button type="button" class="ev2-ico" id="ev2-undo" title="@T["ev2.undo"] (Strg+Z)" aria-label="@T["ev2.undo"]" disabled><i class="ti ti-arrow-back-up"></i></button>
-        <button type="button" class="ev2-ico" id="ev2-redo" title="@T["ev2.redo"] (Strg+Y)" aria-label="@T["ev2.redo"]" disabled><i class="ti ti-arrow-forward-up"></i></button>
-        <div class="ev2-seg" id="ev2-dev" role="group" aria-label="@T["ev2.device"]">
-            <button type="button" class="is-on" data-dev="desktop" title="@T["ev2.desktop"]"><i class="ti ti-device-desktop"></i></button>
-            <button type="button" data-dev="tablet" title="@T["ev2.tablet"]"><i class="ti ti-device-tablet"></i></button>
-            <button type="button" data-dev="phone" title="@T["ev2.phone"]"><i class="ti ti-device-mobile"></i></button>
+        <button type="button" class="btn btn-ghost btn-icon" id="ev2-undo" title="@T["ev2.undo"] (Strg+Z)" aria-label="@T["ev2.undo"]" disabled><i class="ti ti-arrow-back-up"></i></button>
+        <button type="button" class="btn btn-ghost btn-icon" id="ev2-redo" title="@T["ev2.redo"] (Strg+Y)" aria-label="@T["ev2.redo"]" disabled><i class="ti ti-arrow-forward-up"></i></button>
+        <div class="view-toggle ev2-dev" id="ev2-dev" role="group" aria-label="@T["ev2.device"]">
+            <button type="button" class="vt-btn active" data-dev="desktop" title="@T["ev2.desktop"]" aria-pressed="true"><i class="ti ti-device-desktop"></i></button>
+            <button type="button" class="vt-btn" data-dev="tablet" title="@T["ev2.tablet"]" aria-pressed="false"><i class="ti ti-device-tablet"></i></button>
+            <button type="button" class="vt-btn" data-dev="phone" title="@T["ev2.phone"]" aria-pressed="false"><i class="ti ti-device-mobile"></i></button>
         </div>
+        @* Portrait/landscape for tablet and phone; there is nothing to turn on a desktop. *@
+        <button type="button" class="btn btn-ghost btn-icon ev2-dev" id="ev2-rot" title="@T["ev2.landscape"]" aria-label="@T["ev2.landscape"]" aria-pressed="false" disabled><i class="ti ti-device-mobile-rotated"></i></button>
         @if (Model.AiEnabled)
         {
-            <button type="button" class="ev2-ico" id="ev2-aipage-open" title="@T["editor.aiPageGenButton"]" aria-label="@T["editor.aiPageGenButton"]"><i class="ti ti-sparkles"></i></button>
+            <button type="button" class="btn btn-ghost btn-icon" id="ev2-aipage-open" title="@T["editor.aiPageGenButton"]" aria-label="@T["editor.aiPageGenButton"]"><i class="ti ti-sparkles"></i></button>
         }
         <a class="btn btn-ghost btn-sm ev2-hide-s" href="@Model.PublicUrl" target="_blank" rel="noopener"><i class="ti ti-external-link" aria-hidden="true"></i> @T["ev2.view"]</a>
         <button type="button" class="btn btn-sm" id="ev2-save" disabled>@T["ev2.save"]</button>
@@ -101,9 +105,9 @@
             <span class="act"><i class="ti ti-settings"></i></span>
         </button>
         <div class="ev2-sep"></div>
-        <div class="ev2-nav-head">@T["ev2.blocks"]</div>
+        <div class="admin-nav-label ev2-nav-head">@T["ev2.blocks"]</div>
         <div id="ev2-tree" role="tree"></div>
-        <button type="button" class="ev2-add root" id="ev2-add-root"><i class="ti ti-plus"></i> @T["ev2.addSection"]</button>
+        <button type="button" class="btn btn-sm btn-block ev2-add-root" id="ev2-add-root"><i class="ti ti-plus"></i> @T["ev2.addSection"]</button>
         <a class="ev2-classic" asp-page="Edit" asp-route-id="@p.Id"><i class="ti ti-layout-sidebar-left-collapse"></i> @T["ev2.classic"]</a>
     </aside>
 
@@ -119,15 +123,14 @@
             <div class="ev2-crumb" id="ev2-crumb"></div>
             <h3 id="ev2-insp-title"></h3>
         </div>
-        <div class="ev2-tabs" id="ev2-tabs" role="tablist"></div>
+        <div class="tabs ev2-tabs" id="ev2-tabs" role="tablist"></div>
         <div class="ev2-body" id="ev2-body"></div>
         @* Page settings — shown here when "Seite" is chosen in the tree. A plain form posted by the
            editor's own "Speichern" (Edit?handler=Meta&back=json), so it never reloads the editor. *@
         <div class="ev2-body ev2-page-body" id="ev2-page-body" hidden>
             <form id="ev2-page-form" autocomplete="off">
-                <label class="ev2-toggle-row"><span>@T["editor.published"]</span>
-                    <input type="checkbox" name="Meta.IsPublished" value="true" @(p.IsPublished ? "checked" : "") /></label>
-                <div class="ev2-group">@T["ev2.pageGeneral"]</div>
+                <label class="check ev2-published"><input type="checkbox" name="Meta.IsPublished" value="true" @(p.IsPublished ? "checked" : "") /> @T["editor.published"]</label>
+                <div class="admin-nav-label ev2-group">@T["ev2.pageGeneral"]</div>
                 <div class="field">
                     <label>@T["editor.metaTitle"]</label>
                     <input type="text" name="Meta.Title" value="@p.Title" required />
@@ -153,12 +156,12 @@
                 {
                     <input type="hidden" name="Meta.Locale" value="@p.Locale" />
                 }
-                <div class="ev2-group">@T["ev2.pageSeo"]</div>
+                <div class="admin-nav-label ev2-group">@T["ev2.pageSeo"]</div>
                 <div class="field">
                     <label>@T["editor.metaDescription"]</label>
                     <textarea name="Meta.MetaDescription" rows="3">@p.MetaDescription</textarea>
                 </div>
-                <div class="ev2-group">@T["ev2.pageAccess"]</div>
+                <div class="admin-nav-label ev2-group">@T["ev2.pageAccess"]</div>
                 <div class="field">
                     <label>Zugriff</label>
                     <select name="Meta.Access">
@@ -176,7 +179,7 @@
                         }
                     </select>
                 </div>
-                <div class="ev2-group">@T["ev2.pageDesign"]</div>
+                <div class="admin-nav-label ev2-group">@T["ev2.pageDesign"]</div>
                 <div class="field">
                     <label>Template</label>
                     <select name="Meta.TemplateId">
@@ -205,7 +208,7 @@
                 <button type="button" class="btn btn-ghost btn-sm ev2-ai-btn" id="ev2-aiblock-open" title="@T["editor.aiImprove"]"><i class="ti ti-sparkles"></i></button>
             }
             <button type="button" class="btn btn-ghost btn-sm" id="ev2-dup"><i class="ti ti-copy"></i> @T["ev2.duplicate"]</button>
-            <button type="button" class="btn btn-ghost btn-sm ev2-danger" id="ev2-del"><i class="ti ti-trash"></i> @T["ev2.remove"]</button>
+            <button type="button" class="btn btn-danger btn-sm" id="ev2-del"><i class="ti ti-trash"></i> @T["ev2.remove"]</button>
         </div>
     </aside>
 
@@ -233,7 +236,7 @@
 
     @* Page switcher: every page with its address and language; leaving asks first when unsaved. *@
     <div class="ev2-pop ev2-pages" id="ev2-pages" hidden>
-        <input type="search" id="ev2-pages-search" placeholder="@T["editor.switchSearch"]" autocomplete="off" />
+        <input type="search" class="list-search" id="ev2-pages-search" placeholder="@T["editor.switchSearch"]" autocomplete="off" />
         <div class="ev2-pages-list" id="ev2-pages-list">
             @foreach (var pg in Model.AllPages)
             {
@@ -256,7 +259,7 @@
     {
         @* Language versions: switch to one, create a missing one, machine-translate this one. *@
         <div class="ev2-pop ev2-langs" id="ev2-langs" hidden>
-            <div class="ev2-pop-head">@T["ev2.languages"]</div>
+            <div class="admin-nav-label ev2-pop-head">@T["ev2.languages"]</div>
             @foreach (var v in Model.Versions)
             {
                 <a class="ev2-page@(v.Id == p.Id ? " is-cur" : "")" asp-page="Editor" asp-route-id="@v.Id">
@@ -288,25 +291,25 @@
     {
         @* KI: improve the selected block's texts — proposal against the CURRENT draft, applied into the
            draft (nothing is saved until "Speichern"). *@
-        <dialog class="mat-dialog ev2-ai" id="ev2-aiblock" data-url="@Url.Page("Edit", "AiRewriteBlock", new { id = p.Id })">
+        <dialog class="ai-dialog" id="ev2-aiblock" data-url="@Url.Page("Edit", "AiRewriteBlock", new { id = p.Id })">
             <h3>@T["editor.aiDialogTitle"]</h3>
-            <label for="ev2-aiblock-instr">@T["editor.aiInstruction"]</label>
+            <label class="ai-instr-label" for="ev2-aiblock-instr">@T["editor.aiInstruction"]</label>
             <textarea id="ev2-aiblock-instr" rows="2" placeholder="@T["editor.aiInstructionPlaceholder"]"></textarea>
-            <div class="ev2-ai-row"><button type="button" class="btn btn-sm" id="ev2-aiblock-go">@T["editor.aiPropose"]</button><span class="ev2-ai-status" id="ev2-aiblock-status"></span></div>
-            <div class="ev2-ai-diff" id="ev2-aiblock-diff"></div>
-            <div class="form-actions">
+            <div class="ai-dialog-actions"><button type="button" class="btn btn-sm" id="ev2-aiblock-go">@T["editor.aiPropose"]</button><span class="ai-status muted" id="ev2-aiblock-status"></span></div>
+            <div class="ai-diff" id="ev2-aiblock-diff"></div>
+            <div class="ai-dialog-foot">
                 <button type="button" class="btn btn-sm" id="ev2-aiblock-apply" disabled>@T["editor.aiApply"]</button>
                 <button type="button" class="btn btn-ghost btn-sm" data-close>@T["editor.aiCancel"]</button>
             </div>
         </dialog>
         @* KI: a whole set of blocks for this page, appended to the draft. *@
-        <dialog class="mat-dialog ev2-ai" id="ev2-aipage" data-url="@Url.Page("Edit", "AiGeneratePage", new { id = p.Id })">
+        <dialog class="ai-dialog" id="ev2-aipage" data-url="@Url.Page("Edit", "AiGeneratePage", new { id = p.Id })">
             <h3>@T["editor.aiPageGenTitle"]</h3>
-            <label for="ev2-aipage-instr">@T["editor.aiPageGenInstruction"]</label>
+            <label class="ai-instr-label" for="ev2-aipage-instr">@T["editor.aiPageGenInstruction"]</label>
             <textarea id="ev2-aipage-instr" rows="3" placeholder="@T["editor.aiPageGenPlaceholder"]"></textarea>
-            <div class="ev2-ai-row"><button type="button" class="btn btn-sm" id="ev2-aipage-go">@T["editor.aiPageGenPropose"]</button><span class="ev2-ai-status" id="ev2-aipage-status"></span></div>
-            <ol class="ev2-ai-list" id="ev2-aipage-list"></ol>
-            <div class="form-actions">
+            <div class="ai-dialog-actions"><button type="button" class="btn btn-sm" id="ev2-aipage-go">@T["editor.aiPageGenPropose"]</button><span class="ai-status muted" id="ev2-aipage-status"></span></div>
+            <div class="ai-pagegen-list" id="ev2-aipage-list"></div>
+            <div class="ai-dialog-foot">
                 <button type="button" class="btn btn-sm" id="ev2-aipage-apply" disabled>@T["editor.aiPageGenApply"]</button>
                 <button type="button" class="btn btn-ghost btn-sm" data-close>@T["editor.aiCancel"]</button>
             </div>

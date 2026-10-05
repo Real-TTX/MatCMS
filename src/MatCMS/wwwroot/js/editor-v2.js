@@ -118,7 +118,7 @@
         statusEl.className = "ev2-status" + (statusText && statusText.err ? " is-error" : d ? " is-dirty" : "");
         statusEl.innerHTML = statusText ? statusText.html
             : d ? '<i class="ti ti-point-filled"></i> ' + esc(t("unsaved"))
-            : '<i class="ti ti-circle-check" style="color:#16a34a"></i> ' + esc(t("saved"));
+            : '<i class="ti ti-circle-check ev2-ok"></i> ' + esc(t("saved"));
     }
 
     // ---------- tree rendering ----------
@@ -615,7 +615,7 @@
                 var tb = document.createElement("button");
                 tb.type = "button";
                 tb.textContent = names[k];
-                tb.className = k === activeTab ? "is-on" : "";
+                tb.className = "tab" + (k === activeTab ? " active" : "");
                 tb.setAttribute("data-tab", k);
                 insp.tabs.appendChild(tb);
             }
@@ -634,7 +634,7 @@
             var btn = document.createElement("button");
             btn.type = "button";
             btn.setAttribute("data-go", k.id);
-            btn.innerHTML = svgIcon(def(k).svg) + "<span>" + esc(label(k)) + (summary(k) ? ' <span style="color:#9aa1ab">' + esc(summary(k)) + "</span>" : "") + '</span><i class="ti ti-chevron-right chev"></i>';
+            btn.innerHTML = svgIcon(def(k).svg) + "<span>" + esc(label(k)) + (summary(k) ? ' <span class="muted">' + esc(summary(k)) + "</span>" : "") + '</span><i class="ti ti-chevron-right chev"></i>';
             box.appendChild(btn);
         });
         var add = document.createElement("button");
@@ -649,7 +649,7 @@
     insp.tabs.addEventListener("click", function (e) {
         var b = e.target.closest("[data-tab]"); if (!b) return;
         activeTab = b.getAttribute("data-tab");
-        insp.tabs.querySelectorAll("button").forEach(function (x) { x.classList.toggle("is-on", x === b); });
+        insp.tabs.querySelectorAll("button").forEach(function (x) { x.classList.toggle("active", x === b); });
         var i = 0;
         insp.body.querySelectorAll(".ev2-panel").forEach(function (p) {
             var key = Object.keys(panels)[i++];
@@ -756,12 +756,22 @@
             if (!inlineActive) renderPreview();
         }
     });
+    // Device width + orientation. Landscape only means something for tablet and phone; the choice is
+    // kept while switching between the two, so "phone, landscape" → "tablet" stays landscape.
+    var dev = "desktop", landscape = false, rotBtn = document.getElementById("ev2-rot");
+    function applyDevice() {
+        document.getElementById("ev2-frame").className = "ev2-frame" + (dev === "desktop" ? "" : " is-" + dev + (landscape ? " is-landscape" : ""));
+        rotBtn.disabled = dev === "desktop";
+        rotBtn.classList.toggle("active", landscape && dev !== "desktop");
+        rotBtn.setAttribute("aria-pressed", String(landscape && dev !== "desktop"));
+    }
     document.getElementById("ev2-dev").addEventListener("click", function (e) {
         var b = e.target.closest("button"); if (!b) return;
-        this.querySelectorAll("button").forEach(function (x) { x.classList.toggle("is-on", x === b); });
-        var dev = b.getAttribute("data-dev");
-        document.getElementById("ev2-frame").className = "ev2-frame" + (dev === "desktop" ? "" : " is-" + dev);
+        this.querySelectorAll("button").forEach(function (x) { x.classList.toggle("active", x === b); x.setAttribute("aria-pressed", String(x === b)); });
+        dev = b.getAttribute("data-dev");
+        applyDevice();
     });
+    rotBtn.addEventListener("click", function () { landscape = !landscape; applyDevice(); });
 
     // ---------- save ----------
     // One button for both: the page settings go first (a refused slug must stop the save before
@@ -915,8 +925,9 @@
                     aiBlockStatus.textContent = "";
                     aiBlockProposal = { id: forId, data: res.proposed };
                     aiBlockDiff.innerHTML = (res.changes || []).map(function (c) {
-                        return '<div class="ev2-ai-change"><div class="k">' + esc(c.field) + '</div><div class="b"><span>' + esc(t("aiBefore")) + '</span>' + esc(strip(c.before)) +
-                            '</div><div class="a"><span>' + esc(t("aiAfter")) + '</span>' + esc(strip(c.after)) + "</div></div>";
+                        return '<div class="ai-change"><div class="ai-field">' + esc(c.field) + '</div><div class="ai-cols">' +
+                            '<div class="ai-col ai-before"><div class="ai-lbl">' + esc(t("aiBefore")) + '</div><div class="ai-text">' + esc(strip(c.before)) + "</div></div>" +
+                            '<div class="ai-col ai-after"><div class="ai-lbl">' + esc(t("aiAfter")) + '</div><div class="ai-text">' + esc(strip(c.after)) + "</div></div></div></div>";
                     }).join("");
                     aiBlockApply.disabled = false;
                 })
@@ -945,7 +956,9 @@
                     if (!res.ok) { aiPageStatus.textContent = res.error || "—"; return; }
                     aiPageStatus.textContent = "";
                     try { aiPageProposal = JSON.parse(res.proposed); } catch (x) { aiPageProposal = null; }
-                    aiPageList.innerHTML = (res.blocks || []).map(function (b) { return "<li><b>" + esc(b.name) + "</b> " + esc(b.snippet || "") + "</li>"; }).join("");
+                    aiPageList.innerHTML = (res.blocks || []).map(function (b, i) {
+                        return '<div class="ai-pagegen-item"><span class="ai-pagegen-num">' + (i + 1) + '</span><span class="ai-pagegen-name">' + esc(b.name) + '</span><span class="ai-pagegen-snip">' + esc(b.snippet || "") + "</span></div>";
+                    }).join("");
                     aiPageApply.disabled = !aiPageProposal || !aiPageProposal.length;
                 })
                 .catch(function () { aiPageStatus.textContent = t("saveFailed"); });

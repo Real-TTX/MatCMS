@@ -575,6 +575,7 @@
   "ev2.desktop": "Desktop",
   "ev2.tablet": "Tablet",
   "ev2.phone": "Handy",
+  "ev2.landscape": "Querformat",
   "ev2.settings": "Seiteneinstellungen",
   "ev2.settingsAdvanced": "Erweitert (CSS, Template-Parameter)",
   "ev2.settingsDirty": "Speichern lädt den Editor neu – ungespeicherte Änderungen an den Blöcken gehen dabei verloren. Vorher „Speichern“ oben rechts.",

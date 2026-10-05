@@ -518,6 +518,10 @@
                 {
                     <span class="muted">@T["instances.noProfileHint"]</span>
                 }
+                else if (Model.Item.ResyncRequestedAt is not null)
+                {
+                    <span class="badge badge-off">@T["instances.resyncPending"]</span>
+                }
                 else if (Model.Item.LastSyncError is not null)
                 {
                     <span class="badge badge-err">@T["instances.syncFailed"]</span>
@@ -550,6 +554,12 @@
             <div class="kv-label">@T["instances.lastSync"]</div>
             <div class="kv-value muted">@(Model.Item.LastSyncUtc?.ToString("dd.MM.yyyy HH:mm:ss") ?? "—")</div>
         </div>
+        @if (Model.IsAdmin && Model.Item.Profile is not null && Model.Item.Status == InstanceStatus.Approved)
+        {
+            <form class="inline-form" method="post" asp-page-handler="Resync" asp-route-id="@Model.Item.Id" style="margin-top:12px;">
+                <button type="submit" class="btn btn-ghost"><i class="ti ti-refresh"></i> @T["instances.resync"]</button>
+            </form>
+        }
     </div>
 
     @* Every completed apply, newest first. Appended only when the instance reports a NEW run, so a

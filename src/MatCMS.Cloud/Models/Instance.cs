@@ -92,6 +92,11 @@ public class Instance
 
     public DateTime? LastSyncUtc { get; set; }
 
+    /// <summary>Set by "Neu synchronisieren": the instance is told on every beat to forget what it
+    /// applied and pull the profile again, until it reports a new run. Resetting AppliedRevision on
+    /// this side did nothing — the next beat overwrites it with the instance's own unchanged number.</summary>
+    public DateTime? ResyncRequestedAt { get; set; }
+
     /// <summary>Public URL of the site, for the "open" link. Reported by the instance, editable.</summary>
     public string? Url { get; set; }
 

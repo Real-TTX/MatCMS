@@ -481,7 +481,7 @@ public sealed class ProfileOpsService
         if (profileId is int pid && !await ExistsAsync(pid)) return NoProfile;
         inst.ProfileId = profileId;
         // Force a re-pull even if revision numbers coincide (mirrors the admin assignment handler).
-        inst.AppliedRevision = 0;
+        inst.ResyncRequestedAt = DateTime.UtcNow;
         inst.LastSyncError = null;
         _instances.Log(inst, InstanceEventKind.SyncApplied, "Profil über die API zugewiesen.");
         await _db.SaveChangesAsync();

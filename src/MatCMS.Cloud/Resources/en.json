@@ -404,6 +404,8 @@
   "instances.manageProfile": "Manage profile",
   "instances.noProfileHint": "No profile assigned — nothing is rolled out.",
   "instances.syncState": "Sync state",
+  "instances.resync": "Sync again",
+  "instances.resyncPending": "Re-sync requested",
   "instances.syncOk": "in sync",
   "instances.syncPending": "out of date",
   "instances.syncFailed": "error",

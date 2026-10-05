@@ -483,6 +483,17 @@ that changes a payload MUST call `TouchAsync` — **a change that does not bump 
 change that silently never arrives.** The instance reports the applied revision (and any error) back
 on its next beat, which is what drives the *synchron / abweichend / Fehler* badge.
 
+The revision number is the INSTANCE's memory, not the cloud's — so two things re-apply a profile
+without a bump. **"Neu synchronisieren"** (Details button, `/api/v1/instances/{id}/sync`,
+`resync_instance`) sets `Instance.ResyncRequestedAt`; the heartbeat answers `ResyncRequested = true`
+until the instance reports a NEW run (`RecordSyncRunAsync` clears it), and the instance does
+`CloudSyncService.ResetAsync` + pull. Resetting `AppliedRevision` on the cloud side, as it once did,
+was a no-op: the next beat overwrites it with the instance's unchanged number. Assigning a different
+profile requests a re-sync too — two profiles can stand at the same revision. And a **restore with
+settings** writes `cloud.appliedRevision = 0` on the instance: it replaced every profile-delivered
+setting with the backup's, and keeping the number would have left a site built by restore without
+its profile forever (every newer instance was).
+
 Plugin bundles are deliberately **not** inlined in the config JSON: `ConfigPlugin` carries key + name
 + version only, and the instance fetches `/api/instances/{id}/plugin/{key}` when its installed
 version differs. Otherwise a profile with a dozen plugins turns every revision bump into a

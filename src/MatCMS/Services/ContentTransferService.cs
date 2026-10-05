@@ -787,7 +787,15 @@ public class ContentTransferService
                 _db.SiteSettings.Add(new SiteSetting { Key = s.Key!, Value = s.Value ?? "" });
             }
             foreach (var (key, value) in keep)
-                _db.SiteSettings.Add(new SiteSetting { Key = key, Value = value });
+            {
+                // The applied profile revision is the one cloud key that must NOT survive as it was. The
+                // restore just replaced every setting the profile had rolled out (mail route, backup
+                // schedule, SSO …); keeping "revision N applied" told the next heartbeat there was nothing
+                // to do, and a site rebuilt from a backup stayed without its profile for good — every new
+                // instance, since they are filled by a restore. "0" makes the next beat apply it again.
+                var v = string.Equals(key, SettingKeys.CloudAppliedRevision, StringComparison.OrdinalIgnoreCase) ? "0" : value;
+                _db.SiteSettings.Add(new SiteSetting { Key = key, Value = v });
+            }
             await _db.SaveChangesAsync();
             summary.Add($"{dto.Settings.Count} Einstellungen");
         }

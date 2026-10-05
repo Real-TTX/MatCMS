@@ -349,7 +349,13 @@ public class CloudService
 
             // The cloud offers a revision we have not applied → pull and apply it now, in the same
             // cycle, so the next beat already reports the new state.
-            if (_state.ConfigRevision > 0 && _state.ConfigRevision != beat.AppliedRevision)
+            if (_state.ConfigRevision > 0 && answer?.ResyncRequested == true)
+            {
+                _log.LogInformation("Cloud asked to apply the configuration again.");
+                await _sync.ResetAsync(ct);
+                await PullAndApplyAsync(settings, ct);
+            }
+            else if (_state.ConfigRevision > 0 && _state.ConfigRevision != beat.AppliedRevision)
                 await PullAndApplyAsync(settings, ct);
 
             // A backup the cloud asked for. BEFORE the restore below, and that order is the whole

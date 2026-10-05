@@ -107,7 +107,7 @@ public class DetailsModel : PageModel, IAsyncPageFilter
     /// <summary>Admin-only, even on one's own instance: enrollment decisions, profile assignment and
     /// token rotation are fleet/operator-config matters, not day-to-day instance management.</summary>
     private static readonly string[] AdminOnlyHandlers =
-        { "OnPostApproveAsync", "OnPostRejectAsync", "OnPostAssignProfileAsync", "OnPostRotateAsync" };
+        { "OnPostApproveAsync", "OnPostRejectAsync", "OnPostAssignProfileAsync", "OnPostResyncAsync", "OnPostRotateAsync" };
 
     /// <summary>Single security choke point for THIS page: every handler (GET and each POST) takes the
     /// instance <c>id</c>, so one filter can enforce both the per-instance access scope (an Operator
@@ -431,6 +431,9 @@ public class DetailsModel : PageModel, IAsyncPageFilter
             item.ProfileId = profileId;
             item.AppliedRevision = 0;
             item.LastSyncError = null;
+            // Two profiles can stand at the same revision number; the instance compares only the
+            // number, so without this a switched profile would never be applied.
+            item.ResyncRequestedAt = profileId is null ? null : DateTime.UtcNow;
             var name = profileId is null
                 ? null
                 : (await _db.Profiles.FindAsync(profileId.Value))?.Name;
@@ -441,6 +444,19 @@ public class DetailsModel : PageModel, IAsyncPageFilter
         }
 
         TempData["Flash"] = "Profil zugewiesen.";
+        return RedirectToPage(new { id });
+    }
+
+    public async Task<IActionResult> OnPostResyncAsync(int id)
+    {
+        var item = await _db.Instances.FindAsync(id);
+        if (item is null) return RedirectToPage("Index");
+        if (item.ProfileId is null) return RedirectToPage(new { id });
+
+        item.ResyncRequestedAt = DateTime.UtcNow;
+        item.LastSyncError = null;
+        await _db.SaveChangesAsync();
+        TempData["Flash"] = "Neu-Synchronisierung angefordert — die Instanz wendet das Profil beim nächsten Kontakt erneut an.";
         return RedirectToPage(new { id });
     }
 

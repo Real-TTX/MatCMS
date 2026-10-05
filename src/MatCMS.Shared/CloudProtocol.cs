@@ -238,6 +238,12 @@ public sealed class HeartbeatResponse
     /// applied, the instance pulls <c>/api/instances/{id}/config</c>. 0 = nothing to sync.</summary>
     public int ConfigRevision { get; set; }
 
+    /// <summary>An operator asked for the configuration to be applied again ("Neu synchronisieren"),
+    /// whatever revision the instance says it applied — e.g. after its settings were replaced. The instance
+    /// clears its applied revision and seed marks and pulls the config in this same beat. Additive: an
+    /// instance that predates the field ignores it, a cloud that predates it never sets it.</summary>
+    public bool ResyncRequested { get; set; }
+
     /// <summary>Content operations the cloud wants this instance to apply — pages to create, blocks to
     /// change, a site to generate (see <see cref="PendingContentOp"/>). Null/empty is the normal case,
     /// so an instance that predates the field simply never applies one — the right way for an unknown

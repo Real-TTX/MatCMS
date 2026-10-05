@@ -24,6 +24,16 @@ public class InstanceService
     /// a later heartbeat carrying a real name replaces it.</summary>
     public const string PlaceholderName = "Neue Instanz";
 
+    /// <summary>The site name a fresh MatCMS reports before anybody configured one (SiteContext's
+    /// default). It is NOT a name: taken as one, every new instance stayed "MatCMS" in the cloud for good —
+    /// the site's real name arrives later (set by hand, or with the restore that brings the content), and
+    /// by then the label no longer counted as unset. Treated like the placeholder on both ends.</summary>
+    public const string FreshSiteName = "MatCMS";
+
+    /// <summary>Whether a label/site name means "not named yet".</summary>
+    public static bool IsUnnamed(string? name) =>
+        string.IsNullOrWhiteSpace(name) || name.Trim() == PlaceholderName || name.Trim() == FreshSiteName;
+
     private readonly AppDbContext _db;
     private readonly DockerHostService _docker;
     private readonly ReleaseWatcher _releases;
@@ -107,7 +117,7 @@ public class InstanceService
         {
             PublicId = NewPublicId(),
             TokenHash = HashToken(token),
-            Name = string.IsNullOrWhiteSpace(request.SiteName) ? PlaceholderName : request.SiteName!.Trim(),
+            Name = IsUnnamed(request.SiteName) ? PlaceholderName : request.SiteName!.Trim(),
             Url = SafeUrl(request.Url),
             ProfileId = profile.Id,
             Status = profile.AutoApprove ? InstanceStatus.Approved : InstanceStatus.Pending,
@@ -235,7 +245,7 @@ public class InstanceService
         // operator BEFORE it ever beats, and "firstEver ||" overwrote exactly that name with the fresh
         // site's default ("MatCMS") on the very first heartbeat — and again whenever a restart or a
         // restore made the instance look first-ever. The label an operator typed must survive both.
-        if (!instance.NamePinned && instance.Name == PlaceholderName && !string.IsNullOrWhiteSpace(beat.SiteName))
+        if (!instance.NamePinned && IsUnnamed(instance.Name) && !IsUnnamed(beat.SiteName))
             instance.Name = beat.SiteName!.Trim();
 
         await RecordSyncReportAsync(instance, beat, ct);
@@ -281,6 +291,7 @@ public class InstanceService
             ProfileName = instance.Profile?.Name,
             // A pending instance is told 0 so it never even asks for configuration.
             ConfigRevision = instance.Status == InstanceStatus.Approved ? instance.Profile?.Revision ?? 0 : 0,
+            ResyncRequested = instance.Status == InstanceStatus.Approved && instance.ProfileId != null && instance.ResyncRequestedAt != null,
 
             // A backup somebody asked to be restored. Only for an approved instance, and only the
             // OLDEST outstanding one — asking a site to overwrite itself twice in a row is never
@@ -559,6 +570,8 @@ public class InstanceService
         if (beat.SyncRunAt is null || beat.SyncRunAt == instance.LastSyncRunAt) return;
 
         instance.LastSyncRunAt = beat.SyncRunAt;
+        // A requested re-sync is done once the instance has applied again.
+        instance.ResyncRequestedAt = null;
 
         var report = beat.SyncReport ?? new List<SyncItemReport>();
         _db.InstanceSyncRuns.Add(new InstanceSyncRun

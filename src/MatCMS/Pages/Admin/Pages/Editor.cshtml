@@ -20,6 +20,9 @@
         ["cat.plugins"] = T["blockcat.plugins"], ["cat.custom"] = T["blockcat.custom"], ["blockEmpty"] = T["editor.blockEmpty"],
         ["cat.presets"] = T["ev2.presets"],
         ["inlineHint"] = T["ev2.inlineHint"],
+        ["pageSettings"] = T["ev2.settings"], ["pageSaveFailed"] = T["ev2.pageSaveFailed"],
+        ["published"] = T["ev2.published"], ["draft"] = T["ev2.draft"],
+        ["fav"] = T["blockcat.fav"], ["recent"] = T["blockcat.recent"], ["favToggle"] = T["editor.favToggle"], ["noBlocksFound"] = T["editor.noBlocksFound"],
         ["aiWorking"] = T["editor.aiWorking"], ["aiBefore"] = T["editor.aiBefore"], ["aiAfter"] = T["editor.aiAfter"],
         ["preset.hero"] = T["ev2.preset.hero"], ["preset.hero.desc"] = T["ev2.preset.hero.desc"],
         ["preset.imageText"] = T["ev2.preset.imageText"], ["preset.imageText.desc"] = T["ev2.preset.imageText.desc"],
@@ -48,7 +51,8 @@
 </head>
 <body class="ev2" data-page-id="@p.Id"
       data-render-url="@Url.Page("Edit", "RenderPreview", new { id = p.Id })"
-      data-save-url="@Url.Page("Edit", "SaveAll", new { id = p.Id })">
+      data-save-url="@Url.Page("Edit", "SaveAll", new { id = p.Id })"
+      data-meta-url="@Url.Page("Edit", "Meta", new { id = p.Id, back = "json" })">
     @Html.AntiForgeryToken()
     <script id="ev2-blocks" type="application/json">@Html.Raw(Model.BlocksJson.Replace("</", "<\\/"))</script>
     <script id="ev2-types" type="application/json">@Html.Raw(Model.TypesJson.Replace("</", "<\\/"))</script>
@@ -84,25 +88,22 @@
         {
             <button type="button" class="ev2-ico" id="ev2-aipage-open" title="@T["editor.aiPageGenButton"]" aria-label="@T["editor.aiPageGenButton"]"><i class="ti ti-sparkles"></i></button>
         }
-        <button type="button" class="ev2-ico" id="ev2-settings-open" title="@T["ev2.settings"]" aria-label="@T["ev2.settings"]"><i class="ti ti-settings"></i></button>
         <a class="btn btn-ghost btn-sm ev2-hide-s" href="@Model.PublicUrl" target="_blank" rel="noopener"><i class="ti ti-external-link" aria-hidden="true"></i> @T["ev2.view"]</a>
         <button type="button" class="btn btn-sm" id="ev2-save" disabled>@T["ev2.save"]</button>
     </header>
 
     <aside class="ev2-nav" aria-label="@T["ev2.tree"]">
-        <div class="ev2-nav-head">@T["ev2.page"]</div>
-        <a class="ev2-node is-locked" asp-page="/Admin/Templates/Index" title="@T["ev2.templateHint"]">
-            <span class="tw"></span><span class="ic"><i class="ti ti-layout-navbar"></i></span>
-            <span class="lbl">@T["ev2.header"] <em>@T["ev2.fromTemplate"]</em></span><span class="act"><i class="ti ti-lock"></i></span>
-        </a>
+        @* The page itself is the first entry: its settings (title, address, SEO, access, template …)
+           open on the right like a block's fields, and are saved with the same "Speichern". *@
+        <button type="button" class="ev2-node ev2-page-node" id="ev2-page-node">
+            <span class="tw"></span><span class="ic"><i class="ti ti-file-text"></i></span>
+            <span class="lbl">@T["ev2.page"] <em id="ev2-page-node-title">@p.Title</em></span>
+            <span class="act"><i class="ti ti-settings"></i></span>
+        </button>
         <div class="ev2-sep"></div>
+        <div class="ev2-nav-head">@T["ev2.blocks"]</div>
         <div id="ev2-tree" role="tree"></div>
         <button type="button" class="ev2-add root" id="ev2-add-root"><i class="ti ti-plus"></i> @T["ev2.addSection"]</button>
-        <div class="ev2-sep"></div>
-        <a class="ev2-node is-locked" asp-page="/Admin/Templates/Index" title="@T["ev2.templateHint"]">
-            <span class="tw"></span><span class="ic"><i class="ti ti-layout-bottombar"></i></span>
-            <span class="lbl">@T["ev2.footer"] <em>@T["ev2.fromTemplate"]</em></span><span class="act"><i class="ti ti-lock"></i></span>
-        </a>
         <a class="ev2-classic" asp-page="Edit" asp-route-id="@p.Id"><i class="ti ti-layout-sidebar-left-collapse"></i> @T["ev2.classic"]</a>
     </aside>
 
@@ -120,6 +121,82 @@
         </div>
         <div class="ev2-tabs" id="ev2-tabs" role="tablist"></div>
         <div class="ev2-body" id="ev2-body"></div>
+        @* Page settings — shown here when "Seite" is chosen in the tree. A plain form posted by the
+           editor's own "Speichern" (Edit?handler=Meta&back=json), so it never reloads the editor. *@
+        <div class="ev2-body ev2-page-body" id="ev2-page-body" hidden>
+            <form id="ev2-page-form" autocomplete="off">
+                <label class="ev2-toggle-row"><span>@T["editor.published"]</span>
+                    <input type="checkbox" name="Meta.IsPublished" value="true" @(p.IsPublished ? "checked" : "") /></label>
+                <div class="ev2-group">@T["ev2.pageGeneral"]</div>
+                <div class="field">
+                    <label>@T["editor.metaTitle"]</label>
+                    <input type="text" name="Meta.Title" value="@p.Title" required />
+                </div>
+                <div class="field">
+                    <label>@T["editor.slug"]</label>
+                    <input type="text" name="Meta.Slug" value="@p.Slug" required spellcheck="false" />
+                    <div class="help mono" id="ev2-page-url">@Model.PublicUrl</div>
+                </div>
+                @if (Model.SupportedLocales.Count > 1)
+                {
+                    <div class="field">
+                        <label>@T["editor.locale"]</label>
+                        <select name="Meta.Locale">
+                            @foreach (var loc in Model.SupportedLocales)
+                            {
+                                <option value="@loc" selected="@(loc == p.Locale)">@T["lang." + loc]</option>
+                            }
+                        </select>
+                    </div>
+                }
+                else
+                {
+                    <input type="hidden" name="Meta.Locale" value="@p.Locale" />
+                }
+                <div class="ev2-group">@T["ev2.pageSeo"]</div>
+                <div class="field">
+                    <label>@T["editor.metaDescription"]</label>
+                    <textarea name="Meta.MetaDescription" rows="3">@p.MetaDescription</textarea>
+                </div>
+                <div class="ev2-group">@T["ev2.pageAccess"]</div>
+                <div class="field">
+                    <label>Zugriff</label>
+                    <select name="Meta.Access">
+                        <option value="Public" selected="@(p.Access == MatCMS.Models.PageAccess.Public ? "selected" : null)">Öffentlich</option>
+                        <option value="Members" selected="@(p.Access == MatCMS.Models.PageAccess.Members ? "selected" : null)">Nur angemeldete Mitglieder</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Benötigte Rolle</label>
+                    <select name="Meta.RequiredRole">
+                        <option value="">— jede/r Angemeldete —</option>
+                        @foreach (var role in Model.AllRoles)
+                        {
+                            <option value="@role" selected="@(p.RequiredRole == role ? "selected" : null)">@role</option>
+                        }
+                    </select>
+                </div>
+                <div class="ev2-group">@T["ev2.pageDesign"]</div>
+                <div class="field">
+                    <label>Template</label>
+                    <select name="Meta.TemplateId">
+                        <option value="">— Aktives Template —</option>
+                        @foreach (var t in Model.AllTemplates)
+                        {
+                            <option value="@t.Id" selected="@(p.TemplateId == t.Id ? "selected" : null)">@t.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="field">
+                    <label>@T["editor.pageCss"]</label>
+                    <textarea name="Meta.CustomCss" rows="5" spellcheck="false" class="mono">@p.CustomCss</textarea>
+                </div>
+                <div class="field">
+                    <label>Template-Parameter (JSON)</label>
+                    <textarea name="Meta.TemplateParamsJson" rows="3" spellcheck="false" class="mono">@p.TemplateParamsJson</textarea>
+                </div>
+            </form>
+        </div>
         <div class="ev2-foot" id="ev2-foot" hidden>
             @* Classic hero / image+text / text / call-to-action → the same content as a section of elements. *@
             <button type="button" class="btn btn-ghost btn-sm ev2-convert" id="ev2-convert" hidden title="@T["ev2.convertHint"]"><i class="ti ti-transform"></i> @T["ev2.convert"]</button>
@@ -132,91 +209,27 @@
         </div>
     </aside>
 
-    @* Block picker: one popover for every level — the root offers sections, a container only what
-       it may hold (AllowedChildren). Filled by editor-v2.js. *@
-    <div class="ev2-pop" id="ev2-pop" role="dialog" aria-label="@T["ev2.add"]" hidden>
-        <input type="search" id="ev2-pop-search" placeholder="@T["ev2.search"]" autocomplete="off" />
-        <div class="ev2-pop-cats" id="ev2-pop-cats"></div>
-        <div class="ev2-pop-list" id="ev2-pop-list"></div>
+    @* Block picker: the classic editor's dialog (same classes, same favourites and "recently used"),
+       filled by editor-v2.js for the level it is opened on — the page offers sections and templates,
+       a container only what it may hold (AllowedChildren). *@
+    <div class="modal-overlay" id="ev2-pick">
+        <div class="modal" role="dialog" aria-modal="true" aria-label="@T["editor.addBlockModal"]">
+            <div class="modal-head">
+                <h2>@T["editor.addBlockModal"]</h2>
+                <button type="button" class="modal-close" id="ev2-pick-close" aria-label="@T["editor.close"]">✕</button>
+            </div>
+            <div class="modal-body bpick">
+                <div class="bpick-search">
+                    <svg class="bpick-sico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+                    <input type="search" id="ev2-pick-search" placeholder="@T["editor.searchBlocks"]" autocomplete="off" />
+                </div>
+                <div class="bpick-layout">
+                    <aside class="bpick-cats" id="ev2-pick-cats"></aside>
+                    <div class="bpick-main" id="ev2-pick-main"></div>
+                </div>
+            </div>
+        </div>
     </div>
-
-    <dialog class="mat-dialog ev2-settings" id="ev2-settings">
-        <form method="post" asp-page="Edit" asp-page-handler="Meta" asp-route-id="@p.Id" asp-route-back="v2" class="form-grid" id="ev2-settings-form">
-            <h3 class="ev2-settings-title">@T["ev2.settings"]</h3>
-            <div class="form-field">
-                <label>@T["editor.metaTitle"]</label>
-                <input name="Meta.Title" value="@p.Title" required />
-            </div>
-            <div class="form-field">
-                <label>@T["editor.slug"]</label>
-                <input name="Meta.Slug" value="@p.Slug" required />
-            </div>
-            @if (Model.SupportedLocales.Count > 1)
-            {
-                <div class="form-field">
-                    <label>@T["editor.locale"]</label>
-                    <select name="Meta.Locale">
-                        @foreach (var loc in Model.SupportedLocales)
-                        {
-                            <option value="@loc" selected="@(loc == p.Locale)">@T["lang." + loc]</option>
-                        }
-                    </select>
-                </div>
-            }
-            else
-            {
-                <input type="hidden" name="Meta.Locale" value="@p.Locale" />
-            }
-            <div class="form-field">
-                <label>@T["editor.metaDescription"]</label>
-                <input name="Meta.MetaDescription" value="@p.MetaDescription" />
-            </div>
-            <div class="form-field">
-                <label>Template</label>
-                <select name="Meta.TemplateId">
-                    <option value="">— Aktives Template —</option>
-                    @foreach (var t in Model.AllTemplates)
-                    {
-                        <option value="@t.Id" selected="@(p.TemplateId == t.Id ? "selected" : null)">@t.Name</option>
-                    }
-                </select>
-            </div>
-            <div class="form-field">
-                <label>Zugriff</label>
-                <select name="Meta.Access">
-                    <option value="Public" selected="@(p.Access == MatCMS.Models.PageAccess.Public ? "selected" : null)">Öffentlich</option>
-                    <option value="Members" selected="@(p.Access == MatCMS.Models.PageAccess.Members ? "selected" : null)">Nur angemeldete Mitglieder</option>
-                </select>
-            </div>
-            <div class="form-field">
-                <label>Benötigte Rolle</label>
-                <select name="Meta.RequiredRole">
-                    <option value="">— jede/r Angemeldete —</option>
-                    @foreach (var role in Model.AllRoles)
-                    {
-                        <option value="@role" selected="@(p.RequiredRole == role ? "selected" : null)">@role</option>
-                    }
-                </select>
-            </div>
-            <details>
-                <summary>@T["ev2.settingsAdvanced"]</summary>
-                <div class="form-field">
-                    <label>@T["editor.pageCss"]</label>
-                    <textarea name="Meta.CustomCss" rows="5" spellcheck="false" class="mono">@p.CustomCss</textarea>
-                </div>
-                <div class="form-field">
-                    <label>Template-Parameter (JSON)</label>
-                    <textarea name="Meta.TemplateParamsJson" rows="3" spellcheck="false" class="mono">@p.TemplateParamsJson</textarea>
-                </div>
-            </details>
-            <label class="checkbox-row"><input type="checkbox" name="Meta.IsPublished" value="true" @(p.IsPublished ? "checked" : "") /> @T["editor.published"]</label>
-            <div class="help" id="ev2-settings-dirty" hidden>@T["ev2.settingsDirty"]</div>
-            <div class="form-actions">
-                <button type="submit" class="btn btn-sm">@T["action.save"]</button>
-                <button type="button" class="btn btn-ghost btn-sm" id="ev2-settings-close">@T["action.cancel"]</button>
-            </div>
-        </form>
-    </dialog>
 
     @* Page switcher: every page with its address and language; leaving asks first when unsaved. *@
     <div class="ev2-pop ev2-pages" id="ev2-pages" hidden>

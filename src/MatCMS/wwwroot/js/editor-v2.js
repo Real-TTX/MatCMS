@@ -101,7 +101,14 @@
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s" && e.target.closest && e.target.closest("input, textarea, [contenteditable=true]")) { e.preventDefault(); save(); }
     });
 
-    function dirty() { return snap() !== savedSnap; }
+    // The page's own settings (title, address, SEO …) are a form in the inspector, saved with the same
+    // "Speichern" as the blocks. Their state is compared as the posted form, like the blocks as JSON.
+    var pageForm = document.getElementById("ev2-page-form");
+    function pageSnap() { return new URLSearchParams(new FormData(pageForm)).toString(); }
+    var pageSaved = pageSnap();
+    function pageDirty() { return pageSnap() !== pageSaved; }
+    function blocksDirty() { return snap() !== savedSnap; }
+    function dirty() { return blocksDirty() || pageDirty(); }
     var statusText = null;
     function updateChrome() {
         undoBtn.disabled = past.length === 0;
@@ -415,10 +422,17 @@
     document.getElementById("ev2-del").addEventListener("click", function () { if (selectedId != null) action("del", selectedId); });
 
     // ---------- picker ----------
-    var pop = document.getElementById("ev2-pop"), popSearch = document.getElementById("ev2-pop-search");
-    var popList = document.getElementById("ev2-pop-list"), popCats = document.getElementById("ev2-pop-cats");
+    // The classic editor's "Block hinzufügen" dialog — same look, same favourites and "recently used"
+    // (localStorage matBlockFav / matBlockRecent, shared with it). What it offers depends on where it
+    // was opened: the page gets templates and every block that may stand alone, a container only the
+    // types it accepts.
+    var pickEl = document.getElementById("ev2-pick"), pickSearch = document.getElementById("ev2-pick-search");
+    var pickCats = document.getElementById("ev2-pick-cats"), pickMain = document.getElementById("ev2-pick-main");
     var pick = null;   // { parentId, index, options:[def] }
-    var popCat = "all";
+    var pickCat = "all";
+    var CAT_ORDER = ["presets", "layout", "text", "media", "design", "form", "embed", "plugins", "custom"];
+    function loadArr(k) { try { return JSON.parse(localStorage.getItem(k) || "[]") || []; } catch (e) { return []; } }
+    function saveArr(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } }
     function openPicker(anchor, parentId, index) {
         var options;
         if (parentId == null) {
@@ -430,52 +444,86 @@
             if (options.length === 1) { addBlock(options[0].type, parentId, index); return; }
         }
         pick = { parentId: parentId, index: index, options: options };
-        popCat = "all";
-        var cats = [];
-        options.forEach(function (d) { if (cats.indexOf(d.cat) < 0) cats.push(d.cat); });
-        popCats.innerHTML = cats.length > 1 ? ['<button type="button" data-cat="all" class="is-on">' + esc(t("all")) + "</button>"].concat(cats.map(function (c) {
-            return '<button type="button" data-cat="' + esc(c) + '">' + esc(t("cat." + c)) + "</button>";
-        })).join("") : "";
-        popSearch.value = "";
-        fillPicker();
-        pop.hidden = false;
-        var r = anchor ? anchor.getBoundingClientRect() : { left: innerWidth / 2 - 170, bottom: 120 };
-        pop.style.left = Math.max(8, Math.min(r.left, innerWidth - 352)) + "px";
-        pop.style.top = Math.max(8, Math.min(r.bottom + 6, innerHeight - pop.offsetHeight - 8)) + "px";
-        popSearch.focus();
+        pickCat = "all";
+        pickSearch.value = "";
+        renderPicker();
+        pickEl.classList.add("open");
+        setTimeout(function () { pickSearch.focus(); }, 30);
     }
-    function fillPicker() {
-        var q = popSearch.value.trim().toLowerCase();
-        var list = pick.options.filter(function (d) {
-            return (popCat === "all" || d.cat === popCat) && (!q || (d.name + " " + (d.desc || "")).toLowerCase().indexOf(q) >= 0);
-        });
-        popList.innerHTML = list.length ? list.map(function (d) {
-            return '<button type="button" data-type="' + esc(d.type) + '" title="' + esc(d.desc || "") + '">' + svgIcon(d.svg) + "<span>" + esc(d.name) + "</span></button>";
-        }).join("") : '<div class="none">' + esc(t("notFound")) + "</div>";
+    function renderPicker() {
+        var favs = loadArr("matBlockFav"), recent = loadArr("matBlockRecent");
+        var opts = pick.options;
+        var types_ = opts.map(function (d) { return d.type; });
+        var cats = CAT_ORDER.filter(function (c) { return opts.some(function (d) { return d.cat === c; }); });
+        opts.forEach(function (d) { if (cats.indexOf(d.cat) < 0) cats.push(d.cat); });
+        function catBtn(key, label, n, extra, icon) {
+            return '<button type="button" class="bpick-cat' + (extra || "") + (pickCat === key ? " is-active" : "") + '" data-cat="' + esc(key) + '">' +
+                '<span class="bpick-clabel">' + (icon ? '<span class="bpick-cico">' + icon + "</span>" : "") + esc(label) + '</span><span class="bpick-n">' + n + "</span></button>";
+        }
+        pickCats.innerHTML =
+            catBtn("fav", t("fav"), favs.filter(function (x) { return types_.indexOf(x) >= 0; }).length, " bpick-cat-fav", "★") +
+            catBtn("recent", t("recent"), recent.filter(function (x) { return types_.indexOf(x) >= 0; }).length, " bpick-cat-recent", "🕘") +
+            '<div class="bpick-sep"></div>' +
+            catBtn("all", t("all"), opts.length) +
+            cats.map(function (c) { return catBtn(c, t("cat." + c), opts.filter(function (d) { return d.cat === c; }).length); }).join("");
+
+        var q = pickSearch.value.trim().toLowerCase();
+        function shown(d) {
+            var okCat = pickCat === "all" ? true : pickCat === "fav" ? favs.indexOf(d.type) >= 0
+                : pickCat === "recent" ? recent.indexOf(d.type) >= 0 : d.cat === pickCat;
+            return okCat && (!q || (d.name + " " + (d.desc || "")).toLowerCase().indexOf(q) >= 0);
+        }
+        function tile(d) {
+            var isPreset = d.type.indexOf("preset:") === 0;
+            return '<form onsubmit="return false">' +
+                (isPreset ? "" : '<button type="button" class="tile-fav' + (favs.indexOf(d.type) >= 0 ? " on" : "") + '" data-fav="' + esc(d.type) + '" title="' + esc(t("favToggle")) + '" aria-label="' + esc(t("favToggle")) + '">★</button>') +
+                '<button type="button" class="tile" data-type="' + esc(d.type) + '" title="' + esc(d.desc || "") + '">' +
+                '<span class="t-icon">' + svgIcon(d.svg) + '</span><span class="t-name">' + esc(d.name) + '</span><span class="t-desc">' + esc(d.desc || "") + "</span></button></form>";
+        }
+        // "Alle" keeps the grouped headings; a single category, favourites or recent show a flat list.
+        pickMain.classList.toggle("bpick-flat", pickCat !== "all");
+        var html = "";
+        if (pickCat === "recent") {
+            var list = recent.map(function (k) { return opts.filter(function (d) { return d.type === k; })[0]; }).filter(function (d) { return d && shown(d); });
+            if (list.length) html = '<section class="bpick-group"><div class="bpick-grid">' + list.map(tile).join("") + "</div></section>";
+        } else {
+            cats.forEach(function (c) {
+                var list = opts.filter(function (d) { return d.cat === c && shown(d); });
+                if (list.length) html += '<section class="bpick-group"><div class="bpick-grouphead">' + esc(t("cat." + c)) + '</div><div class="bpick-grid">' + list.map(tile).join("") + "</div></section>";
+            });
+        }
+        pickMain.innerHTML = html || '<p class="bpick-empty">' + esc(t("noBlocksFound")) + "</p>";
     }
-    popSearch.addEventListener("input", fillPicker);
-    popSearch.addEventListener("keydown", function (e) {
-        if (e.key === "Enter") { var first = popList.querySelector("button"); if (first) first.click(); }
-        if (e.key === "Escape") closePicker();
+    pickSearch.addEventListener("input", renderPicker);
+    pickSearch.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") { e.preventDefault(); var first = pickMain.querySelector(".tile"); if (first) first.click(); }
     });
-    popCats.addEventListener("click", function (e) {
-        var b = e.target.closest("button"); if (!b) return;
-        popCat = b.getAttribute("data-cat");
-        popCats.querySelectorAll("button").forEach(function (x) { x.classList.toggle("is-on", x === b); });
-        fillPicker();
+    pickCats.addEventListener("click", function (e) {
+        var b = e.target.closest("[data-cat]"); if (!b) return;
+        pickCat = b.getAttribute("data-cat");
+        renderPicker();
     });
-    popList.addEventListener("click", function (e) {
-        var b = e.target.closest("button[data-type]"); if (!b || !pick) return;
+    pickMain.addEventListener("click", function (e) {
+        var fav = e.target.closest("[data-fav]");
+        if (fav) {
+            var favs = loadArr("matBlockFav"), k = fav.getAttribute("data-fav"), i = favs.indexOf(k);
+            if (i >= 0) favs.splice(i, 1); else favs.push(k);
+            saveArr("matBlockFav", favs);
+            renderPicker();
+            return;
+        }
+        var b = e.target.closest(".tile[data-type]"); if (!b || !pick) return;
         var p = pick; closePicker();
         var type = b.getAttribute("data-type");
-        if (type.indexOf("preset:") === 0) insert(PRESETS[type.slice(7)](), p.parentId, p.index);
-        else addBlock(type, p.parentId, p.index);
+        if (type.indexOf("preset:") === 0) { insert(PRESETS[type.slice(7)](), p.parentId, p.index); return; }
+        var recent = loadArr("matBlockRecent").filter(function (x) { return x !== type; });
+        recent.unshift(type); saveArr("matBlockRecent", recent.slice(0, 12));
+        addBlock(type, p.parentId, p.index);
     });
-    function closePicker() { pop.hidden = true; pick = null; }
-    document.addEventListener("mousedown", function (e) {
-        if (!pop.hidden && !pop.contains(e.target) && !e.target.closest("[data-add-parent], #ev2-add-root, [data-add-here]")) closePicker();
-    });
-    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !pop.hidden) closePicker(); });
+    function closePicker() { pickEl.classList.remove("open"); pick = null; }
+    document.getElementById("ev2-pick-close").addEventListener("click", closePicker);
+    pickEl.addEventListener("click", function (e) { if (e.target === pickEl) closePicker(); });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && pickEl.classList.contains("open")) closePicker(); });
     document.getElementById("ev2-add-root").addEventListener("click", function (e) { openPicker(e.currentTarget, null, null); });
 
     // ---------- selection + inspector ----------
@@ -484,8 +532,10 @@
     var panels = null;   // field builders of the open block
     var activeTab = "content";
 
+    var pageSelected = false;
     function select(id, scroll) {
         selectedId = id;
+        pageSelected = false;
         var b = byId(id);
         if (b) ancestors(b).forEach(function (a) { expanded[a.id] = true; });
         renderTree();
@@ -496,10 +546,29 @@
         syncPreviewSelection();
     }
 
+    var pageBody = document.getElementById("ev2-page-body"), pageNode = document.getElementById("ev2-page-node");
+    function selectPage() {
+        selectedId = null;
+        pageSelected = true;
+        renderTree();
+        renderInspector();
+        body.classList.add("ev2-insp-open");
+        post({ type: "mat-select", id: "none" });
+    }
+    pageNode.addEventListener("click", function () { selectPage(); body.classList.remove("ev2-nav-open"); });
     function renderInspector() {
         var b = selectedId != null ? byId(selectedId) : null;
         insp.tabs.innerHTML = "";
         panels = null;
+        pageNode.classList.toggle("is-sel", pageSelected);
+        pageBody.hidden = !pageSelected;
+        insp.body.hidden = pageSelected;
+        if (pageSelected) {
+            insp.crumb.innerHTML = "";
+            insp.title.innerHTML = '<span class="ic"><i class="ti ti-file-text"></i></span>' + esc(t("pageSettings"));
+            insp.foot.hidden = true;
+            return;
+        }
         if (!b) {
             insp.crumb.innerHTML = "";
             insp.title.innerHTML = "";
@@ -589,7 +658,7 @@
     });
     document.querySelector(".ev2-insp").addEventListener("click", function (e) {
         var go = e.target.closest("[data-go]");
-        if (go) { var v = go.getAttribute("data-go"); if (v === "") { selectedId = null; renderTree(); renderInspector(); syncPreviewSelection(); } else select(Number(v), true); return; }
+        if (go) { var v = go.getAttribute("data-go"); if (v === "") selectPage(); else select(Number(v), true); return; }
         var here = e.target.closest("[data-add-here]");
         if (here) openPicker(here, Number(here.getAttribute("data-add-here")), null);
     });
@@ -695,38 +764,68 @@
     });
 
     // ---------- save ----------
+    // One button for both: the page settings go first (a refused slug must stop the save before
+    // anything else is written), then the block tree.
     var saving = false;
+    function postForm(url, params) {
+        params.set("__RequestVerificationToken", token);
+        return fetch(url, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", "RequestVerificationToken": token }, body: params.toString(), credentials: "same-origin" })
+            .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); });
+    }
+    function savePage() {
+        if (!pageDirty()) return Promise.resolve(false);
+        var sent = pageSnap();
+        return postForm(body.getAttribute("data-meta-url"), new URLSearchParams(new FormData(pageForm))).then(function (res) {
+            if (!res || !res.ok) { var err = new Error("page"); err.message = res && res.error || t("pageSaveFailed"); err.page = true; throw err; }
+            pageSaved = sent;
+            // What the page is now called and where it lives — the slug may have been cleaned up.
+            pageForm.querySelector('[name="Meta.Slug"]').value = res.slug;
+            pageSaved = pageSnap();
+            document.querySelectorAll(".ev2-title-text, #ev2-page-node-title").forEach(function (n) { n.textContent = res.title; });
+            var badge = document.querySelector(".ev2-title > .badge");
+            if (badge) { badge.className = "badge " + (res.published ? "badge-on" : "badge-off"); badge.textContent = res.published ? t("published") : t("draft"); }
+            var view = document.querySelector('.ev2-top a[target="_blank"]'); if (view) view.setAttribute("href", res.url);
+            var urlHelp = document.getElementById("ev2-page-url"); if (urlHelp) urlHelp.textContent = res.url;
+            // A new address: the preview has to follow, or it shows a page that no longer exists.
+            var now = new URL(frame.getAttribute("src"), location.href).pathname;
+            if (now !== res.url) frame.setAttribute("src", res.url + (res.url.indexOf("?") >= 0 ? "&" : "?") + "editor=1");
+            return true;
+        });
+    }
+    function saveBlocks() {
+        if (!blocksDirty()) return Promise.resolve(false);
+        var params = new URLSearchParams();
+        params.set("Draft", JSON.stringify(blocks));
+        return postForm(saveUrl, params).then(function (res) {
+            if (!res || !res.ok) throw new Error("save");
+            // Renumber the draft to the ids the database gave the new blocks. History steps keep
+            // the old ids, so undoing past a save would bring back blocks with stale negative
+            // ids — the history starts afresh from the saved state instead.
+            var map = res.ids || {};
+            blocks.forEach(function (b) { if (map[b.id] != null) b.id = map[b.id]; });
+            blocks.forEach(function (b) { if (b.parentId != null && map[b.parentId] != null) b.parentId = map[b.parentId]; });
+            if (selectedId != null && map[selectedId] != null) selectedId = map[selectedId];
+            Object.keys(expanded).forEach(function (k) { if (map[k] != null) { expanded[map[k]] = expanded[k]; } });
+            savedSnap = lastSnap = snap();
+            past = []; future = [];
+            return true;
+        });
+    }
     function save() {
         if (saving || !dirty()) return;
         saving = true;
         statusText = { html: '<i class="ti ti-loader-2"></i> ' + esc(t("saving")) };
         updateChrome();
-        var form = new URLSearchParams();
-        form.set("__RequestVerificationToken", token);
-        form.set("Draft", JSON.stringify(blocks));
-        fetch(saveUrl, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", "RequestVerificationToken": token }, body: form.toString(), credentials: "same-origin" })
-            .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
-            .then(function (res) {
-                if (!res || !res.ok) throw new Error("save");
-                // Renumber the draft to the ids the database gave the new blocks. History steps keep
-                // the old ids, so undoing past a save would bring back blocks with stale negative
-                // ids — the history starts afresh from the saved state instead.
-                var map = res.ids || {};
-                blocks.forEach(function (b) {
-                    if (map[b.id] != null) b.id = map[b.id];
-                });
-                blocks.forEach(function (b) { if (b.parentId != null && map[b.parentId] != null) b.parentId = map[b.parentId]; });
-                if (selectedId != null && map[selectedId] != null) selectedId = map[selectedId];
-                Object.keys(expanded).forEach(function (k) { if (map[k] != null) { expanded[map[k]] = expanded[k]; } });
-                savedSnap = lastSnap = snap();
-                past = []; future = [];
+        savePage()
+            .then(function () { return saveBlocks(); })
+            .then(function () {
                 statusText = null;
                 renderTree(); renderInspector();
                 // The saved page is now what the site serves; reload so the frame shows exactly that.
                 frame.contentWindow && frame.contentWindow.location.reload();
             })
-            .catch(function () { statusText = { html: '<i class="ti ti-alert-triangle"></i> ' + esc(t("saveFailed")), err: true }; })
-            .finally(function () { saving = false; updateChrome(); if (statusText && statusText.err) setTimeout(function () { statusText = null; updateChrome(); }, 5000); });
+            .catch(function (e) { statusText = { html: '<i class="ti ti-alert-triangle"></i> ' + esc(e && e.page ? e.message : t("saveFailed")), err: true }; })
+            .finally(function () { saving = false; updateChrome(); if (statusText && statusText.err) setTimeout(function () { statusText = null; updateChrome(); }, 6000); });
     }
     saveBtn.addEventListener("click", save);
 
@@ -868,17 +967,9 @@
         });
     }
 
-    // ---------- page settings dialog ----------
-    var dlg = document.getElementById("ev2-settings");
-    document.getElementById("ev2-settings-open").addEventListener("click", function () {
-        // Saving the settings reloads the editor — unsaved blocks would be lost, so say so up front.
-        document.getElementById("ev2-settings-dirty").hidden = !dirty();
-        dlg.showModal();
-    });
-    document.getElementById("ev2-settings-close").addEventListener("click", function () { dlg.close(); });
-    document.getElementById("ev2-settings-form").addEventListener("submit", function (e) {
-        if (!okToLeave()) e.preventDefault();   // saving the settings reloads the editor
-    });
+    pageForm.addEventListener("input", updateChrome);
+    pageForm.addEventListener("change", updateChrome);
+    pageForm.addEventListener("submit", function (e) { e.preventDefault(); save(); });
 
     // ---------- small screens: tree and inspector as sheets ----------
     document.getElementById("ev2-tree-toggle").addEventListener("click", function () { body.classList.toggle("ev2-nav-open"); });

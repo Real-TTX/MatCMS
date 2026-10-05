@@ -199,3 +199,15 @@ body.ev2 { margin: 0; display: grid; grid-template-columns: 280px minmax(0, 1fr)
 .ev2-foot .ev2-convert { flex: 1 1 100%; }
 .ev2-foot .ev2-convert[hidden] { display: none; }
 .ev2-hint { display: flex; gap: 6px; align-items: flex-start; font-size: 12px; color: #6b7280; background: #f6f8fb; border-radius: 8px; padding: 8px 10px; margin: 0 0 14px; line-height: 1.45; }
+
+/* --- the page as first tree entry + its settings in the inspector --- */
+.ev2-page-node { width: 100%; border: 0; background: none; font: inherit; text-align: left; margin-bottom: 2px; }
+.ev2-page-node .ic { background: #eef3ff; color: #1d4ed8; }
+.ev2-page-node .act { display: inline-flex; color: #b6bcc5; }
+.ev2-page-node.is-sel .act { color: #1d4ed8; }
+.ev2-page-body .field input[type=text], .ev2-page-body textarea, .ev2-page-body select { width: 100%; box-sizing: border-box; }
+.ev2-page-body .help { font-size: 12px; color: #6b7280; margin-top: 4px; word-break: break-all; }
+.ev2-group { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #9aa1ab; font-weight: 600; margin: 18px 0 10px; padding-top: 14px; border-top: 1px solid #eef0f3; }
+.ev2-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border: 1px solid #e6e8ec; border-radius: 10px;
+    font-size: 14px; font-weight: 600; cursor: pointer; }
+.ev2-toggle-row input { width: 18px; height: 18px; accent-color: #2563eb; }

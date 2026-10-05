@@ -230,19 +230,16 @@ public class EditModel : PageModel
         var locale = Localizer.IsSupported(Meta.Locale) ? Meta.Locale : page.Locale;
         if (string.IsNullOrWhiteSpace(Meta.Title) || string.IsNullOrWhiteSpace(slug))
         {
-            TempData["FlashError"] = "Titel und Slug dürfen nicht leer sein.";
-            return MetaBack(id, back);
+            return MetaFail(id, back, "Titel und Slug dürfen nicht leer sein.");
         }
         if (IndexModel.IsReserved(slug))
         {
-            TempData["FlashError"] = $"Der Slug „{slug}“ ist reserviert und kann nicht verwendet werden.";
-            return MetaBack(id, back);
+            return MetaFail(id, back, $"Der Slug „{slug}“ ist reserviert und kann nicht verwendet werden.");
         }
         // A slug is unique per locale.
         if (await _db.Pages.AnyAsync(p => p.Slug == slug && p.Locale == locale && p.Id != id))
         {
-            TempData["FlashError"] = $"Der Slug „{slug}“ ist in dieser Sprache bereits vergeben.";
-            return MetaBack(id, back);
+            return MetaFail(id, back, $"Der Slug „{slug}“ ist in dieser Sprache bereits vergeben.");
         }
 
         page.Title = Meta.Title.Trim();
@@ -266,7 +263,19 @@ public class EditModel : PageModel
         page.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
 
+        // Editor v2 saves the settings together with the blocks (one "Speichern") and stays on the page:
+        // it needs the outcome as data, including the address the page now lives at.
+        if (back == "json")
+            return new JsonResult(new { ok = true, title = page.Title, slug = page.Slug, published = page.IsPublished,
+                url = SiteContext.LocalizedUrl(page.Locale, page.Slug) });
         TempData["Flash"] = "Seiteneinstellungen gespeichert.";
+        return MetaBack(id, back);
+    }
+
+    private IActionResult MetaFail(int id, string? back, string error)
+    {
+        if (back == "json") return new JsonResult(new { ok = false, error });
+        TempData["FlashError"] = error;
         return MetaBack(id, back);
     }
 

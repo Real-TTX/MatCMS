@@ -1,0 +1,15 @@
+@model MatCMS.Content.BlockData
+@{
+    var body = Model.Str("body");
+    var cls = "rich el-text";
+    var size = Model.Str("size");
+    if (size.Length > 0) { cls += " el-size-" + size; }
+    var align = Model.Str("align");
+    if (align.Length > 0) { cls += " el-align-" + align; }
+    if (Model.Str("measure") == "read") { cls += " el-measure"; }
+}
+@if (!string.IsNullOrWhiteSpace(body))
+{
+    @* Same trust as the rich-text block: stored editor HTML, written by the site's admins. *@
+    <div class="@cls">@Html.Raw(body)</div>
+}

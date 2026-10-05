@@ -1,0 +1,34 @@
+@model MatCMS.Content.ContainerBlockModel
+@inject MatCMS.Services.MediaFocus Focus
+@{
+    // Editor v2 section: a band across the page holding elements (heading, text, image, buttons,
+    // columns …) one under the other. Background, width, spacing and alignment live HERE, so the
+    // elements inside stay simple and every section of a site looks like it belongs to the same one.
+    var d = Model.Data;
+    var bg = d.StrOr("bg", "none");
+    var img = d.Str("bgImage");
+    var safeImg = !string.IsNullOrWhiteSpace(img) && (img.StartsWith("/") || img.StartsWith("http"))
+        && img.IndexOfAny(new[] { '\'', '"', '(', ')', '\\', '\n', '\r' }) < 0 ? img : "";
+    if (bg == "image" && safeImg.Length == 0) { bg = "none"; }
+    var cls = "section el-section el-bg-" + bg + " el-pad-" + d.StrOr("pad", "m");
+    var mh = d.Str("minHeight");
+    if (mh.Length > 0) { cls += " el-h-" + mh; }
+    if (bg == "image") { cls += " el-ov-" + d.StrOr("overlay", "medium"); }
+    var style = bg == "image"
+        ? $"background-image:url('{MatCMS.Services.ThumbnailService.Url(safeImg, 1920)}');background-position:{Focus.Position(safeImg) ?? "center"}"
+        : null;
+    var inner = "container el-inner el-w-" + d.StrOr("width", "normal") + " el-align-" + d.StrOr("align", "left");
+}
+<section class="@cls" style="@style">
+    <div class="@inner">
+        @foreach (var child in Model.Children)
+        {
+            @await Html.PartialAsync("_ChildBlock", child)
+        }
+        @if (Model.Editor && Model.Children.Count == 0)
+        {
+            @* Empty in the editor: something to click and drop elements into. *@
+            <div class="mat-ed-empty">＋ @T["ev2.addElement"]</div>
+        }
+    </div>
+</section>

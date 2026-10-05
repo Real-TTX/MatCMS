@@ -1,0 +1,27 @@
+@model MatCMS.Content.ContainerBlockModel
+@{
+    // Editor v2 columns: two to four columns side by side, each with elements of its own. On a phone
+    // they stack (or stack reversed, so an image that sits on the right still comes first).
+    // At the top of a page there is no section around them, so they bring the section's frame
+    // (spacing, page width) themselves; inside a section they are only the grid.
+    var d = Model.Data;
+    var layout = d.StrOr("layout", "50-50");
+    if (!new[] { "50-50", "33-67", "67-33", "40-60", "60-40", "33-33-33", "25-25-25-25" }.Contains(layout)) { layout = "50-50"; }
+    var cls = "el-columns el-cols-" + layout + " el-valign-" + d.StrOr("valign", "top") + " el-gap-" + d.StrOr("gap", "m")
+        + " el-mobile-" + d.StrOr("mobile", "stack");
+    var top = Model.Depth == 0;
+}
+@if (top)
+{
+    @:<section class="section el-section el-pad-m"><div class="container el-inner">
+}
+<div class="@cls">
+    @foreach (var child in Model.Children)
+    {
+        @await Html.PartialAsync("_ChildBlock", child)
+    }
+</div>
+@if (top)
+{
+    @:</div></section>
+}

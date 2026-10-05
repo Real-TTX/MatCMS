@@ -18,7 +18,7 @@
     MatCMS.Content.ContainerBlockModel? containerModel = null;
     if (def.IsContainer)
     {
-        containerModel = BuildContainer(block.Id, data, registry, allBlocks, 0);
+        containerModel = BuildContainer(block.Id, data, registry, allBlocks, 0, editor);
     }
 
     // Global layout options (width + top/bottom spacing) — one wrapper for both preview and live.
@@ -74,7 +74,7 @@
     // Resolves a container's children into (partial, data) pairs; a child that is itself a container
     // gets its own sub-model built recursively (depth-guarded) so arbitrary nesting renders.
     static MatCMS.Content.ContainerBlockModel BuildContainer(int parentId, MatCMS.Content.BlockData data,
-        MatCMS.Content.BlockRegistry reg, IReadOnlyList<MatCMS.Models.ContentBlock> all, int depth)
+        MatCMS.Content.BlockRegistry reg, IReadOnlyList<MatCMS.Models.ContentBlock> all, int depth, bool editor)
     {
         var kids = new List<MatCMS.Content.ContainerBlockModel.ChildBlock>();
         if (depth <= 6)
@@ -84,11 +84,11 @@
                 var cdef = reg.Get(cb.BlockType);
                 if (cdef is null || string.IsNullOrWhiteSpace(cdef.Partial)) continue;
                 var cdata = new MatCMS.Content.BlockData(cb.DataJson);
-                var sub = cdef.IsContainer ? BuildContainer(cb.Id, cdata, reg, all, depth + 1) : null;
-                kids.Add(new MatCMS.Content.ContainerBlockModel.ChildBlock(cdef.Partial, cdata, sub));
+                var sub = cdef.IsContainer ? BuildContainer(cb.Id, cdata, reg, all, depth + 1, editor) : null;
+                kids.Add(new MatCMS.Content.ContainerBlockModel.ChildBlock(cdef.Partial, cdata, sub, cb.Id, editor, cdef.Type));
             }
         }
-        return new MatCMS.Content.ContainerBlockModel(data, kids);
+        return new MatCMS.Content.ContainerBlockModel(data, kids) { Editor = editor, Depth = depth };
     }
 
     string RenderPluginBlock(MatCMS.Content.BlockDefinition def, string dataJson)

@@ -1,0 +1,36 @@
+@model MatCMS.Content.ContainerBlockModel.ChildBlock
+@inject MatCMS.Content.BlockRegistry Registry
+@* One child of a container block. Every container renders its children through here, so the editor
+   mark exists in ONE place: in the editor preview the child sits in a wrapper carrying its id, which
+   lets a click select exactly this child instead of the whole container. The wrapper is
+   display:contents — it adds no box, so grids and flex rows of the container lay out as before; the
+   preview script highlights the wrapper's first element instead. On the public site there is no
+   wrapper at all.
+   A child that renders NOTHING (an image without an image, a new empty column) would be invisible in
+   the preview and so impossible to click — in the editor it stands as a dashed placeholder instead. *@
+@{
+    var content = Model.Container is not null
+        ? await Html.PartialAsync(Model.Partial, Model.Container)
+        : await Html.PartialAsync(Model.Partial, Model.Data);
+}
+@if (Model.Editor && Model.Id != 0)
+{
+    using var sw = new System.IO.StringWriter();
+    content.WriteTo(sw, System.Text.Encodings.Web.HtmlEncoder.Default);
+    var html = sw.ToString();
+    @:<div class="mat-ed-child" data-block-id="@Model.Id" style="display:contents">
+    if (string.IsNullOrWhiteSpace(html))
+    {
+        var def = string.IsNullOrEmpty(Model.Type) ? null : Registry.Get(Model.Type);
+        <div class="mat-ed-empty">@(def is null ? "＋" : "＋ " + T[def.Name])</div>
+    }
+    else
+    {
+        @Html.Raw(html)
+    }
+    @:</div>
+}
+else
+{
+    @content
+}

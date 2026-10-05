@@ -46,6 +46,12 @@ else
         .mat-ed-block.mat-selected { outline: 3px solid #2563eb; outline-offset: -3px; }
         .mat-ed-block.mat-selected:hover { outline: 3px solid #2563eb; }
         .mat-ed-block.mat-flash { animation: matFlash 1s ease; }
+        /* Children of a container (editor v2): the mark sits on a display:contents wrapper, so the hover
+           and the selection go on the element it wraps. */
+        .mat-ed-child > *:hover { outline: 1px dashed rgba(37, 99, 235, .6); outline-offset: 2px; }
+        .mat-sel-child { outline: 2px solid #2563eb !important; outline-offset: 2px; }
+        /* An element that renders nothing yet (image without image, empty column) — clickable stand-in. */
+        .mat-ed-empty { min-height: 56px; display: flex; align-items: center; justify-content: center; border: 1.5px dashed rgba(37, 99, 235, .45); border-radius: 8px; color: rgba(37, 99, 235, .85); font: 600 12px/1.2 Inter, sans-serif; background: rgba(37, 99, 235, .05); padding: 10px; }
         /* Insert-between-blocks zones (page-builder style) shown in the preview. */
         .mat-insert { display: block; width: 100%; border: none; background: none; padding: 0; margin: 0; cursor: pointer; position: relative; height: 22px; opacity: 0; transition: opacity .12s ease; z-index: 9997; }
         .mat-insert::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 3px; background: #2563eb; border-radius: 3px; transform: translateY(-50%); }
@@ -88,7 +94,8 @@ else
 
             // In editor mode, clicking anywhere selects the containing block (and never navigates).
             document.addEventListener("click", function (e) {
-                var block = e.target.closest(".mat-ed-block");
+                // The innermost mark wins: a click on a card selects the card, not the cards block.
+                var block = e.target.closest("[data-block-id]");
                 if (block) { e.preventDefault(); e.stopPropagation(); post({ type: "mat-select-block", id: block.getAttribute("data-block-id") }); }
                 else {
                     var a = e.target.closest("a");
@@ -104,9 +111,17 @@ else
                     if (el) { ensureVisible(el); el.classList.add("mat-flash"); setTimeout(function () { el.classList.remove("mat-flash"); }, 1000); }
                 }
                 if (d.type === "mat-select" && d.id) {
-                    if (selected) selected.classList.remove("mat-selected");
-                    selected = document.getElementById("block-" + d.id);
-                    if (selected) { selected.classList.add("mat-selected"); ensureVisible(selected); }
+                    if (selected) selected.classList.remove("mat-selected", "mat-sel-child");
+                    // A child has no box of its own (display:contents wrapper) — its first element stands
+                    // in. A child the block's markup does not mark falls back to the block it is in.
+                    var child = document.querySelector('.mat-ed-child[data-block-id="' + d.id + '"]');
+                    var target = child && child.firstElementChild;
+                    if (target) { selected = target; target.classList.add("mat-sel-child"); }
+                    else {
+                        selected = document.getElementById("block-" + d.id) || (d.fallback ? document.getElementById("block-" + d.fallback) : null);
+                        if (selected) selected.classList.add("mat-selected");
+                    }
+                    if (selected) ensureVisible(selected);
                 }
                 // Live preview: replace the block area with freshly-rendered draft HTML (no reload).
                 if (d.type === "mat-render" && typeof d.html === "string") {

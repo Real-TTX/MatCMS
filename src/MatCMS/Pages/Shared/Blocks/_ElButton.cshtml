@@ -1,0 +1,22 @@
+@model MatCMS.Content.BlockData
+@{
+    // The template's own .btn / .btn-outline — a button here looks like every other button of the site.
+    var text = Model.Str("text");
+    var url = Model.Str("url");
+    var safe = !string.IsNullOrWhiteSpace(url) && (url.StartsWith("/") || url.StartsWith("http") || url.StartsWith("#")
+        || url.StartsWith("mailto:") || url.StartsWith("tel:")) ? url : "#";
+    var style = Model.StrOr("style", "primary");
+    var cls = style == "outline" ? "btn btn-outline el-btn" : style == "link" ? "el-btn-link" : "btn el-btn";
+    var newTab = Model.Str("newTab") == "yes";
+}
+@if (!string.IsNullOrWhiteSpace(text))
+{
+    if (newTab)
+    {
+        <a class="@cls" href="@safe" target="_blank" rel="noopener">@text</a>
+    }
+    else
+    {
+        <a class="@cls" href="@safe">@text</a>
+    }
+}

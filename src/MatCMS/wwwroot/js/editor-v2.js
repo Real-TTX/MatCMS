@@ -53,6 +53,13 @@
         for (var i = 0; i < keys.length; i++) { var v = strip(d[keys[i]]); if (v) return v.length > 38 ? v.slice(0, 38) + "…" : v; }
         return "";
     }
+    // A column is named by its place (Spalte 1, 2 …): it has no text of its own, and three nodes all
+    // called "Spalte" do not tell which one is on the left.
+    function label(b) {
+        var name = def(b).name;
+        if (b.blockType === "el-column") name += " " + (kids(b.parentId).indexOf(b) + 1);
+        return name;
+    }
     function svgIcon(svg) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (svg || "") + "</svg>"; }
     function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
 
@@ -133,7 +140,7 @@
         node.innerHTML =
             '<span class="tw">' + (container ? '<i class="ti ti-chevron-' + (open ? "down" : "right") + '"></i>' : "") + "</span>" +
             '<span class="ic">' + svgIcon(d.svg) + "</span>" +
-            '<span class="lbl">' + esc(d.name) + (sum ? " <em>" + esc(sum) + "</em>" : container && children.length ? " <em>" + children.length + "</em>" : "") + "</span>" +
+            '<span class="lbl">' + esc(label(b)) + (sum ? " <em>" + esc(sum) + "</em>" : container && children.length && b.blockType !== "el-column" ? " <em>(" + children.length + ")</em>" : "") + "</span>" +
             '<span class="act">' +
             '<button type="button" data-act="up" title="' + esc(t("moveUp")) + '"><i class="ti ti-arrow-up"></i></button>' +
             '<button type="button" data-act="down" title="' + esc(t("moveDown")) + '"><i class="ti ti-arrow-down"></i></button>' +
@@ -257,18 +264,76 @@
         kids(b.id).forEach(function (k) { if (k.id !== c.id) clone(k, c.id); });
         return c;
     }
-    function addBlock(type, parentId, index) {
+    // ---------- new blocks ----------
+    // A new block starts with its fields' defaults and — for the elements — a word or two of starter
+    // text: an empty heading renders nothing, and an element nobody can see in the preview is an
+    // element nobody can click.
+    var STARTERS = {
+        "el-heading": { text: t("starter.heading") },
+        "el-text": { body: "<p>" + esc(t("starter.text")) + "</p>" },
+        "el-button": { text: t("starter.button"), url: "#" }
+    };
+    function initialData(type) {
+        var d = {};
+        ((types[type] || {}).schema || []).forEach(function (f) { if (f["default"] != null && f["default"] !== "") d[f.id] = f["default"]; });
+        var st = STARTERS[type]; if (st) Object.keys(st).forEach(function (k) { d[k] = st[k]; });
+        return d;
+    }
+    // What a container should come with: buttons with one button, columns with as many columns as
+    // their split has.
+    function COLS(layout) { return String(layout || "50-50").split("-").length; }
+    function withKids(type, data) {
+        if (type === "el-buttons") return [{ type: "el-button" }];
+        if (type === "el-columns") { var n = COLS(data.layout), out = []; for (var i = 0; i < n; i++) out.push({ type: "el-column" }); return out; }
+        return [];
+    }
+    // Builds a tree of new blocks from a spec { type, data, children } (negative ids) and returns its root.
+    function build(spec, parentId) {
+        var data = Object.assign(initialData(spec.type), spec.data || {});
+        var b = { id: nextNeg--, blockType: spec.type, parentId: parentId, sortOrder: 0, dataJson: JSON.stringify(data) };
+        blocks.push(b);
+        (spec.children || withKids(spec.type, data)).forEach(function (c, i) { var k = build(c, b.id); k.sortOrder = i; });
+        if (isContainer(b)) expanded[b.id] = true;
+        return b;
+    }
+    function insert(spec, parentId, index) {
         record();
         var sibs = kids(parentId);
-        var b = { id: nextNeg--, blockType: type, parentId: parentId, sortOrder: 0, dataJson: "{}" };
+        var b = build(spec, parentId);
         var at = index == null || index > sibs.length ? sibs.length : index;
         sibs.splice(at, 0, b);
-        blocks.push(b);
         sibs.forEach(function (k, i) { k.sortOrder = i; });
         if (parentId != null) expanded[parentId] = true;
         committed();
         select(b.id, true);
         renderPreview();
+    }
+    function addBlock(type, parentId, index) { insert({ type: type }, parentId, index); }
+
+    // Ready-made sections out of elements — the hero the mockup showed, put together in one click.
+    var PRESETS = {
+        hero: function () { return { type: "el-section", data: { align: "center", pad: "l", label: t("preset.hero") }, children: [
+            { type: "el-image", data: { size: "xs", shape: "circle" } },
+            { type: "el-heading", data: { level: "h1", size: "xl", text: t("starter.heading") } },
+            { type: "el-text", data: { size: "l", measure: "read" } },
+            { type: "el-buttons", children: [{ type: "el-button" }, { type: "el-button", data: { text: t("starter.button2"), style: "outline" } }] }] }; },
+        imageText: function () { return { type: "el-columns", data: { layout: "50-50", valign: "center" }, children: [
+            { type: "el-column", children: [{ type: "el-image", data: { shape: "rounded" } }] },
+            { type: "el-column", children: [{ type: "el-heading" }, { type: "el-text" }, { type: "el-buttons" }] }] }; },
+        text: function () { return { type: "el-section", data: { width: "narrow", label: t("preset.text") }, children: [{ type: "el-heading" }, { type: "el-text" }] }; },
+        threeCols: function () {
+            var col = function () { return { type: "el-column", children: [{ type: "el-image", data: { shape: "rounded" } }, { type: "el-heading", data: { level: "h3" } }, { type: "el-text" }] }; };
+            return { type: "el-columns", data: { layout: "33-33-33" }, children: [col(), col(), col()] };
+        }
+    };
+    var PRESET_ICON = {
+        hero: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="12" cy="9" r="2"/><path d="M8 14h8"/><path d="M9 17h6"/>',
+        imageText: '<rect x="3" y="5" width="8" height="14" rx="1"/><path d="M14 8h7"/><path d="M14 12h7"/><path d="M14 16h4"/>',
+        text: '<path d="M6 6h12"/><path d="M4 11h16"/><path d="M4 15h16"/><path d="M4 19h10"/>',
+        threeCols: '<rect x="2" y="5" width="5.5" height="14" rx="1"/><rect x="9.25" y="5" width="5.5" height="14" rx="1"/><rect x="16.5" y="5" width="5.5" height="14" rx="1"/>'
+    };
+    function presetOptions() {
+        return Object.keys(PRESETS).map(function (k) { return { type: "preset:" + k, name: t("preset." + k), desc: t("preset." + k + ".desc"), cat: "presets", svg: PRESET_ICON[k] }; });
     }
     document.getElementById("ev2-dup").addEventListener("click", function () { if (selectedId != null) action("dup", selectedId); });
     document.getElementById("ev2-del").addEventListener("click", function () { if (selectedId != null) action("del", selectedId); });
@@ -281,7 +346,7 @@
     function openPicker(anchor, parentId, index) {
         var options;
         if (parentId == null) {
-            options = Object.keys(types).map(function (k) { return types[k]; }).filter(function (d) { return !d.childOnly; });
+            options = presetOptions().concat(Object.keys(types).map(function (k) { return types[k]; }).filter(function (d) { return !d.childOnly; }));
         } else {
             var p = byId(parentId);
             options = (def(p).allowed || []).map(function (k) { return types[k]; }).filter(Boolean);
@@ -326,7 +391,9 @@
     popList.addEventListener("click", function (e) {
         var b = e.target.closest("button[data-type]"); if (!b || !pick) return;
         var p = pick; closePicker();
-        addBlock(b.getAttribute("data-type"), p.parentId, p.index);
+        var type = b.getAttribute("data-type");
+        if (type.indexOf("preset:") === 0) insert(PRESETS[type.slice(7)](), p.parentId, p.index);
+        else addBlock(type, p.parentId, p.index);
     });
     function closePicker() { pop.hidden = true; pick = null; }
     document.addEventListener("mousedown", function (e) {
@@ -418,7 +485,7 @@
             var btn = document.createElement("button");
             btn.type = "button";
             btn.setAttribute("data-go", k.id);
-            btn.innerHTML = svgIcon(def(k).svg) + "<span>" + esc(def(k).name) + (summary(k) ? ' <span style="color:#9aa1ab">' + esc(summary(k)) + "</span>" : "") + '</span><i class="ti ti-chevron-right chev"></i>';
+            btn.innerHTML = svgIcon(def(k).svg) + "<span>" + esc(label(k)) + (summary(k) ? ' <span style="color:#9aa1ab">' + esc(summary(k)) + "</span>" : "") + '</span><i class="ti ti-chevron-right chev"></i>';
             box.appendChild(btn);
         });
         var add = document.createElement("button");
@@ -459,6 +526,13 @@
             if (next === b.dataJson) return;
             record(true);
             b.dataJson = next;
+            // A wider split needs more columns: the missing ones are added, extra ones are kept —
+            // they may hold content, and nothing is thrown away by a dropdown.
+            if (b.blockType === "el-columns") {
+                var have = kids(b.id).length, want = COLS(merged.layout);
+                for (var c = have; c < want; c++) { var col = build({ type: "el-column" }, b.id); col.sortOrder = c; }
+                if (want > have) { renderTree(); renderInspector(); }
+            }
             committed();
             refreshNodeLabel(b);
             renderPreview();
@@ -470,19 +544,19 @@
         var n = treeEl.querySelector('.ev2-node[data-id="' + b.id + '"] .lbl');
         if (!n) return;
         var s = summary(b);
-        n.innerHTML = esc(def(b).name) + (s ? " <em>" + esc(s) + "</em>" : "");
+        n.innerHTML = esc(label(b)) + (s ? " <em>" + esc(s) + "</em>" : "");
     }
 
     // ---------- preview ----------
     function post(msg) { if (frame.contentWindow) frame.contentWindow.postMessage(msg, "*"); }
-    // The preview only marks top-level blocks; a selected child lights up its section until stage 2
-    // gives children their own marks.
     function previewTarget() {
         var b = selectedId != null ? byId(selectedId) : null;
         while (b && b.parentId != null) b = byId(b.parentId);
         return b ? b.id : null;
     }
-    function syncPreviewSelection() { var id = previewTarget(); if (id != null) post({ type: "mat-select", id: String(id) }); }
+    // The block itself when the preview marks it (top level, or a child of a container that renders
+    // its children through _ChildBlock); its top-level block otherwise.
+    function syncPreviewSelection() { var top = previewTarget(); if (top != null) post({ type: "mat-select", id: String(selectedId), fallback: String(top) }); }
     var renderT, renderSeq = 0;
     function renderPreview() {
         clearTimeout(renderT);

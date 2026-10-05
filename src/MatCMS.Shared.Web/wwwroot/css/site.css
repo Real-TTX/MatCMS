@@ -1182,3 +1182,115 @@ body.has-adminbar .site-header { top: 67px; }
 .mat-vs.is-active.vs-cloud { background: #059669; }
 .mat-vs.is-active.vs-web   { background: #2563eb; }
 .mat-vs.is-active.vs-admin { background: #7c3aed; }
+
+/* ============ Element blocks (editor v2: el-section, el-columns, el-heading …) ============
+   A section is a band; inside it elements stack with an even gap. Colours come from the template's
+   variables only (--accent, --ink, --black, --bg-alt), so the pieces fit every theme; a template
+   restyles them through these classes like any other block. */
+.el-section { padding: 64px 0; position: relative; }
+.el-section.el-pad-none { padding: 0; }
+.el-section.el-pad-s { padding: 32px 0; }
+.el-section.el-pad-l { padding: 96px 0; }
+.el-section.el-pad-xl { padding: 140px 0; }
+.el-section.el-h-half { min-height: 50vh; display: flex; align-items: center; }
+.el-section.el-h-screen { min-height: 100vh; min-height: 100svh; display: flex; align-items: center; }
+.el-section.el-h-half > .container, .el-section.el-h-screen > .container { width: 100%; }
+.el-bg-alt { background: var(--bg-alt); }
+.el-bg-accent { background: var(--accent); color: #fff; }
+.el-bg-dark { background: #111; color: #eee; }
+.el-bg-accent :is(h1, h2, h3, h4), .el-bg-dark :is(h1, h2, h3, h4) { color: inherit; }
+.el-bg-image { background-size: cover; background-repeat: no-repeat; color: #fff; }
+.el-bg-image :is(h1, h2, h3, h4) { color: #fff; }
+.el-bg-image::before { content: ""; position: absolute; inset: 0; pointer-events: none; }
+.el-bg-image.el-ov-light::before { background: rgba(0, 0, 0, .25); }
+.el-bg-image.el-ov-medium::before { background: rgba(0, 0, 0, .45); }
+.el-bg-image.el-ov-strong::before { background: rgba(0, 0, 0, .65); }
+.el-bg-image > .container { position: relative; }
+
+.el-inner, .el-column { display: flex; flex-direction: column; gap: 18px; }
+.el-inner.el-w-narrow { max-width: min(var(--max), 760px); }
+.el-inner.el-w-wide { max-width: min(1440px, 100%); }
+.el-align-left { text-align: left; }
+.el-align-center { text-align: center; }
+.el-align-right { text-align: right; }
+.el-inner.el-align-center, .el-column.el-align-center { align-items: center; }
+.el-inner.el-align-right, .el-column.el-align-right { align-items: flex-end; }
+:is(.el-heading, .el-text, .el-image, .el-buttons).el-align-left { align-self: flex-start; }
+:is(.el-heading, .el-text, .el-image, .el-buttons).el-align-center { align-self: center; }
+:is(.el-heading, .el-text, .el-image, .el-buttons).el-align-right { align-self: flex-end; }
+
+.el-heading { max-width: 100%; }
+.el-heading :is(h1, h2, h3, h4) { margin: 0; }
+.el-heading.el-size-s :is(h1, h2, h3, h4) { font-size: clamp(1.2rem, 2vw, 1.5rem); }
+.el-heading.el-size-m :is(h1, h2, h3, h4) { font-size: clamp(1.5rem, 3vw, 2.1rem); }
+.el-heading.el-size-l :is(h1, h2, h3, h4) { font-size: clamp(2rem, 4.2vw, 3rem); }
+.el-heading.el-size-xl :is(h1, h2, h3, h4) { font-size: clamp(2.4rem, 6vw, 4.4rem); line-height: 1.08; }
+.el-hl { color: var(--accent); }
+.el-kicker { margin: 0 0 8px; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+
+.el-text { max-width: 100%; }
+.el-text > :last-child { margin-bottom: 0; }
+.el-text.el-size-s { font-size: .92em; }
+.el-text.el-size-l { font-size: 1.18em; line-height: 1.7; }
+.el-text.el-measure { max-width: 68ch; }
+
+.el-image { margin: 0; max-width: 100%; }
+.el-image img { display: block; width: 100%; height: auto; }
+.el-image.el-isize-l { width: min(100%, 75%); }
+.el-image.el-isize-m { width: min(100%, 50%); }
+.el-image.el-isize-s { width: min(100%, 320px); }
+.el-image.el-isize-xs { width: min(100%, 160px); }
+.el-image.el-shape-rounded img { border-radius: 14px; }
+.el-image.el-shape-circle img { border-radius: 50%; aspect-ratio: 1; object-fit: cover; }
+.el-image.el-shape-square img { aspect-ratio: 1; object-fit: cover; }
+.el-image.el-shape-portrait img { aspect-ratio: 4 / 5; object-fit: cover; }
+.el-image.el-shape-landscape img { aspect-ratio: 16 / 9; object-fit: cover; }
+.el-image figcaption { margin-top: 8px; font-size: .9em; opacity: .75; }
+
+.el-buttons { display: flex; flex-wrap: wrap; gap: 12px; }
+.el-buttons.el-stack-column { flex-direction: column; align-items: flex-start; }
+.el-inner.el-align-center .el-buttons, .el-column.el-align-center .el-buttons, .el-buttons.el-align-center { justify-content: center; }
+.el-inner.el-align-right .el-buttons, .el-column.el-align-right .el-buttons, .el-buttons.el-align-right { justify-content: flex-end; }
+.el-buttons.el-stack-column.el-align-center, .el-align-center .el-buttons.el-stack-column { align-items: center; }
+.el-btn-link { color: var(--accent); font-weight: 600; text-decoration: none; }
+.el-btn-link::after { content: " →"; }
+.el-btn-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+.el-spacer { height: 32px; }
+.el-spacer.el-space-s { height: 12px; }
+.el-spacer.el-space-l { height: 64px; }
+.el-spacer.el-space-xl { height: 112px; }
+.el-spacer.el-line { position: relative; }
+.el-spacer.el-line::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid currentColor; opacity: .18; }
+
+.el-columns { display: grid; gap: 40px; align-items: start; width: 100%; }
+.el-columns.el-gap-s { gap: 20px; }
+.el-columns.el-gap-l { gap: 72px; }
+.el-columns.el-valign-center { align-items: center; }
+.el-columns.el-valign-bottom { align-items: end; }
+.el-cols-50-50 { grid-template-columns: 1fr 1fr; }
+.el-cols-33-67 { grid-template-columns: 1fr 2fr; }
+.el-cols-67-33 { grid-template-columns: 2fr 1fr; }
+.el-cols-40-60 { grid-template-columns: 2fr 3fr; }
+.el-cols-60-40 { grid-template-columns: 3fr 2fr; }
+.el-cols-33-33-33 { grid-template-columns: repeat(3, 1fr); }
+.el-cols-25-25-25-25 { grid-template-columns: repeat(4, 1fr); }
+.el-column { min-width: 0; }
+.el-column.el-bg-alt, .el-column.el-bg-accent, .el-column.el-bg-dark { border-radius: 12px; }
+.el-column.el-ipad-s { padding: 16px; }
+.el-column.el-ipad-m { padding: 28px; }
+.el-column.el-ipad-l { padding: 44px; }
+@media (max-width: 900px) {
+    .el-cols-25-25-25-25 { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 720px) {
+    /* A phone has room for one column; "keep" leaves the grid as it is (e.g. two small icons). */
+    .el-columns.el-mobile-stack, .el-columns.el-mobile-reverse { display: flex; flex-direction: column; gap: 28px; }
+    .el-columns.el-mobile-reverse { flex-direction: column-reverse; }
+    /* "> .mat-ed-child > *": in the editor preview each column sits in a display:contents wrapper. */
+    :is(.el-columns.el-mobile-stack, .el-columns.el-mobile-reverse) > :is(.el-column, .mat-ed-child > .el-column) { width: 100%; }
+    .el-section { padding: 44px 0; }
+    .el-section.el-pad-s { padding: 24px 0; }
+    .el-section.el-pad-l, .el-section.el-pad-xl { padding: 64px 0; }
+    .el-image.el-isize-l, .el-image.el-isize-m { width: 100%; }
+}

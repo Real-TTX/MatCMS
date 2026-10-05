@@ -1,0 +1,39 @@
+@model MatCMS.Content.BlockData
+@inject MatCMS.Services.MediaFocus Focus
+@{
+    var src = Model.Str("image");
+    var safe = !string.IsNullOrWhiteSpace(src) && (src.StartsWith("/") || src.StartsWith("http"))
+        && src.IndexOfAny(new[] { '\'', '"', '(', ')', '\\', '\n', '\r' }) < 0 ? src : "";
+    var alt = Model.Str("alt");
+    var caption = Model.Str("caption");
+    var link = Model.Str("link");
+    var shape = Model.Str("shape");
+    var size = Model.StrOr("size", "full");
+    var cls = "el-image el-isize-" + size + (shape.Length > 0 ? " el-shape-" + shape : "");
+    var align = Model.Str("align");
+    if (align.Length > 0) { cls += " el-align-" + align; }
+    // Large enough for the slot it fills, not the original upload.
+    var px = size switch { "xs" => 240, "s" => 480, "m" => 800, _ => 1400 };
+    var focus = Focus.Position(safe);
+    var safeLink = !string.IsNullOrWhiteSpace(link) && (link.StartsWith("/") || link.StartsWith("http") || link.StartsWith("#")
+        || link.StartsWith("mailto:") || link.StartsWith("tel:")) ? link : "";
+    var imgTag = $"<img src=\"{System.Net.WebUtility.HtmlEncode(MatCMS.Services.ThumbnailService.Url(safe, px))}\" alt=\"{System.Net.WebUtility.HtmlEncode(alt)}\" loading=\"lazy\""
+        + (string.IsNullOrEmpty(focus) ? "" : $" style=\"object-position:{focus}\"") + " />";
+}
+@if (safe.Length > 0)
+{
+    <figure class="@cls">
+        @if (safeLink.Length > 0)
+        {
+            <a href="@safeLink">@Html.Raw(imgTag)</a>
+        }
+        else
+        {
+            @Html.Raw(imgTag)
+        }
+        @if (!string.IsNullOrWhiteSpace(caption))
+        {
+            <figcaption>@caption</figcaption>
+        }
+    </figure>
+}

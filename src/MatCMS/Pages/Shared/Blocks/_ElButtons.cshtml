@@ -1,0 +1,18 @@
+@model MatCMS.Content.ContainerBlockModel
+@{
+    var d = Model.Data;
+    var cls = "el-buttons el-stack-" + d.StrOr("stack", "row");
+    var align = d.Str("align");
+    if (align.Length > 0) { cls += " el-align-" + align; }
+}
+<div class="@cls">
+    @foreach (var child in Model.Children)
+    {
+        @await Html.PartialAsync("_ChildBlock", child)
+    }
+    @if (Model.Editor && Model.Children.Count == 0)
+    {
+        @* Empty in the editor: something to click and drop elements into. *@
+        <div class="mat-ed-empty">＋ @T["ev2.addElement"]</div>
+    }
+</div>

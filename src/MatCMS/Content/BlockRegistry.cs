@@ -6,8 +6,9 @@ namespace MatCMS.Content;
 /// </summary>
 public class BlockRegistry
 {
-    // Built-in blocks — built once (static), shared across requests.
-    private static readonly IReadOnlyList<BlockDefinition> Builtin = Build();
+    // Built-in blocks — built once (static), shared across requests. The element blocks of editor v2
+    // (ElementBlocks) are built-ins like any other, so their types are reserved too.
+    private static readonly IReadOnlyList<BlockDefinition> Builtin = Build().Concat(ElementBlocks.Build()).ToList();
 
     /// <summary>The reserved built-in block type slugs (a component may not reuse these).</summary>
     public static readonly HashSet<string> BuiltinTypes =
@@ -48,7 +49,8 @@ public class BlockRegistry
         ["form"] = "form", ["memberlogin"] = "form",
         ["html"] = "embed"
     };
-    private static string CatOf(string type) => CategoryByType.TryGetValue(type, out var c) ? c : "design";
+    private static string CatOf(string type) =>
+        CategoryByType.TryGetValue(type, out var c) ? c : ElementBlocks.Categories.TryGetValue(type, out var e) ? e : "design";
 
     private IReadOnlyList<BlockDefinition> BuildAll()
     {

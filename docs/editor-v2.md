@@ -20,7 +20,7 @@ Ziel (Matthias, 2026-10-05; Mockup: `docs/mockups/editor-v2.html`):
 
 ## Etappen
 
-**1 — Oberfläche (dieser Schritt).** Neue Seite `/Admin/Pages/Editor/{id}`, layoutlos und im
+**1 — Oberfläche (fertig, 2026-10-05).** Neue Seite `/Admin/Pages/Editor/{id}`, layoutlos und im
 Vollbild, auf den bestehenden Blöcken: Baum beliebiger Tiefe (auf-/zuklappen, auswählen, hinzufügen
 je Ebene nach `AllowedChildren`, duplizieren, löschen, verschieben), Inspector mit den Feldern des
 Blocks (gleicher Renderer), Vorschau mit Klick-zum-Auswählen und Geräte-Breiten, Rückgängig/Wiederholen,
@@ -28,10 +28,18 @@ ein Speichern für alles (`SaveAll`), Warnung vor ungespeichertem Verlassen. Sei
 Dialog. Die Vorschau zeigt keine Admin-Leiste mehr. Der bisherige Editor bleibt als „Klassischer
 Editor“ erreichbar, bis v2 alles kann.
 
-**2 — Elemente und Spalten.** Neue Bausteine: Abschnitt (Hintergrund, Abstand, Breite), Spalten
+**2 — Elemente und Spalten (fertig, 2026-10-05).** Neue Bausteine: Abschnitt (Hintergrund, Abstand, Breite), Spalten
 (50/50, 33/67, 67/33, drei; vertikal ausrichten; Handy untereinander/umgedreht) mit Spalte, und die
 Elemente Überschrift, Text, Bild, Button, Button-Gruppe, Abstand. Vorlagen wie „Hero“ legen einen
 Abschnitt mit Elementen an. In der Vorschau lassen sich auch Kinder anklicken (Markierung pro Kind).
+
+  Umsetzung: `Content/ElementBlocks.cs` (Typen `el-section`, `el-columns`, `el-column`, `el-heading`,
+  `el-text`, `el-image`, `el-buttons`, `el-button`, `el-spacer`; Elemente sind child-only), Partials
+  `Blocks/_El*.cshtml`, Stile in `MatCMS.Shared.Web/wwwroot/css/site.css` (nur Theme-Variablen). Jedes
+  Kind eines Containers rendert über `Pages/Shared/_ChildBlock.cshtml`: im Editor eine
+  `display:contents`-Hülle mit `data-block-id` (anklickbar, ohne das Layout zu ändern) und ein
+  gestrichelter Platzhalter, wenn ein Element noch nichts zeigt. Vorlagen (Hero, Bild + Text,
+  Textabschnitt, drei Spalten) baut `editor-v2.js` als Baum aus Elementen.
 
 **3 — Feinschliff und Umzug.** Ziehen über Ebenen hinweg, KI (Seite erzeugen, Block umschreiben),
 Übersetzungen/Sprachversionen und Seitenwechsel in v2; danach wird v2 der Standard und der klassische

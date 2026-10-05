@@ -1,0 +1,28 @@
+@model MatCMS.Content.BlockData
+@{
+    // **Wort** in the text is set off in the accent colour — the "brennen" of a hero, without HTML.
+    var text = Model.Str("text");
+    var kicker = Model.Str("kicker");
+    var level = Model.StrOr("level", "h2");
+    if (level is not ("h1" or "h2" or "h3" or "h4")) { level = "h2"; }
+    var cls = "el-heading";
+    var size = Model.Str("size");
+    if (size.Length > 0) { cls += " el-size-" + size; }
+    var align = Model.Str("align");
+    if (align.Length > 0) { cls += " el-align-" + align; }
+    var html = System.Text.RegularExpressions.Regex.Replace(System.Net.WebUtility.HtmlEncode(text.Trim()), @"\*\*(.+?)\*\*", "<span class=\"el-hl\">$1</span>")
+        .Replace("\r\n", "\n").Replace("\n", "<br>");
+}
+@if (!string.IsNullOrWhiteSpace(text) || !string.IsNullOrWhiteSpace(kicker))
+{
+    <div class="@cls">
+        @if (!string.IsNullOrWhiteSpace(kicker))
+        {
+            <p class="el-kicker">@kicker</p>
+        }
+        @if (!string.IsNullOrWhiteSpace(text))
+        {
+            @Html.Raw($"<{level}>{html}</{level}>")
+        }
+    </div>
+}

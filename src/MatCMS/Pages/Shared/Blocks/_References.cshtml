@@ -21,7 +21,7 @@
         <div class="@cls">
             @foreach (var child in Model.Children)
             {
-                @await Html.PartialAsync(child.Partial, child.Data)
+                @await Html.PartialAsync("_ChildBlock", child)
             }
         </div>
     </div>

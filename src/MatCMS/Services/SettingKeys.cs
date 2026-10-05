@@ -34,6 +34,10 @@ public static class SettingKeys
     // SEO: "true" serves /sitemap.xml (+ a /robots.txt that references it); anything else = off.
     public const string SitemapEnabled = "sitemap.enabled";
 
+    // The admin bar over the public site for signed-in admins: "0" = off, anything else = on (default).
+    // A free key, so a cloud profile can roll it out; each user can override it in their account.
+    public const string AdminBar = "site.adminBar";
+
     // Optional public base URL (e.g. "https://example.com") used for absolute links in the sitemap /
     // robots.txt. Empty = derive from the request (only correct when not behind a scheme-changing proxy).
     public const string CanonicalUrl = "site.canonicalUrl";
@@ -176,7 +180,7 @@ public static class SettingKeys
     public static readonly string[] All =
     [
         CanonicalUrl, BehindHttpsProxy, SiteName, LogoUrl, FaviconUrl,
-        FooterText, ContactRecipient, AntiSpamLevel
+        FooterText, ContactRecipient, AntiSpamLevel, AdminBar
     ];
 
     /// <summary>SMTP setting keys (managed on the Settings → SMTP tab).</summary>

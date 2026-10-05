@@ -638,7 +638,7 @@ public class DockerHostService : IDisposable
 
             var pulled = await client.Images.InspectImageAsync(image, ct);
             if (pulled.ID == insp.Image)
-                return new(true, "Bereits aktuell — das gezogene Image ist identisch.");
+                return new(true, "Schon auf dem neuesten Stand.");
 
             // 2) Park the old container under a temporary name so the new one can take the real one.
             var parked = $"{name}-matcmscloud-old";
@@ -1307,7 +1307,7 @@ public class DockerHostService : IDisposable
         try { target = await client.Images.InspectImageAsync(image, ct); }
         catch (Exception ex) { return new(false, "failed", $"Image '{image}' nicht vorhanden: {ex.Message}"); }
         if (target.ID == insp.Image)
-            return new(true, "current", "Bereits aktuell — kein neueres Image vorhanden. Nichts verändert.", target.ID);
+            return new(true, "current", "Die Cloud ist auf dem neuesten Stand.", target.ID);
         log($"Neues Image {Short(target.ID)} (bisher {Short(insp.Image)}).");
 
         // 2) Stop the old cloud gracefully, THEN snapshot its database — a stopped process has flushed and

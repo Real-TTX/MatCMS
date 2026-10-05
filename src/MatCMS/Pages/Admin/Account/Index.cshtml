@@ -22,6 +22,24 @@
     <div class="kv"><div class="kv-label">@T["account.role"]</div><div class="kv-value">@Model.Account.Role</div></div>
 </div>
 
+@* Admin-Leiste über der Website — persönliche Wahl, sonst gilt die Einstellung der Website. *@
+<div class="card">
+    <h2>@T["account.adminBarTitle"]</h2>
+    <p class="help">@T["account.adminBarHelp"]</p>
+    <form method="post" asp-page-handler="AdminBar" class="form-grid">
+        <div class="form-field">
+            <select name="adminBar">
+                <option value="" selected="@(Model.Account.AdminBar is null ? "selected" : null)">@T["account.adminBarSite"]</option>
+                <option value="on" selected="@(Model.Account.AdminBar == "on" ? "selected" : null)">@T["account.adminBarOn"]</option>
+                <option value="off" selected="@(Model.Account.AdminBar == "off" ? "selected" : null)">@T["account.adminBarOff"]</option>
+            </select>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn">@T["action.save"]</button>
+        </div>
+    </form>
+</div>
+
 @* Passwort ändern — verlangt das aktuelle Passwort. *@
 <div class="card">
     <h2>@T["account.passwordTitle"]</h2>

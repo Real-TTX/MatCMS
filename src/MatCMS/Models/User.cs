@@ -13,6 +13,11 @@ public class User
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    /// <summary>The admin bar over the public site for THIS user: null = follow the site setting
+    /// (site.adminBar), "on" / "off" = the user's own choice. A login through the cloud's switcher shows
+    /// it regardless (see SiteContext.ShowAdminBar).</summary>
+    public string? AdminBar { get; set; }
+
     // --- Two-factor (TOTP) ----------------------------------------------------
     // Off for every existing account; turned on only after the user confirms a code during enrolment.
     // The secret is stored DataProtection-ENCRYPTED (see TwoFactorService) and recovery codes only as

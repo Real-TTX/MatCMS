@@ -163,8 +163,8 @@
                     {
                         <partial name="_ViewSwitch" model="@(new MatCMS.Shared.Web.ViewSwitch(
                             Active: "cloud", CloudUrl: null,
-                            WebUrl: $"{vsUrl}/sso/start?returnUrl=/",
-                            AdminUrl: $"{vsUrl}/sso/start?returnUrl=/admin",
+                            WebUrl: $"{vsUrl}/sso/start?returnUrl=/&via=cloud",
+                            AdminUrl: $"{vsUrl}/sso/start?returnUrl=/admin&via=cloud",
                             CloudLabel: T["instances.viewCloud"], WebLabel: T["instances.viewWebsite"], AdminLabel: T["instances.viewAdmin"]))" />
                     }
                     <a class="mab-stool mab-account" asp-page="/Admin/Account/Index" title="@T["nav.account"]" aria-label="@T["nav.account"]"><i class="ti ti-user-circle" aria-hidden="true"></i></a>

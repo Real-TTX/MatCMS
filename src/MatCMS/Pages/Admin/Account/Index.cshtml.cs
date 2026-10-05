@@ -70,4 +70,15 @@ public class IndexModel : PageModel
         }
         return RedirectToPage();
     }
+
+    /// <summary>The user's own admin-bar choice: "" = like the site, "on", "off".</summary>
+    public async Task<IActionResult> OnPostAdminBarAsync(string? adminBar)
+    {
+        var user = await CurrentUserAsync();
+        if (user is null) return Redirect("/login");
+        user.AdminBar = adminBar is "on" or "off" ? adminBar : null;
+        await _db.SaveChangesAsync();
+        TempData["Flash"] = "Einstellung gespeichert.";
+        return RedirectToPage();
+    }
 }

@@ -6,7 +6,7 @@
     var metaDescription = ViewData["MetaDescription"] as string;
     // The editor's preview (?editor) shows the page as a VISITOR sees it: the admin bar above it would
     // be a second toolbar inside the editor and push every block down by its height.
-    var showAdminBar = User.IsInRole("Admin") && !Context.Request.Query.ContainsKey("editor");
+    var showAdminBar = !Context.Request.Query.ContainsKey("editor") && Site.ShowAdminBar(User);
 
     // ---- Active template (theme) ----
     var tpl = Site.ActiveTemplate;

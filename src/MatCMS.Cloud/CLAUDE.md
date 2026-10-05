@@ -664,7 +664,10 @@ switcher (`_ContextPicker`) offers two buttons — **Website öffnen** (`/sso/st
 (`Pages/Login.cshtml`) all use **`target="_blank"`**: the flow runs first-party in a new tab, where the
 operator's cloud session is recognised (no re-login) and it works in every browser incl. Brave — and the
 instance's own **admin bar** (over its public site and back-office) then carries the chrome and the way
-back to the cloud. The `frame-buster` on the cloud `/login`/`/oauth/authorize` stays as a defensive guard
+back to the cloud. That is why the switcher's links carry **`&via=cloud`**: the instance keeps it through
+the SSO flow and puts a `via=cloud` claim on the session, and such a session ALWAYS shows the admin bar —
+even where the site (`site.adminBar = 0`, rollable) or the user (`User.AdminBar = off`, own account page)
+switched it off. Order in `SiteContext.ShowAdminBar`: via=cloud → user choice → site setting (default on). The `frame-buster` on the cloud `/login`/`/oauth/authorize` stays as a defensive guard
 against an unintended embed. The only way to get a working *in-iframe* session would have been same-origin
 (a host/subdomain reverse proxy) — assessed and rejected as too much infra for the gain (path-prefix
 proxying is worse: MatCMS emits absolute URLs everywhere incl. stored content). The instance's own

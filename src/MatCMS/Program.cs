@@ -763,7 +763,7 @@ app.MapPost("/api/cloud/link", async (
 static string SsoB64Url(byte[] b) => Convert.ToBase64String(b).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
 app.MapGet("/sso/start", async (HttpContext ctx, MatCMS.Services.SiteContext site, MatCMS.Services.CloudService cloud,
-    Microsoft.AspNetCore.DataProtection.IDataProtectionProvider dp, string? returnUrl) =>
+    Microsoft.AspNetCore.DataProtection.IDataProtectionProvider dp, string? returnUrl, string? via) =>
 {
     var enabled = site.Get(MatCMS.Services.SettingKeys.SsoEnabled) is "1" or "true" or "on" or "yes";
     var client = enabled ? await cloud.GetSsoClientAsync() : null;
@@ -775,7 +775,8 @@ app.MapGet("/sso/start", async (HttpContext ctx, MatCMS.Services.SiteContext sit
     var redirectUri = $"{ctx.Request.Scheme}://{ctx.Request.Host}/sso/callback";
     var safeReturn = (!string.IsNullOrEmpty(returnUrl) && returnUrl.StartsWith("/") && !returnUrl.StartsWith("//")) ? returnUrl : "/admin";
 
-    var payload = System.Text.Json.JsonSerializer.Serialize(new { v = verifier, s = state, r = safeReturn });
+    // c: started from the cloud's switcher — that session always gets the admin bar (the way back).
+    var payload = System.Text.Json.JsonSerializer.Serialize(new { v = verifier, s = state, r = safeReturn, c = via == "cloud" });
     ctx.Response.Cookies.Append("matcms.ssoflow", dp.CreateProtector("MatCMS.SsoFlow").Protect(payload),
         new CookieOptions { HttpOnly = true, Secure = ctx.Request.IsHttps, SameSite = SameSiteMode.Lax, MaxAge = TimeSpan.FromMinutes(10), Path = "/sso" });
 
@@ -799,12 +800,14 @@ app.MapGet("/sso/callback", async (HttpContext ctx, MatCMS.Services.CloudService
         return Results.Redirect("/login?sso=failed");
 
     string verifier, expectedState, returnUrl;
+    var viaCloud = false;
     try
     {
         var json = System.Text.Json.JsonDocument.Parse(dp.CreateProtector("MatCMS.SsoFlow").Unprotect(raw)).RootElement;
         verifier = json.GetProperty("v").GetString() ?? "";
         expectedState = json.GetProperty("s").GetString() ?? "";
         returnUrl = json.GetProperty("r").GetString() ?? "/admin";
+        viaCloud = json.TryGetProperty("c", out var c) && c.ValueKind == System.Text.Json.JsonValueKind.True;
     }
     catch { return Results.Redirect("/login?sso=failed"); }
 
@@ -836,7 +839,7 @@ app.MapGet("/sso/callback", async (HttpContext ctx, MatCMS.Services.CloudService
     // cloud, which enforces its own second factor. The "sso" marker tells the "2FA required" gate to
     // let this federated session through rather than force a redundant local TOTP enrolment — the
     // instance policy applies to LOCAL password logins (Login.cshtml.cs).
-    await auth.SignInAsync(ctx, user, true, amr: "sso");
+    await auth.SignInAsync(ctx, user, true, amr: "sso", via: viaCloud ? "cloud" : null);
     return Results.Redirect(returnUrl.StartsWith("/") && !returnUrl.StartsWith("//") ? returnUrl : "/admin");
 }).RequireRateLimiting("login");
 

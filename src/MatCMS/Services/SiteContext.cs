@@ -266,6 +266,21 @@ public class SiteContext
 
     /// <summary>When true, /sitemap.xml (+ a referencing /robots.txt) is served. On by default; only
     /// an explicit "false" disables it.</summary>
+    /// <summary>Whether the admin bar is shown over the public site to this visitor. Only admins ever see
+    /// it. Order: arrived through the cloud's switcher (claim via=cloud) → always — that bar is the way
+    /// back to the cloud; then the user's own choice; then the site setting (default on).</summary>
+    public bool ShowAdminBar(System.Security.Claims.ClaimsPrincipal user)
+    {
+        if (!user.IsInRole("Admin")) return false;
+        if (user.HasClaim("via", "cloud")) return true;
+        var pref = int.TryParse(user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var uid)
+            ? _db.Users.AsNoTracking().Where(u => u.Id == uid).Select(u => u.AdminBar).FirstOrDefault()
+            : null;
+        if (pref == "on") return true;
+        if (pref == "off") return false;
+        return Get(SettingKeys.AdminBar, "1") != "0";
+    }
+
     public bool SitemapEnabled => !string.Equals(Get(SettingKeys.SitemapEnabled, "true"), "false", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>

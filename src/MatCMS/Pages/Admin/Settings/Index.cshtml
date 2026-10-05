@@ -314,6 +314,11 @@
                 @T["settings.behindProxy"]
             </label>
             <div class="help">@T["settings.behindProxyHelp"]</div>
+            <label class="checkbox-row">
+                <input type="checkbox" name="adminBar" value="true" checked="@(V(SettingKeys.AdminBar) != "0" ? "checked" : null)" />
+                @T["settings.adminBar"]
+            </label>
+            <div class="help">@T["settings.adminBarHelp"]</div>
             <div class="form-field">
                 <label>@T["settings.siteName"]</label>
                 <input name="Values[@SettingKeys.SiteName]" value="@V(SettingKeys.SiteName)" />

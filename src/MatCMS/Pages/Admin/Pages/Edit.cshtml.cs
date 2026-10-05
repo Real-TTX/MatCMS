@@ -167,24 +167,9 @@ public class EditModel : PageModel
                 SelectedDef = Registry.Get(SelectedBlock.BlockType);
                 if (SelectedDef is not null)
                 {
-                    // Dynamic select sources (e.g. the "form" block's form picker) are resolved
-                    // from the database at edit time.
-                    // Dynamic <select> sources resolved from the DB at edit time (keyed by OptionsSource).
-                    var dynamicSources = new Dictionary<string, List<SelectOption>>(StringComparer.Ordinal);
-                    if (SelectedDef.Fields.Any(f => f.OptionsSource == "forms"))
-                        dynamicSources["forms"] = await _db.Forms.AsNoTracking().OrderBy(f => f.Name)
-                            .Select(f => new SelectOption(f.Slug, f.Name)).ToListAsync();
-                    if (SelectedDef.Fields.Any(f => f.OptionsSource == "mediaTags"))
-                        dynamicSources["mediaTags"] = await LoadMediaTagOptionsAsync();
-                    if (SelectedDef.Fields.Any(f => f.OptionsSource == "themeColors"))
-                        dynamicSources["themeColors"] = await LoadThemeColorOptionsAsync();
-
-                    // Resolve the localization keys (Label/Options/ItemLabel) into display text
-                    // for the current UI culture before handing the schema to the JS editor.
-                    var localized = SelectedDef.Fields.Select(f => LocalizeField(f, dynamicSources)).ToList();
-                    // Global layout options (width + spacing) apply to every top-level block.
-                    if (!SelectedDef.ChildOnly)
-                        localized.AddRange(GlobalLayoutFields.Select(f => LocalizeField(f, dynamicSources)));
+                    // Dynamic option lists and localised labels: the same builder editor v2 uses.
+                    var dynamicSources = await BlockSchema.LoadSourcesAsync(_db, new[] { SelectedDef });
+                    var localized = BlockSchema.For(SelectedDef, _t, dynamicSources);
                     SchemaJson = JsonSerializer.Serialize(localized, SchemaOpts);
                     CurrentJson = string.IsNullOrWhiteSpace(SelectedBlock.DataJson) ? "{}" : SelectedBlock.DataJson;
                 }
@@ -236,7 +221,7 @@ public class EditModel : PageModel
         return RedirectToPage(new { id, block = blockId });
     }
 
-    public async Task<IActionResult> OnPostMetaAsync(int id)
+    public async Task<IActionResult> OnPostMetaAsync(int id, string? back = null)
     {
         var page = await _db.Pages.FindAsync(id);
         if (page is null) return NotFound();
@@ -246,18 +231,18 @@ public class EditModel : PageModel
         if (string.IsNullOrWhiteSpace(Meta.Title) || string.IsNullOrWhiteSpace(slug))
         {
             TempData["FlashError"] = "Titel und Slug dürfen nicht leer sein.";
-            return RedirectToPage(new { id });
+            return MetaBack(id, back);
         }
         if (IndexModel.IsReserved(slug))
         {
             TempData["FlashError"] = $"Der Slug „{slug}“ ist reserviert und kann nicht verwendet werden.";
-            return RedirectToPage(new { id });
+            return MetaBack(id, back);
         }
         // A slug is unique per locale.
         if (await _db.Pages.AnyAsync(p => p.Slug == slug && p.Locale == locale && p.Id != id))
         {
             TempData["FlashError"] = $"Der Slug „{slug}“ ist in dieser Sprache bereits vergeben.";
-            return RedirectToPage(new { id });
+            return MetaBack(id, back);
         }
 
         page.Title = Meta.Title.Trim();
@@ -282,8 +267,13 @@ public class EditModel : PageModel
         await _db.SaveChangesAsync();
 
         TempData["Flash"] = "Seiteneinstellungen gespeichert.";
-        return RedirectToPage(new { id });
+        return MetaBack(id, back);
     }
+
+    /// <summary>The page settings are also edited from editor v2 (a dialog there); it sends back=v2 so the
+    /// save lands the operator where they came from instead of in the classic editor.</summary>
+    private IActionResult MetaBack(int id, string? back) =>
+        back == "v2" ? RedirectToPage("/Admin/Pages/Editor", new { id }) : RedirectToPage(new { id });
 
     // Creates a translation of this page in another locale (same TranslationGroup), copying its
     // blocks as a starting point. The new page is a draft and opens in the editor.
@@ -861,93 +851,15 @@ public class EditModel : PageModel
         }
         if (changed) await _db.SaveChangesAsync();
 
-        return new JsonResult(new { ok = true });
+        // Draft id → real id: the editor keeps working on the same tree after a save, and a block it
+        // created a moment ago (negative id) must now be addressed by the id the database gave it.
+        return new JsonResult(new { ok = true, ids = byDraftId.ToDictionary(kv => kv.Key.ToString(), kv => kv.Value.Id) });
     }
 
     private static bool IsJsonObject(string? json)
     {
         try { return JsonNode.Parse(string.IsNullOrWhiteSpace(json) ? "{}" : json) is JsonObject; }
         catch { return false; }
-    }
-
-    // Shared layout options appended to every top-level block (Shopify-style). Labels are literal
-    // German (the localizer falls back to the given text when there's no matching key).
-    private static readonly BlockField[] GlobalLayoutFields =
-    [
-        new BlockField { Id = "_width", Label = "Breite", Type = FieldType.Select, Default = "",
-            Options = [ new("", "Normal"), new("narrow", "Schmal"), new("full", "Volle Breite") ] },
-        new BlockField { Id = "_spaceTop", Label = "Abstand oben", Type = FieldType.Select, Default = "",
-            Options = [ new("", "Standard"), new("s", "Klein"), new("m", "Mittel"), new("l", "Groß") ] },
-        new BlockField { Id = "_spaceBottom", Label = "Abstand unten", Type = FieldType.Select, Default = "",
-            Options = [ new("", "Standard"), new("s", "Klein"), new("m", "Mittel"), new("l", "Groß") ] },
-        // Per-block custom CSS (advanced). Rendered scoped under this block's own `.blk-<id>` wrapper
-        // via native CSS nesting, so rules never leak to other blocks. Write bare declarations
-        // (e.g. `background:#f6f6f6`) or nested selectors with `&` (e.g. `& h2 { color:#289068 }`).
-        new BlockField { Id = "_css", Label = "Custom CSS", Type = FieldType.Textarea,
-            Placeholder = "background: #f6f6f6;\n& h2 { color: #289068; }",
-            Help = "Nur für diesen Block. Gescoped über & (native CSS-Verschachtelung), z. B. „& .btn { … }“." },
-    ];
-
-    // Produces a JSON-friendly copy of a field with all localization keys resolved to text.
-    private object LocalizeField(BlockField f) => LocalizeField(f, null);
-
-    private object LocalizeField(BlockField f, IReadOnlyDictionary<string, List<SelectOption>>? dynamicSources)
-    {
-        // A dynamic source (e.g. "forms", "mediaTags") replaces the static options; its labels are
-        // already display text and must not be run through the localizer.
-        var options = (f.OptionsSource is not null && dynamicSources is not null
-                       && dynamicSources.TryGetValue(f.OptionsSource, out var dyn))
-            ? dyn.Select(o => new { value = o.Value, label = o.Label }).ToList()
-            : f.Options.Select(o => new { value = o.Value, label = _t[o.Label] }).ToList();
-
-        return new
-        {
-            id = f.Id,
-            label = _t[f.Label],
-            type = f.Type,
-            placeholder = f.Placeholder,
-            help = f.Help is null ? null : _t[f.Help],   // translation key when one is used; raw text passes through unchanged
-            @default = f.Default,
-            options,
-            showWhen = f.ShowWhenField is null ? null : new { field = f.ShowWhenField, value = f.ShowWhenValue },
-            itemFields = f.ItemFields.Select(x => LocalizeField(x, dynamicSources)).ToList(),
-            itemLabel = _t[f.ItemLabel]
-        };
-    }
-
-    /// <summary>Active theme's palette as selectable colour options (value = hex), "Standard" first.</summary>
-    private async Task<List<SelectOption>> LoadThemeColorOptionsAsync()
-    {
-        var t = await _db.Templates.AsNoTracking().FirstOrDefaultAsync(x => x.IsActive)
-                ?? await _db.Templates.AsNoTracking().FirstOrDefaultAsync();
-        var opts = new List<SelectOption> { new("", "Standard") };
-        if (t is null) return opts;
-        void Add(string? val, string label) { if (!string.IsNullOrWhiteSpace(val)) opts.Add(new SelectOption(val!, label)); }
-        Add(t.AccentColor, "Akzent");
-        Add(t.SecondaryColor, "Sekundär");
-        Add(t.HeadingColor, "Überschrift");
-        Add(t.TextColor, "Text");
-        Add(t.BackgroundColor, "Hintergrund");
-        Add(t.AltBackground, "Alt-Hintergrund");
-        Add("#ffffff", "Weiß");
-        Add("#111111", "Dunkel");
-        return opts;
-    }
-
-    /// <summary>Distinct media-library tags for the gallery tag picker, with an "all media" entry first.</summary>
-    private async Task<List<SelectOption>> LoadMediaTagOptionsAsync()
-    {
-        var tagStrings = await _db.Media.AsNoTracking().Select(m => m.Tags).ToListAsync();
-        // No "all media" entry any more: the only field using this is a multi-select now, where an
-        // empty-valued tick box would be a chip that means "ignore the other ticks". Nothing ticked
-        // already means all, and the field's help text says so.
-        var options = new List<SelectOption>();
-        options.AddRange(tagStrings
-            .SelectMany(TagUtil.Split)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(t => t, StringComparer.OrdinalIgnoreCase)
-            .Select(t => new SelectOption(t, t)));
-        return options;
     }
 
     public string BlockSummary(ContentBlock b)

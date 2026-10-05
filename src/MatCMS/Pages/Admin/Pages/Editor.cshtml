@@ -1,0 +1,213 @@
+@page "{id:int}"
+@model MatCMS.Pages.Admin.Pages.EditorModel
+@inject MatCMS.Services.SiteContext Site
+@{
+    // Full screen on purpose: the editor brings its own frame (back, tree, preview, inspector) in the
+    // admin's look — inside the admin layout it would be a page within a page, with two menus.
+    Layout = null;
+    var p = Model.Current;
+    var l10n = new Dictionary<string, string>
+    {
+        ["saved"] = T["ev2.saved"], ["unsaved"] = T["ev2.unsaved"], ["saving"] = T["ev2.saving"], ["saveFailed"] = T["ev2.saveFailed"],
+        ["addSection"] = T["ev2.addSection"], ["addElement"] = T["ev2.addElement"], ["add"] = T["ev2.add"],
+        ["duplicate"] = T["ev2.duplicate"], ["remove"] = T["ev2.remove"], ["moveUp"] = T["ev2.moveUp"], ["moveDown"] = T["ev2.moveDown"],
+        ["confirmRemove"] = T["ev2.confirmRemove"], ["confirmLeave"] = T["ev2.confirmLeave"],
+        ["empty"] = T["ev2.empty"], ["noSelection"] = T["ev2.noSelection"], ["noFields"] = T["ev2.noFields"],
+        ["notFound"] = T["ev2.notFound"], ["page"] = T["ev2.page"], ["tabContent"] = T["ev2.tabContent"],
+        ["tabDesign"] = T["ev2.tabDesign"], ["tabAdvanced"] = T["ev2.tabAdvanced"], ["all"] = T["blockcat.all"],
+        ["cat.layout"] = T["blockcat.layout"], ["cat.text"] = T["blockcat.text"], ["cat.media"] = T["blockcat.media"],
+        ["cat.design"] = T["blockcat.design"], ["cat.form"] = T["blockcat.form"], ["cat.embed"] = T["blockcat.embed"],
+        ["cat.plugins"] = T["blockcat.plugins"], ["cat.custom"] = T["blockcat.custom"], ["blockEmpty"] = T["editor.blockEmpty"],
+    };
+}
+<!DOCTYPE html>
+<html lang="@(System.Globalization.CultureInfo.CurrentUICulture.Name.Split('-', 2)[0] is { Length: > 0 } lc ? lc : MatCMS.Services.Localizer.ResourceFallbackCulture)">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@p.Title – @T["ev2.title"] – @Site.SiteName</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Geologica:wght@@500;600;700&family=Inter:wght@@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/lib/tabler-icons/tabler-icons.min.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/admin.css" asp-append-version="true" />
+    @* Multi-select fields in the block editor are built from the public forms' dropdown. *@
+    <link rel="stylesheet" href="~/css/mat-richselect.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/editor-v2.css" asp-append-version="true" />
+    <link rel="icon" href="@Site.FaviconUrl" />
+</head>
+<body class="ev2" data-page-id="@p.Id"
+      data-render-url="@Url.Page("Edit", "RenderPreview", new { id = p.Id })"
+      data-save-url="@Url.Page("Edit", "SaveAll", new { id = p.Id })">
+    @Html.AntiForgeryToken()
+    <script id="ev2-blocks" type="application/json">@Html.Raw(Model.BlocksJson.Replace("</", "<\\/"))</script>
+    <script id="ev2-types" type="application/json">@Html.Raw(Model.TypesJson.Replace("</", "<\\/"))</script>
+    <script id="ev2-l10n" type="application/json">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(l10n).Replace("</", "<\\/"))</script>
+
+    <header class="ev2-top">
+        <a class="ev2-back" asp-page="Index" id="ev2-back" title="@T["ev2.backTitle"]">
+            <i class="ti ti-arrow-left" aria-hidden="true"></i>
+            <span>@T["ev2.back"]<small>@T["ev2.backSub"]</small></span>
+        </a>
+        <button type="button" class="ev2-ico ev2-tree-toggle" id="ev2-tree-toggle" title="@T["ev2.tree"]" aria-label="@T["ev2.tree"]"><i class="ti ti-list-tree"></i></button>
+        <div class="ev2-title" title="@Model.PublicUrl">
+            <span class="ev2-title-text">@p.Title</span>
+            <span class="badge @(p.IsPublished ? "badge-on" : "badge-off")">@(p.IsPublished ? T["ev2.published"] : T["ev2.draft"])</span>
+            @if (Model.SupportedLocales.Count > 1)
+            {
+                <span class="badge mono">@p.Locale.ToUpperInvariant()</span>
+            }
+        </div>
+        <span class="ev2-status" id="ev2-status" aria-live="polite"></span>
+        <div class="ev2-sp"></div>
+        <button type="button" class="ev2-ico" id="ev2-undo" title="@T["ev2.undo"] (Strg+Z)" aria-label="@T["ev2.undo"]" disabled><i class="ti ti-arrow-back-up"></i></button>
+        <button type="button" class="ev2-ico" id="ev2-redo" title="@T["ev2.redo"] (Strg+Y)" aria-label="@T["ev2.redo"]" disabled><i class="ti ti-arrow-forward-up"></i></button>
+        <div class="ev2-seg" id="ev2-dev" role="group" aria-label="@T["ev2.device"]">
+            <button type="button" class="is-on" data-dev="desktop" title="@T["ev2.desktop"]"><i class="ti ti-device-desktop"></i></button>
+            <button type="button" data-dev="tablet" title="@T["ev2.tablet"]"><i class="ti ti-device-tablet"></i></button>
+            <button type="button" data-dev="phone" title="@T["ev2.phone"]"><i class="ti ti-device-mobile"></i></button>
+        </div>
+        <button type="button" class="ev2-ico" id="ev2-settings-open" title="@T["ev2.settings"]" aria-label="@T["ev2.settings"]"><i class="ti ti-settings"></i></button>
+        <a class="btn btn-ghost btn-sm ev2-hide-s" href="@Model.PublicUrl" target="_blank" rel="noopener"><i class="ti ti-external-link" aria-hidden="true"></i> @T["ev2.view"]</a>
+        <button type="button" class="btn btn-sm" id="ev2-save" disabled>@T["ev2.save"]</button>
+    </header>
+
+    <aside class="ev2-nav" aria-label="@T["ev2.tree"]">
+        <div class="ev2-nav-head">@T["ev2.page"]</div>
+        <a class="ev2-node is-locked" asp-page="/Admin/Templates/Index" title="@T["ev2.templateHint"]">
+            <span class="tw"></span><span class="ic"><i class="ti ti-layout-navbar"></i></span>
+            <span class="lbl">@T["ev2.header"] <em>@T["ev2.fromTemplate"]</em></span><span class="act"><i class="ti ti-lock"></i></span>
+        </a>
+        <div class="ev2-sep"></div>
+        <div id="ev2-tree" role="tree"></div>
+        <button type="button" class="ev2-add root" id="ev2-add-root"><i class="ti ti-plus"></i> @T["ev2.addSection"]</button>
+        <div class="ev2-sep"></div>
+        <a class="ev2-node is-locked" asp-page="/Admin/Templates/Index" title="@T["ev2.templateHint"]">
+            <span class="tw"></span><span class="ic"><i class="ti ti-layout-bottombar"></i></span>
+            <span class="lbl">@T["ev2.footer"] <em>@T["ev2.fromTemplate"]</em></span><span class="act"><i class="ti ti-lock"></i></span>
+        </a>
+        <a class="ev2-classic" asp-page="Edit" asp-route-id="@p.Id"><i class="ti ti-layout-sidebar-left-collapse"></i> @T["ev2.classic"]</a>
+    </aside>
+
+    <main class="ev2-stage" id="ev2-stage">
+        <div class="ev2-frame" id="ev2-frame">
+            <iframe id="ev2-preview" src="@Model.PreviewUrl" title="@T["editor.livePreview"]"></iframe>
+        </div>
+    </main>
+
+    <aside class="ev2-insp" id="ev2-insp" aria-label="@T["ev2.inspector"]">
+        <div class="ev2-insp-head">
+            <button type="button" class="ev2-insp-close" id="ev2-insp-close" aria-label="@T["action.close"]"><i class="ti ti-x"></i></button>
+            <div class="ev2-crumb" id="ev2-crumb"></div>
+            <h3 id="ev2-insp-title"></h3>
+        </div>
+        <div class="ev2-tabs" id="ev2-tabs" role="tablist"></div>
+        <div class="ev2-body" id="ev2-body"></div>
+        <div class="ev2-foot" id="ev2-foot" hidden>
+            <button type="button" class="btn btn-ghost btn-sm" id="ev2-dup"><i class="ti ti-copy"></i> @T["ev2.duplicate"]</button>
+            <button type="button" class="btn btn-ghost btn-sm ev2-danger" id="ev2-del"><i class="ti ti-trash"></i> @T["ev2.remove"]</button>
+        </div>
+    </aside>
+
+    @* Block picker: one popover for every level — the root offers sections, a container only what
+       it may hold (AllowedChildren). Filled by editor-v2.js. *@
+    <div class="ev2-pop" id="ev2-pop" role="dialog" aria-label="@T["ev2.add"]" hidden>
+        <input type="search" id="ev2-pop-search" placeholder="@T["ev2.search"]" autocomplete="off" />
+        <div class="ev2-pop-cats" id="ev2-pop-cats"></div>
+        <div class="ev2-pop-list" id="ev2-pop-list"></div>
+    </div>
+
+    <dialog class="mat-dialog ev2-settings" id="ev2-settings">
+        <form method="post" asp-page="Edit" asp-page-handler="Meta" asp-route-id="@p.Id" asp-route-back="v2" class="form-grid" id="ev2-settings-form">
+            <h3 class="ev2-settings-title">@T["ev2.settings"]</h3>
+            <div class="form-field">
+                <label>@T["editor.metaTitle"]</label>
+                <input name="Meta.Title" value="@p.Title" required />
+            </div>
+            <div class="form-field">
+                <label>@T["editor.slug"]</label>
+                <input name="Meta.Slug" value="@p.Slug" required />
+            </div>
+            @if (Model.SupportedLocales.Count > 1)
+            {
+                <div class="form-field">
+                    <label>@T["editor.locale"]</label>
+                    <select name="Meta.Locale">
+                        @foreach (var loc in Model.SupportedLocales)
+                        {
+                            <option value="@loc" selected="@(loc == p.Locale)">@T["lang." + loc]</option>
+                        }
+                    </select>
+                </div>
+            }
+            else
+            {
+                <input type="hidden" name="Meta.Locale" value="@p.Locale" />
+            }
+            <div class="form-field">
+                <label>@T["editor.metaDescription"]</label>
+                <input name="Meta.MetaDescription" value="@p.MetaDescription" />
+            </div>
+            <div class="form-field">
+                <label>Template</label>
+                <select name="Meta.TemplateId">
+                    <option value="">— Aktives Template —</option>
+                    @foreach (var t in Model.AllTemplates)
+                    {
+                        <option value="@t.Id" selected="@(p.TemplateId == t.Id ? "selected" : null)">@t.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="form-field">
+                <label>Zugriff</label>
+                <select name="Meta.Access">
+                    <option value="Public" selected="@(p.Access == MatCMS.Models.PageAccess.Public ? "selected" : null)">Öffentlich</option>
+                    <option value="Members" selected="@(p.Access == MatCMS.Models.PageAccess.Members ? "selected" : null)">Nur angemeldete Mitglieder</option>
+                </select>
+            </div>
+            <div class="form-field">
+                <label>Benötigte Rolle</label>
+                <select name="Meta.RequiredRole">
+                    <option value="">— jede/r Angemeldete —</option>
+                    @foreach (var role in Model.AllRoles)
+                    {
+                        <option value="@role" selected="@(p.RequiredRole == role ? "selected" : null)">@role</option>
+                    }
+                </select>
+            </div>
+            <details>
+                <summary>@T["ev2.settingsAdvanced"]</summary>
+                <div class="form-field">
+                    <label>@T["editor.pageCss"]</label>
+                    <textarea name="Meta.CustomCss" rows="5" spellcheck="false" class="mono">@p.CustomCss</textarea>
+                </div>
+                <div class="form-field">
+                    <label>Template-Parameter (JSON)</label>
+                    <textarea name="Meta.TemplateParamsJson" rows="3" spellcheck="false" class="mono">@p.TemplateParamsJson</textarea>
+                </div>
+            </details>
+            <label class="checkbox-row"><input type="checkbox" name="Meta.IsPublished" value="true" @(p.IsPublished ? "checked" : "") /> @T["editor.published"]</label>
+            <div class="help" id="ev2-settings-dirty" hidden>@T["ev2.settingsDirty"]</div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-sm">@T["action.save"]</button>
+                <button type="button" class="btn btn-ghost btn-sm" id="ev2-settings-close">@T["action.cancel"]</button>
+            </div>
+        </form>
+    </dialog>
+
+    @if (TempData["Flash"] is string flash && !string.IsNullOrWhiteSpace(flash))
+    {
+        <div class="ev2-toast" role="status">@flash</div>
+    }
+    @if (TempData["FlashError"] is string flashError && !string.IsNullOrWhiteSpace(flashError))
+    {
+        <div class="ev2-toast is-error" role="alert">@flashError</div>
+    }
+
+    <script src="~/js/media-picker.js" asp-append-version="true"></script>
+    <script src="~/js/mat-richselect.js" asp-append-version="true"></script>
+    <script src="~/js/admin-blocks.js" asp-append-version="true"></script>
+    <script src="~/js/editor-v2.js" asp-append-version="true"></script>
+</body>
+</html>

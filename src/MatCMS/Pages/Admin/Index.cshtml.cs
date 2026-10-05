@@ -123,7 +123,7 @@ public class IndexModel : PageModel
             .Select(p => new { p.Id, p.Title, p.IsPublished, p.UpdatedAt }).ToListAsync();
         var posts = await _db.Posts.AsNoTracking().OrderByDescending(p => p.UpdatedAt).Take(30)
             .Select(p => new { p.Id, p.Title, p.IsPublished, p.UpdatedAt }).ToListAsync();
-        RecentlyEdited = pages.Select(p => new Edited("page", p.Title, p.IsPublished, p.UpdatedAt, Url.Page("/Admin/Pages/Edit", new { id = p.Id })!))
+        RecentlyEdited = pages.Select(p => new Edited("page", p.Title, p.IsPublished, p.UpdatedAt, Url.Page("/Admin/Pages/Editor", new { id = p.Id })!))
             .Concat(posts.Select(p => new Edited("post", p.Title, p.IsPublished, p.UpdatedAt, Url.Page("/Admin/Posts/Edit", new { id = p.Id })!)))
             .OrderByDescending(e => e.UpdatedAt).Take(30).ToList();
 

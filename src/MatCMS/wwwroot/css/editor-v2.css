@@ -1,0 +1,160 @@
+/* ============ Editor v2 (Pages/Admin/Pages/Editor.cshtml) ============
+   Full screen in the admin's look: top bar, block tree left (where the admin menu sits elsewhere),
+   preview in the middle, inspector of the selected block right. Mockup: docs/mockups/editor-v2.html. */
+html, body.ev2 { height: 100%; }
+body.ev2 { margin: 0; display: grid; grid-template-columns: 280px minmax(0, 1fr) 360px; grid-template-rows: 64px minmax(0, 1fr);
+    height: 100vh; height: 100dvh; overflow: hidden; background: #f4f5f7; font-family: Inter, system-ui, sans-serif; color: #1c1f24; }
+
+/* --- top bar --- */
+.ev2-top { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding: 0 14px 0 0; background: #fff; border-bottom: 1px solid #e6e8ec; min-width: 0; }
+.ev2-back { width: 280px; height: 64px; display: flex; align-items: center; gap: 10px; padding: 0 16px; border-right: 1px solid #e6e8ec;
+    text-decoration: none; color: #1c1f24; font-weight: 600; flex: 0 0 auto; box-sizing: border-box; background: #f8f9fb; }
+.ev2-back i { font-size: 20px; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; background: #fff; border: 1px solid #e1e4e9; }
+.ev2-back:hover i { border-color: #2563eb; color: #2563eb; }
+.ev2-back small { display: block; font-weight: 400; color: #6b7280; font-size: 12px; }
+.ev2-title { display: flex; align-items: center; gap: 8px; min-width: 0; padding-left: 4px; }
+.ev2-title-text { font-family: Geologica, sans-serif; font-weight: 600; font-size: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ev2-status { font-size: 13px; color: #6b7280; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.ev2-status.is-dirty { color: #b45309; }
+.ev2-status.is-error { color: #b42318; }
+.ev2-sp { flex: 1; }
+.ev2-seg { display: inline-flex; border: 1px solid #e1e4e9; border-radius: 10px; overflow: hidden; background: #fff; flex: 0 0 auto; }
+.ev2-seg button { border: 0; background: none; padding: 7px 10px; cursor: pointer; color: #4b5563; font-size: 18px; line-height: 1; }
+.ev2-seg button + button { border-left: 1px solid #e1e4e9; }
+.ev2-seg button.is-on { background: #eef3ff; color: #2563eb; }
+.ev2-ico { border: 1px solid #e1e4e9; background: #fff; border-radius: 10px; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center;
+    color: #4b5563; cursor: pointer; font-size: 18px; flex: 0 0 auto; }
+.ev2-ico:hover:not(:disabled) { border-color: #2563eb; color: #2563eb; }
+.ev2-ico:disabled { opacity: .4; cursor: default; }
+#ev2-save:disabled { opacity: .5; }
+
+/* --- left: block tree --- */
+.ev2-nav { background: #fff; border-right: 1px solid #e6e8ec; overflow: auto; padding: 12px 10px 40px; min-height: 0; }
+.ev2-nav-head { margin: 4px 8px 8px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #9aa1ab; font-weight: 600; }
+.ev2-tree, .ev2-tree ul { list-style: none; margin: 0; padding: 0; }
+.ev2-tree ul { margin-left: 14px; border-left: 1px dashed #e1e4e9; padding-left: 4px; }
+.ev2-tree li.is-closed > ul, .ev2-tree li.is-closed > .ev2-add { display: none; }
+.ev2-node { display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 8px; cursor: pointer; font-size: 14px; color: #2b2f36;
+    user-select: none; position: relative; text-decoration: none; }
+.ev2-node:hover { background: #f3f5f8; }
+.ev2-node.is-sel { background: #eef3ff; color: #1d4ed8; font-weight: 600; }
+.ev2-node.is-drop-before { box-shadow: inset 0 2px 0 #2563eb; }
+.ev2-node.is-drop-after { box-shadow: inset 0 -2px 0 #2563eb; }
+.ev2-node.is-dragging { opacity: .4; }
+.ev2-node .tw { width: 16px; color: #9aa1ab; font-size: 14px; flex: 0 0 auto; text-align: center; }
+.ev2-node .ic { width: 22px; height: 22px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; background: #f1f3f6; color: #4b5563; flex: 0 0 auto; }
+.ev2-node .ic svg { width: 15px; height: 15px; }
+.ev2-node .ic i { font-size: 14px; }
+.ev2-node.is-sel .ic { background: #dbe6ff; color: #1d4ed8; }
+.ev2-node .lbl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ev2-node .lbl em { font-style: normal; color: #9aa1ab; font-weight: 400; margin-left: 4px; }
+.ev2-node .act { display: none; gap: 1px; flex: 0 0 auto; }
+.ev2-node:hover .act, .ev2-node.is-sel .act, .ev2-node:focus-within .act { display: inline-flex; }
+.ev2-node .act button { border: 0; background: none; padding: 2px 3px; border-radius: 4px; color: #9aa1ab; cursor: pointer; font-size: 15px; line-height: 1; }
+.ev2-node .act button:hover { color: #1c1f24; background: #e7eaef; }
+.ev2-node .act .grip { cursor: grab; color: #b6bcc5; font-size: 15px; padding: 2px; }
+.ev2-node.is-locked { color: #9aa1ab; }
+.ev2-node.is-locked .ic { background: #f6f7f9; color: #b6bcc5; }
+.ev2-node.is-locked .act { display: inline-flex; color: #c3c8cf; }
+.ev2-add { display: flex; align-items: center; gap: 6px; padding: 5px 8px; margin: 2px 0 4px 22px; font-size: 13px; color: #2563eb; border-radius: 8px;
+    cursor: pointer; border: 0; background: none; font-family: inherit; width: calc(100% - 22px); text-align: left; }
+.ev2-add:hover { background: #eef3ff; }
+.ev2-add.root { margin: 10px 0 0; width: 100%; border: 1px dashed #c7d4f5; justify-content: center; padding: 9px; }
+.ev2-sep { height: 1px; background: #eef0f3; margin: 8px 6px; }
+.ev2-empty { padding: 12px 8px; color: #6b7280; font-size: 13px; }
+.ev2-classic { display: flex; align-items: center; gap: 6px; margin: 18px 8px 0; font-size: 12px; color: #6b7280; text-decoration: none; }
+.ev2-classic:hover { color: #2563eb; }
+
+/* --- middle: preview --- */
+.ev2-stage { overflow: auto; display: flex; justify-content: center; padding: 18px; min-height: 0; }
+.ev2-frame { width: 100%; max-width: 100%; height: 100%; background: #fff; border-radius: 10px; box-shadow: 0 10px 40px rgba(15, 18, 24, .16); overflow: hidden; transition: max-width .25s; }
+.ev2-frame.is-tablet { max-width: 820px; }
+.ev2-frame.is-phone { max-width: 390px; }
+.ev2-frame iframe { width: 100%; height: 100%; border: 0; display: block; }
+
+/* --- right: inspector --- */
+.ev2-insp { background: #fff; border-left: 1px solid #e6e8ec; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
+.ev2-insp-head { padding: 14px 18px 0; }
+.ev2-crumb { font-size: 12px; color: #9aa1ab; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; min-height: 16px; }
+.ev2-crumb button { border: 0; background: none; padding: 0; color: #6b7280; cursor: pointer; font: inherit; }
+.ev2-crumb button:hover { color: #2563eb; }
+.ev2-insp h3 { font-family: Geologica, sans-serif; font-size: 17px; margin: 6px 0 12px; display: flex; align-items: center; gap: 8px; }
+.ev2-insp h3 .ic { width: 28px; height: 28px; border-radius: 8px; background: #eef3ff; color: #1d4ed8; display: inline-flex; align-items: center; justify-content: center; }
+.ev2-insp h3 .ic svg { width: 17px; height: 17px; }
+.ev2-tabs { display: flex; gap: 2px; border-bottom: 1px solid #e6e8ec; padding: 0 18px; }
+.ev2-tabs:empty { display: none; }
+.ev2-tabs button { border: 0; background: none; padding: 9px 10px; font: 500 13px Inter, sans-serif; color: #6b7280; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.ev2-tabs button.is-on { color: #1d4ed8; border-bottom-color: #2563eb; }
+.ev2-body { padding: 16px 18px 24px; flex: 1; overflow: auto; }
+.ev2-body .ev2-panel[hidden] { display: none; }
+.ev2-body .field { margin-bottom: 14px; }
+.ev2-body .field > label { font-size: 13px; }
+.ev2-body .muted-box { color: #6b7280; font-size: 13px; line-height: 1.6; }
+.ev2-kids { border: 1px solid #e6e8ec; border-radius: 10px; overflow: hidden; margin-bottom: 16px; }
+.ev2-kids-head { font-size: 13px; font-weight: 600; margin: 0 0 6px; }
+.ev2-kids button { display: flex; width: 100%; align-items: center; gap: 8px; padding: 9px 11px; font: 13px Inter, sans-serif; border: 0; border-top: 1px solid #eef0f3;
+    background: #fff; cursor: pointer; text-align: left; color: #1c1f24; }
+.ev2-kids button:first-child { border-top: 0; }
+.ev2-kids button:hover { background: #f6f8fb; }
+.ev2-kids button svg { width: 15px; height: 15px; flex: 0 0 auto; }
+.ev2-kids button .chev { margin-left: auto; color: #9aa1ab; }
+.ev2-kids button.add { color: #2563eb; }
+.ev2-foot { border-top: 1px solid #e6e8ec; padding: 12px 18px; display: flex; gap: 8px; }
+.ev2-foot[hidden] { display: none; }
+.ev2-foot .btn { flex: 1; }
+.ev2-danger { color: #b42318 !important; }
+
+/* --- block picker popover --- */
+.ev2-pop { position: fixed; z-index: 60; width: 340px; max-height: min(520px, 80vh); display: flex; flex-direction: column; background: #fff; border-radius: 12px;
+    box-shadow: 0 18px 50px rgba(15, 18, 24, .25); padding: 12px; }
+.ev2-pop[hidden] { display: none; }
+.ev2-pop input { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #d9dde3; border-radius: 8px; margin-bottom: 8px; font: 14px Inter, sans-serif; }
+.ev2-pop-cats { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.ev2-pop-cats button { border: 1px solid #e1e4e9; background: #fff; border-radius: 999px; padding: 3px 9px; font: 12px Inter, sans-serif; cursor: pointer; color: #4b5563; }
+.ev2-pop-cats button.is-on { background: #eef3ff; border-color: #2563eb; color: #1d4ed8; }
+.ev2-pop-list { overflow: auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.ev2-pop-list button { border: 1px solid #e6e8ec; border-radius: 9px; padding: 9px 4px; text-align: center; font: 12px Inter, sans-serif; cursor: pointer; background: #fff; color: #1c1f24;
+    display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 64px; }
+.ev2-pop-list button svg { width: 20px; height: 20px; color: #4b5563; }
+.ev2-pop-list button:hover, .ev2-pop-list button:focus-visible { border-color: #2563eb; background: #f5f8ff; outline: none; }
+.ev2-pop-list .none { grid-column: 1 / -1; color: #6b7280; font-size: 13px; padding: 8px; }
+
+/* --- settings dialog + toast --- */
+.ev2-settings { width: min(560px, 94vw); }
+.ev2-settings-title { margin: 0 0 6px; }
+.ev2-settings details { margin: 4px 0 8px; }
+.ev2-settings summary { cursor: pointer; font-size: 13px; color: #4b5563; margin-bottom: 8px; }
+.ev2-toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 70; background: #111827; color: #fff; padding: 10px 16px; border-radius: 10px;
+    font-size: 14px; box-shadow: 0 10px 30px rgba(0, 0, 0, .25); animation: ev2Toast 4s ease forwards; }
+.ev2-toast.is-error { background: #b42318; }
+@keyframes ev2Toast { 0%, 85% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
+
+.ev2-tree-toggle, .ev2-insp-close { display: none; }
+.ev2-insp-head { position: relative; }
+.ev2-insp-close { position: absolute; right: 12px; top: 10px; border: 0; background: none; font-size: 18px; color: #6b7280; cursor: pointer; }
+
+/* --- smaller screens: tree and inspector narrow; below 1000 px the inspector slides in over the
+   preview when a block is chosen, on a phone the tree does the same --- */
+@media (max-width: 1280px) { body.ev2 { grid-template-columns: 240px minmax(0, 1fr) 320px; } .ev2-back { width: 240px; } }
+@media (max-width: 1000px) {
+    body.ev2 { grid-template-columns: 220px minmax(0, 1fr); }
+    .ev2-back { width: 220px; }
+    .ev2-insp { position: fixed; right: 0; top: 64px; bottom: 0; width: min(360px, 92vw); z-index: 40; box-shadow: -10px 0 30px rgba(0, 0, 0, .12); display: none; }
+    body.ev2-insp-open .ev2-insp { display: flex; }
+    .ev2-insp-close { display: block; }
+    .ev2-hide-s { display: none; }
+}
+@media (max-width: 700px) {
+    body.ev2 { grid-template-columns: 1fr; grid-template-rows: 56px minmax(0, 1fr); }
+    .ev2-top { height: 56px; gap: 6px; padding-right: 8px; }
+    .ev2-back { width: auto; height: 56px; padding: 0 10px; border-right: 0; background: none; }
+    .ev2-back span, .ev2-status, .ev2-seg, #ev2-redo, .ev2-title .badge, .ev2-sp { display: none; }
+    .ev2-title { flex: 1; min-width: 0; padding-left: 0; }
+    .ev2-title-text { font-size: 16px; }
+    .ev2-tree-toggle { display: inline-flex; }
+    .ev2-nav { display: none; position: fixed; left: 0; top: 56px; bottom: 0; width: min(320px, 88vw); z-index: 45; box-shadow: 10px 0 30px rgba(0, 0, 0, .12); }
+    body.ev2-nav-open .ev2-nav { display: block; }
+    .ev2-insp { top: 56px; width: 100%; }
+    .ev2-stage { padding: 0; }
+    .ev2-frame { border-radius: 0; }
+}

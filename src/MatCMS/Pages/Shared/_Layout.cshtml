@@ -4,6 +4,9 @@
     var title = ViewData["Title"] as string;
     var pageTitle = string.IsNullOrWhiteSpace(title) ? Site.SiteName : $"{title} – {Site.SiteName}";
     var metaDescription = ViewData["MetaDescription"] as string;
+    // The editor's preview (?editor) shows the page as a VISITOR sees it: the admin bar above it would
+    // be a second toolbar inside the editor and push every block down by its height.
+    var showAdminBar = User.IsInRole("Admin") && !Context.Request.Query.ContainsKey("editor");
 
     // ---- Active template (theme) ----
     var tpl = Site.ActiveTemplate;
@@ -194,11 +197,11 @@
         @Html.Raw(Site.HeadCode)
     }
 </head>
-<body class="@(User.IsInRole("Admin") ? "has-adminbar" : null)">
+<body class="@(showAdminBar ? "has-adminbar" : null)">
 @* Admin bar over the live site for logged-in back-office admins — first-party here, so no cross-site
    cookie issue (the "flip it instead of iframe" approach). Rendered first so it sits atop everything.
    The has-adminbar body class makes the site's own sticky header stick below the bar (no overlap). *@
-@if (User.IsInRole("Admin"))
+@if (showAdminBar)
 {
     <partial name="_AdminBar" />
 }

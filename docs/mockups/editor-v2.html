@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mockup · Seiten-Editor v2 · MatCMS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Geologica:wght@500;600;700&family=Inter:wght@400;500;600&family=Cormorant+Garamond:wght@500&family=Montserrat:wght@300;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../../src/MatCMS.Shared.Web/wwwroot/lib/tabler-icons/tabler-icons.min.css" />
+<link rel="stylesheet" href="../../src/MatCMS.Shared.Web/wwwroot/css/site.css" />
+<link rel="stylesheet" href="../../src/MatCMS.Shared.Web/wwwroot/css/admin.css" />
+<style>
+  /* ===== Mockup: Seiten-Editor v2 =====
+     Drei Spalten im Admin-Look: links die Block-Navigation (wo sonst das Admin-Menü steht),
+     Mitte die Vorschau OHNE Admin-Leiste, rechts der Inspector des gewählten Elements. */
+  html, body { height: 100%; }
+  body.ev2 { margin: 0; display: grid; grid-template-columns: 280px 1fr 340px; grid-template-rows: 64px 1fr; height: 100vh; overflow: hidden; background: #f4f5f7; font-family: Inter, sans-serif; color: #1c1f24; }
+
+  /* --- Top bar --- */
+  .ev2-top { grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; padding: 0 16px 0 0; background: #fff; border-bottom: 1px solid #e6e8ec; }
+  .ev2-back { width: 280px; height: 64px; display: flex; align-items: center; gap: 10px; padding: 0 18px; border-right: 1px solid #e6e8ec; text-decoration: none; color: #1c1f24; font-weight: 600; flex: 0 0 auto; box-sizing: border-box; background: #f8f9fb; }
+  .ev2-back i { font-size: 22px; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; background: #fff; border: 1px solid #e1e4e9; }
+  .ev2-back:hover i { border-color: #2563eb; color: #2563eb; }
+  .ev2-back small { display: block; font-weight: 400; color: #6b7280; font-size: 12px; }
+  .ev2-title { font-family: Geologica, sans-serif; font-weight: 600; font-size: 18px; white-space: nowrap; }
+  .ev2-title .badge { margin-left: 8px; vertical-align: middle; }
+  .ev2-sp { flex: 1; }
+  .ev2-seg { display: inline-flex; border: 1px solid #e1e4e9; border-radius: 10px; overflow: hidden; background: #fff; }
+  .ev2-seg button { border: 0; background: none; padding: 7px 11px; cursor: pointer; color: #4b5563; font-size: 18px; line-height: 1; }
+  .ev2-seg button + button { border-left: 1px solid #e1e4e9; }
+  .ev2-seg button.is-on { background: #eef3ff; color: #2563eb; }
+  .ev2-ico { border: 1px solid #e1e4e9; background: #fff; border-radius: 10px; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; color: #4b5563; cursor: pointer; font-size: 18px; }
+  .ev2-status { font-size: 13px; color: #6b7280; display: inline-flex; align-items: center; gap: 6px; }
+  .ev2-status i { color: #16a34a; }
+
+  /* --- Left: block navigation (tree) --- */
+  .ev2-nav { background: #fff; border-right: 1px solid #e6e8ec; overflow: auto; padding: 12px 10px 80px; }
+  .ev2-nav h4 { margin: 6px 8px 8px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #9aa1ab; font-weight: 600; }
+  .ev2-tree, .ev2-tree ul { list-style: none; margin: 0; padding: 0; }
+  .ev2-tree ul { margin-left: 14px; border-left: 1px dashed #e1e4e9; padding-left: 4px; }
+  .ev2-node { display: flex; align-items: center; gap: 6px; padding: 6px 6px; border-radius: 8px; cursor: pointer; font-size: 14px; color: #2b2f36; user-select: none; position: relative; }
+  .ev2-node:hover { background: #f3f5f8; }
+  .ev2-node.is-sel { background: #eef3ff; color: #1d4ed8; font-weight: 600; }
+  .ev2-node .tw { width: 16px; color: #9aa1ab; font-size: 14px; flex: 0 0 auto; text-align: center; }
+  .ev2-node .ic { width: 22px; height: 22px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; background: #f1f3f6; color: #4b5563; flex: 0 0 auto; }
+  .ev2-node.is-sel .ic { background: #dbe6ff; color: #1d4ed8; }
+  .ev2-node .lbl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ev2-node .lbl em { font-style: normal; color: #9aa1ab; font-weight: 400; margin-left: 4px; }
+  .ev2-node .act { display: none; gap: 2px; }
+  .ev2-node:hover .act, .ev2-node.is-sel .act { display: inline-flex; }
+  .ev2-node .act i { font-size: 15px; color: #9aa1ab; padding: 2px; border-radius: 4px; }
+  .ev2-node .act i:hover { color: #1c1f24; background: #e7eaef; }
+  .ev2-node.is-locked { color: #9aa1ab; }
+  .ev2-node.is-locked .ic { background: #f6f7f9; color: #b6bcc5; }
+  li.is-closed > ul { display: none; }
+  .ev2-add { display: flex; align-items: center; gap: 6px; padding: 5px 8px; margin: 2px 0 4px 22px; font-size: 13px; color: #2563eb; border-radius: 8px; cursor: pointer; }
+  .ev2-add:hover { background: #eef3ff; }
+  .ev2-add.root { margin-left: 0; border: 1px dashed #c7d4f5; justify-content: center; padding: 9px; margin-top: 10px; }
+  .ev2-sep { height: 1px; background: #eef0f3; margin: 8px 6px; }
+
+  /* --- Center: preview --- */
+  .ev2-stage { overflow: auto; display: flex; justify-content: center; padding: 22px; }
+  .ev2-frame { width: 100%; max-width: 1180px; background: #0a0807; border-radius: 10px; box-shadow: 0 10px 40px rgba(15, 18, 24, .18); overflow: hidden; transition: max-width .25s; align-self: flex-start; }
+  .ev2-frame.is-tablet { max-width: 820px; }
+  .ev2-frame.is-phone { max-width: 390px; }
+  .ev2-chrome { height: 28px; background: #e9ebef; display: flex; align-items: center; gap: 6px; padding: 0 10px; }
+  .ev2-chrome span { width: 10px; height: 10px; border-radius: 50%; background: #cfd3da; }
+  .ev2-chrome b { margin-left: 10px; font: 500 11px Inter, sans-serif; color: #6b7280; background: #fff; border-radius: 6px; padding: 3px 10px; }
+
+  /* the fake site (N.S. Libera look) */
+  .site { color: #cfc5ba; font-family: Montserrat, sans-serif; font-weight: 300; }
+  .site h1, .site h2, .site h3 { font-family: 'Cormorant Garamond', serif; font-weight: 500; color: #f4ece2; margin: 0; }
+  .s-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 34px; border-bottom: 1px solid rgba(184,105,42,.28); }
+  .s-head .logo { font-family: 'Cormorant Garamond', serif; font-size: 26px; color: #f4ece2; }
+  .s-head .logo i { font-style: italic; font-family: Montserrat; font-weight: 300; font-size: 15px; letter-spacing: .4em; margin-left: 8px; }
+  .s-head nav { display: flex; gap: 18px; font-size: 11px; letter-spacing: .18em; text-transform: uppercase; }
+  .frame-phone .s-head nav { display: none; }
+  .s-hero { padding: 80px 34px 70px; text-align: center; background: radial-gradient(60% 90% at 50% 100%, rgba(232,116,44,.25), transparent 70%), linear-gradient(#120d0b, #0a0807); }
+  .s-hero .ph { width: 120px; height: 120px; margin: 0 auto 22px; border-radius: 50%; background: linear-gradient(135deg, #3a2418, #b8692a); display: flex; align-items: center; justify-content: center; color: #f4ece2; font-size: 34px; }
+  .s-hero h1 { font-size: clamp(28px, 4vw, 46px); }
+  .s-hero h1 b { color: #e8742c; font-weight: 500; }
+  .s-hero p { max-width: 520px; margin: 14px auto 26px; line-height: 1.7; }
+  .s-btns { display: inline-flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .s-btn { background: #e8742c; color: #0a0807; padding: 12px 22px; font-size: 11px; font-weight: 500; letter-spacing: .2em; text-transform: uppercase; }
+  .s-btn.ol { background: transparent; color: #f4ece2; border: 1px solid rgba(244,236,226,.4); }
+  .s-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 34px; padding: 60px 34px; align-items: center; }
+  .frame-phone .s-cols { grid-template-columns: 1fr; }
+  .s-col { min-height: 60px; }
+  .s-img { aspect-ratio: 4/5; background: linear-gradient(160deg, #2a1a12, #6b3a1c 60%, #e8742c); display: flex; align-items: flex-end; padding: 14px; color: #f4ece2; font-family: 'Cormorant Garamond'; font-size: 22px; }
+  .s-col h2 { font-size: 34px; margin-bottom: 12px; }
+  .s-col p { line-height: 1.8; margin: 0 0 18px; }
+  .s-quote { padding: 50px 34px; text-align: center; font-family: 'Cormorant Garamond'; font-size: 26px; color: #e4dad0; font-style: italic; border-top: 1px solid rgba(184,105,42,.28); border-bottom: 1px solid rgba(184,105,42,.28); }
+  .s-foot { padding: 30px 34px; font-size: 12px; color: #8a8178; }
+
+  /* edit affordances inside the preview */
+  [data-el] { position: relative; outline: 0 solid transparent; transition: outline-color .12s; cursor: pointer; }
+  [data-el]:hover { outline: 1px dashed rgba(96, 165, 250, .9); outline-offset: 2px; }
+  [data-el].is-sel { outline: 2px solid #3b82f6; outline-offset: 2px; }
+  [data-el].is-sel::after { content: attr(data-label); position: absolute; left: -2px; top: -24px; background: #3b82f6; color: #fff; font: 600 11px Inter, sans-serif; letter-spacing: 0; text-transform: none; padding: 3px 8px; border-radius: 6px 6px 0 0; white-space: nowrap; z-index: 3; font-style: normal; }
+  [data-el="hero"].is-sel::after, [data-el="cols"].is-sel::after, [data-el="quote"].is-sel::after { top: 4px; left: 4px; border-radius: 6px; }
+
+  /* --- Right: inspector --- */
+  .ev2-insp { background: #fff; border-left: 1px solid #e6e8ec; overflow: auto; display: flex; flex-direction: column; }
+  .ev2-insp-head { padding: 16px 18px 0; }
+  .ev2-crumb { font-size: 12px; color: #9aa1ab; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+  .ev2-crumb a { color: #6b7280; text-decoration: none; cursor: pointer; }
+  .ev2-crumb a:hover { color: #2563eb; }
+  .ev2-insp h3 { font-family: Geologica, sans-serif; font-size: 17px; margin: 6px 0 12px; display: flex; align-items: center; gap: 8px; }
+  .ev2-insp h3 .ic { width: 28px; height: 28px; border-radius: 8px; background: #eef3ff; color: #1d4ed8; display: inline-flex; align-items: center; justify-content: center; font-size: 16px; }
+  .ev2-tabs { display: flex; gap: 2px; border-bottom: 1px solid #e6e8ec; padding: 0 18px; }
+  .ev2-tabs button { border: 0; background: none; padding: 9px 10px; font: 500 13px Inter, sans-serif; color: #6b7280; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .ev2-tabs button.is-on { color: #1d4ed8; border-bottom-color: #2563eb; }
+  .ev2-body { padding: 16px 18px 24px; flex: 1; }
+  .ev2-body .field { margin-bottom: 14px; }
+  .ev2-body label { font-size: 13px; font-weight: 600; display: block; margin-bottom: 6px; }
+  .ev2-body .field input[type=text], .ev2-body textarea, .ev2-body select { width: 100%; box-sizing: border-box; padding: 9px 11px; border: 1px solid #d9dde3; border-radius: 8px; font: 14px Inter, sans-serif; background: #fff; }
+  .ev2-body textarea { min-height: 80px; resize: vertical; }
+  .ev2-img { height: 120px; border-radius: 10px; background: linear-gradient(160deg, #2a1a12, #6b3a1c 60%, #e8742c); display: flex; align-items: flex-end; justify-content: flex-end; padding: 8px; gap: 6px; }
+  .ev2-img button { border: 0; background: rgba(255,255,255,.92); border-radius: 7px; padding: 5px 9px; font: 500 12px Inter; cursor: pointer; }
+  .ev2-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ev2-chip { border: 1px solid #d9dde3; background: #fff; border-radius: 8px; padding: 6px 10px; font-size: 13px; cursor: pointer; }
+  .ev2-chip.is-on { border-color: #2563eb; background: #eef3ff; color: #1d4ed8; font-weight: 600; }
+  .ev2-ratio { display: flex; gap: 6px; }
+  .ev2-ratio div { flex: 1; height: 34px; border: 1px solid #d9dde3; border-radius: 8px; display: flex; gap: 3px; padding: 4px; cursor: pointer; box-sizing: border-box; }
+  .ev2-ratio div span { background: #e4e8ee; border-radius: 4px; }
+  .ev2-ratio div.is-on { border-color: #2563eb; } .ev2-ratio div.is-on span { background: #bfd2ff; }
+  .ev2-sub { border: 1px solid #e6e8ec; border-radius: 10px; overflow: hidden; }
+  .ev2-sub div { display: flex; align-items: center; gap: 8px; padding: 9px 11px; font-size: 13px; border-top: 1px solid #eef0f3; cursor: pointer; }
+  .ev2-sub div:first-child { border-top: 0; }
+  .ev2-sub div:hover { background: #f6f8fb; }
+  .ev2-sub div i:last-child { margin-left: auto; color: #9aa1ab; }
+  .ev2-help { font-size: 12px; color: #6b7280; margin-top: 6px; line-height: 1.5; }
+  .ev2-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .ev2-toggle { display: flex; align-items: center; justify-content: space-between; font-size: 13px; padding: 6px 0; }
+  .ev2-sw { width: 34px; height: 20px; border-radius: 999px; background: #2563eb; position: relative; flex: 0 0 auto; }
+  .ev2-sw::after { content: ""; position: absolute; right: 3px; top: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; }
+  .ev2-sw.off { background: #d1d5db; } .ev2-sw.off::after { right: auto; left: 3px; }
+  .ev2-foot { border-top: 1px solid #e6e8ec; padding: 12px 18px; display: flex; gap: 8px; }
+  .ev2-foot .btn { flex: 1; }
+
+  /* add-element popover */
+  .ev2-pop { position: fixed; z-index: 50; width: 300px; background: #fff; border-radius: 12px; box-shadow: 0 18px 50px rgba(15,18,24,.25); padding: 12px; display: none; }
+  .ev2-pop.is-open { display: block; }
+  .ev2-pop input { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #d9dde3; border-radius: 8px; margin-bottom: 10px; font: 14px Inter; }
+  .ev2-pop h5 { margin: 8px 2px 6px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #9aa1ab; }
+  .ev2-pop .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .ev2-pop .grid div { border: 1px solid #e6e8ec; border-radius: 9px; padding: 9px 4px; text-align: center; font-size: 12px; cursor: pointer; }
+  .ev2-pop .grid div i { display: block; font-size: 19px; margin-bottom: 4px; color: #4b5563; }
+  .ev2-pop .grid div:hover { border-color: #2563eb; background: #f5f8ff; }
+
+  /* mockup notes */
+  .ev2-notes { position: fixed; right: 356px; bottom: 16px; z-index: 40; width: 330px; background: #111827; color: #e5e7eb; border-radius: 12px; padding: 14px 16px; font-size: 13px; line-height: 1.55; box-shadow: 0 12px 40px rgba(0,0,0,.3); }
+  .ev2-notes b { color: #fff; }
+  .ev2-notes ol { margin: 6px 0 0; padding-left: 18px; }
+  .ev2-notes button { position: absolute; right: 8px; top: 6px; background: none; border: 0; color: #9ca3af; cursor: pointer; font-size: 16px; }
+</style>
+</head>
+<body class="ev2">
+
+<!-- ===== Top bar ===== -->
+<header class="ev2-top">
+  <a class="ev2-back" href="#" title="Editor verlassen (zurück zur Seitenliste)">
+    <i class="ti ti-arrow-left"></i>
+    <span>Zurück<small>zu den Seiten</small></span>
+  </a>
+  <div class="ev2-title">Startseite <span class="badge badge-new">Entwurf</span></div>
+  <span class="ev2-status"><i class="ti ti-circle-check"></i> Entwurf gespeichert · vor 5 s</span>
+  <div class="ev2-sp"></div>
+  <button class="ev2-ico" title="Rückgängig"><i class="ti ti-arrow-back-up"></i></button>
+  <button class="ev2-ico" title="Wiederholen"><i class="ti ti-arrow-forward-up"></i></button>
+  <div class="ev2-seg" id="dev">
+    <button class="is-on" data-dev="desktop" title="Desktop"><i class="ti ti-device-desktop"></i></button>
+    <button data-dev="tablet" title="Tablet"><i class="ti ti-device-tablet"></i></button>
+    <button data-dev="phone" title="Handy"><i class="ti ti-device-mobile"></i></button>
+  </div>
+  <button class="ev2-ico" title="Versionen"><i class="ti ti-history"></i></button>
+  <button class="ev2-ico" title="Seiteneinstellungen (SEO, Sprache, Zugriff)"><i class="ti ti-settings"></i></button>
+  <a class="btn btn-ghost btn-sm" href="#"><i class="ti ti-external-link"></i> Ansehen</a>
+  <button class="btn btn-sm">Veröffentlichen</button>
+</header>
+
+<!-- ===== Left: block navigation ===== -->
+<aside class="ev2-nav">
+  <h4>Seite</h4>
+  <ul class="ev2-tree" id="tree">
+    <li><div class="ev2-node is-locked" data-id="header"><span class="tw"></span><span class="ic"><i class="ti ti-layout-navbar"></i></span><span class="lbl">Kopfzeile <em>Template</em></span><span class="act"><i class="ti ti-lock"></i></span></div></li>
+  </ul>
+  <div class="ev2-sep"></div>
+  <ul class="ev2-tree" id="tree-main">
+    <li class="is-open"><div class="ev2-node" data-id="hero"><span class="tw"><i class="ti ti-chevron-down"></i></span><span class="ic"><i class="ti ti-photo-star"></i></span><span class="lbl">Hero</span><span class="act"><i class="ti ti-grip-vertical"></i><i class="ti ti-copy"></i><i class="ti ti-eye"></i><i class="ti ti-dots"></i></span></div>
+      <ul>
+        <li><div class="ev2-node" data-id="hero-img"><span class="tw"></span><span class="ic"><i class="ti ti-photo"></i></span><span class="lbl">Bild <em>Logo</em></span><span class="act"><i class="ti ti-grip-vertical"></i><i class="ti ti-dots"></i></span></div></li>
+        <li><div class="ev2-node" data-id="hero-title"><span class="tw"></span><span class="ic"><i class="ti ti-heading"></i></span><span class="lbl">Überschrift</span><span class="act"><i class="ti ti-grip-vertical"></i><i class="ti ti-dots"></i></span></div></li>
+        <li><div class="ev2-node" data-id="hero-text"><span class="tw"></span><span class="ic"><i class="ti ti-align-left"></i></span><span class="lbl">Text</span><span class="act"><i class="ti ti-grip-vertical"></i><i class="ti ti-dots"></i></span></div></li>
+        <li class="is-open"><div class="ev2-node" data-id="hero-btns"><span class="tw"><i class="ti ti-chevron-down"></i></span><span class="ic"><i class="ti ti-click"></i></span><span class="lbl">Buttons <em>2</em></span><span class="act"><i class="ti ti-grip-vertical"></i><i class="ti ti-dots"></i></span></div>
+          <ul>
+            <li><div class="ev2-node" data-id="btn1"><span class="tw"></span><span class="ic"><i class="ti ti-square-rounded"></i></span><span class="lbl">Melnad entdecken</span><span class="act"><i class="ti ti-grip-vertical"></i><i class="ti ti-dots"></i></span></div></li>
+            <li><div class="ev2-node" data-id="btn2"><span class="tw"></span><span class="ic"><i class="ti ti-square-rounded"></i></span><span class="lbl">Leseprobe lesen</span><span class="act"><i class="ti ti-grip-vertical"></i><i class="ti ti-dots"></i></span></div></li>
+          </ul>
+          <div class="ev2-add" data-add="button"><i class="ti ti-plus"></i> Button</div>
+        </li>
+      </ul>
+      <div class="ev2-add" data-add="element"><i class="ti ti-plus"></i> Element in Hero</div>
+    </li>
+    <li class="is-open"><div class="ev2-node" data-id="cols"><span class="tw"><i class="ti ti-chevron-down"></i></span><span class="ic"><i class="ti ti-columns-2"></i></span><span class="lbl">Spalten <em>50 / 50</em></span><span class="act"><i class="ti ti-grip-vertical"></i><i class="ti ti-copy"></i><i class="ti ti-eye"></i><i class="ti ti-dots"></i></span></div>
+      <ul>
+        <li class="is-open"><div class="ev2-node" data-id="col1"><span class="tw"><i class="ti ti-chevron-down"></i></span><span class="ic"><i class="ti ti-layout-sidebar"></i></span><span class="lbl">Spalte links</span><span class="act"><i class="ti ti-dots"></i></span></div>
+          <ul>
+            <li><div class="ev2-node" data-id="col1-img"><span class="tw"></span><span class="ic"><i class="ti ti-photo"></i></span><span class="lbl">Bild <em>Cover</em></span><span class="act"><i class="ti ti-grip-vertical"></i><i class="ti ti-dots"></i></span></div></li>
+          </ul>
+          <div class="ev2-add" data-add="element"><i class="ti ti-plus"></i> Element</div>
+        </li>
+        <li class="is-open"><div class="ev2-node" data-id="col2"><span class="tw"><i class="ti ti-chevron-down"></i></span><span class="ic"><i class="ti ti-layout-sidebar-right"></i></span><span class="lbl">Spalte rechts</span><span class="act"><i class="ti ti-dots"></i></span></div>
+          <ul>
+            <li><div class="ev2-node" data-id="col2-title"><span class="tw"></span><span class="ic"><i class="ti ti-heading"></i></span><span class="lbl">Überschrift</span><span class="act"><i class="ti ti-grip-vertical"></i><i class="ti ti-dots"></i></span></div></li>
+            <li><div class="ev2-node" data-id="col2-text"><span class="tw"></span><span class="ic"><i class="ti ti-align-left"></i></span><span class="lbl">Text</span><span class="act"><i class="ti ti-grip-vertical"></i><i class="ti ti-dots"></i></span></div></li>
+            <li><div class="ev2-node" data-id="col2-btn"><span class="tw"></span><span class="ic"><i class="ti ti-square-rounded"></i></span><span class="lbl">Button</span><span class="act"><i class="ti ti-grip-vertical"></i><i class="ti ti-dots"></i></span></div></li>
+          </ul>
+          <div class="ev2-add" data-add="element"><i class="ti ti-plus"></i> Element</div>
+        </li>
+      </ul>
+    </li>
+    <li class="is-closed"><div class="ev2-node" data-id="quote"><span class="tw"><i class="ti ti-chevron-right"></i></span><span class="ic"><i class="ti ti-quote"></i></span><span class="lbl">Zitat</span><span class="act"><i class="ti ti-grip-vertical"></i><i class="ti ti-copy"></i><i class="ti ti-eye"></i><i class="ti ti-dots"></i></span></div>
+      <ul>
+        <li><div class="ev2-node" data-id="quote-text"><span class="tw"></span><span class="ic"><i class="ti ti-align-left"></i></span><span class="lbl">Zitattext</span></div></li>
+        <li><div class="ev2-node" data-id="quote-author"><span class="tw"></span><span class="ic"><i class="ti ti-user"></i></span><span class="lbl">Autor</span></div></li>
+      </ul>
+    </li>
+  </ul>
+  <div class="ev2-add root" data-add="section"><i class="ti ti-plus"></i> Abschnitt hinzufügen</div>
+  <div class="ev2-sep"></div>
+  <ul class="ev2-tree">
+    <li><div class="ev2-node is-locked" data-id="footer"><span class="tw"></span><span class="ic"><i class="ti ti-layout-bottombar"></i></span><span class="lbl">Fußzeile <em>Template</em></span><span class="act"><i class="ti ti-lock"></i></span></div></li>
+  </ul>
+</aside>
+
+<!-- ===== Center: preview (no admin bar) ===== -->
+<main class="ev2-stage">
+  <div class="ev2-frame" id="frame">
+    <div class="ev2-chrome"><span></span><span></span><span></span><b>nslibera.matthix.de/ · Vorschau ohne Admin-Leiste</b></div>
+    <div class="site" id="site">
+      <div class="s-head" data-el="header" data-label="Kopfzeile (Template)"><div class="logo">NS<i>LIBERA</i></div><nav><span>Über mich</span><span>Bücher</span><span>Termine</span><span>Rezensionen</span><span>Blog</span></nav></div>
+
+      <section class="s-hero" data-el="hero" data-label="Hero">
+        <div class="ph" data-el="hero-img" data-label="Bild">NS</div>
+        <h1 data-el="hero-title" data-label="Überschrift">Bist du bereit, für das zu <b>brennen</b>, was du liebst?</h1>
+        <p data-el="hero-text" data-label="Text">Dystopische Romantasy über Macht, Verrat und eine Liebe, die alles in Flammen setzt.</p>
+        <div class="s-btns" data-el="hero-btns" data-label="Buttons">
+          <span class="s-btn" data-el="btn1" data-label="Button">Melnad entdecken</span>
+          <span class="s-btn ol" data-el="btn2" data-label="Button">Leseprobe lesen</span>
+        </div>
+      </section>
+
+      <section class="s-cols" data-el="cols" data-label="Spalten 50 / 50">
+        <div class="s-col" data-el="col1" data-label="Spalte links">
+          <div class="s-img" data-el="col1-img" data-label="Bild">Melnad</div>
+        </div>
+        <div class="s-col" data-el="col2" data-label="Spalte rechts">
+          <h2 data-el="col2-title" data-label="Überschrift">Melnad – Brenne für mich</h2>
+          <p data-el="col2-text" data-label="Text">Maya hat gelernt, unsichtbar zu sein. Bis Nero sie findet – und mit ihm ein Feuer, das sie beide verschlingen könnte.</p>
+          <span class="s-btn" data-el="col2-btn" data-label="Button">Zum Buch</span>
+        </div>
+      </section>
+
+      <section class="s-quote" data-el="quote" data-label="Zitat">
+        <span data-el="quote-text" data-label="Zitattext">„Manche Feuer wärmen nicht. Sie verändern dich.“</span>
+      </section>
+
+      <div class="s-foot" data-el="footer" data-label="Fußzeile (Template)">© 2026 N.S. Libera · Geschichten für alle, die in der Dunkelheit tanzen</div>
+    </div>
+  </div>
+</main>
+
+<!-- ===== Right: inspector ===== -->
+<aside class="ev2-insp">
+  <div class="ev2-insp-head">
+    <div class="ev2-crumb" id="crumb"></div>
+    <h3 id="insp-title"></h3>
+  </div>
+  <div class="ev2-tabs" id="tabs"><button class="is-on">Inhalt</button><button>Design</button><button>Erweitert</button></div>
+  <div class="ev2-body" id="insp-body"></div>
+  <div class="ev2-foot"><button class="btn btn-ghost btn-sm"><i class="ti ti-copy"></i> Duplizieren</button><button class="btn btn-ghost btn-sm" style="color:#b42318"><i class="ti ti-trash"></i> Entfernen</button></div>
+</aside>
+
+<!-- add-element popover -->
+<div class="ev2-pop" id="pop">
+  <input type="text" placeholder="Element suchen …" />
+  <h5>Inhalt</h5>
+  <div class="grid">
+    <div><i class="ti ti-heading"></i>Überschrift</div><div><i class="ti ti-align-left"></i>Text</div><div><i class="ti ti-photo"></i>Bild</div>
+    <div><i class="ti ti-square-rounded"></i>Button</div><div><i class="ti ti-list"></i>Liste</div><div><i class="ti ti-quote"></i>Zitat</div>
+  </div>
+  <h5>Layout</h5>
+  <div class="grid">
+    <div><i class="ti ti-columns-2"></i>Spalten</div><div><i class="ti ti-box"></i>Gruppe</div><div><i class="ti ti-spacing-vertical"></i>Abstand</div>
+  </div>
+  <h5>Medien &amp; mehr</h5>
+  <div class="grid">
+    <div><i class="ti ti-layout-grid"></i>Galerie</div><div><i class="ti ti-brand-youtube"></i>Video</div><div><i class="ti ti-forms"></i>Formular</div>
+    <div><i class="ti ti-puzzle"></i>Komponente</div><div><i class="ti ti-star"></i>Leserstimmen</div><div><i class="ti ti-code"></i>HTML</div>
+  </div>
+</div>
+
+<div class="ev2-notes" id="notes">
+  <button onclick="this.parentNode.remove()" title="Ausblenden">×</button>
+  <b>Mockup · Seiten-Editor v2</b>
+  <ol>
+    <li><b>Vollbild im MatCMS-Look:</b> oben links „Zurück“ statt Logo, links die Block-Navigation statt Admin-Menü, rechts das gewählte Element.</li>
+    <li><b>Mehrere Ebenen:</b> ein Abschnitt (Hero) besteht aus Elementen (Bild, Überschrift, Text, Buttons → Button). <b>Spalten</b> nehmen links und rechts eigene Elemente auf.</li>
+    <li><b>Vorschau ohne Admin-Leiste:</b> die Mitte zeigt die Seite so, wie Besucher sie sehen.</li>
+  </ol>
+  Klick links oder direkt in die Vorschau wählt ein Element; „+“ fügt auf der jeweiligen Ebene etwas hinzu.
+</div>
+
+<script>
+(function () {
+  // ---- data for the inspector (what each element would show) ----
+  var D = {
+    header: { t: 'Kopfzeile', ic: 'layout-navbar', path: ['Seite'], locked: true },
+    footer: { t: 'Fußzeile', ic: 'layout-bottombar', path: ['Seite'], locked: true },
+    hero: { t: 'Hero', ic: 'photo-star', path: ['Seite'], kind: 'section' },
+    'hero-img': { t: 'Bild', ic: 'photo', path: ['Seite', 'Hero'], kind: 'image' },
+    'hero-title': { t: 'Überschrift', ic: 'heading', path: ['Seite', 'Hero'], kind: 'heading', v: 'Bist du bereit, für das zu **brennen**, was du liebst?' },
+    'hero-text': { t: 'Text', ic: 'align-left', path: ['Seite', 'Hero'], kind: 'text', v: 'Dystopische Romantasy über Macht, Verrat und eine Liebe, die alles in Flammen setzt.' },
+    'hero-btns': { t: 'Buttons', ic: 'click', path: ['Seite', 'Hero'], kind: 'buttons' },
+    btn1: { t: 'Button', ic: 'square-rounded', path: ['Seite', 'Hero', 'Buttons'], kind: 'button', v: 'Melnad entdecken', u: '/buecher', s: 'Gefüllt' },
+    btn2: { t: 'Button', ic: 'square-rounded', path: ['Seite', 'Hero', 'Buttons'], kind: 'button', v: 'Leseprobe lesen', u: '/leseprobe', s: 'Umriss' },
+    cols: { t: 'Spalten', ic: 'columns-2', path: ['Seite'], kind: 'columns' },
+    col1: { t: 'Spalte links', ic: 'layout-sidebar', path: ['Seite', 'Spalten'], kind: 'column' },
+    col2: { t: 'Spalte rechts', ic: 'layout-sidebar-right', path: ['Seite', 'Spalten'], kind: 'column' },
+    'col1-img': { t: 'Bild', ic: 'photo', path: ['Seite', 'Spalten', 'Spalte links'], kind: 'image' },
+    'col2-title': { t: 'Überschrift', ic: 'heading', path: ['Seite', 'Spalten', 'Spalte rechts'], kind: 'heading', v: 'Melnad – Brenne für mich' },
+    'col2-text': { t: 'Text', ic: 'align-left', path: ['Seite', 'Spalten', 'Spalte rechts'], kind: 'text', v: 'Maya hat gelernt, unsichtbar zu sein. Bis Nero sie findet …' },
+    'col2-btn': { t: 'Button', ic: 'square-rounded', path: ['Seite', 'Spalten', 'Spalte rechts'], kind: 'button', v: 'Zum Buch', u: '/buecher', s: 'Gefüllt' },
+    quote: { t: 'Zitat', ic: 'quote', path: ['Seite'], kind: 'section' },
+    'quote-text': { t: 'Zitattext', ic: 'align-left', path: ['Seite', 'Zitat'], kind: 'text', v: '„Manche Feuer wärmen nicht. Sie verändern dich.“' },
+    'quote-author': { t: 'Autor', ic: 'user', path: ['Seite', 'Zitat'], kind: 'heading', v: 'Maya' }
+  };
+  function chips(list, on) { return '<div class="ev2-chips">' + list.map(function (x) { return '<span class="ev2-chip' + (x === on ? ' is-on' : '') + '">' + x + '</span>'; }).join('') + '</div>'; }
+  function f(label, html, help) { return '<div class="field"><label>' + label + '</label>' + html + (help ? '<div class="ev2-help">' + help + '</div>' : '') + '</div>'; }
+  function input(v) { return '<input type="text" value="' + (v || '').replace(/"/g, '&quot;') + '" />'; }
+  function body(id) {
+    var d = D[id];
+    if (d.locked) return '<p class="ev2-help" style="font-size:13px">Kommt aus dem <b>Template</b> und gilt für alle Seiten. Bearbeiten unter Templates → Layout.</p><a class="btn btn-ghost btn-sm" href="#">Template öffnen</a>';
+    switch (d.kind) {
+      case 'section': return f('Name im Baum', input(d.t)) +
+        f('Enthält', '<div class="ev2-sub">' + subs(id) + '</div>', 'Klick öffnet das Element. Reihenfolge per Ziehen links.') +
+        f('Hintergrund', chips(['Keiner', 'Farbe', 'Bild', 'Verlauf'], 'Verlauf')) +
+        '<div class="ev2-row">' + f('Abstand oben', '<select><option>Groß</option></select>') + f('Abstand unten', '<select><option>Groß</option></select>') + '</div>' +
+        f('Breite', chips(['Schmal', 'Normal', 'Volle Breite'], 'Normal'));
+      case 'image': return f('Bild', '<div class="ev2-img"><button>Ersetzen</button><button>Zuschneiden</button></div>') + f('Alt-Text', input('Logo N.S. Libera')) + f('Link (optional)', input('')) + f('Form', chips(['Original', 'Rund', 'Quadrat', '4:5'], id === 'hero-img' ? 'Rund' : '4:5'));
+      case 'heading': return f('Text', '<textarea>' + d.v + '</textarea>', '**Wort** hebt in Akzentfarbe hervor – wie „brennen“.') + f('Ebene', chips(['H1', 'H2', 'H3', 'H4'], id === 'hero-title' ? 'H1' : 'H2')) + f('Ausrichtung', chips(['Links', 'Mitte', 'Rechts'], id === 'hero-title' ? 'Mitte' : 'Links'));
+      case 'text': return f('Text', '<textarea style="min-height:120px">' + d.v + '</textarea>', 'Fett, kursiv, Links und Listen über die Werkzeugleiste beim Markieren.') + f('Größe', chips(['Klein', 'Normal', 'Groß'], 'Normal'));
+      case 'buttons': return f('Buttons', '<div class="ev2-sub">' + subs(id) + '</div>') + f('Anordnung', chips(['Nebeneinander', 'Untereinander'], 'Nebeneinander')) + f('Ausrichtung', chips(['Links', 'Mitte', 'Rechts'], 'Mitte'));
+      case 'button': return f('Beschriftung', input(d.v)) + f('Link', input(d.u), 'Seite wählen oder Adresse eintragen.') + f('Stil', chips(['Gefüllt', 'Umriss', 'Text'], d.s)) + '<div class="ev2-toggle">In neuem Tab öffnen <span class="ev2-sw off"></span></div>';
+      case 'columns': return f('Aufteilung', '<div class="ev2-ratio">' +
+          '<div class="is-on"><span style="flex:1"></span><span style="flex:1"></span></div>' +
+          '<div><span style="flex:1"></span><span style="flex:2"></span></div>' +
+          '<div><span style="flex:2"></span><span style="flex:1"></span></div>' +
+          '<div><span style="flex:1"></span><span style="flex:1"></span><span style="flex:1"></span></div></div>', '50/50 · 33/67 · 67/33 · drei Spalten') +
+        f('Spalten', '<div class="ev2-sub">' + subs(id) + '</div>') +
+        f('Vertikal ausrichten', chips(['Oben', 'Mitte', 'Unten'], 'Mitte')) +
+        f('Abstand zwischen Spalten', chips(['Klein', 'Normal', 'Groß'], 'Normal')) +
+        '<div class="ev2-toggle">Auf dem Handy untereinander <span class="ev2-sw"></span></div>' +
+        '<div class="ev2-toggle">Reihenfolge auf dem Handy umdrehen <span class="ev2-sw off"></span></div>';
+      case 'column': return f('Elemente in dieser Spalte', '<div class="ev2-sub">' + subs(id) + '</div>') + f('Hintergrund', chips(['Keiner', 'Farbe', 'Bild'], 'Keiner')) + f('Innenabstand', chips(['Keiner', 'Klein', 'Normal'], 'Keiner'));
+    }
+    return '';
+  }
+  function subs(id) {
+    var li = document.querySelector('.ev2-node[data-id="' + id + '"]').parentNode;
+    var kids = li.querySelectorAll(':scope > ul > li > .ev2-node');
+    return Array.prototype.map.call(kids, function (k) {
+      return '<div data-go="' + k.dataset.id + '"><i class="ti ti-' + D[k.dataset.id].ic + '"></i>' + k.querySelector('.lbl').textContent + '<i class="ti ti-chevron-right"></i></div>';
+    }).join('') + '<div style="color:#2563eb" data-addhere><i class="ti ti-plus"></i>Element hinzufügen</div>';
+  }
+
+  // ---- selection ----
+  function select(id) {
+    if (!D[id]) return;
+    document.querySelectorAll('.ev2-node.is-sel,[data-el].is-sel').forEach(function (n) { n.classList.remove('is-sel'); });
+    var node = document.querySelector('.ev2-node[data-id="' + id + '"]');
+    if (node) {
+      node.classList.add('is-sel');
+      for (var p = node.parentNode; p && p.id !== 'tree-main'; p = p.parentNode) if (p.tagName === 'LI') p.classList.remove('is-closed');
+      node.scrollIntoView({ block: 'nearest' });
+    }
+    var el = document.querySelector('[data-el="' + id + '"]');
+    if (el) { el.classList.add('is-sel'); el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+    var d = D[id];
+    document.getElementById('crumb').innerHTML = d.path.map(function (x) { return '<a>' + x + '</a>'; }).join(' <i class="ti ti-chevron-right"></i> ');
+    document.getElementById('insp-title').innerHTML = '<span class="ic"><i class="ti ti-' + d.ic + '"></i></span>' + d.t;
+    document.getElementById('insp-body').innerHTML = body(id);
+  }
+  document.querySelectorAll('.ev2-node').forEach(function (n) {
+    n.addEventListener('click', function (e) {
+      var li = n.parentNode;
+      if (e.target.closest('.tw') && li.querySelector(':scope > ul')) {
+        li.classList.toggle('is-closed');
+        n.querySelector('.tw i').className = 'ti ti-chevron-' + (li.classList.contains('is-closed') ? 'right' : 'down');
+        return;
+      }
+      select(n.dataset.id);
+    });
+  });
+  document.getElementById('site').addEventListener('click', function (e) {
+    var el = e.target.closest('[data-el]'); if (el) { e.preventDefault(); select(el.dataset.el); }
+  });
+  document.getElementById('insp-body').addEventListener('click', function (e) {
+    var go = e.target.closest('[data-go]'); if (go) select(go.dataset.go);
+    if (e.target.closest('[data-addhere]')) openPop(e.target.closest('[data-addhere]'));
+    var c = e.target.closest('.ev2-chip'); if (c) { c.parentNode.querySelectorAll('.ev2-chip').forEach(function (x) { x.classList.remove('is-on'); }); c.classList.add('is-on'); }
+    var r = e.target.closest('.ev2-ratio > div'); if (r) { r.parentNode.querySelectorAll('div').forEach(function (x) { x.classList.remove('is-on'); }); r.classList.add('is-on');
+      var i = Array.prototype.indexOf.call(r.parentNode.children, r);
+      document.querySelector('.s-cols').style.gridTemplateColumns = ['1fr 1fr', '1fr 2fr', '2fr 1fr', '1fr 1fr 1fr'][i]; }
+    var sw = e.target.closest('.ev2-sw'); if (sw) sw.classList.toggle('off');
+  });
+  document.getElementById('tabs').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    this.querySelectorAll('button').forEach(function (x) { x.classList.remove('is-on'); }); b.classList.add('is-on');
+  });
+
+  // ---- devices ----
+  document.getElementById('dev').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    this.querySelectorAll('button').forEach(function (x) { x.classList.remove('is-on'); }); b.classList.add('is-on');
+    var fr = document.getElementById('frame'); fr.className = 'ev2-frame' + (b.dataset.dev === 'desktop' ? '' : ' is-' + b.dataset.dev);
+    document.getElementById('site').className = 'site' + (b.dataset.dev === 'phone' ? ' frame-phone' : '');
+  });
+
+  // ---- add popover ----
+  var pop = document.getElementById('pop');
+  function openPop(anchor) {
+    var r = anchor.getBoundingClientRect();
+    pop.style.left = Math.min(r.left, innerWidth - 320) + 'px';
+    pop.style.top = Math.min(r.bottom + 6, innerHeight - 380) + 'px';
+    pop.classList.add('is-open');
+  }
+  document.querySelectorAll('.ev2-add').forEach(function (a) { a.addEventListener('click', function (e) { e.stopPropagation(); openPop(a); }); });
+  document.addEventListener('click', function (e) { if (!e.target.closest('.ev2-pop') && !e.target.closest('[data-addhere]')) pop.classList.remove('is-open'); });
+
+  select('hero-title');
+})();
+</script>
+</body>
+</html>

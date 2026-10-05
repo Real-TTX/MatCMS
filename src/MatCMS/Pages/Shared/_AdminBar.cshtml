@@ -24,7 +24,7 @@
         <div class="mab-right">
             @if (editId is int pid)
             {
-                <a class="mab-stool mab-edit" href="/admin/pages/edit/@pid" title="@T["adminbar.editPage"]" aria-label="@T["adminbar.editPage"]"><i class="ti ti-edit" aria-hidden="true"></i></a>
+                <a class="mab-stool mab-edit" href="/admin/pages/editor/@pid" title="@T["adminbar.editPage"]" aria-label="@T["adminbar.editPage"]"><i class="ti ti-edit" aria-hidden="true"></i></a>
             }
             <partial name="_ViewSwitch" model="@(new MatCMS.Shared.Web.ViewSwitch(
                 Active: "web",

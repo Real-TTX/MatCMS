@@ -51,6 +51,6 @@ public class CreateModel : PageModel
         await _db.SaveChangesAsync();
 
         TempData["Flash"] = "Seite erstellt. Fügen Sie nun Blöcke hinzu.";
-        return RedirectToPage("Edit", new { id = page.Id });
+        return RedirectToPage("Editor", new { id = page.Id });
     }
 }

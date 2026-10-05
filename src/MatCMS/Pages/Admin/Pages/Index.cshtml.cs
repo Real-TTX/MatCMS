@@ -265,6 +265,6 @@ public class IndexModel : PageModel
         TempData["Flash"] = blocks.Count > 0
             ? $"Seite '{title}' per KI mit {blocks.Count} Block/Blöcken angelegt (Entwurf)."
             : $"Seite '{title}' angelegt — die KI lieferte keine Blöcke; du kannst sie im Editor füllen.";
-        return RedirectToPage("Edit", new { id = page.Id });
+        return RedirectToPage("Editor", new { id = page.Id });
     }
 }

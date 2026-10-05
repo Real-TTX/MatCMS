@@ -468,7 +468,10 @@ public class DetailsModel : PageModel, IAsyncPageFilter
         // Operator edits win: a name typed here is pinned so the heartbeat's reported site name can't
         // overwrite it. For the URL, a value pins it; clearing the field un-pins so the instance's
         // reported address takes over again on the next beat.
-        if (!string.IsNullOrWhiteSpace(name)) { item.Name = name.Trim(); item.NamePinned = true; }
+        // Pinned only when the name actually CHANGED. The field is prefilled and posted with every save,
+        // so "pin whenever it is not empty" pinned the placeholder ("MatCMS") the moment someone saved
+        // just the domain or a note — and the site's real name never arrived (N.S. Libera).
+        if (!string.IsNullOrWhiteSpace(name) && name.Trim() != item.Name) { item.Name = name.Trim(); item.NamePinned = true; }
         if (string.IsNullOrWhiteSpace(url)) { item.Url = null; item.UrlPinned = false; }
         else { item.Url = url.Trim(); item.UrlPinned = true; }
         item.Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();

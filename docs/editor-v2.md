@@ -49,5 +49,8 @@ Editor entfällt.
   den Typ annimmt, nie in sich selbst), KI „Block verbessern“ und „Seite erzeugen“ auf dem Entwurf
   (rückgängig machbar, gespeichert erst mit Speichern), Sprachversionen (wechseln, anlegen,
   maschinell übersetzen, Vergleich) und Seitenwechsel im Titel — die Aktionen des klassischen Editors
-  führen mit `back=v2` zurück in v2. Offen: Text direkt in der Vorschau tippen, klassischen Editor
-  entfernen (bewusst noch nicht — erst nach Freigabe).
+  führen mit `back=v2` zurück in v2. Dazu: **Text direkt in der Vorschau tippen** (Doppelklick auf
+  Überschrift, Text oder Button; die Vorschau meldet jeden Anschlag als Feldwert, gezeichnet wird erst
+  nach dem Verlassen des Feldes) und **„In Elemente umwandeln“** für Hero, Bild & Text, Text und
+  Call-to-Action (gleiche Inhalte als Abschnitt/Spalten; eine Sonderoptik, die ein Template nur dem
+  alten Blocktyp gibt, geht dabei verloren). Offen: klassischen Editor entfernen (erst nach Freigabe).

@@ -18,7 +18,7 @@
     using var sw = new System.IO.StringWriter();
     content.WriteTo(sw, System.Text.Encodings.Web.HtmlEncoder.Default);
     var html = sw.ToString();
-    @:<div class="mat-ed-child" data-block-id="@Model.Id" style="display:contents">
+    @:<div class="mat-ed-child" data-block-id="@Model.Id" data-block-type="@Model.Type" style="display:contents">
     if (string.IsNullOrWhiteSpace(html))
     {
         var def = string.IsNullOrEmpty(Model.Type) ? null : Registry.Get(Model.Type);

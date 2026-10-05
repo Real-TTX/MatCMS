@@ -351,6 +351,66 @@
     function presetOptions() {
         return Object.keys(PRESETS).map(function (k) { return { type: "preset:" + k, name: t("preset." + k), desc: t("preset." + k + ".desc"), cat: "presets", svg: PRESET_ICON[k] }; });
     }
+    // ---------- classic blocks → elements ----------
+    // The four blocks most pages are made of, rebuilt as a section/columns of elements carrying the
+    // same texts, image and button — so an existing page can be taken apart and rearranged in v2.
+    // The width/spacing/CSS a block had at the top level go along to the new root. One undo step.
+    function para(text) { text = String(text || "").trim(); return text ? "<p>" + esc(text).replace(/\n/g, "<br>") + "</p>" : ""; }
+    function btn(text, url, style) { return text ? { type: "el-button", data: { text: text, url: url || "#", style: style || "primary" } } : null; }
+    var CONVERT = {
+        hero: function (d) {
+            var kids = [];
+            if (d.heading) kids.push({ type: "el-heading", data: { text: d.heading, level: "h1", size: "xl" } });
+            if (d.subheading) kids.push({ type: "el-text", data: { body: para(d.subheading), size: "l", measure: "read" } });
+            var b = btn(d.buttonText, d.buttonUrl);
+            if (b) kids.push({ type: "el-buttons", children: [b] });
+            var sec = { align: d.align === "left" ? "left" : "center", pad: "l" };
+            if (d.image) { sec.bg = "image"; sec.bgImage = d.image; sec.overlay = "medium"; sec.minHeight = "half"; }
+            return { type: "el-section", data: sec, children: kids };
+        },
+        imagetext: function (d) {
+            var img = { type: "el-column", children: d.image ? [{ type: "el-image", data: { image: d.image, shape: "rounded" } }] : [] };
+            var txt = { type: "el-column", children: [] };
+            if (d.heading) txt.children.push({ type: "el-heading", data: { text: d.heading } });
+            if (d.body) txt.children.push({ type: "el-text", data: { body: d.body } });
+            var right = d.imageSide === "right";
+            return { type: "el-columns", data: { layout: "50-50", valign: "center", mobile: right ? "reverse" : "stack" }, children: right ? [txt, img] : [img, txt] };
+        },
+        richtext: function (d) {
+            var kids = [];
+            if (d.heading) kids.push({ type: "el-heading", data: { text: d.heading } });
+            if (d.body) kids.push({ type: "el-text", data: { body: d.body } });
+            return { type: "el-section", data: { align: d.align === "center" ? "center" : "left", width: d.width === "narrow" ? "narrow" : "normal" }, children: kids };
+        },
+        cta: function (d) {
+            var kids = [];
+            if (d.heading) kids.push({ type: "el-heading", data: { text: d.heading } });
+            if (d.text) kids.push({ type: "el-text", data: { body: para(d.text), measure: "read" } });
+            var b = btn(d.buttonText, d.buttonUrl);
+            if (b) kids.push({ type: "el-buttons", children: [b] });
+            return { type: "el-section", data: { bg: "accent", align: "center" }, children: kids };
+        }
+    };
+    function convert(id) {
+        var b = byId(id); if (!b || b.parentId != null || !CONVERT[b.blockType]) return;
+        var d = data(b);
+        var spec = CONVERT[b.blockType](d);
+        ["_width", "_spaceTop", "_spaceBottom", "_css"].forEach(function (k) { if (d[k]) spec.data[k] = d[k]; });
+        record();
+        var at = b.sortOrder;
+        var gone = [b.id].concat(descendants(b.id).map(function (x) { return x.id; }));
+        blocks = blocks.filter(function (x) { return gone.indexOf(x.id) < 0; });
+        var root = build(spec, null);
+        var sibs = kids(null).filter(function (k) { return k.id !== root.id; });
+        sibs.splice(Math.min(at, sibs.length), 0, root);
+        sibs.forEach(function (k, i) { k.sortOrder = i; });
+        committed();
+        select(root.id, true);
+        renderPreview();
+    }
+    var convBtn = document.getElementById("ev2-convert");
+    if (convBtn) convBtn.addEventListener("click", function () { if (selectedId != null) convert(selectedId); });
+
     document.getElementById("ev2-dup").addEventListener("click", function () { if (selectedId != null) action("dup", selectedId); });
     document.getElementById("ev2-del").addEventListener("click", function () { if (selectedId != null) action("del", selectedId); });
 
@@ -449,6 +509,8 @@
         }
         var d = def(b);
         insp.foot.hidden = false;
+        var cb = document.getElementById("ev2-convert");
+        if (cb) cb.hidden = !(b.parentId == null && CONVERT[b.blockType]);
         insp.crumb.innerHTML = ['<button type="button" data-go="">' + esc(t("page")) + "</button>"].concat(ancestors(b).map(function (a) {
             return '<button type="button" data-go="' + a.id + '">' + esc(def(a).name) + "</button>";
         })).join(' <i class="ti ti-chevron-right"></i> ');
@@ -464,6 +526,8 @@
         };
         var values = data(b);
         insp.body.innerHTML = "";
+        if (["el-heading", "el-text", "el-button"].indexOf(b.blockType) >= 0)
+            insp.body.insertAdjacentHTML("beforeend", '<p class="ev2-hint"><i class="ti ti-pencil"></i> ' + esc(t("inlineHint")) + "</p>");
         var kidsBox = isContainer(b) ? childList(b) : null;
         panels = {};
         var names = { content: t("tabContent"), design: t("tabDesign"), advanced: t("tabAdvanced") };
@@ -574,7 +638,11 @@
     // its children through _ChildBlock); its top-level block otherwise.
     function syncPreviewSelection() { var top = previewTarget(); if (top != null) post({ type: "mat-select", id: String(selectedId), fallback: String(top) }); }
     var renderT, renderSeq = 0;
+    // While somebody types straight into the preview, redrawing it would take the caret away; the
+    // redraw waits until the field is left.
+    var inlineActive = false, inlinePending = false;
     function renderPreview() {
+        if (inlineActive) { inlinePending = true; return; }
         clearTimeout(renderT);
         renderT = setTimeout(function () {
             var seq = ++renderSeq;
@@ -599,6 +667,25 @@
         if (d.type === "mat-preview-ready") { if (dirty()) renderPreview(); else syncPreviewSelection(); }
         if (d.type === "mat-select-block" && d.id) select(Number(d.id), true);
         if (d.type === "mat-insert-at") openPicker(null, null, d.index);
+        if (d.type === "mat-inline-start") inlineActive = true;
+        if ((d.type === "mat-inline" || d.type === "mat-inline-done") && d.id && d.field) {
+            var ib = byId(d.id);
+            if (ib) {
+                var v = data(ib);
+                if (v[d.field] !== d.value) {
+                    record(true);
+                    v[d.field] = d.value;
+                    ib.dataJson = JSON.stringify(v);
+                    committed();
+                    refreshNodeLabel(ib);
+                    // The open fields show the new text too — but not rebuilt on every keystroke.
+                    if (String(selectedId) === String(ib.id) && d.type === "mat-inline-done") renderInspector();
+                }
+            }
+            inlineActive = d.type === "mat-inline";
+            if (!inlineActive && inlinePending) { inlinePending = false; renderPreview(); }
+            if (!inlineActive) renderPreview();
+        }
     });
     document.getElementById("ev2-dev").addEventListener("click", function (e) {
         var b = e.target.closest("button"); if (!b) return;

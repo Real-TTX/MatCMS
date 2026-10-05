@@ -19,6 +19,7 @@
         ["cat.design"] = T["blockcat.design"], ["cat.form"] = T["blockcat.form"], ["cat.embed"] = T["blockcat.embed"],
         ["cat.plugins"] = T["blockcat.plugins"], ["cat.custom"] = T["blockcat.custom"], ["blockEmpty"] = T["editor.blockEmpty"],
         ["cat.presets"] = T["ev2.presets"],
+        ["inlineHint"] = T["ev2.inlineHint"],
         ["aiWorking"] = T["editor.aiWorking"], ["aiBefore"] = T["editor.aiBefore"], ["aiAfter"] = T["editor.aiAfter"],
         ["preset.hero"] = T["ev2.preset.hero"], ["preset.hero.desc"] = T["ev2.preset.hero.desc"],
         ["preset.imageText"] = T["ev2.preset.imageText"], ["preset.imageText.desc"] = T["ev2.preset.imageText.desc"],
@@ -120,6 +121,8 @@
         <div class="ev2-tabs" id="ev2-tabs" role="tablist"></div>
         <div class="ev2-body" id="ev2-body"></div>
         <div class="ev2-foot" id="ev2-foot" hidden>
+            @* Classic hero / image+text / text / call-to-action → the same content as a section of elements. *@
+            <button type="button" class="btn btn-ghost btn-sm ev2-convert" id="ev2-convert" hidden title="@T["ev2.convertHint"]"><i class="ti ti-transform"></i> @T["ev2.convert"]</button>
             @if (Model.AiEnabled)
             {
                 <button type="button" class="btn btn-ghost btn-sm ev2-ai-btn" id="ev2-aiblock-open" title="@T["editor.aiImprove"]"><i class="ti ti-sparkles"></i></button>

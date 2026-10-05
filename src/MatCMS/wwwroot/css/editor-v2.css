@@ -194,3 +194,8 @@ body.ev2 { margin: 0; display: grid; grid-template-columns: 280px minmax(0, 1fr)
 .ev2-ai-change .a { color: #14532d; margin-top: 4px; }
 .ev2-ai-list { max-height: 40vh; overflow: auto; font-size: 13px; line-height: 1.5; padding-left: 20px; }
 .ev2-foot .ev2-ai-btn { flex: 0 0 auto; }
+
+.ev2-foot { flex-wrap: wrap; }
+.ev2-foot .ev2-convert { flex: 1 1 100%; }
+.ev2-foot .ev2-convert[hidden] { display: none; }
+.ev2-hint { display: flex; gap: 6px; align-items: flex-start; font-size: 12px; color: #6b7280; background: #f6f8fb; border-radius: 8px; padding: 8px 10px; margin: 0 0 14px; line-height: 1.45; }

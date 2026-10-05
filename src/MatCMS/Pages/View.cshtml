@@ -50,6 +50,9 @@ else
            and the selection go on the element it wraps. */
         .mat-ed-child > *:hover { outline: 1px dashed rgba(37, 99, 235, .6); outline-offset: 2px; }
         .mat-sel-child { outline: 2px solid #2563eb !important; outline-offset: 2px; }
+        /* Typing in place: a calm frame, the text cursor back, no hover dashes. */
+        .mat-inline { outline: 2px solid #f59e0b !important; outline-offset: 3px; cursor: text !important; background: rgba(245, 158, 11, .06); }
+        .mat-ed-child .el-heading :is(h1, h2, h3, h4), .mat-ed-child .el-text, .mat-ed-child .el-btn { cursor: pointer; }
         /* An element that renders nothing yet (image without image, empty column) — clickable stand-in. */
         .mat-ed-empty { min-height: 56px; display: flex; align-items: center; justify-content: center; border: 1.5px dashed rgba(37, 99, 235, .45); border-radius: 8px; color: rgba(37, 99, 235, .85); font: 600 12px/1.2 Inter, sans-serif; background: rgba(37, 99, 235, .05); padding: 10px; }
         /* Insert-between-blocks zones (page-builder style) shown in the preview. */
@@ -67,6 +70,11 @@ else
     <script>
         (function () {
             var selected = null;
+            var pendingRender = null;
+            function applyRender(html) {
+                var container = document.getElementById("mat-blocks");
+                if (container) { container.innerHTML = html; selected = null; buildInsertZones(); }
+            }
             function post(msg) { if (window.parent && window.parent !== window) window.parent.postMessage(msg, "*"); }
 
             // Selecting a block reloads the editor page, which reloads this iframe. Persist the
@@ -94,6 +102,8 @@ else
 
             // In editor mode, clicking anywhere selects the containing block (and never navigates).
             document.addEventListener("click", function (e) {
+                // A click inside the text being typed in places the caret — nothing else.
+                if (e.target.closest("[contenteditable=true]")) { var la = e.target.closest("a"); if (la) e.preventDefault(); return; }
                 // The innermost mark wins: a click on a card selects the card, not the cards block.
                 var block = e.target.closest("[data-block-id]");
                 if (block) { e.preventDefault(); e.stopPropagation(); post({ type: "mat-select-block", id: block.getAttribute("data-block-id") }); }
@@ -125,8 +135,10 @@ else
                 }
                 // Live preview: replace the block area with freshly-rendered draft HTML (no reload).
                 if (d.type === "mat-render" && typeof d.html === "string") {
-                    var container = document.getElementById("mat-blocks");
-                    if (container) { container.innerHTML = d.html; selected = null; buildInsertZones(); }
+                    // Never swap the page out from under somebody typing into it — the redraw waits for
+                    // the field to be left (applyPendingRender in the inline editor below).
+                    if (document.querySelector("[contenteditable=true]")) { pendingRender = d.html; return; }
+                    applyRender(d.html);
                 }
             });
 
@@ -151,6 +163,68 @@ else
                 if (blocks.length) blocks[blocks.length - 1].insertAdjacentElement("afterend", makeZone(blocks.length));
             }
             buildInsertZones();
+
+            // ---- Typing straight into the preview (editor v2) ----
+            // A double click on a heading, a text or a button of an element block makes it editable in
+            // place. Every keystroke goes to the editor as the FIELD value (mat-inline), which writes it
+            // into the draft; the preview is not re-rendered while typing (that would take the caret
+            // away) but once the field is left (mat-inline-done).
+            var INLINE = {
+                "el-heading": { sel: "h1, h2, h3, h4", field: "text", read: readHeading, plain: true },
+                "el-text": { sel: ".el-text", field: "body", read: function (el) { return el.innerHTML.trim(); } },
+                "el-button": { sel: "a", field: "text", read: function (el) { return el.textContent.trim(); }, plain: true }
+            };
+            // The heading's field is plain text with **word** for the highlight and real line breaks.
+            function readHeading(el) {
+                var c = el.cloneNode(true);
+                c.querySelectorAll(".el-hl").forEach(function (h) { h.replaceWith("**" + h.textContent + "**"); });
+                c.querySelectorAll("br").forEach(function (b) { b.replaceWith("\n"); });
+                return c.textContent.replace(/ /g, " ").trim();
+            }
+            document.addEventListener("dblclick", function (e) {
+                var wrap = e.target.closest(".mat-ed-child[data-block-type]");
+                var spec = wrap && INLINE[wrap.getAttribute("data-block-type")];
+                if (!spec) return;
+                var el = wrap.querySelector(spec.sel);
+                if (!el || el.isContentEditable) return;
+                e.preventDefault();
+                var id = wrap.getAttribute("data-block-id");
+                el.contentEditable = "true";
+                el.classList.add("mat-inline");
+                el.focus();
+                post({ type: "mat-inline-start", id: id });
+                function send(type) { post({ type: type, id: id, field: spec.field, value: spec.read(el) }); }
+                function onInput() { send("mat-inline"); }
+                function onKey(k) {
+                    // One line break in a heading or button, never a new paragraph block.
+                    if (spec.plain && k.key === "Enter") { k.preventDefault(); if (spec.field === "text" && el.tagName !== "A") document.execCommand("insertLineBreak"); else el.blur(); }
+                    if (k.key === "Escape") el.blur();
+                    // Select all = this element only. The browser would select the whole page, and in a
+                    // link that takes the editing host — and the focus — with it.
+                    if ((k.ctrlKey || k.metaKey) && k.key.toLowerCase() === "a") {
+                        k.preventDefault();
+                        var rg = document.createRange(); rg.selectNodeContents(el);
+                        var sl = window.getSelection(); sl.removeAllRanges(); sl.addRange(rg);
+                    }
+                }
+                function onPaste(p) {
+                    if (!spec.plain) return;
+                    p.preventDefault();
+                    document.execCommand("insertText", false, (p.clipboardData || window.clipboardData).getData("text/plain"));
+                }
+                function done() {
+                    el.contentEditable = "false";
+                    el.classList.remove("mat-inline");
+                    el.removeEventListener("input", onInput); el.removeEventListener("keydown", onKey);
+                    el.removeEventListener("paste", onPaste); el.removeEventListener("blur", done);
+                    send("mat-inline-done");
+                    if (pendingRender != null) { var h = pendingRender; pendingRender = null; applyRender(h); }
+                }
+                el.addEventListener("input", onInput);
+                el.addEventListener("keydown", onKey);
+                el.addEventListener("paste", onPaste);
+                el.addEventListener("blur", done);
+            });
 
             post({ type: "mat-preview-ready" });
         })();

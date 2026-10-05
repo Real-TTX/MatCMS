@@ -863,7 +863,9 @@ app.MapPost("/oauth/token", async (HttpContext ctx, AppDbContext db, InstanceSer
     return Results.Ok(new
     {
         sub = user.Id.ToString(),
-        email = user.Email ?? user.Username,
+        // Empty, not only null: an account saved with a blank e-mail field sent "" here, and the instance
+        // rejects an empty address (sso=failed) — the username is still a usable identity.
+        email = string.IsNullOrWhiteSpace(user.Email) ? user.Username : user.Email,
         name = user.DisplayName ?? user.Username,
         username = user.Username,
     });

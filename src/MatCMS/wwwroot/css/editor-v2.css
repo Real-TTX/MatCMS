@@ -76,6 +76,10 @@ body.ev2 { margin: 0; display: grid; grid-template-columns: 280px minmax(0, 1fr)
 .ev2-stage { overflow: auto; display: flex; justify-content: center; padding: 16px; min-height: 0; background: #eceef1; }
 .ev2-frame { width: 100%; max-width: 100%; height: 100%; background: #fff; border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 30px rgba(0, 0, 0, .07);
     overflow: hidden; transition: max-width .25s, max-height .25s; box-sizing: border-box; }
+/* Desktop is the site at full width: no grey margin, no device frame — that only means something when
+   the preview stands for a smaller screen (tablet/phone). */
+.ev2-stage:has(> .ev2-frame:not(.is-tablet):not(.is-phone)) { padding: 0; }
+.ev2-frame:not(.is-tablet):not(.is-phone) { border: 0; border-radius: 0; box-shadow: none; }
 .ev2-frame.is-tablet { max-width: 820px; }
 .ev2-frame.is-phone { max-width: 390px; }
 /* Landscape: the device's long side becomes the width and its short side the height — centred, so the

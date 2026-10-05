@@ -22,17 +22,26 @@
     <div class="kv"><div class="kv-label">@T["account.role"]</div><div class="kv-value">@Model.Account.Role</div></div>
 </div>
 
-@* Admin-Leiste über der Website — persönliche Wahl, sonst gilt die Einstellung der Website. *@
+@* Darstellung — persönliche Wahl: Farbschema der Verwaltung und die Admin-Leiste über der Website. *@
 <div class="card">
-    <h2>@T["account.adminBarTitle"]</h2>
-    <p class="help">@T["account.adminBarHelp"]</p>
-    <form method="post" asp-page-handler="AdminBar" class="form-grid">
+    <h2>@T["account.appearanceTitle"]</h2>
+    <form method="post" asp-page-handler="Appearance" class="form-grid">
         <div class="form-field">
-            <select name="adminBar">
+            <label for="theme">@T["account.theme"]</label>
+            <select id="theme" name="theme">
+                <option value="light" selected="@(Model.Account.Theme is not ("dark" or "system") ? "selected" : null)">@T["account.themeLight"]</option>
+                <option value="dark" selected="@(Model.Account.Theme == "dark" ? "selected" : null)">@T["account.themeDark"]</option>
+                <option value="system" selected="@(Model.Account.Theme == "system" ? "selected" : null)">@T["account.themeSystem"]</option>
+            </select>
+        </div>
+        <div class="form-field">
+            <label for="adminBar">@T["account.adminBarTitle"]</label>
+            <select id="adminBar" name="adminBar">
                 <option value="" selected="@(Model.Account.AdminBar is null ? "selected" : null)">@T["account.adminBarSite"]</option>
                 <option value="on" selected="@(Model.Account.AdminBar == "on" ? "selected" : null)">@T["account.adminBarOn"]</option>
                 <option value="off" selected="@(Model.Account.AdminBar == "off" ? "selected" : null)">@T["account.adminBarOff"]</option>
             </select>
+            <div class="help">@T["account.adminBarHelp"]</div>
         </div>
         <div class="form-actions">
             <button type="submit" class="btn">@T["action.save"]</button>

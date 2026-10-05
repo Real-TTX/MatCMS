@@ -30,10 +30,10 @@
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 13px;
     line-height: 1.55;
-    background: #fbfbfc;
+    background: var(--surface-2);
 }
 .CodeMirror-focused { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent); }
-.CodeMirror-gutters { background: #f3f4f6; border-right: 1px solid var(--line); }
+.CodeMirror-gutters { background: var(--surface-2); border-right: 1px solid var(--line); }
 
 /* Live JSON validation under a data-code="json" field. */
 .code-status { font-size: 12px; margin-top: 6px; min-height: 16px; color: var(--muted); }
@@ -46,7 +46,7 @@
 .token-chip {
     font-family: ui-monospace, monospace;
     font-size: 12px;
-    background: #f1f2f4;
+    background: var(--surface-2);
     border: 1px solid var(--line);
     border-radius: 6px;
     padding: 2px 7px;
@@ -74,7 +74,7 @@
 .instance-tile {
     display: flex;
     flex-direction: column;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--line);
     border-radius: 10px;
     overflow: hidden;
@@ -173,7 +173,7 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
     display: flex;
     flex-direction: column;
     gap: 4px;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--line);
     border-radius: 10px;
     padding: 14px 16px;
@@ -236,7 +236,7 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
        bottom border — which is why that line stopped 250px from the left instead of running the
        whole width. */
     position: absolute; top: 0; left: 0; bottom: 0; width: 250px;
-    background: #edeff2;
+    background: var(--sidebar);
     border-right: 1px solid var(--line);
     padding: 14px 14px 0;
     overflow: hidden;
@@ -266,7 +266,7 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
        element it sets the height of EVERY page's bar, and 44 made all of them taller than they
        were before the switcher moved up here. */
     height: 36px; max-width: 340px; padding: 0 12px;
-    background: #fff; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
     font: inherit; font-family: var(--font-head); font-weight: 600; font-size: 16px;
     color: inherit; cursor: pointer;
     transition: border-color .12s;
@@ -278,7 +278,7 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
 .inst-picker-menu {
     position: absolute; top: calc(100% + 6px); left: 0; z-index: 40;
     width: 420px; max-height: 70vh; overflow-y: auto;
-    background: #fff; border: 1px solid var(--line); border-radius: 12px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
     box-shadow: 0 18px 44px rgba(0, 0, 0, .16);
     padding: 6px;
 }
@@ -376,20 +376,20 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
    starts pushing the oldest backup out — the reason anybody reads this column. */
 .quota-row { display: flex; align-items: center; gap: 10px; }
 .quota-row .quota-bar { flex: 1 1 auto; min-width: 80px; }
-.quota-pct { flex: 0 0 auto; font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted, #6b7280); }
+.quota-pct { flex: 0 0 auto; font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted); }
 .quota-bar.is-high > span { background: #d97706; }
 .quota-bar.is-full > span { background: #dc2626; }
 
 /* ============ „Alle aktualisieren": Fortschritt, Status-Icons, Attention-Zeile ============ */
 .ua-progress { display: flex; flex-direction: column; gap: 8px; }
 .ua-progress-head { display: flex; align-items: center; justify-content: space-between; }
-.ua-count { font-variant-numeric: tabular-nums; color: var(--muted, #6b7280); font-size: 14px; }
+.ua-count { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 14px; }
 .ua-bar { height: 12px; border-radius: 6px; }
 .ua-bar > span { transition: width .3s ease; }
 /* Status-Spalte hinten: ein Icon, grün/rot/gelb; Meldung im Tooltip (Erfolg) oder Attention-Zeile. */
 .ua-table th.ua-th-status, .ua-table td.ua-status { text-align: center; width: 64px; }
 .ua-status .ti { font-size: 20px; vertical-align: middle; }
-.uas-pending  { color: #9ca3af; }
+.uas-pending  { color: var(--text-muted); }
 .uas-updating { color: #2563eb; }
 .uas-done     { color: #16a34a; }
 .uas-failed   { color: #dc2626; }
@@ -422,7 +422,7 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
 
 /* The cloud's own entry in the switcher. An icon where the others show a thumbnail: it is the page
    you are already in, not a site to preview. */
-.inst-picker-cloudicon { display: flex; align-items: center; justify-content: center; font-size: 22px; color: var(--muted, #6b7280); }
+.inst-picker-cloudicon { display: flex; align-items: center; justify-content: center; font-size: 22px; color: var(--muted); }
 .inst-picker-cloud.is-current .inst-picker-cloudicon { color: var(--accent, #2563eb); }
 
 /* Switcher + view toggle sit together as one control group. */
@@ -470,11 +470,11 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
 
 /* Instance picker on the API-key create page: a slightly inset, scrollable list so a cloud with
    many instances does not push the submit button off the screen. */
-.scope-instances { margin: 8px 0 0 24px; padding-left: 12px; border-left: 2px solid var(--border, #e5e7eb); max-height: 320px; overflow: auto; }
+.scope-instances { margin: 8px 0 0 24px; padding-left: 12px; border-left: 2px solid var(--border, var(--line)); max-height: 320px; overflow: auto; }
 
 /* Full-screen cloud self-update (Pages/Admin/CloudUpdate): one centred box, nothing else to click. */
 body.cu-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--bg, #f4f5f7); }
-.cu-box { width: min(760px, 100%); background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 36px 36px 28px; box-shadow: 0 20px 60px rgba(15, 23, 42, .08); text-align: center; }
+.cu-box { width: min(760px, 100%); background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 36px 36px 28px; box-shadow: 0 20px 60px rgba(15, 23, 42, .08); text-align: center; }
 .cu-logo { display: block; max-height: 44px; margin: 0 auto 18px; }
 .cu-box h1 { font-family: Geologica, sans-serif; font-size: 26px; margin: 0 0 6px; }
 .cu-status { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 24px 0 6px; font-weight: 600; }
@@ -493,7 +493,7 @@ body.cu-screen { min-height: 100vh; display: flex; align-items: center; justify-
 .steps-list { margin: 0; padding-left: 22px; display: grid; gap: 8px; line-height: 1.55; }
 /* "Ressourcen": CPU and RAM stacked in one cell, each with its short label in front. */
 .usage-cell .usage-row + .usage-row { margin-top: 6px; }
-.usage-label { flex: 0 0 32px; font-size: 11px; font-weight: 600; letter-spacing: .04em; color: var(--muted, #6b7280); }
+.usage-label { flex: 0 0 32px; font-size: 11px; font-weight: 600; letter-spacing: .04em; color: var(--muted); }
 
 /* Phone topbar: the switcher and the page title SHRINK (ellipsis) and the icons on the right keep their room.
    Without this a long title ("Benachrichtigungen", "ChatGPT-Connector") made the bar wider than the screen, and
@@ -521,7 +521,7 @@ body.cu-screen { min-height: 100vh; display: flex; align-items: center; justify-
     .inst-picker-menu[hidden] { display: none; }
     .inst-picker-head { display: flex; align-items: center; justify-content: space-between; height: 60px; flex: none;
         border-bottom: 1px solid var(--line); margin: 0 -12px 10px; padding: 0 12px 0 16px; font-size: 17px; }
-    .inst-picker-close { width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-size: 20px; cursor: pointer; }
+    .inst-picker-close { width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font-size: 20px; cursor: pointer; }
     .inst-picker-search { font-size: 16px; padding: 11px 14px; flex: none; }
     .inst-picker-list { flex: 1 1 auto; overflow-y: auto; -webkit-overflow-scrolling: touch; }
     .inst-picker-item { padding: 10px 6px; }

@@ -71,11 +71,13 @@ public class IndexModel : PageModel
         return RedirectToPage();
     }
 
-    /// <summary>The user's own admin-bar choice: "" = like the site, "on", "off".</summary>
-    public async Task<IActionResult> OnPostAdminBarAsync(string? adminBar)
+    /// <summary>The user's own appearance: colour scheme (light/dark/system) and admin bar ("" = like the
+    /// site, "on", "off").</summary>
+    public async Task<IActionResult> OnPostAppearanceAsync(string? theme, string? adminBar)
     {
         var user = await CurrentUserAsync();
         if (user is null) return Redirect("/login");
+        user.Theme = theme is "dark" or "system" ? theme : null;
         user.AdminBar = adminBar is "on" or "off" ? adminBar : null;
         await _db.SaveChangesAsync();
         TempData["Flash"] = "Einstellung gespeichert.";

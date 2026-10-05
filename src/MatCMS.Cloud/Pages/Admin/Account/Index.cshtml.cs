@@ -70,4 +70,16 @@ public class IndexModel : PageModel
         }
         return RedirectToPage();
     }
+
+    /// <summary>The user's own colour scheme for the cloud's back office: light / dark / system.</summary>
+    public async Task<IActionResult> OnPostAppearanceAsync(string? theme)
+    {
+        var user = await CurrentUserAsync();
+        if (user is null) return Redirect("/login");
+        user.Theme = theme is "dark" or "system" ? theme : null;
+        await _db.SaveChangesAsync();
+        TempData["Flash"] = "Darstellung gespeichert.";
+        return RedirectToPage();
+    }
+
 }

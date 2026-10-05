@@ -1,0 +1,21 @@
+<!-- The viewBox is trimmed to the ink (was 0 0 232 66, with ~8 units of empty air above the caps).
+     The admin caps the logo at 40px HEIGHT, so every unit of unused height was shrinking everything
+     inside it: the same drawing in a shorter box simply renders larger. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 6 232 58" role="img" aria-label="MatCMS Cloud – the fleet">
+  <!-- Same wordmark as MatCMS (identical font stack, size, weight and colours) so the two products
+       read as one family. "Cloud" takes the tagline slot underneath, in the accent colour. -->
+  <text x="0" y="42" font-family="'Arial Black', 'Arial Bold', Arial, sans-serif" font-size="48" font-weight="900" letter-spacing="0.5">
+    <tspan fill="#eceef1">Mat</tspan><tspan fill="#2563eb">CMS</tspan>
+  </text>
+  <!-- Short on purpose: the logo is a mark, not an explanation. textLength is the line's own natural
+       width plus even tracking (3 units per gap), the same tracking MatCMS's logo uses — the two
+       lines differ in length because they are different words, but they are set identically.
+
+       In the ACCENT colour, which is what "CLOUD" used to carry. The wordmark above is identical in
+       both products, so with the word Cloud gone the colour is the only thing left that tells the
+       two apart at a glance — and it does it without adding a word. -->
+  <text x="2" y="60" font-family="Arial, sans-serif" font-size="16" font-weight="700"
+        textLength="111" lengthAdjust="spacing">
+    <tspan fill="#2563eb">THE FLEET</tspan>
+  </text>
+</svg>

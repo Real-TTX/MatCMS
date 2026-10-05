@@ -4,25 +4,25 @@
 
 .mat-rs-trigger { display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; }
 .mat-rs-current { display: flex; align-items: center; gap: 10px; min-width: 0; overflow: hidden; }
-.mat-rs-placeholder { color: #999; }
-.mat-rs-cur-img { width: 28px; height: 28px; border-radius: 6px; background: #eee center/cover no-repeat; flex: none; }
+.mat-rs-placeholder { color: var(--text-muted); }
+.mat-rs-cur-img { width: 28px; height: 28px; border-radius: 6px; background: var(--surface-2) center/cover no-repeat; flex: none; }
 .mat-rs-cur-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mat-rs-chev { flex: none; opacity: .6; font-size: 12px; }
 /* Clear (✕): laid over the trigger's right edge, just left of the chevron. Shown only when a value is
    chosen. Sits above the trigger so it takes the click; the rest of the field still opens the menu. */
 .mat-rs-clear {
     position: absolute; top: 50%; right: 30px; transform: translateY(-50%);
-    border: 0; background: none; cursor: pointer; color: #999;
+    border: 0; background: none; cursor: pointer; color: var(--text-muted);
     font-size: 15px; line-height: 1; padding: 4px 6px; border-radius: 6px; z-index: 2;
 }
-.mat-rs-clear:hover { background: rgba(0, 0, 0, .08); color: #333; }
+.mat-rs-clear:hover { background: rgba(0, 0, 0, .08); color: var(--text-2); }
 .mat-rs-clear[hidden] { display: none; }
 /* Keep the closed value from sliding under the ✕ when it is shown. */
 .mat-rs-trigger:has(+ .mat-rs-clear:not([hidden])) .mat-rs-current { padding-right: 26px; }
 
 .mat-rs-menu {
     position: absolute; z-index: 50; left: 0; right: 0; top: calc(100% + 4px);
-    background: #fff; border: 1px solid var(--line, #d5d5d5); border-radius: 10px;
+    background: var(--surface); border: 1px solid var(--line, var(--line)); border-radius: 10px;
     box-shadow: 0 20px 50px rgba(0, 0, 0, .16);
 }
 /* Scroll region holds the options; on desktop it caps the dropdown height. */
@@ -43,12 +43,12 @@
 }
 .mat-rs-opt:hover { background: rgba(0, 0, 0, .05); }
 .mat-rs-opt[aria-selected="true"] { background: rgba(37, 99, 235, .1); }
-.mat-rs-opt-img { width: 56px; height: 56px; border-radius: 8px; background: #eee center/cover no-repeat; flex: none; }
+.mat-rs-opt-img { width: 56px; height: 56px; border-radius: 8px; background: var(--surface-2) center/cover no-repeat; flex: none; }
 .mat-rs-opt-body { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .mat-rs-opt-title { font-weight: 600; }
-.mat-rs-opt-desc { font-size: 13px; color: #666; line-height: 1.4; }
+.mat-rs-opt-desc { font-size: 13px; color: var(--text-muted); line-height: 1.4; }
 .mat-rs-opt-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 3px; }
-.mat-rs-tag { font-size: 11px; font-weight: 600; background: rgba(0, 0, 0, .06); color: #444; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.mat-rs-tag { font-size: 11px; font-weight: 600; background: rgba(0, 0, 0, .06); color: var(--text-2); padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
 
 /* Mobile: present the dropdown as a FULL-SCREEN dialog with a header + ✕ close (same as the
    datepicker). The wrapper gets .mat-rs-modal via JS while open. The menu fills the screen, so the
@@ -82,7 +82,7 @@
 .mat-rs[data-rs-multi] .mat-rs-opt { position: relative; padding-left: 40px; }
 .mat-rs[data-rs-multi] .mat-rs-opt::before {
     content: ""; position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
-    width: 16px; height: 16px; border: 1.5px solid #c7ccd6; border-radius: 4px; background: #fff;
+    width: 16px; height: 16px; border: 1.5px solid var(--line); border-radius: 4px; background: var(--surface);
 }
 .mat-rs[data-rs-multi] .mat-rs-opt.on::before { background: #2563eb; border-color: #2563eb; }
 .mat-rs[data-rs-multi] .mat-rs-opt.on::after {

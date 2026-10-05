@@ -15,6 +15,10 @@ public class User
     public string? DisplayName { get; set; }
     public string? Email { get; set; }
 
+    /// <summary>Colour scheme of the back office for this user: "light" (also null), "dark" or "system"
+    /// (follows the operating system). Read by the admin layout into &lt;html data-theme&gt;.</summary>
+    public string? Theme { get; set; }
+
     /// <summary>Instances this (Operator) user is scoped to. Ignored for Admins (they see everything).</summary>
     public List<UserInstance> Instances { get; set; } = new();
 

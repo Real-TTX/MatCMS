@@ -33,7 +33,7 @@
     };
 }
 <!DOCTYPE html>
-<html lang="@(System.Globalization.CultureInfo.CurrentUICulture.Name.Split('-', 2)[0] is { Length: > 0 } lc ? lc : MatCMS.Services.Localizer.ResourceFallbackCulture)">
+<html data-theme="@Site.ThemeFor(User)" lang="@(System.Globalization.CultureInfo.CurrentUICulture.Name.Split('-', 2)[0] is { Length: > 0 } lc ? lc : MatCMS.Services.Localizer.ResourceFallbackCulture)">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />

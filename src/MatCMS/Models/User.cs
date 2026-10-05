@@ -18,6 +18,10 @@ public class User
     /// it regardless (see SiteContext.ShowAdminBar).</summary>
     public string? AdminBar { get; set; }
 
+    /// <summary>Colour scheme of the back office for this user: "light" (also null), "dark" or "system"
+    /// (follows the operating system). Read by the admin layout into &lt;html data-theme&gt;.</summary>
+    public string? Theme { get; set; }
+
     // --- Two-factor (TOTP) ----------------------------------------------------
     // Off for every existing account; turned on only after the user confirms a code during enrolment.
     // The secret is stored DataProtection-ENCRYPTED (see TwoFactorService) and recovery codes only as

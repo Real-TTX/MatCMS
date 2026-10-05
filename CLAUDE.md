@@ -154,3 +154,13 @@ Razor Pages use the `Index/Create/Edit` triple with `OnGetAsync` / `OnPost<Actio
 The cloud's admin must look and behave exactly like the CMS's — the class-by-class table for that is
 in `src/MatCMS.Cloud/CLAUDE.md`. Never invent a parallel CSS class for something the admin already
 ships.
+
+**Colours in the back office only through variables** — light/dark/system is a per-user choice (`User.Theme`
+in both apps, account page → Darstellung) that the admin layouts write into `<html data-theme>`. The variables
+(`--surface`, `--surface-2`, `--sidebar`, `--hover`, `--border-strong`, `--text-2`, `--text-muted`, `--on-ink`,
+the `--ok/err/info/warn-*` tints, plus site.css's `--black/--ink/--line/--bg`) are defined at the top of
+`admin.css`, with the dark set written twice (`[data-theme=dark]` and `[data-theme=system]` under
+`prefers-color-scheme`). A hard-coded `#fff` or grey in admin CSS is a bug that shows up as a white block in
+dark mode. The public site never carries `data-theme`; previews of site content (iframes, mail preview, the 2FA
+QR code) stay white on purpose. The back office is also **emoji-free**: icons are Tabler classes (`ti ti-…`),
+plugin menu icons are Tabler names (`ti-star`).

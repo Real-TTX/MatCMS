@@ -281,6 +281,14 @@ public class SiteContext
         return Get(SettingKeys.AdminBar, "1") != "0";
     }
 
+    /// <summary>The signed-in user's colour scheme for &lt;html data-theme&gt;: light (default), dark or system.</summary>
+    public string ThemeFor(System.Security.Claims.ClaimsPrincipal user)
+    {
+        if (!int.TryParse(user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var uid)) return "light";
+        var t = _db.Users.AsNoTracking().Where(u => u.Id == uid).Select(u => u.Theme).FirstOrDefault();
+        return t is "dark" or "system" ? t : "light";
+    }
+
     public bool SitemapEnabled => !string.Equals(Get(SettingKeys.SitemapEnabled, "true"), "false", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>

@@ -38,7 +38,7 @@
         : (!string.IsNullOrEmpty(cloudId) ? $"{cloudUrl}/Admin/Instances/Open/{Uri.EscapeDataString(cloudId)}" : cloudUrl);
 }
 <!DOCTYPE html>
-<html lang="@currentCulture">
+<html lang="@currentCulture" data-theme="@Site.ThemeFor(User)">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />

@@ -3,6 +3,14 @@
 @inject MatCMS.Cloud.Services.ContextSwitcher Switcher
 @inject Microsoft.Extensions.Options.IOptions<Microsoft.AspNetCore.Builder.RequestLocalizationOptions> LocOptions
 @inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment Env
+@inject MatCMS.Cloud.Data.AppDbContext ThemeDb
+@{
+    // The signed-in user's colour scheme for <html data-theme> (light by default, see admin.css).
+    var themeUid = int.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var tuid) ? tuid : 0;
+    var themeRaw = themeUid == 0 ? null : System.Linq.Enumerable.FirstOrDefault(
+        System.Linq.Queryable.Select(System.Linq.Queryable.Where(ThemeDb.Users, u => u.Id == themeUid), u => u.Theme));
+    var theme = themeRaw is "dark" or "system" ? themeRaw : "light";
+}
 @{
     var title = ViewData["Title"] as string ?? "Admin";
     string Active(string path) =>
@@ -26,7 +34,7 @@
     var returnUrl = Context.Request.Path + Context.Request.QueryString;
 }
 <!DOCTYPE html>
-<html lang="@currentCulture">
+<html lang="@currentCulture" data-theme="@theme">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -48,7 +56,8 @@
     <aside class="admin-sidebar">
         <div class="admin-brand">
             <a class="admin-brand-link" asp-page="/Admin/Index" title="@Cloud.CloudName">
-                <img class="admin-logo" src="@Cloud.LogoUrl" alt="@Cloud.CloudName" />
+                <img class="admin-logo logo-light" src="@Cloud.LogoUrl" alt="@Cloud.CloudName" />
+                <img class="admin-logo logo-dark" src="/img/logo-dark.svg" alt="@Cloud.CloudName" />
             </a>
         </div>
         @{ var isAdmin = User.IsInRole("Admin"); }
@@ -125,7 +134,8 @@
                        page drops the menu. *@
                     <div class="admin-brand">
                         <a class="admin-brand-link" asp-page="/Admin/Index" title="@Cloud.CloudName">
-                            <img class="admin-logo" src="@Cloud.LogoUrl" alt="@Cloud.CloudName" />
+                            <img class="admin-logo logo-light" src="@Cloud.LogoUrl" alt="@Cloud.CloudName" />
+                <img class="admin-logo logo-dark" src="/img/logo-dark.svg" alt="@Cloud.CloudName" />
                         </a>
                     </div>
                 </div>

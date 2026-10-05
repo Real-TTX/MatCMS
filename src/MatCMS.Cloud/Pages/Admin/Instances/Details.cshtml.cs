@@ -579,7 +579,7 @@ public class DetailsModel : PageModel, IAsyncPageFilter
         var item = await _db.Instances.AsNoTracking().FirstOrDefaultAsync(i => i.Id == id);
         if (item is null) return NotFound();
         var (ok, text) = await _hosting.LogsAsync(item, tail, HttpContext.RequestAborted);
-        return Content(ok ? (text.Length == 0 ? "(keine Ausgabe)" : text) : "⚠ " + text, "text/plain; charset=utf-8");
+        return Content(ok ? (text.Length == 0 ? "(keine Ausgabe)" : text) : "Fehler: " + text, "text/plain; charset=utf-8");
     }
 
     // Das frühere OnPostDelete ist absichtlich weg. Es löschte nur die Zeile — der Container lief

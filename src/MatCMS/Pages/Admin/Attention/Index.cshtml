@@ -23,12 +23,12 @@
         <tbody>
             @if (Model.Items.Count == 0)
             {
-                <partial name="_EmptyRow" model='@("✓ " + T["dashboard.allClear"])' />
+                <partial name="_EmptyRow" model='@((string)T["dashboard.allClear"])' />
             }
             @foreach (var x in Model.Items)
             {
                 <tr class="lvl-@x.Level" data-tags="@x.Level @x.Kind" data-search="@(x.Title + " " + x.Text + " " + x.Detail + " " + x.LastError)">
-                    <td class="dash-icon">@x.Icon</td>
+                    <td class="dash-icon"><i class="ti @x.Icon" aria-hidden="true"></i></td>
                     <td><a href="@x.Url"><strong>@x.Title</strong></a><div class="muted">@x.Text</div></td>
                     <td class="attention-why">
                         @if (!string.IsNullOrEmpty(x.Detail)) { <div>@x.Detail</div> }

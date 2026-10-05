@@ -761,7 +761,7 @@
                         mk.onclick = function () { def = code; render(); };
                         act.appendChild(mk);
                         var rm = document.createElement("button");
-                        rm.type = "button"; rm.className = "btn btn-sm btn-danger btn-icon"; rm.title = "@T["settings.langRemove"]"; rm.textContent = "✕";
+                        rm.type = "button"; rm.className = "btn btn-sm btn-danger btn-icon"; rm.title = "@T["settings.langRemove"]"; rm.innerHTML = '<i class="ti ti-x" aria-hidden="true"></i>';
                         rm.onclick = function () { active = active.filter(function (c) { return c !== code; }); render(); };
                         act.appendChild(rm);
                     }

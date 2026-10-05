@@ -79,7 +79,7 @@
         <div class="dash-card-body">
             @if (Model.AttentionItems.Count == 0)
             {
-                <p class="muted">✓ @T["dashboard.allClear"]</p>
+                <p class="muted"><i class="ti ti-circle-check" aria-hidden="true"></i> @T["dashboard.allClear"]</p>
             }
             else
             {
@@ -89,7 +89,7 @@
                         @foreach (var x in Model.AttentionItems.Take(IndexModel.CardRows))
                         {
                             <tr class="lvl-@x.Level">
-                                <td class="dash-icon">@x.Icon</td>
+                                <td class="dash-icon"><i class="ti @x.Icon" aria-hidden="true"></i></td>
                                 <td><a href="@x.Url"><strong>@x.Title</strong></a><div class="muted dash-clip">@x.Text</div></td>
                             </tr>
                         }
@@ -183,7 +183,7 @@
                 {
                     var e = Model.RecentlyEdited[n];
                     <tr class="@(n >= IndexModel.CardRows ? "dash-extra" : null)" hidden="@(n >= IndexModel.CardRows)">
-                        <td style="width:34px;">@(e.Kind == "page" ? "📄" : "📝")</td>
+                        <td style="width:34px;"><i class="ti @(e.Kind == "page" ? "ti-file-text" : "ti-news")" aria-hidden="true"></i></td>
                         <td><a href="@e.Url">@e.Title</a> @if (!e.Published) { <span class="badge badge-off">@T["dashboard.draft"]</span> }</td>
                         <td class="muted mono nowrap">@e.UpdatedAt.ToLocalTime().ToString("dd.MM. HH:mm")</td>
                     </tr>

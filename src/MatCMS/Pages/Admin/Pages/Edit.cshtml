@@ -165,7 +165,7 @@
                             @foreach (var v in versions)
                             {
                                 var isCur = v.Id == Model.Current.Id;
-                                <option value="@Url.Page("Edit", new { id = v.Id })" selected="@(isCur ? "selected" : null)">@v.Locale.ToUpperInvariant() — @MatCMS.Services.Localizer.DisplayName(v.Locale)@(isCur ? " ✓" : "")</option>
+                                <option value="@Url.Page("Edit", new { id = v.Id })" selected="@(isCur ? "selected" : null)">@v.Locale.ToUpperInvariant() — @MatCMS.Services.Localizer.DisplayName(v.Locale)@(isCur ? " (aktuell)" : "")</option>
                             }
                         </select>
                         @foreach (var loc in Model.MissingLocales)
@@ -178,7 +178,7 @@
                         {
                             <form method="post" asp-page-handler="AutoTranslate" asp-route-id="@Model.Current.Id" class="le-ver-addform"
                                   onsubmit="return confirm('@T["editor.autoTranslateConfirm"]');">
-                                <button type="submit" class="le-ver-add" title="@T["editor.autoTranslateTitle"]">⚡ @T["editor.autoTranslate"]</button>
+                                <button type="submit" class="le-ver-add" title="@T["editor.autoTranslateTitle"]"><i class="ti ti-language" aria-hidden="true"></i> @T["editor.autoTranslate"]</button>
                             </form>
                         }
                     </div>
@@ -206,7 +206,7 @@
                                     </span>
                                 </a>
                                 <form class="inline-form" method="post" asp-page-handler="DeleteBlock" asp-route-id="@Model.Current.Id" asp-route-blockId="@b.Id" onsubmit="return confirm('@T["editor.confirmDeleteBlock"]');">
-                                    <button type="submit" class="icon-btn" title="@T["editor.delete"]">✕</button>
+                                    <button type="submit" class="icon-btn" title="@T["editor.delete"]"><i class="ti ti-x" aria-hidden="true"></i></button>
                                 </form>
                             </div>
                             @if (isContainer)
@@ -227,7 +227,7 @@
                                                 </span>
                                             </a>
                                             <form class="inline-form" method="post" asp-page-handler="DeleteBlock" asp-route-id="@Model.Current.Id" asp-route-blockId="@c.Id" onsubmit="return confirm('@T["editor.confirmDeleteBlock"]');">
-                                                <button type="submit" class="icon-btn" title="@T["editor.delete"]">✕</button>
+                                                <button type="submit" class="icon-btn" title="@T["editor.delete"]"><i class="ti ti-x" aria-hidden="true"></i></button>
                                             </form>
                                         </div>
                                     }
@@ -424,7 +424,7 @@
                 <div class="modal" role="dialog" aria-modal="true" aria-label="@T["editor.addBlockModal"]">
                     <div class="modal-head">
                         <h2>@T["editor.addBlockModal"]</h2>
-                        <button type="button" class="modal-close" id="add-block-close" aria-label="@T["editor.close"]">✕</button>
+                        <button type="button" class="modal-close" id="add-block-close" aria-label="@T["editor.close"]"><i class="ti ti-x" aria-hidden="true"></i></button>
                     </div>
                     <div class="modal-body bpick">
                         @{
@@ -438,8 +438,8 @@
                         </div>
                         <div class="bpick-layout">
                             <aside class="bpick-cats">
-                                <button type="button" class="bpick-cat bpick-cat-fav" data-cat="fav"><span class="bpick-clabel"><span class="bpick-cico">★</span>@T["blockcat.fav"]</span><span class="bpick-n" data-count="fav">0</span></button>
-                                <button type="button" class="bpick-cat bpick-cat-recent" data-cat="recent"><span class="bpick-clabel"><span class="bpick-cico">🕘</span>@T["blockcat.recent"]</span><span class="bpick-n" data-count="recent">0</span></button>
+                                <button type="button" class="bpick-cat bpick-cat-fav" data-cat="fav"><span class="bpick-clabel"><span class="bpick-cico"><i class="ti ti-star" aria-hidden="true"></i></span>@T["blockcat.fav"]</span><span class="bpick-n" data-count="fav">0</span></button>
+                                <button type="button" class="bpick-cat bpick-cat-recent" data-cat="recent"><span class="bpick-clabel"><span class="bpick-cico"><i class="ti ti-clock" aria-hidden="true"></i></span>@T["blockcat.recent"]</span><span class="bpick-n" data-count="recent">0</span></button>
                                 <div class="bpick-sep"></div>
                                 <button type="button" class="bpick-cat is-active" data-cat="all"><span class="bpick-clabel">@T["blockcat.all"]</span><span class="bpick-n">@pdefs.Count</span></button>
                                 @foreach (var k in present)
@@ -457,7 +457,7 @@
                                             {
                                                 <form method="post" asp-page-handler="AddBlock" asp-route-id="@Model.Current.Id" asp-route-type="@def.Type">
                                                     <input type="hidden" name="position" class="add-position" value="" />
-                                                    <button type="button" class="tile-fav" data-type="@def.Type" aria-label="@T["editor.favToggle"]" title="@T["editor.favToggle"]">★</button>
+                                                    <button type="button" class="tile-fav" data-type="@def.Type" aria-label="@T["editor.favToggle"]" title="@T["editor.favToggle"]"><i class="ti ti-star-filled" aria-hidden="true"></i></button>
                                                     <button type="submit" class="tile" data-cat="@def.Category" data-type="@def.Type"
                                                             title="@T[def.Description]"
                                                             data-name="@(((string)T[def.Name]).ToLowerInvariant())"
@@ -529,7 +529,7 @@
                        becomes a full-screen sheet on a phone. *@
                     <div class="mat-rs-sheet-head">
                         <span class="mat-rs-sheet-title">@T["editor.switchPage"]</span>
-                        <button type="button" class="mat-rs-close" data-ps-close aria-label="@T["editor.close"]">✕</button>
+                        <button type="button" class="mat-rs-close" data-ps-close aria-label="@T["editor.close"]"><i class="ti ti-x" aria-hidden="true"></i></button>
                     </div>
                     <div class="bpick-search ps-search">
                         <svg class="bpick-sico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>

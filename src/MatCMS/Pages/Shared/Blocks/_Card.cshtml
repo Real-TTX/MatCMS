@@ -30,7 +30,7 @@
     <div class="feat-card__body">
         @if (!string.IsNullOrWhiteSpace(icon))
         {
-            <div class="feat-card__icon" aria-hidden="true">@icon</div>
+            <div class="feat-card__icon" aria-hidden="true">@MatCMS.Content.BlockIcon.Render(icon)</div>
         }
         @if (!string.IsNullOrWhiteSpace(title))
         {

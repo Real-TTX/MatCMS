@@ -6,7 +6,7 @@
     string FileOf(string? u) => string.IsNullOrEmpty(u) ? "" : u[(u.LastIndexOf('/') + 1)..];
 }
 <div class="page-head">
-    <h1>🧹 @Model.InstanceName</h1>
+    <h1>@Model.InstanceName</h1>
     <div class="list-toolbar">
         <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
     </div>

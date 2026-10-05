@@ -80,7 +80,7 @@
             // (hidden on desktop via CSS). data-dp-cancel reuses the "close without applying" handler.
             '<div class="mat-dp-head">'
                 + '<span class="mat-dp-title" data-dp-title></span>'
-                + '<button type="button" class="mat-dp-close" data-dp-close aria-label="' + T.cancel + '">✕</button>'
+                + '<button type="button" class="mat-dp-close" data-dp-close aria-label="' + T.cancel + '"><i class="ti ti-x" aria-hidden="true"></i></button>'
             + '</div>'
             + '<div class="mat-dp-body">'
                 + '<button type="button" class="mat-dp-nav mat-dp-nav-prev" data-dp-prev aria-label="' + T.prev + '">‹</button>'

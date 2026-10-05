@@ -461,8 +461,8 @@
                 '<span class="bpick-clabel">' + (icon ? '<span class="bpick-cico">' + icon + "</span>" : "") + esc(label) + '</span><span class="bpick-n">' + n + "</span></button>";
         }
         pickCats.innerHTML =
-            catBtn("fav", t("fav"), favs.filter(function (x) { return types_.indexOf(x) >= 0; }).length, " bpick-cat-fav", "★") +
-            catBtn("recent", t("recent"), recent.filter(function (x) { return types_.indexOf(x) >= 0; }).length, " bpick-cat-recent", "🕘") +
+            catBtn("fav", t("fav"), favs.filter(function (x) { return types_.indexOf(x) >= 0; }).length, " bpick-cat-fav", '<i class="ti ti-star" aria-hidden="true"></i>') +
+            catBtn("recent", t("recent"), recent.filter(function (x) { return types_.indexOf(x) >= 0; }).length, " bpick-cat-recent", '<i class="ti ti-clock" aria-hidden="true"></i>') +
             '<div class="bpick-sep"></div>' +
             catBtn("all", t("all"), opts.length) +
             cats.map(function (c) { return catBtn(c, t("cat." + c), opts.filter(function (d) { return d.cat === c; }).length); }).join("");
@@ -476,7 +476,7 @@
         function tile(d) {
             var isPreset = d.type.indexOf("preset:") === 0;
             return '<form onsubmit="return false">' +
-                (isPreset ? "" : '<button type="button" class="tile-fav' + (favs.indexOf(d.type) >= 0 ? " on" : "") + '" data-fav="' + esc(d.type) + '" title="' + esc(t("favToggle")) + '" aria-label="' + esc(t("favToggle")) + '">★</button>') +
+                (isPreset ? "" : '<button type="button" class="tile-fav' + (favs.indexOf(d.type) >= 0 ? " on" : "") + '" data-fav="' + esc(d.type) + '" title="' + esc(t("favToggle")) + '" aria-label="' + esc(t("favToggle")) + '"><i class="ti ti-star-filled" aria-hidden="true"></i></button>') +
                 '<button type="button" class="tile" data-type="' + esc(d.type) + '" title="' + esc(d.desc || "") + '">' +
                 '<span class="t-icon">' + svgIcon(d.svg) + '</span><span class="t-name">' + esc(d.name) + '</span><span class="t-desc">' + esc(d.desc || "") + "</span></button></form>";
         }

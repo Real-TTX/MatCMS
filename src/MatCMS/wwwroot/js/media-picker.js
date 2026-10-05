@@ -14,7 +14,7 @@
             '<div class="modal-head"><h2>' + (multiple ? 'Medien wählen' : 'Medium wählen') + '</h2>' +
             '<div class="mp-head-actions">' +
             '<button type="button" class="btn btn-sm" data-mp-upload>Hochladen</button>' +
-            '<button type="button" class="modal-close" aria-label="Schließen">✕</button>' +
+            '<button type="button" class="modal-close" aria-label="Schließen"><i class="ti ti-x" aria-hidden="true"></i></button>' +
             '</div></div>' +
             '<div class="modal-body"><div class="media-picker-grid"></div></div>' +
             (multiple ? '<div class="modal-foot media-picker-foot"><span class="mp-count muted">0 gewählt</span><button type="button" class="btn btn-sm" data-mp-apply disabled>Übernehmen</button></div>' : '') +
@@ -124,7 +124,7 @@
         var overlay = document.createElement("div");
         overlay.className = "modal-overlay open";
         overlay.innerHTML = '<div class="modal" role="dialog" aria-modal="true">' +
-            '<div class="modal-head"><h2>Seite verlinken</h2><button type="button" class="modal-close" aria-label="Schließen">✕</button></div>' +
+            '<div class="modal-head"><h2>Seite verlinken</h2><button type="button" class="modal-close" aria-label="Schließen"><i class="ti ti-x" aria-hidden="true"></i></button></div>' +
             '<div class="modal-body"><div class="link-picker-list"></div></div></div>';
         document.body.appendChild(overlay);
         var list = overlay.querySelector(".link-picker-list");

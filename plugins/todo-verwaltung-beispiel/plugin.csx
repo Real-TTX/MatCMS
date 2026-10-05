@@ -2,7 +2,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 
 Log("Todo-Plugin geladen.");
-AddAdminMenu("Todos", "/admin/plugin/todos", "✅");
+AddAdminMenu("Todos", "/admin/plugin/todos", "ti-checklist");
 
 JsonArray Load(PluginRequest req)
 {

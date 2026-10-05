@@ -270,8 +270,8 @@ public class PluginContext
     }
 
     /// <summary>Register an entry in the admin sidebar (label, target URL, emoji icon).</summary>
-    public void AddAdminMenu(string label, string url, string icon = "🔌")
-        => _registry.AdminMenu.Add(new(label ?? "", string.IsNullOrWhiteSpace(url) ? "#" : url, string.IsNullOrWhiteSpace(icon) ? "🔌" : icon));
+    public void AddAdminMenu(string label, string url, string icon = "ti-plug")
+        => _registry.AdminMenu.Add(new(label ?? "", string.IsNullOrWhiteSpace(url) ? "#" : url, string.IsNullOrWhiteSpace(icon) ? "ti-plug" : icon));
 
     /// <summary>Register an admin page served at <c>/admin/plugin/{key}</c>. The callback returns HTML.</summary>
     public void AddAdminPage(string key, Func<PluginRequest, string> handler)

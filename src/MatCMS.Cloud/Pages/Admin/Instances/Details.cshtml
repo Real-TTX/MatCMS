@@ -1043,7 +1043,7 @@
                 fetch(btn.dataset.url + '&tail=' + encodeURIComponent(tail.value), { credentials: 'same-origin' })
                     .then(function (r) { return r.text(); })
                     .then(function (t) { out.textContent = t; out.hidden = false; out.scrollTop = out.scrollHeight; })
-                    .catch(function (e) { out.textContent = '⚠ ' + e; out.hidden = false; })
+                    .catch(function (e) { out.textContent = 'Fehler: ' + e; out.hidden = false; })
                     .finally(function () { btn.disabled = false; });
             });
         })();

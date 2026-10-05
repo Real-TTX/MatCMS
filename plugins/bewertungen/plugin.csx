@@ -70,7 +70,7 @@ try {
     foreach (var s in db0.SiteSettings.Where(x => x.Key.StartsWith("plugin.reviews.")).ToList())
         try { var a = JsonNode.Parse(s.Value) as JsonArray; if (a != null) foreach (var n in a) if (!(n?["approved"]?.GetValue<bool>() ?? false)) pending++; } catch {}
 } catch {}
-AddAdminMenu(pending > 0 ? ("Bewertungen (" + pending + ")") : "Bewertungen", "/admin/plugin/bewertungen", "⭐");
+AddAdminMenu(pending > 0 ? ("Bewertungen (" + pending + ")") : "Bewertungen", "/admin/plugin/bewertungen", "ti-star");
 
 AddPublicPage("bewertungen", req =>
 {

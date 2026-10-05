@@ -61,6 +61,11 @@
     font-weight: 500;
     transition: background .15s ease, color .15s ease;
 }
+/* Nav icons are Tabler glyphs (the back office shows no emojis): one fixed column so the labels line up,
+   in the link's own colour — grey at rest, white on the active accent. */
+.admin-nav a .ti { display: inline-block; width: 20px; margin-right: 7px; font-size: 17px; text-align: center; vertical-align: -3px; opacity: .8; }
+.admin-nav a.active .ti, .admin-nav a:hover .ti { opacity: 1; }
+.admin-foot-btn .ti { font-size: 16px; vertical-align: -3px; }
 .admin-nav a:hover { background: #e2e5ea; color: var(--black); }
 .admin-nav a.active { background: var(--accent); color: #fff; }
 /* Thin divider between logical nav groups (Inhalt / Konfiguration / Verwaltung). */

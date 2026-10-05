@@ -65,7 +65,7 @@
         <div class="dash-card-body">
             @if (Model.AttentionItems.Count == 0)
             {
-                <p class="muted">✓ @T["dashboard.allClear"]</p>
+                <p class="muted"><i class="ti ti-circle-check" aria-hidden="true"></i> @T["dashboard.allClear"]</p>
             }
             else
             {
@@ -75,7 +75,7 @@
                         @foreach (var x in Model.AttentionItems.Take(IndexModel.CardRows))
                         {
                             <tr class="lvl-@x.Level">
-                                <td class="dash-icon">@x.Icon</td>
+                                <td class="dash-icon"><i class="ti @x.Icon" aria-hidden="true"></i></td>
                                 <td><a href="@x.Url"><strong>@x.Title</strong></a><div class="muted dash-clip">@x.Text</div></td>
                             </tr>
                         }
@@ -166,7 +166,7 @@
                             @if (!string.IsNullOrEmpty(r.Error)) { <span class="badge badge-err" title="@r.Error">@T["common.error"]</span> }
                             @if (r.Installed > 0) { <span class="badge badge-on">+@r.Installed</span> }
                             @if (r.Updated > 0) { <span class="badge badge-new">~@r.Updated</span> }
-                            @if (r.Failed > 0) { <span class="badge badge-err">✗@r.Failed</span> }
+                            @if (r.Failed > 0) { <span class="badge badge-err"><i class="ti ti-x" aria-hidden="true"></i>@r.Failed</span> }
                             @if (string.IsNullOrEmpty(r.Error) && r.Installed + r.Updated + r.Failed == 0) { <span class="muted">@T["dashboard.syncNoChange"]</span> }
                         </td>
                     </tr>

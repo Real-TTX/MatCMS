@@ -183,7 +183,7 @@
             var sheet = document.createElement("div");
             sheet.className = "mat-rs-sheet-head";
             sheet.innerHTML = '<span class="mat-rs-sheet-title"></span>' +
-                              '<button type="button" class="mat-rs-close" data-rs-close aria-label="Schließen">✕</button>';
+                              '<button type="button" class="mat-rs-close" data-rs-close aria-label="Schließen"><i class="ti ti-x" aria-hidden="true"></i></button>';
             sheet.querySelector(".mat-rs-sheet-title").textContent = field.label || "";
             menu.appendChild(sheet);
             var scroll = document.createElement("div");
@@ -377,7 +377,7 @@
             title.textContent = field.itemLabel || "Eintrag";
             var acts = document.createElement("div");
             acts.className = "li-actions";
-            var up = iconBtn("▲"), down = iconBtn("▼"), del = iconBtn("✕");
+            var up = iconBtn("ti-chevron-up"), down = iconBtn("ti-chevron-down"), del = iconBtn("ti-x");
             acts.appendChild(up); acts.appendChild(down); acts.appendChild(del);
             head.appendChild(title); head.appendChild(acts);
             card.appendChild(head);
@@ -465,7 +465,7 @@
         var b = document.createElement("button");
         b.type = "button";
         b.className = "icon-btn";
-        b.textContent = txt;
+        if (txt.indexOf("ti-") === 0) b.innerHTML = '<i class="ti ' + txt + '" aria-hidden="true"></i>'; else b.textContent = txt;
         return b;
     }
 })();

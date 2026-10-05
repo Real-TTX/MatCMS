@@ -101,18 +101,18 @@ public sealed class AttentionService
         {
             var i = instances.FirstOrDefault(x => x.Id == m.InstanceId);
             if (i is null) continue;
-            if (m.State == "running") AddI(i, "info", "moveRunning", "🚚", Inst(i, "hosting"), D("since", Local(m.StartedAt)), m.FromName, m.ToName, m.Step);
-            else AddI(i, "err", m.State == "rolled-back" ? "moveRolledBack" : "moveFailed", "🚚", Inst(i, "hosting"), LastLogLine(m.Log), m.FromName, m.ToName);
+            if (m.State == "running") AddI(i, "info", "moveRunning", "ti-truck", Inst(i, "hosting"), D("since", Local(m.StartedAt)), m.FromName, m.ToName, m.Step);
+            else AddI(i, "err", m.State == "rolled-back" ? "moveRolledBack" : "moveFailed", "ti-truck", Inst(i, "hosting"), LastLogLine(m.Log), m.FromName, m.ToName);
         }
         foreach (var i in instances)
         {
-            if (IsOffline(i)) AddI(i, "err", "offline", "🔴", Inst(i), D("lastSeen", i.LastHeartbeatUtc is DateTime hb ? Local(hb) : "—", i.Url ?? "—"), $"{i.LastHeartbeatUtc:dd.MM. HH:mm} UTC");
+            if (IsOffline(i)) AddI(i, "err", "offline", "ti-wifi-off", Inst(i), D("lastSeen", i.LastHeartbeatUtc is DateTime hb ? Local(hb) : "—", i.Url ?? "—"), $"{i.LastHeartbeatUtc:dd.MM. HH:mm} UTC");
             else if (IsStopped(i)) AddI(i, "warn", "stopped", "⏸️", Inst(i, "hosting"), D("container", i.ContainerState ?? "?"), i.ContainerState ?? "");
-            if (!string.IsNullOrWhiteSpace(i.LastSyncError)) AddI(i, "err", "syncError", "⚠️", Inst(i, "config"), D("sync", i.LastSyncRunAt is DateTime sr ? Local(sr) : "—", i.AppliedRevision), i.LastSyncError!);
-            if (!string.IsNullOrEmpty(i.ProxyError)) AddI(i, "err", "proxyError", "🌐", Inst(i, "hosting"), D("domain", i.ProxyDomain ?? "—"), i.ProxyError);
-            if (InstanceService.IsOutdatedProtocol(i)) AddI(i, "warn", "outdated", "🧓", Inst(i), D("protocol", i.ProtocolVersion, InstanceService.CurrentProtocolVersion, i.Version ?? "?"));
+            if (!string.IsNullOrWhiteSpace(i.LastSyncError)) AddI(i, "err", "syncError", "ti-alert-triangle", Inst(i, "config"), D("sync", i.LastSyncRunAt is DateTime sr ? Local(sr) : "—", i.AppliedRevision), i.LastSyncError!);
+            if (!string.IsNullOrEmpty(i.ProxyError)) AddI(i, "err", "proxyError", "ti-world", Inst(i, "hosting"), D("domain", i.ProxyDomain ?? "—"), i.ProxyError);
+            if (InstanceService.IsOutdatedProtocol(i)) AddI(i, "warn", "outdated", "ti-history", Inst(i), D("protocol", i.ProtocolVersion, InstanceService.CurrentProtocolVersion, i.Version ?? "?"));
             if (lastBackup.TryGetValue(i.Id, out var lb) && now - lb > StaleBackup)
-                AddI(i, "warn", "backupStale", "💾", Inst(i, "backup"), D("lastBackup", Local(lb)), (int)(now - lb).TotalDays);
+                AddI(i, "warn", "backupStale", "ti-device-floppy", Inst(i, "backup"), D("lastBackup", Local(lb)), (int)(now - lb).TotalDays);
             if (_releases.IsUpdateAvailableFor(i.Version))
                 AddI(i, "info", "update", "⬆️", Inst(i, HostingActionsService.CanAct(i) ? "hosting" : "overview"), HostingActionsService.CanAct(i) ? D("updateHere") : D("updateRemote"), _releases.LatestVersion ?? "", i.Version ?? "?");
         }
@@ -123,15 +123,15 @@ public sealed class AttentionService
             {
                 var url = Page("/Admin/Hosting/Nodes/Details", new { id = n.Id });
                 var title = L("node", n.Name);
-                if (n.LastSeenAt is not null && !n.IsOnline(now)) AddD("err", "nodeOffline", "🖧", title, url, D("node", n.HostName ?? "—", n.Address ?? "—"), $"{n.LastSeenAt:dd.MM. HH:mm} UTC");
-                else if (!string.IsNullOrEmpty(n.DockerError)) AddD("err", "nodeDocker", "🖧", title, url, D("node", n.HostName ?? "—", n.Address ?? "—"), n.DockerError);
-                if (Nodes.NodeService.AgentOutdated(n, cloudVersion)) AddD("info", "agentOutdated", "🖧", title, url, D("agent"), n.AgentVersion ?? "", cloudVersion);
+                if (n.LastSeenAt is not null && !n.IsOnline(now)) AddD("err", "nodeOffline", "ti-server-2", title, url, D("node", n.HostName ?? "—", n.Address ?? "—"), $"{n.LastSeenAt:dd.MM. HH:mm} UTC");
+                else if (!string.IsNullOrEmpty(n.DockerError)) AddD("err", "nodeDocker", "ti-server-2", title, url, D("node", n.HostName ?? "—", n.Address ?? "—"), n.DockerError);
+                if (Nodes.NodeService.AgentOutdated(n, cloudVersion)) AddD("info", "agentOutdated", "ti-server-2", title, url, D("agent"), n.AgentVersion ?? "", cloudVersion);
             }
             var check = await CloudUpdateAsync(ct);
-            if (check is { Error: null, UpdateAvailable: true }) AddD("info", "cloudUpdate", "☁️", L("cloud.title"), Page("/Admin/Hosting/Index", fragment: "updates"), D("running", check.Current), check.Latest ?? "");
-            if (!await _mail.IsConfiguredAsync()) Add("warn", "smtp", "✉️", L("smtp.title"), Page("/Admin/Settings/Index", new { tab = "smtp" }), null);
-            if (_docker.Configured && !await _docker.IsReachableAsync(ct)) AddD("err", "docker", "🐳", "Docker", Page("/Admin/Hosting/Nodes/Details", new { tab = "docker" }), D("endpoint", _docker.Endpoint ?? "—"));
-            if (!string.IsNullOrWhiteSpace(_releases.LastError)) a.Add(new("warn", "release", "📦", L("release.title"), _releases.LastError!, Page("/Admin/Index"), null));
+            if (check is { Error: null, UpdateAvailable: true }) AddD("info", "cloudUpdate", "ti-cloud", L("cloud.title"), Page("/Admin/Hosting/Index", fragment: "updates"), D("running", check.Current), check.Latest ?? "");
+            if (!await _mail.IsConfiguredAsync()) Add("warn", "smtp", "ti-mail", L("smtp.title"), Page("/Admin/Settings/Index", new { tab = "smtp" }), null);
+            if (_docker.Configured && !await _docker.IsReachableAsync(ct)) AddD("err", "docker", "ti-brand-docker", "Docker", Page("/Admin/Hosting/Nodes/Details", new { tab = "docker" }), D("endpoint", _docker.Endpoint ?? "—"));
+            if (!string.IsNullOrWhiteSpace(_releases.LastError)) a.Add(new("warn", "release", "ti-package", L("release.title"), _releases.LastError!, Page("/Admin/Index"), null));
         }
         // Errors first, then warnings, then information; within a level, by name.
         static string Local(DateTime utc) => utc.ToLocalTime().ToString("dd.MM.yyyy HH:mm");

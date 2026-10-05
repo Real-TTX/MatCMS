@@ -18,7 +18,7 @@ public class CreateModel : PageModel
 
     private const string Starter =
         "// Beispiel-Plugin. Verfügbar: AddAdminMenu(label, url, icon), Service<T>()\n" +
-        "AddAdminMenu(\"Mein Plugin\", \"/admin\", \"🔌\");\n\n" +
+        "AddAdminMenu(\"Mein Plugin\", \"/admin\", \"ti-plug\");\n\n" +
         "// Eigene Dateien aus dem Plugin-Ordner (unter „Dateien dieses Plugins\" hochladen):\n" +
         "// IncludeScript(\"app.js\");     // lädt /plugin-assets/<key>/app.js auf allen Seiten\n" +
         "// IncludeStyle(\"style.css\");   // lädt eine CSS-Datei im <head>\n" +

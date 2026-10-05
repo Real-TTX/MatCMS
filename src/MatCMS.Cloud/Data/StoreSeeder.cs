@@ -363,7 +363,7 @@ body { background: transparent; }
                 // überhaupt tun kann, und tut sonst nichts — importierte Plugins sind auf der Instanz
                 // ohnehin deaktiviert, weil Plugin-Code serverseitig läuft.
                 Log("Wartungsfenster-Plugin geladen.");
-                AddAdminMenu("Wartung", "/admin/plugin/wartung", "🛠️");
+                AddAdminMenu("Wartung", "/admin/plugin/wartung", "ti-tool");
                 """);
     }
 

@@ -42,7 +42,7 @@ public static class PluginBlueprints
             "// Blaupause bp:adminpage" + MarkerHint + "\n" +
             "// Ein Menüpunkt im Admin und die Seite dahinter. Die Seite liegt unter\n" +
             "// /admin/plugin/<schlüssel>; Key ist der Schlüssel DIESES Plugins.\n" +
-            "AddAdminMenu(\"Mein Plugin\", \"/admin/plugin/\" + Key, \"🔌\");\n" +
+            "AddAdminMenu(\"Mein Plugin\", \"/admin/plugin/\" + Key, \"ti-plug\");\n" +
             "AddAdminPage(Key, req =>\n" +
             "{\n" +
             "    // Der Knopf unten schickt action=hallo an dieselbe Seite zurück.\n" +

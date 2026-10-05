@@ -67,7 +67,7 @@
 
         var head = el("div", "de-head");
         head.appendChild(el("strong", null, t("editTitle", "Übersetzung bearbeiten") + " · " + ctx.loc.toUpperCase() + " · " + ctx.blockType));
-        var x = el("button", "de-x", "✕"); x.type = "button";
+        var x = el("button", "de-x", ""); x.type = "button"; x.innerHTML = '<i class="ti ti-x" aria-hidden="true"></i>';
         x.addEventListener("click", function () { dlg.close(); });
         head.appendChild(x);
         dlg.appendChild(head);

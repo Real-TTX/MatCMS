@@ -261,7 +261,7 @@
             '<div class="cp-dbg-row"><span>' + (CP.dbgPlaceholders || "Platzhalter") + "</span><div>" + chips(uniq) + "</div></div>" +
             (unknown.length ? '<div class="cp-dbg-row"><span class="cp-warn">' + (CP.dbgUnknown || "Unbekannt") + "</span><div>" + chips(unknown, true) + "</div></div>" : "") +
             '<div class="cp-dbg-row"><span>' + (CP.dbgUnused || "Ungenutzt") + "</span><div>" + chips(unused) + "</div></div>" +
-            (unknown.length === 0 ? '<div class="cp-dbg-ok">✓ ' + (CP.dbgOk || "") + "</div>" : "") +
+            (unknown.length === 0 ? '<div class="cp-dbg-ok"><i class="ti ti-check" aria-hidden="true"></i> ' + (CP.dbgOk || "") + "</div>" : "") +
             '<div class="cp-dbg-out"><div class="cp-dbg-out-label">' + (CP.dbgOutput || "Ausgabe") + "</div><pre>" + esc(out) + "</pre></div>";
     }
 

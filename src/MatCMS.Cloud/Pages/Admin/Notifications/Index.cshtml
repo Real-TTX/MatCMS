@@ -35,9 +35,9 @@
             {
                 <tr class="@(r.Kind == "group" ? "notify-group" : "")">
                     <td>
-                        @if (r.Kind == "group") { <strong>👥 @r.Label</strong> }
-                        else if (r.Kind == "email") { <span class="mono">✉️ @r.Label</span> }
-                        else { <span>👤 @r.Label</span> }
+                        @if (r.Kind == "group") { <strong><i class="ti ti-users" aria-hidden="true"></i> @r.Label</strong> }
+                        else if (r.Kind == "email") { <span class="mono"><i class="ti ti-mail" aria-hidden="true"></i> @r.Label</span> }
+                        else { <span><i class="ti ti-user" aria-hidden="true"></i> @r.Label</span> }
                         @if (!string.IsNullOrEmpty(r.Sub)) { <div class="muted" style="font-size:12px;">@r.Sub</div> }
                         @if (r.NoEmail) { <div class="muted" style="font-size:12px;">@T["notify.noEmail"]</div> }
                         @if (r.Kind == "email") { <input type="hidden" name="rows" value="@r.Key" /> }

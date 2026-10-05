@@ -60,38 +60,40 @@
         </div>
         <nav class="admin-nav">
             @* Inhalt *@
-            <a class="@Active("/admin/pages")" asp-page="/Admin/Pages/Index">📄 @T["nav.pages"]</a>
-            <a class="@Active("/admin/posts")" asp-page="/Admin/Posts/Index">📰 @T["nav.posts"]</a>
-            <a class="@Active("/admin/menus")" asp-page="/Admin/Menus/Index">🧭 @T["nav.menus"]</a>
-            <a class="@Active("/admin/forms")" asp-page="/Admin/Forms/Index">📝 @T["nav.forms"]</a>
-            <a class="@Active("/admin/media")" asp-page="/Admin/Media/Index">🖼️ @T["nav.media"]</a>
+            <a class="@Active("/admin/pages")" asp-page="/Admin/Pages/Index"><i class="ti ti-file-text" aria-hidden="true"></i> @T["nav.pages"]</a>
+            <a class="@Active("/admin/posts")" asp-page="/Admin/Posts/Index"><i class="ti ti-news" aria-hidden="true"></i> @T["nav.posts"]</a>
+            <a class="@Active("/admin/menus")" asp-page="/Admin/Menus/Index"><i class="ti ti-menu-2" aria-hidden="true"></i> @T["nav.menus"]</a>
+            <a class="@Active("/admin/forms")" asp-page="/Admin/Forms/Index"><i class="ti ti-forms" aria-hidden="true"></i> @T["nav.forms"]</a>
+            <a class="@Active("/admin/media")" asp-page="/Admin/Media/Index"><i class="ti ti-photo" aria-hidden="true"></i> @T["nav.media"]</a>
             <div class="admin-nav-sep" role="separator"></div>
             @* Gestaltung & Konfiguration *@
-            <a class="@Active("/admin/templates")" asp-page="/Admin/Templates/Index">🎨 @T["nav.templates"]</a>
-            <a class="@Active("/admin/components")" asp-page="/Admin/Components/Index">🧩 @T["nav.components"]</a>
-            <a class="@Active("/admin/plugins")" asp-page="/Admin/Plugins/Index">🔌 @T["nav.plugins"]</a>
-            <a class="@Active("/admin/mailtemplates")" asp-page="/Admin/MailTemplates/Index">✉️ @T["nav.mailtemplates"]</a>
-            <a class="@Active("/admin/settings")" asp-page="/Admin/Settings/Index">⚙️ @T["nav.settings"]</a>
+            <a class="@Active("/admin/templates")" asp-page="/Admin/Templates/Index"><i class="ti ti-palette" aria-hidden="true"></i> @T["nav.templates"]</a>
+            <a class="@Active("/admin/components")" asp-page="/Admin/Components/Index"><i class="ti ti-puzzle" aria-hidden="true"></i> @T["nav.components"]</a>
+            <a class="@Active("/admin/plugins")" asp-page="/Admin/Plugins/Index"><i class="ti ti-plug" aria-hidden="true"></i> @T["nav.plugins"]</a>
+            <a class="@Active("/admin/mailtemplates")" asp-page="/Admin/MailTemplates/Index"><i class="ti ti-mail" aria-hidden="true"></i> @T["nav.mailtemplates"]</a>
+            <a class="@Active("/admin/settings")" asp-page="/Admin/Settings/Index"><i class="ti ti-settings" aria-hidden="true"></i> @T["nav.settings"]</a>
             <div class="admin-nav-sep" role="separator"></div>
             @* Verwaltung & System *@
-            <a class="@Active("/admin/stats")" asp-page="/Admin/Stats/Index">📊 @T["nav.stats"]</a>
-            <a class="@Active("/admin/users")" asp-page="/Admin/Users/Index">👤 @T["nav.users"]</a>
-            <a class="@Active("/admin/backup")" asp-page="/Admin/Backup/Index">💾 @T["nav.backup"]</a>
-            <a class="@Active("/admin/logs")" asp-page="/Admin/Logs/Index">📋 @T["nav.logs"]</a>
-            <a class="@Active("/admin/cleanup")" asp-page="/Admin/Cleanup/Index">🧹 @T["nav.cleanup"]</a>
+            <a class="@Active("/admin/stats")" asp-page="/Admin/Stats/Index"><i class="ti ti-chart-bar" aria-hidden="true"></i> @T["nav.stats"]</a>
+            <a class="@Active("/admin/users")" asp-page="/Admin/Users/Index"><i class="ti ti-users" aria-hidden="true"></i> @T["nav.users"]</a>
+            <a class="@Active("/admin/backup")" asp-page="/Admin/Backup/Index"><i class="ti ti-device-floppy" aria-hidden="true"></i> @T["nav.backup"]</a>
+            <a class="@Active("/admin/logs")" asp-page="/Admin/Logs/Index"><i class="ti ti-list-details" aria-hidden="true"></i> @T["nav.logs"]</a>
+            <a class="@Active("/admin/cleanup")" asp-page="/Admin/Cleanup/Index"><i class="ti ti-eraser" aria-hidden="true"></i> @T["nav.cleanup"]</a>
             @if (Plugins.AdminMenu.Count > 0)
             {
                 <div class="admin-nav-plugins">
                     @foreach (var entry in Plugins.AdminMenu)
                     {
-                        <a href="@entry.Url">@entry.Icon @entry.Label</a>
+                        @* A plugin names a Tabler icon ("ti-star"); anything else (older plugins brought an emoji) gets the
+                           neutral plugin icon — the back office shows no emojis. *@
+                        <a href="@entry.Url"><i class="ti @(entry.Icon is { } ic && ic.StartsWith("ti-") ? ic : "ti-plug")" aria-hidden="true"></i> @entry.Label</a>
                     }
                 </div>
             }
         </nav>
         <div class="admin-nav-foot">
             <div class="admin-foot-actions">
-                <a class="admin-foot-btn admin-foot-icon" href="/" target="_blank" rel="noopener" title="@T["nav.viewSite"]" aria-label="@T["nav.viewSite"]">🌐</a>
+                <a class="admin-foot-btn admin-foot-icon" href="/" target="_blank" rel="noopener" title="@T["nav.viewSite"]" aria-label="@T["nav.viewSite"]"><i class="ti ti-world" aria-hidden="true"></i></a>
                 @if (cultures.Count > 1)
                 {
                     <div class="admin-foot-lang" data-lang>
@@ -111,9 +113,9 @@
                 }
                 @* Persönliches Konto (Passwort, 2FA) ist eine Konto-Sache, kein Verwaltungsbereich —
                    es sitzt bei den Session-Aktionen (neben Abmelden), nicht als eigener Menüpunkt. *@
-                <a class="admin-foot-btn admin-foot-icon" asp-page="/Admin/Account/Index" title="@T["nav.account"]" aria-label="@T["nav.account"]">👤</a>
+                <a class="admin-foot-btn admin-foot-icon" asp-page="/Admin/Account/Index" title="@T["nav.account"]" aria-label="@T["nav.account"]"><i class="ti ti-user-circle" aria-hidden="true"></i></a>
                 <form method="post" asp-page="/Logout" class="admin-foot-logout">
-                    <button type="submit" class="admin-foot-btn">🚪 @T["nav.logout"]</button>
+                    <button type="submit" class="admin-foot-btn"><i class="ti ti-logout" aria-hidden="true"></i> @T["nav.logout"]</button>
                 </form>
             </div>
             <a class="admin-cms-foot" asp-page="/Admin/About/Index" title="@T["nav.about"]">

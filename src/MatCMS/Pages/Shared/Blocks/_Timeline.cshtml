@@ -33,7 +33,7 @@
                     <div class="tl-title"><h3>@title</h3></div>
                     <div class="tl-card">
                         <div class="tl-card-head">
-                            @if (!string.IsNullOrWhiteSpace(icon)) { <span class="tl-icon" aria-hidden="true">@icon</span> }
+                            @if (!string.IsNullOrWhiteSpace(icon)) { <span class="tl-icon" aria-hidden="true">@MatCMS.Content.BlockIcon.Render(icon)</span> }
                             <span class="tl-num" aria-hidden="true">@num</span>
                         </div>
                         @if (!string.IsNullOrWhiteSpace(text)) { <div class="tl-card-body">@Html.Raw(NlToBr(text))</div> }

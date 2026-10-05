@@ -58,21 +58,21 @@
                are hidden AND server-side blocked (AuthorizeFolder "Admin" in Program.cs). *@
             @if (isAdmin)
             {
-                <a class="@ActiveHosting()" asp-page="/Admin/Hosting/Index">🏗️ @T["hosting.title"]</a>
+                <a class="@ActiveHosting()" asp-page="/Admin/Hosting/Index"><i class="ti ti-server-2" aria-hidden="true"></i> @T["hosting.title"]</a>
             }
-            <a class="@ActiveInstances()" asp-page="/Admin/Instances/Index">🖥️ @T["nav.instances"]</a>
-            <a class="@Active("/admin/stats")" asp-page="/Admin/Stats/Index">📊 @T["stats.title"]</a>
+            <a class="@ActiveInstances()" asp-page="/Admin/Instances/Index"><i class="ti ti-device-desktop" aria-hidden="true"></i> @T["nav.instances"]</a>
+            <a class="@Active("/admin/stats")" asp-page="/Admin/Stats/Index"><i class="ti ti-chart-bar" aria-hidden="true"></i> @T["stats.title"]</a>
             @if (isAdmin)
             {
-                <a class="@Active("/admin/profiles")" asp-page="/Admin/Profiles/Index">🧩 @T["nav.profiles"]</a>
-                <a class="@Active("/admin/store")" asp-page="/Admin/Store/Index">📦 @T["nav.store"]</a>
-                <a class="@Active("/admin/mail")" asp-page="/Admin/Mail/Index">✉️ @T["spool.title"]</a>
-                <a class="@Active("/admin/backups")" asp-page="/Admin/Backups/Index">💾 @T["backups.title"]</a>
+                <a class="@Active("/admin/profiles")" asp-page="/Admin/Profiles/Index"><i class="ti ti-adjustments" aria-hidden="true"></i> @T["nav.profiles"]</a>
+                <a class="@Active("/admin/store")" asp-page="/Admin/Store/Index"><i class="ti ti-package" aria-hidden="true"></i> @T["nav.store"]</a>
+                <a class="@Active("/admin/mail")" asp-page="/Admin/Mail/Index"><i class="ti ti-mail" aria-hidden="true"></i> @T["spool.title"]</a>
+                <a class="@Active("/admin/backups")" asp-page="/Admin/Backups/Index"><i class="ti ti-device-floppy" aria-hidden="true"></i> @T["backups.title"]</a>
                 <div class="admin-nav-sep" role="separator"></div>
-                <a class="@(Active("/admin/settings") + Active("/admin/apikeys") + Active("/admin/oauthclients"))" asp-page="/Admin/Settings/Index">⚙️ @T["nav.settings"]</a>
-                <a class="@Active("/admin/notifications")" asp-page="/Admin/Notifications/Index">🔔 @T["notify.title"]</a>
-                <a class="@Active("/admin/users")" asp-page="/Admin/Users/Index">👤 @T["nav.users"]</a>
-                <a class="@Active("/admin/logs")" asp-page="/Admin/Logs/Index">📋 @T["nav.logs"]</a>
+                <a class="@(Active("/admin/settings") + Active("/admin/apikeys") + Active("/admin/oauthclients"))" asp-page="/Admin/Settings/Index"><i class="ti ti-settings" aria-hidden="true"></i> @T["nav.settings"]</a>
+                <a class="@Active("/admin/notifications")" asp-page="/Admin/Notifications/Index"><i class="ti ti-bell" aria-hidden="true"></i> @T["notify.title"]</a>
+                <a class="@Active("/admin/users")" asp-page="/Admin/Users/Index"><i class="ti ti-users" aria-hidden="true"></i> @T["nav.users"]</a>
+                <a class="@Active("/admin/logs")" asp-page="/Admin/Logs/Index"><i class="ti ti-list-details" aria-hidden="true"></i> @T["nav.logs"]</a>
             }
         </nav>
         <div class="admin-nav-foot">
@@ -96,9 +96,9 @@
                 }
                 @* Personal account (password, 2FA) is a per-account area (Operators have one too), not a
                    management area — it sits with the session actions here, not as its own nav item. *@
-                <a class="admin-foot-btn admin-foot-icon" asp-page="/Admin/Account/Index" title="@T["nav.account"]" aria-label="@T["nav.account"]">👤</a>
+                <a class="admin-foot-btn admin-foot-icon" asp-page="/Admin/Account/Index" title="@T["nav.account"]" aria-label="@T["nav.account"]"><i class="ti ti-user-circle" aria-hidden="true"></i></a>
                 <form method="post" asp-page="/Logout" class="admin-foot-logout">
-                    <button type="submit" class="admin-foot-btn">🚪 @T["nav.logout"]</button>
+                    <button type="submit" class="admin-foot-btn"><i class="ti ti-logout" aria-hidden="true"></i> @T["nav.logout"]</button>
                 </form>
             </div>
             <a class="admin-cms-foot" asp-page="/Admin/About/Index" title="@T["about.title"]">

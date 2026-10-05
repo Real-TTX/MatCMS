@@ -21,7 +21,7 @@
 
     // Item lists (schedule=true → reflect the saved selection; export → all selected).
     List<GranularGroupVm.Item> TplItems(bool sched) => Model.AllTemplates
-        .Select(t => new GranularGroupVm.Item(t.Name, t.Name + (t.IsActive ? " ★" : ""), !sched || PickTpl(t.Name))).ToList();
+        .Select(t => new GranularGroupVm.Item(t.Name, t.Name + (t.IsActive ? " (aktiv)" : ""), !sched || PickTpl(t.Name))).ToList();
     List<GranularGroupVm.Item> PageItems(bool sched) => Model.AllPages
         .Select(p => new GranularGroupVm.Item(IndexModel.PageKey(p), PageLabel(p), !sched || PickPage(IndexModel.PageKey(p)))).ToList();
     List<GranularGroupVm.Item> FormItems(bool sched) => Model.AllForms
@@ -103,7 +103,7 @@
                 <partial name="_GranularGroup" model="usersExport" />
             </div>
             <p class="help">@T["backup.pluginsHint"]</p>
-            <p class="help">⚠️ @T["backup.usersWarn"]</p>
+            <p class="help"><i class="ti ti-alert-triangle" aria-hidden="true"></i> @T["backup.usersWarn"]</p>
             <div class="form-actions">
                 <button type="submit" class="btn">@T["backup.download"]</button>
             </div>
@@ -293,7 +293,7 @@
                         html += row('@T["backup.settings"]', i.settings);
                         html += row('@T["backup.submissions"]', i.submissions);
                         html += row('@T["backup.formsSection"]', i.forms ? (i.forms + mode(i.formsPartial)) : '');
-                        html += row('@T["backup.assets"]', i.media || (i.hasAssets ? '✓' : ''));
+                        html += row('@T["backup.assets"]', i.media || (i.hasAssets ? '@T["backup.yes"]' : ''));
                         html += row('@T["backup.plugins"]', i.plugins);
                         html += row('@T["backup.pluginAssets"]', i.pluginAssets);
                         html += '</ul>';

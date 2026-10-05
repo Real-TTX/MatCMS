@@ -201,7 +201,7 @@ AddHeadHtml("<style>" +
   ".mls-empty{text-align:center;font-style:italic;opacity:.75;margin:0 0 30px;}" +
   "</style>");
 
-AddAdminMenu("Leserstimmen", "/admin/plugin/leserstimmen", "⭐");
+AddAdminMenu("Leserstimmen", "/admin/plugin/leserstimmen", "ti-message-heart");
 
 // ---- public endpoint: a visitor submits a review --------------------------------------------
 AddPublicPage("leserstimmen", req =>

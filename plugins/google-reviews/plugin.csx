@@ -93,7 +93,7 @@ AddHeadHtml("<style>" +
   "</style>");
 
 // Admin page: mode switch + Place-ID Finder link + per-mode fields + manual-review manager.
-AddAdminMenu("Google Bewertungen", "/admin/plugin/google-reviews", "🗺️");
+AddAdminMenu("Google Bewertungen", "/admin/plugin/google-reviews", "ti-brand-google");
 AddAdminPage("google-reviews", req =>
 {
     var db = req.Service<AppDbContext>();

@@ -39,7 +39,7 @@
   "oauthclients.tokenMethod": "Token-Austausch-Methode",
   "oauthclients.tokenMethodValue": "POST-Anfrage (Standard)",
   "oauthclients.copy": "Kopieren",
-  "oauthclients.copied": "Kopiert ✓",
+  "oauthclients.copied": "Kopiert",
   "oauthclients.pasteHeading": "Diese Werte in ChatGPT eintragen",
   "oauthclients.secretOnce": "Das Client-Secret wird nur beim Anlegen angezeigt. Verloren? Lege einfach einen neuen Connector an.",
   "oauthclients.setupHeading": "So verbindest du ChatGPT – Schritt für Schritt",

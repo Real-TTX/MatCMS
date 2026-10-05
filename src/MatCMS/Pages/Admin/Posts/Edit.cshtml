@@ -95,7 +95,7 @@
             <button type="button" data-cmd="formatBlock" data-arg="P" title="@T["posts.rtParagraph"]">¶</button>
             <button type="button" data-cmd="insertUnorderedList" title="@T["posts.rtList"]">@T["posts.rtListLabel"]</button>
             <button type="button" data-cmd="createLink" data-prompt="1" title="@T["posts.rtLink"]">@T["posts.rtLink"]</button>
-            <button type="button" data-cmd="removeFormat" title="@T["posts.rtClear"]">✕</button>
+            <button type="button" data-cmd="removeFormat" title="@T["posts.rtClear"]"><i class="ti ti-clear-formatting" aria-hidden="true"></i></button>
         </div>
         <div class="rt-editor" id="rt-editor" contenteditable="true" style="min-height:220px;">@Html.Raw(Model.Input.ContentHtml)</div>
         <input type="hidden" asp-for="Input.ContentHtml" id="rt-hidden" />

@@ -351,7 +351,7 @@
             if (!text || chips.indexOf(text) >= 0) return;
             chips.push(text);
             var c = document.createElement("span"); c.className = "tag-chip"; c.appendChild(document.createTextNode(text));
-            var x = document.createElement("button"); x.type = "button"; x.className = "tag-chip-x"; x.textContent = "✕";
+            var x = document.createElement("button"); x.type = "button"; x.className = "tag-chip-x"; x.innerHTML = '<i class="ti ti-x" aria-hidden="true"></i>';
             x.addEventListener("click", function () { var i = chips.indexOf(text); if (i >= 0) chips.splice(i, 1); c.remove(); });
             c.appendChild(x); node.insertBefore(c, inp);
         }
@@ -381,7 +381,7 @@
             var top = document.createElement("div"); top.className = "opt-top";
             var val = document.createElement("input"); val.type = "text"; val.placeholder = "Schlüssel (Wert)"; val.value = o.value || "";
             var lab = document.createElement("input"); lab.type = "text"; lab.placeholder = "Titel"; lab.value = o.label || "";
-            var del = iconBtn("✕");
+            var del = iconBtn("ti-x");
             top.appendChild(val); top.appendChild(lab); top.appendChild(del);
             row.appendChild(top);
 
@@ -456,7 +456,7 @@
             var head = document.createElement("div"); head.className = "list-item-head";
             var title = document.createElement("span"); title.className = "li-title"; title.textContent = "Feld";
             var acts = document.createElement("div"); acts.className = "li-actions";
-            var up = iconBtn("▲"), down = iconBtn("▼"), del = iconBtn("✕");
+            var up = iconBtn("ti-chevron-up"), down = iconBtn("ti-chevron-down"), del = iconBtn("ti-x");
             acts.appendChild(up); acts.appendChild(down); acts.appendChild(del);
             head.appendChild(title); head.appendChild(acts);
             card.appendChild(head);
@@ -599,7 +599,7 @@
     }
     function show(node, visible) { node.style.display = visible ? "" : "none"; }
     function iconBtn(txt) {
-        var b = document.createElement("button"); b.type = "button"; b.className = "icon-btn"; b.textContent = txt;
+        var b = document.createElement("button"); b.type = "button"; b.className = "icon-btn"; if (txt.indexOf("ti-") === 0) b.innerHTML = '<i class="ti ' + txt + '" aria-hidden="true"></i>'; else b.textContent = txt;
         return b;
     }
 })();

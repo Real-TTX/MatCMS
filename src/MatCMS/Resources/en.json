@@ -448,6 +448,8 @@
   "pages.slugPlaceholder": "generated from the title",
   "pages.createAndEdit": "Create and edit",
   "editor.title": "Editor",
+  "ev2.switchPage": "Switch page",
+  "ev2.languages": "Language versions",
   "block.el.section.name": "Section",
   "block.el.section.desc": "A band across the page with elements one under the other: heading, text, image, buttons, columns.",
   "block.el.columns.name": "Columns",

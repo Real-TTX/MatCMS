@@ -41,6 +41,13 @@ Abschnitt mit Elementen an. In der Vorschau lassen sich auch Kinder anklicken (M
   gestrichelter Platzhalter, wenn ein Element noch nichts zeigt. Vorlagen (Hero, Bild + Text,
   Textabschnitt, drei Spalten) baut `editor-v2.js` als Baum aus Elementen.
 
-**3 — Feinschliff und Umzug.** Ziehen über Ebenen hinweg, KI (Seite erzeugen, Block umschreiben),
+**3 — Feinschliff und Umzug (größtenteils fertig, 2026-10-05).** Ziehen über Ebenen hinweg, KI (Seite erzeugen, Block umschreiben),
 Übersetzungen/Sprachversionen und Seitenwechsel in v2; danach wird v2 der Standard und der klassische
 Editor entfällt.
+
+  Fertig: Ziehen über Ebenen (vor/nach jedem Block oder in einen Container, nur wo der neue Elternteil
+  den Typ annimmt, nie in sich selbst), KI „Block verbessern“ und „Seite erzeugen“ auf dem Entwurf
+  (rückgängig machbar, gespeichert erst mit Speichern), Sprachversionen (wechseln, anlegen,
+  maschinell übersetzen, Vergleich) und Seitenwechsel im Titel — die Aktionen des klassischen Editors
+  führen mit `back=v2` zurück in v2. Offen: Text direkt in der Vorschau tippen, klassischen Editor
+  entfernen (bewusst noch nicht — erst nach Freigabe).

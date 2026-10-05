@@ -192,10 +192,16 @@
         var n = treeEl.querySelector('.ev2-node[data-id="' + id + '"]'); if (n) n.focus();
     }
 
-    // ---------- drag & drop within the same level ----------
-    // Only between siblings for now: a block dropped into another container would have to be one
-    // that container accepts, and that check belongs with the cross-level move of stage 3.
-    var dragId = null;
+    // ---------- drag & drop, across levels ----------
+    // A block may go before/after any other block, or INTO a container (dropped on the middle of its
+    // row) — wherever the new parent accepts that block type (AllowedChildren; the page itself takes
+    // everything that is not child-only), and never into itself or its own descendants.
+    var dragId = null, dropAt = null;
+    function accepts(parentId, type) {
+        if (parentId == null) return !(types[type] || {}).childOnly;
+        var p = byId(parentId); return !!p && (def(p).allowed || []).indexOf(type) >= 0;
+    }
+    function inside(id, ancestorId) { var b = byId(id); while (b) { if (String(b.id) === String(ancestorId)) return true; b = b.parentId != null ? byId(b.parentId) : null; } return false; }
     treeEl.addEventListener("dragstart", function (e) {
         var n = e.target.closest(".ev2-node"); if (!n) return;
         dragId = Number(n.getAttribute("data-id"));
@@ -203,31 +209,41 @@
         e.dataTransfer.effectAllowed = "move";
         try { e.dataTransfer.setData("text/plain", String(dragId)); } catch (x) { }
     });
-    treeEl.addEventListener("dragend", function () { dragId = null; clearDrop(); renderTree(); });
-    function clearDrop() { treeEl.querySelectorAll(".is-drop-before,.is-drop-after,.is-dragging").forEach(function (n) { n.classList.remove("is-drop-before", "is-drop-after", "is-dragging"); }); }
+    treeEl.addEventListener("dragend", function () { dragId = null; dropAt = null; clearDrop(); renderTree(); });
+    function clearDrop() { treeEl.querySelectorAll(".is-drop-before,.is-drop-after,.is-drop-into,.is-dragging").forEach(function (n) { n.classList.remove("is-drop-before", "is-drop-after", "is-drop-into", "is-dragging"); }); }
     treeEl.addEventListener("dragover", function (e) {
         if (dragId == null) return;
         var n = e.target.closest(".ev2-node"); if (!n) return;
         var target = byId(n.getAttribute("data-id")), src = byId(dragId);
-        if (!target || !src || target.id === src.id || String(target.parentId) !== String(src.parentId)) return;
+        if (!target || !src || target.id === src.id || inside(target.id, src.id)) { dropAt = null; clearDrop(); return; }
+        var r = n.getBoundingClientRect(), y = (e.clientY - r.top) / r.height;
+        var into = isContainer(target) && y > .3 && y < .7 && accepts(target.id, src.blockType);
+        var zone = into ? "into" : y < .5 ? "before" : "after";
+        if (!into && !accepts(target.parentId, src.blockType)) {
+            // Not here as a sibling — maybe still into it, whatever the height.
+            if (isContainer(target) && accepts(target.id, src.blockType)) zone = "into"; else { dropAt = null; clearDrop(); return; }
+        }
         e.preventDefault();
-        var r = n.getBoundingClientRect(), after = e.clientY > r.top + r.height / 2;
+        dropAt = { target: target.id, zone: zone };
         clearDrop();
-        n.classList.add(after ? "is-drop-after" : "is-drop-before");
+        n.classList.add("is-drop-" + zone);
     });
     treeEl.addEventListener("drop", function (e) {
-        var n = e.target.closest(".ev2-node"); if (!n || dragId == null) return;
-        var target = byId(n.getAttribute("data-id")), src = byId(dragId);
-        if (!target || !src || String(target.parentId) !== String(src.parentId)) return;
+        if (dragId == null || !dropAt) return;
         e.preventDefault();
-        var after = n.classList.contains("is-drop-after");
+        var src = byId(dragId), target = byId(dropAt.target); if (!src || !target) return;
         record();
-        var sibs = kids(src.parentId).filter(function (k) { return k.id !== src.id; });
-        var at = sibs.indexOf(target) + (after ? 1 : 0);
+        var oldParent = src.parentId;
+        var newParent = dropAt.zone === "into" ? target.id : target.parentId;
+        var sibs = kids(newParent).filter(function (k) { return k.id !== src.id; });
+        var at = dropAt.zone === "into" ? sibs.length : sibs.indexOf(target) + (dropAt.zone === "after" ? 1 : 0);
+        src.parentId = newParent;
         sibs.splice(at, 0, src);
         sibs.forEach(function (k, i) { k.sortOrder = i; });
+        if (String(oldParent) !== String(newParent)) renumber(oldParent);
+        if (newParent != null) expanded[newParent] = true;
         committed();
-        renderTree(); renderPreview();
+        renderTree(); renderInspector(); renderPreview();
     });
 
     // ---------- actions ----------
@@ -628,13 +644,142 @@
     saveBtn.addEventListener("click", save);
 
     // ---------- leaving ----------
-    window.addEventListener("beforeunload", function (e) { if (dirty()) { e.preventDefault(); e.returnValue = ""; } });
-    document.getElementById("ev2-back").addEventListener("click", function (e) {
-        if (dirty() && !window.confirm(t("confirmLeave"))) e.preventDefault();
+    // One question, ours: once the operator agreed to leave, the browser's own beforeunload prompt
+    // must not ask the same thing a second time.
+    var leaving = false;
+    window.addEventListener("beforeunload", function (e) { if (dirty() && !leaving) { e.preventDefault(); e.returnValue = ""; } });
+    function okToLeave() { if (!dirty() || window.confirm(t("confirmLeave"))) { leaving = true; return true; } return false; }
+    document.addEventListener("click", function (e) {
+        // Only the editor's own ways out (top bar, tree column, page/language lists) — not links inside
+        // a field, the media picker or a dialog.
+        var a = e.target.closest("a[href]"); if (!a || a.target === "_blank" || !a.closest(".ev2-top, .ev2-nav, .ev2-pages, .ev2-langs")) return;
+        if (!okToLeave()) e.preventDefault();
     });
-    document.querySelectorAll(".ev2-classic, .ev2-node.is-locked").forEach(function (a) {
-        a.addEventListener("click", function (e) { if (dirty() && !window.confirm(t("confirmLeave"))) e.preventDefault(); });
+    document.querySelectorAll(".ev2-langs-form").forEach(function (f) {
+        f.addEventListener("submit", function (e) {
+            if (!okToLeave()) { e.preventDefault(); return; }
+            var c = f.getAttribute("data-confirm");
+            if (c && !window.confirm(c)) { leaving = false; e.preventDefault(); }
+        });
     });
+
+    // ---------- popovers in the title: page switcher, language versions ----------
+    function popover(btnId, popId, onOpen) {
+        var btn = document.getElementById(btnId), pop = document.getElementById(popId);
+        if (!btn || !pop) return;
+        btn.addEventListener("click", function (e) {
+            e.stopPropagation();
+            var open = pop.hidden;
+            document.querySelectorAll(".ev2-pages, .ev2-langs").forEach(function (p) { p.hidden = true; });
+            if (!open) return;
+            pop.hidden = false;
+            var r = btn.getBoundingClientRect();
+            pop.style.left = Math.max(8, Math.min(r.left, innerWidth - pop.offsetWidth - 8)) + "px";
+            pop.style.top = (r.bottom + 6) + "px";
+            if (onOpen) onOpen(pop);
+        });
+        document.addEventListener("mousedown", function (e) { if (!pop.hidden && !pop.contains(e.target) && !btn.contains(e.target)) pop.hidden = true; });
+        document.addEventListener("keydown", function (e) { if (e.key === "Escape") pop.hidden = true; });
+    }
+    popover("ev2-pages-open", "ev2-pages", function () {
+        var q = document.getElementById("ev2-pages-search"); q.value = ""; filterPages(); q.focus();
+        var cur = document.querySelector("#ev2-pages-list .is-cur"); if (cur) cur.scrollIntoView({ block: "nearest" });
+    });
+    popover("ev2-langs-open", "ev2-langs");
+    function filterPages() {
+        var q = document.getElementById("ev2-pages-search").value.trim().toLowerCase();
+        document.querySelectorAll("#ev2-pages-list .ev2-page").forEach(function (a) { a.hidden = q && a.getAttribute("data-search").indexOf(q) < 0; });
+    }
+    var ps = document.getElementById("ev2-pages-search");
+    if (ps) {
+        ps.addEventListener("input", filterPages);
+        ps.addEventListener("keydown", function (e) { if (e.key === "Enter") { var first = document.querySelector("#ev2-pages-list .ev2-page:not([hidden])"); if (first) first.click(); } });
+    }
+
+    // ---------- KI ----------
+    // Both work on the DRAFT: a proposal is applied into it like any other edit — undoable, and only
+    // saved with "Speichern". The server never writes anything here.
+    function aiPost(url, fields) {
+        var form = new URLSearchParams();
+        form.set("__RequestVerificationToken", token);
+        Object.keys(fields).forEach(function (k) { form.set(k, fields[k]); });
+        return fetch(url, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", "RequestVerificationToken": token }, body: form.toString(), credentials: "same-origin" })
+            .then(function (r) { return r.json(); });
+    }
+    function dialog(id) {
+        var d = document.getElementById(id); if (!d) return null;
+        d.querySelectorAll("[data-close]").forEach(function (b) { b.addEventListener("click", function () { d.close(); }); });
+        return d;
+    }
+    var aiBlock = dialog("ev2-aiblock"), aiBlockProposal = null;
+    if (aiBlock) {
+        var aiBlockStatus = document.getElementById("ev2-aiblock-status"), aiBlockDiff = document.getElementById("ev2-aiblock-diff"), aiBlockApply = document.getElementById("ev2-aiblock-apply");
+        document.getElementById("ev2-aiblock-open").addEventListener("click", function () {
+            if (selectedId == null) return;
+            aiBlockProposal = null; aiBlockDiff.innerHTML = ""; aiBlockStatus.textContent = ""; aiBlockApply.disabled = true;
+            aiBlock.showModal();
+        });
+        document.getElementById("ev2-aiblock-go").addEventListener("click", function () {
+            var b = byId(selectedId); if (!b) return;
+            aiBlockStatus.textContent = t("aiWorking"); aiBlockApply.disabled = true; aiBlockDiff.innerHTML = "";
+            var forId = b.id;
+            aiPost(aiBlock.getAttribute("data-url"), { instruction: document.getElementById("ev2-aiblock-instr").value, dataJson: b.dataJson })
+                .then(function (res) {
+                    if (!res.ok) { aiBlockStatus.textContent = res.error || "—"; return; }
+                    aiBlockStatus.textContent = "";
+                    aiBlockProposal = { id: forId, data: res.proposed };
+                    aiBlockDiff.innerHTML = (res.changes || []).map(function (c) {
+                        return '<div class="ev2-ai-change"><div class="k">' + esc(c.field) + '</div><div class="b"><span>' + esc(t("aiBefore")) + '</span>' + esc(strip(c.before)) +
+                            '</div><div class="a"><span>' + esc(t("aiAfter")) + '</span>' + esc(strip(c.after)) + "</div></div>";
+                    }).join("");
+                    aiBlockApply.disabled = false;
+                })
+                .catch(function () { aiBlockStatus.textContent = t("saveFailed"); });
+        });
+        aiBlockApply.addEventListener("click", function () {
+            var b = aiBlockProposal && byId(aiBlockProposal.id); if (!b) return;
+            record();
+            b.dataJson = aiBlockProposal.data;
+            committed();
+            aiBlock.close();
+            renderTree(); renderInspector(); renderPreview();
+        });
+    }
+    var aiPage = dialog("ev2-aipage"), aiPageProposal = null;
+    if (aiPage) {
+        var aiPageStatus = document.getElementById("ev2-aipage-status"), aiPageList = document.getElementById("ev2-aipage-list"), aiPageApply = document.getElementById("ev2-aipage-apply");
+        document.getElementById("ev2-aipage-open").addEventListener("click", function () {
+            aiPageProposal = null; aiPageList.innerHTML = ""; aiPageStatus.textContent = ""; aiPageApply.disabled = true;
+            aiPage.showModal();
+        });
+        document.getElementById("ev2-aipage-go").addEventListener("click", function () {
+            aiPageStatus.textContent = t("aiWorking"); aiPageApply.disabled = true; aiPageList.innerHTML = "";
+            aiPost(aiPage.getAttribute("data-url"), { instruction: document.getElementById("ev2-aipage-instr").value })
+                .then(function (res) {
+                    if (!res.ok) { aiPageStatus.textContent = res.error || "—"; return; }
+                    aiPageStatus.textContent = "";
+                    try { aiPageProposal = JSON.parse(res.proposed); } catch (x) { aiPageProposal = null; }
+                    aiPageList.innerHTML = (res.blocks || []).map(function (b) { return "<li><b>" + esc(b.name) + "</b> " + esc(b.snippet || "") + "</li>"; }).join("");
+                    aiPageApply.disabled = !aiPageProposal || !aiPageProposal.length;
+                })
+                .catch(function () { aiPageStatus.textContent = t("saveFailed"); });
+        });
+        aiPageApply.addEventListener("click", function () {
+            if (!aiPageProposal) return;
+            record();
+            var first = null;
+            aiPageProposal.forEach(function (p) {
+                if (!types[p.type]) return;
+                var b = { id: nextNeg--, blockType: p.type, parentId: null, sortOrder: kids(null).length, dataJson: JSON.stringify(p.data || {}) };
+                blocks.push(b);
+                if (first == null) first = b.id;
+            });
+            committed();
+            aiPage.close();
+            if (first != null) select(first, true); else renderTree();
+            renderPreview();
+        });
+    }
 
     // ---------- page settings dialog ----------
     var dlg = document.getElementById("ev2-settings");
@@ -645,8 +790,7 @@
     });
     document.getElementById("ev2-settings-close").addEventListener("click", function () { dlg.close(); });
     document.getElementById("ev2-settings-form").addEventListener("submit", function (e) {
-        if (dirty() && !window.confirm(t("confirmLeave"))) { e.preventDefault(); return; }
-        savedSnap = snap();   // the user agreed to leave the block edits behind
+        if (!okToLeave()) e.preventDefault();   // saving the settings reloads the editor
     });
 
     // ---------- small screens: tree and inspector as sheets ----------

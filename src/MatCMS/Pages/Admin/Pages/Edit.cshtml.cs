@@ -272,8 +272,12 @@ public class EditModel : PageModel
 
     /// <summary>The page settings are also edited from editor v2 (a dialog there); it sends back=v2 so the
     /// save lands the operator where they came from instead of in the classic editor.</summary>
-    private IActionResult MetaBack(int id, string? back) =>
-        back == "v2" ? RedirectToPage("/Admin/Pages/Editor", new { id }) : RedirectToPage(new { id });
+    private IActionResult MetaBack(int id, string? back) => EditorBack(new { id }, back);
+
+    /// <summary>Actions editor v2 calls on this page (settings, translations) send back=v2, so they land
+    /// the operator in v2 again — on the same page, or on the translation just created.</summary>
+    private IActionResult EditorBack(object route, string? back) =>
+        back == "v2" ? RedirectToPage("/Admin/Pages/Editor", route) : RedirectToPage(route);
 
     // Creates a translation of this page in another locale (same TranslationGroup), copying its
     // blocks as a starting point. The new page is a draft and opens in the editor.
@@ -488,7 +492,7 @@ public class EditModel : PageModel
     /// texts of this version — intended to produce a fresh MT draft right after "create translation";
     /// the editor/diff remain the place to polish it.
     /// </summary>
-    public async Task<IActionResult> OnPostAutoTranslateAsync(int id)
+    public async Task<IActionResult> OnPostAutoTranslateAsync(int id, string? back = null)
     {
         var page = await Load(id);
         if (page is null) return NotFound();
@@ -496,7 +500,7 @@ public class EditModel : PageModel
         if (page.Locale == Localizer.DefaultCulture)
         {
             TempData["FlashError"] = "Die Standardsprache ist die Quelle – bitte eine Übersetzungs-Version öffnen.";
-            return RedirectToPage(new { id });
+            return EditorBack(new { id }, back);
         }
         var source = string.IsNullOrWhiteSpace(page.TranslationGroup) ? null
             : await _db.Pages.Include(p => p.Blocks).AsNoTracking()
@@ -505,7 +509,7 @@ public class EditModel : PageModel
         if (source is null)
         {
             TempData["FlashError"] = "Keine Quellversion in der Standardsprache gefunden.";
-            return RedirectToPage(new { id });
+            return EditorBack(new { id }, back);
         }
 
         // Machine settings, not content — never send these to the translator (same list as the diff).
@@ -582,13 +586,13 @@ public class EditModel : PageModel
         if (plainTexts.Count == 0 && htmlTexts.Count == 0)
         {
             TempData["FlashError"] = "Keine übersetzbaren Texte gefunden.";
-            return RedirectToPage(new { id });
+            return EditorBack(new { id }, back);
         }
 
         var (okP, resP, errP) = await _translator.TranslateAsync(plainTexts, source.Locale, page.Locale, html: false);
-        if (!okP) { TempData["FlashError"] = $"Übersetzung fehlgeschlagen: {errP}"; return RedirectToPage(new { id }); }
+        if (!okP) { TempData["FlashError"] = $"Übersetzung fehlgeschlagen: {errP}"; return EditorBack(new { id }, back); }
         var (okH, resH, errH) = await _translator.TranslateAsync(htmlTexts, source.Locale, page.Locale, html: true);
-        if (!okH) { TempData["FlashError"] = $"Übersetzung fehlgeschlagen: {errH}"; return RedirectToPage(new { id }); }
+        if (!okH) { TempData["FlashError"] = $"Übersetzung fehlgeschlagen: {errH}"; return EditorBack(new { id }, back); }
 
         // Write back into the source-derived JSON trees, then persist them as THIS page's block data.
         foreach (var (obj, prop, isHtml, index) in slots)
@@ -601,10 +605,10 @@ public class EditModel : PageModel
 
         await _db.SaveChangesAsync();
         TempData["Flash"] = $"Automatisch übersetzt: {slots.Count} Feld(er) aus {source.Locale.ToUpperInvariant()} → {page.Locale.ToUpperInvariant()}.";
-        return RedirectToPage(new { id });
+        return EditorBack(new { id }, back);
     }
 
-    public async Task<IActionResult> OnPostCreateTranslationAsync(int id, string locale)
+    public async Task<IActionResult> OnPostCreateTranslationAsync(int id, string locale, string? back = null)
     {
         var page = await _db.Pages.Include(p => p.Blocks).FirstOrDefaultAsync(p => p.Id == id);
         if (page is null) return NotFound();
@@ -612,7 +616,7 @@ public class EditModel : PageModel
         if (!Localizer.IsSupported(locale) || locale == page.Locale)
         {
             TempData["FlashError"] = "Ungültige Zielsprache.";
-            return RedirectToPage(new { id });
+            return EditorBack(new { id }, back);
         }
 
         if (string.IsNullOrEmpty(page.TranslationGroup))
@@ -625,7 +629,7 @@ public class EditModel : PageModel
         if (await _db.Pages.AnyAsync(p => p.TranslationGroup == page.TranslationGroup && p.Locale == locale))
         {
             TempData["FlashError"] = "Für diese Sprache existiert bereits eine Übersetzung.";
-            return RedirectToPage(new { id });
+            return EditorBack(new { id }, back);
         }
 
         // A slug is unique per locale; keep the same slug if free, otherwise suffix the locale.
@@ -666,12 +670,12 @@ public class EditModel : PageModel
         await _db.SaveChangesAsync();
 
         TempData["Flash"] = "Übersetzung erstellt.";
-        return RedirectToPage(new { id = translation.Id });
+        return EditorBack(new { id = translation.Id }, back);
     }
 
     // Links an existing page (in another locale) as a translation of this one by merging it into
     // this page's TranslationGroup.
-    public async Task<IActionResult> OnPostLinkTranslationAsync(int id, int targetId)
+    public async Task<IActionResult> OnPostLinkTranslationAsync(int id, int targetId, string? back = null)
     {
         var page = await _db.Pages.FindAsync(id);
         var target = await _db.Pages.FindAsync(targetId);
@@ -680,7 +684,7 @@ public class EditModel : PageModel
         if (target.Locale == page.Locale)
         {
             TempData["FlashError"] = "Eine Übersetzung muss eine andere Sprache haben.";
-            return RedirectToPage(new { id });
+            return EditorBack(new { id }, back);
         }
 
         if (string.IsNullOrEmpty(page.TranslationGroup))
@@ -690,14 +694,14 @@ public class EditModel : PageModel
                                           && p.Locale == target.Locale && p.Id != target.Id))
         {
             TempData["FlashError"] = "Für diese Sprache ist bereits eine Übersetzung verknüpft.";
-            return RedirectToPage(new { id });
+            return EditorBack(new { id }, back);
         }
 
         target.TranslationGroup = page.TranslationGroup;
         await _db.SaveChangesAsync();
 
         TempData["Flash"] = "Übersetzung verknüpft.";
-        return RedirectToPage(new { id });
+        return EditorBack(new { id }, back);
     }
 
     public async Task<IActionResult> OnPostAddBlockAsync(int id, string type, int? parentId, int? position)

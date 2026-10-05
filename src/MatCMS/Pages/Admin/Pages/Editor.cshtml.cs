@@ -23,13 +23,26 @@ public class EditorModel : PageModel
 {
     private readonly AppDbContext _db;
     private readonly Localizer _t;
+    private readonly AiService _ai;
+    private readonly TranslationService _translator;
 
-    public EditorModel(AppDbContext db, BlockRegistry registry, Localizer t)
+    public EditorModel(AppDbContext db, BlockRegistry registry, Localizer t, AiService ai, TranslationService translator)
     {
         _db = db;
         Registry = registry;
         _t = t;
+        _ai = ai;
+        _translator = translator;
     }
+
+    public bool AiEnabled { get; private set; }
+    public bool TranslatorConfigured { get; private set; }
+    /// <summary>Language versions of this page (same TranslationGroup), the current one included.</summary>
+    public List<PageEntity> Versions { get; private set; } = new();
+    /// <summary>Active site languages this page has no version in yet.</summary>
+    public List<string> MissingLocales { get; private set; } = new();
+    /// <summary>Every page, for the page switcher in the title.</summary>
+    public List<PageEntity> AllPages { get; private set; } = new();
 
     public BlockRegistry Registry { get; }
     public PageEntity Current { get; private set; } = default!;
@@ -83,6 +96,14 @@ public class EditorModel : PageModel
         // Only the site's ACTIVE languages (i18n.languages), as on the classic editor's settings.
         SupportedLocales = Localizer.ParseActive(
             (await _db.SiteSettings.AsNoTracking().FirstOrDefaultAsync(s => s.Key == SettingKeys.Languages))?.Value);
+        AiEnabled = _ai.Enabled;
+        TranslatorConfigured = (await _translator.GetConfigAsync()).IsConfigured;
+        Versions = string.IsNullOrEmpty(page.TranslationGroup)
+            ? new List<PageEntity> { page }
+            : await _db.Pages.AsNoTracking().Where(p => p.TranslationGroup == page.TranslationGroup).OrderBy(p => p.Locale).ToListAsync();
+        var used = Versions.Select(v => v.Locale).ToHashSet();
+        MissingLocales = SupportedLocales.Where(c => !used.Contains(c)).ToList();
+        AllPages = await _db.Pages.AsNoTracking().OrderBy(p => p.Title).ToListAsync();
         return Page();
     }
 }

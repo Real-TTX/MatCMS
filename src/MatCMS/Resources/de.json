@@ -447,6 +447,8 @@
   "pages.slugPlaceholder": "wird aus dem Titel erzeugt",
   "pages.createAndEdit": "Anlegen und bearbeiten",
   "editor.title": "Editor",
+  "ev2.switchPage": "Seite wechseln",
+  "ev2.languages": "Sprachversionen",
   "block.el.section.name": "Abschnitt",
   "block.el.section.desc": "Ein Band über die Seite mit Elementen untereinander: Überschrift, Text, Bild, Buttons, Spalten.",
   "block.el.columns.name": "Spalten",

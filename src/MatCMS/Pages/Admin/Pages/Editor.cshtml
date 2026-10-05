@@ -19,6 +19,7 @@
         ["cat.design"] = T["blockcat.design"], ["cat.form"] = T["blockcat.form"], ["cat.embed"] = T["blockcat.embed"],
         ["cat.plugins"] = T["blockcat.plugins"], ["cat.custom"] = T["blockcat.custom"], ["blockEmpty"] = T["editor.blockEmpty"],
         ["cat.presets"] = T["ev2.presets"],
+        ["aiWorking"] = T["editor.aiWorking"], ["aiBefore"] = T["editor.aiBefore"], ["aiAfter"] = T["editor.aiAfter"],
         ["preset.hero"] = T["ev2.preset.hero"], ["preset.hero.desc"] = T["ev2.preset.hero.desc"],
         ["preset.imageText"] = T["ev2.preset.imageText"], ["preset.imageText.desc"] = T["ev2.preset.imageText.desc"],
         ["preset.text"] = T["ev2.preset.text"], ["preset.text.desc"] = T["ev2.preset.text.desc"],
@@ -58,12 +59,15 @@
             <span>@T["ev2.back"]<small>@T["ev2.backSub"]</small></span>
         </a>
         <button type="button" class="ev2-ico ev2-tree-toggle" id="ev2-tree-toggle" title="@T["ev2.tree"]" aria-label="@T["ev2.tree"]"><i class="ti ti-list-tree"></i></button>
-        <div class="ev2-title" title="@Model.PublicUrl">
-            <span class="ev2-title-text">@p.Title</span>
+        <div class="ev2-title">
+            @* The title is the page switcher: one click to the next page, as in the classic editor. *@
+            <button type="button" class="ev2-title-btn" id="ev2-pages-open" title="@T["ev2.switchPage"] — @Model.PublicUrl" aria-haspopup="true">
+                <span class="ev2-title-text">@p.Title</span><i class="ti ti-chevron-down" aria-hidden="true"></i>
+            </button>
             <span class="badge @(p.IsPublished ? "badge-on" : "badge-off")">@(p.IsPublished ? T["ev2.published"] : T["ev2.draft"])</span>
             @if (Model.SupportedLocales.Count > 1)
             {
-                <span class="badge mono">@p.Locale.ToUpperInvariant()</span>
+                <button type="button" class="badge mono ev2-lang-btn" id="ev2-langs-open" title="@T["ev2.languages"]" aria-haspopup="true">@p.Locale.ToUpperInvariant() <i class="ti ti-chevron-down" aria-hidden="true"></i></button>
             }
         </div>
         <span class="ev2-status" id="ev2-status" aria-live="polite"></span>
@@ -75,6 +79,10 @@
             <button type="button" data-dev="tablet" title="@T["ev2.tablet"]"><i class="ti ti-device-tablet"></i></button>
             <button type="button" data-dev="phone" title="@T["ev2.phone"]"><i class="ti ti-device-mobile"></i></button>
         </div>
+        @if (Model.AiEnabled)
+        {
+            <button type="button" class="ev2-ico" id="ev2-aipage-open" title="@T["editor.aiPageGenButton"]" aria-label="@T["editor.aiPageGenButton"]"><i class="ti ti-sparkles"></i></button>
+        }
         <button type="button" class="ev2-ico" id="ev2-settings-open" title="@T["ev2.settings"]" aria-label="@T["ev2.settings"]"><i class="ti ti-settings"></i></button>
         <a class="btn btn-ghost btn-sm ev2-hide-s" href="@Model.PublicUrl" target="_blank" rel="noopener"><i class="ti ti-external-link" aria-hidden="true"></i> @T["ev2.view"]</a>
         <button type="button" class="btn btn-sm" id="ev2-save" disabled>@T["ev2.save"]</button>
@@ -112,6 +120,10 @@
         <div class="ev2-tabs" id="ev2-tabs" role="tablist"></div>
         <div class="ev2-body" id="ev2-body"></div>
         <div class="ev2-foot" id="ev2-foot" hidden>
+            @if (Model.AiEnabled)
+            {
+                <button type="button" class="btn btn-ghost btn-sm ev2-ai-btn" id="ev2-aiblock-open" title="@T["editor.aiImprove"]"><i class="ti ti-sparkles"></i></button>
+            }
             <button type="button" class="btn btn-ghost btn-sm" id="ev2-dup"><i class="ti ti-copy"></i> @T["ev2.duplicate"]</button>
             <button type="button" class="btn btn-ghost btn-sm ev2-danger" id="ev2-del"><i class="ti ti-trash"></i> @T["ev2.remove"]</button>
         </div>
@@ -202,6 +214,88 @@
             </div>
         </form>
     </dialog>
+
+    @* Page switcher: every page with its address and language; leaving asks first when unsaved. *@
+    <div class="ev2-pop ev2-pages" id="ev2-pages" hidden>
+        <input type="search" id="ev2-pages-search" placeholder="@T["editor.switchSearch"]" autocomplete="off" />
+        <div class="ev2-pages-list" id="ev2-pages-list">
+            @foreach (var pg in Model.AllPages)
+            {
+                var pu = MatCMS.Services.SiteContext.LocalizedUrl(pg.Locale, pg.Slug);
+                <a class="ev2-page@(pg.Id == p.Id ? " is-cur" : "")" asp-page="Editor" asp-route-id="@pg.Id"
+                   data-search="@((pg.Title + " " + pu + " " + pg.Locale).ToLowerInvariant())">
+                    <span class="t">@pg.Title</span>
+                    <span class="u mono">@pu</span>
+                    <span class="badge @(pg.IsPublished ? "badge-on" : "badge-off")">@(pg.IsPublished ? T["ev2.published"] : T["ev2.draft"])</span>
+                    @if (Model.SupportedLocales.Count > 1)
+                    {
+                        <span class="badge mono">@pg.Locale.ToUpperInvariant()</span>
+                    }
+                </a>
+            }
+        </div>
+    </div>
+
+    @if (Model.SupportedLocales.Count > 1)
+    {
+        @* Language versions: switch to one, create a missing one, machine-translate this one. *@
+        <div class="ev2-pop ev2-langs" id="ev2-langs" hidden>
+            <div class="ev2-pop-head">@T["ev2.languages"]</div>
+            @foreach (var v in Model.Versions)
+            {
+                <a class="ev2-page@(v.Id == p.Id ? " is-cur" : "")" asp-page="Editor" asp-route-id="@v.Id">
+                    <span class="badge mono">@v.Locale.ToUpperInvariant()</span>
+                    <span class="t">@v.Title</span>
+                </a>
+            }
+            @foreach (var loc in Model.MissingLocales)
+            {
+                <form method="post" asp-page="Edit" asp-page-handler="CreateTranslation" asp-route-id="@p.Id" asp-route-locale="@loc" asp-route-back="v2" class="ev2-langs-form">
+                    <button type="submit" class="ev2-add"><i class="ti ti-plus"></i> @T["editor.translationCreate", T["lang." + loc]]</button>
+                </form>
+            }
+            @if (Model.TranslatorConfigured && p.Locale != MatCMS.Services.Localizer.DefaultCulture)
+            {
+                <form method="post" asp-page="Edit" asp-page-handler="AutoTranslate" asp-route-id="@p.Id" asp-route-back="v2" class="ev2-langs-form"
+                      data-confirm="@T["editor.autoTranslateConfirm"]">
+                    <button type="submit" class="ev2-add"><i class="ti ti-language"></i> @T["editor.autoTranslate"]</button>
+                </form>
+            }
+            @if (Model.Versions.Count > 1)
+            {
+                <a class="ev2-add" asp-page="Diff" asp-route-id="@p.Id"><i class="ti ti-arrows-diff"></i> @T["diff.title"]</a>
+            }
+        </div>
+    }
+
+    @if (Model.AiEnabled)
+    {
+        @* KI: improve the selected block's texts — proposal against the CURRENT draft, applied into the
+           draft (nothing is saved until "Speichern"). *@
+        <dialog class="mat-dialog ev2-ai" id="ev2-aiblock" data-url="@Url.Page("Edit", "AiRewriteBlock", new { id = p.Id })">
+            <h3>@T["editor.aiDialogTitle"]</h3>
+            <label for="ev2-aiblock-instr">@T["editor.aiInstruction"]</label>
+            <textarea id="ev2-aiblock-instr" rows="2" placeholder="@T["editor.aiInstructionPlaceholder"]"></textarea>
+            <div class="ev2-ai-row"><button type="button" class="btn btn-sm" id="ev2-aiblock-go">@T["editor.aiPropose"]</button><span class="ev2-ai-status" id="ev2-aiblock-status"></span></div>
+            <div class="ev2-ai-diff" id="ev2-aiblock-diff"></div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-sm" id="ev2-aiblock-apply" disabled>@T["editor.aiApply"]</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-close>@T["editor.aiCancel"]</button>
+            </div>
+        </dialog>
+        @* KI: a whole set of blocks for this page, appended to the draft. *@
+        <dialog class="mat-dialog ev2-ai" id="ev2-aipage" data-url="@Url.Page("Edit", "AiGeneratePage", new { id = p.Id })">
+            <h3>@T["editor.aiPageGenTitle"]</h3>
+            <label for="ev2-aipage-instr">@T["editor.aiPageGenInstruction"]</label>
+            <textarea id="ev2-aipage-instr" rows="3" placeholder="@T["editor.aiPageGenPlaceholder"]"></textarea>
+            <div class="ev2-ai-row"><button type="button" class="btn btn-sm" id="ev2-aipage-go">@T["editor.aiPageGenPropose"]</button><span class="ev2-ai-status" id="ev2-aipage-status"></span></div>
+            <ol class="ev2-ai-list" id="ev2-aipage-list"></ol>
+            <div class="form-actions">
+                <button type="button" class="btn btn-sm" id="ev2-aipage-apply" disabled>@T["editor.aiPageGenApply"]</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-close>@T["editor.aiCancel"]</button>
+            </div>
+        </dialog>
+    }
 
     @if (TempData["Flash"] is string flash && !string.IsNullOrWhiteSpace(flash))
     {

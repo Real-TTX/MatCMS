@@ -816,7 +816,12 @@ app.MapPost("/oauth/token", async (HttpContext ctx, AppDbContext db, InstanceSer
     // Authenticated by the CLIENT's own id+secret (client_secret_post or HTTP Basic), then the code minted at
     // /oauth/c/authorize is redeemed and a full-access operator key is returned. Kept separate from the
     // instance-SSO code exchange below (that one authenticates by instance token and returns userinfo).
-    if (form["grant_type"].ToString() == "authorization_code")
+    // The instance ALSO sends grant_type=authorization_code (it is a standard code exchange), so the grant
+    // type alone cannot tell the two apart: dispatching on it sent every instance into this branch, where it
+    // is no registered client → 401 → "sso=failed" on every site. The instance token header is what marks
+    // the instance exchange; a connector never has one.
+    var instanceToken = ctx.Request.Headers[CloudProtocol.TokenHeader].ToString();
+    if (form["grant_type"].ToString() == "authorization_code" && string.IsNullOrEmpty(instanceToken))
     {
         // Credentials: HTTP Basic (RFC 6749 §2.3.1, form-url-encoded then base64) or client_secret_post.
         var (cid, csecret) = (form["client_id"].ToString(), form["client_secret"].ToString());
@@ -847,8 +852,7 @@ app.MapPost("/oauth/token", async (HttpContext ctx, AppDbContext db, InstanceSer
         return Results.Ok(new { access_token = minted.RawKey, token_type = "Bearer", scope = "operator" });
     }
 
-    var token = ctx.Request.Headers[CloudProtocol.TokenHeader].ToString();
-    var inst = await instances.AuthenticateAsync(form["client_id"].ToString(), token);
+    var inst = await instances.AuthenticateAsync(form["client_id"].ToString(), instanceToken);
     if (inst is null) return Results.Json(new { error = "invalid_client" }, statusCode: StatusCodes.Status401Unauthorized);
 
     var grant = codes.Redeem(form["code"].ToString());

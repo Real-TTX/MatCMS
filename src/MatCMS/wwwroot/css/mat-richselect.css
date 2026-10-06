@@ -64,7 +64,7 @@
     }
     .mat-rs-modal .mat-rs-sheet-head {
         display: flex; align-items: center; justify-content: space-between; gap: 10px;
-        padding: 16px 12px 14px 16px; border-bottom: 1px solid #ececec; flex: 0 0 auto;
+        padding: 16px 12px 14px 16px; border-bottom: 1px solid var(--line); flex: 0 0 auto;
     }
     .mat-rs-sheet-title { font-weight: 600; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .mat-rs-modal .mat-rs-scroll {
@@ -72,6 +72,8 @@
         padding: 8px 8px max(10px, env(safe-area-inset-bottom));
         -webkit-overflow-scrolling: touch;
     }
+    /* iOS Safari zooms into any focused field under 16px — and the sheet focuses its search on open. */
+    .mat-rs-modal input, .mat-rs-modal select, .mat-rs-modal textarea { font-size: 16px; }
     /* Bigger, more tappable option rows. */
     .mat-rs-modal .mat-rs-opt { padding: 14px; }
     .mat-rs-modal .mat-rs-opt-img { width: 64px; height: 64px; }

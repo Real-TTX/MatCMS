@@ -37,11 +37,31 @@ body.ev2 { margin: 0; display: grid; grid-template-columns: 280px minmax(0, 1fr)
 .ev2-title .le-pagepick .mat-rs-trigger .mat-rs-opt-desc,
 .ev2-title .le-pagepick .mat-rs-trigger:hover .mat-rs-opt-desc { font-size: 12px; line-height: 1.2; color: var(--text-muted); }
 .ev2-title .le-pagepick .mat-rs-chev { font-size: 15px; opacity: .7; }
-/* The list: wide enough for title, path and badges; rows a little lower than in the classic toolbar. */
-.ev2-title .le-pagepick .mat-rs-menu { min-width: 0; width: 460px; max-width: calc(100vw - 24px); }
-.ev2-title .le-pagepick .mat-rs-opt { padding: 7px 10px; gap: 10px; }
-.ev2-title .le-pagepick .mat-rs-opt .mat-rs-opt-title { font-size: 14px; }
-.ev2-title .le-pagepick .mat-rs-opt .mat-rs-opt-desc { font-size: 12px; }
+/* The list, in the editor's own quieter look: title over path, only the language code on the right (a
+   small outlined tag), "published" left out as the normal case and only a draft marked, the page you are
+   on in the accent colour instead of a blue frame, the nav's hover grey. Desktop only — on a phone the
+   richselect's full-screen sheet takes over (a fixed width there made the sheet wider than the screen). */
+.ev2-title .le-pagepick:not(.mat-rs-modal) .mat-rs-menu { min-width: 0; width: 420px; max-width: calc(100vw - 24px);
+    left: -8px; padding: 0; border-radius: 12px; overflow: hidden; box-shadow: 0 16px 40px rgba(0, 0, 0, .14); }
+.ev2-title .le-pagepick .ps-search { padding: 10px 10px 6px; }
+.ev2-title .le-pagepick .ps-search input { padding: 8px 12px 8px 34px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); font-size: 14px; }
+.ev2-title .le-pagepick .ps-search input:focus { border-color: var(--accent); background: var(--surface); }
+.ev2-title .le-pagepick .ps-search .bpick-sico { left: 21px; width: 15px; height: 15px; }
+.ev2-title .le-pagepick .mat-rs-scroll { padding: 2px 6px 8px; max-height: min(60vh, 420px); }
+.ev2-title .le-pagepick .bpick-grouphead { padding: 10px 8px 4px; margin: 0; font-size: 11px; font-weight: 600; letter-spacing: .06em; color: var(--text-muted); opacity: 1; }
+.ev2-title .le-pagepick .ps-section + .ps-section { margin-top: 6px; padding-top: 2px; border-top: 1px solid var(--line); }
+.ev2-title .le-pagepick .bpick-group + .bpick-group { margin-top: 0; }
+.ev2-title .le-pagepick .mat-rs-opt { padding: 7px 8px; gap: 10px; align-items: center; border-radius: 8px; }
+.ev2-title .le-pagepick .mat-rs-opt:hover,
+.ev2-title .le-pagepick .mat-rs-opt.is-active { background: var(--hover); box-shadow: none; }
+.ev2-title .le-pagepick .mat-rs-opt[aria-selected="true"] { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+.ev2-title .le-pagepick .mat-rs-opt[aria-selected="true"] .mat-rs-opt-title { color: var(--accent); }
+.ev2-title .le-pagepick .mat-rs-opt .mat-rs-opt-body { gap: 1px; }
+.ev2-title .le-pagepick .mat-rs-opt .mat-rs-opt-title { font-size: 14px; font-weight: 500; }
+.ev2-title .le-pagepick .mat-rs-opt .mat-rs-opt-desc { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ev2-title .le-pagepick .mat-rs-opt-tags { gap: 6px; }
+.ev2-title .le-pagepick .mat-rs-opt-tags .badge-on:not(.mono) { display: none; }
+.ev2-title .le-pagepick .mat-rs-opt-tags .badge { background: none; border: 1px solid var(--line); color: var(--text-muted); font-size: 11px; line-height: 1.4; padding: 1px 7px; letter-spacing: 0; border-radius: 6px; }
 .ev2-status { font-size: 13px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .ev2-status.is-dirty { color: #b45309; }
 .ev2-status.is-error { color: #b42318; }
@@ -215,6 +235,8 @@ body.ev2 .ev2-tree-toggle, .ev2-insp-close { display: none; }
     .ev2-title .le-pagepick { flex: 1 1 auto; }
     .ev2-title .le-pagepick .mat-rs-trigger { max-width: 100%; }
     .ev2-title .le-pagepick .mat-rs-trigger .mat-rs-opt-title { font-size: 15px; }
+    /* 16px: iOS zooms into a focused field under that, and the sheet focuses its search when it opens. */
+    .ev2-title .le-pagepick .ps-search input { font-size: 16px; }
     body.ev2 .ev2-tree-toggle { display: inline-flex; }
     .ev2-nav { display: none; position: fixed; left: 0; top: 56px; bottom: 0; width: min(320px, 88vw); z-index: 45; box-shadow: 10px 0 30px rgba(0, 0, 0, .12); }
     body.ev2-nav-open .ev2-nav { display: block; }

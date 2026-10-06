@@ -42,7 +42,7 @@
                         </div>
                         <div class="actions">
                             <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@c.Id">@T["action.edit"]</a>
-                            <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@c.Id" onsubmit="return confirm('@T["components.confirmDelete"]');">
+                            <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@c.Id" data-confirm="@T["components.confirmDelete"]">
                                 <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
                             </form>
                         </div>

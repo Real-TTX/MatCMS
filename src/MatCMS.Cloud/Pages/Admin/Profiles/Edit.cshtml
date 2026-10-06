@@ -34,7 +34,7 @@
             <div class="kv-value">
                 <span class="mono is-secret">@Model.Item.JoinCode</span>
                 <form class="inline-form" method="post" asp-page-handler="RotateCode" asp-route-id="@Model.Item.Id"
-                      onsubmit="return confirm('@T["profiles.rotateConfirm"]');">
+                      data-confirm="@T["profiles.rotateConfirm"]">
                     <button type="submit" class="btn btn-sm btn-ghost">@T["profiles.rotateCode"]</button>
                 </form>
             </div>
@@ -220,7 +220,7 @@
                         <td>
                             <div class="actions">
                                 <form class="inline-form" method="post" asp-page="Smtp" asp-page-handler="Remove" asp-route-profileId="@Model.Item.Id"
-                                      onsubmit="return confirm('@T["profiles.smtpRemoveConfirm"]');">
+                                      data-confirm="@T["profiles.smtpRemoveConfirm"]">
                                     <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["profiles.removeFromProfile"]" aria-label="@T["profiles.removeFromProfile"]"><partial name="_IconTrash" /></button>
                                 </form>
                             </div>
@@ -237,7 +237,7 @@
                         <td>
                             <div class="actions">
                                 <form class="inline-form" method="post" asp-page="Translation" asp-page-handler="Remove" asp-route-profileId="@Model.Item.Id"
-                                      onsubmit="return confirm('@T["profiles.translationRemoveConfirm"]');">
+                                      data-confirm="@T["profiles.translationRemoveConfirm"]">
                                     <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["profiles.removeFromProfile"]" aria-label="@T["profiles.removeFromProfile"]"><partial name="_IconTrash" /></button>
                                 </form>
                             </div>
@@ -254,7 +254,7 @@
                         <td>
                             <div class="actions">
                                 <form class="inline-form" method="post" asp-page-handler="BackupRemove" asp-route-id="@Model.Item.Id"
-                                      onsubmit="return confirm('@T["profiles.backupRemoveConfirm"]');">
+                                      data-confirm="@T["profiles.backupRemoveConfirm"]">
                                     <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["profiles.removeFromProfile"]" aria-label="@T["profiles.removeFromProfile"]"><partial name="_IconTrash" /></button>
                                 </form>
                             </div>
@@ -404,7 +404,7 @@
     {
         <div class="list-actions">
             <form class="inline-form" method="post" asp-page-handler="BackupRemove" asp-route-id="@Model.Item.Id"
-                  onsubmit="return confirm('@T["profiles.backupRemoveConfirm"]');">
+                  data-confirm="@T["profiles.backupRemoveConfirm"]">
                 <button type="submit" class="btn btn-danger">@T["profiles.removeFromProfile"]</button>
             </form>
         </div>

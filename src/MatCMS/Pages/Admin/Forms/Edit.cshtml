@@ -35,7 +35,7 @@
                    It used to be a plain link back, so pressing it lost the edits — and a separate save
                    button then does what the tick does, minus the leaving, so it is gone. *@
                 <div class="le-panel-actions">
-                    <form class="inline-form le-delete" method="post" asp-page-handler="DeleteElement" asp-route-id="@Model.Current.Id" asp-route-elementId="@sel.Id" onsubmit="return confirm('@T["forms.confirmDeleteElement"]');">
+                    <form class="inline-form le-delete" method="post" asp-page-handler="DeleteElement" asp-route-id="@Model.Current.Id" asp-route-elementId="@sel.Id" data-confirm="@T["forms.confirmDeleteElement"]">
                         <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["forms.deleteElement"]" aria-label="@T["forms.deleteElement"]"><i class="ti ti-trash" aria-hidden="true"></i></button>
                     </form>
                     <button type="submit" form="element-form" name="close" value="true" class="btn btn-sm btn-icon le-save" title="@T["editor.saveAndClose"]" aria-label="@T["editor.saveAndClose"]"><i class="ti ti-check" aria-hidden="true"></i></button>
@@ -75,7 +75,7 @@
                                     <span class="b-sum">@ElSummary(e)</span>
                                 </span>
                             </a>
-                            <form class="inline-form" method="post" asp-page-handler="DeleteElement" asp-route-id="@Model.Current.Id" asp-route-elementId="@e.Id" onsubmit="return confirm('@T["forms.confirmDeleteElement"]');">
+                            <form class="inline-form" method="post" asp-page-handler="DeleteElement" asp-route-id="@Model.Current.Id" asp-route-elementId="@e.Id" data-confirm="@T["forms.confirmDeleteElement"]">
                                 <button type="submit" class="icon-btn" title="@T["editor.delete"]"><i class="ti ti-x" aria-hidden="true"></i></button>
                             </form>
                         </div>

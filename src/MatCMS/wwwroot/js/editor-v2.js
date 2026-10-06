@@ -270,12 +270,18 @@
             selectedId = copyRoot.id;
         } else if (act === "del") {
             var name = def(b).name + (summary(b) ? " „" + summary(b) + "“" : "");
-            if (!window.confirm(t("confirmRemove").replace("{0}", name))) return;
-            record();
-            var gone = [b.id].concat(descendants(b.id).map(function (x) { return x.id; }));
-            blocks = blocks.filter(function (x) { return gone.indexOf(x.id) < 0; });
-            renumber(b.parentId);
-            if (gone.indexOf(selectedId) >= 0) selectedId = b.parentId;
+            // Asked in our own dialog, so the removal runs once it is answered — and returns here.
+            MatDialog.confirm(t("confirmRemove").replace("{0}", name), { danger: true }).then(function (ok) {
+                if (!ok) return;
+                record();
+                var gone = [b.id].concat(descendants(b.id).map(function (x) { return x.id; }));
+                blocks = blocks.filter(function (x) { return gone.indexOf(x.id) < 0; });
+                renumber(b.parentId);
+                if (gone.indexOf(selectedId) >= 0) selectedId = b.parentId;
+                committed();
+                renderTree(); renderInspector(); renderPreview();
+            });
+            return;
         }
         committed();
         renderTree(); renderInspector(); renderPreview();
@@ -844,18 +850,26 @@
     // must not ask the same thing a second time.
     var leaving = false;
     window.addEventListener("beforeunload", function (e) { if (dirty() && !leaving) { e.preventDefault(); e.returnValue = ""; } });
-    function okToLeave() { if (!dirty() || window.confirm(t("confirmLeave"))) { leaving = true; return true; } return false; }
+    // Resolves true when there is nothing to lose or the operator agreed; then the beforeunload guard is off.
+    function okToLeave() {
+        if (!dirty()) { leaving = true; return Promise.resolve(true); }
+        return MatDialog.confirm(t("confirmLeave")).then(function (ok) { if (ok) leaving = true; return ok; });
+    }
     document.addEventListener("click", function (e) {
         // Only the editor's own ways out (top bar, tree column, page/language lists) — not links inside
         // a field, the media picker or a dialog.
         var a = e.target.closest("a[href]"); if (!a || a.target === "_blank" || !a.closest(".ev2-top, .ev2-nav, .ev2-pages, .ev2-langs")) return;
-        if (!okToLeave()) e.preventDefault();
+        if (!dirty()) { leaving = true; return; }
+        e.preventDefault();
+        okToLeave().then(function (ok) { if (ok) window.location.href = a.href; });
     });
+    // The forms' own data-confirm (create / translate a version) is asked by mat-dialogs.js first; this
+    // only adds the unsaved-work question, and then submits without asking again.
     document.querySelectorAll(".ev2-langs-form").forEach(function (f) {
         f.addEventListener("submit", function (e) {
-            if (!okToLeave()) { e.preventDefault(); return; }
-            var c = f.getAttribute("data-confirm");
-            if (c && !window.confirm(c)) { leaving = false; e.preventDefault(); }
+            if (!dirty()) { leaving = true; return; }
+            e.preventDefault();
+            okToLeave().then(function (ok) { if (ok) f.submit(); });
         });
     });
 

@@ -70,7 +70,7 @@
             </table>
         }
 
-        <form method="post" asp-page-handler="Delete" onsubmit="return confirm('@T["cleanup.confirmJs"]');">
+        <form method="post" asp-page-handler="Delete" data-confirm="@T["cleanup.confirmJs"]">
             @foreach (var m in Model.SelMedia) { <input type="hidden" name="mediaIds" value="@m.Id" /> }
             @foreach (var c in Model.SelComponents) { <input type="hidden" name="componentTypes" value="@c.Type" /> }
             @foreach (var p in Model.SelPlugins) { <input type="hidden" name="pluginKeys" value="@p.Key" /> }

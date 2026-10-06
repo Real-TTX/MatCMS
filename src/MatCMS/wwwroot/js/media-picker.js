@@ -72,9 +72,9 @@
                         var empty = grid.querySelector("p.muted"); if (empty) grid.innerHTML = "";
                         grid.insertBefore(tile, grid.firstChild);
                         selected.push(r.j.url); tile.classList.add("selected"); refresh();
-                    } else alert((r.j && r.j.error) || "Upload fehlgeschlagen.");
+                    } else MatDialog.alert((r.j && r.j.error) || "Upload fehlgeschlagen.");
                 })
-                .catch(function () { alert("Upload fehlgeschlagen."); })
+                .catch(function () { MatDialog.alert("Upload fehlgeschlagen."); })
                 .then(function () { uploadBtn.disabled = false; uploadBtn.textContent = lbl; fileInp.value = ""; });
         });
 

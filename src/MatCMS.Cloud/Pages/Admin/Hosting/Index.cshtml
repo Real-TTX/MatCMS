@@ -151,7 +151,7 @@
             }
             @if (Model.CloudStatus.CanSelfUpdate && Model.Busy is null)
             {
-                <form method="post" asp-page-handler="SelfUpdate" class="inline-form" onsubmit="return confirm('@T["cloudupdate.confirm"]');">
+                <form method="post" asp-page-handler="SelfUpdate" class="inline-form" data-confirm="@T["cloudupdate.confirm"]">
                     <button type="submit" class="btn @(Model.CloudUpdateAvailable ? "" : "btn-ghost")">@T["cloudupdate.now"]</button>
                 </form>
             }

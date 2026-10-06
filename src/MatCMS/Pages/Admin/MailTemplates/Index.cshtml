@@ -55,7 +55,7 @@
                                        one stays undeletable — the code still asks for it. *@
                                     <span class="badge badge-off" title="@T["mailtpl.unknownKeyShort"]">@T["mailtpl.unused"]</span>
                                     <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@t.Id"
-                                          onsubmit="return confirm('@T["mailtpl.deleteUnknownConfirm"]');">
+                                          data-confirm="@T["mailtpl.deleteUnknownConfirm"]">
                                         <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
                                     </form>
                                 }

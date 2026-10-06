@@ -55,7 +55,7 @@
     @if (!Model.IsNew)
     {
         <form class="inline-form" method="post" asp-page-handler="Remove" asp-route-profileId="@Model.Owner.Id"
-              onsubmit="return confirm('@T["profiles.translationRemoveConfirm"]');">
+              data-confirm="@T["profiles.translationRemoveConfirm"]">
             <button type="submit" class="btn btn-danger">@T["profiles.removeFromProfile"]</button>
         </form>
     }

@@ -179,7 +179,10 @@
                 var lost = window.matLostWork();
                 if (lost.length) {
                     var tpl = root.getAttribute("data-confirm-blockswitch") || "{0}";
-                    if (!window.confirm(tpl.replace("{0}", "• " + lost.join("\n• ")))) return;
+                    MatDialog.confirm(tpl.replace("{0}", "• " + lost.join("\n• "))).then(function (ok) {
+                        if (ok) window.location.search = "?block=" + encodeURIComponent(d.id);
+                    });
+                    return;
                 }
             }
             window.location.search = "?block=" + encodeURIComponent(d.id);

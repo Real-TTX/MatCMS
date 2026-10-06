@@ -39,7 +39,7 @@
                     <td>
                         <div class="actions">
                             <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@r.Id"
-                                  onsubmit="return confirm('Diese Rolle löschen?');">
+                                  data-confirm="Diese Rolle löschen?">
                                 <button type="submit" class="btn btn-sm btn-danger">Löschen</button>
                             </form>
                         </div>

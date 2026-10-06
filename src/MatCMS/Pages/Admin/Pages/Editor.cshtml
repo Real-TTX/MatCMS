@@ -33,7 +33,7 @@
     };
 }
 <!DOCTYPE html>
-<html data-theme="@Site.ThemeFor(User)" lang="@(System.Globalization.CultureInfo.CurrentUICulture.Name.Split('-', 2)[0] is { Length: > 0 } lc ? lc : MatCMS.Services.Localizer.ResourceFallbackCulture)">
+<html data-dlg-ok="@T["dialog.ok"]" data-dlg-cancel="@T["action.cancel"]" data-theme="@Site.ThemeFor(User)" lang="@(System.Globalization.CultureInfo.CurrentUICulture.Name.Split('-', 2)[0] is { Length: > 0 } lc ? lc : MatCMS.Services.Localizer.ResourceFallbackCulture)">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -48,6 +48,8 @@
     <link rel="stylesheet" href="~/css/mat-richselect.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/editor-v2.css" asp-append-version="true" />
     <link rel="icon" href="@Site.FaviconUrl" />
+    @* Own confirm/alert/prompt dialogs — loaded early, inline page scripts call MatDialog. *@
+    <script src="~/_content/MatCMS.Shared.Web/js/mat-dialogs.js" asp-append-version="true"></script>
 </head>
 @* .admin: the back office's own scope — without it the slim admin buttons (.admin .btn) and every
    other admin-scoped rule stay off, and the editor drifts away from the rest of the application. *@

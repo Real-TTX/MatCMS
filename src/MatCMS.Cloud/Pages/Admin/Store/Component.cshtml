@@ -98,7 +98,7 @@
     @if (!Model.IsNew)
     {
         <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@ec.Id"
-            onsubmit="return confirm('@T["store.componentDeleteConfirm"]');">
+            data-confirm="@T["store.componentDeleteConfirm"]">
             <button type="submit" class="btn btn-danger">@T["common.delete"]</button>
         </form>
     }

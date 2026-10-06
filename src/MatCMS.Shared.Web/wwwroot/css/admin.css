@@ -1268,6 +1268,12 @@ a.tab { display: inline-block; text-decoration: none; }
     box-shadow: 0 24px 60px rgba(0,0,0,.28); color: var(--ink); background: var(--surface);
 }
 .mat-dialog::backdrop { background: rgba(15,18,24,.45); }
+/* MatDialog (mat-dialogs.js): the confirm / alert / prompt of the back office. */
+.mat-dlg { width: min(460px, 92vw); box-sizing: border-box; }
+.mat-dlg-msg { margin: 0 0 6px; white-space: pre-line; line-height: 1.55; font-size: 15px; overflow-wrap: anywhere; }
+.mat-dlg-input { width: 100%; box-sizing: border-box; margin-top: 10px; padding: 10px 12px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--ink); font: inherit; font-size: 15px; }
+.mat-dlg-input:focus { outline: none; border-color: var(--accent); }
+.mat-dlg-actions { justify-content: flex-end; }
 
 .admin-foot-lang-menu[hidden]{display:none!important}
 .pg-versions[hidden]{display:none!important}

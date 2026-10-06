@@ -164,3 +164,9 @@ the `--ok/err/info/warn-*` tints, plus site.css's `--black/--ink/--line/--bg`) a
 dark mode. The public site never carries `data-theme`; previews of site content (iframes, mail preview, the 2FA
 QR code) stay white on purpose. The back office is also **emoji-free**: icons are Tabler classes (`ti ti-…`),
 plugin menu icons are Tabler names (`ti-star`).
+
+**No browser dialogs.** `window.confirm/alert/prompt` are never used — `MatDialog.confirm/alert/prompt` from
+`MatCMS.Shared.Web/wwwroot/js/mat-dialogs.js` (loaded in the <head> of every admin layout, button wording from
+`<html data-dlg-ok/-cancel>`) returns a Promise. A form asks with `data-confirm="…"` (a `.btn-danger` submit or
+`data-confirm-danger` makes OK red); never `onsubmit="return confirm(…)"`. Plugin action buttons (`ActionButton(confirm:)`)
+render `data-confirm` too.

@@ -91,7 +91,7 @@
         @if (Model.IsCloud && Model.Total > 0)
         {
             <form method="post" asp-page-handler="Clear" class="inline-form"
-                  onsubmit="return confirm('@T["logs.clearConfirm"]');">
+                  data-confirm="@T["logs.clearConfirm"]">
                 <button type="submit" class="btn btn-danger">@T["logs.clear"]</button>
             </form>
         }

@@ -74,7 +74,7 @@
             @if (Model.DomainsOnOtherWay > 0)
             {
                 <button type="submit" class="btn btn-ghost" formaction="@Url.Page("Proxy", "EdgeMove")"
-                        onclick="return confirm('@T["edge.moveConfirm"]');">@T[Model.EdgeEnabled ? "edge.moveToEdge" : "edge.moveToHost", Model.DomainsOnOtherWay]</button>
+                        data-confirm="@T["edge.moveConfirm"]">@T[Model.EdgeEnabled ? "edge.moveToEdge" : "edge.moveToHost", Model.DomainsOnOtherWay]</button>
             }
         </div>
     </div>

@@ -289,7 +289,7 @@
                     <button type="submit" class="btn btn-ghost">@T["settings.cloudTest"]</button>
                 </form>
                 <form method="post" asp-page-handler="CloudDisconnect" style="margin:0;"
-                      onsubmit="return confirm('@T["settings.cloudDisconnectConfirm"]');">
+                      data-confirm="@T["settings.cloudDisconnectConfirm"]">
                     <button type="submit" class="btn btn-ghost">@T["settings.cloudDisconnect"]</button>
                 </form>
             </div>
@@ -779,7 +779,7 @@
                     if (active.includes(code)) return;
                     var o = document.createElement("option"); o.value = code; o.textContent = NAMES[code] + " (" + code + ")"; dsel.appendChild(o);
                 });
-                if (!dsel.options.length) { alert("@T["settings.langAllActive"]"); return; }
+                if (!dsel.options.length) { MatDialog.alert("@T["settings.langAllActive"]"); return; }
                 if (typeof dialog.showModal === "function") dialog.showModal(); else dialog.setAttribute("open", "");
             };
             document.getElementById("lang-dialog-ok").onclick = function () {

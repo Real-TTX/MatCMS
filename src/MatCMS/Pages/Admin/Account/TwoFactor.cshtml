@@ -42,7 +42,7 @@
                 <button type="submit" class="btn btn-ghost">@T["twofactor.regenerate"]</button>
             </form>
             <form method="post" asp-page-handler="Disable" class="inline-form"
-                  onsubmit="return confirm('@T["twofactor.confirmDisable"]');">
+                  data-confirm="@T["twofactor.confirmDisable"]">
                 <button type="submit" class="btn btn-danger">@T["twofactor.disable"]</button>
             </form>
         </div>

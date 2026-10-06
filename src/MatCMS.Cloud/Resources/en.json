@@ -748,6 +748,7 @@
   "action.back": "Back",
   "action.search": "Search …",
   "action.cancel": "Cancel",
+  "dialog.ok": "OK",
   "action.close": "Close",
   "list.noResults": "No matches.",
   "list.pager": "Pagination",

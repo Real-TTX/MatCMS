@@ -87,7 +87,7 @@
     @if (n is not null && on)
     {
         <div class="list-actions">
-            <form class="inline-form" method="post" asp-page-handler="UpdateAgent" asp-route-id="@n.Id" onsubmit="return confirm('@T["nodes.updateAgentConfirm"]');">
+            <form class="inline-form" method="post" asp-page-handler="UpdateAgent" asp-route-id="@n.Id" data-confirm="@T["nodes.updateAgentConfirm"]">
                 <button type="submit" class="btn @(Model.AgentOutdated ? "" : "btn-ghost")">@T["nodes.updateAgent"]</button>
             </form>
         </div>
@@ -215,14 +215,14 @@
         <div class="card">
             <h2>@T["nodes.agent"]</h2>
             <div class="list-actions">
-                <form class="inline-form" method="post" asp-page-handler="Rotate" asp-route-id="@n.Id" onsubmit="return confirm('@T["nodes.rotateConfirm"]');">
+                <form class="inline-form" method="post" asp-page-handler="Rotate" asp-route-id="@n.Id" data-confirm="@T["nodes.rotateConfirm"]">
                     <button type="submit" class="btn btn-ghost">@T["nodes.rotate"]</button>
                 </form>
                 <form class="inline-form" method="post" asp-page-handler="Revoke" asp-route-id="@n.Id" asp-route-revoked="@(!n.Revoked)"
-                      onsubmit="return @(n.Revoked ? "true" : $"confirm('{T["nodes.revokeConfirm"]}')");">
+                      data-confirm="@(n.Revoked ? null : T["nodes.revokeConfirm"])">
                     <button type="submit" class="btn btn-ghost">@(n.Revoked ? T["nodes.activate"] : T["nodes.revoke"])</button>
                 </form>
-                <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@n.Id" onsubmit="return confirm('@T["nodes.deleteConfirm"]');">
+                <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@n.Id" data-confirm="@T["nodes.deleteConfirm"]">
                     <button type="submit" class="btn btn-danger">@T["action.delete"]</button>
                 </form>
             </div>

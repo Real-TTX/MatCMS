@@ -69,13 +69,13 @@
         return parts.filter(function (p) { return !!p; });
     }
 
-    // Returns false when the operator cancels — the switch is then simply not carried out and the
+    // Resolves false when the operator cancels — the switch is then simply not carried out and the
     // page stays where it is, menu and all. With nothing unsaved there is no question.
     function mayLeave(title) {
         var parts = lostWork();
-        if (!parts.length) return true;
+        if (!parts.length) return Promise.resolve(true);
         var tpl = root.getAttribute("data-confirm") || "{0}\n\n{1}";
-        return window.confirm(tpl.replace("{0}", "• " + parts.join("\n• ")).replace("{1}", title || ""));
+        return MatDialog.confirm(tpl.replace("{0}", "• " + parts.join("\n• ")).replace("{1}", title || ""));
     }
 
     // Shared so OTHER navigations that also drop browser-side edits can ask the same question — most
@@ -157,8 +157,9 @@
 
     function go(el) {
         if (!el) return;
-        if (!mayLeave(el.getAttribute("data-title") || "")) return;   // cancel → stay put
-        window.location.href = el.getAttribute("href");
+        mayLeave(el.getAttribute("data-title") || "").then(function (ok) {
+            if (ok) window.location.href = el.getAttribute("href");   // cancel → stay put
+        });
     }
 
     // Delegated, so it catches the mouse and a finger anywhere on the whole two-line row.

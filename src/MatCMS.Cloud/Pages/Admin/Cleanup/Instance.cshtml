@@ -44,7 +44,7 @@
             <div class="form-section"><h3>@T["cleanup.plugins"] (@Model.SelPlugins.Count)</h3>
                 <ul>@foreach (var p in Model.SelPlugins) { <li>@p.Name <span class="muted mono">@p.Key</span></li> }</ul></div>
         }
-        <form method="post" asp-page-handler="Apply" onsubmit="return confirm('@T["cleanup.confirmJs"]');">
+        <form method="post" asp-page-handler="Apply" data-confirm="@T["cleanup.confirmJs"]">
             <input type="hidden" name="publicId" value="@Model.PublicId" />
             @foreach (var m in Model.SelMedia) { <input type="hidden" name="mediaIds" value="@m.Id" /> }
             @foreach (var c in Model.SelComps) { <input type="hidden" name="componentTypes" value="@c.Type" /> }

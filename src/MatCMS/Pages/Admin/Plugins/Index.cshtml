@@ -47,7 +47,7 @@
                         <button type="submit" class="btn btn-sm btn-ghost">@(p.Enabled ? T["plugins.disable"] : T["plugins.enable"])</button>
                     </form>
                     <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@p.Id">@T["action.edit"]</a>
-                    <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@p.Id" onsubmit="return confirm('@T["plugins.confirmDelete"]');">
+                    <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@p.Id" data-confirm="@T["plugins.confirmDelete"]">
                         <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
                     </form>
                 </div>

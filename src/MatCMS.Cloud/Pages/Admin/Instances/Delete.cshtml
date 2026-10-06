@@ -196,10 +196,20 @@ else
                 '@MatCMS.Cloud.Pages.Admin.Instances.DeleteModel.ModeBackupFirst':
                     @Html.Raw(System.Text.Json.JsonSerializer.Serialize(T["instances.removeConfirmBackupFirst", Model.Item.Name]))
             };
+            // The question depends on the chosen way out, so it is asked here rather than by data-confirm.
+            var confirmed = false;
             form.addEventListener('submit', function (e) {
+                if (confirmed) { confirmed = false; return; }
                 var picked = form.querySelector('input[name="mode"]:checked');
                 var text = picked ? texts[picked.value] : null;
-                if (text && !confirm(text)) e.preventDefault();
+                if (!text) return;
+                e.preventDefault();
+                var submitter = e.submitter;
+                MatDialog.confirm(text, { danger: true }).then(function (ok) {
+                    if (!ok) return;
+                    confirmed = true;
+                    form.requestSubmit(submitter && submitter.form === form ? submitter : undefined);
+                });
             });
         })();
     </script>

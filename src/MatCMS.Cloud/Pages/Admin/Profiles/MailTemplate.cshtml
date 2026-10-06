@@ -71,7 +71,7 @@
     {
         <form class="inline-form" method="post" asp-page-handler="Delete"
               asp-route-profileId="@Model.Owner.Id" asp-route-id="@m.Id"
-              onsubmit="return confirm('@T["mailtpl.removeConfirm"]');">
+              data-confirm="@T["mailtpl.removeConfirm"]">
             <button type="submit" class="btn btn-danger">@T["profiles.removeFromProfile"]</button>
         </form>
     }

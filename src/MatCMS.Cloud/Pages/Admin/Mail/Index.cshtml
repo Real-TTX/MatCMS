@@ -121,7 +121,7 @@
             @* Only what is settled — anything still queued is owed to somebody. *@
             <form class="inline-form" method="post" asp-page-handler="Clear"
                   asp-route-instance="@Model.FilteredInstance" asp-route-status="@Model.FilteredStatus?.ToString().ToLowerInvariant()"
-                  onsubmit="return confirm('@T["spool.clearConfirm"]');">
+                  data-confirm="@T["spool.clearConfirm"]">
                 <button type="submit" class="btn btn-ghost">@T["spool.clear"]</button>
             </form>
         }

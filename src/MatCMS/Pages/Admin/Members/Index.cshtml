@@ -49,7 +49,7 @@
                         <div class="actions">
                             <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@m.Id">Bearbeiten</a>
                             <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@m.Id"
-                                  onsubmit="return confirm('Dieses Mitglied löschen?');">
+                                  data-confirm="Dieses Mitglied löschen?">
                                 <button type="submit" class="btn btn-sm btn-danger">Löschen</button>
                             </form>
                         </div>

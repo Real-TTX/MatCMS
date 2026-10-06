@@ -471,7 +471,7 @@
             // Auswahl; ein Knopf, der stillschweigend nichts tut, wäre schlimmer als keiner.
             function copyContent(i) {
                 var text = stores[i].value || '';
-                var done = function () { alert(TXT.copied); };
+                var done = function () { MatDialog.alert(TXT.copied); };
                 var fallback = function () {
                     var ta = document.createElement('textarea');
                     ta.value = text;
@@ -591,8 +591,8 @@
             // Löschen läuft über das seiteneigene Formular (außerhalb des Speichern-Formulars): die
             // Asset-Id in das versteckte Feld, dann absenden. form.submit() umgeht onsubmit, darum wird
             // hier vorher gefragt.
-            function deleteAsset(id) {
-                if (!ASSETS || !confirm(ASSETS.confirm)) return;
+            async function deleteAsset(id) {
+                if (!ASSETS || !await MatDialog.confirm(ASSETS.confirm, { danger: true })) return;
                 var f = document.getElementById(ASSETS.delForm);
                 if (!f) return;
                 var inp = f.querySelector('[name="' + ASSETS.delInput + '"]') || f.querySelector('input');
@@ -657,12 +657,12 @@
             // Der Standard ersetzt, was da ist — deshalb wird gefragt, sobald etwas Eigenes darin
             // steht. Im Dialog war das noch durch "Abbrechen" zurückzuholen; ohne Dialog muss die
             // Frage vorher kommen.
-            function insertDefault(i) {
+            async function insertDefault(i) {
                 var m = FILES[i];
                 if (!m.insertDefault) return;
                 var v = norm(stores[i].value).trim();
                 if (v !== '' && v !== norm(m.insertDefault).trim()
-                    && !confirm(TXT.insertConfirm + '\n\n' + m.name)) return;
+                    && !await MatDialog.confirm(TXT.insertConfirm + '\n\n' + m.name)) return;
                 if (cur !== i) open(i, true);
                 if (!raw && cm) cm.setValue(m.insertDefault);
                 else push(i, m.insertDefault);

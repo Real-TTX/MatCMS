@@ -60,7 +60,7 @@
                             <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@p.Id">@T["action.edit"]</a>
                             <a class="btn btn-sm btn-ghost btn-icon" href="/blog/@p.Slug" target="_blank" rel="noopener" title="@T["posts.view"]" aria-label="@T["posts.view"]"><i class="ti ti-external-link" aria-hidden="true"></i></a>
                             <form method="post" asp-page-handler="Delete" asp-route-id="@p.Id" class="inline-form"
-                                  onsubmit="return confirm('@T["posts.confirmDelete", p.Title]');">
+                                  data-confirm="@T["posts.confirmDelete", p.Title]">
                                 <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><i class="ti ti-trash" aria-hidden="true"></i></button>
                             </form>
                         </div>

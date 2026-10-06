@@ -38,7 +38,7 @@
         : (!string.IsNullOrEmpty(cloudId) ? $"{cloudUrl}/Admin/Instances/Open/{Uri.EscapeDataString(cloudId)}" : cloudUrl);
 }
 <!DOCTYPE html>
-<html lang="@currentCulture" data-theme="@Site.ThemeFor(User)">
+<html lang="@currentCulture" data-dlg-ok="@T["dialog.ok"]" data-dlg-cancel="@T["action.cancel"]" data-theme="@Site.ThemeFor(User)">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -50,6 +50,8 @@
     <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/admin.css" asp-append-version="true" />
     <link rel="icon" href="@Site.FaviconUrl" />
+    @* Own confirm/alert/prompt dialogs — loaded early, inline page scripts call MatDialog. *@
+    <script src="~/_content/MatCMS.Shared.Web/js/mat-dialogs.js" asp-append-version="true"></script>
 </head>
 <body class="admin">
     <aside class="admin-sidebar">

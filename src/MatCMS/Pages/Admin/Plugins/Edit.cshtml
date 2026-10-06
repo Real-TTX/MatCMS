@@ -315,7 +315,7 @@
     </a>
     <a class="btn btn-ghost" asp-page="Index">@T["action.back"]</a>
     <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@Model.Current.Id"
-          onsubmit="return confirm('@T["plugins.confirmDelete"]');">
+          data-confirm="@T["plugins.confirmDelete"]">
         <button type="submit" class="btn btn-danger">@T["plugins.deletePlugin"]</button>
     </form>
 </div>
@@ -842,28 +842,28 @@
 
             function setRole(path, role) {
                 var roles = readRoles();
-                if (roles === null) { alert(TXT.mappingBroken); return; }
+                if (roles === null) { MatDialog.alert(TXT.mappingBroken); return; }
                 if ((roles[path] || '') === role) return;                 // gilt schon
-                var map = read(); if (map === null) { alert(TXT.broken); return; }
+                var map = read(); if (map === null) { MatDialog.alert(TXT.broken); return; }
 
                 if (role === ROLE_ASSETS) {
                     // Es gibt genau EIN Verzeichnis auf der Platte. Die Rolle ein zweites Mal zu
                     // vergeben müsste den ersten Ordner entwerten — das darf nicht stillschweigend
                     // geschehen, also geschieht es gar nicht.
                     var taken = assetsDir();
-                    if (taken !== null && taken !== path) { alert(TXT.assetsTaken.replace('{0}', taken)); return; }
+                    if (taken !== null && taken !== path) { MatDialog.alert(TXT.assetsTaken.replace('{0}', taken)); return; }
                     // In einem Assets-Ordner liegen Dateien der Platte. Läge dort auch eine
                     // Skriptdatei der Karte, wären es zwei Wahrheiten über denselben Pfad — und der
                     // Server weist sie beim Speichern ohnehin zurück.
                     var inside = Object.keys(map).filter(function (k) { return isUnder(k, path); });
-                    if (inside.length) { alert(TXT.assetsNotEmpty.replace('{0}', path).replace('{1}', inside[0])); return; }
+                    if (inside.length) { MatDialog.alert(TXT.assetsNotEmpty.replace('{0}', path).replace('{1}', inside[0])); return; }
                 }
                 // Dem letzten Assets-Ordner die Rolle wegzunehmen, während Dateien auf der Platte
                 // liegen, macht sie unerreichbar: sie bleiben liegen und sind nirgends mehr zu sehen.
                 // Verloren, ohne dass etwas gelöscht wurde — deshalb hier UND noch einmal beim
                 // Speichern serverseitig, denn das Rohfeld geht an dieser Prüfung vorbei.
                 if (roles[path] === ROLE_ASSETS && role !== ROLE_ASSETS && ASSETS.length) {
-                    alert(TXT.assetsNeeded.replace('{0}', ASSETS.length));
+                    MatDialog.alert(TXT.assetsNeeded.replace('{0}', ASSETS.length));
                     return;
                 }
 
@@ -917,13 +917,13 @@
                 }
             }
 
-            function newFile(dir) {
-                var raw = prompt(TXT.fileAsk + (dir ? ' — ' + dir + '/' : ''), 'neu.csx');
+            async function newFile(dir) {
+                var raw = await MatDialog.prompt(TXT.fileAsk + (dir ? ' — ' + dir + '/' : ''), 'neu.csx');
                 if (raw === null) return;
                 var path = clean(join(dir, raw.trim()));
-                if (!path) { alert(TXT.pathInvalid); return; }
+                if (!path) { MatDialog.alert(TXT.pathInvalid); return; }
                 var map = read();
-                if (map === null) { alert(TXT.broken); return; }
+                if (map === null) { MatDialog.alert(TXT.broken); return; }
                 // Eine bestehende Datei wird geöffnet statt überschrieben — derselbe Name zweimal
                 // anzulegen ist fast immer ein Vertipper, kein Wunsch, sie zu leeren.
                 if (!(path in map)) { map[path] = ''; write(map); }
@@ -936,17 +936,17 @@
             // fallenzulassen, nähme dem Bearbeiter etwas weg, das er angelegt zu haben glaubte.
             // Deshalb wird die erste Datei gleich hier verlangt — und wer abbricht, bekommt gesagt,
             // dass nichts entstanden ist.
-            function newFolder(dir) {
-                var raw = prompt(TXT.folderAsk + (dir ? ' — ' + dir + '/' : ''), 'Elements');
+            async function newFolder(dir) {
+                var raw = await MatDialog.prompt(TXT.folderAsk + (dir ? ' — ' + dir + '/' : ''), 'Elements');
                 if (raw === null) return;
                 var folder = clean(join(dir, raw.trim()));
-                if (!folder) { alert(TXT.pathInvalid); return; }
-                var first = prompt(TXT.folderFirst + ' ' + folder + '/', 'neu.csx');
-                if (first === null || !first.trim()) { alert(TXT.folderNothing); return; }
+                if (!folder) { MatDialog.alert(TXT.pathInvalid); return; }
+                var first = await MatDialog.prompt(TXT.folderFirst + ' ' + folder + '/', 'neu.csx');
+                if (first === null || !first.trim()) { MatDialog.alert(TXT.folderNothing); return; }
                 var path = clean(folder + '/' + first.trim());
-                if (!path) { alert(TXT.pathInvalid); return; }
+                if (!path) { MatDialog.alert(TXT.pathInvalid); return; }
                 var map = read();
-                if (map === null) { alert(TXT.broken); return; }
+                if (map === null) { MatDialog.alert(TXT.broken); return; }
                 if (!(path in map)) { map[path] = ''; write(map); }
                 expandTo(path);
                 show(path);
@@ -962,8 +962,8 @@
 
             // Gelöscht wird GENAU der Pfad des Knotens, und die Frage nennt ihn — man soll sehen,
             // was man trifft, statt es aus der Zeile zu schließen, auf die man gezielt hat.
-            function deleteFile(path) {
-                if (!confirm(TXT.fileDel + '\n\n' + path + '\n\n' + TXT.delHint)) return;
+            async function deleteFile(path) {
+                if (!await MatDialog.confirm(TXT.fileDel + '\n\n' + path + '\n\n' + TXT.delHint, { danger: true })) return;
                 var map = read(); if (map === null) return;
                 delete map[path];
                 write(map);
@@ -973,11 +973,11 @@
 
             // Ein Ordner nimmt seinen Inhalt mit — deshalb steht in der Frage, WIE VIELE Dateien
             // das sind. "Sind ja nur ein paar" ist genau der Fall, der später weh tut.
-            function deleteFolder(path) {
+            async function deleteFolder(path) {
                 var map = read(); if (map === null) return;
                 var prefix = path + '/';
                 var hit = Object.keys(map).filter(function (k) { return k.indexOf(prefix) === 0; });
-                if (!confirm(TXT.folderDel.replace('{0}', hit.length) + '\n\n' + prefix + '\n\n' + TXT.delHint)) return;
+                if (!await MatDialog.confirm(TXT.folderDel.replace('{0}', hit.length) + '\n\n' + prefix + '\n\n' + TXT.delHint, { danger: true })) return;
                 hit.forEach(function (k) { delete map[k]; closeIfOpen(k); });
                 write(map);
                 // Mit dem Ordner geht seine Rolle. Bliebe sie stehen, käme der Ordner beim nächsten
@@ -1120,10 +1120,10 @@
             // eigenen Eintrag, weil ein Ordner in der flachen Karte gar nicht vorkommt: der
             // Assets-Ordner hat keine einzige Kartenzeile, und ohne diesen Zusatz wäre sein
             // Umbenennen eine Liste von null Umzügen — also nichts.
-            function applyMoves(moves, folderMove) {
+            async function applyMoves(moves, folderMove) {
                 if (!moves.length && !folderMove) return;
                 var map = read();
-                if (map === null) { alert(TXT.broken); return; }
+                if (map === null) { MatDialog.alert(TXT.broken); return; }
 
                 var moving = {};
                 moves.forEach(function (mv) { moving[mv.from] = mv.to; });
@@ -1134,12 +1134,12 @@
                 for (var i = 0; i < moves.length; i++) {
                     var to = moves[i].to;
                     if (to === moves[i].from) return;              // dort liegt sie schon
-                    if (clean(to) !== to) { alert(TXT.pathInvalid); return; }
-                    if (clash(rest, to)) { alert(TXT.exists.replace('{0}', to)); return; }
+                    if (clean(to) !== to) { MatDialog.alert(TXT.pathInvalid); return; }
+                    if (clash(rest, to)) { MatDialog.alert(TXT.exists.replace('{0}', to)); return; }
                 }
                 if (folderMove) {
                     if (folderMove.to === folderMove.from) return;  // dort liegt er schon
-                    if (clash(rest, folderMove.to)) { alert(TXT.exists.replace('{0}', folderMove.to)); return; }
+                    if (clash(rest, folderMove.to)) { MatDialog.alert(TXT.exists.replace('{0}', folderMove.to)); return; }
                 }
 
                 var code = codeField ? codeField.value : '';
@@ -1149,7 +1149,7 @@
                 var hit = refs.filter(function (r) { return r.target !== null && (r.target in moving); });
                 var rewrite = false;
                 if (hit.length) {
-                    rewrite = confirm(TXT.loadAsk.replace('{0}', hit.map(function (r) {
+                    rewrite = await MatDialog.confirm(TXT.loadAsk.replace('{0}', hit.map(function (r) {
                         return refLabel(r.file, r.line, r.spec, moving[r.target]);
                     }).join('\n')));
                 }
@@ -1184,7 +1184,7 @@
                     if (a && a.target === want) return;
                     warn.push(refLabel(owner, r.line, a ? a.spec : r.spec, a ? a.target : null));
                 });
-                if (warn.length) alert(TXT.loadShadow.replace('{0}', warn.join('\n')));
+                if (warn.length) MatDialog.alert(TXT.loadShadow.replace('{0}', warn.join('\n')));
 
                 write(next);
                 // Eine Rolle hängt am ORDNER und zieht mit ihm um — auch die der Unterordner. Bliebe
@@ -1227,22 +1227,22 @@
             // Name im Baum ist eine Beschriftung, kein Pfad auf der Platte.
             function isFolderNode(o) { return o.kind === 'folder' || o.kind === 'assetdir'; }
 
-            function renameNode(o) {
-                var map = read(); if (map === null) { alert(TXT.broken); return; }
-                var raw = prompt(isFolderNode(o) ? TXT.renameFolderAsk : TXT.renameFileAsk, baseOf(o.path));
+            async function renameNode(o) {
+                var map = read(); if (map === null) { MatDialog.alert(TXT.broken); return; }
+                var raw = await MatDialog.prompt(isFolderNode(o) ? TXT.renameFolderAsk : TXT.renameFileAsk, baseOf(o.path));
                 if (raw === null) return;
                 var target = clean(join(dirOf(o.path), raw.trim()), o.kind === 'assetdir');
-                if (!target) { alert(TXT.pathInvalid); return; }
+                if (!target) { MatDialog.alert(TXT.pathInvalid); return; }
                 applyMoves(movesFor(map, o, target), isFolderNode(o) ? { from: o.path, to: target } : null);
             }
 
             function moveNode(o, dir) {
-                var map = read(); if (map === null) { alert(TXT.broken); return; }
+                var map = read(); if (map === null) { MatDialog.alert(TXT.broken); return; }
                 // Ein Ordner kann nicht unter sich selbst landen — dabei entstünde ein Pfad, der
                 // sich beim Zeichnen endlos wiederholt.
-                if (isFolderNode(o) && (dir === o.path || dir.indexOf(o.path + '/') === 0)) { alert(TXT.selfMove); return; }
+                if (isFolderNode(o) && (dir === o.path || dir.indexOf(o.path + '/') === 0)) { MatDialog.alert(TXT.selfMove); return; }
                 var target = clean(join(dir, baseOf(o.path)), o.kind === 'assetdir');
-                if (!target) { alert(TXT.pathInvalid); return; }
+                if (!target) { MatDialog.alert(TXT.pathInvalid); return; }
                 applyMoves(movesFor(map, o, target), isFolderNode(o) ? { from: o.path, to: target } : null);
             }
 
@@ -1264,11 +1264,11 @@
                     items.push({ label: t === '' ? TXT.moveRoot : t + '/', run: function () { moveNode(o, t); } });
                 });
                 items.push({
-                    label: TXT.moveOther, run: function () {
-                        var raw = prompt(TXT.moveAsk, here);
+                    label: TXT.moveOther, run: async function () {
+                        var raw = await MatDialog.prompt(TXT.moveAsk, here);
                         if (raw === null) return;
                         var dir = raw.trim();
-                        if (dir !== '') { dir = clean(dir); if (!dir) { alert(TXT.pathInvalid); return; } }
+                        if (dir !== '') { dir = clean(dir); if (!dir) { MatDialog.alert(TXT.pathInvalid); return; } }
                         moveNode(o, dir);
                     }
                 });
@@ -1287,7 +1287,7 @@
             }
 
             function copyNode(path) {
-                var map = read(); if (map === null) { alert(TXT.broken); return; }
+                var map = read(); if (map === null) { MatDialog.alert(TXT.broken); return; }
                 clip = { name: baseOf(path), dir: dirOf(path), text: contentOf(map, path) };
                 // Neu zeichnen, damit „Einfügen: …“ in den Menüs steht: sie werden je Zeile beim
                 // Zeichnen zusammengestellt.
@@ -1296,9 +1296,9 @@
 
             function pasteInto(dir) {
                 if (!clip) return;
-                var map = read(); if (map === null) { alert(TXT.broken); return; }
+                var map = read(); if (map === null) { MatDialog.alert(TXT.broken); return; }
                 var target = freePath(map, dir, clip.name);
-                if (!target) { alert(TXT.pathInvalid); return; }
+                if (!target) { MatDialog.alert(TXT.pathInvalid); return; }
                 map[target] = clip.text;
                 write(map);
                 warnCopiedLoads(map, target, join(clip.dir, clip.name));
@@ -1307,9 +1307,9 @@
             }
 
             function duplicate(path) {
-                var map = read(); if (map === null) { alert(TXT.broken); return; }
+                var map = read(); if (map === null) { MatDialog.alert(TXT.broken); return; }
                 var target = freePath(map, dirOf(path), baseOf(path));
-                if (!target) { alert(TXT.pathInvalid); return; }
+                if (!target) { MatDialog.alert(TXT.pathInvalid); return; }
                 map[target] = contentOf(map, path);
                 write(map);
                 expandTo(target);
@@ -1330,7 +1330,7 @@
                     if (resolveLoad(map, was, m[2]) === now) return;
                     warn.push(refLabel(path, i, m[2], now));
                 });
-                if (warn.length) alert(TXT.loadShadow.replace('{0}', warn.join('\n')));
+                if (warn.length) MatDialog.alert(TXT.loadShadow.replace('{0}', warn.join('\n')));
             }
 
             // ---- Blaupausen -------------------------------------------------------------------
@@ -1394,7 +1394,7 @@
 
             function applyBlueprint(bp, target) {
                 if (!bpDialog || !bpDialog.showModal) return;
-                var map = read(); if (map === null) { alert(TXT.broken); return; }
+                var map = read(); if (map === null) { MatDialog.alert(TXT.broken); return; }
                 var already = bpFound(map, bp.marker);
                 var existing = contentOf(map, target);
                 var isEmpty = existing.trim() === '';
@@ -1491,8 +1491,8 @@
             var savedRoles = mapField ? mapField.value : '';
             function unsavedOk() {
                 if ((!codeField || codeField.value === savedCode) && field.value === savedFiles
-                    && (!mapField || mapField.value === savedRoles)) return true;
-                return confirm(TXT.assetUnsaved);
+                    && (!mapField || mapField.value === savedRoles)) return Promise.resolve(true);
+                return MatDialog.confirm(TXT.assetUnsaved);
             }
             var upForm = document.getElementById('asset-upload-form');
             var upInput = document.getElementById('asset-file');
@@ -1529,25 +1529,25 @@
             });
             function uploadAsset() {
                 if (!upInput || !upForm) return;
-                if (unsavedOk()) upInput.click();
+                unsavedOk().then(function (ok) { if (ok) upInput.click(); });
             }
 
             // Der Unterschied gehört in die Frage: eine Skriptdatei verschwindet erst mit dem
             // Speichern aus der Karte, diese hier ist sofort von der Platte weg. Beides gleich
             // harmlos aussehen zu lassen, wäre die eigentliche Falle.
-            function deleteAsset(name) {
+            async function deleteAsset(name) {
                 if (!delForm || !delName) return;
-                if (!confirm(TXT.assetDel + '\n\n' + ASSETDIR + '/' + name + '\n\n' + TXT.assetDelHint)) return;
-                if (!unsavedOk()) return;
+                if (!await MatDialog.confirm(TXT.assetDel + '\n\n' + ASSETDIR + '/' + name + '\n\n' + TXT.assetDelHint, { danger: true })) return;
+                if (!await unsavedOk()) return;
                 delName.value = name;
                 delForm.submit();
             }
 
             function copyUrl(url) {
-                var done = function () { alert(TXT.assetUrlCopied + ' ' + url); };
+                var done = function () { MatDialog.alert(TXT.assetUrlCopied + ' ' + url); };
                 if (navigator.clipboard && navigator.clipboard.writeText)
-                    navigator.clipboard.writeText(url).then(done, function () { prompt(TXT.assetUrlCopy, url); });
-                else prompt(TXT.assetUrlCopy, url);
+                    navigator.clipboard.writeText(url).then(done, function () { MatDialog.prompt(TXT.assetUrlCopy, url); });
+                else MatDialog.prompt(TXT.assetUrlCopy, url);
             }
 
             var delBtn = panel ? panel.querySelector('[data-pf-asset-del]') : null;

@@ -121,7 +121,7 @@
             </table>
             <div class="form-actions">
                 <form class="inline-form" method="post" asp-page-handler="CleanOrphans" asp-route-instance="@Model.FilteredInstance"
-                      onsubmit="return confirm('@T["backups.cleanConfirm"]');">
+                      data-confirm="@T["backups.cleanConfirm"]">
                     <button type="submit" class="btn btn-ghost">@T["backups.clean"]</button>
                 </form>
             </div>
@@ -204,12 +204,12 @@
                                     {
                                         @* The one action here that overwrites a live site, so it asks. *@
                                         <form class="inline-form" method="post" asp-page-handler="Restore" asp-route-id="@b.Id" asp-route-instance="@Model.FilteredInstance"
-                                              onsubmit="return confirm('@T["backups.restoreConfirm"]');">
+                                              data-confirm="@T["backups.restoreConfirm"]">
                                             <button type="submit" class="btn btn-sm btn-ghost">@T["backups.restore"]</button>
                                         </form>
                                     }
                                     <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@b.Id" asp-route-instance="@Model.FilteredInstance"
-                                          onsubmit="return confirm('@T["backups.deleteConfirm"]');">
+                                          data-confirm="@T["backups.deleteConfirm"]">
                                         <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
                                     </form>
                                 </div>
@@ -273,7 +273,7 @@
                             <td>
                                 <div class="actions">
                                     <form class="inline-form" method="post" asp-page-handler="DeleteArchived" asp-route-id="@a.Id"
-                                          onsubmit="return confirm('@T["backups.archiveDeleteConfirm"]');">
+                                          data-confirm="@T["backups.archiveDeleteConfirm"]">
                                         <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
                                     </form>
                                 </div>

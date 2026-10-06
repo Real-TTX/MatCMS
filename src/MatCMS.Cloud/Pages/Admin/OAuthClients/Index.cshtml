@@ -105,12 +105,12 @@
                             {
                                 <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@c.Id">@T["oauthclients.edit"]</a>
                                 <form class="inline-form" method="post" asp-page-handler="Revoke" asp-route-id="@c.Id"
-                                      onsubmit="return confirm('@T["apikeys.revokeConfirm"]');">
+                                      data-confirm="@T["apikeys.revokeConfirm"]">
                                     <button type="submit" class="btn btn-sm btn-ghost">@T["oauthclients.revoke"]</button>
                                 </form>
                             }
                             <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@c.Id"
-                                  onsubmit="return confirm('@T["apikeys.deleteConfirm"]');">
+                                  data-confirm="@T["apikeys.deleteConfirm"]">
                                 <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
                             </form>
                         </div>

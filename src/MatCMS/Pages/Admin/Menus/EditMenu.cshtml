@@ -49,7 +49,7 @@
                 </div>
                 <div class="actions">
                     <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@it.Id">@T["action.edit"]</a>
-                    <form class="inline-form" method="post" asp-page-handler="DeleteItem" asp-route-id="@Model.Current.Id" asp-route-itemId="@it.Id" asp-route-locale="@Model.SelectedLocale" onsubmit="return confirm('@T["menus.confirmDelete", it.Label]');">
+                    <form class="inline-form" method="post" asp-page-handler="DeleteItem" asp-route-id="@Model.Current.Id" asp-route-itemId="@it.Id" asp-route-locale="@Model.SelectedLocale" data-confirm="@T["menus.confirmDelete", it.Label]">
                         <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
                     </form>
                 </div>
@@ -94,7 +94,7 @@
     @if (!Model.Current.BuiltIn)
     {
         <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@Model.Current.Id"
-              onsubmit="return confirm('@T["menus.confirmDeleteMenu"]');">
+              data-confirm="@T["menus.confirmDeleteMenu"]">
             <button type="submit" class="btn btn-danger">@T["menus.deleteMenu"]</button>
         </form>
     }

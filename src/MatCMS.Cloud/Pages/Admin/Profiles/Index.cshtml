@@ -70,7 +70,7 @@
                                 <button type="submit" class="btn btn-sm btn-ghost" title="@T["profiles.duplicate"]">@T["profiles.duplicate"]</button>
                             </form>
                             <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@p.Id"
-                                  onsubmit="return confirm('@T["profiles.deleteConfirm"]');">
+                                  data-confirm="@T["profiles.deleteConfirm"]">
                                 <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
                             </form>
                         </div>

@@ -86,16 +86,12 @@ public sealed class AdminUi
     }
 
     /// <summary>A compact row action: a mini POST form rendering one submit button that carries the token
-    /// plus <paramref name="hidden"/> fields. <paramref name="confirm"/> adds a JS confirmation prompt.</summary>
+    /// plus <paramref name="hidden"/> fields. <paramref name="confirm"/> asks first — in the admin's own dialog
+    /// (data-confirm, mat-dialogs.js), never the browser's confirm().</summary>
     public string ActionButton(string label, IDictionary<string, string> hidden, string? cssClass = null, string? confirm = null)
     {
-        var onclick = "";
-        if (!string.IsNullOrWhiteSpace(confirm))
-        {
-            var js = confirm.Replace("\\", "\\\\").Replace("'", "\\'").Replace("\r", " ").Replace("\n", " ");
-            onclick = " onclick=\"return confirm('" + Enc(js) + "')\"";
-        }
-        var btn = "<button type=\"submit\" class=\"btn btn-sm " + Enc(cssClass) + "\"" + onclick + ">" + Enc(label) + "</button>";
+        var ask = string.IsNullOrWhiteSpace(confirm) ? "" : " data-confirm=\"" + Enc(confirm) + "\"";
+        var btn = "<button type=\"submit\" class=\"btn btn-sm " + Enc(cssClass) + "\"" + ask + ">" + Enc(label) + "</button>";
         return Form(btn, hidden, "inline-form");
     }
 }

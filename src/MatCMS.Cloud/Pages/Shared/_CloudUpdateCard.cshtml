@@ -30,7 +30,7 @@
         @if (s.CanSelfUpdate)
         {
             <form method="post" asp-page-handler="SelfUpdate" class="list-actions"
-                  onsubmit="return confirm('@T["cloudupdate.confirm"]');">
+                  data-confirm="@T["cloudupdate.confirm"]">
                 <button type="submit" class="btn @(s.UpdateAvailable == true ? "" : "btn-ghost")">@T["cloudupdate.now"]</button>
             </form>
             <div class="help">@T["cloudupdate.help"]</div>

@@ -292,8 +292,13 @@
             b.addEventListener("click", function () {
                 ed.focus();
                 if (t.prompt) {
-                    var url = window.prompt("Link-Adresse (URL):", "https://");
-                    if (url) document.execCommand(t.cmd, false, url);
+                    var keep = (function () { var sel = window.getSelection(); return sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null; })();
+                    MatDialog.prompt("Link-Adresse (URL):", 'https://').then(function (url) {
+                        if (!url) return;
+                        ed.focus();
+                        if (keep) { var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(keep); }
+                        document.execCommand(t.cmd, false, url);
+                    });
                 } else {
                     document.execCommand(t.cmd, false, t.arg || null);
                 }

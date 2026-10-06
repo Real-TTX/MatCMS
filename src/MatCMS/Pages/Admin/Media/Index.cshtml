@@ -215,7 +215,7 @@
                 <button type="submit" form="mm-save-form" class="btn">@T["action.save"]</button>
                 <button type="button" class="btn btn-ghost" id="mm-cancel">@T["action.cancel"]</button>
                 <form method="post" asp-page-handler="Delete" asp-route-tag="@Model.ActiveTag" class="media-delete-form act-danger"
-                      onsubmit="return confirm('@T["media.confirmDelete"]');">
+                      data-confirm="@T["media.confirmDelete"]">
                     <input type="hidden" name="id" id="mm-del-id" />
                     <button type="submit" class="btn btn-danger">@T["action.delete"]</button>
                 </form>
@@ -242,7 +242,7 @@
                         var fd = new FormData(); fd.append('file', f);
                         return fetch('/admin/api/upload', { method: 'POST', body: fd })
                             .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-                            .then(function (r) { if (!r.ok) alert(r.j.error || '@T["media.uploadFailed"]'); });
+                            .then(function (r) { if (!r.ok) MatDialog.alert(r.j.error || '@T["media.uploadFailed"]'); });
                     });
                 });
                 chain.then(function () { window.location.reload(); });
@@ -438,9 +438,9 @@
                     body: JSON.stringify({ sourceId: cropCtx.sourceId, x: data.x, y: data.y, w: data.width, h: data.height })
                 }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
                   .then(function (res) {
-                      if (!res.ok) { alert(res.j.error || '@T["media.cropFailed"]'); cropSaveBtn.disabled = false; return; }
+                      if (!res.ok) { MatDialog.alert(res.j.error || '@T["media.cropFailed"]'); cropSaveBtn.disabled = false; return; }
                       window.location.reload();
-                  }).catch(function () { alert('@T["media.cropFailed"]'); cropSaveBtn.disabled = false; });
+                  }).catch(function () { MatDialog.alert('@T["media.cropFailed"]'); cropSaveBtn.disabled = false; });
             });
 
             document.querySelectorAll('.media-card, .media-row').forEach(function (c) {

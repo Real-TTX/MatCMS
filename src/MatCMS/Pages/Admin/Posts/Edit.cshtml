@@ -206,7 +206,13 @@
                 ed.focus();
                 var cmd = b.getAttribute('data-cmd'), arg = b.getAttribute('data-arg');
                 if (b.getAttribute('data-prompt')) {
-                    var url = window.prompt('@T["posts.linkPrompt"]', 'https://'); if (url) document.execCommand(cmd, false, url);
+                    var keep = (function () { var sel = window.getSelection(); return sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null; })();
+                    MatDialog.prompt('@T["posts.linkPrompt"]', 'https://').then(function (url) {
+                        if (!url) return;
+                        ed.focus();
+                        if (keep) { var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(keep); }
+                        document.execCommand(cmd, false, url);
+                    });
                 } else { document.execCommand(cmd, false, arg || null); }
             });
             document.getElementById('post-form').addEventListener('submit', function () { hidden.value = ed.innerHTML.trim(); });
@@ -307,11 +313,11 @@
                 var fd = new FormData(); fd.append('url', url); if (token) fd.append('__RequestVerificationToken', token.value);
                 fetch(box.dataset.url, { method: 'POST', body: fd, credentials: 'same-origin' })
                     .then(function (r) { return r.json(); })
-                    .then(function (d) {
+                    .then(async function (d) {
                         if (!d.ok) { show(d.error || box.dataset.failed, true, d.notes); return; }
                         var ed = document.getElementById('rt-editor');
                         var filled = val('Input_Title') || val('Input_Excerpt') || (ed && ed.textContent.trim());
-                        var overwrite = !filled || window.confirm(box.dataset.overwrite);
+                        var overwrite = !filled || await MatDialog.confirm(box.dataset.overwrite);
                         if (overwrite) {
                             if (d.title) set('Input_Title', d.title);
                             if (d.excerpt) set('Input_Excerpt', d.excerpt);

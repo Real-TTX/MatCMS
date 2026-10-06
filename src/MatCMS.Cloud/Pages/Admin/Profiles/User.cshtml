@@ -53,7 +53,7 @@
     @if (!Model.IsNew)
     {
         <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-profileId="@Model.Owner.Id" asp-route-id="@Model.Item.Id"
-            onsubmit="return confirm('@T["profiles.userDeleteConfirm"]');">
+            data-confirm="@T["profiles.userDeleteConfirm"]">
             <button type="submit" class="btn btn-danger">@T["common.delete"]</button>
         </form>
     }

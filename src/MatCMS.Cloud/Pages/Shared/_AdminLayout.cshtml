@@ -34,7 +34,7 @@
     var returnUrl = Context.Request.Path + Context.Request.QueryString;
 }
 <!DOCTYPE html>
-<html lang="@currentCulture" data-theme="@theme">
+<html lang="@currentCulture" data-dlg-ok="@T["dialog.ok"]" data-dlg-cancel="@T["action.cancel"]" data-theme="@theme">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -47,6 +47,8 @@
     <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/admin.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/cloud.css" asp-append-version="true" />
     <link rel="icon" href="@Cloud.LogoUrl" />
+    @* Own confirm/alert/prompt dialogs — loaded early, inline page scripts call MatDialog. *@
+    <script src="~/_content/MatCMS.Shared.Web/js/mat-dialogs.js" asp-append-version="true"></script>
 </head>
 @* A page may drop the sidebar — the embedded site view wants the whole window for the site and
    carries its own bar at the top. *@

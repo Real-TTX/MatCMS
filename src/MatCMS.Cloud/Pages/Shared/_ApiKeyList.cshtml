@@ -88,12 +88,12 @@
                             @if (!k.Revoked)
                             {
                                 <form class="inline-form" method="post" asp-page="/Admin/ApiKeys/Index" asp-page-handler="Revoke" asp-route-id="@k.Id"
-                                      onsubmit="return confirm('@T["apikeys.revokeConfirm"]');">
+                                      data-confirm="@T["apikeys.revokeConfirm"]">
                                     <button type="submit" class="btn btn-sm btn-ghost">@T["apikeys.revoke"]</button>
                                 </form>
                             }
                             <form class="inline-form" method="post" asp-page="/Admin/ApiKeys/Index" asp-page-handler="Delete" asp-route-id="@k.Id"
-                                  onsubmit="return confirm('@T["apikeys.deleteConfirm"]');">
+                                  data-confirm="@T["apikeys.deleteConfirm"]">
                                 <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
                             </form>
                         </div>

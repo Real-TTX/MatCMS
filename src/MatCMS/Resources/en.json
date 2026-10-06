@@ -86,6 +86,7 @@
   "action.edit": "Edit",
   "action.delete": "Delete",
   "action.cancel": "Cancel",
+  "dialog.ok": "OK",
   "action.back": "Back",
   "action.create": "Create",
   "action.close": "Close",

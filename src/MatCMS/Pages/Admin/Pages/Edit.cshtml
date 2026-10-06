@@ -104,7 +104,7 @@
                    That also makes a separate save button pointless: it did what ✓ now does, minus
                    the leaving. *@
                 <div class="le-panel-actions">
-                    <form class="inline-form le-delete" method="post" asp-page-handler="DeleteBlock" asp-route-id="@Model.Current.Id" asp-route-blockId="@Model.SelectedBlock!.Id" onsubmit="return confirm('@T["editor.confirmDeleteBlock"]');">
+                    <form class="inline-form le-delete" method="post" asp-page-handler="DeleteBlock" asp-route-id="@Model.Current.Id" asp-route-blockId="@Model.SelectedBlock!.Id" data-confirm="@T["editor.confirmDeleteBlock"]">
                         <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["editor.blockDelete"]" aria-label="@T["editor.blockDelete"]"><i class="ti ti-trash" aria-hidden="true"></i></button>
                     </form>
                     <button type="submit" form="block-form" name="thenAdd" value="true" class="btn btn-sm btn-ghost btn-icon" title="@T["editor.addBlock"]" aria-label="@T["editor.addBlock"]"><i class="ti ti-plus" aria-hidden="true"></i></button>
@@ -177,7 +177,7 @@
                         @if (Model.TranslatorConfigured && Model.Current.Locale != MatCMS.Services.Localizer.DefaultCulture)
                         {
                             <form method="post" asp-page-handler="AutoTranslate" asp-route-id="@Model.Current.Id" class="le-ver-addform"
-                                  onsubmit="return confirm('@T["editor.autoTranslateConfirm"]');">
+                                  data-confirm="@T["editor.autoTranslateConfirm"]">
                                 <button type="submit" class="le-ver-add" title="@T["editor.autoTranslateTitle"]"><i class="ti ti-language" aria-hidden="true"></i> @T["editor.autoTranslate"]</button>
                             </form>
                         }
@@ -205,7 +205,7 @@
                                         <span class="b-sum">@Model.BlockSummary(b)</span>
                                     </span>
                                 </a>
-                                <form class="inline-form" method="post" asp-page-handler="DeleteBlock" asp-route-id="@Model.Current.Id" asp-route-blockId="@b.Id" onsubmit="return confirm('@T["editor.confirmDeleteBlock"]');">
+                                <form class="inline-form" method="post" asp-page-handler="DeleteBlock" asp-route-id="@Model.Current.Id" asp-route-blockId="@b.Id" data-confirm="@T["editor.confirmDeleteBlock"]">
                                     <button type="submit" class="icon-btn" title="@T["editor.delete"]"><i class="ti ti-x" aria-hidden="true"></i></button>
                                 </form>
                             </div>
@@ -226,7 +226,7 @@
                                                     <span class="b-sum">@Model.BlockSummary(c)</span>
                                                 </span>
                                             </a>
-                                            <form class="inline-form" method="post" asp-page-handler="DeleteBlock" asp-route-id="@Model.Current.Id" asp-route-blockId="@c.Id" onsubmit="return confirm('@T["editor.confirmDeleteBlock"]');">
+                                            <form class="inline-form" method="post" asp-page-handler="DeleteBlock" asp-route-id="@Model.Current.Id" asp-route-blockId="@c.Id" data-confirm="@T["editor.confirmDeleteBlock"]">
                                                 <button type="submit" class="icon-btn" title="@T["editor.delete"]"><i class="ti ti-x" aria-hidden="true"></i></button>
                                             </form>
                                         </div>

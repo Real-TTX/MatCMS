@@ -221,7 +221,7 @@
                               <div class="actions">
                                 <a class="btn btn-sm btn-ghost" asp-page-handler="Download" asp-route-name="@b.Name">↓</a>
                                 <form method="post" asp-page-handler="RestoreStored" asp-route-name="@b.Name" class="inline-form"
-                                      onsubmit="return confirm('@T["backup.restoreStoredConfirm"]');">
+                                      data-confirm="@T["backup.restoreStoredConfirm"]">
                                     <button type="submit" class="btn btn-sm btn-ghost">@T["backup.restoreThis"]</button>
                                 </form>
                             @if (Model.CloudConnected)
@@ -231,7 +231,7 @@
                                 </form>
                             }
                                 <form method="post" asp-page-handler="DeleteStored" asp-route-name="@b.Name" class="inline-form"
-                                      onsubmit="return confirm('@T["backup.deleteConfirm"]');">
+                                      data-confirm="@T["backup.deleteConfirm"]">
                                     <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
                                 </form>
                               </div>

@@ -275,18 +275,18 @@
             @* Stop takes the customer's site OFFLINE and update restarts it, so both confirm; start does not. *@
             <div class="list-actions">
                 <form class="inline-form" method="post" asp-page-handler="Update" asp-route-id="@Model.Item.Id"
-                      onsubmit="return confirm('@T["instances.updateConfirm"]');">
+                      data-confirm="@T["instances.updateConfirm"]">
                     <button type="submit" class="btn @(Model.HasUpdate ? "" : "btn-ghost")"><i class="ti ti-refresh" aria-hidden="true"></i>
                         @(Model.HasUpdate ? T["instances.updateNow"] : T["hosting.repull"])</button>
                 </form>
                 @if (running)
                 {
                     <form class="inline-form" method="post" asp-page-handler="Restart" asp-route-id="@Model.Item.Id"
-                          onsubmit="return confirm('@T["instances.restartConfirm"]');">
+                          data-confirm="@T["instances.restartConfirm"]">
                         <button type="submit" class="btn"><i class="ti ti-rotate-clockwise" aria-hidden="true"></i> @T["instances.restart"]</button>
                     </form>
                     <form class="inline-form" method="post" asp-page-handler="Stop" asp-route-id="@Model.Item.Id"
-                          onsubmit="return confirm('@T["instances.stopConfirm"]');">
+                          data-confirm="@T["instances.stopConfirm"]">
                         <button type="submit" class="btn btn-danger"><i class="ti ti-player-stop" aria-hidden="true"></i> @T["instances.stop"]</button>
                     </form>
                 }
@@ -326,7 +326,7 @@
                     @if (Model.Item.HostDomain is not null)
                     {
                         <form class="inline-form" method="post" asp-page-handler="RemoveHostAddress" asp-route-id="@Model.Item.Id"
-                              onsubmit="return confirm('@T["hosting.hostAddressRemoveConfirm"]');">
+                              data-confirm="@T["hosting.hostAddressRemoveConfirm"]">
                             <button type="submit" class="btn btn-ghost">@T["hosting.hostAddressRemove"]</button>
                         </form>
                     }
@@ -372,7 +372,7 @@
                         </form>
                     }
                     <form class="inline-form" method="post" asp-page-handler="UnpublishDomain" asp-route-id="@Model.Item.Id"
-                          onsubmit="return confirm('@T["hosting.unpublishConfirm"]');">
+                          data-confirm="@T["hosting.unpublishConfirm"]">
                         <input type="hidden" name="pushCanonical" value="true" />
                         <button type="submit" class="btn btn-danger">@T["hosting.unpublishBtn"]</button>
                     </form>
@@ -403,7 +403,7 @@
             else if (Model.Migrations.FirstOrDefault()?.Running != true)
             {
                 <form method="post" asp-page-handler="Migrate" asp-route-id="@Model.Item.Id"
-                      onsubmit="return confirm('@T["migrate.confirm"]');">
+                      data-confirm="@T["migrate.confirm"]">
                     <div class="form-field">
                         <label for="migrateTarget">@T["migrate.target"]</label>
                         <select id="migrateTarget" name="target" required>
@@ -881,12 +881,12 @@
                                     else
                                     {
                                         <form class="inline-form" method="post" asp-page-handler="Restore" asp-route-id="@Model.Item.Id" asp-route-backupId="@b.Id"
-                                              onsubmit="return confirm('@T["backups.restoreConfirm"]');">
+                                              data-confirm="@T["backups.restoreConfirm"]">
                                             <button type="submit" class="btn btn-sm btn-ghost">@T["backups.restore"]</button>
                                         </form>
                                     }
                                     <form class="inline-form" method="post" asp-page-handler="DeleteBackup" asp-route-id="@Model.Item.Id" asp-route-backupId="@b.Id"
-                                          onsubmit="return confirm('@T["backups.deleteConfirm"]');">
+                                          data-confirm="@T["backups.deleteConfirm"]">
                                         <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
                                     </form>
                                 </div>
@@ -991,7 +991,7 @@
             if (Model.Item.Status == InstanceStatus.Approved)
             {
                 <form class="inline-form" method="post" asp-page-handler="Reject" asp-route-id="@Model.Item.Id"
-                      onsubmit="return confirm('@T["instances.rejectConfirm"]');">
+                      data-confirm="@T["instances.rejectConfirm"]">
                     <button type="submit" class="btn btn-ghost">@T["instances.reject"]</button>
                 </form>
             }
@@ -1002,7 +1002,7 @@
                 </form>
             }
             <form class="inline-form" method="post" asp-page-handler="Rotate" asp-route-id="@Model.Item.Id"
-                  onsubmit="return confirm('@T["instances.rotateConfirm"]');">
+                  data-confirm="@T["instances.rotateConfirm"]">
                 <button type="submit" class="btn btn-ghost">@T["instances.rotateToken"]</button>
             </form>
             @* Kein POST mit confirm() mehr: Entfernen hat vier verschiedene Ausgänge — abmelden,

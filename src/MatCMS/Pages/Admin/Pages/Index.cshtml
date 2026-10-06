@@ -56,7 +56,7 @@
                         <div class="actions">
                             <a class="btn btn-sm btn-ghost" asp-page="Editor" asp-route-id="@p.Id">@T["action.edit"]</a>
                             <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@p.Id"
-                                  onsubmit="return confirm('@T["pages.confirmDelete", p.Title]');">
+                                  data-confirm="@T["pages.confirmDelete", p.Title]">
                                 <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
                             </form>
                         </div>

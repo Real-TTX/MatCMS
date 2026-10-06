@@ -596,7 +596,8 @@
         var schema = d.schema || [];
         var groups = {
             content: schema.filter(function (f) { return f.id.charAt(0) !== "_"; }),
-            design: schema.filter(function (f) { return f.id === "_width" || f.id === "_spaceTop" || f.id === "_spaceBottom"; }),
+            // Width and spacing only exist for blocks on the page itself; inside a container they would do nothing.
+            design: b.parentId != null ? [] : schema.filter(function (f) { return f.id === "_width" || f.id === "_spaceTop" || f.id === "_spaceBottom"; }),
             advanced: schema.filter(function (f) { return f.id === "_css"; })
         };
         var values = data(b);

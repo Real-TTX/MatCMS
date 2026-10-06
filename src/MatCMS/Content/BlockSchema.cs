@@ -22,13 +22,15 @@ public static class BlockSchema
             Options = [ new("", "Standard"), new("s", "Klein"), new("m", "Mittel"), new("l", "Groß") ] },
         new BlockField { Id = "_spaceBottom", Label = "Abstand unten", Type = FieldType.Select, Default = "",
             Options = [ new("", "Standard"), new("s", "Klein"), new("m", "Mittel"), new("l", "Groß") ] },
-        // Per-block custom CSS (advanced). Rendered scoped under this block's own `.blk-<id>` wrapper
-        // via native CSS nesting, so rules never leak to other blocks. Write bare declarations
-        // (e.g. `background:#f6f6f6`) or nested selectors with `&` (e.g. `& h2 { color:#289068 }`).
+    ];
+
+    /// <summary>Per-block custom CSS (advanced) — for EVERY block, nested elements included (see BlockCss):
+    /// scoped under the block's own `.blk-&lt;id&gt;` via native CSS nesting, so rules never leak to other
+    /// blocks. Bare declarations style the block itself, `&amp; h2 { … }` what is inside it.</summary>
+    public static readonly BlockField CssField =
         new BlockField { Id = "_css", Label = "Custom CSS", Type = FieldType.Textarea,
             Placeholder = "background: #f6f6f6;\n& h2 { color: #289068; }",
-            Help = "Nur für diesen Block. Gescoped über & (native CSS-Verschachtelung), z. B. „& .btn { … }“." },
-    ];
+            Help = "Nur für diesen Block. Ohne Selektor gilt es für den Block selbst, mit & für sein Inneres, z. B. „& .btn { … }“." };
 
     /// <summary>The dynamic option lists the given block definitions ask for (by OptionsSource), loaded once.</summary>
     public static async Task<Dictionary<string, List<SelectOption>>> LoadSourcesAsync(AppDbContext db, IEnumerable<BlockDefinition> defs)
@@ -68,12 +70,13 @@ public static class BlockSchema
         return sources;
     }
 
-    /// <summary>The full schema of one block: its own fields, plus the global layout options when it
-    /// can stand at the top level.</summary>
+    /// <summary>The full schema of one block: its own fields, the global layout options when it can stand
+    /// at the top level (width/spacing only exist there), and custom CSS for every block.</summary>
     public static List<object> For(BlockDefinition def, Localizer t, IReadOnlyDictionary<string, List<SelectOption>>? sources)
     {
         var list = def.Fields.Select(f => Localize(f, t, sources)).ToList();
         if (!def.ChildOnly) list.AddRange(GlobalLayoutFields.Select(f => Localize(f, t, sources)));
+        list.Add(Localize(CssField, t, sources));
         return list;
     }
 

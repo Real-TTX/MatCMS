@@ -8,16 +8,30 @@
    wrapper at all.
    A child that renders NOTHING (an image without an image, a new empty column) would be invisible in
    the preview and so impossible to click — in the editor it stands as a dashed placeholder instead. *@
+@*
+   Custom CSS of a NESTED block: it has no wrapper of its own (that would break the container's grid),
+   so the scope class goes onto its own first element and the rule set is written just before it.
+*@
 @{
     var content = Model.Container is not null
         ? await Html.PartialAsync(Model.Partial, Model.Container)
         : await Html.PartialAsync(Model.Partial, Model.Data);
+    var css = Model.Id != 0 ? MatCMS.Content.BlockCss.Scope(Model.Id, (Model.Container?.Data ?? Model.Data)?.Str(MatCMS.Content.BlockCss.Field)) : "";
+    string? html = null;
+    if (Model.Editor || css.Length > 0)
+    {
+        using var sw = new System.IO.StringWriter();
+        content.WriteTo(sw, System.Text.Encodings.Web.HtmlEncoder.Default);
+        html = sw.ToString();
+        if (css.Length > 0) html = MatCMS.Content.BlockCss.AddScopeClass(html, MatCMS.Content.BlockCss.ScopeClass(Model.Id));
+    }
+}
+@if (css.Length > 0)
+{
+    <style>@Html.Raw(css)</style>
 }
 @if (Model.Editor && Model.Id != 0)
 {
-    using var sw = new System.IO.StringWriter();
-    content.WriteTo(sw, System.Text.Encodings.Web.HtmlEncoder.Default);
-    var html = sw.ToString();
     @:<div class="mat-ed-child" data-block-id="@Model.Id" data-block-type="@Model.Type" style="display:contents">
     if (string.IsNullOrWhiteSpace(html))
     {
@@ -29,6 +43,10 @@
         @Html.Raw(html)
     }
     @:</div>
+}
+else if (html is not null)
+{
+    @Html.Raw(html)
 }
 else
 {

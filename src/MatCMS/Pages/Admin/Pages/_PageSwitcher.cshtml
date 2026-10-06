@@ -1,0 +1,117 @@
+@model MatCMS.Pages.Admin.Pages.PageSwitcherModel
+@*
+   The page switcher of BOTH page editors (classic Edit and editor v2): every page of the site, grouped by
+   translation group exactly like the page list, with title, address, state and language. The entries are
+   links to Model.TargetPage; admin-page-switcher.js opens it, searches, drives the keyboard and asks before
+   leaving unsaved work (data-dirty-probe = a global returning true while something is unsaved,
+   data-dirty-forms = ids of settings forms to watch).
+*@
+@{
+    var url = Model.CurrentUrl;
+}
+@{
+    string SwitchSearch(MatCMS.Pages.Admin.Pages.EditModel.SwitchVersion v) =>
+        (v.Title + " " + v.Url + " " + v.Locale + " " + MatCMS.Services.Localizer.DisplayName(v.Locale)).ToLowerInvariant();
+}
+<div class="mat-rs le-pagepick" data-page-switch
+     data-confirm="@T["editor.switchUnsaved"]"
+     data-confirm-block="@T["editor.switchUnsavedBlock"]"
+     data-confirm-settings="@T["editor.switchUnsavedSettings"]"
+     data-dirty-probe="@Model.DirtyProbe" data-dirty-forms="@Model.DirtyForms">
+    @{
+        var curIsPrimary = Model.CurrentGroup?.Versions.FirstOrDefault(v => v.Id == Model.Current.Id)?.IsPrimary != false;
+    }
+    @* The trigger shows exactly what an ENTRY shows — badge, title, address — because that
+       is what it is: the entry you are standing on. title= carries both in full, so a long
+       path can still be read; the path line it replaced had no tooltip at all. *@
+    <button type="button" class="btn btn-sm btn-ghost mat-rs-trigger" data-ps-btn
+            aria-haspopup="listbox" aria-expanded="false"
+            title="@Model.Current.Title — @url"
+            aria-label="@T["editor.switchPage"]: @Model.Current.Title, @url">
+        <span class="mat-rs-current">
+            <span class="mat-rs-opt-body">
+                <span class="mat-rs-opt-title">@Model.Current.Title</span>
+                <span class="mat-rs-opt-desc mono">@url</span>
+            </span>
+            @* Right-hand side, like the entries: the badge stays put while titles of every
+               length come and go in front of it. *@
+            <span class="badge @(curIsPrimary ? "badge-on" : "badge-off") mono">@Model.Current.Locale.ToUpperInvariant()</span>
+        </span>
+        <i class="ti ti-chevron-down mat-rs-chev" aria-hidden="true"></i>
+    </button>
+    <div class="mat-rs-menu" data-ps-menu hidden>
+        @* Header with ✕ — hidden on the desktop by mat-richselect.css, shown when the menu
+           becomes a full-screen sheet on a phone. *@
+        <div class="mat-rs-sheet-head">
+            <span class="mat-rs-sheet-title">@T["editor.switchPage"]</span>
+            <button type="button" class="mat-rs-close" data-ps-close aria-label="@T["editor.close"]"><i class="ti ti-x" aria-hidden="true"></i></button>
+        </div>
+        <div class="bpick-search ps-search">
+            <svg class="bpick-sico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+            <input type="search" data-ps-search placeholder="@T["editor.switchSearch"]" autocomplete="off"
+                   role="combobox" aria-expanded="true" aria-controls="ps-list" aria-autocomplete="list" />
+        </div>
+        <div class="mat-rs-scroll" id="ps-list" role="listbox" aria-label="@T["editor.switchPage"]">
+            @* Two sections, each with its own heading, and inside them one block per
+               LOGICAL page. The heading belongs to the section and not to the first page
+               in it — a search that filters that page away used to take the heading with
+               it, leaving a result list with no idea what it was a list of. *@
+            @{
+                var switchSections = new List<(string Head, IReadOnlyList<MatCMS.Pages.Admin.Pages.EditModel.SwitchGroup> Groups)>();
+                if (Model.CurrentGroup is not null)
+                    switchSections.Add((Model.CurrentGroup.Versions.Count > 1 ? T["editor.switchThisPage"] : T["editor.switchCurrent"],
+                                        new[] { Model.CurrentGroup }));
+                if (Model.SwitchGroups.Count > 0)
+                    switchSections.Add((T["editor.switchAllPages"], Model.SwitchGroups));
+            }
+            @foreach (var (head, sectionGroups) in switchSections)
+            {
+            <div class="ps-section" role="presentation" data-ps-section>
+                <div class="bpick-grouphead" data-ps-head>@head</div>
+                @foreach (var g in sectionGroups)
+                {
+                <div class="bpick-group" role="presentation" data-ps-group>
+                    @foreach (var v in g.Versions)
+                    {
+                        var isCur = v.Id == Model.Current.Id;
+                        <a class="mat-rs-opt" role="option" tabindex="-1" data-ps-opt
+                           id="ps-opt-@v.Id"
+                           href="@Url.Page(Model.TargetPage, new { id = v.Id })"
+                           data-title="@v.Title"
+                           data-search="@SwitchSearch(v)"
+                           aria-selected="@(isCur ? "true" : "false")">
+                            <span class="mat-rs-opt-body">
+                                <span class="mat-rs-opt-title">@v.Title</span>
+                                @* Second line carries what the title cannot: the real address
+                                   (which already differs per language) and the language name. *@
+                                <span class="mat-rs-opt-desc"><span class="mono">@v.Url</span> · @MatCMS.Services.Localizer.DisplayName(v.Locale)</span>
+                            </span>
+                            @* State first, LANGUAGE last — the language sits hard against the
+                               right edge on purpose. It is a two-letter code of constant
+                               width, so right-aligned it forms a column the eye can run
+                               down; the state next to it reads "Veröffentlicht" or
+                               "Entwurf" and would, from the outside, push that column out
+                               of line from row to row. *@
+                            <span class="mat-rs-opt-tags">
+                                @if (v.IsPublished)
+                                {
+                                    <span class="badge badge-on">@T["pages.published"]</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-off">@T["pages.draft"]</span>
+                                }
+                                @* Same colour code as the page list: the original is the
+                                   solid badge, a translation the muted one. *@
+                                <span class="badge @(v.IsPrimary ? "badge-on" : "badge-off") mono">@v.Locale.ToUpperInvariant()</span>
+                            </span>
+                        </a>
+                    }
+                </div>
+                }
+            </div>
+            }
+            <p class="bpick-empty" data-ps-empty hidden>@T["editor.switchNone"]</p>
+        </div>
+    </div>
+</div>

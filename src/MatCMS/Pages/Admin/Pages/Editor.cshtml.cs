@@ -42,7 +42,9 @@ public class EditorModel : PageModel
     /// <summary>Active site languages this page has no version in yet.</summary>
     public List<string> MissingLocales { get; private set; } = new();
     /// <summary>Every page, for the page switcher in the title.</summary>
-    public List<PageEntity> AllPages { get; private set; } = new();
+    /// <summary>The shared page switcher's data (same as the classic editor's, see EditModel.BuildSwitcherAsync).</summary>
+    public EditModel.SwitchGroup? CurrentGroup { get; private set; }
+    public IReadOnlyList<EditModel.SwitchGroup> SwitchGroups { get; private set; } = new List<EditModel.SwitchGroup>();
 
     public BlockRegistry Registry { get; }
     public PageEntity Current { get; private set; } = default!;
@@ -103,7 +105,7 @@ public class EditorModel : PageModel
             : await _db.Pages.AsNoTracking().Where(p => p.TranslationGroup == page.TranslationGroup).OrderBy(p => p.Locale).ToListAsync();
         var used = Versions.Select(v => v.Locale).ToHashSet();
         MissingLocales = SupportedLocales.Where(c => !used.Contains(c)).ToList();
-        AllPages = await _db.Pages.AsNoTracking().OrderBy(p => p.Title).ToListAsync();
+        (CurrentGroup, SwitchGroups) = await EditModel.BuildSwitcherAsync(_db, page);
         return Page();
     }
 }

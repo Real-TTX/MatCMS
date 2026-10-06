@@ -69,10 +69,10 @@
         </a>
         <button type="button" class="btn btn-ghost btn-icon ev2-tree-toggle" id="ev2-tree-toggle" title="@T["ev2.tree"]" aria-label="@T["ev2.tree"]"><i class="ti ti-list-tree"></i></button>
         <div class="ev2-title">
-            @* The title is the page switcher: one click to the next page, as in the classic editor. *@
-            <button type="button" class="ev2-title-btn" id="ev2-pages-open" title="@T["ev2.switchPage"] — @Model.PublicUrl" aria-haspopup="true">
-                <span class="ev2-title-text">@p.Title</span><i class="ti ti-chevron-down" aria-hidden="true"></i>
-            </button>
+            @* The page switcher of the classic editor (title, address, language; search, keyboard, groups by
+               translation) — the entries open this editor. Unsaved work is asked about through ev2Dirty. *@
+            @await Html.PartialAsync("_PageSwitcher", new MatCMS.Pages.Admin.Pages.PageSwitcherModel(
+                p, Model.PublicUrl, Model.CurrentGroup, Model.SwitchGroups, "Editor", "ev2Dirty", ""))
             <span class="badge @(p.IsPublished ? "badge-on" : "badge-off")">@(p.IsPublished ? T["ev2.published"] : T["ev2.draft"])</span>
             @if (Model.SupportedLocales.Count > 1)
             {
@@ -236,26 +236,6 @@
         </div>
     </div>
 
-    @* Page switcher: every page with its address and language; leaving asks first when unsaved. *@
-    <div class="ev2-pop ev2-pages" id="ev2-pages" hidden>
-        <input type="search" class="list-search" id="ev2-pages-search" placeholder="@T["editor.switchSearch"]" autocomplete="off" />
-        <div class="ev2-pages-list" id="ev2-pages-list">
-            @foreach (var pg in Model.AllPages)
-            {
-                var pu = MatCMS.Services.SiteContext.LocalizedUrl(pg.Locale, pg.Slug);
-                <a class="ev2-page@(pg.Id == p.Id ? " is-cur" : "")" asp-page="Editor" asp-route-id="@pg.Id"
-                   data-search="@((pg.Title + " " + pu + " " + pg.Locale).ToLowerInvariant())">
-                    <span class="t">@pg.Title</span>
-                    <span class="u mono">@pu</span>
-                    <span class="badge @(pg.IsPublished ? "badge-on" : "badge-off")">@(pg.IsPublished ? T["ev2.published"] : T["ev2.draft"])</span>
-                    @if (Model.SupportedLocales.Count > 1)
-                    {
-                        <span class="badge mono">@pg.Locale.ToUpperInvariant()</span>
-                    }
-                </a>
-            }
-        </div>
-    </div>
 
     @if (Model.SupportedLocales.Count > 1)
     {
@@ -331,5 +311,6 @@
     <script src="~/js/mat-richselect.js" asp-append-version="true"></script>
     <script src="~/js/admin-blocks.js" asp-append-version="true"></script>
     <script src="~/js/editor-v2.js" asp-append-version="true"></script>
+    <script src="~/js/admin-page-switcher.js" asp-append-version="true"></script>
 </body>
 </html>

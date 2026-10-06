@@ -21,8 +21,13 @@ body.ev2 { margin: 0; display: grid; grid-template-columns: 280px minmax(0, 1fr)
     border: 1px solid var(--border-strong); color: var(--black); flex: 0 0 auto; transition: background .15s, color .15s; }
 .ev2-back:hover i { background: var(--black); border-color: var(--black); color: var(--on-ink); }
 .ev2-back small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
-.ev2-title { display: flex; align-items: center; gap: 8px; min-width: 0; padding-left: 8px; }
-.ev2-title-text { font-family: var(--font-head); font-weight: 600; font-size: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ev2-title { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 0 1 auto; padding-left: 8px; }
+/* The shared page switcher (_PageSwitcher, same as the classic editor): title over address, wide enough to
+   read both, the published state and the language next to it. */
+/* A fixed width, not a flex basis: the richselect root sizes itself in percent, and a percentage gives the
+   bar no real content width — the title area then collapsed and the save status slid underneath it. */
+.ev2-title .le-pagepick { flex: 0 0 auto; width: 460px; min-width: 0; }
+.ev2-title .le-pagepick .mat-rs-menu { min-width: 100%; width: max(100%, 460px); }
 .ev2-status { font-size: 13px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .ev2-status.is-dirty { color: #b45309; }
 .ev2-status.is-error { color: #b42318; }
@@ -139,25 +144,20 @@ body.ev2 { margin: 0; display: grid; grid-template-columns: 280px minmax(0, 1fr)
 .ev2-pop { position: fixed; z-index: 60; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
     box-shadow: 0 12px 34px rgba(0, 0, 0, .14); max-height: min(520px, 80vh); }
 .ev2-pop[hidden] { display: none; }
-.ev2-pages, .ev2-langs { width: 380px; padding: 8px; }
-.ev2-pages .list-search { width: 100%; min-width: 0; box-sizing: border-box; margin-bottom: 6px; }
-.ev2-pages-list { overflow: auto; max-height: min(420px, 60vh); display: flex; flex-direction: column; gap: 2px; }
+.ev2-langs { width: 380px; padding: 8px; }
 .ev2-page { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 2px 8px; align-items: center; padding: 8px 10px; border-radius: 8px; text-decoration: none; color: inherit; font-size: 14px; }
 .ev2-page[hidden] { display: none; }
 .ev2-page .t { grid-column: 1; grid-row: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .ev2-page .u { grid-column: 1; grid-row: 2; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ev2-page .badge { grid-row: 1 / span 2; }
 .ev2-page:hover { background: rgba(0, 0, 0, .05); }
-.ev2-page.is-cur { background: color-mix(in srgb, var(--accent) 10%, #fff); }
+.ev2-page.is-cur { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
 .ev2-langs .ev2-page { grid-template-columns: auto minmax(0, 1fr); }
 .ev2-langs .ev2-page .badge { grid-row: auto; grid-column: 1; }
 .ev2-langs .ev2-page .t { grid-column: 2; }
 .ev2-pop-head { padding: 4px 10px 6px; }
 .ev2-langs-form { margin: 0; }
 .ev2-langs .ev2-add { margin: 2px 0; width: 100%; padding: 8px 10px; font-size: 14px; }
-.ev2-title-btn { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; padding: 4px 6px; margin-left: -6px; border-radius: 7px; cursor: pointer; min-width: 0; color: inherit; }
-.ev2-title-btn:hover { background: var(--hover); }
-.ev2-title-btn i { color: var(--muted); font-size: 15px; flex: 0 0 auto; }
 .ev2-lang-btn { border: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 3px; font: inherit; font-size: 11.5px; }
 
 /* --- flash after a redirect (translation created …): the admin's alert colours, floating --- */
@@ -171,6 +171,15 @@ body.ev2 .ev2-tree-toggle, .ev2-insp-close { display: none; }
 
 /* --- smaller screens: tree and inspector narrow; below 1000 px the inspector slides in over the
    preview when a block is chosen, on a phone the tree does the same --- */
+/* The top bar fills up as the screen narrows: first the switcher gets narrower, the save state shows only
+   its icon (words in the tooltip, colour unchanged) and the published badge goes — the switcher's list
+   shows that state too. */
+@media (max-width: 1440px) {
+    .ev2-title .le-pagepick { width: 360px; }
+    .ev2-title > .badge { display: none; }
+    .ev2-status { font-size: 0; gap: 0; }
+    .ev2-status .ti { font-size: 17px; }
+}
 @media (max-width: 1280px) { body.ev2 { grid-template-columns: 240px minmax(0, 1fr) 320px; } .ev2-back { width: 240px; } }
 @media (max-width: 1000px) {
     body.ev2 { grid-template-columns: 220px minmax(0, 1fr); }
@@ -178,15 +187,18 @@ body.ev2 .ev2-tree-toggle, .ev2-insp-close { display: none; }
     .ev2-insp { position: fixed; right: 0; top: 67px; bottom: 0; width: min(360px, 92vw); z-index: 40; box-shadow: -10px 0 30px rgba(0, 0, 0, .12); display: none; }
     body.ev2-insp-open .ev2-insp { display: flex; }
     .ev2-insp-close { display: block; }
-    .ev2-hide-s { display: none; }
+    /* body.ev2 in front: since the editor carries .admin, ".admin .btn { display: inline-flex }" would win
+       over a plain class and the hidden buttons came back. */
+    body.ev2 .ev2-hide-s { display: none; }
+    .ev2-title .le-pagepick { width: 280px; }
 }
 @media (max-width: 700px) {
     body.ev2 { grid-template-columns: 1fr; grid-template-rows: 56px minmax(0, 1fr); }
     .ev2-top { height: 56px; gap: 6px; padding-right: 8px; }
     .ev2-back { width: auto; height: 56px; padding: 0 8px; border-right: 0; background: none; }
-    .ev2-back span, .ev2-status, .ev2-dev, #ev2-redo, .ev2-title .badge, .ev2-sp { display: none; }
+    .ev2-back span, .ev2-status, #ev2-redo, .ev2-title > .badge, .ev2-sp, body.ev2 .ev2-dev { display: none; }
     .ev2-title { flex: 1; min-width: 0; padding-left: 0; }
-    .ev2-title-text { font-size: 16px; }
+    .ev2-title .le-pagepick { flex: 1 1 auto; width: auto; min-width: 0; }
     body.ev2 .ev2-tree-toggle { display: inline-flex; }
     .ev2-nav { display: none; position: fixed; left: 0; top: 56px; bottom: 0; width: min(320px, 88vw); z-index: 45; box-shadow: 10px 0 30px rgba(0, 0, 0, .12); }
     body.ev2-nav-open .ev2-nav { display: block; }

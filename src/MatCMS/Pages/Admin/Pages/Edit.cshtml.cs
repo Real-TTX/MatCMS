@@ -932,7 +932,13 @@ public class EditModel : PageModel
     // the overview the operator came from.
     private async Task LoadSwitcherAsync(PageEntity page)
     {
-        var all = await _db.Pages.AsNoTracking()
+        (CurrentGroup, SwitchGroups) = await BuildSwitcherAsync(_db, page);
+    }
+
+    /// <summary>The switcher's data for any page editor (classic and v2 share the _PageSwitcher partial).</summary>
+    public static async Task<(SwitchGroup? Current, IReadOnlyList<SwitchGroup> Others)> BuildSwitcherAsync(AppDbContext db, PageEntity page)
+    {
+        var all = await db.Pages.AsNoTracking()
             .OrderBy(p => p.NavOrder).ThenBy(p => p.FooterOrder).ThenBy(p => p.Title)
             .ToListAsync();
 
@@ -957,9 +963,15 @@ public class EditModel : PageModel
             .OrderBy(g => g.PrimaryTitle, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
 
-        CurrentGroup = groups.FirstOrDefault(g => g.Versions.Any(v => v.Id == page.Id));
+        var current = groups.FirstOrDefault(g => g.Versions.Any(v => v.Id == page.Id));
         // The current group appears exactly once, at the top — repeating it below would offer the
         // same page twice and make the arrow keys walk over it a second time.
-        SwitchGroups = groups.Where(g => g != CurrentGroup).ToList();
+        return (current, groups.Where(g => g != current).ToList());
     }
 }
+
+/// <summary>Model of the shared page switcher (_PageSwitcher.cshtml): the current page, its address, the
+/// grouped site pages, which editor the entries open ("Edit" / "Editor") and what counts as unsaved work
+/// there (a global probe function and the ids of settings forms).</summary>
+public sealed record PageSwitcherModel(PageEntity Current, string CurrentUrl, EditModel.SwitchGroup? CurrentGroup,
+    IReadOnlyList<EditModel.SwitchGroup> SwitchGroups, string TargetPage, string DirtyProbe, string DirtyForms);

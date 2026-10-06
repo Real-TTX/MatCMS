@@ -158,7 +158,10 @@
     function go(el) {
         if (!el) return;
         mayLeave(el.getAttribute("data-title") || "").then(function (ok) {
-            if (ok) window.location.href = el.getAttribute("href");   // cancel → stay put
+            if (!ok) return;                                          // cancel → stay put
+            // The page may guard unloading itself (editor v2's beforeunload) — it already got its answer.
+            if (typeof window.matBeforeLeave === "function") window.matBeforeLeave();
+            window.location.href = el.getAttribute("href");
         });
     }
 

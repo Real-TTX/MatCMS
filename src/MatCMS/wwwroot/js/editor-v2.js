@@ -119,6 +119,8 @@
         statusEl.innerHTML = statusText ? statusText.html
             : d ? '<i class="ti ti-point-filled"></i> ' + esc(t("unsaved"))
             : '<i class="ti ti-circle-check ev2-ok"></i> ' + esc(t("saved"));
+        // Narrow bars show only the icon (see editor-v2.css) — the words stay reachable as the tooltip.
+        statusEl.title = statusEl.textContent.trim();
     }
 
     // ---------- tree rendering ----------
@@ -798,7 +800,8 @@
             // What the page is now called and where it lives — the slug may have been cleaned up.
             pageForm.querySelector('[name="Meta.Slug"]').value = res.slug;
             pageSaved = pageSnap();
-            document.querySelectorAll(".ev2-title-text, #ev2-page-node-title").forEach(function (n) { n.textContent = res.title; });
+            document.querySelectorAll("#ev2-page-node-title, .le-pagepick .mat-rs-trigger .mat-rs-opt-title, .le-pagepick .mat-rs-opt[aria-selected=true] .mat-rs-opt-title").forEach(function (n) { n.textContent = res.title; });
+            document.querySelectorAll(".le-pagepick .mat-rs-trigger .mat-rs-opt-desc").forEach(function (n) { n.textContent = res.url; });
             var badge = document.querySelector(".ev2-title > .badge");
             if (badge) { badge.className = "badge " + (res.published ? "badge-on" : "badge-off"); badge.textContent = res.published ? t("published") : t("draft"); }
             var view = document.querySelector('.ev2-top a[target="_blank"]'); if (view) view.setAttribute("href", res.url);
@@ -859,7 +862,9 @@
     document.addEventListener("click", function (e) {
         // Only the editor's own ways out (top bar, tree column, page/language lists) — not links inside
         // a field, the media picker or a dialog.
-        var a = e.target.closest("a[href]"); if (!a || a.target === "_blank" || !a.closest(".ev2-top, .ev2-nav, .ev2-pages, .ev2-langs")) return;
+        // The page switcher handles its own entries (and asks through ev2Dirty) — not a second time here.
+        if (e.defaultPrevented) return;
+        var a = e.target.closest("a[href]"); if (!a || a.target === "_blank" || !a.closest(".ev2-top, .ev2-nav, .ev2-langs") || a.closest(".le-pagepick")) return;
         if (!dirty()) { leaving = true; return; }
         e.preventDefault();
         okToLeave().then(function (ok) { if (ok) window.location.href = a.href; });
@@ -881,7 +886,7 @@
         btn.addEventListener("click", function (e) {
             e.stopPropagation();
             var open = pop.hidden;
-            document.querySelectorAll(".ev2-pages, .ev2-langs").forEach(function (p) { p.hidden = true; });
+            document.querySelectorAll(".ev2-langs").forEach(function (p) { p.hidden = true; });
             if (!open) return;
             pop.hidden = false;
             var r = btn.getBoundingClientRect();
@@ -892,20 +897,11 @@
         document.addEventListener("mousedown", function (e) { if (!pop.hidden && !pop.contains(e.target) && !btn.contains(e.target)) pop.hidden = true; });
         document.addEventListener("keydown", function (e) { if (e.key === "Escape") pop.hidden = true; });
     }
-    popover("ev2-pages-open", "ev2-pages", function () {
-        var q = document.getElementById("ev2-pages-search"); q.value = ""; filterPages(); q.focus();
-        var cur = document.querySelector("#ev2-pages-list .is-cur"); if (cur) cur.scrollIntoView({ block: "nearest" });
-    });
     popover("ev2-langs-open", "ev2-langs");
-    function filterPages() {
-        var q = document.getElementById("ev2-pages-search").value.trim().toLowerCase();
-        document.querySelectorAll("#ev2-pages-list .ev2-page").forEach(function (a) { a.hidden = q && a.getAttribute("data-search").indexOf(q) < 0; });
-    }
-    var ps = document.getElementById("ev2-pages-search");
-    if (ps) {
-        ps.addEventListener("input", filterPages);
-        ps.addEventListener("keydown", function (e) { if (e.key === "Enter") { var first = document.querySelector("#ev2-pages-list .ev2-page:not([hidden])"); if (first) first.click(); } });
-    }
+    // The shared page switcher (admin-page-switcher.js) asks about unsaved work through this probe and,
+    // once the operator agreed, calls matBeforeLeave — so the browser's own "leave page?" stays quiet.
+    window.ev2Dirty = function () { return dirty(); };
+    window.matBeforeLeave = function () { leaving = true; };
 
     // ---------- KI ----------
     // Both work on the DRAFT: a proposal is applied into it like any other edit — undoable, and only

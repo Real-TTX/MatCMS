@@ -156,7 +156,10 @@ table.cleanup-list { table-layout: fixed; }
 table.cleanup-list .cleanup-check { width: 40px; }
 table.cleanup-list .cleanup-thumb { width: 68px; }
 table.cleanup-list .cleanup-thumb img { width: 56px; height: 40px; object-fit: cover; border-radius: 4px; display: block; }
-table.cleanup-list .cleanup-info { width: 170px; }
+/* table.data: the generic "last column = action buttons" rule (width:1%, nowrap) is more specific than a
+   plain .cleanup-list rule, and in this fixed layout it squeezed the info column to ~10px with its heading
+   running out of the card. */
+table.data.cleanup-list th.cleanup-info, table.data.cleanup-list td.cleanup-info { width: 170px; white-space: normal; }
 table.cleanup-list td { overflow: hidden; text-overflow: ellipsis; }
 
 /* A matrix table (recipients × events): centred tick columns, group rows set apart, the "+" row last. */

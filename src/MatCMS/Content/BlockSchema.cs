@@ -27,6 +27,17 @@ public static class BlockSchema
     /// <summary>Per-block custom CSS (advanced) — for EVERY block, nested elements included (see BlockCss):
     /// scoped under the block's own `.blk-&lt;id&gt;` via native CSS nesting, so rules never leak to other
     /// blocks. Bare declarations style the block itself, `&amp; h2 { … }` what is inside it.</summary>
+    /// <summary>Show / hide a block (any block, nested ones included). Hidden = not rendered on the site, kept
+    /// as it is and still shown — faded — in the editors. Stored in the block's own data, so it travels in
+    /// backups and through the cloud like every other setting. Editor v2 drives it from the tree's eye button.</summary>
+    public const string HiddenId = "_hidden";
+    public static readonly BlockField HiddenField =
+        new BlockField { Id = HiddenId, Label = "Sichtbarkeit", Type = FieldType.Select, Default = "",
+            Options = [ new("", "Sichtbar"), new("1", "Ausgeblendet") ],
+            Help = "Ausgeblendete Blöcke erscheinen nicht auf der Website, bleiben aber erhalten." };
+
+    public static bool IsHidden(BlockData data) => data.Str(HiddenId) == "1";
+
     public static readonly BlockField CssField =
         new BlockField { Id = "_css", Label = "Custom CSS", Type = FieldType.Textarea,
             Placeholder = "background: #f6f6f6;\n& h2 { color: #289068; }",
@@ -77,6 +88,7 @@ public static class BlockSchema
         var list = def.Fields.Select(f => Localize(f, t, sources)).ToList();
         if (!def.ChildOnly) list.AddRange(GlobalLayoutFields.Select(f => Localize(f, t, sources)));
         list.Add(Localize(CssField, t, sources));
+        list.Add(Localize(HiddenField, t, sources));
         return list;
     }
 

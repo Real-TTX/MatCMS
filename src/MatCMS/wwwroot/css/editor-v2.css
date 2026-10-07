@@ -102,6 +102,14 @@ body.ev2 { margin: 0; display: grid; grid-template-columns: 280px minmax(0, 1fr)
 .ev2-node .act button:hover { opacity: 1; background: rgba(0, 0, 0, .08); }
 .ev2-node.is-sel .act button:hover { background: rgba(255, 255, 255, .2); }
 .ev2-node .act .grip { cursor: grab; opacity: .45; font-size: 15px; padding: 2px; }
+/* Hidden blocks: faded row, a permanent eye-off mark; what sits inside a hidden container fades along. */
+.ev2-node.is-hidden .lbl, .ev2-node.is-hidden .ic { opacity: .45; }
+.ev2-node.is-hidden .lbl { text-decoration: line-through; text-decoration-color: rgba(128, 128, 128, .5); }
+.ev2-node .hid-mark { font-size: 15px; color: var(--text-muted); flex: 0 0 auto; }
+.ev2-node:hover .hid-mark, .ev2-node.is-sel .hid-mark { display: none; }
+.ev2-tree li:has(> .ev2-node.is-hidden) > ul { opacity: .55; }
+.ev2-hint-hidden { background: var(--warn-bg); border-color: var(--warn-line); color: var(--warn-fg); align-items: center; }
+.ev2-linkbtn { border: 0; background: none; padding: 0; font: inherit; font-weight: 600; color: inherit; text-decoration: underline; cursor: pointer; }
 .ev2-add { display: flex; align-items: center; gap: 6px; padding: 5px 8px; margin: 0 0 4px 22px; font-size: 13px; color: var(--muted); border-radius: 7px;
     cursor: pointer; border: 0; background: none; font-family: inherit; width: calc(100% - 22px); text-align: left; text-decoration: none; }
 .ev2-add:hover { background: var(--hover); color: var(--black); }

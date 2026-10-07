@@ -139,7 +139,8 @@
         var open = container && expanded[b.id] !== false;
         if (container && !open) li.className = "is-closed";
         var node = document.createElement("div");
-        node.className = "ev2-node" + (String(b.id) === String(selectedId) ? " is-sel" : "");
+        var hiddenB = data(b)._hidden === "1";
+        node.className = "ev2-node" + (String(b.id) === String(selectedId) ? " is-sel" : "") + (hiddenB ? " is-hidden" : "");
         node.setAttribute("role", "treeitem");
         node.setAttribute("data-id", b.id);
         node.tabIndex = 0;
@@ -150,7 +151,9 @@
             '<span class="tw">' + (container ? '<i class="ti ti-chevron-' + (open ? "down" : "right") + '"></i>' : "") + "</span>" +
             '<span class="ic">' + svgIcon(d.svg) + "</span>" +
             '<span class="lbl">' + esc(label(b)) + (sum ? " <em>" + esc(sum) + "</em>" : container && children.length && b.blockType !== "el-column" ? " <em>(" + children.length + ")</em>" : "") + "</span>" +
+            (hiddenB ? '<i class="ti ti-eye-off hid-mark" title="' + esc(t("hidden")) + '" aria-label="' + esc(t("hidden")) + '"></i>' : "") +
             '<span class="act">' +
+            '<button type="button" data-act="hide" title="' + esc(hiddenB ? t("show") : t("hide")) + '"><i class="ti ti-' + (hiddenB ? "eye" : "eye-off") + '"></i></button>' +
             '<button type="button" data-act="up" title="' + esc(t("moveUp")) + '"><i class="ti ti-arrow-up"></i></button>' +
             '<button type="button" data-act="down" title="' + esc(t("moveDown")) + '"><i class="ti ti-arrow-down"></i></button>' +
             '<button type="button" data-act="dup" title="' + esc(t("duplicate")) + '"><i class="ti ti-copy"></i></button>' +
@@ -264,6 +267,12 @@
             record();
             sibs.splice(j, 0, sibs.splice(i, 1)[0]);
             sibs.forEach(function (k, n) { k.sortOrder = n; });
+        } else if (act === "hide") {
+            // Hidden = not on the site; the block stays in the page and in the editor (faded).
+            record();
+            var hd = data(b);
+            if (hd._hidden === "1") delete hd._hidden; else hd._hidden = "1";
+            b.dataJson = JSON.stringify(hd);
         } else if (act === "dup") {
             record();
             var copyRoot = clone(b, b.parentId);
@@ -604,6 +613,8 @@
         };
         var values = data(b);
         insp.body.innerHTML = "";
+        if (values._hidden === "1")
+            insp.body.insertAdjacentHTML("beforeend", '<p class="ev2-hint ev2-hint-hidden"><i class="ti ti-eye-off"></i> <span>' + esc(t("hiddenHint")) + ' <button type="button" class="ev2-linkbtn" data-unhide>' + esc(t("show")) + "</button></span></p>");
         if (["el-heading", "el-text", "el-button"].indexOf(b.blockType) >= 0)
             insp.body.insertAdjacentHTML("beforeend", '<p class="ev2-hint"><i class="ti ti-pencil"></i> ' + esc(t("inlineHint")) + "</p>");
         var kidsBox = isContainer(b) ? childList(b) : null;
@@ -666,6 +677,7 @@
         });
     });
     document.querySelector(".ev2-insp").addEventListener("click", function (e) {
+        if (e.target.closest("[data-unhide]") && selectedId != null) { action("hide", selectedId); return; }
         var go = e.target.closest("[data-go]");
         if (go) { var v = go.getAttribute("data-go"); if (v === "") selectPage(); else select(Number(v), true); return; }
         var here = e.target.closest("[data-add-here]");

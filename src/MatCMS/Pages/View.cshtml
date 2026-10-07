@@ -46,6 +46,9 @@ else
         .mat-ed-block.mat-selected { outline: 3px solid #2563eb; outline-offset: -3px; }
         .mat-ed-block.mat-selected:hover { outline: 3px solid #2563eb; }
         .mat-ed-block.mat-flash { animation: matFlash 1s ease; }
+        /* A hidden block: kept and clickable in the editor, faded and framed so it reads as "not on the site". */
+        .mat-ed-hidden { opacity: .38; outline: 2px dashed rgba(100, 116, 139, .7) !important; outline-offset: -2px; filter: grayscale(.6); }
+        .mat-ed-hidden:hover { opacity: .6; }
         /* Children of a container (editor v2): the mark sits on a display:contents wrapper, so the hover
            and the selection go on the element it wraps. */
         .mat-ed-child > *:hover { outline: 1px dashed rgba(37, 99, 235, .6); outline-offset: 2px; }

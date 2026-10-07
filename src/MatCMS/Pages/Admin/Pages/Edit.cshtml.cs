@@ -316,7 +316,7 @@ public class EditModel : PageModel
         {
             "align", "width", "layout", "columns", "imageHeight", "size", "display", "showFilter",
             "source", "perPage", "limit", "form", "tag", "tags", "_width", "_spaceTop", "_spaceBottom",
-            "buttonStyle", "icon", "imageSide", "bg", "fg", "position", "variant", "style", "_css"
+            "buttonStyle", "icon", "imageSide", "bg", "fg", "position", "variant", "style", "_css", "_hidden"
         };
         static bool Prose(string s) => s.Length > 1 && s.Any(char.IsLetter) && !s.StartsWith("/") && !s.StartsWith("http");
 
@@ -396,7 +396,7 @@ public class EditModel : PageModel
         {
             "align", "width", "layout", "columns", "imageHeight", "size", "display", "showFilter",
             "source", "perPage", "limit", "form", "tag", "tags", "_width", "_spaceTop", "_spaceBottom",
-            "buttonStyle", "icon", "imageSide", "bg", "fg", "position", "variant", "style", "_css"
+            "buttonStyle", "icon", "imageSide", "bg", "fg", "position", "variant", "style", "_css", "_hidden"
         };
         static bool Prose(string s) => s.Length > 1 && s.Any(char.IsLetter) && !s.StartsWith("/") && !s.StartsWith("http");
         var sb = new System.Text.StringBuilder();

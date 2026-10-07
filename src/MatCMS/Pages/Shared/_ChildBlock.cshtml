@@ -16,7 +16,10 @@
     var content = Model.Container is not null
         ? await Html.PartialAsync(Model.Partial, Model.Container)
         : await Html.PartialAsync(Model.Partial, Model.Data);
-    var css = Model.Id != 0 ? MatCMS.Content.BlockCss.Scope(Model.Id, (Model.Container?.Data ?? Model.Data)?.Str(MatCMS.Content.BlockCss.Field)) : "";
+    var ownData = Model.Container?.Data ?? Model.Data;
+    var css = Model.Id != 0 ? MatCMS.Content.BlockCss.Scope(Model.Id, ownData?.Str(MatCMS.Content.BlockCss.Field)) : "";
+    // Hidden children never reach the site (BuildContainer skips them); in the editor they arrive faded.
+    var hidden = Model.Editor && ownData is not null && MatCMS.Content.BlockSchema.IsHidden(ownData);
     string? html = null;
     if (Model.Editor || css.Length > 0)
     {
@@ -24,6 +27,7 @@
         content.WriteTo(sw, System.Text.Encodings.Web.HtmlEncoder.Default);
         html = sw.ToString();
         if (css.Length > 0) html = MatCMS.Content.BlockCss.AddScopeClass(html, MatCMS.Content.BlockCss.ScopeClass(Model.Id));
+        if (hidden) html = MatCMS.Content.BlockCss.AddScopeClass(html, "mat-ed-hidden");
     }
 }
 @if (css.Length > 0)

@@ -1247,7 +1247,9 @@ body.has-adminbar .site-header { top: 67px; }
 .el-image.el-shape-landscape img { aspect-ratio: 16 / 9; object-fit: cover; }
 .el-image figcaption { margin-top: 8px; font-size: .9em; opacity: .75; }
 
-.el-buttons { display: flex; flex-wrap: wrap; gap: 12px; }
+/* align-items: center — a link-style button is plain text next to padded boxes; without it the text
+   sat at the top of the row instead of in line with the button beside it. */
+.el-buttons { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 .el-buttons.el-stack-column { flex-direction: column; align-items: flex-start; }
 .el-inner.el-align-center .el-buttons, .el-column.el-align-center .el-buttons, .el-buttons.el-align-center { justify-content: center; }
 .el-inner.el-align-right .el-buttons, .el-column.el-align-right .el-buttons, .el-buttons.el-align-right { justify-content: flex-end; }

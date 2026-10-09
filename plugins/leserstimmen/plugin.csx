@@ -3,8 +3,9 @@ using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection;
 
-// Leserstimmen — visitor reviews with a 1–5 rating (stars, flames or hearts), shown as cards, with a
-// submission form, an average, and moderation in the admin.
+// Leserstimmen — visitor reviews with a 1–5 rating (stars, hearts, flames, dots — or none at all), shown as
+// cards, a quote carousel, a list or a ticker, with a submission form, an average, moderation in the admin
+// and a mail notification on new reviews.
 //
 // Its own key on purpose: MatCMS seeds a plugin "bewertungen" and rewrites that one's code on every
 // start, so an improved version under the same key would silently be reverted by the next restart.
@@ -12,11 +13,15 @@ using Microsoft.Extensions.DependencyInjection;
 //
 // Configuration (Plugins → Leserstimmen → Konfiguration, all optional):
 //   autoPublish = true      publish without moderation
-//   notifyEmail = a@b.de    mail on every new review (falls back to the site's contact recipient)
+//   notifyEmail = a@b.de    legacy: used only until the notification is set up on the admin page
+// The notification itself (on/off, recipients, when) lives in SiteSettings "plugin.leserstimmen-notify" —
+// deliberately NOT under Prefix, which is where the collections are listed from.
 
 const string Prefix = "plugin.leserstimmen.";
 const int MaxPerStore = 1000;   // an anonymous endpoint must not grow storage without bound
 const int MinSeconds = 3;       // a form sent faster than this after rendering came from a script
+const string NotifyKey = "plugin.leserstimmen-notify";
+const string AdminUrl = "/admin/plugin/leserstimmen";
 
 // Plugin code runs again on every admin save, and handlers of the old run can still be in flight
 // while the new run registers its own. A lock object created HERE would therefore exist twice and
@@ -38,7 +43,7 @@ string Slug(string store)
 // Stored JSON is read defensively: one malformed value must cost one field, not the whole page.
 string S(JsonNode n, string k) { try { return n?[k]?.GetValue<string>() ?? ""; } catch { return n?[k]?.ToString() ?? ""; } }
 long L(JsonNode n, string k) { try { return n?[k]?.GetValue<long>() ?? 0; } catch { return long.TryParse(S(n, k), out var v) ? v : 0; } }
-int Rating(JsonNode n) { long r; try { r = n?["rating"]?.GetValue<int>() ?? 5; } catch { r = L(n, "rating"); } return (int)Math.Clamp(r, 1, 5); }
+int Rating(JsonNode n) { long r; try { r = n?["rating"]?.GetValue<int>() ?? 5; } catch { r = L(n, "rating"); } return (int)Math.Clamp(r, 0, 5); }
 bool Approved(JsonNode n) { try { return n?["approved"]?.GetValue<bool>() ?? false; } catch { return S(n, "approved") == "true"; } }
 
 JsonArray Load(AppDbContext db, string store)
@@ -107,6 +112,7 @@ bool AutoPublish() => string.Equals(Config("autoPublish"), "true", StringCompari
 string SymPath(string sym) => sym switch
 {
     "flamme" => "M12 2c.6 3.2 2.4 5.2 4.1 7.1C17.7 10.9 19 12.7 19 15.2 19 19 15.9 22 12 22s-7-3-7-6.8c0-2.4 1.2-4.2 2.7-5.6.2 1.7 1 2.9 2.2 3.5-.4-2.9.4-5.8 3.1-9.1z",
+    "punkt" => "M12 5.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 1 0 0-13z",
     "herz" => "M12 21s-7.5-4.6-9.6-9.3C1 8.3 3 4.5 6.6 4.5c2.1 0 3.6 1.2 4.4 2.6.8-1.4 2.3-2.6 4.4-2.6 3.6 0 5.6 3.8 4.2 7.2C19.5 16.4 12 21 12 21z",
     _ => "M12 2.6l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.5l-5.9 3.1 1.2-6.5L2.5 9.5l6.6-.9z"
 };
@@ -115,10 +121,12 @@ string Noun(string sym, int n) => sym switch
 {
     "flamme" => n == 1 ? "Flamme" : "Flammen",
     "herz" => n == 1 ? "Herz" : "Herzen",
+    "punkt" => n == 1 ? "Punkt" : "Punkte",
     _ => n == 1 ? "Stern" : "Sterne"
 };
 string Symbols(int r, string sym)
 {
+    if (sym == "keine" || r < 1) return "";
     var sb = new StringBuilder("<span class='mls-sym' role='img' aria-label='" + r + " von 5 " + Noun(sym, 5) + "'>");
     for (int i = 1; i <= 5; i++) sb.Append("<span class='" + (i <= r ? "on" : "off") + "'>" + Svg(sym) + "</span>");
     return sb.Append("</span>").ToString();
@@ -138,26 +146,95 @@ bool TokenOk(IServiceProvider sp, string token)
     catch { return false; }
 }
 
+// ---- notification ------------------------------------------------------------------------------
+// Settings: { on, when: "all"|"pending", users: [ids], emails: "one per line" }. Without a saved row the
+// plugin behaves as before 1.3: mail to the notifyEmail config, else the site's contact recipient.
+JsonObject NotifySettings(AppDbContext db)
+{
+    var row = db?.SiteSettings.FirstOrDefault(x => x.Key == NotifyKey);
+    if (row != null && !string.IsNullOrWhiteSpace(row.Value)) { try { if (JsonNode.Parse(row.Value) is JsonObject o) return o; } catch { } }
+    return null;
+}
+void SaveNotifySettings(AppDbContext db, JsonObject o)
+{
+    var row = db.SiteSettings.FirstOrDefault(x => x.Key == NotifyKey);
+    if (row == null) db.SiteSettings.Add(new SiteSetting { Key = NotifyKey, Value = o.ToJsonString() });
+    else row.Value = o.ToJsonString();
+    db.SaveChanges();
+}
+bool NotifyOn(JsonObject ns) { try { return ns?["on"]?.GetValue<bool>() ?? false; } catch { return false; } }
+List<string> SplitMails(string s) => (s ?? "").Split(new[] { ',', ';', '\n', '\r', ' ' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+    .Where(x => x.Contains('@') && x.Length <= 200).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+List<int> UserIds(JsonObject o) { var l = new List<int>(); try { if (o?["users"] is JsonArray a) foreach (var n in a) l.Add(n.GetValue<int>()); } catch { } return l; }
+List<string> Recipients(AppDbContext db, JsonObject ns)
+{
+    if (ns == null)
+    {
+        var legacy = Config("notifyEmail");
+        if (string.IsNullOrWhiteSpace(legacy)) legacy = db?.SiteSettings.FirstOrDefault(x => x.Key == "ContactRecipient")?.Value ?? "";
+        return SplitMails(legacy);
+    }
+    var ids = UserIds(ns);
+    var list = db.Users.Where(u => ids.Contains(u.Id) && u.Email != null).Select(u => u.Email).ToList();
+    list.AddRange(SplitMails(S(ns, "emails")));
+    return list.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+}
+// The site's own address for the link in the mail. The request carries it; behind a proxy MatCMS has
+// already applied the forwarded headers.
+string SiteBase(IServiceProvider sp)
+{
+    var http = sp.GetService<Microsoft.AspNetCore.Http.IHttpContextAccessor>()?.HttpContext;
+    return http == null ? "" : http.Request.Scheme + "://" + http.Request.Host.Value;
+}
+string MailHtml(string siteBase, string name, int rating, string email, string text, string link, bool published, string store)
+{
+    string E(string x) => System.Net.WebUtility.HtmlEncode(x ?? "");
+    var stars = rating > 0 ? new string('★', rating) + new string('☆', 5 - rating) : "";
+    return "<div style='font-family:Segoe UI,Arial,sans-serif;max-width:560px;margin:0 auto;color:#222'>" +
+        "<p style='font-size:13px;color:#888;margin:0 0 6px'>Leserstimmen · Sammlung „" + E(store) + "“</p>" +
+        "<h2 style='margin:0 0 14px;font-size:20px'>Neue Stimme von " + E(name) + "</h2>" +
+        (stars.Length > 0 ? "<p style='font-size:22px;letter-spacing:2px;color:#c98a2b;margin:0 0 12px'>" + stars + "</p>" : "") +
+        "<blockquote style='margin:0 0 16px;padding:14px 18px;border-left:4px solid #c98a2b;background:#f7f4ef;font-size:15px;line-height:1.6'>" + E(text).Replace("\n", "<br>") + "</blockquote>" +
+        (email.Length > 0 ? "<p style='margin:0 0 6px;font-size:14px'>E-Mail: " + E(email) + "</p>" : "") +
+        (link.Length > 0 ? "<p style='margin:0 0 6px;font-size:14px'>Link: <a href='" + E(link) + "'>" + E(link) + "</a></p>" : "") +
+        "<p style='margin:18px 0'>" + (published ? "Sie ist bereits veröffentlicht." : "Sie wartet auf deine Freigabe.") + "</p>" +
+        (siteBase.Length > 0 ? "<p><a href='" + E(siteBase + AdminUrl) + "' style='display:inline-block;background:#222;color:#fff;text-decoration:none;padding:11px 20px;border-radius:8px;font-weight:600'>" +
+            (published ? "Leserstimmen öffnen" : "Jetzt prüfen und freigeben") + "</a></p>" : "") +
+        "</div>";
+}
 // Mail goes out after the response on its own scope: the request's services are disposed by then,
 // and a slow SMTP server must not hold up the visitor's redirect.
-void Notify(IServiceProvider sp, string subject, string body)
+void SendMail(IServiceProvider sp, List<string> to, string subject, string html)
 {
-    var to = Config("notifyEmail");
-    if (string.IsNullOrWhiteSpace(to))
-        to = sp.GetService<AppDbContext>()?.SiteSettings.FirstOrDefault(x => x.Key == "ContactRecipient")?.Value ?? "";
-    if (string.IsNullOrWhiteSpace(to)) return;
+    if (to.Count == 0) return;
     var scopes = sp.GetRequiredService<IServiceScopeFactory>();
-    var list = to.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
     _ = Task.Run(async () =>
     {
         try
         {
             using var scope = scopes.CreateScope();
             var mail = scope.ServiceProvider.GetService<EmailService>();
-            if (mail != null) await mail.SendAsync(list, subject, body);
+            if (mail != null) await mail.SendAsync(to, subject, html, null, true);
         }
         catch { }
     });
+}
+void Notify(IServiceProvider sp, string name, int rating, string email, string text, string link, bool published, string store)
+{
+    var db = sp.GetService<AppDbContext>();
+    var ns = NotifySettings(db);
+    if (ns != null && (!NotifyOn(ns) || (S(ns, "when") == "pending" && published))) return;
+    SendMail(sp, Recipients(db, ns), (published ? "Neue Leserstimme von " : "Neue Leserstimme zur Freigabe: ") + name,
+        MailHtml(SiteBase(sp), name, rating, email, text, link, published, store));
+}
+// The admin menu shows how many reviews wait: "Leserstimmen (2)". The registry entry is replaced in place
+// after every change, so the number is current without re-running every plugin.
+string MenuLabel(AppDbContext db) { var n = db == null ? 0 : All(db).Count(x => !Approved(x.R)); return n > 0 ? "Leserstimmen (" + n + ")" : "Leserstimmen"; }
+void RefreshBadge(PluginRegistry reg, AppDbContext db)
+{
+    if (reg == null || db == null) return;
+    for (int i = 0; i < reg.AdminMenu.Count; i++)
+        if (reg.AdminMenu[i].Url == AdminUrl) { reg.AdminMenu[i] = new PluginRegistry.AdminMenuEntry(MenuLabel(db), AdminUrl, "ti-message-heart"); return; }
 }
 
 AddHeadHtml("<style>" +
@@ -201,7 +278,73 @@ AddHeadHtml("<style>" +
   ".mls-empty{text-align:center;font-style:italic;opacity:.75;margin:0 0 30px;}" +
   "</style>");
 
-AddAdminMenu("Leserstimmen", "/admin/plugin/leserstimmen", "ti-message-heart");
+AddHeadHtml("<style>" + DesignCss + "</style>");
+AddBodyHtml("<script>" + SliderJs + "</script>");
+AddAdminMenu(MenuLabel(Service<AppDbContext>()), AdminUrl, "ti-message-heart");
+
+// ---- designs: everything below is scoped to .mls--<design> / .mls--<look>, the classic cards stay as they were
+const string DesignCss = """
+.mls--hell :is(.mls-card,.mls-c,.mls-form,.mls-ok,.mls-slider__btn){--mls-card:#fff;--mls-text:#444;--mls-head:#151515;--mls-line:rgba(0,0,0,.1);--mls-off:rgba(0,0,0,.18);--mls-field:#fff}
+.mls--dunkel :is(.mls-card,.mls-c,.mls-form,.mls-ok,.mls-slider__btn){--mls-card:#1d1b22;--mls-text:#d6d2dc;--mls-head:#fff;--mls-line:rgba(255,255,255,.12);--mls-off:rgba(255,255,255,.22);--mls-field:#141218}
+.mls--akzent :is(.mls-card,.mls-c,.mls-form,.mls-ok,.mls-slider__btn){--mls-card:color-mix(in srgb,var(--mls-accent) 11%,var(--bg,#fff));--mls-line:color-mix(in srgb,var(--mls-accent) 30%,transparent);--mls-off:color-mix(in srgb,var(--mls-accent) 28%,transparent)}
+.mls--hell .mls-c--row,.mls--dunkel .mls-c--row,.mls--akzent .mls-c--row{padding:24px 22px;margin:0 0 10px;border:1px solid var(--mls-line);border-radius:var(--mls-radius);background:var(--mls-card)}
+.mls-c{position:relative;break-inside:avoid;margin:0 0 24px;background:var(--mls-card);border:1px solid var(--mls-line);border-radius:calc(var(--mls-radius) + 4px);padding:30px 26px 22px;color:var(--mls-text);transition:transform .25s ease,box-shadow .25s ease}
+.mls-c:hover{transform:translateY(-3px);box-shadow:0 18px 40px rgba(0,0,0,.12)}
+.mls-c__q{position:absolute;left:20px;top:2px;font:700 64px/1 Georgia,serif;color:var(--mls-accent);opacity:.35;pointer-events:none}
+.mls-c blockquote{margin:14px 0 18px;padding:0;border:0;font-family:var(--mls-quote-font);font-size:16px;line-height:1.7;color:var(--mls-text);overflow-wrap:anywhere}
+.mls-c figcaption{display:flex;align-items:center;gap:12px;margin:0;padding-top:14px;border-top:1px solid var(--mls-line)}
+.mls-c__av{flex:none;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:16px;color:#fff;background:hsl(var(--h) 42% 46%)}
+.mls-c__who{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.35}
+.mls-c__who b{color:var(--mls-head);font-weight:600;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mls-c__who small{font-size:12.5px;opacity:.7}
+.mls-c__who a{color:var(--mls-accent);text-decoration:none}
+.mls-c__r .mls-sym svg{width:15px;height:15px}
+.mls-rows{max-width:860px;margin:0 auto 40px;border-top:1px solid var(--mls-line)}
+.mls-c--row{display:grid;grid-template-columns:220px 1fr;gap:6px 30px;margin:0;padding:24px 4px;border:0;border-bottom:1px solid var(--mls-line);border-radius:0;background:none}
+.mls-c--row:hover{transform:none;box-shadow:none}
+.mls-c--row .mls-c__q{display:none}
+.mls-c--row blockquote{grid-column:2;grid-row:1;margin:0}
+.mls-c--row figcaption{grid-column:1;grid-row:1;align-self:start;flex-wrap:wrap;border:0;padding:0}
+.mls-c--row .mls-c__r{flex-basis:100%}
+@media(max-width:700px){.mls-c--row{grid-template-columns:1fr}.mls-c--row blockquote,.mls-c--row figcaption{grid-column:1;grid-row:auto}}
+.mls-slider{max-width:820px;margin:0 auto 44px}
+.mls-slider__track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;scrollbar-width:none;outline:none}
+.mls-slider__track::-webkit-scrollbar{display:none}
+.mls-c--slide{flex:0 0 100%;scroll-snap-align:center;margin:0;text-align:center;padding:44px 40px 30px;border-radius:calc(var(--mls-radius) + 8px)}
+.mls-c--slide:hover{transform:none;box-shadow:none}
+.mls-c--slide .mls-c__q{left:50%;transform:translateX(-50%);top:-4px;font-size:84px}
+.mls-c--slide blockquote{font-size:clamp(17px,2.2vw,21px);line-height:1.6;margin:18px auto 22px;max-width:640px}
+.mls-c--slide figcaption{justify-content:center;border:0;padding:0}
+.mls-c--slide .mls-c__who{flex:0 1 auto;text-align:left}
+.mls-slider__nav{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:18px}
+.mls-slider__btn{width:40px;height:40px;border-radius:50%;border:1px solid var(--mls-line);background:var(--mls-card);color:var(--mls-head);font-size:22px;line-height:1;cursor:pointer}
+.mls-slider__btn:hover{border-color:var(--mls-accent);color:var(--mls-accent)}
+.mls-slider__dots{display:flex;gap:8px}
+.mls-slider__dots button{width:9px;height:9px;padding:0;border-radius:50%;border:0;background:var(--mls-off);cursor:pointer;transition:transform .2s,background .2s}
+.mls-slider__dots button[aria-current]{background:var(--mls-accent);transform:scale(1.35)}
+.mls-marquee{overflow:hidden;margin:0 -24px 44px;-webkit-mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent);mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent)}
+.mls-marquee__track{display:flex;gap:22px;width:max-content;animation:mls-tick var(--mls-dur,40s) linear infinite}
+.mls-marquee__dup{display:contents}
+.mls-marquee:hover .mls-marquee__track{animation-play-state:paused}
+.mls-c--tick{width:340px;flex:none;margin:0}
+.mls-c--tick blockquote{display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden}
+@keyframes mls-tick{to{transform:translateX(calc(-50% - 11px))}}
+@media(prefers-reduced-motion:reduce){.mls-marquee{overflow-x:auto}.mls-marquee__track{animation:none}.mls-marquee__dup{display:none}.mls-c{transition:none}}
+""";
+const string SliderJs = """
+(function(){if(window.__mlsSlider)return;window.__mlsSlider=1;
+function init(root){if(root.__mls)return;root.__mls=1;var tr=root.querySelector('.mls-slider__track');if(!tr)return;
+var dots=[].slice.call(root.querySelectorAll('.mls-slider__dots button')),n=tr.children.length,i=0,t=null,rm=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+function go(k){i=(k+n)%n;tr.scrollTo({left:tr.clientWidth*i});mark();}
+function mark(){dots.forEach(function(d,j){if(j===i)d.setAttribute('aria-current','true');else d.removeAttribute('aria-current');});}
+tr.addEventListener('scroll',function(){var k=Math.round(tr.scrollLeft/Math.max(1,tr.clientWidth));if(k!==i){i=k;mark();}},{passive:true});
+root.querySelectorAll('[data-dir]').forEach(function(b){b.addEventListener('click',function(){go(i+ +b.getAttribute('data-dir'));});});
+dots.forEach(function(d,j){d.addEventListener('click',function(){go(j);});});
+function start(){if(rm||n<2)return;stop();t=setInterval(function(){go(i+1);},7000);}function stop(){if(t)clearInterval(t);t=null;}
+root.addEventListener('mouseenter',stop);root.addEventListener('mouseleave',start);root.addEventListener('focusin',stop);start();}
+function scan(){document.querySelectorAll('[data-mls-slider]').forEach(init);}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',scan);else scan();})();
+""";
 
 // ---- public endpoint: a visitor submits a review --------------------------------------------
 AddPublicPage("leserstimmen", req =>
@@ -217,7 +360,10 @@ AddPublicPage("leserstimmen", req =>
     var email = (req.F("email") ?? "").Trim();
     var link = SafeUrl(req.F("link"));
     int rating = int.TryParse(req.F("rating"), out var rr) ? rr : 0;
-    if (name.Length == 0 || text.Length == 0 || rating < 1 || rating > 5) return "";
+    // A block set to "ohne Wertung" sends nr=1 and no rating; it is stored as 0 and never counted in an average.
+    if (req.F("nr") == "1") rating = 0;
+    else if (rating < 1 || rating > 5) return "";
+    if (name.Length == 0 || text.Length == 0) return "";
     if (name.Length > 80) name = name.Substring(0, 80);
     if (text.Length > 3000) text = text.Substring(0, 3000);
     if (email.Length > 200 || !email.Contains('@')) email = "";
@@ -241,11 +387,9 @@ AddPublicPage("leserstimmen", req =>
         });
         Save(db, store, arr);
     }
-    req.Log("Neue Leserstimme (" + rating + "/5) von " + name + (auto ? " – veröffentlicht" : " – wartet auf Freigabe"));
-    Notify(req.Services, "Neue Leserstimme von " + name,
-        name + " hat " + rating + " von 5 gegeben" + (email.Length > 0 ? " (" + email + ")" : "") + ":\n\n" + text +
-        (link.Length > 0 ? "\n\nLink: " + link : "") +
-        (auto ? "\n\nSie ist bereits veröffentlicht." : "\n\nSie wartet in der Verwaltung unter „Leserstimmen“ auf deine Freigabe."));
+    req.Log("Neue Leserstimme (" + (rating > 0 ? rating + "/5" : "ohne Wertung") + ") von " + name + (auto ? " – veröffentlicht" : " – wartet auf Freigabe"));
+    Notify(req.Services, name, rating, email, text, link, auto, store);
+    RefreshBadge(req.Registry, db);
     return "";
 });
 
@@ -254,7 +398,9 @@ const string Fields = """
 [
  {"id":"heading","label":"Überschrift","type":"text","placeholder":"Leserstimmen"},
  {"id":"store","label":"Sammlung","type":"text","default":"default","help":"Name der Liste, z. B. ein Buchtitel. Blöcke mit derselben Sammlung zeigen dieselben Stimmen."},
- {"id":"symbol","label":"Symbol","type":"select","default":"stern","options":[{"value":"stern","label":"Sterne"},{"value":"flamme","label":"Flammen"},{"value":"herz","label":"Herzen"}]},
+ {"id":"layout","label":"Darstellung","type":"select","default":"karten","options":[{"value":"karten","label":"Karten (klassisch)"},{"value":"elegant","label":"Karten mit Zitatzeichen und Initialen"},{"value":"zitat","label":"Großes Zitat, eins nach dem anderen"},{"value":"liste","label":"Schlichte Liste"},{"value":"laufband","label":"Laufband"}]},
+ {"id":"look","label":"Farben","type":"select","default":"template","options":[{"value":"template","label":"Wie das Template"},{"value":"hell","label":"Hell"},{"value":"dunkel","label":"Dunkel"},{"value":"akzent","label":"Akzentfarbe"}]},
+ {"id":"symbol","label":"Wertung mit","type":"select","default":"stern","options":[{"value":"stern","label":"Sternen"},{"value":"herz","label":"Herzen"},{"value":"punkt","label":"Punkten"},{"value":"flamme","label":"Flammen"},{"value":"keine","label":"Ohne Wertung"}]},
  {"id":"address","label":"Anrede","type":"select","default":"sie","options":[{"value":"sie","label":"Sie"},{"value":"du","label":"du"}]},
  {"id":"columns","label":"Spalten","type":"select","default":"3","options":[{"value":"1","label":"1"},{"value":"2","label":"2"},{"value":"3","label":"3"}]},
  {"id":"showAverage","label":"Durchschnitt zeigen","type":"select","default":"ja","options":[{"value":"ja","label":"Ja"},{"value":"nein","label":"Nein"}]},
@@ -267,7 +413,7 @@ const string Fields = """
 ]
 """;
 
-AddBlock("leserstimmen", "Leserstimmen", "Rezensionen mit Sterne-, Flammen- oder Herz-Bewertung: Karten, Durchschnitt und Formular.", req =>
+AddBlock("leserstimmen", "Leserstimmen", "Rezensionen und Kundenstimmen – als Karten, großes Zitat, Liste oder Laufband, mit Sternen, Herzen, Punkten oder ohne Wertung, Durchschnitt und Formular.", req =>
 {
     JsonObject d = null;
     try { d = JsonNode.Parse(req.Data) as JsonObject; } catch { }
@@ -278,6 +424,11 @@ AddBlock("leserstimmen", "Leserstimmen", "Rezensionen mit Sterne-, Flammen- oder
     var cols = D("columns", "3");
     if (cols != "1" && cols != "2") cols = "3";
     var askEmail = D("askEmail", "nein");
+    var layout = D("layout", "karten");
+    if (layout is not ("elegant" or "zitat" or "liste" or "laufband")) layout = "karten";
+    var look = D("look", "template");
+    if (look is not ("hell" or "dunkel" or "akzent")) look = "template";
+    var noRating = sym == "keine";
 
     var db = req.Service<AppDbContext>();
     var shown = Load(db, store).Where(Approved).ToList();
@@ -285,16 +436,18 @@ AddBlock("leserstimmen", "Leserstimmen", "Rezensionen mit Sterne-, Flammen- oder
 
     var id = "mls-" + store;   // anchor + id prefix: two blocks on one page must not share radio ids
     var sb = new StringBuilder();
-    sb.Append("<section class='section'><div class='mls' id='" + id + "' style='--mls-cols:" + cols + "'>");
+    var cls = "mls" + (layout != "karten" ? " mls--" + layout : "") + (look != "template" ? " mls--" + look : "");
+    sb.Append("<section class='section'><div class='" + cls + "' id='" + id + "' style='--mls-cols:" + cols + "'>");
     var heading = D("heading", "");
     if (heading.Length > 0) sb.Append("<h2>" + Enc(heading) + "</h2>");
 
-    if (shown.Count > 0 && D("showAverage", "ja") == "ja")
+    var rated = shown.Where(n => Rating(n) > 0).ToList();
+    if (!noRating && rated.Count > 0 && D("showAverage", "ja") == "ja")
     {
-        var avg = shown.Average(n => (double)Rating(n));
+        var avg = rated.Average(n => (double)Rating(n));
         sb.Append("<p class='mls-avg'>" + Symbols((int)Math.Round(avg), sym) + "<strong>" +
             avg.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture).Replace(".", ",") + "</strong> von 5 · " +
-            shown.Count + (shown.Count == 1 ? " Stimme" : " Stimmen") + "</p>");
+            rated.Count + (rated.Count == 1 ? " Stimme" : " Stimmen") + "</p>");
     }
     if (req.Q("leserstimme") == "danke")
         sb.Append("<div class='mls-ok' role='status'>" + (du ? "Danke für deine Bewertung!" : "Vielen Dank für Ihre Bewertung!") +
@@ -305,7 +458,7 @@ AddBlock("leserstimmen", "Leserstimmen", "Rezensionen mit Sterne-, Flammen- oder
 
     if (shown.Count == 0)
         sb.Append("<p class='mls-empty'>" + (du ? "Noch keine Stimmen – sei die oder der Erste!" : "Noch keine Bewertungen – seien Sie die oder der Erste!") + "</p>");
-    else
+    else if (layout == "karten")
     {
         sb.Append("<div class='mls-list'>");
         foreach (var n in shown)
@@ -318,6 +471,61 @@ AddBlock("leserstimmen", "Leserstimmen", "Rezensionen mit Sterne-, Flammen- oder
                 (date.Length > 0 ? "<small>" + date + "</small>" : "") + "</figcaption></figure>");
         }
         sb.Append("</div>");
+    }
+    else
+    {
+        // One card markup for the newer designs: quote mark, text, then who (initial, name, date/link) and rating.
+        string Card(JsonNode n, string extra)
+        {
+            var link = SafeUrl(S(n, "link"));
+            var date = DateTime.TryParse(S(n, "date"), null, System.Globalization.DateTimeStyles.RoundtripKind, out var dt) ? Month(dt) : "";
+            var nm = S(n, "name").Trim();
+            var bare = nm.TrimStart('@').Trim();
+            var initial = bare.Length > 0 ? bare.Substring(0, 1).ToUpperInvariant() : "?";
+            var hue = Math.Abs(nm.Aggregate(17, (h, ch) => unchecked(h * 31 + ch))) % 360;
+            var meta = new List<string>();
+            if (date.Length > 0) meta.Add(date);
+            if (link.Length > 0) meta.Add("<a href='" + Enc(link) + "' target='_blank' rel='nofollow ugc noopener'>" + Enc(UrlHost(link)) + " ↗</a>");
+            return "<figure class='mls-c" + extra + "'><span class='mls-c__q' aria-hidden='true'>“</span>" +
+                (layout == "zitat" ? Symbols(Rating(n), sym) : "") +
+                "<blockquote>" + Enc(S(n, "text")).Replace("\n", "<br>") + "</blockquote>" +
+                "<figcaption><span class='mls-c__av' style='--h:" + hue + "' aria-hidden='true'>" + Enc(initial) + "</span>" +
+                "<span class='mls-c__who'><b>" + Enc(nm) + "</b>" + (meta.Count > 0 ? "<small>" + string.Join(" · ", meta) + "</small>" : "") + "</span>" +
+                (layout != "zitat" ? "<span class='mls-c__r'>" + Symbols(Rating(n), sym) + "</span>" : "") + "</figcaption></figure>";
+        }
+        if (layout == "elegant")
+        {
+            sb.Append("<div class='mls-list'>");
+            foreach (var n in shown) sb.Append(Card(n, ""));
+            sb.Append("</div>");
+        }
+        else if (layout == "liste")
+        {
+            sb.Append("<div class='mls-rows'>");
+            foreach (var n in shown) sb.Append(Card(n, " mls-c--row"));
+            sb.Append("</div>");
+        }
+        else if (layout == "zitat")
+        {
+            sb.Append("<div class='mls-slider' data-mls-slider><div class='mls-slider__track' tabindex='0' aria-label='Stimmen, zum Blättern wischen'>");
+            foreach (var n in shown) sb.Append(Card(n, " mls-c--slide"));
+            sb.Append("</div>");
+            if (shown.Count > 1)
+            {
+                sb.Append("<div class='mls-slider__nav'><button type='button' class='mls-slider__btn' data-dir='-1' aria-label='Vorherige Stimme'>‹</button><div class='mls-slider__dots'>");
+                for (int i = 0; i < shown.Count; i++) sb.Append("<button type='button' aria-label='Stimme " + (i + 1) + "'" + (i == 0 ? " aria-current='true'" : "") + "></button>");
+                sb.Append("</div><button type='button' class='mls-slider__btn' data-dir='1' aria-label='Nächste Stimme'>›</button></div>");
+            }
+            sb.Append("</div>");
+        }
+        else
+        {
+            // Ticker: the cards twice in a row, the track moves by exactly one half — a seamless loop.
+            var cards = string.Join("", shown.Select(n => Card(n, " mls-c--tick")));
+            var secs = Math.Max(30, shown.Count * 9);
+            sb.Append("<div class='mls-marquee'><div class='mls-marquee__track' style='--mls-dur:" + secs + "s'>" + cards +
+                "<div class='mls-marquee__dup' aria-hidden='true'>" + cards + "</div></div></div>");
+        }
     }
 
     if (D("showForm", "ja") == "ja")
@@ -341,11 +549,15 @@ AddBlock("leserstimmen", "Leserstimmen", "Rezensionen mit Sterne-, Flammen- oder
             sb.Append("<label for='" + id + "-email'>E-Mail <span class='mls-opt'>(wird nicht veröffentlicht" + (askEmail == "pflicht" ? "" : ", optional") + ")</span></label>");
             sb.Append("<input type='email' id='" + id + "-email' name='email' maxlength='200' autocomplete='email'" + (askEmail == "pflicht" ? " required" : "") + "/>");
         }
-        sb.Append("<fieldset><legend>" + (du ? "Deine " : "Ihre ") + Noun(sym, 5) + "</legend><div class='mls-rate'>");
-        for (int i = 5; i >= 1; i--)
-            sb.Append("<input type='radio' id='" + id + "-r" + i + "' name='rating' value='" + i + "'" + (i == 5 ? " required" : "") + "/>" +
-                "<label for='" + id + "-r" + i + "' title='" + i + " " + Noun(sym, i) + "'>" + Svg(sym) + "</label>");
-        sb.Append("</div></fieldset>");
+        if (noRating) sb.Append("<input type='hidden' name='nr' value='1'/>");
+        else
+        {
+            sb.Append("<fieldset><legend>" + (du ? "Deine " : "Ihre ") + Noun(sym, 5) + "</legend><div class='mls-rate'>");
+            for (int i = 5; i >= 1; i--)
+                sb.Append("<input type='radio' id='" + id + "-r" + i + "' name='rating' value='" + i + "'" + (i == 5 ? " required" : "") + "/>" +
+                    "<label for='" + id + "-r" + i + "' title='" + i + " " + Noun(sym, i) + "'>" + Svg(sym) + "</label>");
+            sb.Append("</div></fieldset>");
+        }
         if (D("askLink", "nein") == "ja")
         {
             sb.Append("<label for='" + id + "-link'>Link zu " + (du ? "deinem" : "Ihrem") + " Beitrag <span class='mls-opt'>(optional)</span></label>");
@@ -364,6 +576,37 @@ AddBlock("leserstimmen", "Leserstimmen", "Rezensionen mit Sterne-, Flammen- oder
 AddAdminPage("leserstimmen", req =>
 {
     var db = req.Service<AppDbContext>();
+    if (req.IsPost && req.Action == "notify-save")
+    {
+        var users = new JsonArray();
+        foreach (var u in db.Users.Where(u => u.Email != null && u.Email != "").Select(u => u.Id).ToList())
+            if (req.F("nu_" + u) == "on") users.Add(u);
+        SaveNotifySettings(db, new JsonObject
+        {
+            ["on"] = req.F("n_on") == "on", ["when"] = req.F("n_when") == "pending" ? "pending" : "all",
+            ["users"] = users, ["emails"] = string.Join("\n", SplitMails(req.F("n_emails")))
+        });
+        req.Log("Leserstimmen: Benachrichtigung gespeichert.");
+        return "";
+    }
+    if (req.IsPost && req.Action == "notify-test")
+    {
+        var to = Recipients(db, NotifySettings(db));
+        void Remember(string msg)
+        {
+            var row = db.SiteSettings.FirstOrDefault(x => x.Key == NotifyKey + "-test");
+            var v = DateTime.UtcNow.ToString("o") + "|" + msg;
+            if (row == null) db.SiteSettings.Add(new SiteSetting { Key = NotifyKey + "-test", Value = v }); else row.Value = v;
+            db.SaveChanges();
+            req.Log("Leserstimmen: " + msg);
+        }
+        if (to.Count == 0) { Remember("Test-Mail nicht gesendet: kein Empfänger eingetragen."); return ""; }
+        var mail = req.Service<EmailService>();
+        var (ok, err) = mail == null ? (false, "kein Mail-Dienst") : mail.SendAsync(to, "Test: Leserstimmen-Benachrichtigung",
+            MailHtml(SiteBase(req.Services), "Lena (Test)", 5, "", "So sieht die Benachrichtigung aus, wenn jemand eine Stimme abgibt. Diese hier ist nur ein Test.", "", false, "default"), null, true).GetAwaiter().GetResult();
+        Remember(ok ? "Test-Mail an " + string.Join(", ", to) + " gesendet." : "Test-Mail fehlgeschlagen: " + err);
+        return "";
+    }
     if (req.IsPost)
     {
         var action = req.Action;
@@ -423,6 +666,7 @@ AddAdminPage("leserstimmen", req =>
                 req.Log("Leserstimme " + action + " (" + id + ")");
             }
         }
+        RefreshBadge(req.Registry, db);
         return "";
     }
 
@@ -481,6 +725,40 @@ AddAdminPage("leserstimmen", req =>
         "<div class='form-field'><label>Text</label><textarea name='text' rows='4' maxlength='3000' required></textarea></div>" +
         "<button type='submit' class='btn'>Hinzufügen</button>";
     sb.Append(req.Ui.Card(req.Ui.Form(add, new Dictionary<string, string> { ["action"] = "add" }), "Von Hand hinzufügen"));
+
+    // ---- notification
+    string LastTest(AppDbContext d)
+    {
+        var v = d.SiteSettings.FirstOrDefault(x => x.Key == NotifyKey + "-test")?.Value ?? "";
+        var i = v.IndexOf('|');
+        if (i < 0) return "";
+        var when = DateTime.TryParse(v.Substring(0, i), null, System.Globalization.DateTimeStyles.RoundtripKind, out var t) ? t.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "";
+        return "<p class='help' style='margin-top:8px'>Letzter Test (" + when + "): " + Enc(v.Substring(i + 1)) + "</p>";
+    }
+    var ns = NotifySettings(db);
+    var nOn = ns == null ? Recipients(db, null).Count > 0 : NotifyOn(ns);
+    var nIds = ns == null ? new List<int>() : UserIds(ns);
+    var nMails = ns == null ? string.Join("\n", Recipients(db, null)) : S(ns, "emails");
+    var mailSvc = req.Service<EmailService>();
+    var mailReady = mailSvc != null && mailSvc.IsConfiguredAsync().GetAwaiter().GetResult();
+    var nb = new StringBuilder();
+    if (!mailReady) nb.Append(req.Ui.Alert("Diese Seite kann noch keine Mails versenden. Unter Einstellungen → E-Mail den Versand einrichten (oder über die Cloud).", "info"));
+    nb.Append("<div class='form-field'><label style='display:flex;gap:8px;align-items:center;font-weight:600'><input type='checkbox' name='n_on'" + (nOn ? " checked" : "") + "> Bei neuen Stimmen per E-Mail benachrichtigen</label></div>");
+    nb.Append("<div class='form-field'><label>Wann</label><select name='n_when'><option value='all'" + (ns == null || S(ns, "when") != "pending" ? " selected" : "") + ">Bei jeder neuen Stimme</option><option value='pending'" + (ns != null && S(ns, "when") == "pending" ? " selected" : "") + ">Nur wenn eine Freigabe nötig ist</option></select></div>");
+    var admins = db.Users.Where(u => u.Email != null && u.Email != "").OrderBy(u => u.Username).ToList();
+    if (admins.Count > 0)
+    {
+        nb.Append("<div class='form-field'><label>Empfänger aus den Benutzern</label>");
+        foreach (var u in admins)
+            nb.Append("<label style='display:flex;gap:8px;align-items:center;font-weight:400;margin:4px 0'><input type='checkbox' name='nu_" + u.Id + "'" + (nIds.Contains(u.Id) ? " checked" : "") + "> " + Enc(string.IsNullOrWhiteSpace(u.DisplayName) ? u.Username : u.DisplayName) + " <span class='muted'>(" + Enc(u.Email) + ")</span></label>");
+        nb.Append("</div>");
+    }
+    nb.Append("<div class='form-field'><label>Weitere Adressen</label><textarea name='n_emails' rows='2' placeholder='eine pro Zeile'>" + Enc(nMails) + "</textarea><div class='help'>Eine Adresse pro Zeile.</div></div>");
+    nb.Append("<button type='submit' class='btn'>Speichern</button>");
+    var nCard = req.Ui.Form(nb.ToString(), new Dictionary<string, string> { ["action"] = "notify-save" }) +
+        "<div style='margin-top:10px'>" + req.Ui.ActionButton("Test-Mail senden", new Dictionary<string, string> { ["action"] = "notify-test" }, "btn-ghost") + "</div>" +
+        LastTest(db);
+    sb.Append(req.Ui.Card(nCard, "Benachrichtigung"));
 
     var open = Legacy(db).Count(x => !Load(db, x.Store).Any(n => S(n, "name") == S(x.R, "name") && S(n, "text") == S(x.R, "text")));
     if (open > 0)

@@ -9,6 +9,7 @@ Store der Cloud oder einen Bundle-Import.
 | Ordner | Plugin | Stand |
 | --- | --- | --- |
 | `leserstimmen/` | Leserstimmen — Rezensionen mit Sternen/Flammen/Herzen | aktuell, im Global Store |
+| `cookie-consent/` | Cookie-Banner — Einwilligung für Statistik/Marketing/externe Medien, blockiert bis zur Zustimmung | aktuell, im Global Store |
 | `bewertungen/` | Bewertungen (früher eingebaut) | Altbestand, ersetzt durch Leserstimmen (dort „Aus Bewertungen übernehmen“) |
 | `google-reviews/` | Google Bewertungen (früher eingebaut) | Altbestand; Vorgabe-Konfiguration steht in `meta.json` unter `DefaultConfig` (reist nicht im Bundle mit) |
 | `todo-verwaltung-beispiel/` | Todo-Verwaltung (Beispiel, früher eingebaut) | Anschauungsbeispiel für die Plugin-API |

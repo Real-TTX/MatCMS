@@ -1,0 +1,6 @@
+{
+  "Key": "cookie-consent",
+  "Name": "Cookie-Banner",
+  "Version": "1.0",
+  "Description": "Fragt Besucher, bevor Statistik, Marketing oder externe Medien laden – und lädt sie erst danach. „Alle akzeptieren“ und „Nur notwendige“ gleichwertig, Einstellungen pro Kategorie, Wieder-Öffnen-Button, Platzhalter für Videos/Karten, optional Google Consent Mode v2. Ohne optionale Kategorie bleibt der Banner ausgeblendet."
+}

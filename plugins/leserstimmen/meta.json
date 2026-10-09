@@ -1,6 +1,6 @@
 {
   "Key": "leserstimmen",
   "Name": "Leserstimmen",
-  "Version": "1.2",
-  "Description": "Rezensionen mit Sterne-, Flammen- oder Herz-Bewertung: Karten, Durchschnitt, Abgabeformular mit Spamschutz, Freigabe und Einträge von Hand im Admin, Mail bei neuen Stimmen, Übernahme aus „Bewertungen“. Farben kommen aus dem aktiven Template."
+  "Version": "1.3",
+  "Description": "Rezensionen und Kundenstimmen: als Karten, großes Zitat-Karussell, Liste oder Laufband, in Template-Farben, hell, dunkel oder Akzent; Wertung mit Sternen, Herzen, Punkten, Flammen oder ohne. Durchschnitt, Abgabeformular mit Spamschutz, Freigabe und Einträge von Hand im Admin, E-Mail-Benachrichtigung mit Empfängerwahl und Zähler im Menü."
 }

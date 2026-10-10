@@ -16,6 +16,8 @@
 #   4. Matcad (http://<server>:4433): finish the first-run setup, set the ACME e-mail, add ONE route by
 #      hand for the cloud itself:  cloud.example.de  →  http://matcms-cloud:8080
 #   5. Cloud (https://cloud.example.de, or http://<server>:9100 until the route exists):
+#      Einstellungen → Allgemein → Öffentliche Adresse:  https://cloud.example.de  — new sites find the
+#      cloud ONLY through it; without it provisioning refuses (the site would never enroll).
 #      Hosting → Proxy:  Anbieter "Matcad", URL  http://matcad:4433, Schlüssel = MATCAD_API_KEY,
 #      Upstream "Docker-Netzwerk", Netzwerk  matcms-hosting   → "Testen" must be green.
 #      Same thing over the API (key with CanManageHosting + all instances):

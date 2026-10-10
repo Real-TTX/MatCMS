@@ -204,6 +204,10 @@ public class HostingService
         if (profile is null) return new(false, "Bitte ein Profil wählen.");
         if (!string.IsNullOrWhiteSpace(domain) && Proxy.ProxyService.NormaliseDomain(domain) is null)
             return new(false, "Keine gültige Domain (nur ein Hostname, z. B. shop.example.de).");
+        // The new container finds the cloud ONLY through this address (MatCms__Cloud__Url). Without it the
+        // site runs but never enrolls — a container nobody sees, so refuse before creating it.
+        if (string.IsNullOrWhiteSpace(_cloud.Get(SettingKeys.CanonicalUrl)))
+            return new(false, "Die öffentliche Adresse der Cloud fehlt (Einstellungen → Allgemein) — ohne sie kann sich die neue Instanz nicht anmelden.");
 
         var result = await CreateAsync(new CreateRequest(name.Trim(), domain?.Trim(), imageTag ?? "", profile.JoinCode, nodeId), ct);
         if (!result.Ok) return new(false, $"Anlegen fehlgeschlagen: {result.Error}");

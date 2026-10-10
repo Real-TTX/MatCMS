@@ -114,11 +114,10 @@ docker compose down -v       # RESET (deletes the volume: DB, keys)
 `docker-compose.full.yaml` starts the cloud together with Matcad and its Caddy on a shared network
 `matcms-hosting`. With the cloud's proxy set to Matcad (Hosting → Proxy, or `PUT /api/v1/hosting/proxy`),
 every site created under Hosting gets its container, its route and its HTTPS certificate automatically.
-The setup steps (API key in `.env`, DNS, the one manual route for the cloud itself) are in the file's
-header.
+The setup steps (Matcad's API key, written straight into the file; DNS; the one manual route for the
+cloud itself) are in the file's header.
 
 ```bash
-echo "MATCAD_API_KEY=$(openssl rand -hex 32)" > .env
 docker compose -f docker-compose.full.yaml up -d
 ```
 

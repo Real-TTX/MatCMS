@@ -7,8 +7,8 @@
 #
 # ---------------------------------------------------------------------------------------------------
 # Setup (once)
-#   1. API key for Matcad, in a .env file next to this one (never commit it):
-#        echo "MATCAD_API_KEY=$(openssl rand -hex 32)" > .env
+#   1. Matcad's API key: replace CHANGE-ME below (service "matcad") with a long random string, e.g. the
+#      output of  openssl rand -hex 32 . The cloud needs the same string in step 5.
 #   2. DNS: point the cloud's domain (e.g. cloud.example.de) and every website domain at this server
 #      (A/AAAA record). Ports 80 and 443 must be free on the host — Caddy takes them.
 #   3. Start:   docker compose -f docker-compose.full.yaml up -d
@@ -18,11 +18,11 @@
 #   5. Cloud (https://cloud.example.de, or http://<server>:9100 until the route exists):
 #      Einstellungen → Allgemein → Öffentliche Adresse:  https://cloud.example.de  — new sites find the
 #      cloud ONLY through it; without it provisioning refuses (the site would never enroll).
-#      Hosting → Proxy:  Anbieter "Matcad", URL  http://matcad:4433, Schlüssel = MATCAD_API_KEY,
+#      Hosting → Proxy:  Anbieter "Matcad", URL  http://matcad:4433, Schlüssel = der Key aus Schritt 1,
 #      Upstream "Docker-Netzwerk", Netzwerk  matcms-hosting   → "Testen" must be green.
 #      Same thing over the API (key with CanManageHosting + all instances):
 #        PUT /api/v1/hosting/proxy
-#        {"provider":"matcad","matcadUrl":"http://matcad:4433","matcadToken":"<MATCAD_API_KEY>",
+#        {"provider":"matcad","matcadUrl":"http://matcad:4433","matcadToken":"<Key aus Schritt 1>",
 #         "upstream":"network","network":"matcms-hosting"}
 #      These live in the cloud's database on purpose (rollable, editable in the UI) — not in env vars.
 #   6. From then on: new website = Hosting → Instanz anlegen with a domain. Container, route and
@@ -63,8 +63,9 @@ services:
       # or bound to 127.0.0.1 only.
       - "4433:4433"
     environment:
-      # Without a key Matcad's REST API answers 503 — the cloud could not create a single route.
-      - Matcad__ApiKey=${MATCAD_API_KEY:?MATCAD_API_KEY fehlt - in .env setzen (siehe Kopf dieser Datei)}
+      # Matcad reads its API key only from configuration — it has no UI for it. Without one its REST API
+      # answers 503 and the cloud cannot create a single route. Replace CHANGE-ME (step 1).
+      - Matcad__ApiKey=CHANGE-ME
     volumes:
       - matcad-data:/data
       - caddy-logs:/caddy-logs

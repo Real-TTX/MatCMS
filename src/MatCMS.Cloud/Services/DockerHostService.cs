@@ -172,13 +172,35 @@ public class DockerHostService : IDisposable
         var client = Client;
         if (client is null) return null;
         var list = await client.Containers.ListContainersAsync(new ContainersListParameters { All = true }, ct);
-        // The agent itself and a cloud on the same host are "matcms-cloud" images — infrastructure, not sites.
+        // Once its tag has moved on (a pull of :latest), a container reports its image only as "sha256:…" — the
+        // name check below would then miss "matcms-cloud". The image's remaining tags and repo digests still
+        // name it, so resolve those once.
+        var names = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            foreach (var img in await client.Images.ListImagesAsync(new ImagesListParameters { All = false }, ct))
+                names[img.ID] = string.Join(' ', (img.RepoTags ?? new List<string>()).Concat(img.RepoDigests ?? new List<string>()));
+        }
+        catch (Exception ex) { _log.LogWarning(ex, "Listing images failed"); }
+        string ImageNames(ContainerListResponse c) => (c.Image ?? "") + " " + names.GetValueOrDefault(c.ImageID ?? "", "");
+
         return list.Where(c => LooksLikeMatCms(c.Image ?? "", c.Labels)
-                               && !(c.Image ?? "").Contains("matcms-cloud", StringComparison.OrdinalIgnoreCase)
+                               && !IsInfrastructure(ImageNames(c))
                                && !(c.Labels?.ContainsKey(UpdaterLabel) ?? false)
                                && !(c.Labels?.ContainsKey(AgentUpdaterLabel) ?? false))
             .Select(ToInfo).ToList();
     }
+
+    /// <summary>
+    /// Containers that pass <see cref="LooksLikeMatCms"/> without being a site: the cloud itself (and a node agent,
+    /// both "matcms-cloud" images) and the proxy stack it is deployed with. The hosting stack's compose project is
+    /// called "matcms-hosting", so its Matcad and Caddy carry a project label that names MatCMS — listed as sites
+    /// they showed up as instances.
+    /// </summary>
+    private static bool IsInfrastructure(string imageNames) =>
+        imageNames.Contains("matcms-cloud", StringComparison.OrdinalIgnoreCase)
+        || imageNames.Contains("matcad", StringComparison.OrdinalIgnoreCase)
+        || imageNames.Contains("caddy", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>What a container uses right now. <paramref name="MemLimit"/> is the container's limit, which
     /// without a limit set is the host's whole memory.</summary>

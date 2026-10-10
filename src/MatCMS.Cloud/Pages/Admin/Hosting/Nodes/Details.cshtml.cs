@@ -58,6 +58,7 @@ public class DetailsModel : PageModel
     // Proxy tab.
     public ProxyFieldsView ProxyFields => Item is null ? _proxy.FieldsView() : ProxyService.FieldsView(Item);
     public ProxyService.WildcardConfig Wildcard => _proxy.WildcardFor(Item);
+    public WildcardFieldsView WildcardView { get; private set; } = null!;
     public bool AutoDomainEnabled => Item?.AutoDomainEnabled ?? _cloud.Flag(SettingKeys.HostingAutoDomainEnabled);
     public string? AutoDomainBase => Item is null ? _cloud.Get(SettingKeys.HostingAutoDomainBase) : Item.AutoDomainBase;
     public int MissingHostAddresses { get; private set; }
@@ -80,6 +81,22 @@ public class DetailsModel : PageModel
         Sites = data.Sites.Where(s => s.Host.NodeId == id).ToList();
         if (Item is not null) Jobs = await _nodes.JobsAsync(Item.Id, 50, HttpContext.RequestAborted);
         if (AutoDomainEnabled) MissingHostAddresses = await _proxy.MissingHostAddressCountAsync(Item, HttpContext.RequestAborted);
+        WildcardView = new(Wildcard, null, null, null);
+        if (ShowMatcad)
+        {
+            // Matcad's providers for the wildcard choice. Bounded: a Matcad that does not answer must not hold up the
+            // whole host page — the fields then fall back to free text with the reason shown.
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(HttpContext.RequestAborted);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            try
+            {
+                var types = await _matcad.ProviderTypesAsync(cts.Token);
+                WildcardView = new(Wildcard, await _matcad.ProvidersAsync(cts.Token), types, null);
+            }
+            catch (MatcadException ex) { WildcardView = new(Wildcard, null, null, ex.Message); }
+            catch (OperationCanceledException) when (!HttpContext.RequestAborted.IsCancellationRequested)
+            { WildcardView = new(Wildcard, null, null, "Matcad antwortet nicht."); }
+        }
         if (IsLocal && ModuleEnabled)
         {
             NextPort = await _hosting.NextFreePortAsync(HttpContext.RequestAborted);
@@ -187,8 +204,26 @@ public class DetailsModel : PageModel
     /// <summary>Automatic addresses (name.&lt;base&gt;) with the wildcard certificate, and for a node the address the edge
     /// reaches it at.</summary>
     public async Task<IActionResult> OnPostAddressesAsync(int? id, bool autoDomainEnabled, string? autoDomainBase, string? address,
-        bool wildcard, string? dnsProvider, string? dnsCredentials)
+        bool wildcard, string? dnsProvider, string? dnsCredentials, string? newProviderType, string? newProviderName,
+        Dictionary<string, string?>? newProviderCredentials)
     {
+        // "Neuen DNS-Anbieter anlegen" (Matcad on this host): create it in Matcad first, then use it by name.
+        if (dnsProvider == "__new")
+        {
+            if (!wildcard) dnsProvider = null;
+            else
+            {
+                List<MatcadAdminService.ProviderType> types;
+                try { types = await _matcad.ProviderTypesAsync(HttpContext.RequestAborted); }
+                catch (MatcadException ex) { TempData["FlashError"] = "DNS-Anbieter: " + ex.Message; return Back(id, "proxy"); }
+                var name = string.IsNullOrWhiteSpace(newProviderName)
+                    ? types.FirstOrDefault(t => t.Id == newProviderType)?.DisplayName ?? newProviderType
+                    : newProviderName.Trim();
+                var created = await _matcad.SaveProviderAsync(null, name, newProviderType, newProviderCredentials, HttpContext.RequestAborted);
+                if (!created.Ok) { TempData["FlashError"] = "DNS-Anbieter: " + created.Message; return Back(id, "proxy"); }
+                dnsProvider = name;
+            }
+        }
         Node? n = null;
         if (id is not null)
         {
@@ -258,8 +293,8 @@ public class DetailsModel : PageModel
         return Back(null, "matcad");
     }
 
-    public async Task<IActionResult> OnPostMatcadSettingsAsync(string? baseDomain, string? acmeEmail) =>
-        MatcadDone(await _matcad.SaveSettingsAsync(baseDomain ?? "", acmeEmail ?? "", HttpContext.RequestAborted));
+    public async Task<IActionResult> OnPostMatcadSettingsAsync(string? baseDomain, string? acmeEmail, int? propagationDelay, int? propagationTimeout) =>
+        MatcadDone(await _matcad.SaveSettingsAsync(baseDomain ?? "", acmeEmail ?? "", propagationDelay ?? 0, propagationTimeout ?? 0, HttpContext.RequestAborted));
 
     public async Task<IActionResult> OnPostMatcadRouteAsync(long? id, string? host, string? name, string? target, string? upstream,
         string? fallbackUrl, bool wildcard, long? providerId, bool enabled, bool allowEmbedding) =>

@@ -418,12 +418,15 @@ public class HostingTools
     }
 
     [McpServerTool(Name = "set_matcad_settings"), Description(
-        "Set Matcad's base domain (scope of its login cookie, grouping) and/or the ACME e-mail for Let's Encrypt. Omit a value to keep it, pass an empty string to clear it. The base domain of the instances' automatic addresses is a different setting: set_auto_domain. Requires the hosting right on an all-instances key.")]
+        "Set Matcad's base domain (scope of its login cookie, grouping) and/or the ACME e-mail for Let's Encrypt. Also the DNS propagation wait for wildcard certificates (slow DNS like netcup needs several minutes). Omit a value to keep it, pass an empty string to clear it. The base domain of the instances' automatic addresses is a different setting: set_auto_domain. Requires the hosting right on an all-instances key.")]
     public static async Task<object> SetMatcadSettings(McpContext me, MatCMS.Cloud.Services.Proxy.MatcadAdminService matcad,
-        string? baseDomain = null, string? acmeEmail = null, CancellationToken ct = default)
+        string? baseDomain = null, string? acmeEmail = null,
+        [Description("Seconds to wait after writing the DNS record (netcup: 600–900).")] int? propagationDelay = null,
+        [Description("Seconds to wait at most for the record to be visible; -1 = do not check.")] int? propagationTimeout = null,
+        CancellationToken ct = default)
     {
         RequireCloudWide(me);
-        return new { ok = true, message = Must(await matcad.SaveSettingsAsync(baseDomain, acmeEmail, ct)).Message };
+        return new { ok = true, message = Must(await matcad.SaveSettingsAsync(baseDomain, acmeEmail, propagationDelay, propagationTimeout, ct)).Message };
     }
 
     [McpServerTool(Name = "save_matcad_provider"), Description(

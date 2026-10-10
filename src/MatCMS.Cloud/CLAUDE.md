@@ -871,8 +871,12 @@ Design and increments: `docs/hosting-platform.md`. Increments 1–4 are built:
     an error). The module must be in that Caddy (`caddy add-package github.com/caddy-dns/<name>`), else a clear
     message. Levels of the tls app are only created when the PATH is missing — a refused content is reported as is.
     Matcad: a wildcard route `*.<base>` with the DNS provider named as in Matcad (redirect to the cloud URL for
-    unknown names); its credentials stay in Matcad. Tested against Caddy 2.11 with the hetzner module; the Matcad
-    path is untested.
+    unknown names); its credentials stay in Matcad. Tested against Caddy 2.11 with the hetzner module, and against
+    Matcad 0.6 with netcup (provider created, wildcard route applied by its Caddy). For "Dieser Host" with Matcad the
+    wildcard fields CHOOSE from Matcad's providers or create one inline with its type's fields (`WildcardFieldsView`) —
+    the old free-text name + key=value credentials did nothing with Matcad (it only takes the name of a provider it
+    has) and was the reason "netcup does not work". Slow DNS (netcup) needs Matcad's propagation delay (~600 s),
+    settable on the Matcad tab.
   - **Visitor IP through two proxies:** the edge's source IPs (`hosting.edge.trustedIps`) are set as
     `trusted_proxies` on every Caddy host (on edge save, node address save, and after a host route may have created
     the server); Matcad cannot be set from outside. The CMS takes TWO hops under `MatCms:Proxy:TrustAll`

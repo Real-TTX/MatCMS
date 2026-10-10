@@ -40,7 +40,9 @@ public sealed class MatcadAdminService
     public sealed record Route(long Id, string Name, string Host, bool Wildcard, string Target, string? Upstream, string? FallbackUrl,
         long? ProviderId, bool Enabled, bool AllowEmbedding, string Source, bool Editable, string? CertKind,
         string? ManagedBy, int? ManagedInstanceId);
-    public sealed record MatcadSettings(string BaseDomain, string AcmeEmail);
+    /// <param name="PropagationDelay">Seconds Caddy waits after writing the DNS record before asking Let's Encrypt to check it.</param>
+    /// <param name="PropagationTimeout">Seconds Caddy waits at most for the record to be visible (-1 = do not check).</param>
+    public sealed record MatcadSettings(string BaseDomain, string AcmeEmail, int PropagationDelay, int PropagationTimeout);
     public sealed record Overview(MatcadSettings Settings, List<ProviderType> ProviderTypes, List<Provider> Providers, List<Route> Routes);
     public sealed record Result(bool Ok, string Message, long? Id = null);
 
@@ -126,7 +128,8 @@ public sealed class MatcadAdminService
         await Task.WhenAll(settings, types, raw, routes);
         var s = settings.Result;
         var t = types.Result;
-        return new(new(Str(s?["baseDomain"]), Str(s?["acmeEmail"])), t, raw.Result.Select(p => Mask(p, t)).ToList(), routes.Result);
+        return new(new(Str(s?["baseDomain"]), Str(s?["acmeEmail"]), s?["acmePropagationDelaySeconds"]?.GetValue<int>() ?? 0,
+            s?["acmePropagationTimeoutSeconds"]?.GetValue<int>() ?? 0), t, raw.Result.Select(p => Mask(p, t)).ToList(), routes.Result);
     }
 
     public async Task<List<ProviderType>> ProviderTypesAsync(CancellationToken ct = default) =>
@@ -216,7 +219,8 @@ public sealed class MatcadAdminService
     // ---- settings ------------------------------------------------------------------------------------------------
 
     /// <summary>Base domain and ACME e-mail. Null = leave unchanged, "" = clear.</summary>
-    public async Task<Result> SaveSettingsAsync(string? baseDomain, string? acmeEmail, CancellationToken ct = default)
+    public async Task<Result> SaveSettingsAsync(string? baseDomain, string? acmeEmail, int? propagationDelay = null, int? propagationTimeout = null,
+        CancellationToken ct = default)
     {
         string? bd = null;
         if (baseDomain is not null)
@@ -226,7 +230,13 @@ public sealed class MatcadAdminService
         }
         try
         {
-            var r = await CallAsync(HttpMethod.Put, "/settings", new { baseDomain = bd, acmeEmail = acmeEmail?.Trim() }, ct);
+            if (propagationDelay is < 0 or > 3600 || propagationTimeout is < -1 or > 7200)
+                return new(false, "Wartezeit 0–3600 s, Zeitlimit -1–7200 s.");
+            var r = await CallAsync(HttpMethod.Put, "/settings", new
+            {
+                baseDomain = bd, acmeEmail = acmeEmail?.Trim(),
+                acmePropagationDelaySeconds = propagationDelay, acmePropagationTimeoutSeconds = propagationTimeout,
+            }, ct);
             return r?["ok"]?.GetValue<bool>() == false
                 ? new(false, "Gespeichert, aber Caddy übernahm es nicht: " + (StrOrNull(r["error"]) ?? "unbekannter Fehler"))
                 : new(true, "Matcad-Einstellungen gespeichert.");
@@ -384,3 +394,8 @@ public sealed class MatcadException : Exception
 {
     public MatcadException(string message) : base(message) { }
 }
+
+/// <summary>What the wildcard fields of a host render: its setting and — for a Matcad the cloud reaches — Matcad's DNS
+/// providers to choose from (null = free-text name + Caddy credentials).</summary>
+public sealed record WildcardFieldsView(ProxyService.WildcardConfig Config, List<MatcadAdminService.Provider>? Providers,
+    List<MatcadAdminService.ProviderType>? Types, string? MatcadError);

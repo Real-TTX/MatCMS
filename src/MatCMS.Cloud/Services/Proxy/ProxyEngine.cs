@@ -47,7 +47,7 @@ public static class ProxyEngine
                 "exists" => new(true, "", Exists: await Provider(op.Settings, http, op.Kind).ExistsAsync(op.RouteId ?? "", ct)),
                 // Wildcard certificate for *.{Host} (Host = the base domain), removing it, trusting the edge.
                 "wildcard" => Result(await Provider(op.Settings, http).EnsureWildcardAsync(op.RouteId, op.Host ?? "", op.DnsProvider ?? "",
-                    op.Dns ?? new(), op.Upstream ?? "https://" + op.Host, ct), "Wildcard-Zertifikat eingerichtet."),
+                    op.Dns ?? new(), op.Upstream ?? "https://" + op.Host, ct), "Wildcard eingerichtet – das Zertifikat holt der Proxy jetzt per DNS-Challenge, das kann einige Minuten dauern."),
                 "unwildcard" => Result(await Provider(op.Settings, http, op.Kind).DeleteWildcardAsync(op.RouteId ?? "", op.Host ?? "", ct), "Wildcard-Zertifikat entfernt."),
                 "trust" => Result(await Provider(op.Settings, http).SetTrustedProxiesAsync(op.Trusted ?? new(), ct), "Edge als vertrauenswürdiger Proxy eingetragen."),
                 _ => new(false, $"Unbekannte Proxy-Operation „{op.Op}“."),

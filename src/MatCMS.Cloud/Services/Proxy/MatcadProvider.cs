@@ -182,8 +182,17 @@ public sealed class MatcadProvider : IProxyProvider
             using var post = Req(HttpMethod.Post, "/api/v1/routes", body);
             using var pr = await _http.SendAsync(post, ct);
             var text = await pr.Content.ReadAsStringAsync(ct);
-            if (!pr.IsSuccessStatusCode) return new(false, $"Matcad antwortete {(int)pr.StatusCode}: {text}");
-            var rid = System.Text.Json.Nodes.JsonNode.Parse(text)?["route"]?["id"]?.ToString();
+            if (!pr.IsSuccessStatusCode)
+            {
+                string? err = null;
+                try { err = System.Text.Json.Nodes.JsonNode.Parse(text)?["error"]?.GetValue<string>(); } catch { }
+                return new(false, err is not null ? $"Matcad lehnt die Wildcard ab: {err}" : Explain(pr.StatusCode, text));
+            }
+            var node = System.Text.Json.Nodes.JsonNode.Parse(text);
+            var rid = node?["route"]?["id"]?.ToString();
+            // Stored, but Caddy refused the config — typically the DNS module missing from Matcad's Caddy.
+            if (node?["applied"]?["ok"]?.GetValue<bool>() == false)
+                return new(false, $"Wildcard in Matcad gespeichert, aber Caddy übernahm sie nicht: {node["applied"]?["error"]?.GetValue<string>()}", rid);
             return new(true, null, rid);
         }
         catch (Exception ex) { return new(false, $"Matcad nicht erreichbar: {ex.Message}"); }

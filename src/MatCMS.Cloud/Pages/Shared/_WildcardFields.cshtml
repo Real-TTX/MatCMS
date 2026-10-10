@@ -1,28 +1,94 @@
-@model MatCMS.Cloud.Services.Proxy.ProxyService.WildcardConfig
+@model MatCMS.Cloud.Services.Proxy.WildcardFieldsView
 @* The wildcard-certificate fields of one host — the same partial for "Dieser Host" and every node. Inside the
    automatic-addresses form, because a wildcard only exists for a base domain. Credentials are never rendered back:
-   empty keeps what is stored. *@
+   empty keeps what is stored.
+   With a Matcad the cloud can reach (Dieser Host), the provider is CHOSEN from Matcad's DNS providers — or created
+   right here with its type's fields — because Matcad only takes the name of a provider it has; a free-text name plus
+   key=value credentials, as Caddy needs them, silently did nothing there. *@
+@{
+    var c = Model.Config;
+    var matcad = Model.Providers is not null && Model.Types is not null;
+    var known = matcad && Model.Providers!.Any(p => string.Equals(p.Name, c.DnsProvider, StringComparison.OrdinalIgnoreCase));
+}
 <label class="checkbox-row">
-    <input type="checkbox" name="wildcard" value="true" data-reveal="wildcard-fields" checked="@(Model.Enabled ? "checked" : null)" />
+    <input type="checkbox" name="wildcard" value="true" data-reveal="wildcard-fields" checked="@(c.Enabled ? "checked" : null)" />
     @T["wildcard.enable"]
 </label>
-<div data-reveal-target="wildcard-fields" hidden="@(Model.Enabled ? null : "hidden")">
-    <div class="form-field">
-        <label for="dnsProvider">@T["wildcard.provider"]</label>
-        <input id="dnsProvider" name="dnsProvider" value="@Model.DnsProvider" placeholder="hetzner" spellcheck="false" />
-        <div class="help">@T["wildcard.providerHint"]</div>
-    </div>
-    <div class="form-field">
-        <label for="dnsCredentials">@T["wildcard.credentials"]</label>
-        <textarea id="dnsCredentials" name="dnsCredentials" rows="3" spellcheck="false" autocomplete="off"
-                  placeholder="@(Model.CredentialsSet ? T["wildcard.credentialsKeep"] : "auth_api_token=…")"></textarea>
-        <div class="help">@T["wildcard.credentialsHint"]</div>
-    </div>
-    @if (Model.Error is { } err)
+<div data-reveal-target="wildcard-fields" hidden="@(c.Enabled ? null : "hidden")">
+    @if (matcad)
+    {
+        <div class="form-field">
+            <label for="dnsProvider">@T["wildcard.provider"]</label>
+            <select id="dnsProvider" name="dnsProvider" data-wc-provider>
+                @if (Model.Providers!.Count == 0) { <option value="">—</option> }
+                @foreach (var p in Model.Providers!)
+                {
+                    var type = Model.Types!.FirstOrDefault(t => string.Equals(t.Id, p.Type, StringComparison.OrdinalIgnoreCase));
+                    <option value="@p.Name" selected="@(string.Equals(p.Name, c.DnsProvider, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@p.Name (@(type?.DisplayName ?? p.Type))</option>
+                }
+                @if (!known && !string.IsNullOrEmpty(c.DnsProvider))
+                {
+                    @* A name stored before — kept selectable so saving does not change it behind the operator's back. *@
+                    <option value="@c.DnsProvider" selected>@c.DnsProvider – @T["wildcard.providerMissing"]</option>
+                }
+                <option value="__new" selected="@(Model.Providers!.Count == 0 && string.IsNullOrEmpty(c.DnsProvider) ? "selected" : null)">@T["wildcard.providerNew"]</option>
+            </select>
+            <div class="help">@T["wildcard.providerMatcadHint"]</div>
+        </div>
+        <div data-wc-new hidden>
+            <div class="form-row">
+                <div class="form-field">
+                    <label for="newProviderType">@T["matcad.providerType"]</label>
+                    <select id="newProviderType" name="newProviderType" data-wc-type>
+                        @foreach (var t in Model.Types!) { <option value="@t.Id">@t.DisplayName</option> }
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label for="newProviderName">@T["common.name"]</label>
+                    <input id="newProviderName" name="newProviderName" placeholder="@T["wildcard.providerNameHint"]" />
+                </div>
+            </div>
+            @foreach (var t in Model.Types!)
+            {
+                <div data-wc-fields="@t.Id" hidden>
+                    @foreach (var f in t.Fields)
+                    {
+                        <div class="form-field">
+                            <label>@f.Label <span class="mono muted">@f.Key</span></label>
+                            <input name="newProviderCredentials[@f.Key]" type="@(f.Secret ? "password" : "text")" autocomplete="off" spellcheck="false" disabled />
+                        </div>
+                    }
+                    @if (t.Id == "netcup")
+                    {
+                        <div class="help">@T["wildcard.netcupHint"]</div>
+                    }
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        @if (Model.MatcadError is { } me)
+        {
+            <div class="alert alert-error">@me</div>
+        }
+        <div class="form-field">
+            <label for="dnsProvider">@T["wildcard.provider"]</label>
+            <input id="dnsProvider" name="dnsProvider" value="@c.DnsProvider" placeholder="hetzner" spellcheck="false" />
+            <div class="help">@T["wildcard.providerHint"]</div>
+        </div>
+        <div class="form-field">
+            <label for="dnsCredentials">@T["wildcard.credentials"]</label>
+            <textarea id="dnsCredentials" name="dnsCredentials" rows="3" spellcheck="false" autocomplete="off"
+                      placeholder="@(c.CredentialsSet ? T["wildcard.credentialsKeep"] : "auth_api_token=…")"></textarea>
+            <div class="help">@T["wildcard.credentialsHint"]</div>
+        </div>
+    }
+    @if (c.Error is { } err)
     {
         <div class="alert alert-error">@err</div>
     }
-    else if (Model.RouteId is { } rid)
+    else if (c.RouteId is { } rid)
     {
         <div class="kv"><div class="kv-label">@T["common.status"]</div><div class="kv-value"><span class="badge badge-on">@T["wildcard.active"]</span> <span class="mono muted">@rid</span></div></div>
     }

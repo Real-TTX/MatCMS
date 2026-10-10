@@ -145,7 +145,7 @@
                     <input id="autoDomainBase" name="autoDomainBase" value="@Model.AutoDomainBase" placeholder="@(n is null ? "cloud.example.de" : "server1.example.de")" spellcheck="false" />
                     <div class="help">@T["autodomain.baseHint"]</div>
                 </div>
-                <partial name="_WildcardFields" model="Model.Wildcard" />
+                <partial name="_WildcardFields" model="Model.WildcardView" />
             </div>
             @if (n is not null)
             {
@@ -294,6 +294,26 @@
                 box.addEventListener('change', sync);
                 sync();
             });
+
+            // Wildcard with Matcad: "Neuen DNS-Anbieter anlegen" reveals the type's fields; the other types' fields are
+            // disabled, so a key two types share posts once.
+            var wcProv = document.querySelector('[data-wc-provider]');
+            var wcNew = document.querySelector('[data-wc-new]');
+            var wcType = document.querySelector('[data-wc-type]');
+            if (wcProv && wcNew && wcType) {
+                var syncWc = function () {
+                    var isNew = wcProv.value === '__new';
+                    wcNew.hidden = !isNew;
+                    document.querySelectorAll('[data-wc-fields]').forEach(function (g) {
+                        var on = isNew && g.getAttribute('data-wc-fields') === wcType.value;
+                        g.hidden = !on;
+                        g.querySelectorAll('input').forEach(function (i) { i.disabled = !on; });
+                    });
+                };
+                wcProv.addEventListener('change', syncWc);
+                wcType.addEventListener('change', syncWc);
+                syncWc();
+            }
 
             // Docker tab: the images are fetched when the tab is first shown — for a node that is a job its agent
             // runs, which should not slow down every visit of the page.

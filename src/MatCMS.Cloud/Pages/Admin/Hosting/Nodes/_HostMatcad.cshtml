@@ -30,6 +30,17 @@
             </div>
         </div>
         <div class="help">@T["matcad.settingsHint"]</div>
+        <div class="form-row" style="margin-top:12px;">
+            <div class="form-field">
+                <label for="mcDelay">@T["matcad.propagationDelay"]</label>
+                <input id="mcDelay" name="propagationDelay" type="number" min="0" max="3600" inputmode="numeric" value="@d.Settings.PropagationDelay" />
+            </div>
+            <div class="form-field">
+                <label for="mcTimeout">@T["matcad.propagationTimeout"]</label>
+                <input id="mcTimeout" name="propagationTimeout" type="number" min="-1" max="7200" inputmode="numeric" value="@d.Settings.PropagationTimeout" />
+            </div>
+        </div>
+        <div class="help">@T["matcad.propagationHint"]</div>
         <div style="margin-top:14px;"><button type="submit" class="btn">@T["common.save"]</button></div>
     </div>
 </form>

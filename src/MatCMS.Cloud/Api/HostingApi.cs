@@ -414,7 +414,7 @@ public static class HostingApi
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
             if (RequireCloudWide(key!) is { } g) return g;
-            return MatcadResult(await matcad.SaveSettingsAsync(b.BaseDomain, b.AcmeEmail, ctx.RequestAborted));
+            return MatcadResult(await matcad.SaveSettingsAsync(b.BaseDomain, b.AcmeEmail, b.PropagationDelay, b.PropagationTimeout, ctx.RequestAborted));
         }).RequireRateLimiting("operatorApi");
 
         app.MapPost("/api/v1/hosting/matcad/providers", async (HttpContext ctx, MatcadProviderDto b, ApiKeyService keys, Services.Proxy.MatcadAdminService matcad) =>
@@ -568,7 +568,7 @@ public sealed record StartUpdatesDto(List<string>? InstanceIds);
 /// <summary>Body of <c>PUT /api/v1/hosting/auto-domain</c>.</summary>
 public sealed record AutoDomainDto(bool Enabled, string? BaseDomain);
 /// <summary>Null = unchanged, "" = clear.</summary>
-public sealed record MatcadSettingsDto(string? BaseDomain, string? AcmeEmail);
+public sealed record MatcadSettingsDto(string? BaseDomain, string? AcmeEmail, int? PropagationDelay = null, int? PropagationTimeout = null);
 /// <summary>No id = create. An empty secret credential keeps the stored value.</summary>
 public sealed record MatcadProviderDto(long? Id, string? Name, string? Type, Dictionary<string, string?>? Credentials);
 /// <summary>No id = create. <c>target</c> = "proxy" (to <c>upstream</c>) or "redirect" (to <c>fallbackUrl</c>).</summary>

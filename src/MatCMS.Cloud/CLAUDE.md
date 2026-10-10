@@ -850,6 +850,18 @@ Design and increments: `docs/hosting-platform.md`. Increments 1–4 are built:
     re-points an edge route that depends on it. Teardown (`InstanceRemovalService`) now deletes all routes after
     the container (best effort, failures reported) — before, routes outlived their site.
   - Hosting → Domains lists EVERY address (host addresses + customer domains with their way and target + pending).
+  - **Matcad of "Dieser Host" maintained from the cloud** (`MatcadAdminService`; tab "Matcad" on Hosting → Hosts →
+    Dieser Host, loaded on demand; REST `/api/v1/hosting/matcad/…`; MCP `get_matcad`, `set_matcad_settings`,
+    `save_/delete_matcad_provider`, `save_/delete_matcad_route`): Matcad's base domain + ACME e-mail, its DNS providers
+    (per-type fields from Matcad's `/provider-types`) and every route it serves. Only this host — a node's Matcad
+    answers only on the node, and its key travels only inside node jobs. Traps: Matcad's `/providers` returns
+    credentials **in clear** — the cloud blanks every secret field (unknown type = all secret) and an empty secret on
+    save keeps the stored one; a route the cloud created for an instance (host address, customer domain, pending,
+    wildcard — matched by route id, ids are per Matcad so only routes known to live HERE count) is listed with
+    `managedBy` and refused for edit/delete, or the instance would keep an id pointing at nothing; an edit keeps the
+    route fields the cloud's form does not carry (basic auth, own ACME e-mail) from `/routes/manual`, and port-bound
+    routes are not editable here at all. Matcad's own base domain is NOT the automatic-address base
+    (`hosting.autoDomain.base`) — two settings, labelled as such.
   - **Wildcard certificate per host** (`hosting.wildcard.*` / `Node.Wildcard*`, `ProxyService.SetWildcardAsync`, op
     `wildcard` run ON the host): one certificate for `*.<base>` via DNS-01 instead of one per instance (Let's
     Encrypt ~50/week/domain). Caddy: an automation policy (`@id matcms-wildcard-…`) with the DNS module + the

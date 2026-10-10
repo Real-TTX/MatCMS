@@ -38,6 +38,7 @@
     <button type="button" class="tab" data-tab="containers">@T["nodes.tabContainers"] (@Model.Sites.Count)</button>
     <button type="button" class="tab" data-tab="docker">Docker</button>
     @if (showProxy) { <button type="button" class="tab" data-tab="proxy">Proxy</button> }
+    @if (Model.ShowMatcad) { <button type="button" class="tab" data-tab="matcad">Matcad</button> }
     @if (showProxy) { <button type="button" class="tab" data-tab="settings">@T["hosting.navSettings"]</button> }
     @if (n is not null) { <button type="button" class="tab" data-tab="jobs">@T["nodes.tabJobs"]</button> }
 </div>
@@ -164,6 +165,14 @@
         </div>
     </form>
 </div>
+
+@if (Model.ShowMatcad)
+{
+@* ============ MATCAD ============ *@
+<div class="tab-panel" data-panel="matcad" hidden>
+    <div data-lazy="matcad" data-src="@Url.Page("/Admin/Hosting/Nodes/Details", "Matcad")"><div class="card muted">…</div></div>
+</div>
+}
 
 @* ============ EINSTELLUNGEN ============ *@
 <div class="tab-panel" data-panel="settings" hidden>
@@ -301,6 +310,90 @@
             var tab = document.querySelector('.tab[data-tab="docker"]');
             if (tab) tab.addEventListener('click', loadImages);
             if (box && !box.closest('.tab-panel').hidden) loadImages();
+
+            // Matcad tab: the same on-demand load (three calls to Matcad).
+            var mc = document.querySelector('[data-lazy="matcad"]');
+            var mcLoaded = false;
+            function loadMatcad() {
+                if (mcLoaded || !mc) return;
+                mcLoaded = true;
+                fetch(mc.getAttribute('data-src'), { credentials: 'same-origin' })
+                    .then(function (r) { return r.ok ? r.text() : Promise.reject(r.status); })
+                    .then(function (html) { mc.innerHTML = html; })
+                    .catch(function () { mcLoaded = false; mc.innerHTML = '<div class="card"><span class="badge badge-err">@T["common.error"]</span></div>'; });
+            }
+            var mcTab = document.querySelector('.tab[data-tab="matcad"]');
+            if (mcTab) mcTab.addEventListener('click', loadMatcad);
+            if (mc && !mc.closest('.tab-panel').hidden) loadMatcad();
+
+            // The Matcad forms arrive with the fetched HTML, so their behaviour is delegated from here.
+            function mcForm(kind) { return document.querySelector('[data-matcad-form="' + kind + '"]'); }
+            function syncRoute(f) {
+                var t = f.querySelector('[data-matcad-target]').value;
+                f.querySelectorAll('[data-target-only]').forEach(function (el) { el.hidden = el.getAttribute('data-target-only') !== t; });
+                f.querySelector('[data-wildcard-only]').hidden = !f.querySelector('[data-reveal-wildcard]').checked;
+            }
+            function syncProvider(f, item) {
+                var type = f.querySelector('[data-ptype-select]').value;
+                f.querySelectorAll('[data-ptype]').forEach(function (g) {
+                    var on = g.getAttribute('data-ptype') === type;
+                    g.hidden = !on;
+                    g.querySelectorAll('input').forEach(function (i) {
+                        i.disabled = !on;
+                        var key = i.getAttribute('data-key');
+                        var secret = i.getAttribute('data-secret') === '1';
+                        var same = item && item.type === type;
+                        i.value = same && !secret && item.values && item.values[key] != null ? item.values[key] : '';
+                        i.placeholder = same && secret && item.secretsSet && item.secretsSet.indexOf(key) >= 0 ? i.getAttribute('data-keep') : '';
+                    });
+                });
+            }
+            function openForm(kind, item) {
+                var f = mcForm(kind);
+                if (!f) return;
+                f.reset();
+                f.querySelector('[name="id"]').value = item ? item.id : '';
+                var h = f.querySelector('h2');
+                h.textContent = h.getAttribute(item ? 'data-title-edit' : 'data-title-new');
+                if (kind === 'route') {
+                    if (item) {
+                        f.querySelector('[name="host"]').value = item.host || '';
+                        f.querySelector('[name="name"]').value = item.name && item.name !== item.host ? item.name : '';
+                        f.querySelector('[name="target"]').value = item.target || 'proxy';
+                        f.querySelector('[name="upstream"]').value = item.upstream || '';
+                        f.querySelector('[name="fallbackUrl"]').value = item.fallbackUrl || '';
+                        f.querySelector('[name="wildcard"]').checked = !!item.wildcard;
+                        f.querySelector('[name="providerId"]').value = item.providerId == null ? '' : String(item.providerId);
+                        f.querySelector('[name="enabled"]').checked = !!item.enabled;
+                        f.querySelector('[name="allowEmbedding"]').checked = !!item.allowEmbedding;
+                    }
+                    syncRoute(f);
+                } else {
+                    if (item) {
+                        f.querySelector('[name="name"]').value = item.name || '';
+                        f.querySelector('[name="type"]').value = item.type || '';
+                    }
+                    f.dataset.item = item ? JSON.stringify(item) : '';
+                    syncProvider(f, item);
+                }
+                f.hidden = false;
+                f.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                var first = f.querySelector('input:not([type=hidden]):not([disabled])');
+                if (first) first.focus({ preventScroll: true });
+            }
+            document.addEventListener('click', function (e) {
+                var b = e.target.closest('[data-matcad-new],[data-matcad-edit],[data-matcad-cancel]');
+                if (!b) return;
+                if (b.hasAttribute('data-matcad-cancel')) { b.closest('form').hidden = true; return; }
+                var kind = b.getAttribute('data-matcad-new') || b.getAttribute('data-matcad-edit');
+                openForm(kind, b.hasAttribute('data-item') ? JSON.parse(b.getAttribute('data-item')) : null);
+            });
+            document.addEventListener('change', function (e) {
+                var f = e.target.closest('[data-matcad-form]');
+                if (!f) return;
+                if (f.getAttribute('data-matcad-form') === 'route') syncRoute(f);
+                else if (e.target.hasAttribute('data-ptype-select')) syncProvider(f, f.dataset.item ? JSON.parse(f.dataset.item) : null);
+            });
 
             // Spiegelt HostingService.Normalise: klein, alles Nicht-Alphanumerische zu Bindestrichen. Nur Anzeige.
             var pat = document.getElementById('namePattern');

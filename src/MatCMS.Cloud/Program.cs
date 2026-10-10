@@ -139,6 +139,7 @@ builder.Services.AddScoped<CloudUpdaterService>();
 builder.Services.AddScoped<HostingOverviewService>();
 builder.Services.AddScoped<InstanceUpdatesService>();
 builder.Services.AddScoped<MatCMS.Cloud.Services.Proxy.ProxyService>();
+builder.Services.AddScoped<MatCMS.Cloud.Services.Proxy.MatcadAdminService>();
 builder.Services.AddScoped<MatCMS.Cloud.Services.Nodes.NodeService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddSingleton<MatCMS.Cloud.Services.Nodes.NodeSignal>();

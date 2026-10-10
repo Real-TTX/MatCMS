@@ -1,0 +1,246 @@
+@model MatCMS.Cloud.Pages.Admin.Hosting.Nodes.DetailsModel
+@using System.Text.Json
+@* The Matcad tab of "Dieser Host", fetched when the tab is opened (it is three calls to Matcad). Its forms post to the
+   page's Matcad* handlers; the editing behaviour (fill the form from a row, provider fields per type) is delegated
+   from the page script, because a script inside fetched HTML does not run. *@
+@{
+    var d = Model.Matcad;
+    string Act(string handler) => Url.Page("/Admin/Hosting/Nodes/Details", handler)!;
+    string Json(object o) => JsonSerializer.Serialize(o);
+}
+@if (d is null)
+{
+    <div class="card"><div class="alert alert-error">@Model.MatcadError</div></div>
+    return;
+}
+
+@* ---- Settings ---- *@
+<form method="post" action="@Act("MatcadSettings")">
+    @Html.AntiForgeryToken()
+    <div class="card">
+        <h2>@T["matcad.settings"]</h2>
+        <div class="form-row">
+            <div class="form-field">
+                <label for="mcBaseDomain">@T["matcad.baseDomain"]</label>
+                <input id="mcBaseDomain" name="baseDomain" value="@d.Settings.BaseDomain" placeholder="example.de" spellcheck="false" />
+            </div>
+            <div class="form-field">
+                <label for="mcAcmeEmail">@T["matcad.acmeEmail"]</label>
+                <input id="mcAcmeEmail" name="acmeEmail" type="email" value="@d.Settings.AcmeEmail" placeholder="admin@example.de" spellcheck="false" />
+            </div>
+        </div>
+        <div class="help">@T["matcad.settingsHint"]</div>
+        <div style="margin-top:14px;"><button type="submit" class="btn">@T["common.save"]</button></div>
+    </div>
+</form>
+
+@* ---- Domains ---- *@
+<div class="card">
+    <div class="page-head" style="margin-bottom:8px;">
+        <h2 style="margin:0;">@T["matcad.domains"]</h2>
+        <div class="list-toolbar">
+            <button type="button" class="btn btn-sm" data-matcad-new="route">@T["matcad.routeNew"]</button>
+        </div>
+    </div>
+    <table class="data">
+        <thead>
+            <tr>
+                <th>@T["hosting.domain"]</th>
+                <th>@T["matcad.target"]</th>
+                <th>@T["matcad.certificate"]</th>
+                <th>@T["matcad.origin"]</th>
+                <th style="width:110px;"></th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (d.Routes.Count == 0)
+            {
+                <partial name="_EmptyRow" model='@T["matcad.noRoutes"]' />
+            }
+            @foreach (var r in d.Routes.OrderBy(r => r.Host.TrimStart('*', '.'), StringComparer.OrdinalIgnoreCase))
+            {
+                <tr>
+                    <td class="nowrap">
+                        @if (r.Wildcard) { <span class="mono">@r.Host</span> }
+                        else { <a href="https://@r.Host" target="_blank" rel="noopener" class="mono">@r.Host</a> }
+                        @if (!r.Enabled) { <span class="badge badge-off">@T["matcad.disabled"]</span> }
+                        @if (!string.Equals(r.Name, r.Host, StringComparison.OrdinalIgnoreCase) && r.Name.Length > 0) { <div class="muted">@r.Name</div> }
+                    </td>
+                    <td class="mono muted">@(r.Target == "redirect" ? "↪ " + r.FallbackUrl : r.Upstream)</td>
+                    <td><span class="muted">@(r.CertKind ?? "—")</span></td>
+                    <td>
+                        @if (r.ManagedBy is { } mb)
+                        {
+                            @if (r.ManagedInstanceId is int iid) { <a asp-page="/Admin/Instances/Details" asp-route-id="@iid" asp-route-tab="hosting">@mb</a> }
+                            else { <span>@mb</span> }
+                            <div class="muted">@T["matcad.originCloud"]</div>
+                        }
+                        else
+                        {
+                            <span class="badge badge-off">@(r.Source switch { "manual" => T["matcad.originManual"], "docker" => "Docker", _ => T["matcad.originSystem"] })</span>
+                        }
+                    </td>
+                    <td>
+                        @if (r.Editable)
+                        {
+                            <div class="actions">
+                                <button type="button" class="btn btn-sm btn-ghost" data-matcad-edit="route"
+                                        data-item="@Json(new { id = r.Id, host = r.Wildcard ? r.Host.TrimStart('*', '.') : r.Host, name = r.Name, target = r.Target, upstream = r.Upstream, fallbackUrl = r.FallbackUrl, wildcard = r.Wildcard, providerId = r.ProviderId, enabled = r.Enabled, allowEmbedding = r.AllowEmbedding })">@T["action.edit"]</button>
+                                <form class="inline-form" method="post" action="@Act("MatcadRouteDelete")" data-confirm="@T["matcad.routeDeleteConfirm", r.Host]">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="routeId" value="@r.Id" />
+                                    <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
+                                </form>
+                            </div>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<form method="post" action="@Act("MatcadRoute")" data-matcad-form="route" hidden>
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="id" value="" />
+    <div class="card">
+        <h2 data-title-new="@T["matcad.routeNew"]" data-title-edit="@T["matcad.routeEdit"]">@T["matcad.routeNew"]</h2>
+        <div class="form-row">
+            <div class="form-field">
+                <label for="mcHost">@T["hosting.domain"]</label>
+                <input id="mcHost" name="host" required placeholder="shop.example.de" spellcheck="false" />
+            </div>
+            <div class="form-field">
+                <label for="mcName">@T["common.name"]</label>
+                <input id="mcName" name="name" placeholder="@T["matcad.nameHint"]" />
+            </div>
+        </div>
+        <div class="form-field">
+            <label for="mcTarget">@T["matcad.target"]</label>
+            <select id="mcTarget" name="target" data-matcad-target>
+                <option value="proxy">@T["matcad.targetProxy"]</option>
+                <option value="redirect">@T["matcad.targetRedirect"]</option>
+            </select>
+        </div>
+        <div class="form-field" data-target-only="proxy">
+            <label for="mcUpstream">@T["matcad.upstream"]</label>
+            <input id="mcUpstream" name="upstream" placeholder="http://container:8080" spellcheck="false" />
+            <div class="help">@T["matcad.upstreamHint"]</div>
+        </div>
+        <div class="form-field" data-target-only="redirect">
+            <label for="mcFallback">@T["matcad.redirectUrl"]</label>
+            <input id="mcFallback" name="fallbackUrl" placeholder="https://www.example.de" spellcheck="false" />
+        </div>
+        <label class="checkbox-row"><input type="checkbox" name="wildcard" value="true" data-reveal-wildcard /> @T["matcad.wildcard"]</label>
+        <div class="form-field" data-wildcard-only hidden>
+            <label for="mcProvider">@T["wildcard.provider"]</label>
+            <select id="mcProvider" name="providerId">
+                <option value="">—</option>
+                @foreach (var p in d.Providers) { <option value="@p.Id">@p.Name</option> }
+            </select>
+            <div class="help">@T["matcad.wildcardHint"]</div>
+        </div>
+        <label class="checkbox-row"><input type="checkbox" name="enabled" value="true" checked /> @T["matcad.enabled"]</label>
+        <label class="checkbox-row"><input type="checkbox" name="allowEmbedding" value="true" /> @T["matcad.allowEmbedding"]</label>
+        <div class="list-actions">
+            <button type="submit" class="btn">@T["common.save"]</button>
+            <button type="button" class="btn btn-ghost" data-matcad-cancel>@T["action.cancel"]</button>
+        </div>
+    </div>
+</form>
+
+@* ---- DNS providers ---- *@
+<div class="card">
+    <div class="page-head" style="margin-bottom:8px;">
+        <h2 style="margin:0;">@T["matcad.providers"]</h2>
+        <div class="list-toolbar">
+            <button type="button" class="btn btn-sm" data-matcad-new="provider">@T["matcad.providerNew"]</button>
+        </div>
+    </div>
+    <div class="help" style="margin-bottom:8px;">@T["matcad.providersHint"]</div>
+    <table class="data">
+        <thead>
+            <tr>
+                <th>@T["common.name"]</th>
+                <th>@T["matcad.providerType"]</th>
+                <th>@T["wildcard.credentials"]</th>
+                <th style="width:170px;"></th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (d.Providers.Count == 0)
+            {
+                <partial name="_EmptyRow" model='@T["matcad.noProviders"]' />
+            }
+            @foreach (var p in d.Providers)
+            {
+                var type = d.ProviderTypes.FirstOrDefault(t => string.Equals(t.Id, p.Type, StringComparison.OrdinalIgnoreCase));
+                <tr>
+                    <td>@p.Name</td>
+                    <td>@(type?.DisplayName ?? p.Type)</td>
+                    <td class="muted">
+                        @foreach (var kv in p.Values) { <div><span class="mono">@kv.Key</span> = <span class="mono">@kv.Value</span></div> }
+                        @foreach (var s in p.SecretsSet) { <div><span class="mono">@s</span> = <span class="muted">••••••</span></div> }
+                    </td>
+                    <td>
+                        <div class="actions">
+                            <form class="inline-form" method="post" action="@Act("MatcadProviderTest")">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@p.Id" />
+                                <input type="hidden" name="type" value="@p.Type" />
+                                <button type="submit" class="btn btn-sm btn-ghost">@T["matcad.test"]</button>
+                            </form>
+                            <button type="button" class="btn btn-sm btn-ghost" data-matcad-edit="provider"
+                                    data-item="@Json(new { id = p.Id, name = p.Name, type = p.Type, values = p.Values, secretsSet = p.SecretsSet })">@T["action.edit"]</button>
+                            <form class="inline-form" method="post" action="@Act("MatcadProviderDelete")" data-confirm="@T["matcad.providerDeleteConfirm", p.Name]">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@p.Id" />
+                                <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<form method="post" action="@Act("MatcadProvider")" data-matcad-form="provider" hidden>
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="id" value="" />
+    <div class="card">
+        <h2 data-title-new="@T["matcad.providerNew"]" data-title-edit="@T["matcad.providerEdit"]">@T["matcad.providerNew"]</h2>
+        <div class="form-row">
+            <div class="form-field">
+                <label for="mcpName">@T["common.name"]</label>
+                <input id="mcpName" name="name" required placeholder="Hetzner DNS" />
+            </div>
+            <div class="form-field">
+                <label for="mcpType">@T["matcad.providerType"]</label>
+                <select id="mcpType" name="type" data-ptype-select>
+                    @foreach (var t in d.ProviderTypes) { <option value="@t.Id">@t.DisplayName</option> }
+                </select>
+            </div>
+        </div>
+        @* One field group per type; the hidden groups are disabled, so a key two types share (api_token) posts once. *@
+        @foreach (var t in d.ProviderTypes)
+        {
+            <div data-ptype="@t.Id" hidden>
+                @foreach (var f in t.Fields)
+                {
+                    <div class="form-field">
+                        <label>@f.Label <span class="mono muted">@f.Key</span></label>
+                        <input name="credentials[@f.Key]" data-key="@f.Key" data-secret="@(f.Secret ? "1" : "0")" type="@(f.Secret ? "password" : "text")"
+                               autocomplete="off" spellcheck="false" data-keep="@T["wildcard.credentialsKeep"]" disabled />
+                    </div>
+                }
+            </div>
+        }
+        <div class="help">@T["matcad.providerSecretHint"]</div>
+        <div class="list-actions">
+            <button type="submit" class="btn">@T["common.save"]</button>
+            <button type="submit" class="btn btn-ghost" formaction="@Act("MatcadProviderTest")">@T["matcad.test"]</button>
+            <button type="button" class="btn btn-ghost" data-matcad-cancel>@T["action.cancel"]</button>
+        </div>
+    </div>
+</form>

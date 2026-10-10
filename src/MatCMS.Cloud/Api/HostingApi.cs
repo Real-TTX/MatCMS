@@ -393,6 +393,72 @@ public static class HostingApi
             return Results.Ok(new { created = r.Created, failed = r.Failed, errors = r.Errors });
         }).RequireRateLimiting("operatorApi");
 
+        // ---- Matcad of "Dieser Host": settings, DNS providers, domains (MatcadAdminService) ------------------
+        // Cloud-wide like the proxy itself. Provider secrets are never returned; a route the cloud created for an
+        // instance is listed with managedBy and refused for edit/delete (409) — it is changed on the instance.
+        static IResult MatcadResult(Services.Proxy.MatcadAdminService.Result r) => r.Ok
+            ? Results.Ok(new { ok = true, id = r.Id, message = r.Message })
+            : Results.Json(new { ok = false, id = r.Id, error = r.Message }, statusCode: StatusCodes.Status409Conflict);
+
+        app.MapGet("/api/v1/hosting/matcad", async (HttpContext ctx, ApiKeyService keys, Services.Proxy.MatcadAdminService matcad) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireCloudWide(key!) is { } g) return g;
+            try { return Results.Ok(await matcad.OverviewAsync(ctx.RequestAborted)); }
+            catch (Services.Proxy.MatcadException ex) { return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status409Conflict); }
+        }).RequireRateLimiting("operatorApi");
+
+        app.MapPut("/api/v1/hosting/matcad/settings", async (HttpContext ctx, MatcadSettingsDto b, ApiKeyService keys, Services.Proxy.MatcadAdminService matcad) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireCloudWide(key!) is { } g) return g;
+            return MatcadResult(await matcad.SaveSettingsAsync(b.BaseDomain, b.AcmeEmail, ctx.RequestAborted));
+        }).RequireRateLimiting("operatorApi");
+
+        app.MapPost("/api/v1/hosting/matcad/providers", async (HttpContext ctx, MatcadProviderDto b, ApiKeyService keys, Services.Proxy.MatcadAdminService matcad) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireCloudWide(key!) is { } g) return g;
+            return MatcadResult(await matcad.SaveProviderAsync(b.Id, b.Name, b.Type, b.Credentials, ctx.RequestAborted));
+        }).RequireRateLimiting("operatorApi");
+
+        app.MapPost("/api/v1/hosting/matcad/providers/test", async (HttpContext ctx, MatcadProviderDto b, ApiKeyService keys, Services.Proxy.MatcadAdminService matcad) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireCloudWide(key!) is { } g) return g;
+            var r = await matcad.TestProviderAsync(b.Id, b.Type, b.Credentials, ctx.RequestAborted);
+            return Results.Ok(new { ok = r.Ok, message = r.Message });
+        }).RequireRateLimiting("operatorApi");
+
+        app.MapDelete("/api/v1/hosting/matcad/providers/{id:long}", async (HttpContext ctx, long id, ApiKeyService keys, Services.Proxy.MatcadAdminService matcad) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireCloudWide(key!) is { } g) return g;
+            return MatcadResult(await matcad.DeleteProviderAsync(id, ctx.RequestAborted));
+        }).RequireRateLimiting("operatorApi");
+
+        app.MapPost("/api/v1/hosting/matcad/routes", async (HttpContext ctx, MatcadRouteDto b, ApiKeyService keys, Services.Proxy.MatcadAdminService matcad) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireCloudWide(key!) is { } g) return g;
+            return MatcadResult(await matcad.SaveRouteAsync(new(b.Id, b.Host, b.Name, b.Target, b.Upstream, b.FallbackUrl, b.Wildcard,
+                b.ProviderId, b.Enabled ?? true, b.AllowEmbedding), ctx.RequestAborted));
+        }).RequireRateLimiting("operatorApi");
+
+        app.MapDelete("/api/v1/hosting/matcad/routes/{id:long}", async (HttpContext ctx, long id, ApiKeyService keys, Services.Proxy.MatcadAdminService matcad) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireCloudWide(key!) is { } g) return g;
+            return MatcadResult(await matcad.DeleteRouteAsync(id, ctx.RequestAborted));
+        }).RequireRateLimiting("operatorApi");
+
         // ---- Wildcard certificate per host (nodeId omitted = this cloud's own host) ------------------------
         app.MapGet("/api/v1/hosting/wildcard", async (HttpContext ctx, string? nodeId, ApiKeyService keys, AppDbContext db, Services.Proxy.ProxyService proxy) =>
         {
@@ -501,6 +567,13 @@ public sealed record StartUpdatesDto(List<string>? InstanceIds);
 
 /// <summary>Body of <c>PUT /api/v1/hosting/auto-domain</c>.</summary>
 public sealed record AutoDomainDto(bool Enabled, string? BaseDomain);
+/// <summary>Null = unchanged, "" = clear.</summary>
+public sealed record MatcadSettingsDto(string? BaseDomain, string? AcmeEmail);
+/// <summary>No id = create. An empty secret credential keeps the stored value.</summary>
+public sealed record MatcadProviderDto(long? Id, string? Name, string? Type, Dictionary<string, string?>? Credentials);
+/// <summary>No id = create. <c>target</c> = "proxy" (to <c>upstream</c>) or "redirect" (to <c>fallbackUrl</c>).</summary>
+public sealed record MatcadRouteDto(long? Id, string? Host, string? Name, string? Target, string? Upstream, string? FallbackUrl,
+    bool Wildcard = false, long? ProviderId = null, bool? Enabled = null, bool AllowEmbedding = false);
 
 /// <summary>Body of <c>PUT /api/v1/hosting/wildcard</c>. <c>Credentials</c> null = keep the stored ones.</summary>
 public sealed record WildcardDto(bool Enabled, string? DnsProvider, Dictionary<string, string>? Credentials);

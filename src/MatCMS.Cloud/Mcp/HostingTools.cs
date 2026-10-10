@@ -402,4 +402,72 @@ public class HostingTools
         if (!r.Ok) throw new McpException(r.Message);
         return new { ok = true, message = r.Message };
     }
+
+    // ---- Matcad of "Dieser Host" (MatcadAdminService — the same as Hosting → Hosts → Dieser Host → Matcad) --------
+
+    private static MatCMS.Cloud.Services.Proxy.MatcadAdminService.Result Must(MatCMS.Cloud.Services.Proxy.MatcadAdminService.Result r) =>
+        r.Ok ? r : throw new McpException(r.Message);
+
+    [McpServerTool(Name = "get_matcad"), Description(
+        "The Matcad of this cloud's own host (only when its proxy is Matcad): base domain + ACME e-mail, the DNS provider types with their credential fields, the DNS providers (secrets never returned — only which secret fields are set) and EVERY domain (route) it serves. Routes with managedBy were created by the cloud for an instance and can only be changed on that instance. Requires the hosting right on an all-instances key.")]
+    public static async Task<object> GetMatcad(McpContext me, MatCMS.Cloud.Services.Proxy.MatcadAdminService matcad, CancellationToken ct = default)
+    {
+        RequireCloudWide(me);
+        try { return await matcad.OverviewAsync(ct); }
+        catch (MatCMS.Cloud.Services.Proxy.MatcadException ex) { throw new McpException(ex.Message); }
+    }
+
+    [McpServerTool(Name = "set_matcad_settings"), Description(
+        "Set Matcad's base domain (scope of its login cookie, grouping) and/or the ACME e-mail for Let's Encrypt. Omit a value to keep it, pass an empty string to clear it. The base domain of the instances' automatic addresses is a different setting: set_auto_domain. Requires the hosting right on an all-instances key.")]
+    public static async Task<object> SetMatcadSettings(McpContext me, MatCMS.Cloud.Services.Proxy.MatcadAdminService matcad,
+        string? baseDomain = null, string? acmeEmail = null, CancellationToken ct = default)
+    {
+        RequireCloudWide(me);
+        return new { ok = true, message = Must(await matcad.SaveSettingsAsync(baseDomain, acmeEmail, ct)).Message };
+    }
+
+    [McpServerTool(Name = "save_matcad_provider"), Description(
+        "Create (no id) or update a DNS provider in Matcad — needed for wildcard certificates (DNS challenge). type = a provider type id from get_matcad (netcup, cloudflare, hetzner …), credentials = its fields. On update an omitted or empty secret keeps the stored value. Set test=true to check the credentials against the provider instead of saving. Requires the hosting right on an all-instances key.")]
+    public static async Task<object> SaveMatcadProvider(McpContext me, MatCMS.Cloud.Services.Proxy.MatcadAdminService matcad,
+        string type, string? name = null, long? id = null, Dictionary<string, string?>? credentials = null, bool test = false,
+        CancellationToken ct = default)
+    {
+        RequireCloudWide(me);
+        if (test)
+        {
+            var t = await matcad.TestProviderAsync(id, type, credentials, ct);
+            return new { ok = t.Ok, message = t.Message };
+        }
+        var r = Must(await matcad.SaveProviderAsync(id, name, type, credentials, ct));
+        return new { ok = true, id = r.Id, message = r.Message };
+    }
+
+    [McpServerTool(Name = "delete_matcad_provider"), Description(
+        "Delete a DNS provider in Matcad (refused while a domain still uses it). Requires the hosting right on an all-instances key.")]
+    public static async Task<object> DeleteMatcadProvider(McpContext me, MatCMS.Cloud.Services.Proxy.MatcadAdminService matcad, long id,
+        CancellationToken ct = default)
+    {
+        RequireCloudWide(me);
+        return new { ok = true, message = Must(await matcad.DeleteProviderAsync(id, ct)).Message };
+    }
+
+    [McpServerTool(Name = "save_matcad_route"), Description(
+        "Create (no id) or update a domain in Matcad that the cloud does not manage itself — e.g. the cloud's own address or another service on the server. target \"proxy\" forwards to upstream (http://container:8080 on the proxy's network, or host:port), \"redirect\" sends visitors to fallbackUrl. wildcard=true serves *.host with one certificate and needs providerId. For an instance's own domain use publish_domain instead. Requires the hosting right on an all-instances key.")]
+    public static async Task<object> SaveMatcadRoute(McpContext me, MatCMS.Cloud.Services.Proxy.MatcadAdminService matcad,
+        string host, string target = "proxy", string? upstream = null, string? fallbackUrl = null, long? id = null, string? name = null,
+        bool wildcard = false, long? providerId = null, bool enabled = true, bool allowEmbedding = false, CancellationToken ct = default)
+    {
+        RequireCloudWide(me);
+        var r = Must(await matcad.SaveRouteAsync(new(id, host, name, target, upstream, fallbackUrl, wildcard, providerId, enabled, allowEmbedding), ct));
+        return new { ok = true, id = r.Id, message = r.Message };
+    }
+
+    [McpServerTool(Name = "delete_matcad_route"), Description(
+        "Delete a domain in Matcad. Refused for a route the cloud created for an instance (use unpublish_domain / remove_host_address there). Requires the hosting right on an all-instances key.")]
+    public static async Task<object> DeleteMatcadRoute(McpContext me, MatCMS.Cloud.Services.Proxy.MatcadAdminService matcad, long id,
+        CancellationToken ct = default)
+    {
+        RequireCloudWide(me);
+        return new { ok = true, message = Must(await matcad.DeleteRouteAsync(id, ct)).Message };
+    }
 }

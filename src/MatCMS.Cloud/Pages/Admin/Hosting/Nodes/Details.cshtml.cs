@@ -31,12 +31,14 @@ public class DetailsModel : PageModel
     private readonly CloudContext _cloud;
     private readonly SecretProtector _secrets;
     private readonly Localizer _t;
+    private readonly MatcadAdminService _matcad;
 
     public DetailsModel(AppDbContext db, NodeService nodes, ProxyService proxy, VersionService version, HostingOverviewService overview,
-        HostImagesService images, HostingService hosting, DockerHostService docker, CloudContext cloud, SecretProtector secrets, Localizer t)
+        HostImagesService images, HostingService hosting, DockerHostService docker, CloudContext cloud, SecretProtector secrets, Localizer t,
+        MatcadAdminService matcad)
     {
         _db = db; _nodes = nodes; _proxy = proxy; _version = version; _overview = overview; _images = images;
-        _hosting = hosting; _docker = docker; _cloud = cloud; _secrets = secrets; _t = t;
+        _hosting = hosting; _docker = docker; _cloud = cloud; _secrets = secrets; _t = t; _matcad = matcad;
     }
 
     /// <summary>The node, or null for "Dieser Host".</summary>
@@ -232,6 +234,49 @@ public class DetailsModel : PageModel
         TempData[r.Failed == 0 ? "Flash" : "FlashError"] = $"{r.Created} Adresse(n) angelegt." + (r.Failed > 0 ? $" {r.Failed} fehlgeschlagen: " + string.Join(" · ", r.Errors) : "");
         return Back(id, "proxy");
     }
+
+    // ---- Matcad (Dieser Host only) --------------------------------------------------------------------
+
+    /// <summary>The Matcad tab is shown while this host's proxy is a Matcad the cloud can reach directly — a node's Matcad
+    /// only answers on the node.</summary>
+    public bool ShowMatcad => IsLocal && ModuleEnabled && _matcad.Available;
+    public MatcadAdminService.Overview? Matcad { get; private set; }
+    public string? MatcadError { get; private set; }
+
+    /// <summary>The Matcad tab's content, fetched when the tab is opened.</summary>
+    public async Task<IActionResult> OnGetMatcadAsync(int? id)
+    {
+        if (id is not null) return NotFound();
+        try { Matcad = await _matcad.OverviewAsync(HttpContext.RequestAborted); }
+        catch (MatcadException ex) { MatcadError = ex.Message; }
+        return Partial("_HostMatcad", this);
+    }
+
+    private IActionResult MatcadDone(MatcadAdminService.Result r)
+    {
+        TempData[r.Ok ? "Flash" : "FlashError"] = r.Message;
+        return Back(null, "matcad");
+    }
+
+    public async Task<IActionResult> OnPostMatcadSettingsAsync(string? baseDomain, string? acmeEmail) =>
+        MatcadDone(await _matcad.SaveSettingsAsync(baseDomain ?? "", acmeEmail ?? "", HttpContext.RequestAborted));
+
+    public async Task<IActionResult> OnPostMatcadRouteAsync(long? id, string? host, string? name, string? target, string? upstream,
+        string? fallbackUrl, bool wildcard, long? providerId, bool enabled, bool allowEmbedding) =>
+        MatcadDone(await _matcad.SaveRouteAsync(new MatcadAdminService.RouteInput(id, host, name, target, upstream, fallbackUrl, wildcard,
+            providerId, enabled, allowEmbedding), HttpContext.RequestAborted));
+
+    public async Task<IActionResult> OnPostMatcadRouteDeleteAsync(long routeId) =>
+        MatcadDone(await _matcad.DeleteRouteAsync(routeId, HttpContext.RequestAborted));
+
+    public async Task<IActionResult> OnPostMatcadProviderAsync(long? id, string? name, string? type, Dictionary<string, string?>? credentials) =>
+        MatcadDone(await _matcad.SaveProviderAsync(id, name, type, credentials, HttpContext.RequestAborted));
+
+    public async Task<IActionResult> OnPostMatcadProviderTestAsync(long? id, string? type, Dictionary<string, string?>? credentials) =>
+        MatcadDone(await _matcad.TestProviderAsync(id, type, credentials, HttpContext.RequestAborted));
+
+    public async Task<IActionResult> OnPostMatcadProviderDeleteAsync(long id) =>
+        MatcadDone(await _matcad.DeleteProviderAsync(id, HttpContext.RequestAborted));
 
     // ---- Einstellungen ------------------------------------------------------------------------------
 

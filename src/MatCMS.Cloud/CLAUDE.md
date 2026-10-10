@@ -307,6 +307,11 @@ Local hot-reload loop (.NET SDK 10 required):
 `matcms-cloud:latest`, container `matcms-cloud`, volume `matcms-cloud-data:/app/appdata`,
 `restart: unless-stopped`. `docker-compose.prod.yml` pulls
 `ghcr.io/real-ttx/matcms-cloud:latest` with `pull_policy: always` on the external `main` network.
+`docker-compose.full.yaml` is the whole hosting platform in one stack: cloud + Matcad + Matcad's Caddy on
+the fixed-name network `matcms-hosting` (the cloud's proxy "Netzwerk" setting and the network every site
+container is attached to). Matcad's API key comes from `.env` (`MATCAD_API_KEY`, git-ignored); the cloud's
+proxy settings stay in its DB (set once in the UI or via `PUT /api/v1/hosting/proxy`). The Caddy service
+MUST be named `caddy` — Matcad's admin address `http://caddy:2019` is hard-wired.
 
 There is **no test project** in MatCMS; don't invent one unless asked.
 

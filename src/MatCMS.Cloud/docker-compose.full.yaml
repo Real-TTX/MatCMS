@@ -1,0 +1,103 @@
+# MatCMS hosting platform in ONE stack: MatCMS Cloud + Matcad + Caddy.
+#
+# The cloud creates a container per website (Hosting → "Instanz anlegen" / POST /api/v1/hosting/instances)
+# and hands the domain to Matcad over Matcad's REST API (MatcadProvider: /api/v1/routes, X-Api-Key).
+# Caddy then serves the site with a Let's Encrypt certificate. Every site container is attached to the
+# shared network below, so Caddy reaches it by name — no published port per site.
+#
+# ---------------------------------------------------------------------------------------------------
+# Setup (once)
+#   1. API key for Matcad, in a .env file next to this one (never commit it):
+#        echo "MATCAD_API_KEY=$(openssl rand -hex 32)" > .env
+#   2. DNS: point the cloud's domain (e.g. cloud.example.de) and every website domain at this server
+#      (A/AAAA record). Ports 80 and 443 must be free on the host — Caddy takes them.
+#   3. Start:   docker compose -f docker-compose.full.yaml up -d
+#      Update:  docker compose -f docker-compose.full.yaml pull && docker compose -f docker-compose.full.yaml up -d
+#   4. Matcad (http://<server>:4433): finish the first-run setup, set the ACME e-mail, add ONE route by
+#      hand for the cloud itself:  cloud.example.de  →  http://matcms-cloud:8080
+#   5. Cloud (https://cloud.example.de, or http://<server>:9100 until the route exists):
+#      Hosting → Proxy:  Anbieter "Matcad", URL  http://matcad:4433, Schlüssel = MATCAD_API_KEY,
+#      Upstream "Docker-Netzwerk", Netzwerk  matcms-hosting   → "Testen" must be green.
+#      Same thing over the API (key with CanManageHosting + all instances):
+#        PUT /api/v1/hosting/proxy
+#        {"provider":"matcad","matcadUrl":"http://matcad:4433","matcadToken":"<MATCAD_API_KEY>",
+#         "upstream":"network","network":"matcms-hosting"}
+#      These live in the cloud's database on purpose (rollable, editable in the UI) — not in env vars.
+#   6. From then on: new website = Hosting → Instanz anlegen with a domain. Container, route and
+#      HTTPS certificate are created automatically; the site registers itself with the cloud.
+#
+# Moving an existing cloud onto this stack: back up / copy the volume matcms-cloud-data first; the
+# volume name below is the one docker compose derives from the project name, see "volumes".
+# ---------------------------------------------------------------------------------------------------
+
+name: matcms-hosting
+
+services:
+  # Caddy with Matcad's DNS modules (wildcard certificates via DNS-01 possible). Its admin API stays
+  # inside the network: Matcad reaches it as http://caddy:2019 — that name is hard-wired in Matcad,
+  # so this service must be called "caddy".
+  caddy:
+    image: ghcr.io/real-ttx/matcad-caddy:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+      - caddy-logs:/caddy-logs
+    networks:
+      - hosting
+
+  # Matcad: routes, certificates, DNS providers, access logs — UI on 4433, REST API for the cloud.
+  matcad:
+    image: ghcr.io/real-ttx/matcad:latest
+    restart: unless-stopped
+    depends_on:
+      - caddy
+    ports:
+      # The admin UI. Once Matcad has a route for itself (e.g. matcad.example.de) this can be removed
+      # or bound to 127.0.0.1 only.
+      - "4433:4433"
+    environment:
+      # Without a key Matcad's REST API answers 503 — the cloud could not create a single route.
+      - Matcad__ApiKey=${MATCAD_API_KEY:?MATCAD_API_KEY fehlt - in .env setzen (siehe Kopf dieser Datei)}
+    volumes:
+      - matcad-data:/data
+      - caddy-logs:/caddy-logs
+    networks:
+      - hosting
+
+  # MatCMS Cloud: instances, hosting, profiles, backups, store, API + MCP.
+  cloud:
+    image: ghcr.io/real-ttx/matcms-cloud:latest
+    pull_policy: always
+    container_name: matcms-cloud   # the name Matcad's route for the cloud points at
+    restart: unless-stopped
+    ports:
+      # Direct access for the first setup (and as a fallback). Remove once cloud.example.de works.
+      - "9100:8080"
+    environment:
+      # The Docker engine on this host: the cloud creates, updates and removes the site containers here.
+      - MatCmsCloud__Docker__Endpoint=unix:///var/run/docker.sock
+    volumes:
+      - matcms-cloud-data:/app/appdata
+      # Socket access == root on the host. Needed to create site containers; the image's entrypoint
+      # grants the app access and then runs it unprivileged (no group_add needed).
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - hosting
+
+networks:
+  # Fixed name (not prefixed by compose): it is what the cloud's proxy setting "Netzwerk" refers to,
+  # and the cloud attaches every new site container to it.
+  hosting:
+    name: matcms-hosting
+
+volumes:
+  matcms-cloud-data:
+  matcad-data:
+  caddy-data:
+  caddy-config:
+  caddy-logs:

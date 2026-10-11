@@ -68,6 +68,30 @@ public static class ProfileApi
             return Send(r);
         }).RequireRateLimiting("operatorApi");
 
+        // The backup group (Profil → Backup): saving it puts the policy into the profile and rolls it out.
+        app.MapPut("/api/v1/profiles/{id:int}/backup", async (HttpContext ctx, int id, ProfileBackupDto b, ApiKeyService keys, ProfileOpsService ops) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireManage(key!) is { } g) return g;
+            var s = new BackupSchedule
+            {
+                Enabled = b.Enabled ?? true, IntervalHours = b.IntervalHours ?? 24, Retain = b.Retain ?? 7,
+                Templates = b.Templates ?? true, Pages = b.Pages ?? true, Menus = b.Menus ?? true, Settings = b.Settings ?? true,
+                Submissions = b.Submissions ?? true, Forms = b.Forms ?? true, Assets = b.Assets ?? true, Plugins = b.Plugins ?? true,
+                PluginAssets = b.PluginAssets ?? true,
+            };
+            return Send(await ops.SetBackupAsync(id, s, b.ToCloud ?? true));
+        }).RequireRateLimiting("operatorApi");
+
+        app.MapDelete("/api/v1/profiles/{id:int}/backup", async (HttpContext ctx, int id, ApiKeyService keys, ProfileOpsService ops) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireManage(key!) is { } g) return g;
+            return Send(await ops.RemoveBackupAsync(id));
+        }).RequireRateLimiting("operatorApi");
+
         app.MapPut("/api/v1/profiles/{id:int}/ai", async (HttpContext ctx, int id, ProfileAiDto b, ApiKeyService keys, ProfileOpsService ops) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
@@ -392,6 +416,9 @@ public static class ProfileApi
 
     // ---- request DTOs ----
     public record ProfileCreateDto(string Name, string? Description);
+    /// <summary>Omitted = the default (on / 24 h / 7 kept / everything / to the cloud).</summary>
+    public record ProfileBackupDto(bool? Enabled, int? IntervalHours, int? Retain, bool? Templates, bool? Pages, bool? Menus, bool? Settings,
+        bool? Submissions, bool? Forms, bool? Assets, bool? Plugins, bool? PluginAssets, bool? ToCloud);
     public record ProfileAiDto(bool? SyncAi, int? AiMonthlyTokenBudget, string? AiInstruction, bool? BackupBeforeAiChange);
     public record SettingDto(string Key, string? Value);
     public record ProfileUserDto(string Username, string? Email, string? DisplayName, string? Password, string? PasswordHash, string? Role);

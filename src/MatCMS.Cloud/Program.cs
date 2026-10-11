@@ -140,6 +140,7 @@ builder.Services.AddScoped<HostingOverviewService>();
 builder.Services.AddScoped<InstanceUpdatesService>();
 builder.Services.AddScoped<MatCMS.Cloud.Services.Proxy.ProxyService>();
 builder.Services.AddScoped<MatCMS.Cloud.Services.Proxy.MatcadAdminService>();
+builder.Services.AddScoped<MatCMS.Cloud.Services.CloudConfigBackupService>();
 builder.Services.AddScoped<MatCMS.Cloud.Services.Nodes.NodeService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddSingleton<MatCMS.Cloud.Services.Nodes.NodeSignal>();
@@ -1060,6 +1061,7 @@ MatCMS.Cloud.Api.StoreApi.MapStoreApi(app);
 MatCMS.Cloud.Api.HostingApi.MapHostingApi(app);
 MatCMS.Cloud.Api.NodeApi.MapNodeApi(app);
 MatCMS.Cloud.Api.NotificationApi.MapNotificationApi(app);
+MatCMS.Cloud.Api.CloudConfigApi.MapCloudConfigApi(app);
 MatCMS.Cloud.Api.StatsApi.MapStatsApi(app);
 MatCMS.Cloud.Api.OverviewApi.MapOverviewApi(app);
 

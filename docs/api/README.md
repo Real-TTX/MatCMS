@@ -237,6 +237,20 @@ Auftragsverlauf. Ein nicht verbundener Node antwortet sofort mit `409` „nicht 
 
 ---
 
+## 6a. Cloud-Konfiguration – Einstellungen, Sicherung & Umzug
+
+Alles cloud-weit: **Schlüssel für alle Instanzen mit den Rechten „Profile“ und „Store“**; Benutzer und Server/Hosting zusätzlich „Wiederherstellen“ + „Hosting“.
+
+- `GET /api/v1/cloud/settings` → `{ general:{…}, smtp:{…}, ai:{…}, backup:{…} }` – die Einstellungen der Cloud (Name, HTTPS-Pflicht, 2FA-Pflicht, Auto-Update, Protokoll; SMTP; KI; Backup-Vorgaben). Geheimes nur als `{ set: true|false }`.
+- `PUT /api/v1/cloud/settings` `{ values:{ "smtp.host":"…", "smtp.password":"…", … }, clear?:["smtp.password"] }` – nur die Schlüssel aus `GET`; ein geheimer Wert wird nur durch einen nicht-leeren Wert gesetzt (verschlüsselt) und nur über `clear` gelöscht.
+- `PUT|DELETE /api/v1/profiles/{id}/backup` `{ enabled?, intervalHours?, retain?, templates?, pages?, menus?, settings?, submissions?, forms?, assets?, plugins?, pluginAssets?, toCloud? }` – die Backup-Gruppe eines Profils (setzen = ausrollen; löschen = nicht mehr ausrollen, auf den Sites wird nichts abgeschaltet). Recht „Profile“.
+- **Sicherung der Konfiguration** (nicht der Websites) – ein ZIP mit `cloud-config.json`, abgelegt unter `appdata/config-backups`. Bereiche: `general`, `smtp`, `ai`, `backup`, `store`, `profiles`, `users`, `notifications`, `assignments`, `hosting`.
+  - `GET /api/v1/cloud/config-backups` → `{ sections, defaultRestore, backups:[{ id, createdAt, sizeBytes, source, version, sections, hasSecrets, note }] }`
+  - `POST /api/v1/cloud/config-backups` `{ sections?, passphrase?, note? }` – ohne `sections` alles. **Geheime Werte** (SMTP-Passwort, KI-Schlüssel, Proxy-Schlüssel, Profil-Geheimnisse, 2FA-Secrets) nur mit `passphrase` (≥ 8 Zeichen): hier entschlüsselt und mit dem Passwort verschlüsselt (PBKDF2-SHA256, AES-GCM) – sie sind sonst an den Schlüsselring DIESER Installation gebunden.
+  - `GET …/config-backups/{id}/download` → ZIP · `POST …/config-backups/upload` (rohes ZIP, Name optional in `X-MatCMS-Backup-Name`) · `DELETE …/config-backups/{id}`
+  - `POST …/config-backups/{id}/restore` `{ sections?, passphrase?, dryRun? }` → `{ ok, dryRun, report:[…] }` – Standard: alles außer `hosting` (Adressen, Proxy, Ports gehören zum Server der Sicherung). Einstellungen eines Bereichs werden überschrieben, Profile nach Name ersetzt/angelegt (Revision +1 → die Sites ziehen nach), Store nach Key/Name/Typ aktualisiert/angelegt, **Benutzer nur hinzugefügt** (bestehende Konten bleiben, auch Passwort und 2FA), Instanzen nach Public-ID bzw. Name ihrem Profil zugeordnet. Ohne Passwort bleiben geheime Werte, wie sie sind; ein Benutzer mit 2FA, dessen Secret fehlt, kommt ohne 2FA. `dryRun: true` ändert nichts.
+  - **Umzug:** in der alten Cloud `POST …/config-backups` (mit Passwort) → `…/download`; in der neuen `…/upload` → `…/restore` mit `dryRun: true`, dann ohne.
+
 ## 6b. Benachrichtigungen – wer bekommt was
 
 Die Benachrichtigungs-Matrix: Zeilen sind Empfänger, Spalten Ereignisse.
@@ -317,6 +331,9 @@ Instanz beim nächsten Heartbeat über ihre **eigenen** Validierer anwendet (add
 | `set_auto_domain` / `create_missing_host_addresses` | automatische Adressen für „Dieser Host“ / fehlende nachziehen (Hosting-Recht + alle Instanzen) |
 | `configure_wildcard` | Wildcard-Zertifikat eines Hosts per DNS-Challenge (Hosting-Recht + alle Instanzen) |
 | `add_extra_domain` / `remove_extra_domain` | weitere Domain einer Instanz (`www.…`, alte Domain) als Umleitung oder Alias anlegen bzw. entfernen; `publish_domain` hat dafür auch `www=true` (Hosting-Recht) |
+| `get_cloud_settings` / `set_cloud_settings` | Einstellungen der Cloud (Allgemein, SMTP, KI, Backup-Vorgaben) lesen/setzen (alle Instanzen + Profile + Store) |
+| `list_cloud_config_backups` / `create_cloud_config_backup` / `restore_cloud_config_backup` / `delete_cloud_config_backup` | Sicherung der Cloud-Konfiguration; `restore` standardmäßig als Vorschau (`dryRun=true`); zwischen zwei Clouds wandert die Datei über REST (download/upload) |
+| `set_profile_backup` | Backup-Gruppe eines Profils setzen/entfernen (Profile-Recht) |
 | `get_matcad` / `set_matcad_settings` | Matcad von „Dieser Host“: Einstellungen, DNS-Anbieter, alle Domains lesen / ACME-E-Mail + DNS-Wartezeiten setzen (die Basis-Domain folgt `set_auto_domain`) (Hosting-Recht + alle Instanzen) |
 | `save_matcad_provider` / `delete_matcad_provider` | DNS-Anbieter in Matcad anlegen/ändern/testen (`test=true`) bzw. löschen (Hosting-Recht + alle Instanzen) |
 | `save_matcad_route` / `delete_matcad_route` | eigene Domains in Matcad (Weiterleitung oder Umleitung, auch Wildcard) – nicht die der Instanzen (Hosting-Recht + alle Instanzen) |

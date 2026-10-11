@@ -11,19 +11,70 @@ namespace MatCMS.Cloud.Pages.Admin.Settings;
 /// The cloud's own settings: general + security, SMTP, AI, API keys, log. Each form saves ONLY its own keys.
 /// Everything about hosts and containers is under Hosting — the old tabs here redirect there.
 /// </summary>
+// A configuration backup carries the store's plugin bundles — the default 30 MB request limit would cut an upload off.
+[RequestSizeLimit(256L * 1024 * 1024)]
+[RequestFormLimits(MultipartBodyLengthLimit = 256L * 1024 * 1024)]
 public class IndexModel : PageModel
 {
     private readonly AppDbContext _db;
     private readonly CloudContext _cloud;
     private readonly EmailService _mail;
     private readonly SecretProtector _secrets;
+    private readonly CloudConfigBackupService _config;
 
-    public IndexModel(AppDbContext db, CloudContext cloud, EmailService mail, SecretProtector secrets)
+    public IndexModel(AppDbContext db, CloudContext cloud, EmailService mail, SecretProtector secrets, CloudConfigBackupService config)
     {
         _db = db;
         _cloud = cloud;
         _mail = mail;
         _secrets = secrets;
+        _config = config;
+    }
+
+    // ---- Sicherung: backups of this cloud's configuration (CloudConfigBackupService — the same as REST and MCP) ----
+
+    public List<CloudConfigBackupService.Info> ConfigBackups { get; private set; } = new();
+    public string? ConfigReportTitle { get; private set; }
+    public List<string> ConfigReport { get; private set; } = new();
+
+    private IActionResult BackToConfig() => RedirectToPage(new { tab = "config" });
+
+    public async Task<IActionResult> OnPostConfigCreateAsync(string[]? sections, string? passphrase, string? note)
+    {
+        var (info, error) = await _config.CreateAsync(sections, passphrase, note, HttpContext.RequestAborted);
+        TempData[info is null ? "FlashError" : "Flash"] = info is null ? error
+            : $"Sicherung „{info.Id}“ erstellt" + (info.HasSecrets ? " – geheime Werte mit dem Passwort verschlüsselt." : " – ohne geheime Werte (kein Passwort).");
+        return BackToConfig();
+    }
+
+    public IActionResult OnGetConfigDownload(string id) =>
+        _config.FilePath(id) is { } p ? PhysicalFile(p, "application/zip", id) : NotFound();
+
+    public async Task<IActionResult> OnPostConfigUploadAsync(IFormFile? file)
+    {
+        if (file is null || file.Length == 0) { TempData["FlashError"] = "Bitte eine Sicherung (ZIP) wählen."; return BackToConfig(); }
+        using var ms = new MemoryStream();
+        await file.CopyToAsync(ms, HttpContext.RequestAborted);
+        var (info, error) = _config.Upload(ms.ToArray(), file.FileName);
+        TempData[info is null ? "FlashError" : "Flash"] = info is null ? error : $"Sicherung „{info.Id}“ hochgeladen – jetzt Vorschau ansehen, dann wiederherstellen.";
+        return BackToConfig();
+    }
+
+    /// <summary>"Vorschau" (apply = false) reports what would change; "Wiederherstellen" applies it.</summary>
+    public async Task<IActionResult> OnPostConfigRestoreAsync(string id, string[]? sections, string? passphrase, bool apply)
+    {
+        var r = await _config.RestoreAsync(id, sections, passphrase, dryRun: !apply, HttpContext.RequestAborted);
+        TempData["ConfigReportTitle"] = !r.Ok ? "Wiederherstellen nicht möglich" : apply ? $"Wiederhergestellt aus „{id}“" : $"Vorschau für „{id}“ – noch nichts geändert";
+        TempData["ConfigReport"] = string.Join("\n", r.Lines);
+        if (r.Ok && apply) TempData["Flash"] = "Konfiguration wiederhergestellt.";
+        return BackToConfig();
+    }
+
+    public IActionResult OnPostConfigDelete(string id)
+    {
+        var ok = _config.Delete(id);
+        TempData[ok ? "Flash" : "FlashError"] = ok ? $"Sicherung „{id}“ gelöscht." : "Sicherung nicht gefunden.";
+        return BackToConfig();
     }
 
     public string Get(string key) => _cloud.Get(key) ?? "";
@@ -50,6 +101,9 @@ public class IndexModel : PageModel
             var def = await _db.Profiles.AsNoTracking().Where(p => p.IsDefault).Select(p => (int?)p.Id).FirstOrDefaultAsync();
             return def is int pid ? RedirectToPage("/Admin/Profiles/Edit", new { id = pid }) : RedirectToPage("/Admin/Profiles/Index");
         }
+        ConfigBackups = _config.List();
+        ConfigReportTitle = TempData["ConfigReportTitle"] as string;
+        if (TempData["ConfigReport"] is string rep) ConfigReport = rep.Split('\n').ToList();
         ApiKeys = new Pages.Admin.ApiKeys.ApiKeyListView(
             await _db.ApiKeys.Include(k => k.Instances).AsNoTracking().OrderByDescending(k => k.CreatedAt).ToListAsync(),
             TempData["NewApiKey"] as string);

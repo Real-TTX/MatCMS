@@ -14,6 +14,7 @@
     <button type="button" class="tab" data-tab="ai">@T["settings.tabAi"]</button>
     <button type="button" class="tab" data-tab="api">@T["settings.tabApi"]</button>
     <button type="button" class="tab" data-tab="logs">@T["logs.title"]</button>
+    <button type="button" class="tab" data-tab="config">@T["cfgbackup.tab"]</button>
 </div>
 
 @* ============ PROTOKOLL ============ *@
@@ -233,6 +234,123 @@
     </div>
 </div>
 
+@* ============ SICHERUNG ============ *@
+@* Backups of the cloud's OWN configuration (not of the sites): download here, upload on another cloud, restore. The
+   same service as /api/v1/cloud/config-backups and the MCP tools. *@
+@{
+    var cfgSections = MatCMS.Cloud.Services.CloudConfigBackupService.AllSections;
+    var cfgDefault = MatCMS.Cloud.Services.CloudConfigBackupService.DefaultRestoreSections;
+}
+<div class="tab-panel" data-panel="config" hidden>
+    @if (Model.ConfigReportTitle is { } rt)
+    {
+        <div class="card">
+            <h2>@rt</h2>
+            <ul style="margin:0;padding-left:1.2rem;">
+                @foreach (var line in Model.ConfigReport) { <li>@line</li> }
+            </ul>
+        </div>
+    }
+
+    <form method="post" asp-page-handler="ConfigCreate">
+        <div class="card">
+            <h2>@T["cfgbackup.create"]</h2>
+            <div class="help">@T["cfgbackup.createHint"]</div>
+            <div class="form-field">
+                <label>@T["cfgbackup.sections"]</label>
+                @foreach (var s in cfgSections)
+                {
+                    <label class="checkbox-row"><input type="checkbox" name="sections" value="@s" checked /> @T["cfgbackup.section." + s]</label>
+                }
+            </div>
+            <div class="form-row">
+                <div class="form-field">
+                    <label for="cfgPass">@T["cfgbackup.passphrase"]</label>
+                    <input id="cfgPass" name="passphrase" type="password" autocomplete="new-password" minlength="8" />
+                    <div class="help">@T["cfgbackup.passphraseHint"]</div>
+                </div>
+                <div class="form-field">
+                    <label for="cfgNote">@T["cfgbackup.note"]</label>
+                    <input id="cfgNote" name="note" placeholder="@T["cfgbackup.notePlaceholder"]" />
+                </div>
+            </div>
+            <div class="list-actions"><button type="submit" class="btn">@T["cfgbackup.createBtn"]</button></div>
+        </div>
+    </form>
+
+    <div class="card">
+        <h2>@T["cfgbackup.list"]</h2>
+        <table class="data">
+            <thead><tr><th>@T["cfgbackup.file"]</th><th>@T["cfgbackup.source"]</th><th>@T["cfgbackup.sections"]</th><th style="width:230px;"></th></tr></thead>
+            <tbody>
+                @if (Model.ConfigBackups.Count == 0)
+                {
+                    <partial name="_EmptyRow" model='@T["cfgbackup.none"]' />
+                }
+                @foreach (var b in Model.ConfigBackups)
+                {
+                    <tr>
+                        <td>
+                            <span class="mono">@b.Id</span>
+                            <div class="muted">@b.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm") · @((b.Size / 1024.0).ToString("0")) KB</div>
+                            @if (b.Note is { } note) { <div class="muted">@note</div> }
+                        </td>
+                        <td>@b.Source <div class="muted mono">@b.Version</div></td>
+                        <td>
+                            @string.Join(", ", b.Sections.Select(s => T["cfgbackup.short." + s].ToString()))
+                            <div><span class="badge @(b.HasSecrets ? "badge-on" : "badge-off")">@(b.HasSecrets ? T["cfgbackup.withSecrets"] : T["cfgbackup.withoutSecrets"])</span></div>
+                        </td>
+                        <td>
+                            <div class="actions">
+                                <a class="btn btn-sm btn-ghost" href="@Url.Page("/Admin/Settings/Index", "ConfigDownload", new { id = b.Id })">@T["cfgbackup.download"]</a>
+                                <button type="button" class="btn btn-sm btn-ghost" data-cfg-restore="@b.Id" data-cfg-sections="@string.Join(",", b.Sections)" data-cfg-secrets="@(b.HasSecrets ? "1" : "0")">@T["cfgbackup.restore"]</button>
+                                <form class="inline-form" method="post" asp-page-handler="ConfigDelete" asp-route-id="@b.Id" data-confirm="@T["cfgbackup.deleteConfirm", b.Id]">
+                                    <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <form method="post" asp-page-handler="ConfigUpload" enctype="multipart/form-data" style="margin-top:12px;">
+            <div class="form-field">
+                <label for="cfgFile">@T["cfgbackup.upload"]</label>
+                <input id="cfgFile" type="file" name="file" accept=".zip,application/zip" required />
+                <div class="help">@T["cfgbackup.uploadHint"]</div>
+            </div>
+            <div class="list-actions"><button type="submit" class="btn btn-ghost">@T["cfgbackup.uploadBtn"]</button></div>
+        </form>
+    </div>
+
+    @* Restore: one form for preview and apply — the preview changes nothing; apply asks first. *@
+    <form method="post" asp-page-handler="ConfigRestore" data-cfg-form hidden>
+        <input type="hidden" name="id" value="" />
+        <div class="card">
+            <h2>@T["cfgbackup.restoreTitle"] <span class="mono" data-cfg-name></span></h2>
+            <div class="help">@T["cfgbackup.restoreHint"]</div>
+            <div class="form-field">
+                <label>@T["cfgbackup.sections"]</label>
+                @foreach (var s in cfgSections)
+                {
+                    <label class="checkbox-row" data-cfg-section="@s"><input type="checkbox" name="sections" value="@s" checked="@(cfgDefault.Contains(s) ? "checked" : null)" /> @T["cfgbackup.section." + s]@(s == "hosting" ? " – " + T["cfgbackup.hostingWarn"] : "")</label>
+                }
+            </div>
+            <div class="form-field" data-cfg-pass>
+                <label for="cfgRestorePass">@T["cfgbackup.passphrase"]</label>
+                <input id="cfgRestorePass" name="passphrase" type="password" autocomplete="off" />
+                <div class="help">@T["cfgbackup.restorePassHint"]</div>
+            </div>
+            <div class="list-actions">
+                <button type="submit" class="btn btn-ghost" name="apply" value="false">@T["cfgbackup.preview"]</button>
+                <button type="submit" class="btn" name="apply" value="true" data-confirm="@T["cfgbackup.applyConfirm"]">@T["cfgbackup.apply"]</button>
+                <button type="button" class="btn btn-ghost" data-cfg-cancel>@T["action.cancel"]</button>
+            </div>
+        </div>
+    </form>
+</div>
+
 @section Scripts {
     <script>
         // Tabs — identical to MatCMS's settings page, including the ?tab=<name> deep link that every
@@ -247,6 +365,27 @@
             tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.tab); }); });
             var want = new URLSearchParams(location.search).get('tab');
             if (want) show(want);
+
+            // Sicherung: "Wiederherstellen" opens the restore form for that backup — only its sections are offered, the
+            // passphrase only when it holds secrets.
+            var cfgForm = document.querySelector('[data-cfg-form]');
+            document.addEventListener('click', function (e) {
+                var b = e.target.closest('[data-cfg-restore],[data-cfg-cancel]');
+                if (!b || !cfgForm) return;
+                if (b.hasAttribute('data-cfg-cancel')) { cfgForm.hidden = true; return; }
+                var has = (b.getAttribute('data-cfg-sections') || '').split(',');
+                cfgForm.querySelector('[name=id]').value = b.getAttribute('data-cfg-restore');
+                cfgForm.querySelector('[data-cfg-name]').textContent = b.getAttribute('data-cfg-restore');
+                cfgForm.querySelectorAll('[data-cfg-section]').forEach(function (row) {
+                    var on = has.indexOf(row.getAttribute('data-cfg-section')) >= 0;
+                    // .checkbox-row sets display, which beats the hidden attribute — hide it explicitly.
+                    row.style.display = on ? '' : 'none';
+                    row.querySelector('input').disabled = !on;
+                });
+                cfgForm.querySelector('[data-cfg-pass]').hidden = b.getAttribute('data-cfg-secrets') !== '1';
+                cfgForm.hidden = false;
+                cfgForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
         })();
     </script>
 }

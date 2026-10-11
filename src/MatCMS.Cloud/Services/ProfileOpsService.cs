@@ -151,6 +151,33 @@ public sealed class ProfileOpsService
         return Result.Done();
     }
 
+    /// <summary>The backup group: saving it puts the policy into the profile (SyncBackup on) and rolls it out. One
+    /// implementation for the profile page, REST and MCP. Interval and retention are clamped, not trusted.</summary>
+    public async Task<Result> SetBackupAsync(int id, BackupSchedule schedule, bool toCloud)
+    {
+        var p = await _db.Profiles.FirstOrDefaultAsync(x => x.Id == id);
+        if (p is null) return NoProfile;
+        p.SyncBackup = true;
+        schedule.IntervalHours = Math.Clamp(schedule.IntervalHours, 1, 24 * 30);
+        schedule.Retain = Math.Clamp(schedule.Retain, 1, 100);
+        await UpsertSettingAsync(id, BackupSchedule.ScheduleKey, JsonSerializer.Serialize(schedule));
+        await UpsertSettingAsync(id, BackupSchedule.ToCloudKey, toCloud ? "1" : "0");
+        await _db.SaveChangesAsync();
+        await _profiles.TouchAsync(id);
+        return Result.Done();
+    }
+
+    /// <summary>Stops rolling the backup policy out; the stored values stay and nothing is switched off on the sites.</summary>
+    public async Task<Result> RemoveBackupAsync(int id)
+    {
+        var p = await _db.Profiles.FirstOrDefaultAsync(x => x.Id == id);
+        if (p is null) return NoProfile;
+        p.SyncBackup = false;
+        await _db.SaveChangesAsync();
+        await _profiles.TouchAsync(id);
+        return Result.Done();
+    }
+
     public async Task<Result> SetAiAsync(int id, bool? syncAi, int? monthlyTokenBudget, string? instruction, bool? backupBeforeAiChange)
     {
         var p = await _db.Profiles.FirstOrDefaultAsync(x => x.Id == id);

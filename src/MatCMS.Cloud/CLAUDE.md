@@ -818,6 +818,20 @@ Design and increments: `docs/hosting-platform.md`. Increments 1–4 are built:
 - Fleet-wide pages are folder-locked to `Admin` in `Program.cs` (`/Admin/Cleanup`, `/Admin/Logs`,
   `/Admin/Hosting`): `/Admin` itself is `AdminOrOperator`, and hiding a nav link does not stop an
   Operator typing the URL. Any NEW fleet-wide page needs the same line.
+- **Configuration backup & restore of the CLOUD itself** (`CloudConfigBackupService`; Einstellungen → Sicherung; REST
+  `/api/v1/cloud/config-backups`, `/api/v1/cloud/settings`; MCP `*_cloud_config_backup`, `get_/set_cloud_settings`): one
+  zip (`cloud-config.json`) under `appdata/config-backups` with sections general/smtp/ai/backup (setting keys,
+  WHITELISTED per section — runtime state like pending routes never travels), store, profiles (entities serialized
+  as-is, children + store links by key + global users by name), users, notifications (`u:<id>` rewritten to
+  `u:@username` and back — ids differ between clouds), assignments (instance → profile by public id, else name) and
+  hosting (server-specific, OFF by default on restore). Traps: secrets are encrypted with THIS installation's key ring
+  (`SecretProtector`, the 2FA protector) — they are decrypted on export and travel ONLY inside a passphrase box
+  (PBKDF2-SHA256 310k + AES-GCM), else they are left out and the restore keeps the target's; users are ADD-ONLY
+  (never touch an existing account — same rule as the rollout and the instance restore) and a user whose 2FA secret is
+  missing comes back WITHOUT 2FA rather than locked out; a restored profile keeps its target id, gets revision+1 so
+  the sites resync, keeps the join code unless taken, and the cloud never ends up without a default profile. Cloud
+  settings that had no API (SMTP, KI, general, backup defaults; the profile backup group) now have one
+  (`SetSettingsAsync`: secrets only set by a non-empty value, cleared only via `clear`).
 - **Reverse proxy is OPTIONAL** (`Services/Proxy/`): provider `none` (default — sites on their host port, a
   domain is only recorded) / `matcad` (Matcad's REST API, `X-Api-Key`) / `caddy` (Caddy admin API).
   `ProxyService` is the one place that publishes/moves/unpublishes a domain — UI (Hosting → Proxy,

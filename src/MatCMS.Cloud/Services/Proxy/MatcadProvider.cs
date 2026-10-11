@@ -75,7 +75,7 @@ public sealed class MatcadProvider : IProxyProvider
         // Matcad forwards the visitor's Host header unchanged and has no setting to replace it — a route to another
         // proxy's host-matched route would land on the wrong (or no) site. The cloud then forwards to address:port.
         if (rewriteHost) return new(false, "Matcad kann den Host-Header nicht umschreiben — als Edge leitet Matcad nur auf Node-Adresse:Port weiter.");
-        long? id = long.TryParse(existingId, out var n) ? n : null;
+        long? id = long.TryParse(existingId, out var n) ? n : await ManualIdForHostAsync(host, ct);
         var r = await PostRouteAsync(id, name, host, upstream, ct);
         // The route may have been deleted in Matcad in the meantime — then create it anew instead of failing.
         if (!r.Ok && id is not null && r.Error?.Contains("404") == true)
@@ -83,18 +83,55 @@ public sealed class MatcadProvider : IProxyProvider
         return r;
     }
 
-    private async Task<ProxyResult> PostRouteAsync(long? id, string name, string host, string upstream, CancellationToken ct)
+    /// <summary>
+    /// The id of a manual route Matcad already has for <paramref name="host"/>. A POST without an id does NOT take such a
+    /// route over: Matcad stores a second one for the same host and only shows one of them — the other resurfaces the
+    /// moment the cloud's route is deleted (seen with www routes set up by hand before the cloud managed them). So the
+    /// cloud adopts it by id instead.
+    /// </summary>
+    private async Task<long?> ManualIdForHostAsync(string host, CancellationToken ct)
+    {
+        try
+        {
+            using var resp = await _http.SendAsync(Req(HttpMethod.Get, "/api/v1/routes/manual"), ct);
+            if (!resp.IsSuccessStatusCode || NotJson(resp) is not null) return null;
+            using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct));
+            if (doc.RootElement.ValueKind != JsonValueKind.Array) return null;
+            foreach (var e in doc.RootElement.EnumerateArray())
+                if (e.TryGetProperty("host", out var h) && string.Equals(h.GetString(), host, StringComparison.OrdinalIgnoreCase)
+                    && !(e.TryGetProperty("wildcard", out var w) && w.ValueKind == JsonValueKind.True)
+                    && e.TryGetProperty("id", out var id) && id.TryGetInt64(out var v))
+                    return v;
+        }
+        catch { }
+        return null;
+    }
+
+    /// <summary>A redirect route (Matcad target "redirect", permanent). Without an id Matcad updates a route that already
+    /// has the host — so a www route someone set up by hand is taken over, not duplicated.</summary>
+    public async Task<ProxyResult> UpsertRedirectAsync(string? existingId, string routeKey, string name, string host, string targetUrl, CancellationToken ct = default)
+    {
+        long? id = long.TryParse(existingId, out var n) ? n : await ManualIdForHostAsync(host, ct);
+        // Matcad writes the URL verbatim into Caddy's Location header, where Caddy fills in placeholders — so the visitor's
+        // path and query survive (www.example.de/impressum → example.de/impressum instead of the home page).
+        var location = targetUrl.TrimEnd('/') + "{http.request.uri}";
+        var r = await PostRouteAsync(id, name, host, null, ct, location);
+        if (!r.Ok && id is not null && r.Error?.Contains("404") == true) r = await PostRouteAsync(null, name, host, null, ct, location);
+        return r;
+    }
+
+    private async Task<ProxyResult> PostRouteAsync(long? id, string name, string host, string? upstream, CancellationToken ct, string? redirectTo = null)
     {
         var body = new
         {
             id,
             host,
             wildcard = false,
-            target = "proxy",
+            target = redirectTo is null ? "proxy" : "redirect",
             upstream,
             insecureSkipVerify = false,
-            fallbackUrl = (string?)null,
-            redirectPermanent = false,
+            fallbackUrl = redirectTo,
+            redirectPermanent = redirectTo is not null,
             authenticationId = (long?)null,
             providerId = (long?)null,
             acmeEmail = (string?)null,

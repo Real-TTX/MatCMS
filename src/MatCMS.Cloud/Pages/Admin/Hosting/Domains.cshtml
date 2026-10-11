@@ -13,6 +13,7 @@
                 <option value="">@T["hostdash.filterAll"]</option>
                 <option value="custom">@T["domains.kindCustom"]</option>
                 <option value="host">@T["domains.kindHost"]</option>
+                <option value="extra">@T["domains.kindExtra"]</option>
                 <option value="edge">@T["domains.viaEdge"]</option>
             </select>
             <form method="post" asp-page-handler="Check" class="inline-form">
@@ -43,7 +44,7 @@
                 var i = r.Instance;
                 <tr data-search="@(r.Domain + " " + i.Name + " " + i.Node?.Name)" data-tags="@(r.Kind + (r.Way == "edge" ? " edge" : ""))">
                     <td class="nowrap"><a href="https://@r.Domain" target="_blank" rel="noopener" class="mono">@r.Domain</a></td>
-                    <td><span class="badge @(r.Kind == "custom" ? "badge-on" : "badge-off")">@(r.Kind == "custom" ? T["domains.kindCustom"] : T["domains.kindHost"])</span></td>
+                    <td><span class="badge @(r.Kind == "custom" ? "badge-on" : "badge-off")">@(r.Kind switch { "custom" => T["domains.kindCustom"], "extra" => T["domains.kindExtra"], _ => T["domains.kindHost"] })</span></td>
                     <td><a asp-page="/Admin/Instances/Details" asp-route-id="@i.Id" asp-route-tab="hosting">@i.Name</a></td>
                     <td class="nowrap">@if (i.Node is { } n) { <a asp-page="/Admin/Hosting/Nodes/Details" asp-route-id="@n.Id">@n.Name</a> } else { <a asp-page="/Admin/Hosting/Nodes/Details" class="muted">@T["nodes.thisHost"]</a> }</td>
                     <td>

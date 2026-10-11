@@ -310,7 +310,7 @@ public static class HostingApi
             if (Services.Proxy.ProxyService.NormaliseDomain(b.Domain) is null)
                 return Results.Json(new { ok = false, error = "Keine gültige Domain (nur ein Hostname, z. B. shop.example.de — ohne Pfad, Port oder *)." },
                     statusCode: StatusCodes.Status400BadRequest);
-            var r = await proxy.PublishAsync(inst, b.Domain, b.PushCanonical ?? true, ctx.RequestAborted);
+            var r = await proxy.PublishAsync(inst, b.Domain, b.PushCanonical ?? true, ctx.RequestAborted, b.Www ?? false);
             return r.Ok ? Results.Ok(new { ok = true, domain = r.Domain, message = r.Message })
                         : Results.Json(new { ok = false, error = r.Message }, statusCode: StatusCodes.Status409Conflict);
         }).RequireRateLimiting("operatorApi");
@@ -324,6 +324,48 @@ public static class HostingApi
             var inst = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == publicId);
             if (inst is null || !ApiKeyService.CanAccess(key!, inst)) return NotFoundInstance();
             var r = await proxy.UnpublishAsync(inst, pushCanonical ?? true, ctx.RequestAborted);
+            return r.Ok ? Results.Ok(new { ok = true, message = r.Message })
+                        : Results.Json(new { ok = false, error = r.Message }, statusCode: StatusCodes.Status409Conflict);
+        }).RequireRateLimiting("operatorApi");
+
+        // ---- Further domains of one instance (www.…, old domains) — they live where the main domain lives ----------
+        static object ExtraJson(Models.InstanceDomain d) => new
+        {
+            domain = d.Domain, mode = d.Mode, via = d.Via, provider = d.Provider, routeId = d.RouteId, error = d.Error, publishedAt = d.PublishedAt,
+        };
+
+        app.MapGet("/api/v1/instances/{publicId}/domains", async (HttpContext ctx, string publicId, ApiKeyService keys, AppDbContext db,
+            Services.Proxy.ProxyService proxy) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            var inst = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == publicId);
+            if (inst is null || !ApiKeyService.CanAccess(key!, inst)) return NotFoundInstance();
+            return Results.Ok(new { main = inst.ProxyDomain, extra = (await proxy.ExtraDomainsAsync(inst.Id, ctx.RequestAborted)).Select(ExtraJson) });
+        }).RequireRateLimiting("operatorApi");
+
+        app.MapPost("/api/v1/instances/{publicId}/domains", async (HttpContext ctx, string publicId, ExtraDomainDto b, ApiKeyService keys,
+            AppDbContext db, Services.Proxy.ProxyService proxy) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireHosting(key!) is { } g) return g;
+            var inst = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == publicId);
+            if (inst is null || !ApiKeyService.CanAccess(key!, inst)) return NotFoundInstance();
+            var r = await proxy.AddExtraDomainAsync(inst, b.Domain, b.Mode, ctx.RequestAborted);
+            return r.Ok ? Results.Ok(new { ok = true, domain = r.Domain, message = r.Message })
+                        : Results.Json(new { ok = false, domain = r.Domain, error = r.Message }, statusCode: StatusCodes.Status409Conflict);
+        }).RequireRateLimiting("operatorApi");
+
+        app.MapDelete("/api/v1/instances/{publicId}/domains/{domain}", async (HttpContext ctx, string publicId, string domain, ApiKeyService keys,
+            AppDbContext db, Services.Proxy.ProxyService proxy) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireHosting(key!) is { } g) return g;
+            var inst = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == publicId);
+            if (inst is null || !ApiKeyService.CanAccess(key!, inst)) return NotFoundInstance();
+            var r = await proxy.RemoveExtraDomainAsync(inst, domain, ctx.RequestAborted);
             return r.Ok ? Results.Ok(new { ok = true, message = r.Message })
                         : Results.Json(new { ok = false, error = r.Message }, statusCode: StatusCodes.Status409Conflict);
         }).RequireRateLimiting("operatorApi");
@@ -556,7 +598,10 @@ public static class HostingApi
     }
 
     public record HostingSwitchDto(bool Enabled);
-    public record DomainDto(string Domain, bool? PushCanonical);
+    /// <param name="Www">Also add www.&lt;domain&gt; as a further domain redirecting to it.</param>
+    public record DomainDto(string Domain, bool? PushCanonical, bool? Www = null);
+    /// <param name="Mode">"redirect" (default, to the main domain) or "alias" (same site).</param>
+    public record ExtraDomainDto(string? Domain, string? Mode);
     /// <param name="Target">A node id, or "local" for this cloud's own host.</param>
     public record MigrateDto(string Target, bool? RemoveSource);
     /// <param name="NodeId">A node's id, or null/"local" for this cloud's own host.</param>

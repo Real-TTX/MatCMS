@@ -94,6 +94,8 @@ public class DetailsModel : PageModel, IAsyncPageFilter
     public string ProxyKind => Item.Node is { } pn ? MatCMS.Cloud.Services.Proxy.ProxyKinds.Normalise(pn.ProxyKind) : _proxy.Settings.Kind;
     public bool ProxyRoutes => _proxy.ManagesRoutes(Item.Node);
     public bool EdgeEnabled => _proxy.EdgeEnabled;
+    /// <summary>Further domains of the instance (www.…), shown under its main domain.</summary>
+    public List<MatCMS.Cloud.Models.InstanceDomain> ExtraDomains { get; private set; } = new();
     /// <summary>The base domain of the host's automatic addresses, or null when switched off there.</summary>
     public string? HostAutoBase => HostingActionsService.CanAct(Item) ? _proxy.AutoBase(Item.Node) : null;
 
@@ -222,6 +224,7 @@ public class DetailsModel : PageModel, IAsyncPageFilter
         BackupQuota = Pages.Admin.Backups.IndexModel.Size(quota);
         BackupPercent = quota > 0 ? (int)Math.Min(100, used * 100 / quota) : 0;
         BackupQuotaFromProfile = Item.Profile?.BackupQuotaGb is > 0 ? Item.Profile.Name : null;
+        ExtraDomains = await _db.InstanceDomains.AsNoTracking().Where(d => d.InstanceId == id).OrderBy(d => d.Domain).ToListAsync();
         return Page();
     }
 
@@ -525,11 +528,28 @@ public class DetailsModel : PageModel, IAsyncPageFilter
 
     // ---- Domain on the reverse proxy (Hosting increment 3) — logic in ProxyService, shared with REST + MCP ----
 
-    public async Task<IActionResult> OnPostPublishDomainAsync(int id, string? domain, bool pushCanonical)
+    public async Task<IActionResult> OnPostPublishDomainAsync(int id, string? domain, bool pushCanonical, bool addWww)
     {
         var item = await _db.Instances.FindAsync(id);
         if (item is null) return RedirectToPage("Index");
-        var r = await _proxy.PublishAsync(item, domain, pushCanonical, HttpContext.RequestAborted);
+        var r = await _proxy.PublishAsync(item, domain, pushCanonical, HttpContext.RequestAborted, addWww);
+        return Flash(new HostingActionsService.ActionResult(r.Ok, r.Message), id);
+    }
+
+    /// <summary>A further domain (www.…, an old domain) next to the main one — routed where the main one is.</summary>
+    public async Task<IActionResult> OnPostAddExtraDomainAsync(int id, string? extraDomain, string? extraMode)
+    {
+        var item = await _db.Instances.FindAsync(id);
+        if (item is null) return RedirectToPage("Index");
+        var r = await _proxy.AddExtraDomainAsync(item, extraDomain, extraMode, HttpContext.RequestAborted);
+        return Flash(new HostingActionsService.ActionResult(r.Ok, r.Message), id);
+    }
+
+    public async Task<IActionResult> OnPostRemoveExtraDomainAsync(int id, string? extraDomain)
+    {
+        var item = await _db.Instances.FindAsync(id);
+        if (item is null) return RedirectToPage("Index");
+        var r = await _proxy.RemoveExtraDomainAsync(item, extraDomain, HttpContext.RequestAborted);
         return Flash(new HostingActionsService.ActionResult(r.Ok, r.Message), id);
     }
 

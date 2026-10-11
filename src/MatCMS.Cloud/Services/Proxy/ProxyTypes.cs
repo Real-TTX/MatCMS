@@ -67,6 +67,11 @@ public interface IProxyProvider
     /// provider that cannot do it must refuse rather than route to the wrong site.</summary>
     Task<ProxyResult> UpsertAsync(string? existingId, string routeKey, string name, string host, string upstream, bool rewriteHost = false, CancellationToken ct = default);
 
+    /// <summary>Creates or updates a route that only REDIRECTS <paramref name="host"/> to <paramref name="targetUrl"/>
+    /// (permanently, path kept) — a further domain such as www.example.de pointing at the main domain.</summary>
+    Task<ProxyResult> UpsertRedirectAsync(string? existingId, string routeKey, string name, string host, string targetUrl, CancellationToken ct = default) =>
+        Task.FromResult(new ProxyResult(false, "Dieser Proxy kann keine Umleitungen anlegen."));
+
     /// <summary>Removes the route. A route that is already gone counts as success.</summary>
     Task<ProxyResult> DeleteAsync(string routeId, CancellationToken ct = default);
 

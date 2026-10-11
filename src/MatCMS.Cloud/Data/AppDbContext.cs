@@ -38,6 +38,9 @@ public class AppDbContext : DbContext
     // Hosting increment 5: moves between hosts.
     public DbSet<InstanceMigration> InstanceMigrations => Set<InstanceMigration>();
 
+    // Further customer domains of an instance (www.…, old domains) next to its main one.
+    public DbSet<InstanceDomain> InstanceDomains => Set<InstanceDomain>();
+
     // Per-user instance scope for the "Operator" role (login users, not API keys).
     public DbSet<UserInstance> UserInstances => Set<UserInstance>();
 
@@ -141,6 +144,10 @@ public class AppDbContext : DbContext
             .HasForeignKey(m => m.InstanceId).OnDelete(DeleteBehavior.Cascade);
         b.Entity<InstanceMigration>().HasIndex(m => new { m.InstanceId, m.State });
         b.Entity<InstanceMigration>().HasIndex(m => m.TransferId);
+        b.Entity<InstanceDomain>()
+            .HasOne(d => d.Instance).WithMany()
+            .HasForeignKey(d => d.InstanceId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<InstanceDomain>().HasIndex(d => d.Domain).IsUnique();
         // Deleting a node forgets where its instances ran; the instances themselves stay (they are sites,
         // not the node's property) and fall back to remote on their next beat.
         b.Entity<Instance>()

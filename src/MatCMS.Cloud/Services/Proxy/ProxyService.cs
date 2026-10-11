@@ -230,7 +230,8 @@ public class ProxyService
         for (var i = 1; ; i++)
         {
             var candidate = (i == 1 ? slug : $"{slug}-{i}") + "." + baseDomain;
-            if (!await _db.Instances.AnyAsync(x => x.Id != exceptInstanceId && (x.HostDomain == candidate || x.ProxyDomain == candidate), ct))
+            if (!await _db.Instances.AnyAsync(x => x.Id != exceptInstanceId && (x.HostDomain == candidate || x.ProxyDomain == candidate), ct)
+                && !await _db.InstanceDomains.AnyAsync(d => d.Domain == candidate, ct))
                 return candidate;
         }
     }
@@ -403,12 +404,14 @@ public class ProxyService
     /// routed at the edge, otherwise at the proxy of the site's host. A route left on the other way is removed
     /// first, so switching the edge on or off never leaves two routes for one domain.
     /// <paramref name="pushCanonical"/> additionally tells the instance its public address.</summary>
-    public async Task<PublishResult> PublishAsync(Instance inst, string? rawDomain, bool pushCanonical, CancellationToken ct = default)
+    public async Task<PublishResult> PublishAsync(Instance inst, string? rawDomain, bool pushCanonical, CancellationToken ct = default, bool addWww = false)
     {
         var domain = NormaliseDomain(rawDomain);
         if (domain is null) return new(false, "Keine gültige Domain (nur ein Hostname, z. B. shop.example.de — ohne Pfad, Port oder *).");
-        if (await _db.Instances.AnyAsync(i => i.Id != inst.Id && (i.ProxyDomain == domain || i.HostDomain == domain), ct))
-            return new(false, $"„{domain}“ ist bereits einer anderen Instanz zugeordnet.");
+        if (await _db.InstanceDomains.AnyAsync(d => d.InstanceId == inst.Id && d.Domain == domain, ct))
+            return new(false, $"„{domain}“ ist schon eine weitere Domain dieser Instanz – dort erst entfernen, dann als Hauptdomain setzen.");
+        if (await DomainOwnerAsync(domain, inst.Id, ct) is { } owner)
+            return new(false, $"„{domain}“ ist bereits „{owner}“ zugeordnet.");
 
         var node = await NodeOfAsync(inst, ct);
         var viaEdge = EdgeEnabled;
@@ -471,7 +474,166 @@ public class ProxyService
         await _db.SaveChangesAsync(ct);
 
         var note = await PushCanonicalAsync(inst, pushCanonical ? "https://" + domain : null, pushCanonical, ct);
+        // The further domains follow the main one (a new name changes their redirect target, a switched way their place).
+        note += await SyncExtraDomainsAsync(inst, ct);
+        if (addWww && !domain.StartsWith("www.", StringComparison.Ordinal)
+            && !await _db.InstanceDomains.AnyAsync(d => d.InstanceId == inst.Id && d.Domain == "www." + domain, ct))
+        {
+            var w = await AddExtraDomainAsync(inst, "www." + domain, InstanceDomainModes.Redirect, ct);
+            note += w.Ok ? $" www.{domain} leitet auf die Domain um." : $" www.{domain} NICHT angelegt: {w.Message}";
+        }
         return new(true, $"„{domain}“ veröffentlicht{(viaEdge ? " (über den Edge)" : "")}.{note}", domain);
+    }
+
+    // ---- Further domains (www.…, old domains) ----------------------------------------------------------------------
+    //
+    // An instance has ONE main customer domain (Instance.ProxyDomain) and any number of further ones (InstanceDomain).
+    // A further domain lives exactly where the main one lives — at the edge or at the proxy of the site's host — and is
+    // re-published whenever the main one is (changed, moved to another host, the edge switched), so it can never point
+    // somewhere the main domain no longer is. Without a main domain there are no further domains: unpublishing it
+    // removes them, and adding one first needs it.
+
+    /// <summary>Is <paramref name="domain"/> already somebody's address — a main domain, a host address or a further
+    /// domain? <paramref name="exceptInstanceId"/> excludes that instance's MAIN domain and host address only.</summary>
+    private async Task<string?> DomainOwnerAsync(string domain, int? exceptInstanceId, CancellationToken ct)
+    {
+        var inst = await _db.Instances.AsNoTracking()
+            .Where(i => i.Id != exceptInstanceId && (i.ProxyDomain == domain || i.HostDomain == domain))
+            .Select(i => i.Name).FirstOrDefaultAsync(ct);
+        if (inst is not null) return inst;
+        return await _db.InstanceDomains.AsNoTracking().Where(d => d.Domain == domain)
+            .Select(d => d.Instance!.Name).FirstOrDefaultAsync(ct);
+    }
+
+    public Task<List<InstanceDomain>> ExtraDomainsAsync(int instanceId, CancellationToken ct = default) =>
+        _db.InstanceDomains.Where(d => d.InstanceId == instanceId).OrderBy(d => d.Domain).ToListAsync(ct);
+
+    /// <summary>Adds a further domain and publishes it right away. The row is kept even when the route failed (with its
+    /// error), so the operator sees it and can retry by publishing the main domain again.</summary>
+    public async Task<PublishResult> AddExtraDomainAsync(Instance inst, string? rawDomain, string? mode, CancellationToken ct = default)
+    {
+        var domain = NormaliseDomain(rawDomain);
+        if (domain is null) return new(false, "Keine gültige Domain (nur ein Hostname, z. B. www.example.de).");
+        if (inst.ProxyDomain is null) return new(false, "Erst die Hauptdomain veröffentlichen – weitere Domains hängen an ihr.");
+        if (domain == inst.ProxyDomain) return new(false, $"„{domain}“ ist schon die Hauptdomain.");
+        if (domain == inst.HostDomain) return new(false, $"„{domain}“ ist die automatische Adresse dieser Instanz.");
+        if (await DomainOwnerAsync(domain, null, ct) is { } owner) return new(false, $"„{domain}“ gehört schon zu „{owner}“.");
+
+        var row = new InstanceDomain { InstanceId = inst.Id, Domain = domain, Mode = InstanceDomainModes.Normalise(mode) };
+        _db.InstanceDomains.Add(row);
+        await _db.SaveChangesAsync(ct);
+        var r = await PublishExtraAsync(inst, row, await NodeOfAsync(inst, ct), ct);
+        _instances.Log(inst, r.Ok ? InstanceEventKind.DomainPublished : InstanceEventKind.DomainFailed,
+            r.Ok ? $"Weitere Domain: {domain} ({ModeText(row.Mode)})." : $"Weitere Domain {domain}: {r.Message}");
+        await _db.SaveChangesAsync(ct);
+        return r.Ok ? new(true, $"„{domain}“ angelegt ({ModeText(row.Mode)}).", domain) : new(false, r.Message, domain);
+    }
+
+    private static string ModeText(string mode) => mode == InstanceDomainModes.Alias ? "zeigt dieselbe Seite" : "leitet auf die Hauptdomain um";
+
+    /// <summary>Removes a further domain: route first, row second (a proxy that is down keeps the row and says so).</summary>
+    public async Task<PublishResult> RemoveExtraDomainAsync(Instance inst, string? rawDomain, CancellationToken ct = default)
+    {
+        var domain = NormaliseDomain(rawDomain) ?? rawDomain?.Trim().ToLowerInvariant();
+        var row = await _db.InstanceDomains.FirstOrDefaultAsync(d => d.InstanceId == inst.Id && d.Domain == domain, ct);
+        if (row is null) return new(false, $"„{domain}“ ist keine weitere Domain dieser Instanz.");
+        var del = await DeleteExtraRouteAsync(inst, row, await NodeOfAsync(inst, ct), ct);
+        if (!del.Ok) { row.Error = del.Message; await _db.SaveChangesAsync(ct); return new(false, del.Message); }
+        _db.InstanceDomains.Remove(row);
+        _instances.Log(inst, InstanceEventKind.DomainUnpublished, $"Weitere Domain entfernt: {row.Domain}.");
+        await _db.SaveChangesAsync(ct);
+        return new(true, $"„{row.Domain}“ entfernt.");
+    }
+
+    /// <summary>The route of one further domain, where the main domain lives now. A route left on the OTHER way (edge
+    /// vs host) is removed first. Redirects go to https://main; an alias is routed like the main domain itself.</summary>
+    private async Task<ProxyOpResult> PublishExtraAsync(Instance inst, InstanceDomain d, Node? node, CancellationToken ct)
+    {
+        var viaEdge = inst.ProxyVia == ProxyVia.Edge;
+        var way = viaEdge ? ProxyVia.Edge : ProxyVia.Host;
+        if (d.RouteId is not null && d.Provider is not null && (d.Via ?? ProxyVia.Host) != way)
+        {
+            var old = await DeleteExtraRouteAsync(inst, d, node, ct);
+            if (!old.Ok) return Record(d, old);
+            d.RouteId = null; d.Provider = null;
+        }
+        var kind = viaEdge ? EdgeSettings.Kind : node is null ? Settings.Kind : ProxyKinds.Normalise(node.ProxyKind);
+        var key = $"dom-{inst.PublicId}-{d.Id}";
+        var name = $"{RouteName(inst.Name)} ({d.Domain})";
+        ProxyOpResult r;
+        if (d.Mode == InstanceDomainModes.Alias)
+        {
+            if (viaEdge)
+            {
+                var (up, rewrite, err) = EdgeTarget(inst, node, EdgeSettings);
+                if (err is not null) return Record(d, new(false, err));
+                r = await ProxyEngine.ExecuteAsync(new ProxyOp("publish", EdgeSettings, inst.ContainerId, inst.LocalPort, d.Domain, key, name,
+                    RouteId: d.RouteId, OldKind: d.Provider, Upstream: up, RewriteHost: rewrite), Http(), _docker, ct);
+            }
+            else
+                r = await RunAsync(node, x => new ProxyOp("publish", x, inst.ContainerId, inst.LocalPort, d.Domain, key, name,
+                    RouteId: d.RouteId, OldKind: d.Provider), inst.Id, ct);
+        }
+        else
+        {
+            var target = "https://" + inst.ProxyDomain;
+            r = viaEdge
+                ? await ProxyEngine.ExecuteAsync(new ProxyOp("redirect", EdgeSettings, Host: d.Domain, RouteKey: key, Name: name,
+                    RouteId: d.RouteId, OldKind: d.Provider, Upstream: target), Http(), _docker, ct)
+                : await RunAsync(node, x => new ProxyOp("redirect", x, Host: d.Domain, RouteKey: key, Name: name,
+                    RouteId: d.RouteId, OldKind: d.Provider, Upstream: target), inst.Id, ct);
+        }
+        if (r.Ok || r.RouteId is not null) { d.RouteId = kind == ProxyKinds.None ? null : r.RouteId; d.Provider = kind; d.Via = way; }
+        if (r.Ok) d.PublishedAt = DateTime.UtcNow;
+        return Record(d, r);
+    }
+
+    private static ProxyOpResult Record(InstanceDomain d, ProxyOpResult r)
+    {
+        d.Error = r.Ok ? null : r.Message;
+        return r;
+    }
+
+    private Task<ProxyOpResult> DeleteExtraRouteAsync(Instance inst, InstanceDomain d, Node? node, CancellationToken ct)
+    {
+        if (d.RouteId is null || d.Provider is null) return Task.FromResult(new ProxyOpResult(true, "Keine Route."));
+        return d.Via == ProxyVia.Edge
+            ? ProxyEngine.ExecuteAsync(new ProxyOp("delete", EdgeSettings, Kind: d.Provider, RouteId: d.RouteId), Http(), _docker, ct)
+            : RunAsync(node, x => new ProxyOp("delete", x, Kind: d.Provider, RouteId: d.RouteId), inst.Id, ct);
+    }
+
+    /// <summary>Re-publishes every further domain where the main domain now is (after it was published, changed or
+    /// moved). Returns a note for the failures, empty when all went well or there are none.</summary>
+    private async Task<string> SyncExtraDomainsAsync(Instance inst, CancellationToken ct)
+    {
+        var rows = await ExtraDomainsAsync(inst.Id, ct);
+        if (rows.Count == 0) return "";
+        var node = await NodeOfAsync(inst, ct);
+        var failed = new List<string>();
+        foreach (var d in rows)
+        {
+            var r = await PublishExtraAsync(inst, d, node, ct);
+            if (!r.Ok) failed.Add($"{d.Domain}: {r.Message}");
+        }
+        await _db.SaveChangesAsync(ct);
+        return failed.Count == 0 ? "" : " Weitere Domains NICHT nachgezogen – " + string.Join(" · ", failed);
+    }
+
+    /// <summary>Deletes the routes of all further domains; <paramref name="removeRows"/> also forgets them (unpublish,
+    /// teardown), otherwise only the route fields are cleared (a move: they are re-created on the new host).</summary>
+    private async Task<List<string>> DeleteExtraRoutesAsync(Instance inst, Node? node, bool removeRows, bool onlyHostWay, CancellationToken ct)
+    {
+        var errors = new List<string>();
+        foreach (var d in await ExtraDomainsAsync(inst.Id, ct))
+        {
+            if (onlyHostWay && d.Via == ProxyVia.Edge) continue;
+            var r = await DeleteExtraRouteAsync(inst, d, node, ct);
+            if (!r.Ok) { errors.Add($"{d.Domain}: {r.Message}"); d.Error = r.Message; continue; }
+            if (removeRows) _db.InstanceDomains.Remove(d);
+            else { d.RouteId = null; d.Provider = null; }
+        }
+        await _db.SaveChangesAsync(ct);
+        return errors;
     }
 
     /// <summary>Removes the customer domain again. The route goes first; only when that succeeded is the record
@@ -479,6 +641,9 @@ public class ProxyService
     public async Task<PublishResult> UnpublishAsync(Instance inst, bool pushCanonical, CancellationToken ct = default)
     {
         if (inst.ProxyDomain is null && inst.ProxyRouteId is null) return new(true, "Keine Domain veröffentlicht.");
+        // Further domains hang on the main one — they go with it, routes first.
+        var extraErrors = await DeleteExtraRoutesAsync(inst, await NodeOfAsync(inst, ct), removeRows: true, onlyHostWay: false, ct);
+        if (extraErrors.Count > 0) return Fail(inst, "Weitere Domains nicht entfernt: " + string.Join(" · ", extraErrors));
         if (inst.ProxyRouteId is not null && inst.ProxyProvider is not null)
         {
             var r = await DeleteCustomerRouteAsync(inst, await NodeOfAsync(inst, ct), ct);
@@ -649,6 +814,9 @@ public class ProxyService
 
         if (inst.ProxyDomain is { } domain)
         {
+            // Further domains at the old host go first; PublishAsync below re-creates them where the site now runs.
+            foreach (var e in await DeleteExtraRoutesAsync(inst, from, removeRows: false, onlyHostWay: true, ct))
+                notes.Add("Alte Route einer weiteren Domain nicht entfernt: " + e);
             if (inst.ProxyVia != ProxyVia.Edge && inst.ProxyRouteId is not null && inst.ProxyProvider is not null)
             {
                 var r = await RunAsync(from, x => new ProxyOp("delete", x, Kind: inst.ProxyProvider, RouteId: inst.ProxyRouteId), inst.Id, ct);
@@ -679,6 +847,8 @@ public class ProxyService
             var r = await DeleteCustomerRouteAsync(inst, node, ct);
             if (!r.Ok) errors.Add($"Domain {inst.ProxyDomain}: {r.Message}");
         }
+        // The rows go with the instance (cascade); their routes must go here.
+        errors.AddRange((await DeleteExtraRoutesAsync(inst, node, removeRows: false, onlyHostWay: false, ct)).Select(e => "Weitere Domain " + e));
         return errors.Count == 0 ? null : string.Join(" ", errors);
     }
 

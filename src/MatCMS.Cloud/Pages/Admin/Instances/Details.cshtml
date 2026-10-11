@@ -358,6 +358,9 @@
                     <div class="help">@(Model.EdgeEnabled ? T["hosting.publishHintEdge"] : Model.ProxyRoutes ? T["hosting.publishHintRoute", Model.ProxyKind] : T["hosting.publishHintNone"])</div>
                 </div>
                 <label class="checkbox-row"><input type="checkbox" name="pushCanonical" value="true" checked /> @T["hosting.pushCanonical"]</label>
+                @* www.<domain> as a redirect, ticked unless the instance already has it (or the domain is a www. itself — the
+                   server skips that case). *@
+                <label class="checkbox-row"><input type="checkbox" name="addWww" value="true" checked="@(Model.ExtraDomains.Any(d => d.Domain.StartsWith("www.")) ? null : "checked")" /> @T["extradomain.addWww"]</label>
                 <div class="list-actions">
                     <button type="submit" class="btn">@(Model.Item.ProxyDomain is null ? T["hosting.publishBtn"] : T["hosting.changeBtn"])</button>
                 </div>
@@ -377,6 +380,51 @@
                         <button type="submit" class="btn btn-danger">@T["hosting.unpublishBtn"]</button>
                     </form>
                 </div>
+
+                @* Further domains: www.<domain>, old domains. They live where the main domain lives and follow it. *@
+                <h3 style="margin-top:18px;">@T["extradomain.title"]</h3>
+                <table class="data">
+                    <thead><tr><th>@T["hosting.domain"]</th><th>@T["extradomain.mode"]</th><th style="width:60px;"></th></tr></thead>
+                    <tbody>
+                        @if (Model.ExtraDomains.Count == 0)
+                        {
+                            <partial name="_EmptyRow" model='@T["extradomain.none"]' />
+                        }
+                        @foreach (var x in Model.ExtraDomains)
+                        {
+                            <tr>
+                                <td>
+                                    <a href="https://@x.Domain" target="_blank" rel="noopener" class="mono">@x.Domain</a>
+                                    @if (!string.IsNullOrEmpty(x.Error)) { <div><span class="badge badge-err" title="@x.Error">@T["hosting.proxyError"]</span> <span class="muted">@x.Error</span></div> }
+                                </td>
+                                <td><span class="badge @(x.Mode == "alias" ? "badge-on" : "badge-off")">@(x.Mode == "alias" ? T["extradomain.alias"] : T["extradomain.redirect", Model.Item.ProxyDomain!])</span></td>
+                                <td>
+                                    <form class="inline-form" method="post" asp-page-handler="RemoveExtraDomain" asp-route-id="@Model.Item.Id" data-confirm="@T["extradomain.removeConfirm", x.Domain]">
+                                        <input type="hidden" name="extraDomain" value="@x.Domain" />
+                                        <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                <form method="post" asp-page-handler="AddExtraDomain" asp-route-id="@Model.Item.Id" style="margin-top:10px;">
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label for="extra-domain">@T["extradomain.add"]</label>
+                            <input id="extra-domain" name="extraDomain" placeholder="www.@Model.Item.ProxyDomain" spellcheck="false" required />
+                        </div>
+                        <div class="form-field">
+                            <label for="extra-mode">@T["extradomain.mode"]</label>
+                            <select id="extra-mode" name="extraMode">
+                                <option value="redirect">@T["extradomain.redirect", Model.Item.ProxyDomain!]</option>
+                                <option value="alias">@T["extradomain.alias"]</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="help">@T["extradomain.hint"]</div>
+                    <div class="list-actions"><button type="submit" class="btn btn-ghost">@T["extradomain.addBtn"]</button></div>
+                </form>
             }
         </div>
 

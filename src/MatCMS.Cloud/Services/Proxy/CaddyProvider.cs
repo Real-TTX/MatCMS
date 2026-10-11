@@ -94,11 +94,33 @@ public sealed class CaddyProvider : IProxyProvider
         // travels as X-Forwarded-Host, which Caddy sets by itself.
         if (rewriteHost)
             proxy["headers"] = new JsonObject { ["request"] = new JsonObject { ["set"] = new JsonObject { ["Host"] = new JsonArray(targetHost) } } };
+        return await WriteRouteAsync(id, host, proxy, ct);
+    }
+
+    /// <summary>A route that only redirects <paramref name="host"/> to <paramref name="targetUrl"/> (301, path and query
+    /// kept) — a further domain such as www.example.de pointing at the main one.</summary>
+    public async Task<ProxyResult> UpsertRedirectAsync(string? existingId, string routeKey, string name, string host, string targetUrl, CancellationToken ct = default)
+    {
+        var id = !string.IsNullOrWhiteSpace(existingId) && existingId.StartsWith("matcms-", StringComparison.Ordinal)
+            ? existingId : RouteIdFor(routeKey);
+        var redirect = new JsonObject
+        {
+            ["handler"] = "static_response",
+            ["status_code"] = 301,
+            ["headers"] = new JsonObject { ["Location"] = new JsonArray(targetUrl.TrimEnd('/') + "{http.request.uri}") },
+        };
+        return await WriteRouteAsync(id, host, redirect, ct);
+    }
+
+    /// <summary>Creates or replaces the route <paramref name="id"/> for <paramref name="host"/> with one handler — in
+    /// place when it exists, else at the top of the server's routes (creating server and list when missing).</summary>
+    private async Task<ProxyResult> WriteRouteAsync(string id, string host, JsonObject handler, CancellationToken ct)
+    {
         var route = new JsonObject
         {
             ["@id"] = id,
             ["match"] = new JsonArray(new JsonObject { ["host"] = new JsonArray(host) }),
-            ["handle"] = new JsonArray(proxy),
+            ["handle"] = new JsonArray(handler),
             ["terminal"] = true,
         }.ToJsonString();
 

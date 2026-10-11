@@ -201,6 +201,14 @@ public sealed class MatcadAdminService
             var onEdge = i.ProxyVia == ProxyVia.Edge;
             if (i.ProxyRouteId is { } p && i.ProxyProvider == ProxyKinds.Matcad && (onEdge ? edgeHere : i.NodeId is null)) map[p] = (i.Name, i.Id);
         }
+        // Further domains (www.…) of instances on this host, or at the edge while the edge is this host's proxy.
+        var extras = await _db.InstanceDomains.AsNoTracking()
+            .Where(d => d.RouteId != null && d.Provider == ProxyKinds.Matcad)
+            .Select(d => new { d.RouteId, d.Via, d.InstanceId, d.Instance!.Name, d.Instance.NodeId })
+            .ToListAsync(ct);
+        foreach (var e in extras)
+            if (e.Via == ProxyVia.Edge ? edgeHere : e.NodeId is null) map[e.RouteId!] = (e.Name, e.InstanceId);
+
         var pending = await _db.CloudSettings.AsNoTracking()
             .Where(s => s.Key.StartsWith(SettingKeys.HostingPendingRoutePrefix)).ToListAsync(ct);
         foreach (var row in pending)

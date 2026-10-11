@@ -43,6 +43,8 @@ public static class ProxyEngine
             {
                 "test" => await TestAsync(op.Settings, http, docker, ct),
                 "publish" => await PublishAsync(op, http, docker, ct),
+                // A further domain that only redirects to the main one: Host → Upstream (the target URL), no container.
+                "redirect" => await RedirectAsync(op, http, ct),
                 "delete" => await DeleteAsync(op, http, ct),
                 "exists" => new(true, "", Exists: await Provider(op.Settings, http, op.Kind).ExistsAsync(op.RouteId ?? "", ct)),
                 // Wildcard certificate for *.{Host} (Host = the base domain), removing it, trusting the edge.
@@ -124,6 +126,19 @@ public static class ProxyEngine
         var r = await provider.UpsertAsync(existing, op.RouteKey ?? op.ContainerId ?? "", op.Name ?? "MatCMS", op.Host ?? "", upstream, op.RewriteHost, ct);
         return r.Ok ? new(true, $"Route über {s.Kind} angelegt.", r.RouteId)
                     : new(false, r.Error ?? "Route konnte nicht angelegt werden.", r.RouteId);
+    }
+
+    private static async Task<ProxyOpResult> RedirectAsync(ProxyOp op, HttpClient http, CancellationToken ct)
+    {
+        var s = op.Settings;
+        var provider = Provider(s, http);
+        if (op.RouteId is not null && op.OldKind is not null && op.OldKind != s.Kind)
+            await Provider(s, http, op.OldKind).DeleteAsync(op.RouteId, ct);
+        if (!provider.ManagesRoutes) return new(true, "Kein Proxy — Domain nur vermerkt.");
+        var existing = op.OldKind == s.Kind ? op.RouteId : null;
+        var r = await provider.UpsertRedirectAsync(existing, op.RouteKey ?? "", op.Name ?? "MatCMS", op.Host ?? "", op.Upstream ?? "", ct);
+        return r.Ok ? new(true, $"Umleitung über {s.Kind} angelegt.", r.RouteId)
+                    : new(false, r.Error ?? "Umleitung konnte nicht angelegt werden.", r.RouteId);
     }
 
     private static async Task<ProxyOpResult> DeleteAsync(ProxyOp op, HttpClient http, CancellationToken ct)

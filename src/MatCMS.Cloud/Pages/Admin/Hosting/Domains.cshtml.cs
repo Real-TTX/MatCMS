@@ -53,6 +53,10 @@ public class DomainsModel : PageModel
                 Rows.Add(new(d, "custom", i, way, i.ProxyProvider, i.ProxyRouteId, i.ProxyError, i.ProxyPublishedAt, target));
             }
         }
+        // Further domains (www.…) beside their instance's main domain.
+        foreach (var d in await _db.InstanceDomains.Include(x => x.Instance!).ThenInclude(i => i.Node).ToListAsync())
+            Rows.Add(new(d.Domain, "extra", d.Instance!, d.Via == ProxyVia.Edge ? "edge" : d.RouteId is null ? "record" : "host", d.Provider, d.RouteId,
+                d.Error, d.PublishedAt, d.Mode == InstanceDomainModes.Alias ? null : "https://" + d.Instance!.ProxyDomain));
         Rows = Rows.OrderBy(r => r.Domain, StringComparer.OrdinalIgnoreCase).ToList();
 
         var rows = await _db.CloudSettings.AsNoTracking()

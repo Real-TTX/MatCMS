@@ -468,6 +468,51 @@ namespace MatCMS.Cloud.Data.Migrations
                     b.ToTable("Instances");
                 });
 
+            modelBuilder.Entity("MatCMS.Cloud.Models.InstanceDomain", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Domain")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("InstanceId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Provider")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("PublishedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RouteId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Via")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Domain")
+                        .IsUnique();
+
+                    b.HasIndex("InstanceId");
+
+                    b.ToTable("InstanceDomains");
+                });
+
             modelBuilder.Entity("MatCMS.Cloud.Models.InstanceEvent", b =>
                 {
                     b.Property<int>("Id")
@@ -1890,6 +1935,17 @@ namespace MatCMS.Cloud.Data.Migrations
                     b.Navigation("Node");
 
                     b.Navigation("Profile");
+                });
+
+            modelBuilder.Entity("MatCMS.Cloud.Models.InstanceDomain", b =>
+                {
+                    b.HasOne("MatCMS.Cloud.Models.Instance", "Instance")
+                        .WithMany()
+                        .HasForeignKey("InstanceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Instance");
                 });
 
             modelBuilder.Entity("MatCMS.Cloud.Models.InstanceEvent", b =>

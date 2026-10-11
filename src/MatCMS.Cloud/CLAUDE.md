@@ -850,6 +850,18 @@ Design and increments: `docs/hosting-platform.md`. Increments 1–4 are built:
     re-points an edge route that depends on it. Teardown (`InstanceRemovalService`) now deletes all routes after
     the container (best effort, failures reported) — before, routes outlived their site.
   - Hosting → Domains lists EVERY address (host addresses + customer domains with their way and target + pending).
+  - **Further domains** (`InstanceDomain`, migration `AddInstanceDomains`): an instance has ONE main customer domain
+    (`Instance.ProxyDomain`) and any number of further ones — `www.<domain>`, old domains — each `redirect` (301 to
+    https://main, path kept; the default) or `alias` (same site). Invariant: a further domain lives exactly where the
+    main domain lives (`Via` edge/host) and is re-published by `SyncExtraDomainsAsync` at the end of every successful
+    `PublishAsync` — so a changed main name re-targets the redirects, a switched edge or a host move re-places them
+    (`MoveRouteAsync` deletes the host-way ones on the OLD host first). No main domain, no further domains: adding
+    one needs it, `UnpublishAsync` removes them (routes first), teardown deletes their routes (rows cascade).
+    Redirects are their own proxy op `redirect` (`IProxyProvider.UpsertRedirectAsync`: Matcad target "redirect",
+    permanent — and without an id Matcad UPDATES a route that already has the host, so www routes set up by hand are
+    taken over; Caddy a `static_response` 301 with `{http.request.uri}`) — a node agent older than this image answers
+    "unbekannte Proxy-Operation" until updated. Uniqueness (`DomainOwnerAsync`) spans main domains, host addresses and
+    further domains, also for free host-address names. Publishing with `addWww`/`www: true` adds `www.<domain>`.
   - **Matcad of "Dieser Host" maintained from the cloud** (`MatcadAdminService`; tab "Matcad" on Hosting → Hosts →
     Dieser Host, loaded on demand; REST `/api/v1/hosting/matcad/…`; MCP `get_matcad`, `set_matcad_settings`,
     `save_/delete_matcad_provider`, `save_/delete_matcad_route`): Matcad's base domain + ACME e-mail, its DNS providers

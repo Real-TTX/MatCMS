@@ -198,7 +198,12 @@ oder `hostport` (Ziel `http://<upstreamHost>:<Host-Port>`).
   - `POST /api/v1/hosting/matcad/routes` `{ id?, host, name?, target: "proxy"|"redirect", upstream?, fallbackUrl?, wildcard?, providerId?, enabled? = true, allowEmbedding? }` → `{ ok, id, message }` – Wildcard braucht `providerId`; Felder, die die Cloud nicht kennt (Basic-Auth, eigene ACME-E-Mail), behalten ihren Wert. `DELETE …/routes/{id}`. Routen der Instanzen → `409` (dort über `/api/v1/instances/{id}/domain` bzw. `…/host-address`).
 - `GET|PUT /api/v1/hosting/edge` `{ enabled?, useHostProxy?, provider?, caddyAdminUrl?, caddyServer?, matcadUrl?, matcadToken?, clearMatcadToken?, trustedIps? }` (`trustedIps` = Absender-IPs des Edge; jeder Caddy-Host vertraut ihnen, damit die Besucher-IP ankommt) – zentraler Edge-Proxy für Kundendomains; `POST …/edge/test`; `POST …/edge/move` stellt vor dem Umschalten veröffentlichte Kundendomains auf den aktuellen Weg um (**CanManageHosting + alle Instanzen**). Mit Caddy leitet der Edge auf die Host-Adresse (HTTPS, Host-Header umgeschrieben), mit Matcad auf Node-Adresse:Port.
 - `PUT /api/v1/instances/{publicId}/domain` `{ domain, pushCanonical? = true }` – veröffentlichen bzw. umziehen (Route + TLS; ohne Proxy nur vermerkt). Der DNS-Eintrag muss schon auf den Proxy zeigen. `pushCanonical` setzt auf der Site `site.canonicalUrl = https://<domain>` + „hinter HTTPS-Proxy“ (beim nächsten Heartbeat). `400` = keine gültige Domain, `409` = Domain vergeben / Instanz nicht auf diesem Docker-Host / Proxy-Fehler (**CanManageHosting**, Schlüssel-Umfang).
-- `DELETE /api/v1/instances/{publicId}/domain?pushCanonical=true` – Route entfernen (erst die Route, dann der Eintrag; idempotent) (**CanManageHosting**, Schlüssel-Umfang).
+- `DELETE /api/v1/instances/{publicId}/domain?pushCanonical=true` – Route entfernen (erst die Route, dann der Eintrag; idempotent); die weiteren Domains gehen mit (**CanManageHosting**, Schlüssel-Umfang).
+- **Weitere Domains** (`www.…`, alte Domains) neben der Hauptdomain – sie liegen dort, wo die Hauptdomain liegt, und ziehen bei Änderung, Umzug und Edge-Wechsel mit:
+  - `PUT …/domain` nimmt zusätzlich `www: true` – legt `www.<domain>` als Umleitung auf die Domain mit an.
+  - `GET /api/v1/instances/{publicId}/domains` → `{ main, extra:[{ domain, mode, via, provider, routeId, error, publishedAt }] }`.
+  - `POST /api/v1/instances/{publicId}/domains` `{ domain, mode? }` – `mode` = `redirect` (Standard, Umleitung auf `https://<Hauptdomain>`, Pfad bleibt) oder `alias` (dieselbe Seite). Braucht eine veröffentlichte Hauptdomain; eine schon vorhandene Matcad-Route desselben Namens wird übernommen, nicht verdoppelt. `409` = vergeben / Proxy-Fehler (die Domain bleibt dann mit `error` stehen).
+  - `DELETE /api/v1/instances/{publicId}/domains/{domain}` – Route zuerst, dann der Eintrag (**CanManageHosting**, Schlüssel-Umfang).
 
 Beim **Anlegen** einer Instanz mit Domain (Hosting → Neue Instanz) wird die Route sofort angelegt und beim ersten
 Heartbeat der neuen Instanz übernommen.
@@ -311,6 +316,7 @@ Instanz beim nächsten Heartbeat über ihre **eigenen** Validierer anwendet (add
 | `publish_host_address` / `remove_host_address` | automatische Host-Adresse einer Instanz (Hosting-Recht) |
 | `set_auto_domain` / `create_missing_host_addresses` | automatische Adressen für „Dieser Host“ / fehlende nachziehen (Hosting-Recht + alle Instanzen) |
 | `configure_wildcard` | Wildcard-Zertifikat eines Hosts per DNS-Challenge (Hosting-Recht + alle Instanzen) |
+| `add_extra_domain` / `remove_extra_domain` | weitere Domain einer Instanz (`www.…`, alte Domain) als Umleitung oder Alias anlegen bzw. entfernen; `publish_domain` hat dafür auch `www=true` (Hosting-Recht) |
 | `get_matcad` / `set_matcad_settings` | Matcad von „Dieser Host“: Einstellungen, DNS-Anbieter, alle Domains lesen / ACME-E-Mail + DNS-Wartezeiten setzen (die Basis-Domain folgt `set_auto_domain`) (Hosting-Recht + alle Instanzen) |
 | `save_matcad_provider` / `delete_matcad_provider` | DNS-Anbieter in Matcad anlegen/ändern/testen (`test=true`) bzw. löschen (Hosting-Recht + alle Instanzen) |
 | `save_matcad_route` / `delete_matcad_route` | eigene Domains in Matcad (Weiterleitung oder Umleitung, auch Wildcard) – nicht die der Instanzen (Hosting-Recht + alle Instanzen) |

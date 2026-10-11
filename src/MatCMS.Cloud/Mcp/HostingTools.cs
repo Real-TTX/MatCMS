@@ -233,17 +233,47 @@ public class HostingTools
         [Description("The instance id, as returned by list_instances.")] string instanceId,
         [Description("A single hostname, e.g. shop.example.de (no scheme, path, port or wildcard).")] string domain,
         [Description("Also set the site's canonical URL (default true).")] bool pushCanonical = true,
+        [Description("Also add www.<domain> as a further domain that redirects to it (default false).")] bool www = false,
         CancellationToken ct = default)
     {
         RequireHosting(me);
         var inst = await ResolveAsync(me, db, instanceId, ct);
-        var r = await proxy.PublishAsync(inst, domain, pushCanonical, ct);
+        var r = await proxy.PublishAsync(inst, domain, pushCanonical, ct, www);
         if (!r.Ok) throw new McpException(r.Message);
         return new { ok = true, domain = r.Domain, message = r.Message };
     }
 
+    [McpServerTool(Name = "add_extra_domain"), Description(
+        "Add a further domain to an instance next to its main (published) domain — typically www.<domain> or an old domain. mode 'redirect' (default) sends visitors to https://<main domain>, 'alias' shows the same site. It lives where the main domain lives and follows it on a change or a host move; DNS must point at the same server. Requires the hosting right; honours the key's instance scope.")]
+    public static async Task<object> AddExtraDomain(McpContext me, AppDbContext db, Services.Proxy.ProxyService proxy,
+        [Description("The instance id, as returned by list_instances.")] string instanceId,
+        [Description("A single hostname, e.g. www.example.de.")] string domain,
+        [Description("'redirect' (default) or 'alias'.")] string mode = "redirect",
+        CancellationToken ct = default)
+    {
+        RequireHosting(me);
+        var inst = await ResolveAsync(me, db, instanceId, ct);
+        var r = await proxy.AddExtraDomainAsync(inst, domain, mode, ct);
+        if (!r.Ok) throw new McpException(r.Message);
+        return new { ok = true, domain = r.Domain, message = r.Message };
+    }
+
+    [McpServerTool(Name = "remove_extra_domain"), Description(
+        "Remove a further domain of an instance (deletes its route — the address is then no longer reachable; confirm with the user first). Requires the hosting right; honours the key's instance scope.")]
+    public static async Task<object> RemoveExtraDomain(McpContext me, AppDbContext db, Services.Proxy.ProxyService proxy,
+        [Description("The instance id, as returned by list_instances.")] string instanceId,
+        [Description("The further domain to remove.")] string domain,
+        CancellationToken ct = default)
+    {
+        RequireHosting(me);
+        var inst = await ResolveAsync(me, db, instanceId, ct);
+        var r = await proxy.RemoveExtraDomainAsync(inst, domain, ct);
+        if (!r.Ok) throw new McpException(r.Message);
+        return new { ok = true, message = r.Message };
+    }
+
     [McpServerTool(Name = "unpublish_domain"), Description(
-        "Remove an instance's public domain: deletes the proxy route (the site is then no longer reachable under it — confirm with the user first) and clears the record. pushCanonical (default true) also clears the site's canonical URL. Requires the hosting right; honours the key's instance scope.")]
+        "Remove an instance's public domain: deletes the proxy route (the site is then no longer reachable under it — confirm with the user first) and clears the record; its further domains (www.…) go with it. pushCanonical (default true) also clears the site's canonical URL. Requires the hosting right; honours the key's instance scope.")]
     public static async Task<object> UnpublishDomain(McpContext me, AppDbContext db, Services.Proxy.ProxyService proxy,
         [Description("The instance id, as returned by list_instances.")] string instanceId,
         [Description("Also clear the site's canonical URL (default true).")] bool pushCanonical = true,

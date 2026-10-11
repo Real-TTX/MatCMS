@@ -116,6 +116,35 @@
 {
 @* ============ PROXY ============ *@
 <div class="tab-panel" data-panel="proxy" hidden>
+    @if (Model.Addresses.Count > 0)
+    {
+        @* The whole address picture of this server in one place: what each name is for, what DNS must say and what it
+           says right now. The names are resolved on every visit — a missing or mistyped record is otherwise invisible. *@
+        <div class="card">
+            <h2>@T["addr.title"]</h2>
+            <table class="data">
+                <thead><tr><th>@T["addr.what"]</th><th>@T["addr.name"]</th><th>@T["addr.dns"]</th></tr></thead>
+                <tbody>
+                    @foreach (var a in Model.Addresses)
+                    {
+                        <tr>
+                            <td>@a.Label</td>
+                            <td>
+                                <span class="mono">@a.Name</span>
+                                @if (a.Example is { } ex) { <div class="muted">@T["addr.example"] <span class="mono">@ex</span></div> }
+                            </td>
+                            <td>
+                                <span class="badge @(a.State switch { "ok" => "badge-on", "unknown" => "badge-off", _ => "badge-err" })">@T["addr.state." + a.State]</span>
+                                @if (a.Resolved is { } ip) { <span class="mono muted">@ip</span> }
+                                @if (a.Hint is { } hint) { <div class="help">@hint</div> }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <div class="help">@T["addr.hint"]</div>
+        </div>
+    }
     <form method="post" action="@Url.Page("/Admin/Hosting/Nodes/Details", MatCMS.Cloud.Pages.Admin.Hosting.Nodes.DetailsModel.Route(n?.Id, "Proxy"))">
         @Html.AntiForgeryToken()
         <div class="card">
@@ -142,7 +171,11 @@
             <div data-reveal-target="host-auto" hidden="@(Model.AutoDomainEnabled ? null : "hidden")">
                 <div class="form-field">
                     <label for="autoDomainBase">@T["autodomain.base"]</label>
-                    <input id="autoDomainBase" name="autoDomainBase" value="@Model.AutoDomainBase" placeholder="@(n is null ? "cloud.example.de" : "server1.example.de")" spellcheck="false" />
+                    <input id="autoDomainBase" name="autoDomainBase" value="@Model.AutoDomainBase" placeholder="@(n is null ? "sites.example.de" : "server2.example.de")" spellcheck="false"
+                           data-base-preview data-slug="@Model.ExampleSlug" data-cloud-host="@(n is null ? Model.CloudHost : null)" />
+                    @* Live: the address an instance actually gets, and why sharing the cloud's name is fine. *@
+                    <div class="help" data-base-example data-text="@T["autodomain.example"]"></div>
+                    <div class="help" data-base-same hidden>@T["autodomain.sameAsCloud"]</div>
                     <div class="help">@T["autodomain.baseHint"]</div>
                 </div>
                 <partial name="_WildcardFields" model="Model.WildcardView" />
@@ -294,6 +327,21 @@
                 box.addEventListener('change', sync);
                 sync();
             });
+
+            // Instance-address domain: show the address an instance really gets, and say so when it is the cloud's own
+            // name (allowed — the cloud sits on the name itself, the instances below it).
+            var baseIn = document.querySelector('[data-base-preview]');
+            var baseEx = document.querySelector('[data-base-example]');
+            var baseSame = document.querySelector('[data-base-same]');
+            if (baseIn && baseEx) {
+                var syncBase = function () {
+                    var b = (baseIn.value || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^\*\./, '');
+                    baseEx.textContent = b ? baseEx.getAttribute('data-text').replace('{0}', baseIn.getAttribute('data-slug') + '.' + b) : '';
+                    if (baseSame) baseSame.hidden = !b || b !== (baseIn.getAttribute('data-cloud-host') || '').toLowerCase();
+                };
+                baseIn.addEventListener('input', syncBase);
+                syncBase();
+            }
 
             // Wildcard with Matcad: "Neuen DNS-Anbieter anlegen" reveals the type's fields; the other types' fields are
             // disabled, so a key two types share posts once.

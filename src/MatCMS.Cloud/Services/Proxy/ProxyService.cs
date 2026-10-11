@@ -331,6 +331,9 @@ public class ProxyService
         var kind = node is null ? Settings.Kind : ProxyKinds.Normalise(node.ProxyKind);
         if (kind == ProxyKinds.None) return new(true, "Kein Proxy.");
         var ranges = EdgeEnabled ? EdgeTrustedIps : new List<string>();
+        // Matcad cannot be told from outside — but with nothing to trust there is nothing to tell it, and reporting
+        // "cannot set" on every edge switch-off was an error message about a non-problem.
+        if (kind == ProxyKinds.Matcad && ranges.Count == 0) return new(true, "Nichts zu setzen.");
         return await RunAsync(node, x => new ProxyOp("trust", x, Trusted: ranges), null, ct);
     }
 

@@ -860,8 +860,20 @@ Design and increments: `docs/hosting-platform.md`. Increments 1–4 are built:
     wildcard — matched by route id, ids are per Matcad so only routes known to live HERE count) is listed with
     `managedBy` and refused for edit/delete, or the instance would keep an id pointing at nothing; an edit keeps the
     route fields the cloud's form does not carry (basic auth, own ACME e-mail) from `/routes/manual`, and port-bound
-    routes are not editable here at all. Matcad's own base domain is NOT the automatic-address base
-    (`hosting.autoDomain.base`) — two settings, labelled as such.
+    routes are not editable here at all. Matcad's own base domain is NOT a setting of its own any more: it FOLLOWS
+    the instance-address domain (`hosting.autoDomain.base`) via `MatcadAdminService.SyncBaseDomainAsync`, called by
+    every writer of that domain (host page, `PUT /api/v1/hosting/auto-domain`, MCP `set_auto_domain`); the Matcad
+    tab only shows it. Three "Basis-Domain"-ish fields side by side (cloud address, instance domain, Matcad's)
+    were unreadable — keep it to the two that mean something, labelled "Adresse dieser Cloud" and "Domain für
+    Instanz-Adressen" (examples `sites.example.de` / `server2.example.de`, never `cloud.example.de`, which read as
+    "the cloud's address").
+  - **"Adressen dieses Servers"** (top of the Proxy tab of Dieser Host): the cloud's name, the instance addresses and
+    the wildcard certificate, each RESOLVED on every visit (`Dns.GetHostAddressesAsync`, 3 s; the instance addresses
+    through a probe name `matcms-dns-check.<base>` that only the wildcard record can answer) and compared with the
+    cloud's own IP. A missing or mistyped record (`*.cloude2`) looked like "nothing happens"; now it says so.
+  - The **Edge-Proxy tab** only shows with a node (or while the edge is still on, so it can be switched off): with
+    one server it is the same proxy under another name, and operators switched it on not knowing what it was. Its
+    page opens with what it is for.
   - **Wildcard certificate per host** (`hosting.wildcard.*` / `Node.Wildcard*`, `ProxyService.SetWildcardAsync`, op
     `wildcard` run ON the host): one certificate for `*.<base>` via DNS-01 instead of one per instance (Let's
     Encrypt ~50/week/domain). Caddy: an automation policy (`@id matcms-wildcard-…`) with the DNS module + the

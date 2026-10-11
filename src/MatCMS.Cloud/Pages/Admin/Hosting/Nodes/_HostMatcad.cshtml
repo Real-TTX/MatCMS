@@ -19,11 +19,12 @@
     @Html.AntiForgeryToken()
     <div class="card">
         <h2>@T["matcad.settings"]</h2>
+        @* Matcad's base domain is not a setting of its own: it follows the instance-address domain (Proxy tab). *@
+        <div class="kv">
+            <div class="kv-label">@T["matcad.baseDomain"]</div>
+            <div class="kv-value"><span class="mono">@(string.IsNullOrEmpty(d.Settings.BaseDomain) ? "—" : d.Settings.BaseDomain)</span> <span class="muted">@T["matcad.baseDomainFollows"]</span></div>
+        </div>
         <div class="form-row">
-            <div class="form-field">
-                <label for="mcBaseDomain">@T["matcad.baseDomain"]</label>
-                <input id="mcBaseDomain" name="baseDomain" value="@d.Settings.BaseDomain" placeholder="example.de" spellcheck="false" />
-            </div>
             <div class="form-field">
                 <label for="mcAcmeEmail">@T["matcad.acmeEmail"]</label>
                 <input id="mcAcmeEmail" name="acmeEmail" type="email" value="@d.Settings.AcmeEmail" placeholder="admin@example.de" spellcheck="false" />

@@ -6,6 +6,13 @@
 }
 <partial name="_HostingTabs" model='"proxy"' />
 
+@* What the edge is for, before its switches — "Edge-Proxy" means nothing to someone with one server. *@
+<div class="card">
+    <h2>@T["edge.whatTitle"]</h2>
+    <div class="help">@T["edge.what"]</div>
+    <pre class="mono" style="margin:.75rem 0 0;white-space:pre;overflow-x:auto;">@T["edge.sketch"]</pre>
+</div>
+
 @* The ONE proxy concern that spans hosts. Each host's own reverse proxy and automatic addresses are on its page
    (Hosting → Hosts). *@
 @* The central edge proxy for customer domains. Off = a customer domain is routed at the proxy of the site's host. *@

@@ -244,6 +244,21 @@ public sealed class MatcadAdminService
         catch (MatcadException ex) { return new(false, ex.Message); }
     }
 
+    /// <summary>
+    /// Matcad's own base domain FOLLOWS the domain of this host's instance addresses — it is not a third setting. It
+    /// only scopes Matcad's login cookie and groups its route list, and a second, independently editable "Basis-Domain"
+    /// next to the cloud's address and the instance domain was exactly what made the hosting pages unreadable. Called
+    /// whenever the instance domain is saved; a Matcad that is not this host's proxy is left alone.
+    /// </summary>
+    public async Task<Result> SyncBaseDomainAsync(CancellationToken ct = default)
+    {
+        if (!Available) return new(true, "");
+        var b = _proxy.AutoBase(null);
+        if (b is null) return new(true, "");
+        var r = await SaveSettingsAsync(b, null, ct: ct);
+        return r.Ok ? new(true, "") : new(false, "Matcad-Basis-Domain nicht nachgezogen: " + r.Message);
+    }
+
     // ---- DNS providers -------------------------------------------------------------------------------------------
 
     /// <summary>Creates (no id) or updates a provider. An empty secret field keeps the value Matcad has.</summary>

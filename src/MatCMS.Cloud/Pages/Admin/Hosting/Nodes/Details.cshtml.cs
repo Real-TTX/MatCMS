@@ -59,6 +59,66 @@ public class DetailsModel : PageModel
     public ProxyFieldsView ProxyFields => Item is null ? _proxy.FieldsView() : ProxyService.FieldsView(Item);
     public ProxyService.WildcardConfig Wildcard => _proxy.WildcardFor(Item);
     public WildcardFieldsView WildcardView { get; private set; } = null!;
+
+    /// <summary>One line of "Adressen dieses Servers": what the name is, what DNS must say, what it says now.</summary>
+    /// <param name="State">"ok" | "missing" (does not resolve) | "elsewhere" (resolves, but not to the cloud's IP) | "unknown".</param>
+    public sealed record AddressRow(string Label, string Name, string? Example, string State, string? Resolved, string? Hint);
+    public List<AddressRow> Addresses { get; private set; } = new();
+    /// <summary>The IPs the cloud's own name resolves to — the reference every other name should match.</summary>
+    public string? ServerIps { get; private set; }
+    /// <summary>The cloud's host name (from its public address), for the "same name" hint under the base domain.</summary>
+    public string? CloudHost => Uri.TryCreate(_cloud.Get(SettingKeys.CanonicalUrl) ?? "", UriKind.Absolute, out var u) ? u.Host : null;
+    /// <summary>A real slug from this host, so the base-domain preview shows a name the operator recognises.</summary>
+    public string ExampleSlug { get; private set; } = "meine-seite";
+
+    private static async Task<string[]?> ResolveAsync(string host)
+    {
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+            return (await System.Net.Dns.GetHostAddressesAsync(host, cts.Token))
+                .Where(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork).Select(a => a.ToString()).OrderBy(s => s).ToArray();
+        }
+        catch { return null; }
+    }
+
+    /// <summary>"Adressen dieses Servers": the cloud's name, the instance addresses (checked through a name that exists
+    /// only via the wildcard record) and the wildcard certificate. Every name is resolved now, because a DNS record that
+    /// is missing or mistyped (*.cloude2) looks exactly like "nothing happens" from here.</summary>
+    private async Task BuildAddressesAsync()
+    {
+        string[]? cloudIps = null;
+        if (CloudHost is { } ch)
+        {
+            cloudIps = await ResolveAsync(ch);
+            ServerIps = cloudIps is { Length: > 0 } ? string.Join(", ", cloudIps) : null;
+            Addresses.Add(new(_t["addr.cloud"], "https://" + ch, null, cloudIps is { Length: > 0 } ? "ok" : "missing",
+                ServerIps, cloudIps is { Length: > 0 } ? null : _t["addr.cloudMissing", ch]));
+        }
+        else Addresses.Add(new(_t["addr.cloud"], "—", null, "missing", null, _t["addr.cloudUnset"]));
+
+        if (AutoBase is { } b)
+        {
+            // A name that has no record of its own, so only the wildcard can answer it.
+            var probe = await ResolveAsync("matcms-dns-check." + b);
+            var state = probe is not { Length: > 0 } ? "missing"
+                : cloudIps is { Length: > 0 } && !probe.Intersect(cloudIps).Any() ? "elsewhere" : "ok";
+            Addresses.Add(new(_t["addr.instances"], "*." + b, ExampleSlug + "." + b, state, probe is { Length: > 0 } ? string.Join(", ", probe) : null,
+                state switch
+                {
+                    "missing" => _t["addr.wildcardMissing", "*." + b, ServerIps ?? "IP"],
+                    "elsewhere" => _t["addr.wildcardElsewhere", "*." + b, ServerIps ?? "IP"],
+                    _ => null,
+                }));
+            var w = Wildcard;
+            Addresses.Add(new(_t["addr.certificate"], "*." + b, null,
+                w.Error is not null ? "elsewhere" : w.RouteId is not null ? "ok" : "unknown", null,
+                w.Error ?? (w.RouteId is null ? _t["addr.certificateNone"] : null)));
+        }
+        else Addresses.Add(new(_t["addr.instances"], "—", null, "unknown", null, _t["addr.instancesOff"]));
+    }
+
+    private string? AutoBase => AutoDomainEnabled ? ProxyService.NormaliseDomain(AutoDomainBase) : null;
     public bool AutoDomainEnabled => Item?.AutoDomainEnabled ?? _cloud.Flag(SettingKeys.HostingAutoDomainEnabled);
     public string? AutoDomainBase => Item is null ? _cloud.Get(SettingKeys.HostingAutoDomainBase) : Item.AutoDomainBase;
     public int MissingHostAddresses { get; private set; }
@@ -82,6 +142,10 @@ public class DetailsModel : PageModel
         if (Item is not null) Jobs = await _nodes.JobsAsync(Item.Id, 50, HttpContext.RequestAborted);
         if (AutoDomainEnabled) MissingHostAddresses = await _proxy.MissingHostAddressCountAsync(Item, HttpContext.RequestAborted);
         WildcardView = new(Wildcard, null, null, null);
+        if (Sites.Select(s => s.ContainerName).FirstOrDefault(nm => !string.IsNullOrEmpty(nm)) is { } cn
+            && HostingService.SlugFromStack(cn, _cloud.Get(SettingKeys.HostingNamePattern)) is { } slug)
+            ExampleSlug = slug;
+        if (IsLocal && ModuleEnabled) await BuildAddressesAsync();
         if (ShowMatcad)
         {
             // Matcad's providers for the wildcard choice. Bounded: a Matcad that does not answer must not hold up the
@@ -237,10 +301,12 @@ public class DetailsModel : PageModel
         {
             if (autoDomainEnabled && ProxyService.NormaliseDomain(autoDomainBase) is null)
             {
-                TempData["FlashError"] = "Bitte eine gültige Basis-Domain angeben, z. B. cloud.example.de.";
+                TempData["FlashError"] = "Bitte eine gültige Domain für die Instanz-Adressen angeben, z. B. sites.example.de.";
                 return Back(id, "proxy");
             }
             await _proxy.SetAutoDomainAsync(autoDomainEnabled, autoDomainBase);
+            var sync = await _matcad.SyncBaseDomainAsync(HttpContext.RequestAborted);
+            if (!sync.Ok) { TempData["FlashError"] = sync.Message; return Back(id, "proxy"); }
         }
         var msg = "Adressen gespeichert.";
         // The wildcard follows the base domain; switching it (or the domain) applies it at the host's proxy right away
@@ -293,8 +359,9 @@ public class DetailsModel : PageModel
         return Back(null, "matcad");
     }
 
-    public async Task<IActionResult> OnPostMatcadSettingsAsync(string? baseDomain, string? acmeEmail, int? propagationDelay, int? propagationTimeout) =>
-        MatcadDone(await _matcad.SaveSettingsAsync(baseDomain ?? "", acmeEmail ?? "", propagationDelay ?? 0, propagationTimeout ?? 0, HttpContext.RequestAborted));
+    // The base domain is not posted: it follows the instance domain (MatcadAdminService.SyncBaseDomainAsync).
+    public async Task<IActionResult> OnPostMatcadSettingsAsync(string? acmeEmail, int? propagationDelay, int? propagationTimeout) =>
+        MatcadDone(await _matcad.SaveSettingsAsync(null, acmeEmail ?? "", propagationDelay ?? 0, propagationTimeout ?? 0, HttpContext.RequestAborted));
 
     public async Task<IActionResult> OnPostMatcadRouteAsync(long? id, string? host, string? name, string? target, string? upstream,
         string? fallbackUrl, bool wildcard, long? providerId, bool enabled, bool allowEmbedding) =>

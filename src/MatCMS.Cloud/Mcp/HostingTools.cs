@@ -284,12 +284,14 @@ public class HostingTools
 
     [McpServerTool(Name = "set_auto_domain"), Description(
         "Switch automatic addresses on or off for THIS cloud's own host (every new instance there gets name.<baseDomain>; needs a wildcard DNS record *.<baseDomain> to this server and a proxy). For nodes use update_node(autoDomainEnabled, autoDomainBase); create_missing_host_addresses fills in existing instances. Requires the hosting right on an all-instances key.")]
-    public static async Task<object> SetAutoDomain(McpContext me, Services.Proxy.ProxyService proxy,
-        bool enabled, [Description("e.g. cloud.example.de")] string? baseDomain = null, CancellationToken ct = default)
+    public static async Task<object> SetAutoDomain(McpContext me, Services.Proxy.ProxyService proxy, Services.Proxy.MatcadAdminService matcad,
+        bool enabled, [Description("The domain the instance addresses live under, e.g. sites.example.de (instances become <name>.sites.example.de). May equal the cloud's own host name.")] string? baseDomain = null,
+        CancellationToken ct = default)
     {
         RequireCloudWide(me);
-        if (enabled && Services.Proxy.ProxyService.NormaliseDomain(baseDomain) is null) throw new McpException("Keine gültige Basis-Domain.");
+        if (enabled && Services.Proxy.ProxyService.NormaliseDomain(baseDomain) is null) throw new McpException("Keine gültige Domain für die Instanz-Adressen (z. B. sites.example.de).");
         await proxy.SetAutoDomainAsync(enabled, baseDomain);
+        if (await matcad.SyncBaseDomainAsync(ct) is { Ok: false } s) throw new McpException(s.Message);
         return new { ok = true, missing = await proxy.MissingHostAddressCountAsync(null, ct) };
     }
 
@@ -418,15 +420,15 @@ public class HostingTools
     }
 
     [McpServerTool(Name = "set_matcad_settings"), Description(
-        "Set Matcad's base domain (scope of its login cookie, grouping) and/or the ACME e-mail for Let's Encrypt. Also the DNS propagation wait for wildcard certificates (slow DNS like netcup needs several minutes). Omit a value to keep it, pass an empty string to clear it. The base domain of the instances' automatic addresses is a different setting: set_auto_domain. Requires the hosting right on an all-instances key.")]
+        "Set Matcad's ACME e-mail for Let's Encrypt. Also the DNS propagation wait for wildcard certificates (slow DNS like netcup needs several minutes). Omit a value to keep it, pass an empty string to clear it. Matcad's base domain is not set here: it follows the instance-address domain (set_auto_domain). Requires the hosting right on an all-instances key.")]
     public static async Task<object> SetMatcadSettings(McpContext me, MatCMS.Cloud.Services.Proxy.MatcadAdminService matcad,
-        string? baseDomain = null, string? acmeEmail = null,
+        string? acmeEmail = null,
         [Description("Seconds to wait after writing the DNS record (netcup: 600–900).")] int? propagationDelay = null,
         [Description("Seconds to wait at most for the record to be visible; -1 = do not check.")] int? propagationTimeout = null,
         CancellationToken ct = default)
     {
         RequireCloudWide(me);
-        return new { ok = true, message = Must(await matcad.SaveSettingsAsync(baseDomain, acmeEmail, propagationDelay, propagationTimeout, ct)).Message };
+        return new { ok = true, message = Must(await matcad.SaveSettingsAsync(null, acmeEmail, propagationDelay, propagationTimeout, ct)).Message };
     }
 
     [McpServerTool(Name = "save_matcad_provider"), Description(

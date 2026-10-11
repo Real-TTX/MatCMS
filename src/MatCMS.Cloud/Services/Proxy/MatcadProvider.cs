@@ -117,6 +117,10 @@ public sealed class MatcadProvider : IProxyProvider
         var location = targetUrl.TrimEnd('/') + "{http.request.uri}";
         var r = await PostRouteAsync(id, name, host, null, ct, location);
         if (!r.Ok && id is not null && r.Error?.Contains("404") == true) r = await PostRouteAsync(null, name, host, null, ct, location);
+        // Matcad 0.6 validates the target as a plain URL and refuses the placeholder ("must be an http:// or https://
+        // URL"). Then the redirect goes to the bare target — it works, the path is just not kept — instead of none at all.
+        if (!r.Ok && r.Error?.Contains("redirect target", StringComparison.OrdinalIgnoreCase) == true)
+            r = await PostRouteAsync(id, name, host, null, ct, targetUrl);
         return r;
     }
 

@@ -416,8 +416,7 @@ public class ContentTransferService
             Directory.CreateDirectory(uploads);
             var dest = Path.Combine(uploads, name);
             await using (var es = entry.Open())
-            await using (var fs = File.Create(dest))
-                await es.CopyToAsync(fs);
+                await WriteReplacingAsync(es, dest);
             assetCount++;
             // The original was just OVERWRITTEN (File.Create truncates). Any cached thumbnail of that
             // name now shows the previous picture, and it would keep showing it forever because the
@@ -488,11 +487,38 @@ public class ContentTransferService
             Directory.CreateDirectory(dir);
             var dest = Path.Combine(dir, name);
             await using (var es = entry.Open())
-            await using (var fs = File.Create(dest))
-                await es.CopyToAsync(fs);
+                await WriteReplacingAsync(es, dest);
             count++;
         }
         return count;
+    }
+
+    /// <summary>
+    /// Writes <paramref name="src"/> to <paramref name="dest"/>, replacing an existing file even while somebody reads
+    /// it. Overwriting in place (File.Create) fails on Linux when the file is open — a visitor's request or the
+    /// thumbnail service holding it was enough to abort a whole restore half-way ("being used by another process"),
+    /// after the database part had already been committed. So: write a temp file next to it, then rename over the
+    /// target — a rename does not care about open handles, a reader just keeps the old content.
+    /// </summary>
+    private static async Task WriteReplacingAsync(Stream src, string dest)
+    {
+        var tmp = dest + ".restore-" + Guid.NewGuid().ToString("N")[..8] + ".tmp";
+        try
+        {
+            await using (var fs = new FileStream(tmp, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                await src.CopyToAsync(fs);
+            // Windows (dev) refuses the rename while a handle without FILE_SHARE_DELETE is open — a short retry
+            // covers a request that is just finishing; Linux (the container) renames at once.
+            for (var attempt = 0; ; attempt++)
+            {
+                try { File.Move(tmp, dest, overwrite: true); break; }
+                catch (IOException) when (attempt < 5) { await Task.Delay(200 * (attempt + 1)); }
+            }
+        }
+        finally
+        {
+            if (File.Exists(tmp)) try { File.Delete(tmp); } catch { /* best effort */ }
+        }
     }
 
     /// <summary>

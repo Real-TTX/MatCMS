@@ -261,6 +261,12 @@ public class Instance
     /// </summary>
     public int BackupRequestId { get; set; }
 
+    /// <summary>The <see cref="BackupRequestId"/> that was asked WITH the site's user accounts, or 0. Users
+    /// (password hashes) are left out of every backup by default; only moving a site needs them, and only a
+    /// restore-capable key may ask (<c>POST /api/v1/instances/{id}/backups/request-users</c>). Tied to the
+    /// request id so the next ordinary request is a plain one again without anything having to reset it.</summary>
+    public int BackupUsersRequestId { get; set; }
+
     /// <summary>When the cloud asked. Shown, and used to tell an operator how long a wait has been
     /// going on — never to end one.</summary>
     public DateTime? BackupRequestedAt { get; set; }

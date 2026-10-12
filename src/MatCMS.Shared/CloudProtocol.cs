@@ -402,6 +402,12 @@ public sealed class PendingBackup
     /// <summary>Why the cloud is asking, in the site's own language. Written into the instance's log
     /// so its operator can see that the cloud asked for this backup rather than the schedule.</summary>
     public string? Reason { get; set; }
+
+    /// <summary>Include the site's user accounts (with their password hashes) — only for moving a site to another
+    /// server, where its logins must come along. Never set by the schedule or an ordinary request; the cloud only
+    /// sends it for an explicit request by a key that may restore. An instance that does not know the field makes its
+    /// usual backup without users — the cloud sees the missing accounts, nothing silently goes wrong.</summary>
+    public bool IncludeUsers { get; set; }
 }
 
 /// <summary>

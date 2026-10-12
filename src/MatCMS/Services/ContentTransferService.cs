@@ -493,6 +493,12 @@ public class ContentTransferService
         return count;
     }
 
+    /// <summary>The seeded "admin" account whose password is still "admin".</summary>
+    private static bool IsUntouchedDefaultAdmin(User u) =>
+        string.Equals(u.Username, "admin", StringComparison.OrdinalIgnoreCase)
+        && new Microsoft.AspNetCore.Identity.PasswordHasher<User>().VerifyHashedPassword(u, u.PasswordHash, "admin")
+            is Microsoft.AspNetCore.Identity.PasswordVerificationResult.Success or Microsoft.AspNetCore.Identity.PasswordVerificationResult.SuccessRehashNeeded;
+
     /// <summary>
     /// Writes <paramref name="src"/> to <paramref name="dest"/>, replacing an existing file even while somebody reads
     /// it. Overwriting in place (File.Create) fails on Linux when the file is open — a visitor's request or the
@@ -1053,7 +1059,11 @@ public class ContentTransferService
                 var uname = (u.Username ?? "").Trim();
                 if (uname.Length == 0 || string.IsNullOrWhiteSpace(u.PasswordHash)) continue;
                 var row = existingUsers.FirstOrDefault(x => string.Equals(x.Username, uname, StringComparison.OrdinalIgnoreCase));
-                var isNew = row is null;
+                // The one exception to "an existing account keeps its own": the seeded "admin" that still has the
+                // DEFAULT password. It is not anybody's account yet — anyone can sign in with it — so taking over the
+                // moved site's real "admin" (its hash, role, 2FA) replaces an open door, not an owner. The same test
+                // the cloud's "remove default admin" uses.
+                var isNew = row is null || IsUntouchedDefaultAdmin(row);
                 if (row is null)
                 {
                     row = new User { Username = uname };

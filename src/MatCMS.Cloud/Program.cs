@@ -1064,6 +1064,7 @@ MatCMS.Cloud.Api.NotificationApi.MapNotificationApi(app);
 MatCMS.Cloud.Api.CloudConfigApi.MapCloudConfigApi(app);
 MatCMS.Cloud.Api.StatsApi.MapStatsApi(app);
 MatCMS.Cloud.Api.OverviewApi.MapOverviewApi(app);
+MatCMS.Cloud.Api.BackupUsersApi.MapBackupUsersApi(app);
 
 // --- Catalogue ------------------------------------------------------------
 // The store, browsable by an approved instance itself ("Weiter durchsuchen…" in MatCMS). This is the

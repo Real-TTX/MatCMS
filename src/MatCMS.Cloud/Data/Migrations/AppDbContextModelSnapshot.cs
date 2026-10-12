@@ -298,6 +298,9 @@ namespace MatCMS.Cloud.Data.Migrations
                     b.Property<DateTime?>("BackupRequestedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("BackupUsersRequestId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("BackupWaitNotified")
                         .HasColumnType("INTEGER");
 

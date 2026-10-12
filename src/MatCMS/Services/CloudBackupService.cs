@@ -123,9 +123,9 @@ public class CloudBackupService
         try
         {
             var cfg = await _backups.GetConfigAsync();
-            name = await _backups.RunAsync(cfg, "cloud");
-            _log.LogInformation("Backup {Name} made because the cloud asked for it ({Reason}).",
-                name, request.Reason ?? "ohne Angabe");
+            name = await _backups.RunAsync(cfg, request.IncludeUsers ? "cloud-users" : "cloud", request.IncludeUsers);
+            _log.LogInformation("Backup {Name} made because the cloud asked for it ({Reason}){Users}.",
+                name, request.Reason ?? "ohne Angabe", request.IncludeUsers ? ", with user accounts" : "");
         }
         catch (Exception ex)
         {

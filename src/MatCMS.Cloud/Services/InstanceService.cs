@@ -306,6 +306,7 @@ public class InstanceService
                 ? new PendingBackup
                 {
                     RequestId = instance.BackupRequestId,
+                    IncludeUsers = instance.BackupUsersRequestId == instance.BackupRequestId,
                     Reason = instance.RemovalPending
                         ? "Die Cloud sichert diese Website, bevor sie entfernt wird."
                         : "Die Cloud hat ein Backup angefordert."

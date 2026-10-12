@@ -106,9 +106,11 @@ public class BackupManager
 
     /// <summary>Runs a backup with the config's selection, writes it to disk, prunes old files, and
     /// records the run time. Returns the created file name.</summary>
-    public async Task<string> RunAsync(BackupScheduleConfig cfg, string prefix = "auto")
+    public async Task<string> RunAsync(BackupScheduleConfig cfg, string prefix = "auto", bool includeUsers = false)
     {
         var options = ToOptions(cfg);
+        // User accounts only on explicit request (a move to another server) — never in the schedule's own backups.
+        if (includeUsers) options.Users = true;
         var bytes = await _transfer.ExportAsync(options);   // in memory first — the old files are still safe
         var stamp = DateTime.UtcNow.ToString("yyyy-MM-dd-HHmmss");
         var name = $"{await SiteSlugAsync()}_{prefix}_{stamp}.zip";

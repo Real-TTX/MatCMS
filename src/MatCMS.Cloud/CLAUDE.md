@@ -1085,6 +1085,12 @@ the admin UI uses. There is no second restore path and no second backup format.
   raw body, origin `api`, Kestrel cap lifted like the instance upload); `POST …/backups/{id}/restore`
   (gated on `CanRestore`). Restore is still only MARKED — the instance downloads and applies it on its
   next beat and reports back, which the list then shows.
+- **Backup WITH users** (`Api/BackupUsersApi.cs`, `POST …/backups/request-users`, MCP `request_backup_with_users`,
+  `CanRestore`): ordinary backups never carry the site's accounts (`BackupOptions.Users` is opt-in), so a site moved
+  by backup/restore had nobody but admin/admin. `Instance.BackupUsersRequestId` marks which request wants them and
+  rides as `PendingBackup.IncludeUsers`; it is set BEFORE the request id is bumped so no beat sees the request
+  without it. On import users stay add-only for existing accounts — the one exception is a default `admin` whose
+  password still verifies as "admin": that is an open door, not an owner, and gets the backup's account.
 - **Profile management** (`Api/ProfileApi.cs`, `MapProfileApi`): list/read profiles and edit every payload
   (settings, SMTP/translation groups, users, components, templates, mail-templates, plugins, AI flags) and
   assign instances — mirrors the admin Profile pages field for field through the SAME `ProfileService`, so

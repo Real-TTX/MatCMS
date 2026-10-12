@@ -13,6 +13,7 @@
   "gallery.all": "Sve",
   "carousel.prev": "Prethodno",
   "carousel.next": "Sljedeće",
+  "carousel.slide": "Slika {0} od {1}",
   "form.submit": "Pošalji",
   "form.close": "Zatvori",
   "form.selectPlaceholder": "– Odaberite –",

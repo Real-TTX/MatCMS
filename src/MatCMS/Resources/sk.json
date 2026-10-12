@@ -13,6 +13,7 @@
   "gallery.all": "Všetko",
   "carousel.prev": "Predchádzajúce",
   "carousel.next": "Ďalej",
+  "carousel.slide": "Obrázok {0} z {1}",
   "form.submit": "Odoslať",
   "form.close": "Zavrieť",
   "form.selectPlaceholder": "– Vyberte –",

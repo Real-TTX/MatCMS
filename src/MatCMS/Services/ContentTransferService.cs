@@ -954,7 +954,7 @@ public class ContentTransferService
                     AttachmentsJson = string.IsNullOrWhiteSpace(p.AttachmentsJson) ? "[]" : p.AttachmentsJson!,
                     // Backups older than the gallery carry none of these four — they read as "no gallery, no source".
                     GalleryJson = string.IsNullOrWhiteSpace(p.GalleryJson) ? "[]" : p.GalleryJson!,
-                    GalleryLayout = p.GalleryLayout == "grid" ? "grid" : "carousel",
+                    GalleryLayout = MatCMS.Models.Post.NormaliseGalleryLayout(p.GalleryLayout),
                     SourceUrl = p.SourceUrl, SourceName = p.SourceName,
                     Locale = string.IsNullOrWhiteSpace(p.Locale) ? "de" : p.Locale!,
                     IsPublished = p.IsPublished,

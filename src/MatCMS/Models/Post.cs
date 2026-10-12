@@ -30,8 +30,13 @@ public class Post
     /// of {url,alt}. Separate from <see cref="AttachmentsJson"/>, which is a download list.</summary>
     public string GalleryJson { get; set; } = "[]";
 
-    /// <summary>How the gallery is shown: "carousel" (swipe, like Instagram) or "grid".</summary>
+    /// <summary>How the gallery is shown: "carousel" (a strip of several images), "single" (one image at a time,
+    /// paged like an Instagram post) or "grid". See <see cref="NormaliseGalleryLayout"/>.</summary>
     public string GalleryLayout { get; set; } = "carousel";
+
+    /// <summary>The one place that knows the valid layouts — editor, page and restore all go through it, so a layout
+    /// added here cannot be silently turned back into "carousel" by one of them.</summary>
+    public static string NormaliseGalleryLayout(string? layout) => layout is "grid" or "single" ? layout : "carousel";
 
     /// <summary>Where the post was taken from (e.g. the Instagram post), shown as "Quelle: …". Optional.</summary>
     public string? SourceUrl { get; set; }

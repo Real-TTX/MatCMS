@@ -16,7 +16,7 @@
     {
         var data = System.Text.Json.JsonSerializer.Serialize(new
         {
-            layout = p.GalleryLayout == "grid" ? "grid" : "carousel",
+            layout = MatCMS.Models.Post.NormaliseGalleryLayout(p.GalleryLayout),
             columns = Model.Gallery.Count >= 3 ? "3" : Model.Gallery.Count.ToString(),
             carouselFit = "vary",
             showFilter = "no",

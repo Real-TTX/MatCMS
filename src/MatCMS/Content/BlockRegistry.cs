@@ -721,7 +721,8 @@ public class BlockRegistry
                     Options = [ new("yes", "block.opt.yesno.yes"), new("no", "block.opt.yesno.no") ],
                     Help = "Klickbare Tag-Chips auf der Seite anzeigen, mit denen Besucher die Galerie weiter filtern können." },
                 new BlockField { Id = "layout", Label = "block.gallery.f.layout", Type = FieldType.Select, Default = "grid",
-                    Options = [ new("grid", "block.opt.layout.grid"), new("masonry", "block.opt.layout.masonry"), new("carousel", "block.opt.layout.carousel") ] },
+                    Options = [ new("grid", "block.opt.layout.grid"), new("masonry", "block.opt.layout.masonry"), new("carousel", "block.opt.layout.carousel"),
+                        new("single", "block.opt.layout.single") ] },
                 // Carousel only: how the slides are sized. "uniform" = same height & width (crops to fill,
                 // focal point decides the crop); "vary" = each slide keeps the image's aspect (variable
                 // width, WHOLE image, no crop). Plus optional auto-advance.

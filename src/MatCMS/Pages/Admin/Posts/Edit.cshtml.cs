@@ -70,7 +70,7 @@ public class EditModel : PageModel
             ContentHtml = p.ContentHtml, Tags = p.Tags,
             AttachmentsJson = string.IsNullOrWhiteSpace(p.AttachmentsJson) ? "[]" : p.AttachmentsJson,
             GalleryJson = string.IsNullOrWhiteSpace(p.GalleryJson) ? "[]" : p.GalleryJson,
-            GalleryLayout = p.GalleryLayout == "grid" ? "grid" : "carousel",
+            GalleryLayout = MatCMS.Models.Post.NormaliseGalleryLayout(p.GalleryLayout),
             SourceUrl = p.SourceUrl, SourceName = p.SourceName,
             IsPublished = p.IsPublished, PublishedAt = p.PublishedAt.ToString("yyyy-MM-dd")
         };
@@ -110,7 +110,7 @@ public class EditModel : PageModel
         p.Tags = MatCMS.Content.TagUtil.Normalize(Input.Tags);
         p.AttachmentsJson = string.IsNullOrWhiteSpace(Input.AttachmentsJson) ? "[]" : Input.AttachmentsJson;
         p.GalleryJson = CleanGallery(Input.GalleryJson);
-        p.GalleryLayout = Input.GalleryLayout == "grid" ? "grid" : "carousel";
+        p.GalleryLayout = MatCMS.Models.Post.NormaliseGalleryLayout(Input.GalleryLayout);
         // Only an http(s) link is a source; anything else (javascript:, a typo) is dropped, not stored.
         p.SourceUrl = PostImportService.NormalizeUrl(Input.SourceUrl);
         p.SourceName = p.SourceUrl is null || string.IsNullOrWhiteSpace(Input.SourceName) ? null : Input.SourceName.Trim();

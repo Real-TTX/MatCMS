@@ -92,6 +92,48 @@
             play();
         }
 
+        // Dots + counter (data-dots, the gallery's "single" view): one dot per slide, the current one marked, a
+        // "3/11" badge on the image; a dot jumps to its slide. The index follows the scroll position, so swiping,
+        // the arrows and autoplay all keep it right.
+        if (wrap.hasAttribute("data-dots") && track.children.length > 1) {
+            var total = track.children.length;
+            var label = wrap.getAttribute("data-slide-label") || "Bild {0} von {1}";
+            var count = document.createElement("span");
+            count.className = "carousel-count";
+            count.setAttribute("aria-hidden", "true");
+            var dots = document.createElement("div");
+            dots.className = "carousel-dots";
+            var dotEls = [];
+            for (var i = 0; i < total; i++) {
+                (function (n) {
+                    var d = document.createElement("button");
+                    d.type = "button";
+                    d.className = "carousel-dot";
+                    d.setAttribute("aria-label", label.replace("{0}", n + 1).replace("{1}", total));
+                    d.addEventListener("click", function () { track.scrollTo({ left: n * step(), behavior: "smooth" }); });
+                    dots.appendChild(d);
+                    dotEls.push(d);
+                })(i);
+            }
+            wrap.appendChild(count);
+            wrap.appendChild(dots);
+            var current = -1;
+            var syncDots = function () {
+                var s = step() || 1;
+                var idx = Math.max(0, Math.min(total - 1, Math.round(track.scrollLeft / s)));
+                if (idx === current) return;
+                current = idx;
+                count.textContent = (idx + 1) + "/" + total;
+                dotEls.forEach(function (d, k) {
+                    d.classList.toggle("is-active", k === idx);
+                    if (k === idx) d.setAttribute("aria-current", "true"); else d.removeAttribute("aria-current");
+                });
+            };
+            track.addEventListener("scroll", function () { requestAnimationFrame(syncDots); }, { passive: true });
+            window.addEventListener("resize", function () { current = -1; syncDots(); });
+            syncDots();
+        }
+
         update();
         updateCenter();
     });

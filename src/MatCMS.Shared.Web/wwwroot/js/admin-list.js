@@ -31,7 +31,8 @@
         // but the (CSS-hidden) table rows. Whichever view is on drives the count.
         function items() {
             var tiles = root.classList.contains('list-view-tiles') && root.querySelector('[data-list-tiles]');
-            var sel = tiles ? '[data-list-tiles] > [data-search]' : '[data-list-table] tbody > tr';
+            // Group header rows (data-list-group) are not items: they are shown or hidden with their group below.
+            var sel = tiles ? '[data-list-tiles] > [data-search]' : '[data-list-table] tbody > tr:not([data-list-group])';
             return Array.prototype.slice.call(root.querySelectorAll(sel));
         }
         function hay(el) { return (el.getAttribute('data-search') || el.textContent || '').toLowerCase(); }
@@ -54,6 +55,13 @@
                 el.hidden = pageSize ? (i < page * pageSize || i >= (page + 1) * pageSize) : false;
             });
             if (emptyEl) emptyEl.hidden = matched.length !== 0;
+            // Grouped tables (a header row data-list-group="g" above its rows data-list-in="g"): a header stays only
+            // while at least one of its rows is visible — search and filter never leave a heading over nothing.
+            root.querySelectorAll('[data-list-table] tbody > tr[data-list-group]').forEach(function (h) {
+                var g = h.getAttribute('data-list-group');
+                h.hidden = !Array.prototype.some.call(root.querySelectorAll('[data-list-table] tbody > tr[data-list-in]'),
+                    function (r) { return r.getAttribute('data-list-in') === g && !r.hidden; });
+            });
             renderPager(pages);
         }
         function renderPager(pages) {

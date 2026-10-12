@@ -1488,6 +1488,7 @@
   "hosting.hostAddressRemoveConfirm": "Remove the host address? The instance is then no longer reachable under it.",
   "hosting.publishHintEdge": "Published at this cloud's edge proxy — the domain's DNS must point at the cloud server.",
   "domains.kind": "Kind",
+  "domains.addressCount": "{0} address(es)",
   "domains.kindCustom": "Customer domain",
   "domains.kindHost": "Host address",
   "domains.viaEdge": "via edge",

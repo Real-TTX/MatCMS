@@ -862,6 +862,16 @@ public class ProxyService
         hostAddress = s.HostDomain, hostRouteId = s.HostRouteId, hostError = s.HostError, hostRouteExists = s.HostRouteExists,
     };
 
+    /// <summary>Whether the route of a further domain still exists at its proxy (null = cannot be told / no route).</summary>
+    public async Task<bool?> ExtraRouteExistsAsync(Instance inst, InstanceDomain d, CancellationToken ct = default)
+    {
+        if (d.RouteId is null || d.Provider is null) return null;
+        var r = d.Via == ProxyVia.Edge
+            ? await ProxyEngine.ExecuteAsync(new ProxyOp("exists", EdgeSettings, Kind: d.Provider, RouteId: d.RouteId), Http(), _docker, ct)
+            : await RunAsync(await NodeOfAsync(inst, ct), x => new ProxyOp("exists", x, Kind: d.Provider, RouteId: d.RouteId), inst.Id, ct);
+        return r.Ok ? r.Exists : null;
+    }
+
     public async Task<DomainStatus> StatusAsync(Instance inst, bool checkProvider, CancellationToken ct = default)
     {
         bool? exists = null, hostExists = null;

@@ -863,7 +863,10 @@ Design and increments: `docs/hosting-platform.md`. Increments 1–4 are built:
     ("N Kundendomains umstellen", confirm) removes each old route first. Removing or recreating a host address
     re-points an edge route that depends on it. Teardown (`InstanceRemovalService`) now deletes all routes after
     the container (best effort, failures reported) — before, routes outlived their site.
-  - Hosting → Domains lists EVERY address (host addresses + customer domains with their way and target + pending).
+  - Hosting → Domains lists EVERY address (host addresses + customer domains + further domains, with their way and
+    target + pending), GROUPED by instance: a header row per instance (`data-list-group`), its addresses below
+    (`data-list-in`). admin-list.js treats header rows as non-items and shows one only while a row of its group is
+    visible — any table can group this way. "Alle prüfen" checks further domains too (`ExtraRouteExistsAsync`).
   - **Further domains** (`InstanceDomain`, migration `AddInstanceDomains`): an instance has ONE main customer domain
     (`Instance.ProxyDomain`) and any number of further ones — `www.<domain>`, old domains — each `redirect` (301 to
     https://main, path kept; the default) or `alias` (same site). Invariant: a further domain lives exactly where the

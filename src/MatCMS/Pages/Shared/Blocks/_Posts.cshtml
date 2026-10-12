@@ -170,7 +170,10 @@
     .posts-grid { display: grid; gap: 26px; grid-template-columns: repeat(3, 1fr); }
     .posts-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
     @@media (max-width: 820px) { .posts-grid, .posts-grid.cols-2 { grid-template-columns: 1fr; } }
-    .post-card { background: #fff; border: 1px solid #ece3d5; border-radius: 14px; overflow: hidden;
+    /* The card is always white — so it brings its own dark text. Inheriting the theme's colours put a dark theme's
+       light headings and body text on white (N.S. Libera: pale titles nobody could read). Class selectors, so they
+       win over a template's plain h3/p colours. */
+    .post-card { background: #fff; border: 1px solid #ece3d5; border-radius: 14px; overflow: hidden; color: #3b342e;
         box-shadow: 0 2px 10px rgba(26,21,18,.05); transition: transform .15s ease, box-shadow .15s ease; }
     .post-card:hover { transform: translateY(-3px); box-shadow: 0 14px 30px rgba(26,21,18,.12); }
     .post-card__link { text-decoration: none; color: inherit; display: block; }
@@ -180,8 +183,8 @@
     .post-tag { font-size: 12px; font-weight: 600; color: var(--accent); background: var(--bg-alt, #f5f0e8);
         padding: 3px 9px; border-radius: 999px; text-decoration: none; }
     a.post-tag:hover { background: var(--accent); color: #fff; }
-    .post-card__title { font-family: var(--font-head); margin: 0 0 8px; font-size: 1.25rem; }
-    .post-card__excerpt { margin: 0 0 12px; line-height: 1.6; opacity: .85; }
+    .post-card__title { font-family: var(--font-head); margin: 0 0 8px; font-size: 1.25rem; color: #1a1512; }
+    .post-card__excerpt { margin: 0 0 12px; line-height: 1.6; color: #4a423b; }
     .post-card__more { font-weight: 700; color: var(--accent); }
 
     /* Filter chips (server-side links) */

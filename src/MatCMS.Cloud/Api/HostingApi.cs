@@ -1,6 +1,6 @@
-using MatCMS.Cloud.Data;
 using MatCMS.Cloud.Models;
 using MatCMS.Cloud.Services;
+using MatCMS.Cloud.Services.Nodes;
 using Microsoft.EntityFrameworkCore;
 
 namespace MatCMS.Cloud.Api;
@@ -53,14 +53,6 @@ public static class HostingApi
         },
     };
 
-    /// <summary>A host by its API name: absent / "local" = this cloud's host (node null), else a node's public id.</summary>
-    internal static async Task<(Node? Node, bool Missing)> HostAsync(AppDbContext db, string? node)
-    {
-        if (string.IsNullOrWhiteSpace(node) || node == "local") return (null, false);
-        var n = await db.Nodes.FirstOrDefaultAsync(x => x.PublicId == node);
-        return (n, n is null);
-    }
-
     public static void MapHostingApi(this WebApplication app)
     {
         // ---- Module switch ---------------------------------------------------------------------------
@@ -88,24 +80,24 @@ public static class HostingApi
 
         // ---- Container per instance ------------------------------------------------------------------
         app.MapGet("/api/v1/instances/{publicId}/container", async (HttpContext ctx, string publicId, ApiKeyService keys,
-            AppDbContext db, HostingActionsService hosting) =>
+            InstanceService instances, HostingActionsService hosting) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
-            var inst = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == publicId);
-            if (inst is null || !ApiKeyService.CanAccess(key!, inst)) return NotFoundInstance();
+            var inst = await instances.FindForKeyAsync(publicId, key!);
+            if (inst is null) return NotFoundInstance();
             await hosting.RefreshAsync(inst, ctx.RequestAborted);
             return Results.Ok(ContainerJson(inst, await hosting.DetailsAsync(inst, ctx.RequestAborted)));
         }).RequireRateLimiting("operatorApi");
 
         app.MapPost("/api/v1/instances/{publicId}/container/{action}", async (HttpContext ctx, string publicId, string action,
-            ApiKeyService keys, AppDbContext db, HostingActionsService hosting) =>
+            ApiKeyService keys, InstanceService instances, HostingActionsService hosting) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
             if (RequireHosting(key!) is { } g) return g;
-            var inst = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == publicId);
-            if (inst is null || !ApiKeyService.CanAccess(key!, inst)) return NotFoundInstance();
+            var inst = await instances.FindForKeyAsync(publicId, key!);
+            if (inst is null) return NotFoundInstance();
             await hosting.RefreshAsync(inst, ctx.RequestAborted);
 
             HostingActionsService.ActionResult r;
@@ -122,22 +114,60 @@ public static class HostingApi
         }).RequireRateLimiting("operatorApi");
 
         app.MapGet("/api/v1/instances/{publicId}/container/logs", async (HttpContext ctx, string publicId, int? tail,
-            ApiKeyService keys, AppDbContext db, HostingActionsService hosting) =>
+            ApiKeyService keys, InstanceService instances, HostingActionsService hosting) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
             // Logs can carry request paths, stack traces and the like — reading them is an operator matter.
             if (RequireHosting(key!) is { } g) return g;
-            var inst = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == publicId);
-            if (inst is null || !ApiKeyService.CanAccess(key!, inst)) return NotFoundInstance();
+            var inst = await instances.FindForKeyAsync(publicId, key!);
+            if (inst is null) return NotFoundInstance();
             await hosting.RefreshAsync(inst, ctx.RequestAborted);
             var (ok, text) = await hosting.LogsAsync(inst, tail ?? 200, ctx.RequestAborted);
             return ok ? Results.Ok(new { ok = true, tail = tail ?? 200, logs = text })
                       : Results.Json(new { ok = false, error = text }, statusCode: StatusCodes.Status409Conflict);
         }).RequireRateLimiting("operatorApi");
 
+        // ---- Removing an instance (same four ways and guards as Instances/Delete) -----------------------
+        // `mode` is required and has no default: unregister (the site keeps running), keep-data (container goes, volumes
+        // stay), full (container + volumes) or backup-first (backup arrives, THEN full — answered 202, the watchdog finishes
+        // it). EVERY way deletes the instance's cloud-side backups — even unregister, their rows cascade with the record — so
+        // every way asks for the restore right as well.
+        app.MapDelete("/api/v1/instances/{publicId}", async (HttpContext ctx, string publicId, string? mode,
+            ApiKeyService keys, InstanceService instances, InstanceRemovalService removals) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireHosting(key!) is { } g) return g;
+            if (!InstanceRemovalService.IsKnownMode(mode))
+                return Results.Json(new { error = "Der Parameter mode ist Pflicht. Erlaubt: unregister, keep-data, full, backup-first." }, statusCode: StatusCodes.Status400BadRequest);
+            if (!key!.CanRestore)
+                return Results.Json(new { error = "Dieser Schlüssel darf keine Instanzen entfernen (fehlendes Restore-Recht)." }, statusCode: StatusCodes.Status403Forbidden);
+            var inst = await instances.FindForKeyAsync(publicId, key!);
+            if (inst is null) return NotFoundInstance();
+            var r = await removals.RemoveByModeAsync(inst, mode, ctx.RequestAborted);
+            if (!r.Ok) return Results.Json(new { ok = false, error = r.Message }, statusCode: StatusCodes.Status409Conflict);
+            return r.Removed ? Results.Ok(new { ok = true, removed = true, message = r.Message })
+                             : Results.Json(new { ok = true, removed = false, message = r.Message }, statusCode: StatusCodes.Status202Accepted);
+        }).RequireRateLimiting("operatorApi");
+
+        // Takes a removal back that waits on its backup — the only way out of the wait other than the backup arriving.
+        app.MapDelete("/api/v1/instances/{publicId}/removal", async (HttpContext ctx, string publicId,
+            ApiKeyService keys, InstanceService instances, InstanceRemovalService removals) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireHosting(key!) is { } g) return g;
+            var inst = await instances.FindForKeyAsync(publicId, key!);
+            if (inst is null) return NotFoundInstance();
+            if (!inst.RemovalPending)
+                return Results.Json(new { ok = false, error = "Für diese Instanz ist kein Entfernen vorgemerkt." }, statusCode: StatusCodes.Status409Conflict);
+            var r = await removals.CancelPendingAsync(inst, ctx.RequestAborted);
+            return Results.Ok(new { ok = true, message = r.Message });
+        }).RequireRateLimiting("operatorApi");
+
         // ---- Provisioning (increment 4: here or on a node) -------------------------------------------
-        app.MapPost("/api/v1/hosting/instances", async (HttpContext ctx, ApiKeyService keys, AppDbContext db, HostingService hosting,
+        app.MapPost("/api/v1/hosting/instances", async (HttpContext ctx, ApiKeyService keys, NodeService nodes, ProfileService profiles, HostingService hosting,
             ProvisionDto b) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
@@ -148,11 +178,11 @@ public static class HostingApi
             int? nodeId = null;
             if (!string.IsNullOrWhiteSpace(b.NodeId) && b.NodeId != "local")
             {
-                var node = await db.Nodes.AsNoTracking().FirstOrDefaultAsync(n => n.PublicId == b.NodeId);
+                var node = await nodes.FindByPublicIdAsync(b.NodeId, track: false);
                 if (node is null) return Results.Json(new { error = "Node nicht gefunden." }, statusCode: StatusCodes.Status404NotFound);
                 nodeId = node.Id;
             }
-            var profileId = b.ProfileId ?? (await db.Profiles.AsNoTracking().Where(p => p.IsDefault).Select(p => (int?)p.Id).FirstOrDefaultAsync()) ?? 0;
+            var profileId = b.ProfileId ?? (await profiles.DefaultProfileAsync())?.Id ?? 0;
             var r = await hosting.ProvisionAsync(b.Name, profileId, b.Domain, b.ImageTag, nodeId, b.PushCanonical ?? true, ctx.RequestAborted);
             return r.Ok
                 ? Results.Ok(new { ok = true, containerName = r.ContainerName, port = r.Port, domainFailed = r.DomainFailed, message = r.Message })
@@ -161,7 +191,7 @@ public static class HostingApi
 
         // ---- Moving between hosts (increment 5) ---------------------------------------------------------
         app.MapPost("/api/v1/instances/{publicId}/migrate", async (HttpContext ctx, string publicId, MigrateDto b,
-            ApiKeyService keys, AppDbContext db, Services.Nodes.MigrationService migrations) =>
+            ApiKeyService keys, InstanceService instances, NodeService nodes, Services.Nodes.MigrationService migrations) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
@@ -169,12 +199,12 @@ public static class HostingApi
             // Removing the old copy deletes its data volume — the destructive half needs the restore right too.
             if (b.RemoveSource == true && !key!.CanRestore)
                 return Results.Json(new { error = "Die alte Kopie entfernen braucht zusätzlich das Wiederherstellen-Recht." }, statusCode: StatusCodes.Status403Forbidden);
-            var inst = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == publicId);
-            if (inst is null || !ApiKeyService.CanAccess(key!, inst)) return NotFoundInstance();
+            var inst = await instances.FindForKeyAsync(publicId, key!);
+            if (inst is null) return NotFoundInstance();
             Node? node = null;
             if (!string.IsNullOrWhiteSpace(b.Target) && b.Target != "local")
             {
-                node = await db.Nodes.FirstOrDefaultAsync(n => n.PublicId == b.Target);
+                node = await nodes.FindByPublicIdAsync(b.Target);
                 if (node is null) return Results.Json(new { error = "Ziel-Node nicht gefunden." }, statusCode: StatusCodes.Status404NotFound);
             }
             var (m, err) = await migrations.StartAsync(inst, node, b.RemoveSource ?? false, "api:" + key!.Name, ctx.RequestAborted);
@@ -183,13 +213,13 @@ public static class HostingApi
                 : Results.Json(new { ok = true, migration = Services.Nodes.MigrationService.Json(m) }, statusCode: StatusCodes.Status202Accepted);
         }).RequireRateLimiting("operatorApi");
 
-        app.MapGet("/api/v1/instances/{publicId}/migrations", async (HttpContext ctx, string publicId, ApiKeyService keys, AppDbContext db,
+        app.MapGet("/api/v1/instances/{publicId}/migrations", async (HttpContext ctx, string publicId, ApiKeyService keys, InstanceService instances,
             Services.Nodes.MigrationService migrations) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
-            var inst = await db.Instances.AsNoTracking().FirstOrDefaultAsync(i => i.PublicId == publicId);
-            if (inst is null || !ApiKeyService.CanAccess(key!, inst)) return NotFoundInstance();
+            var inst = await instances.FindForKeyAsync(publicId, key!, track: false);
+            if (inst is null) return NotFoundInstance();
             return Results.Ok((await migrations.HistoryAsync(inst.Id, 10, ctx.RequestAborted)).Select(Services.Nodes.MigrationService.Json));
         }).RequireRateLimiting("operatorApi");
 
@@ -205,12 +235,12 @@ public static class HostingApi
         }).RequireRateLimiting("operatorApi");
 
         // The MatCMS images of ONE host: ?node=<node id> (as in /api/v1/nodes), absent or "local" = this cloud's host.
-        app.MapGet("/api/v1/hosting/images", async (HttpContext ctx, ApiKeyService keys, AppDbContext db, HostImagesService images, string? node) =>
+        app.MapGet("/api/v1/hosting/images", async (HttpContext ctx, ApiKeyService keys, NodeService nodes, HostImagesService images, string? node) =>
         {
             var (key, err) = await CallerAsync(ctx, keys);
             if (err is not null) return err;
             if (RequireCloudWide(key!) is { } denied) return denied;
-            var (n, missing) = await HostAsync(db, node);
+            var (n, missing) = await nodes.ResolveHostAsync(node);
             if (missing) return Results.Json(new { error = "Node nicht gefunden." }, statusCode: StatusCodes.Status404NotFound);
             var r = await images.ListAsync(n, ctx.RequestAborted);
             return r.Images is null ? Results.Json(new { error = r.Error }, statusCode: StatusCodes.Status503ServiceUnavailable)
@@ -218,12 +248,12 @@ public static class HostingApi
         }).RequireRateLimiting("operatorApi");
 
         // Removes only old, untagged MatCMS images no container uses — the same call as the host page's Docker tab.
-        app.MapPost("/api/v1/hosting/images/prune", async (HttpContext ctx, ApiKeyService keys, AppDbContext db, HostImagesService images, string? node) =>
+        app.MapPost("/api/v1/hosting/images/prune", async (HttpContext ctx, ApiKeyService keys, NodeService nodes, HostImagesService images, string? node) =>
         {
             var (key, err) = await CallerAsync(ctx, keys);
             if (err is not null) return err;
             if (RequireCloudWide(key!) is { } denied) return denied;
-            var (n, missing) = await HostAsync(db, node);
+            var (n, missing) = await nodes.ResolveHostAsync(node);
             if (missing) return Results.Json(new { error = "Node nicht gefunden." }, statusCode: StatusCodes.Status404NotFound);
             var (ok, message, r) = await images.PruneAsync(n, ctx.RequestAborted);
             return ok ? Results.Json(new { removed = r?.Removed ?? 0, bytesReclaimed = r?.BytesReclaimed ?? 0 })
@@ -289,24 +319,24 @@ public static class HostingApi
         }).RequireRateLimiting("operatorApi");
 
         app.MapGet("/api/v1/instances/{publicId}/domain", async (HttpContext ctx, string publicId, bool? check,
-            ApiKeyService keys, AppDbContext db, Services.Proxy.ProxyService proxy) =>
+            ApiKeyService keys, InstanceService instances, Services.Proxy.ProxyService proxy) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
-            var inst = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == publicId);
-            if (inst is null || !ApiKeyService.CanAccess(key!, inst)) return NotFoundInstance();
+            var inst = await instances.FindForKeyAsync(publicId, key!);
+            if (inst is null) return NotFoundInstance();
             var s = await proxy.StatusAsync(inst, check ?? true, ctx.RequestAborted);
             return Results.Ok(Services.Proxy.ProxyService.StatusJson(s));
         }).RequireRateLimiting("operatorApi");
 
         app.MapPut("/api/v1/instances/{publicId}/domain", async (HttpContext ctx, string publicId, DomainDto b,
-            ApiKeyService keys, AppDbContext db, Services.Proxy.ProxyService proxy) =>
+            ApiKeyService keys, InstanceService instances, Services.Proxy.ProxyService proxy) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
             if (RequireHosting(key!) is { } g) return g;
-            var inst = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == publicId);
-            if (inst is null || !ApiKeyService.CanAccess(key!, inst)) return NotFoundInstance();
+            var inst = await instances.FindForKeyAsync(publicId, key!);
+            if (inst is null) return NotFoundInstance();
             if (Services.Proxy.ProxyService.NormaliseDomain(b.Domain) is null)
                 return Results.Json(new { ok = false, error = "Keine gültige Domain (nur ein Hostname, z. B. shop.example.de — ohne Pfad, Port oder *)." },
                     statusCode: StatusCodes.Status400BadRequest);
@@ -316,13 +346,13 @@ public static class HostingApi
         }).RequireRateLimiting("operatorApi");
 
         app.MapDelete("/api/v1/instances/{publicId}/domain", async (HttpContext ctx, string publicId, bool? pushCanonical,
-            ApiKeyService keys, AppDbContext db, Services.Proxy.ProxyService proxy) =>
+            ApiKeyService keys, InstanceService instances, Services.Proxy.ProxyService proxy) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
             if (RequireHosting(key!) is { } g) return g;
-            var inst = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == publicId);
-            if (inst is null || !ApiKeyService.CanAccess(key!, inst)) return NotFoundInstance();
+            var inst = await instances.FindForKeyAsync(publicId, key!);
+            if (inst is null) return NotFoundInstance();
             var r = await proxy.UnpublishAsync(inst, pushCanonical ?? true, ctx.RequestAborted);
             return r.Ok ? Results.Ok(new { ok = true, message = r.Message })
                         : Results.Json(new { ok = false, error = r.Message }, statusCode: StatusCodes.Status409Conflict);
@@ -334,37 +364,37 @@ public static class HostingApi
             domain = d.Domain, mode = d.Mode, via = d.Via, provider = d.Provider, routeId = d.RouteId, error = d.Error, publishedAt = d.PublishedAt,
         };
 
-        app.MapGet("/api/v1/instances/{publicId}/domains", async (HttpContext ctx, string publicId, ApiKeyService keys, AppDbContext db,
+        app.MapGet("/api/v1/instances/{publicId}/domains", async (HttpContext ctx, string publicId, ApiKeyService keys, InstanceService instances,
             Services.Proxy.ProxyService proxy) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
-            var inst = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == publicId);
-            if (inst is null || !ApiKeyService.CanAccess(key!, inst)) return NotFoundInstance();
+            var inst = await instances.FindForKeyAsync(publicId, key!);
+            if (inst is null) return NotFoundInstance();
             return Results.Ok(new { main = inst.ProxyDomain, extra = (await proxy.ExtraDomainsAsync(inst.Id, ctx.RequestAborted)).Select(ExtraJson) });
         }).RequireRateLimiting("operatorApi");
 
         app.MapPost("/api/v1/instances/{publicId}/domains", async (HttpContext ctx, string publicId, ExtraDomainDto b, ApiKeyService keys,
-            AppDbContext db, Services.Proxy.ProxyService proxy) =>
+            InstanceService instances, Services.Proxy.ProxyService proxy) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
             if (RequireHosting(key!) is { } g) return g;
-            var inst = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == publicId);
-            if (inst is null || !ApiKeyService.CanAccess(key!, inst)) return NotFoundInstance();
+            var inst = await instances.FindForKeyAsync(publicId, key!);
+            if (inst is null) return NotFoundInstance();
             var r = await proxy.AddExtraDomainAsync(inst, b.Domain, b.Mode, ctx.RequestAborted);
             return r.Ok ? Results.Ok(new { ok = true, domain = r.Domain, message = r.Message })
                         : Results.Json(new { ok = false, domain = r.Domain, error = r.Message }, statusCode: StatusCodes.Status409Conflict);
         }).RequireRateLimiting("operatorApi");
 
         app.MapDelete("/api/v1/instances/{publicId}/domains/{domain}", async (HttpContext ctx, string publicId, string domain, ApiKeyService keys,
-            AppDbContext db, Services.Proxy.ProxyService proxy) =>
+            InstanceService instances, Services.Proxy.ProxyService proxy) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
             if (RequireHosting(key!) is { } g) return g;
-            var inst = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == publicId);
-            if (inst is null || !ApiKeyService.CanAccess(key!, inst)) return NotFoundInstance();
+            var inst = await instances.FindForKeyAsync(publicId, key!);
+            if (inst is null) return NotFoundInstance();
             var r = await proxy.RemoveExtraDomainAsync(inst, domain, ctx.RequestAborted);
             return r.Ok ? Results.Ok(new { ok = true, message = r.Message })
                         : Results.Json(new { ok = false, error = r.Message }, statusCode: StatusCodes.Status409Conflict);
@@ -372,26 +402,26 @@ public static class HostingApi
 
         // ---- Automatic host address of one instance ----------------------------------------------------
         app.MapPost("/api/v1/instances/{publicId}/host-address", async (HttpContext ctx, string publicId, bool? pushCanonical,
-            ApiKeyService keys, AppDbContext db, Services.Proxy.ProxyService proxy) =>
+            ApiKeyService keys, InstanceService instances, Services.Proxy.ProxyService proxy) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
             if (RequireHosting(key!) is { } g) return g;
-            var inst = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == publicId);
-            if (inst is null || !ApiKeyService.CanAccess(key!, inst)) return NotFoundInstance();
+            var inst = await instances.FindForKeyAsync(publicId, key!);
+            if (inst is null) return NotFoundInstance();
             var r = await proxy.PublishHostAddressAsync(inst, pushCanonical ?? true, ct: ctx.RequestAborted);
             return r.Ok ? Results.Ok(new { ok = true, hostAddress = r.Domain, message = r.Message })
                         : Results.Json(new { ok = false, error = r.Message }, statusCode: StatusCodes.Status409Conflict);
         }).RequireRateLimiting("operatorApi");
 
         app.MapDelete("/api/v1/instances/{publicId}/host-address", async (HttpContext ctx, string publicId, bool? pushCanonical,
-            ApiKeyService keys, AppDbContext db, Services.Proxy.ProxyService proxy) =>
+            ApiKeyService keys, InstanceService instances, Services.Proxy.ProxyService proxy) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
             if (RequireHosting(key!) is { } g) return g;
-            var inst = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == publicId);
-            if (inst is null || !ApiKeyService.CanAccess(key!, inst)) return NotFoundInstance();
+            var inst = await instances.FindForKeyAsync(publicId, key!);
+            if (inst is null) return NotFoundInstance();
             var r = await proxy.RemoveHostAddressAsync(inst, pushCanonical ?? true, ctx.RequestAborted);
             return r.Ok ? Results.Ok(new { ok = true, message = r.Message })
                         : Results.Json(new { ok = false, error = r.Message }, statusCode: StatusCodes.Status409Conflict);
@@ -422,7 +452,7 @@ public static class HostingApi
             return Results.Ok(new { ok = true });
         }).RequireRateLimiting("operatorApi");
 
-        app.MapPost("/api/v1/hosting/host-addresses", async (HttpContext ctx, string? nodeId, ApiKeyService keys, AppDbContext db, Services.Proxy.ProxyService proxy) =>
+        app.MapPost("/api/v1/hosting/host-addresses", async (HttpContext ctx, string? nodeId, ApiKeyService keys, NodeService nodes, Services.Proxy.ProxyService proxy) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
@@ -430,7 +460,7 @@ public static class HostingApi
             Node? node = null;
             if (!string.IsNullOrEmpty(nodeId))
             {
-                node = await db.Nodes.FirstOrDefaultAsync(n => n.PublicId == nodeId);
+                node = await nodes.FindByPublicIdAsync(nodeId);
                 if (node is null) return Results.Json(new { error = "Node nicht gefunden." }, statusCode: StatusCodes.Status404NotFound);
             }
             var r = await proxy.PublishMissingHostAddressesAsync(node, ctx.RequestAborted);
@@ -504,24 +534,24 @@ public static class HostingApi
         }).RequireRateLimiting("operatorApi");
 
         // ---- Wildcard certificate per host (nodeId omitted = this cloud's own host) ------------------------
-        app.MapGet("/api/v1/hosting/wildcard", async (HttpContext ctx, string? nodeId, ApiKeyService keys, AppDbContext db, Services.Proxy.ProxyService proxy) =>
+        app.MapGet("/api/v1/hosting/wildcard", async (HttpContext ctx, string? nodeId, ApiKeyService keys, NodeService nodes, Services.Proxy.ProxyService proxy) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
             Node? node = null;
-            if (!string.IsNullOrEmpty(nodeId) && (node = await db.Nodes.FirstOrDefaultAsync(n => n.PublicId == nodeId)) is null)
+            if (!string.IsNullOrEmpty(nodeId) && (node = await nodes.FindByPublicIdAsync(nodeId)) is null)
                 return Results.Json(new { error = "Node nicht gefunden." }, statusCode: StatusCodes.Status404NotFound);
             var w = proxy.WildcardFor(node);
             return Results.Ok(new { enabled = w.Enabled, dnsProvider = w.DnsProvider, credentialsSet = w.CredentialsSet, id = w.RouteId, error = w.Error });
         }).RequireRateLimiting("operatorApi");
 
-        app.MapPut("/api/v1/hosting/wildcard", async (HttpContext ctx, string? nodeId, WildcardDto b, ApiKeyService keys, AppDbContext db, Services.Proxy.ProxyService proxy) =>
+        app.MapPut("/api/v1/hosting/wildcard", async (HttpContext ctx, string? nodeId, WildcardDto b, ApiKeyService keys, NodeService nodes, Services.Proxy.ProxyService proxy) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
             if (RequireCloudWide(key!) is { } g) return g;
             Node? node = null;
-            if (!string.IsNullOrEmpty(nodeId) && (node = await db.Nodes.FirstOrDefaultAsync(n => n.PublicId == nodeId)) is null)
+            if (!string.IsNullOrEmpty(nodeId) && (node = await nodes.FindByPublicIdAsync(nodeId)) is null)
                 return Results.Json(new { error = "Node nicht gefunden." }, statusCode: StatusCodes.Status404NotFound);
             var creds = b.Credentials is null ? null : string.Join("\n", b.Credentials.Select(kv => kv.Key + "=" + kv.Value));
             var r = await proxy.SetWildcardAsync(node, b.Enabled, b.DnsProvider, creds, ctx.RequestAborted);

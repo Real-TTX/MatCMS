@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using MatCMS.Cloud.Data;
+using MatCMS.Cloud.Models;
 using MatCMS.Shared;
 using Microsoft.EntityFrameworkCore;
 
@@ -56,6 +57,42 @@ public class AiService
     }
 
     public async Task<bool> IsConfiguredAsync() => (await GetConfigAsync()).IsConfigured;
+
+    /// <summary>
+    /// One call relayed by an instance, with the checks that come before it: the instance must be approved, and the profile must have AI
+    /// switched on (a valid token is not permission to spend the key), and the instance's monthly token budget (0/null = unlimited; the
+    /// cloud grants it, the instance never sees the number) must not be used up. Only what the provider actually reported is booked.
+    /// A refusal comes back as <c>Ok=false</c> with a reason, so the instance can tell its operator why.
+    /// </summary>
+    public async Task<AiResponse> RelayAsync(Instance instance, AiRequest req, CancellationToken ct = default)
+    {
+        if (instance.Status != InstanceStatus.Approved)
+            return new AiResponse { Ok = false, Error = "Instanz ist nicht freigegeben." };
+        if (instance.Profile is null || !instance.Profile.SyncAi)
+            return new AiResponse { Ok = false, Error = "KI ist für dieses Profil nicht aktiviert." };
+
+        var period = DateTime.UtcNow.ToString("yyyy-MM");
+        var usage = await _db.AiUsages.FirstOrDefaultAsync(u => u.InstanceId == instance.Id && u.Period == period);
+        var budget = instance.Profile.AiMonthlyTokenBudget ?? 0;
+        if (budget > 0 && (usage?.Tokens ?? 0) >= budget)
+            return new AiResponse { Ok = false, Error = "Das monatliche KI-Budget dieser Instanz ist aufgebraucht." };
+
+        var res = await CompleteAsync(req, ct);
+
+        if (res.Ok)
+        {
+            if (usage is null)
+            {
+                usage = new AiUsage { InstanceId = instance.Id, Period = period };
+                _db.AiUsages.Add(usage);
+            }
+            usage.Tokens += res.PromptTokens + res.CompletionTokens;
+            usage.Calls += 1;
+            usage.UpdatedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+        }
+        return res;
+    }
 
     /// <summary>Runs a chat completion with the saved config. Never throws.</summary>
     public async Task<AiResponse> CompleteAsync(AiRequest req, CancellationToken ct = default)

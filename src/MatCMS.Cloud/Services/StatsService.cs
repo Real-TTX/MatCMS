@@ -15,6 +15,18 @@ public sealed class StatsService
     private readonly AppDbContext _db;
     public StatsService(AppDbContext db) => _db = db;
 
+    /// <summary>The approved instances an operator key may see: all of them, or those in its scope list.</summary>
+    public async Task<List<Instance>> VisibleInstancesAsync(ApiKey key, CancellationToken ct = default)
+    {
+        var q = _db.Instances.AsNoTracking().Where(i => i.Status == InstanceStatus.Approved);
+        if (!key.AllInstances)
+        {
+            var ids = key.Instances.Select(s => s.InstanceId).ToList();
+            q = q.Where(i => ids.Contains(i.Id));
+        }
+        return await q.ToListAsync(ct);
+    }
+
     public static readonly int[] Periods = { 7, 30, 90, 365 };
     public static int NormalisePeriod(int? days) => days is int d && Periods.Contains(d) ? d : 30;
 

@@ -1,9 +1,7 @@
 using System.Text.Json;
-using MatCMS.Cloud.Data;
 using MatCMS.Cloud.Models;
 using MatCMS.Cloud.Services;
 using Microsoft.AspNetCore.Http.Features;
-using Microsoft.EntityFrameworkCore;
 
 namespace MatCMS.Cloud.Api;
 
@@ -34,50 +32,29 @@ public static class StoreApi
     public static void MapStoreApi(this WebApplication app)
     {
         // ---- Store overview -------------------------------------------------------
-        app.MapGet("/api/v1/store", async (HttpContext ctx, ApiKeyService keys, AppDbContext db) =>
+        app.MapGet("/api/v1/store", async (HttpContext ctx, ApiKeyService keys, StoreService store) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
+            var o = await store.OverviewAsync();
 
-            var plugins = await db.StorePlugins.AsNoTracking().OrderBy(p => p.Name).Select(p => new
-            {
-                p.Key, p.Name, p.Version, p.Description, sizeBytes = p.Bundle.Length,
-                usedBy = db.ProfileStorePlugins.Count(x => x.StorePluginId == p.Id)
-            }).ToListAsync();
-            var templates = await db.StoreTemplates.AsNoTracking().OrderBy(t => t.Name).Select(t => new
-            {
-                t.Name, t.Description, t.AccentColor, t.HeadingFont, t.BodyFont,
-                usedBy = db.ProfileStoreTemplates.Count(x => x.StoreTemplateId == t.Id)
-            }).ToListAsync();
-            var components = await db.StoreComponents.AsNoTracking().OrderBy(c => c.Name).Select(c => new
-            {
-                c.Type, c.Name, c.Description, c.Icon,
-                usedBy = db.ProfileStoreComponents.Count(x => x.StoreComponentId == c.Id)
-            }).ToListAsync();
-            var mailTemplates = await db.StoreMailTemplates.AsNoTracking().OrderBy(m => m.Key).Select(m => new
-            {
-                m.Key, m.Name, m.Subject, m.Enabled, m.IsHtml,
-                usedBy = db.ProfileStoreMailTemplates.Count(x => x.StoreMailTemplateId == m.Id)
-            }).ToListAsync();
-
-            return Results.Ok(new { canManageStore = key!.CanManageStore, plugins, templates, components, mailTemplates });
+            return Results.Ok(new { canManageStore = key!.CanManageStore, plugins = o.Plugins, templates = o.Templates, components = o.Components, mailTemplates = o.MailTemplates });
         }).RequireRateLimiting("operatorApi");
 
         // ---- Templates (identity = Name) ------------------------------------------
-        app.MapGet("/api/v1/store/templates", async (HttpContext ctx, ApiKeyService keys, AppDbContext db) =>
+        app.MapGet("/api/v1/store/templates", async (HttpContext ctx, ApiKeyService keys, StoreService store) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
-            var list = await db.StoreTemplates.AsNoTracking().OrderBy(t => t.Name)
-                .Select(t => new { t.Name, t.Description, t.AccentColor, t.HeadingFont, t.BodyFont }).ToListAsync();
+            var list = await store.ListTemplatesAsync();
             return Results.Ok(new { templates = list });
         }).RequireRateLimiting("operatorApi");
 
-        app.MapGet("/api/v1/store/templates/{name}", async (HttpContext ctx, string name, ApiKeyService keys, AppDbContext db) =>
+        app.MapGet("/api/v1/store/templates/{name}", async (HttpContext ctx, string name, ApiKeyService keys, StoreService store) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
-            var t = await db.StoreTemplates.AsNoTracking().FirstOrDefaultAsync(x => x.Name == name);
+            var t = await store.GetTemplateAsync(name);
             return t is null ? NotFound("Template") : Results.Ok(t);
         }).RequireRateLimiting("operatorApi");
 
@@ -102,20 +79,19 @@ public static class StoreApi
         }).RequireRateLimiting("operatorApi");
 
         // ---- Components (identity = Type) -----------------------------------------
-        app.MapGet("/api/v1/store/components", async (HttpContext ctx, ApiKeyService keys, AppDbContext db) =>
+        app.MapGet("/api/v1/store/components", async (HttpContext ctx, ApiKeyService keys, StoreService store) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
-            var list = await db.StoreComponents.AsNoTracking().OrderBy(c => c.Name)
-                .Select(c => new { c.Type, c.Name, c.Description, c.Icon }).ToListAsync();
+            var list = await store.ListComponentsAsync();
             return Results.Ok(new { components = list });
         }).RequireRateLimiting("operatorApi");
 
-        app.MapGet("/api/v1/store/components/{type}", async (HttpContext ctx, string type, ApiKeyService keys, AppDbContext db) =>
+        app.MapGet("/api/v1/store/components/{type}", async (HttpContext ctx, string type, ApiKeyService keys, StoreService store) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
-            var c = await db.StoreComponents.AsNoTracking().FirstOrDefaultAsync(x => x.Type == type.ToLowerInvariant());
+            var c = await store.GetComponentAsync(type);
             return c is null ? NotFound("Komponente") : Results.Ok(c);
         }).RequireRateLimiting("operatorApi");
 
@@ -139,20 +115,19 @@ public static class StoreApi
         }).RequireRateLimiting("operatorApi");
 
         // ---- Mail templates (identity = Key) --------------------------------------
-        app.MapGet("/api/v1/store/mail-templates", async (HttpContext ctx, ApiKeyService keys, AppDbContext db) =>
+        app.MapGet("/api/v1/store/mail-templates", async (HttpContext ctx, ApiKeyService keys, StoreService store) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
-            var list = await db.StoreMailTemplates.AsNoTracking().OrderBy(m => m.Key)
-                .Select(m => new { m.Key, m.Name, m.Subject, m.Enabled, m.IsHtml }).ToListAsync();
+            var list = await store.ListMailTemplatesAsync();
             return Results.Ok(new { mailTemplates = list });
         }).RequireRateLimiting("operatorApi");
 
-        app.MapGet("/api/v1/store/mail-templates/{key}", async (HttpContext ctx, string key, ApiKeyService keys, AppDbContext db) =>
+        app.MapGet("/api/v1/store/mail-templates/{key}", async (HttpContext ctx, string key, ApiKeyService keys, StoreService store) =>
         {
             var (k, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
-            var m = await db.StoreMailTemplates.AsNoTracking().FirstOrDefaultAsync(x => x.Key == key);
+            var m = await store.GetMailTemplateAsync(key);
             return m is null ? NotFound("Mail-Template") : Results.Ok(m);
         }).RequireRateLimiting("operatorApi");
 
@@ -175,20 +150,19 @@ public static class StoreApi
         }).RequireRateLimiting("operatorApi");
 
         // ---- Plugins (raw ZIP bundle, identity = Key) -----------------------------
-        app.MapGet("/api/v1/store/plugins", async (HttpContext ctx, ApiKeyService keys, AppDbContext db) =>
+        app.MapGet("/api/v1/store/plugins", async (HttpContext ctx, ApiKeyService keys, StoreService store) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
-            var list = await db.StorePlugins.AsNoTracking().OrderBy(p => p.Name)
-                .Select(p => new { p.Key, p.Name, p.Version, p.Description, sizeBytes = p.Bundle.Length, p.UploadedAt }).ToListAsync();
+            var list = await store.ListPluginsAsync();
             return Results.Ok(new { plugins = list });
         }).RequireRateLimiting("operatorApi");
 
-        app.MapGet("/api/v1/store/plugins/{pluginKey}/download", async (HttpContext ctx, string pluginKey, ApiKeyService keys, AppDbContext db) =>
+        app.MapGet("/api/v1/store/plugins/{pluginKey}/download", async (HttpContext ctx, string pluginKey, ApiKeyService keys, StoreService store) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
-            var row = await db.StorePlugins.AsNoTracking().FirstOrDefaultAsync(x => x.Key == pluginKey);
+            var row = await store.GetPluginAsync(pluginKey);
             if (row is null) return NotFound("Plugin");
             return Results.File(row.Bundle, "application/zip", $"{row.Key}.zip");
         }).RequireRateLimiting("operatorApi");

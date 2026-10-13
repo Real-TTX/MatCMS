@@ -190,6 +190,35 @@ public class InstanceService
         await _db.SaveChangesAsync();
     }
 
+    /// <summary>The instances an operator key may act on: all of them, or those in its scope list. By name, read-only.</summary>
+    public async Task<List<Instance>> ListForKeyAsync(ApiKey key, CancellationToken ct = default)
+    {
+        var q = _db.Instances.AsNoTracking().AsQueryable();
+        if (!key.AllInstances)
+        {
+            var ids = key.Instances.Select(s => s.InstanceId).ToList();
+            q = q.Where(i => ids.Contains(i.Id));
+        }
+        return await q.OrderBy(i => i.Name).ToListAsync(ct);
+    }
+
+    /// <summary>An instance by its public id, or null. Tracked, because callers usually change it; <paramref name="track"/> = false
+    /// for a read-only look.</summary>
+    public async Task<Instance?> FindByPublicIdAsync(string publicId, bool track = true, CancellationToken ct = default)
+    {
+        IQueryable<Instance> q = _db.Instances;
+        if (!track) q = q.AsNoTracking();
+        return await q.FirstOrDefaultAsync(i => i.PublicId == publicId, ct);
+    }
+
+    /// <summary>An instance by its public id that the operator key may reach. "Does not exist" and "outside the key's scope" are
+    /// the same null, so a scoped key cannot find out which instances exist.</summary>
+    public async Task<Instance?> FindForKeyAsync(string publicId, ApiKey key, bool track = true, CancellationToken ct = default)
+    {
+        var inst = await FindByPublicIdAsync(publicId, track, ct);
+        return inst is null || !ApiKeyService.CanAccess(key, inst) ? null : inst;
+    }
+
     /// <summary>
     /// Resolves an instance from the public id + bearer token. The hash comparison is
     /// length-constant (<see cref="CryptographicOperations.FixedTimeEquals"/>) so a wrong token
@@ -408,6 +437,10 @@ public class InstanceService
         await _db.SaveChangesAsync(ct);
         return true;
     }
+
+    /// <summary>A content operation of an instance by its id, or null (an op of another instance is "not found", too). Read-only.</summary>
+    public Task<ContentOp?> FindContentOpAsync(int instanceId, int opId, CancellationToken ct = default) =>
+        _db.ContentOps.AsNoTracking().FirstOrDefaultAsync(o => o.Id == opId && o.InstanceId == instanceId, ct);
 
     /// <summary>Enqueues a content operation for an instance (the MCP server's write path). The cloud only
     /// records the intent; the instance applies it on its next beat through its own validated writers and
@@ -798,6 +831,75 @@ public class InstanceService
         instance.BackupRequestedAt = DateTime.UtcNow;
         instance.BackupRequestError = null;
         instance.BackupWaitNotified = false;
+        await _db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>The instance says it disconnects on purpose: offline NOW instead of after the 150 s dead-man timeout, and no offline mail
+    /// (this outage is intentional).</summary>
+    public async Task DisconnectAsync(Instance instance)
+    {
+        instance.LastHeartbeatUtc = null;
+        instance.OfflineNotified = true;
+        Log(instance, InstanceEventKind.Offline, "Verbindung von der Instanz getrennt.", notified: true);
+        await _db.SaveChangesAsync();
+    }
+
+    /// <summary>Writes an entry to the instance's event log and saves it.</summary>
+    public async Task LogAndSaveAsync(Instance instance, InstanceEventKind kind, string message, CancellationToken ct = default)
+    {
+        Log(instance, kind, message);
+        await _db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>What the instance made of a restore it was asked for. Recorded, never derived: only the site knows whether its own
+    /// restore worked. False when the backup is not one of this instance's.</summary>
+    public async Task<bool> RecordRestoreReportAsync(Instance instance, RestoreReport report)
+    {
+        var row = await _db.CloudBackups.FirstOrDefaultAsync(b => b.Id == report.BackupId && b.InstanceId == instance.Id);
+        if (row is null) return false;
+
+        row.RestoreDoneAt = report.Ok ? DateTime.UtcNow : null;
+        row.RestoreError = report.Ok ? null : (report.Error ?? "Unbekannter Fehler.");
+        Log(instance, report.Ok
+            ? InstanceEventKind.BackupRestored
+            : InstanceEventKind.BackupRestoreFailed,
+            report.Ok ? $"Backup \"{row.FileName}\" wurde zurückgespielt."
+                      : $"Zurückspielen von \"{row.FileName}\" fehlgeschlagen: {row.RestoreError}");
+        await _db.SaveChangesAsync();
+        return true;
+    }
+
+    /// <summary>What the instance made of a BACKUP it was asked for. Recorded so an operator can read why nothing arrived — never as the
+    /// thing that decides whether one did (that is the file, see <see cref="ArrivedBackupAsync"/>). A report for anything other than the
+    /// request currently outstanding is dropped: a late answer must not put an error on the new request.</summary>
+    public async Task RecordBackupReportAsync(Instance instance, BackupReport report)
+    {
+        if (report.RequestId <= 0 || report.RequestId != instance.BackupRequestId) return;
+
+        if (report.Ok)
+        {
+            // Deliberately NOT treated as "the backup is here". The upload is a separate request that can
+            // still have failed, and whatever is waiting waits for the bytes.
+            Log(instance, InstanceEventKind.BackupRequested,
+                $"Instanz meldet das angeforderte Backup als erstellt ({report.FileName ?? "ohne Namen"}).");
+        }
+        else
+        {
+            // Ends the request rather than leaving it to be re-asked on every beat: making a backup takes minutes and holds up
+            // the site's heartbeat, so retrying something that reliably fails would grind the site down. An operator can ask again.
+            instance.BackupRequestError = string.IsNullOrWhiteSpace(report.Error)
+                ? "Unbekannter Fehler." : report.Error!.Trim();
+            Log(instance, InstanceEventKind.BackupRequestFailed,
+                $"Angefordertes Backup fehlgeschlagen: {instance.BackupRequestError}");
+        }
+        await _db.SaveChangesAsync();
+    }
+
+    /// <summary>Asks an instance for a fresh backup and notes in its event log who asked.</summary>
+    public async Task RequestBackupAsync(Instance instance, string note, CancellationToken ct = default)
+    {
+        await RequestBackupAsync(instance, ct);
+        Log(instance, InstanceEventKind.BackupRequested, note);
         await _db.SaveChangesAsync(ct);
     }
 

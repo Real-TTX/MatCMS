@@ -1,8 +1,6 @@
-using MatCMS.Cloud.Data;
 using MatCMS.Cloud.Models;
 using MatCMS.Cloud.Services;
 using MatCMS.Shared;
-using Microsoft.EntityFrameworkCore;
 
 namespace MatCMS.Cloud.Api;
 
@@ -36,35 +34,23 @@ public static class StatsApi
         }),
     };
 
-    /// <summary>The approved instances a key may see.</summary>
-    public static async Task<List<Instance>> VisibleAsync(AppDbContext db, ApiKey key, CancellationToken ct)
-    {
-        var q = db.Instances.AsNoTracking().Where(i => i.Status == InstanceStatus.Approved);
-        if (!key.AllInstances)
-        {
-            var ids = key.Instances.Select(s => s.InstanceId).ToList();
-            q = q.Where(i => ids.Contains(i.Id));
-        }
-        return await q.ToListAsync(ct);
-    }
-
     public static void MapStatsApi(this WebApplication app)
     {
-        app.MapGet("/api/v1/stats", async (HttpContext ctx, ApiKeyService keys, AppDbContext db, StatsService stats, int? days) =>
+        app.MapGet("/api/v1/stats", async (HttpContext ctx, ApiKeyService keys, StatsService stats, int? days) =>
         {
             var key = await keys.AuthenticateAsync(ctx.Request.Headers.Authorization.ToString(), ctx.RequestAborted);
             if (key is null) return Results.Json(new { error = "Ungültiger oder fehlender API-Schlüssel." }, statusCode: StatusCodes.Status401Unauthorized);
             var d = StatsService.NormalisePeriod(days);
-            var (rows, total) = await stats.FleetAsync(await VisibleAsync(db, key, ctx.RequestAborted), d, ctx.RequestAborted);
+            var (rows, total) = await stats.FleetAsync(await stats.VisibleInstancesAsync(key, ctx.RequestAborted), d, ctx.RequestAborted);
             return Results.Ok(FleetDto(rows, total, d));
         }).RequireRateLimiting("operatorApi");
 
-        app.MapGet("/api/v1/instances/{publicId}/stats", async (HttpContext ctx, string publicId, ApiKeyService keys, AppDbContext db, StatsService stats, int? days) =>
+        app.MapGet("/api/v1/instances/{publicId}/stats", async (HttpContext ctx, string publicId, ApiKeyService keys, InstanceService instances, StatsService stats, int? days) =>
         {
             var key = await keys.AuthenticateAsync(ctx.Request.Headers.Authorization.ToString(), ctx.RequestAborted);
             if (key is null) return Results.Json(new { error = "Ungültiger oder fehlender API-Schlüssel." }, statusCode: StatusCodes.Status401Unauthorized);
-            var instance = await db.Instances.AsNoTracking().FirstOrDefaultAsync(i => i.PublicId == publicId, ctx.RequestAborted);
-            if (instance is null || !ApiKeyService.CanAccess(key, instance))
+            var instance = await instances.FindForKeyAsync(publicId, key, track: false, ct: ctx.RequestAborted);
+            if (instance is null)
                 return Results.Json(new { error = "Instanz nicht gefunden." }, statusCode: StatusCodes.Status404NotFound);
             var summary = await stats.SummaryAsync(instance.Id, StatsService.NormalisePeriod(days), ctx.RequestAborted);
             return Results.Ok(new { id = instance.PublicId, name = instance.Name, stats = SummaryDto(summary) });

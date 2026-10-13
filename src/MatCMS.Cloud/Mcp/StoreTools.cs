@@ -1,8 +1,6 @@
 using System.ComponentModel;
-using MatCMS.Cloud.Data;
 using MatCMS.Cloud.Models;
 using MatCMS.Cloud.Services;
-using Microsoft.EntityFrameworkCore;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
 
@@ -28,18 +26,17 @@ public class StoreTools
 
     [McpServerTool(Name = "list_store"), Description(
         "List the cloud-wide store catalogue: templates (themes), components (reusable blocks), mail templates and plugins, each with how many profiles use it. Read-only; any valid key.")]
-    public static async Task<object> ListStore(McpContext me, AppDbContext db, CancellationToken ct)
+    public static async Task<object> ListStore(McpContext me, StoreService store, CancellationToken ct)
     {
         _ = me.Key; // ensures an authenticated key (throws otherwise)
-        var templates = await db.StoreTemplates.AsNoTracking().OrderBy(t => t.Name).Select(t => new
-        { t.Name, t.Description, t.AccentColor, t.HeadingFont, t.BodyFont, usedBy = db.ProfileStoreTemplates.Count(x => x.StoreTemplateId == t.Id) }).ToListAsync(ct);
-        var components = await db.StoreComponents.AsNoTracking().OrderBy(c => c.Name).Select(c => new
-        { c.Type, c.Name, c.Description, c.Icon, usedBy = db.ProfileStoreComponents.Count(x => x.StoreComponentId == c.Id) }).ToListAsync(ct);
-        var mailTemplates = await db.StoreMailTemplates.AsNoTracking().OrderBy(m => m.Key).Select(m => new
-        { m.Key, m.Name, m.Subject, m.Enabled, m.IsHtml, usedBy = db.ProfileStoreMailTemplates.Count(x => x.StoreMailTemplateId == m.Id) }).ToListAsync(ct);
-        var plugins = await db.StorePlugins.AsNoTracking().OrderBy(p => p.Name).Select(p => new
-        { p.Key, p.Name, p.Version, usedBy = db.ProfileStorePlugins.Count(x => x.StorePluginId == p.Id) }).ToListAsync(ct);
-        return new { templates, components, mailTemplates, plugins };
+        var o = await store.OverviewAsync(ct);
+        return new
+        {
+            templates = o.Templates.Select(t => new { t.Name, t.Description, t.AccentColor, t.HeadingFont, t.BodyFont, usedBy = t.UsedBy }),
+            components = o.Components.Select(c => new { c.Type, c.Name, c.Description, c.Icon, usedBy = c.UsedBy }),
+            mailTemplates = o.MailTemplates.Select(m => new { m.Key, m.Name, m.Subject, m.Enabled, m.IsHtml, usedBy = m.UsedBy }),
+            plugins = o.Plugins.Select(p => new { p.Key, p.Name, p.Version, usedBy = p.UsedBy }),
+        };
     }
 
     // ---- Templates ------------------------------------------------------------

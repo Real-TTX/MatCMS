@@ -167,6 +167,8 @@ Aktionen wirken sofort (die Cloud spricht mit ihrem eigenen Docker-Daemon) und n
 - `GET /api/v1/instances/{publicId}/container` → `{ hosting, local, cloudManaged, containerState, localPort, container:{ name, image, state, startedAt, restartCount, publishedPort, health } }`
 - `POST /api/v1/instances/{publicId}/container/{action}` mit `action` = `start` | `stop` | `restart` | `update` (**CanManageHosting**). `update` zieht das neueste Image und erstellt den Container neu (mit Rollback) – blockierend.
 - `GET /api/v1/instances/{publicId}/container/logs?tail=200` → `{ logs }` – stdout/stderr mit Zeitstempeln, 1–5000 Zeilen (**CanManageHosting**).
+- `DELETE /api/v1/instances/{publicId}?mode=…` – **Instanz entfernen**, dieselben vier Wege und Schutzregeln wie *Instanz → Entfernen*. `mode` ist **Pflicht, ohne Standard**: `unregister` (die Cloud vergisst die Instanz, die Website läuft weiter) · `keep-data` (Container weg, Datenträger bleiben) · `full` (Container **und** Datenträger) · `backup-first` (erst Backup anfordern, nach dessen Eingang `full`; Antwort `202`, die Überwachung beendet es später). **Jeder** Weg – auch `unregister` – löscht die Cloud-Backups der Instanz mit, Einträge **und** ZIP-Dateien (bei `backup-first` bleibt das archivierte). Deshalb braucht jeder Weg **CanManageHosting + CanRestore**. Angefasst wird nur ein Container, den diese Cloud selbst angelegt hat – eine per Join-Code beigetretene Instanz lässt sich nur abmelden (`409` sonst). Nach `unregister` läuft die Website weiter und bekommt bei jedem Heartbeat `401`, bis sie auf der Website selbst von der Cloud getrennt wird. Fehlender oder unbekannter `mode` → `400`, fehlendes Recht → `403`, Ablehnung → `409`, Erfolg → `200 { removed: true }`.
+- `DELETE /api/v1/instances/{publicId}/removal` – ein vorgemerktes `backup-first`-Entfernen zurücknehmen (**CanManageHosting**; `409`, wenn keins vorgemerkt ist).
 - `GET /api/v1/cloud/update?check=true` → `{ current, latest, updateAvailable, canSelfUpdate, blocker, lastRun:{ state, message, log[] } }`
 - `POST /api/v1/cloud/update` → `202` – **aktualisiert die Cloud selbst** (**CanManageHosting + alle Instanzen**). Ein Helfer-Container tauscht den Cloud-Container, prüft ihn per Health-Check und rollt bei Fehlern **Container und Datenbank** zurück. Die Cloud ist ~1–2 Min. weg; danach `GET …/cloud/update` → `lastRun.state` = `succeeded` | `current` | `rolled-back` | `failed`.
 
@@ -230,7 +232,7 @@ sie laufen als Auftrag auf dem Node, der Aufruf wartet auf das Ergebnis (`contai
 
 - `POST /api/v1/instances/{publicId}/migrate` `{ target: "local" | <Node-ID>, removeSource?: false }` → `202 { migration:{ id, state, step, from, to, log[] } }` – zieht die Website auf einen anderen Host (**CanManageHosting**, Schlüssel-Umfang; `removeSource: true` braucht zusätzlich **CanRestore**). Der Datenträger wird 1:1 kopiert: Inhalte, Uploads, Benutzer und die Cloud-Verbindung bleiben, die Instanz behält ihre ID. Die Domain zieht mit (DNS danach auf den neuen Host zeigen lassen). **Die Website ist währenddessen offline.** Ohne `removeSource` wird die alte Kopie stillgelegt (gestoppt, umbenannt `…-moved-<Datum>`, startet nie mehr von selbst). Scheitert etwas, läuft die Website wieder an der alten Stelle (`rolled-back`).
 - `GET /api/v1/instances/{publicId}/migrations` → `[{ id, state: running|succeeded|failed|rolled-back, step, from, to, removeSource, bytes, requestedBy, startedAt, finishedAt, log[] }]` – zum Verfolgen (neueste zuerst).
-- Entfernen (Container + Datenträger) einer Instanz auf einem Node geht jetzt genauso wie lokal über *Instanz → Entfernen*.
+- Entfernen (Container + Datenträger) einer Instanz auf einem Node geht genauso wie lokal: *Instanz → Entfernen* oder `DELETE /api/v1/instances/{publicId}?mode=…` (Abschnitt 6).
 
 Antwortet ein Node nicht rechtzeitig, kommt `409` mit „läuft noch (Auftrag #…)“ — das Ergebnis steht dann im
 Auftragsverlauf. Ein nicht verbundener Node antwortet sofort mit `409` „nicht verbunden“.
@@ -342,6 +344,8 @@ Instanz beim nächsten Heartbeat über ihre **eigenen** Validierer anwendet (add
 | `get_container_status` | Container-Zustand einer Instanz (lokal?, Image, Start, Neustarts, Health) |
 | `container_action` | `start` / `stop` / `restart` / `update` des Instanz-Containers — vorher mit dem Nutzer bestätigen |
 | `get_container_logs` | letzte Zeilen stdout/stderr des Instanz-Containers |
+| `remove_instance` | **Instanz entfernen** (`mode` Pflicht: `unregister` / `keep-data` / `full` / `backup-first`) — unwiderruflich, vorher Instanz und Modus mit dem Nutzer bestätigen; jeder Weg löscht die Cloud-Backups der Instanz mit und braucht deshalb zusätzlich das Restore-Recht |
+| `cancel_instance_removal` | ein vorgemerktes `backup-first`-Entfernen zurücknehmen |
 | `get_cloud_update_status` | Cloud-Version, neueste Version, ob Selbst-Update möglich ist, Verlauf des letzten Updates |
 | `update_cloud` | **Cloud selbst aktualisieren** (Helfer-Container, Health-Check, Rollback) — vorher bestätigen; Hosting-Recht + alle Instanzen |
 | `get_proxy_config` | Reverse-Proxy-Konfiguration (Provider, Adressen, Upstream-Modus; ohne Schlüssel) |

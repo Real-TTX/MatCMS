@@ -42,6 +42,10 @@ public class TwoFactorService
     // --- Enrolment ------------------------------------------------------------
 
     /// <summary>A fresh Base32 secret for a not-yet-saved enrolment.</summary>
+    /// <summary>Whether the user has a second factor set up (false for an unknown user).</summary>
+    public async Task<bool> IsEnabledAsync(int userId) =>
+        await _db.Users.AsNoTracking().Where(u => u.Id == userId).Select(u => u.TwoFactorEnabled).FirstOrDefaultAsync();
+
     public string NewSecret() => TwoFactor.GenerateSecret();
 
     /// <summary>The <c>otpauth://</c> URI (rendered as a QR) for a pending secret and this user.</summary>

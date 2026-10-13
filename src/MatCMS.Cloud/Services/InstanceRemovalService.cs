@@ -113,10 +113,38 @@ public class InstanceRemovalService
     public async Task<Outcome> UnregisterAsync(Instance item, CancellationToken ct = default)
     {
         var name = item.Name;
+        var id = item.Id;
         _db.Instances.Remove(item);
         await _db.SaveChangesAsync(ct);
+        _backups.DeleteInstanceFolder(id);   // the rows cascaded; the bytes would otherwise sit there as orphans
         _log.LogWarning("Instance {Name} unregistered; its site was not touched.", name);
         return new Outcome(true, $"\"{name}\" wurde aus der Cloud abgemeldet. Die Website läuft unverändert weiter.", true);
+    }
+
+    public static bool IsKnownMode(string? mode) => mode is ModeUnregister or ModeKeepData or ModeFull or ModeBackupFirst;
+
+    /// <summary>
+    /// The way the operator API and the MCP tool take an instance out: the same four ways as the page, through the same
+    /// guards. Two differences, both because no confirmation screen was looked at: the mode has NO default (a bare
+    /// call must not pick a way), and the container id the guards compare against is read from the daemon right here —
+    /// so what protects the site is the cloud label, the "looks like MatCMS" check and the record being deleted LAST,
+    /// not a stale-page compare.
+    /// </summary>
+    public async Task<Outcome> RemoveByModeAsync(Instance item, string? mode, CancellationToken ct = default)
+    {
+        if (!IsKnownMode(mode))
+            return new Outcome(false, $"Unbekannter Modus. Erlaubt: {ModeUnregister}, {ModeKeepData}, {ModeFull}, {ModeBackupFirst}.", false);
+        // A second answer must not overtake a removal that is waiting on its backup.
+        if (item.RemovalPending)
+            return new Outcome(false, "Für diese Instanz ist bereits ein Entfernen vorgemerkt.", false);
+        if (mode == ModeUnregister) return await UnregisterAsync(item, ct);
+
+        var target = await InspectAsync(item, ct);
+        if (target is null)
+            return new Outcome(false, "Zu dieser Instanz gibt es auf diesem Host keinen Container. Es wurde nichts entfernt.", false);
+        return mode == ModeBackupFirst
+            ? await ScheduleWithBackupAsync(item, target.Id, ct)
+            : await TearDownAsync(item, mode!, target.Id, ct);
     }
 
     /// <summary>
@@ -155,8 +183,10 @@ public class InstanceRemovalService
         if (!result.Ok) return new Outcome(false, result.Message, false);
 
         var name = item.Name;
+        var id = item.Id;
         _db.Instances.Remove(item);
         await _db.SaveChangesAsync(ct);
+        _backups.DeleteInstanceFolder(id);
         return new Outcome(true, $"\"{name}\": {result.Message}", true);
     }
 

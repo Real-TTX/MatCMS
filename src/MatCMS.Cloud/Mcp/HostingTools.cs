@@ -1,7 +1,7 @@
 using System.ComponentModel;
-using MatCMS.Cloud.Data;
 using MatCMS.Cloud.Models;
 using MatCMS.Cloud.Services;
+using MatCMS.Cloud.Services.Nodes;
 using Microsoft.EntityFrameworkCore;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
@@ -30,10 +30,10 @@ public class HostingTools
             throw new McpException("Cloud-weite Hosting-Aktionen brauchen das Hosting-Recht UND einen Schlüssel für alle Instanzen.");
     }
 
-    private static async Task<Instance> ResolveAsync(McpContext me, AppDbContext db, string instanceId, CancellationToken ct)
+    private static async Task<Instance> ResolveAsync(McpContext me, InstanceService instances, string instanceId, CancellationToken ct)
     {
-        var inst = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == instanceId, ct);
-        if (inst is null || !ApiKeyService.CanAccess(me.Key, inst)) throw new McpException("Instanz nicht gefunden.");
+        var inst = await instances.FindForKeyAsync(instanceId, me.Key, ct: ct);
+        if (inst is null) throw new McpException("Instanz nicht gefunden.");
         return inst;
     }
 
@@ -71,11 +71,11 @@ public class HostingTools
 
     [McpServerTool(Name = "list_images"), Description(
         "The MatCMS Docker images on one host — this cloud's host or a node: tag, version, size, created, how many containers use each, and which are old (untagged) and unused — what prune_images would remove. Requires the hosting right on an all-instances key.")]
-    public static async Task<object> ListImages(McpContext me, AppDbContext db, HostImagesService images,
+    public static async Task<object> ListImages(McpContext me, NodeService nodes, HostImagesService images,
         [Description("Node id (from list_nodes); omit or 'local' for this cloud's host.")] string? nodeId = null, CancellationToken ct = default)
     {
         RequireCloudWide(me);
-        var (n, missing) = await Api.HostingApi.HostAsync(db, nodeId);
+        var (n, missing) = await nodes.ResolveHostAsync(nodeId, ct);
         if (missing) throw new McpException("Node nicht gefunden.");
         var r = await images.ListAsync(n, ct);
         if (r.Images is null) throw new McpException(r.Error ?? "Images nicht lesbar.");
@@ -84,11 +84,11 @@ public class HostingTools
 
     [McpServerTool(Name = "prune_images"), Description(
         "Remove old MatCMS images on one host — this cloud's host or a node: only untagged ones left behind by updates, only MatCMS images, and never one a container still uses. Returns how many were removed and the approximate bytes reclaimed. Requires the hosting right on an all-instances key.")]
-    public static async Task<object> PruneImages(McpContext me, AppDbContext db, HostImagesService images,
+    public static async Task<object> PruneImages(McpContext me, NodeService nodes, HostImagesService images,
         [Description("Node id (from list_nodes); omit or 'local' for this cloud's host.")] string? nodeId = null, CancellationToken ct = default)
     {
         RequireCloudWide(me);
-        var (n, missing) = await Api.HostingApi.HostAsync(db, nodeId);
+        var (n, missing) = await nodes.ResolveHostAsync(nodeId, ct);
         if (missing) throw new McpException("Node nicht gefunden.");
         var (ok, message, r) = await images.PruneAsync(n, ct);
         if (!ok) throw new McpException(message);
@@ -125,10 +125,10 @@ public class HostingTools
 
     [McpServerTool(Name = "get_container_status"), Description(
         "Live container status of an instance: whether it runs on this cloud's Docker host (local), its container name/image/state, start time, restart count, published port, health. Any valid key within its instance scope.")]
-    public static async Task<object> GetContainerStatus(McpContext me, AppDbContext db, HostingActionsService hosting,
+    public static async Task<object> GetContainerStatus(McpContext me, InstanceService instances, HostingActionsService hosting,
         [Description("The instance id, as returned by list_instances.")] string instanceId, CancellationToken ct)
     {
-        var inst = await ResolveAsync(me, db, instanceId, ct);
+        var inst = await ResolveAsync(me, instances, instanceId, ct);
         await hosting.RefreshAsync(inst, ct);
         var d = await hosting.DetailsAsync(inst, ct);
         return new
@@ -147,12 +147,12 @@ public class HostingTools
 
     [McpServerTool(Name = "container_action"), Description(
         "Start, stop, restart or update (pull the newest image and recreate, with automatic rollback) the container of an instance that runs on this cloud's Docker host. 'stop' takes the site offline and 'update' restarts it — confirm with the user first. Requires the hosting right; honours the key's instance scope.")]
-    public static async Task<object> ContainerAction(McpContext me, AppDbContext db, HostingActionsService hosting,
+    public static async Task<object> ContainerAction(McpContext me, InstanceService instances, HostingActionsService hosting,
         [Description("The instance id, as returned by list_instances.")] string instanceId,
         [Description("One of: start, stop, restart, update.")] string action, CancellationToken ct)
     {
         RequireHosting(me);
-        var inst = await ResolveAsync(me, db, instanceId, ct);
+        var inst = await ResolveAsync(me, instances, instanceId, ct);
         await hosting.RefreshAsync(inst, ct);
 
         HostingActionsService.ActionResult r;
@@ -164,15 +164,48 @@ public class HostingTools
         return new { ok = true, message = r.Message, containerState = inst.ContainerState };
     }
 
+    [McpServerTool(Name = "remove_instance"), Description(
+        "Take an instance out of the cloud. IRREVERSIBLE — always confirm the exact instance and mode with the user first. "
+        + "Modes (no default): 'unregister' = the cloud forgets the site, it keeps running (it then gets 401 on every heartbeat until it is disconnected on the site); 'keep-data' = remove the container, keep its volumes; "
+        + "'full' = remove container AND data volumes; 'backup-first' = ask the site for a backup, then remove everything once it has arrived "
+        + "(answers 'pending', finishes later; cancel with cancel_instance_removal). EVERY mode, 'unregister' included, deletes the cloud-side backups of the instance "
+        + "(except the one 'backup-first' archives), so it needs the restore right as well as the hosting right. Only containers this cloud created are ever touched. Honours the key's instance scope.")]
+    public static async Task<object> RemoveInstance(McpContext me, InstanceService instances, InstanceRemovalService removals,
+        [Description("The instance id, as returned by list_instances.")] string instanceId,
+        [Description("One of: unregister, keep-data, full, backup-first.")] string mode, CancellationToken ct)
+    {
+        RequireHosting(me);
+        if (!InstanceRemovalService.IsKnownMode(mode))
+            throw new McpException("Unbekannter Modus. Erlaubt: unregister, keep-data, full, backup-first.");
+        if (!me.Key.CanRestore)
+            throw new McpException("Dieser Schlüssel darf keine Instanzen entfernen (fehlendes Restore-Recht).");
+        var inst = await ResolveAsync(me, instances, instanceId, ct);
+        var r = await removals.RemoveByModeAsync(inst, mode, ct);
+        if (!r.Ok) throw new McpException(r.Message);
+        return new { ok = true, removed = r.Removed, pending = !r.Removed, message = r.Message };
+    }
+
+    [McpServerTool(Name = "cancel_instance_removal"), Description(
+        "Take back a removal that was started with remove_instance mode 'backup-first' and is still waiting for its backup. Requires the hosting right; honours the key's instance scope.")]
+    public static async Task<object> CancelInstanceRemoval(McpContext me, InstanceService instances, InstanceRemovalService removals,
+        [Description("The instance id, as returned by list_instances.")] string instanceId, CancellationToken ct)
+    {
+        RequireHosting(me);
+        var inst = await ResolveAsync(me, instances, instanceId, ct);
+        if (!inst.RemovalPending) throw new McpException("Für diese Instanz ist kein Entfernen vorgemerkt.");
+        var r = await removals.CancelPendingAsync(inst, ct);
+        return new { ok = true, message = r.Message };
+    }
+
     [McpServerTool(Name = "get_container_logs"), Description(
         "The last lines of an instance container's stdout/stderr (with timestamps) — for diagnosing a site that will not start or misbehaves. Requires the hosting right; honours the key's instance scope.")]
-    public static async Task<object> GetContainerLogs(McpContext me, AppDbContext db, HostingActionsService hosting,
+    public static async Task<object> GetContainerLogs(McpContext me, InstanceService instances, HostingActionsService hosting,
         [Description("The instance id, as returned by list_instances.")] string instanceId,
         [Description("How many lines from the end (1–5000, default 200).")] int tail = 200,
         CancellationToken ct = default)
     {
         RequireHosting(me);
-        var inst = await ResolveAsync(me, db, instanceId, ct);
+        var inst = await ResolveAsync(me, instances, instanceId, ct);
         await hosting.RefreshAsync(inst, ct);
         var (ok, text) = await hosting.LogsAsync(inst, tail, ct);
         if (!ok) throw new McpException(text);
@@ -217,19 +250,19 @@ public class HostingTools
 
     [McpServerTool(Name = "get_domain_status"), Description(
         "The addresses of an instance: its customer domain (via 'edge' = the cloud's central edge proxy, or 'host' = the proxy of the host it runs on; provider, route id, last error, publish time) and its automatic host address (name.<host base domain>), and (check=true) whether the routes still exist at the proxies. Any valid key within its instance scope.")]
-    public static async Task<object> GetDomainStatus(McpContext me, AppDbContext db, Services.Proxy.ProxyService proxy,
+    public static async Task<object> GetDomainStatus(McpContext me, InstanceService instances, Services.Proxy.ProxyService proxy,
         [Description("The instance id, as returned by list_instances.")] string instanceId,
         [Description("Ask the proxy whether the route still exists (default true).")] bool check = true,
         CancellationToken ct = default)
     {
-        var inst = await ResolveAsync(me, db, instanceId, ct);
+        var inst = await ResolveAsync(me, instances, instanceId, ct);
         var s = await proxy.StatusAsync(inst, check, ct);
         return Services.Proxy.ProxyService.StatusJson(s);
     }
 
     [McpServerTool(Name = "publish_domain"), Description(
         "Publish an instance under a customer domain (or move it to a new one). With the edge proxy switched on the route is created at the edge (DNS points at the cloud server) and forwards to the site's host; otherwise at the proxy of the host the site runs on (DNS points at that host); with provider 'none' the domain is only recorded. pushCanonical (default true) also sets the site's canonical URL to https://<domain>. Requires the hosting right; honours the key's instance scope.")]
-    public static async Task<object> PublishDomain(McpContext me, AppDbContext db, Services.Proxy.ProxyService proxy,
+    public static async Task<object> PublishDomain(McpContext me, InstanceService instances, Services.Proxy.ProxyService proxy,
         [Description("The instance id, as returned by list_instances.")] string instanceId,
         [Description("A single hostname, e.g. shop.example.de (no scheme, path, port or wildcard).")] string domain,
         [Description("Also set the site's canonical URL (default true).")] bool pushCanonical = true,
@@ -237,7 +270,7 @@ public class HostingTools
         CancellationToken ct = default)
     {
         RequireHosting(me);
-        var inst = await ResolveAsync(me, db, instanceId, ct);
+        var inst = await ResolveAsync(me, instances, instanceId, ct);
         var r = await proxy.PublishAsync(inst, domain, pushCanonical, ct, www);
         if (!r.Ok) throw new McpException(r.Message);
         return new { ok = true, domain = r.Domain, message = r.Message };
@@ -245,14 +278,14 @@ public class HostingTools
 
     [McpServerTool(Name = "add_extra_domain"), Description(
         "Add a further domain to an instance next to its main (published) domain — typically www.<domain> or an old domain. mode 'redirect' (default) sends visitors to https://<main domain>, 'alias' shows the same site. It lives where the main domain lives and follows it on a change or a host move; DNS must point at the same server. Requires the hosting right; honours the key's instance scope.")]
-    public static async Task<object> AddExtraDomain(McpContext me, AppDbContext db, Services.Proxy.ProxyService proxy,
+    public static async Task<object> AddExtraDomain(McpContext me, InstanceService instances, Services.Proxy.ProxyService proxy,
         [Description("The instance id, as returned by list_instances.")] string instanceId,
         [Description("A single hostname, e.g. www.example.de.")] string domain,
         [Description("'redirect' (default) or 'alias'.")] string mode = "redirect",
         CancellationToken ct = default)
     {
         RequireHosting(me);
-        var inst = await ResolveAsync(me, db, instanceId, ct);
+        var inst = await ResolveAsync(me, instances, instanceId, ct);
         var r = await proxy.AddExtraDomainAsync(inst, domain, mode, ct);
         if (!r.Ok) throw new McpException(r.Message);
         return new { ok = true, domain = r.Domain, message = r.Message };
@@ -260,13 +293,13 @@ public class HostingTools
 
     [McpServerTool(Name = "remove_extra_domain"), Description(
         "Remove a further domain of an instance (deletes its route — the address is then no longer reachable; confirm with the user first). Requires the hosting right; honours the key's instance scope.")]
-    public static async Task<object> RemoveExtraDomain(McpContext me, AppDbContext db, Services.Proxy.ProxyService proxy,
+    public static async Task<object> RemoveExtraDomain(McpContext me, InstanceService instances, Services.Proxy.ProxyService proxy,
         [Description("The instance id, as returned by list_instances.")] string instanceId,
         [Description("The further domain to remove.")] string domain,
         CancellationToken ct = default)
     {
         RequireHosting(me);
-        var inst = await ResolveAsync(me, db, instanceId, ct);
+        var inst = await ResolveAsync(me, instances, instanceId, ct);
         var r = await proxy.RemoveExtraDomainAsync(inst, domain, ct);
         if (!r.Ok) throw new McpException(r.Message);
         return new { ok = true, message = r.Message };
@@ -274,13 +307,13 @@ public class HostingTools
 
     [McpServerTool(Name = "unpublish_domain"), Description(
         "Remove an instance's public domain: deletes the proxy route (the site is then no longer reachable under it — confirm with the user first) and clears the record; its further domains (www.…) go with it. pushCanonical (default true) also clears the site's canonical URL. Requires the hosting right; honours the key's instance scope.")]
-    public static async Task<object> UnpublishDomain(McpContext me, AppDbContext db, Services.Proxy.ProxyService proxy,
+    public static async Task<object> UnpublishDomain(McpContext me, InstanceService instances, Services.Proxy.ProxyService proxy,
         [Description("The instance id, as returned by list_instances.")] string instanceId,
         [Description("Also clear the site's canonical URL (default true).")] bool pushCanonical = true,
         CancellationToken ct = default)
     {
         RequireHosting(me);
-        var inst = await ResolveAsync(me, db, instanceId, ct);
+        var inst = await ResolveAsync(me, instances, instanceId, ct);
         var r = await proxy.UnpublishAsync(inst, pushCanonical, ct);
         if (!r.Ok) throw new McpException(r.Message);
         return new { ok = true, message = r.Message };
@@ -288,13 +321,13 @@ public class HostingTools
 
     [McpServerTool(Name = "publish_host_address"), Description(
         "Create (or renew) the automatic host address of an instance — name.<base domain> at the proxy of the host it runs on (automatic addresses must be switched on for that host). Without a customer domain it becomes the site's address. Requires the hosting right; honours the key's instance scope.")]
-    public static async Task<object> PublishHostAddress(McpContext me, AppDbContext db, Services.Proxy.ProxyService proxy,
+    public static async Task<object> PublishHostAddress(McpContext me, InstanceService instances, Services.Proxy.ProxyService proxy,
         [Description("The instance id, as returned by list_instances.")] string instanceId,
         [Description("Also set the site's canonical URL when it has no customer domain (default true).")] bool pushCanonical = true,
         CancellationToken ct = default)
     {
         RequireHosting(me);
-        var inst = await ResolveAsync(me, db, instanceId, ct);
+        var inst = await ResolveAsync(me, instances, instanceId, ct);
         var r = await proxy.PublishHostAddressAsync(inst, pushCanonical, ct: ct);
         if (!r.Ok) throw new McpException(r.Message);
         return new { ok = true, hostAddress = r.Domain, message = r.Message };
@@ -302,11 +335,11 @@ public class HostingTools
 
     [McpServerTool(Name = "remove_host_address"), Description(
         "Remove the automatic host address of an instance (deletes its route at the host's proxy). A customer domain at the edge is re-pointed to host:port. Requires the hosting right; honours the key's instance scope.")]
-    public static async Task<object> RemoveHostAddress(McpContext me, AppDbContext db, Services.Proxy.ProxyService proxy,
+    public static async Task<object> RemoveHostAddress(McpContext me, InstanceService instances, Services.Proxy.ProxyService proxy,
         [Description("The instance id, as returned by list_instances.")] string instanceId, CancellationToken ct = default)
     {
         RequireHosting(me);
-        var inst = await ResolveAsync(me, db, instanceId, ct);
+        var inst = await ResolveAsync(me, instances, instanceId, ct);
         var r = await proxy.RemoveHostAddressAsync(inst, pushCanonical: true, ct);
         if (!r.Ok) throw new McpException(r.Message);
         return new { ok = true, message = r.Message };
@@ -327,14 +360,14 @@ public class HostingTools
 
     [McpServerTool(Name = "configure_wildcard"), Description(
         "One wildcard certificate for *.<base domain> of a host's automatic addresses via the DNS challenge, instead of one certificate per instance. Caddy: dnsProvider = the Caddy DNS module (hetzner, cloudflare, netcup …, compiled into that Caddy) and credentials its fields (e.g. api_token); Matcad: dnsProvider = the name of a DNS provider set up in Matcad (credentials stay there, pass none). nodeId omitted = this cloud's own host. Requires the hosting right on an all-instances key.")]
-    public static async Task<object> ConfigureWildcard(McpContext me, AppDbContext db, Services.Proxy.ProxyService proxy,
+    public static async Task<object> ConfigureWildcard(McpContext me, NodeService nodes, Services.Proxy.ProxyService proxy,
         bool enabled, string? dnsProvider = null,
         [Description("Key/value credentials for the Caddy DNS module; omit to keep the stored ones (never returned).")] Dictionary<string, string>? credentials = null,
         [Description("The node id; omit for this cloud's own host.")] string? nodeId = null, CancellationToken ct = default)
     {
         RequireCloudWide(me);
         Node? node = null;
-        if (nodeId is not null) node = await db.Nodes.FirstOrDefaultAsync(n => n.PublicId == nodeId, ct) ?? throw new McpException("Node nicht gefunden.");
+        if (nodeId is not null) node = await nodes.FindByPublicIdAsync(nodeId, ct: ct) ?? throw new McpException("Node nicht gefunden.");
         var creds = credentials is null ? null : string.Join("\n", credentials.Select(kv => kv.Key + "=" + kv.Value));
         var r = await proxy.SetWildcardAsync(node, enabled, dnsProvider, creds, ct);
         if (!r.Ok) throw new McpException(r.Message);
@@ -384,7 +417,7 @@ public class HostingTools
 
     [McpServerTool(Name = "migrate_instance"), Description(
         "Move a site to another host ('local' = this cloud's own Docker host, or a node id from list_nodes). The data volume is copied 1:1, so the site keeps its identity, content and cloud link; its domain route moves along (DNS must then point at the new host). The site is OFFLINE during the move (minutes, depending on its size) — confirm with the user first. Runs in the background; poll get_migrations. removeSource=true deletes the old container AND its data afterwards (needs the restore right as well); default keeps it stopped and renamed as a way back. Requires the hosting right; honours the key's instance scope.")]
-    public static async Task<object> MigrateInstance(McpContext me, AppDbContext db, Services.Nodes.MigrationService migrations,
+    public static async Task<object> MigrateInstance(McpContext me, InstanceService instances, NodeService nodes, Services.Nodes.MigrationService migrations,
         [Description("The instance id, as returned by list_instances.")] string instanceId,
         [Description("'local' or a node id.")] string target,
         [Description("Delete the old copy (container + data) after a successful move. Default false.")] bool removeSource = false,
@@ -393,10 +426,10 @@ public class HostingTools
         RequireHosting(me);
         if (removeSource && !me.Key.CanRestore)
             throw new McpException("Die alte Kopie entfernen braucht zusätzlich das Wiederherstellen-Recht.");
-        var inst = await ResolveAsync(me, db, instanceId, ct);
+        var inst = await ResolveAsync(me, instances, instanceId, ct);
         Node? node = null;
         if (target != "local")
-            node = await db.Nodes.FirstOrDefaultAsync(n => n.PublicId == target, ct) ?? throw new McpException("Ziel-Node nicht gefunden.");
+            node = await nodes.FindByPublicIdAsync(target, ct: ct) ?? throw new McpException("Ziel-Node nicht gefunden.");
         var (m, err) = await migrations.StartAsync(inst, node, removeSource, "mcp:" + me.Key.Name, ct);
         if (m is null) throw new McpException(err ?? "Umzug nicht möglich.");
         return new { ok = true, migration = Services.Nodes.MigrationService.Json(m) };
@@ -404,10 +437,10 @@ public class HostingTools
 
     [McpServerTool(Name = "get_migrations"), Description(
         "The moves of a site, newest first: state (running/succeeded/failed/rolled-back), current step, source and target, and the step log. Any valid key within its instance scope.")]
-    public static async Task<object> GetMigrations(McpContext me, AppDbContext db, Services.Nodes.MigrationService migrations,
+    public static async Task<object> GetMigrations(McpContext me, InstanceService instances, Services.Nodes.MigrationService migrations,
         [Description("The instance id, as returned by list_instances.")] string instanceId, CancellationToken ct = default)
     {
-        var inst = await ResolveAsync(me, db, instanceId, ct);
+        var inst = await ResolveAsync(me, instances, instanceId, ct);
         return (await migrations.HistoryAsync(inst.Id, 10, ct)).Select(Services.Nodes.MigrationService.Json);
     }
 

@@ -365,6 +365,43 @@ public class NodeService
         return new(false, false, $"Der Auftrag läuft auf Node „{node.Name}“ noch (Auftrag #{job.Id}) — das Ergebnis erscheint im Auftragsverlauf.", null, job.Id);
     }
 
+    // ---- Lookups ------------------------------------------------------------------------------------
+
+    /// <summary>A node by its public id, or null. Tracked, because callers usually change it; <paramref name="track"/> = false
+    /// for a read-only look.</summary>
+    public async Task<Node?> FindByPublicIdAsync(string publicId, bool track = true, CancellationToken ct = default)
+    {
+        IQueryable<Node> q = _db.Nodes;
+        if (!track) q = q.AsNoTracking();
+        return await q.FirstOrDefaultAsync(n => n.PublicId == publicId, ct);
+    }
+
+    /// <summary>A host by its API name: absent / "local" = this cloud's host (node null), else a node's public id.</summary>
+    public async Task<(Node? Node, bool Missing)> ResolveHostAsync(string? node, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(node) || node == "local") return (null, false);
+        var n = await FindByPublicIdAsync(node, ct: ct);
+        return (n, n is null);
+    }
+
+    /// <summary>All nodes by name, read-only.</summary>
+    public Task<List<Node>> ListAsync(CancellationToken ct = default) =>
+        _db.Nodes.AsNoTracking().OrderBy(n => n.Name).ToListAsync(ct);
+
+    /// <summary>How many instances run on each node (node id → count; nodes without an instance are absent).</summary>
+    public async Task<Dictionary<int, int>> InstanceCountsAsync(CancellationToken ct = default)
+    {
+        var rows = await _db.Instances.Where(i => i.NodeId != null).GroupBy(i => i.NodeId).Select(g => new { g.Key, N = g.Count() }).ToListAsync(ct);
+        return rows.ToDictionary(r => r.Key!.Value, r => r.N);
+    }
+
+    public Task<int> CountInstancesAsync(int nodeId, CancellationToken ct = default) =>
+        _db.Instances.CountAsync(i => i.NodeId == nodeId, ct);
+
+    /// <summary>How many instances run on this cloud's own Docker host.</summary>
+    public Task<int> CountLocalInstancesAsync(CancellationToken ct = default) =>
+        _db.Instances.CountAsync(i => i.Hosting == InstanceHosting.Local, ct);
+
     public Task<List<NodeJob>> JobsAsync(int nodeId, int take, CancellationToken ct = default) =>
         _db.NodeJobs.AsNoTracking().Where(j => j.NodeId == nodeId).OrderByDescending(j => j.Id).Take(Math.Clamp(take, 1, 200)).ToListAsync(ct);
 

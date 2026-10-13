@@ -18,6 +18,11 @@ public class CloudContext
         _settings ??= _db.CloudSettings.AsNoTracking()
             .ToDictionary(s => s.Key, s => s.Value, StringComparer.OrdinalIgnoreCase);
 
+    private bool? _hasNodes;
+
+    /// <summary>True once a second host exists. Asked once per request, like the settings.</summary>
+    public bool HasNodes => _hasNodes ??= _db.Nodes.Any();
+
     public string? Get(string key) => Settings.TryGetValue(key, out var v) ? v : null;
 
     public bool Flag(string key) =>

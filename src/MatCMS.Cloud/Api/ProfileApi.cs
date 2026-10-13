@@ -1,11 +1,9 @@
 using System.IO.Compression;
 using System.Text.Json;
-using MatCMS.Cloud.Data;
 using MatCMS.Cloud.Models;
 using MatCMS.Cloud.Services;
 using MatCMS.Shared;
 using Microsoft.AspNetCore.Http.Features;
-using Microsoft.EntityFrameworkCore;
 
 namespace MatCMS.Cloud.Api;
 
@@ -297,21 +295,21 @@ public static class ProfileApi
         }).RequireRateLimiting("operatorApi");
 
         // ---- Plugins (raw ZIP bundle) --------------------------------------------
-        app.MapGet("/api/v1/profiles/{id:int}/plugins/{pluginKey}/download", async (HttpContext ctx, int id, string pluginKey, ApiKeyService keys, AppDbContext db) =>
+        app.MapGet("/api/v1/profiles/{id:int}/plugins/{pluginKey}/download", async (HttpContext ctx, int id, string pluginKey, ApiKeyService keys, ProfileOpsService ops) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
-            var row = await db.ProfilePlugins.AsNoTracking().FirstOrDefaultAsync(x => x.ProfileId == id && x.Key == pluginKey);
+            var row = await ops.GetPluginAsync(id, pluginKey);
             if (row is null) return Results.NotFound();
             return Results.File(row.Bundle, "application/zip", $"{row.Key}.zip");
         }).RequireRateLimiting("operatorApi");
 
-        app.MapPost("/api/v1/profiles/{id:int}/plugins", async (HttpContext ctx, int id, ApiKeyService keys, ProfileService profiles, AppDbContext db) =>
+        app.MapPost("/api/v1/profiles/{id:int}/plugins", async (HttpContext ctx, int id, ApiKeyService keys, ProfileOpsService ops) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
             if (RequireManage(key!) is { } g) return g;
-            if (!await db.Profiles.AnyAsync(x => x.Id == id)) return NotFoundProfile();
+            if (!await ops.ProfileExistsAsync(id)) return NotFoundProfile();
 
             var sizeFeature = ctx.Features.Get<IHttpMaxRequestBodySizeFeature>();
             if (sizeFeature is { IsReadOnly: false }) sizeFeature.MaxRequestBodySize = 64L * 1024 * 1024;
@@ -320,18 +318,7 @@ public static class ProfileApi
             var bytes = ms.ToArray();
             if (bytes.Length == 0) return BadReq("Kein Bundle im Body.");
 
-            var (pk, pname, pver, pdesc, mErr) = ReadBundleMeta(bytes);
-            if (mErr is not null) return BadReq(mErr);
-            var row = await db.ProfilePlugins.FirstOrDefaultAsync(x => x.ProfileId == id && x.Key == pk);
-            if (row is null) { row = new ProfilePlugin { ProfileId = id, Key = pk! }; db.ProfilePlugins.Add(row); }
-            row.Name = pname ?? pk!;
-            row.Version = pver ?? "";
-            row.Description = pdesc;
-            row.Bundle = bytes;
-            row.UploadedAt = DateTime.UtcNow;
-            await db.SaveChangesAsync();
-            await profiles.TouchAsync(id);
-            return Results.Ok(new { ok = true, key = pk, name = row.Name, version = row.Version });
+            return Send(await ops.UploadPluginAsync(id, bytes));
         }).RequireRateLimiting("operatorApi").DisableAntiforgery();
 
         app.MapDelete("/api/v1/profiles/{id:int}/plugins/{pluginKey}", async (HttpContext ctx, int id, string pluginKey, ApiKeyService keys, ProfileOpsService ops) =>
@@ -344,42 +331,42 @@ public static class ProfileApi
         }).RequireRateLimiting("operatorApi");
 
         // ---- Instance ↔ profile assignment + sync --------------------------------
-        app.MapGet("/api/v1/instances/{publicId}/profile", async (HttpContext ctx, string publicId, ApiKeyService keys, AppDbContext db, ProfileOpsService ops) =>
+        app.MapGet("/api/v1/instances/{publicId}/profile", async (HttpContext ctx, string publicId, ApiKeyService keys, InstanceService instances, ProfileOpsService ops) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
-            var inst = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == publicId);
-            if (inst is null || !ApiKeyService.CanAccess(key!, inst)) return Send(ProfileOpsService.InstanceNotFound);
+            var inst = await instances.FindForKeyAsync(publicId, key!);
+            if (inst is null) return Send(ProfileOpsService.InstanceNotFound);
             return Send(await ops.AssignmentAsync(inst));
         }).RequireRateLimiting("operatorApi");
 
-        app.MapPut("/api/v1/instances/{publicId}/profile", async (HttpContext ctx, string publicId, AssignDto b, ApiKeyService keys, AppDbContext db, ProfileOpsService ops) =>
+        app.MapPut("/api/v1/instances/{publicId}/profile", async (HttpContext ctx, string publicId, AssignDto b, ApiKeyService keys, InstanceService instances, ProfileOpsService ops) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
             if (RequireManage(key!) is { } g) return g;
-            var inst = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == publicId);
-            if (inst is null || !ApiKeyService.CanAccess(key!, inst)) return Send(ProfileOpsService.InstanceNotFound);
+            var inst = await instances.FindForKeyAsync(publicId, key!);
+            if (inst is null) return Send(ProfileOpsService.InstanceNotFound);
             return Send(await ops.AssignAsync(inst, b.ProfileId));
         }).RequireRateLimiting("operatorApi");
 
-        app.MapDelete("/api/v1/instances/{publicId}/profile", async (HttpContext ctx, string publicId, ApiKeyService keys, AppDbContext db, ProfileOpsService ops) =>
+        app.MapDelete("/api/v1/instances/{publicId}/profile", async (HttpContext ctx, string publicId, ApiKeyService keys, InstanceService instances, ProfileOpsService ops) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
             if (RequireManage(key!) is { } g) return g;
-            var inst = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == publicId);
-            if (inst is null || !ApiKeyService.CanAccess(key!, inst)) return Send(ProfileOpsService.InstanceNotFound);
+            var inst = await instances.FindForKeyAsync(publicId, key!);
+            if (inst is null) return Send(ProfileOpsService.InstanceNotFound);
             return Send(await ops.UnassignAsync(inst));
         }).RequireRateLimiting("operatorApi");
 
-        app.MapPost("/api/v1/instances/{publicId}/sync", async (HttpContext ctx, string publicId, ApiKeyService keys, AppDbContext db, ProfileOpsService ops) =>
+        app.MapPost("/api/v1/instances/{publicId}/sync", async (HttpContext ctx, string publicId, ApiKeyService keys, InstanceService instances, ProfileOpsService ops) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
             if (RequireManage(key!) is { } g) return g;
-            var inst = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == publicId);
-            if (inst is null || !ApiKeyService.CanAccess(key!, inst)) return Send(ProfileOpsService.InstanceNotFound);
+            var inst = await instances.FindForKeyAsync(publicId, key!);
+            if (inst is null) return Send(ProfileOpsService.InstanceNotFound);
             return Send(await ops.ResyncAsync(inst));
         }).RequireRateLimiting("operatorApi");
     }
@@ -391,28 +378,6 @@ public static class ProfileApi
     // ---- helpers ----
     private static IResult BadReq(string msg) => Results.Json(new { error = msg }, statusCode: StatusCodes.Status400BadRequest);
     private static IResult NotFoundProfile() => Results.Json(new { error = "Profil nicht gefunden." }, statusCode: StatusCodes.Status404NotFound);
-
-    // Read a plugin bundle's manifest (plugin.json) enough to key/name/version it. Mirrors the admin
-    // ReadBundleMeta: the instance still receives the exact ZIP its own importer expects.
-    private static (string? key, string? name, string? version, string? desc, string? error) ReadBundleMeta(byte[] bytes)
-    {
-        try
-        {
-            using var ms = new MemoryStream(bytes);
-            using var zip = new ZipArchive(ms, ZipArchiveMode.Read);
-            var entry = zip.GetEntry(PluginBundle.ManifestEntry);
-            if (entry is null) return (null, null, null, null, $"Kein {PluginBundle.ManifestEntry} im Bundle.");
-            using var r = new StreamReader(entry.Open());
-            var json = r.ReadToEnd();
-            using var doc = JsonDocument.Parse(json);
-            var root = doc.RootElement;
-            string? Get(string p) => root.TryGetProperty(p, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
-            var key = Get("Key") ?? Get("key");
-            if (string.IsNullOrWhiteSpace(key)) return (null, null, null, null, "Bundle-Manifest hat keinen Key.");
-            return (key, Get("Name") ?? Get("name"), Get("Version") ?? Get("version"), Get("Description") ?? Get("description"), null);
-        }
-        catch (Exception ex) { return (null, null, null, null, "Ungültiges Bundle: " + ex.Message); }
-    }
 
     // ---- request DTOs ----
     public record ProfileCreateDto(string Name, string? Description);

@@ -3,13 +3,10 @@
 @inject MatCMS.Cloud.Services.ContextSwitcher Switcher
 @inject Microsoft.Extensions.Options.IOptions<Microsoft.AspNetCore.Builder.RequestLocalizationOptions> LocOptions
 @inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment Env
-@inject MatCMS.Cloud.Data.AppDbContext ThemeDb
+@inject MatCMS.Cloud.Services.AuthService Auth
 @{
     // The signed-in user's colour scheme for <html data-theme> (light by default, see admin.css).
-    var themeUid = int.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var tuid) ? tuid : 0;
-    var themeRaw = themeUid == 0 ? null : System.Linq.Enumerable.FirstOrDefault(
-        System.Linq.Queryable.Select(System.Linq.Queryable.Where(ThemeDb.Users, u => u.Id == themeUid), u => u.Theme));
-    var theme = themeRaw is "dark" or "system" ? themeRaw : "light";
+    var theme = await Auth.ThemeAsync(User);
 }
 @{
     var title = ViewData["Title"] as string ?? "Admin";

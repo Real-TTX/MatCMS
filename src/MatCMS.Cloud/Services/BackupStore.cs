@@ -288,6 +288,23 @@ public class BackupStore
     /// <para>Here rather than on a page because two pages offer it now (the backup list and the
     /// instance's own tab), and "what marking a restore means" must not become two answers.</para>
     /// </summary>
+    /// <summary>An instance's backups, newest first, with what a client needs to pick one and to poll a restore (read-only).</summary>
+    public Task<List<BackupRow>> ListForInstanceAsync(int instanceId, CancellationToken ct = default) =>
+        _db.CloudBackups.AsNoTracking()
+            .Where(b => b.InstanceId == instanceId)
+            .OrderByDescending(b => b.CreatedAt)
+            .Select(b => new BackupRow(b.Id, b.FileName, b.SizeBytes, b.CreatedAt, b.UploadedAt, b.Origin, b.Sha256, b.RequestId,
+                b.RestoreRequestedAt != null && b.RestoreDoneAt == null && b.RestoreError == null, b.RestoreDoneAt, b.RestoreError))
+            .ToListAsync(ct);
+
+    /// <summary>One backup of an instance, or null (a backup id of another instance is "not found", too). Tracked unless <paramref name="track"/> is false.</summary>
+    public async Task<CloudBackup?> FindAsync(int instanceId, int backupId, bool track = true, CancellationToken ct = default)
+    {
+        IQueryable<CloudBackup> q = _db.CloudBackups;
+        if (!track) q = q.AsNoTracking();
+        return await q.FirstOrDefaultAsync(b => b.Id == backupId && b.InstanceId == instanceId, ct);
+    }
+
     public async Task RequestRestoreAsync(CloudBackup b, CancellationToken ct = default)
     {
         b.RestoreRequestedAt = DateTime.UtcNow;
@@ -382,6 +399,23 @@ public class BackupStore
         await _db.SaveChangesAsync(ct);
     }
 
+    /// <summary>
+    /// Deletes what a removed instance left in its backup folder: the files of the rows that cascaded away, half-written
+    /// uploads, anything else. Called only AFTER the record is gone — the rows went with it, so these files are all that is
+    /// left of them, and a removal that failed halfway must not have thrown the backups away. Best effort: a file that
+    /// cannot be deleted is logged and ends up in the orphan list like before. Archived backups live elsewhere
+    /// (<see cref="ArchiveRootDir"/>) and are never touched here.
+    /// </summary>
+    public void DeleteInstanceFolder(int instanceId)
+    {
+        try
+        {
+            var dir = DirFor(instanceId);
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+        catch (Exception ex) { _log.LogWarning(ex, "Could not delete the backup folder of removed instance {Instance}", instanceId); }
+    }
+
     // --- Orphans ------------------------------------------------------------------------------
 
     /// <param name="File">Absolute path of a file with no row, or null for a row with no file.</param>
@@ -390,8 +424,8 @@ public class BackupStore
 
     /// <summary>
     /// What does not add up between disk and database.
-    /// <para>Two kinds, and both happen for real: a FILE with no row is what an instance deletion
-    /// leaves behind (the rows cascade, the bytes do not), and a ROW with no file is what somebody
+    /// <para>Two kinds, and both happen for real: a FILE with no row is what an upload that died halfway or a backup
+    /// folder that could not be deleted with its instance leaves behind, and a ROW with no file is what somebody
     /// clearing out the volume by hand leaves behind. Neither is dangerous, both are confusing —
     /// a backup list that quietly counts megabytes nobody can restore is worse than one that says so.</para>
     /// </summary>
@@ -451,3 +485,7 @@ public class BackupStore
         catch (Exception ex) { _log.LogWarning(ex, "Could not delete {Path}", path); }
     }
 }
+
+/// <summary>A backup as the operator API lists it. <see cref="RequestId"/> ties the file to the request that asked for it.</summary>
+public record BackupRow(int Id, string FileName, long SizeBytes, DateTime CreatedAt, DateTime UploadedAt, string Origin, string Sha256, int RequestId,
+    bool RestorePending, DateTime? RestoreDoneAt, string? RestoreError);

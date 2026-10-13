@@ -402,9 +402,7 @@ app.Use(async (ctx, next) =>
             var idClaim = ctx.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
             if (int.TryParse(idClaim, out var uid))
             {
-                var db = ctx.RequestServices.GetRequiredService<AppDbContext>();
-                var enrolled = await db.Users.AsNoTracking()
-                    .Where(u => u.Id == uid).Select(u => u.TwoFactorEnabled).FirstOrDefaultAsync();
+                var enrolled = await ctx.RequestServices.GetRequiredService<TwoFactorService>().IsEnabledAsync(uid);
                 if (!enrolled)
                 {
                     ctx.Response.Redirect("/admin/account/twofactor?enrol=true");
@@ -551,7 +549,7 @@ app.MapPost("/api/instances/{publicId}/logs", async (
 // One plugin bundle, fetched only when the instance's installed version differs. Kept out of the
 // config payload so a profile with many plugins doesn't make every sync a multi-megabyte download.
 app.MapGet("/api/instances/{publicId}/plugin/{key}", async (
-    HttpContext ctx, string publicId, string key, InstanceService instances, AppDbContext db) =>
+    HttpContext ctx, string publicId, string key, InstanceService instances, ProfileService profiles) =>
 {
     var token = ctx.Request.Headers[CloudProtocol.TokenHeader].ToString();
     var instance = await instances.AuthenticateAsync(publicId, token);
@@ -559,15 +557,8 @@ app.MapGet("/api/instances/{publicId}/plugin/{key}", async (
     if (instance.Status != MatCMS.Cloud.Models.InstanceStatus.Approved || instance.Profile is null)
         return Results.Json(new { error = "Instanz ist nicht freigegeben." }, statusCode: StatusCodes.Status403Forbidden);
 
-    // Same precedence as the config itself: the profile's own plugin overrides the store entry it
-    // selected, so an instance never gets a different bundle than the config promised.
-    var bundle = (await db.ProfilePlugins.AsNoTracking()
-        .FirstOrDefaultAsync(p => p.ProfileId == instance.Profile.Id && p.Key == key))?.Bundle;
-
-    bundle ??= (await db.ProfileStorePlugins.AsNoTracking()
-        .Where(x => x.ProfileId == instance.Profile.Id && x.StorePlugin!.Key == key)
-        .Select(x => x.StorePlugin!)
-        .FirstOrDefaultAsync())?.Bundle;
+    // Same precedence as the config itself (the profile's own plugin overrides the store entry it selected).
+    var bundle = await profiles.FindPluginBundleAsync(instance.Profile.Id, key);
 
     if (bundle is null || bundle.Length == 0) return Results.NotFound();
 
@@ -577,17 +568,13 @@ app.MapGet("/api/instances/{publicId}/plugin/{key}", async (
 // A deliberate disconnect on the instance side: mark it offline NOW instead of waiting out the
 // 150s dead-man timeout, and suppress the offline mail (this outage is intentional).
 app.MapPost("/api/instances/{publicId}/disconnect", async (
-    HttpContext ctx, string publicId, InstanceService instances, AppDbContext db) =>
+    HttpContext ctx, string publicId, InstanceService instances) =>
 {
     var token = ctx.Request.Headers[CloudProtocol.TokenHeader].ToString();
     var instance = await instances.AuthenticateAsync(publicId, token);
     if (instance is null) return Results.Unauthorized();
 
-    instance.LastHeartbeatUtc = null;
-    instance.OfflineNotified = true;
-    instances.Log(instance, MatCMS.Cloud.Models.InstanceEventKind.Offline,
-        "Verbindung von der Instanz getrennt.", notified: true);
-    await db.SaveChangesAsync();
+    await instances.DisconnectAsync(instance);
     return Results.Ok();
 }).RequireRateLimiting("instanceApi");
 
@@ -621,41 +608,14 @@ app.MapPost("/api/instances/{publicId}/mail", async (
 // per-instance token budget so one site cannot drain the central credit. Returns 200 with Ok=false +
 // a reason on a refusal, so the instance can tell its operator why.
 app.MapPost("/api/instances/{publicId}/ai", async (
-    HttpContext ctx, string publicId, AiRequest req, InstanceService instances, AiService ai, AppDbContext db) =>
+    HttpContext ctx, string publicId, AiRequest req, InstanceService instances, AiService ai) =>
 {
     var token = ctx.Request.Headers[CloudProtocol.TokenHeader].ToString();
     var instance = await instances.AuthenticateAsync(publicId, token);
     if (instance is null) return Results.Unauthorized();
-    if (instance.Status != MatCMS.Cloud.Models.InstanceStatus.Approved)
-        return Results.Ok(new AiResponse { Ok = false, Error = "Instanz ist nicht freigegeben." });
-    // A valid token is not permission to spend the key — the profile must have AI switched on.
-    if (instance.Profile is null || !instance.Profile.SyncAi)
-        return Results.Ok(new AiResponse { Ok = false, Error = "KI ist für dieses Profil nicht aktiviert." });
 
-    // Monthly token budget per instance (0/null = unlimited). The cloud grants it; the instance never
-    // sees the number — same stance as the backup quota.
-    var period = DateTime.UtcNow.ToString("yyyy-MM");
-    var usage = await db.AiUsages.FirstOrDefaultAsync(u => u.InstanceId == instance.Id && u.Period == period);
-    var budget = instance.Profile.AiMonthlyTokenBudget ?? 0;
-    if (budget > 0 && (usage?.Tokens ?? 0) >= budget)
-        return Results.Ok(new AiResponse { Ok = false, Error = "Das monatliche KI-Budget dieser Instanz ist aufgebraucht." });
-
-    var res = await ai.CompleteAsync(req, ctx.RequestAborted);
-
-    // Book only what the provider actually reported (successful calls).
-    if (res.Ok)
-    {
-        if (usage is null)
-        {
-            usage = new MatCMS.Cloud.Models.AiUsage { InstanceId = instance.Id, Period = period };
-            db.AiUsages.Add(usage);
-        }
-        usage.Tokens += res.PromptTokens + res.CompletionTokens;
-        usage.Calls += 1;
-        usage.UpdatedAt = DateTime.UtcNow;
-        await db.SaveChangesAsync();
-    }
-    return Results.Ok(res);
+    // Approval, the profile's AI switch and the monthly token budget are checked by the service.
+    return Results.Ok(await ai.RelayAsync(instance, req, ctx.RequestAborted));
 }).RequireRateLimiting("aiApi");
 
 // --- Backups --------------------------------------------------------------
@@ -666,7 +626,7 @@ app.MapPost("/api/instances/{publicId}/ai", async (
 // Uploaded as the raw request body rather than multipart: there is exactly one file, and multipart
 // would buffer it to a temp file first to give us back the stream we already had.
 app.MapPost("/api/instances/{publicId}/backups", async (
-    HttpContext ctx, string publicId, InstanceService instances, BackupStore store, AppDbContext db) =>
+    HttpContext ctx, string publicId, InstanceService instances, BackupStore store) =>
 {
     var token = ctx.Request.Headers[CloudProtocol.TokenHeader].ToString();
     var instance = await instances.AuthenticateAsync(publicId, token);
@@ -696,9 +656,8 @@ app.MapPost("/api/instances/{publicId}/backups", async (
         ctx.RequestAborted, requestId);
     if (result.Ok && requestId > 0)
     {
-        instances.Log(instance, MatCMS.Cloud.Models.InstanceEventKind.BackupRequested,
+        await instances.LogAndSaveAsync(instance, MatCMS.Cloud.Models.InstanceEventKind.BackupRequested,
             $"Angefordertes Backup \"{result.Backup?.FileName}\" ist eingetroffen.");
-        await db.SaveChangesAsync();
     }
     // A refusal comes back as 200 with Ok=false so the instance can TELL its operator why the
     // backup did not make it — a bare 4xx gives it nothing to say.
@@ -708,14 +667,13 @@ app.MapPost("/api/instances/{publicId}/backups", async (
 // The instance fetching ITS OWN backup back. Scoped to the caller on purpose: the id alone must
 // never be enough to read another site's data.
 app.MapGet("/api/instances/{publicId}/backups/{id:int}", async (
-    HttpContext ctx, string publicId, int id, InstanceService instances, BackupStore store, AppDbContext db) =>
+    HttpContext ctx, string publicId, int id, InstanceService instances, BackupStore store) =>
 {
     var token = ctx.Request.Headers[CloudProtocol.TokenHeader].ToString();
     var instance = await instances.AuthenticateAsync(publicId, token);
     if (instance is null) return Results.Unauthorized();
 
-    var row = await db.CloudBackups.AsNoTracking()
-        .FirstOrDefaultAsync(b => b.Id == id && b.InstanceId == instance.Id);
+    var row = await store.FindAsync(instance.Id, id, track: false);
     if (row is null) return Results.NotFound();
 
     var path = store.PathFor(row);
@@ -728,58 +686,26 @@ app.MapGet("/api/instances/{publicId}/backups/{id:int}", async (
 // What the instance made of a restore it was asked for. Recorded, never derived: only the site
 // knows whether its own restore worked.
 app.MapPost("/api/instances/{publicId}/backups/restored", async (
-    HttpContext ctx, string publicId, RestoreReport report, InstanceService instances, AppDbContext db) =>
+    HttpContext ctx, string publicId, RestoreReport report, InstanceService instances) =>
 {
     var token = ctx.Request.Headers[CloudProtocol.TokenHeader].ToString();
     var instance = await instances.AuthenticateAsync(publicId, token);
     if (instance is null) return Results.Unauthorized();
 
-    var row = await db.CloudBackups.FirstOrDefaultAsync(b => b.Id == report.BackupId && b.InstanceId == instance.Id);
-    if (row is null) return Results.NotFound();
-
-    row.RestoreDoneAt = report.Ok ? DateTime.UtcNow : null;
-    row.RestoreError = report.Ok ? null : (report.Error ?? "Unbekannter Fehler.");
-    instances.Log(instance, report.Ok
-        ? MatCMS.Cloud.Models.InstanceEventKind.BackupRestored
-        : MatCMS.Cloud.Models.InstanceEventKind.BackupRestoreFailed,
-        report.Ok ? $"Backup \"{row.FileName}\" wurde zurückgespielt."
-                  : $"Zurückspielen von \"{row.FileName}\" fehlgeschlagen: {row.RestoreError}");
-    await db.SaveChangesAsync();
-    return Results.Ok();
+    return await instances.RecordRestoreReportAsync(instance, report) ? Results.Ok() : Results.NotFound();
 }).RequireRateLimiting("instanceApi");
 
 // What the instance made of a BACKUP it was asked for. Recorded so an operator can read why nothing
 // arrived — never as the thing that decides whether one did. That question is answered by the file,
 // and only by the file (InstanceService.ArrivedBackupAsync).
 app.MapPost("/api/instances/{publicId}/backups/taken", async (
-    HttpContext ctx, string publicId, BackupReport report, InstanceService instances, AppDbContext db) =>
+    HttpContext ctx, string publicId, BackupReport report, InstanceService instances) =>
 {
     var token = ctx.Request.Headers[CloudProtocol.TokenHeader].ToString();
     var instance = await instances.AuthenticateAsync(publicId, token);
     if (instance is null) return Results.Unauthorized();
 
-    // A report for anything other than the request currently outstanding is dropped. A late answer
-    // to a request that was already taken back, or superseded, must not put an error on the new one.
-    if (report.RequestId <= 0 || report.RequestId != instance.BackupRequestId) return Results.Ok();
-
-    if (report.Ok)
-    {
-        // Deliberately NOT treated as "the backup is here". The upload is a separate request that can
-        // still have failed, and whatever is waiting waits for the bytes.
-        instances.Log(instance, MatCMS.Cloud.Models.InstanceEventKind.BackupRequested,
-            $"Instanz meldet das angeforderte Backup als erstellt ({report.FileName ?? "ohne Namen"}).");
-    }
-    else
-    {
-        // Ends the request rather than leaving it to be re-asked on every beat: making a backup takes
-        // minutes and holds up the site's heartbeat, so retrying something that reliably fails would
-        // grind the site down for as long as nobody looked. An operator can ask again.
-        instance.BackupRequestError = string.IsNullOrWhiteSpace(report.Error)
-            ? "Unbekannter Fehler." : report.Error!.Trim();
-        instances.Log(instance, MatCMS.Cloud.Models.InstanceEventKind.BackupRequestFailed,
-            $"Angefordertes Backup fehlgeschlagen: {instance.BackupRequestError}");
-    }
-    await db.SaveChangesAsync();
+    await instances.RecordBackupReportAsync(instance, report);
     return Results.Ok();
 }).RequireRateLimiting("instanceApi");
 
@@ -809,7 +735,7 @@ app.MapGet("/.well-known/oauth-authorization-server", (HttpContext ctx) =>
     });
 });
 
-app.MapPost("/oauth/token", async (HttpContext ctx, AppDbContext db, InstanceService instances, OAuthCodes codes,
+app.MapPost("/oauth/token", async (HttpContext ctx, AuthService auth, InstanceService instances, OAuthCodes codes,
     ApiKeyService apiKeys, OAuthClientService clients) =>
 {
     var form = await ctx.Request.ReadFormAsync();
@@ -863,7 +789,7 @@ app.MapPost("/oauth/token", async (HttpContext ctx, AppDbContext db, InstanceSer
         || !OAuthCodes.VerifyPkce(grant.CodeChallenge, form["code_verifier"].ToString()))
         return Results.Json(new { error = "invalid_grant" }, statusCode: StatusCodes.Status400BadRequest);
 
-    var user = await db.Users.FindAsync(grant.UserId);
+    var user = await auth.FindUserAsync(grant.UserId);
     if (user is null) return Results.Json(new { error = "invalid_grant" }, statusCode: StatusCodes.Status400BadRequest);
 
     return Results.Ok(new
@@ -898,27 +824,21 @@ static async Task<(MatCMS.Cloud.Models.ApiKey? key, IResult? error)> ApiCallerAs
 // the SAME 404 on purpose: otherwise a scoped key could enumerate which instances exist by watching
 // for 404 vs 403.
 static async Task<(MatCMS.Cloud.Models.Instance? instance, IResult? error)> ApiInstanceAsync(
-    AppDbContext db, MatCMS.Cloud.Models.ApiKey key, string publicId)
+    InstanceService instances, MatCMS.Cloud.Models.ApiKey key, string publicId)
 {
-    var instance = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == publicId);
-    if (instance is null || !ApiKeyService.CanAccess(key, instance))
+    var instance = await instances.FindForKeyAsync(publicId, key);
+    if (instance is null)
         return (null, Results.Json(new { error = "Instanz nicht gefunden." }, statusCode: StatusCodes.Status404NotFound));
     return (instance, null);
 }
 
 // List the instances this key may act on.
-app.MapGet("/api/v1/instances", async (HttpContext ctx, ApiKeyService keys, AppDbContext db) =>
+app.MapGet("/api/v1/instances", async (HttpContext ctx, ApiKeyService keys, InstanceService instances) =>
 {
     var (key, error) = await ApiCallerAsync(ctx, keys);
     if (error is not null) return error;
 
-    var q = db.Instances.AsNoTracking().AsQueryable();
-    if (!key!.AllInstances)
-    {
-        var ids = key.Instances.Select(s => s.InstanceId).ToList();
-        q = q.Where(i => ids.Contains(i.Id));
-    }
-    var list = await q.OrderBy(i => i.Name).Select(i => new
+    var list = (await instances.ListForKeyAsync(key!)).Select(i => new
     {
         id = i.PublicId,
         name = i.Name,
@@ -927,70 +847,50 @@ app.MapGet("/api/v1/instances", async (HttpContext ctx, ApiKeyService keys, AppD
         version = i.Version,
         url = i.Url,
         lastHeartbeatUtc = i.LastHeartbeatUtc
-    }).ToListAsync();
+    });
 
     return Results.Ok(new { canRestore = key.CanRestore, instances = list });
 }).RequireRateLimiting("operatorApi");
 
 // Ask the instance for a fresh backup. Returns the request id to correlate the arriving file with.
 app.MapPost("/api/v1/instances/{publicId}/backups/request", async (
-    HttpContext ctx, string publicId, ApiKeyService keys, InstanceService instances, AppDbContext db) =>
+    HttpContext ctx, string publicId, ApiKeyService keys, InstanceService instances) =>
 {
     var (key, error) = await ApiCallerAsync(ctx, keys);
     if (error is not null) return error;
-    var (instance, ierr) = await ApiInstanceAsync(db, key!, publicId);
+    var (instance, ierr) = await ApiInstanceAsync(instances, key!, publicId);
     if (ierr is not null) return ierr;
     if (instance!.Status != MatCMS.Cloud.Models.InstanceStatus.Approved)
         return Results.Json(new { error = "Instanz ist nicht freigegeben." }, statusCode: StatusCodes.Status409Conflict);
 
-    await instances.RequestBackupAsync(instance, ctx.RequestAborted);
-    instances.Log(instance, MatCMS.Cloud.Models.InstanceEventKind.BackupRequested, "Backup über die API angefordert.");
-    await db.SaveChangesAsync();
+    await instances.RequestBackupAsync(instance, "Backup über die API angefordert.", ctx.RequestAborted);
     return Results.Ok(new { requestId = instance.BackupRequestId });
 }).RequireRateLimiting("operatorApi");
 
 // List this instance's backups, newest first, with the fields a client needs to pick one and to
 // poll a restore: requestId ties a file to a request above, the restore flags to a restore below.
 app.MapGet("/api/v1/instances/{publicId}/backups", async (
-    HttpContext ctx, string publicId, ApiKeyService keys, AppDbContext db) =>
+    HttpContext ctx, string publicId, ApiKeyService keys, InstanceService instances, BackupStore store) =>
 {
     var (key, error) = await ApiCallerAsync(ctx, keys);
     if (error is not null) return error;
-    var (instance, ierr) = await ApiInstanceAsync(db, key!, publicId);
+    var (instance, ierr) = await ApiInstanceAsync(instances, key!, publicId);
     if (ierr is not null) return ierr;
 
-    var rows = await db.CloudBackups.AsNoTracking()
-        .Where(b => b.InstanceId == instance!.Id)
-        .OrderByDescending(b => b.CreatedAt)
-        .Select(b => new
-        {
-            id = b.Id,
-            fileName = b.FileName,
-            sizeBytes = b.SizeBytes,
-            createdAt = b.CreatedAt,
-            uploadedAt = b.UploadedAt,
-            origin = b.Origin,
-            sha256 = b.Sha256,
-            requestId = b.RequestId,
-            restorePending = b.RestoreRequestedAt != null && b.RestoreDoneAt == null && b.RestoreError == null,
-            restoreDoneAt = b.RestoreDoneAt,
-            restoreError = b.RestoreError
-        })
-        .ToListAsync();
+    var rows = await store.ListForInstanceAsync(instance!.Id);
     return Results.Ok(new { backups = rows });
 }).RequireRateLimiting("operatorApi");
 
 // Pull one backup's bytes. Streamed with range support so a dropped download can resume.
 app.MapGet("/api/v1/instances/{publicId}/backups/{id:int}/download", async (
-    HttpContext ctx, string publicId, int id, ApiKeyService keys, BackupStore store, AppDbContext db) =>
+    HttpContext ctx, string publicId, int id, ApiKeyService keys, BackupStore store, InstanceService instances) =>
 {
     var (key, error) = await ApiCallerAsync(ctx, keys);
     if (error is not null) return error;
-    var (instance, ierr) = await ApiInstanceAsync(db, key!, publicId);
+    var (instance, ierr) = await ApiInstanceAsync(instances, key!, publicId);
     if (ierr is not null) return ierr;
 
-    var row = await db.CloudBackups.AsNoTracking()
-        .FirstOrDefaultAsync(b => b.Id == id && b.InstanceId == instance!.Id);
+    var row = await store.FindAsync(instance!.Id, id, track: false);
     if (row is null) return Results.NotFound();
     var path = store.PathFor(row);
     if (!File.Exists(path)) return Results.NotFound();
@@ -1000,11 +900,11 @@ app.MapGet("/api/v1/instances/{publicId}/backups/{id:int}/download", async (
 // Upload an (edited) backup as the raw request body — one file, so no multipart. Stored exactly like
 // an instance-pushed one; the file name rides in X-MatCMS-Backup-Name (must end in .zip).
 app.MapPost("/api/v1/instances/{publicId}/backups", async (
-    HttpContext ctx, string publicId, ApiKeyService keys, BackupStore store, InstanceService instances, AppDbContext db) =>
+    HttpContext ctx, string publicId, ApiKeyService keys, BackupStore store, InstanceService instances) =>
 {
     var (key, error) = await ApiCallerAsync(ctx, keys);
     if (error is not null) return error;
-    var (instance, ierr) = await ApiInstanceAsync(db, key!, publicId);
+    var (instance, ierr) = await ApiInstanceAsync(instances, key!, publicId);
     if (ierr is not null) return ierr;
 
     // Lift Kestrel's 30 MB body cap for this call; the real ceiling is the streaming guard in
@@ -1019,9 +919,8 @@ app.MapPost("/api/v1/instances/{publicId}/backups", async (
     if (!result.Ok || result.Backup is null)
         return Results.Json(new { ok = false, error = result.Error }, statusCode: StatusCodes.Status400BadRequest);
 
-    instances.Log(instance!, MatCMS.Cloud.Models.InstanceEventKind.BackupUploaded,
+    await instances.LogAndSaveAsync(instance!, MatCMS.Cloud.Models.InstanceEventKind.BackupUploaded,
         $"Backup \"{result.Backup.FileName}\" über die API hochgeladen.");
-    await db.SaveChangesAsync();
     return Results.Ok(new { ok = true, id = result.Backup.Id, fileName = result.Backup.FileName, sha256 = result.Backup.Sha256 });
 }).RequireRateLimiting("operatorApi").DisableAntiforgery();
 
@@ -1029,18 +928,18 @@ app.MapPost("/api/v1/instances/{publicId}/backups", async (
 // only MARKS it; the instance downloads and applies it on its next beat and reports the outcome,
 // which the backups list above then shows.
 app.MapPost("/api/v1/instances/{publicId}/backups/{id:int}/restore", async (
-    HttpContext ctx, string publicId, int id, ApiKeyService keys, BackupStore store, AppDbContext db) =>
+    HttpContext ctx, string publicId, int id, ApiKeyService keys, BackupStore store, InstanceService instances) =>
 {
     var (key, error) = await ApiCallerAsync(ctx, keys);
     if (error is not null) return error;
     if (!key!.CanRestore)
         return Results.Json(new { error = "Dieser Schlüssel darf nicht wiederherstellen." }, statusCode: StatusCodes.Status403Forbidden);
-    var (instance, ierr) = await ApiInstanceAsync(db, key, publicId);
+    var (instance, ierr) = await ApiInstanceAsync(instances, key, publicId);
     if (ierr is not null) return ierr;
     if (instance!.Status != MatCMS.Cloud.Models.InstanceStatus.Approved)
         return Results.Json(new { error = "Instanz ist nicht freigegeben." }, statusCode: StatusCodes.Status409Conflict);
 
-    var row = await db.CloudBackups.FirstOrDefaultAsync(b => b.Id == id && b.InstanceId == instance.Id);
+    var row = await store.FindAsync(instance.Id, id);
     if (row is null) return Results.NotFound();
 
     await store.RequestRestoreAsync(row, ctx.RequestAborted);
@@ -1082,41 +981,30 @@ static async Task<MatCMS.Cloud.Models.Instance?> CatalogCallerAsync(
 }
 
 app.MapGet("/api/store/{publicId}/catalog", async (
-    HttpContext ctx, string publicId, InstanceService instances, AppDbContext db) =>
+    HttpContext ctx, string publicId, InstanceService instances, StoreService store) =>
 {
     if (await CatalogCallerAsync(ctx, publicId, instances) is null) return Results.Unauthorized();
 
-    return Results.Ok(new StoreCatalog
-    {
-        Plugins = await db.StorePlugins.AsNoTracking()
-            .Select(p => new CatalogPlugin { Key = p.Key, Name = p.Name, Version = p.Version, Description = p.Description })
-            .OrderBy(p => p.Name).ToListAsync(),
-        Templates = await db.StoreTemplates.AsNoTracking()
-            .Select(t => new CatalogTemplate { Name = t.Name, Description = t.Description, AccentColor = t.AccentColor })
-            .OrderBy(t => t.Name).ToListAsync(),
-        Components = await db.StoreComponents.AsNoTracking()
-            .Select(c => new CatalogComponent { Type = c.Type, Name = c.Name, Description = c.Description })
-            .OrderBy(c => c.Name).ToListAsync()
-    });
+    return Results.Ok(await store.CatalogAsync());
 }).RequireRateLimiting("instanceApi");
 
 app.MapGet("/api/store/{publicId}/plugin/{key}", async (
-    HttpContext ctx, string publicId, string key, InstanceService instances, AppDbContext db) =>
+    HttpContext ctx, string publicId, string key, InstanceService instances, StoreService store) =>
 {
     if (await CatalogCallerAsync(ctx, publicId, instances) is null) return Results.Unauthorized();
 
-    var plugin = await db.StorePlugins.AsNoTracking().FirstOrDefaultAsync(p => p.Key == key);
+    var plugin = await store.GetPluginAsync(key);
     return plugin is null || plugin.Bundle.Length == 0
         ? Results.NotFound()
         : Results.File(plugin.Bundle, "application/zip", $"{plugin.Key}.zip");
 }).RequireRateLimiting("instanceApi");
 
 app.MapGet("/api/store/{publicId}/template/{name}", async (
-    HttpContext ctx, string publicId, string name, InstanceService instances, AppDbContext db) =>
+    HttpContext ctx, string publicId, string name, InstanceService instances, StoreService store) =>
 {
     if (await CatalogCallerAsync(ctx, publicId, instances) is null) return Results.Unauthorized();
 
-    var t = await db.StoreTemplates.AsNoTracking().FirstOrDefaultAsync(x => x.Name == name);
+    var t = await store.GetTemplateAsync(name);
     if (t is null) return Results.NotFound();
 
     // Same shape the profile sync delivers, so the instance applies it through one code path.
@@ -1137,11 +1025,11 @@ app.MapGet("/api/store/{publicId}/template/{name}", async (
 }).RequireRateLimiting("instanceApi");
 
 app.MapGet("/api/store/{publicId}/component/{type}", async (
-    HttpContext ctx, string publicId, string type, InstanceService instances, AppDbContext db) =>
+    HttpContext ctx, string publicId, string type, InstanceService instances, StoreService store) =>
 {
     if (await CatalogCallerAsync(ctx, publicId, instances) is null) return Results.Unauthorized();
 
-    var c = await db.StoreComponents.AsNoTracking().FirstOrDefaultAsync(x => x.Type == type);
+    var c = await store.GetComponentExactAsync(type);
     return c is null
         ? Results.NotFound()
         : Results.Ok(new ConfigComponent

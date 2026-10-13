@@ -1,8 +1,6 @@
-using MatCMS.Cloud.Data;
 using MatCMS.Cloud.Models;
 using MatCMS.Cloud.Services;
 using MatCMS.Cloud.Services.Nodes;
-using Microsoft.EntityFrameworkCore;
 
 namespace MatCMS.Cloud.Api;
 
@@ -49,11 +47,11 @@ public static class NodeApi
         // Still outbound only: the SOURCE agent uploads, the TARGET agent downloads. Each is allowed exactly for
         // the one running move it takes part in, and only in its own role — a node cannot read another site's data.
         app.MapPut("/api/nodes/{publicId}/transfers/{transferId}", async (HttpContext ctx, string publicId, string transferId,
-            NodeService nodes, AppDbContext db) =>
+            NodeService nodes, MigrationService migrations) =>
         {
             var node = await nodes.AuthenticateAsync(publicId, ctx.Request.Headers[NodeProtocol.TokenHeader].ToString(), ctx.RequestAborted);
             if (node is null || node.Revoked) return Results.Unauthorized();
-            var ok = await db.InstanceMigrations.AnyAsync(m => m.TransferId == transferId && m.State == "running" && m.FromNodeId == node.Id);
+            var ok = await migrations.IsRunningTransferAsync(transferId, node.Id, asSource: true);
             if (!ok) return Results.NotFound();
             // A site's data volume dwarfs Kestrel's default body cap.
             var size = ctx.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>();
@@ -63,11 +61,11 @@ public static class NodeApi
         }).RequireRateLimiting("nodeApi").DisableAntiforgery();
 
         app.MapGet("/api/nodes/{publicId}/transfers/{transferId}", async (HttpContext ctx, string publicId, string transferId,
-            NodeService nodes, AppDbContext db) =>
+            NodeService nodes, MigrationService migrations) =>
         {
             var node = await nodes.AuthenticateAsync(publicId, ctx.Request.Headers[NodeProtocol.TokenHeader].ToString(), ctx.RequestAborted);
             if (node is null || node.Revoked) return Results.Unauthorized();
-            var ok = await db.InstanceMigrations.AnyAsync(m => m.TransferId == transferId && m.State == "running" && m.ToNodeId == node.Id);
+            var ok = await migrations.IsRunningTransferAsync(transferId, node.Id, asSource: false);
             if (!ok) return Results.NotFound();
             var path = FileNodeTransfer.PathFor(transferId);
             if (!File.Exists(path)) return Results.NotFound();
@@ -75,22 +73,22 @@ public static class NodeApi
         }).RequireRateLimiting("nodeApi");
 
         // ---- Operator REST ----------------------------------------------------------------------------------
-        app.MapGet("/api/v1/nodes", async (HttpContext ctx, ApiKeyService keys, AppDbContext db, DockerHostService docker,
+        app.MapGet("/api/v1/nodes", async (HttpContext ctx, ApiKeyService keys, NodeService nodes, DockerHostService docker,
             Services.Proxy.ProxyService proxy) =>
         {
             var (_, error) = await CallerAsync(ctx, keys, cloudWide: false);
             if (error is not null) return error;
-            var counts = await db.Instances.Where(i => i.NodeId != null).GroupBy(i => i.NodeId).Select(g => new { g.Key, N = g.Count() }).ToListAsync();
-            var list = await db.Nodes.AsNoTracking().OrderBy(n => n.Name).ToListAsync();
+            var counts = await nodes.InstanceCountsAsync();
+            var list = await nodes.ListAsync();
             return Results.Ok(new
             {
                 // "Dieser Host" — the cloud's own daemon, configured by the cloud-wide settings (/api/v1/hosting/proxy).
                 local = new
                 {
                     id = "local", dockerConfigured = docker.Configured, dockerReachable = await docker.IsReachableAsync(ctx.RequestAborted),
-                    instances = await db.Instances.CountAsync(i => i.Hosting == InstanceHosting.Local), proxy = proxy.PublicConfig(),
+                    instances = await nodes.CountLocalInstancesAsync(), proxy = proxy.PublicConfig(),
                 },
-                nodes = list.Select(n => NodeService.PublicJson(n, counts.FirstOrDefault(c => c.Key == n.Id)?.N ?? 0, withInventory: false)),
+                nodes = list.Select(n => NodeService.PublicJson(n, counts.GetValueOrDefault(n.Id), withInventory: false)),
             });
         }).RequireRateLimiting("operatorApi");
 
@@ -104,35 +102,35 @@ public static class NodeApi
             return Results.Ok(new { id = node.PublicId, name = node.Name, token, command = nodes.AgentCommand(node, token!) });
         }).RequireRateLimiting("operatorApi");
 
-        app.MapGet("/api/v1/nodes/{id}", async (HttpContext ctx, string id, ApiKeyService keys, AppDbContext db, VersionService version) =>
+        app.MapGet("/api/v1/nodes/{id}", async (HttpContext ctx, string id, ApiKeyService keys, NodeService nodes, VersionService version) =>
         {
             var (_, error) = await CallerAsync(ctx, keys, cloudWide: false);
             if (error is not null) return error;
-            var n = await db.Nodes.AsNoTracking().FirstOrDefaultAsync(x => x.PublicId == id);
+            var n = await nodes.FindByPublicIdAsync(id, track: false);
             if (n is null) return NotFound();
-            return Results.Ok(NodeService.PublicJson(n, await db.Instances.CountAsync(i => i.NodeId == n.Id), withInventory: true, version.Current));
+            return Results.Ok(NodeService.PublicJson(n, await nodes.CountInstancesAsync(n.Id), withInventory: true, version.Current));
         }).RequireRateLimiting("operatorApi");
 
-        app.MapPut("/api/v1/nodes/{id}", async (HttpContext ctx, string id, ApiKeyService keys, AppDbContext db, NodeService nodes,
+        app.MapPut("/api/v1/nodes/{id}", async (HttpContext ctx, string id, ApiKeyService keys, NodeService nodes,
             NodeService.NodeInput b) =>
         {
             var (_, error) = await CallerAsync(ctx, keys, cloudWide: true);
             if (error is not null) return error;
-            var n = await db.Nodes.FirstOrDefaultAsync(x => x.PublicId == id);
+            var n = await nodes.FindByPublicIdAsync(id);
             if (n is null) return NotFound();
             var err = await nodes.UpdateAsync(n, b, ctx.RequestAborted);
             if (err is not null) return Results.Json(new { error = err }, statusCode: StatusCodes.Status409Conflict);
-            return Results.Ok(NodeService.PublicJson(n, await db.Instances.CountAsync(i => i.NodeId == n.Id), withInventory: false));
+            return Results.Ok(NodeService.PublicJson(n, await nodes.CountInstancesAsync(n.Id), withInventory: false));
         }).RequireRateLimiting("operatorApi");
 
         app.MapPost("/api/v1/nodes/{id}/{action}", async (HttpContext ctx, string id, string action, ApiKeyService keys,
-            AppDbContext db, NodeService nodes, Services.Proxy.ProxyService proxy) =>
+            NodeService nodes, Services.Proxy.ProxyService proxy) =>
         {
             // test is an ordinary hosting action; the rest change the node itself.
             var cloudWide = action != "test-proxy";
             var (_, error) = await CallerAsync(ctx, keys, cloudWide);
             if (error is not null) return error;
-            var n = await db.Nodes.FirstOrDefaultAsync(x => x.PublicId == id);
+            var n = await nodes.FindByPublicIdAsync(id);
             if (n is null) return NotFound();
             switch (action)
             {
@@ -153,21 +151,21 @@ public static class NodeApi
             }
         }).RequireRateLimiting("operatorApi");
 
-        app.MapDelete("/api/v1/nodes/{id}", async (HttpContext ctx, string id, ApiKeyService keys, AppDbContext db, NodeService nodes) =>
+        app.MapDelete("/api/v1/nodes/{id}", async (HttpContext ctx, string id, ApiKeyService keys, NodeService nodes) =>
         {
             var (_, error) = await CallerAsync(ctx, keys, cloudWide: true);
             if (error is not null) return error;
-            var n = await db.Nodes.FirstOrDefaultAsync(x => x.PublicId == id);
+            var n = await nodes.FindByPublicIdAsync(id);
             if (n is null) return NotFound();
             await nodes.DeleteAsync(n, ctx.RequestAborted);
             return Results.Ok(new { ok = true });
         }).RequireRateLimiting("operatorApi");
 
-        app.MapGet("/api/v1/nodes/{id}/jobs", async (HttpContext ctx, string id, int? take, ApiKeyService keys, AppDbContext db, NodeService nodes) =>
+        app.MapGet("/api/v1/nodes/{id}/jobs", async (HttpContext ctx, string id, int? take, ApiKeyService keys, NodeService nodes) =>
         {
             var (_, error) = await CallerAsync(ctx, keys, cloudWide: false);
             if (error is not null) return error;
-            var n = await db.Nodes.AsNoTracking().FirstOrDefaultAsync(x => x.PublicId == id);
+            var n = await nodes.FindByPublicIdAsync(id, track: false);
             if (n is null) return NotFound();
             var jobs = await nodes.JobsAsync(n.Id, take ?? 50, ctx.RequestAborted);
             return Results.Ok(jobs.Select(JobJson));

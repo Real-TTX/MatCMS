@@ -1,8 +1,6 @@
 using System.ComponentModel;
-using MatCMS.Cloud.Data;
 using MatCMS.Cloud.Models;
 using MatCMS.Cloud.Services;
-using Microsoft.EntityFrameworkCore;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
 
@@ -33,10 +31,10 @@ public class ProfileTools
     }
 
     // Same opaque answer for "does not exist" and "outside this key's scope" as the REST calls.
-    private static async Task<Instance> InstanceAsync(AppDbContext db, McpContext me, string instanceId, CancellationToken ct)
+    private static async Task<Instance> InstanceAsync(InstanceService instances, McpContext me, string instanceId, CancellationToken ct)
     {
-        var inst = await db.Instances.FirstOrDefaultAsync(i => i.PublicId == instanceId, ct);
-        if (inst is null || !ApiKeyService.CanAccess(me.Key, inst)) throw new McpException("Instanz nicht gefunden.");
+        var inst = await instances.FindForKeyAsync(instanceId, me.Key, ct: ct);
+        if (inst is null) throw new McpException("Instanz nicht gefunden.");
         return inst;
     }
 
@@ -176,21 +174,21 @@ public class ProfileTools
     // ---- instance ↔ profile -----------------------------------------------------------------------
 
     [McpServerTool(Name = "get_instance_profile"), Description("Which profile an instance uses and whether it has applied the profile's current revision (inSync), with the last sync error.")]
-    public static async Task<object> GetInstanceProfile(McpContext me, AppDbContext db, ProfileOpsService ops, string instanceId, CancellationToken ct) =>
-        Unwrap(await ops.AssignmentAsync(await InstanceAsync(db, me, instanceId, ct)));
+    public static async Task<object> GetInstanceProfile(McpContext me, InstanceService instances, ProfileOpsService ops, string instanceId, CancellationToken ct) =>
+        Unwrap(await ops.AssignmentAsync(await InstanceAsync(instances, me, instanceId, ct)));
 
     [McpServerTool(Name = "assign_instance_profile"), Description("Assign an instance to a profile (it applies it on its next heartbeat), or remove the assignment with profileId omitted — the instance then falls back to the default profile. Nothing is deleted on the site either way.")]
-    public static async Task<object> AssignInstanceProfile(McpContext me, AppDbContext db, ProfileOpsService ops, string instanceId, int? profileId = null, CancellationToken ct = default)
+    public static async Task<object> AssignInstanceProfile(McpContext me, InstanceService instances, ProfileOpsService ops, string instanceId, int? profileId = null, CancellationToken ct = default)
     {
         RequireManage(me);
-        var inst = await InstanceAsync(db, me, instanceId, ct);
+        var inst = await InstanceAsync(instances, me, instanceId, ct);
         return Unwrap(profileId is null ? await ops.UnassignAsync(inst) : await ops.AssignAsync(inst, profileId));
     }
 
     [McpServerTool(Name = "resync_instance"), Description("Make an instance apply its profile again on its next heartbeat, even if it reports the current revision.")]
-    public static async Task<object> ResyncInstance(McpContext me, AppDbContext db, ProfileOpsService ops, string instanceId, CancellationToken ct)
+    public static async Task<object> ResyncInstance(McpContext me, InstanceService instances, ProfileOpsService ops, string instanceId, CancellationToken ct)
     {
         RequireManage(me);
-        return Unwrap(await ops.ResyncAsync(await InstanceAsync(db, me, instanceId, ct)));
+        return Unwrap(await ops.ResyncAsync(await InstanceAsync(instances, me, instanceId, ct)));
     }
 }

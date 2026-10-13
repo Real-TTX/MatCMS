@@ -15,6 +15,9 @@ public class AuthService
 
     public AuthService(AppDbContext db) => _db = db;
 
+    /// <summary>A cloud user by id, or null.</summary>
+    public async Task<User?> FindUserAsync(int id) => await _db.Users.FindAsync(id);
+
     public string HashPassword(string password) => _hasher.HashPassword(new User(), password);
 
     public bool VerifyPassword(User user, string password)
@@ -54,6 +57,15 @@ public class AuthService
             CookieAuthenticationDefaults.AuthenticationScheme,
             new ClaimsPrincipal(identity),
             props);
+    }
+
+    /// <summary>The signed-in user's colour scheme for the back office: "dark", "system" or "light"
+    /// (the default, also when nobody is signed in).</summary>
+    public async Task<string> ThemeAsync(ClaimsPrincipal principal)
+    {
+        if (!int.TryParse(principal.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var id) || id == 0) return "light";
+        var theme = await _db.Users.Where(u => u.Id == id).Select(u => u.Theme).FirstOrDefaultAsync();
+        return theme is "dark" or "system" ? theme : "light";
     }
 
     public Task SignOutAsync(HttpContext http) =>

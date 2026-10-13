@@ -476,6 +476,31 @@ public sealed class ProfileOpsService
 
     // ---- plugins (upload stays REST: a raw ZIP is no chat payload) --------------------------------
 
+    /// <summary>Whether a profile with this id exists.</summary>
+    public Task<bool> ProfileExistsAsync(int id) => _db.Profiles.AnyAsync(x => x.Id == id);
+
+    /// <summary>A profile's own plugin (with its bundle, the ZIP), or null. Read-only.</summary>
+    public Task<ProfilePlugin?> GetPluginAsync(int id, string pluginKey) =>
+        _db.ProfilePlugins.AsNoTracking().FirstOrDefaultAsync(x => x.ProfileId == id && x.Key == pluginKey);
+
+    /// <summary>Adds a plugin bundle to a profile or replaces the one with the same key, and rolls it out (the revision moves on).
+    /// The ZIP is kept as it is: the instance still receives exactly what its own importer expects.</summary>
+    public async Task<Result> UploadPluginAsync(int id, byte[] bundle)
+    {
+        var (pk, pname, pver, pdesc, mErr) = StoreService.ReadBundleMeta(bundle);
+        if (mErr is not null) return Result.Bad(mErr);
+        var row = await _db.ProfilePlugins.FirstOrDefaultAsync(x => x.ProfileId == id && x.Key == pk);
+        if (row is null) { row = new ProfilePlugin { ProfileId = id, Key = pk! }; _db.ProfilePlugins.Add(row); }
+        row.Name = pname ?? pk!;
+        row.Version = pver ?? "";
+        row.Description = pdesc;
+        row.Bundle = bundle;
+        row.UploadedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+        await _profiles.TouchAsync(id);
+        return Result.Done(new { ok = true, key = pk, name = row.Name, version = row.Version });
+    }
+
     public async Task<Result> DeletePluginAsync(int id, string pluginKey)
     {
         var row = await _db.ProfilePlugins.FirstOrDefaultAsync(x => x.ProfileId == id && x.Key == pluginKey);

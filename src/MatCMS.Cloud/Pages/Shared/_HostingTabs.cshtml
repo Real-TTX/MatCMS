@@ -1,6 +1,5 @@
 @model string
 @inject MatCMS.Cloud.Services.CloudContext Cloud
-@inject MatCMS.Cloud.Data.AppDbContext Db
 @* Hosting is ONE menu item; its areas are tabs. Each tab is its own page (they are long and have their own
    handlers), so the tabs are links — the same look as the in-page tabs elsewhere. Only what spans hosts is up here:
    everything that belongs to ONE machine (its containers, Docker images, proxy, ports) is on that host's page,
@@ -11,7 +10,7 @@
     var on = Cloud.Flag(MatCMS.Cloud.Services.SettingKeys.HostingEnabled);
     // The edge only means something with a second server; until then it is the same proxy under another name. Shown
     // while it is switched on all the same, so it can be switched off again.
-    var edgeTab = on && (Cloud.Flag(MatCMS.Cloud.Services.SettingKeys.HostingEdgeEnabled) || Db.Nodes.Any());
+    var edgeTab = on && (Cloud.Flag(MatCMS.Cloud.Services.SettingKeys.HostingEdgeEnabled) || Cloud.HasNodes);
     string Cls(string key) => key == Model ? "tab active" : "tab";
 }
 <nav class="tabs">

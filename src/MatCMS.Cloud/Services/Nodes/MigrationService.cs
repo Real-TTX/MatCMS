@@ -41,6 +41,13 @@ public class MigrationService
 
     public static string HostName(Node? n) => n?.Name ?? "Dieser Host";
 
+    /// <summary>Whether <paramref name="transferId"/> belongs to a move that is running and in which the node takes part in the given
+    /// role: the source uploads the data, the target downloads it. A node may only touch the one move it is part of.</summary>
+    public Task<bool> IsRunningTransferAsync(string transferId, int nodeId, bool asSource, CancellationToken ct = default) =>
+        asSource
+            ? _db.InstanceMigrations.AnyAsync(m => m.TransferId == transferId && m.State == "running" && m.FromNodeId == nodeId, ct)
+            : _db.InstanceMigrations.AnyAsync(m => m.TransferId == transferId && m.State == "running" && m.ToNodeId == nodeId, ct);
+
     /// <summary>Checks and queues a move. Nothing is touched yet — the worker runs it in the background.</summary>
     /// <param name="target">Null = "Dieser Host".</param>
     public async Task<(InstanceMigration? Migration, string? Error)> StartAsync(Instance inst, Node? target, bool removeSource,

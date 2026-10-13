@@ -156,6 +156,20 @@ public class ProfileService
         return null;
     }
 
+    /// <summary>The bundle (ZIP) of a plugin for the instances of a profile. Same precedence as the config itself: the profile's own plugin
+    /// overrides the store entry it selected, so an instance never gets a different bundle than the config promised. Null when neither has it.</summary>
+    public async Task<byte[]?> FindPluginBundleAsync(int profileId, string key)
+    {
+        var bundle = (await _db.ProfilePlugins.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.ProfileId == profileId && p.Key == key))?.Bundle;
+
+        bundle ??= (await _db.ProfileStorePlugins.AsNoTracking()
+            .Where(x => x.ProfileId == profileId && x.StorePlugin!.Key == key)
+            .Select(x => x.StorePlugin!)
+            .FirstOrDefaultAsync())?.Bundle;
+        return bundle;
+    }
+
     public async Task<Profile?> DefaultProfileAsync() =>
         await _db.Profiles.FirstOrDefaultAsync(p => p.IsDefault);
 

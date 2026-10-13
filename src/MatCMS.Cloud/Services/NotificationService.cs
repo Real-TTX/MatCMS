@@ -59,6 +59,14 @@ public class NotificationService
         _db = db; _cloud = cloud; _mail = mail; _log = log;
     }
 
+    /// <summary>A cloud user as the matrix names them: the row key, and what a client needs to recognise the person.</summary>
+    public sealed record NotifyUser(string Key, string Username, string? DisplayName, string? Email, string Role);
+
+    /// <summary>Every cloud user by username, with the key a matrix row for them uses (<c>u:&lt;id&gt;</c>).</summary>
+    public async Task<List<NotifyUser>> UsersAsync() =>
+        await _db.Users.AsNoTracking().OrderBy(u => u.Username)
+            .Select(u => new NotifyUser("u:" + u.Id, u.Username, u.DisplayName, u.Email, u.Role)).ToListAsync();
+
     public const string GroupAdmins = "g:admins";
     public const string GroupOperators = "g:operators";
 

@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using MatCMS.Cloud.Data;
 using MatCMS.Cloud.Models;
 using MatCMS.Shared;
@@ -177,6 +178,79 @@ public class StoreService
         foreach (var pid in ids) await _profiles.TouchAsync(pid);
     }
 
+    // ---- Reading ----------------------------------------------------------------------------------
+    // Lists carry what a client needs to pick an entry; the single reads return the whole entry. The overview adds how many
+    // profiles selected each entry (UsedBy). All read-only.
+
+    public async Task<StoreOverview> OverviewAsync(CancellationToken ct = default)
+    {
+        var plugins = await _db.StorePlugins.AsNoTracking().OrderBy(p => p.Name)
+            .Select(p => new StorePluginRow(p.Key, p.Name, p.Version, p.Description, p.Bundle.Length, _db.ProfileStorePlugins.Count(x => x.StorePluginId == p.Id), null))
+            .ToListAsync(ct);
+        var templates = await _db.StoreTemplates.AsNoTracking().OrderBy(t => t.Name)
+            .Select(t => new StoreTemplateRow(t.Name, t.Description, t.AccentColor, t.HeadingFont, t.BodyFont, _db.ProfileStoreTemplates.Count(x => x.StoreTemplateId == t.Id)))
+            .ToListAsync(ct);
+        var components = await _db.StoreComponents.AsNoTracking().OrderBy(c => c.Name)
+            .Select(c => new StoreComponentRow(c.Type, c.Name, c.Description, c.Icon, _db.ProfileStoreComponents.Count(x => x.StoreComponentId == c.Id)))
+            .ToListAsync(ct);
+        var mailTemplates = await _db.StoreMailTemplates.AsNoTracking().OrderBy(m => m.Key)
+            .Select(m => new StoreMailTemplateRow(m.Key, m.Name, m.Subject, m.Enabled, m.IsHtml, _db.ProfileStoreMailTemplates.Count(x => x.StoreMailTemplateId == m.Id)))
+            .ToListAsync(ct);
+        return new StoreOverview(plugins, templates, components, mailTemplates);
+    }
+
+    public Task<List<StoreTemplateRow>> ListTemplatesAsync(CancellationToken ct = default) =>
+        _db.StoreTemplates.AsNoTracking().OrderBy(t => t.Name)
+            .Select(t => new StoreTemplateRow(t.Name, t.Description, t.AccentColor, t.HeadingFont, t.BodyFont, null)).ToListAsync(ct);
+
+    public Task<StoreTemplate?> GetTemplateAsync(string name, CancellationToken ct = default) =>
+        _db.StoreTemplates.AsNoTracking().FirstOrDefaultAsync(x => x.Name == name, ct);
+
+    public Task<List<StoreComponentRow>> ListComponentsAsync(CancellationToken ct = default) =>
+        _db.StoreComponents.AsNoTracking().OrderBy(c => c.Name)
+            .Select(c => new StoreComponentRow(c.Type, c.Name, c.Description, c.Icon, null)).ToListAsync(ct);
+
+    /// <summary>What an instance may browse in the store: plugins, templates and components with the few fields a picker needs.</summary>
+    public async Task<StoreCatalog> CatalogAsync() => new StoreCatalog
+    {
+        Plugins = await _db.StorePlugins.AsNoTracking()
+            .Select(p => new CatalogPlugin { Key = p.Key, Name = p.Name, Version = p.Version, Description = p.Description })
+            .OrderBy(p => p.Name).ToListAsync(),
+        Templates = await _db.StoreTemplates.AsNoTracking()
+            .Select(t => new CatalogTemplate { Name = t.Name, Description = t.Description, AccentColor = t.AccentColor })
+            .OrderBy(t => t.Name).ToListAsync(),
+        Components = await _db.StoreComponents.AsNoTracking()
+            .Select(c => new CatalogComponent { Type = c.Type, Name = c.Name, Description = c.Description })
+            .OrderBy(c => c.Name).ToListAsync()
+    };
+
+    /// <summary>A component by its type exactly as stored (what the catalogue lists); see <see cref="GetComponentAsync"/> for the
+    /// lower-casing lookup of the operator API.</summary>
+    public Task<StoreComponent?> GetComponentExactAsync(string type, CancellationToken ct = default) =>
+        _db.StoreComponents.AsNoTracking().FirstOrDefaultAsync(x => x.Type == type, ct);
+
+    /// <summary>A component by its type (identity; compared lower-case).</summary>
+    public Task<StoreComponent?> GetComponentAsync(string type, CancellationToken ct = default)
+    {
+        var t = type.ToLowerInvariant();
+        return _db.StoreComponents.AsNoTracking().FirstOrDefaultAsync(x => x.Type == t, ct);
+    }
+
+    public Task<List<StoreMailTemplateRow>> ListMailTemplatesAsync(CancellationToken ct = default) =>
+        _db.StoreMailTemplates.AsNoTracking().OrderBy(m => m.Key)
+            .Select(m => new StoreMailTemplateRow(m.Key, m.Name, m.Subject, m.Enabled, m.IsHtml, null)).ToListAsync(ct);
+
+    public Task<StoreMailTemplate?> GetMailTemplateAsync(string key, CancellationToken ct = default) =>
+        _db.StoreMailTemplates.AsNoTracking().FirstOrDefaultAsync(x => x.Key == key, ct);
+
+    public Task<List<StorePluginRow>> ListPluginsAsync(CancellationToken ct = default) =>
+        _db.StorePlugins.AsNoTracking().OrderBy(p => p.Name)
+            .Select(p => new StorePluginRow(p.Key, p.Name, p.Version, p.Description, p.Bundle.Length, null, p.UploadedAt)).ToListAsync(ct);
+
+    /// <summary>A plugin with its bundle (the ZIP), for the download.</summary>
+    public Task<StorePlugin?> GetPluginAsync(string key, CancellationToken ct = default) =>
+        _db.StorePlugins.AsNoTracking().FirstOrDefaultAsync(x => x.Key == key, ct);
+
     /// <summary>Reads a plugin bundle's manifest (plugin.json) enough to key/name/version it.</summary>
     public static (string? key, string? name, string? version, string? desc, string? error) ReadBundleMeta(byte[] bytes)
     {
@@ -207,3 +281,16 @@ public record StoreTemplateInput(string Name, string? Description, string? Accen
     string? LayoutHtml, string? MenuMapJson, string? ParametersJson, string? ParamValuesJson, string? PartsJson);
 public record StoreComponentInput(string Type, string Name, string? Description, string? Icon, string? FieldsJson, string? TemplateHtml);
 public record StoreMailTemplateInput(string Key, string? Name, string? Description, string Subject, string? Body, bool? Enabled, bool? IsHtml);
+
+// ---- rows of the store lists (shared by REST + MCP) ---------------------------
+// UsedBy / UploadedAt are only there where the list asks for them; a null one stays out of the JSON.
+public record StorePluginRow(string Key, string Name, string Version, string Description, int SizeBytes,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? UsedBy,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] DateTime? UploadedAt);
+public record StoreTemplateRow(string Name, string Description, string AccentColor, string HeadingFont, string BodyFont,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? UsedBy);
+public record StoreComponentRow(string Type, string Name, string Description, string Icon,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? UsedBy);
+public record StoreMailTemplateRow(string Key, string Name, string Subject, bool Enabled, bool IsHtml,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? UsedBy);
+public record StoreOverview(List<StorePluginRow> Plugins, List<StoreTemplateRow> Templates, List<StoreComponentRow> Components, List<StoreMailTemplateRow> MailTemplates);

@@ -961,7 +961,14 @@ Design and increments: `docs/hosting-platform.md`. Increments 1–4 are built:
 
 ### Removing an instance — who owns the container
 
-`Instances/Delete` is the only way out. It offers **three destructive ways** (remove the container and
+`Instances/Delete` is the page; the operator API (`DELETE /api/v1/instances/{publicId}?mode=…`, `DELETE …/removal`
+to cancel a wait) and the MCP tools `remove_instance` / `cancel_instance_removal` reach the same code through
+`InstanceRemovalService.RemoveByModeAsync` — same ways, same guards. What differs: no confirmation screen, so
+**`mode` has no default** (a bare call must not pick a way) and EVERY way needs the key's `CanRestore` as well as
+`CanManageHosting` — unregistering included, because the backups (rows AND files) go with the record on every way (a
+site that was only unregistered keeps running and gets 401 on each heartbeat until it is disconnected on its side).
+Verified against a throwaway cloud + real containers: all instance tables cascade; `NodeJobs.InstanceId` has no
+foreign key and stays (job history). It offers **three destructive ways** (remove the container and
 keep the volumes / remove both / take a backup first and then remove both) and, for everything else,
 plain **unregistering**: the cloud forgets the instance and the site keeps running.
 
@@ -993,8 +1000,9 @@ Two traps, both load-bearing:
   removed), and whatever survives is reported by name rather than swallowed.
 
 Cloud-side backups hang off the instance row and **cascade with it on every way**, including the one
-that keeps the volumes — so the page says how many will go. The files themselves stay behind as
-orphans for `BackupStore.FindOrphansAsync`.
+that keeps the volumes — so the page says how many will go. The files go too: after the record is deleted
+`BackupStore.DeleteInstanceFolder` removes the instance's whole backup folder (best effort — a file that cannot be
+deleted lands in `FindOrphansAsync` as before; archived backups live in a sibling folder and are never touched).
 
 ### The third way: back up first, then remove
 

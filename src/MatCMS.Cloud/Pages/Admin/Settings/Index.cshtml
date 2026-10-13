@@ -158,6 +158,7 @@
 
 @* ============ KI (AI) ============ *@
 <div class="tab-panel" data-panel="ai" hidden>
+    @{ var aiProviderIsChatGpt = string.Equals((Model.Get(SettingKeys.AiProvider) ?? "").Trim(), "chatgpt", StringComparison.OrdinalIgnoreCase); }
     <form method="post" asp-page-handler="Ai">
         <div class="card">
             <h2>@T["settings.aiHeading"]</h2>
@@ -166,13 +167,18 @@
                     <div class="form-field">
                         <label>@T["settings.aiProvider"]</label>
                         <select name="provider">
-                            <option value="openai" selected>OpenAI / ChatGPT</option>
+                            <option value="openai" selected="@(!aiProviderIsChatGpt)">@T["settings.aiProviderOpenai"]</option>
+                            <option value="chatgpt" selected="@aiProviderIsChatGpt">@T["settings.aiProviderChatGpt"]</option>
                         </select>
                         <div class="help">@T["settings.aiProviderHint"]</div>
                     </div>
                     <div class="form-field">
                         <label>@T["settings.aiModel"]</label>
-                        <input name="model" value="@Model.Get(SettingKeys.AiModel)" placeholder="gpt-4o-mini" spellcheck="false" />
+                        <input name="model" value="@Model.Get(SettingKeys.AiModel)" placeholder="gpt-4o-mini" spellcheck="false" list="chatgpt-models" />
+                        <datalist id="chatgpt-models">
+                            @foreach (var m in Model.ChatGptModels) { <option value="@m.Slug">@m.Name</option> }
+                        </datalist>
+                        <div class="help">@T["settings.aiModelChatGptHint"]</div>
                     </div>
                 </div>
                 <div class="form-field">
@@ -197,6 +203,62 @@
             <div style="margin-top:14px;"><button type="submit" class="btn">@T["settings.save"]</button></div>
         </div>
     </form>
+    <form method="post" asp-page-handler="AiTest" style="margin-bottom:14px;">
+        <button type="submit" class="btn btn-ghost">@T["settings.aiTest"]</button>
+        <span class="help">@T["settings.aiTestHint"]</span>
+    </form>
+
+    @* Mit ChatGPT anmelden: Geräte-Code wie bei Codex und Hermes. Eigene Formulare, nicht im KI-Formular oben (keine verschachtelten Formulare). *@
+    <div class="card" data-chatgpt data-start-url="@Url.Page("/Admin/Settings/Index", "ChatGptStart")" data-status-url="@Url.Page("/Admin/Settings/Index", "ChatGptStatus")"
+         data-t-valid="@T["settings.chatgptValid"]" data-t-expired="@T["settings.chatgptExpired"]" data-t-copied="@T["settings.chatgptCopied"]" data-t-copy="@T["settings.chatgptCopy"]"
+         data-pending-code="@Model.ChatGpt.Pending?.UserCode" data-pending-url="@Model.ChatGpt.Pending?.VerificationUrl"
+         data-pending-expires="@Model.ChatGpt.Pending?.ExpiresAt.ToString("o")" data-pending-interval="@Model.ChatGpt.Pending?.IntervalSeconds">
+        <h2>@T["settings.chatgptHeading"]</h2>
+        <p class="muted">@T["settings.chatgptIntro"]</p>
+        @if (Model.ChatGpt.Connected)
+        {
+            <div class="kv"><div class="kv-label">@T["settings.chatgptAccount"]</div><div class="kv-value">@(Model.ChatGpt.Email ?? Model.ChatGpt.AccountId ?? "–")</div></div>
+            @if (!string.IsNullOrEmpty(Model.ChatGpt.Plan))
+            {
+                <div class="kv"><div class="kv-label">@T["settings.chatgptPlan"]</div><div class="kv-value">@Model.ChatGpt.Plan</div></div>
+            }
+            <div class="kv"><div class="kv-label">@T["settings.chatgptSince"]</div><div class="kv-value">@Model.ChatGpt.ConnectedAt?.ToString("yyyy-MM-dd HH:mm") UTC</div></div>
+            <div class="kv"><div class="kv-label">@T["settings.chatgptTokenUntil"]</div><div class="kv-value">@Model.ChatGpt.AccessExpiresAt?.ToString("yyyy-MM-dd HH:mm") UTC</div></div>
+            @if (aiProviderIsChatGpt)
+            {
+                <p><span class="badge badge-on">@T["settings.chatgptActive"]</span></p>
+            }
+            else
+            {
+                <div class="alert alert-info">@T["settings.chatgptNotActive"]</div>
+            }
+            <form method="post" asp-page-handler="ChatGptLogout" data-confirm="@T["settings.chatgptLogoutConfirm"]">
+                <button type="submit" class="btn btn-ghost btn-danger">@T["settings.chatgptLogout"]</button>
+            </form>
+        }
+        else
+        {
+            @if (!string.IsNullOrEmpty(Model.ChatGpt.Error))
+            {
+                <div class="alert alert-error">@Model.ChatGpt.Error</div>
+            }
+            @if (!string.IsNullOrEmpty(Model.ChatGpt.LoginError))
+            {
+                <div class="alert alert-error">@Model.ChatGpt.LoginError</div>
+            }
+            <div data-chatgpt-error class="alert alert-error" hidden></div>
+            <button type="button" class="btn" data-chatgpt-start>@T["settings.chatgptStart"]</button>
+            <div data-chatgpt-pending hidden style="margin-top:14px;">
+                <div class="muted">@T["settings.chatgptCodeLabel"]</div>
+                <div><code class="mono" data-chatgpt-code style="font-size:30px; letter-spacing:.15em;"></code></div>
+                <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+                    <a class="btn" data-chatgpt-link href="#" target="_blank" rel="noopener noreferrer">@T["settings.chatgptOpen"]</a>
+                    <button type="button" class="btn btn-ghost" data-chatgpt-copy>@T["settings.chatgptCopy"]</button>
+                </div>
+                <p class="muted" style="margin-top:10px;">@T["settings.chatgptWaiting"] <span class="mono" data-chatgpt-left></span></p>
+            </div>
+        }
+    </div>
 
     @* Verbrauch: cloud-weit + pro Instanz, laufender Monat (aus dem AiUsage-Ledger). *@
     <div class="card">
@@ -352,6 +414,7 @@
 </div>
 
 @section Scripts {
+    <script src="~/js/chatgpt-login.js" asp-append-version="true"></script>
     <script>
         // Tabs — identical to MatCMS's settings page, including the ?tab=<name> deep link that every
         // handler redirects back to.

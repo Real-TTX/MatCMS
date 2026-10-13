@@ -20,22 +20,31 @@ public class AiService
     private readonly SecretProtector _secrets;
     private readonly IHttpClientFactory _http;
     private readonly ILogger<AiService> _log;
+    private readonly ChatGptClient _chatgpt;
+    private readonly ChatGptAuthService _chatgptAuth;
 
     /// <summary>Hard ceiling on completion length regardless of what an instance asks for — bounds the
     /// cost of a single call.</summary>
     private const int MaxCompletionTokens = 4000;
 
-    public AiService(AppDbContext db, SecretProtector secrets, IHttpClientFactory http, ILogger<AiService> log)
+    public AiService(AppDbContext db, SecretProtector secrets, IHttpClientFactory http, ILogger<AiService> log,
+        ChatGptClient chatgpt, ChatGptAuthService chatgptAuth)
     {
         _db = db;
         _secrets = secrets;
         _http = http;
         _log = log;
+        _chatgpt = chatgpt;
+        _chatgptAuth = chatgptAuth;
     }
 
-    public sealed record AiConfig(string Provider, string Model, string BaseUrl, string ApiKey)
+    /// <summary>Provider id of the ChatGPT sign-in ("Mit ChatGPT anmelden"): the account, not an API key, pays for the calls.</summary>
+    public const string ProviderChatGpt = "chatgpt";
+
+    public sealed record AiConfig(string Provider, string Model, string BaseUrl, string ApiKey, bool ChatGptConnected = false)
     {
-        public bool IsConfigured => !string.IsNullOrWhiteSpace(ApiKey) && !string.IsNullOrWhiteSpace(Model);
+        public bool IsChatGpt => Provider == ProviderChatGpt;
+        public bool IsConfigured => !string.IsNullOrWhiteSpace(Model) && (IsChatGpt ? ChatGptConnected : !string.IsNullOrWhiteSpace(ApiKey));
     }
 
     public async Task<AiConfig> GetConfigAsync()
@@ -48,15 +57,29 @@ public class AiService
         var provider = G(SettingKeys.AiProvider).Trim().ToLowerInvariant();
         if (provider.Length == 0) provider = "openai";
         var model = G(SettingKeys.AiModel).Trim();
-        if (model.Length == 0) model = "gpt-4o-mini";
+        // The ChatGPT account only offers its own models — gpt-4o-mini is the API provider default and would simply be refused there.
+        if (model.Length == 0 && provider != ProviderChatGpt) model = "gpt-4o-mini";
         var baseUrl = G(SettingKeys.AiBaseUrl).Trim().TrimEnd('/');
         if (baseUrl.Length == 0) baseUrl = "https://api.openai.com/v1";
         // Stored encrypted (SecretProtector); an unmarked legacy value passes through unchanged.
         var key = _secrets.Unprotect(G(SettingKeys.AiApiKey)) ?? "";
-        return new AiConfig(provider, model, baseUrl, key);
+        return new AiConfig(provider, model, baseUrl, key, provider == ProviderChatGpt && await _chatgptAuth.IsConnectedAsync());
     }
 
     public async Task<bool> IsConfiguredAsync() => (await GetConfigAsync()).IsConfigured;
+
+    /// <summary>A short call with the saved provider, to see that it works: the page's "KI testen", REST and MCP. Not booked to any
+    /// instance's budget — only <see cref="RelayAsync"/> books.</summary>
+    public Task<AiResponse> TestAsync(CancellationToken ct = default) => CompleteAsync(new AiRequest
+    {
+        Purpose = "test",
+        MaxTokens = 60,
+        Messages =
+        {
+            new AiMessage { Role = "system", Content = "Antworte in einem kurzen deutschen Satz." },
+            new AiMessage { Role = "user", Content = "Sag Hallo und nenne den Namen des Modells, das gerade antwortet." },
+        },
+    }, ct);
 
     /// <summary>
     /// One call relayed by an instance, with the checks that come before it: the instance must be approved, and the profile must have AI
@@ -98,10 +121,22 @@ public class AiService
     public async Task<AiResponse> CompleteAsync(AiRequest req, CancellationToken ct = default)
     {
         var cfg = await GetConfigAsync();
+        // A signed-in account that died (revoked, refresh token used elsewhere) must say so to EVERY caller — not only to the one
+        // that found out — or the operator of a site sees "not configured" and has no idea where to look.
+        if (cfg.IsChatGpt && !cfg.ChatGptConnected && !string.IsNullOrWhiteSpace(cfg.Model))
+        {
+            var (_, _, why) = await _chatgptAuth.GetAccessTokenAsync(ct);
+            return new AiResponse { Ok = false, Error = why ?? "Nicht bei ChatGPT angemeldet." };
+        }
         if (!cfg.IsConfigured)
-            return new AiResponse { Ok = false, Error = "KI ist nicht konfiguriert (Anbieter-Schlüssel und Modell erforderlich)." };
+            return new AiResponse { Ok = false, Error = cfg.IsChatGpt
+                ? "KI ist nicht konfiguriert (ChatGPT-Anmeldung und Modell erforderlich)."
+                : "KI ist nicht konfiguriert (Anbieter-Schlüssel und Modell erforderlich)." };
         if (req.Messages is null || req.Messages.Count == 0)
             return new AiResponse { Ok = false, Error = "Leere KI-Anfrage." };
+
+        // The signed-in ChatGPT account: its backend takes no length cap, so MaxTokens is not passed on there.
+        if (cfg.IsChatGpt) return await _chatgpt.CompleteAsync(cfg.Model, req.Messages, ct);
 
         var maxTokens = Math.Clamp(req.MaxTokens ?? 1000, 16, MaxCompletionTokens);
         try

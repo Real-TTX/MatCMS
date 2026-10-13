@@ -21,9 +21,11 @@ public class IndexModel : PageModel
     private readonly EmailService _mail;
     private readonly SecretProtector _secrets;
     private readonly CloudConfigBackupService _config;
+    private readonly ChatGptAuthService _chatgpt;
 
-    public IndexModel(AppDbContext db, CloudContext cloud, EmailService mail, SecretProtector secrets, CloudConfigBackupService config)
+    public IndexModel(AppDbContext db, CloudContext cloud, EmailService mail, SecretProtector secrets, CloudConfigBackupService config, ChatGptAuthService chatgpt)
     {
+        _chatgpt = chatgpt;
         _db = db;
         _cloud = cloud;
         _mail = mail;
@@ -116,7 +118,41 @@ public class IndexModel : PageModel
                          select new AiUsageRow(i.Name, u.Tokens, u.Calls)).ToListAsync();
         AiTokensTotal = AiUsage.Sum(r => (long)r.Tokens);
         AiCallsTotal = AiUsage.Sum(r => r.Calls);
+        ChatGpt = await _chatgpt.GetStatusAsync(poll: false, HttpContext.RequestAborted);
+        if (ChatGpt.Connected) ChatGptModels = await _chatgpt.ListModelsAsync(HttpContext.RequestAborted);
         return Page();
+    }
+
+    // ---- "Mit ChatGPT anmelden" (device code): the page script starts it, polls the status and signs out ----
+
+    public ChatGptAuthService.Status ChatGpt { get; private set; } = new(false, null, null, null, null, null, null, null, null, null);
+    public IReadOnlyList<ChatGptAuthService.ModelInfo> ChatGptModels { get; private set; } = Array.Empty<ChatGptAuthService.ModelInfo>();
+
+    public async Task<IActionResult> OnPostChatGptStartAsync()
+    {
+        var (pending, error) = await _chatgpt.StartLoginAsync(HttpContext.RequestAborted);
+        if (pending is null) return new JsonResult(new { ok = false, error });
+        return new JsonResult(new { ok = true, status = ChatGptAuthService.StatusJson(await _chatgpt.GetStatusAsync(poll: false, HttpContext.RequestAborted)) });
+    }
+
+    /// <summary>Asks OpenAI (at most once per poll interval) whether the code was confirmed and answers the state.</summary>
+    public async Task<IActionResult> OnGetChatGptStatusAsync() =>
+        new JsonResult(ChatGptAuthService.StatusJson(await _chatgpt.GetStatusAsync(poll: true, HttpContext.RequestAborted)));
+
+    /// <summary>"KI testen": one short call with the saved provider, answered as a flash message.</summary>
+    public async Task<IActionResult> OnPostAiTestAsync([FromServices] AiService ai)
+    {
+        var r = await ai.TestAsync(HttpContext.RequestAborted);
+        if (r.Ok) TempData["Flash"] = $"KI-Test erfolgreich ({r.PromptTokens + r.CompletionTokens} Tokens): {r.Text}";
+        else TempData["FlashError"] = "KI-Test fehlgeschlagen: " + r.Error;
+        return RedirectToPage(new { tab = "ai" });
+    }
+
+    public async Task<IActionResult> OnPostChatGptLogoutAsync()
+    {
+        await _chatgpt.LogoutAsync(HttpContext.RequestAborted);
+        TempData["Flash"] = "Von ChatGPT abgemeldet.";
+        return RedirectToPage(new { tab = "ai" });
     }
 
     public async Task<IActionResult> OnPostGeneralAsync(string? cloudName, string? canonicalUrl, bool forceHttps)

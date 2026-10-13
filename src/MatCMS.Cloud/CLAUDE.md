@@ -1125,6 +1125,30 @@ the admin UI uses. There is no second restore path and no second backup format.
   **KI tab of *Einstellungen*** ("ChatGPT verbinden"). (A Device Authorization Grant once lived here too but
   was **removed** — nothing consumed it once the MCP server shipped: ChatGPT uses this connector's OAuth,
   other MCP clients paste an operator key. Don't re-add it without a real browserless-CLI use case.)
+- **"Mit ChatGPT anmelden" — the AI provider `chatgpt`** (`Services/ChatGptAuthService.cs`, `ChatGptClient.cs`; UI in the KI tab
+  of *Einstellungen*, `wwwroot/js/chatgpt-login.js`; REST `/api/v1/cloud/ai/chatgpt[/login]`, MCP `start_chatgpt_login` /
+  `get_chatgpt_login` / `logout_chatgpt`, rights = the cloud-settings rights). The cloud signs in to a ChatGPT account the way
+  Codex CLI and Hermes do — the OAuth **device code** flow — and `AiService` then sends the relayed calls through that account
+  instead of an API key (`ai.provider = chatgpt`, model = a slug the account offers). This is the OPPOSITE direction of the
+  connectors above (there ChatGPT calls the cloud; here the cloud calls ChatGPT). The flow, from the Codex/Hermes sources:
+  `POST {issuer}/api/accounts/deviceauth/usercode` `{client_id}` → `device_auth_id`, `user_code`, `interval`; the human types
+  the code at `{issuer}/codex/device` (15 min); `POST …/deviceauth/token` is polled (403/404 = not yet) → `authorization_code` +
+  `code_verifier`; `POST {issuer}/oauth/token` (form, `redirect_uri={issuer}/deviceauth/callback`) → id/access/refresh token;
+  refresh = the same endpoint with `grant_type=refresh_token`; calls go to `POST chatgpt.com/backend-api/codex/responses`
+  (`store:false`, `stream:true`, system text as `instructions`, `ChatGPT-Account-ID` from the access token's
+  `https://api.openai.com/auth` claim) and come back as an SSE stream that `ChatGptClient` collects into an `AiResponse`.
+  **Unofficial**: the client id is Codex's public one (`app_EMoamEEZ73f0CkXaXp7hrann`) and the backend is undocumented; OpenAI's
+  own "Sign in with ChatGPT" program is partners-only, loopback-redirect and forbids `backend-api` — not usable for a server. If
+  OpenAI changes the route the sign-in stops and the API-key provider is the way out. Traps, all load-bearing: refresh tokens
+  **rotate and are single-use** — `ChatGptLoginState` (singleton) holds the lock, the token is re-read inside it, a refused
+  one is marked `Dead` and never replayed, and a transient failure (network, 5xx, 429) must not kill the sign-in; the tokens
+  live in ONE encrypted setting `ai.chatgpt.tokens` that is in no settings section — not editable by the API, not in a
+  configuration backup (a copy on another cloud would invalidate this one on its first refresh); the login is polled lazily
+  (each status call asks OpenAI at most once per interval — no background task); OpenAI's edge answers HTTP 530 to a default
+  library User-Agent, so every request names itself (`MatCMS-Cloud/…`, `originator: matcms-cloud`); the endpoints can be
+  pointed at a stand-in with `MatCmsCloud:ChatGpt:Issuer|BackendBase|MinPollSeconds` — a test hook, not an operator setting.
+  The backend takes no length cap, so an instance's `MaxTokens` is not passed on; one account serves ALL approved sites, so
+  the per-profile token budget stays the only brake.
 - **MCP server (`/mcp`)** — a remote **Model Context Protocol** server so an AI client (ChatGPT, Claude,
   Cursor) drives the cloud directly, instead of hand-wiring HTTP calls. Built INTO this app (official
   `ModelContextProtocol.AspNetCore` SDK, HTTP/streamable transport, `app.MapMcp("/mcp")`), **not** a

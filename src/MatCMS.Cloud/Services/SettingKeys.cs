@@ -156,8 +156,14 @@ public static class SettingKeys
 
     /// <summary>The provider API key. SecretProtector-encrypted at rest, <b>never</b> rolled out to an
     /// instance (the entire reason for the relay is that the key stays central) and never echoed back
-    /// to the settings form. The OAuth "Mit ChatGPT anmelden" token (later) lands here the same way.</summary>
+    /// to the settings form. The "Mit ChatGPT anmelden" sign-in does NOT land here — see <see cref="AiChatGptTokens"/>.</summary>
     public const string AiApiKey = "ai.apiKey";
+
+    /// <summary>"Mit ChatGPT anmelden": the access and refresh tokens of the signed-in ChatGPT account as ONE
+    /// SecretProtector-encrypted JSON document (<c>ChatGptAuthService.TokenSet</c>). Deliberately part of NO settings
+    /// section: it is neither editable through the settings API nor carried in a configuration backup — refresh tokens
+    /// rotate, so a copy on another cloud would kill this cloud's sign-in on its first refresh.</summary>
+    public const string AiChatGptTokens = "ai.chatgpt.tokens";
 
     // --- SMTP (own tab; kept out of `All` so each form saves only its own keys) ---
     public const string SmtpHost = "smtp.host";

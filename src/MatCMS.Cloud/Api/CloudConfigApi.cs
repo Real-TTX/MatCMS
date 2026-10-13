@@ -60,6 +60,49 @@ public static class CloudConfigApi
             return ok ? Results.Ok(new { ok = true, changed }) : Results.Json(new { ok = false, error }, statusCode: StatusCodes.Status400BadRequest);
         }).RequireRateLimiting("operatorApi");
 
+        // ---- "Mit ChatGPT anmelden": device-code sign-in of the cloud's AI provider ("chatgpt") --------------------------------
+        // POST starts it and answers the code to type on the verification URL; GET shows the state (and, while a login runs, asks OpenAI
+        // once per poll interval whether the code was confirmed — poll it every few seconds); DELETE signs out. Tokens never leave the cloud.
+        app.MapPost("/api/v1/cloud/ai/chatgpt/login", async (HttpContext ctx, ApiKeyService keys, ChatGptAuthService chatgpt) =>
+        {
+            var (key, err) = await CallerAsync(ctx, keys);
+            if (err is not null) return err;
+            if (RequireConfig(key!) is { } d) return d;
+            var (pending, error) = await chatgpt.StartLoginAsync(ctx.RequestAborted);
+            return pending is null
+                ? Results.Json(new { ok = false, error }, statusCode: StatusCodes.Status502BadGateway)
+                : Results.Ok(new { ok = true, userCode = pending.UserCode, verificationUrl = pending.VerificationUrl, expiresAt = pending.ExpiresAt, intervalSeconds = pending.IntervalSeconds });
+        }).RequireRateLimiting("operatorApi");
+
+        app.MapGet("/api/v1/cloud/ai/chatgpt", async (HttpContext ctx, ApiKeyService keys, ChatGptAuthService chatgpt) =>
+        {
+            var (key, err) = await CallerAsync(ctx, keys);
+            if (err is not null) return err;
+            if (RequireConfig(key!) is { } d) return d;
+            var status = await chatgpt.GetStatusAsync(poll: true, ctx.RequestAborted);
+            return Results.Ok(ChatGptAuthService.StatusJson(status, status.Connected ? await chatgpt.ListModelsAsync(ctx.RequestAborted) : null));
+        }).RequireRateLimiting("operatorApi");
+
+        app.MapDelete("/api/v1/cloud/ai/chatgpt", async (HttpContext ctx, ApiKeyService keys, ChatGptAuthService chatgpt) =>
+        {
+            var (key, err) = await CallerAsync(ctx, keys);
+            if (err is not null) return err;
+            if (RequireConfig(key!) is { } d) return d;
+            await chatgpt.LogoutAsync(ctx.RequestAborted);
+            return Results.Ok(new { ok = true });
+        }).RequireRateLimiting("operatorApi");
+
+        // A short call with the saved AI provider (API key or ChatGPT sign-in), to see that it works. Booked to no instance.
+        app.MapPost("/api/v1/cloud/ai/test", async (HttpContext ctx, ApiKeyService keys, AiService ai) =>
+        {
+            var (key, err) = await CallerAsync(ctx, keys);
+            if (err is not null) return err;
+            if (RequireConfig(key!) is { } d) return d;
+            var r = await ai.TestAsync(ctx.RequestAborted);
+            return r.Ok ? Results.Ok(new { ok = true, text = r.Text, promptTokens = r.PromptTokens, completionTokens = r.CompletionTokens })
+                        : Results.Json(new { ok = false, error = r.Error }, statusCode: StatusCodes.Status409Conflict);
+        }).RequireRateLimiting("operatorApi");
+
         // ---- Configuration backups --------------------------------------------------------------------------------------
         app.MapGet("/api/v1/cloud/config-backups", async (HttpContext ctx, ApiKeyService keys, CloudConfigBackupService svc) =>
         {

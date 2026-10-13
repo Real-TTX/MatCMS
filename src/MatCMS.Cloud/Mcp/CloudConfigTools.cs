@@ -46,6 +46,44 @@ public class CloudConfigTools
         return new { ok = true, changed };
     }
 
+    [McpServerTool(Name = "start_chatgpt_login"), Description(
+        "Sign the cloud in to a ChatGPT account for its AI features (device code, like Codex CLI and Hermes): returns a user code and the verification URL. Tell the user to open the URL and type the code within 15 minutes — they must do that themselves — then call get_chatgpt_login every few seconds until connected = true. Afterwards set ai.provider = 'chatgpt' and ai.model (a slug from get_chatgpt_login.models) with set_cloud_settings. Unofficial route (Codex's public client id): it can stop working when OpenAI changes it.")]
+    public static async Task<object> StartChatGptLogin(McpContext me, ChatGptAuthService chatgpt, CancellationToken ct)
+    {
+        RequireConfig(me);
+        var (pending, error) = await chatgpt.StartLoginAsync(ct);
+        if (pending is null) throw new McpException(error ?? "Die Anmeldung konnte nicht gestartet werden.");
+        return new { ok = true, userCode = pending.UserCode, verificationUrl = pending.VerificationUrl, expiresAt = pending.ExpiresAt, intervalSeconds = pending.IntervalSeconds };
+    }
+
+    [McpServerTool(Name = "get_chatgpt_login"), Description(
+        "State of the cloud's ChatGPT sign-in: connected, account email and plan, when the access token expires, the running login (user code, verification URL, expiry) or why the last one failed; the selectable models once connected. While a login is pending each call asks OpenAI once per poll interval whether the code was confirmed. Never returns a token.")]
+    public static async Task<object> GetChatGptLogin(McpContext me, ChatGptAuthService chatgpt, CancellationToken ct)
+    {
+        RequireConfig(me);
+        var status = await chatgpt.GetStatusAsync(poll: true, ct);
+        return ChatGptAuthService.StatusJson(status, status.Connected ? await chatgpt.ListModelsAsync(ct) : null);
+    }
+
+    [McpServerTool(Name = "logout_chatgpt"), Description(
+        "Sign the cloud out of its ChatGPT account: the stored tokens are deleted and a running login is dropped. The AI features fall silent until an API-key provider or a new sign-in is set up — confirm with the user first.")]
+    public static async Task<object> LogoutChatGpt(McpContext me, ChatGptAuthService chatgpt, CancellationToken ct)
+    {
+        RequireConfig(me);
+        await chatgpt.LogoutAsync(ct);
+        return new { ok = true };
+    }
+
+    [McpServerTool(Name = "test_ai"), Description(
+        "Send one short test message through the cloud's saved AI provider (API key or ChatGPT sign-in) and return the answer, or the reason it failed. Booked to no instance's budget.")]
+    public static async Task<object> TestAi(McpContext me, AiService ai, CancellationToken ct)
+    {
+        RequireConfig(me);
+        var r = await ai.TestAsync(ct);
+        if (!r.Ok) throw new McpException(r.Error ?? "Der KI-Test ist fehlgeschlagen.");
+        return new { ok = true, text = r.Text, promptTokens = r.PromptTokens, completionTokens = r.CompletionTokens };
+    }
+
     [McpServerTool(Name = "list_cloud_config_backups"), Description(
         "List the stored backups of this cloud's own configuration (settings, profiles, store, users, assignments, optionally the server/hosting block) — not site backups. Returns the section names too.")]
     public static object List(McpContext me, CloudConfigBackupService svc)

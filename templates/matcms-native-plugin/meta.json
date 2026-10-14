@@ -1,0 +1,6 @@
+{
+  "Key": "my-plugin",
+  "Name": "MatCmsPlugin",
+  "Version": "1.0.0",
+  "Description": "Ein natives MatCMS-Plugin."
+}

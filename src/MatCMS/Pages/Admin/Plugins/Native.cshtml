@@ -1,0 +1,108 @@
+@page "{id:int}"
+@inject MatCMS.Data.AppDbContext DeleteDb
+@inject MatCMS.Services.Plugins.PluginDataService DeleteData
+@model MatCMS.Pages.Admin.Plugins.NativeModel
+@{
+    ViewData["Title"] = Model.Current.Name;
+    var p = Model.Current;
+    string Size(long n) => n < 1024 ? n + " B" : n < 1024 * 1024 ? (n / 1024.0).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " KB" : (n / 1048576.0).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " MB";
+}
+<div class="page-head">
+    <h1>
+        @p.Name
+        <span class="badge">@T["plugins.kind.native"]</span>
+        @if (!string.IsNullOrWhiteSpace(p.Version)) { <span class="badge">v@(p.Version)</span> }
+        @if (Model.Loaded) { <span class="badge badge-on">@T["plugins.native.running"]</span> }
+        else if (p.Enabled && Model.RunError is not null) { <span class="badge badge-err">@T["plugins.error"]</span> }
+        else { <span class="badge badge-off">@T["plugins.disabled"]</span> }
+        @if (Model.Lingering) { <span class="badge badge-new">@T["plugins.native.restart"]</span> }
+    </h1>
+    @if (!string.IsNullOrWhiteSpace(p.Description)) { <p class="muted">@p.Description</p> }
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.RunError))
+{
+    <div class="alert alert-error"><strong>@T["plugins.runError"]:</strong> <span class="mono">@Model.RunError</span></div>
+}
+@if (Model.Lingering)
+{
+    <div class="alert alert-info">@T["plugins.native.lingering"]</div>
+}
+@if (!Model.NativeAllowed)
+{
+    <div class="alert alert-error">@T["plugins.native.notAllowed"]</div>
+}
+
+<form method="post" id="native-form">
+    <div class="card">
+        <p class="help">@T["plugins.native.help"]</p>
+        <div class="kv"><span class="kv-label">@T["plugins.native.api"]</span><span class="kv-value mono">@p.Api</span></div>
+        <div class="kv"><span class="kv-label">@T["plugins.native.entry"]</span><span class="kv-value mono">@p.Entry</span></div>
+        <div class="kv"><span class="kv-label">SHA-256</span><span class="kv-value mono" style="word-break:break-all;">@p.Sha256</span></div>
+        <div class="kv"><span class="kv-label">@T["plugins.native.key"]</span><span class="kv-value mono">@p.Key</span></div>
+        @if (!string.IsNullOrWhiteSpace(p.DataVersion))
+        {
+            <div class="kv"><span class="kv-label">@T["plugins.native.dataVersion"]</span><span class="kv-value mono">@p.DataVersion</span></div>
+        }
+        <label class="check" style="margin-top:14px;">
+            <input type="checkbox" name="Enabled" value="true" @(Model.Enabled ? "checked" : "") /> @T["plugins.enabledLabel"]
+        </label>
+    </div>
+
+    <div class="card">
+        <h3 class="form-section">@T["plugins.config"]</h3>
+        <div class="help">@Html.Raw(T["plugins.configHelp"])</div>
+        @for (var i = 0; i < Model.ConfigKeys.Count + 2; i++)
+        {
+            var k = i < Model.ConfigKeys.Count ? Model.ConfigKeys[i] : "";
+            var v = i < Model.ConfigValues.Count ? Model.ConfigValues[i] : "";
+            <div class="form-row" style="margin-top:8px;">
+                <div class="form-field"><input name="ConfigKeys" value="@k" placeholder="@T["plugins.native.configKey"]" spellcheck="false" /></div>
+                <div class="form-field"><input name="ConfigValues" value="@v" placeholder="@T["plugins.native.configValue"]" spellcheck="false" /></div>
+            </div>
+        }
+        <div class="help">@T["plugins.native.configMore"]</div>
+    </div>
+</form>
+
+<partial name="_PluginOverview" model="@p.Key" />
+
+<div class="card">
+    <h3 class="form-section">@T["plugins.native.files"]</h3>
+    <table class="data">
+        <thead><tr><th>@T["plugins.native.file"]</th><th style="width:110px;text-align:right;">@T["plugins.native.size"]</th></tr></thead>
+        <tbody>
+            @if (Model.Files.Count == 0)
+            {
+                <partial name="_EmptyRow" model='T["plugins.native.filesEmpty"].ToString()' />
+            }
+            @foreach (var f in Model.Files)
+            {
+                <tr><td class="mono">src/@f.Path</td><td style="text-align:right;">@Size(f.Size)</td></tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h3 class="form-section">@T["plugins.log"]</h3>
+    @if (Model.Log.Count == 0)
+    {
+        <p class="muted">@T["plugins.native.logEmpty"]</p>
+    }
+    else
+    {
+        <pre class="code-block" style="max-height:260px;overflow:auto;">@string.Join("\n", Model.Log)</pre>
+    }
+</div>
+
+<div class="form-actions">
+    <button type="submit" class="btn" form="native-form">@T["action.save"]</button>
+    <a class="btn btn-ghost" asp-page-handler="Export" asp-route-id="@p.Id">
+        <i class="ti ti-download" aria-hidden="true"></i> @T["plugins.exportZip"]
+    </a>
+    <a class="btn btn-ghost" asp-page="Index">@T["action.back"]</a>
+    <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@p.Id" data-confirm="@(await MatCMS.Services.Plugins.PluginUninstall.ConfirmTextAsync(DeleteDb, DeleteData, T, p.Key))">
+        <button type="submit" class="btn btn-danger">@T["plugins.deletePlugin"]</button>
+    </form>
+</div>

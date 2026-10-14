@@ -1296,3 +1296,13 @@ body.has-adminbar .site-header { top: 67px; }
     .el-section.el-pad-l, .el-section.el-pad-xl { padding: 64px 0; }
     .el-image.el-isize-l, .el-image.el-isize-m { width: 100%; }
 }
+
+/* ---------- Plugin UI library (UiRenderer): layout primitives shared by the back office and the public site ---------- */
+.ui-stack { display: flex; flex-direction: column; gap: 16px; }
+.ui-inline { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.ui-grid { display: grid; gap: 18px; }
+.ui-card { border: 1px solid var(--line); background: var(--bg); padding: 20px; }
+.ui-card h2 { font-size: 20px; margin: 0 0 12px; }
+.ui-table { width: 100%; border-collapse: collapse; }
+.ui-table th, .ui-table td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.ui-table th { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }

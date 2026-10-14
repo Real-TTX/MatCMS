@@ -189,6 +189,7 @@ builder.Services.AddScoped<TwoFactorService>();
 builder.Services.AddScoped<BlockRegistry>();
 builder.Services.AddScoped<MatCMS.Services.MediaFocus>();
 builder.Services.AddScoped<SiteContext>();
+builder.Services.AddScoped<PublicContentService>();
 builder.Services.AddScoped<ContentTransferService>();
 builder.Services.AddScoped<BackupManager>();
 builder.Services.AddScoped<CleanupService>();
@@ -222,7 +223,17 @@ builder.Services.AddScoped<TranslationService>();
 builder.Services.AddScoped<AiService>();
 builder.Services.AddScoped<BlockGenerator>();
 builder.Services.AddSingleton<PluginRegistry>();
+builder.Services.AddSingleton<AdminNav>();
+builder.Services.AddSingleton<MatCMS.Services.Plugins.PluginDataService>();
+builder.Services.AddSingleton<MatCMS.Services.Plugins.PluginContributions>();
+builder.Services.AddScoped<RazorPartialRenderer>();
+builder.Services.AddSingleton<MatCMS.Services.Plugins.PluginJobService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<MatCMS.Services.Plugins.PluginJobService>());
 builder.Services.AddScoped<PluginRunner>();
+// The one dynamic endpoint behind which every public plugin route lives (see PluginRouteTransformer).
+builder.Services.AddSingleton<MatCMS.Services.Plugins.PluginRouteTransformer>();
+// Native plugins: collectible load contexts, one per plugin, alive as long as the plugin is loaded.
+builder.Services.AddSingleton<MatCMS.Services.Plugins.NativePluginHost>();
 
 // MatCMS.Cloud link: state is a singleton (the admin UI reads the last result), the worker sends an
 // outbound heartbeat once a minute. Unconfigured = the service does nothing at all.
@@ -629,6 +640,13 @@ app.Use(async (ctx, next) =>
 });
 
 app.MapRazorPages();
+
+// Public plugin routes. ASP.NET cannot unregister an endpoint, so plugins do not get endpoints of their
+// own: this ONE catch-all asks the plugin registry whether the path is theirs, and says "not mine" for
+// everything else. The very low order puts it before the CMS's own "/{slug?}" page, so a plugin route
+// like /shop/{slug} wins over a CMS page of the same path — but only for the fixed prefixes a plugin has
+// registered, never for the host's reserved ones (see PluginRoutePattern.Reserved).
+app.MapDynamicPageRoute<MatCMS.Services.Plugins.PluginRouteTransformer>("{**plugin}", null!, -100);
 
 // Serves a file attached to a template (see TemplateAsset). Public and cacheable — these are static
 // site assets (scripts, styles, fonts) a template brings with it, referenced via {{asset:name}}.
@@ -1039,6 +1057,8 @@ app.MapGet("/sitemap.xml", async (HttpContext ctx, MatCMS.Data.AppDbContext db, 
         .ToList();
 
     var baseUrl = site.CanonicalBaseUrl(ctx.Request);
+    var pluginEntries = await ctx.RequestServices.GetRequiredService<MatCMS.Services.Plugins.PluginContributions>()
+        .SitemapAsync(ctx.RequestServices, ctx.RequestAborted);
     var sb = new System.Text.StringBuilder();
     sb.Append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
     sb.Append("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n");
@@ -1047,6 +1067,17 @@ app.MapGet("/sitemap.xml", async (HttpContext ctx, MatCMS.Data.AppDbContext db, 
         var loc = baseUrl + MatCMS.Services.SiteContext.LocalizedUrl(p.Locale, p.Slug);
         sb.Append("  <url><loc>").Append(System.Security.SecurityElement.Escape(loc)).Append("</loc>")
           .Append("<lastmod>").Append(p.UpdatedAt.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)).Append("</lastmod></url>\n");
+    }
+    // What loaded plugins add (the blog's posts, a shop's products). A plugin hands in a path or an address.
+    foreach (var e in pluginEntries)
+    {
+        var u = e.Url ?? "";
+        var loc = u.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || u.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+            ? u : u.StartsWith('/') && !u.StartsWith("//") ? baseUrl + u : "";
+        if (loc.Length == 0) continue;
+        sb.Append("  <url><loc>").Append(System.Security.SecurityElement.Escape(loc)).Append("</loc>");
+        if (e.LastModifiedUtc is { } lm) sb.Append("<lastmod>").Append(lm.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)).Append("</lastmod>");
+        sb.Append("</url>\n");
     }
     sb.Append("</urlset>\n");
     return Results.Content(sb.ToString(), "application/xml", System.Text.Encoding.UTF8);
@@ -1102,3 +1133,6 @@ static async Task EnsureSchemaCurrentAsync(AppDbContext db, ILoggerFactory logge
 
     await db.Database.MigrateAsync();
 }
+
+// Lets the integration tests (tests/MatCMS.Plugins.Tests) start the whole application in memory.
+public partial class Program { }

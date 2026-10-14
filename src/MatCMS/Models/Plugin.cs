@@ -18,6 +18,25 @@ public class Plugin
 
     public string Description { get; set; } = "";
 
+    /// <summary>
+    /// How the plugin is built: <c>script</c> (C# script, source in <see cref="Code"/>/<see cref="FilesJson"/>,
+    /// editable) or <c>native</c> (compiled DLLs under <c>appdata/plugins/{Key}/{Version}/src/</c>, not editable).
+    /// Everything else — states, export/import, cloud, the plugin API — is the same for both.
+    /// <para>Every row from before this column existed is a script: the default is the only migration.</para>
+    /// </summary>
+    public string Kind { get; set; } = PluginKind.Script;
+
+    /// <summary>Native only: file name of the main assembly inside <c>src/</c> (e.g. <c>Shop.dll</c>). Empty for scripts.</summary>
+    public string Entry { get; set; } = "";
+
+    /// <summary>Native only: SHA-256 (hex) of the main assembly as imported, shown in the UI so an operator can compare
+    /// what runs with what a store published. Empty for scripts.</summary>
+    public string Sha256 { get; set; } = "";
+
+    /// <summary>The plugin API major version this plugin was built against. <c>0</c> = a plugin written before the
+    /// versioned API existed (treated as API 1, the <c>PluginContext</c> members).</summary>
+    public int Api { get; set; }
+
     /// <summary>Author-declared version of this plugin (e.g. "1" or "1.2"). Shown in the UI and
     /// carried in the export bundle; a same-Key import replaces the plugin with this version.</summary>
     public string Version { get; set; } = "";
@@ -59,4 +78,23 @@ public class Plugin
     public bool Enabled { get; set; } = true;
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>The values of <see cref="Plugin.Kind"/>.</summary>
+public static class PluginKind
+{
+    /// <summary>A C# script, editable in the admin.</summary>
+    public const string Script = "script";
+    /// <summary>Compiled assemblies, loaded into a context of their own.</summary>
+    public const string Native = "native";
+    /// <summary>Compiled into the CMS itself (the blog): same API and state, but shipped with the image, enabled on a new site,
+    /// and neither deletable, exportable nor replaceable by a bundle.</summary>
+    public const string BuiltIn = "builtin";
+
+    /// <summary>True for a value this host knows.</summary>
+    public static bool IsKnown(string? kind) => kind is Script or Native or BuiltIn;
+
+    /// <summary>An empty or unknown stored value is a script: rows written before the column existed (and a
+    /// restore of such a backup) carry no kind, and a script is what they are.</summary>
+    public static string Normalize(string? kind) => kind == Native ? Native : kind == BuiltIn ? BuiltIn : Script;
 }

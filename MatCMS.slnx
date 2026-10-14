@@ -1,6 +1,9 @@
 <Solution>
   <Project Path="src/MatCMS.Shared/MatCMS.Shared.csproj" />
+  <Project Path="src/MatCMS.Plugin.Abstractions/MatCMS.Plugin.Abstractions.csproj" />
   <Project Path="src/MatCMS.Shared.Web/MatCMS.Shared.Web.csproj" />
   <Project Path="src/MatCMS/MatCMS.csproj" />
   <Project Path="src/MatCMS.Cloud/MatCMS.Cloud.csproj" />
+  <Project Path="tests/MatCMS.Plugins.Tests/MatCMS.Plugins.Tests.csproj" />
+  <Project Path="tests/Fixtures/RefPlugin/RefPlugin.csproj" />
 </Solution>

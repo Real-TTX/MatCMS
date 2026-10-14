@@ -38,6 +38,98 @@ public static class PluginBlueprints
 
     public static IReadOnlyList<Blueprint> All { get; } = new List<Blueprint>
     {
+        // Gegen die Plugin-API geschrieben (Plugin.Route, Plugin.Admin, Plugin.Settings, Plugin.Data …) — dieselbe wie bei nativen Plugins.
+        new("route",
+            "// Blaupause bp:route" + MarkerHint + "\n" +
+            "// Eine öffentliche Seite unter einer eigenen Adresse, im Layout der Website (Titel, Meta, Sprachpräfix).\n" +
+            "// {slug} fängt ein Adressstück; die Adresse muss mit einem festen Stück beginnen (/mein-plugin/…).\n" +
+            "Plugin.Route(\"/mein-plugin/{slug}\", ctx =>\n" +
+            "    PluginResult.Page(\n" +
+            "        Ui.Stack(\n" +
+            "            Ui.Heading(\"Seite \" + ctx.Request.R(\"slug\")),\n" +
+            "            Ui.Text(\"Das ist eine Seite des Plugins.\"),\n" +
+            "            Ui.Button(\"Zur Startseite\", \"/\", UiButtonKind.Ghost)),\n" +
+            "        \"Meine Seite\"));\n"),
+        new("page",
+            "// Blaupause bp:page" + MarkerHint + "\n" +
+            "// Ein Menüpunkt im Admin mit zwei Reitern. Die Seiten werden aus Bausteinen der Bibliothek beschrieben —\n" +
+            "// Dunkelmodus, Handy-Ansicht und Antiforgery-Schutz kommen dadurch von selbst.\n" +
+            "Plugin.Admin.Section(\"Mein Plugin\", \"ti-plug\")\n" +
+            "    .Page(\"start\", \"Start\", ctx => PluginResult.Page(Ui.Stack(\n" +
+            "        Ui.PageHead(\"Was dieses Plugin hier tut.\"),\n" +
+            "        Ui.Card(\"Eingabe\", Ui.Form(\n" +
+            "            Ui.Input(\"wert\", \"Wert\", ctx.Request.F(\"wert\")),\n" +
+            "            Ui.FormActions(Ui.Submit(\"Speichern\", name: \"action\", value: \"save\"))))), \"Mein Plugin\"))\n" +
+            "    .Page(\"liste\", \"Liste\", ctx => PluginResult.Page(Ui.Table(\n" +
+            "        new[] { Ui.Column(\"Name\"), Ui.Column(\"Zustand\") },\n" +
+            "        new[] { Ui.Row(\"Beispiel\", Ui.Badge(\"aktiv\", UiTone.Success)) },\n" +
+            "        searchPlaceholder: \"Suchen\", emptyText: \"Noch nichts da.\")));\n"),
+        new("settings",
+            "// Blaupause bp:settings" + MarkerHint + "\n" +
+            "// Einstellungen als Formular: Das Plugin DEKLARIERT sie, der Admin zeichnet das Formular (Reiter „Einstellungen“),\n" +
+            "// prüft die Eingabe und speichert — ein Geheimnis verschlüsselt und nie wieder im Browser sichtbar.\n" +
+            "Plugin.Settings\n" +
+            "    .Text(\"titel\", \"Titel\", def: \"Hallo\", help: \"Erscheint über der Liste.\", required: true)\n" +
+            "    .Number(\"anzahl\", \"Anzahl\", def: 6, min: 1, max: 50)\n" +
+            "    .Bool(\"aktiv\", \"Aktiv\", def: true)\n" +
+            "    .Secret(\"apikey\", \"API-Schlüssel\");\n" +
+            "\n" +
+            "// Lesen: ctx.Settings.Get(\"titel\"), ctx.Settings.GetInt(\"anzahl\"), ctx.Settings.GetBool(\"aktiv\") …\n" +
+            "Plugin.Route(\"/mein-plugin\", ctx => PluginResult.Text(ctx.Settings.Get(\"titel\")));\n"),
+        new("table",
+            "// Blaupause bp:table" + MarkerHint + "\n" +
+            "// Eine eigene Tabelle. Das Plugin deklariert sie; beim Laden wird sie angelegt oder um neue Spalten ergänzt\n" +
+            "// (gelöscht oder umgebaut wird nie etwas von selbst). Backup, Wiederherstellung und Aufräumen kennen sie.\n" +
+            "Plugin.Data.Table(\"dinge\", t => t\n" +
+            "    .Text(\"name\", required: true)\n" +
+            "    .Int(\"bestand\", def: \"0\")\n" +
+            "    .Bool(\"aktiv\", def: \"1\")\n" +
+            "    .Timestamp(\"angelegt\")\n" +
+            "    .UniqueIndex(\"name\"));\n" +
+            "\n" +
+            "Plugin.Route(\"/mein-plugin/dinge\", async (ctx, ct) =>\n" +
+            "{\n" +
+            "    var dinge = ctx.Data.Table(\"dinge\");\n" +
+            "    if (ctx.Request.IsPost)\n" +
+            "        await dinge.InsertAsync(new Dictionary<string, object?> { [\"name\"] = ctx.Request.F(\"name\"), [\"angelegt\"] = DateTime.UtcNow }, ct);\n" +
+            "    var zeilen = await dinge.QueryAsync(DataQuery.Everything.Eq(\"aktiv\", true).OrderBy(\"name\"), ct);\n" +
+            "    return PluginResult.Page(Ui.Table(new[] { Ui.Column(\"Name\"), Ui.Column(\"Bestand\", right: true) },\n" +
+            "        zeilen.Select(z => Ui.Row(z.Text(\"name\"), z.Int(\"bestand\")))), \"Dinge\");\n" +
+            "}, new PublicRouteOptions { PostRedirectGet = true });\n"),
+        new("job",
+            "// Blaupause bp:job" + MarkerHint + "\n" +
+            "// Eine geplante Aufgabe: läuft einzeln (nie doppelt), Fehler landen im Log dieses Plugins, der letzte Lauf\n" +
+            "// steht unter Plugins. Mindestabstand eine Minute.\n" +
+            "Plugin.Job(\"aufraeumen\", JobSchedule.EveryInterval(TimeSpan.FromHours(6)), async (ctx, ct) =>\n" +
+            "{\n" +
+            "    ctx.Log(\"Aufräumen läuft\");\n" +
+            "    await Task.CompletedTask;\n" +
+            "});\n" +
+            "// Oder einmal täglich zu einer Uhrzeit (UTC): JobSchedule.Daily(new TimeOnly(3, 30))\n"),
+        new("event",
+            "// Blaupause bp:event" + MarkerHint + "\n" +
+            "// Auf ein Ereignis hören. Plugins sprechen über NAMEN und JSON, nie über gemeinsame Typen — so reden Skript-\n" +
+            "// und native Plugins miteinander. Vom Host kommen u. a. HostEvents.FormSubmitted und HostEvents.PageSaved.\n" +
+            "Plugin.On(HostEvents.FormSubmitted, async (ctx, payload) =>\n" +
+            "{\n" +
+            "    ctx.Log(\"Formular \" + payload?[\"form\"] + \" eingegangen\");\n" +
+            "    await Task.CompletedTask;\n" +
+            "});\n" +
+            "\n" +
+            "// Selbst ein Ereignis auslösen und Antworten sammeln (ein Erweiterungspunkt):\n" +
+            "// var antworten = await ctx.Events.CollectAsync(\"mein-plugin.zahlarten\", new JsonObject());\n"),
+        new("strings",
+            "// Blaupause bp:strings" + MarkerHint + "\n" +
+            "// Texte in mehreren Sprachen. ctx.T(\"schluessel\") liefert den Text der Seitensprache, sonst der Standardsprache,\n" +
+            "// sonst Englisch, sonst den Schlüssel. Beschriftungen, die selbst ein Schlüssel sind (Menüpunkt, Reiter,\n" +
+            "// Einstellungen), übersetzt der Admin für dich. Alternativ: Dateien strings/de.json, strings/en.json im Plugin.\n" +
+            "Plugin.Strings(\"de\", new Dictionary<string, string> { [\"mein.titel\"] = \"Mein Plugin\", [\"mein.gruss\"] = \"Hallo {0}!\" });\n" +
+            "Plugin.Strings(\"en\", new Dictionary<string, string> { [\"mein.titel\"] = \"My plugin\", [\"mein.gruss\"] = \"Hello {0}!\" });\n" +
+            "\n" +
+            "Plugin.Admin.Section(\"mein.titel\", \"ti-plug\")\n" +
+            "    .Page(\"start\", \"mein.titel\", ctx => PluginResult.Page(Ui.Text(ctx.T(\"mein.gruss\", \"Welt\"))));\n"),
+
+        // Die älteren Mitglieder des Plugin-Kontexts (AddAdminMenu, AddBlock, Config …): laufen weiter, für neue Plugins gibt es oben das Bessere.
         new("adminpage",
             "// Blaupause bp:adminpage" + MarkerHint + "\n" +
             "// Ein Menüpunkt im Admin und die Seite dahinter. Die Seite liegt unter\n" +

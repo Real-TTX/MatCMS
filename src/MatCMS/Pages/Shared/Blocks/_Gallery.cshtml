@@ -1,8 +1,7 @@
 @model MatCMS.Content.BlockData
-@inject MatCMS.Data.AppDbContext Db
+@inject MatCMS.Services.PublicContentService PublicContent
 @inject MatCMS.Services.Localizer T
 @inject MatCMS.Services.MediaFocus Focus
-@using Microsoft.EntityFrameworkCore
 @{
     var heading = Model.Str("heading");
     var layout = Model.StrOr("layout", "grid");
@@ -27,16 +26,11 @@
     if (source == "media")
     {
         var wanted = MatCMS.Content.TagUtil.Split(Model.Str("tags")).ToList();
-        // Follow the manual media order; new uploads get the next SortOrder so they land at the end.
-        var media = Db.Media.AsNoTracking().OrderBy(m => m.SortOrder).ThenBy(m => m.Id).ToList();
-        foreach (var m in media)
+        foreach (var m in await PublicContent.ListMediaAsync(wanted))
         {
-            var mtags = MatCMS.Content.TagUtil.Split(m.Tags).ToList();
-            if (wanted.Count > 0 && !wanted.Any(w => mtags.Contains(w, StringComparer.OrdinalIgnoreCase)))
-                continue;
             var src = SafeSrc(m.Url);
             if (src.Length == 0) continue;
-            items.Add((src, m.Alt ?? "", "", string.Join(" ", mtags)));
+            items.Add((src, m.Alt ?? "", "", string.Join(" ", m.Tags)));
         }
         // The block's own filter tag(s) select which media appear; they'd be redundant as filter
         // buttons (every shown item has them), so offer only the remaining tags (e.g. room categories)

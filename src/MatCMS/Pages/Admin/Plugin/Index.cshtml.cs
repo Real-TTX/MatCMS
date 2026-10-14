@@ -52,7 +52,7 @@ public class IndexModel : PageModel
             label = System.Text.RegularExpressions.Regex.Replace(label, @"\s*\(\d+\)\s*$", "");
         Title = string.IsNullOrWhiteSpace(label) ? Key : label!;
 
-        if (!_registry.Pages.TryGetValue(Key, out var handler))
+        if (!_registry.TryGetPage(Key, out var handler) || handler is null)
         {
             Found = false;
             return;

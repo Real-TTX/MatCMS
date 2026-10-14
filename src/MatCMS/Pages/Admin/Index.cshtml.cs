@@ -34,8 +34,6 @@ public class IndexModel : PageModel
     public const int CardRows = 6;
     public int PageCount { get; private set; }
     public int PageDrafts { get; private set; }
-    public int PostCount { get; private set; }
-    public int PostDrafts { get; private set; }
     public int MediaCount { get; private set; }
     public long MediaBytes { get; private set; }
     public int UserCount { get; private set; }
@@ -70,6 +68,8 @@ public class IndexModel : PageModel
     // ---- Lists ---------------------------------------------------------------------------------------------
     public sealed record Edited(string Kind, string Title, bool Published, DateTime UpdatedAt, string Url);
     public List<Edited> RecentlyEdited { get; private set; } = new();
+    /// <summary>The tiles loaded plugins add to the row of figures.</summary>
+    public IReadOnlyList<MatCMS.Plugin.UiStat> PluginTiles { get; private set; } = Array.Empty<MatCMS.Plugin.UiStat>();
     public List<MatCMS.Models.FormSubmission> RecentSubmissions { get; private set; } = new();
     public List<MatCMS.Models.LogEntry> RecentErrors { get; private set; } = new();
 
@@ -83,8 +83,6 @@ public class IndexModel : PageModel
     {
         PageCount = await _db.Pages.CountAsync();
         PageDrafts = await _db.Pages.CountAsync(p => !p.IsPublished);
-        PostCount = await _db.Posts.CountAsync();
-        PostDrafts = await _db.Posts.CountAsync(p => !p.IsPublished);
         MediaCount = await _db.Media.CountAsync();
         MediaBytes = MediaCount == 0 ? 0 : await _db.Media.SumAsync(m => m.SizeBytes);
         UserCount = await _db.Users.CountAsync();
@@ -121,12 +119,16 @@ public class IndexModel : PageModel
         // What was worked on last — the fastest way back into an edit.
         var pages = await _db.Pages.AsNoTracking().OrderByDescending(p => p.UpdatedAt).Take(30)
             .Select(p => new { p.Id, p.Title, p.IsPublished, p.UpdatedAt }).ToListAsync();
-        var posts = await _db.Posts.AsNoTracking().OrderByDescending(p => p.UpdatedAt).Take(30)
-            .Select(p => new { p.Id, p.Title, p.IsPublished, p.UpdatedAt }).ToListAsync();
         RecentlyEdited = pages.Select(p => new Edited("page", p.Title, p.IsPublished, p.UpdatedAt, Url.Page("/Admin/Pages/Editor", new { id = p.Id })!))
-            .Concat(posts.Select(p => new Edited("post", p.Title, p.IsPublished, p.UpdatedAt, Url.Page("/Admin/Posts/Edit", new { id = p.Id })!)))
             .OrderByDescending(e => e.UpdatedAt).Take(30).ToList();
 
         AttentionItems = await _attention.BuildAsync(HttpContext.RequestAborted);
+
+        var contributions = HttpContext.RequestServices.GetRequiredService<MatCMS.Services.Plugins.PluginContributions>();
+        PluginTiles = await contributions.TilesAsync(HttpContext.RequestServices, HttpContext.RequestAborted);
+        RecentlyEdited = RecentlyEdited
+            .Concat((await contributions.RecentAsync(HttpContext.RequestServices, HttpContext.RequestAborted))
+                .Select(r => new Edited(r.Kind, r.Title, r.Published, r.UpdatedUtc, r.Url)))
+            .OrderByDescending(e => e.UpdatedAt).Take(30).ToList();
     }
 }

@@ -10,6 +10,8 @@ on:
       # The shared projects are compiled into both images, so a change to either must rebuild this one.
       - "src/MatCMS.Shared/**"
       - "src/MatCMS.Shared.Web/**"
+      # The plugin API: compiled into the CMS image only (the cloud does not reference it).
+      - "src/MatCMS.Plugin.Abstractions/**"
       - ".github/workflows/dev.yml"
   workflow_dispatch:
 

@@ -1,0 +1,12 @@
+@* The sidebar entries of ONE group (content / design / system / the plugin block) from the AdminNav registry:
+   the CMS's own entries and the plugins' entries are the same kind of line, ordered together. A plugin names a
+   Tabler icon ("ti-star"); anything else (older plugins brought an emoji) already got the neutral plugin icon
+   in the registry — the back office shows no emojis. An entry is active on its own URL and below it. *@
+@model MatCMS.Plugin.AdminGroup
+@inject MatCMS.Services.AdminNav Nav
+@foreach (var entry in await Nav.GroupAsync(Model, Context.RequestServices, Context.RequestAborted))
+{
+    var path = entry.Url.Split('?')[0];
+    var active = path.StartsWith('/') && Context.Request.Path.StartsWithSegments(path, StringComparison.OrdinalIgnoreCase);
+    <a class="@(active ? "active" : "")" href="@entry.Url"><i class="ti @entry.Icon" aria-hidden="true"></i> @(entry.IsCore ? T[entry.Label].ToString() : entry.Label)@if (entry.Badge is not null) { <span class="nav-badge">@entry.Badge</span> }</a>
+}

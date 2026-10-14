@@ -9,6 +9,12 @@
 
 <div class="card">
     <p class="help">@Html.Raw(T["plugins.intro"])</p>
+    <form method="post" asp-page-handler="AllowNative" class="check" style="margin:10px 0 4px;">
+        <label class="check">
+            <input type="checkbox" name="allow" value="true" @(Model.NativeAllowed ? "checked" : "") onchange="this.form.requestSubmit()" /> @T["plugins.native.allowTitle"]
+        </label>
+    </form>
+    <div class="help" style="margin-bottom:12px;">@T["plugins.native.allowHelp"]</div>
     @if (Model.Items.Count == 0)
     {
         <p class="muted">@T["plugins.empty"]</p>
@@ -26,6 +32,19 @@
                         @if (!string.IsNullOrWhiteSpace(p.Version))
                         {
                             <span class="badge">v@(p.Version)</span>
+                        }
+                        @if (MatCMS.Models.PluginKind.Normalize(p.Kind) == MatCMS.Models.PluginKind.BuiltIn)
+                        {
+                            <span class="badge badge-new">@T["plugins.kind.builtin"]</span>
+                        }
+                        else if (MatCMS.Models.PluginKind.Normalize(p.Kind) == MatCMS.Models.PluginKind.Native)
+                        {
+                            <span class="badge">@T["plugins.kind.native"]</span>
+                            @if (Model.Lingering(p.Key)) { <span class="badge badge-new">@T["plugins.native.restart"]</span> }
+                        }
+                        else
+                        {
+                            <span class="badge">@T["plugins.kind.script"]</span>
                         }
                         @if (p.Enabled)
                         {
@@ -46,10 +65,17 @@
                     <form class="inline-form" method="post" asp-page-handler="Toggle" asp-route-id="@p.Id">
                         <button type="submit" class="btn btn-sm btn-ghost">@(p.Enabled ? T["plugins.disable"] : T["plugins.enable"])</button>
                     </form>
+                    @if (Model.WithSettings.Contains(p.Key))
+                    {
+                        <a class="btn btn-sm btn-ghost" href="/admin/p/@p.Key/_settings"><i class="ti ti-adjustments" aria-hidden="true"></i> @T["plugins.settings.tab"]</a>
+                    }
                     <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@p.Id">@T["action.edit"]</a>
-                    <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@p.Id" data-confirm="@T["plugins.confirmDelete"]">
-                        <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
-                    </form>
+                    @if (MatCMS.Models.PluginKind.Normalize(p.Kind) != MatCMS.Models.PluginKind.BuiltIn)
+                    {
+                        <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@p.Id" data-confirm="@Model.DeleteConfirm.GetValueOrDefault(p.Key, T["plugins.confirmDelete"].ToString())">
+                            <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
+                        </form>
+                    }
                 </div>
             </div>
         }
@@ -57,6 +83,39 @@
     }
     <partial name="_AddMenu" model='AddMenus.Payload(T, "plugins", Url.Page("Create")!, "plugins.new", Model.CloudConnected ? Url.Page("Index", new { browse = true }) : null, "import-plugin")' />
 </div>
+
+@if (Model.Jobs.Count > 0)
+{
+    <div class="card">
+        <h2>@T["plugins.jobs.title"]</h2>
+        <table class="data">
+            <thead><tr><th>@T["plugins.jobs.plugin"]</th><th>@T["plugins.jobs.job"]</th><th>@T["plugins.jobs.schedule"]</th><th>@T["plugins.jobs.last"]</th><th>@T["plugins.jobs.state"]</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var j in Model.Jobs)
+                {
+                    <tr>
+                        <td>@j.Owner</td>
+                        <td class="mono">@j.Name</td>
+                        <td>@j.Schedule</td>
+                        <td class="muted nowrap">@(j.LastRunUtc is { } lr ? lr.ToLocalTime().ToString("dd.MM. HH:mm") : "—")</td>
+                        <td>
+                            @if (j.Running) { <span class="badge badge-new">@T["plugins.jobs.running"]</span> }
+                            else if (j.LastError is not null) { <span class="badge badge-err" title="@j.LastError">@T["plugins.jobs.failed"]</span> }
+                            else if (j.LastRunUtc is not null) { <span class="badge badge-on">@T["plugins.jobs.ok"]</span> }
+                            else { <span class="badge badge-off">@T["plugins.jobs.waiting"]</span> }
+                        </td>
+                        <td>
+                            <form class="inline-form" method="post" asp-page-handler="RunJob">
+                                <input type="hidden" name="owner" value="@j.Owner" /><input type="hidden" name="job" value="@j.Name" />
+                                <button type="submit" class="btn btn-sm btn-ghost" disabled="@j.Running">@T["plugins.jobs.runNow"]</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
 
 <div class="card" id="import-plugin" hidden>
     <h2>@T["plugins.importZip"]</h2>

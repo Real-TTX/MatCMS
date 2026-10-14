@@ -747,6 +747,8 @@ table.data .btn { white-space: nowrap; }
 .tab { flex: none; white-space: nowrap; appearance: none; background: none; border: none; border-bottom: 2px solid transparent; padding: 10px 16px; font: inherit; font-size: 14.5px; font-weight: 600; color: var(--muted); cursor: pointer; }
 .tab:hover { color: var(--black); }
 .tab.active { color: var(--black); border-bottom-color: var(--accent); }
+/* A tab that is a link (plugin sections: one page per tab) looks like the button tabs. */
+a.tab { text-decoration: none; display: inline-block; }
 /* Tabs that are pages of one area (a link per tab, not a panel switch) look exactly the same. */
 a.tab { display: inline-block; text-decoration: none; }
 /* A hidden tab panel must stay hidden even when it also carries a display-setting class
@@ -1703,3 +1705,65 @@ table.data.attention-list td.attention-why { white-space: normal; overflow-wrap:
 }
 /* In a dashboard card the name stays one line, so six lines always fit. */
 .dash-card table.dash-attention td:last-child > a { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ===== Plugin UI library (UiRenderer): what the components need beyond the shared classes ===== */
+html[data-theme] .alert-warning { background: var(--warn-bg); border-color: var(--warn-line); color: var(--warn-fg); }
+.alert-warning { background: #fdf6e3; border-color: #ecd9a0; color: #7a5a00; padding: 14px 18px; margin-bottom: 24px; font-size: 15px; border: 1px solid; }
+.ui-stack > .card, .ui-stack > .alert, .ui-stack > .stat-grid { margin-bottom: 0; }
+.ui-form { max-width: 860px; }
+.ui-form-narrow { max-width: 560px; }
+.ui-dialog-foot { display: flex; justify-content: flex-end; margin-top: 14px; }
+.ui-grid > .card { margin-bottom: 0; }
+/* Image gallery and attachment chips of UiMediaList. */
+.gal-list, .att-list { display: flex; flex-wrap: wrap; gap: 10px; }
+.gal-item { position: relative; width: 112px; }
+.gal-item img { width: 112px; height: 112px; object-fit: cover; border-radius: 8px; display: block; border: 1px solid var(--line); }
+.gal-item .gal-tools { display: flex; justify-content: space-between; margin-top: 4px; }
+.gal-item button, .att-chip button { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 6px; cursor: pointer; font-size: 12px; padding: 2px 7px; }
+.gal-item .gal-first { position: absolute; left: 6px; top: 6px; background: rgba(0,0,0,.6); color: #fff; font-size: 11px; padding: 1px 6px; border-radius: 4px; }
+.gal-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 8px; }
+.att-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+.att-chip a { text-decoration: none; color: var(--accent); }
+.att-chip button { border: 0; background: none; color: var(--err-fg); font-weight: 700; padding: 0 2px; }
+/* The blog editor's "Aus Link übernehmen" dialog. */
+.post-import { width: min(620px, 92vw); }
+.post-import__status { margin-top: 10px; font-size: 14px; }
+.post-import__status.is-error { color: var(--err-fg); }
+.post-import__status ul { margin: 6px 0 0; padding-left: 18px; color: var(--muted); }
+#pi-dialog .ui-inline { flex-wrap: nowrap; align-items: flex-end; }
+#pi-dialog .ui-inline .field { flex: 1; min-width: 0; margin-bottom: 0; }
+/* The plugin editor's code field (CodeMirror in front of the file textarea) and the findings of "Prüfen". Colours from the admin's variables so
+   the dark mode needs no second theme. */
+.pf-main .CodeMirror { height: 520px; font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 13.5px; line-height: 1.55; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; }
+.pf-main .CodeMirror-gutters { background: var(--surface-2); border-right: 1px solid var(--line); }
+.pf-main .CodeMirror-linenumber { color: var(--text-muted); }
+.pf-main .CodeMirror-cursor { border-left-color: var(--ink); }
+.pf-main .CodeMirror-activeline-background { background: var(--hover); }
+.pf-main .CodeMirror-selected { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.pf-main .cm-keyword { color: color-mix(in srgb, var(--accent) 80%, var(--ink)); font-weight: 600; }
+.pf-main .cm-builtin, .pf-main .cm-type { color: color-mix(in srgb, #0891b2 75%, var(--ink)); }
+.pf-main .cm-string, .pf-main .cm-string-2 { color: color-mix(in srgb, #16a34a 70%, var(--ink)); }
+.pf-main .cm-number, .pf-main .cm-atom { color: color-mix(in srgb, #d97706 75%, var(--ink)); }
+.pf-main .cm-comment { color: var(--text-muted); font-style: italic; }
+.pf-main .cm-def, .pf-main .cm-variable-2 { color: var(--ink); }
+.pf-main .cm-meta { color: var(--text-muted); }
+.pf-diag-error, .pf-diag-warning { text-decoration: underline wavy; text-underline-offset: 3px; }
+.pf-diag-error { text-decoration-color: var(--err-fg); background: var(--err-bg); }
+.pf-diag-warning { text-decoration-color: #d97706; background: var(--warn-bg); }
+.pf-diag-panel { margin-top: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font-size: 13.5px; overflow: hidden; }
+.pf-diag-panel[hidden] { display: none; }
+.pf-diag-panel.is-ok { border-color: var(--ok-line); } .pf-diag-panel.is-error { border-color: var(--err-line); } .pf-diag-panel.is-warn { border-color: var(--warn-line); }
+.pf-diag-head { padding: 8px 12px; font-weight: 600; background: var(--surface-2); }
+.pf-diag-panel.is-ok .pf-diag-head { color: var(--ok-fg); background: var(--ok-bg); }
+.pf-diag-panel.is-error .pf-diag-head { color: var(--err-fg); background: var(--err-bg); }
+.pf-diag-row { display: block; width: 100%; text-align: left; border: 0; border-top: 1px solid var(--line); background: none; padding: 7px 12px; font: 12.5px/1.45 ui-monospace, Consolas, monospace; color: var(--ink); cursor: pointer; }
+.pf-diag-row:hover { background: var(--hover); }
+.pf-diag-row.is-error { border-left: 3px solid var(--err-fg); } .pf-diag-row.is-warning { border-left: 3px solid #d97706; }
+.CodeMirror-hints { background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.25); z-index: 4000; max-height: 18em; }
+.CodeMirror-hint { color: var(--ink); padding: 4px 10px; max-width: 520px; white-space: normal; }
+li.CodeMirror-hint-active { background: var(--accent); color: #fff; }
+.pf-hint-name { font-weight: 600; } .pf-hint-sig, .pf-hint-ret { opacity: .75; font-size: 12px; }
+.pf-hint-doc { font-size: 11.5px; opacity: .8; margin-top: 1px; }
+/* A counter at the right of a sidebar entry (a plugin's "3 new"). */
+.admin-nav a .nav-badge { float: right; min-width: 20px; padding: 1px 7px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 11.5px; line-height: 1.6; text-align: center; margin-top: 1px; }
+.admin-nav a.active .nav-badge { background: #fff; color: var(--accent); }

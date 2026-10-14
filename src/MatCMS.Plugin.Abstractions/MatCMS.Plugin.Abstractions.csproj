@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>MatCMS.Plugin</RootNamespace>
+    <!-- The API version, not the app version: a plugin declares the MAJOR it was built against
+         (plugin.json "Api") and the host decides from that. Additive changes bump the minor only. -->
+    <Version>2.0.0</Version>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- A public API member without a summary is an API nobody can use correctly. -->
+    <WarningsAsErrors>$(WarningsAsErrors);CS1591</WarningsAsErrors>
+  </PropertyGroup>
+
+  <!-- NuGet package, so a native plugin can be built OUTSIDE this repo (plugins/pack-abstractions.ps1 writes it to a
+       local feed; nothing is published). Deliberately no license, repository or author fields: none of that is decided
+       yet, and an invented value would be worse than a missing one. Add them here once it is. -->
+  <PropertyGroup>
+    <PackageId>MatCMS.Plugin.Abstractions</PackageId>
+    <Description>The API that MatCMS plugins are written against: IPlugin, IPluginBuilder, PluginResult and the UI component model. Free of ASP.NET and EF.</Description>
+    <PackageTags>matcms;plugin</PackageTags>
+  </PropertyGroup>
+
+  <!-- Deliberately free of ASP.NET and EF: this is the surface plugins are written against, so no
+       framework type may leak into it (every internal change would then break plugins), and the cloud
+       can reference it later to render plugin settings with the same components as an instance. -->
+
+</Project>

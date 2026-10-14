@@ -382,7 +382,7 @@ public class CloudSyncService
     {
         // Guard: the cloud link keys live in the same table. Letting a profile push those would let
         // one instance's configuration hijack another's cloud connection.
-        var forbidden = SettingKeys.Cloud.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var forbidden = SettingKeys.Protected.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var count = 0;
         foreach (var (key, value) in settings)

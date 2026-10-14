@@ -1,4 +1,5 @@
 using MatCMS.Data;
+using MatCMS.Plugin;
 using Microsoft.EntityFrameworkCore;
 
 namespace MatCMS.Services;
@@ -18,11 +19,14 @@ public sealed class AttentionService
     private readonly VersionService _version;
     private readonly Localizer _t;
     private readonly LinkGenerator _links;
+    private readonly Plugins.PluginContributions _contributions;
+    private readonly IServiceProvider _services;
 
     public AttentionService(AppDbContext db, CloudState cloud, BackupManager backups, EmailService mail, VersionService version,
-        Localizer t, LinkGenerator links)
+        Localizer t, LinkGenerator links, Plugins.PluginContributions contributions, IServiceProvider services)
     {
         _db = db; _cloud = cloud; _backups = backups; _mail = mail; _version = version; _t = t; _links = links;
+        _contributions = contributions; _services = services;
     }
 
     /// <param name="Level">err | warn | info.</param>
@@ -89,6 +93,9 @@ public sealed class AttentionService
                 _t["attention.detail.lastError", Local(e.CreatedAt), (e.StatusCode is int sc ? sc + " " : "") + (string.IsNullOrEmpty(e.Path) ? "" : e.Path + " · ") + e.Message],
                 errors);
         }
+
+        foreach (var n in await _contributions.AttentionAsync(_services, ct))
+            a.Add(new(n.Tone switch { UiTone.Error => "err", UiTone.Warning => "warn", _ => "info" }, "plugin", n.Icon, n.Title, n.Text, n.Url));
 
         return a.OrderBy(x => x.Level switch { "err" => 0, "warn" => 1, _ => 2 }).ToList();
     }

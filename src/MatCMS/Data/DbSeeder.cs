@@ -349,7 +349,7 @@ public static class DbSeeder
     /// <summary>Assigns a stable slug Key to any plugin created before the Key column existed.</summary>
     private static async Task BackfillPluginKeysAsync(AppDbContext db)
     {
-        List<Plugin> pending;
+        List<Models.Plugin> pending;
         try { pending = await db.Plugins.Where(p => p.Key == null || p.Key == "").ToListAsync(); }
         catch { return; }
         if (pending.Count == 0) return;

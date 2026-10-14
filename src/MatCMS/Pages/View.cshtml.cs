@@ -145,12 +145,17 @@ public class ViewModel : PageModel
         }
         else
         {
-            _db.FormSubmissions.Add(new FormSubmission
+            var submission = new FormSubmission
             {
                 FormId = form.Id,
                 DataJson = System.Text.Json.JsonSerializer.Serialize(stored, FormDefinition.Opts)
-            });
+            };
+            _db.FormSubmissions.Add(submission);
             await _db.SaveChangesAsync();
+            var fieldsPayload = new System.Text.Json.Nodes.JsonObject();
+            foreach (var (fl, fv) in answered) fieldsPayload[fl] = fv;
+            await MatCMS.Services.Plugins.PluginHostEvents.RaiseAsync(HttpContext.RequestServices, MatCMS.Plugin.HostEvents.FormSubmitted,
+                new System.Text.Json.Nodes.JsonObject { ["form"] = form.Name, ["id"] = submission.Id, ["fields"] = fieldsPayload }, HttpContext.RequestAborted);
 
             TempData["FormSuccess_" + formSlug] = string.IsNullOrWhiteSpace(form.SuccessMessage)
                 ? "Vielen Dank! Ihre Angaben wurden übermittelt."

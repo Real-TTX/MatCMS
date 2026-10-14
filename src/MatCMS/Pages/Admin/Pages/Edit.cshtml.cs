@@ -262,6 +262,8 @@ public class EditModel : PageModel
         page.TemplateParamsJson = NormalizeParamsJson(Meta.TemplateParamsJson);
         page.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
+        await MatCMS.Services.Plugins.PluginHostEvents.RaiseAsync(HttpContext.RequestServices, MatCMS.Plugin.HostEvents.PageSaved,
+            new System.Text.Json.Nodes.JsonObject { ["id"] = page.Id, ["slug"] = page.Slug, ["locale"] = page.Locale, ["published"] = page.IsPublished }, HttpContext.RequestAborted);
 
         // Editor v2 saves the settings together with the blocks (one "Speichern") and stays on the page:
         // it needs the outcome as data, including the address the page now lives at.

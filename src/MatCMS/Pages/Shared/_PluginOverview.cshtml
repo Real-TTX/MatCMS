@@ -1,0 +1,51 @@
+@* What a plugin contributes, read from the registry: the same for a script, a native plugin and a built-in one, because all three
+   register through the same API. Shown on the plugin's page so an operator sees what switching it on changes before they do. *@
+@model string
+@inject MatCMS.Services.PluginRegistry Registry
+@{
+    var slice = Registry.SliceOf(Model);
+    var section = Registry.Sections.FirstOrDefault(s => s.Owner == Model);
+    var routes = Registry.Routes.Where(r => r.Owner == Model).Select(r => r.Pattern.Template).ToList();
+    var blocks = Registry.Blocks.Where(b => b.Owner == Model).Select(b => b.Type).ToList();
+    var jobs = Registry.Jobs.Where(j => j.Owner == Model).Select(j => j.Name).ToList();
+    var listens = Registry.ListensOf(Model).ToList();
+    void Row(string label, IEnumerable<string> items)
+    {
+        var list = items.ToList();
+        if (list.Count == 0) return;
+        <div class="kv"><span class="kv-label">@label</span><span class="kv-value">@foreach (var i in list) { <span class="mini-chip mono">@i</span> }</span></div>
+    }
+}
+<div class="card">
+    <h3 class="form-section">@T["plugins.overview.title"]</h3>
+    @if (slice is null)
+    {
+        <p class="muted">@T["plugins.overview.notLoaded"]</p>
+    }
+    else
+    {
+        Row(T["plugins.overview.routes"], routes);
+        if (section is not null)
+        {
+            Row(T["plugins.overview.admin"], new[] { section.Label }.Concat(section.Pages.Select(p => "/" + p.Pattern.Template.Trim('/'))));
+        }
+        Row(T["plugins.overview.blocks"], blocks);
+        Row(T["plugins.overview.settings"], slice.Settings.Select(s => s.Key));
+        Row(T["plugins.overview.tables"], slice.Tables.Select(t => t.Name));
+        Row(T["plugins.overview.jobs"], jobs);
+        Row(T["plugins.overview.events"], listens);
+        Row(T["plugins.overview.languages"], slice.Strings.Keys);
+        Row(T["plugins.overview.extensions"], new[]
+        {
+            slice.Sitemaps.Count > 0 ? T["plugins.overview.sitemap"].ToString() : "",
+            slice.MediaRefs.Count > 0 ? T["plugins.overview.media"].ToString() : "",
+            slice.Operations.Count > 0 ? T["plugins.overview.operations"].ToString() + ": " + string.Join(", ", slice.Operations.Select(o => o.Name)) : "",
+            slice.Tiles.Count + slice.Recents.Count + slice.Attentions.Count > 0 ? T["plugins.overview.dashboard"].ToString() : ""
+        }.Where(x => x.Length > 0));
+        @if (routes.Count + blocks.Count + jobs.Count + listens.Count == 0 && section is null && slice.Settings.Count == 0 && slice.Tables.Count == 0
+             && Registry.HeadHtml.Count + Registry.BodyHtml.Count == 0)
+        {
+            <p class="muted">@T["plugins.overview.nothing"]</p>
+        }
+    }
+</div>

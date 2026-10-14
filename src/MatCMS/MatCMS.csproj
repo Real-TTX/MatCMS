@@ -67,8 +67,23 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The blog's own texts travel inside the assembly (the plugin reads them at load), not as loose content files. -->
+    <Content Remove="Plugin\Blog\Strings\*.json" />
+    <!-- WithCulture="false": "blog.de.json" would otherwise be read as a German satellite resource and leave the assembly. -->
+    <EmbeddedResource Include="Plugin\Blog\Strings\*.json" WithCulture="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The plugin tests build the registry, builder and loaders directly. -->
+    <InternalsVisibleTo Include="MatCMS.Plugins.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\MatCMS.Shared\MatCMS.Shared.csproj" />
     <ProjectReference Include="..\MatCMS.Shared.Web\MatCMS.Shared.Web.csproj" />
+    <!-- The API plugins are written against. Referenced by the host so a plugin and the host share ONE
+         copy of these types (type identity across the plugin load context). -->
+    <ProjectReference Include="..\MatCMS.Plugin.Abstractions\MatCMS.Plugin.Abstractions.csproj" />
   </ItemGroup>
 
 </Project>

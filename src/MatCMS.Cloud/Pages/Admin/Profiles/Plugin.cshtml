@@ -94,6 +94,22 @@
         }
     </div>
 
+        @if (Model.Native is { } native)
+        {
+            <div class="card">
+                <h2>@T["profiles.pluginNative"] <span class="badge badge-new">@T["profiles.pluginNativeBadge"]</span></h2>
+                <p class="muted">@T["profiles.pluginNativeHint"]</p>
+                <div class="kv"><div class="kv-label">@T["profiles.pluginNativeEntry"]</div><div class="kv-value mono">@native.Entry</div></div>
+                <div class="kv"><div class="kv-label">API</div><div class="kv-value mono">@native.Api</div></div>
+                <div class="kv"><div class="kv-label">SHA-256</div><div class="kv-value mono" style="word-break:break-all;">@native.Sha256</div></div>
+                <div class="kv">
+                    <div class="kv-label">@T["profiles.pluginFiles"]</div>
+                    <div class="kv-value"><div class="code-toolbar">@foreach (var f in native.Files) { <span class="token-chip" title="@f.Size B">src/@f.Path</span> }</div></div>
+                </div>
+            </div>
+        }
+        else
+        {
     <div class="card">
         <h2>@T["profiles.pluginCode"]</h2>
         <div class="form-field">
@@ -101,6 +117,7 @@
             <div class="help">@T["profiles.pluginCodeHint"]</div>
         </div>
     </div>
+        }
 
 </form>
 

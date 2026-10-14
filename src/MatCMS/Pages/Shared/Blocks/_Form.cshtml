@@ -1,15 +1,11 @@
 @using MatCMS.Content
-@using Microsoft.EntityFrameworkCore
 @model MatCMS.Content.BlockData
-@inject MatCMS.Data.AppDbContext Db
+@inject MatCMS.Services.PublicContentService PublicContent
 @inject MatCMS.Services.Localizer T
 @inject MatCMS.Services.FormGuard Guard
 @inject MatCMS.Services.SiteContext Site
 @{
-    var slug = Model.Str("form");
-    var form = string.IsNullOrWhiteSpace(slug)
-        ? null
-        : Db.Forms.AsNoTracking().FirstOrDefault(f => f.Slug == slug);
+    var form = await PublicContent.FindFormAsync(Model.Str("form"));
 }
 @if (form is null)
 {

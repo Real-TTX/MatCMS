@@ -14,6 +14,9 @@ namespace MatCMS.Cloud.Pages.Admin.Profiles;
 /// Plugin editor as its own page. The stored bundle is unpacked into editable metadata + code and
 /// repacked on save, so the instance keeps receiving the exact ZIP its own importer expects.
 /// </summary>
+// A native bundle can hold up to 60 MB of assemblies; the framework's default body limit would refuse it before this page ran.
+[RequestSizeLimit(96L * 1024 * 1024)]
+[RequestFormLimits(MultipartBodyLengthLimit = 96L * 1024 * 1024)]
 public class PluginModel : PageModel
 {
     private readonly AppDbContext _db;
@@ -28,6 +31,8 @@ public class PluginModel : PageModel
     public Profile Owner { get; private set; } = new();
     public ProfilePlugin Item { get; private set; } = new();
     public string Code { get; private set; } = "";
+    /// <summary>Set for a native (compiled) bundle: shown read-only instead of the code editor.</summary>
+    public NativeBundleInfo? Native { get; private set; }
     public List<string> Assets { get; private set; } = new();
 
     /// <summary>The plugin's further script files, by name. Listed, not edited: <see cref="Repack"/>
@@ -54,6 +59,7 @@ public class PluginModel : PageModel
         Item = item;
         var unpacked = ReadBundle(item.Bundle);
         Code = unpacked.Code;
+        Native = NativeBundleInfo.Read(item.Bundle);
         Assets = unpacked.Assets;
         Files = unpacked.Files;
         return Page();
@@ -68,9 +74,9 @@ public class PluginModel : PageModel
             TempData["FlashError"] = "Bitte eine Plugin-ZIP auswählen.";
             return RedirectToPage(new { profileId });
         }
-        if (bundle.Length > 32 * 1024 * 1024)
+        if (bundle.Length > 90L * 1024 * 1024)
         {
-            TempData["FlashError"] = "Die Datei ist zu groß (max. 32 MB).";
+            TempData["FlashError"] = "Die Datei ist zu groß (max. 90 MB).";
             return RedirectToPage(new { profileId });
         }
 
@@ -265,7 +271,8 @@ public class PluginModel : PageModel
             meta["Key"] = key;
             meta["Version"] = version;
             meta["Description"] = description;
-            meta["Code"] = code;
+            // A native bundle has no source to edit: its Code is the note for older instances and stays exactly as it was.
+            if (!MatCMS.Cloud.Services.NativeBundleInfo.IsNative(meta)) meta["Code"] = code;
 
             using var target = new MemoryStream();
             using (var outZip = new ZipArchive(target, ZipArchiveMode.Create, leaveOpen: true))

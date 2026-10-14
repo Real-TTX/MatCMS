@@ -16,9 +16,17 @@ public class CreateModel : PageModel
     [BindProperty] public string? Name { get; set; }
     public string? Error { get; private set; }
 
-    private const string Starter =
-        "// Beispiel-Plugin. Verfügbar: AddAdminMenu(label, url, icon), Service<T>()\n" +
-        "AddAdminMenu(\"Mein Plugin\", \"/admin\", \"ti-plug\");\n\n" +
+    internal const string Starter =
+        "// Mein Plugin — geschrieben gegen die Plugin-API, dieselbe wie bei nativen Plugins:\n" +
+        "// Plugin.Route · Plugin.Admin.Section · Plugin.Block · Plugin.Settings · Plugin.Data · Plugin.Job · Plugin.On · Plugin.Strings\n" +
+        "// Weitere Bausteine einfügen: „Blaupause“ im Dateibaum.\n" +
+        "Plugin.Admin.Section(\"Mein Plugin\", \"ti-plug\")\n" +
+        "    .Page(\"start\", \"Start\", ctx => PluginResult.Page(\n" +
+        "        Ui.Stack(\n" +
+        "            Ui.PageHead(\"Was dieses Plugin hier tut.\"),\n" +
+        "            Ui.Card(\"Hallo\", Ui.Text(\"Dieses Plugin läuft. Der Code steht links in plugin.csx.\"))),\n" +
+        "        \"Mein Plugin\"));\n\n" +
+        "// Ältere Schreibweise (läuft weiter): AddAdminMenu(label, url, icon), Service<T>()\n" +
         "// Eigene Dateien aus dem Plugin-Ordner (unter „Dateien dieses Plugins\" hochladen):\n" +
         "// IncludeScript(\"app.js\");     // lädt /plugin-assets/<key>/app.js auf allen Seiten\n" +
         "// IncludeStyle(\"style.css\");   // lädt eine CSS-Datei im <head>\n" +

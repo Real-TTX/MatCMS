@@ -27,12 +27,14 @@ public class ContentTransferService
     private readonly AppDbContext _db;
     private readonly IWebHostEnvironment _env;
     private readonly PluginRunner _plugins;
+    private readonly MatCMS.Services.Plugins.PluginDataService _pluginData;
 
-    public ContentTransferService(AppDbContext db, IWebHostEnvironment env, PluginRunner plugins)
+    public ContentTransferService(AppDbContext db, IWebHostEnvironment env, PluginRunner plugins, MatCMS.Services.Plugins.PluginDataService pluginData)
     {
         _db = db;
         _env = env;
         _plugins = plugins;
+        _pluginData = pluginData;
     }
 
     private static readonly JsonSerializerOptions WriteOpts = new()
@@ -133,6 +135,10 @@ public class ContentTransferService
     /// </summary>
     private const string PluginAssetFolder = "plugin-assets/";
 
+    /// <summary>Folder of the native plugins' compiled files inside the backup ZIP:
+    /// <c>plugins-native/{key}/{version}/{path under src/}</c>.</summary>
+    private const string NativePluginFolder = "plugins-native/";
+
     /// <summary>Builds a ZIP backup (content.json + optional assets/) and returns its bytes.</summary>
     public async Task<byte[]> ExportAsync(BackupOptions options, string? exportedAtUtc = null)
     {
@@ -154,6 +160,28 @@ public class ContentTransferService
                     await using var es = entry.Open();
                     await using var fs = File.OpenRead(file);
                     await fs.CopyToAsync(es);
+                }
+            }
+
+            // The compiled files of NATIVE plugins, with the plugin rows (options.Plugins): a row without its DLLs is a
+            // shell that looks complete and does nothing — the same trap as a script that `#load`s files the backup left
+            // out. Only the version the row names; one folder per key and version, as on disk.
+            if (options.Plugins)
+            {
+                foreach (var p in await _db.Plugins.AsNoTracking().Where(p => p.Kind == PluginKind.Native).ToListAsync())
+                {
+                    var src = StoragePaths.PluginSrc(_env, p.Key, p.Version);
+                    if (!Directory.Exists(src)) continue;
+                    foreach (var file in Directory.GetFiles(src, "*", SearchOption.AllDirectories))
+                    {
+                        var rel = MatCMS.Shared.PluginBundle.NormalizeSourcePath(Path.GetRelativePath(src, file));
+                        if (rel is null) continue;
+                        var entry = zip.CreateEntry(NativePluginFolder + StoragePaths.SafeSegment(p.Key) + "/"
+                            + StoragePaths.SafeSegment(p.Version) + "/" + rel, CompressionLevel.Optimal);
+                        await using var es = entry.Open();
+                        await using var fs = File.OpenRead(file);
+                        await fs.CopyToAsync(es);
+                    }
                 }
             }
 
@@ -334,8 +362,10 @@ public class ContentTransferService
         // Blog posts travel with the full Pages section (not a granular page subset).
         if (options.Pages && (options.PageKeys is null || options.PageKeys.Count == 0))
         {
-            dto.Posts = (await _db.Posts.AsNoTracking()
-                .OrderByDescending(p => p.PublishedAt).ThenBy(p => p.Id).ToListAsync())
+            // The posts are the blog's table, read here without the plugin: a backup carries them whether or not the blog is switched on.
+            dto.Posts = (await (await MatCMS.Plugin.Blog.BlogStore.EnsureTableAsync(_pluginData, _db)).QueryAsync(
+                    MatCMS.Plugin.DataQuery.Everything.OrderBy("PublishedAt", descending: true).OrderBy("Id")))
+                .Select(MatCMS.Plugin.Blog.BlogStore.From)
                 .Select(p => new PostDto
                 {
                     Title = p.Title, Slug = p.Slug, TitleImage = p.TitleImage, Excerpt = p.Excerpt,
@@ -352,13 +382,23 @@ public class ContentTransferService
         // would otherwise come back as a broken shell that still looks complete.
         if (options.Plugins)
         {
-            dto.Plugins = (await _db.Plugins.AsNoTracking().OrderBy(p => p.Id).ToListAsync())
+            var pluginRows = await _db.Plugins.AsNoTracking().OrderBy(p => p.Id).ToListAsync();
+            // The tables a plugin keeps its data in travel with it: without them a restore brings back a shop with no products.
+            var pluginData = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var p in pluginRows)
+            {
+                var tables = await _pluginData.ExportAsync(_db, p.Key);
+                if (tables.Count > 0) pluginData[p.Key] = tables.ToJsonString();
+            }
+            dto.Plugins = pluginRows
                 .Select(p => new PluginDto
                 {
+                    DataJson = pluginData.GetValueOrDefault(p.Key),
                     Key = p.Key, Name = p.Name, Description = p.Description,
                     Version = p.Version, DataVersion = p.DataVersion,
                     Code = p.Code, FilesJson = p.FilesJson, MappingJson = p.MappingJson,
                     ConfigJson = p.ConfigJson,
+                    Kind = PluginKind.Normalize(p.Kind), Entry = p.Entry, Sha256 = p.Sha256, Api = p.Api,
                     Enabled = p.Enabled, CreatedAt = p.CreatedAt
                 }).ToList();
         }
@@ -400,7 +440,7 @@ public class ContentTransferService
         using (var r = new StreamReader(contentEntry.Open(), Encoding.UTF8))
             json = await r.ReadToEndAsync();
 
-        var summary = await ImportJsonAsync(json);
+        var summary = await ImportJsonAsync(json, zip);
 
         // Restore assets into wwwroot/uploads (filename only -> no path traversal; image types only).
         var assetCount = 0;
@@ -451,6 +491,105 @@ public class ContentTransferService
             var file = Path.Combine(root, width.ToString(), name + ".webp");
             try { if (File.Exists(file)) File.Delete(file); } catch { /* a stale thumbnail must never fail a restore */ }
             try { if (File.Exists(file + ".failed")) File.Delete(file + ".failed"); } catch { /* same */ }
+        }
+    }
+
+    /// <summary>
+    /// Puts the compiled files of native plugins back under <c>appdata/plugins/{key}/{version}/src/</c>.
+    /// <para>Only for a (key, version) the backup's own plugin list names as native: a crafted ZIP cannot park files for a
+    /// plugin the restore did not create. Every path goes through the bundle's rule (no "..", no hidden names, only
+    /// the allowed types), the plugin API assembly is refused as in an import, and sizes are counted while reading.
+    /// A plugin that is running is unloaded first — its DLLs are about to be replaced — and started again by the caller.</para>
+    /// </summary>
+    /// <summary>
+    /// Puts the plugins' tables back. Done BEFORE the plugins start: a plugin that loads finds its tables (and only adds what its newer
+    /// version declares). The destination of every table is computed from the plugin's key — the backup never names it — and a plugin
+    /// whose key is not in the backup's plugin list is not touched; see <see cref="MatCMS.Services.Plugins.PluginDataService.ImportAsync"/>.
+    /// A failing table is reported in the log and does not stop the rest of the restore.
+    /// </summary>
+    private async Task RestorePluginDataAsync(List<PluginDto> plugins)
+    {
+        foreach (var p in plugins)
+        {
+            var key = (p.Key ?? "").Trim();
+            if (key.Length == 0 || string.IsNullOrWhiteSpace(p.DataJson)) continue;
+            try
+            {
+                if (System.Text.Json.Nodes.JsonNode.Parse(p.DataJson) is not System.Text.Json.Nodes.JsonObject tables) continue;
+                // A running plugin is stopped first: its handlers must not write into a table that is being replaced.
+                await _plugins.UnloadAsync(key);
+                // A table a plugin ADOPTED (the blog's posts) is never in this blob and never restored from it: the core backup
+                // carries those in their own, older shape (see the Posts section), so an empty allow-list is exactly right.
+                await _pluginData.ImportAsync(_db, key, tables, Array.Empty<string>());
+            }
+            catch (Exception ex)
+            {
+                _db.Logs.Add(new LogEntry { Level = "Error", Message = $"Wiederherstellung der Plugin-Daten von „{key}“ fehlgeschlagen: {ex.Message}", CreatedAt = DateTime.UtcNow });
+                await _db.SaveChangesAsync();
+            }
+        }
+    }
+
+    private async Task RestoreNativePluginFilesAsync(ZipArchive zip, List<PluginDto> plugins)
+    {
+        var wanted = plugins
+            .Where(p => PluginKind.Normalize(p.Kind) == PluginKind.Native && !string.IsNullOrWhiteSpace(p.Key))
+            .Select(p => (Key: (p.Key ?? "").Trim(), Version: p.Version ?? ""))
+            .ToList();
+        if (wanted.Count == 0) return;
+
+        long total = 0;
+        var count = 0;
+        var unloaded = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var entry in zip.Entries)
+        {
+            var norm = entry.FullName.Replace('\\', '/');
+            if (!norm.StartsWith(NativePluginFolder, StringComparison.OrdinalIgnoreCase) || norm.EndsWith('/')) continue;
+
+            var parts = norm[NativePluginFolder.Length..].Split('/', 3);
+            if (parts.Length < 3) continue;                                  // key/version/file at least
+            var plugin = wanted.FirstOrDefault(w =>
+                StoragePaths.SafeSegment(w.Key) == StoragePaths.SafeSegment(parts[0])
+                && StoragePaths.SafeSegment(w.Version) == StoragePaths.SafeSegment(parts[1]));
+            if (plugin.Key is null) continue;
+
+            var rel = MatCMS.Shared.PluginBundle.NormalizeSourcePath(parts[2]);
+            if (rel is null) continue;
+            if (string.Equals(Path.GetFileName(rel), "MatCMS.Plugin.Abstractions.dll", StringComparison.OrdinalIgnoreCase)) continue;
+            if (++count > MatCMS.Shared.PluginBundle.MaxSourceFiles * Math.Max(1, wanted.Count)) break;
+
+            var src = StoragePaths.PluginSrc(_env, plugin.Key, plugin.Version);
+            var dest = Path.GetFullPath(Path.Combine(src, rel));
+            if (!dest.StartsWith(Path.GetFullPath(src) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) continue;
+
+            if (unloaded.Add(plugin.Key)) await _plugins.UnloadAsync(plugin.Key);   // before the first file is replaced
+            Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+
+            // Counted while copying, never from the length the ZIP claims.
+            var tmp = dest + ".restoretmp";
+            long written = 0;
+            try
+            {
+                await using (var es = entry.Open())
+                await using (var fs = File.Create(tmp))
+                {
+                    var buffer = new byte[81920];
+                    int n;
+                    while ((n = await es.ReadAsync(buffer)) > 0)
+                    {
+                        written += n; total += n;
+                        if (written > MatCMS.Shared.PluginBundle.MaxSourceFileBytes || total > MatCMS.Shared.PluginBundle.MaxSourceTotalBytes * Math.Max(1, wanted.Count))
+                            throw new InvalidOperationException("Ein Plugin im Backup ist zu groß.");
+                        await fs.WriteAsync(buffer.AsMemory(0, n));
+                    }
+                }
+                File.Move(tmp, dest, overwrite: true);
+            }
+            catch
+            {
+                try { if (File.Exists(tmp)) File.Delete(tmp); } catch { /* ignore */ }
+                throw;
+            }
         }
     }
 
@@ -531,7 +670,7 @@ public class ContentTransferService
     /// Restores the sections present in the JSON (transactional). Each present section replaces
     /// the corresponding table; sections not in the file are left untouched.
     /// </summary>
-    private async Task<string> ImportJsonAsync(string json)
+    private async Task<string> ImportJsonAsync(string json, ZipArchive? zip = null)
     {
         if (string.IsNullOrWhiteSpace(json))
             throw new InvalidOperationException("Die Datei ist leer.");
@@ -807,14 +946,19 @@ public class ContentTransferService
             // It also stops a backup from carrying an identity between sites. Restoring another
             // instance's ZIP by hand would otherwise hand this container that instance's token, and
             // two sites reporting as the same instance is not a state anything downstream expects.
+            //
+            // The permission for NATIVE plugins is the same kind of key: it is what THIS site's operator decided,
+            // and a backup that brings compiled code must not also be able to switch on running it. It is kept as
+            // it is here and never read from the file — absent here means off.
             var keep = await _db.SiteSettings
-                .Where(s => SettingKeys.Cloud.Contains(s.Key))
+                .Where(s => SettingKeys.Protected.Contains(s.Key))
                 .ToDictionaryAsync(s => s.Key, s => s.Value, StringComparer.OrdinalIgnoreCase);
 
             _db.SiteSettings.RemoveRange(_db.SiteSettings);
             await _db.SaveChangesAsync();
             foreach (var s in dto.Settings.Where(s => !string.IsNullOrWhiteSpace(s.Key)))
             {
+                if (string.Equals(s.Key, SettingKeys.AllowNativePlugins, StringComparison.OrdinalIgnoreCase)) continue;
                 if (keep.ContainsKey(s.Key!)) continue;
                 _db.SiteSettings.Add(new SiteSetting { Key = s.Key!, Value = s.Value ?? "" });
             }
@@ -974,28 +1118,27 @@ public class ContentTransferService
 
         if (dto.Posts is not null)
         {
-            _db.Posts.RemoveRange(_db.Posts);
-            await _db.SaveChangesAsync();
+            var postsTable = await MatCMS.Plugin.Blog.BlogStore.EnsureTableAsync(_pluginData, _db);
+            await postsTable.DeleteWhereAsync(MatCMS.Plugin.DataQuery.Everything);
             foreach (var p in dto.Posts)
             {
                 if (string.IsNullOrWhiteSpace(p.Slug)) continue;
-                _db.Posts.Add(new Post
+                await postsTable.InsertAsync(MatCMS.Plugin.Blog.BlogStore.ToValues(new MatCMS.Plugin.Blog.BlogPost
                 {
                     Title = p.Title ?? "", Slug = p.Slug!, TitleImage = p.TitleImage,
                     Excerpt = p.Excerpt ?? "", ContentHtml = p.ContentHtml ?? "", Tags = p.Tags ?? "",
                     AttachmentsJson = string.IsNullOrWhiteSpace(p.AttachmentsJson) ? "[]" : p.AttachmentsJson!,
                     // Backups older than the gallery carry none of these four — they read as "no gallery, no source".
                     GalleryJson = string.IsNullOrWhiteSpace(p.GalleryJson) ? "[]" : p.GalleryJson!,
-                    GalleryLayout = MatCMS.Models.Post.NormaliseGalleryLayout(p.GalleryLayout),
+                    GalleryLayout = MatCMS.Plugin.Blog.BlogStore.NormaliseGalleryLayout(p.GalleryLayout),
                     SourceUrl = p.SourceUrl, SourceName = p.SourceName,
                     Locale = string.IsNullOrWhiteSpace(p.Locale) ? "de" : p.Locale!,
                     IsPublished = p.IsPublished,
                     PublishedAt = p.PublishedAt == default ? DateTime.UtcNow : p.PublishedAt,
                     CreatedAt = p.CreatedAt == default ? DateTime.UtcNow : p.CreatedAt,
                     UpdatedAt = p.UpdatedAt == default ? DateTime.UtcNow : p.UpdatedAt
-                });
+                }));
             }
-            await _db.SaveChangesAsync();
             summary.Add($"{dto.Posts.Count} Beiträge");
         }
 
@@ -1024,9 +1167,26 @@ public class ContentTransferService
                 var key = (p.Key ?? "").Trim();
                 if (key.Length == 0) continue;
                 var row = existingPlugins.FirstOrDefault(x => string.Equals(x.Key, key, StringComparison.OrdinalIgnoreCase));
+                // A plugin that ships with the CMS: a restore brings back whether it was on and its configuration, never its
+                // identity — name, kind and code come from this image. (An operator's own plugin under that key is left alone.)
+                if (MatCMS.Services.Plugins.BuiltInPlugins.Find(key) is { } builtIn)
+                {
+                    if (row is not null && PluginKind.Normalize(row.Kind) != PluginKind.BuiltIn) continue;
+                    if (row is null)
+                    {
+                        row = new Models.Plugin { Key = builtIn.Key, Name = builtIn.Name, Description = builtIn.Description, Version = builtIn.Version, Kind = PluginKind.BuiltIn, Enabled = true };
+                        _db.Plugins.Add(row);
+                        existingPlugins.Add(row);
+                    }
+                    if (p.Enabled is bool builtInOn) row.Enabled = builtInOn;
+                    row.ConfigJson = string.IsNullOrWhiteSpace(p.ConfigJson) ? "{}" : p.ConfigJson!;
+                    if (row.Enabled) enabled++;
+                    n++;
+                    continue;
+                }
                 if (row is null)
                 {
-                    row = new Plugin { Key = key, Enabled = false, CreatedAt = p.CreatedAt == default ? DateTime.UtcNow : p.CreatedAt };
+                    row = new Models.Plugin { Key = key, Enabled = false, CreatedAt = p.CreatedAt == default ? DateTime.UtcNow : p.CreatedAt };
                     _db.Plugins.Add(row);
                     existingPlugins.Add(row);   // same key twice in one backup updates one row, no duplicate insert
                 }
@@ -1043,6 +1203,11 @@ public class ContentTransferService
                 // Einspielen den Assets-Ordner wegzunehmen.
                 row.MappingJson = p.MappingJson ?? "";
                 row.ConfigJson = string.IsNullOrWhiteSpace(p.ConfigJson) ? "{}" : p.ConfigJson!;
+                row.Kind = PluginKind.Normalize(p.Kind);
+                row.Entry = row.Kind == PluginKind.Native ? (p.Entry ?? "") : "";
+                row.Sha256 = row.Kind == PluginKind.Native ? (p.Sha256 ?? "") : "";
+                row.Api = row.Kind == PluginKind.Native ? p.Api : 0;
+                if (row.Kind == PluginKind.Native) row.FilesJson = "{}";
                 n++;
             }
             await _db.SaveChangesAsync();
@@ -1099,7 +1264,13 @@ public class ContentTransferService
         // re-run the site kept serving the code from before the restore — and a plugin the backup
         // switched on stayed absent — until the next restart or plugin save.
         if (dto.Plugins is not null)
+        {
+            // The compiled files first: the plugins are STARTED right below, and a native plugin whose DLL is not on
+            // disk yet would fail to load and sit in that error until somebody reloads it.
+            if (zip is not null) await RestoreNativePluginFilesAsync(zip, dto.Plugins);
+            await RestorePluginDataAsync(dto.Plugins);
             await _plugins.RunAllAsync();
+        }
 
         return summary.Count == 0 ? "Nichts importiert" : string.Join(", ", summary) + " wiederhergestellt";
     }
@@ -1309,6 +1480,14 @@ public class ContentTransferService
         /// Bestand gelesen — siehe <see cref="MatCMS.Services.PluginMapping"/>.</summary>
         public string? MappingJson { get; set; }
         public string? ConfigJson { get; set; }
+        /// <summary>The plugin's own tables with schema and rows (a JSON object, kept as text so it survives a rewrite field by field).</summary>
+        public string? DataJson { get; set; }
+        /// <summary><c>script</c> or <c>native</c>. Absent in a backup from before native plugins: a script.</summary>
+        public string? Kind { get; set; }
+        /// <summary>Native: main assembly, its checksum and the API major it was built for.</summary>
+        public string? Entry { get; set; }
+        public string? Sha256 { get; set; }
+        public int Api { get; set; }
         /// <summary>State at the time of the backup — restored as it was. Nullable on purpose: a file
         /// without the field (hand-built) says nothing, and must not read as "off".</summary>
         public bool? Enabled { get; set; }

@@ -52,6 +52,72 @@ public static class PluginBundle
     public const long MaxFileBytes = 1 * 1024 * 1024;
     public const int MaxFiles = 200;
 
+    // ---- native plugins -------------------------------------------------------------------------
+    // A bundle has two kinds. SCRIPT bundles are exactly what they always were — Format 1, the entry file in the
+    // manifest's `Code`, further files under files/ — and stay that way on purpose: older instances and the cloud's
+    // store editor read them, and an older reader IGNORES `Format` entirely, so a new shape for scripts would be
+    // imported by them as an empty plugin without a word. NATIVE bundles are new and additive.
+
+    /// <summary>Manifest <c>Kind</c> of a script plugin (also what a bundle without the field is).</summary>
+    public const string KindScript = "script";
+
+    /// <summary>Manifest <c>Kind</c> of a native plugin: compiled assemblies under <see cref="SourceFolder"/>.</summary>
+    public const string KindNative = "native";
+
+    /// <summary>
+    /// Folder holding a NATIVE plugin's assemblies (and what they bring: strings, dependency DLLs) inside the zip and
+    /// on disk (<c>appdata/plugins/{Key}/{Version}/src/</c>). For a script plugin the same word names the editor's root
+    /// of source files; there the files are still stored the old way (see above).
+    /// <para>Like <c>files/</c>, one zip entry each — the cloud copies every entry other than the manifest byte for
+    /// byte, so a native bundle survives a cloud round trip untouched.</para>
+    /// </summary>
+    public const string SourceFolder = "src/";
+
+    /// <summary>What a native bundle's <c>Code</c> says: the one thing an OLDER reader can do with it — import a plugin
+    /// whose only source is this line, which then reports why it cannot run instead of being silently empty.</summary>
+    public const string NativeGuardCode =
+        "throw new System.NotSupportedException(\"Dies ist ein natives Plugin. Es braucht ein MatCMS mit nativen Plugins — bitte MatCMS aktualisieren.\");";
+
+    /// <summary>A native bundle may be heavier than a script one: it carries assemblies. Per file, for all of
+    /// <c>src/</c>, and on the count — the same zip-bomb guards as for assets, sized for DLLs.</summary>
+    public const long MaxSourceFileBytes = 25 * 1024 * 1024;
+    public const long MaxSourceTotalBytes = 60 * 1024 * 1024;
+    public const int MaxSourceFiles = 300;
+
+    /// <summary>File types allowed under <c>src/</c>: managed assemblies, their dependency and string files, and the
+    /// native libraries a dependency may need. No scripts, no executables.</summary>
+    public static readonly string[] AllowedSourceExt = [".dll", ".json", ".txt", ".so"];
+
+    /// <summary>
+    /// Straightens a path below <see cref="SourceFolder"/> and says whether it may be written to disk. Nested folders
+    /// are fine (<c>strings/de.json</c>, <c>runtimes/linux-x64/native/x.so</c>); what is refused is anything that could
+    /// leave the folder or confuse a file system: "..", control characters, the characters no file system agrees on,
+    /// and a file type that is not on the list.
+    /// </summary>
+    /// <returns>The normalised path (forward slashes), or <c>null</c>.</returns>
+    public static string? NormalizeSourcePath(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        var text = raw.Replace('\\', '/').Trim();
+        if (text.EndsWith('/')) return null;
+
+        var segments = new List<string>();
+        foreach (var part in text.Split('/'))
+        {
+            var s = part.Trim();
+            if (s.Length == 0 || s == ".") continue;
+            if (s == ".." || s.StartsWith('.')) return null;
+            foreach (var ch in s)
+                if (char.IsControl(ch) || ch is ':' or '*' or '?' or '"' or '<' or '>' or '|') return null;
+            segments.Add(s);
+        }
+        if (segments.Count == 0) return null;
+
+        var path = string.Join('/', segments);
+        var ext = Path.GetExtension(path).ToLowerInvariant();
+        return AllowedSourceExt.Contains(ext) ? path : null;
+    }
+
     /// <summary>Asset file types a bundle may carry. SVG is excluded deliberately — served from the
     /// site's own origin it is a stored-XSS vector.</summary>
     public static readonly string[] AllowedAssetExt =

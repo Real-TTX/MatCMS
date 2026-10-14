@@ -25,6 +25,23 @@ public static class StoragePaths
     /// <summary>Root of all plugin asset folders, served publicly under <c>/plugin-assets</c>.</summary>
     public static string PluginAssets(IWebHostEnvironment env) => Path.Combine(DataDir(env), "plugin-assets");
 
+    /// <summary>Root of the native plugins' files: <c>plugins/{key}/{version}/src/…</c>. A new version gets a folder
+    /// NEXT TO the old one and is never written over it, so an update that fails to load leaves the running
+    /// version's files untouched.</summary>
+    public static string Plugins(IWebHostEnvironment env) => Path.Combine(DataDir(env), "plugins");
+
+    /// <summary>The <c>src/</c> folder of one version of a native plugin. Key and version become path segments, so
+    /// anything outside <c>[A-Za-z0-9._-]</c> is replaced — a version label can never walk out of the folder.</summary>
+    public static string PluginSrc(IWebHostEnvironment env, string key, string version) =>
+        Path.Combine(Plugins(env), SafeSegment(key), SafeSegment(version), "src");
+
+    /// <summary>One path segment from free text: letters, digits, dot, dash, underscore; never empty, never "..".</summary>
+    public static string SafeSegment(string? value)
+    {
+        var s = new string((value ?? "").Where(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '-' or '_').ToArray()).Trim('.');
+        return s.Length == 0 ? "_" : s;
+    }
+
     /// <summary>One plugin's own asset folder (<c>plugin-assets/{key}</c>). The key is a trusted slug.</summary>
     public static string PluginAssetDir(IWebHostEnvironment env, string key) =>
         Path.Combine(PluginAssets(env), key);

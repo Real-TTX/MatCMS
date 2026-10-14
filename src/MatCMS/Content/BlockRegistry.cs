@@ -44,7 +44,7 @@ public class BlockRegistry
         ["pricing"] = "design", ["plan"] = "design", ["comparison"] = "design",
         ["bento"] = "design", ["bentotile"] = "design", ["testimonials"] = "design", ["testimonial"] = "design",
         ["features"] = "design", ["feature"] = "design", ["servicegrid"] = "design",
-        ["service"] = "design", ["imagetext"] = "design", ["posts"] = "design",
+        ["service"] = "design", ["imagetext"] = "design",
         ["references"] = "design", ["reference"] = "design",
         ["form"] = "form", ["memberlogin"] = "form",
         ["html"] = "embed"
@@ -69,11 +69,12 @@ public class BlockRegistry
                 Type = pb.Type,
                 Name = pb.Name,
                 Description = pb.Description,
-                Svg = SvgPlugin,
+                Svg = string.IsNullOrWhiteSpace(pb.IconSvg) ? SvgPlugin : pb.IconSvg,
                 Partial = "(plugin)",
                 PluginRender = pb.Render,
+                PluginRenderAsync = pb.RenderAsync,
                 Fields = pb.Fields,   // editable fields the plugin declared (empty = none)
-                Category = "plugins"  // plugin-provided blocks
+                Category = string.IsNullOrWhiteSpace(pb.Category) ? "plugins" : pb.Category  // plugin-provided blocks
             });
         }
         return list;
@@ -863,33 +864,6 @@ public class BlockRegistry
                     Options = [ new("stack", "block.section.opt.stack"), new("cols2", "block.section.opt.cols2"), new("cols3", "block.section.opt.cols3") ] },
                 new BlockField { Id = "bg", Label = "block.section.f.bg", Type = FieldType.Select, Default = "none",
                     Options = [ new("none", "block.section.opt.bgnone"), new("alt", "block.section.opt.bgalt"), new("accent", "block.section.opt.bgaccent") ] },
-            ]
-        },
-        new BlockDefinition
-        {
-            Type = "posts",
-            Name = "block.posts.name",
-            Description = "block.posts.desc",
-            Svg = SvgGrid,
-            Partial = "Blocks/_Posts",
-            Fields =
-            [
-                new BlockField { Id = "heading", Label = "block.f.heading", Type = FieldType.Text },
-                new BlockField { Id = "display", Label = "block.posts.f.display", Type = FieldType.Select, Default = "cards",
-                    Options = [ new("cards", "block.posts.opt.cards"), new("blog", "block.posts.opt.blog") ],
-                    Help = "block.posts.f.display.help" },
-                new BlockField { Id = "tag", Label = "block.posts.f.tag", Type = FieldType.Text,
-                    Help = "block.posts.f.tag.help" },
-                new BlockField { Id = "columns", Label = "block.gallery.f.columns", Type = FieldType.Select, Default = "3",
-                    Options = [ new("2", "block.opt.columns.2"), new("3", "block.opt.columns.3") ],
-                    Help = "block.posts.f.columns.help" },
-                new BlockField { Id = "perPage", Label = "block.posts.f.perPage", Type = FieldType.Text,
-                    Help = "block.posts.f.perPage.help" },
-                new BlockField { Id = "limit", Label = "block.posts.f.limit", Type = FieldType.Text,
-                    Help = "block.posts.f.limit.help" },
-                new BlockField { Id = "showFilter", Label = "block.gallery.f.showFilter", Type = FieldType.Select, Default = "no",
-                    Options = [ new("yes", "block.opt.yesno.yes"), new("no", "block.opt.yesno.no") ],
-                    Help = "block.posts.f.showFilter.help" },
             ]
         },
         // Referenzen/Projekte. A CONTAINER with one child block per reference — not a component and

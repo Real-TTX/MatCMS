@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- A native MatCMS plugin. The settings below are not taste; each one keeps the plugin loadable and unloadable
+       (docs/plugin-system-v2.md, section 7). tests/Fixtures/RefPlugin in the MatCMS repo is the reference. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>MatCmsPlugin</RootNamespace>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <!-- Dependencies are not copied next to the plugin automatically: the host brings the plugin API, the framework, EF
+         and its own libraries, and the same copy must be used on both sides or the host would not recognise the plugin's
+         IPlugin. A library the plugin needs and the host lacks is added deliberately (CopyLocal) and ends up in src/. -->
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Compile against the API, never ship it: pack-native.ps1 refuses a bundle with its own copy. The package comes from
+         whatever feed your nuget.config names (plugins/pack-abstractions.ps1 writes a local one). -->
+    <PackageReference Include="MatCMS.Plugin.Abstractions" Version="2.*">
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>

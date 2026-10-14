@@ -1,31 +1,18 @@
-using MatCMS.Data;
-using MatCMS.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.EntityFrameworkCore;
 
 namespace MatCMS.Pages.Admin.Posts;
 
+/// <summary>The blog's back office used to live here (<c>/admin/posts</c>, <c>/admin/posts/edit/{id}</c>). It is a plugin now, at
+/// <c>/admin/p/blog</c>; this page only forwards old links and bookmarks.</summary>
 public class IndexModel : PageModel
 {
-    private readonly AppDbContext _db;
-    public IndexModel(AppDbContext db) => _db = db;
-
-    public List<Post> Items { get; private set; } = new();
-
-    public async Task OnGetAsync() =>
-        Items = await _db.Posts.AsNoTracking()
-            .OrderByDescending(p => p.PublishedAt).ThenByDescending(p => p.Id).ToListAsync();
-
-    public async Task<IActionResult> OnPostDeleteAsync(int id)
+    public IActionResult OnGet(string? rest)
     {
-        var p = await _db.Posts.FindAsync(id);
-        if (p is not null)
-        {
-            _db.Posts.Remove(p);
-            await _db.SaveChangesAsync();
-            TempData["Flash"] = "Beitrag gelöscht.";
-        }
-        return RedirectToPage();
+        var parts = (rest ?? "").Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+        // /admin/posts/edit/7 → /admin/p/blog/posts/7
+        if (parts.Length == 2 && parts[0].Equals("edit", StringComparison.OrdinalIgnoreCase) && long.TryParse(parts[1], out var id))
+            return Redirect("/admin/p/blog/posts/" + id);
+        return Redirect("/admin/p/blog");
     }
 }

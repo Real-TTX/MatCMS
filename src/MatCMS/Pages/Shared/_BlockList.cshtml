@@ -50,7 +50,7 @@
         }
         @if (def.IsPluginBlock)
         {
-            @Html.Raw(RenderPluginBlock(def, block.DataJson))
+            @Html.Raw(await RenderPluginBlockAsync(def, block.DataJson))
         }
         else if (def.IsComponent)
         {
@@ -88,7 +88,7 @@
         return new MatCMS.Content.ContainerBlockModel(data, kids) { Editor = editor, Depth = depth };
     }
 
-    string RenderPluginBlock(MatCMS.Content.BlockDefinition def, string dataJson)
+    async Task<string> RenderPluginBlockAsync(MatCMS.Content.BlockDefinition def, string dataJson)
     {
         var http = ViewContext.HttpContext;
         var svc = http.RequestServices;
@@ -103,9 +103,10 @@
             Data = dataJson,
             Method = http.Request.Method,
             Path = http.Request.Path.Value ?? "",
-            Query = query
+            Query = query,
+            IsAdmin = http.User?.IsInRole("Admin") == true
         };
-        try { return def.PluginRender!(pr); }
+        try { return def.PluginRenderAsync is { } renderAsync ? await renderAsync(pr, http.RequestAborted) : def.PluginRender!(pr); }
         catch (Exception ex) { return "<!-- plugin block error: " + System.Net.WebUtility.HtmlEncode(ex.Message) + " -->"; }
     }
 }

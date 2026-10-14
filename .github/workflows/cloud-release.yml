@@ -10,6 +10,7 @@ on:
       # The shared projects are compiled into both images, so a change to either must rebuild this one.
       - "src/MatCMS.Shared/**"
       - "src/MatCMS.Shared.Web/**"
+      - "src/MatCMS.Plugin.Abstractions/**"
       - ".github/workflows/cloud-release.yml"
   workflow_dispatch:
 

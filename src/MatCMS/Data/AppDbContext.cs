@@ -21,8 +21,7 @@ public class AppDbContext : DbContext
     public DbSet<Media> Media => Set<Media>();
     public DbSet<Component> Components => Set<Component>();
     public DbSet<MailTemplate> MailTemplates => Set<MailTemplate>();
-    public DbSet<Plugin> Plugins => Set<Plugin>();
-    public DbSet<Post> Posts => Set<Post>();
+    public DbSet<Models.Plugin> Plugins => Set<Models.Plugin>();
 
     // Public-site visitor accounts and their role vocabulary (the "guest area" login).
     public DbSet<SiteMember> SiteMembers => Set<SiteMember>();
@@ -32,7 +31,6 @@ public class AppDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder b)
     {
-        b.Entity<Post>().HasIndex(p => new { p.Slug, p.Locale }).IsUnique();
         b.Entity<User>().HasIndex(u => u.Username).IsUnique();
         // Optimistic-concurrency guard so two simultaneous logins can't spend the same single-use
         // recovery code twice: the second UPDATE matches 0 rows and throws (handled in TwoFactorService).

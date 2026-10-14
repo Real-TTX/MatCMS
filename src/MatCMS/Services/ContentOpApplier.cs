@@ -21,12 +21,14 @@ public class ContentOpApplier
     private readonly AppDbContext _db;
     private readonly BlockGenerator _blockGen;
     private readonly CleanupService _cleanup;
+    private readonly IServiceProvider _services;
 
-    public ContentOpApplier(AppDbContext db, BlockGenerator blockGen, CleanupService cleanup)
+    public ContentOpApplier(AppDbContext db, BlockGenerator blockGen, CleanupService cleanup, IServiceProvider services)
     {
         _db = db;
         _blockGen = blockGen;
         _cleanup = cleanup;
+        _services = services;
     }
 
     public async Task<ContentOpReport> ApplyAsync(PendingContentOp op, CancellationToken ct = default)
@@ -36,7 +38,6 @@ public class ContentOpApplier
             return op.Kind switch
             {
                 "page.create" => await CreatePageAsync(op, ct),
-                "post.create" => await CreatePostAsync(op, ct),
                 "form.create" => await CreateFormAsync(op, ct),
                 "setting.set" => await SetSettingAsync(op, ct),
                 "cleanup.analyze" => await AnalyzeCleanupAsync(op, ct),
@@ -44,7 +45,7 @@ public class ContentOpApplier
                 "pages.list" => await ListPagesAsync(op, ct),
                 "page.read" => await ReadPageAsync(op, ct),
                 "page.updateBlocks" => await UpdatePageBlocksAsync(op, ct),
-                _ => Report(op, "failed", $"Unbekannte Aktion: {op.Kind}"),
+                _ => await RunPluginOperationAsync(op, ct),
             };
         }
         catch (Exception ex)
@@ -52,6 +53,20 @@ public class ContentOpApplier
             // A single bad op must never take the heartbeat down — report it failed and move on.
             return Report(op, "failed", ex.Message);
         }
+    }
+
+    /// <summary>An operation no core handler knows may be offered by a loaded plugin (<c>Plugin.Operation(name, …)</c>). The plugin
+    /// gets the payload as JSON and answers with a message; it validates what it receives like any other writer.</summary>
+    private async Task<ContentOpReport> RunPluginOperationAsync(PendingContentOp op, CancellationToken ct)
+    {
+        var plugins = _services.GetRequiredService<Plugins.PluginContributions>();
+        if (!plugins.HasOperation(op.Kind)) return Report(op, "failed", $"Unbekannte Aktion: {op.Kind}");
+        var args = string.IsNullOrWhiteSpace(op.PayloadJson) ? null : JsonNode.Parse(op.PayloadJson);
+        var answer = await plugins.RunOperationAsync(_services, op.Kind, args, ct);
+        // The answer is a JSON object { "status": "applied|skipped-exists|failed", "message": "…" } (a bare string is a message).
+        if (answer is JsonObject o)
+            return Report(op, o["status"]?.GetValue<string>() is { Length: > 0 } s ? s : "applied", o["message"]?.GetValue<string>() ?? "");
+        return Report(op, "applied", answer?.ToString() ?? "");
     }
 
     private async Task<ContentOpReport> CreatePageAsync(PendingContentOp op, CancellationToken ct)
@@ -101,39 +116,6 @@ public class ContentOpApplier
         return Report(op, "applied", $"Seite „{slug}“ mit {validated.Count} Block/Blöcken angelegt.");
     }
 
-    private async Task<ContentOpReport> CreatePostAsync(PendingContentOp op, CancellationToken ct)
-    {
-        var payload = JsonNode.Parse(op.PayloadJson) as JsonObject
-            ?? throw new InvalidOperationException("PayloadJson ist kein Objekt.");
-
-        var title = (payload["title"]?.GetValue<string>() ?? "").Trim();
-        var slug = Slugify(payload["slug"]?.GetValue<string>() ?? title);
-        var publish = payload["publish"]?.GetValue<bool>() ?? true;
-        if (string.IsNullOrWhiteSpace(title)) return Report(op, "failed", "Kein Titel angegeben.");
-        if (string.IsNullOrWhiteSpace(slug)) return Report(op, "failed", "Kein gültiger Slug ableitbar.");
-
-        // Add-only by slug within the default locale.
-        if (await _db.Posts.AnyAsync(p => p.Slug == slug && p.Locale == Localizer.DefaultCulture, ct))
-            return Report(op, "skipped-exists", $"Beitrag „{slug}“ existiert bereits.");
-
-        // The body and teaser are AI-supplied HTML → SANITISE before it is ever stored (it is rendered raw
-        // on the public site). This is the whole reason SafeHtml exists.
-        var post = new Post
-        {
-            Title = title,
-            Slug = slug,
-            Excerpt = SafeHtml.Sanitize(payload["excerpt"]?.GetValue<string>()),
-            ContentHtml = SafeHtml.Sanitize(payload["contentHtml"]?.GetValue<string>()),
-            Tags = (payload["tags"]?.GetValue<string>() ?? "").Trim(),
-            Locale = Localizer.DefaultCulture,
-            IsPublished = publish,
-            PublishedAt = DateTime.UtcNow,
-        };
-        _db.Posts.Add(post);
-        await _db.SaveChangesAsync(ct);
-        return Report(op, "applied", $"Beitrag „{slug}“ angelegt{(publish ? " und veröffentlicht" : " (Entwurf)")}.");
-    }
-
     private async Task<ContentOpReport> CreateFormAsync(PendingContentOp op, CancellationToken ct)
     {
         var payload = JsonNode.Parse(op.PayloadJson) as JsonObject
@@ -177,9 +159,9 @@ public class ContentOpApplier
 
         // The cloud-link keys live in the same table; letting an op set them would let a change hijack the
         // instance's cloud connection. Same guard as the profile sync applier (CloudSyncService).
-        var forbidden = SettingKeys.Cloud.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var forbidden = SettingKeys.Protected.ToHashSet(StringComparer.OrdinalIgnoreCase);
         if (forbidden.Contains(key))
-            return Report(op, "failed", $"Schlüssel „{key}“ ist geschützt (Cloud-Verbindung) und kann nicht gesetzt werden.");
+            return Report(op, "failed", $"Schlüssel „{key}“ ist geschützt (Cloud-Verbindung, Erlaubnis für native Plugins) und kann von außen nicht gesetzt werden.");
 
         var row = await _db.SiteSettings.FirstOrDefaultAsync(s => s.Key == key, ct);
         if (row is null) { _db.SiteSettings.Add(new SiteSetting { Key = key, Value = value }); }

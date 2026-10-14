@@ -98,7 +98,7 @@ together by hand:
 ## Layout
 
 ```
-MatCMS.slnx                      # dotnet build MatCMS.slnx builds all four
+MatCMS.slnx                      # dotnet build MatCMS.slnx builds everything (apps, libraries, tests)
 .dockerignore                    # applies to BOTH images (context is the repo root)
 .github/workflows/
   release.yml  dev.yml           # → matcms        (paths: src/MatCMS/** + src/MatCMS.Shared/**)
@@ -106,6 +106,8 @@ MatCMS.slnx                      # dotnet build MatCMS.slnx builds all four
 Directory.Build.props            # promotes MSB9008 (missing ProjectReference) to an error
 src/MatCMS.Shared/               # the cloud↔instance contract, referenced by both
 src/MatCMS.Shared.Web/           # the shared admin shell (RCL): css, admin-list.js, vendor libs
+src/MatCMS.Plugin.Abstractions/  # the API plugins are written against (CMS image only; no ASP.NET, no EF)
+tests/MatCMS.Plugins.Tests/      # plugin system tests; tests/Fixtures/RefPlugin = the reference plugin (native)
 src/MatCMS/                      # each app keeps its own Dockerfile, compose,
 src/MatCMS.Cloud/                #   run-*.ps1, VERSION and appdata/ volume
 plugins/                         # plugin SOURCES (plugin.csx + meta.json each) + pack.ps1 → store bundle
@@ -133,6 +135,86 @@ copy `src/MatCMS.Shared.Web` therefore built "successfully" and produced an imag
 CSS at all — the app ran, every page was unstyled. `Directory.Build.props` promotes that warning to
 an error; do not remove it. When a project is added, both `COPY` lines (csproj first for the restore
 layer, then the folder) go into **both** Dockerfiles.
+
+## The plugin system
+
+Design, status and the traps found while building it: **`docs/plugin-system-v2.md`** — read it before touching
+`Services/PluginRuntime.cs`, `Services/Plugins/` or `Services/PluginPackager.cs`.
+
+**One plugin concept, two kinds, one API.** A plugin is a *script* (C#, `.csx`, editable, source in the database) or
+*native* (compiled DLLs under `appdata/plugins/{key}/{version}/src/`, not editable). The admin treats them the same
+(load/unload, export/import, configuration); both are written against `MatCMS.Plugin.Abstractions`: a script gets the
+`IPluginBuilder` as the global `Plugin`, a native plugin implements `IPlugin.Configure`. The older `PluginContext`
+members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written and register into the same registry.
+**Never give the new API a name an old script can see twice**: scripts import `MatCMS.Services`, which already has
+`PluginRequest`, so the new request type is `RequestData`.
+
+- **The registry is one slice per plugin** (`PluginRegistry.Begin/Publish/Remove`): a load builds a private slice and
+  publishes it in one step, so ONE plugin can be reloaded or unloaded without touching the others. A load that throws
+  publishes nothing; a failed reload keeps what ran before — **except** a withdrawn `plugins.allowNative`, which unloads
+  ("off" must mean off). Do not go back to "reset everything and re-run all".
+- **Plugin routes are not ASP.NET endpoints.** ASP.NET cannot remove an endpoint, so ONE dynamic endpoint
+  (`PluginRouteTransformer`, order -100, in front of the CMS's `/{slug?}`) asks the registry. Public routes need a fixed
+  first segment and may not claim `PluginRoutePattern.Reserved` (admin, api, login, uploads, …). Admin pages live at
+  `/admin/p/{key}/…`.
+- **Plugin bundles: scripts keep Format 1 exactly** — older instances and the cloud's store editor read them, and an
+  older reader IGNORES `Format`, so a new shape would import there as an empty plugin. Only native bundles are new
+  (`Kind: native`, `src/`, `Entry`, `Sha256`; `Code` carries a line that tells an older reader why it cannot run).
+  New manifest fields are strings (the cloud rewrites `plugin.json` field by field). The container shape is in
+  `MatCMS.Shared/PluginBundle.cs`; sizes are counted while reading, not from the zip's length field.
+- **Native plugins are compiled code from outside running with every right of the process — there is no sandbox.**
+  `plugins.allowNative` (default OFF, operator-set, live) is the gate; an import, a cloud rollout, a backup or an MCP
+  `set_setting` can bring the files, never the permission — it is in `SettingKeys.Protected` (with the cloud link keys),
+  which the restore, `CloudSyncService.ApplySettingsAsync` and `ContentOpApplier` all honour. A new outside path that
+  writes settings must honour it too. Imported plugins stay disabled, as always. The DLL's SHA-256 is checked at import
+  AND at every load. Backups carry native plugins with their files (`plugins-native/{key}/{version}/`), put down BEFORE
+  the plugins are started.
+- **Unloading is real but depends on the plugin.** `NativePluginHost` releases the `AssemblyLoadContext` and checks with a
+  `WeakReference`; a plugin that cannot be freed shows "Neustart nötig" instead of leaking silently. Known holders:
+  reflection-based `System.Text.Json` over a plugin's own types (use a source-generated context or `JsonNode`) and EF —
+  EF's static provider cache (cleared by `EfInternals`, the one reflection into EF) AND the provider shared with the
+  host's own contexts (a plugin context needs its OWN service provider). `PluginSystemTests` unloads a real DLL with an
+  EF context; if it fails after an EF update, that is the cause.
+- **Debug builds keep every temporary alive until the method ends**, which alone keeps a load context from being
+  collected. Code and tests that check unloading hold nothing of the plugin in their own frame (`NoInlining` helpers).
+- **Tests: `dotnet test tests/MatCMS.Plugins.Tests`.** They run on in-memory SQLite and temporary folders and never touch
+  an `appdata`. The conformance test runs the SAME reference plugin as script and as native and compares registrations and
+  answers — a feature only one kind has is a bug in the API, not a difference. Practical checks in the real image: own
+  container, own volume, a port that is not 9101/9100, deleted afterwards.
+- **`docker build -f src/MatCMS/Dockerfile .` needs every project the app references** (two COPY lines each, and the
+  `paths:` filters of `dev.yml`/`release.yml`) — `MatCMS.Plugin.Abstractions` is in both. The cloud does not reference it.
+- **"MatCMS ships no plugins" still holds for script plugins and the seeder.** What does ship is the *built-in* plugin
+  (`Kind = builtin`, `Services/Plugins/BuiltInPlugins.cs`): compiled into the image, written against the same API, enabled on a
+  new site, can be switched off, never deleted, exported or overwritten (a bundle or cloud rollout with its key is refused).
+  Today that is **the blog** (`src/MatCMS/Plugin/Blog/`, namespace `MatCMS.Plugin.Blog`): it *adopts* the existing `Posts`
+  table (nothing moved), registers `/blog/{slug}`, the `posts` block, its admin section, the dashboard tile, the sitemap
+  entries and the cloud operation `post.create`. The core no longer knows posts except for the backup, which reads the table
+  through `BlogStore.Table(db)` — so posts are in every backup whether or not the blog is on.
+- **Namespaces: `MatCMS.Plugin` is the API** (assembly `MatCMS.Plugin.Abstractions`), **`MatCMS.Plugin.{Name}` is a plugin's own
+  code** (`MatCMS.Plugin.Blog`, later `MatCMS.Plugin.Shop`). Consequence: the entity is `MatCMS.Models.Plugin` and a bare
+  `Plugin` in host code means the NAMESPACE — write `Models.Plugin` (the compiler says CS0118 where you forgot).
+- **What the API offers** (design: `docs/plugin-system-v2.md` §3): `Route`, `Admin.Section/Page/Tile/RecentlyEdited/Attention`,
+  `Block`, `Settings` (declared; the host draws the form, validates, encrypts secrets), `Data.Table` (declared; reconciled on load —
+  never drops, renames or retypes; backed up, restored and cleaned up by the host), `Lifecycle` (OnInstall/OnUpdate/OnLoad), `On` +
+  `ctx.Events` (name + JSON payload, never shared types), `Job`, `Strings` + `ctx.T` (and `strings/{culture}.json` files), `Sitemap`,
+  `MediaReferences`, `Operation`. Screens are **component trees** (`Ui.*`, `MatCMS.Plugin` records), drawn by
+  `MatCMS.Shared.Web/Ui/UiRenderer.cs` — the one place that knows classes and `data-ui-*` hooks; the rich fields' behaviour is
+  `MatCMS.Shared.Web/wwwroot/js/ui-fields.js`. The renderer encodes everything, limits link targets, and adds the antiforgery token.
+- **Data layer 1 safety rules** (`Services/Plugins/PluginData*.cs`): table/column names come from the plugin's *declaration*
+  (validated, then looked up — never from a request), values are parameters, a plugin's tables are `p_{key}_{name}` and
+  `__plugin_tables` records the owner; a restore recomputes the destination and never trusts a table name from the backup; only a
+  built-in plugin may `Adopt` an existing table. The cleanup reads the text of ALL plugin tables, loaded or not.
+- **A plugin's pages are inside the admin's own chrome:** the sidebar is the `AdminNav` registry (core entries and plugin entries
+  ordered together by group + order, optional badge), plugin settings live at `/admin/p/{key}/_settings`.
+- **The script editor** (`Pages/Admin/Plugins/Edit.cshtml` + `wwwroot/js/plugin-code-editor.js`) puts CodeMirror (C# mode, vendored with the other modes in
+  `Shared.Web/wwwroot/lib/codemirror`) in front of its file textarea and takes over the textarea's `.value`/`focus`, so the page's own script is unchanged. It
+  completes the plugin API from `/admin/plugins/edit/{id}?handler=Catalog` (`PluginApiCatalog`: reflection + the API's XML docs — never hand-written) and has
+  "Prüfen" (`PluginRunner.Check`: compiles exactly as the loader does, never runs; the include prologue is taken out of the line numbers). New API surface needs
+  nothing here: the catalogue follows the assembly. Editor blueprints (`PluginBlueprints`) are loaded for real by `BlueprintTests`.
+- **Native bundles in the cloud are read-only:** the store and profile editors show entry, API, checksum and the `src/` files instead of a code editor, and
+  `Repack` leaves a native bundle's `Code` (the note for older instances) alone (`MatCMS.Cloud/Services/NativeBundleInfo.cs`). The cloud still never loads one.
+- **The plugin machinery tests don't start the built-ins** (`new Harness()`); the blog tests do (`new Harness(builtIns: true)`).
+  `BlueprintTests` load every editor blueprint for real. `AppFactory` + `BlogEndToEndTests` start the whole application in memory over a temp folder (own database, own keys) and drive the blog through HTTP: login, antiforgery, the public pages, switching the plugin off and on.
 
 ## Conventions
 

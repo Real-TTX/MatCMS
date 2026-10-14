@@ -15,6 +15,9 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <!-- The statistics view renders the shared StatsSummary. -->
     <ProjectReference Include="..\MatCMS.Shared\MatCMS.Shared.csproj" />
+    <!-- The component renderer (Ui/UiRenderer.cs) draws the trees plugins describe. It lives here so the cloud
+         can draw a plugin's settings form with the very same components as an instance does. -->
+    <ProjectReference Include="..\MatCMS.Plugin.Abstractions\MatCMS.Plugin.Abstractions.csproj" />
   </ItemGroup>
 
   <!-- The admin shell, shared instead of copied. These files used to live twice, byte-identical, in

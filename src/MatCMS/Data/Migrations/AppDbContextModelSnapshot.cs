@@ -15,7 +15,7 @@ namespace MatCMS.Data.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.12");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.13");
 
             modelBuilder.Entity("MatCMS.Models.Component", b =>
                 {
@@ -472,6 +472,9 @@ namespace MatCMS.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("Api")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -494,11 +497,19 @@ namespace MatCMS.Data.Migrations
                     b.Property<bool>("Enabled")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("Entry")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("FilesJson")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Key")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Kind")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
@@ -510,6 +521,10 @@ namespace MatCMS.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Version")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -517,77 +532,6 @@ namespace MatCMS.Data.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Plugins");
-                });
-
-            modelBuilder.Entity("MatCMS.Models.Post", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("AttachmentsJson")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ContentHtml")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Excerpt")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("GalleryJson")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("GalleryLayout")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("IsPublished")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Locale")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("PublishedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Slug")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("SourceName")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("SourceUrl")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Tags")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("TitleImage")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Slug", "Locale")
-                        .IsUnique();
-
-                    b.ToTable("Posts");
                 });
 
             modelBuilder.Entity("MatCMS.Models.SiteMember", b =>

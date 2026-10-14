@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "identity": "MatCMS.NativePlugin.CSharp",
+  "name": "MatCMS Native Plugin",
+  "shortName": "matcms-native-plugin",
+  "description": "A native (compiled) MatCMS plugin: IPlugin with a public route and an admin page, JSON via a source-generated context. Pack it with plugins/pack-native.ps1.",
+  "classifications": [ "MatCMS", "Plugin" ],
+  "tags": { "language": "C#", "type": "project" },
+  "sourceName": "MatCmsPlugin",
+  "preferNameDirectory": true,
+  "sources": [
+    { "modifiers": [ { "exclude": [ "**/bin/**", "**/obj/**" ] } ] }
+  ],
+  "symbols": {
+    "PluginKey": {
+      "type": "parameter",
+      "datatype": "text",
+      "description": "The plugin's key: its identity on an instance, its URL prefix and its asset folder. Lower-case letters, digits and '-'. Defaults to the project name, lower-cased.",
+      "defaultValue": ""
+    },
+    "KeyFromName": {
+      "type": "derived",
+      "datatype": "text",
+      "valueSource": "name",
+      "valueTransform": "keyify"
+    },
+    "PluginKeyFinal": {
+      "type": "generated",
+      "generator": "coalesce",
+      "parameters": {
+        "sourceVariableName": "PluginKey",
+        "fallbackVariableName": "KeyFromName"
+      },
+      "replaces": "my-plugin"
+    }
+  },
+  "forms": {
+    "keyify": { "identifier": "chain", "steps": [ "lowerCase", "dashes" ] },
+    "dashes": { "identifier": "replace", "pattern": "[^a-z0-9]+", "replacement": "-" }
+  }
+}

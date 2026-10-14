@@ -34,5 +34,9 @@ public class BlockDefinition
     /// <summary>For plugin-provided blocks: renders HTML from a request context (null otherwise).</summary>
     public Func<MatCMS.Services.PluginRequest, string>? PluginRender { get; set; }
 
+    /// <summary>The same render, asynchronous. A block that reads the database should use this one: the page awaits it instead of
+    /// blocking a thread. Set together with <see cref="PluginRender"/> for blocks registered through the plugin API.</summary>
+    public Func<MatCMS.Services.PluginRequest, CancellationToken, Task<string>>? PluginRenderAsync { get; set; }
+
     public bool IsPluginBlock => PluginRender is not null;
 }

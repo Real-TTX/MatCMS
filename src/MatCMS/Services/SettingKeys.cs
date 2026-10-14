@@ -31,6 +31,10 @@ public static class SettingKeys
     public const string TranslateApiKey = "translate.apiKey";
     public const string TranslateUrl = "translate.url";
 
+    // Native plugins (compiled DLLs, loaded into the process with all of its rights — there is no sandbox):
+    // "1" = allowed. OFF by default; the operator of the site decides, and a cloud profile can roll it out.
+    public const string AllowNativePlugins = "plugins.allowNative";
+
     // SEO: "true" serves /sitemap.xml (+ a /robots.txt that references it); anything else = off.
     public const string SitemapEnabled = "sitemap.enabled";
 
@@ -224,4 +228,12 @@ public static class SettingKeys
     /// deny-list for pushed settings: a profile must never be able to rewrite the cloud link.</summary>
     public static readonly string[] Cloud =
         [CloudUrl, CloudPublicUrl, CloudInstanceId, CloudToken, CloudAppliedRevision, CloudSyncError, CloudSyncReport, CloudSeeded, CloudSyncRunAt];
+
+    /// <summary>
+    /// Keys no OUTSIDE source may write: a cloud rollout, a content operation (MCP `set_setting`) or a restored backup.
+    /// The cloud link keys, because one site's configuration must not hijack another's connection — and
+    /// <see cref="AllowNativePlugins"/>, because a package that brings compiled code and also the permission to run it
+    /// would make the permission worth nothing. It is set on the site, by whoever operates the site.
+    /// </summary>
+    public static readonly string[] Protected = [.. Cloud, AllowNativePlugins];
 }

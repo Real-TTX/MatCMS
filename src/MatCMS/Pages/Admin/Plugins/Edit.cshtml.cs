@@ -41,11 +41,16 @@ public class EditModel : PageModel
     /// <summary>One file in this plugin's own asset folder.</summary>
     public sealed record AssetFile(string Name, long Size, string Kind);
     public List<AssetFile> Assets { get; private set; } = new();
+    /// <summary>The plugin declared settings: they are edited in a form of their own, next to the free key/value list.</summary>
+    public bool HasSettings => _registry.SliceOf(Current.Key) is { Settings.Count: > 0 };
 
     public async Task<IActionResult> OnGetAsync(int id)
     {
         var p = await _db.Plugins.FindAsync(id);
         if (p is null) return RedirectToPage("Index");
+        // A compiled plugin has no source to edit; its page shows what there is.
+        if (MatCMS.Models.PluginKind.Normalize(p.Kind) == MatCMS.Models.PluginKind.Native) return RedirectToPage("Native", new { id });
+        if (MatCMS.Models.PluginKind.Normalize(p.Kind) == MatCMS.Models.PluginKind.BuiltIn) return RedirectToPage("BuiltIn", new { id });
         Current = p;
         Name = p.Name; Description = p.Description; Code = p.Code; FilesJson = p.FilesJson; Enabled = p.Enabled; Version = p.Version; ConfigJson = p.ConfigJson;
         MappingJson = System.Text.Json.JsonSerializer.Serialize(PluginMapping.Parse(p.MappingJson),
@@ -53,6 +58,29 @@ public class EditModel : PageModel
         RunError = _registry.Errors.TryGetValue(id, out var e) ? e : null;
         LoadAssets();
         return Page();
+    }
+
+    /// <summary>The plugin API as data for the editor's completion (names, what each returns, the documentation line).</summary>
+    public IActionResult OnGetCatalog()
+    {
+        Response.Headers.CacheControl = "private, max-age=3600";
+        return Content(MatCMS.Services.Plugins.PluginApiCatalog.AsJson(), "application/json; charset=utf-8");
+    }
+
+    /// <summary>"Prüfen": compiles what is in the editor RIGHT NOW (not what is saved) and answers with the findings. Never runs the script.</summary>
+    public IActionResult OnPostCheck()
+    {
+        if ((Code?.Length ?? 0) > 400_000 || (FilesJson?.Length ?? 0) > 2_000_000)
+            return new JsonResult(new { ok = false, error = "Zu groß zum Prüfen." });
+        try
+        {
+            var found = PluginRunner.Check(Code, FilesJson, MappingJson);
+            return new JsonResult(new { ok = true, diagnostics = found.Select(d => new { severity = d.Severity, file = d.File, line = d.Line, column = d.Column, id = d.Id, message = d.Message }) });
+        }
+        catch (Exception ex)
+        {
+            return new JsonResult(new { ok = false, error = ex.Message });
+        }
     }
 
     /// <summary>Downloads this plugin as a self-contained ZIP bundle (plugin.json + assets/).</summary>
@@ -123,8 +151,8 @@ public class EditModel : PageModel
         p.Enabled = Enabled;
         await _db.SaveChangesAsync();
 
-        // Re-run all plugins so this one takes effect (or surfaces its error).
-        await _runner.RunAllAsync();
+        // Reload THIS plugin so the change takes effect (or surfaces its error); the others keep running.
+        await _runner.ReloadAsync(id);
         RunError = _registry.Errors.TryGetValue(id, out var e) ? e : null;
 
         if (RunError is not null)
@@ -142,15 +170,13 @@ public class EditModel : PageModel
     public async Task<IActionResult> OnPostDeleteAsync(int id)
     {
         var p = await _db.Plugins.FindAsync(id);
-        if (p is not null)
+        if (p is not null && MatCMS.Models.PluginKind.Normalize(p.Kind) == MatCMS.Models.PluginKind.BuiltIn)
         {
-            var key = p.Key;
-            _db.Plugins.Remove(p);
-            await _db.SaveChangesAsync();
-            await _runner.RunAllAsync();
-            var dir = StoragePaths.PluginAssetDir(_env, key);
-            if (!string.IsNullOrWhiteSpace(key) && Directory.Exists(dir))
-                try { Directory.Delete(dir, recursive: true); } catch { /* best-effort */ }
+            TempData["FlashError"] = "Ein eingebautes Plugin lässt sich nicht löschen, nur ausschalten.";
+        }
+        else if (p is not null)
+        {
+            await MatCMS.Services.Plugins.PluginUninstall.DeleteAsync(_db, _runner, HttpContext.RequestServices.GetRequiredService<MatCMS.Services.Plugins.PluginDataService>(), _env, p);
             TempData["Flash"] = "Plugin gelöscht.";
         }
         return RedirectToPage("Index");

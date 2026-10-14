@@ -1,0 +1,23 @@
+@page "{key}/{**path}"
+@model MatCMS.Pages.Admin.P.IndexModel
+@{
+    if (!Model.Found) { ViewData["Title"] = T["plugins.pageNotFound"].ToString(); }
+}
+@if (!Model.Found)
+{
+    <div class="page-head"><h1>@T["plugins.pageNotFound"]</h1></div>
+    <div class="card"><p class="muted">@T["plugins.pageNotFoundHelp"]</p></div>
+}
+else
+{
+    @if (Model.Tabs.Count > 0)
+    {
+        <div class="tabs" role="tablist">
+            @foreach (var t in Model.Tabs)
+            {
+                <a class="tab@(t.Active ? " active" : "")" href="@t.Url" role="tab" aria-selected="@(t.Active ? "true" : "false")">@t.Label</a>
+            }
+        </div>
+    }
+    @Html.Raw(Model.Html)
+}

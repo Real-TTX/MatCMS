@@ -30,11 +30,6 @@
         <div class="l">@T["dashboard.pages"]</div>
         <div class="s">@T["dashboard.drafts", Model.PageDrafts]</div>
     </a>
-    <a class="stat" asp-page="/Admin/Posts/Index">
-        <div class="n">@Model.PostCount</div>
-        <div class="l">@T["dashboard.posts"]</div>
-        <div class="s">@T["dashboard.drafts", Model.PostDrafts]</div>
-    </a>
     <a class="stat" asp-page="/Admin/Media/Index">
         <div class="n">@Model.MediaCount</div>
         <div class="l">@T["dashboard.media"]</div>
@@ -45,6 +40,14 @@
         <div class="l">@T["dashboard.newSubmissions"]</div>
         <div class="s">@T["dashboard.ofTotal", Model.SubmissionCount]</div>
     </a>
+    @foreach (var pt in Model.PluginTiles)
+    {
+        <a class="stat @(pt.Tone == MatCMS.Plugin.UiTone.Warning ? "is-warn" : pt.Tone == MatCMS.Plugin.UiTone.Error ? "is-err" : "")" href="@(string.IsNullOrWhiteSpace(pt.Href) ? "#" : pt.Href)">
+            <div class="n">@pt.Value</div>
+            <div class="l">@pt.Label</div>
+            @if (!string.IsNullOrWhiteSpace(pt.Hint)) { <div class="s">@pt.Hint</div> }
+        </a>
+    }
     <a class="stat" asp-page="/Admin/Users/Index">
         <div class="n">@Model.UserCount</div>
         <div class="l">@T["dashboard.users"]</div>
@@ -183,7 +186,7 @@
                 {
                     var e = Model.RecentlyEdited[n];
                     <tr class="@(n >= IndexModel.CardRows ? "dash-extra" : null)" hidden="@(n >= IndexModel.CardRows)">
-                        <td style="width:34px;"><i class="ti @(e.Kind == "page" ? "ti-file-text" : "ti-news")" aria-hidden="true"></i></td>
+                        <td style="width:34px;"><i class="ti @(e.Kind == "page" ? "ti-file-text" : e.Kind.StartsWith("ti-") ? e.Kind : "ti-news")" aria-hidden="true"></i></td>
                         <td><a href="@e.Url">@e.Title</a> @if (!e.Published) { <span class="badge badge-off">@T["dashboard.draft"]</span> }</td>
                         <td class="muted mono nowrap">@e.UpdatedAt.ToLocalTime().ToString("dd.MM. HH:mm")</td>
                     </tr>
@@ -196,7 +199,6 @@
             <div class="dash-card-foot">
                 <button type="button" class="btn btn-ghost" data-dash-expand data-more="@T["dashboard.showMore"]" data-less="@T["dashboard.showLess"]">@T["dashboard.showMore"]</button>
                 <a class="btn btn-ghost" asp-page="/Admin/Pages/Index">@T["nav.pages"]</a>
-                <a class="btn btn-ghost" asp-page="/Admin/Posts/Index">@T["nav.posts"]</a>
             </div>
         }
     </div>

@@ -20,8 +20,46 @@ Store der Cloud oder einen Bundle-Import.
   gleichem Key aktualisiert das Plugin an Ort und Stelle.
 - `README.md` (wo nötig) — was es kann, Konfiguration, Fallen.
 
+## Native Plugins
+
+Neben den Skript-Plugins (`plugin.csx`) gibt es **native** (kompilierte DLLs). Sie sprechen dieselbe API
+(`MatCMS.Plugin.Abstractions`), erscheinen im Admin wie Skript-Plugins und lassen sich laden, entladen, exportieren
+und über ein neues Paket aktualisieren — nur nicht bearbeiten. Das Referenz-Plugin liegt unter
+`tests/Fixtures/RefPlugin` (dasselbe als Skript: `tests/Fixtures/ref-plugin.csx`); Aufbau, Regeln und Fallen stehen in
+`docs/plugin-system-v2.md`.
+
+Was man vor dem ersten eigenen wissen muss:
+- Das Bundle hat `plugin.json` (`Kind: native`, `Api`, `Entry`, `Sha256`) und `src/` mit der DLL. Eine eigene Kopie von
+  `MatCMS.Plugin.Abstractions.dll` gehört **nicht** hinein (Referenz mit `Private=false`, `ExcludeAssets=runtime`).
+- JSON über eigene Typen **quellgeneriert** (`JsonSerializerContext`) oder über `JsonNode` — Reflexions-JSON hält das
+  Plugin im Speicher fest; ebenso ein `DbContext`, der den Provider des Hosts teilt (`UseInternalServiceProvider`).
+- Es läuft nur, wenn der Betreiber unter Plugins **„Native Plugins erlauben“** eingeschaltet hat — nie durch Import,
+  Cloud oder Backup. Es gibt keinen Sandkasten.
+
+Der Weg zu einem eigenen Native-Plugin (auch außerhalb dieses Repos):
+1. **Paket der API bereitstellen.** `MatCMS.Plugin.Abstractions` ist als NuGet-Paket packbar, aber **nirgends
+   veröffentlicht**: `./pack-abstractions.ps1` schreibt es in einen lokalen Feed (`artifacts/nuget`, nicht im Git; `-Out`
+   für einen anderen Ordner). Diesen Ordner als Quelle in die `nuget.config` des Plugin-Projekts (oder des Ordners
+   darüber) eintragen. Lizenz-/Repository-Angaben fehlen im Paket bewusst, bis sie entschieden sind.
+2. **Vorlage installieren und Projekt anlegen:**
+   `dotnet new install templates/matcms-native-plugin`, dann
+   `dotnet new matcms-native-plugin -n DemoShop [--PluginKey demo-shop]` — Namespace und Dateinamen kommen aus `-n`, der Key
+   (Identität, URL-Präfix) standardmäßig aus dem Namen in Kleinbuchstaben. Enthalten: `IPlugin` mit einer öffentlichen Route,
+   einer Admin-Seite und quellgeneriertem JSON, dazu `meta.json` (Key, Name, Version, Beschreibung).
+3. **Bauen und paketieren:** `./pack-native.ps1 -Path <Projektordner>` (baut mit `dotnet publish`) oder
+   `-Path <Publish-Ordner>` → `dist/<key>-<version>.zip`. Es erkennt die Hauptdatei, liest die Plugin-API aus der DLL
+   (Hauptversion der Abstractions, gegen die sie gebaut ist), setzt `plugin.json` (Format 2, Kind `native`, Prüfsumme) und legt
+   DLLs, `.json`, `.txt`, `.so` unter `src/`, einen Ordner `assets/` daneben als Assets ab. Es bricht ab bei einer eigenen Kopie
+   von `MatCMS.Plugin.Abstractions.dll`, fehlender Hauptdatei, nicht bestimmbarer Api-Version und Überschreitung der
+   Zip-Grenzen (25 MB je Datei, 60 MB gesamt, 300 Dateien).
+4. **Importieren:** im Admin unter Plugins das ZIP hochladen (oder per Store). Es landet deaktiviert; laufen tut es erst mit
+   „Native Plugins erlauben“.
+
+Vor jedem neuen Upload die Version in `meta.json` erhöhen — dasselbe wie bei Skript-Plugins.
+
 ## Bauen und verteilen
-- `./pack.ps1 -Key <key>` → `dist/<key>-<version>.zip` (`dist/` ist nicht im Git).
+- `./pack.ps1 -Key <key>` → `dist/<key>-<version>.zip` (`dist/` ist nicht im Git). Für Native-Plugins `pack-native.ps1`
+  (siehe oben).
 - Store: `POST /api/v1/store/plugins` mit dem ZIP als Body (API-Schlüssel mit CanManageStore).
 - **Vor jedem Upload die Version in `meta.json` erhöhen**, sonst holen Instanzen das Update nicht.
 

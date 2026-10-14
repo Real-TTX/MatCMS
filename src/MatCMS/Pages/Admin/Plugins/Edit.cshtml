@@ -1,4 +1,6 @@
 @page "{id:int}"
+@inject MatCMS.Data.AppDbContext DeleteDb
+@inject MatCMS.Services.Plugins.PluginDataService DeleteData
 @model MatCMS.Pages.Admin.Plugins.EditModel
 @{
     ViewData["Title"] = T["plugins.edit"];
@@ -75,6 +77,13 @@
     // auf statt als roher Schlüssel im Menü.
     var bpText = new Dictionary<string, string[]>
     {
+        ["route"] = [T["plugins.bpRoute"], T["plugins.bpRouteDesc"]],
+        ["page"] = [T["plugins.bpPage"], T["plugins.bpPageDesc"]],
+        ["settings"] = [T["plugins.bpSettings"], T["plugins.bpSettingsDesc"]],
+        ["table"] = [T["plugins.bpTable"], T["plugins.bpTableDesc"]],
+        ["job"] = [T["plugins.bpJob"], T["plugins.bpJobDesc"]],
+        ["event"] = [T["plugins.bpEvent"], T["plugins.bpEventDesc"]],
+        ["strings"] = [T["plugins.bpStrings"], T["plugins.bpStringsDesc"]],
         ["adminpage"] = [T["plugins.bpAdminPage"], T["plugins.bpAdminPageDesc"]],
         ["block"] = [T["plugins.bpBlock"], T["plugins.bpBlockDesc"]],
         ["config"] = [T["plugins.bpConfig"], T["plugins.bpConfigDesc"]],
@@ -196,7 +205,7 @@
                sehen, WELCHE Datei im Feld steht. *@
             <div class="tab-panel" data-pf-panel="editor" hidden>
             @* data-fe: on a phone file-editor-mobile.js shows the tree and the open file as two steps. *@
-            <div class="pf-tree" data-fe>
+            <div class="pf-tree" data-fe data-pf-catalog="@Url.Page(null, "Catalog", new { id = Model.Current.Id })">
                 @* EIN Baum, eine Wurzel: das Plugin. Darunter hängen die Systemdatei plugin.csx,
                    der Systemordner assets/ und die eigenen Ordner und Dateien — eingerückt, auf-
                    und zuklappbar. Zwei nebeneinanderstehende Listen mit je eigener Kopfzeile waren
@@ -217,7 +226,12 @@
                        das eine Blaupause von hier aus schreibt. *@
                     <div class="pf-menu">
                         <span class="pf-menu-file mono" data-pf-current></span>
-                        <button type="button" class="pf-menu-item" data-pf-blueprints style="margin-left:auto;">
+                        <button type="button" class="pf-menu-item" data-pf-check="@Url.Page(null, "Check", new { id = Model.Current.Id })"
+                                data-t-working="@T["plugins.check.working"]" data-t-ok="@T["plugins.check.ok"]" data-t-errors="@T["plugins.check.errors"]" data-t-warnings="@T["plugins.check.warnings"]"
+                                title="@T["plugins.check.hint"]" style="margin-left:auto;">
+                            <i class="ti ti-circle-check" aria-hidden="true"></i> @T["plugins.check"]
+                        </button>
+                        <button type="button" class="pf-menu-item" data-pf-blueprints>
                             <i class="ti ti-file-plus" aria-hidden="true"></i> @T["plugins.blueprint"]
                         </button>
                     </div>
@@ -229,6 +243,8 @@
                         </div>
                         @* Kein leerer Kasten, sondern der Hinweis, was zu tun ist. *@
                         <div class="pf-empty" data-pf-empty>@T["plugins.filePick"]</div>
+                        @* Die Befunde von „Prüfen“: nur Ausgabe, jede Zeile springt an die Stelle. *@
+                        <div class="pf-diag-panel" data-pf-diag hidden></div>
                     </div>
                     @* Fläche für eine hochgeladene Datei. Sie ist KEIN Reiter, sondern erscheint an
                        derselben Stelle wie der Code, wenn im Zweig assets/ eine Datei gewählt wird
@@ -302,6 +318,12 @@
     </form>
 </div>
 
+<partial name="_PluginOverview" model="@Model.Current.Key" />
+@if (Model.HasSettings)
+{
+    <div class="alert alert-info">@Html.Raw(T["plugins.settings.hasSchema", "/admin/p/" + Model.Current.Key + "/_settings"])</div>
+}
+
 @* Alle Aktionen der Seite in EINER Reihe, von positiv nach negativ: Speichern, Exportieren,
    Zurück, Löschen (rot, ganz rechts) — dieselbe Ordnung und dieselben Klassen wie in
    Menus/EditMenu und Posts/Edit, wo Speichern das gefüllte .btn ist, Wege daneben .btn-ghost und
@@ -315,7 +337,7 @@
     </a>
     <a class="btn btn-ghost" asp-page="Index">@T["action.back"]</a>
     <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@Model.Current.Id"
-          data-confirm="@T["plugins.confirmDelete"]">
+          data-confirm="@(await MatCMS.Services.Plugins.PluginUninstall.ConfirmTextAsync(DeleteDb, DeleteData, T, Model.Current.Key))">
         <button type="submit" class="btn btn-danger">@T["plugins.deletePlugin"]</button>
     </form>
 </div>
@@ -357,6 +379,19 @@
 
 @section Scripts {
     <script src="~/_content/MatCMS.Shared.Web/js/file-editor-mobile.js" asp-append-version="true"></script>
+    @* The code field: CodeMirror with C# highlighting, completion of the plugin API and "Prüfen". It goes in FRONT of the textarea the script
+       below talks to and takes over its .value, so that script stays as it is (see plugin-code-editor.js). *@
+    <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/lib/codemirror/codemirror.min.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/lib/codemirror/addon/hint/show-hint.css" asp-append-version="true" />
+    <script src="~/_content/MatCMS.Shared.Web/lib/codemirror/codemirror.min.js" asp-append-version="true"></script>
+    <script src="~/_content/MatCMS.Shared.Web/lib/codemirror/mode/clike/clike.js" asp-append-version="true"></script>
+    <script src="~/_content/MatCMS.Shared.Web/lib/codemirror/mode/javascript.min.js" asp-append-version="true"></script>
+    <script src="~/_content/MatCMS.Shared.Web/lib/codemirror/mode/css.min.js" asp-append-version="true"></script>
+    <script src="~/_content/MatCMS.Shared.Web/lib/codemirror/addon/closebrackets.min.js" asp-append-version="true"></script>
+    <script src="~/_content/MatCMS.Shared.Web/lib/codemirror/addon/matchbrackets.min.js" asp-append-version="true"></script>
+    <script src="~/_content/MatCMS.Shared.Web/lib/codemirror/addon/active-line.min.js" asp-append-version="true"></script>
+    <script src="~/_content/MatCMS.Shared.Web/lib/codemirror/addon/hint/show-hint.js" asp-append-version="true"></script>
+    <script src="~/js/plugin-code-editor.js" asp-append-version="true"></script>
     <script>
 (function () {
             var root = document.querySelector('[data-plugin-files]');
@@ -1566,6 +1601,7 @@
                 openAsset = null;
                 open = name;
                 current.textContent = name;
+                if (window.PluginCodeEditor) window.PluginCodeEditor.setMode(name);
                 content.value = name === ENTRY ? codeField.value : (map[name] != null ? map[name] : '');
                 editor.hidden = false;
                 if (empty) empty.hidden = true;
@@ -1611,6 +1647,16 @@
                 if (!generalPanel.contains(e.target)) return;
                 activateTab('general');
             }, true);
+
+            // „Prüfen“ klickt einen Befund an: die Datei öffnen und an die Stelle springen.
+            document.addEventListener('pf:open', function (e) {
+                var d = e.detail || {};
+                var map = read(); if (map === null) return;
+                var file = d.file === ENTRY || map[d.file] != null ? d.file : null;
+                if (file === null) return;
+                show(file);
+                if (window.PluginCodeEditor) window.PluginCodeEditor.jump(d.line || 1, d.column || 1);
+            });
 
             // Die Einstiegsdatei ist von Anfang an geöffnet — der Editor zeigt sie, sobald man
             // seinen Reiter wählt. Vorn steht aber "Allgemein": Name, Version und Konfiguration

@@ -20,10 +20,14 @@ public class CleanupService
     private readonly AppDbContext _db;
     private readonly IWebHostEnvironment _env;
     private readonly PluginRunner _plugins;
+    private readonly Plugins.PluginDataService _pluginData;
+    private readonly Plugins.PluginContributions _contributions;
+    private readonly IServiceProvider _services;
 
-    public CleanupService(AppDbContext db, IWebHostEnvironment env, PluginRunner plugins)
+    public CleanupService(AppDbContext db, IWebHostEnvironment env, PluginRunner plugins,
+        Plugins.PluginDataService pluginData, Plugins.PluginContributions contributions, IServiceProvider services)
     {
-        _db = db; _env = env; _plugins = plugins;
+        _db = db; _env = env; _plugins = plugins; _pluginData = pluginData; _contributions = contributions; _services = services;
     }
 
     public record MediaItem(int Id, string Url, string FileName, string? Alt, long SizeBytes);
@@ -181,9 +185,13 @@ public class CleanupService
         foreach (var c in await _db.Components.AsNoTracking().Select(c => new { c.TemplateHtml, c.FieldsJson }).ToListAsync(ct))
         { Add(c.TemplateHtml); Add(c.FieldsJson); }
 
-        foreach (var p in await _db.Posts.AsNoTracking()
-            .Select(p => new { p.TitleImage, p.ContentHtml, p.Excerpt, p.AttachmentsJson, p.GalleryJson }).ToListAsync(ct))
-        { Add(p.TitleImage); Add(p.ContentHtml); Add(p.Excerpt); Add(p.AttachmentsJson); Add(p.GalleryJson); }
+        // Blog posts: the blog adopted the Posts table, so they are part of the plugin-table corpus below.
+
+        // Plugin data: every plugin's tables are read whether the plugin is loaded or not (a shop switched off for a week
+        // keeps its product images), plus what the loaded plugins name themselves — and if one of those cannot answer, the
+        // whole analysis stops rather than offering files that might be in use.
+        Add(await _pluginData.CorpusAsync(_db, ct));
+        foreach (var url in await _contributions.MediaInUseAsync(_services, ct)) Add(url);
 
         foreach (var v in await _db.SiteSettings.AsNoTracking().Select(s => s.Value).ToListAsync(ct)) Add(v);
         foreach (var u in await _db.MenuItems.AsNoTracking().Select(m => m.Url).ToListAsync(ct)) Add(u);

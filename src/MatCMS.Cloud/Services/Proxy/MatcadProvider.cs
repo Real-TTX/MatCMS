@@ -70,16 +70,61 @@ public sealed class MatcadProvider : IProxyProvider
         catch (Exception ex) { return new(false, $"Matcad nicht erreichbar: {ex.Message}"); }
     }
 
-    public async Task<ProxyResult> UpsertAsync(string? existingId, string routeKey, string name, string host, string upstream, bool rewriteHost = false, CancellationToken ct = default)
+    // What a Matcad can do is asked of /api/v1/status ("capabilities": ["routeGuards"], Matcad 0.9). The answer is kept for a short
+    // while — the cloud asks on every publish and the answer only changes when somebody updates Matcad.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (bool Can, DateTime Until)> GuardCache = new();
+
+    /// <summary>The last known answer of <see cref="CanGuardAsync"/> for this address — false when never asked or stale. For
+    /// places that cannot await (a status page); the decision to publish always asks.</summary>
+    public static bool CachedCanGuard(string? baseUrl) =>
+        !string.IsNullOrWhiteSpace(baseUrl) && GuardCache.TryGetValue(baseUrl.TrimEnd('/'), out var c) && c.Until > DateTime.UtcNow && c.Can;
+
+    /// <summary>Whether this Matcad can rewrite the Host header and carry guards. An old Matcad ignores the unknown JSON fields
+    /// without a word — which would publish a route that is SUPPOSED to be guarded as an open one — so "no capability" is asked
+    /// for explicitly and means no.</summary>
+    public async Task<bool> CanGuardAsync(CancellationToken ct = default) => (await GuardCapabilityAsync(ct)).Can == true;
+
+    /// <summary>The answer with its third state: <c>null</c> = could not be asked (unreachable, wrong key, not a Matcad) together with the
+    /// reason — an operator told "Matcad too old" when the real problem is a dead port goes and updates the wrong thing. Only definite
+    /// answers are cached.</summary>
+    private async Task<(bool? Can, string? Error)> GuardCapabilityAsync(CancellationToken ct)
     {
-        // Matcad forwards the visitor's Host header unchanged and has no setting to replace it — a route to another
-        // proxy's host-matched route would land on the wrong (or no) site. The cloud then forwards to address:port.
-        if (rewriteHost) return new(false, "Matcad kann den Host-Header nicht umschreiben — als Edge leitet Matcad nur auf Node-Adresse:Port weiter.");
+        if (GuardCache.TryGetValue(_base, out var c) && c.Until > DateTime.UtcNow) return (c.Can, null);
+        try
+        {
+            using var resp = await _http.SendAsync(Req(HttpMethod.Get, "/api/v1/status"), ct);
+            var text = await resp.Content.ReadAsStringAsync(ct);
+            if (!resp.IsSuccessStatusCode)
+                return (null, resp.StatusCode == HttpStatusCode.NotFound ? $"Unter {_base} gibt es kein Matcad-API (/api/v1/status: 404) — falsche Adresse?" : Explain(resp.StatusCode, text));
+            if (NotJson(resp) is { } nj) return (null, nj);
+            using var doc = JsonDocument.Parse(text);
+            var can = doc.RootElement.TryGetProperty("capabilities", out var caps) && caps.ValueKind == JsonValueKind.Array
+                      && caps.EnumerateArray().Any(e => e.ValueKind == JsonValueKind.String && e.GetString() == "routeGuards");
+            GuardCache[_base] = (can, DateTime.UtcNow.AddSeconds(can ? 120 : 20));
+            return (can, null);
+        }
+        catch (Exception ex) { return (null, $"Matcad nicht erreichbar: {ex.Message}"); }
+    }
+
+    public async Task<ProxyResult> UpsertAsync(string? existingId, string routeKey, string name, string host, string upstream, bool rewriteHost = false,
+        ProxyRouteOptions? options = null, CancellationToken ct = default)
+    {
+        if (options?.Problem() is { } problem) return new(false, problem);
+        rewriteHost |= options?.RewriteHost == true;
+        // Matcad before 0.9 forwards the visitor's Host header unchanged and cannot guard a route — a route to another proxy's
+        // host-matched route would land on the wrong (or no) site, and a guard would be dropped silently. Refuse instead.
+        if (rewriteHost || options?.NeedsGuardCapability == true)
+        {
+            var (can, why) = await GuardCapabilityAsync(ct);
+            if (can is null) return new(false, why);   // "not reachable" is not "too old"
+            if (can == false)
+                return new(false, "Dieses Matcad kann den Host-Header nicht umschreiben und keine Zugriffsregeln (Pflicht-Header) setzen — es braucht die Fähigkeit „routeGuards“ (Matcad ab 0.9). Bis dahin leitet Matcad als Edge nur auf Node-Adresse:Port weiter.");
+        }
         long? id = long.TryParse(existingId, out var n) ? n : await ManualIdForHostAsync(host, ct);
-        var r = await PostRouteAsync(id, name, host, upstream, ct);
+        var r = await PostRouteAsync(id, name, host, upstream, ct, null, rewriteHost, options);
         // The route may have been deleted in Matcad in the meantime — then create it anew instead of failing.
         if (!r.Ok && id is not null && r.Error?.Contains("404") == true)
-            r = await PostRouteAsync(null, name, host, upstream, ct);
+            r = await PostRouteAsync(null, name, host, upstream, ct, null, rewriteHost, options);
         return r;
     }
 
@@ -124,10 +169,22 @@ public sealed class MatcadProvider : IProxyProvider
         return r;
     }
 
-    private async Task<ProxyResult> PostRouteAsync(long? id, string name, string host, string? upstream, CancellationToken ct, string? redirectTo = null)
+    private async Task<ProxyResult> PostRouteAsync(long? id, string name, string host, string? upstream, CancellationToken ct, string? redirectTo = null,
+        bool rewriteHost = false, ProxyRouteOptions? options = null)
     {
+        // The four route properties are ALWAYS sent, null when unused: Matcad keeps a property that is missing from the body and
+        // clears one that is null — so dropping a guard (or the edge's header) means saying so. A Matcad without them ignores them.
+        string? upstreamHost = null;
+        // IdnHost: a name with an umlaut goes over the wire as punycode, which is what Matcad accepts as a plain host name.
+        if (rewriteHost && upstream is not null && Uri.TryCreate(upstream, UriKind.Absolute, out var upstreamUri)) upstreamHost = upstreamUri.IdnHost;
+        var upstreamHeaders = options?.UpstreamHeaders is { Count: > 0 } uh ? uh.Select(kv => new { name = kv.Key, value = kv.Value }).ToArray() : null;
+        var requireHeader = options?.Guard is { } g ? new { name = g.HeaderName, value = g.HeaderValue } : null;
         var body = new
         {
+            upstreamHost,
+            upstreamHeaders,
+            requireHeader,
+            allowedIps = (string[]?)null,
             id,
             host,
             wildcard = false,
@@ -161,9 +218,41 @@ public sealed class MatcadProvider : IProxyProvider
                 var err = applied.TryGetProperty("error", out var e) ? e.GetString() : null;
                 return new(false, $"Route gespeichert, aber Caddy übernahm sie nicht: {err}", routeId);
             }
+
+            // Trust, but check: a route that was meant to be guarded must come back WITH its guard. If it did not (a Matcad that
+            // answered "routeGuards" but stored something else), the route is removed again rather than left open.
+            if (rewriteHost || options?.NeedsGuardCapability == true)
+                if (Unverified(route, rewriteHost ? upstreamHost : null, options) is { } missing)
+                {
+                    // The id Matcad answered with, else the one we posted to — and when neither exists, the message must not claim a removal.
+                    var removable = routeId ?? id?.ToString();
+                    var removed = removable is not null && (await DeleteAsync(removable, ct)).Ok;
+                    return new(false, "Matcad hat die Zugriffsregeln der Route nicht übernommen (" + missing + ") — "
+                        + (removed ? "die Route wurde wieder entfernt, damit sie nicht offen bleibt." : "die Route ließ sich NICHT entfernen, bitte in Matcad prüfen und löschen."));
+                }
             return new(true, null, routeId);
         }
         catch (Exception ex) { return new(false, $"Matcad nicht erreichbar: {ex.Message}"); }
+    }
+
+    /// <summary>What of the requested host rewrite / headers / guard is missing from the route Matcad answered with (null = all
+    /// there). Matcad never returns the secret values, only that they are set.</summary>
+    private static string? Unverified(JsonElement route, string? upstreamHost, ProxyRouteOptions? options)
+    {
+        if (route.ValueKind != JsonValueKind.Object) return "keine Route in der Antwort";
+        if (upstreamHost is not null && !(route.TryGetProperty("upstreamHost", out var h) && string.Equals(h.GetString(), upstreamHost, StringComparison.OrdinalIgnoreCase)))
+            return "Host-Header";
+        if (options?.Guard is { } g && !(route.TryGetProperty("requireHeader", out var rh) && rh.ValueKind == JsonValueKind.Object
+                && string.Equals(rh.TryGetProperty("name", out var rn) ? rn.GetString() : null, g.HeaderName, StringComparison.OrdinalIgnoreCase)
+                && rh.TryGetProperty("valueSet", out var vs) && vs.ValueKind == JsonValueKind.True))
+            return "Pflicht-Header";
+        if (options?.UpstreamHeaders is { Count: > 0 } uh)
+        {
+            var have = route.TryGetProperty("upstreamHeaders", out var uhe) && uhe.ValueKind == JsonValueKind.Array
+                ? uhe.EnumerateArray().Select(e => e.TryGetProperty("name", out var n) ? n.GetString() : null).ToHashSet(StringComparer.OrdinalIgnoreCase) : new();
+            if (!uh.Keys.All(k => have.Contains(k))) return "Upstream-Header";
+        }
+        return null;
     }
 
     public async Task<ProxyResult> DeleteAsync(string routeId, CancellationToken ct = default)

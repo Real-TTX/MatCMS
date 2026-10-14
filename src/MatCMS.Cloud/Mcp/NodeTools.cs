@@ -92,6 +92,18 @@ public class NodeTools
         return NodeService.PublicJson(n, await nodes.CountInstancesAsync(n.Id, ct), withInventory: false);
     }
 
+    [McpServerTool(Name = "set_node_edge_guard"), Description(
+        "'Nur über den Edge erreichbar' for a node: its automatic host addresses answer ONLY the cloud's edge proxy (a secret header the edge sends; everybody else gets 403), while customer domains routed at the edge keep working. enabled = true closes the node, false opens it again, omitted = apply the current state once more (after a node was unreachable half-way). rotate = true renews the secret (a few seconds of interruption). Needs the edge proxy on, a proxy on the node that can guard (Caddy, Matcad from 0.9), automatic addresses on the node and an up-to-date agent. Returns what could not be done; the secret is never returned. Requires the hosting right on an all-instances key.")]
+    public static async Task<object> SetNodeEdgeGuard(McpContext me, NodeService nodes, Services.Proxy.ProxyService proxy,
+        [Description("The node id.")] string nodeId, bool? enabled = null, bool rotate = false, CancellationToken ct = default)
+    {
+        RequireCloudWide(me);
+        var n = await ResolveAsync(nodes, nodeId, ct);
+        var r = await proxy.SetEdgeGuardAsync(n, enabled ?? n.EdgeGuard, rotate, ct);
+        if (!r.Ok) throw new McpException(r.Message + (r.Notes.Count > 0 ? " — " + string.Join(" · ", r.Notes) : ""));
+        return new { ok = true, message = r.Message, notes = r.Notes, edgeGuard = n.EdgeGuard };
+    }
+
     [McpServerTool(Name = "create_missing_host_addresses"), Description(
         "Create the automatic host address (name.<base domain>) for every instance on a host that has none yet — after switching automatic addresses on for a host that already runs sites. nodeId omitted = this cloud's own host. Requires the hosting right on an all-instances key.")]
     public static async Task<object> CreateMissingHostAddresses(McpContext me, NodeService nodes, Services.Proxy.ProxyService proxy,

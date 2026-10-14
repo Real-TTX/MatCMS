@@ -70,8 +70,14 @@ public sealed class CaddyProvider : IProxyProvider
         catch (Exception ex) { return new(false, $"Caddy-Admin-API nicht erreichbar: {ex.Message}"); }
     }
 
-    public async Task<ProxyResult> UpsertAsync(string? existingId, string routeKey, string name, string host, string upstream, bool rewriteHost = false, CancellationToken ct = default)
+    /// <summary>Caddy can rewrite the Host header and guard a route natively — no version to ask for.</summary>
+    public Task<bool> CanGuardAsync(CancellationToken ct = default) => Task.FromResult(true);
+
+    public async Task<ProxyResult> UpsertAsync(string? existingId, string routeKey, string name, string host, string upstream, bool rewriteHost = false,
+        ProxyRouteOptions? options = null, CancellationToken ct = default)
     {
+        if (options?.Problem() is { } problem) return new(false, problem);
+        rewriteHost |= options?.RewriteHost == true;
         // Keep an id we already own: a route created at provisioning was keyed by the container name, and
         // re-deriving it from the instance id later would add a SECOND route for the same host.
         var id = !string.IsNullOrWhiteSpace(existingId) && existingId.StartsWith("matcms-", StringComparison.Ordinal)
@@ -92,10 +98,42 @@ public sealed class CaddyProvider : IProxyProvider
             proxy["transport"] = new JsonObject { ["protocol"] = "http", ["tls"] = new JsonObject { ["server_name"] = targetHost } };
         // The host proxy matches on its own name for the site, not on the customer's; the customer's name still
         // travels as X-Forwarded-Host, which Caddy sets by itself.
-        if (rewriteHost)
-            proxy["headers"] = new JsonObject { ["request"] = new JsonObject { ["set"] = new JsonObject { ["Host"] = new JsonArray(targetHost) } } };
-        return await WriteRouteAsync(id, host, proxy, ct);
+        // Headers towards the upstream: the Host rewrite and whatever else the caller sends along (the secret of the edge).
+        var set = new JsonObject();
+        if (rewriteHost) set["Host"] = new JsonArray(targetHost);
+        foreach (var (k, v) in options?.UpstreamHeaders ?? new()) set[k] = new JsonArray(v);
+        var requestHeaders = new JsonObject();
+        if (set.Count > 0) requestHeaders["set"] = set;
+        // The guard's header is the edge's proof, not the site's business: it is stripped once checked, so neither the MatCMS instance nor
+        // a plugin or log behind it ever sees the secret.
+        var strip = new List<string>();
+        if (options?.Guard is { } stripped) strip.Add(stripped.HeaderName);
+        foreach (var s in options?.StripHeaders ?? Array.Empty<string>())
+            if (!strip.Contains(s, StringComparer.OrdinalIgnoreCase)) strip.Add(s);
+        if (strip.Count > 0) requestHeaders["delete"] = new JsonArray(strip.Select(s => (JsonNode?)JsonValue.Create(s)).ToArray());
+        if (requestHeaders.Count > 0) proxy["headers"] = new JsonObject { ["request"] = requestHeaders };
+        // A guard comes FIRST in the chain, so a request without the header never reaches the proxy handler.
+        var chain = new JsonArray();
+        if (options?.Guard is { } guard) chain.Add(GuardHandler(guard));
+        chain.Add(proxy);
+        return await WriteRouteAsync(id, host, chain, ct);
     }
+
+    /// <summary>A sub-route that answers 403 to every request WITHOUT the header (compared exactly — the value was checked for
+    /// wildcards and placeholders); a request that has it falls through to the next handler.</summary>
+    private static JsonObject GuardHandler(RouteGuard g) => new()
+    {
+        ["handler"] = "subroute",
+        ["routes"] = new JsonArray(new JsonObject
+        {
+            ["match"] = new JsonArray(new JsonObject
+            {
+                ["not"] = new JsonArray(new JsonObject { ["header"] = new JsonObject { [g.HeaderName] = new JsonArray(g.HeaderValue) } }),
+            }),
+            ["handle"] = new JsonArray(new JsonObject { ["handler"] = "static_response", ["status_code"] = 403 }),
+            ["terminal"] = true,
+        }),
+    };
 
     /// <summary>A route that only redirects <paramref name="host"/> to <paramref name="targetUrl"/> (301, path and query
     /// kept) — a further domain such as www.example.de pointing at the main one.</summary>
@@ -109,18 +147,18 @@ public sealed class CaddyProvider : IProxyProvider
             ["status_code"] = 301,
             ["headers"] = new JsonObject { ["Location"] = new JsonArray(targetUrl.TrimEnd('/') + "{http.request.uri}") },
         };
-        return await WriteRouteAsync(id, host, redirect, ct);
+        return await WriteRouteAsync(id, host, new JsonArray(redirect), ct);
     }
 
     /// <summary>Creates or replaces the route <paramref name="id"/> for <paramref name="host"/> with one handler — in
     /// place when it exists, else at the top of the server's routes (creating server and list when missing).</summary>
-    private async Task<ProxyResult> WriteRouteAsync(string id, string host, JsonObject handler, CancellationToken ct)
+    private async Task<ProxyResult> WriteRouteAsync(string id, string host, JsonArray handlers, CancellationToken ct)
     {
         var route = new JsonObject
         {
             ["@id"] = id,
             ["match"] = new JsonArray(new JsonObject { ["host"] = new JsonArray(host) }),
-            ["handle"] = new JsonArray(handler),
+            ["handle"] = handlers,
             ["terminal"] = true,
         }.ToJsonString();
 

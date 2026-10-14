@@ -82,6 +82,23 @@ public class Node
     public string? WildcardRouteId { get; set; }
     public string? WildcardError { get; set; }
 
+    /// <summary>"Nur über den Edge erreichbar": the automatic host addresses on this node answer only requests that carry the edge's
+    /// secret header (<see cref="EdgeGuardHeader"/>) — everybody else gets 403 from the node's proxy. The edge sends the header on
+    /// its way to those addresses, so customer domains routed at the edge keep working while the node itself is closed to the
+    /// world. Needs the edge, a proxy that can guard (Caddy, Matcad ≥ 0.9) and automatic addresses on this node.</summary>
+    public bool EdgeGuard { get; set; }
+
+    /// <summary>The secret, <c>SecretProtector</c>-encrypted, never read back. Set before the guard goes on and kept until it is
+    /// off again: the edge's routes carry it first and lose it last, so there is no moment when the edge is locked out.</summary>
+    public string? EdgeGuardTokenEnc { get; set; }
+
+    /// <summary>What the last switching could NOT do (one line per instance), or null when everything is as asked. <see cref="EdgeGuard"/>
+    /// only says what was REQUESTED — this is the other half of the truth, kept until the next successful application.</summary>
+    public string? EdgeGuardIssues { get; set; }
+
+    /// <summary>The header the edge proves itself with.</summary>
+    public const string EdgeGuardHeader = "X-MatCMS-Edge";
+
     public int PortFrom { get; set; } = 9201;
     public int PortTo { get; set; } = 9299;
 

@@ -821,6 +821,15 @@ namespace MatCMS.Cloud.Data.Migrations
                     b.Property<string>("DockerVersion")
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("EdgeGuard")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("EdgeGuardIssues")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EdgeGuardTokenEnc")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("HostName")
                         .HasColumnType("TEXT");
 

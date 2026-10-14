@@ -42,11 +42,12 @@ public class ProxyService
     private readonly InstanceService _instances;
     private readonly NodeService _nodes;
     private readonly IHttpClientFactory _http;
+    private readonly VersionService _version;
 
     public ProxyService(AppDbContext db, CloudContext cloud, SecretProtector secrets, DockerHostService docker,
-        InstanceService instances, NodeService nodes, IHttpClientFactory http)
+        InstanceService instances, NodeService nodes, IHttpClientFactory http, VersionService version)
     {
-        _db = db; _cloud = cloud; _secrets = secrets; _docker = docker; _instances = instances; _nodes = nodes; _http = http;
+        _db = db; _cloud = cloud; _secrets = secrets; _docker = docker; _instances = instances; _nodes = nodes; _http = http; _version = version;
     }
 
     /// <summary>The settings of the cloud's OWN host ("Dieser Host") — cloud-wide hosting.* keys.</summary>
@@ -190,8 +191,8 @@ public class ProxyService
             enabled = EdgeEnabled, useHostProxy = EdgeUsesHostProxy, provider = s.Kind,
             matcadUrl = s.MatcadUrl, matcadTokenSet = !string.IsNullOrEmpty(s.MatcadToken),
             caddyAdminUrl = s.CaddyAdminUrl, caddyServer = s.CaddyServer,
-            // A host's automatic address as the edge's target needs a Host header rewrite — only Caddy does that.
-            forwardsToHostAddress = s.Kind == ProxyKinds.Caddy,
+            // A host's automatic address as the edge's target needs a Host header rewrite — Caddy, or a Matcad that reports routeGuards.
+            forwardsToHostAddress = EdgeCanRewriteCached(s),
             trustedIps = EdgeTrustedIps,
         };
     }
@@ -383,21 +384,220 @@ public class ProxyService
 
     public sealed record PublishResult(bool Ok, string Message, string? Domain = null);
 
+    /// <summary>Can the edge forward to a host's automatic address, i.e. rewrite the Host header? Caddy always; Matcad only when it
+    /// reports <c>routeGuards</c> (0.9) — asked of the Matcad itself, and an unreachable or older one answers no.</summary>
+    public async Task<bool> EdgeCanRewriteAsync(ProxySettings edge, CancellationToken ct = default) =>
+        edge.Kind == ProxyKinds.Caddy
+        || (edge.Kind == ProxyKinds.Matcad && await new MatcadProvider(Http(), edge.MatcadUrl ?? "", edge.MatcadToken).CanGuardAsync(ct));
+
+    /// <summary>The same answer from what was last asked, for places that cannot await (a status page). Never decides anything.</summary>
+    public static bool EdgeCanRewriteCached(ProxySettings edge) =>
+        edge.Kind == ProxyKinds.Caddy || (edge.Kind == ProxyKinds.Matcad && MatcadProvider.CachedCanGuard(edge.MatcadUrl));
+
     /// <summary>
     /// Where the EDGE forwards a site to, in this order: the site's automatic host address over https (the host
-    /// proxy matches on that name, so the edge must rewrite the Host header — only Caddy can); a site on THIS host
-    /// the way this host's proxy reaches it (derived from the container — the edge runs here); a site on a node
-    /// at <c>node-address:port</c>. Null upstream with no error = derive from the container.
+    /// proxy matches on that name, so the edge must rewrite the Host header — Caddy, or a Matcad with routeGuards); a site on THIS
+    /// host the way this host's proxy reaches it (derived from the container — the edge runs here); a site on a node
+    /// at <c>node-address:port</c>. Null upstream with no error = derive from the container. A node that is closed to everybody
+    /// but the edge (<see cref="Node.EdgeGuard"/>) is reachable ONLY through its host address — the port is not an option there.
     /// </summary>
-    private static (string? Upstream, bool RewriteHost, string? Error) EdgeTarget(Instance inst, Node? node, ProxySettings edge)
+    private async Task<(string? Upstream, bool RewriteHost, string? Error)> EdgeTargetAsync(string? hostDomain, Node? node, int? localPort,
+        ProxySettings edge, CancellationToken ct)
     {
-        if (inst.HostDomain is { } hd && edge.Kind == ProxyKinds.Caddy) return ("https://" + hd, true, null);
+        if (hostDomain is { } hd && await EdgeCanRewriteAsync(edge, ct)) return ("https://" + hd, true, null);
         if (node is null) return (null, false, null);
+        if (node.EdgeGuard)
+            return (null, false, $"Node „{node.Name}“ ist nur über den Edge erreichbar, aber der Edge kann hier nicht auf die Host-Adresse des Nodes weiterleiten "
+                + "(der Edge braucht Caddy oder Matcad ab 0.9, und die Instanz braucht ihre automatische Adresse auf dem Node).");
         if (string.IsNullOrWhiteSpace(node.Address))
             return (null, false, $"Node „{node.Name}“ hat keine Adresse für den Edge-Proxy (Node → Proxy & Ports)"
                 + (edge.Kind == ProxyKinds.Caddy ? " — oder dort automatische Adressen einschalten." : "."));
-        if (inst.LocalPort is not int port) return (null, false, "Der Container veröffentlicht keinen Host-Port.");
+        if (localPort is not int port) return (null, false, "Der Container veröffentlicht keinen Host-Port.");
         return ($"http://{node.Address!.Trim()}:{port}", false, null);
+    }
+
+    // ---- The authenticated edge → node hop (Node.EdgeGuard) ------------------------------------------------------------
+    //
+    // A node's proxy can be closed to everybody but the edge: the automatic host addresses on it answer 403 unless the request
+    // carries a secret header, and the edge's routes TO those addresses send it. Customer domains keep working (they are routed at
+    // the edge); the node's own addresses stop being a way past it. The secret is per node, encrypted, never shown.
+
+    private string? GuardToken(Node? node) => node is null ? null : _secrets.Unprotect(node.EdgeGuardTokenEnc) is { Length: > 0 } t ? t : null;
+
+    /// <summary>The guard on the host-address routes of <paramref name="node"/> — only while it is ON.</summary>
+    private ProxyRouteOptions? HostRouteOptions(Node? node)
+    {
+        if (GuardToken(node) is not { } t) return null;
+        if (node!.EdgeGuard) return new ProxyRouteOptions(Guard: new RouteGuard(Node.EdgeGuardHeader, t));
+        // The guard is not (yet, or any more) asking for the secret, but the edge already sends it: the site must still never see it.
+        return ProxyKinds.Normalise(node.ProxyKind) == ProxyKinds.Caddy ? new ProxyRouteOptions(StripHeaders: new[] { Node.EdgeGuardHeader }) : null;
+    }
+
+    /// <summary>What an EDGE route that forwards to <paramref name="node"/>'s host address carries: the Host rewrite and, once the node
+    /// has a secret, the header the node expects. The edge sends it as soon as the secret exists, so switching the guard ON never
+    /// locks the edge out; it keeps sending it until the guard is off again.</summary>
+    private ProxyRouteOptions? EdgeRouteOptions(Node? node, bool rewrite) =>
+        rewrite && GuardToken(node) is { } t
+            ? new ProxyRouteOptions(RewriteHost: true, UpstreamHeaders: new() { [Node.EdgeGuardHeader] = t })
+            : null;
+
+    /// <summary>A node whose proxy op would carry options needs an agent that understands them — an older agent drops the field
+    /// without a word and would publish an OPEN route where a guarded one was asked for. Null = fine.</summary>
+    private string? OptionsBlocker(Node? node, ProxyRouteOptions? options)
+    {
+        if (node is null) return null;
+        // The guard is ON but its secret cannot be read (the data-protection keys changed, the row was edited): publishing now would
+        // quietly create an OPEN route on a node everyone believes to be closed.
+        if (node.EdgeGuard && options is null)
+            return $"Der Zugriffsschutz von Node „{node.Name}“ ist an, aber sein Schlüssel ist nicht lesbar — den Schutz aus- und wieder einschalten.";
+        return options is not null && NodeService.AgentOutdated(node, _version.Current)
+            ? $"Der Agent von Node „{node.Name}“ ist veraltet und würde die Zugriffsregel ignorieren — erst den Agent aktualisieren (Node → Agent aktualisieren)."
+            : null;
+    }
+
+    public sealed record EdgeGuardResult(bool Ok, string Message, List<string> Notes);
+
+    private static string NewGuardToken() =>
+        Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+    /// <summary>
+    /// Switches the guard of a node on or off, rotates its secret, or (with the current state) applies it once more — every step is
+    /// idempotent, so "again" is the answer to a node that was unreachable half-way. The ORDER is what keeps customer domains up:
+    /// switching ON, the edge learns the secret first and the node starts asking for it second — instance by instance, so a rotation's
+    /// gap (the edge sends the new secret while the node still wants the old one) is one job long, not as long as the whole node; switching
+    /// OFF, the node stops asking first and the edge drops the header last. An instance whose edge route could not be updated keeps an OPEN
+    /// host address: closing it would lock its customers out.
+    /// </summary>
+    public async Task<EdgeGuardResult> SetEdgeGuardAsync(Node node, bool enable, bool rotate, CancellationToken ct = default)
+    {
+        static EdgeGuardResult Bad(string m) => new(false, m, new());
+        // A node that does not answer would turn every step into a 45-second wait and leave a half-applied state behind.
+        if (!node.IsOnline(DateTime.UtcNow)) return Bad($"Node „{node.Name}“ ist offline – der Zugriffsschutz lässt sich nur bei erreichbarem Node ändern.");
+        if (enable)
+        {
+            if (!EdgeEnabled) return Bad("Der Edge-Proxy ist nicht eingeschaltet – ohne ihn wäre der Node für niemanden erreichbar (Hosting → Edge-Proxy).");
+            if (EdgeSettings.Kind == ProxyKinds.None) return Bad("Für den Edge-Proxy ist kein Proxy eingerichtet.");
+            if (!await EdgeCanRewriteAsync(EdgeSettings, ct)) return Bad("Der Edge-Proxy kann nicht auf die Host-Adresse des Nodes weiterleiten (er braucht Caddy oder Matcad ab 0.9).");
+            if (ProxyKinds.Normalise(node.ProxyKind) == ProxyKinds.None) return Bad("Der Node hat keinen Proxy – die Zugriffsregel gehört in dessen Proxy (Node → Proxy & Ports).");
+            if (AutoBase(node) is null) return Bad("Der Node braucht eingeschaltete automatische Adressen – der Edge erreicht ihn über deren Host-Adresse.");
+            if (NodeService.AgentOutdated(node, _version.Current)) return Bad("Der Agent dieses Nodes ist veraltet und würde die Zugriffsregel ignorieren – erst aktualisieren (Node → Agent aktualisieren).");
+        }
+
+        var notes = new List<string>();
+        var instances = await _db.Instances.Where(i => i.NodeId == node.Id).ToListAsync(ct);
+        // `problems` are things that make the state differ from what was asked (they are kept on the node and shown there); the rest of
+        // `notes` are warnings the operator should read once.
+        var problems = new List<string>();
+        if (enable)
+        {
+            if (rotate || GuardToken(node) is null) node.EdgeGuardTokenEnc = _secrets.Protect(NewGuardToken());
+            node.EdgeGuard = true;
+            await _db.SaveChangesAsync(ct);
+
+            foreach (var inst in instances)
+            {
+                var viaEdge = inst.ProxyVia == ProxyVia.Edge && inst.ProxyDomain is not null;
+                // Said BEFORE the edge route is touched: without a host address the edge cannot reach the site any other way than its
+                // container port, and the guard refuses that way — so its route stays exactly as it is.
+                if (viaEdge && inst.HostDomain is null)
+                {
+                    problems.Add($"{inst.Name}: keine Host-Adresse – die Seite bleibt über den Container-Port des Nodes erreichbar (Adressen anlegen, dann „Erneut anwenden“).");
+                    continue;
+                }
+                if (viaEdge)
+                {
+                    var e = await PublishAsync(inst, inst.ProxyDomain, pushCanonical: false, ct);
+                    if (!e.Ok)
+                    {
+                        problems.Add($"{inst.Name}: Edge-Route {inst.ProxyDomain} – {e.Message} Die Host-Adresse bleibt vorerst offen, damit die Kunden nicht ausgesperrt werden.");
+                        continue;
+                    }
+                }
+                if (inst.HostDomain is null) continue;   // no edge route and no address: nothing to guard
+                var h = await PublishHostAddressAsync(inst, pushCanonical: false, repointEdge: false, ct);
+                if (!h.Ok) { problems.Add($"{inst.Name}: Host-Adresse {inst.HostDomain} – {h.Message}"); continue; }
+                if (!viaEdge)
+                    notes.Add($"{inst.Name}: hat keine Kundendomain am Edge – ihre Adresse {inst.HostDomain} ist jetzt für alle gesperrt, auch für „Website öffnen“ aus der Cloud.");
+            }
+            foreach (var p in await ProbeGuardAsync(instances, ct))
+                if (p.StartsWith("ACHTUNG", StringComparison.Ordinal)) problems.Add(p); else notes.Add(p);
+
+            node.EdgeGuardIssues = problems.Count == 0 ? null : string.Join("\n", problems);
+            await _db.SaveChangesAsync(ct);
+            notes.InsertRange(0, problems);
+            return new(problems.Count == 0,
+                problems.Count == 0 ? $"Node „{node.Name}“ ist jetzt nur noch über den Edge erreichbar." + (rotate ? " Schlüssel erneuert." : "")
+                                    : $"Node „{node.Name}“: nicht alles ist abgesichert – bitte die Hinweise lesen und danach „Erneut anwenden“.", notes);
+        }
+
+        // OFF: the node stops asking first, the edge stops sending last.
+        node.EdgeGuard = false;
+        await _db.SaveChangesAsync(ct);
+        problems.AddRange(await RepublishHostRoutesAsync(instances, ct));
+        if (problems.Count == 0)
+        {
+            node.EdgeGuardTokenEnc = null;
+            node.EdgeGuardIssues = null;
+            await _db.SaveChangesAsync(ct);
+            notes.AddRange(await RepublishEdgeRoutesAsync(instances, ct));
+            return new(true, $"Der Zugriffsschutz von Node „{node.Name}“ ist aus – seine Adressen sind wieder direkt erreichbar.", notes);
+        }
+        problems.Add("Der geheime Schlüssel bleibt erhalten, bis alle Host-Adressen wieder offen sind (der Edge sendet ihn weiter).");
+        node.EdgeGuardIssues = string.Join("\n", problems);
+        await _db.SaveChangesAsync(ct);
+        notes.InsertRange(0, problems);
+        return new(false, $"Node „{node.Name}“: nicht alle Host-Adressen konnten geöffnet werden.", notes);
+    }
+
+    /// <summary>The edge routes of these instances once more (they pick up the current secret, or lose it). One line per failure.</summary>
+    private async Task<List<string>> RepublishEdgeRoutesAsync(IEnumerable<Instance> instances, CancellationToken ct)
+    {
+        var failures = new List<string>();
+        foreach (var inst in instances.Where(i => i.ProxyVia == ProxyVia.Edge && i.ProxyDomain is not null))
+        {
+            var r = await PublishAsync(inst, inst.ProxyDomain, pushCanonical: false, ct);
+            if (!r.Ok) failures.Add($"{inst.Name}: Edge-Route {inst.ProxyDomain} – {r.Message}");
+        }
+        return failures;
+    }
+
+    /// <summary>The host-address routes of these instances once more, with or without the guard as the node's state says.</summary>
+    private async Task<List<string>> RepublishHostRoutesAsync(IEnumerable<Instance> instances, CancellationToken ct)
+    {
+        var failures = new List<string>();
+        foreach (var inst in instances.Where(i => i.HostDomain is not null))
+        {
+            var r = await PublishHostAddressAsync(inst, pushCanonical: false, repointEdge: false, ct);
+            if (!r.Ok) failures.Add($"{inst.Name}: Host-Adresse {inst.HostDomain} – {r.Message}");
+        }
+        return failures;
+    }
+
+    /// <summary>Asks every guarded address WITHOUT the header: it must answer 403. The one check that does not trust a proxy to have
+    /// stored what it was told — a route that answers anything else is open. Unreachable (DNS, certificate) is reported as
+    /// "not checkable", not as a failure.</summary>
+    private async Task<List<string>> ProbeGuardAsync(IEnumerable<Instance> instances, CancellationToken ct)
+    {
+        var notes = new List<string>();
+        foreach (var inst in instances.Where(i => i.HostDomain is not null))
+        {
+            try
+            {
+                // A name that does not resolve is said so in one line — letting HttpClient fail would log a whole stack per instance.
+                try { await System.Net.Dns.GetHostAddressesAsync(inst.HostDomain!, ct); }
+                catch (System.Net.Sockets.SocketException) { notes.Add($"{inst.Name}: {inst.HostDomain} ließ sich nicht prüfen (der Name ist nicht auflösbar – DNS fehlt?)."); continue; }
+                var http = _http.CreateClient("proxy");
+                http.Timeout = TimeSpan.FromSeconds(8);
+                using var resp = await http.GetAsync("https://" + inst.HostDomain + "/", ct);
+                if ((int)resp.StatusCode != 403)
+                    notes.Add($"ACHTUNG {inst.Name}: {inst.HostDomain} antwortet ohne Schlüssel mit {(int)resp.StatusCode} statt 403 – der Schutz wirkt dort nicht.");
+            }
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+            {
+                notes.Add($"{inst.Name}: {inst.HostDomain} ließ sich nicht prüfen ({ex.Message}).");
+            }
+        }
+        return notes;
     }
 
     /// <summary>Publishes (or moves) the CUSTOMER domain of <paramref name="inst"/> (tracked). With the edge on it is
@@ -434,11 +634,11 @@ public class ProxyService
         string? routeId = null;
         if (viaEdge)
         {
-            var (up, rewrite, err) = EdgeTarget(inst, node, edge);
+            var (up, rewrite, err) = await EdgeTargetAsync(inst.HostDomain, node, inst.LocalPort, edge, ct);
             if (err is not null) return Fail(inst, err);
             var r = await ProxyEngine.ExecuteAsync(new ProxyOp("publish", edge, inst.ContainerId, inst.LocalPort, domain,
                 "edge-" + inst.PublicId, RouteName(inst.Name), RouteId: inst.ProxyRouteId, OldKind: inst.ProxyProvider,
-                Upstream: up, RewriteHost: rewrite), Http(), _docker, ct);
+                Upstream: up, RewriteHost: rewrite, Options: EdgeRouteOptions(node, rewrite)), Http(), _docker, ct);
             if (!r.Ok)
             {
                 if (r.RouteId is not null) { inst.ProxyRouteId = r.RouteId; inst.ProxyProvider = kind; inst.ProxyVia = ProxyVia.Edge; }
@@ -565,10 +765,10 @@ public class ProxyService
         {
             if (viaEdge)
             {
-                var (up, rewrite, err) = EdgeTarget(inst, node, EdgeSettings);
+                var (up, rewrite, err) = await EdgeTargetAsync(inst.HostDomain, node, inst.LocalPort, EdgeSettings, ct);
                 if (err is not null) return Record(d, new(false, err));
                 r = await ProxyEngine.ExecuteAsync(new ProxyOp("publish", EdgeSettings, inst.ContainerId, inst.LocalPort, d.Domain, key, name,
-                    RouteId: d.RouteId, OldKind: d.Provider, Upstream: up, RewriteHost: rewrite), Http(), _docker, ct);
+                    RouteId: d.RouteId, OldKind: d.Provider, Upstream: up, RewriteHost: rewrite, Options: EdgeRouteOptions(node, rewrite)), Http(), _docker, ct);
             }
             else
                 r = await RunAsync(node, x => new ProxyOp("publish", x, inst.ContainerId, inst.LocalPort, d.Domain, key, name,
@@ -685,8 +885,10 @@ public class ProxyService
         var label = HostingService.SlugFromStack(inst.LocalContainerName, _cloud.Get(SettingKeys.HostingNamePattern)) ?? inst.Name;
         var address = inst.HostDomain is { } cur && cur.EndsWith("." + baseDomain, StringComparison.OrdinalIgnoreCase)
             ? cur : await FreeHostAddressAsync(label, baseDomain, inst.Id, ct);
-        var r = await RunAsync(node, x => new ProxyOp("publish", x, inst.ContainerId, inst.LocalPort, address,
-            "host-" + inst.PublicId, RouteName(inst.Name), RouteId: inst.HostRouteId, OldKind: inst.HostProvider), inst.Id, ct);
+        var hostOptions = HostRouteOptions(node);
+        var r = OptionsBlocker(node, hostOptions) is { } blocked ? new ProxyOpResult(false, blocked)
+            : await RunAsync(node, x => new ProxyOp("publish", x, inst.ContainerId, inst.LocalPort, address,
+                "host-" + inst.PublicId, RouteName(inst.Name), RouteId: inst.HostRouteId, OldKind: inst.HostProvider, Options: hostOptions), inst.Id, ct);
         if (!r.Ok)
         {
             inst.HostRouteError = r.Message;
@@ -703,7 +905,7 @@ public class ProxyService
         if (EdgeEnabled && EdgeTrustedIps.Count > 0) await ApplyTrustAsync(node, ct);
 
         var note = "";
-        if (repointEdge && inst.ProxyDomain is { } d && inst.ProxyVia == ProxyVia.Edge && EdgeSettings.Kind == ProxyKinds.Caddy)
+        if (repointEdge && inst.ProxyDomain is { } d && inst.ProxyVia == ProxyVia.Edge && await EdgeCanRewriteAsync(EdgeSettings, ct))
         {
             var e = await PublishAsync(inst, d, pushCanonical: false, ct);
             note = e.Ok ? " Edge leitet jetzt über die Host-Adresse weiter." : " Edge NICHT umgestellt: " + e.Message;
@@ -919,7 +1121,9 @@ public class ProxyService
         if (AutoBase(node) is { } baseDomain && hostKind != ProxyKinds.None)
         {
             var address = await FreeHostAddressAsync(instanceName, baseDomain, null, ct);
-            var r = await RunAsync(node, x => new ProxyOp("publish", x, containerId, localPort, address, "host-" + containerName, RouteName(instanceName)), null, ct);
+            var hostOptions = HostRouteOptions(node);
+            var r = OptionsBlocker(node, hostOptions) is { } blocked ? new ProxyOpResult(false, blocked)
+                : await RunAsync(node, x => new ProxyOp("publish", x, containerId, localPort, address, "host-" + containerName, RouteName(instanceName), Options: hostOptions), null, ct);
             if (r.Ok)
             {
                 hostDomain = address; hostRouteId = r.RouteId; notes.Add($"Host-Adresse „{address}“ angelegt.");
@@ -937,16 +1141,10 @@ public class ProxyService
                 var edge = EdgeSettings;
                 kind = edge.Kind;
                 if (kind == ProxyKinds.None) return new(false, "Der Edge-Proxy ist eingeschaltet, aber für ihn ist kein Proxy eingerichtet.");
-                string? up = null;
-                var rewrite = false;
-                if (hostDomain is not null && kind == ProxyKinds.Caddy) { up = "https://" + hostDomain; rewrite = true; }
-                else if (node is not null)
-                {
-                    if (string.IsNullOrWhiteSpace(node.Address)) return new(false, $"Node „{node.Name}“ hat keine Adresse für den Edge-Proxy.");
-                    up = $"http://{node.Address!.Trim()}:{localPort}";
-                }
+                var (up, rewrite, targetError) = await EdgeTargetAsync(hostDomain, node, localPort, edge, ct);
+                if (targetError is not null) return new(false, targetError);
                 var r = await ProxyEngine.ExecuteAsync(new ProxyOp("publish", edge, containerId, localPort, domain, "edge-" + containerName,
-                    RouteName(instanceName), Upstream: up, RewriteHost: rewrite), Http(), _docker, ct);
+                    RouteName(instanceName), Upstream: up, RewriteHost: rewrite, Options: EdgeRouteOptions(node, rewrite)), Http(), _docker, ct);
                 if (!r.Ok) return new(false, r.Message);
                 routeId = r.RouteId;
                 via = ProxyVia.Edge;

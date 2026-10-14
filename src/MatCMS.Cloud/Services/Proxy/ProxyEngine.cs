@@ -8,13 +8,16 @@ namespace MatCMS.Cloud.Services.Proxy;
 /// <param name="Upstream">publish: a fixed target (the edge forwarding to a host address or to node-address:port).
 /// Null = derive it from the container, as a host proxy does.</param>
 /// <param name="RewriteHost">publish: send the target's host name as the Host header (see IProxyProvider).</param>
+/// <param name="Options">publish: a guard on the route and/or headers towards the upstream. A node-agent OLDER than this field
+/// would drop it without a word (and publish an open route) — <see cref="ProxyService"/> never sends options to an outdated agent.</param>
 public sealed record ProxyOp(
     string Op, ProxySettings Settings,
     string? ContainerId = null, int? LocalPort = null,
     string? Host = null, string? RouteKey = null, string? Name = null,
     string? Kind = null, string? RouteId = null, string? OldKind = null,
     string? Upstream = null, bool RewriteHost = false,
-    string? DnsProvider = null, Dictionary<string, string>? Dns = null, List<string>? Trusted = null);
+    string? DnsProvider = null, Dictionary<string, string>? Dns = null, List<string>? Trusted = null,
+    ProxyRouteOptions? Options = null);
 
 public sealed record ProxyOpResult(bool Ok, string Message, string? RouteId = null, bool? Exists = null);
 
@@ -123,7 +126,7 @@ public static class ProxyEngine
         }
 
         var existing = op.OldKind == s.Kind ? op.RouteId : null;
-        var r = await provider.UpsertAsync(existing, op.RouteKey ?? op.ContainerId ?? "", op.Name ?? "MatCMS", op.Host ?? "", upstream, op.RewriteHost, ct);
+        var r = await provider.UpsertAsync(existing, op.RouteKey ?? op.ContainerId ?? "", op.Name ?? "MatCMS", op.Host ?? "", upstream, op.RewriteHost, op.Options, ct);
         return r.Ok ? new(true, $"Route über {s.Kind} angelegt.", r.RouteId)
                     : new(false, r.Error ?? "Route konnte nicht angelegt werden.", r.RouteId);
     }

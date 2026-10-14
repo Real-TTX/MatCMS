@@ -30,6 +30,7 @@ public static class NodeApi
     private static IResult NotFound() => Results.Json(new { error = "Node nicht gefunden." }, statusCode: StatusCodes.Status404NotFound);
 
     public sealed record CreateNodeDto(string Name);
+    public sealed record EdgeGuardDto(bool? Enabled, bool? Rotate);
 
     public static void MapNodeApi(this WebApplication app)
     {
@@ -149,6 +150,21 @@ public static class NodeApi
                 default:
                     return Results.Json(new { error = "Unbekannte Aktion. Erlaubt: revoke, activate, token, update-agent, test-proxy." }, statusCode: StatusCodes.Status400BadRequest);
             }
+        }).RequireRateLimiting("operatorApi");
+
+        // "Nur über den Edge erreichbar": closes the node's automatic host addresses to everybody but the edge (a secret header the edge
+        // sends), switches that off, rotates the secret, or — with no enabled — applies the current state once more (after a node was
+        // unreachable half-way). The answer lists what could not be done; the secret never leaves the cloud.
+        app.MapPut("/api/v1/nodes/{id}/edge-guard", async (HttpContext ctx, string id, EdgeGuardDto b, ApiKeyService keys,
+            NodeService nodes, Services.Proxy.ProxyService proxy) =>
+        {
+            var (_, error) = await CallerAsync(ctx, keys, cloudWide: true);
+            if (error is not null) return error;
+            var n = await nodes.FindByPublicIdAsync(id);
+            if (n is null) return NotFound();
+            var r = await proxy.SetEdgeGuardAsync(n, b.Enabled ?? n.EdgeGuard, b.Rotate ?? false, ctx.RequestAborted);
+            return Results.Json(new { ok = r.Ok, message = r.Message, notes = r.Notes, edgeGuard = n.EdgeGuard },
+                statusCode: r.Ok ? StatusCodes.Status200OK : StatusCodes.Status409Conflict);
         }).RequireRateLimiting("operatorApi");
 
         app.MapDelete("/api/v1/nodes/{id}", async (HttpContext ctx, string id, ApiKeyService keys, NodeService nodes) =>

@@ -171,6 +171,10 @@ public class NodeService
             portFrom = n.PortFrom, portTo = n.PortTo,
             autoDomain = new { enabled = n.AutoDomainEnabled, baseDomain = n.AutoDomainBase },
             address = n.Address,
+            // "Nur über den Edge erreichbar": the node's host addresses answer only the edge. The secret itself is never shown.
+            edgeGuard = n.EdgeGuard,
+            // edgeGuard is what was REQUESTED; this is what the last application could not do (null = all as asked).
+            edgeGuardIssues = string.IsNullOrEmpty(n.EdgeGuardIssues) ? null : n.EdgeGuardIssues.Split('\n'),
             proxy = new
             {
                 provider = ProxyKinds.Normalise(n.ProxyKind), matcadUrl = n.MatcadUrl, matcadTokenSet = !string.IsNullOrEmpty(n.MatcadTokenEnc),

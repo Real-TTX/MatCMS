@@ -327,6 +327,22 @@ public class DetailsModel : PageModel
         return Back(id, "proxy");
     }
 
+    /// <summary>"Zugriffsschutz": on / apply (again) / rotate / off — <see cref="ProxyService.SetEdgeGuardAsync"/>, the same as REST and MCP.</summary>
+    public async Task<IActionResult> OnPostEdgeGuardAsync(int id, string? mode)
+    {
+        var n = await _db.Nodes.FindAsync(id);
+        if (n is null) return RedirectToPage("Index");
+        // Anything but the four known values is refused — a typo must not be read as "switch it on".
+        if (mode is not ("on" or "apply" or "rotate" or "off"))
+        {
+            TempData["FlashError"] = "Unbekannte Aktion für den Zugriffsschutz.";
+            return Back(id, "proxy");
+        }
+        var r = await _proxy.SetEdgeGuardAsync(n, enable: mode != "off", rotate: mode == "rotate", HttpContext.RequestAborted);
+        TempData[r.Ok ? "Flash" : "FlashError"] = r.Message + (r.Notes.Count > 0 ? " " + string.Join(" · ", r.Notes) : "");
+        return Back(id, "proxy");
+    }
+
     public async Task<IActionResult> OnPostAddressBackfillAsync(int? id)
     {
         Node? n = id is null ? null : await _db.Nodes.FindAsync(id);

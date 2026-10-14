@@ -197,6 +197,49 @@
             </div>
         </div>
     </form>
+
+    @* The authenticated edge → node hop: the node's automatic addresses answer only the edge (a secret header). Own forms. *@
+    @if (n is not null)
+    {
+        <div class="card">
+            <h2>@T["edgeguard.title"]</h2>
+            <p class="muted">@T["edgeguard.intro"]</p>
+            <p><span class="badge @(n.EdgeGuard ? "badge-on" : "badge-off")">@T[n.EdgeGuard ? "edgeguard.on" : "edgeguard.off"]</span></p>
+            @if (!string.IsNullOrEmpty(n.EdgeGuardIssues))
+            {
+                @* "Geschützt" only says what was asked for; this is what the last application could not do. *@
+                <div class="alert alert-error">
+                    <strong>@T["edgeguard.issues"]</strong>
+                    @foreach (var line in n.EdgeGuardIssues.Split('\n')) { <div>@line</div> }
+                </div>
+            }
+            <div class="list-actions">
+                @if (!n.EdgeGuard)
+                {
+                    <form class="inline-form" method="post" asp-page-handler="EdgeGuard" asp-route-id="@n.Id" data-confirm="@T["edgeguard.onConfirm"]">
+                        <input type="hidden" name="mode" value="on" />
+                        <button type="submit" class="btn">@T["edgeguard.enable"]</button>
+                    </form>
+                }
+                else
+                {
+                    <form class="inline-form" method="post" asp-page-handler="EdgeGuard" asp-route-id="@n.Id">
+                        <input type="hidden" name="mode" value="apply" />
+                        <button type="submit" class="btn btn-ghost">@T["edgeguard.apply"]</button>
+                    </form>
+                    <form class="inline-form" method="post" asp-page-handler="EdgeGuard" asp-route-id="@n.Id" data-confirm="@T["edgeguard.rotateConfirm"]">
+                        <input type="hidden" name="mode" value="rotate" />
+                        <button type="submit" class="btn btn-ghost">@T["edgeguard.rotate"]</button>
+                    </form>
+                    <form class="inline-form" method="post" asp-page-handler="EdgeGuard" asp-route-id="@n.Id" data-confirm="@T["edgeguard.offConfirm"]">
+                        <input type="hidden" name="mode" value="off" />
+                        <button type="submit" class="btn btn-ghost btn-danger">@T["edgeguard.disable"]</button>
+                    </form>
+                }
+            </div>
+            <div class="help">@T["edgeguard.hint"]</div>
+        </div>
+    }
 </div>
 
 @if (Model.ShowMatcad)

@@ -266,6 +266,9 @@ show the result, not just the values.
   when the operator's browser is on the Docker host. On the instance side, `CloudState.ObservedBaseUrl`
   (an in-memory value set by a middleware in MatCMS's `Program.cs`) reports where the site was last
   actually reached, so a site with no canonical URL configured still has an address here.
+- **A native plugin bundle (`Kind: native`, compiled assemblies under `src/`) is shown read-only** in the store and profile plugin editors
+  (`Services/NativeBundleInfo.cs`: entry, API, SHA-256, the files) and re-packed with its `Code` untouched — there is no source to edit and the manifest's
+  `Code` is only the note an older instance shows. Upload limit 90 MB (a native plugin may bring 60 MB of assemblies). `plugins.allowNative` is never rolled out.
 - Plugins are edited **in place**: the bundle is unpacked, `plugin.json` rewritten, every other entry
   copied byte for byte (`Repack` in `Pages/Admin/Profiles/Plugin.cshtml.cs`, second copy for the store
   in `Pages/Admin/Store/Plugin.cshtml.cs`). Repacking rather than
@@ -947,6 +950,35 @@ Design and increments: `docs/hosting-platform.md`. Increments 1–4 are built:
   an agent whose version differs from the cloud's (`NodeService.AgentOutdated`). Docker.DotNet 3.125 HANGS on `tcp://` endpoints —
   `DockerHostService` translates them to `http://`; the agent uses a fresh Docker client per beat and per job
   (a client once got stuck after an archive extract) and bounds its daemon calls.
+- **Node access guard ("Nur über den Edge erreichbar", `Node.EdgeGuard`/`EdgeGuardTokenEnc`, `ProxyService.SetEdgeGuardAsync`;
+  node page → Proxy tab, REST `PUT /api/v1/nodes/{id}/edge-guard`, MCP `set_node_edge_guard`)** — the authenticated edge → node
+  hop. The node's automatic host addresses (`name.<node base>`) answer only requests carrying the secret header
+  `X-MatCMS-Edge`; everybody else gets 403 from the NODE's proxy. The edge's routes to those addresses send the header
+  (`ProxyRouteOptions.UpstreamHeaders` + `RewriteHost`), so customer domains at the edge keep working and the node's own addresses
+  stop being a way past the edge. Plumbing: `ProxyRouteOptions { RewriteHost, UpstreamHeaders, Guard }` travels in `ProxyOp.Options`
+  to `IProxyProvider.UpsertAsync`; Caddy builds a `subroute` guard (`not header` → 403) as the FIRST handler of the route, Matcad
+  sends `upstreamHost`/`upstreamHeaders`/`requireHeader`. Traps, all load-bearing: **fail closed** — an old Matcad ignores the unknown
+  JSON fields and would publish a "guarded" route open, so `MatcadProvider.CanGuardAsync` asks `/api/v1/status` for the capability
+  `routeGuards` (Matcad 0.9) and refuses without it, and after the POST the returned route must show the guard (`valueSet`) or it is
+  deleted again; an agent OLDER than the cloud drops `ProxyOp.Options` without a word → `OptionsBlocker` never sends options to an
+  outdated agent; the four Matcad properties are ALWAYS sent (null = clear, missing = keep on their side) so a dropped guard really
+  goes; header values are validated (`ProxyRouteOptions.HeaderProblem`: Caddy's header matcher reads `*` as a wildcard and fills in
+  `{…}` placeholders, secrets ≥ 16 chars of visible ASCII only — HTTP trims blanks at the ends of a header, so such a secret
+  would lock everybody out); the guard header is **stripped before the request reaches the site** (Caddy `headers.request.delete`)
+  so neither the instance nor a plugin or log ever sees it, which is also why it may not double as an upstream header (a Caddy
+  node route strips it as soon as the node HAS a secret — `ProxyRouteOptions.StripHeaders` — so the switching-on/off window does not
+  show it to the site either; a Matcad strips it only with its own guard, so there a window of one job remains); the ORDER
+  keeps customer domains up — ON/rotate: instance by instance, ITS edge route learns the secret first and ITS host address asks for
+  it second (an instance whose edge route failed keeps an open host address rather than locking its customers out); OFF: the node
+  stops asking, then the edge drops the header; a rotation's gap is therefore one job long, not the node's whole instance list
+  (measured: 12 instances went from 1.6 s to one job); `ProbeGuardAsync` asks every address WITHOUT the key and reports anything
+  but 403 (the one check that does not trust a proxy to have stored what it was told). `Node.EdgeGuard` only says what was
+  REQUESTED — `Node.EdgeGuardIssues` keeps what the last application could not do (shown on the node page, `edgeGuardIssues` in
+  the API); a node that is offline refuses any change (every step would be a 45-second wait). **The guard covers the addresses at
+  the node's proxy only — the published container ports (the node's port range) stay open unless a firewall closes them.**
+  Instances without a customer domain at the edge are closed to everybody (warned about when switching on). With the guard on, the edge may ONLY reach the node's host address (the plain
+  `address:port` fallback is refused in `EdgeTargetAsync`), which is why the guard needs an edge that can rewrite the Host header
+  (Caddy, or Matcad with `routeGuards`). The secret is per node, encrypted, never shown and never rides a backup.
 - **Moving between hosts (increment 5, `Services/Nodes/MigrationService.cs`)** copies the DATA VOLUME 1:1 —
   NOT backup/restore, which would give the site a new identity (a restore keeps the fresh container's `cloud.*`).
   Stop → export (archive API, stopped container) → source uploads / target downloads via

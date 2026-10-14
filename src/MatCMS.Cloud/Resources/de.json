@@ -613,6 +613,8 @@
   "nodes.rotate": "Neuer Token",
   "nodes.runCommand": "Start-Befehl",
   "nodes.runCommandHint": "Auf dem Host ausführen. Statt <TOKEN> gehört der Token des Agenten hinein — er wird nur als Hash gespeichert und ist nicht mehr abrufbar. Mit „Neuer Token“ erscheint der komplette Befehl einmalig.",
+  "nodes.composeTitle": "Node-Stack (Compose)",
+  "nodes.composeHint": "Agent, Matcad und Caddy in einer Datei für einen Host, der Seiten selbst ausliefern soll. Als docker-compose.node.yaml speichern und mit docker compose -f docker-compose.node.yaml up -d starten. Offen bleiben <TOKEN> (siehe oben) und <MATCAD-KEY>: ein langer Zufallswert, z. B. openssl rand -hex 32 — derselbe kommt danach im Reiter Proxy dieses Nodes als Schlüssel. Ohne eigenen Proxy genügt der Start-Befehl oben.",
   "nodes.rotateConfirm": "Neuen Token erzeugen? Der laufende Agent wird sofort abgewiesen, bis er mit dem neuen Befehl neu gestartet ist.",
   "nodes.revoke": "Sperren",
   "nodes.revokeConfirm": "Node sperren? Er bekommt keine Aufträge mehr; seine Websites laufen weiter.",

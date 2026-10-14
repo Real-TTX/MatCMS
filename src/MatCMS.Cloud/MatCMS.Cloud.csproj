@@ -30,6 +30,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The node stack shown on a node's page (NodeService.AgentCompose) — the very file that lives next to the app. -->
+    <EmbeddedResource Include="docker-compose.node.yaml" LogicalName="node-compose.yaml" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Floating 10.0.* so restores/rebuilds always pick up the latest patch ("immer aktuell"). -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.*">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

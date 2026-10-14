@@ -151,13 +151,32 @@ public class NodeService
     /// so the node's page can always show what is run on the host.</summary>
     public string AgentCommand(Node n, string? token = null)
     {
-        var cloudUrl = _cloud.Get(SettingKeys.CanonicalUrl) is { Length: > 0 } u ? u.TrimEnd('/') : "https://<cloud-adresse>";
+        var cloudUrl = CloudUrlForAgent();
         return "docker run -d --name matcms-node --restart unless-stopped \\\n" +
                "  -v /var/run/docker.sock:/var/run/docker.sock \\\n" +
                $"  -e MatCmsNode__CloudUrl={cloudUrl} \\\n" +
                $"  -e MatCmsNode__NodeId={n.PublicId} \\\n" +
-               $"  -e MatCmsNode__Token={token ?? "<TOKEN>"}\\\n" +
+               $"  -e MatCmsNode__Token={token ?? "<TOKEN>"} \\\n" +
                "  ghcr.io/real-ttx/matcms-cloud:latest dotnet MatCMS.Cloud.dll --node-agent";
+    }
+
+    private string CloudUrlForAgent() =>
+        _cloud.Get(SettingKeys.CanonicalUrl) is { Length: > 0 } u ? u.TrimEnd('/') : "<CLOUD-URL>";
+
+    /// <summary>The whole node stack — agent, Matcad and Caddy — as a compose file to paste on the host. It is
+    /// <c>docker-compose.node.yaml</c> itself (embedded in this assembly, so the page and the file cannot drift apart) from its
+    /// <c>name:</c> line on, with the cloud address and the node id filled in. What stays in angle brackets is what only the
+    /// operator knows: the Matcad key, and the token unless it was just issued (it is stored as a hash).</summary>
+    public string AgentCompose(Node n, string? token = null)
+    {
+        using var stream = typeof(NodeService).Assembly.GetManifestResourceStream("node-compose.yaml")
+                           ?? throw new InvalidOperationException("node-compose.yaml is not embedded.");
+        using var reader = new StreamReader(stream);
+        var text = reader.ReadToEnd().Replace("\r\n", "\n");
+        var start = text.IndexOf("\nname:", StringComparison.Ordinal);
+        text = start >= 0 ? text[(start + 1)..] : text;
+        text = text.Replace("<CLOUD-URL>", CloudUrlForAgent()).Replace("<NODE-ID>", n.PublicId);
+        return token is null ? text : text.Replace("<TOKEN>", token);
     }
 
     /// <summary>What the API/MCP show about a node — never the token, never the Matcad key.</summary>

@@ -67,7 +67,7 @@ public class NodeTools
         RequireCloudWide(me);
         var (node, token, err) = await nodes.CreateAsync(name, ct);
         if (node is null) throw new McpException(err ?? "Node konnte nicht angelegt werden.");
-        return new { id = node.PublicId, name = node.Name, token, command = nodes.AgentCommand(node, token!) };
+        return new { id = node.PublicId, name = node.Name, token, command = nodes.AgentCommand(node, token!), compose = nodes.AgentCompose(node, token!) };
     }
 
     [McpServerTool(Name = "update_node"), Description(
@@ -134,7 +134,7 @@ public class NodeTools
         RequireCloudWide(me);
         var n = await ResolveAsync(nodes, nodeId, ct);
         var token = await nodes.RotateTokenAsync(n, ct);
-        return new { ok = true, token, command = nodes.AgentCommand(n, token) };
+        return new { ok = true, token, command = nodes.AgentCommand(n, token), compose = nodes.AgentCompose(n, token) };
     }
 
     [McpServerTool(Name = "update_node_agent"), Description(

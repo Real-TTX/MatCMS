@@ -29,7 +29,18 @@
     <div class="alert alert-success">
         <strong>@T["nodes.commandTitle"]</strong>
         <div class="help">@T["nodes.commandOnce"]</div>
-        <pre class="mono is-secret" style="margin:.5rem 0 0;white-space:pre-wrap;word-break:break-all;">@Model.Command</pre>
+        <div class="copy-row" style="display:flex;align-items:flex-start;gap:.5rem;margin-top:.5rem;">
+            <pre class="mono is-secret" data-copy-val style="flex:1;margin:0;white-space:pre-wrap;word-break:break-all;">@Model.Command</pre>
+            <button type="button" class="btn btn-sm btn-ghost" data-copy-cmd data-copied="@T["oauthclients.copied"]">@T["oauthclients.copy"]</button>
+        </div>
+        @if (Model.Compose is not null)
+        {
+            <div class="help" style="margin-top:.8rem;">@T["nodes.composeTitle"]</div>
+            <div class="copy-row" style="display:flex;align-items:flex-start;gap:.5rem;margin-top:.3rem;">
+                <pre class="mono is-secret" data-copy-val style="flex:1;margin:0;white-space:pre;overflow-x:auto;">@Model.Compose</pre>
+                <button type="button" class="btn btn-sm btn-ghost" data-copy-cmd data-copied="@T["oauthclients.copied"]">@T["oauthclients.copy"]</button>
+            </div>
+        }
     </div>
 }
 
@@ -109,6 +120,16 @@
                         <button type="button" class="btn btn-sm btn-ghost" data-copy-cmd data-copied="@T["oauthclients.copied"]">@T["oauthclients.copy"]</button>
                     </div>
                     <div class="help" style="margin-top:.4rem;">@T["nodes.runCommandHint"]</div>
+                </div>
+            </div>
+            <div class="kv">
+                <div class="kv-label">@T["nodes.composeTitle"]</div>
+                <div class="kv-value">
+                    <div class="copy-row" style="display:flex;align-items:flex-start;gap:.5rem;">
+                        <pre class="mono" data-copy-val style="flex:1;margin:0;white-space:pre;overflow-x:auto;">@Model.AgentCompose</pre>
+                        <button type="button" class="btn btn-sm btn-ghost" data-copy-cmd data-copied="@T["oauthclients.copied"]">@T["oauthclients.copy"]</button>
+                    </div>
+                    <div class="help" style="margin-top:.4rem;">@T["nodes.composeHint"]</div>
                 </div>
             </div>
             <div class="list-actions">

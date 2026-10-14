@@ -22,6 +22,7 @@ public class CreateModel : PageModel
             return RedirectToPage();
         }
         TempData["NodeCommand"] = _nodes.AgentCommand(node, token!);
+        TempData["NodeCompose"] = _nodes.AgentCompose(node, token!);
         TempData["Flash"] = $"Node „{node.Name}“ angelegt — jetzt den Agent auf dem Host starten.";
         return RedirectToPage("Details", new { id = node.Id });
     }

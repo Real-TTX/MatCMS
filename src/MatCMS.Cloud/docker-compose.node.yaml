@@ -6,10 +6,11 @@
 #
 # ---------------------------------------------------------------------------------------------------
 # Setup (once)
-#   1. Cloud: Hosting → Nodes → "Node hinzufügen" (or POST /api/v1/nodes). It shows the three values for the agent
-#      below (CloudUrl, NodeId, Token — the token is shown ONCE).
-#   2. Replace the three CHANGE-ME values of the service "agent" and the Matcad key of "matcad" (a long random
-#      string, e.g. openssl rand -hex 32 — the cloud needs the same string in step 5).
+#   1. Cloud: Hosting → Nodes → the node → Übersicht → Agent. That page shows THIS file with the cloud address and the
+#      node id already filled in (it is embedded in the cloud image — the page and this file cannot drift apart).
+#      The token is stored as a hash: "Neuer Token" shows it, and the filled-in file, ONCE.
+#   2. Replace what is still in <angle brackets>: <TOKEN> and <MATCAD-KEY> (a long random string, e.g.
+#      openssl rand -hex 32 — the cloud needs the same string in step 5).
 #   3. Ports 80 and 443 must be free on this host (Caddy takes them). Start:
 #        docker compose -f docker-compose.node.yaml up -d
 #      Update:  docker compose -f docker-compose.node.yaml pull && docker compose -f docker-compose.node.yaml up -d
@@ -53,7 +54,7 @@ services:
       - "127.0.0.1:4433:4433"
     environment:
       # Matcad reads its API key only from configuration. Without one its REST API answers 503.
-      - Matcad__ApiKey=CHANGE-ME
+      - Matcad__ApiKey=<MATCAD-KEY>
     volumes:
       - matcad-data:/data
       - caddy-logs:/caddy-logs
@@ -68,9 +69,9 @@ services:
     command: ["dotnet", "MatCMS.Cloud.dll", "--node-agent"]
     restart: unless-stopped
     environment:
-      - MatCmsNode__CloudUrl=CHANGE-ME      # e.g. https://cloud2.matthix.de
-      - MatCmsNode__NodeId=CHANGE-ME
-      - MatCmsNode__Token=CHANGE-ME
+      - MatCmsNode__CloudUrl=<CLOUD-URL>
+      - MatCmsNode__NodeId=<NODE-ID>
+      - MatCmsNode__Token=<TOKEN>
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:

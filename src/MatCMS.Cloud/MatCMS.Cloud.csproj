@@ -32,6 +32,7 @@
   <ItemGroup>
     <!-- The node stack shown on a node's page (NodeService.AgentCompose) — the very file that lives next to the app. -->
     <EmbeddedResource Include="docker-compose.node.yaml" LogicalName="node-compose.yaml" />
+    <EmbeddedResource Include="docker-compose.node-agent.yaml" LogicalName="node-compose-agent.yaml" />
   </ItemGroup>
 
   <ItemGroup>

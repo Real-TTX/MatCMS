@@ -1,0 +1,32 @@
+# A further Docker host ("node") for MatCMS Cloud: the node-agent ALONE — no proxy on the node.
+#
+# The agent is the cloud image in --node-agent mode: it dials OUT to the cloud (no inbound port for it) and takes the
+# cloud's jobs (create / update / stop site containers on THIS host). Without a proxy on the node the cloud's edge reaches
+# each site at  <node address>:<port>  (the node's port range, 9201–9299 by default) over plain HTTP — keep those ports
+# closed for everybody but the edge (firewall), and put customer domains on the edge, which holds their certificates.
+#
+# Same as the "docker run" command on the node's page, as a compose file. Setup:
+#   1. Cloud: Hosting → Nodes → the node → Übersicht → Agent shows THIS file with the cloud address and the node id filled
+#      in (it is embedded in the cloud image). The token is stored as a hash: "Neuer Token" shows it, and the file, ONCE.
+#   2. Replace <TOKEN> if it is still there. Start:   docker compose -f docker-compose.node-agent.yaml up -d
+#      Update:  docker compose -f docker-compose.node-agent.yaml pull && docker compose -f docker-compose.node-agent.yaml up -d
+#   3. A proxy that is already running on the host (an existing Caddy) can be used later: the node's page → Proxy tab →
+#      provider "Caddy" with its admin URL. The compose with Matcad + Caddy is for a host that has none.
+# ---------------------------------------------------------------------------------------------------
+
+name: matcms-node
+
+services:
+  # Socket access == root on the host; that is the point of a node.
+  agent:
+    image: ghcr.io/real-ttx/matcms-cloud:latest
+    pull_policy: always
+    container_name: matcms-node
+    command: ["dotnet", "MatCMS.Cloud.dll", "--node-agent"]
+    restart: unless-stopped
+    environment:
+      - MatCmsNode__CloudUrl=<CLOUD-URL>
+      - MatCmsNode__NodeId=<NODE-ID>
+      - MatCmsNode__Token=<TOKEN>
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock

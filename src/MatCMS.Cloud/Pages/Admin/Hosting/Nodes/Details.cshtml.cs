@@ -51,6 +51,8 @@ public class DetailsModel : PageModel
     public string? Command { get; private set; }
     /// <summary>What is run on the host, with a placeholder for the token (which is only ever shown once).</summary>
     public string? Compose { get; private set; }
+    public string? ComposeAgent { get; private set; }
+    public string? AgentComposeAgentOnly => Item is null ? null : _nodes.AgentComposeAgentOnly(Item);
     public string? AgentCompose => Item is null ? null : _nodes.AgentCompose(Item);
     public string? AgentRunCommand => Item is null ? null : _nodes.AgentCommand(Item);
 
@@ -141,6 +143,7 @@ public class DetailsModel : PageModel
         if (!await LoadAsync(id)) return RedirectToPage("Index");
         if (TempData["NodeCommand"] is string cmd) Command = cmd;
         if (TempData["NodeCompose"] is string compose) Compose = compose;
+        if (TempData["NodeComposeAgent"] is string composeAgent) ComposeAgent = composeAgent;
         var data = await _overview.BuildAsync(HttpContext.RequestAborted);
         Host = data.Hosts.FirstOrDefault(h => h.NodeId == id);
         Sites = data.Sites.Where(s => s.Host.NodeId == id).ToList();
@@ -448,6 +451,7 @@ public class DetailsModel : PageModel
         var token = await _nodes.RotateTokenAsync(n, HttpContext.RequestAborted);
         TempData["NodeCommand"] = _nodes.AgentCommand(n, token);
         TempData["NodeCompose"] = _nodes.AgentCompose(n, token);
+        TempData["NodeComposeAgent"] = _nodes.AgentComposeAgentOnly(n, token);
         TempData["Flash"] = "Neuer Token erzeugt — der Agent muss mit dem neuen Befehl neu gestartet werden.";
         return Back(id, tab == "overview" ? "overview" : "settings");
     }

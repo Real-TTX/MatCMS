@@ -167,10 +167,16 @@ public class NodeService
     /// <c>docker-compose.node.yaml</c> itself (embedded in this assembly, so the page and the file cannot drift apart) from its
     /// <c>name:</c> line on, with the cloud address and the node id filled in. What stays in angle brackets is what only the
     /// operator knows: the Matcad key, and the token unless it was just issued (it is stored as a hash).</summary>
-    public string AgentCompose(Node n, string? token = null)
+    public string AgentCompose(Node n, string? token = null) => FillCompose("node-compose.yaml", n, token);
+
+    /// <summary>The same for a node WITHOUT a proxy of its own: the agent alone (<c>docker-compose.node-agent.yaml</c>). The edge then
+    /// reaches the sites at node address:port.</summary>
+    public string AgentComposeAgentOnly(Node n, string? token = null) => FillCompose("node-compose-agent.yaml", n, token);
+
+    private string FillCompose(string resource, Node n, string? token)
     {
-        using var stream = typeof(NodeService).Assembly.GetManifestResourceStream("node-compose.yaml")
-                           ?? throw new InvalidOperationException("node-compose.yaml is not embedded.");
+        using var stream = typeof(NodeService).Assembly.GetManifestResourceStream(resource)
+                           ?? throw new InvalidOperationException(resource + " is not embedded.");
         using var reader = new StreamReader(stream);
         var text = reader.ReadToEnd().Replace("\r\n", "\n");
         var start = text.IndexOf("\nname:", StringComparison.Ordinal);

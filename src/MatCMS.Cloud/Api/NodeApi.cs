@@ -100,7 +100,7 @@ public static class NodeApi
             var (node, token, err) = await nodes.CreateAsync(b.Name, ctx.RequestAborted);
             if (node is null) return Results.Json(new { error = err }, statusCode: StatusCodes.Status409Conflict);
             // The token exists in plain text only in this response.
-            return Results.Ok(new { id = node.PublicId, name = node.Name, token, command = nodes.AgentCommand(node, token!), compose = nodes.AgentCompose(node, token!) });
+            return Results.Ok(new { id = node.PublicId, name = node.Name, token, command = nodes.AgentCommand(node, token!), compose = nodes.AgentCompose(node, token!), composeAgent = nodes.AgentComposeAgentOnly(node, token!) });
         }).RequireRateLimiting("operatorApi");
 
         app.MapGet("/api/v1/nodes/{id}", async (HttpContext ctx, string id, ApiKeyService keys, NodeService nodes, VersionService version) =>
@@ -139,7 +139,7 @@ public static class NodeApi
                 case "activate": await nodes.SetRevokedAsync(n, false, ctx.RequestAborted); return Results.Ok(new { ok = true, revoked = false });
                 case "token":
                     var token = await nodes.RotateTokenAsync(n, ctx.RequestAborted);
-                    return Results.Ok(new { ok = true, token, command = nodes.AgentCommand(n, token), compose = nodes.AgentCompose(n, token) });
+                    return Results.Ok(new { ok = true, token, command = nodes.AgentCommand(n, token), compose = nodes.AgentCompose(n, token), composeAgent = nodes.AgentComposeAgentOnly(n, token) });
                 case "update-agent":
                     var u = await nodes.UpdateAgentAsync(n, ctx.RequestAborted);
                     return u.Ok ? Results.Ok(new { ok = true, message = u.Message })

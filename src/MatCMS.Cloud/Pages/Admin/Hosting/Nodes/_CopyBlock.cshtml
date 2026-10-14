@@ -1,0 +1,7 @@
+@* A block of text to paste on a host, with a copy button (the script is the node page's own: [data-copy-cmd]).
+   Model: (text, secret) — secret marks a freshly issued token the page shows only once. *@
+@model (string? Text, bool Secret)
+<div class="copy-row" style="display:flex;align-items:flex-start;gap:.5rem;">
+    <pre class="mono@(Model.Secret ? " is-secret" : "")" data-copy-val style="flex:1;margin:0;white-space:pre;overflow-x:auto;">@Model.Text</pre>
+    <button type="button" class="btn btn-sm btn-ghost" data-copy-cmd data-copied="@T["oauthclients.copied"]">@T["oauthclients.copy"]</button>
+</div>

@@ -1,0 +1,89 @@
+# A further Docker host ("node") for MatCMS Cloud: node-agent + Matcad + Caddy in ONE stack.
+#
+# The agent is the cloud image in --node-agent mode: it dials OUT to the cloud (no inbound port for it), takes the
+# cloud's jobs (create / update / stop site containers on THIS host) and also applies the proxy jobs to the Matcad
+# below. Matcad + Caddy are what serve the sites of this node with HTTPS; the cloud does not start them for you.
+#
+# ---------------------------------------------------------------------------------------------------
+# Setup (once)
+#   1. Cloud: Hosting → Nodes → "Node hinzufügen" (or POST /api/v1/nodes). It shows the three values for the agent
+#      below (CloudUrl, NodeId, Token — the token is shown ONCE).
+#   2. Replace the three CHANGE-ME values of the service "agent" and the Matcad key of "matcad" (a long random
+#      string, e.g. openssl rand -hex 32 — the cloud needs the same string in step 5).
+#   3. Ports 80 and 443 must be free on this host (Caddy takes them). Start:
+#        docker compose -f docker-compose.node.yaml up -d
+#      Update:  docker compose -f docker-compose.node.yaml pull && docker compose -f docker-compose.node.yaml up -d
+#   4. Matcad's UI listens on 127.0.0.1:4433 only (an SSH tunnel:  ssh -L 4433:127.0.0.1:4433 <server>  →
+#      http://localhost:4433): finish the first-run setup and set the ACME e-mail.
+#   5. Cloud → the node's page → Proxy tab: provider "Matcad", URL  http://matcad:4433, key = the one from step 2,
+#      upstream "Docker-Netzwerk", network  matcms-hosting   → "Testen" must be green.
+#      (The agent sits in that network, which is why the name "matcad" resolves for it.)
+#   6. A site on this node then gets its route and certificate through the node's Matcad. Customer domains must point
+#      at the EDGE (the cloud's own proxy), unless you publish them on this node directly.
+#
+# The agent must NOT run next to a second cloud on the same Docker socket — it is the one thing that talks to it.
+# ---------------------------------------------------------------------------------------------------
+
+name: matcms-node
+
+services:
+  # Caddy with Matcad's DNS modules. Its admin API stays inside the network (Matcad reaches it as http://caddy:2019 —
+  # that name is hard-wired in Matcad, so this service must be called "caddy").
+  caddy:
+    image: ghcr.io/real-ttx/matcad-caddy:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+      - caddy-logs:/caddy-logs
+    networks:
+      - hosting
+
+  matcad:
+    image: ghcr.io/real-ttx/matcad:latest
+    restart: unless-stopped
+    depends_on:
+      - caddy
+    ports:
+      # Loopback only: the cloud reaches Matcad through the Docker network, nobody else needs this port.
+      - "127.0.0.1:4433:4433"
+    environment:
+      # Matcad reads its API key only from configuration. Without one its REST API answers 503.
+      - Matcad__ApiKey=CHANGE-ME
+    volumes:
+      - matcad-data:/data
+      - caddy-logs:/caddy-logs
+    networks:
+      - hosting
+
+  # The node-agent. Socket access == root on the host; that is the point of a node.
+  agent:
+    image: ghcr.io/real-ttx/matcms-cloud:latest
+    pull_policy: always
+    container_name: matcms-node
+    command: ["dotnet", "MatCMS.Cloud.dll", "--node-agent"]
+    restart: unless-stopped
+    environment:
+      - MatCmsNode__CloudUrl=CHANGE-ME      # e.g. https://cloud2.matthix.de
+      - MatCmsNode__NodeId=CHANGE-ME
+      - MatCmsNode__Token=CHANGE-ME
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - hosting
+
+networks:
+  # Fixed name: it is what the node's proxy setting "Netzwerk" refers to, and the agent attaches every new site
+  # container of this node to it.
+  hosting:
+    name: matcms-hosting
+
+volumes:
+  caddy-data:
+  caddy-config:
+  caddy-logs:
+  matcad-data:

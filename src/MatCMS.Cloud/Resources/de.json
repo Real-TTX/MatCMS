@@ -611,6 +611,8 @@
   "nodes.tabContainers": "Container",
   "nodes.tabJobs": "Aufträge",
   "nodes.rotate": "Neuer Token",
+  "nodes.runCommand": "Start-Befehl",
+  "nodes.runCommandHint": "Auf dem Host ausführen. Statt <TOKEN> gehört der Token des Agenten hinein — er wird nur als Hash gespeichert und ist nicht mehr abrufbar. Mit „Neuer Token“ erscheint der komplette Befehl einmalig.",
   "nodes.rotateConfirm": "Neuen Token erzeugen? Der laufende Agent wird sofort abgewiesen, bis er mit dem neuen Befehl neu gestartet ist.",
   "nodes.revoke": "Sperren",
   "nodes.revokeConfirm": "Node sperren? Er bekommt keine Aufträge mehr; seine Websites laufen weiter.",

@@ -146,15 +146,17 @@ public class NodeService
         NodeJobExecutor.Deserialize<List<NodeContainer>>(n.InventoryJson) ?? new();
 
     /// <summary>The command that starts the agent on the host — the only thing an operator has to run there.
-    /// The image is the cloud's own (<c>--node-agent</c> mode), so agent and cloud always speak the same protocol.</summary>
-    public string AgentCommand(Node n, string token)
+    /// The image is the cloud's own (<c>--node-agent</c> mode), so agent and cloud always speak the same protocol.
+    /// Without a <paramref name="token"/> (it is stored as a hash and cannot be shown again) the command carries a placeholder,
+    /// so the node's page can always show what is run on the host.</summary>
+    public string AgentCommand(Node n, string? token = null)
     {
         var cloudUrl = _cloud.Get(SettingKeys.CanonicalUrl) is { Length: > 0 } u ? u.TrimEnd('/') : "https://<cloud-adresse>";
         return "docker run -d --name matcms-node --restart unless-stopped \\\n" +
                "  -v /var/run/docker.sock:/var/run/docker.sock \\\n" +
                $"  -e MatCmsNode__CloudUrl={cloudUrl} \\\n" +
                $"  -e MatCmsNode__NodeId={n.PublicId} \\\n" +
-               $"  -e MatCmsNode__Token={token} \\\n" +
+               $"  -e MatCmsNode__Token={token ?? "<TOKEN>"}\\\n" +
                "  ghcr.io/real-ttx/matcms-cloud:latest dotnet MatCMS.Cloud.dll --node-agent";
     }
 

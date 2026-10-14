@@ -611,6 +611,8 @@
   "nodes.tabContainers": "Containers",
   "nodes.tabJobs": "Jobs",
   "nodes.rotate": "New token",
+  "nodes.runCommand": "Start command",
+  "nodes.runCommandHint": "Run on the host. Replace <TOKEN> with the agent's token — it is stored only as a hash and cannot be shown again. “New token” shows the complete command once.",
   "nodes.rotateConfirm": "Issue a new token? The running agent is turned away at once until it is restarted with the new command.",
   "nodes.revoke": "Revoke",
   "nodes.revokeConfirm": "Revoke this node? It receives no more jobs; its sites keep running.",

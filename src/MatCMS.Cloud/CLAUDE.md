@@ -950,6 +950,7 @@ Design and increments: `docs/hosting-platform.md`. Increments 1–4 are built:
   an agent whose version differs from the cloud's (`NodeService.AgentOutdated`). Docker.DotNet 3.125 HANGS on `tcp://` endpoints —
   `DockerHostService` translates them to `http://`; the agent uses a fresh Docker client per beat and per job
   (a client once got stuck after an archive extract) and bounds its daemon calls.
+- **The node's page shows the agent and its start command** (overview tab, `Details.cshtml`): status, agent version, and `NodeService.AgentCommand(n)` with a `<TOKEN>` placeholder — the token is stored as a hash and exists in plain text only right after creating or rotating ("Neuer Token" there goes back to the overview and shows the whole command once). `docker-compose.node.yaml` is the same agent plus Matcad + Caddy for a node that serves sites itself; the agent does NOT set up a proxy, it only executes the cloud's proxy jobs against the Matcad that is already there.
 - **Node access guard ("Nur über den Edge erreichbar", `Node.EdgeGuard`/`EdgeGuardTokenEnc`, `ProxyService.SetEdgeGuardAsync`;
   node page → Proxy tab, REST `PUT /api/v1/nodes/{id}/edge-guard`, MCP `set_node_edge_guard`)** — the authenticated edge → node
   hop. The node's automatic host addresses (`name.<node base>`) answer only requests carrying the secret header

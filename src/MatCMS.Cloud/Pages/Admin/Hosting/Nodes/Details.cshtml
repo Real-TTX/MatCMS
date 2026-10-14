@@ -85,6 +85,39 @@
             <div class="kv"><div class="kv-label">@T["nodes.created"]</div><div class="kv-value mono">@n.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div></div>
         }
     </div>
+    @if (n is not null)
+    {
+        @* The agent: what runs on the host and the command that starts it. The token is stored as a hash, so the command
+           carries a placeholder; "Neuer Token" shows the whole command once. *@
+        <div class="card">
+            <h2>@T["nodes.agent"]</h2>
+            <div class="kv">
+                <div class="kv-label">@T["common.status"]</div>
+                <div class="kv-value">
+                    @if (n.Revoked) { <span class="badge badge-err">@T["nodes.revoked"]</span> }
+                    else if (n.LastSeenAt is null) { <span class="badge badge-new">@T["nodes.neverSeen"]</span> }
+                    else { <span class="badge @(on ? "badge-on" : "badge-err")">@(on ? T["nodes.online"] : T["nodes.offline"])</span> }
+                    <span class="mono">@(n.AgentVersion ?? "—")</span>
+                    @if (Model.AgentOutdated) { <span class="badge badge-new">@T["nodes.agentOutdated", Model.CloudVersion]</span> }
+                </div>
+            </div>
+            <div class="kv">
+                <div class="kv-label">@T["nodes.runCommand"]</div>
+                <div class="kv-value">
+                    <div class="copy-row" style="display:flex;align-items:flex-start;gap:.5rem;">
+                        <pre class="mono" data-copy-val style="flex:1;margin:0;white-space:pre-wrap;word-break:break-all;">@Model.AgentRunCommand</pre>
+                        <button type="button" class="btn btn-sm btn-ghost" data-copy-cmd data-copied="@T["oauthclients.copied"]">@T["oauthclients.copy"]</button>
+                    </div>
+                    <div class="help" style="margin-top:.4rem;">@T["nodes.runCommandHint"]</div>
+                </div>
+            </div>
+            <div class="list-actions">
+                <form class="inline-form" method="post" asp-page-handler="Rotate" asp-route-id="@n.Id" asp-route-tab="overview" data-confirm="@T["nodes.rotateConfirm"]">
+                    <button type="submit" class="btn btn-ghost">@T["nodes.rotate"]</button>
+                </form>
+            </div>
+        </div>
+    }
     @if (n is not null && on)
     {
         <div class="list-actions">
@@ -405,6 +438,16 @@
                 wcType.addEventListener('change', syncWc);
                 syncWc();
             }
+
+            // Copy button of the agent command.
+            document.addEventListener('click', function (e) {
+                var btn = e.target.closest('[data-copy-cmd]');
+                if (!btn) return;
+                var text = (btn.closest('.copy-row').querySelector('[data-copy-val]').textContent || '').trim();
+                var done = function () { var old = btn.textContent; btn.textContent = btn.getAttribute('data-copied') || 'OK'; setTimeout(function () { btn.textContent = old; }, 1500); };
+                if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done);
+                else { var ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.left = '-9999px'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch (x) { } ta.remove(); }
+            });
 
             // Docker tab: the images are fetched when the tab is first shown — for a node that is a job its agent
             // runs, which should not slow down every visit of the page.

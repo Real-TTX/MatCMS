@@ -49,6 +49,8 @@ public class DetailsModel : PageModel
     public string CloudVersion => _version.Current;
     public bool AgentOutdated => Item is not null && NodeService.AgentOutdated(Item, CloudVersion);
     public string? Command { get; private set; }
+    /// <summary>What is run on the host, with a placeholder for the token (which is only ever shown once).</summary>
+    public string? AgentRunCommand => Item is null ? null : _nodes.AgentCommand(Item);
 
     /// <summary>This host's line of the hosting overview (state, size, load) and its containers.</summary>
     public HostingOverviewService.HostRow? Host { get; private set; }
@@ -436,14 +438,14 @@ public class DetailsModel : PageModel
         return Back(id, "overview");
     }
 
-    public async Task<IActionResult> OnPostRotateAsync(int id)
+    public async Task<IActionResult> OnPostRotateAsync(int id, string? tab)
     {
         var n = await _db.Nodes.FindAsync(id);
         if (n is null) return RedirectToPage("Index");
         var token = await _nodes.RotateTokenAsync(n, HttpContext.RequestAborted);
         TempData["NodeCommand"] = _nodes.AgentCommand(n, token);
         TempData["Flash"] = "Neuer Token erzeugt — der Agent muss mit dem neuen Befehl neu gestartet werden.";
-        return Back(id, "settings");
+        return Back(id, tab == "overview" ? "overview" : "settings");
     }
 
     public async Task<IActionResult> OnPostRevokeAsync(int id, bool revoked)

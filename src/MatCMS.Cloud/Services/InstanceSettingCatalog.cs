@@ -52,6 +52,8 @@ public static class InstanceSettingCatalog
                 "Pro Website verschieden — als Profilwert nur sinnvoll, wenn wirklich alle Instanzen dieselbe Adresse haben."),
             new Entry("site.embedAuth", "Login im Cloud-iFrame",
                 "1 = an. Erlaubt die Anmeldung im eingebetteten Cloud-Rahmen (Cookies SameSite=None; Secure). Erfordert HTTPS auf der Instanz; wirkt nach dem nächsten Neustart der Instanz."),
+            new Entry("members.selfRegistration", "Besucher dürfen sich selbst ein Konto anlegen",
+                "1 = an. Schaltet die Seite „/registrieren“ frei (E-Mail-Adresse + Passwort, Bestätigung per Link). Aus: Konten legt nur ein Administrator an. Ein Shop legt Konten beim Bestellen unabhängig davon an."),
             new Entry("sso.enabled", "Anmeldung mit Cloud-Konto",
                 "1 = an. Zeigt auf der Anmeldeseite den Knopf „Mit Cloud-Konto anmelden“ und schaltet den SSO-Ablauf frei. Wirkt nur, wenn die Instanz mit dieser Cloud verbunden ist; der lokale Login bleibt daneben bestehen.",
                 Recommended: "1"),

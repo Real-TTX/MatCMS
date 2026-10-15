@@ -112,6 +112,95 @@ public class ContentTools
         return new { ok = true, opId = op.Id, queued = true, message = "Beitrag eingereiht — wird beim nächsten Kontakt angelegt. Ergebnis via get_content_op." };
     }
 
+    [McpServerTool(Name = "create_product"), Description(
+        "Create a NEW shop product on a connected site (add-only: an existing slug is skipped). The shop plugin must be switched on there. " +
+        "The description is HTML and is SANITISED by the instance before storage. The price is the GROSS price the customer pays, in cents (or as text like \"19,90\"). " +
+        "Queued and applied on the next heartbeat (~a minute); check get_content_op(opId). Requires a key with the restore right.")]
+    public static async Task<object> CreateProduct(
+        McpContext me, InstanceService instances,
+        [Description("The instance id, as returned by list_instances.")] string instanceId,
+        [Description("The product name, e.g. \"Kaffeetasse Rot\".")] string title,
+        [Description("The gross price in cents, e.g. 1990 for 19,90 EUR.")] long priceCents,
+        [Description("\"physical\" (shipped) or \"digital\" (a download; files are added in the shop's admin). Default physical.")] string? kind = null,
+        [Description("One or two sentences for the product cards.")] string? summary = null,
+        [Description("The description as HTML (sanitised: only safe formatting/links/images survive).")] string? descriptionHtml = null,
+        [Description("URL slug, lowercase, no spaces. Falls back to a slug of the title if empty.")] string? slug = null,
+        [Description("Tax rate in percent, e.g. 19 or 7. Falls back to the shop's default rate.")] string? taxPercent = null,
+        [Description("Pieces in stock; leave empty for unlimited (and for downloads).")] long? stock = null,
+        [Description("Article number.")] string? sku = null,
+        [Description("Publish immediately (true) or keep it hidden (false). Default true.")] bool publish = true,
+        [Description("The category's name, e.g. \"Kaffee\". It is created when the shop has no such category yet.")] string? category = null,
+        [Description("Keywords, comma separated, e.g. \"Bio, Geschenk\". Visitors can filter by them, page blocks can pick by them.")] string? tags = null,
+        [Description("Highlight the product (shown first where a block shows the highlighted products). Default false.")] bool featured = false,
+        [Description("An earlier price in cents, shown struck through next to the price (a sale). Must be higher than priceCents; it is never what is charged.")] long? compareCents = null,
+        CancellationToken ct = default)
+    {
+        var instance = await ResolveWritableAsync(me, instances, instanceId, ct);
+        if (priceCents < 0) throw new McpException("priceCents darf nicht negativ sein.");
+        var payload = JsonSerializer.Serialize(new
+        {
+            title = (title ?? "").Trim(),
+            slug = (slug ?? "").Trim(),
+            price_cents = priceCents,
+            kind = (kind ?? "physical").Trim(),
+            summary = summary ?? "",
+            description_html = descriptionHtml ?? "",
+            tax_percent = string.IsNullOrWhiteSpace(taxPercent) ? null : taxPercent.Trim(),
+            stock,
+            sku = sku ?? "",
+            publish,
+            category = (category ?? "").Trim(),
+            tags = (tags ?? "").Trim(),
+            featured,
+            compare_cents = compareCents is > 0 ? compareCents : null,
+        });
+        var op = await instances.EnqueueContentOpAsync(instance, "product.create", payload,
+            overwrite: false, reason: "KI: Produkt anlegen", ct);
+        return new { ok = true, opId = op.Id, queued = true, message = "Produkt eingereiht — wird beim nächsten Kontakt angelegt. Ergebnis via get_content_op." };
+    }
+
+    [McpServerTool(Name = "create_coupon"), Description(
+        "Create a NEW coupon code in the shop of a connected site (add-only: an existing code is skipped). The shop plugin must be switched on there. " +
+        "kind \"percent\" takes percent (e.g. 10), \"fixed\" takes amountCents, \"shipping\" is free shipping. A coupon reduces the GOODS (never shipping, except \"shipping\"). " +
+        "Queued and applied on the next heartbeat (~a minute); check get_content_op(opId). Requires a key with the restore right.")]
+    public static async Task<object> CreateCoupon(
+        McpContext me, InstanceService instances,
+        [Description("The instance id, as returned by list_instances.")] string instanceId,
+        [Description("\"percent\", \"fixed\" or \"shipping\" (free shipping). Default percent.")] string? kind = null,
+        [Description("The code customers type, letters/digits/dash; case does not matter. Empty: a random code is made.")] string? code = null,
+        [Description("For kind percent: the percentage, e.g. 10 for 10 %.")] string? percent = null,
+        [Description("For kind fixed: the amount in cents, e.g. 500 for 5,00 EUR.")] long? amountCents = null,
+        [Description("Minimum value of the goods in cents before the coupon applies. Default none.")] long? minOrderCents = null,
+        [Description("Valid through this day, format yyyy-MM-dd. Default no end.")] string? expires = null,
+        [Description("How often the code may be used in all. Default unlimited.")] int? maxUses = null,
+        [Description("Only once per e-mail address. Default false.")] bool oncePerCustomer = false,
+        [Description("Only goods of this category count; the category must exist. Default all goods.")] string? category = null,
+        [Description("A note for the shop owner, e.g. \"Newsletter Mai\".")] string? note = null,
+        CancellationToken ct = default)
+    {
+        var instance = await ResolveWritableAsync(me, instances, instanceId, ct);
+        var k = (kind ?? "percent").Trim().ToLowerInvariant();
+        if (k is not ("percent" or "fixed" or "shipping")) throw new McpException("kind muss percent, fixed oder shipping sein.");
+        if (k == "percent" && string.IsNullOrWhiteSpace(percent)) throw new McpException("Für percent fehlt \"percent\".");
+        if (k == "fixed" && amountCents is not > 0) throw new McpException("Für fixed fehlt \"amountCents\" (größer als 0).");
+        var payload = JsonSerializer.Serialize(new
+        {
+            kind = k,
+            code = (code ?? "").Trim(),
+            percent = string.IsNullOrWhiteSpace(percent) ? null : percent.Trim(),
+            amount_cents = amountCents,
+            min_order_cents = minOrderCents,
+            expires = string.IsNullOrWhiteSpace(expires) ? null : expires.Trim(),
+            max_uses = maxUses,
+            once_per_customer = oncePerCustomer,
+            category = (category ?? "").Trim(),
+            note = (note ?? "").Trim(),
+        });
+        var op = await instances.EnqueueContentOpAsync(instance, "coupon.create", payload,
+            overwrite: false, reason: "KI: Gutschein anlegen", ct);
+        return new { ok = true, opId = op.Id, queued = true, message = "Gutschein eingereiht — wird beim nächsten Kontakt angelegt. Ergebnis via get_content_op." };
+    }
+
     [McpServerTool(Name = "create_form"), Description(
         "Create a NEW form (\"Formular\") on a connected site (add-only: an existing slug is skipped). " +
         "You supply the fields as a JSON array (the form-builder definition). Queued and applied on the next heartbeat (~a minute); check get_content_op(opId). Requires a key with the restore right.")]

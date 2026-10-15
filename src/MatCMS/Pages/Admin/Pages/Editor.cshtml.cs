@@ -78,7 +78,7 @@ public class EditorModel : PageModel
         // Every block type with what the editor needs to offer and edit it. The schema of ALL types goes
         // along (a few hundred KB at most), so selecting a block never waits for the server.
         var defs = Registry.All.ToList();
-        var sources = await BlockSchema.LoadSourcesAsync(_db, defs);
+        var sources = await BlockSchema.LoadSourcesAsync(_db, defs, HttpContext.RequestServices.GetRequiredService<MatCMS.Services.Plugins.PluginContributions>(), HttpContext.RequestServices);
         TypesJson = JsonSerializer.Serialize(defs.Select(d => new
         {
             type = d.Type,

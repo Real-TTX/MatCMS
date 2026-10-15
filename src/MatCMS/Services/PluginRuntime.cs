@@ -393,6 +393,8 @@ public class PluginRunner
         // context to release.
         var wasNative = _native.IsLoaded(key);
         var had = wasNative ? _native.Unload(key, _registry) : _registry.Remove(key);
+        // The plugin's mails stop being declared with it (their rows stay: an operator's wording is not thrown away by switching a plugin off).
+        MatCMS.Shared.MailTemplates.Unregister(key + ".");
         if (wasNative || had) _registry.AddLog(key, "entladen");
     }
 
@@ -570,6 +572,7 @@ public class PluginRunner
     private async Task ActivateAsync(Models.Plugin p, PluginInfo info, PluginRegistry.Slice slice)
     {
         if (slice.Tables.Count > 0) await _data.ReconcileAsync(_db, p.Key, slice.Tables);
+        if (slice.MailTemplates.Count > 0) await PluginMailTemplates.EnsureAsync(_db, slice.MailTemplates);
         if (!slice.HasLifecycle) return;
 
         var ctx = PluginRequestContext.ForBackground(info, _services, _registry, slice);

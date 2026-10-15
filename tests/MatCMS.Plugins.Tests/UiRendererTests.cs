@@ -150,7 +150,7 @@ public class UiRendererTests
             Ui.Button("b", "/"), Ui.Action("a", "x"), Ui.Dialog("d", "t", Ui.Text("x")),
             Ui.Form(Ui.Hidden("a", "b"), Ui.FormActions(Ui.Submit("s"))),
             Ui.Input("i", "I"), Ui.TextArea("t", "T"), Ui.Select("s", "S", "a", Ui.Option("a", "A")), Ui.Checkbox("c", "C"),
-            Ui.Image("im", "Im"), Ui.MediaList("ml", "Ml"), Ui.MediaList("fl", "Fl", files: true), Ui.RichText("rt", "Rt"), Ui.Tags("tg", "Tg", "a, b", new[] { "c" }),
+            Ui.File("doc", "Doc", ".pdf"), Ui.Image("im", "Im"), Ui.MediaList("ml", "Ml"), Ui.MediaList("fl", "Fl", files: true), Ui.RichText("rt", "Rt"), Ui.Tags("tg", "Tg", "a, b", new[] { "c" }),
             Ui.Table(new[] { Ui.Column("c") }, new[] { Ui.Row("x", Ui.Badge("y")) }), Ui.Tabs(Ui.Tab("t", "/")), Ui.Pager(1, 3, "?p={0}")
         };
         foreach (var n in all)
@@ -164,6 +164,16 @@ public class UiRendererTests
         var covered = all.SelectMany(UiTree.Descendants).Select(n => n.GetType().Name).ToHashSet();
         covered.UnionWith(new[] { nameof(UiHidden) });
         Assert.Empty(known.Except(covered));
+    }
+
+    [Fact]
+    public void A_file_field_renders_an_upload_input_with_the_accept_hint_encoded()
+    {
+        var html = Admin(Ui.Form(Ui.File("doc", "Datei", ".pdf,.zip\"><script>")) with { Upload = true });
+        Assert.Contains("enctype=\"multipart/form-data\"", html);
+        Assert.Contains("type=\"file\"", html);
+        Assert.Contains("name=\"doc\"", html);
+        Assert.DoesNotContain("<script>", html);                       // the accept text cannot break out of its attribute
     }
 
     [Fact]

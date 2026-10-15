@@ -97,7 +97,9 @@ public class Localizer
     private readonly IWebHostEnvironment _env;
     private static readonly ConcurrentDictionary<string, Dictionary<string, string>> _cache = new();
 
-    public Localizer(IWebHostEnvironment env) => _env = env;
+    private readonly PluginRegistry? _plugins;
+
+    public Localizer(IWebHostEnvironment env, PluginRegistry? plugins = null) { _env = env; _plugins = plugins; }
 
     public string this[string key] => Get(key) ?? key;
 
@@ -124,7 +126,8 @@ public class Localizer
             if (Load(c).TryGetValue(key, out var v))
                 return v;
         }
-        return null;
+        // A plugin's own texts (its block names, field labels and options reach the editors as keys of its string tables).
+        return _plugins?.TextOf(key, culture);
     }
 
     private Dictionary<string, string> Load(string culture) =>

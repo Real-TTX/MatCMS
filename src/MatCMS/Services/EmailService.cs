@@ -103,12 +103,13 @@ public class EmailService
     public async Task<(bool ok, string? error)> SendTemplateAsync(
         string key, IEnumerable<string> to, IReadOnlyDictionary<string, string> values,
         string? replyTo = null,
-        IReadOnlyDictionary<string, IReadOnlyList<MatCMS.Shared.MailTemplates.Item>>? lists = null)
+        IReadOnlyDictionary<string, IReadOnlyList<MatCMS.Shared.MailTemplates.Item>>? lists = null,
+        MatCMS.Shared.MailTemplates.Definition? fallback = null)
     {
         var row = await _db.MailTemplates.AsNoTracking().FirstOrDefaultAsync(t => t.Key == key);
         if (row is not null && !row.Enabled) return (false, "Diese Benachrichtigung ist deaktiviert.");
 
-        var def = MatCMS.Shared.MailTemplates.Find(key);
+        var def = MatCMS.Shared.MailTemplates.Find(key) ?? fallback;
         var subject = row?.Subject ?? def?.Subject;
         var body = row?.Body ?? def?.Body;
         var isHtml = row?.IsHtml ?? false;

@@ -35,6 +35,26 @@ public class SiteMember
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    /// <summary>
+    /// The e-mail address, lower-cased, or "" for an account an administrator created without one (the original guest-area accounts have
+    /// none). Unique when set. It is a second way to sign in and the address confirmation and reset mails go to; a plugin (a shop) keeps
+    /// its own copy where it needs one frozen in time.
+    /// </summary>
+    public string Email { get; set; } = "";
+
+    /// <summary>When the owner followed the link in the confirmation mail; null while unconfirmed. An unconfirmed account works — this only
+    /// says whether the address has been proven to belong to the person.</summary>
+    public DateTime? EmailConfirmedAt { get; set; }
+
+    /// <summary>SHA-256 of the pending confirmation token (the token itself only ever travels in the mail), or "".</summary>
+    public string ConfirmTokenHash { get; set; } = "";
+    /// <summary>When the confirmation token stops working.</summary>
+    public DateTime? ConfirmTokenExpiresAt { get; set; }
+    /// <summary>SHA-256 of the pending password-reset token, or "".</summary>
+    public string ResetTokenHash { get; set; } = "";
+    /// <summary>When the reset token stops working.</summary>
+    public DateTime? ResetTokenExpiresAt { get; set; }
+
     /// <summary>The role names as a set, split from <see cref="RolesCsv"/>.</summary>
     public IReadOnlyCollection<string> Roles =>
         (RolesCsv ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);

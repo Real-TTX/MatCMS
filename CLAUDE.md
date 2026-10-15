@@ -186,7 +186,8 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
 - **"MatCMS ships no plugins" still holds for script plugins and the seeder.** What does ship is the *built-in* plugin
   (`Kind = builtin`, `Services/Plugins/BuiltInPlugins.cs`): compiled into the image, written against the same API, enabled on a
   new site, can be switched off, never deleted, exported or overwritten (a bundle or cloud rollout with its key is refused).
-  Today that is **the blog** (`src/MatCMS/Plugin/Blog/`, namespace `MatCMS.Plugin.Blog`): it *adopts* the existing `Posts`
+  Two exist: **the shop** (`src/MatCMS/Plugin/Shop/`, namespace `MatCMS.Plugin.Shop`, **off on a new site** — `BuiltInPlugin.EnabledOnNewSite` — see `docs/shop-plugin.md`
+  and "The shop" below) and **the blog** (`src/MatCMS/Plugin/Blog/`, namespace `MatCMS.Plugin.Blog`): it *adopts* the existing `Posts`
   table (nothing moved), registers `/blog/{slug}`, the `posts` block, its admin section, the dashboard tile, the sitemap
   entries and the cloud operation `post.create`. The core no longer knows posts except for the backup, which reads the table
   through `BlogStore.Table(db)` — so posts are in every backup whether or not the blog is on.
@@ -213,8 +214,63 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
   nothing here: the catalogue follows the assembly. Editor blueprints (`PluginBlueprints`) are loaded for real by `BlueprintTests`.
 - **Native bundles in the cloud are read-only:** the store and profile editors show entry, API, checksum and the `src/` files instead of a code editor, and
   `Repack` leaves a native bundle's `Code` (the note for older instances) alone (`MatCMS.Cloud/Services/NativeBundleInfo.cs`). The cloud still never loads one.
+- **Customer accounts, visitor routes and the rest of what a shop needed** (all in `MatCMS.Plugin.Abstractions`, implemented in `Services/Plugins/PluginAccessParts.cs` and
+  `PluginRequestContext.cs`): `ctx.Member` (the signed-in customer of the guest area — read from the DATABASE on every request, so a deleted or switched-off account stops being
+  "the member" at once, cookie or not), `ctx.Members` (find / create / sign in / change password / delete — the account itself is `SiteMember`, now with `Email`, confirmation and
+  reset tokens as SHA-256 hashes; the pages `/registrieren`, `/anmelden/vergessen`, `/anmelden/zuruecksetzen`, `/anmelden/bestaetigen`; self-registration is the setting
+  `members.selfRegistration`, off by default, and does NOT bind a plugin that creates an account for its own purpose), `ctx.Mail` + `Plugin.MailTemplate` (templates land in
+  Admin → Mailvorlagen, rows are never overwritten; a plugin sends only keys that start with its own), `ctx.Files` (`appdata/plugin-files/{key}`, validated names, in the backup
+  on the plugin-uploads switch, deleted with the plugin), `IDataTable.IncrementAsync` + `NextNumberAsync` (atomic counters, gapless sequences inside a transaction).
+  `PublicRouteOptions`: `RequireMember`/`RequiredRole` (sign-in redirect, handler never runs), `Antiforgery` (checked BEFORE the handler, answer `no-store`), `Webhook` (POST only,
+  raw body ≤ 1 MB in `RequestData.Body`, own looser limit), `PostsPerMinute` (default 20 per address and plugin). A plugin's cookies are `{key}.`-prefixed on the wire,
+  `HttpOnly`, `SameSite=Lax`. `PluginResult.RedirectExternal` accepts only an absolute https address. Host events for accounts: `host.member.registered/confirmed/deleted/export/erase`.
+- **Block fields of a plugin**: besides text/select/image/list a field can be `MultiSelect`, can appear only while another field has a value (`ShowWhenField/Value`) and can draw its choices from
+  a list the plugin registered with `IPluginBuilder.OptionsSource` (the host asks when the editor opens, via `PluginContributions.OptionsAsync` and `BlockSchema.LoadSourcesAsync`; the
+  field's source is stored host-side as `plugin:{key}:{name}`). A block's texts (name, labels, option labels) are looked up in the plugin's own string tables: `Localizer` falls back to
+  `PluginRegistry.TextOf` for keys the core does not have — a plugin key therefore contains a dot, and a plugin block that shows raw keys in the editor means this lookup broke.
+- **SQLite under concurrency — two traps found by the shop's race tests.** (1) `UPDATE … RETURNING` through Microsoft.Data.Sqlite: the driver waits for a busy database only on a
+  statement's FIRST step, the commit of a RETURNING statement happens on a later one and failed with "database is locked" — counters are `UPDATE` + `SELECT` inside a
+  `Serializable` (= `BEGIN IMMEDIATE`) transaction. Plugin transactions (`InTransactionAsync`) are `Serializable` too, and a transaction that reads before it writes should start with a
+  write (`ShopStore.LockForWriteAsync`) so it queues instead of being refused. (2) `UseStatusCodePagesWithReExecute` re-runs every EMPTY error response as the status page; for a POST
+  that ends as a bare 400 — `PluginPage` therefore always gives an error answer to a POST a short body.
 - **The plugin machinery tests don't start the built-ins** (`new Harness()`); the blog tests do (`new Harness(builtIns: true)`).
   `BlueprintTests` load every editor blueprint for real. `AppFactory` + `BlogEndToEndTests` start the whole application in memory over a temp folder (own database, own keys) and drive the blog through HTTP: login, antiforgery, the public pages, switching the plugin off and on.
+
+## The shop
+
+A built-in plugin (off until switched on), written against the plugin API and nothing else — the core does not know it. Read `docs/shop-plugin.md` before touching
+`src/MatCMS/Plugin/Shop/`. The rules that are easy to break:
+
+- **Money is whole cents, prices are GROSS, and the server prices everything** (`ShopOrders.PriceAsync`); nothing a form sends as a price or total is read. An order and its lines
+  are a **snapshot** (title, price, tax) — later product edits never touch them; the invoice is written ONCE when the order is paid and stored as HTML.
+- **Every status change goes through `ShopOrders`** (`OrderStatus.CanMove` is the only list of allowed moves; `ShopStore.SetStatusAsync` is called by nobody else). Each move does
+  its whole job in one transaction — stock, invoice number, downloads, history — and sends mails/events after the commit. Paying is idempotent; a payment that arrives for a
+  cancelled order revives it (stock is taken again, a warning is written if there was none).
+- **Stripe:** Checkout only (`StripeClient` is plain REST, no SDK). The order is paid by the signed WEBHOOK, never by the browser's return; the return page asks Stripe about the
+  ORDER'S OWN session (never a session id from the address). Amount and currency of the session must equal the order's. Events are applied idempotently (absolute refunded totals, an
+  event id table, a status check inside the lock). `StripeClient.HandlerFactory` is the test seam (`FakeStripe` in the tests).
+- **Stock** is taken atomically (`IncrementAsync` with a floor of 0) inside the order transaction; a lost race throws `SoldOutException` and the whole transaction is undone.
+  Order and invoice numbers come from gapless sequences taken inside that transaction.
+- **Customer data:** orders belong to an account by `member_id`; a guest's earlier orders join the account only when its address is CONFIRMED (`host.member.confirmed`). Deleting an
+  account (`host.member.erase`) removes addresses and carts and unlinks the orders — orders and invoices stay (retention duty).
+- **Choosing products:** one category per product plus free **keywords** (`ShopTags`: kept as typed, compared without case, never a comma) and a `featured` flag; every list of products goes through
+  `ShopStore.FindProductsAsync(ProductQuery)` (catalogue, the two page blocks `shop_products`/`shop_product` in `ShopBlocks.cs`, related products). A keyword is matched in memory after a
+  database `Contains` (a longer word must not match), everything else in the database. The blocks' CSS is `ShopHtml.CardCss` (also inside the page's stylesheet) and the markup sits in
+  `section.section > .container` like the other blocks.
+- **Coupons, tax by country, documents** (the chain every price goes through, in this order): `ShopOrders.PriceAsync` (gross lines, stock) → `ShopTax.Apply` (the country of DELIVERY for goods, of the BILLING address
+  for downloads; with "oss" on: another EU country's rate, outside the EU no VAT and the net price; shipping gets a `ShipTax`) → `ShopCoupons.Resolve/Apply` (discount on the goods only, shared over the lines with
+  `Money.Allocate` so every line's VAT is the VAT of what is paid; `free shipping` is a flag) → `ShippingOptions` → `Compute` (total = subtotal − discount + shipping). `PlaceAsync` runs the whole chain AGAIN inside its
+  transaction (a coupon is checked, and its use counted, under the same write lock — two buyers against `MaxUses=1` cannot both win; a coupon that fell away since the cart is a refusal with the reason, never a silent full
+  price). An order stores the discount, the coupon code, the tax note ("", "oss", "export") and the shipping rate it was charged with. **Invoice and credit note** are drawn from ONE `InvoiceDoc`
+  (`ShopInvoice.Build/BuildCredit`) into HTML (`ShopInvoice.Html`) and PDF (`ShopPdf`, a hand-written PDF 1.4 writer — no library; WinAnsi text, Helvetica) and stored once (`invoices` rows, `kind` invoice|credit,
+  PDF as base64). `ShopOrders.ApplyRefundAsync` writes a credit note (gapless `credit` sequence) inside the refund's transaction. The invoice page's own PDF link is a marker (`ShopInvoice.PdfMarker`) the route
+  replaces — the stored page never contains the order's key.
+- **PayPal** (`Payments/PayPalClient.cs`, `PayPalPayments.cs`; `PayPalClient.HandlerFactory` is the test seam, `FakePayPal` the stand-in): the order is paid by what PayPal says about the order's OWN PayPal order (`payment_ref`),
+  when amount, currency and `custom_id` match; a notification is verified BY PayPal (`verify-webhook-signature`; the certificate address must be `*.paypal.com`); a refund counts exactly once, gated by its id in
+  `webhook_events` (`refund:{id}`) whoever reports it first, and `ApplyRefundAsync(isIncrease: true)` adds to what the transaction reads.
+- **Downloads** are private files streamed by `ShopDownloads.ServeAsync`: paid order, the order's secret key (or the owner, or the admin), a download row that is not revoked or
+  expired, a count that is taken atomically.
+- Texts: `ShopStrings.All` (key, German, English in one row); a test checks that every key used in the code has both.
 
 ## Conventions
 

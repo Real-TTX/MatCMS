@@ -46,6 +46,8 @@ public class AppDbContext : DbContext
         b.Entity<MailTemplate>().HasIndex(m => m.Key).IsUnique();
         b.Entity<Menu>().HasIndex(m => m.Key).IsUnique();
         b.Entity<SiteMember>().HasIndex(m => m.Username).IsUnique();
+        // One account per address — but the accounts that have none ("") must not collide with each other.
+        b.Entity<SiteMember>().HasIndex(m => m.Email).IsUnique().HasFilter("\"Email\" <> ''");
         b.Entity<SiteRole>().HasIndex(r => r.Name).IsUnique();
         // The upsert target of the statistics flush (INSERT … ON CONFLICT), and what every period query walks.
         b.Entity<StatCounter>().HasIndex(c => new { c.Day, c.Kind, c.Key }).IsUnique();

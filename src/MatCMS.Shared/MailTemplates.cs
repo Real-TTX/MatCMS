@@ -34,6 +34,10 @@ public static class MailTemplates
         IReadOnlyList<Loop> Loops, string HtmlBody);
 
     public const string FormSubmission = "form.submission";
+    /// <summary>Asks a new customer to confirm the address of the account.</summary>
+    public const string MemberConfirm = "member.confirm";
+    /// <summary>Carries the link to choose a new password.</summary>
+    public const string MemberReset = "member.reset";
 
     /// <summary>
     /// Every mail the product can send. Today that is one; the shape exists so the next one is a
@@ -83,10 +87,76 @@ public static class MailTemplates
               <p style="color:#888;font-size:13px;">Gesendet am {{date}} über {{site_name}}.</p>
             </div>
             """),
+
+        new Definition(
+            MemberConfirm,
+            "Konto bestätigen",
+            "Geht an einen Besucher, der ein Konto angelegt hat, damit er seine E-Mail-Adresse bestätigt.",
+            "Bitte bestätigen Sie Ihre E-Mail-Adresse – {{site_name}}",
+            """
+            Hallo {{name}},
+
+            Sie haben bei {{site_name}} ein Konto angelegt. Bitte bestätigen Sie Ihre E-Mail-Adresse mit diesem Link:
+
+            {{link}}
+
+            Der Link ist {{hours}} Stunden gültig. Haben Sie das Konto nicht angelegt, können Sie diese Nachricht ignorieren.
+            """,
+            [
+                new Placeholder("name", "Name des Kontos"),
+                new Placeholder("link", "Der Bestätigungslink"),
+                new Placeholder("hours", "Wie lange der Link gilt"),
+                new Placeholder("site_name", "Name der Website"),
+            ],
+            [],
+            ""),
+
+        new Definition(
+            MemberReset,
+            "Passwort zurücksetzen",
+            "Geht an einen Besucher, der sein Passwort vergessen hat, mit dem Link für ein neues.",
+            "Neues Passwort für {{site_name}}",
+            """
+            Hallo {{name}},
+
+            für Ihr Konto bei {{site_name}} wurde ein neues Passwort angefordert. Sie können es hier festlegen:
+
+            {{link}}
+
+            Der Link ist {{hours}} Stunden gültig und lässt sich nur einmal verwenden. Haben Sie das nicht angefordert, ändert sich nichts — ignorieren Sie diese Nachricht.
+            """,
+            [
+                new Placeholder("name", "Name des Kontos"),
+                new Placeholder("link", "Der Link zum Festlegen eines neuen Passworts"),
+                new Placeholder("hours", "Wie lange der Link gilt"),
+                new Placeholder("site_name", "Name der Website"),
+            ],
+            [],
+            ""),
     ];
 
+    /// <summary>
+    /// Mails that a plugin declares. They live next to <see cref="All"/> rather than in it: <c>All</c> is what the cloud seeds into every profile
+    /// and what a fresh site starts with, and a plugin's mail must exist only on a site that has the plugin. The host registers a plugin's
+    /// definitions when it loads and takes them out again when it unloads; <see cref="Find"/> and <see cref="Declared"/> see both lists.
+    /// </summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Definition> Extra = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Makes a plugin's mail known (replacing an earlier declaration under the same key).</summary>
+    public static void Register(Definition definition) => Extra[definition.Key] = definition;
+
+    /// <summary>Forgets every declared mail whose key starts with <paramref name="prefix"/> (<c>shop.</c>).</summary>
+    public static void Unregister(string prefix)
+    {
+        foreach (var key in Extra.Keys.Where(k => k.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToList()) Extra.TryRemove(key, out _);
+    }
+
+    /// <summary>The core mails and the ones plugins declare right now.</summary>
+    public static IReadOnlyList<Definition> Declared => All.Concat(Extra.Values.OrderBy(d => d.Key, StringComparer.OrdinalIgnoreCase)).ToList();
+
     public static Definition? Find(string key) =>
-        All.FirstOrDefault(d => string.Equals(d.Key, key, StringComparison.OrdinalIgnoreCase));
+        All.FirstOrDefault(d => string.Equals(d.Key, key, StringComparison.OrdinalIgnoreCase))
+        ?? (Extra.TryGetValue(key ?? "", out var extra) ? extra : null);
 
     /// <summary>One pass of a loop: the placeholders available inside the block, filled.</summary>
     public sealed class Item : Dictionary<string, string>

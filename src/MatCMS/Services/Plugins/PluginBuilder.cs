@@ -147,6 +147,18 @@ internal sealed class PluginBuilder : IPluginBuilder, IAdminBuilder, ISettingsBu
         _slice.Operations.Add(new PluginRegistry.OperationEntry(Info.Key, Info, name!, handler));
     }
 
+    private static readonly System.Text.RegularExpressions.Regex MailKey = new(@"^[a-z][a-z0-9_-]{0,40}(\.[a-z0-9_-]{1,40}){1,3}$", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    public void MailTemplate(MailTemplateSpec spec)
+    {
+        ArgumentNullException.ThrowIfNull(spec);
+        if (!MailKey.IsMatch(spec.Key ?? "") || !spec.Key!.StartsWith(Info.Key + ".", StringComparison.Ordinal))
+            throw new InvalidOperationException($"Mail template '{spec.Key}': the key is '{Info.Key}.' followed by a name (lower-case letters, digits, '_', '-', '.').");
+        if (_slice.MailTemplateSpecs.Any(m => m.Key == spec.Key)) throw new InvalidOperationException($"Mail template '{spec.Key}' is declared twice.");
+        if (string.IsNullOrWhiteSpace(spec.Subject) && string.IsNullOrWhiteSpace(spec.Body)) throw new InvalidOperationException($"Mail template '{spec.Key}' has neither subject nor body.");
+        _slice.MailTemplateSpecs.Add(spec);
+    }
+
     // ---- dashboard ----------------------------------------------------------------------------------
 
     public void Tile(PluginTileProvider provider) { ArgumentNullException.ThrowIfNull(provider); _slice.Tiles.Add(new(Info.Key, Info, provider)); }
@@ -167,7 +179,10 @@ internal sealed class PluginBuilder : IPluginBuilder, IAdminBuilder, ISettingsBu
             throw new InvalidOperationException($"Route '{pattern}': a public route must start with a fixed segment (e.g. /{Info.Key}/…).");
         if (p.IsReserved)
             throw new InvalidOperationException($"Route '{pattern}': '/{p.FirstLiteral}' belongs to the CMS.");
-        _slice.Routes.Add(new PluginRegistry.RouteEntry(Info.Key, Info, p, handler, options ?? new PublicRouteOptions()));
+        var opts = options ?? new PublicRouteOptions();
+        // A webhook is POSTed to; answering a GET for it would only give a stranger something to probe.
+        if (opts.Webhook) opts = opts with { Methods = PluginMethod.Post };
+        _slice.Routes.Add(new PluginRegistry.RouteEntry(Info.Key, Info, p, handler, opts));
     }
 
     public IAdminSection Section(string label, string icon = "ti-plug", AdminGroup group = AdminGroup.Plugins, int order = 100)
@@ -214,7 +229,15 @@ internal sealed class PluginBuilder : IPluginBuilder, IAdminBuilder, ISettingsBu
         });
     }
 
-    private static BlockField ToBlockField(FieldSpec f)
+    public void OptionsSource(string name, Func<IPluginContext, CancellationToken, Task<IReadOnlyList<FieldOption>>> provider)
+    {
+        ArgumentNullException.ThrowIfNull(provider);
+        if (string.IsNullOrWhiteSpace(name) || name.Contains(':')) throw new InvalidOperationException("An option source needs a name without a colon.");
+        if (_slice.OptionSources.Any(o => o.Name == name)) throw new InvalidOperationException($"The option source '{name}' is registered twice.");
+        _slice.OptionSources.Add(new PluginRegistry.OptionSourceEntry(Info.Key, Info, name, provider));
+    }
+
+    private BlockField ToBlockField(FieldSpec f)
     {
         var field = new BlockField
         {
@@ -227,9 +250,13 @@ internal sealed class PluginBuilder : IPluginBuilder, IAdminBuilder, ISettingsBu
                 FieldKind.Url => FieldType.Url,
                 FieldKind.Select => FieldType.Select,
                 FieldKind.List => FieldType.List,
+                FieldKind.MultiSelect => FieldType.MultiSelect,
                 _ => FieldType.Text
             },
-            Placeholder = f.Placeholder, Help = f.Help, Default = f.Default
+            Placeholder = f.Placeholder, Help = f.Help, Default = f.Default,
+            // The editor knows a plugin's list by "plugin:{key}:{name}", so two plugins may both call theirs "categories".
+            OptionsSource = string.IsNullOrWhiteSpace(f.OptionsSource) ? null : $"plugin:{Info.Key}:{f.OptionsSource}",
+            ShowWhenField = f.ShowWhenField, ShowWhenValue = f.ShowWhenValue
         };
         foreach (var o in f.Options) field.Options.Add(new SelectOption(o.Value, o.Label));
         return field;

@@ -21,6 +21,8 @@ public class AnmeldenModel : PageModel
     public string? Error { get; private set; }
     public string? ReturnUrl { get; private set; }
     public bool LoggedIn { get; private set; }
+    /// <summary>Visitors may create their own account (<c>members.selfRegistration</c>): the page then offers the link.</summary>
+    public bool CanRegister { get; private set; }
     public string? MemberName { get; private set; }
 
     // --- Custom (template-provided) login page ---
@@ -58,6 +60,7 @@ public class AnmeldenModel : PageModel
     public async Task<IActionResult> OnGetAsync(string? returnUrl = null, bool denied = false)
     {
         ReturnUrl = Local(returnUrl);
+        CanRegister = await _members.SelfRegistrationEnabledAsync();
         var member = await MemberService.CurrentAsync(HttpContext);
         LoggedIn = member?.Identity?.IsAuthenticated == true;
         MemberName = member?.FindFirst("DisplayName")?.Value ?? member?.Identity?.Name;
@@ -77,6 +80,7 @@ public class AnmeldenModel : PageModel
         var member = await _members.ValidateAsync(username ?? "", password ?? "");
         if (member is null)
         {
+            CanRegister = await _members.SelfRegistrationEnabledAsync();
             Error = "Benutzername oder Passwort ist falsch.";
             MemberName = null;
             ResolveTemplate();

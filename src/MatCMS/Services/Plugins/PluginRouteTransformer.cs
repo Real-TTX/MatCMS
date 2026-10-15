@@ -58,7 +58,24 @@ internal static class PluginPostLimiter
     private const int PerMinute = 20;
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (long Window, int Count)> Hits = new();
 
-    public static bool Allow(string client)
+    /// <summary>A webhook is called by a provider from a few addresses, in bursts: its limit is far looser (and still there — an open endpoint is open).</summary>
+    public static bool AllowWebhook(string client)
+    {
+        var window = DateTimeOffset.UtcNow.ToUnixTimeSeconds() / 60;
+        if (WebhookHits.Count > 2000)
+            foreach (var kv in WebhookHits.Where(kv => kv.Value.Window != window).ToList()) WebhookHits.TryRemove(kv.Key, out _);
+        var now = WebhookHits.AddOrUpdate(client, (window, 1), (_, cur) => cur.Window == window ? (window, cur.Count + 1) : (window, 1));
+        return now.Count <= 600;
+    }
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (long Window, int Count)> WebhookHits = new();
+
+    /// <summary>Forgets every count (tests start from a clean minute).</summary>
+    internal static void Reset() { Hits.Clear(); WebhookHits.Clear(); }
+
+    /// <param name="client">The visitor's address, joined with the plugin's key so one plugin's traffic does not use up another's allowance.</param>
+    /// <param name="perMinute">The route's allowance (<see cref="PublicRouteOptions.PostsPerMinute"/>).</param>
+    public static bool Allow(string client, int perMinute = PerMinute)
     {
         var window = DateTimeOffset.UtcNow.ToUnixTimeSeconds() / 60;
         // The dictionary is bounded: old windows are dropped on the way, so it cannot grow with the
@@ -66,6 +83,6 @@ internal static class PluginPostLimiter
         if (Hits.Count > 5000)
             foreach (var kv in Hits.Where(kv => kv.Value.Window != window).ToList()) Hits.TryRemove(kv.Key, out _);
         var now = Hits.AddOrUpdate(client, (window, 1), (_, cur) => cur.Window == window ? (window, cur.Count + 1) : (window, 1));
-        return now.Count <= PerMinute;
+        return now.Count <= Math.Clamp(perMinute, 1, 10_000);
     }
 }

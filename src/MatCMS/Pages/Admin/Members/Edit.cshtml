@@ -23,6 +23,11 @@
                 <label asp-for="Input.DisplayName">Anzeigename</label>
                 <input asp-for="Input.DisplayName" placeholder="z. B. Familie Jehle" />
             </div>
+            <div class="form-field">
+                <label asp-for="Input.Email">E-Mail-Adresse</label>
+                <input asp-for="Input.Email" type="email" autocomplete="off" />
+                <div class="help">Optional. Mit Adresse kann sich das Mitglied auch damit anmelden und sich ein neues Passwort schicken lassen.</div>
+            </div>
         </div>
         <div class="form-field">
             <label asp-for="Input.Password">Passwort</label>

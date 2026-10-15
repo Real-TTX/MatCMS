@@ -540,6 +540,13 @@ namespace MatCMS.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<DateTime?>("ConfirmTokenExpiresAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ConfirmTokenHash")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
@@ -547,10 +554,24 @@ namespace MatCMS.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("EmailConfirmedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ResetTokenExpiresAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ResetTokenHash")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
@@ -563,6 +584,10 @@ namespace MatCMS.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Email")
+                        .IsUnique()
+                        .HasFilter("\"Email\" <> ''");
 
                     b.HasIndex("Username")
                         .IsUnique();

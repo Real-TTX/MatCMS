@@ -312,6 +312,8 @@ Instanz beim nächsten Heartbeat über ihre **eigenen** Validierer anwendet (add
 | `create_page` | neue Seite anlegen (add-only) |
 | `update_page_blocks` | die Blöcke einer Seite ersetzen (CanRestore) |
 | `create_post` | neuen Beitrag anlegen (add-only) |
+| `create_product` | neues Shop-Produkt anlegen (add-only; Preis brutto in Cent; optional Kategorie — wird angelegt, falls neu —, Schlagwörter, „hervorgehoben“, Statt-Preis; das Shop-Plugin muss auf der Site eingeschaltet sein) |
+| `create_coupon` | neuen Gutschein-Code im Shop anlegen (add-only, ein vorhandener Code wird übersprungen; Prozent, Festbetrag oder Versand frei, optional Mindestwert, Ablaufdatum, Höchstzahl, einmal pro Kunde, Kategorie) |
 | `create_form` | neues Formular anlegen (add-only; Felder als JSON-Array) — CanRestore |
 | `set_setting` | eine Site-Einstellung setzen (`cloud.*`-Schlüssel werden abgewiesen) — CanRestore |
 | `analyze_cleanup` | unbenutzte Medien/Komponenten + Plugins der Site ermitteln (async → `get_content_op`, `result` = Liste) — read |

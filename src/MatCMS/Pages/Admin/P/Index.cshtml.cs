@@ -18,6 +18,10 @@ namespace MatCMS.Pages.Admin.P;
 /// plugin that has settings, with or without a section of its own.</para>
 /// <para>The older <c>AddAdminPage</c> pages keep their own URL (<c>/admin/plugin/{key}</c>) and page.</para>
 /// </summary>
+// A plugin's admin page may carry an upload (a product's download file): the framework's default body limit (30 MB) is lifted to 1 GB for
+// these pages. They are behind the Admin role, and the plugin checks what it stores.
+[RequestSizeLimit(1_073_741_824)]
+[RequestFormLimits(MultipartBodyLengthLimit = 1_073_741_824)]
 public class IndexModel : PageModel
 {
     /// <summary>The reserved path of the settings page.</summary>

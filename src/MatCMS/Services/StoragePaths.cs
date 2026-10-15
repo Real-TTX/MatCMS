@@ -25,6 +25,13 @@ public static class StoragePaths
     /// <summary>Root of all plugin asset folders, served publicly under <c>/plugin-assets</c>.</summary>
     public static string PluginAssets(IWebHostEnvironment env) => Path.Combine(DataDir(env), "plugin-assets");
 
+    /// <summary>Root of the plugins' PRIVATE files (<c>plugin-files/{key}/…</c>): product downloads, invoices. Not under the web root and not
+    /// served by address — only a handler of the plugin hands a file out. Carried by the backup.</summary>
+    public static string PluginFiles(IWebHostEnvironment env) => Path.Combine(DataDir(env), "plugin-files");
+
+    /// <summary>One plugin's private file folder. The key is a trusted slug.</summary>
+    public static string PluginFilesDir(IWebHostEnvironment env, string key) => Path.Combine(PluginFiles(env), SafeSegment(key));
+
     /// <summary>Root of the native plugins' files: <c>plugins/{key}/{version}/src/…</c>. A new version gets a folder
     /// NEXT TO the old one and is never written over it, so an update that fails to load leaves the running
     /// version's files untouched.</summary>

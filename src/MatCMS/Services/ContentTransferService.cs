@@ -124,6 +124,12 @@ public class ContentTransferService
 
     private string UploadsDir => StoragePaths.Uploads(_env);
     private string PluginAssetsDir => StoragePaths.PluginAssets(_env);
+    private string PluginFilesRoot => StoragePaths.PluginFiles(_env);
+
+    /// <summary>Where a plugin's PRIVATE files (product downloads, invoices) live inside the ZIP: <c>plugin-files/{key}/{path}</c>, the shape they have on disk.
+    /// They ride on the same switch as the plugin uploads (<see cref="BackupOptions.PluginAssets"/>): both are the binaries a restored plugin needs, and a
+    /// shop restored without its downloads looks complete and delivers nothing.</summary>
+    private const string PluginFilesFolder = "plugin-files/";
 
     /// <summary>
     /// Folder the plugins' uploaded files live under inside the ZIP — one level deeper than the media,
@@ -187,6 +193,25 @@ public class ContentTransferService
 
             // The plugins' own uploaded files. One folder per plugin key, exactly as on disk — the key
             // has to travel, or a restore would not know which plugin a stylesheet belongs to.
+            // A plugin's private files (product downloads …), every level of its folder.
+            if (options.PluginAssets && Directory.Exists(PluginFilesRoot))
+            {
+                foreach (var pluginDir in Directory.GetDirectories(PluginFilesRoot))
+                {
+                    var key = Path.GetFileName(pluginDir);
+                    if (string.IsNullOrWhiteSpace(key)) continue;
+                    foreach (var file in Directory.EnumerateFiles(pluginDir, "*", SearchOption.AllDirectories))
+                    {
+                        var rel = Path.GetRelativePath(pluginDir, file).Replace('\\', '/');
+                        if (rel.EndsWith(".part", StringComparison.Ordinal)) continue;     // a download still being written
+                        var entry = zip.CreateEntry(PluginFilesFolder + key + "/" + rel, CompressionLevel.Optimal);
+                        await using var es = entry.Open();
+                        await using var fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                        await fs.CopyToAsync(es);
+                    }
+                }
+            }
+
             if (options.PluginAssets && Directory.Exists(PluginAssetsDir))
             {
                 foreach (var pluginDir in Directory.GetDirectories(PluginAssetsDir))
@@ -464,7 +489,7 @@ public class ContentTransferService
             DropThumbnails(name);
         }
 
-        var pluginAssetCount = await RestorePluginAssetsAsync(zip);
+        var pluginAssetCount = await RestorePluginAssetsAsync(zip) + await RestorePluginFilesAsync(zip);
 
         var extra = new List<string>();
         if (assetCount > 0) extra.Add($"{assetCount} Medien");
@@ -627,6 +652,36 @@ public class ContentTransferService
             var dest = Path.Combine(dir, name);
             await using (var es = entry.Open())
                 await WriteReplacingAsync(es, dest);
+            count++;
+        }
+        return count;
+    }
+
+    /// <summary>
+    /// Puts the plugins' private files back under <c>appdata/plugin-files/{key}/</c>. As with the uploads, both parts are REBUILT, not trusted: the key is
+    /// slugified to one folder name and the rest must pass the same name rule the plugin API enforces (<see cref="PluginFilesAccess"/>), so a crafted
+    /// backup cannot write outside the folder. Nothing is removed — a restore is not a synchronisation.
+    /// </summary>
+    private async Task<int> RestorePluginFilesAsync(ZipArchive zip)
+    {
+        var count = 0;
+        foreach (var entry in zip.Entries)
+        {
+            var norm = entry.FullName.Replace('\\', '/');
+            if (!norm.StartsWith(PluginFilesFolder, StringComparison.OrdinalIgnoreCase) || norm.EndsWith('/')) continue;
+            var rest = norm[PluginFilesFolder.Length..];
+            var slash = rest.IndexOf('/');
+            if (slash <= 0) continue;
+
+            var key = Pages.Admin.Pages.IndexModel.Slugify(rest[..slash]);
+            var rel = rest[(slash + 1)..];
+            if (string.IsNullOrEmpty(key) || !MatCMS.Services.Plugins.PluginFilesAccess.IsValidRelativeName(rel)) continue;
+
+            var dest = Path.GetFullPath(Path.Combine(StoragePaths.PluginFilesDir(_env, key), rel.Replace('/', Path.DirectorySeparatorChar)));
+            if (!dest.StartsWith(Path.GetFullPath(StoragePaths.PluginFilesDir(_env, key)) + Path.DirectorySeparatorChar, StringComparison.Ordinal)) continue;
+            Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+            await using var es = entry.Open();
+            await WriteReplacingAsync(es, dest);
             count++;
         }
         return count;
@@ -1401,7 +1456,9 @@ public class ContentTransferService
             json = r.ReadToEnd();
             hasAssets = zip.Entries.Any(e => e.FullName.StartsWith("assets/", StringComparison.OrdinalIgnoreCase)
                                              && !string.IsNullOrWhiteSpace(Path.GetFileName(e.FullName)));
-            pluginAssets = zip.Entries.Count(e => e.FullName.StartsWith(PluginAssetFolder, StringComparison.OrdinalIgnoreCase)
+            // Uploads and private files are one figure: both are "the plugins' files" to the person reading the preview.
+            pluginAssets = zip.Entries.Count(e => (e.FullName.StartsWith(PluginAssetFolder, StringComparison.OrdinalIgnoreCase)
+                                                   || e.FullName.StartsWith(PluginFilesFolder, StringComparison.OrdinalIgnoreCase))
                                                   && !string.IsNullOrWhiteSpace(Path.GetFileName(e.FullName)));
         }
         else

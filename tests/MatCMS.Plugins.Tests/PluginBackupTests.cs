@@ -199,3 +199,107 @@ public class PluginBackupTests
         foreach (var key in SettingKeys.Cloud) Assert.Contains(key, SettingKeys.Protected);
     }
 }
+
+/// <summary>A plugin's private files (<c>appdata/plugin-files/{key}</c>) in backups, restores and deletion.</summary>
+public class PluginPrivateFilesBackupTests
+{
+    private static ContentTransferService Transfer(Harness h) => new(h.Db, h.Env, h.Runner, h.Data);
+
+    private static async Task<byte[]> ZipWith(byte[] original, params (string Name, string Content)[] extra)
+    {
+        using var inZip = new ZipArchive(new MemoryStream(original), ZipArchiveMode.Read);
+        var ms = new MemoryStream();
+        using (var outZip = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            foreach (var e in inZip.Entries)
+            {
+                var copy = outZip.CreateEntry(e.FullName);
+                await using var s = copy.Open(); await using var r = e.Open(); await r.CopyToAsync(s);
+            }
+            foreach (var (name, content) in extra)
+            {
+                var e = outZip.CreateEntry(name);
+                await using var s = e.Open();
+                await s.WriteAsync(Encoding.UTF8.GetBytes(content));
+            }
+        }
+        return ms.ToArray();
+    }
+
+    [Fact]
+    public async Task A_backup_carries_the_private_files_of_a_plugin_and_a_restore_puts_them_back_deep_paths_included()
+    {
+        using var source = new Harness();
+        source.AddScript("shopx", "Plugin.Route(\"/shopx\", ctx => PluginResult.Text(\"x\"));");
+        await source.Runner.RunAllAsync();
+        var files = source.Context("shopx", new RequestData()).Files;
+        await files.SaveAsync("products/12/guide.pdf", new MemoryStream(Encoding.UTF8.GetBytes("PDF-BYTES")));
+        await files.SaveAsync("top.txt", new MemoryStream(Encoding.UTF8.GetBytes("T")));
+
+        var backup = await Transfer(source).ExportAsync(new ContentTransferService.BackupOptions());
+        using (var zip = new ZipArchive(new MemoryStream(backup), ZipArchiveMode.Read))
+        {
+            Assert.NotNull(zip.GetEntry("plugin-files/shopx/products/12/guide.pdf"));
+            Assert.NotNull(zip.GetEntry("plugin-files/shopx/top.txt"));
+        }
+        Assert.Equal(2, Transfer(source).Inspect(backup).PluginAssets);                   // shown in the preview before a restore
+
+        using var target = new Harness();
+        var message = await Transfer(target).ImportAsync(backup);
+        Assert.Contains("Plugin-Dateien", message);
+        var restored = target.Context("shopx", new RequestData()).Files;
+        await using var s = (await restored.OpenAsync("products/12/guide.pdf"))!;
+        Assert.Equal("PDF-BYTES", await new StreamReader(s).ReadToEndAsync());
+    }
+
+    [Fact]
+    public async Task The_backup_switch_for_plugin_uploads_also_governs_the_private_files()
+    {
+        using var source = new Harness();
+        await source.Context("shopx", new RequestData()).Files.SaveAsync("a.txt", new MemoryStream(new byte[] { 1 }));
+        var backup = await Transfer(source).ExportAsync(new ContentTransferService.BackupOptions { PluginAssets = false });
+        using var zip = new ZipArchive(new MemoryStream(backup), ZipArchiveMode.Read);
+        Assert.DoesNotContain(zip.Entries, e => e.FullName.StartsWith("plugin-files/"));
+    }
+
+    [Theory]
+    [InlineData("plugin-files/shopx/../../../escape.txt")]
+    [InlineData("plugin-files/../../escape.txt")]
+    [InlineData("plugin-files/shopx/.hidden")]
+    [InlineData("plugin-files/shopx/a//b.txt")]
+    [InlineData("plugin-files/shopx/a/b/c/d/e.txt")]
+    [InlineData("plugin-files/shopx/with space.txt")]
+    [InlineData("plugin-files//x.txt")]
+    [InlineData("plugin-files/shopx")]
+    public async Task A_crafted_backup_cannot_write_a_private_file_outside_the_plugins_folder(string entryName)
+    {
+        using var source = new Harness();
+        var backup = await Transfer(source).ExportAsync(new ContentTransferService.BackupOptions());
+        var crafted = await ZipWith(backup, (entryName, "evil"));
+        using var target = new Harness();
+        await Transfer(target).ImportAsync(crafted);
+
+        // Nothing under the plugin-files root but (at most) the folder of a valid key — and nothing outside it.
+        var root = StoragePaths.PluginFiles(target.Env);
+        var written = Directory.Exists(root) ? Directory.GetFiles(root, "*", SearchOption.AllDirectories) : Array.Empty<string>();
+        Assert.Empty(written);
+        Assert.False(File.Exists(Path.Combine(target.Root, "escape.txt")));
+        Assert.False(File.Exists(Path.Combine(Path.GetDirectoryName(target.Root)!, "escape.txt")));
+    }
+
+    [Fact]
+    public async Task Deleting_a_plugin_for_good_removes_its_private_files_but_switching_it_off_does_not()
+    {
+        using var h = new Harness();
+        var row = h.AddScript("shopx", "Plugin.Route(\"/shopx\", ctx => PluginResult.Text(\"x\"));");
+        await h.Runner.RunAllAsync();
+        var files = h.Context("shopx", new RequestData()).Files;
+        await files.SaveAsync("keep.txt", new MemoryStream(new byte[] { 1 }));
+
+        await h.Runner.UnloadAsync("shopx");                                           // off
+        await using (var open = await files.OpenAsync("keep.txt")) Assert.NotNull(open);   // (closed again: an open handle would keep a delete from working on Windows)
+
+        await MatCMS.Services.Plugins.PluginUninstall.DeleteAsync(h.Db, h.Runner, h.Data, h.Env, row);
+        Assert.False(Directory.Exists(StoragePaths.PluginFilesDir(h.Env, "shopx")));
+    }
+}

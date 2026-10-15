@@ -30,7 +30,7 @@ internal sealed class PluginDataAccess : IPluginData
     {
         // Already inside one (a nested call): everything shares the connection's transaction, so just run.
         if (_db.Database.CurrentTransaction is not null) return await work(this);
-        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+        await using var tx = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
         try
         {
             var result = await work(this);
@@ -223,6 +223,37 @@ internal sealed class PluginDataAccess : IPluginData
             var assignments = sets.Select((s, i) => { var n = "$s" + i; ps.Add((n, ToDb(s.Spec, s.Value))); return "\"" + s.Spec.Name + "\" = " + n; });
             var sql = $"UPDATE {Table} SET {string.Join(", ", assignments)}{Where(where, ps)}";
             return await PluginDataService.ExecAsync(_db, sql, ct, ps.ToArray());
+        }
+
+        public async Task<long?> IncrementAsync(long id, string column, long delta, long? atLeast = null, CancellationToken ct = default)
+        {
+            var c = Column(column);
+            if (c.Type != ColumnType.Int) throw new ArgumentException($"'{_spec.Name}.{c.Name}' is not a whole-number column.", nameof(column));
+            // The arithmetic and the guard are ONE statement, evaluated by the database under its write lock, so concurrent callers are serialised and a guarded
+            // decrement can never take the value below the limit. The new value is read back inside the same transaction (the lock is held, nobody can change it between).
+            // Deliberately not UPDATE … RETURNING: the SQLite driver waits for a busy database only on a statement's FIRST step, and an UPDATE … RETURNING commits on a
+            // later one — under load that commit failed with "database is locked" instead of waiting its turn.
+            var col = "\"" + c.Name + "\"";
+            var sql = $"UPDATE {Table} SET {col} = COALESCE({col}, 0) + $d WHERE {Key} = $id"
+                      + (atLeast is null ? "" : $" AND COALESCE({col}, 0) + $d >= $min");
+            var ps = new List<(string, object?)> { ("$d", delta), ("$id", id) };
+            if (atLeast is not null) ps.Add(("$min", atLeast.Value));
+            // An immediate transaction takes the write lock at its start, where the wait for a busy database does work; inside the caller's transaction there is nothing to begin.
+            var own = _db.Database.CurrentTransaction is null ? await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct) : null;
+            try
+            {
+                long? result = null;
+                if (await PluginDataService.ExecAsync(_db, sql, ct, ps.ToArray()) > 0)
+                    result = Convert.ToInt64(await PluginDataService.ScalarAsync(_db, $"SELECT {col} FROM {Table} WHERE {Key} = $id", ct, ("$id", id)) ?? 0L, CultureInfo.InvariantCulture);
+                if (own is not null) await own.CommitAsync(ct);
+                return result;
+            }
+            catch
+            {
+                if (own is not null) await own.RollbackAsync(CancellationToken.None);
+                throw;
+            }
+            finally { if (own is not null) await own.DisposeAsync(); }
         }
 
         public Task<int> DeleteAsync(long id, CancellationToken ct = default) =>

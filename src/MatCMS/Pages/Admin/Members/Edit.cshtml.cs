@@ -25,6 +25,7 @@ public class EditModel : PageModel
         public int Id { get; set; }
         public string Username { get; set; } = "";
         public string DisplayName { get; set; } = "";
+        public string? Email { get; set; }
         public string? Password { get; set; }
         public bool IsActive { get; set; } = true;
         public List<string> Roles { get; set; } = new();
@@ -39,7 +40,7 @@ public class EditModel : PageModel
             if (m is null) return RedirectToPage("Index");
             Input = new InputModel
             {
-                Id = m.Id, Username = m.Username, DisplayName = m.DisplayName,
+                Id = m.Id, Username = m.Username, DisplayName = m.DisplayName, Email = m.Email,
                 IsActive = m.IsActive, Roles = m.Roles.ToList()
             };
         }
@@ -62,6 +63,18 @@ public class EditModel : PageModel
             return Page();
         }
 
+        var email = MemberService.NormalizeEmail(Input.Email);
+        if (email.Length > 0 && !MemberService.IsValidEmail(email))
+        {
+            Error = "Die E-Mail-Adresse ist ungültig.";
+            return Page();
+        }
+        if (email.Length > 0 && await _db.SiteMembers.AnyAsync(m => m.Email == email && m.Id != Input.Id))
+        {
+            Error = $"Die E-Mail-Adresse „{email}“ gehört schon zu einem anderen Konto.";
+            return Page();
+        }
+
         // Only roles that actually exist survive — a stale tick cannot invent a role.
         var roles = (Input.Roles ?? new()).Where(r => AllRoles.Contains(r)).Distinct();
         var rolesCsv = string.Join(",", roles);
@@ -77,6 +90,8 @@ public class EditModel : PageModel
             {
                 Username = username,
                 DisplayName = (Input.DisplayName ?? "").Trim(),
+                // An address an administrator types in is vouched for by them: no confirmation mail needed.
+                Email = email, EmailConfirmedAt = email.Length > 0 ? DateTime.UtcNow : null,
                 PasswordHash = _members.HashPassword(Input.Password!),
                 RolesCsv = rolesCsv,
                 IsActive = Input.IsActive
@@ -88,6 +103,7 @@ public class EditModel : PageModel
             if (m is null) return RedirectToPage("Index");
             m.Username = username;
             m.DisplayName = (Input.DisplayName ?? "").Trim();
+            if (m.Email != email) { m.Email = email; m.EmailConfirmedAt = email.Length > 0 ? DateTime.UtcNow : null; }
             m.RolesCsv = rolesCsv;
             m.IsActive = Input.IsActive;
             // Blank password on edit = keep the existing one.

@@ -74,7 +74,26 @@ Gebaut und **gegen die echte App und das echte Linux-Image geprüft**:
 - **Native bauen:** `plugins/pack-native.ps1`, `templates/matcms-native-plugin`, `plugins/pack-abstractions.ps1` (NuGet lokal).
 - **Namespaces:** `MatCMS.Plugin` = API, `MatCMS.Plugin.{Name}` = Code eines Plugins (Blog: `MatCMS.Plugin.Blog`).
 
-**Offen:** Schicht 2 für Native (EF-Optionen vom Host) und der Shop (4), Cloud: Einstellungen/Admin-Seiten von Plugins rendern, Cloud-API/MCP für den
+- **Phase 4a (15.10.2026) — die API-Erweiterungen für den Shop, gebaut und getestet** (Details und Gründe: `docs/shop-plugin.md`):
+  `ctx.Member`/`ctx.Members` (Kundenkonten des Gästebereichs; `SiteMember` bekommt E-Mail, Bestätigung, Passwort-Reset, Selbstregistrierung per Einstellung
+  `members.selfRegistration`, Standard aus), `PublicRouteOptions.RequireMember/RequiredRole/Antiforgery/Webhook/PostsPerMinute`, `RequestData` mit Header, Cookies,
+  Rohkörper, Client-IP, Datei-Uploads; `PluginResult.WithCookie/WithoutCookie/WithHeader/WithStatus/FromStream/RedirectExternal`; `IDataTable.IncrementAsync` und
+  `NextNumberAsync` (atomare Zähler, lückenlose Folgen); `ctx.Mail` + `Plugin.MailTemplate` (eigene Vorlagen unter Mailvorlagen); `ctx.Files` (private Dateien,
+  `appdata/plugin-files/{key}`, im Backup); Ereignisse `host.member.registered/confirmed/deleted/export/erase`; `Ui.File` für Uploads. Block-Felder können
+  **Mehrfachauswahl** (`FieldKind.MultiSelect`, ein String mit „, “), **bedingt** erscheinen (`ShowWhenField/ShowWhenValue`) und ihre Auswahl aus einer **Liste des Plugins** ziehen
+  (`IPluginBuilder.OptionsSource(name, provider)` + `FieldSpec.OptionsSource`; der Host fragt beim Öffnen des Editors, ein Anbieter, der scheitert, liefert eine leere Liste).
+  Und die Texte eines Plugin-Blocks werden im Editor über die Strings des Plugins aufgelöst (`Localizer` fragt `PluginRegistry.TextOf` nach den Kernschlüsseln — vorher standen dort
+  rohe Schlüssel wie „shop.block.name“). Eingebaute Plugins können
+  jetzt **aus** starten (`BuiltInPlugin.EnabledOnNewSite`). **Nicht gebaut:** eigene Template-Teile (L10) — der Shop liefert sein Aussehen als eigenes, überschreibbares CSS.
+- **Phase 4b–4f — der Shop** (`src/MatCMS/Plugin/Shop/`, eingebaut, Standard aus): Katalog, Varianten, Bestand, Warenkorb, Kasse, Vorkasse, Stripe Checkout mit Webhook,
+  Bestellstatus mit einer einzigen Zustandsmaschine, Rechnung (HTML, lückenlos nummeriert), digitale Produkte mit privaten Downloads, Kundenbereich `/konto`,
+  Datenschutz-Export/-Löschung, Versandarten, Kleinunternehmer-Modus, Back-Office, Cloud-Aktionen `product.create` (MCP `create_product`) und `coupon.create` (MCP `create_coupon`), Gutscheine, Rechnung/Gutschrift als PDF, Steuer nach Lieferland, PayPal.
+- **Gelernt (SQLite unter Last):** `UPDATE … RETURNING` über den Microsoft.Data.Sqlite-Treiber wartet bei belegter Datenbank nur im ersten Schritt — der Commit im
+  zweiten schlug mit „database is locked“ fehl. Zähler laufen jetzt als `UPDATE` + `SELECT` in einer sofort sperrenden Transaktion (`IsolationLevel.Serializable`),
+  Plugin-Transaktionen ebenso, und Shop-Transaktionen nehmen die Schreibsperre als **erste** Anweisung (`LockForWriteAsync`). Und: **leere Fehlerantworten werden von
+  `UseStatusCodePagesWithReExecute` als Statusseite wiederholt — bei einem POST endet das in einem blanken 400**; `PluginPage` gibt Fehlern eines POST deshalb einen Körper.
+
+**Offen:** Schicht 2 für Native (EF-Optionen vom Host; der Shop braucht sie nicht), Cloud: Einstellungen/Admin-Seiten von Plugins rendern, Cloud-API/MCP für den
 Plugin-Zustand (5), eine echte Linux-Probe des Blogs im Image, `ctx.Json`, Template-Teile, die ein Plugin selbst definiert (Details in 8 und 9).
 
 ## 1. Was heute nicht reicht
@@ -466,7 +485,7 @@ Thema, die Regel „neue Version neben die alte“ (2.1) umgeht es ohnehin).
 | **1b** | **UI-Bibliothek** (3.5): Komponentenmodell + Renderer in `Shared.Web`, Seitenleiste als Registry, `Badge` an `IAdminSection`. Die Bausteine „Extrahieren“ sind **nicht** nach `Shared.Web` verschoben, sondern als Komponenten gebaut (`ui-fields.js`); Medienwahl/Datepicker bleiben im CMS, weil sie nur dort einen Medienspeicher haben. | **erledigt** |
 | **2** | `Data`-Schicht 1, Settings-Schema, Jobs, Hooks, `MediaReferences`, Backup/Cleanup-Anbindung. Ohne `ctx.Json` (JsonNode reicht). | **erledigt** |
 | **3** | Blog als BuiltIn-Plugin (Abschnitt 5). | **erledigt** |
-| **4** | Schicht 2 (EF, vom Host erzeugt) für Native. Shop-Entwurf, dann Shop. | offen |
+| **4** | Schicht 2 (EF, vom Host erzeugt) für Native — **für den Shop nicht nötig**, bleibt offen. **4a** API-Erweiterungen und **4b–4f** der Shop (`docs/shop-plugin.md`). | **Shop erledigt**, Schicht 2 offen |
 | **5** | Cloud: Store/Profil zeigen Native-Bundles schreibgeschützt und packen sie unberührt neu (**erledigt**); Zustand von Plugins in Profilen, Cloud-API/MCP (offen). `plugins.allowNative` bleibt bewusst **nicht** ausrollbar. | teilweise |
 
 ## 9. Offene Punkte und Erkenntnisse

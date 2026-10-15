@@ -46,6 +46,10 @@ public static class SettingKeys
     // robots.txt. Empty = derive from the request (only correct when not behind a scheme-changing proxy).
     public const string CanonicalUrl = "site.canonicalUrl";
 
+    /// <summary>"1" lets visitors create their own guest-area account on <c>/registrieren</c>. Off unless the operator ticks it: until then only an
+    /// administrator creates accounts, as always. A plugin that creates accounts for its own purpose (a shop's checkout) is not bound by it.</summary>
+    public const string MembersSelfRegistration = "members.selfRegistration";
+
     /// <summary>
     /// "This site sits behind a proxy that terminates TLS."
     /// <para>Without it the app only sees the unencrypted hop to the proxy and builds every absolute
@@ -184,7 +188,7 @@ public static class SettingKeys
     public static readonly string[] All =
     [
         CanonicalUrl, BehindHttpsProxy, SiteName, LogoUrl, FaviconUrl,
-        FooterText, ContactRecipient, AntiSpamLevel, AdminBar
+        FooterText, ContactRecipient, AntiSpamLevel, AdminBar, MembersSelfRegistration
     ];
 
     /// <summary>SMTP setting keys (managed on the Settings → SMTP tab).</summary>

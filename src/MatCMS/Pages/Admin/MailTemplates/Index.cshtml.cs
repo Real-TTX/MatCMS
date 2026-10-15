@@ -26,7 +26,7 @@ public class IndexModel : PageModel
         // Ordered by the declaration, not by name: that is the order the product thinks in, and it
         // stays stable when somebody renames a template.
         var rows = await _db.MailTemplates.AsNoTracking().ToListAsync();
-        Items = MatCMS.Shared.MailTemplates.All
+        Items = MatCMS.Shared.MailTemplates.Declared
             .Select(d => rows.FirstOrDefault(r => r.Key == d.Key))
             .Where(r => r is not null).Select(r => r!)
             // Anything stored that the code no longer declares still shows, or it would be

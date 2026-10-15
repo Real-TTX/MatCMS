@@ -1,0 +1,20 @@
+@page "/anmelden/bestaetigen"
+@model MatCMS.Pages.AnmeldenBestaetigenModel
+@{
+    ViewData["Title"] = "E-Mail-Adresse bestätigen";
+}
+<partial name="_MemberAuthStyle" />
+<section class="member-auth">
+    <div class="member-auth-card">
+        <h1>E-Mail-Adresse bestätigen</h1>
+        @if (Model.Confirmed)
+        {
+            <p class="member-auth-ok">Danke — Ihre E-Mail-Adresse ist bestätigt.</p>
+            <p><a class="btn" href="/">Zur Startseite</a></p>
+        }
+        else
+        {
+            <p class="member-auth-error">Dieser Link ist abgelaufen oder wurde schon benutzt.</p>
+        }
+    </div>
+</section>

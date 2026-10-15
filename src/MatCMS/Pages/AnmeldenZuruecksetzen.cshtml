@@ -1,0 +1,36 @@
+@page "/anmelden/zuruecksetzen"
+@model MatCMS.Pages.AnmeldenZuruecksetzenModel
+@{
+    ViewData["Title"] = "Neues Passwort";
+}
+<partial name="_MemberAuthStyle" />
+<section class="member-auth">
+    <div class="member-auth-card">
+        <h1>Neues Passwort</h1>
+        @if (Model.Done)
+        {
+            <p class="member-auth-ok">Ihr Passwort ist geändert. Sie können sich jetzt anmelden.</p>
+            <p><a class="btn" href="/anmelden">Anmelden</a></p>
+        }
+        else if (!Model.TokenValid)
+        {
+            <p class="member-auth-error">Dieser Link ist abgelaufen oder wurde schon benutzt.</p>
+            <p class="member-auth-links"><a href="/anmelden/vergessen">Neuen Link anfordern</a></p>
+        }
+        else
+        {
+            @if (!string.IsNullOrEmpty(Model.Error))
+            {
+                <p class="member-auth-error">@Model.Error</p>
+            }
+            <form method="post">
+                <input type="hidden" name="token" value="@Model.Token" />
+                <label class="member-auth-field">
+                    <span>Neues Passwort (mindestens @MatCMS.Services.MemberService.MinPasswordLength Zeichen)</span>
+                    <input name="password" type="password" autocomplete="new-password" minlength="@MatCMS.Services.MemberService.MinPasswordLength" required autofocus />
+                </label>
+                <button type="submit" class="btn">Passwort speichern</button>
+            </form>
+        }
+    </div>
+</section>

@@ -44,7 +44,8 @@ public static class BlockSchema
             Help = "Nur für diesen Block. Ohne Selektor gilt es für den Block selbst, mit & für sein Inneres, z. B. „& .btn { … }“." };
 
     /// <summary>The dynamic option lists the given block definitions ask for (by OptionsSource), loaded once.</summary>
-    public static async Task<Dictionary<string, List<SelectOption>>> LoadSourcesAsync(AppDbContext db, IEnumerable<BlockDefinition> defs)
+    public static async Task<Dictionary<string, List<SelectOption>>> LoadSourcesAsync(AppDbContext db, IEnumerable<BlockDefinition> defs,
+        MatCMS.Services.Plugins.PluginContributions? plugins = null, IServiceProvider? services = null)
     {
         var wanted = defs.SelectMany(d => Flatten(d.Fields)).Select(f => f.OptionsSource)
             .Where(s => s is not null).Select(s => s!).ToHashSet(StringComparer.Ordinal);
@@ -59,6 +60,10 @@ public static class BlockSchema
             sources["mediaTags"] = tags.SelectMany(TagUtil.Split).Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(t => t, StringComparer.OrdinalIgnoreCase).Select(t => new SelectOption(t, t)).ToList();
         }
+        // A plugin's own lists ("plugin:{key}:{name}"), asked of the plugin each time the editor opens.
+        if (plugins is not null && services is not null)
+            foreach (var name in wanted.Where(w => w.StartsWith("plugin:", StringComparison.Ordinal)))
+                sources[name] = await plugins.OptionsAsync(services, name);
         if (wanted.Contains("themeColors"))
         {
             var t = await db.Templates.AsNoTracking().FirstOrDefaultAsync(x => x.IsActive)

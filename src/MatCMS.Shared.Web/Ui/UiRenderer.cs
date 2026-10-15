@@ -358,6 +358,13 @@ public static class UiRenderer
                     if (c.Checked) _sb.Append(" checked");
                     _sb.Append(" /> ").Append(E(c.Label)).Append("</label>");
                     FieldClose(c); break;
+                case UiFile file:
+                    FieldOpen(file);
+                    _sb.Append("<input type=\"file\"");
+                    Common(file);
+                    if (!string.IsNullOrWhiteSpace(file.Accept)) _sb.Append(" accept=\"").Append(E(file.Accept)).Append('"');
+                    _sb.Append(" />");
+                    FieldClose(file); break;
                 case UiImage img: ImageField(img); break;
                 case UiMediaList ml: MediaListField(ml); break;
                 case UiRichText rt: RichTextField(rt); break;

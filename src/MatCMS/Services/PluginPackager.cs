@@ -358,7 +358,9 @@ public static class PluginPackager
         if (string.IsNullOrWhiteSpace(key)) return;
         var assets = StoragePaths.PluginAssetDir(env, key);
         var native = Path.Combine(StoragePaths.Plugins(env), StoragePaths.SafeSegment(key));
-        foreach (var dir in new[] { assets, native })
+        // Deleting a plugin for good takes its private files with it (the confirmation says so); deactivating never gets here.
+        var privateFiles = StoragePaths.PluginFilesDir(env, key);
+        foreach (var dir in new[] { assets, native, privateFiles })
             if (Directory.Exists(dir))
                 try { Directory.Delete(dir, recursive: true); } catch { /* best effort */ }
     }

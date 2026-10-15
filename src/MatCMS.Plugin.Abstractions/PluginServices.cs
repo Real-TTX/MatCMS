@@ -105,6 +105,17 @@ public static class HostEvents
     public const string FormSubmitted = "host.form.submitted";
     /// <summary>A page was saved in the editor. Payload: <c>{ "id": 3, "slug": "kontakt", "locale": "de", "published": true }</c>.</summary>
     public const string PageSaved = "host.page.saved";
+    /// <summary>A customer account was created (by a visitor on <c>/registrieren</c>, by an administrator, or by a plugin). Payload: <c>{ "id": 5, "email": "…", "username": "…" }</c>.</summary>
+    public const string MemberRegistered = "host.member.registered";
+    /// <summary>The owner of an account followed the link in the confirmation mail. Payload as <see cref="MemberRegistered"/>. A plugin may now trust the address (attach earlier guest orders to the account).</summary>
+    public const string MemberConfirmed = "host.member.confirmed";
+    /// <summary>An account is being deleted. Payload as <see cref="MemberRegistered"/>. Raised before the row is removed.</summary>
+    public const string MemberDeleted = "host.member.deleted";
+    /// <summary>Somebody asked for everything the site holds about one account (the data-protection export). A listener ANSWERS (<see cref="IPluginEvents.CollectAsync"/>)
+    /// with <c>{ "plugin": "shop", "data": { … } }</c>; the payload is <c>{ "id": 5, "email": "…" }</c>.</summary>
+    public const string MemberExport = "host.member.export";
+    /// <summary>Delete or anonymise what the plugin holds about this account (payload as <see cref="MemberRegistered"/>). Raised with <see cref="MemberDeleted"/>; a plugin that must keep a record by law (invoices) anonymises instead of deleting.</summary>
+    public const string MemberErase = "host.member.erase";
 }
 
 /// <summary>Raises and collects events across plugins.</summary>

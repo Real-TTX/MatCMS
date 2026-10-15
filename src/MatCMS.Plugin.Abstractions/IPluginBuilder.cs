@@ -34,6 +34,40 @@ public sealed record PublicRouteOptions
     /// prefixed address would show the same page in a language it does not have.
     /// </summary>
     public bool DefaultLanguageOnly { get; init; }
+
+    /// <summary>
+    /// Only a signed-in customer (a member of the guest area) gets the page. Anybody else is sent to <c>/anmelden?returnUrl=…</c> — exactly what a
+    /// members-only page does — and the handler never runs. <see cref="IPluginContext.Member"/> is then never null inside it. The administrator
+    /// is NOT let through here (unlike on a members-only page): a plugin whose handler reads <c>ctx.Member</c> has no use for somebody who has none.
+    /// </summary>
+    public bool RequireMember { get; init; }
+
+    /// <summary>With <see cref="RequireMember"/>: the member must also hold this role. A member without it gets the same sign-in page with the
+    /// "no access for this account" message.</summary>
+    public string? RequiredRole { get; init; }
+
+    /// <summary>
+    /// The route checks the antiforgery token on a POST (a missing or wrong one answers 400 and the handler does not run) and offers one in
+    /// <see cref="IPluginContext.Antiforgery"/> for the page's forms. Use it for everything a signed-in customer can change; leave it off for
+    /// anonymous submissions with nothing to forge (they are rate-limited instead). The answer is marked <c>no-store</c>, because a page that
+    /// carries a token must not be cached and handed to somebody else.
+    /// </summary>
+    public bool Antiforgery { get; init; }
+
+    /// <summary>
+    /// How many POSTs one visitor address may send to this plugin's public routes per minute before the host answers 429. The default (20) suits a contact or
+    /// review form; a shop's cart and checkout are used by real customers, several of whom may share one address (an office, a campus, a mobile network), so it
+    /// asks for more. The limit is counted per plugin and address, and is still a limit — an open write endpoint must not be hammered into filling the database.
+    /// </summary>
+    public int PostsPerMinute { get; init; } = 20;
+
+    /// <summary>
+    /// A route for another server to call (a payment provider's notification): the body is NOT read as a form but handed over raw in
+    /// <see cref="RequestData.Body"/> (at most <see cref="RequestData.MaxWebhookBody"/> bytes; more is a 413), the per-address POST limit of public
+    /// forms does not apply (a provider calls from a few addresses, in bursts), and the answer is the handler's, without a layout. Authenticating
+    /// the call — a signature over the body — is the handler's job. POST only.
+    /// </summary>
+    public bool Webhook { get; init; }
 }
 
 /// <summary>Computes the small counter next to a sidebar entry ("3 new reviews"). Return null or "" for none. Runs on
@@ -69,7 +103,9 @@ public enum FieldKind
     /// <summary>One choice out of <see cref="FieldSpec.Options"/>.</summary>
     Select,
     /// <summary>A repeatable list.</summary>
-    List
+    List,
+    /// <summary>Several choices out of <see cref="FieldSpec.Options"/> (or <see cref="FieldSpec.OptionsSource"/>), stored as ONE string joined with ", ".</summary>
+    MultiSelect
 }
 
 /// <summary>One choice of a <see cref="FieldKind.Select"/> field.</summary>
@@ -89,6 +125,15 @@ public sealed record FieldSpec(string Id, string Label, FieldKind Kind = FieldKi
     public string? Default { get; init; }
     /// <summary>The choices of a <see cref="FieldKind.Select"/>.</summary>
     public IReadOnlyList<FieldOption> Options { get; init; } = Array.Empty<FieldOption>();
+    /// <summary>
+    /// The name of a list the plugin registered with <see cref="IPluginBuilder.OptionsSource"/>: the choices are read when the editor opens, so a
+    /// block can offer "the shop's categories" and not a text box to type a slug into. Replaces <see cref="Options"/>.
+    /// </summary>
+    public string? OptionsSource { get; init; }
+    /// <summary>Show this field only while the field with this id has <see cref="ShowWhenValue"/> (a block with many options stays readable).</summary>
+    public string? ShowWhenField { get; init; }
+    /// <summary>The value <see cref="ShowWhenField"/> must have.</summary>
+    public string? ShowWhenValue { get; init; }
 }
 
 /// <summary>A content block a plugin offers in the page editor.</summary>
@@ -130,6 +175,12 @@ public interface IPluginBuilder
 
     /// <summary>A content block for the page editor. The render handler answers with <see cref="PluginResult.Fragment(string)"/>.</summary>
     void Block(BlockSpec spec, PluginHandler render);
+
+    /// <summary>
+    /// A list of choices a block field can draw from (<see cref="FieldSpec.OptionsSource"/>), computed each time the page editor opens. Labels are
+    /// display text, not string keys. A provider that throws gives an empty list; it never stops the editor.
+    /// </summary>
+    void OptionsSource(string name, Func<IPluginContext, CancellationToken, Task<IReadOnlyList<FieldOption>>> provider);
 
     /// <summary>Raw HTML for the &lt;head&gt; of every public page.</summary>
     void Head(string html);
@@ -174,6 +225,12 @@ public interface IPluginBuilder
 
     /// <summary>An operation the cloud or an agent (MCP) may ask for by name, with a JSON argument.</summary>
     void Operation(string name, PluginOperationHandler handler);
+
+    /// <summary>
+    /// A mail the plugin sends, with its default wording. It appears under <i>Admin → Mailvorlagen</i> from the first load on and the operator
+    /// may edit it; <see cref="IPluginMail.SendAsync"/> then sends the edited version. The key must start with the plugin's key and a dot.
+    /// </summary>
+    void MailTemplate(MailTemplateSpec spec);
 }
 
 /// <summary>Back-office contributions.</summary>

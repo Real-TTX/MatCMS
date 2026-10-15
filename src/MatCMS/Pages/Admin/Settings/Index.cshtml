@@ -319,6 +319,11 @@
                 @T["settings.adminBar"]
             </label>
             <div class="help">@T["settings.adminBarHelp"]</div>
+            <label class="checkbox-row">
+                <input type="checkbox" name="memberSignup" value="true" checked="@(V(SettingKeys.MembersSelfRegistration) == "1" ? "checked" : null)" />
+                @T["settings.memberSignup"]
+            </label>
+            <div class="help">@T["settings.memberSignupHelp"]</div>
             <div class="form-field">
                 <label>@T["settings.siteName"]</label>
                 <input name="Values[@SettingKeys.SiteName]" value="@V(SettingKeys.SiteName)" />

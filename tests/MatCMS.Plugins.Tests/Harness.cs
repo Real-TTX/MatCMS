@@ -41,6 +41,11 @@ internal sealed class Harness : IDisposable
         Db.Database.EnsureCreated();
         var services = new ServiceCollection();
         services.AddSingleton(Db);
+        services.AddSingleton<IWebHostEnvironment>(Env);
+        services.AddSingleton(Registry);
+        services.AddLogging();
+        services.AddScoped<MemberService>();
+        services.AddScoped<EmailService>();
         services.AddSingleton<Microsoft.AspNetCore.DataProtection.IDataProtectionProvider>(new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider());
         Services = services.BuildServiceProvider();
         Runner = new PluginRunner(Db, Registry, Services, NullLogger<PluginRunner>.Instance, Native, Env, Data) { BuiltIns = builtIns };

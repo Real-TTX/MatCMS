@@ -105,6 +105,8 @@ public static class Ui
     public static UiOption Option(string value, string label) => new(value, label);
     /// <summary>A switch.</summary>
     public static UiCheckbox Checkbox(string name, string label, bool isChecked = false) => new(name, label) { Checked = isChecked };
+    /// <summary>A file picked on the visitor's computer (a form made with <c>Form(...) with { Upload = true }</c>). Arrives in <c>ctx.Request.Files</c>.</summary>
+    public static UiFile File(string name, string label, string? accept = null) => new(name, label) { Accept = accept };
     /// <summary>An image from the media library.</summary>
     public static UiImage Image(string name, string label, string value = "") => new(name, label) { Value = value ?? "" };
     /// <summary>Several images or files from the media library.</summary>

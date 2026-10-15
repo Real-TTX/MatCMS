@@ -168,7 +168,7 @@ public class EditModel : PageModel
                 if (SelectedDef is not null)
                 {
                     // Dynamic option lists and localised labels: the same builder editor v2 uses.
-                    var dynamicSources = await BlockSchema.LoadSourcesAsync(_db, new[] { SelectedDef });
+                    var dynamicSources = await BlockSchema.LoadSourcesAsync(_db, new[] { SelectedDef }, HttpContext.RequestServices.GetRequiredService<MatCMS.Services.Plugins.PluginContributions>(), HttpContext.RequestServices);
                     var localized = BlockSchema.For(SelectedDef, _t, dynamicSources);
                     SchemaJson = JsonSerializer.Serialize(localized, SchemaOpts);
                     CurrentJson = string.IsNullOrWhiteSpace(SelectedBlock.DataJson) ? "{}" : SelectedBlock.DataJson;

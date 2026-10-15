@@ -1,0 +1,33 @@
+@page "/registrieren"
+@model MatCMS.Pages.RegistrierenModel
+@{
+    ViewData["Title"] = "Konto anlegen";
+}
+<partial name="_MemberAuthStyle" />
+<section class="member-auth">
+    <div class="member-auth-card">
+        <h1>Konto anlegen</h1>
+        @if (!string.IsNullOrEmpty(Model.Error))
+        {
+            <p class="member-auth-error">@Model.Error</p>
+        }
+        <form method="post">
+            <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+            <div class="member-auth-hp" aria-hidden="true"><label>Website <input name="website" tabindex="-1" autocomplete="off" /></label></div>
+            <label class="member-auth-field">
+                <span>Name</span>
+                <input name="name" value="@Model.Name" autocomplete="name" />
+            </label>
+            <label class="member-auth-field">
+                <span>E-Mail-Adresse</span>
+                <input name="email" type="email" value="@Model.Email" autocomplete="email" required autofocus />
+            </label>
+            <label class="member-auth-field">
+                <span>Passwort (mindestens @MatCMS.Services.MemberService.MinPasswordLength Zeichen)</span>
+                <input name="password" type="password" autocomplete="new-password" minlength="@MatCMS.Services.MemberService.MinPasswordLength" required />
+            </label>
+            <button type="submit" class="btn">Konto anlegen</button>
+        </form>
+        <p class="member-auth-links"><a href="/anmelden@(string.IsNullOrEmpty(Model.ReturnUrl) ? "" : "?returnUrl=" + System.Net.WebUtility.UrlEncode(Model.ReturnUrl))">Schon ein Konto? Anmelden</a></p>
+    </div>
+</section>

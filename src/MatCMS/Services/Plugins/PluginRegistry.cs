@@ -69,6 +69,9 @@ public sealed class PluginRegistry
     /// <summary>A contribution of one plugin to a host extension point, with its owner (for the log and for isolating failures).</summary>
     public sealed record Contribution<T>(string Owner, PluginInfo Info, T Provider);
 
+    /// <summary>A list of choices a block field draws from, computed when the page editor opens.</summary>
+    public sealed record OptionSourceEntry(string Owner, PluginInfo Info, string Name, Func<IPluginContext, CancellationToken, Task<IReadOnlyList<FieldOption>>> Provider);
+
     /// <summary>A named operation (cloud / MCP).</summary>
     public sealed record OperationEntry(string Owner, PluginInfo Info, string Name, PluginOperationHandler Handler);
 
@@ -99,6 +102,8 @@ public sealed class PluginRegistry
         internal List<Contribution<PluginSitemapProvider>> Sitemaps { get; } = new();
         internal List<Contribution<PluginMediaProvider>> MediaRefs { get; } = new();
         internal List<OperationEntry> Operations { get; } = new();
+        internal List<OptionSourceEntry> OptionSources { get; } = new();
+        internal List<MailTemplateSpec> MailTemplateSpecs { get; } = new();
         internal List<PluginLifecycleHandler> OnInstall { get; } = new();
         internal List<PluginUpdateHandler> OnUpdate { get; } = new();
         internal List<PluginLifecycleHandler> OnLoad { get; } = new();
@@ -114,6 +119,8 @@ public sealed class PluginRegistry
         public IReadOnlyList<SettingSpec> Settings => SettingSpecs;
         /// <summary>The tables the plugin declared.</summary>
         public IReadOnlyList<TableSpec> Tables => TableSpecs;
+        /// <summary>The mails the plugin declared.</summary>
+        public IReadOnlyList<MailTemplateSpec> MailTemplates => MailTemplateSpecs;
         /// <summary>The plugin's texts: culture → key → text.</summary>
         public IReadOnlyDictionary<string, Dictionary<string, string>> Strings => StringTables;
         /// <summary>True when the plugin declared any install/update/load handler.</summary>
@@ -239,6 +246,18 @@ public sealed class PluginRegistry
     public IReadOnlyList<SectionEntry> Sections => _snap.Sections;
     /// <summary>The published slice of a plugin, or null when it is not loaded.</summary>
     public Slice? SliceOf(string key) => _snap.Slices.TryGetValue(key, out var s) ? s : null;
+    /// <summary>A text of any loaded plugin's string tables: the given language, else the site's, else English. Null when no plugin has the key.</summary>
+    public string? TextOf(string key, string culture)
+    {
+        if (string.IsNullOrEmpty(key) || !key.Contains('.')) return null;
+        foreach (var c in new[] { culture, Localizer.DefaultCulture, "en" })
+            foreach (var slice in _snap.Slices.Values)
+                if (slice.Strings.TryGetValue(c, out var table) && table.TryGetValue(key, out var v)) return v;
+        return null;
+    }
+
+    /// <summary>The option source <paramref name="name"/> of a loaded plugin, or null.</summary>
+    public OptionSourceEntry? OptionSourceOf(string key, string name) => SliceOf(key)?.OptionSources.FirstOrDefault(o => o.Name == name);
     /// <summary>The scheduled jobs of all loaded plugins.</summary>
     public IReadOnlyList<JobEntry> Jobs => _snap.Jobs;
     /// <summary>The listeners of an event, in plugin load order (empty when none).</summary>

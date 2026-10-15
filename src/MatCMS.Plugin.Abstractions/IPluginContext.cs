@@ -26,15 +26,82 @@ public sealed class RequestData
     public string R(string key) => Route.TryGetValue(key, out var v) ? v : "";
     /// <summary>The posted <c>action</c> field, which tells several buttons of one page apart.</summary>
     public string Action => F("action");
+
+    /// <summary>The request headers (names compare case-insensitively). Only what a plugin has a use for is listed here: the
+    /// framework's own and the proxy's are there too, so a webhook can read <c>Stripe-Signature</c>.</summary>
+    public IReadOnlyDictionary<string, string> Headers { get; init; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    /// <summary>The cookies this plugin set with <see cref="PluginResult.WithCookie"/>, under the name it gave them (the host keeps a prefix on the wire so
+    /// plugins cannot read each other's — nor the site's login cookie). Names compare case-sensitively, as browsers do.</summary>
+    public IReadOnlyDictionary<string, string> Cookies { get; init; } = new Dictionary<string, string>();
+    /// <summary>
+    /// The raw request body, exactly as it arrived — the one thing a signature is computed over. Filled only for a route declared with
+    /// <see cref="PublicRouteOptions.Webhook"/> (and then limited to <see cref="MaxWebhookBody"/> bytes); empty otherwise, because a form
+    /// post has already been read as fields.
+    /// </summary>
+    public byte[] Body { get; init; } = Array.Empty<byte>();
+    /// <summary>The address the request came from, as the host sees it (behind a proxy: the visitor's, when the proxy is trusted). "" outside a request.</summary>
+    public string ClientIp { get; init; } = "";
+    /// <summary>The files posted with a multipart form (an admin page's upload field). Empty for everything else.</summary>
+    public IReadOnlyList<UploadedFile> Files { get; init; } = Array.Empty<UploadedFile>();
+
+    /// <summary>The largest body a webhook route reads (1 MB — a payment notification is a few kilobytes).</summary>
+    public const int MaxWebhookBody = 1024 * 1024;
+
+    /// <summary>A header value, or "".</summary>
+    public string Header(string name) => Headers.TryGetValue(name, out var v) ? v : "";
+    /// <summary>A cookie value, or "".</summary>
+    public string Cookie(string name) => Cookies.TryGetValue(name, out var v) ? v : "";
+    /// <summary>The body as UTF-8 text.</summary>
+    public string BodyText => System.Text.Encoding.UTF8.GetString(Body);
+    /// <summary>The uploaded file posted under a field name, or null.</summary>
+    public UploadedFile? File(string field) => Files.FirstOrDefault(f => string.Equals(f.Field, field, StringComparison.Ordinal));
 }
 
-/// <summary>Who is asking.</summary>
+/// <summary>A file posted with a multipart form. The bytes are read when <see cref="OpenRead"/> is called, not before.</summary>
+public sealed class UploadedFile
+{
+    private readonly Func<Stream> _open;
+
+    /// <summary>Creates the description of an upload. The host builds these; a test can too.</summary>
+    public UploadedFile(string field, string fileName, string contentType, long length, Func<Stream> open)
+    {
+        Field = field; FileName = fileName; ContentType = contentType; Length = length; _open = open;
+    }
+
+    /// <summary>The form field it was posted under.</summary>
+    public string Field { get; }
+    /// <summary>The name the browser sent (never trust it as a path: use <see cref="System.IO.Path.GetFileName(string)"/>).</summary>
+    public string FileName { get; }
+    /// <summary>The content type the browser claimed (also not to be trusted).</summary>
+    public string ContentType { get; }
+    /// <summary>The size in bytes.</summary>
+    public long Length { get; }
+    /// <summary>Opens the content for reading. The caller disposes the stream.</summary>
+    public Stream OpenRead() => _open();
+}
+
+/// <summary>Who is asking: the back-office administrator, if any. A signed-in customer of the site is <see cref="IPluginContext.Member"/>.</summary>
 public sealed class PluginUser
 {
     /// <summary>True when the visitor is signed in to the back office as an administrator.</summary>
     public bool IsAdmin { get; init; }
     /// <summary>The back-office user name, or "".</summary>
     public string Name { get; init; } = "";
+}
+
+/// <summary>
+/// A visitor who is signed in to the site's guest area (<c>/anmelden</c>) — the same account the members-only pages use. Entirely separate
+/// from <see cref="PluginUser"/>: a member is never an administrator and an administrator is never a member.
+/// </summary>
+/// <param name="Id">The account's key.</param>
+/// <param name="Username">The login name.</param>
+/// <param name="DisplayName">The name to show; falls back to the user name.</param>
+/// <param name="Email">The e-mail address, or "" for an account that was created by an administrator without one.</param>
+/// <param name="Roles">The roles the account holds (a members-only page can require one).</param>
+public sealed record PluginMember(long Id, string Username, string DisplayName, string Email, IReadOnlyList<string> Roles)
+{
+    /// <summary>True when the account holds the role.</summary>
+    public bool InRole(string role) => Roles.Contains(role, StringComparer.OrdinalIgnoreCase);
 }
 
 /// <summary>Data of the block being rendered (block renders only).</summary>
@@ -64,8 +131,16 @@ public interface IPluginContext
     PluginInfo Plugin { get; }
     /// <summary>The request.</summary>
     RequestData Request { get; }
-    /// <summary>Who is asking.</summary>
+    /// <summary>Who is asking, when it is the back-office administrator.</summary>
     PluginUser User { get; }
+    /// <summary>The signed-in customer of the site (the guest-area account), or null for an anonymous visitor and outside a request.</summary>
+    PluginMember? Member { get; }
+    /// <summary>The site's accounts: look one up, create one, sign in and out.</summary>
+    IPluginMembers Members { get; }
+    /// <summary>Sends e-mail through the site's own mail settings, using templates the plugin declared (<see cref="IPluginBuilder.MailTemplate"/>).</summary>
+    IPluginMail Mail { get; }
+    /// <summary>The plugin's private files: stored outside the public folders, in the backup, never served by address.</summary>
+    IPluginFiles Files { get; }
     /// <summary>The language of the page being served (<c>de</c>, <c>en</c>, ...).</summary>
     string Locale { get; }
     /// <summary>The block being rendered; null outside a block render.</summary>

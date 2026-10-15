@@ -10,7 +10,9 @@ namespace MatCMS.Services.Plugins;
 /// <param name="Description">One sentence for the plugin list.</param>
 /// <param name="Version">Its version; changes with the image, never by import.</param>
 /// <param name="Create">Makes the plugin instance.</param>
-public sealed record BuiltInPlugin(string Key, string Name, string Description, string Version, Func<IPlugin> Create);
+/// <param name="EnabledOnNewSite">Whether a site that has never seen the plugin starts it. The blog is on (it is part of what a CMS is); the shop is off — an
+/// operator who wants to sell something switches it on, and a site that does not never carries a shop's pages, routes or tables.</param>
+public sealed record BuiltInPlugin(string Key, string Name, string Description, string Version, Func<IPlugin> Create, bool EnabledOnNewSite = true);
 
 /// <summary>
 /// The plugins compiled into the CMS itself — today the blog. They run through the very same API as every other plugin (the same
@@ -24,7 +26,7 @@ public sealed record BuiltInPlugin(string Key, string Name, string Description, 
 public static class BuiltInPlugins
 {
     /// <summary>All built-in plugins.</summary>
-    public static IReadOnlyList<BuiltInPlugin> All { get; } = new[] { Plugin.Blog.BlogPlugin.Definition };
+    public static IReadOnlyList<BuiltInPlugin> All { get; } = new[] { Plugin.Blog.BlogPlugin.Definition, Plugin.Shop.ShopPlugin.Definition };
 
     /// <summary>The built-in plugin with this key, or null.</summary>
     public static BuiltInPlugin? Find(string? key) => All.FirstOrDefault(b => string.Equals(b.Key, key, StringComparison.OrdinalIgnoreCase));
@@ -49,7 +51,7 @@ public static class BuiltInPlugins
                 db.Plugins.Add(new Models.Plugin
                 {
                     Key = b.Key, Name = b.Name, Description = b.Description, Version = b.Version, Kind = Models.PluginKind.BuiltIn,
-                    Enabled = true, ConfigJson = "{}", FilesJson = "{}"
+                    Enabled = b.EnabledOnNewSite, ConfigJson = "{}", FilesJson = "{}"
                 });
             }
             else if (Models.PluginKind.Normalize(row.Kind) != Models.PluginKind.BuiltIn) conflicts.Add(b.Key);

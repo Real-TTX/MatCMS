@@ -9,7 +9,8 @@ namespace MatCMS.Pages.Admin.Members;
 public class IndexModel : PageModel
 {
     private readonly AppDbContext _db;
-    public IndexModel(AppDbContext db) => _db = db;
+    private readonly MatCMS.Services.MemberService _members;
+    public IndexModel(AppDbContext db, MatCMS.Services.MemberService members) { _db = db; _members = members; }
 
     public List<SiteMember> Items { get; private set; } = new();
 
@@ -18,13 +19,8 @@ public class IndexModel : PageModel
 
     public async Task<IActionResult> OnPostDeleteAsync(int id)
     {
-        var member = await _db.SiteMembers.FindAsync(id);
-        if (member is not null)
-        {
-            _db.SiteMembers.Remove(member);
-            await _db.SaveChangesAsync();
-            TempData["Flash"] = "Mitglied gelöscht.";
-        }
+        // Through the service, not a bare Remove: the plugins (a shop's orders) are told first and anonymise what they hold.
+        if (await _members.DeleteAsync(id, HttpContext.RequestAborted)) TempData["Flash"] = "Mitglied gelöscht.";
         return RedirectToPage();
     }
 }

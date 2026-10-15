@@ -226,6 +226,16 @@ public interface IDataTable
     Task<int> UpdateAsync(long id, IReadOnlyDictionary<string, object?> values, CancellationToken ct = default);
     /// <summary>Changes the given columns of every row matching the query. Returns the number changed.</summary>
     Task<int> UpdateWhereAsync(DataQuery where, IReadOnlyDictionary<string, object?> values, CancellationToken ct = default);
+    /// <summary>
+    /// Adds <paramref name="delta"/> (negative to subtract) to a whole-number column of one row IN ONE STEP — the database does the arithmetic,
+    /// so two requests that run at the same moment cannot both read 1 and both write 0. This is what stock and number sequences need and a
+    /// read-then-<see cref="UpdateAsync"/> cannot give.
+    /// <para>With <paramref name="atLeast"/> the change only happens if the result would not fall below it (<c>atLeast: 0</c> never takes stock
+    /// below zero); otherwise nothing is written.</para>
+    /// </summary>
+    /// <returns>The new value, or null when the row does not exist or the guard refused the change.</returns>
+    Task<long?> IncrementAsync(long id, string column, long delta, long? atLeast = null, CancellationToken ct = default);
+
     /// <summary>Deletes one row. Returns 0 when there is no such row.</summary>
     Task<int> DeleteAsync(long id, CancellationToken ct = default);
     /// <summary>Deletes every row matching the query. Returns the number deleted.</summary>
@@ -251,6 +261,29 @@ public static class PluginDataExtensions
     /// <summary>A transaction without a result.</summary>
     public static Task InTransactionAsync(this IPluginData data, Func<IPluginData, Task> work, CancellationToken ct = default) =>
         data.InTransactionAsync<bool>(async d => { await work(d); return true; }, ct);
+
+    /// <summary>
+    /// The next number of a sequence: one row per sequence in a table with a unique text column (<paramref name="nameColumn"/>) and a whole-number
+    /// column (<paramref name="valueColumn"/>), created on first use. Call it INSIDE <see cref="IPluginData.InTransactionAsync{T}"/> together with
+    /// the write that uses the number: a transaction that fails takes the increment back, so a sequence has no gaps (an invoice number must not).
+    /// </summary>
+    public static async Task<long> NextNumberAsync(this IDataTable table, string name, string nameColumn = "name", string valueColumn = "value", CancellationToken ct = default)
+    {
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            var row = await table.FindByAsync(nameColumn, name, ct);
+            if (row is null)
+            {
+                try { await table.InsertAsync(new Dictionary<string, object?> { [nameColumn] = name, [valueColumn] = 0L }, ct); }
+                catch { /* another request created it between the look and the insert: take theirs */ }
+                row = await table.FindByAsync(nameColumn, name, ct);
+                if (row is null) continue;
+            }
+            var next = await table.IncrementAsync(row.Id, valueColumn, 1, null, ct);
+            if (next is not null) return next.Value;
+        }
+        throw new InvalidOperationException($"The sequence '{name}' could not be advanced.");
+    }
 
     /// <summary>The first row whose <paramref name="column"/> equals <paramref name="value"/>, or null.</summary>
     public static Task<DataRow?> FindByAsync(this IDataTable table, string column, object? value, CancellationToken ct = default) =>

@@ -32,7 +32,7 @@
             @foreach (var m in Model.Items)
             {
                 <tr data-search="@(m.Username + " " + m.DisplayName + " " + m.RolesCsv)">
-                    <td><strong>@m.Username</strong></td>
+                    <td><strong>@m.Username</strong>@if (m.Email.Length > 0 && m.Email != m.Username) { <div class="muted">@m.Email</div> }</td>
                     <td class="muted">@(string.IsNullOrWhiteSpace(m.DisplayName) ? "—" : m.DisplayName)</td>
                     <td class="muted">@(string.IsNullOrWhiteSpace(m.RolesCsv) ? "—" : m.RolesCsv.Replace(",", ", "))</td>
                     <td>

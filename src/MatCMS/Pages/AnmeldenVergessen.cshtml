@@ -1,0 +1,26 @@
+@page "/anmelden/vergessen"
+@model MatCMS.Pages.AnmeldenVergessenModel
+@{
+    ViewData["Title"] = "Passwort vergessen";
+}
+<partial name="_MemberAuthStyle" />
+<section class="member-auth">
+    <div class="member-auth-card">
+        <h1>Passwort vergessen</h1>
+        @if (Model.Sent)
+        {
+            <p class="member-auth-ok">Wenn zu dieser Adresse ein Konto gehört, haben wir eine E-Mail mit einem Link geschickt. Er ist @MatCMS.Services.MemberService.TokenHours Stunden gültig.</p>
+        }
+        else
+        {
+            <form method="post">
+                <label class="member-auth-field">
+                    <span>E-Mail-Adresse Ihres Kontos</span>
+                    <input name="email" type="email" autocomplete="email" required autofocus />
+                </label>
+                <button type="submit" class="btn">Link schicken</button>
+            </form>
+        }
+        <p class="member-auth-links"><a href="/anmelden">Zurück zur Anmeldung</a></p>
+    </div>
+</section>

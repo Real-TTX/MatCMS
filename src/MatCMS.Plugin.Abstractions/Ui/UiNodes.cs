@@ -329,6 +329,17 @@ public sealed record UiCheckbox(string Name, string Label) : UiField(Name, Label
     public bool Checked { get; init; }
 }
 
+/// <summary>A file chosen on the visitor's computer and posted with the form (the form must be <see cref="UiForm.Upload"/>). It arrives in
+/// <see cref="RequestData.Files"/>, not in <see cref="RequestData.Form"/>. For a private file (a product download) — a picture for the site
+/// belongs in <see cref="UiImage"/>, which uses the media library.</summary>
+/// <param name="Name">Field name.</param>
+/// <param name="Label">Label.</param>
+public sealed record UiFile(string Name, string Label) : UiField(Name, Label)
+{
+    /// <summary>File types the picker offers (<c>.pdf,.zip</c> or <c>image/*</c>); the browser's hint, not a check — validate on the server.</summary>
+    public string? Accept { get; init; }
+}
+
 /// <summary>An image from the media library, with preview and picker. Posts the file's URL.</summary>
 /// <param name="Name">Field name.</param>
 /// <param name="Label">Label.</param>

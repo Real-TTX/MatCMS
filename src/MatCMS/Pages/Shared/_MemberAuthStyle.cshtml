@@ -1,0 +1,15 @@
+@* The look of the guest-area forms (sign in, register, reset). One copy, so the pages cannot drift apart. *@
+<style>
+    .member-auth { display: flex; justify-content: center; padding: 48px 16px; }
+    .member-auth-card { width: 100%; max-width: 380px; background: #fff; border: 1px solid rgba(0,0,0,.1); border-radius: 12px; padding: 28px; box-shadow: 0 10px 30px rgba(0,0,0,.06); }
+    .member-auth-card h1 { margin: 0 0 18px; font-size: 1.5rem; }
+    .member-auth-field { display: block; margin: 0 0 14px; }
+    .member-auth-field span { display: block; font-size: .85rem; margin-bottom: 6px; opacity: .8; }
+    .member-auth-field input { width: 100%; padding: 10px 12px; border: 1px solid rgba(0,0,0,.2); border-radius: 8px; font: inherit; box-sizing: border-box; }
+    .member-auth-remember { display: flex; align-items: center; gap: 8px; margin: 0 0 18px; font-size: .9rem; }
+    .member-auth-error { background: #fdecec; color: #b02020; border: 1px solid #f3c0c0; border-radius: 8px; padding: 10px 12px; margin: 0 0 16px; }
+    .member-auth-ok { background: #eef8ee; color: #1d6b2a; border: 1px solid #bfe3c4; border-radius: 8px; padding: 10px 12px; margin: 0 0 16px; }
+    .member-auth-links { margin: 16px 0 0; font-size: .9rem; display: flex; flex-wrap: wrap; gap: 6px 16px; }
+    .member-auth-hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+    .member-auth .btn { cursor: pointer; }
+</style>

@@ -88,6 +88,15 @@ public sealed class PluginContributions
         return list;
     }
 
+    /// <summary>The choices of a block field's option source ("plugin:{key}:{name}"). Empty when the plugin is off, the source is unknown or the provider fails.</summary>
+    public async Task<List<MatCMS.Content.SelectOption>> OptionsAsync(IServiceProvider sp, string source, CancellationToken ct = default)
+    {
+        var parts = source.Split(':', 3);
+        if (parts.Length != 3 || parts[0] != "plugin" || _registry.OptionSourceOf(parts[1], parts[2]) is not { } entry) return new();
+        var rows = await CallAsync<IReadOnlyList<FieldOption>>(entry.Owner, entry.Info, (ctx, t) => entry.Provider(ctx, t)!, sp, ct);
+        return rows?.Select(o => new MatCMS.Content.SelectOption(o.Value, o.Label)).ToList() ?? new();
+    }
+
     /// <summary>True when a loaded plugin offers an operation of this name.</summary>
     public bool HasOperation(string name) => _registry.Operations.Any(o => o.Name == name);
 

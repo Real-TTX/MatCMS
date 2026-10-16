@@ -1350,4 +1350,16 @@ body.has-adminbar .site-header { top: 67px; }
 .shop-suggest .t { display: flex; flex-direction: column; min-width: 0; } .shop-suggest .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .shop-suggest .p { font-size: .85em; opacity: .7; }
 .shop-suggest .shop-sg-fix { flex-wrap: wrap; gap: 4px; } .shop-suggest .shop-sg-fix .n { font-weight: 600; text-decoration: underline; }
 /* On a phone the header wraps: logo and menu button on top, the icon strip (search first) as a row of its own below. */
-@media (max-width: 640px) { .header-inner { flex-wrap: wrap; row-gap: 8px; } .header-icons { order: 5; flex: 1 0 100%; } .mat-search { flex: 1 1 0; min-width: 0; max-width: none; } .header-icons .mat-search input { width: 100%; } }
+/* On a phone the search box is an ICON between the other header icons (a bar of its own made the header two rows high); a tap opens it as a bar across the top of the screen (site-nav.js). */
+@media (max-width: 760px) {
+    .header-inner { row-gap: 8px; }
+    .mat-search { flex: none; min-width: 0; max-width: none; border: 0; border-radius: 0; background: none; overflow: visible; }
+    .mat-search:focus-within { box-shadow: none; }
+    .mat-search input { display: none; }
+    .mat-search button { background: none; color: var(--accent); padding: 0; }
+    .mat-search button svg { width: 27px; height: 27px; }
+    .mat-search.is-open { position: fixed; left: 8px; right: 8px; top: 8px; z-index: 1200; display: flex; background: var(--bg, #fff); border: 1px solid var(--line, rgba(0,0,0,.2)); border-radius: 999px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,.2); }
+    .mat-search.is-open input { display: block; padding: 13px 18px; font-size: 16px; }   /* 16px: iOS zooms into a smaller field */
+    .mat-search.is-open button { background: var(--accent); color: #fff; padding: 0 18px; }
+    .mat-search.is-open button svg { width: 20px; height: 20px; }
+}

@@ -231,7 +231,7 @@ internal static class ShopHtml
         .shop-nomatch{text-align:center;padding:52px 16px;border:1px dashed var(--shop-line,var(--line,rgba(0,0,0,.14)));border-radius:14px}.shop-nomatch p{margin:0 0 16px;font-size:1.1em}
         @media(max-width:900px){.shop-layout{display:flex;flex-direction:column;align-items:stretch;gap:14px}.shop-main{display:contents}.shop-main>*{order:3}.shop-main>.shop-toolbar{order:1;margin:0}.shop-side{order:2;display:none;position:static;padding:6px 18px;border:1px solid var(--shop-line,var(--line,rgba(0,0,0,.14)));border-radius:12px}.shop-ftoggle:checked ~ .shop-side{display:flex}
         .shop-ftbtn{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border:1px solid var(--shop-line,var(--line,rgba(0,0,0,.14)));border-radius:99px;cursor:pointer;font-weight:600}.shop-ftoggle:checked ~ .shop-main .shop-ftbtn{background:var(--shop-accent,var(--accent,#1a1a1a));color:var(--shop-on-accent,#fff);border-color:var(--shop-accent,var(--accent,#1a1a1a))}
-        .shop-layout.no-side .shop-ftbtn{display:none}.shop-toolbar{flex-wrap:wrap}.shop-sort{order:2;margin-left:auto}.shop-count{order:3;flex:1 0 100%;margin:0}}
+        .shop-layout.no-side .shop-ftbtn{display:none}.shop-toolbar{flex-wrap:wrap}.shop-count{order:1;margin:0}.shop-sort{order:2;margin-left:auto}}
         @media(max-width:520px){.shop-sort label span{display:none}.shop-grid .shop-card .body>p.shop-muted{display:none}}
         .shop-attrh{font-size:1.05em;margin:18px 0 6px}.shop-attrs{width:100%;border-collapse:collapse}.shop-attrs th{width:40%;font-weight:500;opacity:.7;padding:7px 8px 7px 0}.shop-attrs td{padding:7px 0}
         .shop-ordhead{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:6px}.shop-ordhead h1{margin:0}

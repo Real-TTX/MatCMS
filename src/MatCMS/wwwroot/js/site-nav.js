@@ -54,3 +54,34 @@
 
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
 })();
+
+// The search box on a phone is an icon (site.css); a tap on it opens the box as a bar across the top, a second tap searches. It closes on Escape, a tap outside, or when the field loses focus empty.
+// Only the box the shop puts in the header (class mat-search) — a template that wrote its own search keeps what it wrote.
+(function () {
+    "use strict";
+    var mq = window.matchMedia ? window.matchMedia("(max-width: 760px)") : null;
+    if (!mq) return;
+    function init(f) {
+        var input = f.querySelector("input"), btn = f.querySelector("button");
+        if (!input || !btn || f.__phoneSearch) return;
+        f.__phoneSearch = true;
+        function close() { f.classList.remove("is-open"); }
+        btn.addEventListener("click", function (e) {
+            if (!mq.matches) return;
+            if (!f.classList.contains("is-open")) { e.preventDefault(); f.classList.add("is-open"); input.focus(); }
+            else if (!input.value.trim()) { e.preventDefault(); close(); }
+        });
+        input.addEventListener("keydown", function (e) { if (e.key === "Escape") { close(); btn.focus(); } });
+        input.addEventListener("blur", function () {
+            setTimeout(function () {
+                var a = document.activeElement;
+                if (f.contains(a) || (a && a.closest && a.closest(".shop-suggest"))) return;
+                if (!input.value.trim()) close();
+            }, 200);
+        });
+        document.addEventListener("click", function (e) { if (f.classList.contains("is-open") && !f.contains(e.target) && !(e.target.closest && e.target.closest(".shop-suggest"))) close(); });
+        mq.addEventListener && mq.addEventListener("change", function () { if (!mq.matches) close(); });
+    }
+    function scan() { document.querySelectorAll("form.mat-search").forEach(init); }
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", scan); else scan();
+})();

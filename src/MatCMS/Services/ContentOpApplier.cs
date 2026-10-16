@@ -64,8 +64,13 @@ public class ContentOpApplier
         var args = string.IsNullOrWhiteSpace(op.PayloadJson) ? null : JsonNode.Parse(op.PayloadJson);
         var answer = await plugins.RunOperationAsync(_services, op.Kind, args, ct);
         // The answer is a JSON object { "status": "applied|skipped-exists|failed", "message": "…" } (a bare string is a message).
+        // A READ adds "data", which rides home as the report's result (the same slot as a page read).
         if (answer is JsonObject o)
-            return Report(op, o["status"]?.GetValue<string>() is { Length: > 0 } s ? s : "applied", o["message"]?.GetValue<string>() ?? "");
+        {
+            var status = o["status"]?.GetValue<string>() is { Length: > 0 } s ? s : "applied";
+            var message = o["message"]?.GetValue<string>() ?? "";
+            return o["data"] is { } data ? new ContentOpReport { OpId = op.OpId, Outcome = status, Detail = message, ResultJson = data.ToJsonString() } : Report(op, status, message);
+        }
         return Report(op, "applied", answer?.ToString() ?? "");
     }
 
@@ -200,7 +205,8 @@ public class ContentOpApplier
 
     private async Task<ContentOpReport> ListPagesAsync(PendingContentOp op, CancellationToken ct)
     {
-        var pages = await _db.Pages.AsNoTracking()
+        // A plugin's pages are laid out in the editor, not through the cloud: the slug of one cannot even be written (it starts with an underscore).
+        var pages = await _db.Pages.AsNoTracking().Where(p => p.OwnerPlugin == null)
             .OrderBy(p => p.Locale).ThenBy(p => p.NavOrder).ThenBy(p => p.Title)
             .Select(p => new { slug = p.Slug, title = p.Title, locale = p.Locale, published = p.IsPublished, showInNav = p.ShowInNav })
             .ToListAsync(ct);

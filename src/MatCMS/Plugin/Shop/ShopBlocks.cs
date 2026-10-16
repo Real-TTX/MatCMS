@@ -14,11 +14,18 @@ internal static class ShopBlocks
     private const string SvgBag = @"<path d=""M6 7h12l1 13H5L6 7z""/><path d=""M9 7a3 3 0 0 1 6 0""/>";
     private const string SvgOne = "<rect x=\"3\" y=\"4\" width=\"10\" height=\"10\" rx=\"1\"/><path d=\"M16 6h5M16 10h5M3 18h18\"/>";
 
+    /// <summary>The categories as a block field offers them: in tree order, a subcategory with its path ("Kaffee › Bohnen").</summary>
+    private static async Task<List<FieldOption>> CategoryOptionsAsync(IPluginContext ctx, CancellationToken ct)
+    {
+        var cats = await new ShopStore(ctx.Data).CategoriesAsync(ct);
+        return ShopCategories.Flatten(cats).Select(t => new FieldOption(t.Cat.Slug, ShopCategories.Label(cats, t.Cat))).ToList();
+    }
+
     public static void Register(IPluginBuilder b)
     {
         // The lists the block editor offers, read from the shop each time the editor opens.
         b.OptionsSource("categories", async (ctx, ct) =>
-            (await new ShopStore(ctx.Data).CategoriesAsync(ct)).Select(c => new FieldOption(c.Slug, c.Name)).ToList());
+            await CategoryOptionsAsync(ctx, ct));
         b.OptionsSource("tags", async (ctx, ct) =>
             (await new ShopStore(ctx.Data).FacetsAsync(ct)).Tags.Select(t => new FieldOption(t.Tag, $"{t.Tag} ({t.Count})")).ToList());
         b.OptionsSource("products", async (ctx, ct) =>
@@ -37,7 +44,7 @@ internal static class ShopBlocks
                     Options = new[]
                     {
                         new FieldOption("all", "shop.block.src.all"), new FieldOption("category", "shop.block.src.category"), new FieldOption("tag", "shop.block.src.tag"),
-                        new FieldOption("featured", "shop.block.src.featured"), new FieldOption("sale", "shop.block.src.sale"), new FieldOption("pick", "shop.block.src.pick")
+                        new FieldOption("featured", "shop.block.src.featured"), new FieldOption("top", "shop.block.src.top"), new FieldOption("sale", "shop.block.src.sale"), new FieldOption("pick", "shop.block.src.pick")
                     }
                 },
                 new FieldSpec("category", "shop.block.category", FieldKind.Select) { OptionsSource = "categories", ShowWhenField = "source", ShowWhenValue = "category" },
@@ -55,7 +62,7 @@ internal static class ShopBlocks
                 new FieldSpec("limit", "shop.block.limit", FieldKind.Text) { Default = "4", Help = "shop.block.limitHelp" },
                 new FieldSpec("layout", "shop.block.layout", FieldKind.Select)
                 {
-                    Default = "grid", Options = new[] { new FieldOption("grid", "shop.block.layout.grid"), new FieldOption("list", "shop.block.layout.list") }
+                    Default = "grid", Options = new[] { new FieldOption("grid", "shop.block.layout.grid"), new FieldOption("carousel", "shop.block.layout.carousel"), new FieldOption("list", "shop.block.layout.list") }
                 },
                 new FieldSpec("columns", "shop.block.columns", FieldKind.Select)
                 {
@@ -92,7 +99,7 @@ internal static class ShopBlocks
     private static async Task<PluginResult> ProductsAsync(IPluginContext ctx, CancellationToken ct)
     {
         var cfg = ShopConfig.From(ctx.Settings);
-        var store = new ShopStore(ctx.Data);
+        var store = ShopStore.Public(ctx);
         var limit = int.TryParse(Field(ctx, "limit"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var l) ? Math.Clamp(l, 1, 48) : 4;
         var source = Field(ctx, "source");
         // A block saved before the choices existed has only a category (or nothing): it keeps showing what it showed.
@@ -105,13 +112,19 @@ internal static class ShopBlocks
         switch (source)
         {
             case "category" when Field(ctx, "category") is { Length: > 0 } cat:
-                pq = pq with { Category = cat }; more = "/shop?cat=" + Uri.EscapeDataString(cat); break;
+                pq = pq with { Category = cat }; more = ShopUrls.Category(cat); break;
             case "tag" when Field(ctx, "tag") is { Length: > 0 } tag:
                 pq = pq with { Tag = tag }; more = "/shop?tag=" + Uri.EscapeDataString(tag); break;
             case "featured":
                 pq = pq with { FeaturedOnly = true }; break;
             case "sale":
                 pq = pq with { OnSaleOnly = true }; break;
+            case "top":
+                // The best sellers by pieces sold in paid orders; a shop that has sold nothing yet shows its highlights, then its newest products.
+                picked = await store.TopSellerIdsAsync(limit, ct);
+                pq = picked.Count > 0 ? pq with { Ids = picked } : pq with { FeaturedOnly = true };
+                if (picked.Count == 0 && sort.Length == 0) pq = pq with { Sort = "new" };
+                break;
             case "pick":
                 picked = ParseIds(Field(ctx, "products"));
                 pq = pq with { Ids = picked }; break;
@@ -124,13 +137,21 @@ internal static class ShopBlocks
         var variants = (await store.VariantsOfAsync(items.Select(p => p.Id), ct)).Where(v => v.Active).GroupBy(v => v.ProductId).ToDictionary(g => g.Key, g => g.ToList());
         var view = new ShopPublic.CardView(Field(ctx, "showSummary") != "no", Field(ctx, "showPrice") != "no", false);
         var list = Field(ctx, "layout") == "list";
+        var carousel = Field(ctx, "layout") == "carousel";
         var cols = Field(ctx, "columns") is "2" or "3" or "4" ? " cols-" + Field(ctx, "columns") : "";
 
         var sb = new StringBuilder("<style>").Append(CardCss).Append("</style><section class=\"section\"><div class=\"container\"><div class=\"shop shop-block\">");
         if (Field(ctx, "heading") is { Length: > 0 } heading) sb.Append("<h2>").Append(E(heading)).Append("</h2>");
-        sb.Append(list ? "<div class=\"shop-list\">" : $"<div class=\"shop-grid{cols}\">");
-        foreach (var p in items) sb.Append(ShopPublic.CardHtml(ctx, cfg, p, variants.TryGetValue(p.Id, out var vs) ? vs : new List<Variant>(), view));
-        sb.Append("</div>");
+        var shown = new StringBuilder();
+        foreach (var p in items) shown.Append(ShopPublic.CardHtml(ctx, cfg, p, variants.TryGetValue(p.Id, out var vs) ? vs : new List<Variant>(), view));
+        if (carousel)
+        {
+            // A row that scrolls sideways and snaps to the cards; the two buttons page it (the row also scrolls by touch, wheel and keyboard). Without script it is simply a scrollable row.
+            var id = "shop-car-" + Guid.NewGuid().ToString("N")[..8];
+            sb.Append($"<div class=\"shop-carousel\" id=\"{id}\"><button type=\"button\" class=\"prev\" aria-label=\"{E(ctx.T("shop.block.prev"))}\">‹</button><div class=\"track\" tabindex=\"0\">{shown}</div><button type=\"button\" class=\"next\" aria-label=\"{E(ctx.T("shop.block.next"))}\">›</button></div>");
+            sb.Append($"<script>(function(){{var r=document.getElementById('{id}');if(!r)return;var t=r.querySelector('.track'),p=r.querySelector('.prev'),n=r.querySelector('.next');function u(){{p.hidden=t.scrollLeft<4;n.hidden=t.scrollLeft+t.clientWidth>=t.scrollWidth-4}}function g(d){{t.scrollBy({{left:d*t.clientWidth*.85,behavior:'smooth'}})}}p.onclick=function(){{g(-1)}};n.onclick=function(){{g(1)}};t.addEventListener('scroll',u,{{passive:true}});window.addEventListener('resize',u);u()}})()</script>");
+        }
+        else sb.Append(list ? "<div class=\"shop-list\">" : $"<div class=\"shop-grid{cols}\">").Append(shown).Append("</div>");
         if (Field(ctx, "allLink") == "yes") sb.Append($"<p class=\"shop-more\"><a class=\"shop-btn ghost\" href=\"{E(more)}\">{E(ctx.T("shop.block.allLinkText"))}</a></p>");
         return PluginResult.Fragment(sb.Append("</div></div></section>").ToString());
     }
@@ -139,7 +160,7 @@ internal static class ShopBlocks
     {
         if (!long.TryParse(Field(ctx, "product"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var id)) return PluginResult.Fragment("");
         var cfg = ShopConfig.From(ctx.Settings);
-        var store = new ShopStore(ctx.Data);
+        var store = ShopStore.Public(ctx);
         if (await store.ProductAsync(id, ct) is not { Active: true } p) return PluginResult.Fragment("");
         var variants = (await store.VariantsAsync(p.Id, true, ct)).ToList();
         var url = "/shop/" + Uri.EscapeDataString(p.Slug);

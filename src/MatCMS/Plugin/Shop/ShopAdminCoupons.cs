@@ -38,7 +38,8 @@ internal static class ShopAdminCoupons
         }
         var cfg = ShopConfig.From(ctx.Settings);
         var coupons = await store.CouponsAsync(ct);
-        var cats = (await store.CategoriesAsync(ct)).ToDictionary(c => c.Slug, c => c.Name);
+        var allCats = await store.CategoriesAsync(ct);
+        var cats = allCats.ToDictionary(c => c.Slug, c => ShopCategories.Label(allCats, c));
         string D(DateTime? d) => d is null ? "" : d.Value.ToLocalTime().ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
         var table = Ui.Table(
             new[] { Ui.Column(ctx.T("shop.adm.cpCode")), Ui.Column(ctx.T("shop.adm.cpWorth")), Ui.Column(ctx.T("shop.adm.cpMin"), right: true), Ui.Column(ctx.T("shop.adm.cpUsed"), right: true),
@@ -46,7 +47,7 @@ internal static class ShopAdminCoupons
             coupons.Select(c =>
             {
                 var (key, tone) = StateOf(c);
-                return Ui.RowFor($"{c.Code} {c.Note}",
+                return (Ui.RowFor($"{c.Code} {c.Note}",
                     Ui.Inline(Ui.Text(c.Code) with { Inline = true, Strong = true }, c.Category.Length > 0 ? Ui.Text(cats.TryGetValue(c.Category, out var n) ? n : c.Category) with { Inline = true, Muted = true } : null),
                     ShopCoupons.Describe(ctx, c, cfg.Currency),
                     c.MinOrderCents > 0 ? Money.Format(c.MinOrderCents, cfg.Currency, "de") : "—",
@@ -55,10 +56,15 @@ internal static class ShopAdminCoupons
                     Ui.Badge(ctx.T(key), tone),
                     Ui.Inline(
                         Ui.Button(ctx.T("action.edit"), CouponUrl(c.Id), UiButtonKind.Ghost, small: true),
-                        Ui.Action(ctx.T("action.delete"), "delete", Intl(c.Id), UiButtonKind.Danger, confirm: ctx.T("shop.adm.cpDeleteConfirm", c.Code), icon: "ti-trash")));
+                        Ui.Action(ctx.T("action.delete"), "delete", Intl(c.Id), UiButtonKind.Danger, confirm: ctx.T("shop.adm.cpDeleteConfirm", c.Code), icon: "ti-trash"))) with { Tags = key });
             }),
-            searchPlaceholder: ctx.T("action.search"), pageSize: 25, emptyText: ctx.T("shop.adm.noCoupons"));
-        return PluginResult.Page(Ui.Stack(Ui.PageHead(ctx.T("shop.adm.cpHelp"), ctx.T("shop.adm.coupons"), Ui.Button(ctx.T("shop.adm.newCoupon"), CouponUrl(0), small: true)), table), ctx.T("shop.adm.coupons"));
+            searchPlaceholder: ctx.T("action.search"), pageSize: 25, emptyText: ctx.T("shop.adm.noCoupons")) with
+        {
+            Filter = Ui.ListFilter(ctx.T("shop.adm.filter"), new[] { ("", $"{ctx.T("shop.adm.all")} ({coupons.Count})") }.Concat(
+                coupons.GroupBy(c => StateOf(c).Key).Select(g => (g.Key, $"{ctx.T(g.Key)} ({g.Count()})"))).ToArray()),
+            Below = new UiNode[] { Ui.Button(ctx.T("shop.adm.newCoupon"), CouponUrl(0)) }
+        };
+        return PluginResult.Page(ShopConditions.Frame(ctx, "coupons", table), ctx.T("shop.adm.coupons"));
     }
 
     public static async Task<PluginResult> CouponAsync(IPluginContext ctx, CancellationToken ct)
@@ -91,7 +97,7 @@ internal static class ShopAdminCoupons
         kids.Add(Ui.Select("kind", ctx.T("shop.adm.cpKind"), coupon.Kind, Ui.Option(CouponKind.Percent, ctx.T("shop.coupon.kind.percent")), Ui.Option(CouponKind.Fixed, ctx.T("shop.coupon.kind.fixed")), Ui.Option(CouponKind.Shipping, ctx.T("shop.coupon.kind.shipping"))));
         kids.Add(Ui.Input("value", ctx.T("shop.adm.cpValue"), coupon.Kind == CouponKind.Fixed ? Money.ForInput(coupon.Value) : coupon.Kind == CouponKind.Percent ? Money.Percent((int)coupon.Value) : "") with { Help = ctx.T("shop.adm.cpValueHelp", cfg.Currency) });
         kids.Add(Ui.Input("min", ctx.T("shop.adm.cpMinOrder", cfg.Currency), coupon.MinOrderCents > 0 ? Money.ForInput(coupon.MinOrderCents) : "") with { Help = ctx.T("shop.adm.cpMinHelp") });
-        kids.Add(Ui.Select("category", ctx.T("shop.adm.category"), coupon.Category, new[] { Ui.Option("", ctx.T("shop.adm.cpAllCategories")) }.Concat(cats.Select(c => Ui.Option(c.Slug, c.Name))).ToArray()));
+        kids.Add(Ui.Select("category", ctx.T("shop.adm.category"), coupon.Category, new[] { Ui.Option("", ctx.T("shop.adm.cpAllCategories")) }.Concat(ShopCategories.Flatten(cats).Select(t => Ui.Option(t.Cat.Slug, ShopCategories.Label(cats, t.Cat)))).ToArray()));
         kids.Add(Ui.Input("max_uses", ctx.T("shop.adm.cpMaxUses"), coupon.MaxUses > 0 ? Intl(coupon.MaxUses) : "", UiInputType.Number) with { Min = "0", Help = ctx.T("shop.adm.cpMaxHelp") });
         kids.Add(Ui.Checkbox("per_customer", ctx.T("shop.adm.cpOnce"), coupon.OncePerCustomer) with { Help = ctx.T("shop.adm.cpOnceHelp") });
         kids.Add(Ui.Input("starts", ctx.T("shop.adm.cpStarts"), D(coupon.StartsUtc), UiInputType.Date));
@@ -106,7 +112,7 @@ internal static class ShopAdminCoupons
             Ui.Card(Ui.Form(kids.ToArray()))
         };
         if (id > 0) nodes.Add(Ui.Muted(ctx.T("shop.adm.cpStats", coupon.Used, await store.OrdersWithCouponAsync(coupon.Code, ct))));
-        return PluginResult.Page(Ui.Stack(nodes.ToArray()), ctx.T(id == 0 ? "shop.adm.newCoupon" : "shop.adm.editCoupon"));
+        return PluginResult.Page(ShopConditions.Frame(ctx, "coupons", nodes.ToArray()), ctx.T(id == 0 ? "shop.adm.newCoupon" : "shop.adm.editCoupon"));
     }
 
     /// <summary>The coupon as the form describes it. Sets <paramref name="error"/> on the first thing wrong — the form comes back with what was typed.</summary>

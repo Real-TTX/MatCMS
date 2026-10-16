@@ -1,0 +1,26 @@
+@model MatCMS.Pages.Admin.IndexModel
+<div>
+    <div data-list>
+        <div class="page-head"><h2>@T["dashboard.recentErrors"]</h2></div>
+        <table class="data" data-list-table>
+            <thead>
+                <tr>
+                    <th style="width:160px;">@T["dashboard.time"]</th>
+                    <th style="width:70px;"></th>
+                    <th>@T["logs.message"]</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var e in Model.RecentErrors)
+                {
+                    <tr>
+                        <td class="muted mono">@e.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                        <td>@if (e.StatusCode is int sc) { <span class="badge badge-err mono">@sc</span> }</td>
+                        <td><span class="mono muted">@e.Path</span> @e.Message</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="list-actions"><a class="btn btn-ghost" asp-page="/Admin/Logs/Index" asp-route-level="Error">@T["dashboard.allLogs"]</a></div>
+</div>

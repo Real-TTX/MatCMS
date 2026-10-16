@@ -17,6 +17,13 @@ public static class Ui
     public static UiInline Inline(params UiNode?[] children) => new(L(children));
     /// <summary>A responsive grid.</summary>
     public static UiGrid Grid(int minWidth, params UiNode?[] children) => new(L(children)) { MinWidth = minWidth };
+    /// <summary>An entry of a screen's sub-menu.</summary>
+    public static UiNavItem NavItem(string label, string href, string? icon = null, bool active = false, string? heading = null, string? badge = null) =>
+        new(label, href) { Icon = icon, Active = active, Heading = heading, Badge = badge };
+    /// <summary>A screen with a sub-menu at the left and the content at the right.</summary>
+    public static UiSplit Split(IEnumerable<UiNavItem> nav, params UiNode?[] children) => new(nav.ToList(), L(children));
+    /// <summary>A main column with a side column.</summary>
+    public static UiColumns Columns(IEnumerable<UiNode?> main, IEnumerable<UiNode?> side) => new(L(main), L(side));
     /// <summary>A panel with an optional heading.</summary>
     public static UiCard Card(string? title, params UiNode?[] children) => new(L(children)) { Title = title };
     /// <summary>A panel without a heading.</summary>
@@ -118,6 +125,15 @@ public static class Ui
     public static UiTags Tags(string name, string label, string value = "", IEnumerable<string>? suggestions = null) =>
         new(name, label) { Value = value ?? "", Suggestions = suggestions?.ToList() ?? new List<string>() };
 
+    /// <summary>A column of a row editor.</summary>
+    public static UiRowColumn RowColumn(string key, string header, UiRowCell kind = UiRowCell.Text, string? placeholder = null, string? width = null) =>
+        new(key, header) { Kind = kind, Placeholder = placeholder, Width = width };
+    /// <summary>A row of a row editor.</summary>
+    public static UiRowValue RowValue(string id, params string[] values) => new(id ?? "", values);
+    /// <summary>Rows to edit in place — add, change, delete (see <see cref="UiRowEditor"/> for what is posted).</summary>
+    public static UiRowEditor RowEditor(string name, string label, IEnumerable<UiRowColumn> columns, IEnumerable<UiRowValue> rows, string addLabel = "+") =>
+        new(name, label) { Columns = columns.ToList(), Rows = rows.ToList(), AddLabel = addLabel };
+
     // ---- lists ------------------------------------------------------------------------------------
 
     /// <summary>A column.</summary>
@@ -140,6 +156,9 @@ public static class Ui
     public static UiTable Table(IEnumerable<UiColumn> columns, IEnumerable<UiTableRow> rows, string? searchPlaceholder = null,
         int pageSize = 0, string emptyText = "") =>
         new(columns.ToList(), rows.ToList()) { SearchPlaceholder = searchPlaceholder, PageSize = pageSize, EmptyText = emptyText };
+
+    /// <summary>A filter for a table (see <see cref="UiListFilter"/>); the rows name their values with <see cref="UiTableRow.Tags"/>.</summary>
+    public static UiListFilter ListFilter(string label, params (string Value, string Text)[] options) => new(label, options);
 
     /// <summary>A tab bar.</summary>
     public static UiTabs Tabs(params UiTab[] tabs) => new(tabs);

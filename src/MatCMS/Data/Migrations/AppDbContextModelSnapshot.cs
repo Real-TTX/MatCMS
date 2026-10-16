@@ -427,6 +427,12 @@ namespace MatCMS.Data.Migrations
                     b.Property<int>("NavOrder")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("OwnerPlugin")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PluginRole")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("RequiredRole")
                         .HasColumnType("TEXT");
 
@@ -462,6 +468,8 @@ namespace MatCMS.Data.Migrations
 
                     b.HasIndex("Slug", "Locale")
                         .IsUnique();
+
+                    b.HasIndex("OwnerPlugin", "PluginRole", "Locale");
 
                     b.ToTable("Pages");
                 });
@@ -815,6 +823,9 @@ namespace MatCMS.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DashboardJson")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("DisplayName")

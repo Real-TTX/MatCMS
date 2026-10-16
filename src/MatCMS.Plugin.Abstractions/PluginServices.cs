@@ -22,7 +22,11 @@ public enum SettingKind
     /// <summary>One choice out of <see cref="SettingSpec.Options"/>.</summary>
     Choice,
     /// <summary>A secret (API key, password). Stored encrypted, never sent back to the browser.</summary>
-    Secret
+    Secret,
+    /// <summary>A picture chosen from the media library (or typed as an address): stored as a local path or an https address, empty = none.</summary>
+    Image,
+    /// <summary>A colour, stored as <c>#rrggbb</c>; <see cref="SettingSpec.Default"/> is what the picker starts with (a colour field cannot be empty).</summary>
+    Color
 }
 
 /// <summary>One declared setting.</summary>
@@ -43,7 +47,7 @@ public sealed record SettingSpec(string Key, string Label, SettingKind Kind = Se
     public double? Max { get; init; }
     /// <summary>A value is required.</summary>
     public bool Required { get; init; }
-    /// <summary>A heading the setting is grouped under in the form (consecutive settings with the same group share it).</summary>
+    /// <summary>A heading the setting is grouped under in the form. Name it on the first setting of the group: the settings after it, without a name, belong to it until the next one is named.</summary>
     public string? Group { get; init; }
 }
 
@@ -186,6 +190,36 @@ public sealed record SitemapEntry(string Url, DateTime? LastModifiedUtc = null);
 /// <param name="Url">The admin address that opens it.</param>
 public sealed record RecentItem(string Kind, string Title, bool Published, DateTime UpdatedUtc, string Url);
 
+/// <summary>One line of a plugin's dashboard card.</summary>
+/// <param name="Text">What it is ("Bestellung R-1007 · 23,70 €").</param>
+/// <param name="Url">The admin address that opens it.</param>
+public sealed record DashboardRow(string Text, string Url)
+{
+    /// <summary>A Tabler icon (<c>ti-receipt</c>); null = none.</summary>
+    public string? Icon { get; init; }
+    /// <summary>A short muted text at the right (a date).</summary>
+    public string? Meta { get; init; }
+    /// <summary>A small badge after the text ("Bezahlt").</summary>
+    public string? Badge { get; init; }
+}
+
+/// <summary>
+/// A card of the plugin's own on the dashboard — "Shop · Bestellungen" with the latest orders — for what is not "edited" and so does not belong into "Zuletzt bearbeitet".
+/// The title is shown as given (name the plugin in it); a long list is cut and "all" links to <see cref="AllUrl"/>.
+/// </summary>
+public sealed record DashboardCard(string Title, IReadOnlyList<DashboardRow> Rows)
+{
+    /// <summary>Where the full list is (an admin address); null = no link.</summary>
+    public string? AllUrl { get; init; }
+    /// <summary>Text of that link.</summary>
+    public string? AllLabel { get; init; }
+    /// <summary>What to say when there are no rows.</summary>
+    public string EmptyText { get; init; } = "";
+}
+
+/// <summary>Delivers a dashboard card; null = no card (nothing to show yet).</summary>
+public delegate Task<DashboardCard?> PluginCardProvider(IPluginContext ctx, CancellationToken ct);
+
 /// <summary>A line of "Braucht Aufmerksamkeit".</summary>
 /// <param name="Title">What it is about.</param>
 /// <param name="Text">What to do.</param>
@@ -197,6 +231,82 @@ public sealed record AttentionNote(string Title, string Text, string Url)
     /// <summary>A Tabler icon name.</summary>
     public string Icon { get; init; } = "ti-alert-circle";
 }
+
+/// <summary>A placeholder of a template part: <c>{{name}}</c> in the part's HTML. A value is HTML-encoded when it is put in, unless the placeholder is declared <see cref="Html"/> (the plugin hands over finished markup).</summary>
+public sealed record TemplatePlaceholder(string Name, string Help, bool Html = false);
+
+/// <summary>
+/// A named HTML file a plugin draws a page (or a piece of one) with — the product page of a shop, a product card. The plugin ships the DEFAULT; every site template may carry its own version of
+/// it (in the template editor it is one more file of the template, next to <c>body.html</c> and <c>article.html</c>), and the plugin renders whichever the active template has
+/// (<see cref="IPluginContext.RenderPart"/>). In the part, <c>{{name}}</c> puts a value in, <c>{{#if name}}…{{/if}}</c> keeps a piece only when the value is not empty and
+/// <c>{{#unless name}}…{{/unless}}</c> only when it is.
+/// </summary>
+/// <param name="Name">Lower case letters, digits and dashes (<c>product</c>). The template stores it as <c>{plugin key}.{name}</c>.</param>
+/// <param name="Label">What the editor calls it (a key of the plugin's strings is translated).</param>
+/// <param name="DefaultHtml">The part as it is without a template's own version.</param>
+public sealed record TemplatePartSpec(string Name, string Label, string DefaultHtml)
+{
+    /// <summary>The placeholders the plugin fills, listed in the editor as chips to insert.</summary>
+    public IReadOnlyList<TemplatePlaceholder> Placeholders { get; init; } = Array.Empty<TemplatePlaceholder>();
+    /// <summary>One line under the file's name in the editor (a key of the plugin's strings is translated).</summary>
+    public string? Help { get; init; }
+}
+
+/// <summary>
+/// One entry a plugin adds to a menu of the PUBLIC site. <see cref="Children"/> make a dropdown (one level); <see cref="Badge"/> is a small counter next to the label (a cart's
+/// item count) — null shows none. <see cref="Icon"/> is a Tabler icon name without the prefix (<c>shopping-cart</c>), used by the icon strip ("toolbar").
+/// </summary>
+public sealed record MenuEntry(string Label, string Url)
+{
+    /// <summary>A Tabler icon name (<c>user</c>, <c>shopping-cart</c>); null = none.</summary>
+    public string? Icon { get; init; }
+    /// <summary>A counter shown next to the entry; null or empty = none.</summary>
+    public string? Badge { get; init; }
+    /// <summary>Position among the plugin's entries of this menu (the site's own entries come first).</summary>
+    public int Order { get; init; } = 100;
+    /// <summary>Entries of a dropdown under this one.</summary>
+    public IReadOnlyList<MenuEntry> Children { get; init; } = Array.Empty<MenuEntry>();
+    /// <summary>
+    /// Markup to put in the menu INSTEAD of a link — a search box. Drawn as it is, in the place of the entry, so build it with <see cref="IPluginContext.RenderPart"/>:
+    /// the site's template can then replace it and style it. <see cref="Label"/> still names the entry (for the editor and screen readers).
+    /// </summary>
+    public string? Html { get; init; }
+}
+
+/// <summary>A place a link can point at, offered wherever the editor picks a link target (menus, buttons, links in blocks).</summary>
+/// <param name="Label">What the editor sees ("Beitrag: Neues Sortiment").</param>
+/// <param name="Url">A local address (<c>/blog/neues-sortiment</c>) or an https address.</param>
+public sealed record LinkTarget(string Label, string Url);
+
+/// <summary>Delivers the link targets of one group. At most 300 are taken; the picker has a search box.</summary>
+public delegate Task<IEnumerable<LinkTarget>> LinkTargetProvider(IPluginContext ctx, CancellationToken ct);
+
+/// <summary>
+/// A piece a plugin offers for the site's menus that is more than a link: the shop's cart with its count, "Anmelden"/"Mein Konto", a search box, "Shop" with its categories as a dropdown.
+/// The editor adds it to any menu like a menu item (Admin → Menü → "Plugin-Element"), moves, renames and removes it there; the plugin draws it per visitor
+/// (<see cref="MenuElementProvider"/>). The look comes from the site's template: a link-like element goes through the template's menu markup, a search box through a template part.
+/// </summary>
+/// <param name="Name">Lower case letters, digits and dashes; stored as <c>plugin:{plugin}.{name}</c> in the menu item.</param>
+/// <param name="Label">What the editor sees in the list (a string key of the plugin or plain text).</param>
+public sealed record MenuElementSpec(string Name, string Label)
+{
+    /// <summary>One line telling what it is.</summary>
+    public string? Help { get; init; }
+    /// <summary>A Tabler icon name without the prefix (<c>shopping-cart</c>) used until the editor picks another.</summary>
+    public string? Icon { get; init; }
+    /// <summary>The menu ("header", "footer", "toolbar") the host adds the element to ONCE when the plugin is first loaded on a site; empty = the editor adds it. Removing it sticks.</summary>
+    public string DefaultMenu { get; init; } = "";
+}
+
+/// <summary>Draws a menu element for the request's visitor; null = nothing for this visitor. Asked on every page view and must be quick (a slow answer is skipped for that page).</summary>
+public delegate Task<MenuEntry?> MenuElementProvider(IPluginContext ctx, CancellationToken ct);
+
+/// <summary>
+/// Answers which entries the plugin adds to a menu. Asked on every page view for <c>"header"</c>, <c>"footer"</c>, <c>"toolbar"</c> (the icon strip) and any menu the
+/// site defines, with the request's own context — the signed-in member, the plugin's cookies — so an entry can differ per visitor ("Anmelden" or "Mein Konto").
+/// It must be quick: a slow answer is skipped for that page, a failing one is logged and skipped.
+/// </summary>
+public delegate Task<IEnumerable<MenuEntry>> PluginMenuProvider(IPluginContext ctx, string menu, CancellationToken ct);
 
 /// <summary>Computes the figure of a dashboard tile.</summary>
 public delegate Task<UiStat?> PluginTileProvider(IPluginContext ctx, CancellationToken ct);
@@ -239,4 +349,13 @@ public interface IPluginSite
     /// encodes what needs encoding). Parts a plugin defines itself are not supported yet.
     /// </summary>
     string RenderTemplatePart(string part, IReadOnlyDictionary<string, string> tokens);
+
+    /// <summary>
+    /// A picture of the media library (<c>/uploads/…</c>, PNG, JPEG, WebP or GIF; never SVG) as a JPEG of at most <paramref name="maxWidth"/> pixels across, transparency on white — what a plugin needs to
+    /// put it on paper (a PDF). Null for anything else: an address outside the library, a file that is gone or too big, a picture that cannot be read.
+    /// </summary>
+    Task<PluginImage?> LoadImageAsync(string url, int maxWidth = 600, CancellationToken ct = default);
 }
+
+/// <summary>A picture ready for a document: JPEG bytes and the size in pixels.</summary>
+public sealed record PluginImage(byte[] Jpeg, int Width, int Height);

@@ -99,6 +99,9 @@ public static class UiRenderer
                     _sb.Append("<div class=\"ui-grid\" style=\"grid-template-columns:repeat(auto-fill,minmax(")
                         .Append(Math.Clamp(g.MinWidth, 80, 1200)).Append("px,1fr))\">");
                     Children(g.Children); _sb.Append("</div>"); break;
+                case UiSplit sp: Split(sp); break;
+                case UiColumns cols:
+                    _sb.Append("<div class=\"ui-cols\"><div class=\"ui-cols-main\">"); Children(cols.Main); _sb.Append("</div><aside class=\"ui-cols-side\">"); Children(cols.Side); _sb.Append("</aside></div>"); break;
                 case UiCard c:
                     _sb.Append(Admin ? "<div class=\"card\">" : "<div class=\"ui-card\">");
                     if (!string.IsNullOrWhiteSpace(c.Title)) _sb.Append("<h2>").Append(E(c.Title)).Append("</h2>");
@@ -128,7 +131,7 @@ public static class UiRenderer
                     _sb.Append("<img src=\"").Append(E(SafeUrl(im.Src))).Append("\" alt=\"").Append(E(im.Alt)).Append("\" loading=\"lazy\"");
                     if (im.Size > 0)
                         _sb.Append(" width=\"").Append(im.Size).Append("\" height=\"").Append(im.Size)
-                           .Append("\" style=\"object-fit:cover;border-radius:6px;vertical-align:middle\"");
+                           .Append("\" style=\"object-fit:cover;border-radius:6px;vertical-align:middle;flex:none;min-width:").Append(im.Size).Append("px;max-width:none\"");
                     else _sb.Append(" style=\"max-width:100%\"");
                     _sb.Append(" />"); break;
                 }
@@ -140,7 +143,7 @@ public static class UiRenderer
                 }
                 case UiBadge b:
                 {
-                    var cls = b.Tone switch { UiTone.Success => " badge-on", UiTone.Error => " badge-err", UiTone.Info or UiTone.Warning => " badge-new", UiTone.Muted => " badge-off", _ => "" };
+                    var cls = b.Tone switch { UiTone.Success => " badge-on", UiTone.Error => " badge-err", UiTone.Warning => " badge-warn", UiTone.Info => " badge-new", UiTone.Muted => " badge-off", _ => "" };
                     _sb.Append("<span class=\"badge").Append(cls).Append("\">").Append(E(b.Text)).Append("</span>"); break;
                 }
                 case UiEmpty e: _sb.Append("<p class=\"list-empty\">").Append(E(e.Text)).Append("</p>"); break;
@@ -166,6 +169,23 @@ public static class UiRenderer
                 case UiPager p: Pager(p); break;
                 default: throw new NotSupportedException($"The renderer does not know {node.GetType().Name}.");
             }
+        }
+
+        private static readonly Regex IconName = new("^ti-[a-z0-9-]+$", RegexOptions.Compiled);
+
+        private void Split(UiSplit sp)
+        {
+            _sb.Append("<div class=\"ui-split\"><nav class=\"ui-subnav\">");
+            foreach (var i in sp.Nav)
+            {
+                if (!string.IsNullOrWhiteSpace(i.Heading)) _sb.Append("<div class=\"ui-subnav-label\">").Append(E(i.Heading)).Append("</div>");
+                _sb.Append("<a href=\"").Append(E(SafeUrl(i.Href))).Append('"').Append(i.Active ? " class=\"active\" aria-current=\"page\"" : "").Append('>');
+                if (i.Icon is { } ic && IconName.IsMatch(ic)) _sb.Append("<i class=\"ti ").Append(ic).Append("\" aria-hidden=\"true\"></i> ");
+                _sb.Append(E(i.Label));
+                if (!string.IsNullOrWhiteSpace(i.Badge)) _sb.Append("<span class=\"ui-subnav-badge\">").Append(E(i.Badge)).Append("</span>");
+                _sb.Append("</a>");
+            }
+            _sb.Append("</nav><div class=\"ui-split-body\">"); Children(sp.Children); _sb.Append("</div></div>");
         }
 
         private void PageHead(UiPageHead h)
@@ -249,7 +269,7 @@ public static class UiRenderer
 
         private void ActionButton(UiAction a)
         {
-            var iconOnly = !string.IsNullOrWhiteSpace(a.Icon);
+            var iconOnly = !string.IsNullOrWhiteSpace(a.Icon) && !a.WithLabel;
             _sb.Append("<form method=\"post\" class=\"inline-form\"");
             if (!string.IsNullOrWhiteSpace(a.Confirm)) _sb.Append(" data-confirm=\"").Append(E(a.Confirm)).Append('"');
             if (a.Kind == UiButtonKind.Danger && !string.IsNullOrWhiteSpace(a.Confirm)) _sb.Append(" data-confirm-danger");
@@ -259,7 +279,7 @@ public static class UiRenderer
             _sb.Append("<button type=\"submit\" class=\"").Append(ButtonClass(a.Kind, true, iconOnly)).Append('"');
             if (iconOnly) _sb.Append(" title=\"").Append(E(a.Label)).Append("\" aria-label=\"").Append(E(a.Label)).Append('"');
             _sb.Append('>');
-            if (iconOnly) Icon(a.Icon); else _sb.Append(E(a.Label));
+            if (iconOnly) Icon(a.Icon); else { Icon(a.Icon); _sb.Append(E(a.Label)); }
             _sb.Append("</button></form>");
         }
 
@@ -290,7 +310,7 @@ public static class UiRenderer
         private void FieldOpen(UiField f, bool labelFor = true)
         {
             _sb.Append(Admin ? "<div class=\"field\">" : "<div class=\"form-field\">");
-            if (f is UiCheckbox) return;
+            if (f is UiCheckbox || string.IsNullOrEmpty(f.Label)) return;   // a field with no label (a table of rows inside a card that has its title) has nothing to say above itself
             _sb.Append("<label");
             if (labelFor) _sb.Append(" for=\"").Append(E(FieldId(f))).Append('"');
             _sb.Append('>').Append(E(f.Label));
@@ -369,6 +389,7 @@ public static class UiRenderer
                 case UiMediaList ml: MediaListField(ml); break;
                 case UiRichText rt: RichTextField(rt); break;
                 case UiTags tg: TagsField(tg); break;
+                case UiRowEditor re: RowEditorField(re); break;
                 default: throw new NotSupportedException($"The renderer does not know {field.GetType().Name}.");
             }
         }
@@ -429,6 +450,64 @@ public static class UiRenderer
             FieldClose(f);
         }
 
+        /// <summary>The cells of one row (or of the blank one the script copies for a new row, its index being a placeholder).</summary>
+        private void RowCells(UiRowEditor f, UiRowValue? row, string index)
+        {
+            _sb.Append("<tr data-ui-row>");
+            for (var c = 0; c < f.Columns.Count; c++)
+            {
+                var col = f.Columns[c];
+                var value = row is not null && c < row.Values.Count ? row.Values[c] : "";
+                var name = E(f.Name) + "." + index + "." + E(col.Key);
+                _sb.Append("<td>");
+                // The row's identity travels in its first cell, so the cells and the id are one unit for the script.
+                if (c == 0) _sb.Append("<input type=\"hidden\" data-key=\"id\" name=\"").Append(E(f.Name)).Append('.').Append(index).Append(".id\" value=\"").Append(E(row?.Id ?? "")).Append("\" />");
+                if (col.Kind == UiRowCell.Image)
+                {
+                    _sb.Append("<div class=\"row-img\"><span class=\"preview\"").Append(string.IsNullOrWhiteSpace(value) ? "" : " style=\"background-image:url('" + E(SafeUrl(value).Replace("'", "%27")) + "')\"").Append("></span><input type=\"text\" data-key=\"").Append(E(col.Key))
+                       .Append("\" name=\"").Append(name).Append("\" value=\"").Append(E(value)).Append('"');
+                    if (!string.IsNullOrEmpty(col.Placeholder)) _sb.Append(" placeholder=\"").Append(E(col.Placeholder)).Append('"');
+                    _sb.Append(" aria-label=\"").Append(E(col.Header)).Append('"').Append(f.Disabled ? " disabled" : "").Append(" autocomplete=\"off\" />");
+                    if (!f.Disabled) _sb.Append("<button type=\"button\" class=\"icon-btn\" data-ui-rowimage-pick title=\"").Append(S("ui.image.pick")).Append("\" aria-label=\"").Append(S("ui.image.pick")).Append("\"><i class=\"ti ti-photo\" aria-hidden=\"true\"></i></button>");
+                    _sb.Append("</div>");
+                }
+                else if (col.Kind == UiRowCell.Check)
+                    _sb.Append("<label class=\"row-check\"><input type=\"checkbox\" value=\"true\" data-key=\"").Append(E(col.Key)).Append("\" name=\"").Append(name).Append('"').Append(value == "true" ? " checked" : "")
+                       .Append(f.Disabled ? " disabled" : "").Append(" aria-label=\"").Append(E(col.Header)).Append("\" /></label>");
+                else
+                {
+                    _sb.Append("<input type=\"text\"").Append(col.Kind == UiRowCell.Number ? " inputmode=\"decimal\" class=\"num\"" : "").Append(" data-key=\"").Append(E(col.Key)).Append("\" name=\"").Append(name)
+                       .Append("\" value=\"").Append(E(value)).Append('"');
+                    if (!string.IsNullOrEmpty(col.Placeholder)) _sb.Append(" placeholder=\"").Append(E(col.Placeholder)).Append('"');
+                    _sb.Append(" aria-label=\"").Append(E(col.Header)).Append('"').Append(f.Disabled ? " disabled" : "").Append(" autocomplete=\"off\" />");
+                }
+                _sb.Append("</td>");
+            }
+            _sb.Append("<td class=\"row-end\">");
+            if (!f.Disabled)
+                _sb.Append("<button type=\"button\" class=\"icon-btn row-remove\" data-ui-row-remove title=\"").Append(S("ui.rows.remove")).Append("\" aria-label=\"").Append(S("ui.rows.remove")).Append("\"><i class=\"ti ti-trash\" aria-hidden=\"true\"></i></button>");
+            _sb.Append("</td></tr>");
+        }
+
+        private void RowEditorField(UiRowEditor f)
+        {
+            FieldOpen(f, labelFor: false);
+            _sb.Append("<div class=\"row-editor\" data-ui-rows data-name=\"").Append(E(f.Name)).Append("\" data-max=\"").Append(Math.Clamp(f.MaxRows, 1, 500)).Append("\"><table class=\"data\"><thead><tr>");
+            foreach (var col in f.Columns)
+                _sb.Append("<th").Append(col.Kind == UiRowCell.Check ? " class=\"row-check-head\"" : "").Append(string.IsNullOrEmpty(col.Width) ? "" : " style=\"width:" + E(col.Width) + "\"").Append('>').Append(E(col.Header)).Append("</th>");
+            _sb.Append("<th class=\"row-end\"></th></tr></thead><tbody data-ui-rows-body>");
+            for (var i = 0; i < f.Rows.Count; i++) RowCells(f, f.Rows[i], i.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            _sb.Append("</tbody></table><template data-ui-rows-template>");
+            RowCells(f, null, "__i__");
+            _sb.Append("</template>");
+            if (!string.IsNullOrWhiteSpace(f.EmptyText)) _sb.Append("<p class=\"row-empty\" data-ui-rows-empty").Append(f.Rows.Count > 0 ? " hidden" : "").Append('>').Append(E(f.EmptyText)).Append("</p>");
+            _sb.Append("<input type=\"hidden\" name=\"").Append(E(f.Name)).Append(".count\" value=\"").Append(f.Rows.Count).Append("\" data-ui-rows-count />");
+            if (!f.Disabled)
+                _sb.Append("<div class=\"row-actions\"><button type=\"button\" class=\"btn btn-ghost btn-sm\" data-ui-rows-add><i class=\"ti ti-plus\" aria-hidden=\"true\"></i> ").Append(E(f.AddLabel)).Append("</button></div>");
+            _sb.Append("</div>");
+            FieldClose(f);
+        }
+
         private void TagsField(UiTags f)
         {
             FieldOpen(f, labelFor: false);
@@ -453,15 +532,26 @@ public static class UiRenderer
 
         private void Table(UiTable t)
         {
-            var listed = Admin && (!string.IsNullOrEmpty(t.SearchPlaceholder) || t.PageSize > 0);
+            var listed = Admin && (!string.IsNullOrEmpty(t.SearchPlaceholder) || t.PageSize > 0 || t.Filter is not null);
             if (listed)
             {
                 _sb.Append("<div data-list");
                 if (t.PageSize > 0) _sb.Append(" data-list-page-size=\"").Append(t.PageSize).Append('"');
                 _sb.Append('>');
-                if (!string.IsNullOrEmpty(t.SearchPlaceholder))
-                    _sb.Append("<div class=\"list-toolbar\" style=\"margin-bottom:12px\"><input type=\"search\" class=\"list-search\" data-list-search placeholder=\"")
-                       .Append(E(t.SearchPlaceholder)).Append("\" aria-label=\"").Append(E(t.SearchPlaceholder)).Append("\" autocomplete=\"off\" /></div>");
+                // The admin's own list shape: the framed toolbar (search, filter) sits in a page-head above the table (admin.css frames `[data-list] .page-head .list-toolbar`).
+                if (!string.IsNullOrEmpty(t.SearchPlaceholder) || t.Filter is not null)
+                {
+                    _sb.Append("<div class=\"page-head\"><div class=\"list-toolbar\">");
+                    if (!string.IsNullOrEmpty(t.SearchPlaceholder))
+                        _sb.Append("<input type=\"search\" class=\"list-search\" data-list-search placeholder=\"").Append(E(t.SearchPlaceholder)).Append("\" aria-label=\"").Append(E(t.SearchPlaceholder)).Append("\" autocomplete=\"off\" />");
+                    if (t.Filter is { } flt)
+                    {
+                        _sb.Append("<select class=\"list-search\" data-list-filter aria-label=\"").Append(E(flt.Label)).Append("\">");
+                        foreach (var (value, text) in flt.Options) _sb.Append("<option value=\"").Append(E(value)).Append('"').Append(!string.IsNullOrEmpty(flt.Selected) && flt.Selected == value ? " selected" : "").Append('>').Append(E(text)).Append("</option>");
+                        _sb.Append("</select>");
+                    }
+                    _sb.Append("</div></div>");
+                }
             }
             _sb.Append(Admin ? "<table class=\"data\"" : "<table class=\"ui-table\"");
             if (listed) _sb.Append(" data-list-table");
@@ -475,6 +565,7 @@ public static class UiRenderer
             {
                 _sb.Append("<tr");
                 if (listed && r.Search is not null) _sb.Append(" data-search=\"").Append(E(r.Search)).Append('"');
+                if (listed && !string.IsNullOrWhiteSpace(r.Tags)) _sb.Append(" data-tags=\"").Append(E(r.Tags)).Append('"');
                 _sb.Append('>');
                 for (var i = 0; i < r.Cells.Count; i++)
                 {
@@ -491,8 +582,11 @@ public static class UiRenderer
             if (listed)
             {
                 if (t.PageSize > 0) _sb.Append("<div class=\"list-pager\" data-list-pager></div>");
-                _sb.Append("<p class=\"list-empty\" data-list-empty hidden>").Append(E(string.IsNullOrWhiteSpace(t.EmptyText) ? "" : t.EmptyText)).Append("</p></div>");
+                _sb.Append("<p class=\"list-empty\" data-list-empty hidden>").Append(E(string.IsNullOrWhiteSpace(t.EmptyText) ? "" : t.EmptyText)).Append("</p>");
             }
+            // What can be done with the list sits below it, like every list in the admin.
+            if (t.Below.Count > 0) { _sb.Append("<div class=\"list-actions\">"); Children(t.Below); _sb.Append("</div>"); }
+            if (listed) _sb.Append("</div>");
         }
 
         private void Tabs(UiTabs tabs)

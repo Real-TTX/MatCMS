@@ -9,7 +9,7 @@ namespace MatCMS.Plugin.Shop;
 /// Everything that reads and writes the shop's tables — the only place that knows the column names. It wraps an <see cref="IPluginData"/>, so inside a
 /// transaction (<c>ctx.Data.InTransactionAsync(d =&gt; new ShopStore(d)…)</c>) the same methods take part in it.
 /// </summary>
-internal sealed class ShopStore
+internal sealed partial class ShopStore
 {
     private readonly IPluginData _data;
     public ShopStore(IPluginData data) => _data = data;
@@ -25,15 +25,24 @@ internal sealed class ShopStore
         d.Table("products", t => t.Text("slug", required: true, def: "").Text("title", required: true, def: "").Text("summary").Text("description").Text("image")
             .Json("gallery", def: "[]").Text("kind", def: "physical").Int("price_cents", def: "0").Int("tax_bp", def: "1900").Text("sku")
             .Bool("track_stock", def: "0").Int("stock", def: "0").Int("weight_g", def: "0").Text("category").Int("max_per_order", def: "0")
-            .Bool("active", def: "1").Int("sort", def: "0").Timestamp("created").Timestamp("updated").Text("tags").Bool("featured", def: "0").Int("compare_cents", def: "0")
+            .Bool("active", def: "1").Int("sort", def: "0").Timestamp("created").Timestamp("updated").Text("tags").Bool("featured", def: "0").Int("compare_cents", def: "0").Json("var_options", def: "[]")
+            .Text("seo_title").Text("seo_description").Text("cats_extra")
             .UniqueIndex("slug").Index("active", "sort").Index("category"));
         d.Table("variants", t => t.Int("product_id", required: true, def: "0").Text("name", required: true, def: "").Text("sku").Int("price_delta", def: "0")
-            .Bool("track_stock", def: "0").Int("stock", def: "0").Bool("active", def: "1").Int("sort", def: "0").Index("product_id"));
+            .Bool("track_stock", def: "0").Int("stock", def: "0").Bool("active", def: "1").Int("sort", def: "0").Text("image").Index("product_id"));
         d.Table("product_files", t => t.Int("product_id", required: true, def: "0").Text("file_name", required: true, def: "").Text("storage_name", required: true, def: "")
             .Int("size", def: "0").Int("sort", def: "0").Index("product_id"));
-        d.Table("categories", t => t.Text("slug", required: true, def: "").Text("name", required: true, def: "").Int("sort", def: "0").UniqueIndex("slug"));
+        d.Table("categories", t => t.Text("slug", required: true, def: "").Text("name", required: true, def: "").Int("sort", def: "0").Int("parent_id", def: "0").Text("image", def: "").Text("description", def: "").Text("tags", def: "").Text("rule", def: "").UniqueIndex("slug"));
+        d.Table("attributes", t => t.Text("slug", required: true, def: "").Text("name", required: true, def: "").Text("kind", def: "choice").Text("options").Text("unit")
+            .Bool("filterable", def: "1").Text("category").Int("sort", def: "0").UniqueIndex("slug"));
+        d.Table("product_attrs", t => t.Int("product_id", required: true, def: "0").Int("attr_id", required: true, def: "0").Text("value", def: "").Index("product_id").Index("attr_id"));
         d.Table("carts", t => t.Text("token", required: true, def: "").Int("member_id", def: "0").Json("items", def: "[]").Timestamp("updated").Timestamp("expires")
-            .Text("coupon").UniqueIndex("token").Index("expires"));
+            .Text("coupon").Text("email").Bool("remind", def: "0").Timestamp("reminded").Text("restore_key").UniqueIndex("token").Index("expires").Index("restore_key"));
+        // The earlier addresses of products whose address was changed: the old one answers with a permanent redirect to the product.
+        d.Table("slug_redirects", t => t.Text("old_slug", required: true, def: "").Int("product_id", required: true, def: "0").UniqueIndex("old_slug").Index("product_id"));
+        // The words of a product or a category in another language (the main language is the row itself).
+        d.Table("translations", t => t.Text("kind", required: true, def: "product").Int("ref_id", required: true, def: "0").Text("locale", required: true, def: "").Text("title").Text("summary")
+            .Text("description").Text("seo_title").Text("seo_description").UniqueIndex("kind", "ref_id", "locale"));
         d.Table("coupons", t => t.Text("code", required: true, def: "").Text("kind", required: true, def: "percent").Int("value", def: "0").Int("min_order", def: "0").Int("max_uses", def: "0")
             .Int("used", def: "0").Bool("per_customer", def: "0").Timestamp("starts").Timestamp("expires").Text("category").Bool("active", def: "1").Text("note").Timestamp("created")
             .UniqueIndex("code"));
@@ -41,7 +50,7 @@ internal sealed class ShopStore
             .Int("member_id", def: "0").Text("email").Text("name").Text("phone").Json("billing", def: "{}").Json("shipping", def: "{}").Text("shipping_method")
             .Int("subtotal", def: "0").Int("shipping_cents", def: "0").Int("tax", def: "0").Int("total", def: "0").Int("refunded", def: "0").Text("currency", def: "EUR")
             .Text("payment_provider").Text("payment_ref").Text("payment_intent").Timestamp("paid").Text("access_token").Text("terms_version").Timestamp("terms_accepted")
-            .Bool("waiver", def: "0").Text("note").Text("tracking").Text("invoice_number").Text("locale", def: "de").Bool("small_business", def: "0")
+            .Bool("waiver", def: "0").Text("note").Text("tracking").Text("carrier").Text("invoice_number").Text("locale", def: "de").Bool("small_business", def: "0")
             .Timestamp("reserved_until").Timestamp("created").Timestamp("updated").Int("discount", def: "0").Text("coupon_code").Text("tax_note").Int("shipping_tax_bp", def: "-1")
             .UniqueIndex("number").Index("status").Index("member_id").Index("email").Index("payment_ref").Index("payment_intent").Index("created"));
         d.Table("order_items", t => t.Int("order_id", required: true, def: "0").Int("product_id", def: "0").Int("variant_id", def: "0").Text("title").Text("variant_title")
@@ -82,7 +91,8 @@ internal sealed class ShopStore
     private static Product ProductOf(DataRow r) => new()
     {
         Id = r.Id, Slug = r.Text("slug"), Title = r.Text("title"), Summary = r.Text("summary"), DescriptionHtml = r.Text("description"), Image = r.Text("image"),
-        GalleryJson = r.Text("gallery") is { Length: > 0 } g ? g : "[]", Kind = ProductKind.Normalise(r.Text("kind")),
+        ExtraCategories = r.Text("cats_extra"), SeoTitle = r.Text("seo_title"), SeoDescription = r.Text("seo_description"),
+        GalleryJson = r.Text("gallery") is { Length: > 0 } g ? g : "[]", VariantOptions = r.Text("var_options") is { Length: > 0 } vo ? vo : "[]", Kind = ProductKind.Normalise(r.Text("kind")),
         PriceCents = r.Int("price_cents"), TaxBp = (int)r.Int("tax_bp"), Sku = r.Text("sku"), TrackStock = r.Bool("track_stock"), Stock = r.Int("stock"),
         WeightGrams = (int)r.Int("weight_g"), Category = r.Text("category"), Tags = r.Text("tags"), Featured = r.Bool("featured"), CompareCents = r.Int("compare_cents"), MaxPerOrder = (int)r.Int("max_per_order"), Active = r.Bool("active"), Sort = (int)r.Int("sort"),
         CreatedUtc = r.Timestamp("created") ?? DateTime.UtcNow, UpdatedUtc = r.Timestamp("updated") ?? DateTime.UtcNow
@@ -90,22 +100,23 @@ internal sealed class ShopStore
 
     private static Dictionary<string, object?> Values(Product p) => new()
     {
-        ["slug"] = p.Slug, ["title"] = p.Title, ["summary"] = p.Summary, ["description"] = p.DescriptionHtml, ["image"] = p.Image, ["gallery"] = p.GalleryJson,
+        ["slug"] = p.Slug, ["title"] = p.Title, ["summary"] = p.Summary, ["description"] = p.DescriptionHtml, ["image"] = p.Image, ["gallery"] = p.GalleryJson, ["var_options"] = p.VariantOptions,
+        ["cats_extra"] = p.ExtraCategories, ["seo_title"] = p.SeoTitle, ["seo_description"] = p.SeoDescription,
         ["kind"] = p.Kind, ["price_cents"] = p.PriceCents, ["tax_bp"] = p.TaxBp, ["sku"] = p.Sku, ["track_stock"] = p.TrackStock, ["stock"] = p.Stock,
         ["weight_g"] = p.WeightGrams, ["category"] = p.Category, ["tags"] = ShopTags.Normalise(p.Tags), ["featured"] = p.Featured, ["compare_cents"] = Math.Max(0, p.CompareCents), ["max_per_order"] = p.MaxPerOrder, ["active"] = p.Active, ["sort"] = p.Sort, ["updated"] = DateTime.UtcNow
     };
 
     public async Task<Product?> ProductAsync(long id, CancellationToken ct = default) =>
-        id > 0 && await T("products").GetAsync(id, ct) is { } r ? ProductOf(r) : null;
+        id > 0 && await T("products").GetAsync(id, ct) is { } r ? await LocalizeAsync(ProductOf(r), ct) : null;
 
     public async Task<Product?> ProductBySlugAsync(string slug, CancellationToken ct = default) =>
-        await T("products").FindByAsync("slug", slug, ct) is { } r ? ProductOf(r) : null;
+        await T("products").FindByAsync("slug", slug, ct) is { } r ? await LocalizeAsync(ProductOf(r), ct) : null;
 
     public async Task<IReadOnlyList<Product>> ProductsByIdsAsync(IEnumerable<long> ids, CancellationToken ct = default)
     {
         var list = ids.Distinct().ToList();
         if (list.Count == 0) return Array.Empty<Product>();
-        return (await T("products").QueryAsync(DataQuery.Everything.Where("id", DataOp.In, list), ct)).Select(ProductOf).ToList();
+        return await LocalizeAsync((await T("products").QueryAsync(DataQuery.Everything.Where("id", DataOp.In, list), ct)).Select(ProductOf).ToList(), ct);
     }
 
     /// <summary>Products for the catalogue or the admin list, with the total count for paging.</summary>
@@ -118,7 +129,7 @@ internal sealed class ShopStore
         var total = await T("products").CountAsync(q, ct);
         q = q.OrderBy("sort").OrderBy("title");
         if (take > 0) q = q.Page(skip, take);
-        return ((await T("products").QueryAsync(q, ct)).Select(ProductOf).ToList(), total);
+        return (await LocalizeAsync((await T("products").QueryAsync(q, ct)).Select(ProductOf).ToList(), ct), total);
     }
 
     /// <summary>Products by a <see cref="ProductQuery"/>, with the total before paging. A keyword is matched in memory (the column holds a list), everything else in the database.</summary>
@@ -130,11 +141,27 @@ internal sealed class ShopStore
         if (pq.FeaturedOnly) q = q.Eq("featured", true);
         if (pq.OnSaleOnly) q = q.Where("compare_cents", DataOp.Gt, 0L);
         if (pq.ExceptId > 0) q = q.Where("id", DataOp.Ne, pq.ExceptId);
+        if (pq.MinCents is { } minC) q = q.Where("price_cents", DataOp.Ge, minC);
+        if (pq.MaxCents is { } maxC) q = q.Where("price_cents", DataOp.Le, maxC);
         if (pq.Ids is { } ids) q = q.Where("id", DataOp.In, ids.ToList());
-        if (!string.IsNullOrWhiteSpace(pq.Category)) q = q.Eq("category", pq.Category);
+        // A category means itself AND everything below it — and a product belongs to it by its main category, by a further one it was put into, or by the rule of an automatic collection. That is
+        // decided in memory (below), after the database has filtered and ordered the rest.
+        HashSet<string>? memberSlugs = null; List<Category> ruleCats = new();
+        if (!string.IsNullOrWhiteSpace(pq.Category))
+        {
+            var allCats = await CategoriesAsync(ct);
+            memberSlugs = ShopCategories.SlugsUnder(allCats, pq.Category).ToHashSet(StringComparer.Ordinal);
+            ruleCats = ShopMembership.RuleCategories(allCats, memberSlugs);
+        }
+        var now = DateTime.UtcNow;
         if (!string.IsNullOrWhiteSpace(pq.Tag)) q = q.Where("tags", DataOp.Contains, pq.Tag);
         if (!string.IsNullOrWhiteSpace(pq.Search))
-            q = q.Either(new DataFilter("title", DataOp.Contains, pq.Search), new DataFilter("summary", DataOp.Contains, pq.Search), new DataFilter("sku", DataOp.Contains, pq.Search), new DataFilter("tags", DataOp.Contains, pq.Search));
+        {
+            var where = new List<DataFilter> { new("title", DataOp.Contains, pq.Search), new("sku", DataOp.Contains, pq.Search) };
+            if (pq.SearchIn != "title") { where.Add(new("summary", DataOp.Contains, pq.Search)); where.Add(new("tags", DataOp.Contains, pq.Search)); }
+            if (pq.SearchIn == "all") where.Add(new("description", DataOp.Contains, pq.Search));
+            q = q.Either(where.ToArray());
+        }
         q = pq.Sort switch
         {
             "new" => q.OrderBy("created", true).OrderBy("title"),
@@ -143,23 +170,24 @@ internal sealed class ShopStore
             "name" => q.OrderBy("title"),
             _ => q.OrderBy("sort").OrderBy("title")
         };
-        if (!string.IsNullOrWhiteSpace(pq.Tag) || pq.OnSaleOnly)
+        if (!string.IsNullOrWhiteSpace(pq.Tag) || pq.OnSaleOnly || memberSlugs is not null)
         {
             // The database only narrowed it down ("bio" is also inside "biodynamisch"; an earlier price is not yet a higher one); the exact test decides.
-            var all = (await T("products").QueryAsync(q, ct)).Select(ProductOf).Where(p => (string.IsNullOrWhiteSpace(pq.Tag) || ShopTags.Has(p, pq.Tag!)) && (!pq.OnSaleOnly || p.OnSale)).ToList();
+            var all = (await T("products").QueryAsync(q, ct)).Select(ProductOf).Where(p => (string.IsNullOrWhiteSpace(pq.Tag) || ShopTags.Has(p, pq.Tag!)) && (!pq.OnSaleOnly || p.OnSale) && (memberSlugs is null || ShopMembership.In(p, memberSlugs, ruleCats, now))).ToList();
             var paged = pq.Take > 0 ? all.Skip(pq.Skip).Take(pq.Take).ToList() : all;
-            return (paged, all.Count);
+            return (await LocalizeAsync(paged, ct), all.Count);
         }
         var total = await T("products").CountAsync(q, ct);
         if (pq.Take > 0) q = q.Page(pq.Skip, pq.Take);
-        return ((await T("products").QueryAsync(q, ct)).Select(ProductOf).ToList(), total);
+        return (await LocalizeAsync((await T("products").QueryAsync(q, ct)).Select(ProductOf).ToList(), ct), total);
     }
 
     /// <summary>What a visitor can filter by: how many ACTIVE products each category and each keyword has.</summary>
     public async Task<(Dictionary<string, int> Categories, List<(string Tag, int Count)> Tags)> FacetsAsync(CancellationToken ct = default)
     {
         var rows = (await T("products").QueryAsync(DataQuery.Everything.Eq("active", true), ct)).Select(ProductOf).ToList();
-        var cats = rows.Where(p => p.Category.Length > 0).GroupBy(p => p.Category).ToDictionary(g => g.Key, g => g.Count());
+        // A category counts what is below it too ("Kaffee" is offered while only "Kaffee › Bohnen" has products), what was put into it as a further category and what its rule collects.
+        var cats = ShopMembership.Counts(await CategoriesAsync(ct), rows, DateTime.UtcNow);
         var tags = new Dictionary<string, (string Tag, int Count)>(StringComparer.OrdinalIgnoreCase);
         foreach (var t in rows.SelectMany(p => ShopTags.Split(p.Tags)))
             tags[t] = tags.TryGetValue(t, out var cur) ? (cur.Tag, cur.Count + 1) : (t, 1);
@@ -178,6 +206,9 @@ internal sealed class ShopStore
     {
         await T("variants").DeleteWhereAsync(DataQuery.Everything.Eq("product_id", id), ct);
         await T("product_files").DeleteWhereAsync(DataQuery.Everything.Eq("product_id", id), ct);
+        await T("product_attrs").DeleteWhereAsync(DataQuery.Everything.Eq("product_id", id), ct);
+        await T("slug_redirects").DeleteWhereAsync(DataQuery.Everything.Eq("product_id", id), ct);
+        await T("translations").DeleteWhereAsync(DataQuery.Everything.Eq("kind", "product").Eq("ref_id", id), ct);
         await T("products").DeleteAsync(id, ct);
     }
 
@@ -189,7 +220,7 @@ internal sealed class ShopStore
     private static Variant VariantOf(DataRow r) => new()
     {
         Id = r.Id, ProductId = r.Int("product_id"), Name = r.Text("name"), Sku = r.Text("sku"), PriceDeltaCents = r.Int("price_delta"),
-        TrackStock = r.Bool("track_stock"), Stock = r.Int("stock"), Active = r.Bool("active"), Sort = (int)r.Int("sort")
+        TrackStock = r.Bool("track_stock"), Stock = r.Int("stock"), Active = r.Bool("active"), Sort = (int)r.Int("sort"), Image = r.Text("image")
     };
 
     public async Task<IReadOnlyList<Variant>> VariantsAsync(long productId, bool activeOnly = false, CancellationToken ct = default)
@@ -214,7 +245,7 @@ internal sealed class ShopStore
         var values = new Dictionary<string, object?>
         {
             ["product_id"] = v.ProductId, ["name"] = v.Name, ["sku"] = v.Sku, ["price_delta"] = v.PriceDeltaCents, ["track_stock"] = v.TrackStock,
-            ["stock"] = v.Stock, ["active"] = v.Active, ["sort"] = v.Sort
+            ["stock"] = v.Stock, ["active"] = v.Active, ["sort"] = v.Sort, ["image"] = v.Image
         };
         if (v.Id == 0) return await T("variants").InsertAsync(values, ct);
         await T("variants").UpdateAsync(v.Id, values, ct);
@@ -245,32 +276,61 @@ internal sealed class ShopStore
 
     // ---- categories ------------------------------------------------------------------------------------
 
-    private static Category CategoryOf(DataRow r) => new() { Id = r.Id, Slug = r.Text("slug"), Name = r.Text("name"), Sort = (int)r.Int("sort") };
+    private static Category CategoryOf(DataRow r) => new()
+    {
+        Id = r.Id, Slug = r.Text("slug"), Name = r.Text("name"), Sort = (int)r.Int("sort"), ParentId = r.Int("parent_id"), Image = r.Text("image"), Description = r.Text("description"), Tags = r.Text("tags"), Rule = r.Text("rule")
+    };
 
     public async Task<IReadOnlyList<Category>> CategoriesAsync(CancellationToken ct = default) =>
-        (await T("categories").QueryAsync(DataQuery.Everything.OrderBy("sort").OrderBy("name"), ct)).Select(CategoryOf).ToList();
+        await LocalizeAsync((await T("categories").QueryAsync(DataQuery.Everything.OrderBy("sort").OrderBy("name"), ct)).Select(CategoryOf).ToList(), ct);
 
     public async Task<Category?> CategoryBySlugAsync(string slug, CancellationToken ct = default) =>
-        await T("categories").FindByAsync("slug", slug, ct) is { } r ? CategoryOf(r) : null;
+        await T("categories").FindByAsync("slug", slug, ct) is { } r ? await LocalizeAsync(CategoryOf(r), ct) : null;
+
+    public async Task<Category?> CategoryAsync(long id, CancellationToken ct = default) =>
+        id > 0 && await T("categories").GetAsync(id, ct) is { } r ? await LocalizeAsync(CategoryOf(r), ct) : null;
 
     public Task<long> AddCategoryAsync(string slug, string name, int sort, CancellationToken ct = default) =>
-        T("categories").InsertAsync(new Dictionary<string, object?> { ["slug"] = slug, ["name"] = name, ["sort"] = sort }, ct);
+        T("categories").InsertAsync(new Dictionary<string, object?> { ["slug"] = slug, ["name"] = name, ["sort"] = sort, ["parent_id"] = 0L, ["image"] = "", ["description"] = "" }, ct);
 
-    public Task<int> UpdateCategoryAsync(long id, string name, int sort, CancellationToken ct = default) =>
-        T("categories").UpdateAsync(id, new Dictionary<string, object?> { ["name"] = name, ["sort"] = sort }, ct);
+    /// <summary>Writes a category: new when <c>Id</c> is 0, else everything but the slug (products refer to it, so it never changes). A parent that is the category itself, one of its own descendants
+    /// or one that does not exist becomes "top level" — a loop must not be possible to write. Returns the id.</summary>
+    public async Task<long> SaveCategoryAsync(Category c, CancellationToken ct = default)
+    {
+        var all = await CategoriesAsync(ct);
+        var parent = c.ParentId;
+        if (parent != 0 && (all.All(x => x.Id != parent) || (c.Id > 0 && ShopCategories.IdsUnder(all, c.Id).Contains(parent)))) parent = 0;
+        var values = new Dictionary<string, object?>
+        {
+            ["name"] = c.Name, ["sort"] = c.Sort, ["parent_id"] = parent, ["image"] = c.Image, ["description"] = c.Description, ["tags"] = ShopTags.Normalise(c.Tags), ["rule"] = ShopCollectionRule.Clean(c.Rule)
+        };
+        if (c.Id > 0) { await T("categories").UpdateAsync(c.Id, values, ct); return c.Id; }
+        values["slug"] = c.Slug;
+        return await T("categories").InsertAsync(values, ct);
+    }
 
+    /// <summary>Deletes a category. Its subcategories move up to ITS parent; its products and the coupons that were limited to it move there too (or lose the category, at the top level) — nothing is deleted with it.</summary>
     public async Task DeleteCategoryAsync(long id, CancellationToken ct = default)
     {
         var c = await T("categories").GetAsync(id, ct);
         if (c is null) return;
-        // The products keep existing; they just lose the category.
-        await T("products").UpdateWhereAsync(DataQuery.Everything.Eq("category", c.Text("slug")), new Dictionary<string, object?> { ["category"] = "" }, ct);
+        var up = c.Int("parent_id");
+        var upSlug = up > 0 && await T("categories").GetAsync(up, ct) is { } parent ? parent.Text("slug") : "";
+        await T("categories").UpdateWhereAsync(DataQuery.Everything.Eq("parent_id", id), new Dictionary<string, object?> { ["parent_id"] = upSlug.Length > 0 ? up : 0L }, ct);
+        await T("products").UpdateWhereAsync(DataQuery.Everything.Eq("category", c.Text("slug")), new Dictionary<string, object?> { ["category"] = upSlug }, ct);
+        await T("coupons").UpdateWhereAsync(DataQuery.Everything.Eq("category", c.Text("slug")), new Dictionary<string, object?> { ["category"] = upSlug }, ct);
+        // A further category that is gone is taken out of the products that held it.
+        var gone = c.Text("slug");
+        foreach (var r in await T("products").QueryAsync(DataQuery.Everything.Where("cats_extra", DataOp.Contains, gone), ct))
+            if (ShopMembership.SplitSlugs(r.Text("cats_extra")) is var held && held.Contains(gone))
+                await T("products").UpdateAsync(r.Id, new Dictionary<string, object?> { ["cats_extra"] = string.Join(",", held.Where(h => h != gone)) }, ct);
+        await T("translations").DeleteWhereAsync(DataQuery.Everything.Eq("kind", "category").Eq("ref_id", id), ct);
         await T("categories").DeleteAsync(id, ct);
     }
 
     // ---- carts -----------------------------------------------------------------------------------------
 
-    public sealed record CartRow(long Id, string Token, long MemberId, IReadOnlyList<CartLine> Lines, string Coupon = "");
+    public sealed record CartRow(long Id, string Token, long MemberId, IReadOnlyList<CartLine> Lines, string Coupon = "", string Email = "", bool Remind = false);
 
     private static CartRow CartOf(DataRow r)
     {
@@ -279,7 +339,7 @@ internal sealed class ShopStore
             foreach (var n in arr)
                 if (n is JsonObject o && o["p"] is JsonValue p && o["q"] is JsonValue q && p.TryGetValue<long>(out var pid) && q.TryGetValue<int>(out var qty) && pid > 0 && qty > 0)
                     lines.Add(new CartLine(pid, o["v"] is JsonValue v && v.TryGetValue<long>(out var vid) ? vid : 0, qty));
-        return new CartRow(r.Id, r.Text("token"), r.Int("member_id"), lines, r.Text("coupon"));
+        return new CartRow(r.Id, r.Text("token"), r.Int("member_id"), lines, r.Text("coupon"), r.Text("email"), r.Bool("remind"));
     }
 
     public static string LinesJson(IEnumerable<CartLine> lines) =>
@@ -323,7 +383,7 @@ internal sealed class ShopStore
         TotalCents = r.Int("total"), RefundedCents = r.Int("refunded"), Currency = r.Text("currency") is { Length: > 0 } c ? c : "EUR",
         PaymentProvider = r.Text("payment_provider"), PaymentRef = r.Text("payment_ref"), PaymentIntent = r.Text("payment_intent"), PaidUtc = r.Timestamp("paid"),
         AccessToken = r.Text("access_token"), TermsVersion = r.Text("terms_version"), TermsAcceptedUtc = r.Timestamp("terms_accepted"), WithdrawalWaiver = r.Bool("waiver"),
-        Note = r.Text("note"), Tracking = r.Text("tracking"), InvoiceNumber = r.Text("invoice_number"), Locale = r.Text("locale") is { Length: > 0 } l ? l : "de",
+        Note = r.Text("note"), Tracking = r.Text("tracking"), Carrier = r.Text("carrier"), InvoiceNumber = r.Text("invoice_number"), Locale = r.Text("locale") is { Length: > 0 } l ? l : "de",
         SmallBusiness = r.Bool("small_business"), ReservedUntilUtc = r.Timestamp("reserved_until"),
         DiscountCents = r.Int("discount"), CouponCode = r.Text("coupon_code"), TaxNote = r.Text("tax_note"), ShippingTaxBp = (int)r.Int("shipping_tax_bp"),
         CreatedUtc = r.Timestamp("created") ?? DateTime.UtcNow, UpdatedUtc = r.Timestamp("updated") ?? DateTime.UtcNow
@@ -373,7 +433,7 @@ internal sealed class ShopStore
             ["shipping_cents"] = o.ShippingCents, ["tax"] = o.TaxCents, ["total"] = o.TotalCents, ["refunded"] = o.RefundedCents, ["currency"] = o.Currency,
             ["payment_provider"] = o.PaymentProvider, ["payment_ref"] = o.PaymentRef, ["payment_intent"] = o.PaymentIntent, ["paid"] = o.PaidUtc,
             ["access_token"] = o.AccessToken, ["terms_version"] = o.TermsVersion, ["terms_accepted"] = o.TermsAcceptedUtc, ["waiver"] = o.WithdrawalWaiver,
-            ["note"] = o.Note, ["tracking"] = o.Tracking, ["invoice_number"] = o.InvoiceNumber, ["locale"] = o.Locale, ["small_business"] = o.SmallBusiness,
+            ["note"] = o.Note, ["tracking"] = o.Tracking, ["carrier"] = o.Carrier, ["invoice_number"] = o.InvoiceNumber, ["locale"] = o.Locale, ["small_business"] = o.SmallBusiness,
             ["reserved_until"] = o.ReservedUntilUtc, ["created"] = DateTime.UtcNow, ["updated"] = DateTime.UtcNow,
             ["discount"] = o.DiscountCents, ["coupon_code"] = o.CouponCode, ["tax_note"] = o.TaxNote, ["shipping_tax_bp"] = o.ShippingTaxBp
         };
@@ -671,6 +731,21 @@ internal sealed class ShopStore
 
     public async Task<IReadOnlyList<Product>> LowStockAsync(int threshold, CancellationToken ct = default) =>
         (await T("products").QueryAsync(DataQuery.Everything.Eq("active", true).Eq("track_stock", true).Where("stock", DataOp.Le, (long)threshold).OrderBy("stock"), ct)).Select(ProductOf).ToList();
+
+    /// <summary>The ids of the best-selling products — pieces in paid, shipped or completed orders, most first. Read from the orders; empty while nothing has been sold.</summary>
+    public async Task<List<long>> TopSellerIdsAsync(int take, CancellationToken ct = default)
+    {
+        var paid = (await T("orders").QueryAsync(DataQuery.Everything.Where("status", DataOp.In, new List<string> { OrderStatus.Paid, OrderStatus.Shipped, OrderStatus.Completed }).OrderBy("created", descending: true).Page(0, 2000), ct))
+            .Select(r => r.Id).ToList();
+        if (paid.Count == 0) return new List<long>();
+        var sold = new Dictionary<long, long>();
+        foreach (var r in await T("order_items").QueryAsync(DataQuery.Everything.Where("order_id", DataOp.In, paid), ct))
+            if (r.Int("product_id") is > 0 and var pid) sold[pid] = sold.GetValueOrDefault(pid) + r.Int("qty");
+        var ids = sold.OrderByDescending(kv => kv.Value).ThenBy(kv => kv.Key).Select(kv => kv.Key).ToList();
+        // Only products that can still be bought (a sold-out classic of last year must not hold a place).
+        var live = (await ProductsByIdsAsync(ids, ct)).Where(p => p.Active).Select(p => p.Id).ToHashSet();
+        return ids.Where(live.Contains).Take(Math.Max(1, take)).ToList();
+    }
 
     // ---- customers (derived from orders) -------------------------------------------------------------------
 

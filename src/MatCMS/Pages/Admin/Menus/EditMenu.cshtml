@@ -45,7 +45,7 @@
                 }
                 <div class="b-info">
                     <div class="b-type">@it.Label</div>
-                    <div class="b-sum">@it.Url@(it.OpenInNewTab ? " · " + T["menus.newTab"] : "")</div>
+                    <div class="b-sum">@(it.Url.StartsWith("plugin:") ? T["menus.elementOf"] + " " + it.Url["plugin:".Length..] : it.Url)@(it.OpenInNewTab ? " · " + T["menus.newTab"] : "")</div>
                 </div>
                 <div class="actions">
                     <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@it.Id">@T["action.edit"]</a>

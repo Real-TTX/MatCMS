@@ -13,9 +13,12 @@
    so the scope class goes onto its own first element and the rule set is written just before it.
 *@
 @{
-    var content = Model.Container is not null
-        ? await Html.PartialAsync(Model.Partial, Model.Container)
-        : await Html.PartialAsync(Model.Partial, Model.Data);
+    // A plugin's block has no partial: it was drawn when the container was built.
+    var content = Model.Rendered is not null
+        ? new Microsoft.AspNetCore.Html.HtmlString(Model.Rendered)
+        : Model.Container is not null
+            ? await Html.PartialAsync(Model.Partial, Model.Container)
+            : await Html.PartialAsync(Model.Partial, Model.Data);
     var ownData = Model.Container?.Data ?? Model.Data;
     var css = Model.Id != 0 ? MatCMS.Content.BlockCss.Scope(Model.Id, ownData?.Str(MatCMS.Content.BlockCss.Field)) : "";
     // Hidden children never reach the site (BuildContainer skips them); in the editor they arrive faded.
@@ -36,7 +39,7 @@
 }
 @if (Model.Editor && Model.Id != 0)
 {
-    @:<div class="mat-ed-child" data-block-id="@Model.Id" data-block-type="@Model.Type" style="display:contents">
+    @:<div class="mat-ed-child" data-block-id="@Model.Id" data-block-type="@Model.Type" style="display:contents"@(Model.HasVars ? " data-vars=1" : "")>
     if (string.IsNullOrWhiteSpace(html))
     {
         var def = string.IsNullOrEmpty(Model.Type) ? null : Registry.Get(Model.Type);

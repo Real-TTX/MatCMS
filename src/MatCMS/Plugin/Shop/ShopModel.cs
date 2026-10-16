@@ -49,6 +49,8 @@ internal sealed record Product
     public string DescriptionHtml { get; init; } = "";
     public string Image { get; init; } = "";
     public string GalleryJson { get; init; } = "[]";
+    /// <summary>The options variants are made from ("Größe": S, M, L) as JSON — only a memory for the editor, what is sold are the variants.</summary>
+    public string VariantOptions { get; init; } = "[]";
     public string Kind { get; init; } = ProductKind.Physical;
     /// <summary>The price a customer pays, tax included, in the smallest unit.</summary>
     public long PriceCents { get; init; }
@@ -62,6 +64,11 @@ internal sealed record Product
     public long Stock { get; init; }
     public int WeightGrams { get; init; }
     public string Category { get; init; } = "";
+    /// <summary>Further categories the product also stands in (slugs, comma-separated); <see cref="Category"/> stays the main one (breadcrumbs, the address of its page).</summary>
+    public string ExtraCategories { get; init; } = "";
+    /// <summary>What a search engine shows for the page: the title and the description (empty = the product's title and short text).</summary>
+    public string SeoTitle { get; init; } = "";
+    public string SeoDescription { get; init; } = "";
     /// <summary>Free keywords, stored as typed and joined with ", " (see <see cref="ShopTags"/>).</summary>
     public string Tags { get; init; } = "";
     /// <summary>Shown first where a block or a page asks for the highlighted products.</summary>
@@ -114,9 +121,14 @@ internal sealed record ProductQuery
     public string? Category { get; init; }
     public string? Tag { get; init; }
     public string? Search { get; init; }
+    /// <summary>What a search looks at: "title" (name, article number), "text" (+ summary, keywords) or "all" (+ description).</summary>
+    public string SearchIn { get; init; } = "text";
     public bool FeaturedOnly { get; init; }
     /// <summary>Only products with a lower price than their earlier one.</summary>
     public bool OnSaleOnly { get; init; }
+    /// <summary>A price range in cents (the product's own price, gross), either end open.</summary>
+    public long? MinCents { get; init; }
+    public long? MaxCents { get; init; }
     /// <summary>When set, only these products (a hand-picked list).</summary>
     public IReadOnlyCollection<long>? Ids { get; init; }
     public long ExceptId { get; init; }
@@ -132,6 +144,8 @@ internal sealed record ProductQuery
 /// <summary>A variant of a product (a size, a colour): its own name, price difference and stock.</summary>
 internal sealed record Variant
 {
+    /// <summary>A picture of this variant (a local path or https address); empty = the product's.</summary>
+    public string Image { get; init; } = "";
     public long Id { get; init; }
     public long ProductId { get; init; }
     public string Name { get; init; } = "";
@@ -160,6 +174,17 @@ internal sealed record Category
     public string Slug { get; init; } = "";
     public string Name { get; init; } = "";
     public int Sort { get; init; }
+    /// <summary>The category above this one; 0 = top level.</summary>
+    public long ParentId { get; init; }
+    /// <summary>A picture for the category's page, tiles and blocks (a local path or https address); empty = none.</summary>
+    public string Image { get; init; } = "";
+    /// <summary>A short plain text shown on the category's page.</summary>
+    public string Description { get; init; } = "";
+    /// <summary>Free keywords on the category itself ("Neuware", "Gebrauchtware"), written like a product's: a menu or link can lead to all categories with one of them.</summary>
+    public string Tags { get; init; } = "";
+    /// <summary>An automatic collection: besides the products filed in the category, every product a rule picks — <c>tag:Neuware</c>, <c>sale</c>, <c>featured</c>, <c>new:30</c> (added in the last 30 days),
+    /// <c>price&lt;20</c>, <c>price&gt;100</c>, <c>instock</c> (several rules separated by a semicolon must all hold). Empty = a plain category (see <see cref="ShopCollectionRule"/>).</summary>
+    public string Rule { get; init; } = "";
 }
 
 /// <summary>One line of a cart: what, which variant (0 = none), how many.</summary>
@@ -219,6 +244,8 @@ internal sealed record Order
     public bool WithdrawalWaiver { get; init; }
     public string Note { get; init; } = "";
     public string Tracking { get; init; } = "";
+    /// <summary>The carrier the parcel went with (a key of <see cref="ShopTracking.All"/>, "custom", or "" when none was chosen).</summary>
+    public string Carrier { get; init; } = "";
     public string InvoiceNumber { get; init; } = "";
     public string Locale { get; init; } = "de";
     public bool SmallBusiness { get; init; }

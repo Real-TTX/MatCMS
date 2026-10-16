@@ -156,4 +156,51 @@
         if (form) form.addEventListener("submit", function () { if (entry.value.trim()) { addTag(entry.value); entry.value = ""; } });
         setTags(hidden.value);
     });
+
+    // ---- Rows: add a row, delete a row, and number them as they stand when the form is sent ----
+    each("[data-ui-rows]", function (root) {
+        var name = root.getAttribute("data-name");
+        var body = root.querySelector("[data-ui-rows-body]");
+        var tpl = root.querySelector("[data-ui-rows-template]");
+        var count = root.querySelector("[data-ui-rows-count]");
+        var empty = root.querySelector("[data-ui-rows-empty]");
+        var add = root.querySelector("[data-ui-rows-add]");
+        var max = parseInt(root.getAttribute("data-max"), 10) || 100;
+        if (!body) return;
+        function rows() { return body.querySelectorAll("[data-ui-row]"); }
+        function renumber() {
+            var list = rows();
+            Array.prototype.forEach.call(list, function (tr, i) {
+                Array.prototype.forEach.call(tr.querySelectorAll("[data-key]"), function (el) { el.name = name + "." + i + "." + el.getAttribute("data-key"); });
+            });
+            if (count) count.value = list.length;
+            if (empty) empty.hidden = list.length > 0;
+            if (add) add.disabled = list.length >= max;
+        }
+        if (add && tpl) add.addEventListener("click", function () {
+            if (rows().length >= max) return;
+            body.appendChild(tpl.content.cloneNode(true));
+            renumber();
+            var all = rows(), field = all[all.length - 1].querySelector("input[type=text]");
+            if (field) field.focus();
+        });
+        root.addEventListener("click", function (e) {
+            var b = e.target.closest("[data-ui-row-remove]"); if (!b) return;
+            var tr = b.closest("[data-ui-row]"); if (tr) { tr.remove(); renumber(); }
+        });
+        // A picture cell: the preview follows the address, the button opens the media library (works for rows added later: the click is caught here, not on each button).
+        function preview(box) {
+            var url = box.querySelector("input"), prev = box.querySelector(".preview");
+            if (url && prev) prev.style.backgroundImage = url.value ? "url('" + url.value.replace(/'/g, "%27") + "')" : "";
+        }
+        root.addEventListener("input", function (e) { var b = e.target.closest && e.target.closest(".row-img"); if (b) preview(b); });
+        root.addEventListener("click", function (e) {
+            var pick = e.target.closest("[data-ui-rowimage-pick]"); if (!pick) return;
+            var box = pick.closest(".row-img"), url = box && box.querySelector("input");
+            if (url && window.openMediaPicker) window.openMediaPicker(function (u) { url.value = u; preview(box); url.dispatchEvent(new Event("input", { bubbles: true })); });
+        });
+        var form = root.closest("form");
+        if (form) form.addEventListener("submit", renumber);
+        renumber();
+    });
 })();

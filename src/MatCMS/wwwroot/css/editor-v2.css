@@ -252,3 +252,12 @@ body.ev2 .ev2-tree-toggle, .ev2-insp-close { display: none; }
     .ev2-stage { padding: 0; }
     .ev2-frame { border-radius: 0; border: 0; }
 }
+
+/* --- the variables of a plugin's page (plugin-page-vars.js) --- */
+.ev2-vars { width: 420px; padding: 8px; overflow: auto; }
+.ev2-vars-help { margin: 4px 8px 8px; font-size: 12.5px; line-height: 1.45; }
+.ev2-var { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; text-align: left; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; padding: 7px 10px; border-radius: 8px; }
+.ev2-var:hover { background: var(--hover); }
+.ev2-var code { font-size: 12.5px; color: var(--accent); }
+.ev2-var span { font-size: 12.5px; color: var(--muted); }
+.ev2-var.no-field { background: var(--warn-bg, #fff4d6); }

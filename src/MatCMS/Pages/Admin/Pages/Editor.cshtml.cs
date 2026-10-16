@@ -26,8 +26,11 @@ public class EditorModel : PageModel
     private readonly AiService _ai;
     private readonly TranslationService _translator;
 
-    public EditorModel(AppDbContext db, BlockRegistry registry, Localizer t, AiService ai, TranslationService translator)
+    private readonly MatCMS.Services.Plugins.PluginPageService _pluginPages;
+
+    public EditorModel(AppDbContext db, BlockRegistry registry, Localizer t, AiService ai, TranslationService translator, MatCMS.Services.Plugins.PluginPageService pluginPages)
     {
+        _pluginPages = pluginPages;
         _db = db;
         Registry = registry;
         _t = t;
@@ -51,6 +54,9 @@ public class EditorModel : PageModel
     public string BlocksJson { get; private set; } = "[]";
     public string TypesJson { get; private set; } = "[]";
     public string PreviewUrl { get; private set; } = "/";
+    /// <summary>A plugin's page: the variables it offers (complete name, label, holds HTML) and whether the plugin has an example to preview with. Empty/false on an ordinary page.</summary>
+    public IReadOnlyList<(string Name, string Label, bool Html)> PluginVariables { get; private set; } = Array.Empty<(string, string, bool)>();
+    public bool PluginHasExample { get; private set; }
     public string PublicUrl { get; private set; } = "/";
     public List<Template> AllTemplates { get; private set; } = new();
     public List<string> AllRoles { get; private set; } = new();
@@ -88,11 +94,23 @@ public class EditorModel : PageModel
             svg = d.Svg,
             allowed = d.AllowedChildren,
             childOnly = d.ChildOnly,
-            schema = BlockSchema.For(d, _t, sources)
+            schema = BlockSchema.For(d, _t, sources, scoped: page.OwnerPlugin is not null)
         }), Opts);
 
         PublicUrl = SiteContext.LocalizedUrl(page.Locale, page.Slug);
-        PreviewUrl = PublicUrl + (PublicUrl.Contains('?') ? "&" : "?") + "editor=1";
+        // A plugin's page is drawn by the plugin's own route: the editor previews it at a real example of that route (a product), not at the page's own address.
+        if (page.OwnerPlugin is not null)
+        {
+            PluginVariables = _pluginPages.VariablesOf(page, System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName);
+            var example = await _pluginPages.PreviewUrlAsync(page);
+            PluginHasExample = example is not null;
+            PublicUrl = example ?? "";
+            PreviewUrl = (example ?? PublicUrl).Length > 0 ? example! + (example!.Contains('?') ? "&" : "?") + "editor=1" : SiteContext.LocalizedUrl(page.Locale, page.Slug) + "?editor=1";
+        }
+        else
+        {
+            PreviewUrl = PublicUrl + (PublicUrl.Contains('?') ? "&" : "?") + "editor=1";
+        }
         AllTemplates = await _db.Templates.AsNoTracking().OrderBy(t => t.Name).ToListAsync();
         AllRoles = await _db.SiteRoles.AsNoTracking().OrderBy(r => r.Name).Select(r => r.Name).ToListAsync();
         // Only the site's ACTIVE languages (i18n.languages), as on the classic editor's settings.

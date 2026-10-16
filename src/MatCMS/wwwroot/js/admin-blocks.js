@@ -236,7 +236,7 @@
             lb.setAttribute("aria-label", "Seite verlinken");
             lb.innerHTML = '<i class="ti ti-link" aria-hidden="true"></i>';
             lb.addEventListener("click", function () {
-                if (window.openLinkPicker) window.openLinkPicker(function (u) { iu.value = u; notifyChanged(iu); });
+                if (window.openLinkPicker) window.openLinkPicker(function (u) { iu.value = u; notifyChanged(iu); }, { anchor: lf });
             });
             lf.appendChild(lb);
             wrap.appendChild(lf);

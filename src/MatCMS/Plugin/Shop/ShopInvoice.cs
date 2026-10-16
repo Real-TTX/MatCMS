@@ -51,6 +51,9 @@ internal sealed record InvoiceDoc
     public string TaxNote { get; init; } = "";
     public string BankInfo { get; init; } = "";
     public string Footer { get; init; } = "";
+    /// <summary>The seller's logo (a safe local or https address; "" = none) and the accent colour (#rrggbb) of the page and the PDF.</summary>
+    public string Logo { get; init; } = "";
+    public string Accent { get; init; } = "#111111";
 
     public bool IsCredit => Kind == InvoiceKinds.Credit;
     public string Locale => En ? "en" : "de";
@@ -91,8 +94,12 @@ internal static class ShopInvoice
     {
         Kind = kind, Number = number, OrderNumber = o.Number, IssuedUtc = issuedUtc, PaidUtc = o.PaidUtc, En = o.Locale == "en", Currency = o.Currency,
         SellerName = cfg.SellerName, SellerAddress = cfg.SellerAddress, SellerEmail = cfg.SellerEmail, SellerPhone = cfg.SellerPhone, SellerVatId = cfg.SellerVatId,
-        SellerTaxNumber = cfg.SellerTaxNumber, Billing = o.Billing.Lines(), SmallBusiness = o.SmallBusiness, TaxNote = o.SmallBusiness ? "" : o.TaxNote, Footer = cfg.InvoiceFooter
+        SellerTaxNumber = cfg.SellerTaxNumber, Billing = o.Billing.Lines(), SmallBusiness = o.SmallBusiness, TaxNote = o.SmallBusiness ? "" : o.TaxNote, Footer = cfg.InvoiceFooter,
+        Logo = cfg.SellerLogo, Accent = AccentOf(cfg.InvoiceAccent)
     };
+
+    /// <summary>A colour setting as it may go into a style attribute and a PDF: <c>#rrggbb</c>, else the black the invoice always had.</summary>
+    public static string AccentOf(string? v) => v is { Length: 7 } && v[0] == '#' && v.Skip(1).All(Uri.IsHexDigit) ? v.ToLowerInvariant() : "#111111";
 
     /// <summary>The invoice of a paid order.</summary>
     public static InvoiceDoc Build(Order o, IReadOnlyList<OrderItem> items, ShopConfig cfg, string number, DateTime issuedUtc, string bankInfo)
@@ -146,15 +153,18 @@ internal static class ShopInvoice
         sb.Append("<title>").Append(E(d.Title)).Append(' ').Append(E(d.Number)).Append("</title><style>");
         sb.Append("body{font:14px/1.5 -apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#111;margin:0;padding:32px;background:#fff}");
         sb.Append(".inv{max-width:820px;margin:0 auto}.top{display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:28px}");
-        sb.Append("h1{font-size:22px;margin:0 0 4px}.muted{color:#666}table{width:100%;border-collapse:collapse;margin:18px 0}");
-        sb.Append("th,td{padding:8px 6px;border-bottom:1px solid #ddd;text-align:left;vertical-align:top}th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#555}");
-        sb.Append(".r{text-align:right}.sum td{border:0;padding:3px 6px}.total td{font-weight:700;border-top:2px solid #111;padding-top:8px}");
-        sb.Append(".box{margin-top:24px;padding:12px 14px;background:#f6f6f6;border-radius:6px;white-space:pre-line}.foot{margin-top:28px;font-size:12px;color:#555;white-space:pre-line}");
+        sb.Append(":root{--accent:").Append(AccentOf(d.Accent)).Append("}");
+        sb.Append("h1{font-size:22px;margin:0 0 4px;color:var(--accent)}.logo{display:block;max-height:64px;max-width:240px;margin:0 0 14px}.muted{color:#666}table{width:100%;border-collapse:collapse;margin:18px 0}a{color:var(--accent)}");
+        sb.Append("th,td{padding:8px 6px;border-bottom:1px solid #ddd;text-align:left;vertical-align:top}th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#555;border-bottom:2px solid var(--accent)}");
+        sb.Append(".r{text-align:right}.sum td{border:0;padding:3px 6px}.total td{font-weight:700;border-top:2px solid var(--accent);padding-top:8px}");
+        sb.Append(".box{margin-top:24px;padding:12px 14px;background:#f6f6f6;border-radius:6px;border-left:3px solid var(--accent);white-space:pre-line}.foot{margin-top:28px;font-size:12px;color:#555;white-space:pre-line}");
         sb.Append(".noprint a{margin-right:14px}@media print{body{padding:0}.noprint{display:none}}</style></head><body><div class=\"inv\">");
         sb.Append("<p class=\"noprint\"><a href=\"").Append(PdfMarker).Append("\">").Append(E(d.L("Als PDF herunterladen", "Download as PDF"))).Append("</a>")
           .Append("<a href=\"javascript:window.print()\">").Append(E(d.L("Drucken", "Print"))).Append("</a></p>");
 
-        sb.Append("<div class=\"top\"><div><h1>").Append(E(d.Title)).Append("</h1>");
+        sb.Append("<div class=\"top\"><div>");
+        if (ShopPublic.SafeUrl(d.Logo).Length > 0) sb.Append("<img class=\"logo\" src=\"").Append(E(ShopPublic.SafeUrl(d.Logo))).Append("\" alt=\"").Append(E(d.SellerName)).Append("\">");
+        sb.Append("<h1>").Append(E(d.Title)).Append("</h1>");
         sb.Append("<div>").Append(E(d.IsCredit ? d.L("Gutschriftnummer: ", "Credit note number: ") : d.L("Rechnungsnummer: ", "Invoice number: "))).Append("<strong>").Append(E(d.Number)).Append("</strong></div>");
         sb.Append("<div>").Append(E(d.IsCredit ? d.L("Datum: ", "Date: ") : d.L("Rechnungsdatum: ", "Invoice date: "))).Append(InvoiceDoc.D(d.IssuedUtc)).Append("</div>");
         if (d.IsCredit) sb.Append("<div>").Append(E(d.L("zu Rechnung: ", "For invoice: "))).Append(E(d.InvoiceNumber)).Append("</div>");

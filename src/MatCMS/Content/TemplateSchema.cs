@@ -160,10 +160,11 @@ public static class TemplateSchema
     }
 
     /// <summary>Serialise a parts map to JSON for storage (keeps only known, non-empty parts).</summary>
-    public static string Serialize(IReadOnlyDictionary<string, string> parts)
+    public static string Serialize(IReadOnlyDictionary<string, string> parts, IEnumerable<string>? pluginKeys = null)
     {
         var clean = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var key in KnownParts)
+        // The known parts and the ones loaded plugins declared (stored as "{plugin}.{name}").
+        foreach (var key in KnownParts.Concat(pluginKeys ?? Array.Empty<string>()))
             if (parts.TryGetValue(key, out var v) && !string.IsNullOrWhiteSpace(v))
                 clean[key] = v;
         return JsonSerializer.Serialize(clean, WriteOpts);

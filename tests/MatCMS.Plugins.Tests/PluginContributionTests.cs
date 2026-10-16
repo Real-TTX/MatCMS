@@ -34,6 +34,33 @@ public class PluginContributionTests
     }
 
     [Fact]
+    public async Task A_plugin_has_its_own_dashboard_card_rows_that_do_not_lead_into_the_admin_are_dropped_and_a_broken_one_is_skipped()
+    {
+        using var h = await Start(
+            ("cards", """
+                Plugin.Admin.DashboardCard(async (ctx, ct) => new DashboardCard("Dinge · Neueste", new[]
+                {
+                    new DashboardRow("Eins", "/admin/p/cards/1") { Icon = "ti-receipt", Meta = "01.01.", Badge = "Neu" },
+                    new DashboardRow("Fremd", "https://evil.example/x"),
+                    new DashboardRow("Doppelt", "//evil.example/x"),
+                    new DashboardRow("", "/admin/p/cards/2"),
+                    new DashboardRow("Zwei", "/admin/p/cards/2")
+                }) { AllUrl = "/admin/p/cards", AllLabel = "Alle Dinge" });
+                """),
+            ("leer", """Plugin.Admin.DashboardCard(async (ctx, ct) => null);"""),
+            ("kaputt", """Plugin.Admin.DashboardCard((ctx, ct) => throw new System.InvalidOperationException("karte kaputt"));"""),
+            ("boese", """Plugin.Admin.DashboardCard(async (ctx, ct) => new DashboardCard("Böse", new[] { new DashboardRow("x", "/admin/x") }) { AllUrl = "https://evil.example" });"""));
+        var cards = await new PluginContributions(h.Registry).CardsAsync(h.Services);
+        Assert.Equal(new[] { "Böse", "Dinge · Neueste" }, cards.Select(c => c.Card.Title).OrderBy(t => t).ToArray());
+        var good = cards.Single(c => c.Card.Title == "Dinge · Neueste").Card;
+        Assert.Equal("card:cards", cards.Single(c => c.Card.Title == "Dinge · Neueste").Id);          // the id a user's dashboard layout remembers
+        Assert.Equal(new[] { "Eins", "Zwei" }, good.Rows.Select(r => r.Text).ToArray());
+        Assert.Equal("/admin/p/cards", good.AllUrl);
+        Assert.Null(cards.Single(c => c.Card.Title == "Böse").Card.AllUrl);                                    // a link out of the site is not a link
+        Assert.Contains("karte kaputt", string.Join("\n", h.Registry.LogOf("kaputt")));
+    }
+
+    [Fact]
     public async Task Tiles_recent_rows_attention_and_sitemap_come_from_every_loaded_plugin_and_a_broken_one_is_skipped()
     {
         using var h = await Start(("good", Good), ("broken", Broken));

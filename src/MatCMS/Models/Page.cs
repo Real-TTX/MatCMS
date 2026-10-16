@@ -69,6 +69,13 @@ public class Page
     /// member must hold (a <see cref="SiteRole.Name"/>). Empty = any logged-in member suffices.</summary>
     public string? RequiredRole { get; set; }
 
+    /// <summary>The plugin this page belongs to ("shop"), or null for an ordinary page. A plugin's pages are laid out in the block editor like any other, but the site does not serve them at their own
+    /// address: the plugin's route answers and draws the page's blocks with the data of that request (see <see cref="PluginRole"/>). They are not in menus, sitemaps or the page pickers, cannot be deleted or renamed.</summary>
+    public string? OwnerPlugin { get; set; }
+
+    /// <summary>Which of its pages this is ("product", "cart") — what the plugin declared with <c>PageRole</c>. Together with <see cref="OwnerPlugin"/> and <see cref="Locale"/> unique.</summary>
+    public string? PluginRole { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 

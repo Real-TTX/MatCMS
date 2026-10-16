@@ -35,6 +35,10 @@ public class ViewModel : PageModel
         // Admins may preview unpublished (draft) pages; everyone else gets 404.
         if (page is null || (!page.IsPublished && !User.IsInRole("Admin")))
             return NotFound();
+        // A plugin's page (the shop's product page …) is drawn by the plugin's own route with the data of a request. At its own address there is nothing to show — except to an
+        // administrator in the block editor's preview, which draws it without data when the plugin has no example to open.
+        if (page.OwnerPlugin is not null && !(User.IsInRole("Admin") && Request.Query.ContainsKey("editor")))
+            return NotFound();
 
         // Members-only pages: a visitor who is not logged in (or lacks the required role) never sees
         // the content. Sent to the login with a returnUrl so they land back here afterwards; a member

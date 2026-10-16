@@ -94,6 +94,13 @@ h1, h2, h3, h4 {
 .hicon svg { width: 31px; height: 31px; display: block; }
 .hicon .ti { font-size: 29px; line-height: 1; display: block; }
 .hicon:hover { color: var(--accent-dark); transform: translateY(-2px); }
+/* A plugin's counter on an icon (the shop's cart) and next to a text link in a menu. */
+.hicon { position: relative; }
+.hbadge { position: absolute; top: -6px; right: -9px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--accent); color: #fff; font: 700 11px/18px var(--font-body, inherit); text-align: center; box-sizing: border-box; }
+.mat-toolbar-overlay { position: fixed; top: 12px; right: 16px; z-index: 900; display: flex; gap: 16px; padding: 8px 16px; background: #fff; border: 1px solid rgba(0,0,0,.1); border-radius: 99px; box-shadow: 0 4px 18px rgba(0,0,0,.12); }
+.mat-toolbar-overlay.with-lang { right: 92px; }
+.mat-toolbar-overlay .hicon .ti, .mat-toolbar-overlay .hicon svg { font-size: 24px; width: 24px; height: 24px; }
+.hbadge.inline { position: static; display: inline-block; margin-left: 4px; vertical-align: 2px; }
 
 .main-nav {
     display: flex;
@@ -896,15 +903,18 @@ html.mat-langm-lock { overflow: hidden; }
    built-in header/footer. A parent item is wrapped in .mat-hassub carrying a .mat-sub. */
 .mat-hassub { position: relative; }
 .mat-sub { display: none; }
-@media (min-width: 861px) {
+@media (min-width: 761px) {
     .mat-hassub { display: inline-flex; align-items: center; }
+    .mat-sub-toggle { display: none; }
     .mat-hassub > .mat-sub {
         position: absolute; top: 100%; left: 0; z-index: 500;
         flex-direction: column; min-width: 210px; padding: 8px 0;
         background: #fff; border: 1px solid rgba(0,0,0,.10); border-radius: 12px;
         box-shadow: 0 16px 40px rgba(0,0,0,.16);
     }
-    .mat-hassub:hover > .mat-sub, .mat-hassub:focus-within > .mat-sub { display: flex; }
+    .mat-hassub:hover > .mat-sub, .mat-hassub:focus-within > .mat-sub, .mat-hassub.open > .mat-sub { display: flex; }
+    /* The last entry of the main menu sits at the right edge: its dropdown opens to the left, or it would push the page sideways. */
+    .main-nav > .mat-hassub:last-child > .mat-sub { left: auto; right: 0; }
     .mat-sub a {
         display: block; padding: 8px 20px; margin: 0; white-space: nowrap;
         color: #1a1a1a; font-size: 15px; line-height: 1.5; border: 0;
@@ -912,11 +922,27 @@ html.mat-langm-lock { overflow: hidden; }
     .mat-sub a::after { display: none !important; } /* kill inherited underline/caret animations */
     .mat-sub a:hover { background: rgba(0,0,0,.06); }
     .mat-sub .mat-hassub > .mat-sub { top: -8px; left: 100%; } /* 3rd level opens sideways */
+    .mat-sub .mat-hassub > a { flex: 1 1 auto; position: relative; padding-right: 36px; }
+    .mat-sub .mat-hassub > a::before { content: "\203A"; position: absolute; right: 16px; top: 50%; transform: translateY(-52%); opacity: .55; font-size: 18px; } /* a flyout follows */
+    /* The last entry of the main menu is at the right edge: its flyouts open to the left, too. */
+    .main-nav > .mat-hassub:last-child .mat-sub .mat-hassub > .mat-sub { left: auto; right: 100%; }
 }
-@media (max-width: 860px) {
-    /* Stacked/burger nav: submenus render as static indented lists (no hover needed). */
+@media (max-width: 760px) {
+    /* Stacked/burger nav: a submenu is an indented list. Elsewhere (the footer) it is always shown; in the main menu it is folded away behind an arrow (site-nav.js adds the button). */
     .mat-hassub { display: block; }
     .mat-hassub > .mat-sub { display: flex; flex-direction: column; padding-left: 16px; }
+    .main-nav { align-items: stretch; max-height: calc(100vh - 96px); overflow-y: auto; }
+    .main-nav > a, .main-nav .mat-sub a { display: block; }
+    .main-nav .mat-hassub { display: flex; flex-wrap: wrap; align-items: stretch; position: static; }
+    .main-nav .mat-hassub > a { flex: 1 1 0; min-width: 0; }
+    /* Folded away only where the arrow button exists (site-nav.js adds it) — without the script the submenu simply stays visible. */
+    .main-nav .mat-hassub > .mat-sub { flex: 1 1 100%; }
+    .main-nav .mat-hassub:has(> .mat-sub-toggle) > .mat-sub { display: none; }
+    .main-nav .mat-hassub.open > .mat-sub { display: flex; }
+    .mat-sub-toggle { flex: 0 0 52px; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--ink); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .mat-sub-toggle span { width: 9px; height: 9px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg) translate(-2px, -2px); transition: transform .18s ease; }
+    .mat-hassub.open > .mat-sub-toggle span { transform: rotate(225deg) translate(-2px, -2px); }
+    .main-nav .mat-sub a { padding-left: 0; }
 }
 
 /* =========================================================================
@@ -1273,6 +1299,8 @@ body.has-adminbar .site-header { top: 67px; }
 .el-cols-50-50 { grid-template-columns: 1fr 1fr; }
 .el-cols-33-67 { grid-template-columns: 1fr 2fr; }
 .el-cols-67-33 { grid-template-columns: 2fr 1fr; }
+.el-cols-25-75 { grid-template-columns: 1fr 3fr; }
+.el-cols-75-25 { grid-template-columns: 3fr 1fr; }
 .el-cols-40-60 { grid-template-columns: 2fr 3fr; }
 .el-cols-60-40 { grid-template-columns: 3fr 2fr; }
 .el-cols-33-33-33 { grid-template-columns: repeat(3, 1fr); }
@@ -1306,3 +1334,20 @@ body.has-adminbar .site-header { top: 67px; }
 .ui-table { width: 100%; border-collapse: collapse; }
 .ui-table th, .ui-table td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
 .ui-table th { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+
+/* A search box a plugin puts into a menu (the shop's). The markup is a template part, so a template can replace it; this is the look it has until it does — it follows the template's accent. */
+.mat-search { display: flex; align-items: stretch; flex: 1 1 220px; min-width: 150px; max-width: 440px; border: 1px solid var(--line, rgba(0,0,0,.2)); border-radius: 999px; background: #fff; overflow: hidden; }
+.mat-search:focus-within { box-shadow: 0 0 0 2px var(--accent); border-color: var(--accent); }
+.mat-search input { flex: 1; min-width: 0; border: 0; background: transparent; padding: 9px 14px; font: inherit; color: inherit; outline: none; }
+.mat-search button { border: 0; background: var(--accent); color: #fff; padding: 0 15px; cursor: pointer; display: inline-flex; align-items: center; }
+.mat-search button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* The suggestions under a shop search box (script in the shop plugin: ShopSuggest). The list sits in <body>, so a box that clips its content cannot cut it off; it follows the template's colours. */
+.shop-suggest { position: absolute; z-index: 1000; max-width: min(92vw, 440px); background: var(--bg, #fff); color: var(--text, inherit); border: 1px solid var(--line, rgba(0,0,0,.2)); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.14); overflow: hidden; padding: 4px; }
+.shop-suggest .shop-sg-item { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 8px; color: inherit; text-decoration: none; }
+.shop-suggest .shop-sg-item.on, .shop-suggest .shop-sg-item:hover { background: var(--bg-soft, rgba(0,0,0,.06)); }
+.shop-suggest .shop-sg-item img { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; flex: none; }
+.shop-suggest .ph { width: 44px; height: 44px; border-radius: 6px; flex: none; background: var(--bg-soft, rgba(0,0,0,.08)); }
+.shop-suggest .t { display: flex; flex-direction: column; min-width: 0; } .shop-suggest .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .shop-suggest .p { font-size: .85em; opacity: .7; }
+.shop-suggest .shop-sg-fix { flex-wrap: wrap; gap: 4px; } .shop-suggest .shop-sg-fix .n { font-weight: 600; text-decoration: underline; }
+/* On a phone the header wraps: logo and menu button on top, the icon strip (search first) as a row of its own below. */
+@media (max-width: 640px) { .header-inner { flex-wrap: wrap; row-gap: 8px; } .header-icons { order: 5; flex: 1 0 100%; } .mat-search { flex: 1 1 0; min-width: 0; max-width: none; } .header-icons .mat-search input { width: 100%; } }

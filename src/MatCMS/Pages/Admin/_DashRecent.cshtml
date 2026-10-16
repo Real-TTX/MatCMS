@@ -1,0 +1,30 @@
+@model MatCMS.Pages.Admin.IndexModel
+<div class="card dash-card">
+    <h2>@T["dashboard.recentlyEdited"]</h2>
+    <div class="dash-card-body">
+    <table class="data">
+        <tbody>
+            @if (Model.RecentlyEdited.Count == 0)
+            {
+                <partial name="_EmptyRow" model='@T["dashboard.nothingEdited"]' />
+            }
+            @for (var n = 0; n < Model.RecentlyEdited.Count; n++)
+            {
+                var e = Model.RecentlyEdited[n];
+                <tr class="@(n >= IndexModel.CardRows ? "dash-extra" : null)" hidden="@(n >= IndexModel.CardRows)">
+                    <td style="width:34px;"><i class="ti @(e.Kind == "page" ? "ti-file-text" : e.Kind.StartsWith("ti-") ? e.Kind : "ti-news")" aria-hidden="true"></i></td>
+                    <td><a href="@e.Url">@e.Title</a> @if (!e.Published) { <span class="badge badge-off">@T["dashboard.draft"]</span> }</td>
+                    <td class="muted mono nowrap">@e.UpdatedAt.ToLocalTime().ToString("dd.MM. HH:mm")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    </div>
+    @if (Model.RecentlyEdited.Count > IndexModel.CardRows)
+    {
+        <div class="dash-card-foot">
+            <button type="button" class="btn btn-ghost" data-dash-expand data-more="@T["dashboard.showMore"]" data-less="@T["dashboard.showLess"]">@T["dashboard.showMore"]</button>
+            <a class="btn btn-ghost" asp-page="/Admin/Pages/Index">@T["nav.pages"]</a>
+        </div>
+    }
+</div>

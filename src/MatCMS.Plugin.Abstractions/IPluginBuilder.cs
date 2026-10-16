@@ -176,6 +176,9 @@ public interface IPluginBuilder
     /// <summary>A content block for the page editor. The render handler answers with <see cref="PluginResult.Fragment(string)"/>.</summary>
     void Block(BlockSpec spec, PluginHandler render);
 
+    /// <summary>A page of the plugin that the site's editors lay out in the block editor, with variables for the plugin's data (see <see cref="PageRoleSpec"/>). The page is created once, for every content language, when the plugin is first loaded.</summary>
+    void PageRole(PageRoleSpec spec);
+
     /// <summary>
     /// A list of choices a block field can draw from (<see cref="FieldSpec.OptionsSource"/>), computed each time the page editor opens. Labels are
     /// display text, not string keys. A provider that throws gives an empty list; it never stops the editor.
@@ -217,6 +220,27 @@ public interface IPluginBuilder
     /// </summary>
     void Strings(string culture, IReadOnlyDictionary<string, string> table);
 
+    /// <summary>
+    /// Adds entries to the public site's menus (a cart with its item count, "Anmelden" / "Mein Konto", a shop with its categories as a dropdown). They come after the entries the
+    /// site's own menus hold, and are asked for on every page view, so they can depend on the visitor (see <see cref="PluginMenuProvider"/>).
+    /// </summary>
+    void Menu(PluginMenuProvider provider);
+
+    /// <summary>
+    /// Offers addresses of the plugin's own content as link targets — blog posts, shop categories, products — in every place the editor picks a link (menu items, buttons, links in blocks).
+    /// <paramref name="group"/> is the heading in the picker (a string key of the plugin or plain text); register several groups to keep a long list apart ("Shop – Kategorien", "Shop – Produkte").
+    /// </summary>
+    void LinkTargets(string group, LinkTargetProvider provider);
+
+    /// <summary>Offers a piece for the site's menus (see <see cref="MenuElementSpec"/>): the editor adds it in Admin → Menü, the plugin draws it per visitor.</summary>
+    void MenuElement(MenuElementSpec spec, MenuElementProvider provider);
+
+    /// <summary>
+    /// Declares a template part: an HTML file with placeholders the plugin renders a page with and that a site template can replace (see <see cref="TemplatePartSpec"/>). It appears in the
+    /// template editor of every template as a file of its own, and a template that does not touch it renders the plugin's default.
+    /// </summary>
+    void TemplatePart(TemplatePartSpec spec);
+
     /// <summary>Adds the plugin's pages to the sitemap.</summary>
     void Sitemap(PluginSitemapProvider provider);
 
@@ -249,8 +273,11 @@ public interface IAdminBuilder
     /// <summary>A figure tile on the dashboard (<c>Ui.Stat("Beiträge", "12", "3 Entwürfe", href: "/admin/p/blog")</c>). Null = no tile.</summary>
     void Tile(PluginTileProvider provider);
 
-    /// <summary>Rows for the dashboard's "recently edited" list.</summary>
+    /// <summary>Rows for the dashboard's "recently edited" list — for things an editor works on (a post, a page). Orders, messages and the like get their own <see cref="DashboardCard"/>.</summary>
     void RecentlyEdited(PluginRecentProvider provider);
+
+    /// <summary>A card of the plugin's own on the dashboard, below the standard ones ("Shop · Bestellungen": the latest orders). Null from the provider = no card.</summary>
+    void DashboardCard(PluginCardProvider provider);
 
     /// <summary>Lines for "Braucht Aufmerksamkeit" (low stock, an unpaid order older than a week, …).</summary>
     void Attention(PluginAttentionProvider provider);
@@ -268,6 +295,19 @@ public interface IAdminSection
 
     /// <summary>A counter shown next to the section's sidebar entry. At most one per section.</summary>
     IAdminSection Badge(PluginBadgeProvider provider);
+
+    /// <summary>
+    /// A link in the section's OWN sidebar block. Once a section declares links, it is not one sidebar line any more but a block of its own — a separator, the section's name as
+    /// a quiet heading, then the links in the order they were declared, with a sub-heading wherever <paramref name="heading"/> changes — and the tab bar above its pages is not drawn:
+    /// the sidebar is the navigation. A shop with orders, products and a whole set of conditions to edit needs more than a handful of tabs.
+    /// </summary>
+    /// <param name="label">The link's text; a key of the plugin's strings is translated.</param>
+    /// <param name="path">A page of the section, relative to <c>/admin/p/{key}/</c> (<c>"orders"</c>), or the settings page of one group (<c>"_settings?group=set.groupSeller"</c>).</param>
+    /// <param name="icon">A Tabler icon name.</param>
+    /// <param name="heading">A sub-heading above this link and the ones after it, until another is given.</param>
+    /// <param name="badge">Show the section's counter (<see cref="Badge"/>) on this link.</param>
+    /// <param name="also">Further pages of the section the link also stands for: it is shown as the current one on them (a "Konditionen" link on the pages of shipping, taxes, …).</param>
+    IAdminSection Link(string label, string path, string icon = "ti-point", string? heading = null, bool badge = false, params string[] also);
 }
 
 /// <summary>Convenience overloads: synchronous handlers and handlers without a cancellation token.</summary>

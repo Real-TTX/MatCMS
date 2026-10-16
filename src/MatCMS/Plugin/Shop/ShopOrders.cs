@@ -65,6 +65,10 @@ internal sealed class SoldOutException(string title) : Exception(title)
 /// </summary>
 internal static class ShopOrders
 {
+    /// <summary>The seller's logo as the PDF can carry it (null = none, or a picture that cannot be used — the invoice is then written without).</summary>
+    private static async Task<PluginImage?> LogoAsync(IPluginContext ctx, ShopConfig cfg, CancellationToken ct) =>
+        cfg.SellerLogo.Length > 0 ? await ctx.Site.LoadImageAsync(cfg.SellerLogo, 600, ct) : null;
+
     // ---- pricing -----------------------------------------------------------------------------------------
 
     public static async Task<PricedCart> PriceAsync(ShopStore store, IReadOnlyList<CartLine> lines, ShopConfig cfg, IPluginContext ctx, CancellationToken ct = default)
@@ -139,7 +143,7 @@ internal static class ShopOrders
         {
             return await ctx.Data.InTransactionAsync(async d =>
             {
-                var store = new ShopStore(d);
+                var store = new ShopStore(d, ctx.Locale);                 // the titles an order keeps are the ones the customer saw: in their language
                 await store.LockForWriteAsync(ct);
                 var priced = await PriceAsync(store, cart, cfg, ctx, ct);
                 if (priced.Lines.Count == 0) return new PlaceResult(null, ctx.T("shop.err.emptyCart"));
@@ -243,7 +247,7 @@ internal static class ShopOrders
             var fresh = (await store.OrderAsync(orderId, ct))!;
             var bankInfo = fresh.PaymentProvider == Payments.Bank ? cfg.BankDetails : "";
             var invoiceDoc = ShopInvoice.Build(fresh, items, cfg, invoiceNumber, DateTime.UtcNow, bankInfo);
-            await store.AddInvoiceAsync(orderId, invoiceNumber, InvoiceKinds.Invoice, ShopInvoice.Html(invoiceDoc), ShopPdf.Render(invoiceDoc), 0, ct);
+            await store.AddInvoiceAsync(orderId, invoiceNumber, InvoiceKinds.Invoice, ShopInvoice.Html(invoiceDoc), ShopPdf.Render(invoiceDoc, await LogoAsync(ctx, cfg, ct)), 0, ct);
             await store.UpdateOrderAsync(orderId, new Dictionary<string, object?> { ["invoice_number"] = invoiceNumber }, ct);
 
             // Digital goods are delivered at once: one download entry per file of every digital line.
@@ -307,8 +311,11 @@ internal static class ShopOrders
     }
 
     /// <summary>Paid → shipped: the goods left. Tells the customer, with the tracking number when there is one.</summary>
-    public static async Task<bool> ShipAsync(IPluginContext ctx, long orderId, string tracking, string actor, bool notifyCustomer = true, CancellationToken ct = default)
+    public static async Task<bool> ShipAsync(IPluginContext ctx, long orderId, string tracking, string actor, bool notifyCustomer = true, CancellationToken ct = default, string carrier = "")
     {
+        // The carrier the form named, else the operator's usual one; a tracking link needs both it and the number.
+        carrier = ShopTracking.Clean(carrier);
+        if (carrier.Length == 0) carrier = ShopConfig.From(ctx.Settings).Carrier;
         Order? order = null; IReadOnlyList<OrderItem> items = Array.Empty<OrderItem>();
         var moved = await ctx.Data.InTransactionAsync(async d =>
         {
@@ -317,8 +324,8 @@ internal static class ShopOrders
             var o = await store.OrderAsync(orderId, ct);
             if (o is null || !OrderStatus.CanMove(o.Status, OrderStatus.Shipped)) return false;
             await store.SetStatusAsync(orderId, OrderStatus.Shipped, "", ct);
-            await store.UpdateOrderAsync(orderId, new Dictionary<string, object?> { ["tracking"] = tracking.Trim() }, ct);
-            await store.AddEventAsync(orderId, "shipped", tracking.Trim().Length > 0 ? "Versendet, Sendungsnummer " + tracking.Trim() : "Versendet", actor, null, ct);
+            await store.UpdateOrderAsync(orderId, new Dictionary<string, object?> { ["tracking"] = tracking.Trim(), ["carrier"] = tracking.Trim().Length > 0 ? carrier : "" }, ct);
+            await store.AddEventAsync(orderId, "shipped", tracking.Trim().Length > 0 ? "Versendet, Sendungsnummer " + tracking.Trim() + (ShopTracking.NameOf(carrier) is { Length: > 0 } cn ? " (" + cn + ")" : "") : "Versendet", actor, null, ct);
             items = await store.ItemsAsync(orderId, ct);
             order = (await store.OrderAsync(orderId, ct))!;
             return true;
@@ -376,7 +383,7 @@ internal static class ShopOrders
                 creditNumber = ShopInvoice.CreditNumber(cfg, await store.NextAsync("credit", 1, ct));
                 creditInvoice = invoice.Number;
                 var doc = ShopInvoice.BuildCredit(o with { RefundedCents = now }, items, cfg, creditNumber, DateTime.UtcNow, invoice.Number, added);
-                await store.AddInvoiceAsync(orderId, creditNumber, InvoiceKinds.Credit, ShopInvoice.Html(doc), ShopPdf.Render(doc), added, ct);
+                await store.AddInvoiceAsync(orderId, creditNumber, InvoiceKinds.Credit, ShopInvoice.Html(doc), ShopPdf.Render(doc, await LogoAsync(ctx, cfg, ct)), added, ct);
                 await store.AddEventAsync(orderId, "credit", $"Gutschrift {creditNumber} zu Rechnung {invoice.Number} ({Money.Format(added, o.Currency)})", actor, null, ct);
             }
             if (now >= o.TotalCents && OrderStatus.CanMove(o.Status, OrderStatus.Refunded))

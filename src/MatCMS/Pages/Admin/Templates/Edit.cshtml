@@ -18,6 +18,7 @@
         "<header class=\"site-header\">\n" +
         "  <div class=\"container header-inner\">\n" +
         "    <a class=\"logo\" href=\"/\">{{logo}}</a>\n" +
+        "    <div class=\"header-icons\">{{toolbar}}</div>\n" +
         "    <nav class=\"main-nav\">{{menu:primary}}</nav>\n" +
         "  </div>\n" +
         "</header>\n\n" +
@@ -44,6 +45,7 @@
         new TemplateToken("{{menu:primary}}", T["templates.tokMenu"]),
         new TemplateToken("{{#menu:primary}}…{{/menu:primary}}", T["templates.tokMenuLoop"]),
         new TemplateToken("{{param:id}}", T["templates.tokParam"]),
+        new TemplateToken("{{toolbar}}", T["templates.tokToolbar"]),
         new TemplateToken("{{languages}}", T["templates.tokLanguages"]),
         new TemplateToken("{{languages:dropdown}}", T["templates.tokLanguagesDropdown"]),
         new TemplateToken("{{languages:flags}}", T["templates.tokLanguagesFlags"]),
@@ -94,12 +96,20 @@
         "Noch keine Dateien.", "Diese Datei löschen?",
         "Eigene Dateien (JS, CSS, Schriften, Bilder), die dieses Template mitbringt — z. B. eine Zähler-Bibliothek selbst hosten statt per CDN. Im Layout/Login/CSS/JS als <code>{{asset:dateiname}}</code> einbinden.");
 
+    // One file per template part a loaded plugin declared: the stored version of THIS template, or the plugin's default (a part left at its default is stored as "unset").
+    var pluginFiles = Model.PluginParts.Select(e =>
+    {
+        var stored = Model.Parts.TryGetValue(e.Key, out var sv) && !string.IsNullOrWhiteSpace(sv) ? sv : e.Spec.DefaultHtml;
+        return new TemplateFile(e.FileName, "html", Model.PluginText(e, e.Spec.Help ?? e.Spec.Label), "Parts[" + e.Key + "]", stored, "htmlmixed",
+            e.Spec.Placeholders.Select(p => new TemplateToken("{{" + p.Name + "}}", Model.PluginText(e, p.Help))).ToList(),
+            InsertDefault: e.Spec.DefaultHtml, Baseline: e.Spec.DefaultHtml);
+    }).ToList();
     var templateFiles = new TemplateFiles(
         T["tplfiles.intro"],
-        new[]
+        new TemplateFile[]
         {
             new TemplateFile("body.html", "html", T["tplfiles.body.desc"], "LayoutHtml", Model.LayoutHtml,
-                "htmlmixed", bodyTokens, InsertDefault: StarterBody),
+                "htmlmixed", bodyTokens.Concat(Model.ElementTokens.Select(e => new TemplateToken(e.Token, T["templates.tokElement", e.Label]))).ToList(), InsertDefault: StarterBody),
             new TemplateFile("login.html", "html", "Eigene Anmelde-Seite (/anmelden) ohne Kopf/Navigation. Leer = Standard-Login. {{login_form}} wird durch das Formular ersetzt.", "LoginHtml", Model.LoginHtml,
                 "htmlmixed", loginTokens),
             new TemplateFile("article.html", "html", T["tplfiles.article.desc"], "Parts[post]", postValue,
@@ -110,7 +120,7 @@
                 "javascript", System.Array.Empty<TemplateToken>()),
             new TemplateFile("maintenance.html", "html", T["tplfiles.maintenance.desc"], "Parts[maintenance]", maintenanceValue,
                 "htmlmixed", paramToken, InsertDefault: Model.DefaultMaintenancePart, Baseline: Model.DefaultMaintenancePart),
-        },
+        }.Concat(pluginFiles).ToList(),
         new TemplateFileLabels(
             T["tplfiles.edit"], T["tplfiles.tokens"], T["tplfiles.insertDefault"],
             T["tplfiles.insertDefaultConfirm"],

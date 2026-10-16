@@ -25,5 +25,7 @@ public sealed class ContainerBlockModel
     /// itself a container, <see cref="Container"/> carries its resolved sub-model (for recursive
     /// rendering, e.g. a cards block inside a section); it is null for ordinary leaf children.
     /// Render it through the shared <c>_ChildBlock</c> partial, which adds the editor mark.</summary>
-    public sealed record ChildBlock(string Partial, BlockData Data, ContainerBlockModel? Container = null, int Id = 0, bool Editor = false, string Type = "");
+    /// <param name="Rendered">The HTML of a plugin's block, drawn already (it has no partial); null for every other block.</param>
+    /// <param name="HasVars">In the editor: the block's texts hold variables, so it is not typed into in the preview.</param>
+    public sealed record ChildBlock(string Partial, BlockData Data, ContainerBlockModel? Container = null, int Id = 0, bool Editor = false, string Type = "", string? Rendered = null, bool HasVars = false);
 }

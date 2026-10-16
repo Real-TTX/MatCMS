@@ -1,0 +1,29 @@
+@model MatCMS.Pages.Admin.IndexModel
+<div class="card dash-card">
+    <h2>@T["dashboard.attention"] @if (Model.AttentionItems.Count > 0) { <span class="muted">(@Model.AttentionItems.Count)</span> }</h2>
+    <div class="dash-card-body">
+        @if (Model.AttentionItems.Count == 0)
+        {
+            <p class="muted"><i class="ti ti-circle-check" aria-hidden="true"></i> @T["dashboard.allClear"]</p>
+        }
+        else
+        {
+            <table class="data dash-attention">
+                <colgroup><col class="dash-icon-col" /><col /></colgroup>
+                <tbody>
+                    @foreach (var x in Model.AttentionItems.Take(IndexModel.CardRows))
+                    {
+                        <tr class="lvl-@x.Level">
+                            <td class="dash-icon"><i class="ti @x.Icon" aria-hidden="true"></i></td>
+                            <td><a href="@x.Url"><strong>@x.Title</strong></a><div class="muted dash-clip">@x.Text</div></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+    @if (Model.AttentionItems.Count > 0)
+    {
+        <div class="dash-card-foot"><a class="btn btn-ghost" asp-page="/Admin/Attention/Index">@T["dashboard.showAll", Model.AttentionItems.Count]</a></div>
+    }
+</div>

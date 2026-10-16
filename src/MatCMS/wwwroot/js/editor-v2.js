@@ -49,6 +49,12 @@
     // The first meaningful text of a block, so a tree of ten "Text" nodes can be told apart.
     function summary(b) {
         var d = data(b);
+        // A plugin's piece placed on one of its pages (the shop's gallery, cart lines …) is named by what it places: "Produkt › Galerie" → "Galerie".
+        if (typeof d.slot === "string" && d.slot) {
+            var sf = (def(b).schema || []).filter(function (f) { return f.id === "slot"; })[0];
+            var so = sf && (sf.options || []).filter(function (o) { return o.value === d.slot; })[0];
+            if (so) { var sl = String(so.label), at = sl.lastIndexOf("›"); return (at >= 0 ? sl.slice(at + 1) : sl).trim(); }
+        }
         var keys = ["heading", "title", "name", "label", "buttonText", "text", "body", "quote", "subheading", "question"];
         for (var i = 0; i < keys.length; i++) { var v = strip(d[keys[i]]); if (v) return v.length > 38 ? v.slice(0, 38) + "…" : v; }
         return "";

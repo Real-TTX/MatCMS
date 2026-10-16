@@ -1,3 +1,4 @@
+@inject MatCMS.Services.Plugins.PluginContributions Contrib
 @inject MatCMS.Services.SiteContext Site
 @inject MatCMS.Services.PluginRegistry PluginReg
 @{
@@ -74,6 +75,9 @@
         string Enc(string? s) => System.Net.WebUtility.HtmlEncode(s ?? "");
         string Link(MatCMS.Models.MenuItem mi) =>
             $"<a href=\"{Enc(mi.Url)}\"{(mi.OpenInNewTab ? " target=\"_blank\" rel=\"noopener\"" : "")}>{Enc(mi.Label)}</a>";
+        // {{element:shop.search}} places ONE plugin element where the layout wants it. What a layout places itself is not drawn again in the icon strip.
+        var placedElements = MatCMS.Content.LayoutRenderer.PlacedElements(tpl.LayoutHtml);
+        var stripItems = Site.ToolbarMenu.Where(t => t.Element is null || !placedElements.Contains(t.Element)).ToList();
         var globals = new Dictionary<string, string>
         {
             ["content"] = contentHtml,
@@ -84,11 +88,13 @@
             // Back-compat whole-menu placeholders.
             ["nav"] = string.Concat(Site.HeaderMenu.Select(Link)),
             ["footer_nav"] = string.Concat(Site.FooterMenu.Select(Link)),
-            ["toolbar"] = string.Concat(Site.ToolbarMenu.Select(t =>
-                $"<a class=\"hicon\" href=\"{Enc(t.Url)}\"{(t.OpenInNewTab ? " target=\"_blank\" rel=\"noopener\"" : "")} title=\"{Enc(t.Label)}\">{MatCMS.Content.MenuIcons.IconMarkup(t.Icon)}</a>")),
+            ["toolbar"] = string.Concat(stripItems.Select(t => t.Html is { Length: > 0 } rawToolbarHtml ? rawToolbarHtml :
+                $"<a class=\"hicon\" href=\"{Enc(t.Url)}\"{(t.OpenInNewTab ? " target=\"_blank\" rel=\"noopener\"" : "")} title=\"{Enc(t.Label)}\">{MatCMS.Content.MenuIcons.IconMarkup(t.Icon)}{(string.IsNullOrEmpty(t.Badge) ? "" : $"<span class=\"hbadge\">{Enc(t.Badge)}</span>")}</a>")),
         };
         foreach (var kv in tplParams)
             globals["param:" + kv.Key] = Enc(kv.Value);
+        foreach (var el in placedElements)
+            globals["element:" + el] = await Contrib.ElementHtmlAsync(Context, el, Context.RequestAborted);
         var menuMap = MatCMS.Content.LayoutRenderer.ParseMap(tpl.MenuMapJson);
         var custLangs = Site.LanguageLinks()
             .Select(l => new MatCMS.Content.LayoutRenderer.LangLink(l.Locale, l.Url, l.IsCurrent)).ToList();
@@ -105,6 +111,13 @@
             // Closed dropdown, fixed top right (opens on click; toggled by lang-switch.js).
             customBody += MatCMS.Content.LayoutRenderer.RenderLangDropdown(custLangs, overlay: true);
         }
+
+        // The icon strip must work with ANY template: a layout of its own that never placed {{toolbar}} (or a menu slot that leads to the toolbar) would otherwise lose the cart and the way
+        // to sign in — and every other icon the site has. Then they float, like the language switcher does.
+        var slotKeys = MatCMS.Content.LayoutRenderer.ExtractSlots(tpl.LayoutHtml).Select(sl => menuMap.TryGetValue(sl, out var mk) && !string.IsNullOrWhiteSpace(mk) ? mk : sl);
+        var rendersToolbar = tpl.LayoutHtml!.Contains("{{toolbar}}") || slotKeys.Contains("toolbar");
+        if (!rendersToolbar && stripItems.Count > 0)
+            customBody += $"<div class=\"mat-toolbar-overlay{(!hasLangPlaceholder && custLangs.Count > 1 ? " with-lang" : "")}\">{globals["toolbar"]}</div>";
     }
 }
 <!DOCTYPE html>
@@ -197,7 +210,7 @@
         @Html.Raw(Site.HeadCode)
     }
 </head>
-<body class="@(showAdminBar ? "has-adminbar" : null)">
+<body class="@(showAdminBar ? "has-adminbar" : null)" data-toolbar="@(Site.ToolbarMenu.Count > 0 ? "1" : null)" data-els="@(Site.ElementKeys.Count > 0 ? string.Join(' ', Site.ElementKeys) : null)">
 @* Admin bar over the live site for logged-in back-office admins — first-party here, so no cross-site
    cookie issue (the "flip it instead of iframe" approach). Rendered first so it sits atop everything.
    The has-adminbar body class makes the site's own sticky header stick below the bar (no overlap). *@
@@ -223,9 +236,10 @@ else
             <div class="header-icons">
                 @foreach (var t in Site.ToolbarMenu)
                 {
+                    if (!string.IsNullOrEmpty(t.Html)) { <text>@Html.Raw(t.Html)</text> continue; }
                     <a class="hicon" href="@t.Url" target="@(t.OpenInNewTab ? "_blank" : null)" rel="@(t.OpenInNewTab ? "noopener" : null)"
                        title="@t.Label" aria-label="@t.Label">
-                        <i class="ti ti-@MatCMS.Content.MenuIcons.Resolve(t.Icon)" aria-hidden="true"></i>
+                        <i class="ti ti-@MatCMS.Content.MenuIcons.Resolve(t.Icon)" aria-hidden="true"></i>@if (!string.IsNullOrEmpty(t.Badge)) { <span class="hbadge">@t.Badge</span> }
                     </a>
                 }
             </div>
@@ -272,6 +286,7 @@ else
     <script src="~/js/carousel.js" asp-append-version="true"></script>
     <script src="~/js/hero-carousel.js" asp-append-version="true"></script>
     <script src="~/js/lang-switch.js" asp-append-version="true"></script>
+    <script src="~/js/site-nav.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
     @if (!string.IsNullOrWhiteSpace(tpl.CustomJs))
     {

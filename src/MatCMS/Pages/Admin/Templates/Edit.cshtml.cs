@@ -16,7 +16,19 @@ namespace MatCMS.Pages.Admin.Templates;
 public class EditModel : PageModel
 {
     private readonly AppDbContext _db;
-    public EditModel(AppDbContext db) => _db = db;
+    private readonly MatCMS.Services.PluginRegistry _plugins;
+    public EditModel(AppDbContext db, MatCMS.Services.PluginRegistry plugins) { _db = db; _plugins = plugins; }
+
+    /// <summary>The template parts loaded plugins declared — each is one more file of the template (the shop's product page, its product card …).</summary>
+    public IReadOnlyList<MatCMS.Services.PluginRegistry.TemplatePartEntry> PluginParts => _plugins.TemplateParts;
+
+    /// <summary>The menu elements loaded plugins offer, as placeholders a layout can use (<c>{{element:shop.search}}</c>) with the element's name.</summary>
+    public IReadOnlyList<(string Token, string Label)> ElementTokens => _plugins.MenuElements
+        .Select(e => ("{{element:" + e.Key + "}}", MatCMS.Services.Plugins.PluginStrings.Label(_plugins.SliceOf(e.Owner), MatCMS.Services.Plugins.PluginRequestContext.CurrentLocale(), e.Spec.Label))).ToList();
+
+    /// <summary>A text of a plugin's own strings (a key is translated), for the file list.</summary>
+    public string PluginText(MatCMS.Services.PluginRegistry.TemplatePartEntry e, string text) =>
+        MatCMS.Services.Plugins.PluginStrings.Label(_plugins.SliceOf(e.Owner), MatCMS.Services.Plugins.PluginRequestContext.CurrentLocale(), text);
 
     /// <summary>Files attached to this template, served at /template-assets/{id}/{name} and referenced
     /// via {{asset:name}} in the template's HTML/CSS/JS.</summary>
@@ -209,6 +221,7 @@ public class EditModel : PageModel
         var parts = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var key in TemplateSchema.KnownParts)
             parts[key] = TemplateFonts.Code(Parts.TryGetValue(key, out var pv) ? pv : "");
+        foreach (var pp in PluginParts) parts[pp.Key] = TemplateFonts.Code(Parts.TryGetValue(pp.Key, out var plv) ? plv : "");
 
         // The pseudo-file names the editor's tree shows, so the message names what the operator sees.
         var tooLong = new List<string>();
@@ -222,6 +235,7 @@ public class EditModel : PageModel
         Check("login.html", login, TemplateFonts.MaxLayoutHtml);
         Check("article.html", parts[TemplateSchema.PartPost], TemplateFonts.MaxLayoutHtml);
         Check("maintenance.html", parts[TemplateSchema.PartMaintenance], TemplateFonts.MaxLayoutHtml);
+        foreach (var pp in PluginParts) Check(pp.FileName, parts[pp.Key], TemplateFonts.MaxLayoutHtml);
         if (tooLong.Count > 0)
         {
             IsActive = t.IsActive;
@@ -268,10 +282,14 @@ public class EditModel : PageModel
         var cleanParts = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var (key, html) in parts)
         {
-            if (!string.IsNullOrWhiteSpace(html) && html.Trim() != TemplateSchema.DefaultFor(key).Trim())
+            var def = PluginParts.FirstOrDefault(p => p.Key == key)?.Spec.DefaultHtml.ReplaceLineEndings("\n") ?? TemplateSchema.DefaultFor(key);
+            if (!string.IsNullOrWhiteSpace(html) && html.Trim() != def.Trim())
                 cleanParts[key] = html;
         }
-        t.PartsJson = TemplateSchema.Serialize(cleanParts);
+        // A part of a plugin that is switched off or removed is not on the page and cannot be posted — its stored version must not vanish with the next save.
+        foreach (var (key, html) in TemplateSchema.Parse(t.PartsJson))
+            if (!TemplateSchema.KnownParts.Contains(key) && PluginParts.All(p => p.Key != key) && key.Contains('.') && !cleanParts.ContainsKey(key)) cleanParts[key] = html;
+        t.PartsJson = TemplateSchema.Serialize(cleanParts, PluginParts.Select(p => p.Key).Concat(cleanParts.Keys.Where(k => k.Contains('.'))).Distinct());
         // A saved template is written in the current format.
         t.SchemaVersion = TemplateSchema.Current;
 

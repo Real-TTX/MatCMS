@@ -1,0 +1,65 @@
+@model MatCMS.Pages.Admin.IndexModel
+<div class="card dash-card">
+    <h2>@T["dashboard.website"]</h2>
+    <div class="kv">
+        <div class="kv-label">@T["dashboard.siteName"]</div>
+        <div class="kv-value">
+            @(Model.SiteName ?? "—")
+            @if (Model.Maintenance) { <span class="badge badge-new">@T["dashboard.maintenanceOn"]</span> }
+        </div>
+    </div>
+    <div class="kv">
+        <div class="kv-label">@T["dashboard.address"]</div>
+        <div class="kv-value">
+            @if (Model.CanonicalUrl is { } url) { <a href="@url" target="_blank" rel="noopener" class="mono">@url</a> }
+            else { <a asp-page="/Admin/Settings/Index" asp-route-tab="general" class="muted">@T["dashboard.noAddress"]</a> }
+        </div>
+    </div>
+    <div class="kv">
+        <div class="kv-label">@T["dashboard.template"]</div>
+        <div class="kv-value"><a asp-page="/Admin/Templates/Index">@(Model.ActiveTemplate ?? T["dashboard.noTemplate"])</a></div>
+    </div>
+    <div class="kv">
+        <div class="kv-label">@T["dashboard.languages"]</div>
+        <div class="kv-value mono">@Model.Languages</div>
+    </div>
+    <div class="kv">
+        <div class="kv-label">@T["dashboard.version"]</div>
+        <div class="kv-value">
+            <span class="mono">@Model.Version</span>
+            @if (Model.UpdateAvailable) { <span class="badge badge-new">@T["dashboard.updateTo", Model.LatestVersion ?? ""]</span> }
+        </div>
+    </div>
+    <div class="kv">
+        <div class="kv-label">@T["dashboard.backup"]</div>
+        <div class="kv-value">
+            <a asp-page="/Admin/Backup/Index">
+                @(Model.LastBackup is { } lb ? T["dashboard.lastBackup", lb.ToLocalTime().ToString("dd.MM.yyyy HH:mm"), Model.BackupCount] : T["dashboard.noBackup"])
+            </a>
+            <span class="badge @(Model.BackupScheduled ? "badge-on" : "badge-off")">@(Model.BackupScheduled ? T["dashboard.scheduled"] : T["dashboard.notScheduled"])</span>
+        </div>
+    </div>
+    <div class="kv">
+        <div class="kv-label">@T["dashboard.mail"]</div>
+        <div class="kv-value">
+            @if (Model.MailConfigured) { <span class="badge badge-on">@T["dashboard.mailOk"]</span> }
+            else { <a class="badge badge-err" asp-page="/Admin/Settings/Index" asp-route-tab="smtp">@T["dashboard.mailMissing"]</a> }
+        </div>
+    </div>
+    @* The cloud is optional — one line, and "nicht verbunden" is a perfectly normal state for a standalone site. *@
+    <div class="kv">
+        <div class="kv-label">@T["dashboard.cloud"]</div>
+        <div class="kv-value">
+            @if (Model.CloudConnected)
+            {
+                <span class="badge badge-on">@T["dashboard.cloudConnected"]</span>
+                <span class="badge @(Model.CloudOutOfSync ? "badge-new" : "badge-on")">@(Model.CloudOutOfSync ? T["dashboard.cloudOutOfSync"] : T["dashboard.cloudSynced"])</span>
+                @if (Model.CloudLastSync is { } ls) { <span class="muted">@ls.ToLocalTime().ToString("dd.MM. HH:mm")</span> }
+            }
+            else
+            {
+                <span class="muted">@T["dashboard.cloudStandalone"]</span>
+            }
+        </div>
+    </div>
+</div>

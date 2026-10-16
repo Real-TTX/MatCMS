@@ -3,6 +3,8 @@
     var allBlocks = Model.Blocks;
     var editor = Model.Editor;
     var registry = Model.Registry;
+    // The variables of a page a plugin draws with the data of a request (Model.Scope); empty on every ordinary page, where nothing below changes.
+    var scope = Model.Scope ?? MatCMS.Content.BlockScope.Empty;
 }
 @foreach (var block in allBlocks.Where(b => b.ParentId == null).OrderBy(b => b.SortOrder))
 {
@@ -11,9 +13,12 @@
     {
         continue;
     }
-    var data = new MatCMS.Content.BlockData(block.DataJson);
+    // Variables first: the block's own data with {{role.name}} filled in, by the kind of each field.
+    var dataJson = scope.Apply(def, block.DataJson);
+    var data = new MatCMS.Content.BlockData(dataJson);
     // Hidden: not on the site at all (children included); in the editor faded, so it can still be picked.
-    var isHidden = MatCMS.Content.BlockSchema.IsHidden(data);
+    // "Show only when" (a variable) hides the same way.
+    var isHidden = MatCMS.Content.BlockSchema.IsHidden(data) || !scope.Visible(data.Str(MatCMS.Content.BlockSchema.ShowIfId));
     if (isHidden && !editor)
     {
         continue;
@@ -24,7 +29,7 @@
     MatCMS.Content.ContainerBlockModel? containerModel = null;
     if (def.IsContainer)
     {
-        containerModel = BuildContainer(block.Id, data, registry, allBlocks, 0, editor);
+        containerModel = await BuildContainerAsync(block.Id, data, registry, allBlocks, 0, editor, scope);
     }
 
     // Global layout options (width + top/bottom spacing) — one wrapper for both preview and live.
@@ -39,8 +44,10 @@
     // Per-block custom CSS scopes under this stable class (nesting keeps it from leaking).
     var blkCls = " blk-" + block.Id;
     var wrapCls = (editor ? "mat-ed-block" : "block-wrap") + blkCls + layoutCls + (isHidden ? " mat-ed-hidden" : "");
+    // A block whose texts hold variables is not typed into in the preview: what is on the screen is the value, and typing would write it over the variable.
+    var hasVars = !scope.IsEmpty && block.DataJson.Contains("{{", StringComparison.Ordinal);
     var edAttrs = editor
-        ? new Microsoft.AspNetCore.Html.HtmlString($" id=\"block-{block.Id}\" data-block-id=\"{block.Id}\" data-block-name=\"{System.Net.WebUtility.HtmlEncode(T[def.Name])}\"")
+        ? new Microsoft.AspNetCore.Html.HtmlString($" id=\"block-{block.Id}\" data-block-id=\"{block.Id}\" data-block-name=\"{System.Net.WebUtility.HtmlEncode(T[def.Name])}\"" + (hasVars ? " data-vars=\"1\"" : ""))
         : Microsoft.AspNetCore.Html.HtmlString.Empty;
 
     <div class="@wrapCls"@edAttrs>
@@ -50,7 +57,7 @@
         }
         @if (def.IsPluginBlock)
         {
-            @Html.Raw(await RenderPluginBlockAsync(def, block.DataJson))
+            @Html.Raw(await RenderPluginBlockAsync(def, dataJson, scope))
         }
         else if (def.IsComponent)
         {
@@ -69,8 +76,9 @@
 @functions {
     // Resolves a container's children into (partial, data) pairs; a child that is itself a container
     // gets its own sub-model built recursively (depth-guarded) so arbitrary nesting renders.
-    static MatCMS.Content.ContainerBlockModel BuildContainer(int parentId, MatCMS.Content.BlockData data,
-        MatCMS.Content.BlockRegistry reg, IReadOnlyList<MatCMS.Models.ContentBlock> all, int depth, bool editor)
+    // A plugin's block has no partial: it is drawn here, and its HTML travels with the child.
+    async Task<MatCMS.Content.ContainerBlockModel> BuildContainerAsync(int parentId, MatCMS.Content.BlockData data,
+        MatCMS.Content.BlockRegistry reg, IReadOnlyList<MatCMS.Models.ContentBlock> all, int depth, bool editor, MatCMS.Content.BlockScope scope)
     {
         var kids = new List<MatCMS.Content.ContainerBlockModel.ChildBlock>();
         if (depth <= 6)
@@ -79,16 +87,23 @@
             {
                 var cdef = reg.Get(cb.BlockType);
                 if (cdef is null || string.IsNullOrWhiteSpace(cdef.Partial)) continue;
-                var cdata = new MatCMS.Content.BlockData(cb.DataJson);
-                if (!editor && MatCMS.Content.BlockSchema.IsHidden(cdata)) continue;
-                var sub = cdef.IsContainer ? BuildContainer(cb.Id, cdata, reg, all, depth + 1, editor) : null;
-                kids.Add(new MatCMS.Content.ContainerBlockModel.ChildBlock(cdef.Partial, cdata, sub, cb.Id, editor, cdef.Type));
+                var cjson = scope.Apply(cdef, cb.DataJson);
+                var cdata = new MatCMS.Content.BlockData(cjson);
+                if (!editor && (MatCMS.Content.BlockSchema.IsHidden(cdata) || !scope.Visible(cdata.Str(MatCMS.Content.BlockSchema.ShowIfId)))) continue;
+                var hasVars = editor && !scope.IsEmpty && cb.DataJson.Contains("{{", StringComparison.Ordinal);
+                if (cdef.IsPluginBlock)
+                {
+                    kids.Add(new MatCMS.Content.ContainerBlockModel.ChildBlock(cdef.Partial, cdata, null, cb.Id, editor, cdef.Type, await RenderPluginBlockAsync(cdef, cjson, scope), hasVars));
+                    continue;
+                }
+                var sub = cdef.IsContainer ? await BuildContainerAsync(cb.Id, cdata, reg, all, depth + 1, editor, scope) : null;
+                kids.Add(new MatCMS.Content.ContainerBlockModel.ChildBlock(cdef.Partial, cdata, sub, cb.Id, editor, cdef.Type, null, hasVars));
             }
         }
         return new MatCMS.Content.ContainerBlockModel(data, kids) { Editor = editor, Depth = depth };
     }
 
-    async Task<string> RenderPluginBlockAsync(MatCMS.Content.BlockDefinition def, string dataJson)
+    async Task<string> RenderPluginBlockAsync(MatCMS.Content.BlockDefinition def, string dataJson, MatCMS.Content.BlockScope scope)
     {
         var http = ViewContext.HttpContext;
         var svc = http.RequestServices;
@@ -104,7 +119,9 @@
             Method = http.Request.Method,
             Path = http.Request.Path.Value ?? "",
             Query = query,
-            IsAdmin = http.User?.IsInRole("Admin") == true
+            IsAdmin = http.User?.IsInRole("Admin") == true,
+            Scope = scope.Values,
+            ScopeHtml = scope.HtmlNames
         };
         try { return def.PluginRenderAsync is { } renderAsync ? await renderAsync(pr, http.RequestAborted) : def.PluginRender!(pr); }
         catch (Exception ex) { return "<!-- plugin block error: " + System.Net.WebUtility.HtmlEncode(ex.Message) + " -->"; }

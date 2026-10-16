@@ -22,6 +22,8 @@ internal static class ShopEvents
         var store = new ShopStore(ctx.Data);
         await store.DeleteAddressesOfMemberAsync(id);
         await store.DeleteCartsOfMemberAsync(id);
+        // A cart a guest asked a reminder for is found by its address: the address goes with the account.
+        if ((payload?["email"]?.GetValue<string>() ?? "").Trim().ToLowerInvariant() is { Length: > 0 } mail) await store.DeleteCartsOfEmailAsync(mail);
         await store.UnlinkMemberAsync(id);
     }
 
@@ -84,6 +86,7 @@ internal static class ShopEvents
                 .Where("created", DataOp.Lt, now.AddMinutes(-10)).Where("reserved_until", DataOp.Ge, now).Page(0, 50), ct);
             foreach (var o in waiting) await PayPalPayments.ReconcileAsync(ctx, cfg, o, ct);
         }
+        await ShopReminders.RunAsync(ctx, cfg, store, now, ct);
         await store.DeleteExpiredCartsAsync(ct);
     }
 

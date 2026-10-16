@@ -93,7 +93,7 @@ internal static class ShopMail
 
             Mit freundlichen Grüßen
             {{site_name}}
-            """) { Placeholders = With(new MailPlaceholder("tracking", "Die Sendungsnummer (leer, wenn keine eingetragen wurde)")), Loops = new[] { ItemsLoop } },
+            """) { Placeholders = With(new MailPlaceholder("tracking", "Die Sendungsnummer (leer, wenn keine eingetragen wurde); kennt der Shop den Paketdienst, steht der Link zur Sendungsverfolgung in der Zeile darunter"), new MailPlaceholder("tracking_url", "Nur der Link zur Sendungsverfolgung (leer, wenn es keinen gibt)"), new MailPlaceholder("carrier", "Der Paketdienst (leer, wenn keiner gewählt wurde)")), Loops = new[] { ItemsLoop } },
 
         new(Cancelled, "Shop: Bestellung storniert", "Geht an den Kunden, wenn eine unbezahlte Bestellung storniert wurde (auch nach Ablauf der Zahlungsfrist).",
             "Ihre Bestellung {{order_number}} wurde storniert",
@@ -143,12 +143,14 @@ internal static class ShopMail
     public static Dictionary<string, string> Values(IPluginContext ctx, Order o, IReadOnlyList<OrderItem> items, string site)
     {
         string M(long c) => Money.Format(c, o.Currency, o.Locale);
+        var cfg = ShopConfig.From(ctx.Settings);
+        var trackUrl = ShopTracking.UrlOf(cfg, o);
         return new Dictionary<string, string>
         {
             ["order_number"] = o.Number, ["customer_name"] = string.IsNullOrWhiteSpace(o.Name) ? o.Billing.Name : o.Name, ["total"] = M(o.TotalCents),
             ["order_url"] = OrderUrl(ctx, o), ["site_name"] = site, ["billing_address"] = o.Billing.Lines(), ["shipping_address"] = o.Shipping.Lines(),
             ["subtotal"] = M(o.SubtotalCents), ["shipping_cost"] = M(o.ShippingCents), ["shipping_method"] = string.IsNullOrWhiteSpace(o.ShippingMethod) ? "—" : o.ShippingMethod,
-            ["tracking"] = o.Tracking, ["payment_info"] = "", ["downloads"] = "", ["invoice_url"] = "", ["admin_url"] = "", ["refund_amount"] = "", ["credit_info"] = ""
+            ["tracking"] = trackUrl.Length > 0 && !string.Equals(trackUrl, o.Tracking, StringComparison.OrdinalIgnoreCase) ? o.Tracking + "\n" + trackUrl : o.Tracking, ["tracking_url"] = trackUrl, ["carrier"] = ShopTracking.NameOf(cfg, o), ["payment_info"] = "", ["downloads"] = "", ["invoice_url"] = "", ["admin_url"] = "", ["refund_amount"] = "", ["credit_info"] = ""
         };
     }
 

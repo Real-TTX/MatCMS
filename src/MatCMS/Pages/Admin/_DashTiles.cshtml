@@ -1,0 +1,57 @@
+@model MatCMS.Pages.Admin.IndexModel
+@{
+    var maxDay = Math.Max(1, Model.ErrorsPerDay.Max(d => d.Count));
+    var maxViews = Math.Max(1, Model.Stats7d.Days.Max(d => d.Views));
+    string Hsize(long b) => b >= 1L << 30 ? $"{b / (double)(1L << 30):0.0} GB" : b >= 1 << 20 ? $"{b / 1048576.0:0} MB" : $"{b / 1024} KB";
+}
+@* ---- Tiles: the numbers first, each leading to where it is dealt with. ---- *@
+<div class="stat-grid dash-tiles">
+    <a class="stat" asp-page="/Admin/Pages/Index">
+        <div class="n">@Model.PageCount</div>
+        <div class="l">@T["dashboard.pages"]</div>
+        <div class="s">@T["dashboard.drafts", Model.PageDrafts]</div>
+    </a>
+    <a class="stat" asp-page="/Admin/Media/Index">
+        <div class="n">@Model.MediaCount</div>
+        <div class="l">@T["dashboard.media"]</div>
+        <div class="s">@Hsize(Model.MediaBytes)</div>
+    </a>
+    <a class="stat @(Model.UnreadCount > 0 ? "is-warn" : "")" asp-page="/Admin/Forms/Inbox" asp-route-filter="@(Model.UnreadCount > 0 ? "unread" : null)">
+        <div class="n">@Model.UnreadCount</div>
+        <div class="l">@T["dashboard.newSubmissions"]</div>
+        <div class="s">@T["dashboard.ofTotal", Model.SubmissionCount]</div>
+    </a>
+    @foreach (var pt in Model.PluginTiles)
+    {
+        <a class="stat @(pt.Tone == MatCMS.Plugin.UiTone.Warning ? "is-warn" : pt.Tone == MatCMS.Plugin.UiTone.Error ? "is-err" : "")" href="@(string.IsNullOrWhiteSpace(pt.Href) ? "#" : pt.Href)">
+            <div class="n">@pt.Value</div>
+            <div class="l">@pt.Label</div>
+            @if (!string.IsNullOrWhiteSpace(pt.Hint)) { <div class="s">@pt.Hint</div> }
+        </a>
+    }
+    <a class="stat" asp-page="/Admin/Users/Index">
+        <div class="n">@Model.UserCount</div>
+        <div class="l">@T["dashboard.users"]</div>
+        <div class="s">@T["dashboard.members", Model.MemberCount]</div>
+    </a>
+    <a class="stat" asp-page="/Admin/Stats/Index" asp-route-days="7">
+        <div class="n">@Model.Stats7d.Views</div>
+        <div class="l">@T["dashboard.views7d"]</div>
+        <div class="dash-bars is-views" aria-hidden="true">
+            @foreach (var d in Model.Stats7d.Days)
+            {
+                <span style="height:@(d.Views == 0 ? 2 : 4 + 22 * d.Views / maxViews)px" title="@d.Day.ToString("ddd dd.MM."): @d.Views"></span>
+            }
+        </div>
+    </a>
+    <a class="stat @(Model.ErrorCount7d > 0 ? "is-warn" : "")" asp-page="/Admin/Logs/Index" asp-route-level="@(Model.ErrorCount7d > 0 ? "Error" : null)">
+        <div class="n">@Model.ErrorCount7d</div>
+        <div class="l">@T["dashboard.errors7d"]</div>
+        <div class="dash-bars" aria-hidden="true">
+            @foreach (var d in Model.ErrorsPerDay)
+            {
+                <span style="height:@(d.Count == 0 ? 2 : 4 + 22 * d.Count / maxDay)px" title="@d.Day.ToString("ddd dd.MM."): @d.Count"></span>
+            }
+        </div>
+    </a>
+</div>

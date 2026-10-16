@@ -19,6 +19,11 @@ internal sealed class PdfWriter
 
     public PdfPage AddPage() { var p = new PdfPage(); _pages.Add(p); return p; }
 
+    private readonly List<(byte[] Jpeg, int Width, int Height)> _images = new();
+
+    /// <summary>Adds a JPEG for use on pages (<see cref="PdfPage.Image"/>); returns its number.</summary>
+    public int AddImage(byte[] jpeg, int width, int height) { _images.Add((jpeg, width, height)); return _images.Count; }
+
     // ---- the font metrics (Adobe's AFM widths of Helvetica and Helvetica-Bold, for 32…126) ---------------------
 
     private static readonly int[] Regular =
@@ -140,11 +145,16 @@ internal sealed class PdfWriter
         for (var i = 0; i < _pages.Count; i++)
         {
             var content = _pages[i].Content;
-            Object(FirstPage + i * 2, $"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {Num(PageWidth)} {Num(PageHeight)}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents {FirstPage + i * 2 + 1} 0 R >>");
+            var firstImage = FirstPage + _pages.Count * 2 + 1;                        // right after the info dictionary
+            var xobjects = _images.Count == 0 ? "" : " /XObject << " + string.Join(" ", Enumerable.Range(0, _images.Count).Select(k => $"/Im{k + 1} {firstImage + k} 0 R")) + " >>";
+            Object(FirstPage + i * 2, $"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {Num(PageWidth)} {Num(PageHeight)}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >>{xobjects} >> /Contents {FirstPage + i * 2 + 1} 0 R >>");
             Object(FirstPage + i * 2 + 1, $"<< /Length {content.Length} >>\nstream\n{content}\nendstream");
         }
         var info = FirstPage + _pages.Count * 2;
         Object(info, $"<< /Title {Literal(Title)} /Author {Literal(Author)} /Producer (MatCMS Shop) /CreationDate (D:{DateTime.UtcNow:yyyyMMddHHmmss}Z) >>");
+
+        foreach (var (jpeg, w, h) in _images)
+            Object(offsets.Count + 1, $"<< /Type /XObject /Subtype /Image /Width {w} /Height {h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length {jpeg.Length} >>\nstream\n{Encoding.Latin1.GetString(jpeg)}\nendstream");
 
         var xref = buffer.Position;
         Write($"xref\n0 {offsets.Count + 1}\n0000000000 65535 f \n");
@@ -179,6 +189,21 @@ internal sealed class PdfPage
     public void Line(double x1, double top1, double x2, double top2, double width = 0.5, double gray = 0.75) =>
         _content.Append($"{N(gray)} G {N(width)} w {N(x1)} {N(Y(top1))} m {N(x2)} {N(Y(top2))} l S\n");
 
+    /// <summary>Text in a colour (components 0…1).</summary>
+    public void TextRgb(double x, double baseline, string text, double size, (double R, double G, double B) rgb, bool bold = false)
+    {
+        if (text.Length == 0) return;
+        _content.Append($"BT /{(bold ? "F2" : "F1")} {N(size)} Tf {N(rgb.R)} {N(rgb.G)} {N(rgb.B)} rg {N(x)} {N(Y(baseline))} Td {PdfWriter.Literal(text)} Tj ET\n");
+    }
+
+    /// <summary>A line in a colour.</summary>
+    public void LineRgb(double x1, double top1, double x2, double top2, double width, (double R, double G, double B) rgb) =>
+        _content.Append($"{N(rgb.R)} {N(rgb.G)} {N(rgb.B)} RG {N(width)} w {N(x1)} {N(Y(top1))} m {N(x2)} {N(Y(top2))} l S\n");
+
+    /// <summary>An image added with <see cref="PdfWriter.AddImage"/>, its upper left corner at (<paramref name="x"/>, <paramref name="top"/>).</summary>
+    public void Image(int number, double x, double top, double width, double height) =>
+        _content.Append($"q {N(width)} 0 0 {N(height)} {N(x)} {N(Y(top + height))} cm /Im{number} Do Q\n");
+
     /// <summary>A filled grey rectangle (<paramref name="top"/> is its upper edge).</summary>
     public void Box(double x, double top, double width, double height, double gray = 0.95) =>
         _content.Append($"{N(gray)} g {N(x)} {N(Y(top + height))} {N(width)} {N(height)} re f\n");
@@ -189,14 +214,28 @@ internal static class ShopPdf
 {
     private const double Left = 50, Right = 545, Top = 52, Bottom = 780, Line = 12.5;
 
-    public static byte[] Render(InvoiceDoc d)
+    /// <summary>#rrggbb as PDF colour components.</summary>
+    internal static (double R, double G, double B) Rgb(string hex) =>
+        (System.Convert.ToInt32(hex.Substring(1, 2), 16) / 255.0, System.Convert.ToInt32(hex.Substring(3, 2), 16) / 255.0, System.Convert.ToInt32(hex.Substring(5, 2), 16) / 255.0);
+
+    /// <param name="logo">The seller's logo as a JPEG (<see cref="IPluginSite.LoadImageAsync"/>), or null for none.</param>
+    public static byte[] Render(InvoiceDoc d, PluginImage? logo = null)
     {
         var pdf = new PdfWriter { Title = d.Title + " " + d.Number, Author = d.SellerName };
         var page = pdf.AddPage();
         var y = Top;
+        var accent = Rgb(ShopInvoice.AccentOf(d.Accent));
+        if (logo is { Width: > 0, Height: > 0 })
+        {
+            // As large as fits into 170 × 46 points, never stretched.
+            var scale = Math.Min(170.0 / logo.Width, 46.0 / logo.Height);
+            var w = logo.Width * scale; var h = logo.Height * scale;
+            page.Image(pdf.AddImage(logo.Jpeg, logo.Width, logo.Height), Left, y, w, h);
+            y += h + 12;
+        }
 
         // ---- head: the title and the numbers on the left, the seller on the right ----------------------
-        page.Text(Left, y + 14, d.Title, 20, bold: true);
+        page.TextRgb(Left, y + 14, d.Title, 20, accent, bold: true);
         var left = y + 36;
         void Pair(string label, string value)
         {
@@ -248,6 +287,7 @@ internal static class ShopPdf
             page.TextRight(colUnit, y + 1.5, d.L("Einzelpreis", "Unit price"), 8.5, true);
             if (d.ShowTax) page.TextRight(colTax, y + 1.5, d.L("MwSt.", "VAT"), 8.5, true);
             page.TextRight(colTotal - 3, y + 1.5, d.L("Gesamt", "Total"), 8.5, true);
+            page.LineRgb(Left, y + 7, Right, y + 7, 1.2, accent);
             y += 20;
         }
         PdfPage NewPage()
@@ -293,7 +333,7 @@ internal static class ShopPdf
             page.TextRight(Right - 3, y + 8, d.M(g.TaxCents), 9, gray: 0.35);
             y += 13;
         }
-        page.Line(sumLeft, y + 2, Right, y + 2, 1, 0);
+        page.LineRgb(sumLeft, y + 2, Right, y + 2, 1.4, accent);
         page.Text(sumLeft, y + 16, d.IsCredit ? d.L("Erstattungsbetrag", "Amount refunded") : d.L("Gesamtbetrag", "Total"), 11, bold: true);
         page.TextRight(Right - 3, y + 16, d.M(d.TotalCents), 11, bold: true);
         y += 34;

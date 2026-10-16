@@ -102,8 +102,53 @@ public class ShopSaleTests : IClassFixture<AppFactory>, IAsyncLifetime
         var id = long.Parse(ok.Headers.Location!.OriginalString.Split('/').Last().Split('?')[0]);
         var saved = await _shop.ProductAsync(id);
         Assert.Equal(800, saved.PriceCents); Assert.Equal(1000, saved.CompareCents);
-        Assert.Contains("Angebot −20 %", Decode(await admin.GetStringAsync("/admin/p/shop/products")));
+        Assert.Contains("−20 %", Decode(await admin.GetStringAsync("/admin/p/shop/products")));
         Assert.Contains("value=\"10,00\"", Decode(await admin.GetStringAsync($"/admin/p/shop/products/{id}")));
+    }
+
+    [Fact]
+    public async Task The_carousel_layout_is_a_row_that_scrolls_and_snaps_with_two_buttons_and_the_cards_inside()
+    {
+        await Add("Karussell Eins", 500, 0); await Add("Karussell Zwei", 600, 0);
+        var html = await Block("""{"source":"all","layout":"carousel","limit":"48"}""");
+        Assert.Contains("class=\"shop-carousel\"", html);
+        Assert.Contains("class=\"track\"", html);
+        Assert.Contains("class=\"prev\"", html); Assert.Contains("class=\"next\"", html);
+        Assert.Contains("Karussell Eins", html); Assert.Contains("Karussell Zwei", html);
+        Assert.Contains("scroll-snap-type:x mandatory", html);                                 // the CSS comes with the block
+        Assert.Contains("<script>(function(){var r=document.getElementById('shop-car-", html);
+        // Two carousels on one page do not share a script target.
+        var other = await Block("""{"source":"all","layout":"carousel"}""");
+        var idOf = (string s) => System.Text.RegularExpressions.Regex.Match(s, "id=\"(shop-car-[a-f0-9]+)\"").Groups[1].Value;
+        Assert.NotEqual(idOf(html), idOf(other));
+        Assert.DoesNotContain("shop-carousel\"", await Block("""{"source":"all","layout":"grid"}"""));
+    }
+
+    [Fact]
+    public async Task The_best_sellers_are_the_products_sold_most_in_paid_orders_and_an_empty_history_shows_the_highlights()
+    {
+        var featured = await _shop.WithContextAsync((_, s) => s.SaveProductAsync(new Product { Slug = "top-noch-nichts", Title = "Top Noch Nichts", PriceCents = 700, Featured = true }));
+        Assert.True(featured > 0);
+        // Before any sale the block does not stay empty.
+        Assert.Contains("Top Noch Nichts", await Block("""{"source":"top","limit":"1"}"""));
+
+        await _shop.AddProductAsync("Top Selten", 1000);
+        await _shop.AddProductAsync("Top Oft", 1000);
+        await _shop.AddProductAsync("Top Nie Bezahlt", 1000);
+        var admin = await _shop.AdminAsync();
+        async Task Sell(string slug, int qty, bool pay = true)
+        {
+            var c = _app.Browser();
+            await _shop.AddToCartAsync(c, slug, qty);
+            var order = (await _shop.OrderAsync(ShopApp.NumberOf(await _shop.CheckoutAsync(c))))!;
+            if (pay) await _shop.AdminActionAsync(admin, order.Id, "paid");
+        }
+        await Sell("top-selten", 1); await Sell("top-oft", 2); await Sell("top-oft", 3); await Sell("top-nie-bezahlt", 9, pay: false);
+        var html = await Block("""{"source":"top","limit":"2"}""");
+        Assert.True(html.IndexOf("Top Oft", StringComparison.Ordinal) is var a and >= 0 && html.IndexOf("Top Selten", StringComparison.Ordinal) is var b && b > a);   // most pieces first
+        Assert.DoesNotContain("Top Nie Bezahlt", html);                                         // an order nobody paid is no sale
+        Assert.DoesNotContain("Top Noch Nichts", html);                                         // with sales, the highlights step aside
+        Assert.DoesNotContain("Top Selten", await Block("""{"source":"top","limit":"1"}"""));    // the limit counts
     }
 
     [Fact]

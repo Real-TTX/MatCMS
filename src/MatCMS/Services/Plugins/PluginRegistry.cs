@@ -49,9 +49,18 @@ public sealed class PluginRegistry
     /// <summary>A page inside an admin section. <see cref="Tab"/> null = a detail page without a tab.</summary>
     public sealed record SectionPage(PluginRoutePattern Pattern, string? Tab, PluginHandler Handler);
 
-    /// <summary>An admin section: one sidebar line and the pages behind it.</summary>
+    /// <summary>A link of a section's own sidebar block (<see cref="IAdminSection.Link"/>).</summary>
+    public sealed record SectionLink(string Label, string Path, string Icon, string? Heading, bool Badge)
+    {
+        /// <summary>Further pages of the section the link also stands for (active on them).</summary>
+        public IReadOnlyList<string> Also { get; init; } = Array.Empty<string>();
+    }
+
+    /// <summary>An admin section: one sidebar line (or a block of links, when it declares any) and the pages behind it.</summary>
     public sealed record SectionEntry(string Owner, PluginInfo Info, string Label, string Icon, AdminGroup Group, int Order, IReadOnlyList<SectionPage> Pages)
     {
+        /// <summary>The links of the section's own sidebar block; empty = one plain line and the tab bar.</summary>
+        public List<SectionLink> Links { get; } = new();
         /// <summary>The pages that appear as tabs, in registration order.</summary>
         public IEnumerable<SectionPage> Tabs => Pages.Where(p => p.Tab is not null);
         /// <summary>URL of the section's start page.</summary>
@@ -59,6 +68,26 @@ public sealed class PluginRegistry
         /// <summary>Computes the counter next to the sidebar entry; null when the section has none. Set while the plugin configures.</summary>
         public PluginBadgeProvider? Badge { get; set; }
     }
+
+    /// <summary>A template part a plugin declared. <see cref="Key"/> is how a template stores its version of it.</summary>
+    public sealed record TemplatePartEntry(string Owner, PluginInfo Info, TemplatePartSpec Spec)
+    {
+        public string Key => Owner + "." + Spec.Name;
+        /// <summary>The name of the file in the template editor.</summary>
+        public string FileName => Owner + "-" + Spec.Name + ".html";
+    }
+
+    /// <summary>A group of link targets a plugin offers (<see cref="IPluginBuilder.LinkTargets"/>).</summary>
+    public sealed record LinkTargetEntry(string Owner, PluginInfo Info, string Group, LinkTargetProvider Provider);
+
+    /// <summary>A menu element a plugin offers. <see cref="Key"/> is what a menu item stores after "plugin:".</summary>
+    public sealed record MenuElementEntry(string Owner, PluginInfo Info, MenuElementSpec Spec, MenuElementProvider Provider)
+    {
+        public string Key => Owner + "." + Spec.Name;
+    }
+
+    /// <summary>A page of a plugin the editors lay out in the block editor.</summary>
+    public sealed record PageRoleEntry(string Owner, PluginInfo Info, PageRoleSpec Spec);
 
     /// <summary>A scheduled job.</summary>
     public sealed record JobEntry(string Owner, PluginInfo Info, string Name, JobSchedule Schedule, PluginJobHandler Handler);
@@ -98,8 +127,14 @@ public sealed class PluginRegistry
         internal Dictionary<string, Dictionary<string, string>> StringTables { get; } = new(StringComparer.OrdinalIgnoreCase);
         internal List<Contribution<PluginTileProvider>> Tiles { get; } = new();
         internal List<Contribution<PluginRecentProvider>> Recents { get; } = new();
+        internal List<Contribution<PluginCardProvider>> Cards { get; } = new();
         internal List<Contribution<PluginAttentionProvider>> Attentions { get; } = new();
         internal List<Contribution<PluginSitemapProvider>> Sitemaps { get; } = new();
+        internal List<Contribution<PluginMenuProvider>> Menus { get; } = new();
+        internal List<TemplatePartEntry> TemplateParts { get; } = new();
+        internal List<LinkTargetEntry> LinkTargetSets { get; } = new();
+        internal List<MenuElementEntry> MenuElements { get; } = new();
+        internal List<PageRoleEntry> PageRoles { get; } = new();
         internal List<Contribution<PluginMediaProvider>> MediaRefs { get; } = new();
         internal List<OperationEntry> Operations { get; } = new();
         internal List<OptionSourceEntry> OptionSources { get; } = new();
@@ -148,8 +183,14 @@ public sealed class PluginRegistry
         public IReadOnlyDictionary<string, IReadOnlyList<EventEntry>> Events = new Dictionary<string, IReadOnlyList<EventEntry>>();
         public IReadOnlyList<Contribution<PluginTileProvider>> Tiles = Array.Empty<Contribution<PluginTileProvider>>();
         public IReadOnlyList<Contribution<PluginRecentProvider>> Recents = Array.Empty<Contribution<PluginRecentProvider>>();
+        public IReadOnlyList<Contribution<PluginCardProvider>> Cards = Array.Empty<Contribution<PluginCardProvider>>();
         public IReadOnlyList<Contribution<PluginAttentionProvider>> Attentions = Array.Empty<Contribution<PluginAttentionProvider>>();
         public IReadOnlyList<Contribution<PluginSitemapProvider>> Sitemaps = Array.Empty<Contribution<PluginSitemapProvider>>();
+        public IReadOnlyList<Contribution<PluginMenuProvider>> Menus = Array.Empty<Contribution<PluginMenuProvider>>();
+        public IReadOnlyList<TemplatePartEntry> TemplateParts = Array.Empty<TemplatePartEntry>();
+        public IReadOnlyList<LinkTargetEntry> LinkTargetSets = Array.Empty<LinkTargetEntry>();
+        public IReadOnlyList<MenuElementEntry> MenuElements = Array.Empty<MenuElementEntry>();
+        public IReadOnlyList<PageRoleEntry> PageRoles = Array.Empty<PageRoleEntry>();
         public IReadOnlyList<Contribution<PluginMediaProvider>> MediaRefs = Array.Empty<Contribution<PluginMediaProvider>>();
         public IReadOnlyList<OperationEntry> Operations = Array.Empty<OperationEntry>();
     }
@@ -225,8 +266,14 @@ public sealed class PluginRegistry
                 .ToDictionary(g => g.Key, g => (IReadOnlyList<EventEntry>)g.ToList(), StringComparer.Ordinal),
             Tiles = slices.SelectMany(s => s.Tiles).ToList(),
             Recents = slices.SelectMany(s => s.Recents).ToList(),
+            Cards = slices.SelectMany(s => s.Cards).ToList(),
             Attentions = slices.SelectMany(s => s.Attentions).ToList(),
             Sitemaps = slices.SelectMany(s => s.Sitemaps).ToList(),
+            Menus = slices.SelectMany(s => s.Menus).ToList(),
+            TemplateParts = slices.SelectMany(s => s.TemplateParts).ToList(),
+            LinkTargetSets = slices.SelectMany(s => s.LinkTargetSets).ToList(),
+            MenuElements = slices.SelectMany(s => s.MenuElements).ToList(),
+            PageRoles = slices.SelectMany(s => s.PageRoles).ToList(),
             MediaRefs = slices.SelectMany(s => s.MediaRefs).ToList(),
             Operations = slices.SelectMany(s => s.Operations).ToList()
         };
@@ -269,8 +316,20 @@ public sealed class PluginRegistry
     public IReadOnlyList<Contribution<PluginTileProvider>> Tiles => _snap.Tiles;
     /// <summary>Providers of the dashboard's "recently edited" rows.</summary>
     public IReadOnlyList<Contribution<PluginRecentProvider>> Recents => _snap.Recents;
+    /// <summary>Providers of the plugins' own dashboard cards.</summary>
+    public IReadOnlyList<Contribution<PluginCardProvider>> Cards => _snap.Cards;
     /// <summary>Providers of "Braucht Aufmerksamkeit" lines.</summary>
     public IReadOnlyList<Contribution<PluginAttentionProvider>> Attentions => _snap.Attentions;
+    /// <summary>The template parts loaded plugins declared.</summary>
+    public IReadOnlyList<TemplatePartEntry> TemplateParts => _snap.TemplateParts;
+    /// <summary>The groups of link targets loaded plugins offer.</summary>
+    public IReadOnlyList<LinkTargetEntry> LinkTargetSets => _snap.LinkTargetSets;
+    /// <summary>The menu elements loaded plugins offer.</summary>
+    public IReadOnlyList<MenuElementEntry> MenuElements => _snap.MenuElements;
+    /// <summary>The pages loaded plugins let the editors lay out.</summary>
+    public IReadOnlyList<PageRoleEntry> PageRoles => _snap.PageRoles;
+    /// <summary>Providers of the entries plugins add to the public menus.</summary>
+    public IReadOnlyList<Contribution<PluginMenuProvider>> Menus => _snap.Menus;
     /// <summary>Sitemap providers.</summary>
     public IReadOnlyList<Contribution<PluginSitemapProvider>> Sitemaps => _snap.Sitemaps;
     /// <summary>Providers of the media files plugins use.</summary>
@@ -320,7 +379,8 @@ public sealed class PluginRegistry
         if (section is null) return null;
         if (string.IsNullOrWhiteSpace(path))
         {
-            var start = section.Tabs.FirstOrDefault() ?? section.Pages.FirstOrDefault();
+            // A section with a menu of its own opens on its FIRST page (the shop's dashboard); one with tabs, on its first tab.
+            var start = section.Links.Count > 0 ? section.Pages.FirstOrDefault() : section.Tabs.FirstOrDefault() ?? section.Pages.FirstOrDefault();
             return start is null ? null : (section, start, new Dictionary<string, string>());
         }
         foreach (var p in section.Pages.OrderBy(p => p.Pattern.HasCatchAll).ThenByDescending(p => p.Pattern.Specificity))

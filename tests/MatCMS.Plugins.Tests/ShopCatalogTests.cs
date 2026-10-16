@@ -103,12 +103,12 @@ public class ShopCatalogTests : IClassFixture<AppFactory>, IAsyncLifetime
     public async Task The_catalogue_shows_the_category_it_is_about_counts_and_a_way_back()
     {
         await Add("Kc Eins", 100, category: "kc-sachen"); await Add("Kc Zwei", 200, category: "kc-sachen"); await Add("Kc Weg", 300, category: "kc-sachen", active: false);
-        var page = await Page("/shop?cat=kc-sachen");
+        var page = await Page("/shop/categories/kc-sachen");
         Assert.Contains("<h1>Kc-sachen</h1>", page);
         Assert.Contains("2 Produkte", page);                                              // the hidden one is not counted
-        Assert.Contains("Filter zurücksetzen", page);
+        Assert.Contains("<a href=\"/shop\">Alle</a>", page);                                 // the way back is in the category list
         Assert.DoesNotContain("Kc Weg", page);
-        Assert.Contains("Kc-sachen <span class=\"shop-muted\">2</span>", page);
+        Assert.Contains("Kc-sachen <span>2</span>", page);
     }
 
     [Fact]
@@ -128,7 +128,7 @@ public class ShopCatalogTests : IClassFixture<AppFactory>, IAsyncLifetime
         await Add("Kr Fremd", 1300, category: "kr-andere");
         var page = await Page("/shop/kr-haupt");
         Assert.Contains("href=\"/shop?tag=kr-wort\"", page);
-        Assert.Contains("href=\"/shop?cat=kr-gruppe\"", page);                           // the breadcrumb
+        Assert.Contains("href=\"/shop/categories/kr-gruppe\"", page);                           // the breadcrumb
         Assert.Contains("Ähnliche Produkte", page);
         Assert.Contains("Kr Gleiche Kategorie", page);
         Assert.Contains("Kr Gleiches Wort", page);

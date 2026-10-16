@@ -19,6 +19,8 @@ public static class SettingKeys
     // i18n: comma-separated list of ACTIVE content languages (besides the always-on default "de"),
     // e.g. "en,fr". Managed under Settings → Sprachen. Only routable codes count (Localizer).
     public const string Languages = "i18n.languages";
+    /// <summary>The dashboard layout new and unconfigured users get (an admin can save his own as the default) — same JSON as <c>User.DashboardJson</c>.</summary>
+    public const string DashboardLayout = "dashboard.layout";
 
     // i18n: the DEFAULT (root) content language served at prefix-less URLs. Empty = "de". Applied at
     // startup (Localizer.SetDefaultCulture) → a change needs an app restart. Managed under Settings → Sprachen.

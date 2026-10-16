@@ -8,4 +8,5 @@ namespace MatCMS.Content;
 /// container children). Used both by the public page (<c>View.cshtml</c>, DB rows) and by the editor's
 /// live-preview endpoint (in-memory draft rows), so there is a single block-render code path.
 /// </summary>
-public sealed record BlockListModel(IReadOnlyList<ContentBlock> Blocks, BlockRegistry Registry, bool Editor);
+/// <param name="Scope">The variables of a plugin page drawn with the data of a request; null on every other page.</param>
+public sealed record BlockListModel(IReadOnlyList<ContentBlock> Blocks, BlockRegistry Registry, bool Editor, BlockScope? Scope = null);

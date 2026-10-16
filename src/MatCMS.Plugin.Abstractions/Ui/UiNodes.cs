@@ -75,6 +75,28 @@ public sealed record UiGrid(IReadOnlyList<UiNode> Children) : UiNode
     public int MinWidth { get; init; } = 240;
 }
 
+/// <summary>One entry of a screen's own sub-menu (<see cref="UiSplit"/>).</summary>
+public sealed record UiNavItem(string Label, string Href)
+{
+    /// <summary>A Tabler icon name (<c>ti-truck-delivery</c>); null = none.</summary>
+    public string? Icon { get; init; }
+    /// <summary>The entry of the page being shown.</summary>
+    public bool Active { get; init; }
+    /// <summary>A small heading above this entry (and the ones after it, until another is given).</summary>
+    public string? Heading { get; init; }
+    /// <summary>A counter or a short state next to the label.</summary>
+    public string? Badge { get; init; }
+}
+
+/// <summary>
+/// A screen with a sub-menu: a list of links on the left, the content on the right (on a narrow screen the list sits above). For a group of related pages — the conditions of a
+/// shop, the settings of a plugin — where a row of tabs is too small and a line per page in the sidebar too many.
+/// </summary>
+public sealed record UiSplit(IReadOnlyList<UiNavItem> Nav, IReadOnlyList<UiNode> Children) : UiNode;
+
+/// <summary>A main column and a narrower side column next to it (below it on a narrow screen) — an editor with its settings at the side. Inside a form the fields of both columns belong to the form.</summary>
+public sealed record UiColumns(IReadOnlyList<UiNode> Main, IReadOnlyList<UiNode> Side) : UiNode;
+
 /// <summary>A panel.</summary>
 /// <param name="Children">The content.</param>
 public sealed record UiCard(IReadOnlyList<UiNode> Children) : UiNode
@@ -220,6 +242,8 @@ public sealed record UiAction(string Label, IReadOnlyDictionary<string, string> 
     public UiButtonKind Kind { get; init; } = UiButtonKind.Ghost;
     /// <summary>A Tabler icon instead of text (the label stays as tooltip).</summary>
     public string? Icon { get; init; }
+    /// <summary>Show the label next to the icon instead of the icon alone.</summary>
+    public bool WithLabel { get; init; }
     /// <summary>Asks first.</summary>
     public string? Confirm { get; init; }
 }
@@ -383,6 +407,57 @@ public sealed record UiTags(string Name, string Label) : UiField(Name, Label)
     public IReadOnlyList<string> Suggestions { get; init; } = Array.Empty<string>();
 }
 
+/// <summary>What a cell of a <see cref="UiRowEditor"/> holds.</summary>
+public enum UiRowCell
+{
+    /// <summary>One line of text.</summary>
+    Text,
+    /// <summary>A number or an amount (typed with comma or point; the plugin reads it).</summary>
+    Number,
+    /// <summary>A switch; posts "true" when on and nothing when off.</summary>
+    Check,
+    /// <summary>A picture of the media library: its address in a small field with a preview and a button that opens the picker.</summary>
+    Image
+}
+
+/// <summary>A column of a <see cref="UiRowEditor"/>.</summary>
+/// <param name="Key">The part of the posted name that says which column it is.</param>
+/// <param name="Header">The column heading.</param>
+public sealed record UiRowColumn(string Key, string Header)
+{
+    /// <summary>What the cell holds.</summary>
+    public UiRowCell Kind { get; init; }
+    /// <summary>Greyed hint while empty.</summary>
+    public string? Placeholder { get; init; }
+    /// <summary>A CSS width such as "8em"; the column shares what is left when null.</summary>
+    public string? Width { get; init; }
+}
+
+/// <summary>One row of a <see cref="UiRowEditor"/>.</summary>
+/// <param name="Id">Whatever identifies the thing the row stands for ("" for a new one); posted back untouched so the plugin knows which row is which.</param>
+/// <param name="Values">One value per column, in the columns' order ("true" switches a <see cref="UiRowCell.Check"/> on).</param>
+public sealed record UiRowValue(string Id, IReadOnlyList<string> Values);
+
+/// <summary>
+/// Rows the user can add to, edit and delete in place (variants, price steps, links): a small table whose cells are fields. It posts <c>{Name}.count</c> and, for each row i,
+/// <c>{Name}.{i}.id</c> and <c>{Name}.{i}.{column key}</c> — numbered in the order the rows stand on the screen when the form is sent, so a row added or deleted on the way leaves no gap.
+/// </summary>
+/// <param name="Name">Field name (the prefix of everything posted).</param>
+/// <param name="Label">Label.</param>
+public sealed record UiRowEditor(string Name, string Label) : UiField(Name, Label)
+{
+    /// <summary>The columns.</summary>
+    public IReadOnlyList<UiRowColumn> Columns { get; init; } = Array.Empty<UiRowColumn>();
+    /// <summary>The rows as they are now.</summary>
+    public IReadOnlyList<UiRowValue> Rows { get; init; } = Array.Empty<UiRowValue>();
+    /// <summary>The text of the button that adds a row.</summary>
+    public string AddLabel { get; init; } = "+";
+    /// <summary>Shown while there is no row.</summary>
+    public string? EmptyText { get; init; }
+    /// <summary>No more rows than this can be added.</summary>
+    public int MaxRows { get; init; } = 100;
+}
+
 /// <summary>A column of a <see cref="UiTable"/>.</summary>
 /// <param name="Header">The heading.</param>
 public sealed record UiColumn(string Header)
@@ -399,6 +474,17 @@ public sealed record UiTableRow(IReadOnlyList<UiNode> Cells)
 {
     /// <summary>The text the live search matches against; the cells' own text when null.</summary>
     public string? Search { get; init; }
+    /// <summary>Space-separated words the table's <see cref="UiTable.Filter"/> selects by ("active", "sale").</summary>
+    public string? Tags { get; init; }
+}
+
+/// <summary>A drop-down above a table that shows only the rows carrying the chosen value among their <see cref="UiTableRow.Tags"/>; an empty value shows all.</summary>
+/// <param name="Label">What the control is for (read aloud).</param>
+/// <param name="Options">Value and text of each choice; the first should have an empty value ("All").</param>
+public sealed record UiListFilter(string Label, IReadOnlyList<(string Value, string Text)> Options)
+{
+    /// <summary>The value chosen when the page opens (a link such as "orders waiting to be shipped" lands on a list that is already filtered); empty = all.</summary>
+    public string? Selected { get; init; }
 }
 
 /// <summary>A table with optional live search and paging in the browser.</summary>
@@ -412,6 +498,10 @@ public sealed record UiTable(IReadOnlyList<UiColumn> Columns, IReadOnlyList<UiTa
     public int PageSize { get; init; }
     /// <summary>What to say when there are no rows (the header stays).</summary>
     public string EmptyText { get; init; } = "";
+    /// <summary>A filter next to the search box.</summary>
+    public UiListFilter? Filter { get; init; }
+    /// <summary>The list's actions — "New …" — shown BELOW it, where the admin's own lists put them.</summary>
+    public IReadOnlyList<UiNode> Below { get; init; } = Array.Empty<UiNode>();
 }
 
 /// <summary>One tab of a <see cref="UiTabs"/>.</summary>

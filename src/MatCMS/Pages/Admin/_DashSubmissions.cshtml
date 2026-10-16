@@ -1,0 +1,28 @@
+@model MatCMS.Pages.Admin.IndexModel
+<div class="card dash-card">
+    <h2>@T["dashboard.recentSubmissions"]</h2>
+    <div class="dash-card-body">
+    <table class="data">
+        <tbody>
+            @if (Model.RecentSubmissions.Count == 0)
+            {
+                <partial name="_EmptyRow" model='@T["dashboard.noSubmissions"]' />
+            }
+            @foreach (var s in Model.RecentSubmissions)
+            {
+                <tr>
+                    <td><a asp-page="/Admin/Forms/Submissions" asp-route-id="@s.FormId">@(s.Form?.Name ?? "—")</a> @if (!s.IsRead) { <span class="badge badge-new">@T["dashboard.unread"]</span> }</td>
+                    <td class="muted mono nowrap">@s.CreatedAt.ToLocalTime().ToString("dd.MM. HH:mm")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    </div>
+    @if (Model.SubmissionCount > 0)
+    {
+        <div class="dash-card-foot">
+            <a class="btn btn-ghost" asp-page="/Admin/Forms/Inbox">@T["dashboard.showAll", Model.SubmissionCount]</a>
+            @if (Model.UnreadCount > 0) { <a class="btn btn-ghost" asp-page="/Admin/Forms/Inbox" asp-route-filter="unread">@T["dashboard.showUnread", Model.UnreadCount]</a> }
+        </div>
+    }
+</div>

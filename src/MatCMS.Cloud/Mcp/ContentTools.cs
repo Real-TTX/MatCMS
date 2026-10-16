@@ -201,6 +201,123 @@ public class ContentTools
         return new { ok = true, opId = op.Id, queued = true, message = "Gutschein eingereiht — wird beim nächsten Kontakt angelegt. Ergebnis via get_content_op." };
     }
 
+    // ---- the shop: orders, variants, attributes (the site's shop plugin answers; queued like every content op) ----
+
+    [McpServerTool(Name = "list_shop_orders"), Description(
+        "Read orders of the shop of a connected site: ONE order by number, or the newest ones (optionally of one status: awaiting_payment, paid, shipped, completed, cancelled, refunded; optionally since a day yyyy-MM-dd; at most 100). " +
+        "The answer holds customers' names, e-mail and delivery addresses, so it needs a key with the restore right. QUEUED: returns an opId; poll get_content_op(opId) whose `result` holds { orders:[{ number, status, totals in cents, items, shippingAddress, tracking … }], total }.")]
+    public static async Task<object> ListShopOrders(
+        McpContext me, InstanceService instances,
+        [Description("The instance id, as returned by list_instances.")] string instanceId,
+        [Description("One order's number, e.g. \"SH-1001\". Leave empty for a list.")] string? number = null,
+        [Description("Only orders of this status.")] string? status = null,
+        [Description("Only orders since this day, format yyyy-MM-dd.")] string? since = null,
+        [Description("How many (1-100). Default 25.")] int? limit = null,
+        CancellationToken ct = default)
+    {
+        var instance = await ResolveWritableAsync(me, instances, instanceId, ct);
+        var payload = JsonSerializer.Serialize(new { number = (number ?? "").Trim(), status = (status ?? "").Trim(), since = (since ?? "").Trim(), limit });
+        var op = await instances.EnqueueContentOpAsync(instance, "order.list", payload, overwrite: false, reason: "KI: Bestellungen lesen", ct);
+        return new { ok = true, opId = op.Id, queued = true, message = "Angefragt — Ergebnis via get_content_op(opId)." };
+    }
+
+    [McpServerTool(Name = "update_shop_order"), Description(
+        "Move ONE order of a connected site's shop along, the way the shop's admin does: action \"paid\" (mark as paid: invoice, stock, mails), \"ship\" (with carrier and tracking number; the customer is notified unless notify=false), " +
+        "\"complete\", \"cancel\", \"note\" (an internal note) or \"tracking\" (only set carrier/tracking). A move the order cannot make (e.g. completing an unpaid order) is refused with the reason. " +
+        "Queued and applied on the next heartbeat (~a minute); check get_content_op(opId). Requires a key with the restore right.")]
+    public static async Task<object> UpdateShopOrder(
+        McpContext me, InstanceService instances,
+        [Description("The instance id, as returned by list_instances.")] string instanceId,
+        [Description("The order's number, e.g. \"SH-1001\".")] string number,
+        [Description("paid, ship, complete, cancel, note or tracking.")] string action,
+        [Description("For ship/tracking: the tracking number.")] string? tracking = null,
+        [Description("For ship/tracking: the carrier, e.g. dhl, dpd, ups, hermes, gls, fedex, post-at, swiss-post or custom.")] string? carrier = null,
+        [Description("For note: the text.")] string? text = null,
+        [Description("Tell the customer by mail (ship: default true; cancel: default false).")] bool? notify = null,
+        CancellationToken ct = default)
+    {
+        var instance = await ResolveWritableAsync(me, instances, instanceId, ct);
+        var a = (action ?? "").Trim().ToLowerInvariant();
+        if (a is not ("paid" or "ship" or "complete" or "cancel" or "note" or "tracking")) throw new McpException("action muss paid, ship, complete, cancel, note oder tracking sein.");
+        if (string.IsNullOrWhiteSpace(number)) throw new McpException("number fehlt.");
+        var payload = JsonSerializer.Serialize(new { number = number.Trim(), action = a, tracking = (tracking ?? "").Trim(), carrier = (carrier ?? "").Trim(), text = (text ?? "").Trim(), notify });
+        var op = await instances.EnqueueContentOpAsync(instance, "order.update", payload, overwrite: true, reason: "KI: Bestellung bearbeiten", ct);
+        return new { ok = true, opId = op.Id, queued = true, message = "Bestellung-Aktion eingereiht — wird beim nächsten Kontakt ausgeführt. Ergebnis via get_content_op." };
+    }
+
+    [McpServerTool(Name = "set_product_variants"), Description(
+        "Set the variants (size, colour …) of an EXISTING product of a connected site's shop by the product's slug. variantsJson is a JSON array of { name, deltaCents, stock, sku, image } — a variant with a known name is updated in place (stock, orders and carts keep pointing at it), a new name is added. " +
+        "With replace=true the variants not in the list are switched off (never deleted). optionsJson ({\"Größe\":[\"S\",\"M\"]}) lets the storefront show a separate picker per option; name the variants \"S / Rot\" (values joined by \" / \"). " +
+        "Queued and applied on the next heartbeat (~a minute); check get_content_op(opId). Requires a key with the restore right.")]
+    public static async Task<object> SetProductVariants(
+        McpContext me, InstanceService instances,
+        [Description("The instance id, as returned by list_instances.")] string instanceId,
+        [Description("The product's slug.")] string product,
+        [Description("JSON array: [{\"name\":\"M\",\"deltaCents\":200,\"stock\":5,\"sku\":\"T-M\",\"image\":\"/uploads/x.jpg\"}]. deltaCents is the surcharge on the product's price; leave stock out for unlimited.")] string variantsJson,
+        [Description("Switch off the product's variants that are not in the list. Default false.")] bool replace = false,
+        [Description("Optional JSON object option name → values, e.g. {\"Größe\":[\"S\",\"M\"],\"Farbe\":[\"Rot\"]}.")] string? optionsJson = null,
+        CancellationToken ct = default)
+    {
+        var instance = await ResolveWritableAsync(me, instances, instanceId, ct);
+        System.Text.Json.Nodes.JsonNode? variants, options = null;
+        try { variants = System.Text.Json.Nodes.JsonNode.Parse(variantsJson ?? ""); if (!string.IsNullOrWhiteSpace(optionsJson)) options = System.Text.Json.Nodes.JsonNode.Parse(optionsJson); }
+        catch (JsonException) { throw new McpException("variantsJson/optionsJson ist kein gültiges JSON."); }
+        if (variants is not System.Text.Json.Nodes.JsonArray list || list.Count == 0) throw new McpException("variantsJson muss ein nicht leeres Array sein.");
+        foreach (var v in list.OfType<System.Text.Json.Nodes.JsonObject>())
+            if (v["deltaCents"] is { } d) { v["delta_cents"] = d.DeepClone(); v.Remove("deltaCents"); }
+        var payload = new System.Text.Json.Nodes.JsonObject { ["product"] = (product ?? "").Trim(), ["variants"] = list, ["replace"] = replace };
+        if (options is System.Text.Json.Nodes.JsonObject) payload["options"] = options;
+        var op = await instances.EnqueueContentOpAsync(instance, "variant.set", payload.ToJsonString(), overwrite: true, reason: "KI: Varianten setzen", ct);
+        return new { ok = true, opId = op.Id, queued = true, message = "Varianten eingereiht — wird beim nächsten Kontakt gesetzt. Ergebnis via get_content_op." };
+    }
+
+    [McpServerTool(Name = "create_shop_attribute"), Description(
+        "Define a NEW product attribute (Eigenschaft) in the shop of a connected site (add-only: an existing address is skipped): a choice (colour with options), free text, a number (with a unit) or yes/no. Attributes can be shown on the product page and offered as filters. " +
+        "Queued and applied on the next heartbeat (~a minute); check get_content_op(opId). Requires a key with the restore right.")]
+    public static async Task<object> CreateShopAttribute(
+        McpContext me, InstanceService instances,
+        [Description("The instance id, as returned by list_instances.")] string instanceId,
+        [Description("The attribute's name, e.g. \"Farbe\".")] string name,
+        [Description("choice (default), text, number or bool.")] string? kind = null,
+        [Description("For a choice: the options, comma separated, e.g. \"Rot, Blau, Grün\".")] string? options = null,
+        [Description("For a number: the unit shown behind it, e.g. kg.")] string? unit = null,
+        [Description("Offer it as a filter in the catalogue. Default true.")] bool filterable = true,
+        [Description("Limit it to this category's slug (and the categories below); it must exist. Default: every product.")] string? category = null,
+        CancellationToken ct = default)
+    {
+        var instance = await ResolveWritableAsync(me, instances, instanceId, ct);
+        var k = (kind ?? "choice").Trim().ToLowerInvariant();
+        if (k is not ("choice" or "text" or "number" or "bool")) throw new McpException("kind muss choice, text, number oder bool sein.");
+        if (string.IsNullOrWhiteSpace(name)) throw new McpException("name fehlt.");
+        var payload = JsonSerializer.Serialize(new
+        {
+            name = name.Trim(), kind = k, options = (options ?? "").Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries),
+            unit = (unit ?? "").Trim(), filterable, category = (category ?? "").Trim()
+        });
+        var op = await instances.EnqueueContentOpAsync(instance, "attribute.create", payload, overwrite: false, reason: "KI: Eigenschaft anlegen", ct);
+        return new { ok = true, opId = op.Id, queued = true, message = "Eigenschaft eingereiht — wird beim nächsten Kontakt angelegt. Ergebnis via get_content_op." };
+    }
+
+    [McpServerTool(Name = "set_product_attributes"), Description(
+        "Give an EXISTING product of a connected site's shop values for its attributes, by the product's slug. valuesJson is an object attribute-address → value: a choice takes one option or a list (only the attribute's own options are stored), a number a number (\"1,5\"), a text a text, a yes/no true/false. " +
+        "An unknown attribute or an invalid value is reported in the result, not stored. Queued and applied on the next heartbeat (~a minute); check get_content_op(opId). Requires a key with the restore right.")]
+    public static async Task<object> SetProductAttributes(
+        McpContext me, InstanceService instances,
+        [Description("The instance id, as returned by list_instances.")] string instanceId,
+        [Description("The product's slug.")] string product,
+        [Description("JSON object, e.g. {\"farbe\":[\"Rot\",\"Blau\"],\"gewicht\":\"1,5\",\"bio\":true}.")] string valuesJson,
+        CancellationToken ct = default)
+    {
+        var instance = await ResolveWritableAsync(me, instances, instanceId, ct);
+        System.Text.Json.Nodes.JsonNode? values;
+        try { values = System.Text.Json.Nodes.JsonNode.Parse(valuesJson ?? ""); }
+        catch (JsonException) { throw new McpException("valuesJson ist kein gültiges JSON."); }
+        if (values is not System.Text.Json.Nodes.JsonObject obj || obj.Count == 0) throw new McpException("valuesJson muss ein nicht leeres Objekt sein.");
+        var payload = new System.Text.Json.Nodes.JsonObject { ["product"] = (product ?? "").Trim(), ["values"] = obj };
+        var op = await instances.EnqueueContentOpAsync(instance, "product.attributes", payload.ToJsonString(), overwrite: true, reason: "KI: Eigenschaften setzen", ct);
+        return new { ok = true, opId = op.Id, queued = true, message = "Eigenschaften eingereiht — wird beim nächsten Kontakt gesetzt. Ergebnis via get_content_op." };
+    }
+
     [McpServerTool(Name = "create_form"), Description(
         "Create a NEW form (\"Formular\") on a connected site (add-only: an existing slug is skipped). " +
         "You supply the fields as a JSON array (the form-builder definition). Queued and applied on the next heartbeat (~a minute); check get_content_op(opId). Requires a key with the restore right.")]

@@ -163,6 +163,56 @@ internal sealed class PluginBuilder : IPluginBuilder, IAdminBuilder, ISettingsBu
 
     public void Tile(PluginTileProvider provider) { ArgumentNullException.ThrowIfNull(provider); _slice.Tiles.Add(new(Info.Key, Info, provider)); }
     public void RecentlyEdited(PluginRecentProvider provider) { ArgumentNullException.ThrowIfNull(provider); _slice.Recents.Add(new(Info.Key, Info, provider)); }
+    public void DashboardCard(PluginCardProvider provider) { ArgumentNullException.ThrowIfNull(provider); _slice.Cards.Add(new(Info.Key, Info, provider)); }
+    public void TemplatePart(TemplatePartSpec spec)
+    {
+        ArgumentNullException.ThrowIfNull(spec);
+        if (!System.Text.RegularExpressions.Regex.IsMatch(spec.Name ?? "", "^[a-z][a-z0-9-]{0,39}$"))
+            throw new InvalidOperationException($"Template part '{spec.Name}': lower case letters, digits and dashes, starting with a letter.");
+        if (string.IsNullOrWhiteSpace(spec.Label)) throw new InvalidOperationException($"Template part '{spec.Name}' needs a label.");
+        if (string.IsNullOrWhiteSpace(spec.DefaultHtml) || spec.DefaultHtml.Length > 100_000) throw new InvalidOperationException($"Template part '{spec.Name}' needs a default of up to 100,000 characters.");
+        if (_slice.TemplateParts.Any(p => p.Spec.Name == spec.Name)) throw new InvalidOperationException($"Template part '{spec.Name}' is declared twice.");
+        var seen = new HashSet<string>();
+        foreach (var p in spec.Placeholders)
+            if (!System.Text.RegularExpressions.Regex.IsMatch(p.Name ?? "", "^[a-z][a-z0-9_]{0,39}$") || !seen.Add(p.Name!))
+                throw new InvalidOperationException($"Template part '{spec.Name}': placeholder '{p.Name}' is invalid or repeated (lower case letters, digits, underscore).");
+        _slice.TemplateParts.Add(new PluginRegistry.TemplatePartEntry(Info.Key, Info, spec));
+    }
+
+    public void LinkTargets(string group, LinkTargetProvider provider)
+    {
+        ArgumentNullException.ThrowIfNull(provider);
+        if (string.IsNullOrWhiteSpace(group) || group.Length > 80) throw new InvalidOperationException("Link targets need a group name (up to 80 characters).");
+        if (_slice.LinkTargetSets.Any(l => l.Group == group)) throw new InvalidOperationException($"Link target group '{group}' is declared twice.");
+        _slice.LinkTargetSets.Add(new PluginRegistry.LinkTargetEntry(Info.Key, Info, group.Trim(), provider));
+    }
+
+    public void MenuElement(MenuElementSpec spec, MenuElementProvider provider)
+    {
+        ArgumentNullException.ThrowIfNull(spec);
+        ArgumentNullException.ThrowIfNull(provider);
+        if (!System.Text.RegularExpressions.Regex.IsMatch(spec.Name ?? "", "^[a-z][a-z0-9-]{0,39}$"))
+            throw new InvalidOperationException($"Menu element '{spec.Name}': lower case letters, digits and dashes, starting with a letter.");
+        if (string.IsNullOrWhiteSpace(spec.Label) || spec.Label.Length > 80) throw new InvalidOperationException($"Menu element '{spec.Name}' needs a label of up to 80 characters.");
+        if (spec.Icon is { Length: > 0 } ic && !System.Text.RegularExpressions.Regex.IsMatch(ic, "^[a-z][a-z0-9-]*$")) throw new InvalidOperationException($"Menu element '{spec.Name}': the icon is a Tabler name like 'shopping-cart'.");
+        if (spec.DefaultMenu is { Length: > 0 } dm && !System.Text.RegularExpressions.Regex.IsMatch(dm, "^[a-zA-Z0-9_-]{1,40}$")) throw new InvalidOperationException($"Menu element '{spec.Name}': invalid default menu.");
+        if (_slice.MenuElements.Any(e => e.Spec.Name == spec.Name)) throw new InvalidOperationException($"Menu element '{spec.Name}' is declared twice.");
+        _slice.MenuElements.Add(new PluginRegistry.MenuElementEntry(Info.Key, Info, spec, provider));
+    }
+
+    public void PageRole(PageRoleSpec spec)
+    {
+        ArgumentNullException.ThrowIfNull(spec);
+        if (!System.Text.RegularExpressions.Regex.IsMatch(spec.Name ?? "", "^[a-z][a-z0-9-]{0,29}$"))
+            throw new InvalidOperationException($"Page '{spec.Name}': lower case letters, digits and dashes, starting with a letter.");
+        if (string.IsNullOrWhiteSpace(spec.Title)) throw new InvalidOperationException($"Page '{spec.Name}' needs a title.");
+        if (_slice.PageRoles.Any(r => r.Spec.Name == spec.Name)) throw new InvalidOperationException($"Page '{spec.Name}' is declared twice.");
+        foreach (var v in spec.Variables)
+            if (!System.Text.RegularExpressions.Regex.IsMatch(v.Name ?? "", "^[a-z][a-z0-9_]{0,39}$")) throw new InvalidOperationException($"Page '{spec.Name}': variable '{v.Name}' is lower case letters, digits and underscores.");
+        _slice.PageRoles.Add(new PluginRegistry.PageRoleEntry(Info.Key, Info, spec));
+    }
+
+    public void Menu(PluginMenuProvider provider) { ArgumentNullException.ThrowIfNull(provider); _slice.Menus.Add(new(Info.Key, Info, provider)); }
     public void Attention(PluginAttentionProvider provider) { ArgumentNullException.ThrowIfNull(provider); _slice.Attentions.Add(new(Info.Key, Info, provider)); }
 
     public PluginInfo Info { get; }
@@ -211,7 +261,7 @@ internal sealed class PluginBuilder : IPluginBuilder, IAdminBuilder, ISettingsBu
         // back; the adapter turns that into a context, runs the handler and unwraps the result.
         async Task<string> RenderAsync(PluginRequest legacy, CancellationToken ct)
         {
-            var ctx = PluginRequestContext.FromBlock(info, type, legacy, registry);
+            var ctx = await PluginRequestContext.FromBlockAsync(info, type, legacy, registry);
             var result = await render(ctx, ct);
             return result.Kind is PluginResult.ResultKind.Page or PluginResult.ResultKind.Fragment
                 ? PluginResults.Html(result, legacy.Services, MatCMS.Shared.Web.UiTarget.Public)
@@ -293,6 +343,20 @@ internal sealed class PluginBuilder : IPluginBuilder, IAdminBuilder, ISettingsBu
             ArgumentNullException.ThrowIfNull(provider);
             if (entry.Badge is not null) throw new InvalidOperationException("A section has one badge.");
             entry.Badge = provider;
+            return this;
+        }
+
+        public IAdminSection Link(string label, string path, string icon = "ti-point", string? heading = null, bool badge = false, params string[] also)
+        {
+            if (string.IsNullOrWhiteSpace(label)) throw new InvalidOperationException("A sidebar link needs a label.");
+            var p = (path ?? "").Trim();
+            // Relative to the section: a page name or the settings page with a group — never another address (a plugin cannot put a link to elsewhere in the back office's menu).
+            if (p.Length == 0 || p.StartsWith('/') || p.Contains("..") || p.Contains("://") || p.Contains('\\') || p.Contains('#') || p.Any(char.IsControl))
+                throw new InvalidOperationException($"Sidebar link '{path}': a path inside the section (\"orders\", \"_settings?group=…\") is expected.");
+            if (badge && entry.Links.Any(l => l.Badge)) throw new InvalidOperationException("Only one sidebar link shows the section's counter.");
+            var ic = !string.IsNullOrWhiteSpace(icon) && icon.StartsWith("ti-", StringComparison.Ordinal) ? icon : "ti-point";
+            entry.Links.Add(new PluginRegistry.SectionLink(label.Trim(), p, ic, string.IsNullOrWhiteSpace(heading) ? null : heading.Trim(), badge)
+            { Also = (also ?? Array.Empty<string>()).Where(a => !string.IsNullOrWhiteSpace(a) && !a.StartsWith('/') && !a.Contains("..")).Select(a => a.Trim().Trim('/')).ToList() });
             return this;
         }
 

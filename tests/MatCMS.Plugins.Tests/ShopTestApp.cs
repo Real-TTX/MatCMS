@@ -31,6 +31,11 @@ internal sealed class FakeStripe : HttpMessageHandler
     /// <summary>When set, the next session creation fails with this Stripe-style error.</summary>
     public string? FailNextSessionWith { get; set; }
     public string? FailRefundWith { get; set; }
+    /// <summary>What the connection check sees: the key's mode, the endpoints listed at Stripe, and errors for the two calls.</summary>
+    public bool Livemode { get; set; }
+    public JsonArray WebhookEndpoints { get; set; } = new();
+    public (HttpStatusCode, string)? BalanceError { get; set; }
+    public (HttpStatusCode, string)? HooksError { get; set; }
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
@@ -65,6 +70,10 @@ internal sealed class FakeStripe : HttpMessageHandler
             if (FailRefundWith is { } fail) return Error(HttpStatusCode.BadRequest, fail);
             return Json(HttpStatusCode.OK, new JsonObject { ["id"] = "re_test_1", ["status"] = "succeeded" });
         }
+        if (request.Method == HttpMethod.Get && path == "/v1/balance")
+            return BalanceError is { } be ? Error(be.Item1, be.Item2) : Json(HttpStatusCode.OK, new JsonObject { ["object"] = "balance", ["livemode"] = Livemode });
+        if (request.Method == HttpMethod.Get && path == "/v1/webhook_endpoints")
+            return HooksError is { } he ? Error(he.Item1, he.Item2) : Json(HttpStatusCode.OK, new JsonObject { ["data"] = WebhookEndpoints.DeepClone() });
         if (request.Method == HttpMethod.Get && path.StartsWith("/v1/payment_intents/", StringComparison.Ordinal))
             return Json(HttpStatusCode.OK, new JsonObject { ["id"] = path["/v1/payment_intents/".Length..], ["latest_charge"] = new JsonObject { ["amount_refunded"] = AmountRefunded } });
         return Error(HttpStatusCode.NotFound, "Unexpected request " + request.Method + " " + path);
@@ -105,6 +114,8 @@ internal sealed class FakePayPal : HttpMessageHandler
     public string? CaptureValueOverride { get; set; }
     public string CaptureStatus { get; set; } = "COMPLETED";
     public string LastRefundId { get; private set; } = "";
+    public JsonArray Webhooks { get; set; } = new();
+    public HttpStatusCode HooksStatus { get; set; } = HttpStatusCode.OK;
 
     public Order Approve(string id) { Orders[id].Status = "APPROVED"; return Orders[id]; }
 
@@ -164,6 +175,8 @@ internal sealed class FakePayPal : HttpMessageHandler
                 return Json(HttpStatusCode.Created, new JsonObject { ["id"] = LastRefundId, ["status"] = "COMPLETED" });
             }
         }
+        if (request.Method == HttpMethod.Get && path == "/v1/notifications/webhooks")
+            return HooksStatus != HttpStatusCode.OK ? Error(HooksStatus, "NOT_AUTHORIZED", "Not allowed") : Json(HttpStatusCode.OK, new JsonObject { ["webhooks"] = Webhooks.DeepClone() });
         if (request.Method == HttpMethod.Post && path == "/v1/notifications/verify-webhook-signature")
             return Json(HttpStatusCode.OK, new JsonObject { ["verification_status"] = VerifyStatus });
         return Error(HttpStatusCode.NotFound, "NOT_FOUND", "Unexpected request " + request.Method + " " + path);
@@ -293,6 +306,14 @@ internal sealed class ShopApp
 
     public Task<Product> ProductAsync(long id) => WithContextAsync(async (_, store) => (await store.ProductAsync(id))!);
     public Task<IReadOnlyList<OrderItem>> ItemsAsync(long orderId) => WithContextAsync((_, store) => store.ItemsAsync(orderId));
+    /// <summary>Switches the shop's block pages off (or on): off, the template parts draw the pages — what the tests of the parts are about.</summary>
+    public async Task BlockPagesAsync(bool on)
+    {
+        using var scope = App.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MatCMS.Data.AppDbContext>();
+        await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ExecuteUpdateAsync(db.Pages.Where(p => p.OwnerPlugin == "shop"), s => s.SetProperty(p => p.IsPublished, on));
+    }
+
     public Task<Order?> OrderAsync(string number) => WithContextAsync((_, store) => store.OrderByNumberAsync(number));
     public Task<IReadOnlyList<ShopStore.OrderEvent>> EventsAsync(long orderId) => WithContextAsync((_, store) => store.EventsAsync(orderId));
 

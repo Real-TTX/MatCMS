@@ -22,6 +22,7 @@ public class EditModel : PageModel
     public List<PageEntity> Pages { get; private set; } = new();
     public List<Menu> Menus { get; private set; } = new();
     public List<MenuItem> ParentOptions { get; private set; } = new();
+    public Dictionary<int, int> ParentDepths { get; private set; } = new();
     public int? MenuId { get; private set; }
     /// <summary>The edited item's content language — used to return to the right language tab.</summary>
     public string ItemLocale { get; private set; } = MatCMS.Services.Localizer.DefaultCulture;
@@ -63,6 +64,12 @@ public class EditModel : PageModel
             Error = "Bitte Label und Ziel (URL) angeben.";
             return Page();
         }
+        // "plugin:shop.cart" stands for a piece a plugin offers; it must be one that exists, else the item would silently never show.
+        if (url.StartsWith("plugin:", StringComparison.Ordinal) && !HttpContext.RequestServices.GetRequiredService<MatCMS.Services.Plugins.PluginContributions>().HasMenuElement(url["plugin:".Length..]))
+        {
+            Error = "Dieses Plugin-Element gibt es nicht (ist das Plugin eingeschaltet?).";
+            return Page();
+        }
 
         item.Menu = Menu;
         item.Label = label;
@@ -83,10 +90,12 @@ public class EditModel : PageModel
         Menus = await _db.Menus.OrderBy(m => m.SortOrder).ThenBy(m => m.Id).ToListAsync();
     }
 
-    // Offer top-level items of the same menu + locale (except this item) as parents — a clean 2-level
-    // menu, cycle-free by construction. Deeper nesting can still arrive via import and renders fine.
-    private async Task LoadParentOptionsAsync(MenuItem item) =>
-        ParentOptions = await _db.MenuItems
-            .Where(m => m.Menu == item.Menu && m.Locale == item.Locale && m.ParentId == null && m.Id != item.Id)
-            .OrderBy(m => m.SortOrder).ThenBy(m => m.Id).ToListAsync();
+    // Offer the items of the same menu + locale as parents, at any level — except this item and what hangs below it (a loop), and only where it still fits into the most levels a menu may have.
+    private async Task LoadParentOptionsAsync(MenuItem item)
+    {
+        var items = await _db.MenuItems.Where(m => m.Menu == item.Menu && m.Locale == item.Locale).OrderBy(m => m.SortOrder).ThenBy(m => m.Id).ToListAsync();
+        var choices = MatCMS.Content.MenuTree.ParentChoices(items, item.Id);
+        ParentOptions = choices.Select(c => c.Item).ToList();
+        ParentDepths = choices.ToDictionary(c => c.Item.Id, c => c.Depth);
+    }
 }

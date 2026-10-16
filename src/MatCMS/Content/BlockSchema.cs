@@ -38,6 +38,13 @@ public static class BlockSchema
 
     public static bool IsHidden(BlockData data) => data.Str(HiddenId) == "1";
 
+    /// <summary>"Show only when" — a variable of a plugin page (<c>product.on_sale</c>, <c>!product.sold_out</c>): the block is on the page only while it has a value (or, with a leading !, has none).
+    /// Offered only on pages that have variables.</summary>
+    public const string ShowIfId = "_showIf";
+    public static readonly BlockField ShowIfField =
+        new BlockField { Id = ShowIfId, Label = "Nur anzeigen, wenn …", Type = FieldType.Text, Placeholder = "z. B. product.on_sale",
+            Help = "Eine Variable dieser Seite: der Block erscheint nur, wenn sie einen Wert hat. Mit ! davor: nur, wenn sie keinen hat." };
+
     public static readonly BlockField CssField =
         new BlockField { Id = "_css", Label = "Custom CSS", Type = FieldType.Textarea,
             Placeholder = "background: #f6f6f6;\n& h2 { color: #289068; }",
@@ -88,12 +95,13 @@ public static class BlockSchema
 
     /// <summary>The full schema of one block: its own fields, the global layout options when it can stand
     /// at the top level (width/spacing only exist there), and custom CSS for every block.</summary>
-    public static List<object> For(BlockDefinition def, Localizer t, IReadOnlyDictionary<string, List<SelectOption>>? sources)
+    public static List<object> For(BlockDefinition def, Localizer t, IReadOnlyDictionary<string, List<SelectOption>>? sources, bool scoped = false)
     {
         var list = def.Fields.Select(f => Localize(f, t, sources)).ToList();
         if (!def.ChildOnly) list.AddRange(GlobalLayoutFields.Select(f => Localize(f, t, sources)));
         list.Add(Localize(CssField, t, sources));
         list.Add(Localize(HiddenField, t, sources));
+        if (scoped) list.Add(Localize(ShowIfField, t, sources));
         return list;
     }
 

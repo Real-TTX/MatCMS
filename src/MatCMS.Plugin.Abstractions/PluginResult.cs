@@ -140,6 +140,10 @@ public sealed class PluginResult
     public static PluginResult Redirect(string localPath) =>
         new(ResultKind.Redirect) { Target = localPath ?? "/", StatusCode = 302 };
 
+    /// <summary>A PERMANENT (301) redirect to a local path — an address that moved for good, so search engines and bookmarks follow it.</summary>
+    public static PluginResult RedirectPermanent(string localPath) =>
+        new(ResultKind.Redirect) { Target = localPath ?? "/", StatusCode = 301 };
+
     /// <summary>
     /// Redirect to ANOTHER site — the page of a payment provider. Only an absolute https address is accepted (the host turns anything else into a redirect to the
     /// home page), because this is a door out of the site and a handler that builds the target from a request value must not be able to make an open redirect of it.

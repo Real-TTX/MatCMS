@@ -77,7 +77,7 @@ public static class ElementBlocks
             Fields =
             [
                 new BlockField { Id = "layout", Label = "block.el.f.layout", Type = FieldType.Select, Default = "50-50",
-                    Options = [O("50-50", "50 / 50"), O("33-67", "33 / 67"), O("67-33", "67 / 33"), O("40-60", "40 / 60"), O("60-40", "60 / 40"), O("33-33-33", "33 / 33 / 33"), O("25-25-25-25", "4 × 25")] },
+                    Options = [O("50-50", "50 / 50"), O("33-67", "33 / 67"), O("67-33", "67 / 33"), O("25-75", "25 / 75"), O("75-25", "75 / 25"), O("40-60", "40 / 60"), O("60-40", "60 / 40"), O("33-33-33", "33 / 33 / 33"), O("25-25-25-25", "4 × 25")] },
                 new BlockField { Id = "valign", Label = "block.el.f.valign", Type = FieldType.Select, Default = "top",
                     Options = [O("top", "block.el.opt.top"), O("center", "block.el.opt.center"), O("bottom", "block.el.opt.bottom")] },
                 new BlockField { Id = "gap", Label = "block.el.f.gap", Type = FieldType.Select, Default = "m",

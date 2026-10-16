@@ -77,8 +77,21 @@ public class BlockRegistry
                 Category = string.IsNullOrWhiteSpace(pb.Category) ? "plugins" : pb.Category  // plugin-provided blocks
             });
         }
+        // A plugin's blocks (and the HTML block) may stand inside a section and a column too — a plugin page is laid out in columns like any other. The two element containers are shared static
+        // definitions, so they are copied before their list of children is extended: another load of the registry must not inherit this one's plugins.
+        var extra = list.Where(d => d.IsPluginBlock || d.Type == "html").Select(d => d.Type).ToList();
+        for (var i = 0; i < list.Count; i++)
+            if (list[i].Type is ElementBlocks.Section or ElementBlocks.Column && extra.Count > 0)
+                list[i] = WithChildren(list[i], extra);
         return list;
     }
+
+    private static BlockDefinition WithChildren(BlockDefinition d, IEnumerable<string> extra) => new()
+    {
+        Type = d.Type, Name = d.Name, Description = d.Description, Category = d.Category, Svg = d.Svg, Partial = d.Partial, Fields = d.Fields, ChildOnly = d.ChildOnly,
+        ComponentTemplate = d.ComponentTemplate, PluginRender = d.PluginRender, PluginRenderAsync = d.PluginRenderAsync,
+        AllowedChildren = d.AllowedChildren.Concat(extra.Where(e => !d.AllowedChildren.Contains(e))).ToList()
+    };
 
     /// <summary>Renamed block types: an OLD persisted/backup value → its current type. The startup
     /// migration rewrites stored rows (see <c>DbSeeder.MigrateFeaturesAsync</c>), but a backup or an
@@ -935,7 +948,7 @@ public class BlockRegistry
             Partial = "Blocks/_Html",
             Fields =
             [
-                new BlockField { Id = "html", Label = "block.html.f.html", Type = FieldType.Textarea, Help = "Eigenes HTML – wird 1:1 ausgegeben. Nur für vertrauenswürdige Inhalte." },
+                new BlockField { Id = "html", Label = "block.html.f.html", Type = FieldType.Textarea, RawHtml = true, Help = "Eigenes HTML – wird 1:1 ausgegeben. Nur für vertrauenswürdige Inhalte." },
             ]
         },
     ];

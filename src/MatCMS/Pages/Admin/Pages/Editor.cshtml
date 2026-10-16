@@ -94,7 +94,14 @@
         {
             <button type="button" class="btn btn-ghost btn-icon" id="ev2-aipage-open" title="@T["editor.aiPageGenButton"]" aria-label="@T["editor.aiPageGenButton"]"><i class="ti ti-sparkles"></i></button>
         }
-        <a class="btn btn-ghost btn-sm ev2-hide-s" href="@Model.PublicUrl" target="_blank" rel="noopener"><i class="ti ti-external-link" aria-hidden="true"></i> @T["ev2.view"]</a>
+        @if (p.OwnerPlugin is not null)
+        {
+            <button type="button" class="btn btn-ghost btn-sm" id="ev2-vars-open" aria-haspopup="true"><i class="ti ti-braces" aria-hidden="true"></i> @T["pages.pluginVars"]</button>
+        }
+        @if (Model.PublicUrl.Length > 0)
+        {
+            <a class="btn btn-ghost btn-sm ev2-hide-s" href="@Model.PublicUrl" target="_blank" rel="noopener"><i class="ti ti-external-link" aria-hidden="true"></i> @T["ev2.view"]</a>
+        }
         <button type="button" class="btn btn-sm" id="ev2-save" disabled>@T["ev2.save"]</button>
     </header>
 
@@ -137,12 +144,32 @@
                     <label>@T["editor.metaTitle"]</label>
                     <input type="text" name="Meta.Title" value="@p.Title" required />
                 </div>
+                @if (p.OwnerPlugin is not null)
+                {
+                    @* A plugin's page has no address of its own and keeps its language: the plugin's route draws it. *@
+                    <input type="hidden" name="Meta.Slug" value="@p.Slug" />
+                    <input type="hidden" name="Meta.Locale" value="@p.Locale" />
+                    <div class="field">
+                        <div class="help">@T["pages.pluginPage"]: <strong>@p.OwnerPlugin</strong> · <span class="mono">@p.PluginRole</span></div>
+                        @if (!Model.PluginHasExample)
+                        {
+                            <div class="help">@T["pages.pluginNoExample"]</div>
+                        }
+                    </div>
+                    <div class="field">
+                        <button type="submit" class="btn btn-ghost btn-sm" formaction="@Url.Page("Edit", "ResetPlugin", new { id = p.Id })" formmethod="post" formnovalidate
+                                data-confirm="@T["pages.pluginResetConfirm"]"><i class="ti ti-restore"></i> @T["pages.pluginReset"]</button>
+                    </div>
+                }
+                else
+                {
                 <div class="field">
                     <label>@T["editor.slug"]</label>
                     <input type="text" name="Meta.Slug" value="@p.Slug" required spellcheck="false" />
                     <div class="help mono" id="ev2-page-url">@Model.PublicUrl</div>
                 </div>
-                @if (Model.SupportedLocales.Count > 1)
+                }
+                @if (p.OwnerPlugin is null && Model.SupportedLocales.Count > 1)
                 {
                     <div class="field">
                         <label>@T["editor.locale"]</label>
@@ -154,7 +181,7 @@
                         </select>
                     </div>
                 }
-                else
+                else if (p.OwnerPlugin is null)
                 {
                     <input type="hidden" name="Meta.Locale" value="@p.Locale" />
                 }
@@ -237,6 +264,19 @@
     </div>
 
 
+    @if (p.OwnerPlugin is not null)
+    {
+        @* The variables of a plugin's page: click one to put it into the field being typed in (plugin-page-vars.js). *@
+        <div class="ev2-pop ev2-vars" id="ev2-vars" hidden>
+            <div class="admin-nav-label ev2-pop-head">@T["pages.pluginVars"]</div>
+            <p class="muted ev2-vars-help">@T["pages.pluginVarsHelp"]</p>
+            @foreach (var v in Model.PluginVariables)
+            {
+                <button type="button" class="ev2-var" data-var="@v.Name" title="@v.Label"><code>{{@v.Name}}</code> <span>@v.Label@(v.Html ? " " + T["pages.pluginVarsHtml"] : "")</span></button>
+            }
+        </div>
+    }
+
     @if (Model.SupportedLocales.Count > 1)
     {
         @* Language versions: switch to one, create a missing one, machine-translate this one. *@
@@ -311,6 +351,10 @@
     <script src="~/js/mat-richselect.js" asp-append-version="true"></script>
     <script src="~/js/admin-blocks.js" asp-append-version="true"></script>
     <script src="~/js/editor-v2.js" asp-append-version="true"></script>
+    @if (p.OwnerPlugin is not null)
+    {
+        <script src="~/js/plugin-page-vars.js" asp-append-version="true"></script>
+    }
     <script src="~/js/admin-page-switcher.js" asp-append-version="true"></script>
 </body>
 </html>

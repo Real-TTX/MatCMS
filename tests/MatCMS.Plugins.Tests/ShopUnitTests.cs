@@ -101,33 +101,77 @@ public class ShopUnitTests
         Assert.All(new[] { "paid", "shipped", "completed" }, s => Assert.False(OrderStatus.CanMove(s, OrderStatus.AwaitingPayment)));
     }
 
-    // ---- variants textarea -----------------------------------------------------------------------------------
+    // ---- the variants editor ----------------------------------------------------------------------------------
+
+    private static Func<string, string> Form(params (string Key, string Value)[] kv) { var d = kv.ToDictionary(x => x.Key, x => x.Value); return k => d.TryGetValue(k, out var v) ? v : ""; }
 
     [Fact]
-    public void A_variants_list_is_parsed_line_by_line_with_optional_parts()
+    public void The_rows_of_the_variants_editor_are_read_with_optional_parts_and_empty_rows_are_skipped()
     {
-        var list = ShopAdminCatalog.ParseVariants("Größe M | | 12 | TS-M\nGröße L | +2,00 | 8 | TS-L\nXL | -1,50\nEinheitsgröße\n\n  ", out var error);
+        var rows = ShopVariants.ReadRows(Form(("variants.count", "5"),
+            ("variants.0.id", "7"), ("variants.0.name", "Größe M"), ("variants.0.stock", "12"), ("variants.0.sku", "TS-M"),
+            ("variants.1.id", ""), ("variants.1.name", "Größe L"), ("variants.1.delta", "+2,00"), ("variants.1.stock", "8"),
+            ("variants.2.name", "XL"), ("variants.2.delta", "-1,50"),
+            ("variants.3.id", "9"),                                                  // a row with nothing in it
+            ("variants.4.name", "Einheitsgröße")), out var error);
         Assert.Null(error);
-        Assert.Equal(4, list.Count);
-        Assert.Equal(("Größe M", 0L, (long?)12, "TS-M"), list[0]);
-        Assert.Equal(("Größe L", 200L, (long?)8, "TS-L"), list[1]);
-        Assert.Equal(("XL", -150L, (long?)null, ""), list[2]);
-        Assert.Equal(("Einheitsgröße", 0L, (long?)null, ""), list[3]);
+        Assert.Equal(4, rows.Count);
+        Assert.Equal(new VariantRow(7, "Größe M", 0, 12, "TS-M"), rows[0]);
+        Assert.Equal(new VariantRow(0, "Größe L", 200, 8, ""), rows[1]);
+        Assert.Equal(new VariantRow(0, "XL", -150, null, ""), rows[2]);
+        Assert.Equal(new VariantRow(0, "Einheitsgröße", 0, null, ""), rows[3]);
     }
 
     [Theory]
-    [InlineData("A | abc", "kein Betrag")]
-    [InlineData("A | 1 | -3", "keine Stückzahl")]
-    [InlineData("A | 1 | x", "keine Stückzahl")]
-    [InlineData(" | 1", "Name fehlt")]
-    [InlineData("A\nA", "doppelt")]
-    [InlineData("A\na", "doppelt")]
-    public void A_bad_variants_line_says_which_line_and_why(string text, string reason)
+    [InlineData("A", "abc", "", "shop.adm.var.errAmount")]
+    [InlineData("A", "1", "-3", "shop.adm.var.errStock")]
+    [InlineData("A", "1", "x", "shop.adm.var.errStock")]
+    [InlineData("", "1", "", "shop.adm.var.errName")]
+    public void A_bad_variant_row_names_its_row_and_the_reason(string name, string delta, string stock, string key)
     {
-        ShopAdminCatalog.ParseVariants(text, out var error);
-        Assert.NotNull(error);
-        Assert.Contains(reason, error);
-        Assert.Contains("Zeile", error);
+        ShopVariants.ReadRows(Form(("variants.count", "1"), ("variants.0.name", name), ("variants.0.delta", delta), ("variants.0.stock", stock)), out var error);
+        Assert.Equal(key, error!.Value.Key);
+        Assert.Equal(1, error.Value.Args[0]);                                           // the row's number as the person counts it
+    }
+
+    [Fact]
+    public void A_name_twice_in_the_rows_is_refused_without_regard_to_case()
+    {
+        ShopVariants.ReadRows(Form(("variants.count", "2"), ("variants.0.name", "A"), ("variants.1.name", "a")), out var error);
+        Assert.Equal("shop.adm.var.errDup", error!.Value.Key);
+        Assert.Equal(2, error.Value.Args[0]);
+    }
+
+    [Fact]
+    public void Options_make_every_combination_the_first_option_varying_slowest_and_only_the_missing_ones_are_added()
+    {
+        var options = ShopVariants.ReadOptions(Form(("opt_name_1", "Größe"), ("opt_values_1", "S, M, m, L"), ("opt_name_2", "Farbe"), ("opt_values_2", "Rot,Blau"), ("opt_name_3", "leer"), ("opt_values_3", " , ")));
+        Assert.Equal(2, options.Count);                                                  // the third has no value
+        Assert.Equal(new[] { "S", "M", "L" }, options[0].Values);                       // no repeat (m = M)
+        var all = ShopVariants.Combinations(options);
+        Assert.Equal(new[] { "S / Rot", "S / Blau", "M / Rot", "M / Blau", "L / Rot", "L / Blau" }, all);
+
+        var rows = new List<VariantRow> { new(5, "m / rot", 300, 4, "X") };            // already there (case does not matter), keeps its price and stock
+        Assert.True(ShopVariants.AddMissing(rows, all, out var added));
+        Assert.Equal(5, added); Assert.Equal(6, rows.Count); Assert.Equal(300, rows[0].DeltaCents);
+
+        // The options survive a round trip through the product's column; damaged text is no options.
+        Assert.Equal(options.Select(o => o.Name), ShopVariants.OptionsFromJson(ShopVariants.OptionsToJson(options)).Select(o => o.Name));
+        Assert.Empty(ShopVariants.OptionsFromJson("{kaputt")); Assert.Empty(ShopVariants.OptionsFromJson(""));
+        // Too many combinations are refused, not made.
+        var big = new List<VariantRow>();
+        Assert.False(ShopVariants.AddMissing(big, Enumerable.Range(1, 100).Select(i => "V" + i), out _));
+        Assert.Equal(ShopVariants.MaxVariants, big.Count);
+    }
+
+    [Fact]
+    public void The_tax_choices_start_with_the_home_countrys_rates_and_never_lose_a_rate_the_product_has()
+    {
+        var all = ShopTaxChoices.AllRates();
+        Assert.Contains(1900, all); Assert.Contains(700, all); Assert.Contains(0, all);
+        Assert.Equal(all.OrderByDescending(b => b).ToList(), all);
+        Assert.Equal("19 %", ShopTaxChoices.ForSettings().First(o => o.Value == "19").Label);
+        Assert.Equal("5,5 %", ShopTaxChoices.ForSettings().First(o => o.Value == "5,5").Label);
     }
 
     // ---- file names ---------------------------------------------------------------------------------------
@@ -214,12 +258,12 @@ public class ShopUnitTests
         foreach (var file in Directory.GetFiles(Path.Combine(RepoRoot(), "src", "MatCMS", "Plugin", "Shop"), "*.cs", SearchOption.AllDirectories).Where(f => !f.EndsWith("ShopStrings.cs")))
         {
             var text = File.ReadAllText(file);
-            // (In ShopStore, T(...) is the table accessor, not a text.)
-            if (!file.EndsWith("ShopStore.cs")) foreach (Match m in Regex.Matches(text, "\\bT\\(\"([^\"]+)\"")) used.Add(m.Groups[1].Value);
+            // (In the ShopStore files, T(...) is the table accessor, not a text.)
+            if (!Path.GetFileName(file).StartsWith("ShopStore") && !file.EndsWith("ShopAttributes.cs")) foreach (Match m in Regex.Matches(text, "\\bT\\(\"([^\"]+)\"")) used.Add(m.Groups[1].Value);
             foreach (Match m in Regex.Matches(text, "\"((?:shop|set)\\.[A-Za-z0-9_.]+)\"")) used.Add(m.Groups[1].Value);
         }
         // Names that look like keys but are events or mail keys, not texts.
-        used.ExceptWith(new[] { "shop.payment.methods", "shop.payment.paid", "shop.payment.start", "shop.order.placed", "shop.order.paid", "shop.order.shipped", "shop.order.cancelled", "shop.order.refunded", "shop.order.completed", "shop.admin.order" });
+        used.ExceptWith(new[] { "shop.payment.methods", "shop.payment.paid", "shop.payment.start", "shop.order.placed", "shop.order.paid", "shop.order.shipped", "shop.order.cancelled", "shop.order.refunded", "shop.order.completed", "shop.admin.order", "shop.cart.reminder" });
         used.RemoveWhere(k => k.EndsWith('.'));                                                     // "shop.status." + status: the dynamic ones are checked in the next test
         Assert.True(used.Count > 200, "the scan found only " + used.Count);
         Assert.Empty(used.Where(k => !have.Contains(k)).OrderBy(k => k));

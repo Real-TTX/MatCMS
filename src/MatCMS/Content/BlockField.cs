@@ -46,6 +46,9 @@ public class BlockField
     /// left out of what the model is offered — used by the hero's optional slideshow images, which the
     /// hero renders fine without.</summary>
     public bool AiIgnore { get; set; }
+
+    /// <summary>The field's text is drawn as raw HTML (the HTML block). A page's variables are then put in encoded — see <see cref="BlockScope"/> — where a plain field gets them as they are.</summary>
+    public bool RawHtml { get; set; }
 }
 
 public class SelectOption

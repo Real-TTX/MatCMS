@@ -1,0 +1,18 @@
+@* The sidebar while the visitor is inside a plugin section that has a menu of its own (it declared links — the shop):
+   the main menu gives way to the section's, headed by the way back. The plugin's own pages all show it, so the visitor
+   never has to find their way back to the main menu to move between them. *@
+@model MatCMS.Services.AdminNavEntry
+<a class="admin-nav-back" href="/admin"><i class="ti ti-arrow-left" aria-hidden="true"></i> @T["action.back"]</a>
+<div class="admin-nav-section"><i class="ti @Model.Icon" aria-hidden="true"></i> @Model.Label</div>
+@{ var atStart = string.Equals(Context.Request.Path.Value?.TrimEnd('/'), Model.Url, StringComparison.OrdinalIgnoreCase); }   @* the bare section address opens its first page *@
+@foreach (var l in Model.Links!)
+{
+    var parts = l.Url.Split('?', 2);
+    bool On(string p) => Context.Request.Path.StartsWithSegments(p, StringComparison.OrdinalIgnoreCase);
+    // A link with a query (a settings group) is active only for that query; a plain link also for the pages below it ("orders/5") and for the pages it stands for.
+    var linkActive = parts.Length == 2
+        ? On(parts[0]) && ("?" + parts[1]) == Context.Request.QueryString.Value
+        : On(parts[0]) || l.AlsoActive.Any(On) || (atStart && ReferenceEquals(l, Model.Links![0]));
+    if (l.Heading is not null) { <div class="admin-nav-label">@l.Heading</div> }
+    <a class="@(linkActive ? "active" : "")" href="@l.Url"><i class="ti @l.Icon" aria-hidden="true"></i> @l.Label@if (l.Badge is not null) { <span class="nav-badge">@l.Badge</span> }</a>
+}

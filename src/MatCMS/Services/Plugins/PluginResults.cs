@@ -76,7 +76,7 @@ internal static class PluginResults
                 if (r.External)
                     return Uri.TryCreate(r.Target, UriKind.Absolute, out var away) && away.Scheme == Uri.UriSchemeHttps && away.UserInfo.Length == 0
                         ? new RedirectResult(away.AbsoluteUri) : new LocalRedirectResult("/");
-                return new LocalRedirectResult(SafeLocal(r.Target));
+                return new LocalRedirectResult(SafeLocal(r.Target), permanent: r.StatusCode == 301);
             case PluginResult.ResultKind.Json:
                 return new ContentResult { Content = r.Body?.ToJsonString() ?? "null", ContentType = r.ContentType, StatusCode = r.StatusCode };
             case PluginResult.ResultKind.Text:

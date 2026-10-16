@@ -27,6 +27,7 @@ public class CreateModel : PageModel
     public List<PageEntity> Pages { get; private set; } = new();
     public List<Menu> Menus { get; private set; } = new();
     public List<MenuItem> ParentOptions { get; private set; } = new();
+    public Dictionary<int, int> ParentDepths { get; private set; } = new();
     public int? MenuId { get; private set; }
     public string? Error { get; private set; }
 
@@ -51,6 +52,12 @@ public class CreateModel : PageModel
         if (string.IsNullOrWhiteSpace(label) || string.IsNullOrWhiteSpace(url))
         {
             Error = "Bitte Label und Ziel (URL) angeben.";
+            return Page();
+        }
+        // "plugin:shop.cart" stands for a piece a plugin offers; it must be one that exists, else the item would silently never show.
+        if (url.StartsWith("plugin:", StringComparison.Ordinal) && !HttpContext.RequestServices.GetRequiredService<MatCMS.Services.Plugins.PluginContributions>().HasMenuElement(url["plugin:".Length..]))
+        {
+            Error = "Dieses Plugin-Element gibt es nicht (ist das Plugin eingeschaltet?).";
             return Page();
         }
 
@@ -83,9 +90,12 @@ public class CreateModel : PageModel
         Menus = await _db.Menus.OrderBy(m => m.SortOrder).ThenBy(m => m.Id).ToListAsync();
     }
 
-    // Offer the target locale's top-level items as parents (a new item nests only under its own language).
-    private async Task LoadParentOptionsAsync() =>
-        ParentOptions = await _db.MenuItems
-            .Where(m => m.Menu == Menu && m.Locale == TargetLocale && m.ParentId == null)
-            .OrderBy(m => m.SortOrder).ThenBy(m => m.Id).ToListAsync();
+    // Offer the target locale's items as parents, whatever their level (a new item nests only under its own language), in tree order.
+    private async Task LoadParentOptionsAsync()
+    {
+        var items = await _db.MenuItems.Where(m => m.Menu == Menu && m.Locale == TargetLocale).OrderBy(m => m.SortOrder).ThenBy(m => m.Id).ToListAsync();
+        var choices = MatCMS.Content.MenuTree.ParentChoices(items);
+        ParentOptions = choices.Select(c => c.Item).ToList();
+        ParentDepths = choices.ToDictionary(c => c.Item.Id, c => c.Depth);
+    }
 }

@@ -24,4 +24,16 @@ public class MenuItem
 
     public int SortOrder { get; set; }
     public bool OpenInNewTab { get; set; }
+
+    /// <summary>A small counter next to the label — set only on entries a plugin adds (never stored).</summary>
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public string? Badge { get; set; }
+
+    /// <summary>Markup drawn in place of the link — set only on a plugin element that is more than a link (a search box); never stored.</summary>
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public string? Html { get; set; }
+
+    /// <summary>The plugin element (<c>shop.cart</c>) this item was drawn from — never stored.</summary>
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public string? Element { get; set; }
 }

@@ -43,6 +43,12 @@ public sealed class BlogPlugin : IPlugin
         });
 
         // The post page. Only on the plain address: the blog publishes in one language, so /en/blog/x stays a 404 as it always was.
+        // The overview: every post, newest first, with the tag filter — what a menu item "Blog" points at.
+        b.Route("/blog", BlogPublic.OverviewAsync, new PublicRouteOptions { Methods = PluginMethod.Get, DefaultLanguageOnly = true });
+        b.LinkTargets("blog.lt.pages", (ctx, ct) => Task.FromResult<IEnumerable<LinkTarget>>(new[] { new LinkTarget(ctx.T("blog.overview"), "/blog") }));
+        b.LinkTargets("blog.lt.posts", async (ctx, ct) =>
+            (await ctx.Data.Table("posts").QueryAsync(DataQuery.Everything.Eq("IsPublished", true).Eq("Locale", "de").Where("PublishedAt", DataOp.Le, DateTime.UtcNow).OrderBy("PublishedAt", descending: true).Page(0, 300), ct))
+                .Select(BlogStore.From).Select(p => new LinkTarget(p.Title, "/blog/" + p.Slug)).ToList());
         b.Route("/blog/{slug}", BlogPublic.PostPageAsync, new PublicRouteOptions { Methods = PluginMethod.Get, DefaultLanguageOnly = true });
 
         // The content block.
@@ -95,7 +101,7 @@ public sealed class BlogPlugin : IPlugin
         // The sitemap lists the posts that are live.
         b.Sitemap(async (ctx, ct) =>
             (await ctx.Data.Table("posts").QueryAsync(DataQuery.Everything.Eq("IsPublished", true).Eq("Locale", "de").Where("PublishedAt", DataOp.Le, DateTime.UtcNow), ct))
-                .Select(BlogStore.From).Select(p => new SitemapEntry("/blog/" + p.Slug, p.UpdatedAt)));
+                .Select(BlogStore.From).Select(p => new SitemapEntry("/blog/" + p.Slug, p.UpdatedAt)).Prepend(new SitemapEntry("/blog")));
 
         // The cloud's (and an agent's) "write a post".
         b.Operation("post.create", CreateFromCloudAsync);

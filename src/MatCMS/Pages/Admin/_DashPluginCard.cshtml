@@ -1,0 +1,31 @@
+@model MatCMS.Plugin.DashboardCard
+@* A card a plugin brought (Admin.DashboardCard): rows, a link to the full list. *@
+<div class="card dash-card">
+    <h2>@Model.Title</h2>
+    <div class="dash-card-body">
+    <table class="data">
+        <tbody>
+            @if (Model.Rows.Count == 0)
+            {
+                <partial name="_EmptyRow" model='@(string.IsNullOrWhiteSpace(Model.EmptyText) ? "—" : Model.EmptyText)' />
+            }
+            @for (var n = 0; n < Model.Rows.Count; n++)
+            {
+                var r = Model.Rows[n];
+                <tr class="@(n >= MatCMS.Pages.Admin.IndexModel.CardRows ? "dash-extra" : null)" hidden="@(n >= MatCMS.Pages.Admin.IndexModel.CardRows)">
+                    <td style="width:34px;">@if (!string.IsNullOrEmpty(r.Icon) && r.Icon.StartsWith("ti-")) { <i class="ti @r.Icon" aria-hidden="true"></i> }</td>
+                    <td><a href="@r.Url">@r.Text</a> @if (!string.IsNullOrWhiteSpace(r.Badge)) { <span class="badge badge-new">@r.Badge</span> }</td>
+                    <td class="muted mono nowrap">@r.Meta</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    </div>
+    @if (Model.Rows.Count > MatCMS.Pages.Admin.IndexModel.CardRows || Model.AllUrl is not null)
+    {
+        <div class="dash-card-foot">
+            @if (Model.Rows.Count > MatCMS.Pages.Admin.IndexModel.CardRows) { <button type="button" class="btn btn-ghost" data-dash-expand data-more="@T["dashboard.showMore"]" data-less="@T["dashboard.showLess"]">@T["dashboard.showMore"]</button> }
+            @if (Model.AllUrl is not null) { <a class="btn btn-ghost" href="@Model.AllUrl">@(string.IsNullOrWhiteSpace(Model.AllLabel) ? Model.Title : Model.AllLabel)</a> }
+        </div>
+    }
+</div>

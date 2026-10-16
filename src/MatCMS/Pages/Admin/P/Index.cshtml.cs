@@ -102,6 +102,8 @@ public class IndexModel : PageModel
         PluginRegistry.SectionPage? current, bool settingsActive)
     {
         if (section is null) return Array.Empty<(string, string, bool)>();
+        // A section with its own sidebar block is navigated from the sidebar: no tab bar above its pages.
+        if (section.Links.Count > 0) return Array.Empty<(string, string, bool)>();
         var tabs = section.Tabs.Select(t => (PluginStrings.Label(slice, Locale, t.Tab!), section.Url + t.Pattern.Template, !settingsActive && ReferenceEquals(t, current))).ToList();
         if (slice is { Settings.Count: > 0 }) tabs.Add((_t["plugins.settings.tab"], section.Url + "/" + SettingsPath, settingsActive));
         return tabs.Count < 2 ? Array.Empty<(string, string, bool)>() : tabs;
@@ -121,12 +123,20 @@ public class IndexModel : PageModel
         Tabs = TabsOf(section, slice, null, settingsActive: true);
         ViewData["Title"] = _t["plugins.settings.title", PluginStrings.Label(slice, Locale, section?.Label ?? row.Name)];
 
+        // One group of the settings at a time, when the plugin's sidebar links name one (?group=…); without it, all of them.
+        var group = Request.Query["group"].ToString();
+        var groups = PluginSettingsUi.Groups(slice);
+        if (group.Length > 0 && groups.All(g => g.Group != group)) group = "";
+        // A plugin with several groups of settings shows ONE group at a time, with the groups as a sub-menu at the left — never one long form. Asked for without a group, the first one opens.
+        if (group.Length == 0 && groups.Count >= 2 && Request.Method == "GET") return Redirect((section?.Url ?? "/admin/p/" + key) + "/" + SettingsPath + "?group=" + Uri.EscapeDataString(groups[0].Group));
+        if (group.Length > 0) ViewData["Title"] = PluginStrings.Label(slice, Locale, group);
+
         Dictionary<string, string>? errors = null;
         Dictionary<string, string>? posted = null;
         if (Request.Method == "POST" && Request.HasFormContentType && Request.Form["action"] == "save-settings")
         {
             posted = Request.Form.ToDictionary(kv => kv.Key, kv => kv.Value.ToString());
-            var (config, errs) = PluginSettingsUi.Apply(slice, stored, posted, _protection, k => _t[k]);
+            var (config, errs) = PluginSettingsUi.Apply(slice, stored, posted, _protection, k => _t[k], group.Length > 0 ? group : null);
             if (errs.Count == 0)
             {
                 row.ConfigJson = PluginSettingsUi.ToJson(config);
@@ -139,7 +149,14 @@ public class IndexModel : PageModel
             TempData["FlashError"] = _t["plugins.settings.invalid"];
         }
 
-        Html = Draw(PluginSettingsUi.Build(slice, stored, Locale, _t["action.save"], _t["plugins.settings.clearSecret"], _t["plugins.settings.secretSet"], errors, posted));
+        var form = PluginSettingsUi.Build(slice, stored, Locale, _t["action.save"], _t["plugins.settings.clearSecret"], _t["plugins.settings.secretSet"], errors, posted, group.Length > 0 ? group : null);
+        if (groups.Count >= 2 && group.Length > 0)
+        {
+            var baseUrl = (section?.Url ?? "/admin/p/" + key) + "/" + SettingsPath;
+            var nav = groups.Select(g => Ui.NavItem(PluginStrings.Label(slice, Locale, g.Group), baseUrl + "?group=" + Uri.EscapeDataString(g.Group), active: g.Group == group)).ToList();
+            Html = Draw(Ui.Split(nav, Ui.Card(PluginStrings.Label(slice, Locale, group), form)));
+        }
+        else Html = Draw(form);
         return Page();
     }
 }

@@ -154,8 +154,11 @@ public static class LayoutRenderer
 
     /// <summary>Appends one node (recursively) using <paramref name="link"/> to render each item;
     /// nodes with children get a <c>.mat-hassub</c>/<c>.mat-sub</c> dropdown wrapper.</summary>
-    private static void AppendInline(StringBuilder sb, Func<MenuItem, string> link, MenuNode node)
+    private static void AppendInline(StringBuilder sb, Func<MenuItem, string> plain, MenuNode node)
     {
+        // An element that brings markup of its own (a search box) is drawn as it is — the template's per-item link markup would only wrap it in a link.
+        string link(MenuItem it) => it.Html is { Length: > 0 } raw ? raw : plain(it);
+        if (node.Item.Html is { Length: > 0 } own && !node.HasChildren) { sb.Append(own); return; }
         if (!node.HasChildren) { sb.Append(link(node.Item)); return; }
         sb.Append("<span class=\"mat-hassub\">");
         sb.Append(link(node.Item));
@@ -163,6 +166,20 @@ public static class LayoutRenderer
         foreach (var c in node.Children) AppendInline(sb, link, c);
         sb.Append("</span></span>");
     }
+
+    /// <summary>An item as the icon strip draws it: the symbol (and counter) as a link — what <c>{{toolbar}}</c> and <c>{{element:…}}</c> put into a layout.</summary>
+    public static string IconLink(MenuItem t)
+    {
+        var target = t.OpenInNewTab ? " target=\"_blank\" rel=\"noopener\"" : "";
+        var badge = string.IsNullOrEmpty(t.Badge) ? "" : $"<span class=\"hbadge\">{WebUtility.HtmlEncode(t.Badge)}</span>";
+        return $"<a class=\"hicon\" href=\"{WebUtility.HtmlEncode(t.Url)}\"{target} title=\"{WebUtility.HtmlEncode(t.Label)}\">{MenuIcons.IconMarkup(t.Icon)}{badge}</a>";
+    }
+
+    /// <summary>The element keys (<c>shop.search</c>) a layout places with <c>{{element:shop.search}}</c>.</summary>
+    public static List<string> PlacedElements(string? layoutHtml) =>
+        string.IsNullOrEmpty(layoutHtml) ? new() : ElementRx.Matches(layoutHtml).Select(m => m.Groups[1].Value).Distinct(StringComparer.Ordinal).Take(20).ToList();
+
+    private static readonly Regex ElementRx = new(@"\{\{element:([a-z][a-z0-9._-]{0,80})\}\}", RegexOptions.Compiled);
 
     private static string RenderItem(string tpl, MenuItem it)
     {
@@ -172,13 +189,15 @@ public static class LayoutRenderer
             .Replace("{{label}}", WebUtility.HtmlEncode(it.Label))
             .Replace("{{url}}", WebUtility.HtmlEncode(it.Url))
             .Replace("{{icon}}", icon)
+            .Replace("{{badge}}", it.Badge is { Length: > 0 } b ? $"<span class=\"hbadge\">{WebUtility.HtmlEncode(b)}</span>" : "")
             .Replace("{{target}}", target);
     }
 
     private static string DefaultLink(MenuItem it)
     {
         var target = it.OpenInNewTab ? " target=\"_blank\" rel=\"noopener\"" : "";
-        return $"<a href=\"{WebUtility.HtmlEncode(it.Url)}\"{target}>{WebUtility.HtmlEncode(it.Label)}</a>";
+        var badge = it.Badge is { Length: > 0 } b ? $" <span class=\"hbadge inline\">{WebUtility.HtmlEncode(b)}</span>" : "";
+        return $"<a href=\"{WebUtility.HtmlEncode(it.Url)}\"{target}>{WebUtility.HtmlEncode(it.Label)}{badge}</a>";
     }
 
     private static string RenderLang(string tpl, LangLink l) =>

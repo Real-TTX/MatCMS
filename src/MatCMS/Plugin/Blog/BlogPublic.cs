@@ -228,9 +228,20 @@ internal static class BlogPublic
         return new ListResult(page, filterTags, pageNum, totalPages);
     }
 
-    public static async Task<PluginResult> PostsBlockAsync(IPluginContext ctx, CancellationToken ct)
+    /// <summary>The blog's own address: the posts block drawn as a page (the blog layout, tag filter, ten to a page).</summary>
+    public static async Task<PluginResult> OverviewAsync(IPluginContext ctx, CancellationToken ct)
     {
-        var block = ctx.Block!;
+        // The block's own renderer with the block's values given by hand — a plugin block cannot be asked for through the site's block renderer, which knows only the host's.
+        var block = new BlockData { Type = "posts", Values = new JsonObject { ["heading"] = ctx.T("blog.overview"), ["display"] = "blog", ["showFilter"] = "yes", ["perPage"] = "10" } };
+        var drawn = await RenderPostsAsync(ctx, block, ct);
+        return PluginResult.Page(drawn, ctx.T("blog.overview"));
+    }
+
+    public static async Task<PluginResult> PostsBlockAsync(IPluginContext ctx, CancellationToken ct) =>
+        PluginResult.Fragment(await RenderPostsAsync(ctx, ctx.Block!, ct));
+
+    private static async Task<string> RenderPostsAsync(IPluginContext ctx, BlockData block, CancellationToken ct)
+    {
         var encoder = ctx.Unsafe.Services.GetService(typeof(HtmlEncoder)) as HtmlEncoder ?? HtmlEncoder.Default;
         string H(string? s) => encoder.Encode(s ?? "");
         string StrOr(string field, string fallback) => block.Get(field) is { Length: > 0 } v ? v : fallback;
@@ -336,7 +347,7 @@ internal static class BlogPublic
             sb.Append("</nav>");
         }
         sb.Append("</div>\n</section>\n").Append(PostsBlockStyle);
-        return PluginResult.Fragment(sb.ToString());
+        return sb.ToString();
     }
 
     private const string PostsBlockStyle = """

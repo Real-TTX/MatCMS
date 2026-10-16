@@ -6,7 +6,7 @@
     // (spacing, page width) themselves; inside a section they are only the grid.
     var d = Model.Data;
     var layout = d.StrOr("layout", "50-50");
-    if (!new[] { "50-50", "33-67", "67-33", "40-60", "60-40", "33-33-33", "25-25-25-25" }.Contains(layout)) { layout = "50-50"; }
+    if (!new[] { "50-50", "33-67", "67-33", "25-75", "75-25", "40-60", "60-40", "33-33-33", "25-25-25-25" }.Contains(layout)) { layout = "50-50"; }
     var cls = "el-columns el-cols-" + layout + " el-valign-" + d.StrOr("valign", "top") + " el-gap-" + d.StrOr("gap", "m")
         + " el-mobile-" + d.StrOr("mobile", "stack");
     var top = Model.Depth == 0;

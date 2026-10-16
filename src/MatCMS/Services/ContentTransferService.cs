@@ -312,6 +312,7 @@ public class ContentTransferService
                 CustomCss = p.CustomCss,
                 TemplateName = p.TemplateId is int tid && tplNameById.TryGetValue(tid, out var tn) ? tn : null,
                 Access = p.Access, RequiredRole = p.RequiredRole, TemplateParamsJson = p.TemplateParamsJson,
+                OwnerPlugin = p.OwnerPlugin, PluginRole = p.PluginRole,
                 CreatedAt = p.CreatedAt, UpdatedAt = p.UpdatedAt,
                 // Preserve the block hierarchy: top-level blocks with their children nested inside.
                 Blocks = BuildBlockDtos(p.Blocks, null)
@@ -1428,6 +1429,8 @@ public class ContentTransferService
         // page is only ever demoted to public when the backup actually says so. TemplateId is NOT set here
         // — it needs the imported templates' fresh ids and is resolved by name in the page-import loop.
         row.Access = p.Access ?? PageAccess.Public;
+        row.OwnerPlugin = string.IsNullOrWhiteSpace(p.OwnerPlugin) ? null : p.OwnerPlugin;
+        row.PluginRole = string.IsNullOrWhiteSpace(p.OwnerPlugin) ? null : p.PluginRole;
         row.RequiredRole = p.RequiredRole;
         row.TemplateParamsJson = p.TemplateParamsJson;
         row.UpdatedAt = DateTime.UtcNow;
@@ -1684,6 +1687,9 @@ public class ContentTransferService
         public string? RequiredRole { get; set; }
         /// <summary>Per-page template parameter overrides (JSON). Null on an older backup.</summary>
         public string? TemplateParamsJson { get; set; }
+        /// <summary>The plugin the page belongs to and which of its pages it is; null on an ordinary page and on a backup from before plugins owned pages.</summary>
+        public string? OwnerPlugin { get; set; }
+        public string? PluginRole { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
         public List<BlockDto>? Blocks { get; set; }

@@ -19,7 +19,26 @@ internal static class PluginSettingsUi
 
     private const int MaxText = 4000;
 
-    /// <summary>The settings form for a plugin.</summary>
+    /// <summary>
+    /// The settings with the group each belongs to. A declaration names a group on the first setting of it; the settings after it (without a name) belong to it until the next one is named.
+    /// </summary>
+    public static IReadOnlyList<(SettingSpec Spec, string? Group)> WithGroups(PluginRegistry.Slice slice)
+    {
+        string? current = null;
+        var list = new List<(SettingSpec, string?)>();
+        foreach (var s in slice.Settings)
+        {
+            if (!string.IsNullOrWhiteSpace(s.Group)) current = s.Group;
+            list.Add((s, current));
+        }
+        return list;
+    }
+
+    /// <summary>The groups a plugin's settings fall into, in declaration order, with how many settings each has.</summary>
+    public static IReadOnlyList<(string Group, int Count)> Groups(PluginRegistry.Slice slice) =>
+        WithGroups(slice).Where(x => x.Group is not null).GroupBy(x => x.Group!).Select(g => (g.Key, g.Count())).ToList();
+
+    /// <summary>The settings form for a plugin — or, with <paramref name="onlyGroup"/>, for one group of its settings.</summary>
     /// <param name="slice">The plugin's declaration.</param>
     /// <param name="stored">What is saved (<c>ConfigJson</c> parsed).</param>
     /// <param name="locale">The admin language, for translating labels that are keys of the plugin's strings.</param>
@@ -28,17 +47,19 @@ internal static class PluginSettingsUi
     /// <param name="secretSet">The placeholder shown in an already stored secret.</param>
     public static UiNode Build(PluginRegistry.Slice slice, IReadOnlyDictionary<string, string> stored, string locale,
         string saveLabel, string clearLabel, string secretSet, IReadOnlyDictionary<string, string>? errors = null,
-        IReadOnlyDictionary<string, string>? posted = null)
+        IReadOnlyDictionary<string, string>? posted = null, string? onlyGroup = null)
     {
         string L(string s) => PluginStrings.Label(slice, locale, s);
         var children = new List<UiNode?>();
         string? group = null;
-        foreach (var s in slice.Settings)
+        foreach (var (s, effective) in WithGroups(slice))
         {
-            if (!string.Equals(s.Group, group, StringComparison.Ordinal))
+            if (onlyGroup is not null && effective != onlyGroup) continue;
+            if (!string.Equals(effective, group, StringComparison.Ordinal))
             {
-                group = s.Group;
-                if (!string.IsNullOrWhiteSpace(group)) children.Add(Ui.Heading(L(group), 3));
+                group = effective;
+                // On a page of one group the page's own title already says it.
+                if (!string.IsNullOrWhiteSpace(group) && onlyGroup is null) children.Add(Ui.Heading(L(group), 3));
             }
             var name = FieldName(s.Key);
             var value = posted is not null && posted.TryGetValue(name, out var pv) ? pv
@@ -52,6 +73,8 @@ internal static class PluginSettingsUi
                     Min = s.Min?.ToString(CultureInfo.InvariantCulture), Max = s.Max?.ToString(CultureInfo.InvariantCulture) },
                 SettingKind.Bool => new UiCheckbox(name, L(s.Label)) { Checked = IsTrue(value), Help = help },
                 SettingKind.Choice => new UiSelect(name, L(s.Label)) { Value = value, Help = help, Options = s.Options.Select(o => new UiOption(o.Value, L(o.Label))).ToList() },
+                SettingKind.Image => new UiImage(name, L(s.Label)) { Value = value, Help = help },
+                SettingKind.Color => new UiInput(name, L(s.Label)) { Value = IsColor(value) ? value : (IsColor(s.Default) ? s.Default : "#000000"), Type = UiInputType.Color, Help = help },
                 SettingKind.Secret => new UiInput(name, L(s.Label)) { Type = UiInputType.Password, Help = help, Placeholder = stored.ContainsKey(s.Key) ? secretSet : null },
                 _ => new UiInput(name, L(s.Label)) { Value = value, Help = help, Required = s.Required }
             };
@@ -69,14 +92,16 @@ internal static class PluginSettingsUi
     /// </summary>
     public static (Dictionary<string, string> Config, Dictionary<string, string> Errors) Apply(
         PluginRegistry.Slice slice, IReadOnlyDictionary<string, string> stored, IReadOnlyDictionary<string, string> form,
-        IDataProtectionProvider? protection, Func<string, string> t)
+        IDataProtectionProvider? protection, Func<string, string> t, string? onlyGroup = null)
     {
         var config = new Dictionary<string, string>(stored, StringComparer.Ordinal);
         var errors = new Dictionary<string, string>(StringComparer.Ordinal);
         string F(string name) => form.TryGetValue(name, out var v) ? v : "";
 
-        foreach (var s in slice.Settings)
+        foreach (var (s, effective) in WithGroups(slice))
         {
+            // A page of one group posts only that group's fields: the others keep what is stored (a missing switch must not read as "off").
+            if (onlyGroup is not null && effective != onlyGroup) continue;
             var raw = F(FieldName(s.Key));
             switch (s.Kind)
             {
@@ -104,6 +129,19 @@ internal static class PluginSettingsUi
                     config[s.Key] = n.ToString("R", CultureInfo.InvariantCulture);
                     break;
                 }
+                case SettingKind.Color:
+                    raw = raw.Trim();
+                    if (raw.Length == 0) config[s.Key] = IsColor(s.Default) ? s.Default : "";          // a form that does not carry the field keeps the default
+                    else if (!IsColor(raw)) errors[s.Key] = t("plugins.settings.notColor");
+                    else config[s.Key] = raw.ToLowerInvariant();
+                    break;
+                case SettingKind.Image:
+                    raw = raw.Trim();
+                    // An address that is safe in a src and a CSS url(): a local path or https, nothing else.
+                    if (raw.Length > 0 && (raw.Length > 500 || raw.IndexOfAny(new[] { '\'', '"', '(', ')', '\\', '<', '>', ' ' }) >= 0 || !((raw.StartsWith('/') && !raw.StartsWith("//")) || raw.StartsWith("https://", StringComparison.OrdinalIgnoreCase))))
+                        errors[s.Key] = t("plugins.settings.notImage");
+                    else config[s.Key] = raw;
+                    break;
                 case SettingKind.Choice:
                     if (s.Options.All(o => o.Value != raw)) errors[s.Key] = t("plugins.settings.choice");
                     else config[s.Key] = raw;
@@ -125,6 +163,8 @@ internal static class PluginSettingsUi
         foreach (var kv in config) o[kv.Key] = kv.Value;
         return o.ToJsonString();
     }
+
+    private static bool IsColor(string? v) => v is { Length: 7 } && v[0] == '#' && v.Skip(1).All(Uri.IsHexDigit);
 
     private static bool IsTrue(string? v) => (v ?? "").Trim().ToLowerInvariant() is "true" or "1" or "on" or "yes";
 }

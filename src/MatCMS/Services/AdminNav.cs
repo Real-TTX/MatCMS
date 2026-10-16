@@ -10,7 +10,15 @@ namespace MatCMS.Services;
 /// <param name="Order">Position inside its group; lower comes first.</param>
 /// <param name="IsCore">True for the CMS's own entries, whose label is a key to translate.</param>
 /// <param name="Badge">A counter, or null.</param>
-public sealed record AdminNavEntry(string Label, string Url, string Icon, int Order, bool IsCore, string? Badge = null);
+/// <param name="Links">For a plugin section with a menu of its own: the links, with their sub-headings (the sidebar shows them instead of the main menu while inside); null for a plain line.</param>
+public sealed record AdminNavEntry(string Label, string Url, string Icon, int Order, bool IsCore, string? Badge = null, IReadOnlyList<AdminNavLink>? Links = null);
+
+/// <summary>One link of a section's own sidebar block. <paramref name="Heading"/> is set on the first link under a new sub-heading.</summary>
+public sealed record AdminNavLink(string Label, string Url, string Icon, string? Heading, string? Badge)
+{
+    /// <summary>Further addresses (and the ones below them) the link also stands for: "Konditionen" is active on its pages for shipping, coupons, taxes …</summary>
+    public IReadOnlyList<string> AlsoActive { get; init; } = Array.Empty<string>();
+}
 
 /// <summary>
 /// The sidebar as a registry. The layout used to hard-code three groups of links with the plugins' entries
@@ -61,16 +69,49 @@ public sealed class AdminNav
         var list = new List<AdminNavEntry>();
         list.AddRange(CoreEntries.Where(c => c.Group == group).Select(c => new AdminNavEntry(c.LabelKey, c.Url, c.Icon, c.Order, true)));
         foreach (var m in _registry.AdminMenu.Where(m => m.Group == group))
-        {
-            var icon = m.Icon is { } ic && ic.StartsWith("ti-", StringComparison.Ordinal) ? ic : "ti-plug";
-            var section = _registry.Sections.FirstOrDefault(s => s.Url == m.Url && s.Owner == m.Owner);
-            var badge = section?.Badge is { } provider ? await BadgeAsync(section, provider, services, ct) : null;
-            // A label that is a key of the plugin's own strings is shown in the admin's language.
-            var label = PluginStrings.Label(_registry.SliceOf(m.Owner), PluginRequestContext.CurrentLocale(), m.Label);
-            list.Add(new AdminNavEntry(label, m.Url, icon, m.Order, false, badge));
-        }
+            list.Add(await PluginEntryAsync(m, services, ct));
         // Stable: entries of the same order keep core-first, then plugin load order.
         return list.OrderBy(e => e.Order).ToList();
+    }
+
+    private async Task<AdminNavEntry> PluginEntryAsync(PluginRegistry.AdminMenuEntry m, IServiceProvider services, CancellationToken ct)
+    {
+        var icon = m.Icon is { } ic && ic.StartsWith("ti-", StringComparison.Ordinal) ? ic : "ti-plug";
+        var section = _registry.Sections.FirstOrDefault(s => s.Url == m.Url && s.Owner == m.Owner);
+        var badge = section?.Badge is { } provider ? await BadgeAsync(section, provider, services, ct) : null;
+        // A label that is a key of the plugin's own strings is shown in the admin's language.
+        var label = PluginStrings.Label(_registry.SliceOf(m.Owner), PluginRequestContext.CurrentLocale(), m.Label);
+        IReadOnlyList<AdminNavLink>? links = null;
+        if (section is { Links.Count: > 0 })
+        {
+            var slice = _registry.SliceOf(m.Owner);
+            var locale = PluginRequestContext.CurrentLocale();
+            string? lastHeading = null;
+            var built = new List<AdminNavLink>();
+            foreach (var l in section.Links)
+            {
+                var heading = l.Heading is null || l.Heading == lastHeading ? null : PluginStrings.Label(slice, locale, l.Heading);
+                if (l.Heading is not null) lastHeading = l.Heading;
+                built.Add(new AdminNavLink(PluginStrings.Label(slice, locale, l.Label), section.Url + "/" + l.Path, l.Icon, heading, l.Badge ? badge : null) { AlsoActive = l.Also.Select(a => section.Url + "/" + a).ToList() });
+            }
+            links = built;
+        }
+        return new AdminNavEntry(label, m.Url, icon, m.Order, false, badge, links);
+    }
+
+    /// <summary>
+    /// The plugin section the request is inside, when that section has a menu of its own (it declared links): the sidebar then shows THAT menu instead of the main one,
+    /// with a way back — the plugin decides by declaring links. Null on every other page.
+    /// </summary>
+    public async Task<AdminNavEntry?> SubmenuAsync(PathString path, IServiceProvider services, CancellationToken ct = default)
+    {
+        foreach (var m in _registry.AdminMenu)
+        {
+            if (!path.StartsWithSegments(m.Url, StringComparison.OrdinalIgnoreCase)) continue;
+            if (!_registry.Sections.Any(s => s.Url == m.Url && s.Owner == m.Owner && s.Links.Count > 0)) continue;
+            return await PluginEntryAsync(m, services, ct);
+        }
+        return null;
     }
 
     /// <summary>True when any plugin entry sits in the group — the layout draws the plugin block only then.</summary>

@@ -24,6 +24,11 @@ public class PluginRequest
     /// <summary>True when the visitor is signed in to the back office as an administrator (a block may show a preview of drafts to them).</summary>
     public bool IsAdmin { get; init; }
 
+    /// <summary>The variables of the plugin page this block stands on ("product.title" → the name); empty on any other page.</summary>
+    public IReadOnlyDictionary<string, string> Scope { get; init; } = new Dictionary<string, string>();
+    /// <summary>The names in <see cref="Scope"/> whose values are HTML the plugin built.</summary>
+    public IReadOnlySet<string> ScopeHtml { get; init; } = new HashSet<string>();
+
     /// <summary>Pre-rendered hidden antiforgery &lt;input&gt; for admin POST forms (empty on public/
     /// anonymous requests). Include it in any custom &lt;form method="post"&gt;, or — simpler — use
     /// <see cref="Ui"/>, whose Form/ActionButton helpers add it for you.</summary>
@@ -573,6 +578,8 @@ public class PluginRunner
     {
         if (slice.Tables.Count > 0) await _data.ReconcileAsync(_db, p.Key, slice.Tables);
         if (slice.MailTemplates.Count > 0) await PluginMailTemplates.EnsureAsync(_db, slice.MailTemplates);
+        if (slice.PageRoles.Count > 0) await PluginPageService.EnsureAsync(_db, slice, slice.PageRoles);
+        if (slice.MenuElements.Count > 0) await PluginMenuElements.SeedAsync(_db, slice.MenuElements, (locale, text) => PluginStrings.Label(slice, locale, text));
         if (!slice.HasLifecycle) return;
 
         var ctx = PluginRequestContext.ForBackground(info, _services, _registry, slice);

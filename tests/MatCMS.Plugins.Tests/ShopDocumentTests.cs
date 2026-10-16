@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 using MatCMS.Plugin.Shop;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace MatCMS.Plugin.Tests;
@@ -287,5 +288,128 @@ public class ShopCreditNoteTests : IClassFixture<AppFactory>, IAsyncLifetime
         Assert.Empty(await CreditsAsync(order.Id));
         Assert.False(await _shop.WithContextAsync((ctx, _) => ShopOrders.ApplyRefundAsync(ctx, order.Id, 500, "test", "x")));
         Assert.Empty(await CreditsAsync(order.Id));
+    }
+}
+
+/// <summary>The seller's logo and accent colour on the invoice, the credit note and the PDF.</summary>
+public class ShopInvoiceBrandingTests : IClassFixture<AppFactory>, IAsyncLifetime
+{
+    private readonly AppFactory _app;
+    private ShopApp _shop = null!;
+    public ShopInvoiceBrandingTests(AppFactory app) { _app = app; MatCMS.Services.Plugins.PluginPostLimiter.Reset(); }
+    public async Task InitializeAsync() => _shop = await ShopApp.StartAsync(_app);
+    public Task DisposeAsync() => Task.CompletedTask;
+
+    private static InvoiceDoc Doc(string accent = "#ff0000", string logo = "/uploads/logo.png") => new()
+    {
+        Number = "RE-1", OrderNumber = "1", SellerName = "Rostkunst", Billing = "Erika\nMusterweg 1", Accent = accent, Logo = logo,
+        Lines = new[] { new DocLine("Kaffee", "K1", 1, 1000, 1900, 1000) }, Groups = new[] { new TaxGroup(1900, 1000, Money.TaxIncluded(1000, 1900)) }, TotalCents = 1000
+    };
+
+    private static byte[] Jpeg(int w, int h)
+    {
+        using var image = new SixLabors.ImageSharp.Image<SixLabors.ImageSharp.PixelFormats.Rgb24>(w, h, SixLabors.ImageSharp.Color.CornflowerBlue);
+        using var ms = new MemoryStream();
+        SixLabors.ImageSharp.ImageExtensions.SaveAsJpeg(image, ms);
+        return ms.ToArray();
+    }
+
+    [Fact]
+    public void The_html_invoice_shows_the_logo_and_takes_its_colour_from_the_accent_and_never_from_junk()
+    {
+        var html = ShopInvoice.Html(Doc());
+        Assert.Contains("<img class=\"logo\" src=\"/uploads/logo.png\" alt=\"Rostkunst\">", html);
+        Assert.Contains(":root{--accent:#ff0000}", html);
+        Assert.Contains("border-top:2px solid var(--accent)", html);
+
+        var junk = ShopInvoice.Html(Doc(accent: "red;}</style><script>x</script>", logo: "javascript:alert(1)"));
+        Assert.Contains(":root{--accent:#111111}", junk);                              // the black the invoice always had
+        Assert.DoesNotContain("<script>", junk);
+        Assert.DoesNotContain("class=\"logo\"", junk);
+        Assert.DoesNotContain("<img", ShopInvoice.Html(Doc(logo: "")));
+    }
+
+    [Fact]
+    public void The_pdf_carries_the_logo_as_an_image_and_the_accent_as_colour_and_stays_well_formed()
+    {
+        var plain = Encoding.Latin1.GetString(ShopPdf.Render(Doc()));
+        Assert.DoesNotContain("/XObject", plain);
+        Assert.Contains("1 0 0 rg", plain);                                            // the title in the accent colour (ff0000)
+        Assert.Contains("1 0 0 RG", plain);                                            // and the rules
+
+        var jpeg = Jpeg(120, 60);
+        var bytes = ShopPdf.Render(Doc(), new PluginImage(jpeg, 120, 60));
+        var s = Encoding.Latin1.GetString(bytes);
+        Assert.Contains("/XObject << /Im1 ", s);
+        Assert.Contains("/Subtype /Image /Width 120 /Height 60 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode", s);
+        Assert.Contains("/Im1 Do", s);
+        var start = long.Parse(Regex.Match(s, @"startxref\n(\d+)\n").Groups[1].Value);
+        var entries = Regex.Matches(s[(int)start..], @"(\d{10}) 00000 n \n").Select(m => long.Parse(m.Groups[1].Value)).ToList();
+        for (var i = 0; i < entries.Count; i++) Assert.StartsWith($"{i + 1} 0 obj", s[(int)entries[i]..]);       // the image object is where the table says
+        foreach (Match m in Regex.Matches(s, @"/Length (\d+) >>\nstream\n"))
+            Assert.Equal("\nendstream", s.Substring(m.Index + m.Length + int.Parse(m.Groups[1].Value), 10));       // and as long as it says (the JPEG bytes survive the round trip)
+        var imageObject = Regex.Match(s, @"/DCTDecode /Length (\d+) >>\nstream\n");
+        Assert.Equal(jpeg.Length, int.Parse(imageObject.Groups[1].Value));
+        Assert.Equal(jpeg, bytes.Skip(imageObject.Index + imageObject.Length).Take(jpeg.Length).ToArray());
+    }
+
+    [Fact]
+    public async Task A_logo_is_read_from_the_media_library_only_resized_on_white_and_never_as_svg_or_from_elsewhere()
+    {
+        using var scope = _app.Services.CreateScope();
+        var env = scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Hosting.IWebHostEnvironment>();
+        var uploads = MatCMS.Services.StoragePaths.Uploads(env);
+        Directory.CreateDirectory(uploads);
+        var png = Path.Combine(uploads, "branding-logo.png");
+        using (var image = new SixLabors.ImageSharp.Image<SixLabors.ImageSharp.PixelFormats.Rgba32>(800, 400))   // fully transparent
+            await SixLabors.ImageSharp.ImageExtensions.SaveAsPngAsync(image, png);
+        await File.WriteAllTextAsync(Path.Combine(uploads, "branding-logo.svg"), "<svg xmlns=\"http://www.w3.org/2000/svg\"/>");
+        try
+        {
+            var site = new MatCMS.Services.Plugins.PluginSiteFacade(scope.ServiceProvider);
+            var logo = await site.LoadImageAsync("/uploads/branding-logo.png", 200);
+            Assert.NotNull(logo);
+            Assert.Equal((200, 100), (logo!.Width, logo.Height));
+            Assert.Equal(new byte[] { 0xFF, 0xD8 }, logo.Jpeg.Take(2).ToArray());
+            using var back = SixLabors.ImageSharp.Image.Load<SixLabors.ImageSharp.PixelFormats.Rgb24>(logo.Jpeg);
+            Assert.True(back[100, 50].R > 240 && back[100, 50].G > 240 && back[100, 50].B > 240);                 // transparency became white
+
+            Assert.Null(await site.LoadImageAsync("/uploads/branding-logo.svg"));                                  // SVG is never read
+            Assert.Null(await site.LoadImageAsync("/uploads/gibt-es-nicht.png"));
+            Assert.Null(await site.LoadImageAsync("/uploads/../appsettings.json"));
+            Assert.Null(await site.LoadImageAsync("https://example.org/logo.png"));                                // only the library
+            Assert.Null(await site.LoadImageAsync(""));
+        }
+        finally { File.Delete(png); File.Delete(Path.Combine(uploads, "branding-logo.svg")); }
+    }
+
+    [Fact]
+    public async Task The_settings_take_a_colour_and_a_picture_address_and_refuse_anything_else()
+    {
+        var admin = await _shop.AdminAsync();
+        async Task<HttpResponseMessage> Save(string accent, string logo)
+        {
+            var page = await admin.GetStringAsync("/admin/p/shop/_settings?group=set.groupSeller");
+            return await admin.PostAsync("/admin/p/shop/_settings?group=set.groupSeller", new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = AppFactory.Token(page)!, ["action"] = "save-settings", ["s_seller.accent"] = accent, ["s_seller.logo"] = logo
+            }));
+        }
+        try
+        {
+            Assert.Equal(HttpStatusCode.Redirect, (await Save("#FF8800", "/uploads/logo-x.png")).StatusCode);
+            var page = WebUtility.HtmlDecode(await admin.GetStringAsync("/admin/p/shop/_settings?group=set.groupSeller"));
+            Assert.Contains("type=\"color\"", page);
+            Assert.Contains("value=\"#ff8800\"", page);                                   // stored in one spelling
+            Assert.Contains("/uploads/logo-x.png", page);
+
+            var bad = await Save("rot", "/uploads/logo-x.png");
+            Assert.Equal(HttpStatusCode.UnprocessableEntity, bad.StatusCode);
+            Assert.Contains("Keine Farbe", WebUtility.HtmlDecode(await bad.Content.ReadAsStringAsync()));
+            var badLogo = await Save("#112233", "javascript:alert(1)");
+            Assert.Equal(HttpStatusCode.UnprocessableEntity, badLogo.StatusCode);
+            Assert.Contains("Keine gültige Bildadresse", WebUtility.HtmlDecode(await badLogo.Content.ReadAsStringAsync()));
+        }
+        finally { await Save("#111111", ""); }
     }
 }

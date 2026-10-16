@@ -22,8 +22,11 @@ public class EditModel : PageModel
     private readonly AiService _ai;
     private readonly BlockGenerator _blockGen;
 
-    public EditModel(AppDbContext db, BlockRegistry registry, Localizer t, TranslationService translator, AiService ai, BlockGenerator blockGen)
+    private readonly MatCMS.Services.Plugins.PluginPageService _pluginPages;
+
+    public EditModel(AppDbContext db, BlockRegistry registry, Localizer t, TranslationService translator, AiService ai, BlockGenerator blockGen, MatCMS.Services.Plugins.PluginPageService pluginPages)
     {
+        _pluginPages = pluginPages;
         _db = db;
         Registry = registry;
         _t = t;
@@ -127,6 +130,8 @@ public class EditModel : PageModel
         OpenAddPicker = add;
         var page = await Load(id);
         if (page is null) return NotFound();
+        // A plugin's page is laid out in editor v2 (its preview is the plugin's own route, its variables are listed there).
+        if (page.OwnerPlugin is not null) return RedirectToPage("Editor", new { id });
 
         Current = page;
         TranslatorConfigured = (await _translator.GetConfigAsync()).IsConfigured;
@@ -226,8 +231,10 @@ public class EditModel : PageModel
         var page = await _db.Pages.FindAsync(id);
         if (page is null) return NotFound();
 
-        var slug = IndexModel.Slugify(string.IsNullOrWhiteSpace(Meta.Slug) ? Meta.Title : Meta.Slug);
-        var locale = Localizer.IsSupported(Meta.Locale) ? Meta.Locale : page.Locale;
+        // A plugin's page keeps its address and its language (the plugin's route draws it), is always for everybody, and uses the site's template.
+        var owned = page.OwnerPlugin is not null;
+        var slug = owned ? page.Slug : IndexModel.Slugify(string.IsNullOrWhiteSpace(Meta.Slug) ? Meta.Title : Meta.Slug);
+        var locale = owned ? page.Locale : Localizer.IsSupported(Meta.Locale) ? Meta.Locale : page.Locale;
         if (string.IsNullOrWhiteSpace(Meta.Title) || string.IsNullOrWhiteSpace(slug))
         {
             return MetaFail(id, back, "Titel und Slug dürfen nicht leer sein.");
@@ -250,16 +257,19 @@ public class EditModel : PageModel
         page.MetaDescription = Meta.MetaDescription;
         page.CustomCss = string.IsNullOrWhiteSpace(Meta.CustomCss) ? null : Meta.CustomCss;
         page.IsPublished = Meta.IsPublished;
-        page.Access = Meta.Access;
-        // A required role only means anything for a members-only page; drop it otherwise so a page
-        // flipped back to public does not keep a stale gate.
-        page.RequiredRole = Meta.Access == PageAccess.Members && !string.IsNullOrWhiteSpace(Meta.RequiredRole)
-            ? Meta.RequiredRole!.Trim() : null;
-        // Per-page template: 0/empty means "use the active template".
-        page.TemplateId = Meta.TemplateId is > 0 ? Meta.TemplateId : null;
-        // Per-page template parameter overrides (JSON object). Kept only if it parses to an object, so a
-        // typo can't poison rendering; blank clears it.
-        page.TemplateParamsJson = NormalizeParamsJson(Meta.TemplateParamsJson);
+        if (!owned)
+        {
+            page.Access = Meta.Access;
+            // A required role only means anything for a members-only page; drop it otherwise so a page
+            // flipped back to public does not keep a stale gate.
+            page.RequiredRole = Meta.Access == PageAccess.Members && !string.IsNullOrWhiteSpace(Meta.RequiredRole)
+                ? Meta.RequiredRole!.Trim() : null;
+            // Per-page template: 0/empty means "use the active template".
+            page.TemplateId = Meta.TemplateId is > 0 ? Meta.TemplateId : null;
+            // Per-page template parameter overrides (JSON object). Kept only if it parses to an object, so a
+            // typo can't poison rendering; blank clears it.
+            page.TemplateParamsJson = NormalizeParamsJson(Meta.TemplateParamsJson);
+        }
         page.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
         await MatCMS.Services.Plugins.PluginHostEvents.RaiseAsync(HttpContext.RequestServices, MatCMS.Plugin.HostEvents.PageSaved,
@@ -803,8 +813,18 @@ public class EditModel : PageModel
         catch { return new(); }
     }
 
-    /// <summary>Renders the draft block tree (editor mode) WITHOUT touching the DB — for the live preview.</summary>
-    public IActionResult OnPostRenderPreview(int id)
+    /// <summary>"Back to default" for a plugin's page: its blocks are replaced by the plugin's starting layout.</summary>
+    public async Task<IActionResult> OnPostResetPluginAsync(int id)
+    {
+        var page = await _db.Pages.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id);
+        if (page?.OwnerPlugin is null) return NotFound();
+        if (await _pluginPages.ResetAsync(page)) TempData["Flash"] = _t["pages.pluginReset.done"].ToString();
+        else TempData["FlashError"] = "Das Plugin ist nicht geladen.";
+        return RedirectToPage("Editor", new { id });
+    }
+
+    /// <summary>Renders the draft block tree (editor mode) WITHOUT touching the DB — for the live preview. A plugin's page is drawn with the variables of the plugin's example.</summary>
+    public async Task<IActionResult> OnPostRenderPreview(int id)
     {
         var blocks = ParseDraft().Select(d => new ContentBlock
         {
@@ -815,7 +835,9 @@ public class EditModel : PageModel
             SortOrder = d.SortOrder,
             DataJson = string.IsNullOrWhiteSpace(d.DataJson) ? "{}" : d.DataJson
         }).ToList();
-        return Partial("_BlockList", new BlockListModel(blocks, Registry, true));
+        var page = await _db.Pages.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id);
+        var scope = page?.OwnerPlugin is not null ? await _pluginPages.PreviewScopeAsync(page) : null;
+        return Partial("_BlockList", new BlockListModel(blocks, Registry, true, scope));
     }
 
     /// <summary>Reconciles the whole draft into the page's ContentBlock rows in one transaction.</summary>

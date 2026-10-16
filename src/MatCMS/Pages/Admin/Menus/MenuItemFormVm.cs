@@ -18,6 +18,8 @@ public class MenuItemFormVm
     /// <summary>Candidate parent items (same menu + locale, minus self/descendants) for the
     /// "übergeordneter Eintrag" picker. Empty = only top-level possible.</summary>
     public List<MatCMS.Models.MenuItem> ParentOptions { get; set; } = new();
+    /// <summary>How deep each option sits (by id) — the picker indents by it.</summary>
+    public Dictionary<int, int> ParentDepths { get; set; } = new();
 
     // Per-page differences.
     public string QuickPickHelpKey { get; set; } = "menus.quickPickHelpCreate";

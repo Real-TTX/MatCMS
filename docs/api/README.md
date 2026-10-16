@@ -314,6 +314,11 @@ Instanz beim nächsten Heartbeat über ihre **eigenen** Validierer anwendet (add
 | `create_post` | neuen Beitrag anlegen (add-only) |
 | `create_product` | neues Shop-Produkt anlegen (add-only; Preis brutto in Cent; optional Kategorie — wird angelegt, falls neu —, Schlagwörter, „hervorgehoben“, Statt-Preis; das Shop-Plugin muss auf der Site eingeschaltet sein) |
 | `create_coupon` | neuen Gutschein-Code im Shop anlegen (add-only, ein vorhandener Code wird übersprungen; Prozent, Festbetrag oder Versand frei, optional Mindestwert, Ablaufdatum, Höchstzahl, einmal pro Kunde, Kategorie) |
+| `list_shop_orders` | Bestellungen einer Instanz lesen (eine nach Nummer oder die neuesten, nach Status/Datum; enthält Kundendaten, daher mit Restore-Recht); Ergebnis über `get_content_op` |
+| `update_shop_order` | eine Bestellung weiterbewegen: bezahlt, versendet (mit Paketdienst und Sendungsnummer), abgeschlossen, storniert, Notiz, Sendungsnummer; nicht erlaubte Schritte werden mit Grund abgelehnt |
+| `set_product_variants` | Varianten eines Produkts setzen (Name, Aufpreis, Bestand, Art.-Nr., Bild; vorhandene werden an Ort und Stelle geändert, mit `replace` werden die übrigen abgeschaltet, nie gelöscht) und die Optionen für getrennte Wähler |
+| `create_shop_attribute` | neue Produkt-Eigenschaft anlegen (Auswahl, Text, Zahl mit Einheit, Ja/Nein; add-only) |
+| `set_product_attributes` | einem Produkt Werte für Eigenschaften geben (nur gültige Optionen werden gespeichert, Unbekanntes wird gemeldet) |
 | `create_form` | neues Formular anlegen (add-only; Felder als JSON-Array) — CanRestore |
 | `set_setting` | eine Site-Einstellung setzen (`cloud.*`-Schlüssel werden abgewiesen) — CanRestore |
 | `analyze_cleanup` | unbenutzte Medien/Komponenten + Plugins der Site ermitteln (async → `get_content_op`, `result` = Liste) — read |

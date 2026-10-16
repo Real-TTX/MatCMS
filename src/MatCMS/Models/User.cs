@@ -22,6 +22,9 @@ public class User
     /// (follows the operating system). Read by the admin layout into &lt;html data-theme&gt;.</summary>
     public string? Theme { get; set; }
 
+    /// <summary>What the dashboard shows for THIS user and in which order, as JSON (<see cref="MatCMS.Services.DashboardLayout"/>); null = follow the site's default layout.</summary>
+    public string? DashboardJson { get; set; }
+
     // --- Two-factor (TOTP) ----------------------------------------------------
     // Off for every existing account; turned on only after the user confirms a code during enrolment.
     // The secret is stored DataProtection-ENCRYPTED (see TwoFactorService) and recovery codes only as

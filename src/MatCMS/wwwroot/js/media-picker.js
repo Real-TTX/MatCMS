@@ -119,33 +119,111 @@
         }).catch(function () { grid.innerHTML = '<p class="muted">Konnte Mediathek nicht laden.</p>'; });
     };
 
-    // Internal-link picker: pick a published page (returns its URL). Used by URL fields.
-    window.openLinkPicker = function (onPick) {
-        var overlay = document.createElement("div");
-        overlay.className = "modal-overlay open";
-        overlay.innerHTML = '<div class="modal" role="dialog" aria-modal="true">' +
-            '<div class="modal-head"><h2>Seite verlinken</h2><button type="button" class="modal-close" aria-label="Schließen"><i class="ti ti-x" aria-hidden="true"></i></button></div>' +
-            '<div class="modal-body"><div class="link-picker-list"></div></div></div>';
-        document.body.appendChild(overlay);
-        var list = overlay.querySelector(".link-picker-list");
-        function close() { overlay.remove(); }
-        overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
-        overlay.querySelector(".modal-close").addEventListener("click", close);
-        document.addEventListener("keydown", function esc(e) {
-            if (e.key === "Escape") { close(); document.removeEventListener("keydown", esc); }
-        });
-        fetch("/admin/api/pages").then(function (r) { return r.json(); }).then(function (pages) {
-            if (!pages || !pages.length) { list.innerHTML = '<p class="muted">Keine veröffentlichten Seiten.</p>'; return; }
-            pages.forEach(function (p) {
-                var b = document.createElement("button");
-                b.type = "button"; b.className = "link-pick";
-                b.innerHTML = '<span class="lp-title"></span><span class="lp-url mono"></span>';
-                b.querySelector(".lp-title").textContent = p.title || p.url;
-                b.querySelector(".lp-url").textContent = p.url;
-                b.addEventListener("click", function () { onPick(p.url, p.title || ""); close(); });
-                list.appendChild(b);
+    // Link picker: a drop-down under the address field — a search box on top, the places to link to below it, grouped by where they come from (pages, blog posts, shop categories,
+    // products …), one compact line each (title, address). opts.anchor is the element it opens under (the link field); opts.elements also offers the plugin elements a menu item can stand for
+    // (the cart, the search box). Arrow keys move, Enter takes, Escape closes. onPick(url, title).
+    window.openLinkPicker = function (onPick, opts) {
+        opts = opts || {};
+        var open = document.querySelector(".lp-pop");
+        if (open && open._close) open._close();
+        // The picker's own words: the admin's language is on <html lang>.
+        var en = (document.documentElement.lang || "de").slice(0, 2) === "en";
+        var L = en
+            ? { search: "Search pages, posts, categories, products …", searchLabel: "Search", none: "Nothing found.", empty: "No targets available.", failed: "Could not load the targets." }
+            : { search: "Seiten, Beiträge, Kategorien, Produkte durchsuchen …", searchLabel: "Suchen", none: "Nichts gefunden.", empty: "Keine Ziele vorhanden.", failed: "Konnte die Ziele nicht laden." };
+        var anchor = opts.anchor || null;
+        var pop = document.createElement("div");
+        pop.className = "lp-pop";
+        pop.setAttribute("role", "dialog");
+        pop.innerHTML = '<div class="lp-pop-head"><i class="ti ti-search" aria-hidden="true"></i><input type="search" class="lp-pop-search" autocomplete="off"></div><div class="lp-pop-list" role="listbox"></div>';
+        var search = pop.querySelector(".lp-pop-search");
+        var list = pop.querySelector(".lp-pop-list");
+        search.placeholder = L.search;
+        search.setAttribute("aria-label", L.searchLabel);
+        document.body.appendChild(pop);
+
+        function place() {
+            var vw = document.documentElement.clientWidth, vh = window.innerHeight;
+            if (!anchor) { pop.style.cssText = "position:fixed;top:12vh;left:50%;width:min(560px,calc(100vw - 24px));transform:translateX(-50%)"; return; }
+            var r = anchor.getBoundingClientRect();
+            var width = Math.min(Math.max(r.width, 440), vw - 16);
+            var left = Math.min(Math.max(r.left, 8), vw - width - 8);
+            var below = vh - r.bottom - 12, above = r.top - 12;
+            var up = below < 240 && above > below;
+            var room = Math.max(160, Math.min(380, up ? above : below));
+            pop.style.width = width + "px";
+            pop.style.left = (left + window.scrollX) + "px";
+            pop.style.maxHeight = room + "px";
+            if (up) { pop.style.top = ""; pop.style.bottom = (document.documentElement.clientHeight - r.top - window.scrollY + 4) + "px"; }
+            else { pop.style.bottom = ""; pop.style.top = (r.bottom + window.scrollY + 4) + "px"; }
+        }
+        place();
+        window.addEventListener("resize", place);
+
+        var items = [], active = -1;
+        function close(refocus) {
+            window.removeEventListener("resize", place);
+            document.removeEventListener("mousedown", outside, true);
+            document.removeEventListener("keydown", keys, true);
+            pop.remove();
+            if (refocus && anchor) { var f = anchor.querySelector("input"); if (f) f.focus(); }
+        }
+        pop._close = close;
+        function outside(e) { if (!pop.contains(e.target) && !(anchor && anchor.contains(e.target))) close(false); }
+        function visible() { return items.filter(function (i) { return !i.el.hidden; }); }
+        function setActive(i) {
+            var v = visible();
+            if (!v.length) { active = -1; return; }
+            active = Math.max(0, Math.min(v.length - 1, i));
+            items.forEach(function (x) { x.el.classList.remove("on"); });
+            v[active].el.classList.add("on");
+            v[active].el.scrollIntoView({ block: "nearest" });
+        }
+        function keys(e) {
+            if (e.key === "Escape") { e.preventDefault(); close(true); return; }
+            if (!pop.contains(document.activeElement)) return;
+            if (e.key === "ArrowDown") { e.preventDefault(); setActive(active + 1); }
+            else if (e.key === "ArrowUp") { e.preventDefault(); setActive(active - 1); }
+            else if (e.key === "Enter") { e.preventDefault(); var v = visible(); if (v[active]) v[active].el.click(); }
+        }
+        document.addEventListener("mousedown", outside, true);
+        document.addEventListener("keydown", keys, true);
+
+        function filter() {
+            var q = search.value.trim().toLowerCase(), any = false;
+            items.forEach(function (i) { i.el.hidden = !!q && i.find.indexOf(q) === -1; });
+            list.querySelectorAll(".lp-pop-group").forEach(function (g) {
+                var shown = false, n = g.nextElementSibling;
+                while (n && n.classList.contains("lp-pop-item")) { if (!n.hidden) shown = true; n = n.nextElementSibling; }
+                g.hidden = !shown; if (shown) any = true;
             });
-        }).catch(function () { list.innerHTML = '<p class="muted">Konnte Seiten nicht laden.</p>'; });
+            var empty = list.querySelector(".lp-pop-empty"); if (empty) empty.hidden = any;
+            setActive(0);
+        }
+        search.addEventListener("input", filter);
+        search.focus();
+
+        fetch("/admin/api/link-targets" + (opts.elements ? "?elements=true" : "")).then(function (r) { return r.json(); }).then(function (data) {
+            if (!data || !data.length) { list.innerHTML = '<div class="lp-pop-empty"></div>'; list.firstChild.textContent = L.empty; return; }
+            data.forEach(function (g) {
+                var h = document.createElement("div"); h.className = "lp-pop-group"; h.textContent = g.group; list.appendChild(h);
+                g.items.forEach(function (p) {
+                    var b = document.createElement("button");
+                    b.type = "button"; b.className = "lp-pop-item"; b.setAttribute("role", "option");
+                    b.innerHTML = '<span class="t"></span><span class="u mono"></span>';
+                    b.querySelector(".t").textContent = p.title || p.url;
+                    b.querySelector(".u").textContent = p.url;
+                    b.title = p.url;
+                    b.addEventListener("mouseenter", function () { var v = visible(); setActive(v.findIndex(function (x) { return x.el === b; })); });
+                    b.addEventListener("click", function () { var t = p.title || ""; close(false); onPick(p.url, t); });
+                    list.appendChild(b);
+                    items.push({ el: b, find: ((p.title || "") + " " + p.url + " " + g.group).toLowerCase() });
+                });
+            });
+            var none = document.createElement("div"); none.className = "lp-pop-empty"; none.hidden = true; none.textContent = L.none; list.appendChild(none);
+            setActive(0);
+            place();
+        }).catch(function () { list.innerHTML = '<div class="lp-pop-empty"></div>'; list.firstChild.textContent = L.failed; });
     };
 
     // Reusable pattern: any [data-link-btn] opens the link picker and fills a target input.
@@ -161,7 +239,7 @@
                 window.openLinkPicker(function (url, title) {
                     if (input) { input.value = url; input.dispatchEvent(new Event("input", { bubbles: true })); }
                     if (label && !label.value && title) label.value = title;
-                });
+                }, { elements: btn.hasAttribute("data-elements"), anchor: btn.closest(".link-field") || btn });
             });
         });
     }

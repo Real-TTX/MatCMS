@@ -161,6 +161,23 @@ public interface IPluginContext
     IPluginSite Site { get; }
     /// <summary>A text of the plugin in the page's language (<see cref="IPluginBuilder.Strings"/>); <c>{0}</c>… are replaced with <paramref name="args"/>.</summary>
     string T(string key, params object[] args);
+
+    /// <summary>
+    /// Renders one of the plugin's own template parts (<see cref="IPluginBuilder.TemplatePart"/>) with <paramref name="values"/>: the ACTIVE template's version of it if it has one, else
+    /// the plugin's default. A value is encoded unless its placeholder is declared <see cref="TemplatePlaceholder.Html"/>; a placeholder without a value is empty.
+    /// </summary>
+    string RenderPart(string name, IReadOnlyDictionary<string, string> values);
+    /// <summary>
+    /// The variables of the plugin page a block is being drawn on ("product.title" → the name), empty on any other page. A plugin block reads the data of THIS request here instead of asking the address again.
+    /// </summary>
+    IReadOnlyDictionary<string, string> PageScope { get; }
+    /// <summary>True while an administrator looks at the page in the block editor's preview (<c>?editor=1</c>): a handler may then show sample data where the real request has none (a cart, a customer).</summary>
+    bool IsEditorPreview { get; }
+    /// <summary>
+    /// Draws the page the editors made for <paramref name="role"/> (<see cref="IPluginBuilder.PageRole"/>) with <paramref name="scope"/> and answers its HTML, or null when there is no such page (never created, switched off) —
+    /// then the plugin draws its own default. The page's blocks are drawn in the language of the request; the variables are the scope's, prefixed with the role.
+    /// </summary>
+    Task<string?> RenderPageAsync(string role, PageScope scope, CancellationToken ct = default);
     /// <summary>The raw door to the host's services. No stability promise: it exists so nothing is impossible, not so everything is easy.</summary>
     IPluginUnsafe Unsafe { get; }
 }

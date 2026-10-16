@@ -39,6 +39,7 @@ public class AppDbContext : DbContext
         // A slug is unique per locale (the same slug may exist once per content locale).
         b.Entity<Page>().HasIndex(p => new { p.Slug, p.Locale }).IsUnique();
         b.Entity<Page>().HasIndex(p => p.TranslationGroup);
+        b.Entity<Page>().HasIndex(p => new { p.OwnerPlugin, p.PluginRole, p.Locale });
         b.Entity<MenuItem>().HasIndex(m => new { m.Menu, m.Locale });
         b.Entity<SiteSetting>().HasIndex(s => s.Key).IsUnique();
         b.Entity<Form>().HasIndex(f => f.Slug).IsUnique();

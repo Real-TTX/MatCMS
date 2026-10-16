@@ -63,6 +63,12 @@ public class IndexModel : PageModel
     public async Task<IActionResult> OnPostDeleteAsync(int id)
     {
         var page = await _db.Pages.FindAsync(id);
+        // A plugin's page belongs to the plugin: it is laid out here, but it stays (the plugin draws it); "back to default" is in its editor.
+        if (page?.OwnerPlugin is not null)
+        {
+            TempData["FlashError"] = "Diese Seite gehört einem Plugin und kann nicht gelöscht werden.";
+            return RedirectToPage();
+        }
         if (page is not null)
         {
             // Delete the whole logical page — all its language versions (same translation group).

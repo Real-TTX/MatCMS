@@ -30,10 +30,14 @@ internal static class ShopCoupons
     /// <summary>Forgets every count (tests start clean).</summary>
     internal static void ResetAttempts() => Attempts.Clear();
 
-    private static bool Eligible(Coupon c, PricedLine l) => c.Category.Length == 0 || l.Product.Category == c.Category;
+    /// <summary>A coupon limited to a category covers that category and everything below it; <paramref name="scope"/> is that set (null = just the category itself).</summary>
+    private static bool Eligible(Coupon c, PricedLine l, IReadOnlySet<string>? scope) => c.Category.Length == 0 || (scope?.Contains(l.Product.Category) ?? l.Product.Category == c.Category);
+
+    private static async Task<IReadOnlySet<string>?> ScopeAsync(ShopStore store, Coupon c, CancellationToken ct) =>
+        c.Category.Length == 0 ? null : ShopCategories.SlugsUnder(await store.CategoriesAsync(ct), c.Category);
 
     /// <summary>The goods this coupon may reduce.</summary>
-    private static long EligibleGoods(Coupon c, PricedCart cart) => cart.Lines.Where(l => Eligible(c, l)).Sum(l => l.LineCents);
+    private static long EligibleGoods(Coupon c, PricedCart cart, IReadOnlySet<string>? scope) => cart.Lines.Where(l => Eligible(c, l, scope)).Sum(l => l.LineCents);
 
     /// <summary>The sentence that says why the coupon cannot be used for this cart, or null when it can. <paramref name="email"/> is empty while the buyer's address is not known yet.</summary>
     public static async Task<string?> ProblemAsync(IPluginContext ctx, ShopStore store, Coupon c, PricedCart cart, string email, ShopConfig cfg, CancellationToken ct)
@@ -48,18 +52,18 @@ internal static class ShopCoupons
         {
             if (!cart.NeedsShipping) return ctx.T("shop.coupon.noShipping");
         }
-        else if (EligibleGoods(c, cart) <= 0) return ctx.T("shop.coupon.nothingEligible");
+        else if (EligibleGoods(c, cart, await ScopeAsync(store, c, ct)) <= 0) return ctx.T("shop.coupon.nothingEligible");
         if (c.MinOrderCents > 0 && cart.SubtotalCents < c.MinOrderCents) return ctx.T("shop.coupon.minOrder", Money.Format(c.MinOrderCents, cfg.Currency, ctx.Locale));
         if (c.OncePerCustomer && email.Length > 0 && await store.CouponOrdersOfAsync(c.Code, email, ct) > 0) return ctx.T("shop.coupon.onceOnly");
         return null;
     }
 
     /// <summary>The cart with the coupon applied. Call only for a coupon that <see cref="ProblemAsync"/> accepted.</summary>
-    public static PricedCart Apply(PricedCart cart, Coupon c)
+    public static PricedCart Apply(PricedCart cart, Coupon c, IReadOnlySet<string>? scope = null)
     {
         if (c.Kind == CouponKind.Shipping) return cart with { CouponCode = c.Code, FreeShipping = true };
 
-        var eligible = cart.Lines.Select(l => Eligible(c, l) ? l.LineCents : 0L).ToList();
+        var eligible = cart.Lines.Select(l => Eligible(c, l, scope) ? l.LineCents : 0L).ToList();
         var basis = eligible.Sum();
         var discount = c.Kind == CouponKind.Percent
             ? (long)Math.Round(basis * (decimal)Math.Clamp(c.Value, 0, 10000) / 10000m, MidpointRounding.AwayFromZero)
@@ -78,7 +82,7 @@ internal static class ShopCoupons
         var coupon = await store.CouponByCodeAsync(code, ct);
         if (coupon is null) return new CouponResult(cart, null, ctx.T("shop.coupon.unknown"));
         var problem = await ProblemAsync(ctx, store, coupon, cart, email, cfg, ct);
-        return problem is not null ? new CouponResult(cart, null, problem) : new CouponResult(Apply(cart, coupon), coupon, null);
+        return problem is not null ? new CouponResult(cart, null, problem) : new CouponResult(Apply(cart, coupon, await ScopeAsync(store, coupon, ct)), coupon, null);
     }
 
     /// <summary>"10 %", "5,00 €" or "Versand frei" — what a coupon is worth, for lists and notes.</summary>

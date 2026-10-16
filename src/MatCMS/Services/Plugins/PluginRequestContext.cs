@@ -28,10 +28,24 @@ internal sealed class PluginRequestContext : IPluginContext
 
     /// <param name="slice">The plugin's slice when it is not published yet (while it is being activated); otherwise looked up.</param>
     public PluginRequestContext(PluginInfo plugin, RequestData request, PluginUser user, string locale,
-        BlockData? block, string antiforgery, IServiceProvider services, PluginRegistry registry, PluginRegistry.Slice? slice = null)
+        BlockData? block, string antiforgery, IServiceProvider services, PluginRegistry registry, PluginRegistry.Slice? slice = null,
+        IReadOnlyDictionary<string, string>? pageScope = null, bool editorPreview = false)
     {
         Plugin = plugin; Request = request; User = user; Locale = locale; Block = block;
         Antiforgery = antiforgery; _services = services; _registry = registry; _slice = slice;
+        PageScope = pageScope ?? new Dictionary<string, string>(); IsEditorPreview = editorPreview;
+    }
+
+    public IReadOnlyDictionary<string, string> PageScope { get; }
+    public bool IsEditorPreview { get; }
+
+    public async Task<string?> RenderPageAsync(string role, PageScope scope, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+        if (_services.GetService(typeof(PluginPageService)) is not PluginPageService pages) return null;
+        // Only the plugin's own pages: a role of another plugin is none of its business.
+        if (!_registry.PageRoles.Any(r => r.Owner == Plugin.Key && r.Spec.Name == role)) return null;
+        return await pages.RenderAsync(Plugin.Key, role, Locale, pages.ScopeOf(role, scope, Member), IsEditorPreview, ct);
     }
 
     private PluginRegistry.Slice? Slice => _slice ?? _registry.SliceOf(Plugin.Key);
@@ -64,6 +78,20 @@ internal sealed class PluginRequestContext : IPluginContext
     public BlockData? Block { get; }
     public string Antiforgery { get; }
     public IPluginUnsafe Unsafe => new UnsafeAccess(_services);
+
+    private Dictionary<string, string>? _templateParts;
+
+    public string RenderPart(string name, IReadOnlyDictionary<string, string> values)
+    {
+        var entry = _registry.TemplateParts.FirstOrDefault(p => p.Owner == Plugin.Key && p.Spec.Name == name)
+            ?? throw new InvalidOperationException($"The plugin '{Plugin.Key}' declared no template part '{name}'.");
+        // The active template's own version of the part, if it has one that is not blank; else the plugin's default.
+        _templateParts ??= _services.GetService(typeof(AppDbContext)) is AppDbContext db
+            ? MatCMS.Content.TemplateSchema.Parse(db.Templates.AsNoTracking().Where(t => t.IsActive).Select(t => t.PartsJson).FirstOrDefault())
+            : new Dictionary<string, string>();
+        var own = _templateParts.TryGetValue(entry.Key, out var o) && !string.IsNullOrWhiteSpace(o) ? o : entry.Spec.DefaultHtml;
+        return PartRenderer.Render(own, values, entry.Spec.Placeholders.Where(p => p.Html).Select(p => p.Name).ToHashSet());
+    }
 
     public string AssetUrl(string file)
     {
@@ -134,7 +162,9 @@ internal sealed class PluginRequestContext : IPluginContext
             IsAdmin = http.User?.IsInRole("Admin") == true,
             Name = http.User?.Identity?.Name ?? ""
         };
-        var ctx = new PluginRequestContext(info, request, user, CurrentLocale(), null, csrf, http.RequestServices, registry);
+        // An administrator who opens the page with ?editor=1 is looking at it in the block editor's preview.
+        var editorPreview = user.IsAdmin && http.Request.Query.ContainsKey("editor");
+        var ctx = new PluginRequestContext(info, request, user, CurrentLocale(), null, csrf, http.RequestServices, registry, editorPreview: editorPreview);
         ctx.Member = await CurrentMemberAsync(http);
         return ctx;
     }
@@ -172,15 +202,32 @@ internal sealed class PluginRequestContext : IPluginContext
 
     /// <summary>A context for work that belongs to no HTTP request of the plugin's own: a sidebar counter, a job, an install handler.
     /// No request data, nobody signed in.</summary>
-    public static PluginRequestContext ForBackground(PluginInfo info, IServiceProvider services, PluginRegistry registry, PluginRegistry.Slice? slice = null) =>
-        new(info, new RequestData(), new PluginUser(), CurrentLocale(), null, "", services, registry, slice);
+    public static PluginRequestContext ForBackground(PluginInfo info, IServiceProvider services, PluginRegistry registry, PluginRegistry.Slice? slice = null, bool editorPreview = false) =>
+        new(info, new RequestData(), new PluginUser(), CurrentLocale(), null, "", services, registry, slice, editorPreview: editorPreview);
 
     /// <summary>A context for an event listener: the listener's own plugin, the caller's user and language.</summary>
     public static PluginRequestContext ForListener(PluginInfo info, IServiceProvider services, PluginRegistry registry, PluginUser user, string locale) =>
         new(info, new RequestData(), user, locale, null, "", services, registry);
 
+    /// <summary>
+    /// <see cref="FromBlock"/> plus what only the request knows: the plugin's own cookies (the cart), the visitor's address and the signed-in member — a block may show "your orders"
+    /// or "3 items in your cart". Pages are drawn per request and never cached for everybody, so a block may differ per visitor.
+    /// </summary>
+    public static async Task<PluginRequestContext> FromBlockAsync(PluginInfo info, string blockType, PluginRequest legacy, PluginRegistry registry)
+    {
+        if (legacy.Services?.GetService(typeof(IHttpContextAccessor)) is not IHttpContextAccessor { HttpContext: { } http }) return FromBlock(info, blockType, legacy, registry);
+        var prefix = CookiePrefix(info.Key);
+        var cookies = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var kv in http.Request.Cookies)
+            if (kv.Key.StartsWith(prefix, StringComparison.Ordinal)) cookies[kv.Key[prefix.Length..]] = kv.Value;
+        var ctx = FromBlock(info, blockType, legacy, registry, cookies, http.Connection.RemoteIpAddress?.ToString() ?? "");
+        ctx.Member = await CurrentMemberAsync(http);
+        return ctx;
+    }
+
     /// <summary>Builds the context of a block render from the request type the block pipeline passes.</summary>
-    public static PluginRequestContext FromBlock(PluginInfo info, string blockType, PluginRequest legacy, PluginRegistry registry)
+    public static PluginRequestContext FromBlock(PluginInfo info, string blockType, PluginRequest legacy, PluginRegistry registry,
+        IReadOnlyDictionary<string, string>? cookies = null, string clientIp = "")
     {
         JsonObject values;
         try { values = JsonNode.Parse(string.IsNullOrWhiteSpace(legacy.Data) ? "{}" : legacy.Data) as JsonObject ?? new JsonObject(); }
@@ -188,11 +235,12 @@ internal sealed class PluginRequestContext : IPluginContext
         var request = new RequestData
         {
             Method = legacy.Method, Path = legacy.Path,
-            Query = legacy.Query, Form = legacy.Form
+            Query = legacy.Query, Form = legacy.Form, Cookies = cookies ?? new Dictionary<string, string>(), ClientIp = clientIp
         };
         var user = new PluginUser { IsAdmin = legacy.IsAdmin };
         return new PluginRequestContext(info, request, user, CurrentLocale(),
-            new BlockData { Type = blockType, Values = values }, legacy.Antiforgery, legacy.Services, registry);
+            new BlockData { Type = blockType, Values = values }, legacy.Antiforgery, legacy.Services, registry,
+            pageScope: legacy.Scope, editorPreview: legacy.IsAdmin && legacy.Query.ContainsKey("editor"));
     }
 }
 

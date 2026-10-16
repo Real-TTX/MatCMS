@@ -239,7 +239,7 @@ body.nav-open .admin-menu-toggle span:nth-child(2) { opacity: 0; }
 body.nav-open .admin-menu-toggle span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
 .admin-backdrop { display: none; }
 
-.admin-content { padding: 32px; max-width: 1500px; width: 100%; }
+.admin-content { padding: 32px; max-width: 1840px; width: 100%; }
 /* Keep single text inputs readable on wide screens (lists/tables still use full width). */
 .card .form-field > input:not([type=color]),
 .card .form-field > .color-field,
@@ -255,7 +255,7 @@ body.nav-open .admin-menu-toggle span:nth-child(3) { transform: translateY(-6px)
 
 /* The page title already appears in the top bar, so the per-page <h1> is redundant: hide it (keeping
    any action buttons in the header row), and collapse the whole row when the title was its only child. */
-.admin-content .page-head > h1 { display: none; }
+.admin-content .page-head > h1, .admin-content .page-head > div > h1 { display: none; }   /* the topbar already names the page */
 .admin-content .page-head:not(:has(> :not(h1))) { display: none; margin: 0; }
 
 /* Same for the <h2> above a list: the tab or the page title already names it, so repeating it right
@@ -493,11 +493,19 @@ textarea.cp-sample-inp { resize: vertical; min-height: 0; }
 .asset-table .a-name { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .asset-table .a-url { width: 100%; min-width: 160px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; padding: 4px 6px; }
 textarea.code-area { width: 100%; box-sizing: border-box; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; line-height: 1.5; }
-.link-picker-list { display: flex; flex-direction: column; gap: 6px; max-height: 60vh; overflow-y: auto; }
-.link-pick { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 10px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); cursor: pointer; }
-.link-pick:hover { border-color: var(--accent); background: var(--surface-2); }
-.link-pick .lp-title { font-weight: 600; }
-.link-pick .lp-url { font-size: 12.5px; color: var(--muted); }
+/* Link picker: a drop-down under the address field — search on top, the targets grouped below it, one compact line each. */
+.lp-pop { position: absolute; z-index: 1200; display: flex; flex-direction: column; overflow: hidden; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 14px 34px rgba(0, 0, 0, .22); }
+.lp-pop-head { position: relative; padding: 8px; border-bottom: 1px solid var(--line); }
+.lp-pop-head .ti { position: absolute; left: 19px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
+.lp-pop-search { width: 100%; box-sizing: border-box; margin: 0; padding: 7px 10px 7px 32px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--surface); color: var(--ink); font: inherit; font-size: 14px; }
+.lp-pop-list { overflow-y: auto; }
+.lp-pop-group { position: sticky; top: 0; z-index: 1; padding: 4px 12px; background: var(--surface-2); border-bottom: 1px solid var(--line); font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text-muted); }
+.lp-pop-item { display: flex; align-items: baseline; gap: 12px; width: 100%; padding: 6px 12px; border: 0; background: none; color: var(--ink); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+.lp-pop-item .t { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lp-pop-item .u { flex: 0 1 46%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; font-size: 12px; color: var(--text-muted); }
+.lp-pop-item.on { background: var(--hover); }
+.lp-pop-item[hidden], .lp-pop-group[hidden] { display: none; }
+.lp-pop-empty { padding: 14px 12px; color: var(--text-muted); font-size: 14px; }
 
 /* Icon picker — the current icon as a button, the grid in a dialog.
    Die Klassen sind dieselben wie vorher, als das Raster noch dauerhaft im Formular stand: das
@@ -660,6 +668,22 @@ table.data th, table.data td { text-align: left; padding: 13px 16px; border-bott
 table.data th { background: var(--surface-2); text-transform: uppercase; letter-spacing: .05em; font-size: 12px; color: var(--muted); }
 table.data tr:last-child td { border-bottom: none; }
 table.data .row-unread td { font-weight: 600; }
+/* Rows to edit in place (UiRowEditor): a table whose cells are fields. */
+.row-editor table.data { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.row-editor table.data th, .row-editor table.data td { padding: 7px 10px; }
+.row-editor table.data td input[type=text] { width: 100%; min-width: 0; box-sizing: border-box; margin: 0; padding: 8px 10px; }
+.row-editor table.data td input.num { text-align: right; }
+.row-editor table.data th.row-end, .row-editor table.data td.row-end { width: 44px; text-align: right; }
+.row-editor table.data th.row-check-head, .row-editor .row-check { text-align: center; }
+.row-editor .row-check { display: flex; justify-content: center; align-items: center; }
+.row-editor .row-img { display: flex; align-items: center; gap: 6px; }
+.row-editor .row-img .preview { flex: none; width: 34px; height: 34px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface-2) center / cover no-repeat; }
+.row-editor .row-img input[type=text] { flex: 1 1 auto; }
+.row-editor .row-empty { margin: 12px 0 0; color: var(--muted); }
+.row-editor .row-actions { margin-top: 10px; }
+.row-editor .icon-btn.row-remove { color: var(--text-2); }
+.row-editor .icon-btn.row-remove:hover { color: var(--err-fg, #b3261e); border-color: var(--err-fg, #b3261e); }
+
 /* Grouped tables (admin-list.js: data-list-group / data-list-in): a header row per group, its rows indented below. */
 table.data tr[data-list-group] td { background: var(--surface-2); padding: 10px 16px; width: auto; white-space: normal; }
 table.data tr[data-list-group] .group-title { font-weight: 600; }
@@ -670,6 +694,7 @@ table.data tr[data-list-in] td:first-child { padding-left: 34px; }
 .badge-on { background: var(--ok-bg); color: var(--ok-fg); }
 .badge-off { background: var(--surface-2); color: var(--text-muted); }
 .badge-new { background: var(--black); color: var(--on-ink); }
+.badge-warn { background: var(--warn-bg); color: var(--warn-fg); }
 .badge-err { background: var(--err-bg); color: var(--err-fg); }
 .admin-nav-plugins { margin-top: 6px; padding-top: 8px; border-top: 1px dashed var(--line); display: flex; flex-direction: column; gap: 4px; }
 
@@ -1050,7 +1075,7 @@ a.tab { display: inline-block; text-decoration: none; }
 /* Field editor (admin-blocks.js) */
 .field { margin-bottom: 20px; }
 .field > label { display: block; font-weight: 600; font-size: 13.5px; margin-bottom: 7px; }
-.field input[type=text], .field input[type=url], .field textarea, .field select {
+.field input[type=text], .field input[type=url], .field input[type=number], .field input[type=email], .field input[type=password], .field input[type=search], .field input[type=tel], .field input[type=date], .field textarea, .field select {
     width: 100%; padding: 11px 13px; border: 1px solid var(--border-strong); font-family: inherit; font-size: 15px; background: var(--surface);
 }
 .field textarea { min-height: 90px; resize: vertical; }
@@ -1711,9 +1736,45 @@ html[data-theme] .alert-warning { background: var(--warn-bg); border-color: var(
 .alert-warning { background: #fdf6e3; border-color: #ecd9a0; color: #7a5a00; padding: 14px 18px; margin-bottom: 24px; font-size: 15px; border: 1px solid; }
 .ui-stack > .card, .ui-stack > .alert, .ui-stack > .stat-grid { margin-bottom: 0; }
 .ui-form { max-width: 860px; }
+/* A form that holds a main and a side column (a product, an order, a category) is an editor, not a settings card: it uses the width there is. */
+.ui-form:has(.ui-cols) { max-width: none; }
 .ui-form-narrow { max-width: 560px; }
 .ui-dialog-foot { display: flex; justify-content: flex-end; margin-top: 14px; }
 .ui-grid > .card { margin-bottom: 0; }
+/* A screen with a sub-menu (Ui.Split) and one with a main and a side column (Ui.Columns). */
+/* A list cell with a picture: the thumbnail keeps its size however narrow the column gets. */
+.ui-media-cell { display: flex; gap: 14px; align-items: flex-start; }
+.ui-thumb { flex: none; width: 56px; height: 56px; background: var(--surface-2) center / cover no-repeat; border: 1px solid var(--line); display: inline-flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 22px; }
+.ui-thumb.empty { background: var(--surface-2); }
+.ui-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.ui-chips .chip { font-size: 11px; padding: 1px 8px; border: 1px solid var(--line); color: var(--text-2); border-radius: 99px; }
+.ui-split { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 24px; align-items: start; }
+.ui-subnav { display: flex; flex-direction: column; gap: 2px; background: var(--surface); border: 1px solid var(--line); padding: 8px; position: sticky; top: 16px; }
+.ui-subnav a { display: flex; align-items: center; gap: 8px; padding: 9px 11px; color: var(--text-2); text-decoration: none; font-size: 14px; }
+.ui-subnav a .ti { font-size: 17px; opacity: .8; }
+.ui-subnav a:hover { background: var(--hover); color: var(--black); }
+.ui-subnav a.active { background: var(--accent); color: #fff; }
+.ui-subnav a.active .ti { opacity: 1; }
+.ui-subnav-badge { margin-left: 4px; font-size: 11px; opacity: .75; }
+.ui-subnav-label { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); padding: 10px 11px 2px; }
+.ui-split-body { min-width: 0; }
+.ui-split-body > .card:last-child { margin-bottom: 0; }
+.ui-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 26%); gap: 24px; align-items: start; }
+@media (max-width: 1000px) { .ui-cols { grid-template-columns: minmax(0, 1fr); } }
+.ui-cols-main, .ui-cols-side { min-width: 0; display: flex; flex-direction: column; }
+.ui-cols-side .card { padding: 18px; }
+.ui-cols-side .card h2, .ui-cols-main .card h2 { font-size: 15px; margin: 0 0 12px; }
+.ui-cols-side .kv { flex-direction: column; gap: 2px; padding: 9px 0; }
+.ui-cols-side .kv-label { flex: none; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.ui-cols-side .kv-value { font-weight: 500; }
+@media (max-width: 960px) { .ui-split, .ui-cols { grid-template-columns: minmax(0, 1fr); } .ui-subnav { position: static; flex-direction: row; flex-wrap: wrap; } .ui-subnav-label { display: none; } }
+/* A plugin section with a menu of its own: one line in the main menu (chevron), and inside it a sidebar of its own with a way back. */
+.admin-nav a .nav-more { float: right; margin: 2px 0 0; width: auto; font-size: 15px; opacity: .55; }
+.admin-nav a.active .nav-more { opacity: .9; }
+.admin-nav a.admin-nav-back { color: var(--text-2); font-size: 13px; margin-bottom: 2px; }
+.admin-nav a.admin-nav-back:hover { color: var(--black); }
+.admin-nav-section { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; color: var(--black); padding: 10px 11px 8px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }
+.admin-nav-section .ti { font-size: 19px; color: var(--accent); }
 /* Image gallery and attachment chips of UiMediaList. */
 .gal-list, .att-list { display: flex; flex-wrap: wrap; gap: 10px; }
 .gal-item { position: relative; width: 112px; }
@@ -1730,6 +1791,8 @@ html[data-theme] .alert-warning { background: var(--warn-bg); border-color: var(
 .post-import__status { margin-top: 10px; font-size: 14px; }
 .post-import__status.is-error { color: var(--err-fg); }
 .post-import__status ul { margin: 6px 0 0; padding-left: 18px; color: var(--muted); }
+/* A row of buttons in a table's action column stays one row (it used to stack three high next to a product picture). */
+table.data .actions .ui-inline { flex-wrap: nowrap; gap: 6px; justify-content: flex-end; }
 #pi-dialog .ui-inline { flex-wrap: nowrap; align-items: flex-end; }
 #pi-dialog .ui-inline .field { flex: 1; min-width: 0; margin-bottom: 0; }
 /* The plugin editor's code field (CodeMirror in front of the file textarea) and the findings of "Prüfen". Colours from the admin's variables so
@@ -1765,5 +1828,27 @@ li.CodeMirror-hint-active { background: var(--accent); color: #fff; }
 .pf-hint-name { font-weight: 600; } .pf-hint-sig, .pf-hint-ret { opacity: .75; font-size: 12px; }
 .pf-hint-doc { font-size: 11.5px; opacity: .8; margin-top: 1px; }
 /* A counter at the right of a sidebar entry (a plugin's "3 new"). */
-.admin-nav a .nav-badge { float: right; min-width: 20px; padding: 1px 7px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 11.5px; line-height: 1.6; text-align: center; margin-top: 1px; }
+.admin-nav a .nav-badge { display: inline-block; margin-left: 8px; min-width: 20px; padding: 1px 7px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 11.5px; line-height: 1.6; text-align: center; vertical-align: 1px; }
 .admin-nav a.active .nav-badge { background: #fff; color: var(--accent); }
+
+
+/* The dashboard: its widgets stand in one column with ONE gap between them (a card after a list after a grid used to touch), and the user can customise which and in what order. */
+.dash-stack { display: flex; flex-direction: column; gap: 16px; }
+.dash-stack > .card, .dash-stack > .dash-grid, .dash-stack > .stat-grid, .dash-stack > div { margin: 0; }
+.dash-stack > .dash-grid + .dash-grid { margin-top: 0; }
+.page-head .btn-sm[data-dash-cfg-open] { margin-left: auto; }
+.dash-cfg { margin-bottom: 16px; }
+.dash-cfg-list { list-style: none; margin: 0 0 16px; padding: 0; border: 1px solid var(--line); }
+.dash-cfg-row { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.dash-cfg-row:last-child { border-bottom: 0; }
+.dash-cfg-row .check { flex: 1; margin: 0; }
+.dash-cfg-move { display: flex; gap: 4px; }
+
+/* A status light (Ui.Html): red = needs doing, amber = waiting, green = done, grey = closed. A row with a red light is marked, so what is unprocessed is seen from afar. */
+.ui-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: var(--text-muted); vertical-align: middle; }
+.ui-dot-err { background: #d64545; box-shadow: 0 0 0 3px color-mix(in srgb, #d64545 24%, transparent); }
+.ui-dot-warn { background: #e0a100; box-shadow: 0 0 0 3px color-mix(in srgb, #e0a100 24%, transparent); }
+.ui-dot-ok { background: #2f9e57; }
+table.data tr:has(.ui-dot-err) td { background: var(--err-bg); }
+table.data tr:has(.ui-dot-err) td:first-child { box-shadow: inset 3px 0 0 #d64545; }
+table.data tr:has(.ui-dot-err) td strong { color: var(--err-fg); }

@@ -61,16 +61,25 @@
         <nav class="admin-nav">
             @* Content, then design and configuration, then administration and system. Every line — the CMS's own
                and the plugins' — comes from the AdminNav registry, ordered within its group. *@
-            @await Html.PartialAsync("_AdminNavGroup", MatCMS.Plugin.AdminGroup.Content)
-            <div class="admin-nav-sep" role="separator"></div>
-            @await Html.PartialAsync("_AdminNavGroup", MatCMS.Plugin.AdminGroup.Design)
-            <div class="admin-nav-sep" role="separator"></div>
-            @await Html.PartialAsync("_AdminNavGroup", MatCMS.Plugin.AdminGroup.System)
-            @if (Nav.HasPluginEntries(MatCMS.Plugin.AdminGroup.Plugins))
+            @* Inside a plugin section that has a menu of its own (the shop), that menu replaces the main one, with a way back. *@
+            @{ var submenu = await Nav.SubmenuAsync(Context.Request.Path, Context.RequestServices, Context.RequestAborted); }
+            @if (submenu is not null)
             {
-                <div class="admin-nav-plugins">
-                    @await Html.PartialAsync("_AdminNavGroup", MatCMS.Plugin.AdminGroup.Plugins)
-                </div>
+                @await Html.PartialAsync("_AdminNavSub", submenu)
+            }
+            else
+            {
+                @await Html.PartialAsync("_AdminNavGroup", MatCMS.Plugin.AdminGroup.Content)
+                <div class="admin-nav-sep" role="separator"></div>
+                @await Html.PartialAsync("_AdminNavGroup", MatCMS.Plugin.AdminGroup.Design)
+                <div class="admin-nav-sep" role="separator"></div>
+                @await Html.PartialAsync("_AdminNavGroup", MatCMS.Plugin.AdminGroup.System)
+                @if (Nav.HasPluginEntries(MatCMS.Plugin.AdminGroup.Plugins))
+                {
+                    <div class="admin-nav-plugins">
+                        @await Html.PartialAsync("_AdminNavGroup", MatCMS.Plugin.AdminGroup.Plugins)
+                    </div>
+                }
             }
         </nav>
         <div class="admin-nav-foot">

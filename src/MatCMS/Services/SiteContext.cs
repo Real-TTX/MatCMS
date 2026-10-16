@@ -13,10 +13,13 @@ public class SiteContext
     private List<Page>? _navPages;
     private List<Page>? _footerPages;
 
-    public SiteContext(AppDbContext db, IHttpContextAccessor http)
+    private readonly MatCMS.Services.Plugins.PluginContributions? _plugins;
+
+    public SiteContext(AppDbContext db, IHttpContextAccessor http, MatCMS.Services.Plugins.PluginContributions? plugins = null)
     {
         _db = db;
         _http = http;
+        _plugins = plugins;
     }
 
     // ------------------------------------------------------------------
@@ -64,9 +67,21 @@ public class SiteContext
         var items = _db.MenuItems.AsNoTracking()
             .Where(m => m.Menu == key && m.Locale == CurrentLocale)
             .OrderBy(m => m.SortOrder).ThenBy(m => m.Id).ToList();
+        // Items that stand for a plugin element (the shop's cart, "Anmelden"/"Mein Konto", the search box) become what the visitor gets; where there is no page view (the back office,
+        // a background job) or no plugin to ask they are left out rather than drawn as a link to "plugin:…".
+        var viaPlugin = _plugins is not null && _http.HttpContext is { } pv && !pv.Request.Path.StartsWithSegments("/admin");
+        if (items.Any(i => i.Url.StartsWith("plugin:", StringComparison.Ordinal)))
+            items = viaPlugin ? _plugins!.ResolveElementsAsync(_http.HttpContext!, items, _http.HttpContext!.RequestAborted).GetAwaiter().GetResult()
+                              : items.Where(i => !i.Url.StartsWith("plugin:", StringComparison.Ordinal)).ToList();
+        // What plugins add by themselves comes after the site's own entries. Skipped for requests that are not a page view.
+        if (viaPlugin) items.AddRange(_plugins!.MenuItemsAsync(_http.HttpContext!, key, CurrentLocale, _http.HttpContext!.RequestAborted).GetAwaiter().GetResult());
         _menuCache[key] = items;
         return items;
     }
+
+    /// <summary>The plugin elements (<c>shop.cart</c>) the header, footer and icon strip show for this visitor — the page carries them as <c>data-els</c> so a plugin's own fallback (the shop's small bar) can step aside.</summary>
+    public IReadOnlyCollection<string> ElementKeys =>
+        HeaderMenu.Concat(FooterMenu).Concat(ToolbarMenu).Where(i => i.Element is not null).Select(i => i.Element!).Distinct().ToList();
 
     // Convenience accessors for the built-in menus (served per content locale).
     public IReadOnlyList<MenuItem> HeaderMenu => MenuItems("header");

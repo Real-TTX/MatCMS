@@ -227,6 +227,7 @@ builder.Services.AddSingleton<AdminNav>();
 builder.Services.AddSingleton<MatCMS.Services.Plugins.PluginDataService>();
 builder.Services.AddSingleton<MatCMS.Services.Plugins.PluginContributions>();
 builder.Services.AddScoped<RazorPartialRenderer>();
+builder.Services.AddScoped<MatCMS.Services.Plugins.PluginPageService>();
 builder.Services.AddSingleton<MatCMS.Services.Plugins.PluginJobService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<MatCMS.Services.Plugins.PluginJobService>());
 builder.Services.AddScoped<PluginRunner>();
@@ -1025,10 +1026,26 @@ app.MapGet("/admin/api/media", async (MatCMS.Data.AppDbContext db) =>
 app.MapGet("/admin/api/pages", async (MatCMS.Data.AppDbContext db) =>
 {
     var items = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
-        db.Pages.AsNoTracking().Where(p => p.IsPublished)
+        db.Pages.AsNoTracking().Where(p => p.IsPublished && p.OwnerPlugin == null)
             .OrderBy(p => p.Locale).ThenBy(p => p.Title)
             .Select(p => new { title = p.Title, url = p.Slug == "home" ? "/" : "/" + p.Slug, locale = p.Locale }));
     return Results.Ok(items);
+}).RequireAuthorization("Admin");
+
+// Every place a link can point at (admin only), grouped: the published pages, then what loaded plugins offer (blog posts, shop categories and products …), and — for the menu form
+// only (?elements=true) — the plugin elements a menu item can stand for. The link picker shows the groups with a search box.
+app.MapGet("/admin/api/link-targets", async (HttpContext http, MatCMS.Data.AppDbContext db, MatCMS.Services.Plugins.PluginContributions plugins, MatCMS.Services.Localizer t, bool? elements) =>
+{
+    var groups = new List<object>();
+    var pages = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
+        db.Pages.AsNoTracking().Where(p => p.IsPublished && p.OwnerPlugin == null).OrderBy(p => p.Locale).ThenBy(p => p.Title)
+            .Select(p => new { title = p.Title, url = p.Slug == "home" ? "/" : "/" + p.Slug }));
+    if (pages.Count > 0) groups.Add(new { group = t["nav.pages"].ToString(), items = pages });
+    foreach (var g in await plugins.LinkTargetsAsync(http.RequestServices, http.RequestAborted))
+        groups.Add(new { group = g.Group, items = g.Items.Select(i => new { title = i.Label, url = i.Url }).ToList() });
+    if (elements == true && plugins.MenuElementChoices() is { Count: > 0 } els)
+        groups.Add(new { group = t["menus.elements"].ToString(), items = els.Select(e => new { title = e.Label, url = e.Value }).ToList() });
+    return Results.Ok(groups);
 }).RequireAuthorization("Admin");
 
 // --- SEO: XML sitemap + robots.txt (both served only when "sitemap.enabled" is on) ---
@@ -1049,7 +1066,7 @@ app.MapGet("/sitemap.xml", async (HttpContext ctx, MatCMS.Data.AppDbContext db, 
         .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
     var pages = (await db.Pages.AsNoTracking()
-        .Where(p => p.IsPublished && supported.Contains(p.Locale))
+        .Where(p => p.IsPublished && p.OwnerPlugin == null && supported.Contains(p.Locale))
         .OrderBy(p => p.Locale).ThenBy(p => p.NavOrder).ThenBy(p => p.Title)
         .Select(p => new { p.Slug, p.Locale, p.UpdatedAt })
         .ToListAsync())

@@ -13,6 +13,18 @@ internal static class Keys
     public const string SellerVatId = "seller.vatId";
     public const string SellerTaxNumber = "seller.taxNumber";
     public const string InvoiceFooter = "seller.invoiceFooter";
+    public const string SellerLogo = "seller.logo";
+    public const string ShowSearch = "catalog.showSearch";
+    public const string ShowSort = "catalog.showSort";
+    public const string ShowCategories = "catalog.showCategories";
+    public const string ShowTags = "catalog.showTags";
+    public const string ShowFilters = "catalog.showFilters";
+    public const string SearchIn = "catalog.searchIn";
+    public const string CatPageTags = "catpage.tags";
+    public const string CatPageSubs = "catpage.subs";
+    public const string CatPageDesc = "catpage.desc";
+    public const string CatPageCounts = "catpage.counts";
+    public const string InvoiceAccent = "seller.accent";
     public const string Currency = "currency";
     public const string SmallBusiness = "tax.smallBusiness";
     public const string ShippingTaxPercent = "tax.shippingPercent";
@@ -44,10 +56,14 @@ internal static class Keys
     public const string AccountsAtCheckout = "checkout.accounts";
     public const string GuestCheckout = "checkout.guest";
     public const string PerPage = "catalog.perPage";
+    public const string Carrier = "track.carrier";
+    public const string TrackingUrl = "track.url";
     public const string DownloadDays = "downloads.days";
     public const string DownloadLimit = "downloads.limit";
     public const string CustomCss = "design.customCss";
     public const string LowStock = "stock.low";
+    public const string RemindEnabled = "cart.remind.enabled";
+    public const string RemindHours = "cart.remind.hours";
 }
 
 /// <summary>The shop's settings, read once per request into plain values.</summary>
@@ -60,6 +76,25 @@ internal sealed record ShopConfig
     public string SellerVatId { get; init; } = "";
     public string SellerTaxNumber { get; init; } = "";
     public string InvoiceFooter { get; init; } = "";
+    /// <summary>The logo on the invoice, a local path or https address ("" = none).</summary>
+    public string SellerLogo { get; init; } = "";
+    /// <summary>What the catalogue page shows above the products (each can be switched off) and what a search looks at: "title" (name and article number), "text" (+ summary and keywords) or "all" (+ description).</summary>
+    public bool ShowSearch { get; init; } = true;
+    public bool ShowSort { get; init; } = true;
+    public bool ShowCategories { get; init; } = true;
+    public bool ShowTags { get; init; } = true;
+    public bool ShowFilters { get; init; } = true;
+    public string SearchIn { get; init; } = "text";
+    /// <summary>The page of all categories: the keyword links, the subcategories and the text in a card, the product counts.</summary>
+    public bool CatPageTags { get; init; } = true;
+    public bool CatPageSubs { get; init; } = true;
+    public bool CatPageDesc { get; init; } = true;
+    public bool CatPageCounts { get; init; } = true;
+    /// <summary>The carrier that is preselected when an order is shipped (a key of <see cref="ShopTracking.All"/>, "custom" or "") and the operator's own tracking address with {n} for the number.</summary>
+    public string Carrier { get; init; } = "";
+    public string TrackingUrl { get; init; } = "";
+    /// <summary>The accent colour of the invoice (#rrggbb).</summary>
+    public string InvoiceAccent { get; init; } = "#111111";
     public string Currency { get; init; } = "EUR";
     public bool SmallBusiness { get; init; }
     public int ShippingTaxBp { get; init; } = 1900;
@@ -101,6 +136,9 @@ internal sealed record ShopConfig
     public int DownloadLimit { get; init; } = 5;
     public string CustomCss { get; init; } = "";
     public int LowStock { get; init; } = 3;
+    /// <summary>Offer "remind me" on the cart page and send the reminders (off until the operator turns it on).</summary>
+    public bool RemindEnabled { get; init; }
+    public int RemindHours { get; init; } = 24;
 
     /// <summary>PayPal is on, and has what it needs to take a payment.</summary>
     public bool PayPalReady => PayPalEnabled && PayPalClientId.Length > 5 && PayPalSecret.Length > 5;
@@ -116,8 +154,12 @@ internal sealed record ShopConfig
         {
             SellerName = s.Get(Keys.SellerName).Trim(), SellerAddress = s.Get(Keys.SellerAddress).Trim(), SellerEmail = s.Get(Keys.SellerEmail).Trim(),
             SellerPhone = s.Get(Keys.SellerPhone).Trim(), SellerVatId = s.Get(Keys.SellerVatId).Trim(), SellerTaxNumber = s.Get(Keys.SellerTaxNumber).Trim(),
-            InvoiceFooter = s.Get(Keys.InvoiceFooter).Trim(),
+            InvoiceFooter = s.Get(Keys.InvoiceFooter).Trim(), SellerLogo = ShopPublic.SafeUrl(s.Get(Keys.SellerLogo)),
+            ShowSearch = s.GetBool(Keys.ShowSearch), ShowSort = s.GetBool(Keys.ShowSort), ShowCategories = s.GetBool(Keys.ShowCategories), ShowTags = s.GetBool(Keys.ShowTags), ShowFilters = s.GetBool(Keys.ShowFilters),
+            SearchIn = s.Get(Keys.SearchIn) is "title" or "all" ? s.Get(Keys.SearchIn) : "text",
+            CatPageTags = s.GetBool(Keys.CatPageTags), CatPageSubs = s.GetBool(Keys.CatPageSubs), CatPageDesc = s.GetBool(Keys.CatPageDesc), CatPageCounts = s.GetBool(Keys.CatPageCounts), InvoiceAccent = ShopInvoice.AccentOf(s.Get(Keys.InvoiceAccent)),
             Currency = Currencies.Normalise(s.Get(Keys.Currency)),
+            Carrier = ShopTracking.Clean(s.Get(Keys.Carrier)), TrackingUrl = ShopTracking.ValidTemplate(s.Get(Keys.TrackingUrl).Trim()) ? s.Get(Keys.TrackingUrl).Trim() : "",
             SmallBusiness = s.GetBool(Keys.SmallBusiness),
             ShippingTaxBp = Pct(Keys.ShippingTaxPercent, 1900), DefaultTaxBp = Pct(Keys.DefaultTaxPercent, 1900),
             OrderStart = Math.Max(1, s.GetInt(Keys.OrderStart, 1000)), OrderPrefix = Safe(s.Get(Keys.OrderPrefix)),
@@ -137,7 +179,8 @@ internal sealed record ShopConfig
             PerPage = (int)Math.Clamp(s.GetInt(Keys.PerPage, 12), 3, 60),
             DownloadDays = (int)Math.Clamp(s.GetInt(Keys.DownloadDays, 30), 1, 3650), DownloadLimit = (int)Math.Clamp(s.GetInt(Keys.DownloadLimit, 5), 0, 1000),
             CustomCss = s.Get(Keys.CustomCss),
-            LowStock = (int)Math.Clamp(s.GetInt(Keys.LowStock, 3), 0, 1000)
+            LowStock = (int)Math.Clamp(s.GetInt(Keys.LowStock, 3), 0, 1000),
+            RemindEnabled = s.GetBool(Keys.RemindEnabled), RemindHours = (int)Math.Clamp(s.GetInt(Keys.RemindHours, 24), 1, 168),
         };
     }
 
@@ -173,13 +216,15 @@ internal sealed record ShopConfig
         s.Add(new SettingSpec(Keys.SellerVatId, "set.sellerVatId"));
         s.Add(new SettingSpec(Keys.SellerTaxNumber, "set.sellerTaxNumber"));
         s.Add(new SettingSpec(Keys.InvoiceFooter, "set.invoiceFooter", SettingKind.TextArea) { Help = "set.invoiceFooterHelp" });
+        s.Add(new SettingSpec(Keys.SellerLogo, "set.sellerLogo", SettingKind.Image) { Help = "set.sellerLogoHelp" });
+        s.Add(new SettingSpec(Keys.InvoiceAccent, "set.invoiceAccent", SettingKind.Color) { Default = "#111111", Help = "set.invoiceAccentHelp" });
         s.Add(new SettingSpec(Keys.Currency, "set.currency", SettingKind.Choice)
         {
             Group = "set.groupMoney", Default = "EUR", Options = Currencies.All.Select(c => new FieldOption(c, c)).ToList()
         });
         s.Add(new SettingSpec(Keys.SmallBusiness, "set.smallBusiness", SettingKind.Bool) { Help = "set.smallBusinessHelp" });
-        s.Add(new SettingSpec(Keys.DefaultTaxPercent, "set.defaultTax") { Default = "19", Help = "set.defaultTaxHelp" });
-        s.Add(new SettingSpec(Keys.ShippingTaxPercent, "set.shippingTax") { Default = "19", Help = "set.shippingTaxHelp" });
+        s.Add(new SettingSpec(Keys.DefaultTaxPercent, "set.defaultTax", SettingKind.Choice) { Default = "19", Help = "set.defaultTaxHelp", Options = ShopTaxChoices.ForSettings() });
+        s.Add(new SettingSpec(Keys.ShippingTaxPercent, "set.shippingTax", SettingKind.Choice) { Default = "19", Help = "set.shippingTaxHelp", Options = ShopTaxChoices.ForSettings() });
         s.Add(new SettingSpec(Keys.TaxMode, "set.taxMode", SettingKind.Choice)
         {
             Default = "domestic", Help = "set.taxModeHelp",
@@ -199,11 +244,33 @@ internal sealed record ShopConfig
         s.Add(new SettingSpec(Keys.GuestCheckout, "set.guestCheckout", SettingKind.Bool) { Group = "set.groupCheckout", Default = "true", Help = "set.guestCheckoutHelp" });
         s.Add(new SettingSpec(Keys.AccountsAtCheckout, "set.accounts", SettingKind.Bool) { Default = "true", Help = "set.accountsHelp" });
         s.Add(new SettingSpec(Keys.NotifyEmail, "set.notifyEmail") { Help = "set.notifyEmailHelp" });
+        s.Add(new SettingSpec(Keys.Carrier, "set.carrier", SettingKind.Choice)
+        {
+            Group = "set.groupShipping", Default = "", Help = "set.carrierHelp",
+            Options = new[] { new FieldOption("", "set.carrierNone") }.Concat(ShopTracking.All.Select(c => new FieldOption(c.Key, c.Name))).Append(new FieldOption(ShopTracking.Custom, "set.carrierCustom")).ToList()
+        });
+        s.Add(new SettingSpec(Keys.TrackingUrl, "set.trackingUrl") { Help = "set.trackingUrlHelp" });
         s.Add(new SettingSpec(Keys.DownloadDays, "set.downloadDays", SettingKind.Number) { Group = "set.groupDownloads", Default = "30", Min = 1, Max = 3650 });
         s.Add(new SettingSpec(Keys.DownloadLimit, "set.downloadLimit", SettingKind.Number) { Default = "5", Min = 0, Max = 1000, Help = "set.downloadLimitHelp" });
         s.Add(new SettingSpec(Keys.PerPage, "set.perPage", SettingKind.Number) { Group = "set.groupShop", Default = "12", Min = 3, Max = 60 });
         s.Add(new SettingSpec(Keys.LowStock, "set.lowStock", SettingKind.Number) { Default = "3", Min = 0, Max = 1000, Help = "set.lowStockHelp" });
+        s.Add(new SettingSpec(Keys.RemindEnabled, "set.remindEnabled", SettingKind.Bool) { Group = "set.groupReminder", Default = "false", Help = "set.remindEnabledHelp" });
+        s.Add(new SettingSpec(Keys.RemindHours, "set.remindHours", SettingKind.Number) { Default = "24", Min = 1, Max = 168, Help = "set.remindHoursHelp" });
         s.Add(new SettingSpec(Keys.CustomCss, "set.customCss", SettingKind.TextArea) { Help = "set.customCssHelp" });
+        s.Add(new SettingSpec(Keys.ShowSearch, "set.showSearch", SettingKind.Bool) { Group = "set.groupCatalog", Default = "true", Help = "set.showSearchHelp" });
+        s.Add(new SettingSpec(Keys.SearchIn, "set.searchIn", SettingKind.Choice)
+        {
+            Default = "text", Help = "set.searchInHelp",
+            Options = new[] { new FieldOption("title", "set.searchInTitle"), new FieldOption("text", "set.searchInText"), new FieldOption("all", "set.searchInAll") }
+        });
+        s.Add(new SettingSpec(Keys.ShowSort, "set.showSort", SettingKind.Bool) { Default = "true" });
+        s.Add(new SettingSpec(Keys.ShowCategories, "set.showCategories", SettingKind.Bool) { Default = "true", Help = "set.showCategoriesHelp" });
+        s.Add(new SettingSpec(Keys.ShowTags, "set.showTags", SettingKind.Bool) { Default = "true", Help = "set.showTagsHelp" });
+        s.Add(new SettingSpec(Keys.ShowFilters, "set.showFilters", SettingKind.Bool) { Default = "true", Help = "set.showFiltersHelp" });
+        s.Add(new SettingSpec(Keys.CatPageTags, "set.catPageTags", SettingKind.Bool) { Group = "set.groupCatPage", Default = "true", Help = "set.catPageTagsHelp" });
+        s.Add(new SettingSpec(Keys.CatPageSubs, "set.catPageSubs", SettingKind.Bool) { Default = "true" });
+        s.Add(new SettingSpec(Keys.CatPageDesc, "set.catPageDesc", SettingKind.Bool) { Default = "true" });
+        s.Add(new SettingSpec(Keys.CatPageCounts, "set.catPageCounts", SettingKind.Bool) { Default = "true" });
     }
 }
 

@@ -148,6 +148,16 @@ public class TemplateModel : PageModel
         // dropped so "no override" stays absent rather than being stored as an empty string.
         var kept = Parts.Where(kv => !string.IsNullOrWhiteSpace(kv.Value))
             .ToDictionary(kv => kv.Key, kv => kv.Value);
+        // A part of a PLUGIN ("shop.product" — a dotted key) is edited on the instance that has the plugin; this editor
+        // never lists it, so it is not posted. Dropping it here would wipe what a template imported from a site carries.
+        try
+        {
+            var stored = string.IsNullOrWhiteSpace(row.PartsJson) ? null : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(row.PartsJson);
+            if (stored is not null)
+                foreach (var kv in stored.Where(kv => kv.Key.Contains('.') && !string.IsNullOrWhiteSpace(kv.Value) && !Parts.ContainsKey(kv.Key)))
+                    kept[kv.Key] = kv.Value;
+        }
+        catch (System.Text.Json.JsonException) { /* a broken stored blob is replaced by what was posted, as before */ }
         row.PartsJson = System.Text.Json.JsonSerializer.Serialize(kept);
 
         await _db.SaveChangesAsync();

@@ -80,7 +80,7 @@ Medien-Referenzen, Cloud/MCP-Operationen (`Operation`), Dashboard-Kachel und „
 | **L7** | **Keine Mail-API.** `EmailService` + `MailTemplates` (Schlüssel, im Admin editierbar, Seeder legt `MatCMS.Shared.MailTemplates.All` an) gibt es, ein Plugin kommt nicht heran und kann keine eigenen Vorlagen anmelden. | Nichts in `Abstractions`. | Keine Bestell-, Versand-, Download-Mail. |
 | **L8** | **Atomare Zahlen fehlen.** Bestand verringern und **lückenlose** Rechnungs-/Bestellnummern brauchen „Wert um n erhöhen, wenn Bedingung“ und eine fortlaufende Nummer in der Transaktion. `UpdateWhereAsync` setzt nur feste Werte. | `IDataTable`. | Überverkauf bei gleichzeitigen Bestellungen; Nummernlücken (steuerrechtlich ein Problem). |
 | **L9** | **Private Dateien.** Digitale Produkte dürfen nicht unter `/uploads` (öffentlich) liegen. `PluginResult.File` nimmt `byte[]` — große Dateien gehen so nicht. | `PluginResult.File(byte[])`. | Download-Links wären erratbar/teilbar oder der Speicher läuft voll. |
-| **L10** | **Eigene Template-Teile.** „Parts a plugin defines itself are not supported yet“ (`IPluginSite.RenderTemplatePart`). | Doku von `RenderTemplatePart`. | Produkt-, Warenkorb- und Kassenseite können nicht im Look der Kundenseite überschrieben werden; nur das Standard-Aussehen. |
+| **L10** | **Eigene Template-Teile.** *(gebaut — siehe 3.10)* Früher: „Parts a plugin defines itself are not supported yet“. | `IPluginBuilder.TemplatePart`, `ctx.RenderPart`. | Produkt-, Karten- und Katalogseite sind im Template-Editor überschreibbar. |
 | **L11** | **Host-Ereignisse für Konten fehlen.** Es gibt nur `FormSubmitted` und `PageSaved`. | `HostEvents`. | Kein DSGVO-Export/-Löschen beim Löschen eines Mitglieds; kein „Konto angelegt“-Haken. |
 | **L12** | **Nur Skripte in der Cloud.** Native-Bundles zeigt der Store schreibgeschützt, `plugins.allowNative` ist absichtlich nicht ausrollbar. | Phase 5 teilweise. | Als Native-DLL müsste jeder Kunde den Shop von Hand freischalten **und** die DLL bekommen. Siehe Entscheidung E1. |
 
@@ -121,9 +121,14 @@ Katalog des Script-Editors (der folgt der Assembly, es braucht nichts Handgeschr
 9. **`ctx.Files`** (L9) — privater Speicher `appdata/plugin-files/{key}/` (nicht öffentlich ausgeliefert, **im Backup**,
    vom Aufräumen ausgenommen); `PluginResult.FileStream(path, contentType, fileName)` streamt mit Range-Unterstützung.
    Downloads laufen über eine Route des Shops mit signiertem, befristetem Token (siehe 5.4).
-10. **Eigene Template-Teile** (L10) — `Plugin.TemplatePart(name, defaultHtml, tokens)`: der Teil erscheint im Template-Editor,
-    ein Template kann ihn überschreiben, sonst gilt der Standard des Plugins. Erste Teile: `shop-product`, `shop-list`,
-    `shop-cart`, `shop-checkout`.
+10. **Eigene Template-Teile** (L10, **gebaut**) — `Plugin.TemplatePart(new TemplatePartSpec(name, label, defaultHtml) { Placeholders, Help })`:
+    der Teil erscheint im Template-Editor als eigene Datei (`{plugin}-{name}.html`, Schlüssel `{plugin}.{name}` in `Template.PartsJson`),
+    das aktive Template kann ihn überschreiben, leer/fehlend = Standard des Plugins. Gezeichnet wird mit `ctx.RenderPart(name, werte)`
+    (`PartRenderer`: `{{name}}`, `{{#if name}}…{{/if}}`, `{{#unless name}}…{{/unless}}`; Werte werden kodiert, außer der Platzhalter ist
+    als HTML deklariert; ein Wert wird nie erneut gelesen). Ein Plugin rendert nur **seine eigenen** Teile. Die Shop-Teile:
+    `shop-card.html`, `shop-product.html`, `shop-catalog.html` (`ShopParts`). Warenkorb, Kasse und Kundenseiten bleiben im Plugin
+    (Formulare, die funktionieren müssen) — ihr Aussehen ist das CSS des Shops und die Einstellung „eigenes CSS“. Die Cloud-Editoren
+    für Templates behalten gespeicherte Plugin-Schlüssel (mit Punkt) beim Speichern, zeigen sie aber nicht.
 11. **Host-Ereignisse** (L11) — `host.member.registered`, `host.member.deleted`, und der Erweiterungspunkt
     `host.member.export` (jedes Plugin liefert per `CollectAsync` seine Daten zu einem Mitglied für den DSGVO-Auszug) samt
     `host.member.erase`.
@@ -219,7 +224,20 @@ sehen die Downloads zusätzlich unter `/konto/bestellungen/{nr}`. Ein erstattete
 - Anmeldung, Registrierung, Passwort-Reset: die Seiten des CMS (`/anmelden`, Block `memberlogin`); das Template-`LoginHtml`
   gilt weiter.
 
-### 5.6 Admin (Bereich „Shop“, Tabs)
+### 5.6 Admin (Bereich „Shop“, Unterpunkte)
+
+**Menü der Website:** Warenkorb, Konto/Anmelden, Suchfeld und „Shop“ mit Kategorien sind **Menü-Elemente** (Admin → Menü, Auswahl „Plugin-Element“); beim ersten Laden setzt der Host sie einmalig in „Obere Leiste“ bzw. „Hauptmenü“, danach sind es normale Menüpunkte (verschieben, umbenennen, löschen — Löschen bleibt). Die Einstellungen `menu.shop`/`menu.icons` gibt es nicht mehr. Das Suchfeld ist der Template-Teil `shop-search.html` (Klasse `mat-search`). Link-Ziele: Shop-Seiten, Kategorien (mit Pfad) und Produkte stehen in jeder Link-Auswahl.
+
+**Kategorien** sind ein Baum (Elternkategorie, Bild, Beschreibung): „in der Kategorie“ heißt sie selbst und alles darunter (Filter, Zähler, Gutschein-Bereich); Löschen schiebt Unterkategorien, Produkte und Gutscheine eine Ebene hoch. Listen im Admin haben die gerahmte Werkzeugleiste über der Tabelle (Suche, Filter) und die Anlegen-Taste darunter.
+
+**Stand nach dem Umbau:** der Shop ist **eine** Zeile in der Hauptleiste; ein Klick öffnet das **Dashboard** und ersetzt die Seitenleiste durch das Shop-Menü mit „Zurück“
+(Übersicht, Bestellungen, Produkte, Kategorien, Kunden, Konditionen, Einstellungen — auf jeder Shop-Seite; `IAdminSection.Link`, `AdminNav.SubmenuAsync`). Das Dashboard (`ShopAdmin.DashboardAsync`)
+zeigt zu versenden / wartet auf Zahlung / Umsatz 30 Tage / aktive Produkte, letzte Bestellungen, Hinweise und Bestseller; die Bestellung ist zweispaltig (Positionen + Verlauf | Details, Kunde, Aktionen). *Konditionen*
+(Zahlung, Steuern, Rechtliches, Nummern, Gutscheine, Versand) und *Einstellungen* sind je ein Bildschirm mit Untermenü links
+(`Ui.Split`/`Ui.NavItem`); Einstellungen werden pro Gruppe gespeichert. Die Produktliste zeigt Vorschaubilder, der Editor ist
+zweispaltig (`Ui.Columns`). Menü der Seite: Shop/Konto/Warenkorb-Einträge kommen über `IPluginBuilder.Menu` in **jedes** Theme
+(Fallback: eine Leiste über der Seite, wenn das Layout das Menü selbst zeichnet); Blöcke: Produkte (Raster/Karussell, „Bestseller“),
+Kategorien, Suche, Warenkorb, Konto.
 
 **Bestellungen** (Liste mit Status-/Datumsfilter, Suche nach Nummer/E-Mail/Name, Detail mit Positionen, Adressen, Zahlung, Verlauf;
 Aktionen: als versendet markieren mit Sendungsnummer, erstatten, stornieren, Mails erneut senden, Notiz) ·
@@ -333,5 +351,100 @@ Nach jeder Phase: Tests grün, CLAUDE.md und dieses Dokument nachgezogen, ein Co
   gleichzeitigen Zugriffen wäre auf einer anderen Datenbank besser aufgehoben.
 - **Kundenkonto:** Registrierung im Shop nur beim Bestellen (oder auf `/registrieren`, wenn der Betreiber sie einschaltet); Bestellungen eines Gastes erscheinen im Konto erst,
   wenn die E-Mail-Adresse bestätigt ist. Beim Löschen des Kontos bleiben Bestellungen und Rechnungen (ohne Verbindung zum Konto) bestehen — Aufbewahrungspflicht.
-- **Offen:** eigene Template-Teile für das Aussehen der Shop-Seiten (L10); echte Testläufe mit Stripe und PayPal; E-Rechnung (ZUGFeRD); Reverse Charge; mehrere Kategorien je Produkt;
+- **Offen** (der vollständige Vergleich mit Shopify steht in `docs/shop-vs-shopify.md`): echte Testläufe mit Stripe und PayPal; E-Rechnung (ZUGFeRD); Reverse Charge; mehrere Kategorien je Produkt;
   Warenkorb-Knopf direkt auf der Produktkarte.
+
+## Addresses
+
+| Page | Address |
+|---|---|
+| Catalogue | `/shop` (filters `?tag=`, `?q=`, `?sort=`, `?page=`) |
+| A category (and everything below it) | `/shop/categories/{slug}` — the same filters apply; the old `/shop?cat={slug}` redirects here (301) |
+| A product | `/shop/{slug}` |
+| Cart, checkout, order, invoice | `/shop/cart`, `/shop/checkout`, `/shop/order/{number}`, `/shop/invoice/{number}` |
+
+All links are built by `ShopUrls`. Whether the shop shows up in the site's menu is not a shop setting: "Shop", cart, account and search are menu elements, ordinary menu items an editor adds or removes in Admin → Menü.
+
+## Pages, cart, invoice branding
+
+- `/shop/categories` lists the top-level categories as tiles; with `?tag=Neuware` it lists every category (at any level) that carries that keyword. Keywords on categories are typed in the category's edit page (comma-separated, like a product's). The template part `categories` (`shop-categories.html`) has the placeholders `title`, `total`, `tag`, `crumbs_html`, `tags_html`, `tiles_html` and `list_html` (the whole tree as a nested list).
+- `/shop/tags` lists all keywords of the products with their counts (part `tags`).
+- Menu elements: "Kategorien (mehrstufig)" (the category tree as a multi-level dropdown; the heading opens `/shop/categories`) and "Schlagwörter". The link picker also offers "Shop – Kategorien nach Schlagwort" and "Shop – Schlagwörter".
+- The cart page: lines with a picture, quantity field (changes are posted when it changes) and "Entfernen"; a summary on the right (one big button to the checkout, the coupon box); an empty cart offers a way on (button, top categories, a few products).
+- The invoice and credit note (HTML and PDF) carry a logo and an accent colour: Settings → Seller → "Logo auf Rechnungen" and "Akzentfarbe der Rechnung". The PDF embeds PNG/JPEG/WebP/GIF logos from the media library (as JPEG, transparency on white); an SVG logo shows on the HTML page only. An invoice that was already written keeps what it had — the setting applies to documents written afterwards.
+
+## Attributes, catalogue switches
+
+- **Attributes** (Admin → Shop → Eigenschaften): colour, size, material, weight … Kinds: choice (a list of options, a product may have several), text, number (with a unit; filtered by a range), yes/no. An attribute may apply to all products or to one category and everything below it, and may be offered as a filter. The product form shows a field for every attribute that applies to its category (a category-limited attribute appears once the product is saved in that category).
+- On the catalogue the filters sit above the products (`filters_html` in the catalogue part): `?a.farbe=Rot,Blau` (any of these values), `?a.gewicht.min=1&a.gewicht.max=5`; across attributes all must match. The counts are over the products the page would show without the attribute filters. The product page lists the attributes the product has (`attributes_html`).
+- **Settings → Katalog und Suche:** show or hide the search box, sorting, the category chips, the keyword row and the attribute filters on `/shop`; what a search looks at (name and article number / + summary and keywords / + description). **Kategorien-Seite:** the keyword links, the product count, the text and the subcategories of a card.
+- The orders list in the back office has the status as a drop-down in the toolbar and a traffic light per row; the order page has its next steps as buttons in the head.
+
+## Catalogue controls, tracking link, customer area (theme-able)
+
+- **Everything public is theme-able:** a page is a template part (`shop-{name}.html`, the active template may replace it) with placeholders, and the CSS uses the shop's own variables with the SITE's variables behind them (`var(--shop-accent, var(--accent, #1a1a1a))`, `--shop-line` → `--line`, `--shop-bg` → `--bg`, headings `--font-head`) — a site's accent, lines and heading font reach the shop without a line of shop CSS. A new page gets a part and keeps the old placeholders filled so parts a template already holds do not break.
+- **The catalogue page** is the usual shop layout: the search field on top (`search_html`, a rounded box with the magnifier), a side column (`categories_html` = the category list with the branch being looked at opened, `filters_html` = the price range and the attribute filters as collapsible groups with boxes and counts, `tags_html` = keywords) and the main column (a toolbar with `count_html` and `sort_html`, the chips of what is switched on `active_html`, each with its own × and one "Filter zurücksetzen", then `grid_html`, `pager_html`). On a phone the side column folds behind a "Filter" button (a checkbox + label, no script). `layout_class` is `no-side` when every control is switched off. The price range is `?price.min=5&price.max=20` (euros, comma or point; a reversed pair is turned around; the product's own gross price). Code: `ShopCatalogUi.cs` (`CatalogState` carries what the page was asked for and builds every link and hidden field, so a filter survives the other controls).
+- **Tracking link:** an order carries a carrier (`orders.carrier`: a key of `ShopTracking.All` — DHL, DHL Express, DPD, Hermes, GLS, UPS, FedEx, Österreichische Post, Die Post — or `custom`) next to its tracking number. The link is built ONLY from a fixed https template with the number escaped into it (`ShopTracking.Url`); a number that is itself an https address is used as it is; the operator's own template (setting `track.url`, must be https and contain `{n}`) serves `custom`. The ship dialog has a carrier drop-down (preselected from the setting `track.carrier`), the order page in the back office a tracking card (change carrier and number without shipping again). The customer sees carrier, number and a "Sendung verfolgen" button on the order page and in the account's order cards; the shipping mail's `{{tracking}}` is the number with the link in the line below (existing mail templates get the link without being edited), `{{tracking_url}}` and `{{carrier}}` are there for templates that want them apart.
+- **The customer area (`/konto…`)** is the template part `account` (`shop-account.html`; placeholders `title`, `section`, `name`, `email`, `initials`, `nav_html`, `signout_html`, `content_html`): who is signed in (round picture with initials), the navigation with icons, the way out, and the page. Overview = three tiles (orders, in progress, last order), the latest orders as cards, the default address and the account; "Meine Bestellungen" = order cards (number, date, state with a progress bar while the order is on its way, the product pictures, the total, buttons: details, track the parcel, invoice); addresses = cards with the default marked; profile = cards, deleting the account set apart. Forms, field names and actions are unchanged.
+
+## Variants editor, tax drop-downs, the customer page in the back office
+
+- **Variants are rows, not a text** (`ShopVariants.cs`, `Ui.RowEditor`): the product form's "Varianten" card has the variants as an editable table (name, surcharge, stock — empty = not counted —, article number; add and delete rows in place) and, below it, up to three **options** (name + values as chips). "Kombinationen erzeugen" saves like any save and adds a variant ("M / Rot") for every combination that is not there yet (existing rows keep price and stock; at most 60 variants). A row is identified by its **id**, so renaming a variant keeps its stock and what old orders point at; a row that is taken out is switched off, never deleted; a new row brings back a switched-off variant of the same name. The options are remembered on the product (`products.var_options`, JSON) only for the editor — what is sold are the variants.
+- **`Ui.RowEditor`** (plugin UI toolkit; `UiRowEditor`, `UiRowColumn`, `UiRowValue`): rows the user adds to, edits and deletes in place. Posts `{name}.count` and `{name}.{i}.id` / `{name}.{i}.{column key}`, numbered in screen order when the form is sent (`ui-fields.js` renumbers on submit, so no gaps); cells are text, number or switch; an empty label draws no label. Any plugin can use it.
+- **Tax rates are drop-downs:** on the product (the home country's standard and reduced rate and "steuerfrei" first, then every other rate the tables know, and the product's own when none lists it — saving never changes a tax silently) and in the settings "Standard-Steuersatz" and "Steuersatz auf Versandkosten" (`ShopTaxChoices.cs`).
+- **A customer has a page** in the back office (`customers/{key}`, `ShopAdminCustomers.cs`; the key is the e-mail address in a route-safe form): contact, the addresses the orders used (billing, shipping, earlier ones) and those saved in the account, totals, and the orders; reached from the customer list, the order list and the order page.
+
+## Shop pages in the block editor (CMS 1.13)
+
+- **The idea:** a plugin can declare **pages** (`IPluginBuilder.PageRole`) that the site's editors lay out in the block editor like any other page — sections, columns, headings, texts, images and the plugin's own blocks — with **variables** for the data of the request: `{{product.title}}` in a heading, `{{#if product.on_sale}}…{{/if}}` in a text, a block shown only while a variable has a value ("Nur anzeigen, wenn …" in the block's settings; `!name` = only when it has none). The plugin's route stays the owner of the address, the data and the forms; it only asks the host to draw the page's blocks with its values (`ctx.RenderPageAsync`) and falls back to its own markup (the template part) when there is no such page or it is switched off.
+- **The shop's roles** (`ShopPageRoles.cs`): `catalog` (/shop, a category, the search), `categories`, `tags`, `product`, `cart`, `checkout`, `order`, `account` (the frame of /konto with its pages). They exist as pages "Shop – …" in Admin → Seiten (a badge "Seite des Plugins", no address, not deletable, language and address locked; "Auf Standard zurücksetzen" in the page settings), one per content language, created when the shop loads. Each starts with a layout that draws what the page showed before (`ShopPageLayouts.cs`).
+- **Variables** (listed under "Variablen" in the editor; click to put one into the field being typed in): the values the page's handler computes — `product.title`, `product.price`, `cart.pieces`, `order.number`, `account.name` … — plus `site.name` and `member.name/email/signed_in` on every plugin page. Variables that hold HTML the shop built (`product.image_html`, `cart.lines_html`, `checkout.form_html` …) are placed with the block **"Shop-Baustein"** (`shop_slot`; the editor tree names it by what it places). The shop's forms stay whole: the buy form, the cart's lines, the checkout form are one piece each — layout and words around them are free.
+- **Encoding follows the field** (`BlockScope`): a plain field (text, link, image) gets a value as it is (the block draws it encoded), a field drawn as HTML (rich text, the HTML block) gets it encoded; only a variable the plugin declared as HTML is put in raw. An unknown variable is empty; a value is never read again (braces in a name do nothing).
+- **Preview:** the editor opens a real example of the route (a product, the catalogue, the newest order) with `?editor=1`, so the page is drawn by the shop's own route in the site's layout; the live preview of the unsaved draft is drawn with the example's variables. Pages that need a customer or a full cart (checkout, customer area) get sample pieces drawn with the shop's classes.
+- **Precedence:** a published block page wins over the template part of the same name. A site that had its own version of such a part when the pages were created keeps it: the page is created **switched off** and the part keeps drawing the page until the page is switched on (the part files in the template editor say so). The parts remain the fallback, and their placeholders are unchanged.
+- **Core pieces:** `Page.OwnerPlugin`/`PluginRole` (+ migration), `Content/BlockScope.cs`, `Services/Plugins/PluginPageService.cs` (create, find, draw, preview, reset), `Pages/Shared/_PreviewChrome.cshtml` (the editor's preview script, shared by ordinary and plugin pages), plugin blocks and the HTML block may sit inside sections and columns, `wwwroot/js/plugin-page-vars.js`. Backups carry the owner; plugin pages are not in the sitemap, the link pickers or the cloud's page list, and their own address answers 404 (except to an administrator in the editor's preview).
+
+## Catalogue depth, data tools and storefront comforts (CMS 1.13, packages A and B)
+
+What `docs/shop-vs-shopify.md` listed as missing, built and tested; the rules that are easy to break:
+
+- **More than one category, and rule collections** (`ShopModel.cs`, `ShopCollections.cs`, `ShopStoreExtras.cs`): a product has ONE main category (`category`) plus further ones (`cats_extra`, comma list); a category may carry a **rule**
+  (`rule`: `tag:Neuware; price<20; new:30; sale; instock; featured`, at most five clauses, ALL must hold, an empty or invalid rule picks nothing — `ShopCollectionRule.Clean/Matches`). **Membership is computed in one place,
+  `ShopMembership`** (main, further, rule, and "everything below": a category counts what its descendants hold, each product once). `FindProductsAsync` filters by category in memory through it and `FacetsAsync` counts through
+  it — never write a second "which category is this in" query. Deleting a category cleans extra-category lists and moves children up as before.
+- **Moved addresses and search-engine fields:** changing a product's slug writes the old one to `slug_redirects` (`ShopStore.RememberSlugAsync`); the product route answers an unknown slug with a **301** to the product that owns it
+  (active products only — a hidden product's old address stays a 404). `seo_title`/`seo_description` replace title and summary in `<title>`, the description meta and the Open-Graph tags (`PageView.Meta`).
+- **Translations of product data** (`translations` table: kind `product|category`, ref id, locale, title, summary, description, seo fields; unique per (kind, ref, locale)): the main language is the base, a translation only
+  OVERLAYS what it has (blank = fall back). `ShopStore.Public(ctx)` returns a store that overlays for the request's locale — the public pages, blocks, menu elements and checkout use it; **an order stores the title the customer saw**
+  (`PlaceAsync` builds its store with the order's locale). Admin: one card per site language on the product and the category (`ShopAdminTranslations.cs`). Attribute names are not translated yet.
+- **Duplicate a product** (`DuplicateProductAsync`): a new inactive product "… (Kopie)" with its own slug, variants, attribute values and translations; the article number is emptied (a copy must not share it).
+- **Variants in the storefront** (`ShopVariantPicker.cs`): when the product's `var_options` match the variants' names ("M / Rot" = values joined by " / ", the way "Kombinationen erzeugen" names them) the page shows **one picker per
+  option** (chips, arrow keys, `role=radiogroup`); the hidden `variant` field, the price (`[data-shop-price]` inside `price_html`) and the main picture (the variant's `image`) follow the choice; a sold-out or missing combination
+  disables the button and says so. Anything that does not fit keeps the plain list; a `noscript` copy of the list keeps the form working without script. **The picker is derived, not stored** — no new data. A variant's `image`
+  also shows in the cart and checkout lines.
+- **Shipping estimate in the cart** (`ShopCartExtras.cs`): `GET /shop/cart?ship=AT` lists each way of shipping with its price (the same `ShopTax.Apply` + `ShopOrders.ShippingOptions` the checkout uses), the total from the cheapest and
+  "noch X bis gratis". Countries offered = those an active rate covers; an unknown value falls back to the home country. Nothing is stored.
+- **Direct-pay buttons** under the cart's checkout button (`ExpressHtml`): links to `/shop/checkout?pay=paypal|stripe` (only for methods that are set up); the checkout preselects a method that is offered. **This is not a one-click
+  wallet checkout** — that needs the order to be created from the payment webhook and live tests.
+- **Search suggestions** (`ShopSuggest.cs`): `GET /shop/suggest?q=` (JSON: ≤6 active products with picture and price, ≤3 categories, and a corrected spelling when nothing matches; `Cache-Control: private, no-store`; `suggest` is a
+  reserved product slug). The script attaches to every `form input[name=q]` whose form goes to `/shop` (catalogue bar, page block, the menu element — appended OUTSIDE the template part so a template cannot lose it), draws the list
+  from text nodes only into `<body>` (a box with `overflow:hidden` would clip it; CSS in `site.css`) and has keyboard and ARIA. "Meinten Sie …?" on an empty catalogue search uses `ShopSuggest.DidYouMean` (Damerau–Levenshtein over
+  titles, keywords and category names; words under four letters are left alone).
+- **Abandoned-cart reminder** (`ShopReminders.cs`, `ShopStoreReminders.cs`; settings group "Warenkorb-Erinnerung", **off by default**): the customer asks on the cart page (address + button; they can switch it off, which also
+  forgets the address); the maintenance job sends **one** mail per ask (template `shop.cart.reminder` under Mailvorlagen) when the cart was untouched for the set hours, is not older than 14 days and the address has not ordered since.
+  The cart row is marked BEFORE sending (a failing mail server must not become a retry storm). The mail's link `/shop/cart?restore=<48 hex>` puts the cart back in the browser it is opened in; the key is the only thing that
+  reveals a cart. The address is deleted with the cart, with the account (`host.member.erase` also deletes by e-mail) and when switched off. `ShopReminders.MailSender` is the test seam.
+- **CSV and the product import** (`ShopCsv.cs`, `ShopExport.cs`, `ShopAdminData.cs`; Shop → Import & Export): orders (one row per order), order lines, customers, products, variants; period and status; German (`;`, decimal comma,
+  BOM, CRLF) or international. **Text that starts with `= + - @` or a tab is written with a quote in front** (a product called `=HYPERLINK(…)` must not run in a spreadsheet). The import finds products by slug (made from the
+  title when missing; reserved words get `-1`), updates only the columns the file HAS, clears optional fields on an empty cell, sanitises descriptions, accepts only safe picture addresses, creates missing categories at the top level
+  and **never** writes in the dry run ("Nur prüfen" is on by default); limits: 2000 rows, 2 MB; an Excel "CSV" in the local code page is read as Latin-1 when it is not UTF-8. Variants come from a second file (`product;name;delta;stock;sku;image`).
+- **Sales report** (`ShopReports.cs`, Shop → Berichte): pure `Compute` over orders and lines; an order counts from the day it was **paid** (local time), refunds are deducted (with their share of the tax), unpaid and cancelled orders
+  do not count; courses by day (by month over 62 days), best sellers, split by country, payment method and tax rate.
+- **Packing slip** (`ShopSlip.cs`, `orders/{id}?slip=1`): a printable page without prices, digital items left out.
+- **"Verbindung prüfen"** (`ShopConnectionCheck.cs`, on Zahlungsarten): read-only calls — Stripe `GET /v1/balance` and `/v1/webhook_endpoints`, PayPal `GET /v1/notifications/webhooks` — report key accepted, test/live matches the
+  setting, webhook secret/ID present, webhook address and events as the shop needs them. A restricted key (403) is a remark, a rejected one (401) an error. It places no order; the checklist beside it describes the real test
+  purchase, which still needs the operator's test credentials.
+- **Cloud/MCP operations** (`ShopOps.cs`, answers `{status, message}`; a READ also carries `data`, which `ContentOpApplier` forwards as the report's `ResultJson`): `order.list` (one order by number or the newest, ≤100),
+  `order.update` (paid, ship, complete, cancel, note, tracking — through `ShopOrders`, so a move the order cannot make is refused), `variant.set` (by name, in place; `replace` switches the others off, never deletes),
+  `attribute.create` (add-only), `product.attributes`. MCP tools: `list_shop_orders`, `update_shop_order`, `set_product_variants`, `create_shop_attribute`, `set_product_attributes`. Orders hold personal data: the tools need the
+  key's restore right, also for reading.

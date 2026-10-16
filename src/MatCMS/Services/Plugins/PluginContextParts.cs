@@ -6,6 +6,9 @@ using MatCMS.Data;
 using MatCMS.Plugin;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.Processing;
 
 namespace MatCMS.Services.Plugins;
 
@@ -193,6 +196,29 @@ internal sealed class PluginSiteFacade : IPluginSite
         if (def.IsContainer) throw new ArgumentException($"'{blockType}' ist ein Container-Block und lässt sich so nicht zeichnen.", nameof(blockType));
         var renderer = _services.GetService(typeof(RazorPartialRenderer)) as RazorPartialRenderer ?? throw new InvalidOperationException("Der Renderer ist nicht verfügbar.");
         return await renderer.RenderAsync(def.Partial, new MatCMS.Content.BlockData(values?.ToJsonString() ?? "{}"), ct);
+    }
+
+    public async Task<PluginImage?> LoadImageAsync(string url, int maxWidth = 600, CancellationToken ct = default)
+    {
+        var u = (url ?? "").Trim();
+        if (!u.StartsWith("/uploads/", StringComparison.Ordinal) || u.Contains("..") || u.Contains('\\') || u.Contains('?')) return null;
+        var name = Path.GetFileName(u);
+        if (Path.GetExtension(name).ToLowerInvariant() is not (".png" or ".jpg" or ".jpeg" or ".webp" or ".gif")) return null;      // SVG is never read
+        if (_services.GetService(typeof(IWebHostEnvironment)) is not IWebHostEnvironment env) return null;
+        var path = Path.Combine(StoragePaths.Uploads(env), name);
+        try
+        {
+            var info = new FileInfo(path);
+            if (!info.Exists || info.Length > 8 * 1024 * 1024) return null;
+            using var image = await Image.LoadAsync(path, ct);
+            var width = Math.Clamp(maxWidth, 16, 2000);
+            if (image.Width > width) image.Mutate(c => c.Resize(width, 0));
+            image.Mutate(c => c.BackgroundColor(Color.White));              // a JPEG has no transparency
+            using var ms = new MemoryStream();
+            await image.SaveAsJpegAsync(ms, new JpegEncoder { Quality = 90 }, ct);
+            return new PluginImage(ms.ToArray(), image.Width, image.Height);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException) { return null; }
     }
 
     public string TemplatePart(string part) => TemplateSchema.EffectivePart(Site.ActiveTemplate, part);

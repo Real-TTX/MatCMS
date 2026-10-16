@@ -59,14 +59,14 @@ public class ShopCheckoutTests : IClassFixture<AppFactory>, IAsyncLifetime
         await _shop.AddProductAsync("Filterkaffee Röstung", 900, category: "kaffee");
         await _shop.AddProductAsync("Teekanne Porzellan", 3000, category: "");
         var c = _app.Browser();
-        var inCat = Decode(await c.GetStringAsync("/shop?cat=kaffee"));
+        var inCat = Decode(await c.GetStringAsync("/shop/categories/kaffee"));
         Assert.Contains("Filterkaffee Röstung", inCat);
         Assert.DoesNotContain("Teekanne Porzellan", inCat);
         Assert.Contains("Teekanne Porzellan", Decode(await c.GetStringAsync("/shop?q=teekanne")));
         Assert.DoesNotContain("Filterkaffee Röstung", Decode(await c.GetStringAsync("/shop?q=teekanne")));
         // A search term is data, never markup or SQL.
         var odd = await c.GetStringAsync("/shop?q=%27%3B%20DROP%20TABLE%20x%3B%20--%3Cscript%3E");
-        Assert.DoesNotContain("<script>", odd);
+        Assert.DoesNotContain("--<script>", odd);
     }
 
     // ---- cart --------------------------------------------------------------------------------------------
@@ -81,7 +81,8 @@ public class ShopCheckoutTests : IClassFixture<AppFactory>, IAsyncLifetime
         var cart = Decode(await a.GetStringAsync("/shop/cart"));
         Assert.Contains("Warenkorb Buch", cart);
         Assert.Contains("45,00 €", cart);                                              // 3 × 15,00
-        Assert.DoesNotContain("Warenkorb Buch", Decode(await b.GetStringAsync("/shop/cart")));   // another browser has its own cart
+        var other = Decode(await b.GetStringAsync("/shop/cart"));   // another browser has its own cart: empty (the suggestions may name the product, the cart does not hold it)
+        Assert.Contains("Ihr Warenkorb ist leer", other); Assert.DoesNotContain("class=\"shop-line\"", other);
 
         // Change the quantity through the cart form.
         var token = AppFactory.Token(cart)!;
@@ -490,13 +491,21 @@ public class ShopCheckoutTests : IClassFixture<AppFactory>, IAsyncLifetime
     [InlineData("/admin/p/shop/categories")]
     [InlineData("/admin/p/shop/customers")]
     [InlineData("/admin/p/shop/shipping")]
-    [InlineData("/admin/p/shop/_settings")]
+    [InlineData("/admin/p/shop/_settings?group=set.groupSeller")]
+    [InlineData("/admin/p/shop/_settings?group=set.groupStripe")]
+    [InlineData("/admin/p/shop/coupons")]
+    [InlineData("/admin/p/shop/coupons/0")]
+    [InlineData("/admin/p/shop/payment")]
+    [InlineData("/admin/p/shop/taxes")]
+    [InlineData("/admin/p/shop/legal")]
+    [InlineData("/admin/p/shop/numbers")]
     public async Task Every_back_office_page_of_the_shop_renders(string url)
     {
         var admin = await _shop.AdminAsync();
         var res = await admin.GetAsync(url);
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
-        var html = await res.Content.ReadAsStringAsync();
+        // A key may sit in an address (the sidebar links to a settings group by its key); what must not show is one as TEXT.
+        var html = System.Text.RegularExpressions.Regex.Replace(await res.Content.ReadAsStringAsync(), "(href|action|value)=\"[^\"]*\"", "");
         Assert.DoesNotContain("shop.tab.", html);                                       // no untranslated key shows
         Assert.DoesNotContain("shop.adm.", html);
         Assert.DoesNotContain("set.group", html);
@@ -516,20 +525,21 @@ public class ShopCheckoutTests : IClassFixture<AppFactory>, IAsyncLifetime
     {
         var admin = await _shop.AdminAsync();
         var form = await admin.GetStringAsync("/admin/p/shop/products/0");
-        Assert.Contains("name=\"variants\"", form);
-        Dictionary<string, string> Post(string title, string price, string variants = "") => new()
+        Assert.Contains("name=\"variants.count\"", form);                                // the variants are rows to edit, not a text
+        Dictionary<string, string> Post(string title, string price, string[][]? variants = null) => new Dictionary<string, string>
         {
             ["__RequestVerificationToken"] = AppFactory.Token(form)!, ["action"] = "save", ["title"] = title, ["slug"] = "", ["kind"] = "physical", ["price"] = price, ["tax"] = "19",
-            ["sku"] = "SKU-1", ["category"] = "", ["summary"] = "Kurz", ["description"] = "<p>Lang</p><script>alert(1)</script>", ["image"] = "", ["gallery"] = "[]", ["variants"] = variants,
+            ["sku"] = "SKU-1", ["category"] = "", ["summary"] = "Kurz", ["description"] = "<p>Lang</p><script>alert(1)</script>", ["image"] = "", ["gallery"] = "[]", ["variants.count"] = (variants?.Length ?? 0).ToString(),
             ["stock"] = "0", ["weight"] = "0", ["max"] = "0", ["sort"] = "0", ["active"] = "true"
-        };
+        }.Concat((variants ?? Array.Empty<string[]>()).SelectMany((r, i) => new[] { ($"variants.{i}.id", r[0]), ($"variants.{i}.name", r[1]), ($"variants.{i}.delta", r[2]), ($"variants.{i}.stock", r[3]), ($"variants.{i}.sku", r[4]) }
+            .Select(x => KeyValuePair.Create(x.Item1, x.Item2)))).ToDictionary(kv => kv.Key, kv => kv.Value);
         var bad = await admin.PostAsync("/admin/p/shop/products/0", new FormUrlEncodedContent(Post("Adm Produkt", "abc")));
         Assert.Equal(HttpStatusCode.OK, bad.StatusCode);
         Assert.Contains("keine gültige Zahl", Decode(await bad.Content.ReadAsStringAsync()));
-        var badVar = await admin.PostAsync("/admin/p/shop/products/0", new FormUrlEncodedContent(Post("Adm Produkt", "9,90", "A | x")));
+        var badVar = await admin.PostAsync("/admin/p/shop/products/0", new FormUrlEncodedContent(Post("Adm Produkt", "9,90", new[] { new[] { "", "A", "x", "", "" } })));
         Assert.Contains("kein Betrag", Decode(await badVar.Content.ReadAsStringAsync()));
 
-        var ok = await admin.PostAsync("/admin/p/shop/products/0", new FormUrlEncodedContent(Post("Adm Produkt", "9,90", "S | | 4 | A-S\nM | +1 | 2")));
+        var ok = await admin.PostAsync("/admin/p/shop/products/0", new FormUrlEncodedContent(Post("Adm Produkt", "9,90", new[] { new[] { "", "S", "", "4", "A-S" }, new[] { "", "M", "+1", "2", "" } })));
         Assert.Equal(HttpStatusCode.Redirect, ok.StatusCode);
         var location = ok.Headers.Location!.OriginalString;
         var id = long.Parse(location[(location.LastIndexOf('/') + 1)..]);
@@ -550,9 +560,9 @@ public class ShopCheckoutTests : IClassFixture<AppFactory>, IAsyncLifetime
         var reserved = await admin.PostAsync("/admin/p/shop/products/0", new FormUrlEncodedContent(cart));
         Assert.NotEqual("cart", (await _shop.ProductAsync(long.Parse(reserved.Headers.Location!.OriginalString.Split('/').Last()))).Slug);
 
-        // Removing a name from the list switches the variant off; it is not deleted (old orders point at it).
+        // Taking a row out of the editor switches the variant off; it is not deleted (old orders point at it).
         var edit = await admin.GetStringAsync(location);
-        var change = Post("Adm Produkt", "9,90", "S | | 4 | A-S"); change["__RequestVerificationToken"] = AppFactory.Token(edit)!;
+        var change = Post("Adm Produkt", "9,90", new[] { new[] { variants[0].Id.ToString(), "S", "", "4", "A-S" } }); change["__RequestVerificationToken"] = AppFactory.Token(edit)!;
         await admin.PostAsync(location, new FormUrlEncodedContent(change));
         Assert.Equal(new[] { "S" }, (await _shop.WithContextAsync((_, store) => store.VariantsAsync(id, true))).Select(v => v.Name));
         Assert.Equal(2, (await _shop.WithContextAsync((_, store) => store.VariantsAsync(id, false))).Count);
@@ -568,8 +578,8 @@ public class ShopCheckoutTests : IClassFixture<AppFactory>, IAsyncLifetime
     public async Task Categories_and_shipping_rates_are_edited_in_the_back_office_with_checks()
     {
         var admin = await _shop.AdminAsync();
-        var page = await admin.GetStringAsync("/admin/p/shop/categories");
-        var res = await admin.PostAsync("/admin/p/shop/categories", new FormUrlEncodedContent(new Dictionary<string, string> { ["__RequestVerificationToken"] = AppFactory.Token(page)!, ["action"] = "save", ["new_name"] = "Büro & Co" }));
+        var page = await admin.GetStringAsync("/admin/p/shop/categories/0");
+        var res = await admin.PostAsync("/admin/p/shop/categories/0", new FormUrlEncodedContent(new Dictionary<string, string> { ["__RequestVerificationToken"] = AppFactory.Token(page)!, ["action"] = "save", ["name"] = "Büro & Co" }));
         Assert.Equal(HttpStatusCode.Redirect, res.StatusCode);
         Assert.NotNull(await _shop.WithContextAsync((_, store) => store.CategoryBySlugAsync(MatCMS.Pages.Admin.Pages.IndexModel.Slugify("Büro & Co"))));
 

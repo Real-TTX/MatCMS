@@ -115,6 +115,32 @@ public class UiRendererTests
     }
 
     [Fact]
+    public void A_list_has_the_admins_framed_toolbar_above_it_with_search_and_filter_and_its_actions_below()
+    {
+        var t = Ui.Table(new[] { Ui.Column("Name") }, new[] { Ui.RowFor("a", "A") with { Tags = "active sale" }, Ui.RowFor("b", "B") with { Tags = "inactive" } }, searchPlaceholder: "Suchen", pageSize: 25) with
+        {
+            Filter = Ui.ListFilter("Filtern", ("", "Alle (2)"), ("active", "Aktiv (1)")),
+            Below = new UiNode[] { Ui.Button("Neu", "/neu") }
+        };
+        var html = Admin(t);
+        // The toolbar sits in a page-head inside the list wrapper (admin.css frames `[data-list] .page-head .list-toolbar`), search and filter together.
+        var head = html.IndexOf("<div class=\"page-head\"><div class=\"list-toolbar\">", StringComparison.Ordinal);
+        Assert.True(head > html.IndexOf("<div data-list", StringComparison.Ordinal));
+        Assert.True(html.IndexOf("data-list-search", StringComparison.Ordinal) > head);
+        Assert.True(html.IndexOf("<select class=\"list-search\" data-list-filter aria-label=\"Filtern\">", StringComparison.Ordinal) > head);
+        Assert.True(html.IndexOf("<table", StringComparison.Ordinal) > html.IndexOf("data-list-filter", StringComparison.Ordinal));
+        Assert.Contains("<option value=\"active\">Aktiv (1)</option>", html);
+        Assert.Contains("data-tags=\"active sale\"", html);
+        // The actions come after the table, inside the list.
+        Assert.True(html.IndexOf("<div class=\"list-actions\">", StringComparison.Ordinal) > html.IndexOf("</table>", StringComparison.Ordinal));
+        Assert.True(html.IndexOf("<div class=\"list-actions\">", StringComparison.Ordinal) < html.LastIndexOf("</div>", StringComparison.Ordinal));
+        // A table without search, paging or filter is no list: no toolbar, but its actions still show.
+        var plain = Admin(Ui.Table(new[] { Ui.Column("Name") }, new[] { Ui.Row("x") }) with { Below = new UiNode[] { Ui.Button("Neu", "/neu") } });
+        Assert.DoesNotContain("list-toolbar", plain);
+        Assert.Contains("list-actions", plain);
+    }
+
+    [Fact]
     public void The_same_tree_draws_with_the_admin_classes_in_the_back_office_and_the_sites_classes_on_the_public_page()
     {
         var tree = Ui.Card("Titel", Ui.Alert("hallo", UiTone.Success), Ui.Button("Los", "/x", UiButtonKind.Ghost), Ui.Input("a", "A"));
@@ -151,7 +177,10 @@ public class UiRendererTests
             Ui.Form(Ui.Hidden("a", "b"), Ui.FormActions(Ui.Submit("s"))),
             Ui.Input("i", "I"), Ui.TextArea("t", "T"), Ui.Select("s", "S", "a", Ui.Option("a", "A")), Ui.Checkbox("c", "C"),
             Ui.File("doc", "Doc", ".pdf"), Ui.Image("im", "Im"), Ui.MediaList("ml", "Ml"), Ui.MediaList("fl", "Fl", files: true), Ui.RichText("rt", "Rt"), Ui.Tags("tg", "Tg", "a, b", new[] { "c" }),
-            Ui.Table(new[] { Ui.Column("c") }, new[] { Ui.Row("x", Ui.Badge("y")) }), Ui.Tabs(Ui.Tab("t", "/")), Ui.Pager(1, 3, "?p={0}")
+            Ui.RowEditor("re", "Re", new[] { Ui.RowColumn("a", "A"), Ui.RowColumn("b", "B", UiRowCell.Check) }, new[] { Ui.RowValue("1", "x", "true") }, "Add"),
+            Ui.Table(new[] { Ui.Column("c") }, new[] { Ui.Row("x", Ui.Badge("y")) }), Ui.Tabs(Ui.Tab("t", "/")), Ui.Pager(1, 3, "?p={0}"),
+            Ui.Split(new[] { Ui.NavItem("A", "/a", "ti-star", true, "Gruppe", "3"), Ui.NavItem("B", "/b") }, Ui.Text("body")),
+            Ui.Columns(new UiNode[] { Ui.Text("main") }, new UiNode[] { Ui.Text("side") })
         };
         foreach (var n in all)
         {
@@ -164,6 +193,27 @@ public class UiRendererTests
         var covered = all.SelectMany(UiTree.Descendants).Select(n => n.GetType().Name).ToHashSet();
         covered.UnionWith(new[] { nameof(UiHidden) });
         Assert.Empty(known.Except(covered));
+    }
+
+    [Fact]
+    public void A_row_editor_names_every_field_by_row_and_column_carries_the_id_encodes_values_and_brings_a_blank_row_for_the_script()
+    {
+        var html = Admin(Ui.Form(Ui.RowEditor("variants", "V",
+            new[] { Ui.RowColumn("name", "Name", UiRowCell.Text, "z"), Ui.RowColumn("on", "On", UiRowCell.Check) },
+            new[] { Ui.RowValue("7", "<b>x</b>", "true"), Ui.RowValue("", "y", "") }, "Add")));
+        Assert.Contains("name=\"variants.0.id\" value=\"7\"", html);
+        Assert.Contains("name=\"variants.0.name\" value=\"&lt;b&gt;x&lt;/b&gt;\"", html);                      // what is in a cell is text, never markup
+        Assert.Contains("name=\"variants.1.name\" value=\"y\"", html);
+        Assert.Contains("name=\"variants.1.id\" value=\"\"", html);                                           // a new row has no id
+        Assert.Contains("name=\"variants.0.on\" checked", html.Replace("data-key=\"on\" ", ""));            // the switch is on for row 0 only
+        Assert.DoesNotContain("name=\"variants.1.on\" checked", html.Replace("data-key=\"on\" ", ""));
+        Assert.Contains("name=\"variants.count\" value=\"2\"", html);
+        Assert.Contains("<template data-ui-rows-template>", html);                                             // the blank row the script copies
+        Assert.Contains("variants.__i__.name", html);
+        Assert.Contains("data-ui-rows-add", html); Assert.Contains("data-ui-row-remove", html);
+        // Switched off, there is nothing to add or remove.
+        var fixedRows = Admin(Ui.RowEditor("v", "V", new[] { Ui.RowColumn("n", "N") }, new[] { Ui.RowValue("1", "x") }) with { Disabled = true });
+        Assert.DoesNotContain("data-ui-rows-add", fixedRows); Assert.DoesNotContain("data-ui-row-remove", fixedRows);
     }
 
     [Fact]

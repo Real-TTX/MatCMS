@@ -34,14 +34,23 @@
                 var primaryVer = g.Versions.FirstOrDefault(v => v.Id == p.Id) ?? g.Versions[0];
                 var children = g.Versions.Where(v => v.Id != p.Id).ToList();
                 var gid = "g" + p.Id;
-                var search = p.Title + " " + string.Join(" ", g.Versions.Select(v => v.Locale + " " + v.Url));
+                var search = p.Title + " " + string.Join(" ", g.Versions.Select(v => v.Locale + (p.OwnerPlugin is null ? " " + v.Url : "")));
                 <tr data-search="@search">
                     <td><strong>@p.Title</strong></td>
                     <td>
                         <span class="badge badge-on mono">@primaryVer.Locale.ToUpperInvariant()</span>
                         <span class="muted" style="font-size:12px;">@Localizer.DisplayName(primaryVer.Locale) · Original</span>
                     </td>
-                    <td><a class="mono" href="@primaryVer.Url" target="_blank">@primaryVer.Url</a></td>
+                    <td>
+                        @if (p.OwnerPlugin is not null)
+                        {
+                            <span class="badge badge-on">@p.OwnerPlugin</span> <span class="muted" style="font-size:12px;">@T["pages.pluginPage"]</span>
+                        }
+                        else
+                        {
+                            <a class="mono" href="@primaryVer.Url" target="_blank">@primaryVer.Url</a>
+                        }
+                    </td>
                     <td>
                         @if (primaryVer.IsPublished)
                         {
@@ -55,10 +64,13 @@
                     <td>
                         <div class="actions">
                             <a class="btn btn-sm btn-ghost" asp-page="Editor" asp-route-id="@p.Id">@T["action.edit"]</a>
-                            <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@p.Id"
-                                  data-confirm="@T["pages.confirmDelete", p.Title]">
-                                <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
-                            </form>
+                            @if (p.OwnerPlugin is null)
+                            {
+                                <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@p.Id"
+                                      data-confirm="@T["pages.confirmDelete", p.Title]">
+                                    <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
+                                </form>
+                            }
                         </div>
                     </td>
                 </tr>
@@ -70,7 +82,7 @@
                             <span class="badge badge-off mono">@v.Locale.ToUpperInvariant()</span>
                             <span class="muted" style="font-size:12px;">@Localizer.DisplayName(v.Locale)</span>
                         </td>
-                        <td><a class="mono" href="@v.Url" target="_blank">@v.Url</a></td>
+                        <td>@if (p.OwnerPlugin is null) { <a class="mono" href="@v.Url" target="_blank">@v.Url</a> }</td>
                         <td>
                             @if (v.IsPublished)
                             {

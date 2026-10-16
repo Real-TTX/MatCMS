@@ -1210,6 +1210,7 @@ the admin UI uses. There is no second restore path and no second backup format.
   writer) and reports on its next beat (`CloudState` holds the outcomes between beats). Add-only (slug
   dedupe → `skipped-exists`), so a re-offer after a lost report is idempotent.
   **This bumped `CloudProtocol.Version` 14 → 15 — cloud and instances must deploy together.**
+- **Shop tools ride the same channel** (`Mcp/ContentTools.cs`: `create_product`, `create_coupon`, `list_shop_orders`, `update_shop_order`, `set_product_variants`, `create_shop_attribute`, `set_product_attributes`). They enqueue PLUGIN operations (`product.create`, `order.list`, `order.update`, `variant.set` …) that the instance's shop plugin answers; an operation that READS answers with `data`, which the instance's `ContentOpApplier` returns as the report's `ResultJson` (so `get_content_op` shows it as `result`). Orders hold personal data, so even `list_shop_orders` needs the restore right (not read scope). No REST twin yet: like the other content ops these are MCP-only.
 - **MCP reads + edits (Stage 2, Increment 2 — built).** Reading existing content does NOT parse a backup in
   the cloud (that would duplicate the content format the instance owns — the exact coupling the repo avoids).
   Instead **reads flow through the same content-op channel**: `list_pages` / `get_page` enqueue a `pages.list`

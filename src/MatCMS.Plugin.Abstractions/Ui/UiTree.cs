@@ -25,11 +25,13 @@ public static class UiTree
         UiInline i => i.Children,
         UiGrid g => g.Children,
         UiCard c => c.Children,
+        UiSplit sp => sp.Children,
+        UiColumns cols => cols.Main.Concat(cols.Side),
         UiPageHead h => h.Actions,
         UiForm f => f.Children,
         UiFormActions a => a.Children,
         UiDialog d => d.Children,
-        UiTable t => t.Rows.SelectMany(r => r.Cells),
+        UiTable t => t.Rows.SelectMany(r => r.Cells).Concat(t.Below),
         _ => Array.Empty<UiNode>()
     };
 

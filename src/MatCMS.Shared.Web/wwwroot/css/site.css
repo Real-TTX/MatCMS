@@ -414,7 +414,13 @@ html.mat-langm-lock { overflow: hidden; }
 .feature-card p, .leistung-card p { margin: 0; color: var(--muted); }
 @media (max-width: 720px) {
     .features-grid.cols-3, .features-grid.cols-4,
-    .leistungen-grid.cols-3, .leistungen-grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
+    .leistungen-grid.cols-3, .leistungen-grid.cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .feature-card, .leistung-card { min-width: 0; padding: 22px; }
+}
+@media (max-width: 520px) {
+    /* One column on a phone: two cards of 28px padding each overflowed 390px by a few pixels. */
+    .features-grid.cols-2, .features-grid.cols-3, .features-grid.cols-4,
+    .leistungen-grid.cols-2, .leistungen-grid.cols-3, .leistungen-grid.cols-4 { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ---------- Global per-block layout options (width + spacing, set in the editor) ---------- */

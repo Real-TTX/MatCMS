@@ -400,6 +400,7 @@ internal static partial class ShopPublic
                 else form.Append(ShopVariantPicker.Html(ShopVariants.OptionsFromJson(p.VariantOptions), plan, c => M(ctx, cfg, c), ctx.T("shop.variantNA"))).Append("<noscript>").Append(list).Append("</noscript>");
             }
             form.Append($"<div class=\"shop-actions\"><input class=\"shop-qty\" type=\"number\" name=\"qty\" value=\"1\" min=\"1\" max=\"{(p.MaxPerOrder > 0 ? Intl(p.MaxPerOrder) : "999")}\"><button class=\"shop-btn\" type=\"submit\">{E(ctx.T("shop.addToCart"))}</button></div></form>");
+            form.Append(await TrustHtmlAsync(ctx, cfg, store, p, ct));
         }
         var ptags = ShopTags.Split(p.Tags);
         var taxNote = (cfg.SmallBusiness ? ctx.T("shop.smallBusinessNote") : ctx.T("shop.taxIncluded", Money.Percent(p.TaxBp))) + (p.IsDigital ? "" : " · " + ctx.T("shop.plusShipping"));

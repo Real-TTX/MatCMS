@@ -19,6 +19,31 @@ internal static partial class ShopPublic
         return buttons.Length == 0 ? "" : $"<div class=\"shop-express\"><span class=\"shop-small shop-muted\">{E(ctx.T("shop.express.or"))}</span>{buttons}</div>";
     }
 
+    private const string TruckIcon = "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M3 7h11v9H3zM14 10h4l3 3v3h-7\"/><circle cx=\"7\" cy=\"17.5\" r=\"1.7\"/><circle cx=\"17\" cy=\"17.5\" r=\"1.7\"/></svg>";
+    private const string LockIcon = "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><rect x=\"5\" y=\"11\" width=\"14\" height=\"9\" rx=\"2\"/><path d=\"M8 11V8a4 4 0 018 0v3\"/></svg>";
+    private const string BackIcon = "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M9 14L4 9l5-5\"/><path d=\"M4 9h10a6 6 0 010 12h-3\"/></svg>";
+    private const string DownloadIcon = "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 4v11M7 11l5 5 5-5M5 20h14\"/></svg>";
+
+    /// <summary>
+    /// The short list of reasons to buy that sits under the buy button: only what the shop's own settings make true — a free-shipping threshold that exists, a withdrawal page that is set, a payment method that is on.
+    /// Nothing here is a claim the operator has not configured.
+    /// </summary>
+    internal static async Task<string> TrustHtmlAsync(IPluginContext ctx, ShopConfig cfg, ShopStore store, Product p, CancellationToken ct)
+    {
+        var items = new List<(string Icon, string Html)>();
+        if (p.IsDigital) items.Add((DownloadIcon, E(ctx.T("shop.trust.instant"))));
+        else
+        {
+            var rates = (await store.RatesAsync(true, ct)).Where(r => r.Active && r.Covers(cfg.HomeCountry)).ToList();
+            var free = rates.Where(r => r.FreeFromCents > 0).Select(r => r.FreeFromCents).DefaultIfEmpty(0).Min();
+            if (free > 0) items.Add((TruckIcon, E(ctx.T("shop.trust.freeFrom", M(ctx, cfg, free)))));
+            else if (rates.Count > 0) items.Add((TruckIcon, E(ctx.T("shop.trust.ships"))));
+        }
+        if (cfg.StripeReady || cfg.PayPalReady || cfg.BankEnabled) items.Add((LockIcon, E(ctx.T("shop.trust.secure"))));
+        if (cfg.WithdrawalUrl.Length > 0 && SafeUrl(cfg.WithdrawalUrl).Length > 0) items.Add((BackIcon, $"<a href=\"{E(SafeUrl(cfg.WithdrawalUrl))}\">{E(ctx.T("shop.trust.withdrawal"))}</a>"));
+        return items.Count == 0 ? "" : "<ul class=\"shop-trust\">" + string.Concat(items.Select(i => $"<li>{i.Icon}<span>{i.Html}</span></li>")) + "</ul>";
+    }
+
     /// <summary>The countries a visitor can ask about in the cart: those some active shipping rate covers (all known ones when a rate says "everywhere").</summary>
     internal static IReadOnlyList<string> EstimateCountries(IReadOnlyList<ShippingRate> rates)
     {

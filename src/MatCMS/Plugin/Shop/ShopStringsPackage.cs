@@ -18,6 +18,8 @@ internal static class ShopStringsPackage
         ("shop.rem.on", "Erinnerung aktiv", "Reminder on"), ("shop.rem.onText", "Wir schreiben einmal an {0}, falls Sie nicht bestellen.", "We will write once to {0} if you do not order."), ("shop.rem.off", "Erinnerung ausschalten", "Switch reminder off"),
         ("shop.rem.onDone", "Erinnerung eingerichtet für {0}.", "Reminder set up for {0}."), ("shop.rem.offDone", "Erinnerung ausgeschaltet.", "Reminder switched off."), ("shop.rem.badMail", "Bitte eine gültige E-Mail-Adresse eingeben.", "Please enter a valid e-mail address."),
         ("shop.express.or", "Oder direkt bezahlen mit:", "Or pay directly with:"), ("shop.express.paypal", "PayPal", "PayPal"), ("shop.express.card", "Karte · Apple Pay · Google Pay", "Card · Apple Pay · Google Pay"),
+        ("shop.trust.freeFrom", "Kostenloser Versand ab {0}", "Free shipping from {0}"), ("shop.trust.ships", "Schneller Versand", "Fast shipping"), ("shop.trust.instant", "Sofort nach der Zahlung als Download", "Instant download after payment"),
+        ("shop.trust.secure", "Sicher bezahlen", "Secure payment"), ("shop.trust.withdrawal", "Widerruf & Rückgabe", "Withdrawal & returns"),
         // ---- sales report ----
         ("shop.tab.reports", "Berichte", "Reports"), ("shop.rep.title", "Umsatzbericht", "Sales report"),
         ("shop.rep.p.30d", "Letzte 30 Tage", "Last 30 days"), ("shop.rep.p.month", "Dieser Monat", "This month"), ("shop.rep.p.lastmonth", "Letzter Monat", "Last month"),

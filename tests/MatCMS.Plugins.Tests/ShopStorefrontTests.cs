@@ -196,4 +196,17 @@ public class ShopStorefrontTests : IClassFixture<AppFactory>, IAsyncLifetime
         Assert.Contains("__shopSuggest", await c.GetStringAsync("/shop"));                              // the catalogue's own search box
         Assert.DoesNotContain("class=\"shop-dym\"", await c.GetStringAsync("/shop?q=kaffeebohnen"));
     }
+
+    [Fact]
+    public async Task The_product_page_lists_only_the_reasons_to_buy_the_settings_make_true()
+    {
+        await _shop.AddRateAsync("Trust Inland", "DE", 490, 7500);
+        var physical = await _shop.AddProductAsync("Trust Ware", 2500);
+        var html = WebUtility.HtmlDecode(await _app.Browser().GetStringAsync("/shop/trust-ware"));
+        Assert.Contains("class=\"shop-trust\"", html);
+        Assert.Contains("Kostenloser Versand ab", html); Assert.Contains("Widerruf &amp; Rückgabe".Replace("&amp;", "&"), html); Assert.Contains("Sicher bezahlen", html);
+        await _shop.AddProductAsync("Trust Download", 900, ProductKind.Digital);
+        var digital = WebUtility.HtmlDecode(await _app.Browser().GetStringAsync("/shop/trust-download"));
+        Assert.Contains("Sofort nach der Zahlung als Download", digital); Assert.DoesNotContain("Kostenloser Versand", digital);
+    }
 }

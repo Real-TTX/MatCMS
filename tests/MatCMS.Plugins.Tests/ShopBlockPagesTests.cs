@@ -207,7 +207,7 @@ public class ShopBlockPagesTests : IClassFixture<AppFactory>, IAsyncLifetime
 
         Assert.Equal(HttpStatusCode.Redirect, (await admin.GetAsync($"/admin/pages/edit/{product.Id}")).StatusCode);   // the classic editor sends it to editor v2
         var editor = Decode(await admin.GetStringAsync($"/admin/pages/editor/{product.Id}"));
-        Assert.Contains("id=\"ev2-vars-open\"", editor);
+        Assert.Contains("id=\"ev2-vars\"", editor); Assert.DoesNotContain("ev2-vars-open", editor);          // the list sits in the inspector, not in the header bar
         Assert.Contains("data-var=\"product.title\"", editor);
         Assert.Contains("data-var=\"product.image_html\"", editor);
         Assert.Contains("data-var=\"member.name\"", editor);                                                          // what every plugin page can use

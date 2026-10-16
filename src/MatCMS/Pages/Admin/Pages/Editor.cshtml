@@ -94,10 +94,6 @@
         {
             <button type="button" class="btn btn-ghost btn-icon" id="ev2-aipage-open" title="@T["editor.aiPageGenButton"]" aria-label="@T["editor.aiPageGenButton"]"><i class="ti ti-sparkles"></i></button>
         }
-        @if (p.OwnerPlugin is not null)
-        {
-            <button type="button" class="btn btn-ghost btn-sm" id="ev2-vars-open" aria-haspopup="true"><i class="ti ti-braces" aria-hidden="true"></i> @T["pages.pluginVars"]</button>
-        }
         @if (Model.PublicUrl.Length > 0)
         {
             <a class="btn btn-ghost btn-sm ev2-hide-s" href="@Model.PublicUrl" target="_blank" rel="noopener"><i class="ti ti-external-link" aria-hidden="true"></i> @T["ev2.view"]</a>
@@ -133,6 +129,20 @@
             <h3 id="ev2-insp-title"></h3>
         </div>
         <div class="tabs ev2-tabs" id="ev2-tabs" role="tablist"></div>
+        @if (p.OwnerPlugin is not null)
+        {
+            @* The variables of a plugin's page, next to the fields they go into: a click puts {{name}} into the field typed in last (plugin-page-vars.js). *@
+            <details class="ev2-vars" id="ev2-vars" hidden>
+                <summary><i class="ti ti-braces" aria-hidden="true"></i> @T["pages.pluginVars"] <span class="n">@Model.PluginVariables.Count</span></summary>
+                <p class="muted ev2-vars-help">@T["pages.pluginVarsHelp"]</p>
+                <div class="ev2-var-list">
+                    @foreach (var v in Model.PluginVariables)
+                    {
+                        <button type="button" class="ev2-var" data-var="@v.Name" title="@v.Label"><code>{{@v.Name}}</code> <span>@v.Label@(v.Html ? " " + T["pages.pluginVarsHtml"] : "")</span></button>
+                    }
+                </div>
+            </details>
+        }
         <div class="ev2-body" id="ev2-body"></div>
         @* Page settings — shown here when "Seite" is chosen in the tree. A plain form posted by the
            editor's own "Speichern" (Edit?handler=Meta&back=json), so it never reloads the editor. *@
@@ -263,19 +273,6 @@
         </div>
     </div>
 
-
-    @if (p.OwnerPlugin is not null)
-    {
-        @* The variables of a plugin's page: click one to put it into the field being typed in (plugin-page-vars.js). *@
-        <div class="ev2-pop ev2-vars" id="ev2-vars" hidden>
-            <div class="admin-nav-label ev2-pop-head">@T["pages.pluginVars"]</div>
-            <p class="muted ev2-vars-help">@T["pages.pluginVarsHelp"]</p>
-            @foreach (var v in Model.PluginVariables)
-            {
-                <button type="button" class="ev2-var" data-var="@v.Name" title="@v.Label"><code>{{@v.Name}}</code> <span>@v.Label@(v.Html ? " " + T["pages.pluginVarsHtml"] : "")</span></button>
-            }
-        </div>
-    }
 
     @if (Model.SupportedLocales.Count > 1)
     {

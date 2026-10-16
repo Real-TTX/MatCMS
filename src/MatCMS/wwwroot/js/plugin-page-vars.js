@@ -1,36 +1,24 @@
-// The variables of a plugin's page in the block editor (editor v2). A button in the top bar opens the list; a click puts {{name}} into the field the person was typing in — a heading, a text,
-// a button's address, the rich text — without taking the focus away from it. The server fills the variables when the page is drawn (Content/BlockScope.cs); this only saves typing the names.
+// The variables of a plugin's page in the block editor (editor v2). The list sits in the inspector, above the fields of the selected block; a click puts {{name}} into the field the person was
+// typing in last — a heading, a text, a button's address, the rich text — without taking the focus away from it. The server fills the variables when the page is drawn (Content/BlockScope.cs);
+// this only saves typing the names.
 (function () {
     "use strict";
-    var open = document.getElementById("ev2-vars-open"), pop = document.getElementById("ev2-vars");
-    if (!open || !pop) return;
+    var box = document.getElementById("ev2-vars");
+    if (!box) return;
     var last = null;          // the field the person was typing in last (inside the inspector)
 
     function isField(el) {
-        if (!el || !el.closest || !el.closest("#ev2-insp") || pop.contains(el)) return false;
+        if (!el || !el.closest || !el.closest("#ev2-insp") || box.contains(el)) return false;
         if (el.isContentEditable) return true;
         var t = (el.tagName || "").toLowerCase();
         if (t === "textarea") return true;
         return t === "input" && /^(text|url|search|email|tel|)$/i.test(el.getAttribute("type") || "");
     }
     document.addEventListener("focusin", function (e) { if (isField(e.target)) last = e.target; });
-
-    function place() {
-        var r = open.getBoundingClientRect();
-        pop.style.left = Math.max(8, Math.min(r.left, innerWidth - pop.offsetWidth - 8)) + "px";
-        pop.style.top = (r.bottom + 6) + "px";
-    }
-    open.addEventListener("click", function (e) {
-        e.stopPropagation();
-        pop.hidden = !pop.hidden;
-        if (!pop.hidden) place();
-    });
-    document.addEventListener("mousedown", function (e) { if (!pop.hidden && !pop.contains(e.target) && !open.contains(e.target)) pop.hidden = true; });
-    document.addEventListener("keydown", function (e) { if (e.key === "Escape") pop.hidden = true; });
     // Pressing a variable must not take the focus from the field it goes into.
-    pop.addEventListener("mousedown", function (e) { if (e.target.closest("[data-var]")) e.preventDefault(); });
+    box.addEventListener("mousedown", function (e) { if (e.target.closest("[data-var]")) e.preventDefault(); });
 
-    pop.addEventListener("click", function (e) {
+    box.addEventListener("click", function (e) {
         var b = e.target.closest("[data-var]");
         if (!b) return;
         var text = "{{" + b.getAttribute("data-var") + "}}";

@@ -586,6 +586,8 @@
         pageNode.classList.toggle("is-sel", pageSelected);
         pageBody.hidden = !pageSelected;
         insp.body.hidden = pageSelected;
+        var varsBox = document.getElementById("ev2-vars");        // a plugin page's variables belong to a block's fields, not to the page's settings
+        if (varsBox) varsBox.hidden = pageSelected || !b;
         if (pageSelected) {
             insp.crumb.innerHTML = "";
             insp.title.innerHTML = '<span class="ic"><i class="ti ti-file-text"></i></span>' + esc(t("pageSettings"));

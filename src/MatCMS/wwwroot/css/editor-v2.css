@@ -253,10 +253,17 @@ body.ev2 .ev2-tree-toggle, .ev2-insp-close { display: none; }
     .ev2-frame { border-radius: 0; border: 0; }
 }
 
-/* --- the variables of a plugin's page (plugin-page-vars.js) --- */
-.ev2-vars { width: 420px; padding: 8px; overflow: auto; }
-.ev2-vars-help { margin: 4px 8px 8px; font-size: 12.5px; line-height: 1.45; }
-.ev2-var { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; text-align: left; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; padding: 7px 10px; border-radius: 8px; }
+/* --- the variables of a plugin's page (plugin-page-vars.js): a fold-out in the inspector, above the block's fields --- */
+.ev2-vars { margin: 8px 18px 0; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2, var(--surface)); }
+.ev2-vars[hidden] { display: none; }
+.ev2-vars > summary { cursor: pointer; padding: 9px 12px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 7px; list-style: none; }
+.ev2-vars > summary::-webkit-details-marker { display: none; }
+.ev2-vars > summary::after { content: ""; margin-left: auto; width: 7px; height: 7px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg) translateY(-2px); }
+.ev2-vars[open] > summary::after { transform: rotate(-135deg); }
+.ev2-vars .n { font-weight: 500; font-size: 11.5px; color: var(--muted); background: var(--hover); border-radius: 99px; padding: 1px 7px; }
+.ev2-vars-help { margin: 0 12px 6px; font-size: 12.5px; line-height: 1.45; }
+.ev2-var-list { max-height: 210px; overflow: auto; padding: 0 6px 6px; }
+.ev2-var { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; width: 100%; text-align: left; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; padding: 6px 8px; border-radius: 8px; }
 .ev2-var:hover { background: var(--hover); }
 .ev2-var code { font-size: 12.5px; color: var(--accent); }
 .ev2-var span { font-size: 12.5px; color: var(--muted); }

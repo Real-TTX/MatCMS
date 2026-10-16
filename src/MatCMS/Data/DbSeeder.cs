@@ -402,6 +402,9 @@ public static class DbSeeder
     private static async Task AddColumnIfMissingAsync(AppDbContext db, string table, string column, string type)
     {
         // table/column/type are hard-coded constants (never user input) — safe to inline.
+        // Look first: an ALTER that fails is caught below, but EF logs every failed command as an error, and this ran (and "failed") sixteen times on every start.
+        var have = await db.Database.SqlQueryRaw<string>("SELECT name AS Value FROM pragma_table_info('" + table + "')").ToListAsync();
+        if (have.Contains(column, StringComparer.OrdinalIgnoreCase)) return;
         var sql = "ALTER TABLE \"" + table + "\" ADD COLUMN \"" + column + "\" " + type;
         try
         {

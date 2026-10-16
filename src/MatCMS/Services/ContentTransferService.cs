@@ -329,7 +329,7 @@ public class ContentTransferService
                 {
                     Id = m.Id, ParentId = m.ParentId,
                     Menu = m.Menu, Label = m.Label, Url = m.Url, SortOrder = m.SortOrder,
-                    OpenInNewTab = m.OpenInNewTab, Locale = m.Locale, Icon = m.Icon
+                    OpenInNewTab = m.OpenInNewTab, Locale = m.Locale, Icon = m.Icon, Visibility = m.Visibility
                 }).ToList();
         }
 
@@ -974,7 +974,8 @@ public class ContentTransferService
                     Menu = string.IsNullOrWhiteSpace(m.Menu) ? "header" : m.Menu!,
                     Label = m.Label ?? "", Url = m.Url ?? "", SortOrder = m.SortOrder, OpenInNewTab = m.OpenInNewTab,
                     Locale = string.IsNullOrWhiteSpace(m.Locale) ? Localizer.DefaultCulture : m.Locale!,
-                    Icon = MenuIcons.IsValid(m.Icon) ? m.Icon : null
+                    Icon = MenuIcons.IsValid(m.Icon) ? m.Icon : null,
+                    Visibility = MenuItem.NormaliseVisibility(m.Visibility)
                 };
                 _db.MenuItems.Add(row);
                 if (m.Id != 0) menuMap[m.Id] = row;
@@ -1747,6 +1748,8 @@ public class ContentTransferService
         public bool OpenInNewTab { get; set; }
         public string? Locale { get; set; }
         public string? Icon { get; set; }
+        /// <summary>"", "in" or "out" — absent in an older backup, which reads as everybody.</summary>
+        public string? Visibility { get; set; }
     }
 
     private sealed class SettingDto

@@ -46,6 +46,15 @@
             Model.Icon, LabelKey: "menus.icon", HelpKey: "menus.iconHelp", MenuOnly: true);
     }
     <partial name="_IconPicker" model="iconVm" />
+    <div class="field">
+        <label for="mi-visibility">@T["menus.visibility"]</label>
+        <select id="mi-visibility" name="Visibility">
+            <option value="" selected="@(string.IsNullOrEmpty(Model.Visibility))">@T["menus.visAll"]</option>
+            <option value="in" selected="@(Model.Visibility == "in")">@T["menus.visIn"]</option>
+            <option value="out" selected="@(Model.Visibility == "out")">@T["menus.visOut"]</option>
+        </select>
+        <div class="help">@T["menus.visibilityHelp"]</div>
+    </div>
     <label class="check">
         <input type="checkbox" name="OpenInNewTab" value="true" @(Model.OpenInNewTab ? "checked" : "") /> @T["menus.openNewTab"]
     </label>

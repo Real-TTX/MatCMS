@@ -2009,5 +2009,10 @@
   "plugins.check.working": "Checking …",
   "plugins.check.ok": "No errors and no warnings.",
   "plugins.check.errors": "errors",
-  "plugins.check.warnings": "warnings"
+  "plugins.check.warnings": "warnings",
+  "menus.visibility": "Visible to",
+  "menus.visAll": "Everybody",
+  "menus.visIn": "Signed-in members only",
+  "menus.visOut": "Visitors who are not signed in only",
+  "menus.visibilityHelp": "For example “Account” with “Orders” and “Sign out” below it for signed-in members only, and “Sign in” for everybody else. A hidden entry takes its sub-entries with it. The back office always shows everything."
 }

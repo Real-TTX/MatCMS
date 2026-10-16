@@ -18,6 +18,7 @@ public class CreateModel : PageModel
     [BindProperty] public string? Url { get; set; }
     [BindProperty] public string? Icon { get; set; }
     [BindProperty] public bool OpenInNewTab { get; set; }
+    [BindProperty] public string? Visibility { get; set; }
     [BindProperty] public int? ParentId { get; set; }
 
     /// <summary>The resolved content language the new item is created in (route/hidden value, else default).</summary>
@@ -74,6 +75,7 @@ public class CreateModel : PageModel
             Url = url,
             Icon = MatCMS.Content.MenuIcons.IsValid(Icon) ? Icon : null,
             OpenInNewTab = OpenInNewTab,
+            Visibility = MenuItem.NormaliseVisibility(Visibility),
             ParentId = parent?.Id,
             SortOrder = max + 1,
             Locale = TargetLocale

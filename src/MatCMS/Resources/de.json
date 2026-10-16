@@ -2009,5 +2009,10 @@
   "plugins.check.working": "Prüfe …",
   "plugins.check.ok": "Keine Fehler und keine Warnungen.",
   "plugins.check.errors": "Fehler",
-  "plugins.check.warnings": "Warnungen"
+  "plugins.check.warnings": "Warnungen",
+  "menus.visibility": "Sichtbar für",
+  "menus.visAll": "Alle Besucher",
+  "menus.visIn": "Nur angemeldete Mitglieder",
+  "menus.visOut": "Nur nicht angemeldete Besucher",
+  "menus.visibilityHelp": "Zum Beispiel „Konto“ mit „Bestellungen“ und „Abmelden“ darunter nur für Angemeldete und „Anmelden“ nur für alle anderen. Was ausgeblendet ist, nimmt seine Untereinträge mit. Im Admin siehst du immer alles."
 }

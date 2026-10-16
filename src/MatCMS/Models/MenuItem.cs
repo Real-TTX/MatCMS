@@ -25,6 +25,12 @@ public class MenuItem
     public int SortOrder { get; set; }
     public bool OpenInNewTab { get; set; }
 
+    /// <summary>Who sees the entry: "" = everybody, "in" = only a signed-in member of the guest area, "out" = only a visitor who is not signed in. An entry that is hidden takes everything under it along.</summary>
+    public string Visibility { get; set; } = "";
+
+    public const string ForMembers = "in", ForGuests = "out";
+    public static string NormaliseVisibility(string? v) => v is ForMembers or ForGuests ? v : "";
+
     /// <summary>A small counter next to the label — set only on entries a plugin adds (never stored).</summary>
     [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public string? Badge { get; set; }

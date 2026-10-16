@@ -11,6 +11,8 @@ public class MenuItemFormVm
     public string? Url { get; set; }
     public string? Icon { get; set; }
     public bool OpenInNewTab { get; set; }
+    /// <summary>"" = everybody, "in" = signed-in members, "out" = visitors who are not signed in (<see cref="MatCMS.Models.MenuItem.Visibility"/>).</summary>
+    public string? Visibility { get; set; }
     public int? ParentId { get; set; }
     public List<MatCMS.Models.Menu> Menus { get; set; } = new();
     public List<MatCMS.Models.Page> Pages { get; set; } = new();

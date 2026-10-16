@@ -17,6 +17,7 @@ public class EditModel : PageModel
     [BindProperty] public string? Url { get; set; }
     [BindProperty] public string? Icon { get; set; }
     [BindProperty] public bool OpenInNewTab { get; set; }
+    [BindProperty] public string? Visibility { get; set; }
     [BindProperty] public int? ParentId { get; set; }
 
     public List<PageEntity> Pages { get; private set; } = new();
@@ -38,6 +39,7 @@ public class EditModel : PageModel
         Url = item.Url;
         Icon = item.Icon;
         OpenInNewTab = item.OpenInNewTab;
+        Visibility = item.Visibility;
         ParentId = item.ParentId;
         ItemLocale = item.Locale;
         await LoadListsAsync();
@@ -76,6 +78,7 @@ public class EditModel : PageModel
         item.Url = url;
         item.Icon = MatCMS.Content.MenuIcons.IsValid(Icon) ? Icon : null;
         item.OpenInNewTab = OpenInNewTab;
+        item.Visibility = MenuItem.NormaliseVisibility(Visibility);
         // Accept only a valid offered parent (same menu+locale, top-level, not self) — else top-level.
         item.ParentId = ParentId is int pid && ParentOptions.Any(o => o.Id == pid) ? pid : null;
         await _db.SaveChangesAsync();

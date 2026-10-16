@@ -67,6 +67,9 @@ public class SiteContext
         var items = _db.MenuItems.AsNoTracking()
             .Where(m => m.Menu == key && m.Locale == CurrentLocale)
             .OrderBy(m => m.SortOrder).ThenBy(m => m.Id).ToList();
+        // "Only for signed-in members" / "only for visitors": decided per request, in the pages of the site (the back office shows every entry, so an editor can still find and change them).
+        if (items.Any(i => i.Visibility.Length > 0) && _http.HttpContext is { } vc && !vc.Request.Path.StartsWithSegments("/admin"))
+            items = MenuVisibility.Filter(items, MemberService.CurrentAsync(vc).GetAwaiter().GetResult()?.Identity?.IsAuthenticated == true);
         // Items that stand for a plugin element (the shop's cart, "Anmelden"/"Mein Konto", the search box) become what the visitor gets; where there is no page view (the back office,
         // a background job) or no plugin to ask they are left out rather than drawn as a link to "plugin:…".
         var viaPlugin = _plugins is not null && _http.HttpContext is { } pv && !pv.Request.Path.StartsWithSegments("/admin");

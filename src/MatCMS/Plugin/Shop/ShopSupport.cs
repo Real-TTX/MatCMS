@@ -121,6 +121,7 @@ internal static class ShopHtml
         .shop-carousel button[hidden]{display:none}.shop-carousel .prev{left:-10px}.shop-carousel .next{right:-10px}
         .shop-trust{list-style:none;margin:18px 0 0;padding:14px 0 0;border-top:1px solid var(--shop-line,var(--line,rgba(0,0,0,.12)));display:grid;gap:9px;font-size:.92em}
         .shop-trust li{display:flex;align-items:center;gap:10px}.shop-trust svg{flex:none;width:20px;height:20px;fill:none;stroke:var(--shop-accent,var(--accent,currentColor));stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+        .shop input[type=radio],.shop input[type=checkbox],.shop-form input[type=radio],.shop-form input[type=checkbox]{accent-color:var(--shop-accent,var(--accent,currentColor))}
         .shop-more{margin-top:16px}.shop-was{font-weight:400;opacity:.6;margin-left:4px}.shop-coupon{margin-top:18px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
         .shop-coupon input[type=text]{padding:9px 12px;border:1px solid rgba(0,0,0,.25);border-radius:6px;font:inherit;text-transform:uppercase}
         """;

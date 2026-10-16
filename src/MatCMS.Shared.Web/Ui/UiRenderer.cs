@@ -459,7 +459,7 @@ public static class UiRenderer
                 var col = f.Columns[c];
                 var value = row is not null && c < row.Values.Count ? row.Values[c] : "";
                 var name = E(f.Name) + "." + index + "." + E(col.Key);
-                _sb.Append("<td>");
+                _sb.Append("<td data-label=\"").Append(E(col.Header)).Append("\">");
                 // The row's identity travels in its first cell, so the cells and the id are one unit for the script.
                 if (c == 0) _sb.Append("<input type=\"hidden\" data-key=\"id\" name=\"").Append(E(f.Name)).Append('.').Append(index).Append(".id\" value=\"").Append(E(row?.Id ?? "")).Append("\" />");
                 if (col.Kind == UiRowCell.Image)
@@ -553,7 +553,7 @@ public static class UiRenderer
                     _sb.Append("</div></div>");
                 }
             }
-            _sb.Append(Admin ? "<table class=\"data\"" : "<table class=\"ui-table\"");
+            _sb.Append(Admin ? "<table class=\"data\" data-stack" : "<table class=\"ui-table\"");
             if (listed) _sb.Append(" data-list-table");
             _sb.Append("><thead><tr>");
             foreach (var c in t.Columns)
@@ -570,7 +570,8 @@ public static class UiRenderer
                 for (var i = 0; i < r.Cells.Count; i++)
                 {
                     var col = i < t.Columns.Count ? t.Columns[i] : null;
-                    _sb.Append("<td").Append(col is { Right: true } ? " style=\"text-align:right\"" : "").Append('>');
+                    // data-label: on a phone each cell names its column (admin.css turns the row into a card).
+                    _sb.Append("<td").Append(col is { Right: true } ? " style=\"text-align:right\"" : "").Append(col is { Header.Length: > 0 } ? " data-label=\"" + E(col.Header) + "\"" + (i == t.Columns.ToList().FindIndex(c => c.Header.Length > 0) ? " data-primary" : "") : "").Append('>');
                     if (col is { Actions: true }) _sb.Append("<div class=\"actions\">");
                     Node(r.Cells[i]);
                     if (col is { Actions: true }) _sb.Append("</div>");

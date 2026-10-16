@@ -793,7 +793,7 @@ internal static partial class ShopPublic
         if (name) sb.Append($"<div><label>{E(ctx.T("shop.fullName"))}</label><input type=\"text\" name=\"{prefix}name\" value=\"{E(a.Name)}\" autocomplete=\"name\"></div>");
         sb.Append($"<div><label>{E(ctx.T("shop.street"))}</label><input type=\"text\" name=\"{prefix}line1\" value=\"{E(a.Line1)}\" autocomplete=\"address-line1\"></div>");
         sb.Append($"<div><label>{E(ctx.T("shop.street2"))}</label><input type=\"text\" name=\"{prefix}line2\" value=\"{E(a.Line2)}\" autocomplete=\"address-line2\"></div>");
-        sb.Append($"<div class=\"shop-row\"><div><label>{E(ctx.T("shop.zip"))}</label><input type=\"text\" name=\"{prefix}zip\" value=\"{E(a.Zip)}\" autocomplete=\"postal-code\"></div>");
+        sb.Append($"<div class=\"shop-row shop-zipcity\"><div><label>{E(ctx.T("shop.zip"))}</label><input type=\"text\" name=\"{prefix}zip\" value=\"{E(a.Zip)}\" autocomplete=\"postal-code\"></div>");
         sb.Append($"<div><label>{E(ctx.T("shop.city"))}</label><input type=\"text\" name=\"{prefix}city\" value=\"{E(a.City)}\" autocomplete=\"address-level2\"></div></div>");
         sb.Append($"<div><label>{E(ctx.T("shop.country"))}</label>{Select(prefix + "country", string.IsNullOrEmpty(a.Country) ? "DE" : a.Country, CountryOptions(ctx.Locale))}</div>");
         return sb.ToString();

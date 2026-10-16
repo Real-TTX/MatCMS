@@ -1852,3 +1852,37 @@ li.CodeMirror-hint-active { background: var(--accent); color: #fff; }
 table.data tr:has(.ui-dot-err) td { background: var(--err-bg); }
 table.data tr:has(.ui-dot-err) td:first-child { box-shadow: inset 3px 0 0 #d64545; }
 table.data tr:has(.ui-dot-err) td strong { color: var(--err-fg); }
+
+/* A plugin's table (Ui.Table) on a phone: every row is a card, every cell names its column (data-label). Sideways scrolling hid the very columns a list is read for — status, total, the buttons. */
+@media (max-width: 700px) {
+    table.data[data-stack], table.data[data-stack] tbody { display: block; width: 100%; }
+    table.data[data-stack] thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+    table.data[data-stack] tr { display: block; padding: 8px 0 10px; border-bottom: 1px solid var(--line); }
+    table.data[data-stack] tr[hidden] { display: none; }
+    table.data[data-stack] tr.list-empty-row td { display: block; text-align: left !important; }
+    table.data[data-stack] td { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; width: auto !important; padding: 4px 14px; border: 0; white-space: normal !important; text-align: right !important; overflow-wrap: anywhere; }
+    table.data[data-stack] td[data-label]::before { content: attr(data-label); flex: none; max-width: 42%; text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+    /* No column name: a status light, a picture or the row's buttons — the buttons get a line of their own, the rest sits at the card's corner. */
+    /* The first named column is what the row IS (the number, the product, the customer): no label, left, larger. */
+    table.data[data-stack] td[data-primary] { justify-content: flex-start; text-align: left !important; font-size: 15.5px; font-weight: 600; }
+    table.data[data-stack] td[data-primary]::before { display: none; }
+    table.data[data-stack] td:not([data-label]) { justify-content: flex-start; text-align: left !important; }
+    table.data[data-stack] td:first-child:not([data-label]):not(:last-child) { float: right; padding: 4px 14px 0 0; background: transparent !important; box-shadow: none !important; border: 0 !important; }
+    table.data[data-stack] td:last-child .actions { justify-content: flex-start; flex-wrap: wrap; }
+    table.data[data-stack] td:last-child:not([data-label]) { padding-top: 8px; }
+    .table-scroll:has(> table[data-stack]) { overflow-x: visible; }
+}
+
+/* A row editor on a phone: each row is a small form — the name on its own line, the other fields two by two with their names above them. Squeezing six columns into 390px cut the names to two letters. */
+@media (max-width: 700px) {
+    .row-editor table.data, .row-editor table.data tbody { display: block; width: 100%; }
+    .row-editor table.data thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+    .row-editor table.data tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 10px; padding: 12px; border-bottom: 1px solid var(--line); }
+    .row-editor table.data tr:last-child { border-bottom: 0; }
+    .row-editor table.data td { display: block; padding: 0; border: 0; min-width: 0; }
+    .row-editor table.data td[data-label]::before { content: attr(data-label); display: block; margin-bottom: 3px; font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+    .row-editor table.data td:first-child, .row-editor table.data td:has(.row-img) { grid-column: 1 / -1; }
+    .row-editor table.data td.row-end { grid-column: 1 / -1; width: auto; text-align: right; }
+    .row-editor table.data td.row-end::before { display: none; }
+    .row-editor table.data td input[type=text] { min-height: 40px; }
+}

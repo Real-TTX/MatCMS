@@ -20,7 +20,6 @@ public class AiService
     private readonly SecretProtector _secrets;
     private readonly IHttpClientFactory _http;
     private readonly ILogger<AiService> _log;
-    private readonly ChatGptClient _chatgpt;
     private readonly ChatGptAuthService _chatgptAuth;
 
     /// <summary>Hard ceiling on completion length regardless of what an instance asks for — bounds the
@@ -34,13 +33,12 @@ public class AiService
     private static readonly string[] AttachmentTypes = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
 
     public AiService(AppDbContext db, SecretProtector secrets, IHttpClientFactory http, ILogger<AiService> log,
-        ChatGptClient chatgpt, ChatGptAuthService chatgptAuth)
+        ChatGptAuthService chatgptAuth)
     {
         _db = db;
         _secrets = secrets;
         _http = http;
         _log = log;
-        _chatgpt = chatgpt;
         _chatgptAuth = chatgptAuth;
     }
 
@@ -148,160 +146,11 @@ public class AiService
             return new AiResponse { Ok = false, Error = "Leere KI-Anfrage." };
 
         // The signed-in ChatGPT account: its backend takes no length cap, so MaxTokens is not passed on there.
-        if (cfg.IsChatGpt)
-        {
-            var answer = await _chatgpt.CompleteAsync(cfg.Model, req.Messages, ct);
-            answer.Model ??= cfg.Model;
-            return answer;
-        }
+        if (cfg.IsChatGpt) return await _chatgptAuth.CompleteAsync(cfg.Model, req.Messages, ct);
 
-        var maxTokens = Math.Clamp(req.MaxTokens ?? 2000, 16, MaxCompletionTokens);
-        // What the provider may refuse, learned per call: providers differ in the name of the length cap (newer OpenAI
-        // models want max_completion_tokens), in whether they take a temperature at all (reasoning models do not), in JSON
-        // mode and in pictures (DeepSeek reads text only). A refusal that names one of these is retried without it rather
-        // than failing the whole action — each switch flips once, so this ends after a handful of attempts at most.
-        var useCompletionTokens = false;
-        var useTemperature = true;
-        var useJson = req.Json;
-        var useAttachments = req.Messages.Any(m => m.Attachments is { Count: > 0 });
-        string? note = null;
-        try
-        {
-            for (var attempt = 0; attempt < 5; attempt++)
-            {
-                var payload = new System.Text.Json.Nodes.JsonObject
-                {
-                    ["model"] = cfg.Model,
-                    ["messages"] = BuildMessages(req.Messages, useAttachments),
-                    [useCompletionTokens ? "max_completion_tokens" : "max_tokens"] = maxTokens,
-                };
-                if (useTemperature) payload["temperature"] = 0.4;
-                if (useJson) payload["response_format"] = new System.Text.Json.Nodes.JsonObject { ["type"] = "json_object" };
-
-                var client = _http.CreateClient();
-                // AI completions routinely exceed the 30s mail cap, and a reasoning model writing a whole page thinks first.
-                client.Timeout = TimeSpan.FromSeconds(280);
-                using var httpReq = new HttpRequestMessage(HttpMethod.Post, $"{cfg.BaseUrl}/chat/completions");
-                httpReq.Headers.Add("Authorization", $"Bearer {cfg.ApiKey}");
-                httpReq.Content = new StringContent(payload.ToJsonString(), Encoding.UTF8, "application/json");
-
-                using var resp = await client.SendAsync(httpReq, ct);
-                var raw = await resp.Content.ReadAsStringAsync(ct);
-                if (!resp.IsSuccessStatusCode)
-                {
-                    var status = (int)resp.StatusCode;
-                    var why = ProviderError(raw);
-                    var lower = why.ToLowerInvariant();
-                    if (status is 400 or 422)
-                    {
-                        if (!useCompletionTokens && lower.Contains("max_tokens")) { useCompletionTokens = true; continue; }
-                        if (useTemperature && lower.Contains("temperature")) { useTemperature = false; continue; }
-                        if (useJson && (lower.Contains("response_format") || lower.Contains("json"))) { useJson = false; continue; }
-                        if (useAttachments && (lower.Contains("image") || lower.Contains("file") || lower.Contains("variant") || lower.Contains("content")))
-                        {
-                            useAttachments = false;
-                            note = "Dieses Modell kann angehängte Bilder und PDFs nicht lesen – sie wurden weggelassen.";
-                            continue;
-                        }
-                    }
-                    _log.LogWarning("AI call failed: {Status} {Body}", status, Trunc(raw));
-                    return new AiResponse { Ok = false, Error = $"Anbieter-Fehler {status}: {why}", Model = cfg.Model };
-                }
-
-                using var doc = JsonDocument.Parse(raw);
-                var root = doc.RootElement;
-                var choice = root.GetProperty("choices")[0];
-                var text = ContentText(choice.GetProperty("message"));
-                var finish = choice.TryGetProperty("finish_reason", out var fr) && fr.ValueKind == JsonValueKind.String ? fr.GetString() : null;
-                int prompt = 0, completion = 0;
-                if (root.TryGetProperty("usage", out var usage))
-                {
-                    if (usage.TryGetProperty("prompt_tokens", out var p) && p.ValueKind == JsonValueKind.Number) prompt = p.GetInt32();
-                    if (usage.TryGetProperty("completion_tokens", out var c) && c.ValueKind == JsonValueKind.Number) completion = c.GetInt32();
-                }
-                // An empty answer is a failure, not a success with nothing in it: every caller would otherwise report "the AI had
-                // no suggestion". With a reasoning model it nearly always means the cap was spent on thinking.
-                if (string.IsNullOrWhiteSpace(text))
-                    return new AiResponse
-                    {
-                        Ok = false, PromptTokens = prompt, CompletionTokens = completion, Model = cfg.Model,
-                        Error = finish == "length"
-                            ? "Die KI hat ihr Längenlimit erreicht, bevor sie antworten konnte (bei Denk-Modellen zählt das Nachdenken mit)."
-                            : "Die KI hat eine leere Antwort geliefert.",
-                    };
-                if (finish == "length")
-                    note = (note is null ? "" : note + " ") + "Die Antwort wurde am Längenlimit abgeschnitten.";
-                return new AiResponse { Ok = true, Text = text, PromptTokens = prompt, CompletionTokens = completion, Model = cfg.Model, Note = note };
-            }
-            return new AiResponse { Ok = false, Error = "Der KI-Anbieter hat die Anfrage wiederholt abgelehnt.", Model = cfg.Model };
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
-        {
-            _log.LogWarning(ex, "AI call threw");
-            return new AiResponse { Ok = false, Error = ex is TaskCanceledException
-                ? "Die KI hat nicht rechtzeitig geantwortet."
-                : $"KI-Aufruf fehlgeschlagen: {ex.Message}", Model = cfg.Model };
-        }
-    }
-
-    /// <summary>The messages in chat-completions form. A message with files becomes a list of parts (its text, then each
-    /// picture as a data URL, each PDF as a file part); without, or with files switched off, it stays a plain string — the
-    /// one shape every OpenAI-compatible provider understands. Switched off, a picture leaves a line saying it was there.</summary>
-    private static System.Text.Json.Nodes.JsonArray BuildMessages(IEnumerable<AiMessage> messages, bool withAttachments)
-    {
-        var arr = new System.Text.Json.Nodes.JsonArray();
-        foreach (var m in messages)
-        {
-            var role = NormalizeRole(m.Role);
-            var files = m.Attachments ?? new();
-            if (files.Count == 0 || role != "user")
-            {
-                arr.Add(new System.Text.Json.Nodes.JsonObject { ["role"] = role, ["content"] = m.Content ?? "" });
-                continue;
-            }
-            if (!withAttachments)
-            {
-                var names = string.Join(", ", files.Select(f => f.Name));
-                arr.Add(new System.Text.Json.Nodes.JsonObject { ["role"] = role, ["content"] = (m.Content ?? "") + $"\n\n[Angehängt, für dieses Modell nicht lesbar: {names}]" });
-                continue;
-            }
-            var parts = new System.Text.Json.Nodes.JsonArray { new System.Text.Json.Nodes.JsonObject { ["type"] = "text", ["text"] = m.Content ?? "" } };
-            foreach (var f in files)
-            {
-                var dataUrl = $"data:{f.MediaType};base64,{f.Data}";
-                parts.Add(f.Kind == "file"
-                    ? new System.Text.Json.Nodes.JsonObject { ["type"] = "file", ["file"] = new System.Text.Json.Nodes.JsonObject { ["filename"] = f.Name, ["file_data"] = dataUrl } }
-                    : new System.Text.Json.Nodes.JsonObject { ["type"] = "image_url", ["image_url"] = new System.Text.Json.Nodes.JsonObject { ["url"] = dataUrl } });
-            }
-            arr.Add(new System.Text.Json.Nodes.JsonObject { ["role"] = role, ["content"] = parts });
-        }
-        return arr;
-    }
-
-    /// <summary>The answer text of a chat-completions message: a string, or (some providers) a list of parts.</summary>
-    private static string ContentText(JsonElement message)
-    {
-        if (!message.TryGetProperty("content", out var c)) return "";
-        if (c.ValueKind == JsonValueKind.String) return c.GetString() ?? "";
-        if (c.ValueKind != JsonValueKind.Array) return "";
-        var sb = new StringBuilder();
-        foreach (var part in c.EnumerateArray())
-            if (part.TryGetProperty("text", out var t) && t.ValueKind == JsonValueKind.String) sb.Append(t.GetString());
-        return sb.ToString();
-    }
-
-    private static string NormalizeRole(string? r) => r is "system" or "assistant" ? r! : "user";
-    private static string Trunc(string s) => s.Length > 600 ? s[..600] : s;
-
-    private static string ProviderError(string raw)
-    {
-        try
-        {
-            using var d = JsonDocument.Parse(raw);
-            if (d.RootElement.TryGetProperty("error", out var e) && e.TryGetProperty("message", out var m))
-                return m.GetString() ?? "";
-        }
-        catch { /* not JSON */ }
-        return Trunc(raw);
+        // An API key: OpenAI or any compatible server. The model is the CLOUD's, not the instance's. One implementation, shared with
+        // the CMS's own-key provider (MatCMS.Shared.Ai).
+        return await MatCMS.Shared.Ai.ChatCompletionsClient.CompleteAsync(_http.CreateClient(), cfg.BaseUrl, cfg.ApiKey, cfg.Model, req,
+            MaxCompletionTokens, m => _log.LogWarning("{Message}", m), ct);
     }
 }

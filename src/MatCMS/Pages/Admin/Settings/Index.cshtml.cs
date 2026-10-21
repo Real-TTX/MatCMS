@@ -13,16 +13,28 @@ public class IndexModel : PageModel
     private readonly EmailService _email;
     private readonly CloudService _cloud;
     private readonly CloudSyncService _sync;
+    private readonly OwnAi _ownAi;
+    private readonly SiteChatGptAccount _chatgpt;
+    private readonly IAiTransport _ai;
     public CloudState CloudState { get; }
 
-    public IndexModel(AppDbContext db, EmailService email, CloudService cloud, CloudSyncService sync, CloudState cloudState)
+    public IndexModel(AppDbContext db, EmailService email, CloudService cloud, CloudSyncService sync, CloudState cloudState,
+        OwnAi ownAi, SiteChatGptAccount chatgpt, IAiTransport ai)
     {
         _db = db;
         _email = email;
         _cloud = cloud;
         _sync = sync;
         CloudState = cloudState;
+        _ownAi = ownAi;
+        _chatgpt = chatgpt;
+        _ai = ai;
     }
+
+    /// <summary>The site's own AI connection (KI tab). The key is never rendered back — only whether one is stored.</summary>
+    public OwnAi.Config AiOwn { get; private set; } = new("", "", "", "", false, "");
+    /// <summary>Whether the cloud profile switched the relay on — the way AI goes when the site has no connection of its own.</summary>
+    public bool AiViaCloud { get; private set; }
 
     /// <summary>Current cloud link (Cloud tab). The token is never rendered back — only whether one
     /// is stored — so it cannot be read out of the page source.</summary>
@@ -96,6 +108,8 @@ public class IndexModel : PageModel
             .OrderBy(p => p.Title).ToListAsync();
         Cloud = await _cloud.GetSettingsAsync();
         if (Cloud.Configured) SyncReport = await _sync.LastReportAsync() ?? new();
+        AiOwn = await _ownAi.GetAsync(HttpContext.RequestAborted);
+        AiViaCloud = existing.TryGetValue(SettingKeys.AiTransport, out var at) && at == "cloud";
 
         if (preview && Cloud.Configured)
         {
@@ -103,6 +117,59 @@ public class IndexModel : PageModel
             if (result.Ok) Preview = result.Report;
             else TempData["FlashError"] = $"Vorschau nicht möglich: {result.Error}";
         }
+    }
+
+    // --- The site's own AI connection (KI tab) ------------------------------------------------------------
+    // Its own handlers, not SaveKeysAsync: the key is encrypted, an empty key field means keep (the stored one is never sent to
+    // the page), and the ChatGPT sign-in is a little dialog of its own (start, poll, sign out) answered as JSON.
+
+    public async Task<IActionResult> OnPostAiAsync(string? provider, string? baseUrl, string? model, string? apiKey, bool clearKey, string? chatgptModel)
+    {
+        var p = provider is "openai" or "chatgpt" ? provider : "";
+        await _ownAi.SetAsync(SettingKeys.AiOwnProvider, p);
+        await _ownAi.SetAsync(SettingKeys.AiOwnBaseUrl, (baseUrl ?? "").Trim().TrimEnd('/'));
+        await _ownAi.SetAsync(SettingKeys.AiOwnModel, (model ?? "").Trim());
+        await _ownAi.SetAsync(SettingKeys.AiOwnChatGptModel, (chatgptModel ?? "").Trim());
+        if (clearKey) await _ownAi.SetAsync(SettingKeys.AiOwnApiKey, "");
+        else if (!string.IsNullOrWhiteSpace(apiKey)) await _ownAi.SetAsync(SettingKeys.AiOwnApiKey, _ownAi.Protect(apiKey.Trim()));
+        TempData["Flash"] = "KI-Verbindung gespeichert.";
+        return RedirectToPage(new { tab = "ai" });
+    }
+
+    /// <summary>A short call through whatever this site uses now (own key, own ChatGPT account or the cloud).</summary>
+    public async Task<IActionResult> OnPostAiTestAsync()
+    {
+        var r = await _ai.SendAsync(new AiRequest
+        {
+            Purpose = "test", MaxTokens = 1500,
+            Messages =
+            {
+                new AiMessage { Role = "system", Content = "Antworte in einem kurzen deutschen Satz." },
+                new AiMessage { Role = "user", Content = "Sag Hallo und nenne den Namen des Modells, das gerade antwortet." },
+            },
+        }, HttpContext.RequestAborted);
+        return new JsonResult(new { ok = r.Ok, text = r.Text, error = r.Error, model = r.Model, note = r.Note });
+    }
+
+    public async Task<IActionResult> OnPostAiChatGptLoginAsync()
+    {
+        var (_, error) = await _chatgpt.StartLoginAsync(HttpContext.RequestAborted);
+        var status = await _chatgpt.GetStatusAsync(poll: false, HttpContext.RequestAborted);
+        return new JsonResult(new { ok = error is null, error, status = MatCMS.Shared.Ai.ChatGptAccount.StatusJson(status) });
+    }
+
+    /// <summary>Polled by the tab while a login runs: advances it at most one step per OpenAI interval, then lists the models.</summary>
+    public async Task<IActionResult> OnGetAiChatGptStatusAsync()
+    {
+        var status = await _chatgpt.GetStatusAsync(poll: true, HttpContext.RequestAborted);
+        var models = status.Connected ? await _chatgpt.ListModelsAsync(HttpContext.RequestAborted) : null;
+        return new JsonResult(MatCMS.Shared.Ai.ChatGptAccount.StatusJson(status, models));
+    }
+
+    public async Task<IActionResult> OnPostAiChatGptLogoutAsync()
+    {
+        await _chatgpt.LogoutAsync(HttpContext.RequestAborted);
+        return new JsonResult(new { ok = true });
     }
 
     // --- MatCMS.Cloud link (Cloud tab) --------------------------------------

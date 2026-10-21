@@ -311,6 +311,65 @@ public class AssistantTests : IClassFixture<AssistantApp>
     }
 
     [Fact]
+    public void An_svg_keeps_its_drawing_and_loses_everything_that_could_run()
+    {
+        var dirty = """
+            <?xml version="1.0"?>
+            <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 10 10" onload="alert(1)">
+              <script>alert(2)</script>
+              <style>@import url(https://evil.example/x.css); .a{fill:red}</style>
+              <defs><linearGradient id="g"><stop offset="0" stop-color="#f00"/></linearGradient></defs>
+              <a href="javascript:alert(3)"><rect width="10" height="10" fill="url(#g)"/></a>
+              <circle cx="5" cy="5" r="3" style="fill:url(https://evil.example/p)" onclick="x()"/>
+              <use xlink:href="#g"/><use href="https://evil.example/s.svg#x"/>
+              <image href="data:image/png;base64,AAAA"/>
+              <foreignObject><div xmlns="http://www.w3.org/1999/xhtml">html</div></foreignObject>
+              <text x="1" y="9">Röstkunst</text>
+            </svg>
+            """;
+        var clean = SafeSvg.Sanitize(dirty)!;
+        foreach (var bad in new[] { "script", "onload", "onclick", "javascript:", "evil.example", "@import", "foreignObject", "<image", "<a " })
+            Assert.DoesNotContain(bad, clean, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("viewBox=\"0 0 10 10\"", clean);
+        Assert.Contains("fill=\"url(#g)\"", clean);
+        Assert.Contains("Röstkunst", clean);
+        Assert.Contains("href=\"#g\"", clean);
+        Assert.Null(SafeSvg.Sanitize("<html><body>kein svg</body></html>"));
+        Assert.Null(SafeSvg.Sanitize("<!DOCTYPE svg [<!ENTITY x \"y\">]><svg xmlns=\"http://www.w3.org/2000/svg\">&x;</svg>"));
+    }
+
+    [Fact]
+    public async Task An_uploaded_svg_is_cleaned_and_served_so_it_cannot_run_and_the_ai_can_draw_a_logo_and_set_it()
+    {
+        var admin = await AdminAsync();
+        var form = new MultipartFormDataContent();
+        var part = new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 4 4\" onload=\"alert(1)\"><rect width=\"4\" height=\"4\"/></svg>"));
+        part.Headers.ContentType = new MediaTypeHeaderValue("image/svg+xml");
+        form.Add(part, "file", "logo.svg");
+        var up = await admin.PostAsync("/admin/api/upload", form);
+        Assert.Equal(HttpStatusCode.OK, up.StatusCode);
+        var url = JsonNode.Parse(await up.Content.ReadAsStringAsync())!["url"]!.GetValue<string>();
+        var served = await _app.Browser().GetAsync(url);
+        Assert.Equal("image/svg+xml", served.Content.Headers.ContentType!.MediaType);
+        Assert.Contains("default-src 'none'", served.Headers.GetValues("Content-Security-Policy").Single());
+        Assert.DoesNotContain("onload", await served.Content.ReadAsStringAsync());
+
+        _app.Ai.Say(
+            """{"message":"","actions":[{"tool":"create_svg","args":{"name":"Logo Bergblick","alt":"Logo","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 120 40\"><script>x</script><text x=\"0\" y=\"30\">Bergblick</text></svg>"}}],"done":false}""",
+            """{"message":"","actions":[{"tool":"list_media","args":{"search":"logo-bergblick"}}],"done":false}""");
+        var (convId, steps, _) = await SendAsync(admin, "Zeichne ein Logo.");
+        var made = Kind(steps, "action").First()["data"]!;
+        Assert.True(made["ok"]!.GetValue<bool>());
+        var logo = made["result"]!["url"]!.GetValue<string>();
+        Assert.DoesNotContain("script", await (await _app.Browser().GetAsync(logo)).Content.ReadAsStringAsync());
+
+        _app.Ai.Say("""{"message":"Logo gesetzt.","actions":[{"tool":"update_settings","args":{"logoUrl":"LOGO","faviconUrl":"LOGO"}}],"done":true}""".Replace("LOGO", logo));
+        await SendAsync(admin, "Setz es als Logo und Favicon.", convId);
+        Assert.Equal(logo, _app.Use(db => db.SiteSettings.First(s => s.Key == SettingKeys.LogoUrl).Value));
+        Assert.Equal(logo, _app.Use(db => db.SiteSettings.First(s => s.Key == SettingKeys.FaviconUrl).Value));
+    }
+
+    [Fact]
     public void Links_the_assistant_may_write()
     {
         foreach (var ok in new[] { "/kontakt", "#faq", "https://example.de", "mailto:a@b.de", "tel:+49123" })

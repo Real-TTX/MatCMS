@@ -27,7 +27,7 @@
 <div class="tab-panel" data-panel="chat" hidden="@(Model.Tab != "chat")">
     @if (!Model.Enabled)
     {
-        <div class="alert alert-info">@T["assistant.disabledLong"]</div>
+        <div class="alert alert-info">@T["assistant.disabledLong"] <a href="/admin/settings?tab=ai">@T["settings.tabAi"] →</a></div>
     }
     <div class="ai-wrap" id="ai"
          data-id="@(c?.Id)" data-page="@Model.ScopePageId" data-block="@Model.ScopeBlockId"

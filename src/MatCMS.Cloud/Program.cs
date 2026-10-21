@@ -127,10 +127,9 @@ builder.Services.AddScoped<CloudContext>();
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<AiService>();
 // "Mit ChatGPT anmelden": the endpoints and the running login outlive a request (one process = one refresh-token user at a time).
-builder.Services.AddSingleton(sp => ChatGptEndpoints.From(sp.GetRequiredService<IConfiguration>()));
-builder.Services.AddSingleton<ChatGptLoginState>();
+builder.Services.AddSingleton(sp => ChatGptEndpointsConfig.From(sp.GetRequiredService<IConfiguration>()));
+builder.Services.AddSingleton<MatCMS.Shared.Ai.ChatGptLoginState>();
 builder.Services.AddScoped<ChatGptAuthService>();
-builder.Services.AddScoped<ChatGptClient>();
 builder.Services.AddScoped<InstanceService>();
 builder.Services.AddScoped<StatsService>();
 builder.Services.AddScoped<HostImagesService>();

@@ -29,16 +29,18 @@ public sealed class AssistantTools
     private readonly AppDbContext _db;
     private readonly AssistantBlocks _blocks;
     private readonly Localizer _t;
+    private readonly AssistantFiles _files;
 
     public int ConversationId { get; set; }
     public int Run { get; set; }
     public AssistantScope Scope { get; set; } = new(null, null, false);
 
-    public AssistantTools(AppDbContext db, AssistantBlocks blocks, Localizer t)
+    public AssistantTools(AppDbContext db, AssistantBlocks blocks, Localizer t, AssistantFiles files)
     {
         _db = db;
         _blocks = blocks;
         _t = t;
+        _files = files;
     }
 
     /// <summary>The tools as the prompt describes them: name, arguments, what it does. The order is the order a sensible
@@ -59,7 +61,8 @@ public sealed class AssistantTools
         ("delete_page", "{\"page\"}", "Seite löschen (nicht die Startseite).", true),
         ("set_menu", "{\"menu\": \"header\"|\"footer\"|…, \"locale\"?, \"items\": [{\"label\", \"url\", \"children\"?: […], \"newTab\"?: false}]}", "Ein Menü komplett neu setzen (Plugin-Einträge wie Warenkorb bleiben erhalten).", true),
         ("update_theme", "{\"values\": {\"AccentColor\"?, \"SecondaryColor\"?, \"HeadingColor\"?, \"TextColor\"?, \"BackgroundColor\"?, \"AltBackground\"?, \"HeaderBackground\"?, \"HeaderTextColor\"?, \"HeadingFont\"?, \"BodyFont\"?, \"ButtonStyle\"?, \"ButtonRadius\"?, \"ContainerWidth\"?, \"HeaderPadding\"?}, \"params\"?: {id: wert}, \"customCss\"?: \"…\" (ersetzt), \"appendCss\"?: \"…\" (hängt an)}", "Design des aktiven Templates ändern.", true),
-        ("update_settings", "{\"siteName\"?, \"footerText\"?, \"logoUrl\"?, \"contactRecipient\"?}", "Grundeinstellungen der Website.", true),
+        ("create_svg", "{\"name\": \"logo\", \"svg\": \"<svg xmlns=\\\"http://www.w3.org/2000/svg\\\" viewBox=\\\"0 0 200 60\\\">…</svg>\", \"alt\"?: \"…\"}", "Eine Grafik als SVG zeichnen (Logo, Icon, Illustration) und in die Mediathek legen. Die url danach als Bild, Logo (update_settings logoUrl) oder Favicon verwenden. Nur Zeichenelemente; Skripte, Links nach außen und eingebettete Bilder werden entfernt.", true),
+        ("update_settings", "{\"siteName\"?, \"footerText\"?, \"logoUrl\"?, \"faviconUrl\"?, \"contactRecipient\"?}", "Grundeinstellungen der Website (Logo und Favicon aus der Mediathek, auch SVG).", true),
     ];
 
     private static readonly HashSet<string> WriteTools = Catalog.Where(c => c.Writes).Select(c => c.Name).ToHashSet();
@@ -86,6 +89,7 @@ public sealed class AssistantTools
                 "set_menu" => await SetMenuAsync(args, ct),
                 "update_theme" => await UpdateThemeAsync(args, ct),
                 "update_settings" => await UpdateSettingsAsync(args, ct),
+                "create_svg" => await CreateSvgAsync(args, ct),
                 _ => Fail($"Unbekanntes Werkzeug „{tool}“.", $"Es gibt kein Werkzeug \"{tool}\". Verfügbar: {string.Join(", ", Catalog.Select(c => c.Name))}."),
             };
         }
@@ -635,6 +639,7 @@ public sealed class AssistantTools
         ("siteName", SettingKeys.SiteName, "Name der Website"),
         ("footerText", SettingKeys.FooterText, "Fußzeilentext"),
         ("logoUrl", SettingKeys.LogoUrl, "Logo"),
+        ("faviconUrl", SettingKeys.FaviconUrl, "Favicon"),
         ("contactRecipient", SettingKeys.ContactRecipient, "Empfänger Kontaktformular"),
     ];
 
@@ -648,7 +653,7 @@ public sealed class AssistantTools
         {
             if (!args.ContainsKey(arg)) continue;
             var value = Str(args[arg]).Trim();
-            if (arg == "logoUrl" && value.Length > 0 && !media.Contains(value, StringComparer.OrdinalIgnoreCase)) { warnings.Add($"logoUrl \"{value}\" ist nicht in der Mediathek – ignoriert."); continue; }
+            if (arg is "logoUrl" or "faviconUrl" && value.Length > 0 && !media.Contains(value, StringComparer.OrdinalIgnoreCase)) { warnings.Add($"{arg} \"{value}\" ist nicht in der Mediathek – ignoriert."); continue; }
             if (arg == "contactRecipient" && value.Length > 0 && !System.Net.Mail.MailAddress.TryCreate(value, out _)) { warnings.Add($"\"{value}\" ist keine E-Mail-Adresse – ignoriert."); continue; }
             var row = await _db.SiteSettings.FirstOrDefaultAsync(s => s.Key == key, ct);
             Journal("setting", key, row is null ? null : JsonSerializer.Serialize(row.Value));
@@ -658,6 +663,30 @@ public sealed class AssistantTools
         }
         await _db.SaveChangesAsync(ct);
         return Ok(changed.Count == 0 ? "Einstellungen: nichts geändert" : $"Einstellungen geändert: {string.Join(", ", changed)}", new JsonObject { ["changed"] = changed.Count }, warnings, null, changed: changed.Count > 0);
+    }
+
+    /// <summary>The assistant draws a picture itself: its SVG is rebuilt by <see cref="SafeSvg"/> (drawing elements only) and goes
+    /// into the media library like an upload. What the cleaning dropped is said, so a model that tried an embedded photo or a
+    /// font from outside knows why it is missing.</summary>
+    private async Task<ToolOutcome> CreateSvgAsync(JsonObject args, CancellationToken ct)
+    {
+        RequireUnlocked("neue Grafiken in die Mediathek legen");
+        var svg = Str(args["svg"]).Trim();
+        if (svg.Length == 0) throw new ToolError("Keine Grafik", "svg fehlt (der SVG-Code).");
+        var safe = SafeSvg.Sanitize(svg) ?? throw new ToolError("Kein gültiges SVG", "Das ist kein gültiges SVG (wohlgeformtes XML mit <svg> als Wurzel, xmlns=\"http://www.w3.org/2000/svg\").");
+        var warnings = new List<string>();
+        if (safe.Length < svg.Length * 0.8)
+            warnings.Add("Beim Säubern ist ein Teil weggefallen (z. B. Skripte, eingebettete Bilder, Links oder Schriften von außen). Nur Zeichenelemente bleiben erhalten.");
+        if (!safe.Contains("viewBox")) warnings.Add("Ohne viewBox skaliert die Grafik schlecht – setze viewBox auf dem <svg>.");
+        var name = Pages.Admin.Pages.IndexModel.Slugify(Str(args["name"])) is { Length: > 0 } n ? n : "grafik";
+        var url = await _files.SaveSvgAsync(safe, name + ".svg", ct);
+        var media = await _db.Media.FirstAsync(m => m.Url == url, ct);
+        if (Str(args["alt"]) is { Length: > 0 } alt) media.Alt = Cap(alt, 300);
+        media.Tags = "KI-Grafik";
+        Journal("media", media.Id.ToString(), null);
+        await _db.SaveChangesAsync(ct);
+        _blocks.KnowMedia(url);
+        return Ok($"Grafik „{name}.svg“ gezeichnet und in die Mediathek gelegt", new JsonObject { ["url"] = url, ["chars"] = safe.Length }, warnings, null, changed: true);
     }
 
     // ============================================================================================== journal (for undo)

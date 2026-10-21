@@ -19,8 +19,16 @@ public class AiService
         _transport = transport;
     }
 
-    /// <summary>True when AI is switched on for this site (rolled out from the cloud profile).</summary>
-    public bool Enabled => _site.Get(SettingKeys.AiTransport) is "cloud";
+    /// <summary>True when this site has AI: its own connection (Einstellungen → KI) is set up, or the cloud profile switched the
+    /// relay on. Read from the settings only — whether a key is still valid, the first call says.</summary>
+    public bool Enabled => OwnConfigured || _site.Get(SettingKeys.AiTransport) is "cloud";
+
+    private bool OwnConfigured => _site.Get(SettingKeys.AiOwnProvider) switch
+    {
+        "openai" => _site.Get(SettingKeys.AiOwnApiKey).Length > 0 && _site.Get(SettingKeys.AiOwnModel).Length > 0,
+        "chatgpt" => _site.Get(SettingKeys.AiOwnChatGptTokens).Length > 0 && _site.Get(SettingKeys.AiOwnChatGptModel).Length > 0,
+        _ => false,
+    };
 
     /// <summary>One call as it is, with the whole answer (model, tokens, the cloud's note). The assistant builds its own
     /// messages, including the cloud's instruction, so nothing is added here.</summary>
@@ -122,17 +130,9 @@ public class AiService
     }
 }
 
-/// <summary>How a model call leaves this site. The one implementation relays through the connected cloud, which holds the
-/// provider key; the seam exists so the tests can answer in its place without a cloud or a provider.</summary>
+/// <summary>How a model call leaves this site: <see cref="SiteAiTransport"/> (the site's own key or ChatGPT account, else the
+/// cloud relay). The seam exists so the tests can answer in its place without a cloud or a provider.</summary>
 public interface IAiTransport
 {
     Task<AiResponse> SendAsync(AiRequest request, CancellationToken ct = default);
-}
-
-/// <summary>The cloud relay (<c>POST /api/instances/{id}/ai</c>).</summary>
-public sealed class CloudAiTransport : IAiTransport
-{
-    private readonly CloudService _cloud;
-    public CloudAiTransport(CloudService cloud) => _cloud = cloud;
-    public Task<AiResponse> SendAsync(AiRequest request, CancellationToken ct = default) => _cloud.RelayAiAsync(request, ct);
 }

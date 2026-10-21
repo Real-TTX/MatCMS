@@ -55,10 +55,11 @@ public sealed class AssistantFiles
             try
             {
                 if (ImageExt.Contains(ext)) result.Add(await ImageAsync(conversationId, f, name, ext, ct));
+                else if (ext == ".svg") result.Add(await SvgAsync(f, name, ct));
                 else if (ext == ".pdf") result.Add(await DocumentAsync(f, name, ext, "pdf", ReadPdf, ct));
                 else if (ext == ".docx") result.Add(await DocumentAsync(f, name, ext, "document", ReadDocx, ct));
                 else if (TextExt.Contains(ext)) result.Add(await TextAsync(f, name, ct));
-                else result.Add(new(name, "text", null, null, null, "Dateityp wird nicht unterstützt (Bilder, PDF, DOCX, TXT, MD, CSV, JSON, HTML)."));
+                else result.Add(new(name, "text", null, null, null, "Dateityp wird nicht unterstützt (Bilder inkl. SVG, PDF, DOCX, TXT, MD, CSV, JSON, HTML)."));
             }
             catch (Exception ex)
             {
@@ -91,6 +92,22 @@ public sealed class AssistantFiles
         await image.SaveAsJpegAsync(Path.Combine(dir, file), new JpegEncoder { Quality = 82 }, ct);
         return new(name, "image", url, $"{conversationId}/{file}", null, null);
     }
+
+    /// <summary>An SVG (a logo, an icon): cleaned (<see cref="SafeSvg"/>) into the library, and its code goes to the model as text —
+    /// no model looks at an SVG as a picture, but every model reads its markup.</summary>
+    private async Task<AttachedFile> SvgAsync(IFormFile f, string name, CancellationToken ct)
+    {
+        if (f.Length > SafeSvg.MaxChars) return new(name, "image", null, null, null, "SVG zu groß (höchstens 1 MB).");
+        using var reader = new StreamReader(f.OpenReadStream());
+        var safe = SafeSvg.Sanitize(await reader.ReadToEndAsync(ct));
+        if (safe is null) return new(name, "image", null, null, null, "Kein gültiges SVG.");
+        var url = await SaveSvgAsync(safe, name, ct);
+        return new(name, "image", url, null, safe.Length > 20000 ? safe[..20000] + " …[gekürzt]" : safe, null);
+    }
+
+    /// <summary>Stores an ALREADY CLEANED SVG in the library (used for attachments and for the assistant's own drawings).</summary>
+    public Task<string> SaveSvgAsync(string cleanSvg, string name, CancellationToken ct) =>
+        SaveToLibraryAsync(System.Text.Encoding.UTF8.GetBytes(cleanSvg), name.EndsWith(".svg", StringComparison.OrdinalIgnoreCase) ? name : name + ".svg", ".svg", "image/svg+xml", ct);
 
     private async Task<AttachedFile> DocumentAsync(IFormFile f, string name, string ext, string kind, Func<byte[], string> read, CancellationToken ct)
     {

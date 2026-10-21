@@ -220,7 +220,12 @@ builder.Services.AddScoped<EmailService>();
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<FormGuard>();
 builder.Services.AddScoped<TranslationService>();
-builder.Services.AddScoped<IAiTransport, CloudAiTransport>();
+// AI: the site's own connection (API key or ChatGPT account, Einstellungen → KI) or the cloud relay. The ChatGPT login state is
+// ONE per process: a refresh token may be used by one caller at a time.
+builder.Services.AddScoped<OwnAi>();
+builder.Services.AddSingleton<MatCMS.Shared.Ai.ChatGptLoginState>();
+builder.Services.AddScoped<SiteChatGptAccount>();
+builder.Services.AddScoped<IAiTransport, SiteAiTransport>();
 builder.Services.AddScoped<AiService>();
 builder.Services.AddScoped<BlockGenerator>();
 // The AI assistant (Admin → KI-Assistent): the runner is ONE instance — it holds the queue and the running runs — and
@@ -530,7 +535,13 @@ app.UseStaticFiles(new StaticFileOptions
     FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(uploadsDir),
     RequestPath = "/uploads",
     OnPrepareResponse = ctx =>
-        ctx.Context.Response.Headers["X-Content-Type-Options"] = "nosniff"
+    {
+        ctx.Context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        // An SVG opened at its own address is a document: no script, no outside fetches, whatever is in it (SafeSvg cleans it
+        // on upload; this is the second wall).
+        if (ctx.File.Name.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
+            ctx.Context.Response.Headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; sandbox";
+    }
 });
 
 // Serve plugin asset files (uploaded JS/CSS libraries etc.) from appdata/plugin-assets at /plugin-assets.
@@ -919,12 +930,13 @@ app.MapPost("/admin/api/upload", async (HttpRequest request, IWebHostEnvironment
         return Results.BadRequest(new { error = "Keine Datei erhalten." });
 
     var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-    // SVG is intentionally excluded: it can carry active content (stored XSS on direct navigation).
-    string[] images = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
+    // SVG is a document that can carry script: it is accepted only REBUILT by SafeSvg (drawing elements only), and /uploads
+    // serves it with a CSP that forbids script on top (see the static-files options above).
+    string[] images = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"];
     string[] docs = [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".csv", ".zip"];
     var isImage = images.Contains(ext);
     if (!isImage && !docs.Contains(ext))
-        return Results.BadRequest(new { error = "Dateityp nicht erlaubt (Bilder: PNG/JPG/GIF/WEBP · Dateien: PDF, DOC(X), XLS(X), PPT(X), TXT, CSV, ZIP)." });
+        return Results.BadRequest(new { error = "Dateityp nicht erlaubt (Bilder: PNG/JPG/GIF/WEBP/SVG · Dateien: PDF, DOC(X), XLS(X), PPT(X), TXT, CSV, ZIP)." });
     // Images stay small; documents may be larger.
     var maxMb = isImage ? 8 : 25;
     if (file.Length > maxMb * 1024 * 1024)
@@ -933,8 +945,19 @@ app.MapPost("/admin/api/upload", async (HttpRequest request, IWebHostEnvironment
     var uploads = MatCMS.Services.StoragePaths.Uploads(env);
     Directory.CreateDirectory(uploads);
     var name = $"{Guid.NewGuid():N}{ext}";
-    await using (var stream = File.Create(Path.Combine(uploads, name)))
-        await file.CopyToAsync(stream);
+    long size = file.Length;
+    if (ext == ".svg")
+    {
+        string raw;
+        using (var reader = new StreamReader(file.OpenReadStream())) raw = await reader.ReadToEndAsync();
+        var safe = MatCMS.Services.SafeSvg.Sanitize(raw);
+        if (safe is null) return Results.BadRequest(new { error = "Die Datei ist kein gültiges SVG." });
+        await File.WriteAllTextAsync(Path.Combine(uploads, name), safe);
+        size = System.Text.Encoding.UTF8.GetByteCount(safe);
+    }
+    else
+        await using (var stream = File.Create(Path.Combine(uploads, name)))
+            await file.CopyToAsync(stream);
 
     var url = $"/uploads/{name}";
     // Record it in the media library, appended after existing media (highest SortOrder).
@@ -944,8 +967,8 @@ app.MapPost("/admin/api/upload", async (HttpRequest request, IWebHostEnvironment
     {
         Url = url,
         FileName = file.FileName,
-        ContentType = file.ContentType ?? "",
-        SizeBytes = file.Length,
+        ContentType = ext == ".svg" ? "image/svg+xml" : file.ContentType ?? "",
+        SizeBytes = size,
         SortOrder = nextOrder
     });
     await db.SaveChangesAsync();

@@ -357,7 +357,21 @@ through the cloud relay — the key never lives on the site.
 - **Cloud side** (`MatCMS.Cloud/Services/AiService.cs`): completion cap 16 000 and 280 s — a reasoning model spends the cap on thinking and
   came back EMPTY with the old 60/220/500-token caps, which is why the old actions "did not work"; an empty answer is now an error that says
   why. Refusals naming `max_tokens`, `temperature`, `response_format` or a picture are retried without it. `CloudProtocol.Version` 18.
-- Tests: `AssistantTests` (the whole app in memory, `FakeAi` in place of the relay).
+- **The site's OWN AI connection** (Einstellungen → KI, `Services/OwnAi.cs`) — MatCMS must work without a cloud: an API key (OpenAI or any
+  compatible server, e.g. DeepSeek) or a signed-in ChatGPT account (device code, like Codex). `SiteAiTransport` (the one `IAiTransport`)
+  uses it when set up, else the cloud relay; `AiService.Enabled` = own connection configured OR `ai.transport=cloud`. The provider code is
+  ONE implementation in `MatCMS.Shared/Ai/` (`ChatCompletionsClient`, `ChatGptAccount` + `IChatGptTokenStore`), used by the cloud too —
+  each app only stores the tokens its way. The keys (`SettingKeys.AiOwn`, `assistant.provider/apiBaseUrl/apiModel/apiKey/chatgptModel/
+  chatgptTokens`) are NOT under `ai.` (the cloud's group would overwrite them), key and sign-in are DataProtection-encrypted (purpose
+  `MatCMS.AiSecrets`), they are in `SettingKeys.Protected` (no rollout, content op or restore writes them) and **never in a backup**
+  (`ContentTransferService` leaves them out): a ChatGPT refresh token ROTATES and may be used once — a copy elsewhere kills the sign-in here.
+- **SVG** is allowed now (upload, assistant attachments, the assistant's own `create_svg` for logos/icons, `update_settings` logo +
+  favicon): `Services/SafeSvg.cs` REBUILDS the file from an allow-list (drawing elements and presentation attributes; script,
+  `foreignObject`, `image`, animation elements and every `on…` dropped; an unknown wrapper like `<a>` is unwrapped; references only `#id`;
+  no DTD), and `/uploads/*.svg` is served with `Content-Security-Policy: default-src 'none'; …; sandbox` as a second wall. An SVG is
+  never scaled (`ThumbnailService`) or read as a bitmap (`LoadImageAsync`, the shop's invoice logo stays a raster picture).
+- Tests: `AssistantTests` (the whole app in memory, `FakeAi` in place of the relay), `OwnAiTests` (shared provider clients, the KI tab,
+  encryption, backup exclusion).
 
 ## Conventions
 

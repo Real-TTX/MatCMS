@@ -134,6 +134,24 @@ public static class SettingKeys
     /// site's own editor wrote here. The cloud's <see cref="AiInstruction"/> still rides along, ahead of it.</summary>
     public const string AssistantPrompt = "assistant.prompt";
 
+    /// <summary>The site's OWN AI provider, set on the site (Einstellungen → KI), so AI works without a cloud: "" = through the
+    /// cloud (when its profile switches AI on, <see cref="AiTransport"/>), "openai" = an API key (OpenAI or any compatible
+    /// server, e.g. DeepSeek), "chatgpt" = a signed-in ChatGPT account (device code, like Codex). Own keys, not under <c>ai.</c>:
+    /// a cloud rollout writes that group and must never switch off what the site's operator set up here.</summary>
+    public const string AiOwnProvider = "assistant.provider";
+    public const string AiOwnBaseUrl = "assistant.apiBaseUrl";
+    public const string AiOwnModel = "assistant.apiModel";
+    /// <summary>The API key, DataProtection-encrypted (purpose <c>MatCMS.AiSecrets</c>) — readable only by this installation.</summary>
+    public const string AiOwnApiKey = "assistant.apiKey";
+    public const string AiOwnChatGptModel = "assistant.chatgptModel";
+    /// <summary>The ChatGPT sign-in (token document), DataProtection-encrypted. Its refresh token ROTATES and may be used once —
+    /// a copy on another site would invalidate this one on its first renewal, which is why it is in no backup.</summary>
+    public const string AiOwnChatGptTokens = "assistant.chatgptTokens";
+
+    /// <summary>The site's own AI connection: configured HERE and nowhere else. Never in a backup (a key and a sign-in belong to
+    /// this installation, and its encryption keys could not read them anywhere else), and protected from every outside writer.</summary>
+    public static readonly string[] AiOwn = [AiOwnProvider, AiOwnBaseUrl, AiOwnModel, AiOwnApiKey, AiOwnChatGptModel, AiOwnChatGptTokens];
+
     /// <summary>Whether finished backups are handed to the connected cloud. Off unless somebody says
     /// otherwise — uploading a customer's whole site somewhere is a decision, not a default.</summary>
     public const string BackupToCloud = "backup.toCloud";
@@ -247,5 +265,5 @@ public static class SettingKeys
     /// <see cref="AllowNativePlugins"/>, because a package that brings compiled code and also the permission to run it
     /// would make the permission worth nothing. It is set on the site, by whoever operates the site.
     /// </summary>
-    public static readonly string[] Protected = [.. Cloud, AllowNativePlugins];
+    public static readonly string[] Protected = [.. Cloud, AllowNativePlugins, .. AiOwn];
 }

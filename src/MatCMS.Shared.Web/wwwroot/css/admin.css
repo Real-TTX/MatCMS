@@ -1642,8 +1642,9 @@ a.tab { display: inline-block; text-decoration: none; }
 .ai-undo { align-self: flex-start; }
 .ai-compose { border-top: 1px solid var(--line); padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; background: var(--surface); }
 .ai-compose textarea { width: 100%; resize: vertical; min-height: 64px; font: inherit; font-size: 14px; line-height: 1.5; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); color: var(--ink); }
-/* .btn sets a display of its own, which would beat the hidden attribute (the stop button showed while nothing ran). */
-.ai-wrap [hidden] { display: none !important; }
+/* .btn sets a display of its own, which beats the hidden attribute: a button a script hides (the assistant's stop button, the
+   ChatGPT sign-in buttons) stayed on screen. Hidden means hidden, for every button of the back office. */
+.btn[hidden], .ai-wrap [hidden] { display: none !important; }
 .ai-compose-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .ai-hint { font-size: 12px; }
 .ai-files:empty { display: none; }

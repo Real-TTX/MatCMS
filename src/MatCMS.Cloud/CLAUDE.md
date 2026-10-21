@@ -1158,7 +1158,9 @@ the admin UI uses. There is no second restore path and no second backup format.
   **KI tab of *Einstellungen*** ("ChatGPT verbinden"). (A Device Authorization Grant once lived here too but
   was **removed** — nothing consumed it once the MCP server shipped: ChatGPT uses this connector's OAuth,
   other MCP clients paste an operator key. Don't re-add it without a real browserless-CLI use case.)
-- **"Mit ChatGPT anmelden" — the AI provider `chatgpt`** (`Services/ChatGptAuthService.cs`, `ChatGptClient.cs`; UI in the KI tab
+- **"Mit ChatGPT anmelden" — the AI provider `chatgpt`** (`Services/ChatGptAuthService.cs` = the cloud's token store around the SHARED
+  `MatCMS.Shared/Ai/ChatGptAccount.cs`, which also does the calls (the old `ChatGptClient.cs` is gone); the API-key provider is the shared
+  `ChatCompletionsClient` — a CMS uses both for its OWN connection without a cloud; UI in the KI tab
   of *Einstellungen*, `wwwroot/js/chatgpt-login.js`; REST `/api/v1/cloud/ai/chatgpt[/login]`, MCP `start_chatgpt_login` /
   `get_chatgpt_login` / `logout_chatgpt`, rights = the cloud-settings rights). The cloud signs in to a ChatGPT account the way
   Codex CLI and Hermes do — the OAuth **device code** flow — and `AiService` then sends the relayed calls through that account

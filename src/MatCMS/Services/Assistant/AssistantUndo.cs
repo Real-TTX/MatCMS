@@ -61,6 +61,7 @@ public sealed class AssistantUndo
                 case "menu": lines.Add(await RevertMenuAsync(c, ct)); break;
                 case "template": lines.Add(await RevertTemplateAsync(c, ct)); break;
                 case "setting": lines.Add(await RevertSettingAsync(c, ct)); break;
+                case "media": lines.Add(await RevertMediaAsync(c, ct)); break;
             }
             c.Reverted = true;
             await _db.SaveChangesAsync(ct);
@@ -150,6 +151,18 @@ public sealed class AssistantUndo
         t.ContainerWidth = s.ContainerWidth; t.HeaderPadding = s.HeaderPadding; t.CustomCss = s.CustomCss; t.ParamValuesJson = s.ParamValuesJson;
         await _db.SaveChangesAsync(ct);
         return $"Design „{t.Name}“ wiederhergestellt";
+    }
+
+    /// <summary>A picture the run drew leaves the media library (the file itself is left to Aufräumen — it costs a few KB, and a
+    /// page outside the run might already point at it).</summary>
+    private async Task<string> RevertMediaAsync(AiChange c, CancellationToken ct)
+    {
+        if (c.BeforeJson is not null) return "";
+        var m = await _db.Media.FirstOrDefaultAsync(x => x.Id == int.Parse(c.Key), ct);
+        if (m is null) return "";
+        _db.Media.Remove(m);
+        await _db.SaveChangesAsync(ct);
+        return $"Grafik „{m.FileName}“ entfernt";
     }
 
     private async Task<string> RevertSettingAsync(AiChange c, CancellationToken ct)

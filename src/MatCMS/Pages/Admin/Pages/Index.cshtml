@@ -110,78 +110,10 @@
         <a class="btn" asp-page="Create">@T["pages.create"]</a>
         @if (Model.AiEnabled)
         {
-            <button type="button" class="btn btn-ghost" id="ai-newpage-btn">
-                <i class="ti ti-sparkles" aria-hidden="true"></i> @T["pages.aiNewPageButton"]
-            </button>
-            <button type="button" class="btn btn-ghost" id="ai-sitegen-btn" data-ai-url="@Url.Page(null, "AiGenerateSite")">
-                <i class="ti ti-sparkles" aria-hidden="true"></i> @T["pages.aiSiteGenButton"]
-            </button>
+            <a class="btn btn-ghost" href="/admin/ai"><i class="ti ti-sparkles" aria-hidden="true"></i> @T["nav.assistant"]</a>
         }
     </div>
 </div>
-
-@if (Model.AiEnabled)
-{
-    @* Einzelne (Unter-)Seite per KI: Titel + kurze Beschreibung → Seite als ENTWURF anlegen + Blöcke
-       generieren in einem Schritt → direkt im Editor öffnen (dort prüfen/veröffentlichen). Ein-Schuss,
-       ohne Vorschlags-Runde — der Editor IST die Vorschau. *@
-    <dialog id="ai-newpage-dialog" class="ai-dialog">
-        <h3>@T["pages.aiNewPageTitle"]</h3>
-        <form method="post" asp-page-handler="AiNewPage">
-            <label class="ai-instr-label" for="ai-newpage-title">@T["pages.aiNewPageName"]</label>
-            <input id="ai-newpage-title" name="title" required placeholder="@T["pages.aiNewPageNamePh"]" />
-            <label class="ai-instr-label" for="ai-newpage-brief">@T["pages.aiNewPageBrief"]</label>
-            <textarea id="ai-newpage-brief" name="briefing" rows="2" placeholder="@T["pages.aiNewPageBriefPh"]"></textarea>
-            <label class="checkbox-row" style="margin-top:8px;"><input type="checkbox" name="nav" value="true" /> @T["pages.aiNewPageNav"]</label>
-            <div class="ai-dialog-foot">
-                <button type="submit" class="btn btn-sm"><i class="ti ti-sparkles" aria-hidden="true"></i> @T["pages.aiNewPageCreate"]</button>
-                <button type="button" class="btn btn-sm btn-ghost" id="ai-newpage-cancel">@T["editor.aiCancel"]</button>
-            </div>
-        </form>
-    </dialog>
-    <script>
-        (function () {
-            var b = document.getElementById('ai-newpage-btn'), d = document.getElementById('ai-newpage-dialog');
-            var c = document.getElementById('ai-newpage-cancel');
-            if (!b || !d) return;
-            b.addEventListener('click', function () { d.showModal(); });
-            if (c) c.addEventListener('click', function () { d.close(); });
-        })();
-    </script>
-}
-
-@if (Model.AiEnabled)
-{
-    @* Website-Generator: die KI schlägt mehrere Seiten (mit Blöcken + Menü) vor → Liste bestätigen →
-       per normalem Formular anlegen (add-only, PRG). Reuse der .ai-dialog/.ai-pagegen-*-Styles. *@
-    <dialog id="ai-sitegen-dialog" class="ai-dialog ai-dialog-wide" data-lbl-working="@T["editor.aiWorking"]"
-            data-lbl-blocks="@T["pages.aiSiteGenBlocks"]" data-lbl-nav="@T["pages.aiSiteGenNav"]">
-        <h3>@T["pages.aiSiteGenTitle"]</h3>
-        <label class="ai-instr-label" for="ai-sitegen-instruction">@T["pages.aiSiteGenInstruction"]</label>
-        <textarea id="ai-sitegen-instruction" rows="2" placeholder="@T["pages.aiSiteGenPlaceholder"]"></textarea>
-        <div class="ai-dialog-actions">
-            <button type="button" id="ai-sitegen-propose" class="btn btn-sm">@T["pages.aiSiteGenPropose"]</button>
-            <span id="ai-sitegen-status" class="ai-status muted"></span>
-        </div>
-        @* Seiten-Umschalter (eine Karte je Seite) + visuelle Vorschau der gewählten Seite im iFrame. *@
-        <div id="ai-sitegen-tabs" class="ai-preview-tabs"></div>
-        <iframe id="ai-sitegen-frame" name="ai-sitegen-frame" class="ai-preview-frame" title="@T["pages.aiSiteGenTitle"]"></iframe>
-        <div class="ai-dialog-foot">
-            <button type="button" id="ai-sitegen-apply" class="btn btn-sm" disabled>@T["pages.aiSiteGenApply"]</button>
-            <button type="button" id="ai-sitegen-cancel" class="btn btn-sm btn-ghost">@T["editor.aiCancel"]</button>
-        </div>
-    </dialog>
-    @* Website anlegen (bestätigt) *@
-    <form id="ai-sitegen-form" method="post" asp-page-handler="AiCreateSite">
-        <input type="hidden" name="sitesJson" id="ai-sitegen-data" />
-    </form>
-    @* Vorschau-Render: postet die Blöcke EINER Seite in den iFrame (read-only). *@
-    <form id="ai-sitegen-preview-form" method="post" action="/Admin/Pages/AiPreview" target="ai-sitegen-frame">
-        <input type="hidden" name="blocksJson" id="ai-sitegen-preview-data" />
-        <input type="hidden" name="title" id="ai-sitegen-preview-title" />
-    </form>
-    <script src="~/js/ai-site-gen.js" asp-append-version="true"></script>
-}
 
 <style>
     /* Language versions are always shown as indented child rows (no collapse). */

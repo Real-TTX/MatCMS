@@ -220,8 +220,19 @@ builder.Services.AddScoped<EmailService>();
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<FormGuard>();
 builder.Services.AddScoped<TranslationService>();
+builder.Services.AddScoped<IAiTransport, CloudAiTransport>();
 builder.Services.AddScoped<AiService>();
 builder.Services.AddScoped<BlockGenerator>();
+// The AI assistant (Admin → KI-Assistent): the runner is ONE instance — it holds the queue and the running runs — and
+// also the hosted service that works the queue; everything a run uses is scoped to that run.
+builder.Services.AddScoped<MatCMS.Services.Assistant.AssistantBlocks>();
+builder.Services.AddScoped<MatCMS.Services.Assistant.AssistantTools>();
+builder.Services.AddScoped<MatCMS.Services.Assistant.AssistantUndo>();
+builder.Services.AddScoped<MatCMS.Services.Assistant.AssistantFiles>();
+builder.Services.AddScoped<MatCMS.Services.Assistant.AssistantAgent>();
+builder.Services.AddScoped<MatCMS.Services.Assistant.AssistantService>();
+builder.Services.AddSingleton<MatCMS.Services.Assistant.AssistantRunner>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<MatCMS.Services.Assistant.AssistantRunner>());
 builder.Services.AddSingleton<PluginRegistry>();
 builder.Services.AddSingleton<AdminNav>();
 builder.Services.AddSingleton<MatCMS.Services.Plugins.PluginDataService>();

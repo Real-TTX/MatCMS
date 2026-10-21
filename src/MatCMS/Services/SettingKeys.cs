@@ -128,6 +128,12 @@ public static class SettingKeys
     /// Set only via the cloud profile — never edited on the instance.</summary>
     public const string AiActionGuides = "ai.actionGuides";
 
+    /// <summary>The AI assistant's basic instruction (Admin → KI-Assistent → Grundanweisung), edited ON the site: how it
+    /// works, what it may and may not do. Empty = the built-in default (<c>AssistantPrompt.Default</c>). Not under
+    /// <c>ai.</c> on purpose — that prefix is the cloud profile's group, and a rollout must never overwrite what the
+    /// site's own editor wrote here. The cloud's <see cref="AiInstruction"/> still rides along, ahead of it.</summary>
+    public const string AssistantPrompt = "assistant.prompt";
+
     /// <summary>Whether finished backups are handed to the connected cloud. Off unless somebody says
     /// otherwise — uploading a customer's whole site somewhere is a decision, not a default.</summary>
     public const string BackupToCloud = "backup.toCloud";

@@ -22,6 +22,11 @@ public static class StoragePaths
     /// </summary>
     public static string Thumbs(IWebHostEnvironment env) => Path.Combine(DataDir(env), "thumbs");
 
+    /// <summary>What the AI assistant keeps of an attachment for the model: the scaled-down copy of a picture
+    /// (<c>ai-files/{conversation}/…</c>). Not served, not in the backup; deleted with its conversation. The picture
+    /// itself is in the media library like any other upload.</summary>
+    public static string AiFiles(IWebHostEnvironment env) => Path.Combine(DataDir(env), "ai-files");
+
     /// <summary>Root of all plugin asset folders, served publicly under <c>/plugin-assets</c>.</summary>
     public static string PluginAssets(IWebHostEnvironment env) => Path.Combine(DataDir(env), "plugin-assets");
 

@@ -37,7 +37,7 @@ public class ChatGptClient
                 if (token is null) return Fail(error ?? "Nicht bei ChatGPT angemeldet.");
 
                 var client = _http.CreateClient();
-                client.Timeout = TimeSpan.FromSeconds(100);
+                client.Timeout = TimeSpan.FromSeconds(280);
                 using var req = new HttpRequestMessage(HttpMethod.Post, $"{_auth.Backend}/responses")
                 {
                     Content = new StringContent(body, Encoding.UTF8, "application/json"),
@@ -79,24 +79,38 @@ public class ChatGptClient
     {
         var instructions = string.Join("\n\n", messages.Where(m => m.Role == "system").Select(m => m.Content ?? "").Where(s => s.Length > 0));
         var items = messages.Where(m => m.Role != "system")
-            .Select(m => (Assistant: m.Role == "assistant", Text: m.Content ?? ""))
+            .Select(m => (Assistant: m.Role == "assistant", Text: m.Content ?? "", Files: m.Attachments ?? new()))
             .ToList();
-        if (items.Count == 0) { items.Add((false, instructions)); instructions = ""; }   // only a system message: it is the task
+        if (items.Count == 0) { items.Add((false, instructions, new())); instructions = ""; }   // only a system message: it is the task
         if (instructions.Length == 0) instructions = "You are a helpful assistant.";
 
-        return JsonSerializer.Serialize(new
+        var input = new System.Text.Json.Nodes.JsonArray();
+        foreach (var i in items)
         {
-            model,
-            instructions,
-            input = items.Select(i => new
+            var content = new System.Text.Json.Nodes.JsonArray
             {
-                type = "message",
-                role = i.Assistant ? "assistant" : "user",
-                content = new[] { new { type = i.Assistant ? "output_text" : "input_text", text = i.Text } },
-            }).ToArray(),
-            store = false,
-            stream = true,
-        });
+                new System.Text.Json.Nodes.JsonObject { ["type"] = i.Assistant ? "output_text" : "input_text", ["text"] = i.Text },
+            };
+            // Pictures and PDFs of a user message: the Responses API's own part types, inline as data URLs.
+            if (!i.Assistant)
+                foreach (var f in i.Files)
+                {
+                    var dataUrl = $"data:{f.MediaType};base64,{f.Data}";
+                    content.Add(f.Kind == "file"
+                        ? new System.Text.Json.Nodes.JsonObject { ["type"] = "input_file", ["filename"] = f.Name, ["file_data"] = dataUrl }
+                        : new System.Text.Json.Nodes.JsonObject { ["type"] = "input_image", ["image_url"] = dataUrl });
+                }
+            input.Add(new System.Text.Json.Nodes.JsonObject { ["type"] = "message", ["role"] = i.Assistant ? "assistant" : "user", ["content"] = content });
+        }
+
+        return new System.Text.Json.Nodes.JsonObject
+        {
+            ["model"] = model,
+            ["instructions"] = instructions,
+            ["input"] = input,
+            ["store"] = false,
+            ["stream"] = true,
+        }.ToJsonString();
     }
 
     /// <summary>Collects the event stream. A call counts as successful only after <c>response.completed</c>; text that arrived before an

@@ -1555,5 +1555,7 @@
   "profiles.pluginNative": "Native plugin",
   "profiles.pluginNativeBadge": "compiled",
   "profiles.pluginNativeEntry": "Main file",
-  "profiles.pluginNativeHint": "This bundle holds compiled code. It cannot be edited here, only replaced (upload a new bundle) or downloaded. On an instance it runs only once the operator has switched on 'Allow native plugins' there — that cannot be set from here."
+  "profiles.pluginNativeHint": "This bundle holds compiled code. It cannot be edited here, only replaced (upload a new bundle) or downloaded. On an instance it runs only once the operator has switched on 'Allow native plugins' there — that cannot be set from here.",
+  "profiles.aiGuideAssistant": "AI assistant",
+  "profiles.aiGuideAssistantPlaceholder": "e.g. Always start pages with a hero and end with a call to get in touch. Address readers formally. Never delete pages."
 }

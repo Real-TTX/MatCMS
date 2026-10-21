@@ -64,6 +64,10 @@
          engine and no persistent parser state — chosen over the AngleSharp-based HtmlSanitizer, whose
          one-time ~30 MB footprint bloated each instance's working set. -->
     <PackageReference Include="HtmlAgilityPack" Version="1.*" />
+    <!-- Reads the text out of a PDF an editor attaches to an AI assistant message (Services/Assistant/AssistantFiles.cs).
+         Pure managed code, no native library to ship in the image; the text goes to the model like any other text, so a
+         PDF works with every provider and not only with the ones that accept files. Apache-2.0. -->
+    <PackageReference Include="PdfPig" Version="0.1.*" />
   </ItemGroup>
 
   <ItemGroup>

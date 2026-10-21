@@ -924,92 +924,26 @@
     window.matBeforeLeave = function () { leaving = true; };
 
     // ---------- KI ----------
-    // Both work on the DRAFT: a proposal is applied into it like any other edit — undoable, and only
-    // saved with "Speichern". The server never writes anything here.
-    function aiPost(url, fields) {
-        var form = new URLSearchParams();
-        form.set("__RequestVerificationToken", token);
-        Object.keys(fields).forEach(function (k) { form.set(k, fields[k]); });
-        return fetch(url, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", "RequestVerificationToken": token }, body: form.toString(), credentials: "same-origin" })
-            .then(function (r) { return r.json(); });
+    // The assistant (Admin → KI-Assistent) works on the SAVED page — it reads and writes the database step by step, in
+    // view — so unsaved work is saved first. It opens with this page, or the selected block, as its scope.
+    function openAssistant(withBlock) {
+        var btn = document.getElementById("ev2-ai-open");
+        if (!btn) return;
+        var go = function () {
+            var url = btn.getAttribute("data-href") + (withBlock && selectedId != null && selectedId > 0 ? "&blockId=" + selectedId : "");
+            leaving = true;
+            window.location.href = url;
+        };
+        if (!dirty()) { go(); return; }
+        statusText = { html: '<i class="ti ti-loader-2"></i> ' + esc(t("saving")) };
+        updateChrome();
+        savePage().then(function () { return saveBlocks(); }).then(go)
+            .catch(function (e) { statusText = { html: '<i class="ti ti-alert-triangle"></i> ' + esc(e && e.page ? e.message : t("saveFailed")), err: true }; updateChrome(); });
     }
-    function dialog(id) {
-        var d = document.getElementById(id); if (!d) return null;
-        d.querySelectorAll("[data-close]").forEach(function (b) { b.addEventListener("click", function () { d.close(); }); });
-        return d;
-    }
-    var aiBlock = dialog("ev2-aiblock"), aiBlockProposal = null;
-    if (aiBlock) {
-        var aiBlockStatus = document.getElementById("ev2-aiblock-status"), aiBlockDiff = document.getElementById("ev2-aiblock-diff"), aiBlockApply = document.getElementById("ev2-aiblock-apply");
-        document.getElementById("ev2-aiblock-open").addEventListener("click", function () {
-            if (selectedId == null) return;
-            aiBlockProposal = null; aiBlockDiff.innerHTML = ""; aiBlockStatus.textContent = ""; aiBlockApply.disabled = true;
-            aiBlock.showModal();
-        });
-        document.getElementById("ev2-aiblock-go").addEventListener("click", function () {
-            var b = byId(selectedId); if (!b) return;
-            aiBlockStatus.textContent = t("aiWorking"); aiBlockApply.disabled = true; aiBlockDiff.innerHTML = "";
-            var forId = b.id;
-            aiPost(aiBlock.getAttribute("data-url"), { instruction: document.getElementById("ev2-aiblock-instr").value, dataJson: b.dataJson })
-                .then(function (res) {
-                    if (!res.ok) { aiBlockStatus.textContent = res.error || "—"; return; }
-                    aiBlockStatus.textContent = "";
-                    aiBlockProposal = { id: forId, data: res.proposed };
-                    aiBlockDiff.innerHTML = (res.changes || []).map(function (c) {
-                        return '<div class="ai-change"><div class="ai-field">' + esc(c.field) + '</div><div class="ai-cols">' +
-                            '<div class="ai-col ai-before"><div class="ai-lbl">' + esc(t("aiBefore")) + '</div><div class="ai-text">' + esc(strip(c.before)) + "</div></div>" +
-                            '<div class="ai-col ai-after"><div class="ai-lbl">' + esc(t("aiAfter")) + '</div><div class="ai-text">' + esc(strip(c.after)) + "</div></div></div></div>";
-                    }).join("");
-                    aiBlockApply.disabled = false;
-                })
-                .catch(function () { aiBlockStatus.textContent = t("saveFailed"); });
-        });
-        aiBlockApply.addEventListener("click", function () {
-            var b = aiBlockProposal && byId(aiBlockProposal.id); if (!b) return;
-            record();
-            b.dataJson = aiBlockProposal.data;
-            committed();
-            aiBlock.close();
-            renderTree(); renderInspector(); renderPreview();
-        });
-    }
-    var aiPage = dialog("ev2-aipage"), aiPageProposal = null;
-    if (aiPage) {
-        var aiPageStatus = document.getElementById("ev2-aipage-status"), aiPageList = document.getElementById("ev2-aipage-list"), aiPageApply = document.getElementById("ev2-aipage-apply");
-        document.getElementById("ev2-aipage-open").addEventListener("click", function () {
-            aiPageProposal = null; aiPageList.innerHTML = ""; aiPageStatus.textContent = ""; aiPageApply.disabled = true;
-            aiPage.showModal();
-        });
-        document.getElementById("ev2-aipage-go").addEventListener("click", function () {
-            aiPageStatus.textContent = t("aiWorking"); aiPageApply.disabled = true; aiPageList.innerHTML = "";
-            aiPost(aiPage.getAttribute("data-url"), { instruction: document.getElementById("ev2-aipage-instr").value })
-                .then(function (res) {
-                    if (!res.ok) { aiPageStatus.textContent = res.error || "—"; return; }
-                    aiPageStatus.textContent = "";
-                    try { aiPageProposal = JSON.parse(res.proposed); } catch (x) { aiPageProposal = null; }
-                    aiPageList.innerHTML = (res.blocks || []).map(function (b, i) {
-                        return '<div class="ai-pagegen-item"><span class="ai-pagegen-num">' + (i + 1) + '</span><span class="ai-pagegen-name">' + esc(b.name) + '</span><span class="ai-pagegen-snip">' + esc(b.snippet || "") + "</span></div>";
-                    }).join("");
-                    aiPageApply.disabled = !aiPageProposal || !aiPageProposal.length;
-                })
-                .catch(function () { aiPageStatus.textContent = t("saveFailed"); });
-        });
-        aiPageApply.addEventListener("click", function () {
-            if (!aiPageProposal) return;
-            record();
-            var first = null;
-            aiPageProposal.forEach(function (p) {
-                if (!types[p.type]) return;
-                var b = { id: nextNeg--, blockType: p.type, parentId: null, sortOrder: kids(null).length, dataJson: JSON.stringify(p.data || {}) };
-                blocks.push(b);
-                if (first == null) first = b.id;
-            });
-            committed();
-            aiPage.close();
-            if (first != null) select(first, true); else renderTree();
-            renderPreview();
-        });
-    }
+    var aiOpen = document.getElementById("ev2-ai-open");
+    if (aiOpen) aiOpen.addEventListener("click", function () { openAssistant(false); });
+    var aiBlockOpen = document.getElementById("ev2-aiblock-open");
+    if (aiBlockOpen) aiBlockOpen.addEventListener("click", function () { openAssistant(true); });
 
     pageForm.addEventListener("input", updateChrome);
     pageForm.addEventListener("change", updateChrome);

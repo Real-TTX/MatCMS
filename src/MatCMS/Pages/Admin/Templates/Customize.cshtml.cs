@@ -132,7 +132,7 @@ public class CustomizeModel : PageModel
     }
 
     // Validates/canonicalises a proposed value against the parameter's declared type; null = reject.
-    private static string? Normalize(TemplateParam p, string? raw)
+    public static string? Normalize(TemplateParam p, string? raw)
     {
         var v = (raw ?? "").Trim();
         if (v.Length == 0) return null;

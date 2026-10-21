@@ -492,7 +492,7 @@ public class EditModel : PageModel
     /// (empty/0 = unlimited). Saving this tab adds the group; the remove button takes it out. The
     /// provider key is NOT here — it lives centrally on the cloud (Einstellungen → KI).</summary>
     public async Task<IActionResult> OnPostAiAsync(int id, bool enabled, string? budget, string? instruction, bool backupBeforeAiChange,
-        string? guidePage, string? guideSite, string? guideTheme, string? guideSeo)
+        string? guideAssistant, string? guideTheme, string? guideSeo)
     {
         var profile = await _db.Profiles.FindAsync(id);
         if (profile is null) return RedirectToPage("Index");
@@ -512,8 +512,8 @@ public class EditModel : PageModel
         // so an unset profile stays clean). Rolled out with the AI group; TouchAsync below bumps the revision.
         var guides = new Dictionary<string, string>();
         void Add(string key, string? val) { var t = (val ?? "").Trim(); if (t.Length > 0) guides[key] = t; }
-        Add("pagegen", guidePage);
-        Add("sitegen", guideSite);
+        // The AI assistant replaced the page and site generators (CMS 1.14); their guidance went into its field.
+        Add("assistant", guideAssistant);
         Add("theme", guideTheme);
         Add("seo", guideSeo);
         profile.AiActionGuidesJson = guides.Count == 0 ? null : System.Text.Json.JsonSerializer.Serialize(guides);

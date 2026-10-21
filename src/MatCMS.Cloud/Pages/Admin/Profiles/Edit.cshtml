@@ -438,17 +438,15 @@
                 var guides = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(
                     string.IsNullOrWhiteSpace(Model.Item.AiActionGuidesJson) ? "{}" : Model.Item.AiActionGuidesJson!) ?? new();
                 string Guide(string k) => guides.TryGetValue(k, out var v) ? v : "";
+                // A profile from before the assistant still has guidance for the two generators it replaced: shown here, saved under "assistant".
+                string AssistantGuide() => Guide("assistant") is { Length: > 0 } a ? a : string.Join(Environment.NewLine, new[] { Guide("pagegen"), Guide("sitegen") }.Where(x => x.Length > 0));
             }
             <details class="card" style="margin-top:12px;">
                 <summary><strong>@T["profiles.aiGuidesHeading"]</strong></summary>
                 <div class="help" style="margin:.4rem 0 .6rem;">@T["profiles.aiGuidesHint"]</div>
                 <div class="form-field">
-                    <label for="guidePage">@T["profiles.aiGuidePage"]</label>
-                    <textarea id="guidePage" name="guidePage" rows="2" placeholder="@T["profiles.aiGuidePagePlaceholder"]">@Guide("pagegen")</textarea>
-                </div>
-                <div class="form-field">
-                    <label for="guideSite">@T["profiles.aiGuideSite"]</label>
-                    <textarea id="guideSite" name="guideSite" rows="2" placeholder="@T["profiles.aiGuideSitePlaceholder"]">@Guide("sitegen")</textarea>
+                    <label for="guideAssistant">@T["profiles.aiGuideAssistant"]</label>
+                    <textarea id="guideAssistant" name="guideAssistant" rows="3" placeholder="@T["profiles.aiGuideAssistantPlaceholder"]">@AssistantGuide()</textarea>
                 </div>
                 <div class="form-field">
                     <label for="guideTheme">@T["profiles.aiGuideTheme"]</label>

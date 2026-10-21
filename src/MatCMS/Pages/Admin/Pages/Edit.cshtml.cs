@@ -20,11 +20,10 @@ public class EditModel : PageModel
     private readonly Localizer _t;
     private readonly TranslationService _translator;
     private readonly AiService _ai;
-    private readonly BlockGenerator _blockGen;
 
     private readonly MatCMS.Services.Plugins.PluginPageService _pluginPages;
 
-    public EditModel(AppDbContext db, BlockRegistry registry, Localizer t, TranslationService translator, AiService ai, BlockGenerator blockGen, MatCMS.Services.Plugins.PluginPageService pluginPages)
+    public EditModel(AppDbContext db, BlockRegistry registry, Localizer t, TranslationService translator, AiService ai, MatCMS.Services.Plugins.PluginPageService pluginPages)
     {
         _pluginPages = pluginPages;
         _db = db;
@@ -32,7 +31,6 @@ public class EditModel : PageModel
         _t = t;
         _translator = translator;
         _ai = ai;
-        _blockGen = blockGen;
     }
 
     /// <summary>True when a machine-translation provider is configured (shows the auto-translate button).</summary>
@@ -300,84 +298,6 @@ public class EditModel : PageModel
     private IActionResult EditorBack(object route, string? back) =>
         back == "v2" ? RedirectToPage("/Admin/Pages/Editor", route) : RedirectToPage(route);
 
-    // Creates a translation of this page in another locale (same TranslationGroup), copying its
-    // blocks as a starting point. The new page is a draft and opens in the editor.
-    /// <summary>
-    /// Proposes an AI rewrite of a block's prose fields WITHOUT saving anything. It works on the CURRENT
-    /// editor state (the DataJson the client posts, so unsaved edits are respected), collects the prose
-    /// string fields (the same machine-vs-content split as auto-translate), rewrites each through the
-    /// cloud relay, and returns a proposed DataJson plus a before/after per changed field. The client
-    /// shows the diff and — only on the operator's confirm — applies it via the normal SaveBlock.
-    /// </summary>
-    public async Task<IActionResult> OnPostAiRewriteBlockAsync(int id, string? instruction, string? dataJson)
-    {
-        if (!_ai.Enabled)
-            return new JsonResult(new { ok = false, error = "KI ist für diese Website nicht aktiviert." });
-
-        JsonObject? root;
-        try { root = JsonNode.Parse(string.IsNullOrWhiteSpace(dataJson) ? "{}" : dataJson!) as JsonObject; }
-        catch { root = null; }
-        if (root is null) return new JsonResult(new { ok = false, error = "Ungültige Blockdaten." });
-
-        var instr = string.IsNullOrWhiteSpace(instruction)
-            ? "Verbessere den Text: klar, prägnant und fehlerfrei, ohne den Sinn zu verändern."
-            : instruction!.Trim();
-
-        // Machine settings, not content — never rewrite these (same list as auto-translate + _css).
-        var skipKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "align", "width", "layout", "columns", "imageHeight", "size", "display", "showFilter",
-            "source", "perPage", "limit", "form", "tag", "tags", "_width", "_spaceTop", "_spaceBottom",
-            "buttonStyle", "icon", "imageSide", "bg", "fg", "position", "variant", "style", "_css", "_hidden"
-        };
-        static bool Prose(string s) => s.Length > 1 && s.Any(char.IsLetter) && !s.StartsWith("/") && !s.StartsWith("http");
-
-        // Collect prose slots, bounded so one block can't fan out into dozens of paid calls.
-        const int maxSlots = 12;
-        var slots = new List<(JsonObject Obj, string Prop, string Value)>();
-        void Collect(JsonNode? node)
-        {
-            if (slots.Count >= maxSlots) return;
-            switch (node)
-            {
-                case JsonObject obj:
-                    foreach (var p in obj.ToList())
-                    {
-                        if (slots.Count >= maxSlots) break;
-                        if (skipKeys.Contains(p.Key)) continue;
-                        if (p.Value is JsonValue v && v.TryGetValue<string>(out var s) && Prose(s))
-                            slots.Add((obj, p.Key, s));
-                        else Collect(p.Value);
-                    }
-                    break;
-                case JsonArray arr:
-                    foreach (var it in arr) Collect(it);
-                    break;
-            }
-        }
-        Collect(root);
-
-        if (slots.Count == 0)
-            return new JsonResult(new { ok = false, error = "In diesem Block gibt es keinen Text zum Verbessern." });
-
-        var changes = new List<object>();
-        foreach (var (obj, prop, value) in slots)
-        {
-            var (ok, text, error) = await _ai.RewriteAsync(instr, value, ct: HttpContext.RequestAborted);
-            if (!ok) return new JsonResult(new { ok = false, error = error ?? "KI-Aufruf fehlgeschlagen." });
-            var after = (text ?? "").Trim();
-            if (after.Length == 0 || after == value) continue;   // nothing changed for this field
-            obj[prop] = after;                                    // write into the proposed clone
-            changes.Add(new { field = prop, before = value, after });
-        }
-
-        if (changes.Count == 0)
-            return new JsonResult(new { ok = false, error = "Die KI hatte keine Verbesserung vorzuschlagen." });
-
-        // `root` is now the proposed DataJson (originals captured in `changes` before overwriting).
-        return new JsonResult(new { ok = true, proposed = root.ToJsonString(), changes });
-    }
-
     /// <summary>SEO: propose a meta description for THIS page, summarised from its SAVED block content
     /// (relayed through the cloud). Returns { ok, proposed } without saving — the client shows a
     /// before/after and writes the accepted text into the meta field, saved with the normal page save.</summary>
@@ -440,70 +360,6 @@ public class EditModel : PageModel
             try { Walk(JsonNode.Parse(b.DataJson)); } catch { /* skip malformed */ }
         }
         return sb.ToString().Trim();
-    }
-
-    // --- AI "generate page" -----------------------------------------------------------------------
-    // The block catalogue (which blocks the model may use) and the TRUSTED-BOUNDARY validation of what it
-    // returns live in the shared BlockGenerator service — the same validator the site generator uses.
-
-    /// <summary>Proposes a whole page as a list of blocks, generated from the description + the site's
-    /// global AI instruction, validated against the registry. Returns { ok, blocks[summary], proposed }
-    /// WITHOUT saving; the client shows the list and — on confirm — posts `proposed` to CreateBlocks.</summary>
-    public async Task<IActionResult> OnPostAiGeneratePageAsync(int id, string? instruction)
-    {
-        if (!_ai.Enabled)
-            return new JsonResult(new { ok = false, error = "KI ist für diese Website nicht aktiviert." });
-        if (string.IsNullOrWhiteSpace(instruction))
-            return new JsonResult(new { ok = false, error = "Bitte beschreibe kurz, was die Seite enthalten soll." });
-
-        var (ok, text, error) = await _ai.GeneratePageAsync(instruction.Trim(), _blockGen.BuildSpecText(), HttpContext.RequestAborted);
-        if (!ok) return new JsonResult(new { ok = false, error = error ?? "KI-Aufruf fehlgeschlagen." });
-
-        var blocks = _blockGen.ValidateBlocks(text);
-        if (blocks.Count == 0)
-            return new JsonResult(new { ok = false, error = "Die KI hat keine verwertbaren Blöcke geliefert." });
-
-        var proposed = new JsonArray();
-        var summary = new List<object>();
-        foreach (var (type, name, data) in blocks)
-        {
-            var firstText = "";
-            foreach (var kv in data) { if (kv.Value is JsonValue vv) { firstText = vv.ToString(); break; } }
-            summary.Add(new { type, name, snippet = Truncate(StripHtml(firstText), 140) });
-            proposed.Add(new JsonObject { ["type"] = type, ["data"] = data });   // data node moves here
-        }
-        return new JsonResult(new { ok = true, blocks = summary, proposed = proposed.ToJsonString() });
-    }
-
-    /// <summary>Creates the confirmed AI-proposed blocks on this page (appended after existing ones). The
-    /// posted JSON is RE-validated here — the client is never trusted — and this is a normal antiforgery-
-    /// protected form post, so the result lands via PRG in the editor where it can be edited or deleted.</summary>
-    public async Task<IActionResult> OnPostAiCreateBlocksAsync(int id, string? blocksJson)
-    {
-        if (!_ai.Enabled) return RedirectToPage("Edit", new { id });
-        var page = await _db.Pages.FirstOrDefaultAsync(p => p.Id == id);
-        if (page is null) return NotFound();
-
-        var blocks = _blockGen.ValidateBlocks(blocksJson);
-        if (blocks.Count == 0)
-        {
-            TempData["FlashError"] = "Es gab keine gültigen Blöcke zum Anlegen.";
-            return RedirectToPage("Edit", new { id });
-        }
-
-        var maxSort = await _db.ContentBlocks.Where(b => b.PageId == id && b.ParentId == null)
-            .Select(b => (int?)b.SortOrder).MaxAsync() ?? -1;
-        var sort = maxSort + 1;
-        foreach (var (type, _, data) in blocks)
-            _db.ContentBlocks.Add(new ContentBlock
-            {
-                PageId = id, ParentId = null, BlockType = type, DataJson = data.ToJsonString(), SortOrder = sort++
-            });
-        page.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync();
-
-        TempData["Flash"] = $"{blocks.Count} Block(e) von der KI angelegt.";
-        return RedirectToPage("Edit", new { id });
     }
 
     /// <summary>

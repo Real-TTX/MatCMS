@@ -29,8 +29,17 @@ public class AppDbContext : DbContext
     public DbSet<MatCMS.Models.LogEntry> Logs => Set<MatCMS.Models.LogEntry>();
     public DbSet<StatCounter> StatCounters => Set<StatCounter>();
 
+    // The AI assistant: conversations, their visible steps and what each run changed (for "Rückgängig").
+    public DbSet<AiConversation> AiConversations => Set<AiConversation>();
+    public DbSet<AiStep> AiSteps => Set<AiStep>();
+    public DbSet<AiChange> AiChanges => Set<AiChange>();
+
     protected override void OnModelCreating(ModelBuilder b)
     {
+        b.Entity<AiStep>().HasIndex(s => new { s.ConversationId, s.Id });
+        b.Entity<AiChange>().HasIndex(c => new { c.ConversationId, c.Run });
+        b.Entity<AiStep>().HasOne<AiConversation>().WithMany().HasForeignKey(s => s.ConversationId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<AiChange>().HasOne<AiConversation>().WithMany().HasForeignKey(c => c.ConversationId).OnDelete(DeleteBehavior.Cascade);
         b.Entity<User>().HasIndex(u => u.Username).IsUnique();
         // Optimistic-concurrency guard so two simultaneous logins can't spend the same single-use
         // recovery code twice: the second UPDATE matches 0 rows and throws (handled in TwoFactorService).

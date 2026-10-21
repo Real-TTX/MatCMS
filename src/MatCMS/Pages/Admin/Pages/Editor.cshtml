@@ -23,7 +23,6 @@
         ["pageSettings"] = T["ev2.settings"], ["pageSaveFailed"] = T["ev2.pageSaveFailed"],
         ["published"] = T["ev2.published"], ["draft"] = T["ev2.draft"],
         ["fav"] = T["blockcat.fav"], ["recent"] = T["blockcat.recent"], ["favToggle"] = T["editor.favToggle"], ["noBlocksFound"] = T["editor.noBlocksFound"],
-        ["aiWorking"] = T["editor.aiWorking"], ["aiBefore"] = T["editor.aiBefore"], ["aiAfter"] = T["editor.aiAfter"],
         ["preset.hero"] = T["ev2.preset.hero"], ["preset.hero.desc"] = T["ev2.preset.hero.desc"],
         ["preset.imageText"] = T["ev2.preset.imageText"], ["preset.imageText.desc"] = T["ev2.preset.imageText.desc"],
         ["preset.text"] = T["ev2.preset.text"], ["preset.text.desc"] = T["ev2.preset.text.desc"],
@@ -90,9 +89,9 @@
         </div>
         @* Portrait/landscape for tablet and phone; there is nothing to turn on a desktop. *@
         <button type="button" class="btn btn-ghost btn-icon ev2-dev" id="ev2-rot" title="@T["ev2.landscape"]" aria-label="@T["ev2.landscape"]" aria-pressed="false" disabled><i class="ti ti-device-mobile-rotated"></i></button>
-        @if (Model.AiEnabled)
+        @if (Model.AiEnabled && p.OwnerPlugin is null)
         {
-            <button type="button" class="btn btn-ghost btn-icon" id="ev2-aipage-open" title="@T["editor.aiPageGenButton"]" aria-label="@T["editor.aiPageGenButton"]"><i class="ti ti-sparkles"></i></button>
+            <button type="button" class="btn btn-ghost btn-icon" id="ev2-ai-open" data-href="/admin/ai?pageId=@p.Id" title="@T["editor.aiAssistantPage"]" aria-label="@T["editor.aiAssistantPage"]"><i class="ti ti-sparkles"></i></button>
         }
         @if (Model.PublicUrl.Length > 0)
         {
@@ -242,9 +241,9 @@
         <div class="ev2-foot" id="ev2-foot" hidden>
             @* Classic hero / image+text / text / call-to-action → the same content as a section of elements. *@
             <button type="button" class="btn btn-ghost btn-sm ev2-convert" id="ev2-convert" hidden title="@T["ev2.convertHint"]"><i class="ti ti-transform"></i> @T["ev2.convert"]</button>
-            @if (Model.AiEnabled)
+            @if (Model.AiEnabled && p.OwnerPlugin is null)
             {
-                <button type="button" class="btn btn-ghost btn-sm ev2-ai-btn" id="ev2-aiblock-open" title="@T["editor.aiImprove"]"><i class="ti ti-sparkles"></i></button>
+                <button type="button" class="btn btn-ghost btn-sm ev2-ai-btn" id="ev2-aiblock-open" title="@T["editor.aiAssistantBlock"]" aria-label="@T["editor.aiAssistantBlock"]"><i class="ti ti-sparkles"></i></button>
             }
             <button type="button" class="btn btn-ghost btn-sm" id="ev2-dup"><i class="ti ti-copy"></i> @T["ev2.duplicate"]</button>
             <button type="button" class="btn btn-danger btn-sm" id="ev2-del"><i class="ti ti-trash"></i> @T["ev2.remove"]</button>
@@ -304,35 +303,6 @@
                 <a class="ev2-add" asp-page="Diff" asp-route-id="@p.Id"><i class="ti ti-arrows-diff"></i> @T["diff.title"]</a>
             }
         </div>
-    }
-
-    @if (Model.AiEnabled)
-    {
-        @* KI: improve the selected block's texts — proposal against the CURRENT draft, applied into the
-           draft (nothing is saved until "Speichern"). *@
-        <dialog class="ai-dialog" id="ev2-aiblock" data-url="@Url.Page("Edit", "AiRewriteBlock", new { id = p.Id })">
-            <h3>@T["editor.aiDialogTitle"]</h3>
-            <label class="ai-instr-label" for="ev2-aiblock-instr">@T["editor.aiInstruction"]</label>
-            <textarea id="ev2-aiblock-instr" rows="2" placeholder="@T["editor.aiInstructionPlaceholder"]"></textarea>
-            <div class="ai-dialog-actions"><button type="button" class="btn btn-sm" id="ev2-aiblock-go">@T["editor.aiPropose"]</button><span class="ai-status muted" id="ev2-aiblock-status"></span></div>
-            <div class="ai-diff" id="ev2-aiblock-diff"></div>
-            <div class="ai-dialog-foot">
-                <button type="button" class="btn btn-sm" id="ev2-aiblock-apply" disabled>@T["editor.aiApply"]</button>
-                <button type="button" class="btn btn-ghost btn-sm" data-close>@T["editor.aiCancel"]</button>
-            </div>
-        </dialog>
-        @* KI: a whole set of blocks for this page, appended to the draft. *@
-        <dialog class="ai-dialog" id="ev2-aipage" data-url="@Url.Page("Edit", "AiGeneratePage", new { id = p.Id })">
-            <h3>@T["editor.aiPageGenTitle"]</h3>
-            <label class="ai-instr-label" for="ev2-aipage-instr">@T["editor.aiPageGenInstruction"]</label>
-            <textarea id="ev2-aipage-instr" rows="3" placeholder="@T["editor.aiPageGenPlaceholder"]"></textarea>
-            <div class="ai-dialog-actions"><button type="button" class="btn btn-sm" id="ev2-aipage-go">@T["editor.aiPageGenPropose"]</button><span class="ai-status muted" id="ev2-aipage-status"></span></div>
-            <div class="ai-pagegen-list" id="ev2-aipage-list"></div>
-            <div class="ai-dialog-foot">
-                <button type="button" class="btn btn-sm" id="ev2-aipage-apply" disabled>@T["editor.aiPageGenApply"]</button>
-                <button type="button" class="btn btn-ghost btn-sm" data-close>@T["editor.aiCancel"]</button>
-            </div>
-        </dialog>
     }
 
     @if (TempData["Flash"] is string flash && !string.IsNullOrWhiteSpace(flash))

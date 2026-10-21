@@ -1182,6 +1182,15 @@ the admin UI uses. There is no second restore path and no second backup format.
   pointed at a stand-in with `MatCmsCloud:ChatGpt:Issuer|BackendBase|MinPollSeconds` — a test hook, not an operator setting.
   The backend takes no length cap, so an instance's `MaxTokens` is not passed on; one account serves ALL approved sites, so
   the per-profile token budget stays the only brake.
+- **The AI relay serves the site's AI assistant** (protocol 18; the assistant itself is the CMS's, see the root `CLAUDE.md`). What the
+  relay does for it in `AiService.CompleteAsync`: a cap of 16 000 completion tokens and 280 s (a REASONING model — DeepSeek, o-series,
+  gpt-5 — spends the cap on thinking first; with the old small caps it answered with an EMPTY text, reported as success, which is why
+  the old editor actions "did nothing"; an empty answer is now an error naming the length limit). A 400/422 that names `max_tokens`
+  (→ `max_completion_tokens`), `temperature` (→ left out), `response_format` (→ no JSON mode) or a picture/file part (→ text only, with
+  `AiResponse.Note`) is retried without it, each switch once. `AiRequest.Json` asks for JSON mode; `AiMessage.Attachments` (images, PDF,
+  base64) become `image_url`/`file` parts (chat completions) or `input_image`/`input_file` (ChatGPT account); `RelayAsync` bounds them
+  (≤ 8, ≤ ~10 MB each, whitelisted types). The profile's per-action guides now have `assistant` (replacing `pagegen`/`sitegen`, whose old
+  text the KI tab shows in the new field until it is saved).
 - **MCP server (`/mcp`)** — a remote **Model Context Protocol** server so an AI client (ChatGPT, Claude,
   Cursor) drives the cloud directly, instead of hand-wiring HTTP calls. Built INTO this app (official
   `ModelContextProtocol.AspNetCore` SDK, HTTP/streamable transport, `app.MapMcp("/mcp")`), **not** a

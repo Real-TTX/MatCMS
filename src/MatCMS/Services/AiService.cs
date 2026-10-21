@@ -11,16 +11,24 @@ namespace MatCMS.Services;
 public class AiService
 {
     private readonly SiteContext _site;
-    private readonly CloudService _cloud;
+    private readonly IAiTransport _transport;
 
-    public AiService(SiteContext site, CloudService cloud)
+    public AiService(SiteContext site, IAiTransport transport)
     {
         _site = site;
-        _cloud = cloud;
+        _transport = transport;
     }
 
     /// <summary>True when AI is switched on for this site (rolled out from the cloud profile).</summary>
     public bool Enabled => _site.Get(SettingKeys.AiTransport) is "cloud";
+
+    /// <summary>One call as it is, with the whole answer (model, tokens, the cloud's note). The assistant builds its own
+    /// messages, including the cloud's instruction, so nothing is added here.</summary>
+    public async Task<AiResponse> SendAsync(AiRequest request, CancellationToken ct = default)
+    {
+        if (!Enabled) return new AiResponse { Ok = false, Error = "KI ist für diese Website nicht aktiviert." };
+        return await _transport.SendAsync(request, ct);
+    }
 
     /// <summary>Runs a chat completion through the cloud relay. Returns (ok, text, error).</summary>
     public async Task<(bool ok, string? text, string? error)> RunAsync(
@@ -43,7 +51,8 @@ public class AiService
             msgs.Add(new AiMessage { Role = "system", Content = "Zusätzliche Vorgabe für diese Aktion (immer beachten):\n" + guide });
         msgs.AddRange(messages.Select(m => new AiMessage { Role = m.role, Content = m.content }));
         var req = new AiRequest { Purpose = purpose, MaxTokens = maxTokens, Messages = msgs };
-        return await _cloud.CallAiAsync(req, ct);
+        var answer = await _transport.SendAsync(req, ct);
+        return (answer.Ok, answer.Text, answer.Ok ? null : answer.Error ?? "Unbekannter Grund.");
     }
 
     /// <summary>The operator's extra guidance for one action ("pagegen"/"sitegen"/"theme"/"seo"), from the
@@ -58,22 +67,6 @@ public class AiService
             return map != null && map.TryGetValue(purpose, out var g) ? (g ?? "").Trim() : "";
         }
         catch { return ""; }
-    }
-
-    /// <summary>Rewrites a single piece of prose to a given instruction, returning ONLY the rewritten
-    /// text (no quotes, no commentary). The site's content language is passed so the model keeps it.</summary>
-    public Task<(bool ok, string? text, string? error)> RewriteAsync(
-        string instruction, string text, string? language = null, CancellationToken ct = default)
-    {
-        var lang = string.IsNullOrWhiteSpace(language) ? "" : $" Antworte auf {language}.";
-        var system = "Du bist ein Redakteur für Website-Texte. Verbessere den gegebenen Text gemäß der "
-                   + "Anweisung. Gib AUSSCHLIESSLICH den überarbeiteten Text zurück — ohne Anführungszeichen, "
-                   + "ohne Erklärungen, ohne Markdown-Codeblöcke. Behalte Sinn und Sprache bei." + lang;
-        return RunAsync("rewrite", new[]
-        {
-            ("system", system),
-            ("user", $"Anweisung: {instruction}\n\nText:\n{text}"),
-        }, maxTokens: 800, ct: ct);
     }
 
     /// <summary>Proposes new values for a template's design parameters to match a design instruction.
@@ -105,7 +98,7 @@ public class AiService
         {
             ("system", system),
             ("user", $"Anweisung: {instruction}\n\nParameter:\n{sb}"),
-        }, maxTokens: 500, ct: ct);
+        }, maxTokens: 3000, ct: ct);
     }
 
     /// <summary>Summarises page/post content into a short SEO text: a meta description
@@ -125,46 +118,21 @@ public class AiService
           + "AUSSCHLIESSLICH den Text zurück: ohne Anführungszeichen, ohne Label, ohne Markdown.";
         var trimmed = content.Length > 6000 ? content[..6000] : content;
         var body = $"Titel: {title}\n\nInhalt:\n{trimmed}{extra}";
-        return RunAsync("seo", new[] { ("system", system), ("user", body) }, maxTokens: 220, ct: ct);
+        return RunAsync("seo", new[] { ("system", system), ("user", body) }, maxTokens: 2000, ct: ct);
     }
+}
 
-    /// <summary>Generates a whole page as a list of blocks. The model is given the AVAILABLE block types
-    /// with their text fields (<paramref name="blocksSpec"/>) and a brief, and must answer with a JSON
-    /// array of <c>{type, data}</c> using only those types/fields. The caller validates every block
-    /// against the registry — nothing here is trusted. The global site instruction (via RunAsync) rides
-    /// along, so the page comes out on-brand.</summary>
-    public Task<(bool ok, string? text, string? error)> GeneratePageAsync(
-        string instruction, string blocksSpec, CancellationToken ct = default)
-    {
-        var system =
-            "Du bist Web-Redakteur und Designer und baust eine Website-Seite aus VORGEGEBENEN Bausteinen. "
-          + "Unten die verfügbaren Blocktypen mit ihren Textfeldern (feldId [Beschreibung]). Wähle eine "
-          + "sinnvolle Abfolge (z. B. Hero am Anfang, dann Inhalt, am Ende ein Aufruf zur Handlung) und "
-          + "fülle die Textfelder mit echten, zum Auftrag passenden Inhalten — KEIN Lorem Ipsum, keine "
-          + "Platzhalter. Verwende AUSSCHLIESSLICH die aufgelisteten type-Werte und feldId-Werte; erfinde "
-          + "keine. Antworte AUSSCHLIESSLICH mit einem JSON-Array "
-          + "[{\"type\":\"hero\",\"data\":{\"heading\":\"…\"}}, …] — ohne Erklärungen, ohne Markdown.";
-        var body = $"Auftrag: {instruction}\n\nVerfügbare Blöcke:\n{blocksSpec}";
-        return RunAsync("pagegen", new[] { ("system", system), ("user", body) }, maxTokens: 2000, ct: ct);
-    }
+/// <summary>How a model call leaves this site. The one implementation relays through the connected cloud, which holds the
+/// provider key; the seam exists so the tests can answer in its place without a cloud or a provider.</summary>
+public interface IAiTransport
+{
+    Task<AiResponse> SendAsync(AiRequest request, CancellationToken ct = default);
+}
 
-    /// <summary>Generates a whole WEBSITE — several pages, each with a title, slug, whether it belongs in
-    /// the menu, and a block list — from a briefing + the available blocks. Answers with a JSON array of
-    /// pages. The caller validates every page and every block against the registry; nothing is trusted.
-    /// The global site instruction rides along (via RunAsync), so the whole site comes out on-brand.</summary>
-    public Task<(bool ok, string? text, string? error)> GenerateSiteAsync(
-        string briefing, string blocksSpec, CancellationToken ct = default)
-    {
-        var system =
-            "Du bist Web-Redakteur und Designer und baust eine ganze WEBSITE (mehrere Seiten) aus "
-          + "VORGEGEBENEN Bausteinen. Unten die verfügbaren Blocktypen mit ihren Textfeldern. Erstelle "
-          + "eine sinnvolle, kompakte Seitenstruktur (z. B. Start, Details/Über uns, Angebot/Preise, "
-          + "Kontakt) — höchstens 6 Seiten. Für JEDE Seite: ein kurzer Titel, ein URL-Slug (klein, nur "
-          + "a-z, 0-9, Bindestrich), ob sie ins Hauptmenü gehört (nav true/false), und eine Blockliste "
-          + "(nur aufgelistete type/feldId, echte Inhalte, KEIN Lorem Ipsum). Antworte AUSSCHLIESSLICH "
-          + "mit einem JSON-Array von Seiten: [{\"title\":\"Start\",\"slug\":\"home\",\"nav\":true,"
-          + "\"blocks\":[{\"type\":\"hero\",\"data\":{\"heading\":\"…\"}}]}, …] — ohne Erklärungen, ohne Markdown.";
-        var body = $"Auftrag: {briefing}\n\nVerfügbare Blöcke:\n{blocksSpec}";
-        return RunAsync("sitegen", new[] { ("system", system), ("user", body) }, maxTokens: 4000, ct: ct);
-    }
+/// <summary>The cloud relay (<c>POST /api/instances/{id}/ai</c>).</summary>
+public sealed class CloudAiTransport : IAiTransport
+{
+    private readonly CloudService _cloud;
+    public CloudAiTransport(CloudService cloud) => _cloud = cloud;
+    public Task<AiResponse> SendAsync(AiRequest request, CancellationToken ct = default) => _cloud.RelayAiAsync(request, ct);
 }

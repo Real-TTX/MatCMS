@@ -1555,5 +1555,7 @@
   "profiles.pluginNative": "Natives Plugin",
   "profiles.pluginNativeBadge": "kompiliert",
   "profiles.pluginNativeEntry": "Hauptdatei",
-  "profiles.pluginNativeHint": "Dieses Paket enthält kompilierten Code. Es lässt sich hier nicht bearbeiten, nur austauschen (neues Paket hochladen) oder herunterladen. Auf einer Instanz läuft es erst, wenn der Betreiber dort „Native Plugins erlauben“ eingeschaltet hat — das lässt sich von hier nicht setzen."
+  "profiles.pluginNativeHint": "Dieses Paket enthält kompilierten Code. Es lässt sich hier nicht bearbeiten, nur austauschen (neues Paket hochladen) oder herunterladen. Auf einer Instanz läuft es erst, wenn der Betreiber dort „Native Plugins erlauben“ eingeschaltet hat — das lässt sich von hier nicht setzen.",
+  "profiles.aiGuideAssistant": "KI-Assistent",
+  "profiles.aiGuideAssistantPlaceholder": "z. B. Seiten immer mit einem Hero beginnen und mit einem Kontakt-Aufruf enden. Leser mit „Sie“ ansprechen. Keine Seiten löschen."
 }

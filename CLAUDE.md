@@ -312,6 +312,53 @@ A built-in plugin (off until switched on), written against the plugin API and no
   expired, a count that is taken atomically.
 - Texts: `ShopStrings.All` (key, German, English in one row); a test checks that every key used in the code has both.
 
+## The AI assistant
+
+Admin → KI-Assistent (`Pages/Admin/Ai/`, `Services/Assistant/`). It replaced the one-shot generators ("KI: Seite generieren",
+"KI: Website generieren", "Block verbessern" and their `AiPreview` page) — those could only fill TEXT fields, append or add-only, and showed
+nothing of the way there. The narrow helpers that work stay: meta description / teaser (`_AiSeoDialog`) and the theme suggestion
+(`Templates/Customize`). Only where AI is on for the site (`ai.transport`, rolled out by the cloud profile); every model call still goes
+through the cloud relay — the key never lives on the site.
+
+- **A run is a loop, written down as it happens.** The editor's message starts a run (`AssistantService.SendAsync` → `AssistantRunner`, a
+  hosted queue, ≤ 3 conversations at once, each stoppable); `AssistantAgent` calls the model, executes the actions it asks for, hands the
+  results back, until the model says `done` (≤ 30 calls, ≤ 8 actions per answer). Every message, every action (tool, arguments, result,
+  warnings), every error is an `AiStep` the page polls (`?handler=Steps`) — that IS the "see what the AI does". A restart marks a running
+  conversation idle with a line saying so.
+- **The protocol is a JSON object per answer** (`{"message","actions":[{"tool","args"}],"done"}`), not a provider's native tool calling:
+  it works through the one plain relay request with every model the cloud may use (DeepSeek, OpenAI, a ChatGPT account). `AiRequest.Json`
+  asks for JSON mode where the provider has it; `AssistantAgent.Parse` reads leniently (fences, prose around it, `name`/`arguments`
+  spellings) and asks again twice before showing a non-protocol answer as text.
+- **The tools** (`AssistantTools`, list in `Catalog`): reads (site_overview, read_page, list_media, read_theme) and writes (create_page incl.
+  `translationOf` and `addToMenu`, update_page, set_page_blocks, add_blocks, update_block = a PATCH that keeps unnamed fields and clears on
+  null, move_block, delete_block, delete_page — never the home page —, set_menu — keeps the plugin elements —, update_theme, update_settings
+  for four whitelisted keys). Plugin pages are read-only. They write the same tables the editor writes.
+- **The trusted boundary is `AssistantBlocks`**: the catalogue the model is told (EVERY field of every block — pictures, lists, choices, the
+  layout fields `_width/_spaceTop/_spaceBottom/_hidden/_css`) and the validation of what comes back, per field kind: a choice must be one of
+  its options (dynamic sources resolved), a picture must be in the media library or https, a link is never `javascript:`/`data:`/`//`, rich
+  text goes through `SafeHtml`, `_css` loses every `<`. **Blocks with a raw-HTML field (the HTML block) are not offered at all** — an
+  attached document could steer the model into writing markup onto a live page. What does not fit is dropped WITH a warning that goes back to
+  the model, so it corrects itself. `BlockGenerator` stays for the cloud's MCP content ops.
+- **Undo is per run** (`AiChange`, `AssistantUndo`): the first time a run touches a page / menu (menu+locale) / template / setting, its state
+  is journalled; created things are journalled as null. Undo restores blocks and menu entries WITH THEIR OLD IDS (SQLite never reuses one)
+  and only the newest run with changes may be undone, then the one before — a run may build on the previous one. A tool that fails half-way
+  detaches everything unsaved (`AssistantTools.Discard`), or the next log line's save would write the half-change.
+- **Scope**: opened from editor v2 (sparkles in the top bar = this page, on a block = that block) or the classic editor, with
+  `?pageId=&blockId=` — NOT `page`, which Razor Pages keeps as a route name (the query value never arrived). "Nur hier ändern" makes the
+  tools refuse writes outside the page/block; reading stays allowed. The editor saves unsaved work before it hands over.
+- **The prompt** = the cloud's `ai.instruction` + the profile's per-action guide `assistant` (`AssistantAgent.OperatorText`) → the site's own
+  basic instruction (`assistant.prompt`, edited in the Grundanweisung tab; empty = `AssistantPrompt.Default`; NOT under `ai.`, which is the
+  cloud's group) → the fixed part nobody edits (protocol, tools, catalogue) → the situation. "Vollständige Anweisung anzeigen" shows the
+  exact text.
+- **Attachments** (`AssistantFiles`, ≤ 6 per message): pictures go into the media library (tag `KI-Anhang`, usable on a page at once) and a
+  ≤ 1600 px JPEG copy rides as `AiAttachment` on THIS run's user message (`appdata/ai-files/{conversation}`, deleted with it); PDF (PdfPig)
+  and DOCX go into the library and their TEXT into the message; txt/md/csv/json/html are read only. The cloud drops pictures for a model
+  that refuses them and says so (`AiResponse.Note`).
+- **Cloud side** (`MatCMS.Cloud/Services/AiService.cs`): completion cap 16 000 and 280 s — a reasoning model spends the cap on thinking and
+  came back EMPTY with the old 60/220/500-token caps, which is why the old actions "did not work"; an empty answer is now an error that says
+  why. Refusals naming `max_tokens`, `temperature`, `response_format` or a picture are retried without it. `CloudProtocol.Version` 18.
+- Tests: `AssistantTests` (the whole app in memory, `FakeAi` in place of the relay).
+
 ## Conventions
 
 Code, identifiers and comments in **English**; user-facing strings in **German**, via `@T["key"]`

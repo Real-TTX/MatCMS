@@ -1,0 +1,184 @@
+@page
+@model MatCMS.Pages.Admin.Ai.IndexModel
+@{
+    ViewData["Title"] = T["assistant.title"];
+    var words = new Dictionary<string, string>
+    {
+        ["you"] = T["assistant.you"], ["ai"] = T["assistant.ai"], ["working"] = T["assistant.working"], ["stop"] = T["assistant.stop"],
+        ["undo"] = T["assistant.undo"], ["undoConfirm"] = T["assistant.undoConfirm"], ["details"] = T["assistant.details"],
+        ["raw"] = T["assistant.raw"], ["args"] = T["assistant.args"], ["result"] = T["assistant.result"], ["warnings"] = T["assistant.warnings"],
+        ["plans"] = T["assistant.plans"], ["tokens"] = T["assistant.tokens"], ["sendFailed"] = T["assistant.sendFailed"],
+        ["remove"] = T["assistant.removeFile"], ["fileError"] = T["assistant.fileError"], ["openPage"] = T["assistant.openPage"],
+        ["noChange"] = T["assistant.noChange"], ["uploading"] = T["assistant.uploading"],
+    };
+    var c = Model.Conversation;
+}
+<div class="page-head">
+    <h1>@T["assistant.title"]</h1>
+</div>
+
+<div class="tabs" role="tablist">
+    <button type="button" class="tab @(Model.Tab == "chat" ? "active" : "")" data-tab="chat">@T["assistant.tabChat"]</button>
+    <button type="button" class="tab @(Model.Tab == "history" ? "active" : "")" data-tab="history">@T["assistant.tabHistory"]</button>
+    <button type="button" class="tab @(Model.Tab == "prompt" ? "active" : "")" data-tab="prompt">@T["assistant.tabPrompt"]</button>
+</div>
+
+@* ============ CHAT ============ *@
+<div class="tab-panel" data-panel="chat" hidden="@(Model.Tab != "chat")">
+    @if (!Model.Enabled)
+    {
+        <div class="alert alert-info">@T["assistant.disabledLong"]</div>
+    }
+    <div class="ai-wrap" id="ai"
+         data-id="@(c?.Id)" data-page="@Model.ScopePageId" data-block="@Model.ScopeBlockId"
+         data-send="@Url.Page("Index", "Send")" data-steps="@Url.Page("Index", "Steps")"
+         data-cancel="@Url.Page("Index", "Cancel")" data-undo="@Url.Page("Index", "Undo")"
+         data-self="@Url.Page("Index")" data-preview="@Model.PreviewUrl"
+         data-words="@System.Text.Json.JsonSerializer.Serialize(words)">
+        <section class="card ai-main">
+            <div class="ai-scope">
+                <span class="badge"><i class="ti ti-target"></i> @Model.ScopeText</span>
+                @if (Model.ScopePageId is not null)
+                {
+                    <label class="checkbox-row ai-lock" title="@T["assistant.lockHelp"]">
+                        <input type="checkbox" id="ai-lock" checked="@Model.ScopeLocked" /> @T["assistant.lock"]
+                    </label>
+                }
+                <span class="ai-scope-gap"></span>
+                @if (c is not null)
+                {
+                    <a class="btn btn-ghost btn-sm" href="@Url.Page("Index", new { pageId = Model.ScopePageId, blockId = Model.ScopeBlockId })">@T["assistant.new"]</a>
+                }
+            </div>
+
+            <div class="ai-log" id="ai-log" aria-live="polite">
+                @if (c is null)
+                {
+                    <div class="ai-empty" id="ai-empty">
+                        <p>@T["assistant.intro"]</p>
+                        <div class="ai-examples">
+                            @foreach (var ex in (Model.ScopePageId is null
+                                ? new[] { "assistant.ex.site1", "assistant.ex.site2", "assistant.ex.site3", "assistant.ex.site4" }
+                                : Model.ScopeBlockId is null
+                                    ? new[] { "assistant.ex.page1", "assistant.ex.page2", "assistant.ex.page3", "assistant.ex.page4" }
+                                    : new[] { "assistant.ex.block1", "assistant.ex.block2", "assistant.ex.block3" }))
+                            {
+                                <button type="button" class="ai-example" data-example>@T[ex]</button>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <form class="ai-compose" id="ai-compose" method="post" enctype="multipart/form-data">
+                @Html.AntiForgeryToken()
+                <div class="ai-files" id="ai-files"></div>
+                <textarea id="ai-input" rows="3" placeholder="@T["assistant.placeholder"]" @(Model.Enabled ? "" : "disabled")></textarea>
+                <div class="ai-compose-bar">
+                    <input type="file" id="ai-file" multiple hidden accept=".jpg,.jpeg,.png,.webp,.gif,.pdf,.docx,.txt,.md,.csv,.json,.html,.htm,.xml" />
+                    <button type="button" class="btn btn-ghost btn-sm" id="ai-attach" title="@T["assistant.attachHelp"]" @(Model.Enabled ? "" : "disabled")><i class="ti ti-paperclip"></i> @T["assistant.attach"]</button>
+                    <span class="muted ai-hint">@T["assistant.hint"]</span>
+                    <span class="ai-scope-gap"></span>
+                    <button type="button" class="btn btn-ghost btn-sm" id="ai-stop" hidden>@T["assistant.stop"]</button>
+                    <button type="submit" class="btn btn-sm" id="ai-send" @(Model.Enabled ? "" : "disabled")>@T["assistant.send"]</button>
+                </div>
+            </form>
+        </section>
+
+        <aside class="card ai-side">
+            <div class="ai-side-bar">
+                <span class="ai-side-url" id="ai-url">@Model.PreviewUrl</span>
+                <button type="button" class="btn btn-ghost btn-icon btn-sm" id="ai-reload" title="@T["assistant.reload"]" aria-label="@T["assistant.reload"]"><i class="ti ti-refresh"></i></button>
+                <a class="btn btn-ghost btn-icon btn-sm" id="ai-open" href="@Model.PreviewUrl" target="_blank" rel="noopener" title="@T["assistant.openTab"]" aria-label="@T["assistant.openTab"]"><i class="ti ti-external-link"></i></a>
+                @if (Model.ScopePageId is int sp)
+                {
+                    <a class="btn btn-ghost btn-sm" href="/admin/pages/editor/@sp">@T["assistant.toEditor"]</a>
+                }
+            </div>
+            <iframe class="ai-frame" id="ai-frame" title="@T["assistant.preview"]" src="@Model.PreviewUrl"></iframe>
+        </aside>
+    </div>
+</div>
+
+@* ============ HISTORY ============ *@
+<div class="tab-panel" data-panel="history" hidden="@(Model.Tab != "history")">
+    <div data-list data-list-page-size="25">
+        <div class="page-head">
+            <div class="list-toolbar">
+                <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+            </div>
+        </div>
+        <table class="data" data-list-table>
+            <thead>
+                <tr>
+                    <th>@T["assistant.colTitle"]</th>
+                    <th>@T["assistant.colScope"]</th>
+                    <th>@T["assistant.colRuns"]</th>
+                    <th>@T["assistant.colChanges"]</th>
+                    <th>@T["assistant.colTokens"]</th>
+                    <th>@T["assistant.colUpdated"]</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Conversations.Count == 0)
+                {
+                    @await Html.PartialAsync("_EmptyRow", T["assistant.noConversations"].ToString())
+                }
+                @foreach (var row in Model.Conversations)
+                {
+                    <tr>
+                        <td><a href="@Url.Page("Index", new { id = row.Id })">@row.Title</a></td>
+                        <td>@row.Scope</td>
+                        <td>@row.Runs</td>
+                        <td>@row.Changes</td>
+                        <td>@row.Tokens.ToString("N0")</td>
+                        <td>@row.UpdatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                        <td>
+                            <div class="actions">
+                                <form method="post" asp-page-handler="Delete" asp-route-id="@row.Id" class="inline-form" data-confirm="@T["assistant.deleteConfirm"]">
+                                    <button type="submit" class="btn btn-ghost btn-icon btn-danger" title="@T["assistant.delete"]" aria-label="@T["assistant.delete"]">@await Html.PartialAsync("_IconTrash")</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <div class="list-empty" data-list-empty hidden>@T["assistant.searchEmpty"]</div>
+        <div class="list-pager" data-list-pager></div>
+        <div class="list-actions"><a class="btn btn-sm" href="@Url.Page("Index")">@T["assistant.new"]</a></div>
+    </div>
+</div>
+
+@* ============ PROMPT ============ *@
+<div class="tab-panel" data-panel="prompt" hidden="@(Model.Tab != "prompt")">
+    <form method="post" asp-page-handler="Prompt" class="card">
+        <h2>@T["assistant.promptTitle"]</h2>
+        <div class="help">@T["assistant.promptHelp"]</div>
+        <div class="form-field">
+            <textarea name="prompt" rows="22" class="ai-prompt">@Model.SitePrompt</textarea>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn">@T["assistant.promptSave"]</button>
+            <button type="submit" name="reset" value="true" class="btn btn-ghost" data-confirm="@T["assistant.promptResetConfirm"]">@T["assistant.promptResetBtn"]</button>
+        </div>
+    </form>
+    @if (!string.IsNullOrWhiteSpace(Model.OperatorInstruction))
+    {
+        <div class="card">
+            <h2>@T["assistant.operatorTitle"]</h2>
+            <div class="help">@T["assistant.operatorHelp"]</div>
+            <pre class="ai-pre">@Model.OperatorInstruction</pre>
+        </div>
+    }
+    <div class="card">
+        <h2>@T["assistant.fullTitle"]</h2>
+        <div class="help">@T["assistant.fullHelp"]</div>
+        <p><a class="btn btn-ghost btn-sm" href="@Url.Page("Index", "FullPrompt", new { id = c?.Id, pageId = Model.ScopePageId, blockId = Model.ScopeBlockId })" target="_blank" rel="noopener">@T["assistant.fullShow"]</a></p>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/ai-assistant.js" asp-append-version="true"></script>
+}

@@ -742,27 +742,34 @@ public class CloudService
     public async Task<(bool ok, string? text, string? error)> CallAiAsync(
         AiRequest request, CancellationToken ct = default)
     {
+        var answer = await RelayAiAsync(request, ct);
+        return (answer.Ok, answer.Text, answer.Ok ? null : answer.Error ?? "Unbekannter Grund.");
+    }
+
+    /// <summary>The relayed call with the whole answer — model, tokens and the cloud's note — for the assistant, which shows them.</summary>
+    public async Task<AiResponse> RelayAiAsync(AiRequest request, CancellationToken ct = default)
+    {
         var settings = await GetSettingsAsync();
-        if (!settings.Configured) return (false, null, "Diese Website ist mit keiner Cloud verbunden.");
+        if (!settings.Configured) return new AiResponse { Ok = false, Error = "Diese Website ist mit keiner Cloud verbunden." };
 
         try
         {
             var client = CreateClient(settings);
-            client.Timeout = TimeSpan.FromSeconds(120);   // AI completions are slow; the mail 30s is too short
+            // AI completions are slow (a reasoning model thinks before it writes a page); the cloud allows its provider 280 s.
+            client.Timeout = TimeSpan.FromSeconds(300);
             using var res = await client.PostAsJsonAsync(
                 $"{settings.Url}/api/instances/{settings.InstanceId}/ai", request, ct);
 
             if (!res.IsSuccessStatusCode)
-                return (false, null, $"Die Cloud hat die KI-Anfrage abgelehnt (HTTP {(int)res.StatusCode}).");
+                return new AiResponse { Ok = false, Error = $"Die Cloud hat die KI-Anfrage abgelehnt (HTTP {(int)res.StatusCode})." };
 
             var answer = await res.Content.ReadFromJsonAsync<AiResponse>(cancellationToken: ct);
-            if (answer is null) return (false, null, "Die Cloud hat nicht geantwortet.");
-            return (answer.Ok, answer.Text, answer.Ok ? null : answer.Error ?? "Unbekannter Grund.");
+            return answer ?? new AiResponse { Ok = false, Error = "Die Cloud hat nicht geantwortet." };
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             _log.LogWarning(ex, "Relaying AI request to the cloud failed");
-            return (false, null, ex.Message);
+            return new AiResponse { Ok = false, Error = ex is TaskCanceledException ? "Die KI hat nicht rechtzeitig geantwortet." : ex.Message };
         }
     }
 

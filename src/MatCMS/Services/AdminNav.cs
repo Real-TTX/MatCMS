@@ -29,10 +29,12 @@ public sealed record AdminNavLink(string Label, string Url, string Icon, string?
 /// </summary>
 public sealed class AdminNav
 {
-    private sealed record Core(string LabelKey, string Url, string Icon, AdminGroup Group, int Order);
+    private sealed record Core(string LabelKey, string Url, string Icon, AdminGroup Group, int Order, bool OnlyWithAi = false);
 
     private static readonly Core[] CoreEntries =
     {
+        // The AI assistant first: it works on everything below it. Shown only where AI is switched on for the site.
+        new("nav.assistant", "/admin/ai", "ti-sparkles", AdminGroup.Content, 5, OnlyWithAi: true),
         new("nav.pages", "/admin/pages", "ti-file-text", AdminGroup.Content, 10),
         new("nav.menus", "/admin/menus", "ti-menu-2", AdminGroup.Content, 30),
         new("nav.forms", "/admin/forms", "ti-forms", AdminGroup.Content, 40),
@@ -67,7 +69,8 @@ public sealed class AdminNav
     public async Task<IReadOnlyList<AdminNavEntry>> GroupAsync(AdminGroup group, IServiceProvider services, CancellationToken ct = default)
     {
         var list = new List<AdminNavEntry>();
-        list.AddRange(CoreEntries.Where(c => c.Group == group).Select(c => new AdminNavEntry(c.LabelKey, c.Url, c.Icon, c.Order, true)));
+        var ai = services.GetService<AiService>()?.Enabled == true;
+        list.AddRange(CoreEntries.Where(c => c.Group == group && (!c.OnlyWithAi || ai)).Select(c => new AdminNavEntry(c.LabelKey, c.Url, c.Icon, c.Order, true)));
         foreach (var m in _registry.AdminMenu.Where(m => m.Group == group))
             list.Add(await PluginEntryAsync(m, services, ct));
         // Stable: entries of the same order keep core-first, then plugin load order.

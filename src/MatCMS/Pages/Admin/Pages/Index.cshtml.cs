@@ -14,15 +14,13 @@ public class IndexModel : PageModel
 {
     private readonly AppDbContext _db;
     private readonly AiService _ai;
-    private readonly BlockGenerator _blockGen;
-    public IndexModel(AppDbContext db, AiService ai, BlockGenerator blockGen)
+    public IndexModel(AppDbContext db, AiService ai)
     {
         _db = db;
         _ai = ai;
-        _blockGen = blockGen;
     }
 
-    /// <summary>True when AI is switched on for this site (shows the "generate website" action).</summary>
+    /// <summary>True when AI is switched on for this site (shows the way to the AI assistant).</summary>
     public bool AiEnabled { get; private set; }
 
     /// <summary>One language version of a logical page (with its own public URL).</summary>
@@ -106,171 +104,5 @@ public class IndexModel : PageModel
         var slug = sb.ToString();
         while (slug.Contains("--")) slug = slug.Replace("--", "-");
         return slug.Trim('-');
-    }
-
-    // --- AI "generate whole website" --------------------------------------------------------------
-    // A briefing → several pages (title, slug, nav flag, blocks). Blocks reuse the shared BlockGenerator
-    // validator; pages are ADD-ONLY (slugs deduped, existing pages never overwritten).
-
-    public sealed record GenPage(string Title, string Slug, bool Nav, List<(string Type, string Name, JsonObject Data)> Blocks);
-
-    /// <summary>Validates the model's site JSON: per page a non-empty title, a safe slug, a nav flag and
-    /// a validated block list (shared validator). Pages with no valid blocks are dropped. Bounded to 6.</summary>
-    private List<GenPage> ValidateSite(string? json)
-    {
-        var pages = new List<GenPage>();
-        JsonNode? root;
-        try { root = JsonNode.Parse(BlockGenerator.ExtractJsonArray(json)); } catch { return pages; }
-        if (root is not JsonArray arr) return pages;
-
-        foreach (var item in arr)
-        {
-            if (pages.Count >= 6) break;
-            if (item is not JsonObject obj) continue;
-            var title = ((obj["title"] as JsonValue)?.ToString() ?? "").Trim();
-            if (title.Length == 0) continue;
-            if (title.Length > 120) title = title[..120];
-            var slug = Slugify((obj["slug"] as JsonValue)?.ToString() ?? title);
-            if (slug.Length == 0) slug = Slugify(title);
-            if (slug.Length == 0 || IsReserved(slug)) slug = "seite";
-            var nav = false;
-            if (obj["nav"] is JsonValue nv)
-            {
-                if (nv.TryGetValue<bool>(out var nb)) nav = nb;
-                else if (nv.TryGetValue<string>(out var ns)) nav = ns.Trim().ToLowerInvariant() is "true" or "1" or "yes" or "ja";
-            }
-            var blocks = _blockGen.ValidateBlocks(obj["blocks"] as JsonArray);
-            if (blocks.Count == 0) continue;
-            pages.Add(new GenPage(title, slug, nav, blocks));
-        }
-        return pages;
-    }
-
-    /// <summary>Proposes a whole website (several pages, each with blocks) from a briefing + the global
-    /// AI instruction, validated against the registry. Returns { ok, pages[summary], proposed } WITHOUT
-    /// saving; the client shows the list and — on confirm — posts `proposed` to CreateSite.</summary>
-    public async Task<IActionResult> OnPostAiGenerateSiteAsync(string? briefing)
-    {
-        if (!_ai.Enabled)
-            return new JsonResult(new { ok = false, error = "KI ist für diese Website nicht aktiviert." });
-        if (string.IsNullOrWhiteSpace(briefing))
-            return new JsonResult(new { ok = false, error = "Bitte beschreibe kurz, was die Website enthalten soll." });
-
-        var (ok, text, error) = await _ai.GenerateSiteAsync(briefing.Trim(), _blockGen.BuildSpecText(), HttpContext.RequestAborted);
-        if (!ok) return new JsonResult(new { ok = false, error = error ?? "KI-Aufruf fehlgeschlagen." });
-
-        var pages = ValidateSite(text);
-        if (pages.Count == 0)
-            return new JsonResult(new { ok = false, error = "Die KI hat keine verwertbaren Seiten geliefert." });
-
-        var proposed = new JsonArray();
-        var summary = new List<object>();
-        foreach (var p in pages)
-        {
-            var blocksArr = new JsonArray();
-            foreach (var (type, _, data) in p.Blocks) blocksArr.Add(new JsonObject { ["type"] = type, ["data"] = data });
-            proposed.Add(new JsonObject { ["title"] = p.Title, ["slug"] = p.Slug, ["nav"] = p.Nav, ["blocks"] = blocksArr });
-            summary.Add(new { title = p.Title, slug = p.Slug, nav = p.Nav, blocks = p.Blocks.Count });
-        }
-        return new JsonResult(new { ok = true, pages = summary, proposed = proposed.ToJsonString() });
-    }
-
-    /// <summary>Creates the confirmed AI-proposed website. Re-validates the round-trip (client never
-    /// trusted). Pages are ADD-ONLY — slugs are deduped so nothing existing is overwritten — published,
-    /// with the nav pages appended to the main menu. Normal antiforgery form post → PRG to the list.</summary>
-    public async Task<IActionResult> OnPostAiCreateSiteAsync(string? sitesJson)
-    {
-        if (!_ai.Enabled) return RedirectToPage();
-        var pages = ValidateSite(sitesJson);
-        if (pages.Count == 0)
-        {
-            TempData["FlashError"] = "Es gab keine gültigen Seiten zum Anlegen.";
-            return RedirectToPage();
-        }
-
-        var used = new HashSet<string>(
-            await _db.Pages.Where(p => p.Locale == Localizer.DefaultCulture).Select(p => p.Slug).ToListAsync(),
-            StringComparer.OrdinalIgnoreCase);
-        var navOrder = await _db.Pages.Select(p => (int?)p.NavOrder).MaxAsync() ?? 0;
-
-        var created = 0;
-        foreach (var gp in pages)
-        {
-            var slug = gp.Slug;
-            var n = 2;
-            while (used.Contains(slug)) slug = $"{gp.Slug}-{n++}";
-            used.Add(slug);
-
-            var page = new PageEntity
-            {
-                Title = gp.Title,
-                Slug = slug,
-                Locale = Localizer.DefaultCulture,
-                IsPublished = true,
-                ShowInNav = gp.Nav,
-                NavOrder = gp.Nav ? ++navOrder : 0,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
-            var sort = 0;
-            foreach (var (type, _, data) in gp.Blocks)
-                page.Blocks.Add(new ContentBlock { BlockType = type, DataJson = data.ToJsonString(), SortOrder = sort++ });
-            _db.Pages.Add(page);
-            created++;
-        }
-        await _db.SaveChangesAsync();
-
-        TempData["Flash"] = $"{created} Seite(n) von der KI angelegt.";
-        return RedirectToPage();
-    }
-
-    /// <summary>One-shot: create a SINGLE (sub)page from a title + briefing and generate its blocks in one
-    /// step, then open it in the editor. Created as a DRAFT (add-only slug) so the operator reviews and
-    /// publishes; if the AI returns nothing, the empty page is still created so the operator is not stuck.</summary>
-    public async Task<IActionResult> OnPostAiNewPageAsync(string? title, string? briefing, bool nav)
-    {
-        if (!_ai.Enabled) { TempData["FlashError"] = "KI ist für diese Website nicht aktiviert."; return RedirectToPage(); }
-        title = (title ?? "").Trim();
-        if (title.Length == 0) { TempData["FlashError"] = "Bitte einen Titel für die Seite angeben."; return RedirectToPage(); }
-
-        var slugBase = Slugify(title);
-        if (slugBase.Length == 0 || IsReserved(slugBase))
-        {
-            TempData["FlashError"] = "Aus dem Titel lässt sich kein gültiger Slug bilden.";
-            return RedirectToPage();
-        }
-        var used = new HashSet<string>(
-            await _db.Pages.Where(p => p.Locale == Localizer.DefaultCulture).Select(p => p.Slug).ToListAsync(),
-            StringComparer.OrdinalIgnoreCase);
-        var slug = slugBase; var n = 2;
-        while (used.Contains(slug)) slug = $"{slugBase}-{n++}";
-
-        var (ok, text, error) = await _ai.GeneratePageAsync(
-            string.IsNullOrWhiteSpace(briefing) ? title : briefing!.Trim(), _blockGen.BuildSpecText(), HttpContext.RequestAborted);
-        var blocks = ok ? _blockGen.ValidateBlocks(text) : new();
-
-        var navOrder = nav ? (await _db.Pages.Select(p => (int?)p.NavOrder).MaxAsync() ?? 0) + 1 : 0;
-        var page = new PageEntity
-        {
-            Title = title,
-            Slug = slug,
-            Locale = Localizer.DefaultCulture,
-            IsPublished = false,   // draft: created for review, operator publishes after checking
-            ShowInNav = nav,
-            NavOrder = navOrder,
-            TranslationGroup = Guid.NewGuid().ToString("N"),
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        };
-        var sort = 0;
-        foreach (var (type, _, data) in blocks)
-            page.Blocks.Add(new ContentBlock { BlockType = type, DataJson = data.ToJsonString(), SortOrder = sort++ });
-        _db.Pages.Add(page);
-        await _db.SaveChangesAsync();
-
-        TempData["Flash"] = blocks.Count > 0
-            ? $"Seite '{title}' per KI mit {blocks.Count} Block/Blöcken angelegt (Entwurf)."
-            : $"Seite '{title}' angelegt — die KI lieferte keine Blöcke; du kannst sie im Editor füllen.";
-        return RedirectToPage("Editor", new { id = page.Id });
     }
 }

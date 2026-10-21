@@ -15,7 +15,7 @@ public static class CloudProtocol
     /// <summary>Contract version. Bump on <b>every</b> change to the payloads in this file: the cloud
     /// badges an instance reporting an older one as "veraltet", and both sides read this constant, so
     /// one edit covers both.</summary>
-    public const int Version = 17;
+    public const int Version = 18;
 
     /// <summary>Header carrying the instance's bearer token.</summary>
     public const string TokenHeader = "X-MatCMS-Instance-Token";
@@ -518,6 +518,29 @@ public sealed class AiMessage
     /// <summary>"system" | "user" | "assistant".</summary>
     public string Role { get; set; } = "user";
     public string Content { get; set; } = "";
+
+    /// <summary>Files that ride along with a USER message: pictures the model may look at, PDFs it may read. Empty for
+    /// nearly every message. A text document never travels here — the instance reads it and puts its text into
+    /// <see cref="Content"/>, which works with every model. An older cloud ignores the field and the model gets the text only.</summary>
+    public List<AiAttachment> Attachments { get; set; } = new();
+}
+
+/// <summary>One file attached to an <see cref="AiMessage"/>, inline as base64 (the relay is one request, there is
+/// no file store in between). The cloud bounds count and size; a model that cannot see pictures gets a line of
+/// text in their place instead of an error.</summary>
+public sealed class AiAttachment
+{
+    /// <summary>"image" | "file".</summary>
+    public string Kind { get; set; } = "image";
+
+    /// <summary>MIME type: image/jpeg, image/png, image/webp, application/pdf.</summary>
+    public string MediaType { get; set; } = "";
+
+    /// <summary>The original file name, shown to the model.</summary>
+    public string Name { get; set; } = "";
+
+    /// <summary>The bytes, base64-encoded.</summary>
+    public string Data { get; set; } = "";
 }
 
 /// <summary>
@@ -538,6 +561,10 @@ public sealed class AiRequest
 
     /// <summary>Completion-length cap the instance would like; the cloud clamps it to its own maximum.</summary>
     public int? MaxTokens { get; set; }
+
+    /// <summary>The answer must be one JSON object. The cloud asks the provider for JSON mode where it has one and
+    /// quietly drops the request where it does not — the instance parses leniently either way.</summary>
+    public bool Json { get; set; }
 }
 
 /// <summary>
@@ -551,6 +578,12 @@ public sealed class AiResponse
     public string? Error { get; set; }
     public int PromptTokens { get; set; }
     public int CompletionTokens { get; set; }
+
+    /// <summary>The model that answered — shown next to the answer so an editor knows who wrote it.</summary>
+    public string? Model { get; set; }
+
+    /// <summary>What the cloud had to leave out ("Bilder kann dieses Modell nicht sehen"), or null.</summary>
+    public string? Note { get; set; }
 }
 
 /// <summary>

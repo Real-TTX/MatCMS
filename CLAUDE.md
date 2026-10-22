@@ -399,6 +399,15 @@ through the cloud relay — the key never lives on the site.
 - Tests: `AssistantTests` (the whole app in memory, `FakeAi` in place of the relay), `OwnAiTests` (shared provider clients, the KI tab,
   encryption, backup exclusion).
 
+## Fonts are served by this server (LocalFonts)
+
+No page may send a visitor's browser to Google: `MatCMS.Shared.Web/LocalFonts.cs` maps `/fonts/css2` (+ `/fonts/css`, `/fonts/f/{file}`) in
+BOTH apps; the first request fetches Google's stylesheet and font files server-side into `appdata/fonts`, every later one is served
+from there. Layouts link `/fonts/css2?…` (same query as Google). User-written template code (CSS `@import`, layout, head code, login
+and maintenance pages) goes through `LocalFonts.Rewrite` when rendered. If Google is unreachable on that first fetch the answer is an
+empty, uncached stylesheet (system fonts) — never a link to Google. A new place that emits template/user HTML must call `Rewrite` too.
+Trap: a minimal-API lambda taking ONLY `HttpContext` and returning a Task binds to `RequestDelegate` and drops its IResult (empty 200).
+
 ## Conventions
 
 Code, identifiers and comments in **English**; user-facing strings in **German**, via `@T["key"]`

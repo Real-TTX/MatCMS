@@ -140,7 +140,7 @@
         expectLoad = true;
         writeFrame(frame, '<!doctype html><html><head><meta charset="utf-8">' +
             '<base target="_blank">' +
-            '<link href="https://fonts.googleapis.com/css2?family=' + fonts + '&display=swap" rel="stylesheet">' +
+            '<link href="/fonts/css2?family=' + fonts + '&display=swap" rel="stylesheet">' +
             '<style>' +
             '*{box-sizing:border-box}' +
             'body{margin:0;background:' + bg + ';color:' + text + ';font-family:"' + bodyFont + '",system-ui,sans-serif;line-height:1.65;font-size:16px}' +

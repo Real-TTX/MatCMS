@@ -24,7 +24,7 @@
         !string.Equals(tpl.BodyFont.Trim(), tpl.HeadingFont?.Trim(), StringComparison.OrdinalIgnoreCase))
         families.Add(tpl.BodyFont.Trim());
     if (families.Count == 0) families.Add("Inter");
-    var fontsHref = "https://fonts.googleapis.com/css2?" +
+    var fontsHref = "/fonts/css2?" +
         string.Join("&", families.Select(f => "family=" + FontQuery(f))) + "&display=swap";
 
     // Accent + a slightly darker shade for --accent-dark.
@@ -139,8 +139,6 @@
             <meta property="@hm.Key" content="@hm.Value" />
         }
     }
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="@fontsHref" rel="stylesheet" />
     <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/lib/tabler-icons/tabler-icons.min.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/site.css" asp-append-version="true" />
@@ -184,7 +182,8 @@
     }
     @if (!string.IsNullOrWhiteSpace(customCssResolved))
     {
-        <style>@Html.Raw(customCssResolved)</style>
+        @* A template's own @import/link to Google Fonts is served from this server too (LocalFonts) — no visitor talks to Google. *@
+        <style>@Html.Raw(MatCMS.Shared.Web.LocalFonts.Rewrite(customCssResolved))</style>
     }
     <link rel="icon" href="@Site.FaviconUrl" />
     @{
@@ -207,7 +206,7 @@
     }
     @if (!string.IsNullOrWhiteSpace(Site.HeadCode))
     {
-        @Html.Raw(Site.HeadCode)
+        @Html.Raw(MatCMS.Shared.Web.LocalFonts.Rewrite(Site.HeadCode))
     }
 </head>
 <body class="@(showAdminBar ? "has-adminbar" : null)" data-toolbar="@(Site.ToolbarMenu.Count > 0 ? "1" : null)" data-els="@(Site.ElementKeys.Count > 0 ? string.Join(' ', Site.ElementKeys) : null)">
@@ -224,7 +223,7 @@
 }
 @if (useCustomLayout)
 {
-    @Html.Raw(customBody)
+    @Html.Raw(MatCMS.Shared.Web.LocalFonts.Rewrite(customBody))
 }
 else
 {

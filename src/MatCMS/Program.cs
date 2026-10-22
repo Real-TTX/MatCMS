@@ -645,7 +645,8 @@ app.Use(async (ctx, next) =>
         p.StartsWith("/login", StringComparison.OrdinalIgnoreCase) ||
         p.StartsWith("/logout", StringComparison.OrdinalIgnoreCase) ||
         p.StartsWith("/_status", StringComparison.OrdinalIgnoreCase) ||
-        p.StartsWith("/set-language", StringComparison.OrdinalIgnoreCase);
+        p.StartsWith("/set-language", StringComparison.OrdinalIgnoreCase) ||
+        p.StartsWith("/fonts/", StringComparison.OrdinalIgnoreCase);   // the maintenance page itself uses them
     if (exempt)
     {
         await next();
@@ -668,6 +669,8 @@ app.Use(async (ctx, next) =>
     await ctx.Response.WriteAsync(html);
 });
 
+// Google Fonts from this server (LocalFonts): fetched once into appdata/fonts, no visitor ever contacts Google.
+MatCMS.Shared.Web.LocalFonts.MapLocalFonts(app, StoragePaths.DataDir(app.Environment));
 app.MapRazorPages();
 
 // Public plugin routes. ASP.NET cannot unregister an endpoint, so plugins do not get endpoints of their

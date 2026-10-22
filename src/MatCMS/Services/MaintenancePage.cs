@@ -67,7 +67,7 @@ public static class MaintenancePage
         };
 
         var part = TemplateSchema.EffectivePart(tpl, TemplateSchema.PartMaintenance);
-        return TemplateSchema.RenderTokens(part, tokens);
+        return MatCMS.Shared.Web.LocalFonts.Rewrite(TemplateSchema.RenderTokens(part, tokens));
     }
 
     // --- helpers -----------------------------------------------------------
@@ -91,7 +91,7 @@ public static class MaintenancePage
         var families = new List<string> { headFont };
         if (!string.Equals(bodyFont, headFont, StringComparison.OrdinalIgnoreCase))
             families.Add(bodyFont);
-        return "https://fonts.googleapis.com/css2?" + string.Join("&", families.Select(f => "family=" + Q(f))) + "&display=swap";
+        return "/fonts/css2?" + string.Join("&", families.Select(f => "family=" + Q(f))) + "&display=swap";
     }
 
     private static (int r, int g, int b)? ParseHex(string hex)

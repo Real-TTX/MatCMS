@@ -15,10 +15,10 @@
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>Anmelden – @Model.SiteName</title>
-        <style>@Html.Raw(Model.CustomCss)</style>
+        <style>@Html.Raw(MatCMS.Shared.Web.LocalFonts.Rewrite(Model.CustomCss))</style>
     </head>
     <body>
-        @Html.Raw(Model.CustomBefore)
+        @Html.Raw(MatCMS.Shared.Web.LocalFonts.Rewrite(Model.CustomBefore))
         <form class="login-form" method="post">
             @Html.AntiForgeryToken()
             <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
@@ -26,7 +26,7 @@
             <input class="login-pass" name="password" type="password" placeholder="Kennwort eingeben…" autocomplete="current-password" required />
             <button class="login-submit" type="submit">Anmelden</button>
         </form>
-        @Html.Raw(Model.CustomAfter)
+        @Html.Raw(MatCMS.Shared.Web.LocalFonts.Rewrite(Model.CustomAfter))
         <script>
             (function () {
                 if (window.__cuInit) return; window.__cuInit = true;

@@ -91,8 +91,6 @@ public static class TemplateSchema
           <meta name="robots" content="noindex" />
           <title>{{maint_title}} – {{site_name}}</title>
           {{favicon}}
-          <link rel="preconnect" href="https://fonts.googleapis.com">
-          <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
           <link href="{{fonts_href}}" rel="stylesheet">
           <style>
             :root{

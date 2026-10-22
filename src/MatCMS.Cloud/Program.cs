@@ -440,6 +440,8 @@ app.Use(async (ctx, next) =>
     await next();
 });
 
+// Google Fonts from this server (LocalFonts) — the admin's own fonts too: no browser contacts Google.
+MatCMS.Shared.Web.LocalFonts.MapLocalFonts(app, Path.Combine(app.Environment.ContentRootPath, "appdata"));
 app.MapRazorPages();
 
 // --- Remote MCP server (/mcp) ---------------------------------------------

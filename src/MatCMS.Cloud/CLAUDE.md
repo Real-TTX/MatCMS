@@ -1189,7 +1189,9 @@ the admin UI uses. There is no second restore path and no second backup format.
   COPIES the profile into the live keys `ai.provider/model/baseUrl/apiKey`, so `AiService`, the settings API/MCP and the configuration backup are
   unchanged. "Active" is CHECKED, not only remembered (`ai.activeProfile` counts while the live keys still hold its values) — a change through
   the API or a restore shows as "Eigene Einstellung (kein Profil)" instead of a profile that claims values it no longer has. A cloud from before
-  profiles shows its live connection as the one profile. ChatGPT profiles share the one sign-in. "Modelle laden" = the shared
+  profiles shows its live connection as the one profile. Every ChatGPT profile has its OWN sign-in (`ai.chatgpt.tokens.{profile}`, signed in
+  on the profile page, `ChatGptAccounts.For`); activating one sets `ai.chatgpt.account`, which the DI `ChatGptAuthService` (relay, REST, MCP)
+  follows. The old single sign-in (`ai.chatgpt.tokens`) is moved to the first profile that reads it. The KI tab has no ChatGPT card any more. "Modelle laden" = the shared
   `ChatCompletionsClient.ListModelsAsync`. The OAuth connector card moved to the API tab (access TO the cloud, not the cloud calling a provider).
 - **The AI relay serves the site's AI assistant** (protocol 18; the assistant itself is the CMS's, see the root `CLAUDE.md`). What the
   relay does for it in `AiService.CompleteAsync`: a cap of 16 000 completion tokens and 280 s (a REASONING model — DeepSeek, o-series,

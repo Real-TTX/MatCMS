@@ -350,6 +350,11 @@ through the cloud relay — the key never lives on the site.
   (compiled with `PluginRunner.Check` first; a new one is saved OFF, a running one whose code changed is switched OFF until the admin looks).
   Markup for layouts and components is REFUSED, not cleaned, when anything in it runs (`AssistantMarkup`: script/iframe/object/base/meta/link,
   `on*`, `srcdoc`, `javascript:`/`data:` addresses, CSS expressions) — the refusal names it so the model rewrites it.
+- **A run always finishes visibly**: an answer that only ANNOUNCES ("done": false, no actions) is told to go on (twice, then "stalled"), a
+  question to the user ends it as "waiting", a busy/slow provider is asked again (2×, growing pause), the limit is 50 calls. The LAST step of
+  every run is kind `end` with `state` done|waiting|limit|stalled|error|cancelled — the page draws it as a status line, with "Weitermachen"
+  (sends "Mach weiter.") where it makes sense. The runner's start-up reset only touches runs older than its start (a run begun in the
+  first second used to be marked idle while it went on).
 - **Undo is per run** (`AiChange`, `AssistantUndo`): the first time a run touches a page / menu (menu+locale) / template / setting, its state
   is journalled; created things are journalled as null. Undo restores blocks and menu entries WITH THEIR OLD IDS (SQLite never reuses one)
   and only the newest run with changes may be undone, then the one before — a run may build on the previous one. A tool that fails half-way
@@ -381,7 +386,10 @@ through the cloud relay — the key never lives on the site.
   (empty = the cloud's relay); both in `SettingKeys.AiOwn`, so protected and in no backup. `OwnAi.GetAsync` returns the ACTIVE profile,
   so `SiteAiTransport` did not change. A site from before profiles has no `assistant.profiles` row: `OwnAi.Read` presents its loose
   keys as the profile (active if it was in use) and the first save writes the list and clears them. All ChatGPT profiles share the one
-  sign-in. "Modelle laden" = `ChatCompletionsClient.ListModelsAsync` (the provider's `GET /models`; free = OpenRouter's prices "0" or
+  sign-in — NO: every ChatGPT profile has its OWN sign-in (`assistant.chatgptTokens.{profile}`, `SiteChatGptAccounts.For(id)`, one
+  `ChatGptLoginState` per account from the singleton `ChatGptLoginStates`), started on the profile page; the old single sign-in is MOVED to the
+  first ChatGPT profile that reads it (never copied — a refresh token may be used once). `SettingKeys.IsAiOwn/IsProtected` cover the prefix.
+  "Modelle laden" = `ChatCompletionsClient.ListModelsAsync` (the provider's `GET /models`; free = OpenRouter's prices "0" or
   `:free`, never guessed). The assistant switches the active profile from its compose bar (site-wide, like the KI tab).
 - **SVG** is allowed now (upload, assistant attachments, the assistant's own `create_svg` for logos/icons, `update_settings` logo +
   favicon): `Services/SafeSvg.cs` REBUILDS the file from an allow-list (drawing elements and presentation attributes; script,

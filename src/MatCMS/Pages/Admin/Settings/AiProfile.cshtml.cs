@@ -14,10 +14,10 @@ namespace MatCMS.Pages.Admin.Settings;
 public class AiProfileModel : PageModel
 {
     private readonly OwnAi _own;
-    private readonly SiteChatGptAccount _chatgpt;
+    private readonly SiteChatGptAccounts _chatgpt;
     private readonly IHttpClientFactory _http;
 
-    public AiProfileModel(OwnAi own, SiteChatGptAccount chatgpt, IHttpClientFactory http)
+    public AiProfileModel(OwnAi own, SiteChatGptAccounts chatgpt, IHttpClientFactory http)
     {
         _own = own; _chatgpt = chatgpt; _http = http;
     }
@@ -74,6 +74,8 @@ public class AiProfileModel : PageModel
         p.Name = n.Length > 0 ? (n.Length > 80 ? n[..80] : n) : OwnAi.DefaultName(p.Kind, p.BaseUrl, p.ModelShown);
         await _own.SaveProfilesAsync(activate ? set with { ActiveId = p.Id } : set, HttpContext.RequestAborted);
         TempData["Flash"] = activate ? $"KI-Profil „{p.Name}“ gespeichert und aktiviert." : $"KI-Profil „{p.Name}“ gespeichert.";
+        // A ChatGPT profile that is not signed in yet comes back here: the sign-in is the next step, and it lives on this page.
+        if (p.Kind == "chatgpt" && !await _own.HasSignInAsync(p.Id, HttpContext.RequestAborted)) return RedirectToPage(new { id = p.Id });
         return RedirectToPage("Index", new { tab = "ai" });
     }
 
@@ -101,7 +103,8 @@ public class AiProfileModel : PageModel
         if (provider == "chatgpt")
             r = string.IsNullOrWhiteSpace(chatgptModel)
                 ? new AiResponse { Ok = false, Error = "Kein ChatGPT-Modell gewählt." }
-                : await _chatgpt.CompleteAsync(chatgptModel.Trim(), req.Messages, HttpContext.RequestAborted);
+                : id is null ? new AiResponse { Ok = false, Error = "Erst speichern und anmelden." }
+                : await _chatgpt.For(id).CompleteAsync(chatgptModel.Trim(), req.Messages, HttpContext.RequestAborted);
         else
         {
             var key = await KeyAsync(id, apiKey);
@@ -111,6 +114,36 @@ public class AiProfileModel : PageModel
                     null, HttpContext.RequestAborted);
         }
         return new JsonResult(new { ok = r.Ok, text = r.Text, error = r.Error, model = r.Model, note = r.Note });
+    }
+
+    // ---- the ChatGPT sign-in of THIS profile (device code): started, polled and ended from the profile page ----
+
+    private async Task<string?> ExistingAsync(string? id) =>
+        id is not null && (await _own.ProfilesAsync(HttpContext.RequestAborted)).Profiles.Any(p => p.Id == id) ? id : null;
+
+    public async Task<IActionResult> OnPostChatGptLoginAsync(string? id)
+    {
+        if (await ExistingAsync(id) is not { } pid) return new JsonResult(new { ok = false, error = "Erst das Profil speichern." });
+        var account = _chatgpt.For(pid);
+        var (_, error) = await account.StartLoginAsync(HttpContext.RequestAborted);
+        var status = await account.GetStatusAsync(poll: false, HttpContext.RequestAborted);
+        return new JsonResult(new { ok = error is null, error, status = MatCMS.Shared.Ai.ChatGptAccount.StatusJson(status) });
+    }
+
+    /// <summary>Polled while a login runs: advances it at most one step per OpenAI interval, then lists the account's models.</summary>
+    public async Task<IActionResult> OnGetChatGptStatusAsync(string? id)
+    {
+        if (await ExistingAsync(id) is not { } pid) return new JsonResult(new { connected = false });
+        var account = _chatgpt.For(pid);
+        var status = await account.GetStatusAsync(poll: true, HttpContext.RequestAborted);
+        var models = status.Connected ? await account.ListModelsAsync(HttpContext.RequestAborted) : null;
+        return new JsonResult(MatCMS.Shared.Ai.ChatGptAccount.StatusJson(status, models));
+    }
+
+    public async Task<IActionResult> OnPostChatGptLogoutAsync(string? id)
+    {
+        if (await ExistingAsync(id) is { } pid) await _chatgpt.For(pid).LogoutAsync(HttpContext.RequestAborted);
+        return new JsonResult(new { ok = true });
     }
 
     private async Task<string> KeyAsync(string? id, string? typed)

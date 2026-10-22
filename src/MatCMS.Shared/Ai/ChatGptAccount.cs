@@ -22,6 +22,14 @@ public sealed class ChatGptLoginState
     public IReadOnlyList<ChatGptAccount.ModelInfo> Models { get; set; } = Array.Empty<ChatGptAccount.ModelInfo>();
 }
 
+/// <summary>One <see cref="ChatGptLoginState"/> per signed-in account (a profile of its own each), kept for the application's life — the lock
+/// that guards a refresh and a login under way must be the SAME object for every request about that account. Register as a singleton.</summary>
+public sealed class ChatGptLoginStates
+{
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, ChatGptLoginState> _states = new(StringComparer.Ordinal);
+    public ChatGptLoginState For(string? account) => _states.GetOrAdd(account ?? "", _ => new ChatGptLoginState());
+}
+
 /// <summary>Where an application keeps the sign-in: ONE encrypted value it alone can read. The account only ever hands it the
 /// token document as JSON (null = signed out) — encrypting, and keeping it out of every backup and copy, is the store's job.</summary>
 public interface IChatGptTokenStore

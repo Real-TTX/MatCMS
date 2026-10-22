@@ -14,13 +14,19 @@ namespace MatCMS.Cloud.Pages.Admin.Settings;
 public class AiProfileModel : PageModel
 {
     private readonly AiProfileService _profiles;
-    private readonly ChatGptAuthService _chatgpt;
+    private readonly ChatGptAccounts _accounts;
     private readonly IHttpClientFactory _http;
 
-    public AiProfileModel(AiProfileService profiles, ChatGptAuthService chatgpt, IHttpClientFactory http)
+    public AiProfileModel(AiProfileService profiles, ChatGptAccounts accounts, IHttpClientFactory http)
     {
-        _profiles = profiles; _chatgpt = chatgpt; _http = http;
+        _profiles = profiles; _accounts = accounts; _http = http;
     }
+
+    /// <summary>The sign-in of THIS profile (null while it is not saved yet).</summary>
+    public ChatGptAuthService.Status? ChatGpt { get; private set; }
+
+    private ChatGptAuthService? AccountOf(string? id) =>
+        id is not null && _profiles.Get().Profiles.FirstOrDefault(p => p.Id == id) is { } p ? _accounts.For(AiProfileService.AccountOf(p)) : null;
 
     public AiProfileService.Profile Profile { get; private set; } = new();
     public bool IsNew { get; private set; }
@@ -48,8 +54,12 @@ public class AiProfileModel : PageModel
             IsActive = found.Id == set.ActiveId;
         }
         else IsNew = true;
-        ChatGptConnected = await _chatgpt.IsConnectedAsync();
-        if (ChatGptConnected) ChatGptModels = await _chatgpt.ListModelsAsync(HttpContext.RequestAborted);
+        if (AccountOf(id) is { } account)
+        {
+            ChatGpt = await account.GetStatusAsync(poll: false, HttpContext.RequestAborted);
+            ChatGptConnected = ChatGpt.Connected;
+            if (ChatGptConnected) ChatGptModels = await account.ListModelsAsync(HttpContext.RequestAborted);
+        }
         return Page();
     }
 
@@ -63,7 +73,29 @@ public class AiProfileModel : PageModel
             Id = id ?? "", Name = name ?? "", Kind = chat ? "chatgpt" : "openai", BaseUrl = baseUrl ?? "", Model = (chat ? chatgptModel : model) ?? "",
         }, apiKey, clearKey, activate);
         TempData["Flash"] = activate ? $"KI-Profil „{p.Name}“ gespeichert und aktiviert." : $"KI-Profil „{p.Name}“ gespeichert.";
+        // A ChatGPT profile that is not signed in yet comes back here: the sign-in is the next step, and it lives on this page.
+        if (p.Kind == "chatgpt" && AccountOf(p.Id) is { } acc && !await acc.IsConnectedAsync(HttpContext.RequestAborted)) return RedirectToPage(new { id = p.Id });
         return RedirectToPage("Index", new { tab = "ai" });
+    }
+
+    // ---- the ChatGPT sign-in of this profile (device code; the page's chatgpt-login.js drives it) ----
+
+    public async Task<IActionResult> OnPostChatGptStartAsync(string? id)
+    {
+        if (AccountOf(id) is not { } account) return new JsonResult(new { ok = false, error = "Erst das Profil speichern." });
+        var (pending, error) = await account.StartLoginAsync(HttpContext.RequestAborted);
+        if (pending is null) return new JsonResult(new { ok = false, error });
+        return new JsonResult(new { ok = true, status = ChatGptAuthService.StatusJson(await account.GetStatusAsync(poll: false, HttpContext.RequestAborted)) });
+    }
+
+    public async Task<IActionResult> OnGetChatGptStatusAsync(string? id) =>
+        AccountOf(id) is { } account ? new JsonResult(ChatGptAuthService.StatusJson(await account.GetStatusAsync(poll: true, HttpContext.RequestAborted))) : new JsonResult(new { connected = false });
+
+    public async Task<IActionResult> OnPostChatGptLogoutAsync(string? id)
+    {
+        if (AccountOf(id) is { } account) await account.LogoutAsync(HttpContext.RequestAborted);
+        TempData["Flash"] = "Von ChatGPT abgemeldet.";
+        return RedirectToPage(new { id });
     }
 
     public async Task<IActionResult> OnPostModelsAsync(string? id, string? baseUrl, string? apiKey)
@@ -88,7 +120,8 @@ public class AiProfileModel : PageModel
         if (kind == "chatgpt")
             r = string.IsNullOrWhiteSpace(chatgptModel)
                 ? new AiResponse { Ok = false, Error = "Kein ChatGPT-Modell gewählt." }
-                : await _chatgpt.CompleteAsync(chatgptModel.Trim(), req.Messages, HttpContext.RequestAborted);
+                : AccountOf(id) is { } account ? await account.CompleteAsync(chatgptModel.Trim(), req.Messages, HttpContext.RequestAborted)
+                : new AiResponse { Ok = false, Error = "Erst speichern und anmelden." };
         else
         {
             var key = string.IsNullOrWhiteSpace(apiKey) ? _profiles.KeyOf(id) : apiKey.Trim();

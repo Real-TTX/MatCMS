@@ -164,8 +164,7 @@ public class ContentOpApplier
 
         // The cloud-link keys live in the same table; letting an op set them would let a change hijack the
         // instance's cloud connection. Same guard as the profile sync applier (CloudSyncService).
-        var forbidden = SettingKeys.Protected.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (forbidden.Contains(key))
+        if (SettingKeys.IsProtected(key))
             return Report(op, "failed", $"Schlüssel „{key}“ ist geschützt (Cloud-Verbindung, Erlaubnis für native Plugins) und kann von außen nicht gesetzt werden.");
 
         var row = await _db.SiteSettings.FirstOrDefaultAsync(s => s.Key == key, ct);

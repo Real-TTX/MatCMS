@@ -65,10 +65,15 @@
     </div>
 
     <div class="form-section" data-ai-part="chatgpt" id="ai-chatgpt"
-         data-login="@Url.Page("Index", "AiChatGptLogin")" data-status="@Url.Page("Index", "AiChatGptStatus")" data-logout="@Url.Page("Index", "AiChatGptLogout")"
+         data-login="@Url.Page("AiProfile", "ChatGptLogin", new { id = Model.IsNew ? null : p.Id })" data-status="@Url.Page("AiProfile", "ChatGptStatus", new { id = Model.IsNew ? null : p.Id })" data-logout="@Url.Page("AiProfile", "ChatGptLogout", new { id = Model.IsNew ? null : p.Id })"
+         data-new="@(Model.IsNew ? "1" : null)"
          data-model="@p.ChatGptModel"
          data-words="@System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, string> { ["connected"] = T["settings.ai.cgConnected"], ["notConnected"] = T["settings.ai.cgNotConnected"], ["code"] = T["settings.ai.cgCode"], ["open"] = T["settings.ai.cgOpen"], ["waiting"] = T["settings.ai.cgWaiting"], ["plan"] = T["settings.ai.cgPlan"] })">
-        <div class="help">@T["settings.ai.cgHelp"] @T["settings.ai.cgShared"]</div>
+        <div class="help">@T["settings.ai.cgHelp"]</div>
+        @if (Model.IsNew)
+        {
+            <div class="alert alert-info">@T["settings.ai.cgSaveFirst"]</div>
+        }
         <div class="kv"><div class="kv-label">@T["settings.ai.cgAccount"]</div><div class="kv-value" id="ai-cg-state">…</div></div>
         <div id="ai-cg-pending" hidden class="alert alert-info"></div>
         <div class="form-field">

@@ -160,6 +160,19 @@ public static class SettingKeys
     /// <summary>Id of the profile in use; empty = no own profile, the cloud's relay (when the cloud switched AI on).</summary>
     public const string AiActiveProfile = "assistant.activeProfile";
 
+    /// <summary>Each ChatGPT profile signs in on its own: its token document lives under this prefix + the profile id (encrypted, like
+    /// <see cref="AiOwnChatGptTokens"/>, which is the one sign-in of a site from before — the first ChatGPT profile that needs it takes it over).</summary>
+    public const string AiChatGptTokensPrefix = "assistant.chatgptTokens.";
+    public static string AiChatGptTokensOf(string profileId) => AiChatGptTokensPrefix + profileId;
+
+    /// <summary>One of the site's own AI keys (the fixed ones or a profile's sign-in) — never in a backup.</summary>
+    public static bool IsAiOwn(string? key) => key is not null
+        && (AiOwn.Contains(key, StringComparer.OrdinalIgnoreCase) || key.StartsWith(AiChatGptTokensPrefix, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>A key no outside writer may set (<see cref="Protected"/> plus the profiles' sign-ins).</summary>
+    public static bool IsProtected(string? key) => key is not null
+        && (Protected.Contains(key, StringComparer.OrdinalIgnoreCase) || key.StartsWith(AiChatGptTokensPrefix, StringComparison.OrdinalIgnoreCase));
+
     /// <summary>Whether finished backups are handed to the connected cloud. Off unless somebody says
     /// otherwise — uploading a customer's whole site somewhere is a decision, not a default.</summary>
     public const string BackupToCloud = "backup.toCloud";

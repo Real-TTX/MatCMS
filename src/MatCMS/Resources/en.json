@@ -2115,7 +2115,7 @@
   "settings.ai.apiKeyHelp": "Stored encrypted and never shown again. Leave empty to keep the stored one.",
   "settings.ai.keyStored": "stored – leave empty to keep",
   "settings.ai.clearKey": "Delete the stored key",
-  "settings.ai.cgHelp": "The website signs in to your ChatGPT account the way the Codex app does: you get a code, enter it at OpenAI, done. The AI calls then run on your subscription instead of an API key.",
+  "settings.ai.cgHelp": "This profile signs in to a ChatGPT account like the Codex app: you get a code, enter it at OpenAI, done. Every ChatGPT profile has its own sign-in – two accounts are two profiles.",
   "settings.ai.cgAccount": "ChatGPT account",
   "settings.ai.cgConnected": "Signed in as {0}",
   "settings.ai.cgPlan": "plan: {0}",
@@ -2201,7 +2201,15 @@
   "settings.ai.loadModels": "Load models",
   "settings.ai.freeOnly": "free only",
   "settings.ai.free": "free",
-  "settings.ai.cgShared": "All ChatGPT profiles share one sign-in; they differ in the model.",
   "settings.ai.activateOnSave": "Activate after saving",
-  "assistant.profile": "AI profile"
+  "assistant.profile": "AI profile",
+  "assistant.endDone": "Done",
+  "assistant.endWaiting": "Waiting for your answer",
+  "assistant.endStopped": "Stopped",
+  "assistant.endError": "Ended with an error",
+  "assistant.endCancelled": "Cancelled",
+  "assistant.goOn": "Go on",
+  "assistant.goOnText": "Please go on.",
+  "assistant.titleDone": "Done",
+  "settings.ai.cgSaveFirst": "Save the profile first – then sign in here with the ChatGPT account this profile should use."
 }

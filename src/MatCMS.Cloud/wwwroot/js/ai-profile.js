@@ -12,6 +12,8 @@
     function showParts() {
         var kind = (form.querySelector('input[name="kind"]:checked') || {}).value || 'openai';
         form.querySelectorAll('[data-aip-part]').forEach(function (p) { p.hidden = p.getAttribute('data-aip-part') !== kind; });
+        // The sign-in card stands outside the form (it has forms of its own); it belongs to the ChatGPT kind too.
+        document.querySelectorAll('[data-for-kind]').forEach(function (c) { c.hidden = c.getAttribute('data-for-kind') !== kind; });
     }
     form.querySelectorAll('input[name="kind"]').forEach(function (r) { r.addEventListener('change', showParts); });
     showParts();

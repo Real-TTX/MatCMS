@@ -338,7 +338,7 @@ public class ContentTransferService
             // The site's own AI connection (API key, ChatGPT sign-in) stays with this installation: encrypted with its keys, and a
             // ChatGPT refresh token copied elsewhere would kill the sign-in here on its first renewal.
             dto.Settings = (await _db.SiteSettings.AsNoTracking().OrderBy(s => s.Key).ToListAsync())
-                .Where(s => !SettingKeys.AiOwn.Contains(s.Key))
+                .Where(s => !SettingKeys.IsAiOwn(s.Key))
                 .Select(s => new SettingDto { Key = s.Key, Value = s.Value }).ToList();
         }
 
@@ -1018,7 +1018,7 @@ public class ContentTransferService
             // and a backup that brings compiled code must not also be able to switch on running it. It is kept as
             // it is here and never read from the file — absent here means off.
             var keep = await _db.SiteSettings
-                .Where(s => SettingKeys.Protected.Contains(s.Key))
+                .Where(s => SettingKeys.Protected.Contains(s.Key) || s.Key.StartsWith(SettingKeys.AiChatGptTokensPrefix))
                 .ToDictionaryAsync(s => s.Key, s => s.Value, StringComparer.OrdinalIgnoreCase);
 
             _db.SiteSettings.RemoveRange(_db.SiteSettings);
@@ -1027,6 +1027,8 @@ public class ContentTransferService
             {
                 if (string.Equals(s.Key, SettingKeys.AllowNativePlugins, StringComparison.OrdinalIgnoreCase)) continue;
                 if (keep.ContainsKey(s.Key!)) continue;
+                // A backup from elsewhere (or an old one) may carry another site's AI keys or sign-ins: they are never taken over.
+                if (SettingKeys.IsProtected(s.Key)) continue;
                 _db.SiteSettings.Add(new SiteSetting { Key = s.Key!, Value = s.Value ?? "" });
             }
             foreach (var (key, value) in keep)

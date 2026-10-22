@@ -114,6 +114,8 @@
     }
 
     function refresh() {
+        // A profile not saved yet has no sign-in of its own to ask about: saving comes first (the page says so).
+        if (box.hasAttribute('data-new')) { state.textContent = W.notConnected; login.hidden = true; return; }
         fetch(box.getAttribute('data-status'), { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(render)
             .catch(function () { timer = setTimeout(refresh, 5000); });
     }

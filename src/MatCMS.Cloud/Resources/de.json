@@ -1577,12 +1577,15 @@
   "aiprof.loadModels": "Modelle laden",
   "aiprof.freeOnly": "nur kostenlose",
   "aiprof.free": "kostenlos",
-  "aiprof.chatgptShared": "Alle ChatGPT-Profile nutzen dieselbe Anmeldung; sie unterscheiden sich im Modell.",
-  "aiprof.chatgptFirst": "Zuerst unter Einstellungen → KI mit ChatGPT anmelden, dann lassen sich die Modelle des Kontos wählen.",
   "aiprof.activateOnSave": "Nach dem Speichern aktivieren",
   "aiprof.active": "Aktiv",
   "aiprof.activate": "Aktivieren",
   "aiprof.activateConfirm": "„{0}“ aktivieren? Alle Instanzen nutzen es ab dem nächsten KI-Aufruf.",
   "aiprof.deleteConfirm": "KI-Profil „{0}“ löschen?",
-  "aiprof.new": "Neues KI-Profil"
+  "aiprof.new": "Neues KI-Profil",
+  "aiprof.signedInAs": "Angemeldet als {0}",
+  "aiprof.notSignedIn": "Nicht angemeldet",
+  "aiprof.chatgptIntro": "Dieses Profil meldet sich wie die Codex-App bei einem ChatGPT-Konto an: Code anzeigen lassen, bei OpenAI eingeben, fertig. Jedes ChatGPT-Profil hat seine eigene Anmeldung – zwei Konten sind zwei Profile.",
+  "aiprof.saveFirst": "Erst das Profil speichern – danach meldest du dich hier mit dem ChatGPT-Konto an, das es nutzen soll.",
+  "aiprof.chatgptAccount": "ChatGPT-Konto dieses Profils"
 }

@@ -204,4 +204,30 @@ public class OwnAiTests : IClassFixture<AppFactory>
         old[SettingKeys.AiOwnProvider] = "";     // configured, but the site went through the cloud
         Assert.Equal("", OwnAi.Read(Get).ActiveId);
     }
+
+    [Fact]
+    public async Task Every_chatgpt_profile_has_its_own_sign_in_the_old_one_is_moved_to_the_first_and_none_goes_into_a_backup()
+    {
+        using var scope = _app.Services.CreateScope();
+        var own = scope.ServiceProvider.GetRequiredService<OwnAi>();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await own.SetAsync(SettingKeys.AiOwnChatGptTokens, own.Protect("""{"accessToken":"a","refreshToken":"r"}"""));
+
+        var accounts = scope.ServiceProvider.GetRequiredService<SiteChatGptAccounts>();
+        await accounts.For("profil-a").GetStatusAsync(poll: false);       // reads its tokens → takes the old sign-in over
+        string Raw(string key) => db.SiteSettings.AsNoTracking().Where(s => s.Key == key).Select(s => s.Value).FirstOrDefault() ?? "";
+        Assert.Equal("", Raw(SettingKeys.AiOwnChatGptTokens));               // moved, not copied: a refresh token may be used once
+        Assert.NotEqual("", Raw(SettingKeys.AiChatGptTokensOf("profil-a")));
+        Assert.True(await own.HasSignInAsync("profil-a"));
+        Assert.False(await own.HasSignInAsync("profil-b"));                  // a second profile signs in on its own
+
+        Assert.True(SettingKeys.IsProtected(SettingKeys.AiChatGptTokensOf("profil-a")));
+        var zip = await scope.ServiceProvider.GetRequiredService<ContentTransferService>().ExportAsync(new ContentTransferService.BackupOptions());
+        using var archive = new ZipArchive(new MemoryStream(zip));
+        using var reader = new StreamReader(archive.GetEntry("content.json")!.Open());
+        Assert.DoesNotContain(SettingKeys.AiChatGptTokensPrefix, await reader.ReadToEndAsync());
+
+        await own.ForgetSignInAsync("profil-a");
+        Assert.False(await own.HasSignInAsync("profil-a"));
+    }
 }

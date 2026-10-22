@@ -2115,7 +2115,7 @@
   "settings.ai.apiKeyHelp": "Wird verschlüsselt gespeichert und nie wieder angezeigt. Leer lassen, um den gespeicherten zu behalten.",
   "settings.ai.keyStored": "gespeichert – leer lassen zum Behalten",
   "settings.ai.clearKey": "Gespeicherten Schlüssel löschen",
-  "settings.ai.cgHelp": "Die Website meldet sich wie die Codex-App bei deinem ChatGPT-Konto an: Du bekommst einen Code, gibst ihn bei OpenAI ein, fertig. Die KI-Aufrufe laufen dann über dein Abo statt über einen API-Schlüssel.",
+  "settings.ai.cgHelp": "Dieses Profil meldet sich wie die Codex-App bei einem ChatGPT-Konto an: Du bekommst einen Code, gibst ihn bei OpenAI ein, fertig. Jedes ChatGPT-Profil hat seine eigene Anmeldung – zwei Konten sind zwei Profile.",
   "settings.ai.cgAccount": "ChatGPT-Konto",
   "settings.ai.cgConnected": "Angemeldet als {0}",
   "settings.ai.cgPlan": "Abo: {0}",
@@ -2201,7 +2201,15 @@
   "settings.ai.loadModels": "Modelle laden",
   "settings.ai.freeOnly": "nur kostenlose",
   "settings.ai.free": "kostenlos",
-  "settings.ai.cgShared": "Alle ChatGPT-Profile nutzen dieselbe Anmeldung; sie unterscheiden sich im Modell.",
   "settings.ai.activateOnSave": "Nach dem Speichern aktivieren",
-  "assistant.profile": "KI-Profil"
+  "assistant.profile": "KI-Profil",
+  "assistant.endDone": "Fertig",
+  "assistant.endWaiting": "Wartet auf deine Antwort",
+  "assistant.endStopped": "Angehalten",
+  "assistant.endError": "Mit Fehler beendet",
+  "assistant.endCancelled": "Abgebrochen",
+  "assistant.goOn": "Weitermachen",
+  "assistant.goOnText": "Mach weiter.",
+  "assistant.titleDone": "Fertig",
+  "settings.ai.cgSaveFirst": "Erst das Profil speichern – danach meldest du dich hier mit dem ChatGPT-Konto an, das dieses Profil nutzen soll."
 }

@@ -224,8 +224,8 @@ builder.Services.AddScoped<TranslationService>();
 // AI: the site's own connection (API key or ChatGPT account, Einstellungen → KI) or the cloud relay. The ChatGPT login state is
 // ONE per process: a refresh token may be used by one caller at a time.
 builder.Services.AddScoped<OwnAi>();
-builder.Services.AddSingleton<MatCMS.Shared.Ai.ChatGptLoginState>();
-builder.Services.AddScoped<SiteChatGptAccount>();
+builder.Services.AddSingleton<MatCMS.Shared.Ai.ChatGptLoginStates>();
+builder.Services.AddScoped<SiteChatGptAccounts>();
 builder.Services.AddScoped<IAiTransport, SiteAiTransport>();
 builder.Services.AddScoped<AiService>();
 builder.Services.AddScoped<BlockGenerator>();

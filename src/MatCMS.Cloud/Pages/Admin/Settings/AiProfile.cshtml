@@ -67,6 +67,11 @@
     </div>
 
     <div class="form-section" data-aip-part="chatgpt">
+        <div class="help">@T["aiprof.chatgptIntro"]</div>
+        @if (Model.IsNew)
+        {
+            <div class="alert alert-info">@T["aiprof.saveFirst"]</div>
+        }
         @if (Model.ChatGptConnected)
         {
             <div class="form-field">
@@ -75,12 +80,10 @@
                     @if (chat && p.Model.Length > 0 && Model.ChatGptModels.All(m => m.Slug != p.Model)) { <option value="@p.Model" selected>@p.Model</option> }
                     @foreach (var m in Model.ChatGptModels) { <option value="@m.Slug" selected="@(chat && m.Slug == p.Model)">@m.Name</option> }
                 </select>
-                <div class="help">@T["aiprof.chatgptShared"]</div>
             </div>
         }
         else
         {
-            <div class="alert alert-info">@T["aiprof.chatgptFirst"] <a asp-page="Index" asp-route-tab="ai">@T["settings.tabAi"] →</a></div>
             <input type="hidden" name="chatgptModel" value="@(chat ? p.Model : "")" />
         }
     </div>
@@ -99,6 +102,56 @@
     </div>
 </form>
 
+@* The ChatGPT sign-in of this profile: outside the form above (it has its own forms and buttons), shown for a saved ChatGPT profile. *@
+@if (!Model.IsNew && Model.ChatGpt is { } cg)
+{
+    <div class="card" id="aip-chatgpt" data-for-kind="chatgpt">
+        <h2>@T["aiprof.chatgptAccount"]</h2>
+        <div class="form-section" data-chatgpt data-start-url="@Url.Page("AiProfile", "ChatGptStart", new { id = p.Id })" data-status-url="@Url.Page("AiProfile", "ChatGptStatus", new { id = p.Id })"
+             data-t-valid="@T["settings.chatgptValid"]" data-t-expired="@T["settings.chatgptExpired"]" data-t-copied="@T["settings.chatgptCopied"]" data-t-copy="@T["settings.chatgptCopy"]"
+             data-pending-code="@cg.Pending?.UserCode" data-pending-url="@cg.Pending?.VerificationUrl"
+             data-pending-expires="@cg.Pending?.ExpiresAt.ToString("o")" data-pending-interval="@cg.Pending?.IntervalSeconds">
+                            @if (cg.Connected)
+            {
+                <div class="kv"><div class="kv-label">@T["settings.chatgptAccount"]</div><div class="kv-value">@(cg.Email ?? cg.AccountId ?? "–")</div></div>
+                @if (!string.IsNullOrEmpty(cg.Plan))
+                {
+                    <div class="kv"><div class="kv-label">@T["settings.chatgptPlan"]</div><div class="kv-value">@cg.Plan</div></div>
+                }
+                <div class="kv"><div class="kv-label">@T["settings.chatgptSince"]</div><div class="kv-value">@cg.ConnectedAt?.ToString("yyyy-MM-dd HH:mm") UTC</div></div>
+                <div class="kv"><div class="kv-label">@T["settings.chatgptTokenUntil"]</div><div class="kv-value">@cg.AccessExpiresAt?.ToString("yyyy-MM-dd HH:mm") UTC</div></div>
+                <form method="post" asp-page-handler="ChatGptLogout" asp-route-id="@p.Id" data-confirm="@T["settings.chatgptLogoutConfirm"]">
+                    <button type="submit" class="btn btn-ghost btn-danger">@T["settings.chatgptLogout"]</button>
+                </form>
+            }
+            else
+            {
+                @if (!string.IsNullOrEmpty(cg.Error))
+                {
+                    <div class="alert alert-error">@cg.Error</div>
+                }
+                @if (!string.IsNullOrEmpty(cg.LoginError))
+                {
+                    <div class="alert alert-error">@cg.LoginError</div>
+                }
+                <div data-chatgpt-error class="alert alert-error" hidden></div>
+                <button type="button" class="btn" data-chatgpt-start>@T["settings.chatgptStart"]</button>
+                <div data-chatgpt-pending hidden style="margin-top:14px;">
+                    <div class="muted">@T["settings.chatgptCodeLabel"]</div>
+                    <div><code class="mono" data-chatgpt-code style="font-size:30px; letter-spacing:.15em;"></code></div>
+                    <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+                        <a class="btn" data-chatgpt-link href="#" target="_blank" rel="noopener noreferrer">@T["settings.chatgptOpen"]</a>
+                        <button type="button" class="btn btn-ghost" data-chatgpt-copy>@T["settings.chatgptCopy"]</button>
+                    </div>
+                    <p class="muted" style="margin-top:10px;">@T["settings.chatgptWaiting"] <span class="mono" data-chatgpt-left></span></p>
+                </div>
+            }
+        </div>
+    
+        </div>
+}
+
 @section Scripts {
     <script src="~/js/ai-profile.js" asp-append-version="true"></script>
+    <script src="~/js/chatgpt-login.js" asp-append-version="true"></script>
 }

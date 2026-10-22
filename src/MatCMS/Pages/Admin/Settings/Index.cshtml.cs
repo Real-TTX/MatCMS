@@ -14,12 +14,12 @@ public class IndexModel : PageModel
     private readonly CloudService _cloud;
     private readonly CloudSyncService _sync;
     private readonly OwnAi _ownAi;
-    private readonly SiteChatGptAccount _chatgpt;
+    private readonly SiteChatGptAccounts _chatgpt;
     private readonly IAiTransport _ai;
     public CloudState CloudState { get; }
 
     public IndexModel(AppDbContext db, EmailService email, CloudService cloud, CloudSyncService sync, CloudState cloudState,
-        OwnAi ownAi, SiteChatGptAccount chatgpt, IAiTransport ai)
+        OwnAi ownAi, SiteChatGptAccounts chatgpt, IAiTransport ai)
     {
         _db = db;
         _email = email;
@@ -35,6 +35,8 @@ public class IndexModel : PageModel
     public OwnAi.Config AiOwn { get; private set; } = new("", "", "", "", false, "");
     /// <summary>The saved AI profiles and the one in use (KI tab).</summary>
     public OwnAi.ProfileSet AiProfiles { get; private set; } = new(new(), "");
+    /// <summary>Who each ChatGPT profile is signed in as (profile id → e-mail; absent = not signed in).</summary>
+    public Dictionary<string, string> AiAccounts { get; } = new();
     /// <summary>Whether the cloud profile switched the relay on — the way AI goes when the site has no connection of its own.</summary>
     public bool AiViaCloud { get; private set; }
 
@@ -112,6 +114,8 @@ public class IndexModel : PageModel
         if (Cloud.Configured) SyncReport = await _sync.LastReportAsync() ?? new();
         AiOwn = await _ownAi.GetAsync(HttpContext.RequestAborted);
         AiProfiles = await _ownAi.ProfilesAsync(HttpContext.RequestAborted);
+        foreach (var p in AiProfiles.Profiles.Where(p => p.Kind == "chatgpt"))
+            if (await _chatgpt.For(p.Id).GetStatusAsync(poll: false, HttpContext.RequestAborted) is { Connected: true } st) AiAccounts[p.Id] = st.Email ?? "✓";
         AiViaCloud = existing.TryGetValue(SettingKeys.AiTransport, out var at) && at == "cloud";
 
         if (preview && Cloud.Configured)
@@ -146,6 +150,7 @@ public class IndexModel : PageModel
             return RedirectToPage(new { tab = "ai" });
         }
         await _ownAi.SaveProfilesAsync(set, HttpContext.RequestAborted);
+        await _ownAi.ForgetSignInAsync(id, HttpContext.RequestAborted);
         TempData["Flash"] = "KI-Profil gelöscht.";
         return RedirectToPage(new { tab = "ai" });
     }
@@ -163,27 +168,6 @@ public class IndexModel : PageModel
             },
         }, HttpContext.RequestAborted);
         return new JsonResult(new { ok = r.Ok, text = r.Text, error = r.Error, model = r.Model, note = r.Note });
-    }
-
-    public async Task<IActionResult> OnPostAiChatGptLoginAsync()
-    {
-        var (_, error) = await _chatgpt.StartLoginAsync(HttpContext.RequestAborted);
-        var status = await _chatgpt.GetStatusAsync(poll: false, HttpContext.RequestAborted);
-        return new JsonResult(new { ok = error is null, error, status = MatCMS.Shared.Ai.ChatGptAccount.StatusJson(status) });
-    }
-
-    /// <summary>Polled by the tab while a login runs: advances it at most one step per OpenAI interval, then lists the models.</summary>
-    public async Task<IActionResult> OnGetAiChatGptStatusAsync()
-    {
-        var status = await _chatgpt.GetStatusAsync(poll: true, HttpContext.RequestAborted);
-        var models = status.Connected ? await _chatgpt.ListModelsAsync(HttpContext.RequestAborted) : null;
-        return new JsonResult(MatCMS.Shared.Ai.ChatGptAccount.StatusJson(status, models));
-    }
-
-    public async Task<IActionResult> OnPostAiChatGptLogoutAsync()
-    {
-        await _chatgpt.LogoutAsync(HttpContext.RequestAborted);
-        return new JsonResult(new { ok = true });
     }
 
     // --- MatCMS.Cloud link (Cloud tab) --------------------------------------

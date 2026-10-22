@@ -38,7 +38,7 @@
             fetch(root.dataset.statusUrl, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
                 .then(function (r) { return r.json(); })
                 .then(function (s) {
-                    if (s.connected) { stop(); location.href = location.pathname + '?tab=ai'; return; }
+                    if (s.connected) { stop(); location.href = location.pathname + (/\/settings\/?$/i.test(location.pathname) ? '?tab=ai' : ''); return; }
                     if (s.pending) { show(s.pending); poll(Math.max(3, s.pending.intervalSeconds || 5)); return; }
                     fail(s.loginError || s.error || root.dataset.tExpired);
                 })

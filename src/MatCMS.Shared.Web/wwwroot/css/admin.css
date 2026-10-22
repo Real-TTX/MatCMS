@@ -1682,6 +1682,15 @@ a.tab { display: inline-block; text-decoration: none; }
 .ai-line { font-size: 13px; color: var(--text-muted); }
 .ai-line.is-error { color: var(--err-fg); }
 .ai-working { display: flex; align-items: center; gap: 6px; }
+/* How a run ended — one line at its end, tinted by the outcome. */
+.ai-end { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; border: 1px solid var(--line); background: var(--surface-2); color: var(--text-2); }
+.ai-end .ti { font-size: 17px; }
+.ai-end-why { font-weight: 400; color: var(--text-muted); }
+.ai-end .ai-goon { margin-left: auto; }
+.ai-end.is-done { background: var(--ok-bg); color: var(--ok-fg); border-color: transparent; }
+.ai-end.is-waiting { background: var(--info-bg); color: var(--info-fg); border-color: transparent; }
+.ai-end.is-stopped { background: var(--warn-bg); color: var(--warn-fg); border-color: transparent; }
+.ai-end.is-error { background: var(--err-bg); color: var(--err-fg); border-color: transparent; }
 .ai-spinner { width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent, #2563eb); border-radius: 50%; animation: ai-spin .8s linear infinite; }
 @keyframes ai-spin { to { transform: rotate(360deg); } }
 .ai-undo { align-self: flex-start; }

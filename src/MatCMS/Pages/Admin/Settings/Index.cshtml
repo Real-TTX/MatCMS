@@ -529,7 +529,7 @@
                     <tr>
                         <td><a asp-page="AiProfile" asp-route-id="@pr.Id"><strong>@pr.Name</strong></a></td>
                         <td>@(pr.Kind == "chatgpt" ? T["settings.ai.kindChatGpt"] : T["settings.ai.kindKey"])</td>
-                        <td class="mono">@pr.ModelShown</td>
+                        <td><span class="mono">@pr.ModelShown</span>@if (pr.Kind == "chatgpt") { <div class="muted">@(Model.AiAccounts.TryGetValue(pr.Id, out var acc) ? T["settings.ai.cgConnected", acc] : T["settings.ai.cgNotConnected"])</div> }</td>
                         <td>
                             <div class="actions">
                                 @if (isActive)

@@ -26,7 +26,7 @@ public sealed class OwnAi
     }
 
     /// <summary>What a call goes through: the ACTIVE profile, decrypted. <c>Provider</c> "" = no own profile (the cloud's relay).</summary>
-    public sealed record Config(string Provider, string BaseUrl, string Model, string ApiKey, bool HasChatGpt, string ChatGptModel, string Name = "")
+    public sealed record Config(string Provider, string BaseUrl, string Model, string ApiKey, bool HasChatGpt, string ChatGptModel, string Name = "", string ProfileId = "")
     {
         public bool UsesKey => Provider == "openai";
         public bool UsesChatGpt => Provider == "chatgpt";
@@ -60,9 +60,22 @@ public sealed class OwnAi
     public async Task<Config> GetAsync(CancellationToken ct = default)
     {
         var set = await ProfilesAsync(ct);
-        var hasChatGpt = (await GetRawAsync(SettingKeys.AiOwnChatGptTokens, ct)).Length > 0;
-        if (set.Active is not { } p) return new Config("", "", "", "", hasChatGpt, "");
-        return new Config(p.Kind, p.BaseUrl, p.Model, Unprotect(p.Key), hasChatGpt, p.ChatGptModel, p.Name);
+        if (set.Active is not { } p) return new Config("", "", "", "", false, "");
+        var hasChatGpt = p.Kind == "chatgpt" && await HasSignInAsync(p.Id, ct);
+        return new Config(p.Kind, p.BaseUrl, p.Model, Unprotect(p.Key), hasChatGpt, p.ChatGptModel, p.Name, p.Id);
+    }
+
+    /// <summary>Whether this ChatGPT profile is signed in — its own sign-in, or the site's one from before profiles that it may take over.</summary>
+    public async Task<bool> HasSignInAsync(string profileId, CancellationToken ct = default) =>
+        (await GetRawAsync(SettingKeys.AiChatGptTokensOf(profileId), ct)).Length > 0 || (await GetRawAsync(SettingKeys.AiOwnChatGptTokens, ct)).Length > 0;
+
+    /// <summary>A profile that is deleted takes its sign-in with it.</summary>
+    public async Task ForgetSignInAsync(string profileId, CancellationToken ct = default)
+    {
+        var row = await _db.SiteSettings.FirstOrDefaultAsync(s => s.Key == SettingKeys.AiChatGptTokensOf(profileId), ct);
+        if (row is null) return;
+        _db.SiteSettings.Remove(row);
+        await _db.SaveChangesAsync(ct);
     }
 
     /// <summary>The saved profiles and which one is in use. A site from before profiles has none stored: its single connection is
@@ -107,7 +120,7 @@ public sealed class OwnAi
         var p = Read(get).Active;
         if (p is null) return false;
         return p.Kind == "chatgpt"
-            ? get(SettingKeys.AiOwnChatGptTokens).Length > 0 && p.ChatGptModel.Length > 0
+            ? (get(SettingKeys.AiChatGptTokensOf(p.Id)).Length > 0 || get(SettingKeys.AiOwnChatGptTokens).Length > 0) && p.ChatGptModel.Length > 0
             : p.Key.Length > 0 && p.Model.Length > 0;
     }
 
@@ -152,29 +165,49 @@ public sealed class OwnAi
     }
 }
 
-/// <summary>The site's ChatGPT sign-in: <see cref="ChatGptAccount"/> with its tokens in ONE encrypted site setting.</summary>
+/// <summary>
+/// The ChatGPT sign-in of ONE profile: <see cref="ChatGptAccount"/> with its tokens in an encrypted site setting of that profile
+/// (<see cref="SettingKeys.AiChatGptTokensOf"/>) — so two ChatGPT accounts can be two profiles, and switching is switching profiles.
+/// A site from before profiles had one sign-in (<see cref="SettingKeys.AiOwnChatGptTokens"/>): the first ChatGPT profile that asks for
+/// its tokens takes it over (moves it, it is never copied — a refresh token may be used once).
+/// </summary>
 public sealed class SiteChatGptAccount : ChatGptAccount
 {
-    public SiteChatGptAccount(OwnAi own, IHttpClientFactory http, ChatGptLoginState state, ILogger<SiteChatGptAccount> log)
-        : base(new Store(own), () => http.CreateClient(), ChatGptEndpoints.Default, state, SiteUserAgent, "matcms", "Einstellungen → KI",
+    public SiteChatGptAccount(OwnAi own, IHttpClientFactory http, ChatGptLoginStates states, ILogger log, string profileId)
+        : base(new Store(own, profileId), () => http.CreateClient(), ChatGptEndpoints.Default, states.For(profileId), SiteUserAgent, "matcms", "Einstellungen → KI",
             m => log.LogInformation("{Message}", m))
     {
     }
 
     public static string SiteUserAgent { get; } = "MatCMS/" + (typeof(SiteChatGptAccount).Assembly.GetName().Version?.ToString(3) ?? "1");
 
-    private sealed class Store(OwnAi own) : IChatGptTokenStore
+    private sealed class Store(OwnAi own, string profileId) : IChatGptTokenStore
     {
+        private string Key => SettingKeys.AiChatGptTokensOf(profileId);
+
         public async Task<string?> LoadAsync(CancellationToken ct)
         {
-            var raw = await own.GetRawAsync(SettingKeys.AiOwnChatGptTokens, ct);
+            var raw = await own.GetRawAsync(Key, ct);
+            if (raw.Length == 0 && (await own.GetRawAsync(SettingKeys.AiOwnChatGptTokens, ct)) is { Length: > 0 } legacy)
+            {
+                await own.SetAsync(Key, legacy, ct);
+                await own.SetAsync(SettingKeys.AiOwnChatGptTokens, "", ct);
+                raw = legacy;
+            }
             var json = own.Unprotect(raw);
             return json.Length == 0 ? null : json;
         }
 
-        public Task SaveAsync(string? json, CancellationToken ct) =>
-            own.SetAsync(SettingKeys.AiOwnChatGptTokens, json is null ? "" : own.Protect(json), ct);
+        public Task SaveAsync(string? json, CancellationToken ct) => own.SetAsync(Key, json is null ? "" : own.Protect(json), ct);
     }
+}
+
+/// <summary>Hands out the sign-in of a ChatGPT profile (scoped; one account object per profile and request).</summary>
+public sealed class SiteChatGptAccounts(OwnAi own, IHttpClientFactory http, ChatGptLoginStates states, ILogger<SiteChatGptAccount> log)
+{
+    private readonly Dictionary<string, SiteChatGptAccount> _made = new(StringComparer.Ordinal);
+    public SiteChatGptAccount For(string profileId) =>
+        _made.TryGetValue(profileId, out var a) ? a : _made[profileId] = new SiteChatGptAccount(own, http, states, log, profileId);
 }
 
 /// <summary>
@@ -184,7 +217,7 @@ public sealed class SiteChatGptAccount : ChatGptAccount
 public sealed class SiteAiTransport : IAiTransport
 {
     private readonly OwnAi _own;
-    private readonly SiteChatGptAccount _chatgpt;
+    private readonly SiteChatGptAccounts _chatgpt;
     private readonly CloudService _cloud;
     private readonly IHttpClientFactory _http;
     private readonly ILogger<SiteAiTransport> _log;
@@ -192,7 +225,7 @@ public sealed class SiteAiTransport : IAiTransport
     /// <summary>A site's own key pays for its calls; the same generous cap as the cloud (reasoning models think first).</summary>
     public const int MaxCompletionTokens = 16000;
 
-    public SiteAiTransport(OwnAi own, SiteChatGptAccount chatgpt, CloudService cloud, IHttpClientFactory http, ILogger<SiteAiTransport> log)
+    public SiteAiTransport(OwnAi own, SiteChatGptAccounts chatgpt, CloudService cloud, IHttpClientFactory http, ILogger<SiteAiTransport> log)
     {
         _own = own; _chatgpt = chatgpt; _cloud = cloud; _http = http; _log = log;
     }
@@ -203,7 +236,7 @@ public sealed class SiteAiTransport : IAiTransport
         if (cfg.UsesChatGpt)
         {
             if (cfg.ChatGptModel.Length == 0) return new AiResponse { Ok = false, Error = "Kein ChatGPT-Modell gewählt (Einstellungen → KI)." };
-            return await _chatgpt.CompleteAsync(cfg.ChatGptModel, request.Messages, ct);
+            return await _chatgpt.For(cfg.ProfileId).CompleteAsync(cfg.ChatGptModel, request.Messages, ct);
         }
         if (cfg.UsesKey)
         {

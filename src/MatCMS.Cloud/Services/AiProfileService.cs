@@ -75,14 +75,17 @@ public sealed class AiProfileService
         return new ProfileSet(list, remembered is not null && IsLive(remembered) ? remembered.Id : "");
     }
 
-    /// <summary>Whether the live connection holds exactly this profile's values.</summary>
+    /// <summary>Whether the live connection holds exactly this profile's values (for ChatGPT: its model and its own sign-in).</summary>
     private bool IsLive(Profile p)
     {
         var provider = G(SettingKeys.AiProvider);
         if (provider.Length == 0) provider = "openai";
         return provider == p.Kind && G(SettingKeys.AiModel) == p.Model
-            && (p.Kind == "chatgpt" || (G(SettingKeys.AiBaseUrl) == p.BaseUrl && G(SettingKeys.AiApiKey) == p.Key));
+            && (p.Kind == "chatgpt" ? G(ChatGptAuthService.AccountKey) == AccountOf(p) : G(SettingKeys.AiBaseUrl) == p.BaseUrl && G(SettingKeys.AiApiKey) == p.Key);
     }
+
+    /// <summary>The ChatGPT sign-in a profile uses: its own (by id), "" for the profile a cloud from before profiles was shown as.</summary>
+    public static string AccountOf(Profile p) => p.Id == "legacy" ? "" : p.Id;
 
     /// <summary>Saves a profile (new when its id is empty). A typed key replaces the stored one, an empty one keeps it. Saving the
     /// ACTIVE profile, or with <paramref name="activate"/>, writes its values into the live connection.</summary>
@@ -120,6 +123,7 @@ public sealed class AiProfileService
             [SettingKeys.AiModel] = p.Model,
             [SettingKeys.AiBaseUrl] = p.BaseUrl,
             [SettingKeys.AiApiKey] = p.Kind == "chatgpt" ? G(SettingKeys.AiApiKey) : p.Key,   // a ChatGPT profile leaves a stored key alone
+            [ChatGptAuthService.AccountKey] = p.Kind == "chatgpt" ? AccountOf(p) : G(ChatGptAuthService.AccountKey),
             [ActiveKey] = p.Id,
         });
         return p;
@@ -129,8 +133,13 @@ public sealed class AiProfileService
     public async Task<bool> DeleteAsync(string id)
     {
         var set = Get();
-        if (id == set.ActiveId || set.Profiles.RemoveAll(x => x.Id == id) == 0) return false;
+        var gone = set.Profiles.FirstOrDefault(x => x.Id == id);
+        if (id == set.ActiveId || gone is null) return false;
+        set.Profiles.Remove(gone);
         await StoreAsync(set.Profiles);
+        // Its sign-in goes with it (never the cloud's one from before profiles, which the API still reaches).
+        if (gone.Kind == "chatgpt" && AccountOf(gone).Length > 0)
+            await _cloud.SaveAsync(new Dictionary<string, string?> { [ChatGptAuthService.TokensKey(AccountOf(gone))] = "" });
         return true;
     }
 

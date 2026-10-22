@@ -1577,12 +1577,15 @@
   "aiprof.loadModels": "Load models",
   "aiprof.freeOnly": "free only",
   "aiprof.free": "free",
-  "aiprof.chatgptShared": "All ChatGPT profiles share one sign-in; they differ in the model.",
-  "aiprof.chatgptFirst": "Sign in with ChatGPT under Settings → AI first, then the account's models can be chosen.",
   "aiprof.activateOnSave": "Activate after saving",
   "aiprof.active": "Active",
   "aiprof.activate": "Activate",
   "aiprof.activateConfirm": "Activate \"{0}\"? Every instance uses it from its next AI call.",
   "aiprof.deleteConfirm": "Delete AI profile \"{0}\"?",
-  "aiprof.new": "New AI profile"
+  "aiprof.new": "New AI profile",
+  "aiprof.signedInAs": "Signed in as {0}",
+  "aiprof.notSignedIn": "Not signed in",
+  "aiprof.chatgptIntro": "This profile signs in to a ChatGPT account like the Codex app: show a code, enter it at OpenAI, done. Every ChatGPT profile has its own sign-in – two accounts are two profiles.",
+  "aiprof.saveFirst": "Save the profile first – then sign in here with the ChatGPT account it should use.",
+  "aiprof.chatgptAccount": "This profile's ChatGPT account"
 }

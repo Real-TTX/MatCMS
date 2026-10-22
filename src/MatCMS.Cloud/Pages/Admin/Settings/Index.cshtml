@@ -207,7 +207,7 @@
                     <tr>
                         <td><a asp-page="AiProfile" asp-route-id="@pr.Id"><strong>@pr.Name</strong></a></td>
                         <td>@(pr.Kind == "chatgpt" ? T["aiprof.kindChatGpt"] : T["aiprof.kindKey"])</td>
-                        <td class="mono">@pr.Model</td>
+                        <td><span class="mono">@pr.Model</span>@if (pr.Kind == "chatgpt") { <div class="muted">@(Model.AiAccounts.TryGetValue(pr.Id, out var acc) ? T["aiprof.signedInAs", acc] : T["aiprof.notSignedIn"])</div> }</td>
                         <td>
                             <div class="actions">
                                 @if (isActive)
@@ -236,49 +236,6 @@
         <div class="list-actions">
             <a class="btn" asp-page="AiProfile">@T["aiprof.new"]</a>
         </div>
-    </div>
-
-    <div class="card" data-chatgpt data-start-url="@Url.Page("/Admin/Settings/Index", "ChatGptStart")" data-status-url="@Url.Page("/Admin/Settings/Index", "ChatGptStatus")"
-         data-t-valid="@T["settings.chatgptValid"]" data-t-expired="@T["settings.chatgptExpired"]" data-t-copied="@T["settings.chatgptCopied"]" data-t-copy="@T["settings.chatgptCopy"]"
-         data-pending-code="@Model.ChatGpt.Pending?.UserCode" data-pending-url="@Model.ChatGpt.Pending?.VerificationUrl"
-         data-pending-expires="@Model.ChatGpt.Pending?.ExpiresAt.ToString("o")" data-pending-interval="@Model.ChatGpt.Pending?.IntervalSeconds">
-        <h2>@T["settings.chatgptHeading"]</h2>
-        <div class="help">@T["settings.chatgptIntro"] @T["aiprof.chatgptShared"]</div>
-        @if (Model.ChatGpt.Connected)
-        {
-            <div class="kv"><div class="kv-label">@T["settings.chatgptAccount"]</div><div class="kv-value">@(Model.ChatGpt.Email ?? Model.ChatGpt.AccountId ?? "–")</div></div>
-            @if (!string.IsNullOrEmpty(Model.ChatGpt.Plan))
-            {
-                <div class="kv"><div class="kv-label">@T["settings.chatgptPlan"]</div><div class="kv-value">@Model.ChatGpt.Plan</div></div>
-            }
-            <div class="kv"><div class="kv-label">@T["settings.chatgptSince"]</div><div class="kv-value">@Model.ChatGpt.ConnectedAt?.ToString("yyyy-MM-dd HH:mm") UTC</div></div>
-            <div class="kv"><div class="kv-label">@T["settings.chatgptTokenUntil"]</div><div class="kv-value">@Model.ChatGpt.AccessExpiresAt?.ToString("yyyy-MM-dd HH:mm") UTC</div></div>
-            <form method="post" asp-page-handler="ChatGptLogout" data-confirm="@T["settings.chatgptLogoutConfirm"]">
-                <button type="submit" class="btn btn-ghost btn-danger">@T["settings.chatgptLogout"]</button>
-            </form>
-        }
-        else
-        {
-            @if (!string.IsNullOrEmpty(Model.ChatGpt.Error))
-            {
-                <div class="alert alert-error">@Model.ChatGpt.Error</div>
-            }
-            @if (!string.IsNullOrEmpty(Model.ChatGpt.LoginError))
-            {
-                <div class="alert alert-error">@Model.ChatGpt.LoginError</div>
-            }
-            <div data-chatgpt-error class="alert alert-error" hidden></div>
-            <button type="button" class="btn" data-chatgpt-start>@T["settings.chatgptStart"]</button>
-            <div data-chatgpt-pending hidden style="margin-top:14px;">
-                <div class="muted">@T["settings.chatgptCodeLabel"]</div>
-                <div><code class="mono" data-chatgpt-code style="font-size:30px; letter-spacing:.15em;"></code></div>
-                <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
-                    <a class="btn" data-chatgpt-link href="#" target="_blank" rel="noopener noreferrer">@T["settings.chatgptOpen"]</a>
-                    <button type="button" class="btn btn-ghost" data-chatgpt-copy>@T["settings.chatgptCopy"]</button>
-                </div>
-                <p class="muted" style="margin-top:10px;">@T["settings.chatgptWaiting"] <span class="mono" data-chatgpt-left></span></p>
-            </div>
-        }
     </div>
 
     @* Verbrauch: cloud-weit + pro Instanz, laufender Monat (aus dem AiUsage-Ledger). *@
@@ -426,7 +383,6 @@
 </div>
 
 @section Scripts {
-    <script src="~/js/chatgpt-login.js" asp-append-version="true"></script>
     <script>
         // Tabs — identical to MatCMS's settings page, including the ?tab=<name> deep link that every
         // handler redirects back to.

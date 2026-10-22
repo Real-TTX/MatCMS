@@ -150,7 +150,15 @@ public static class SettingKeys
 
     /// <summary>The site's own AI connection: configured HERE and nowhere else. Never in a backup (a key and a sign-in belong to
     /// this installation, and its encryption keys could not read them anywhere else), and protected from every outside writer.</summary>
-    public static readonly string[] AiOwn = [AiOwnProvider, AiOwnBaseUrl, AiOwnModel, AiOwnApiKey, AiOwnChatGptModel, AiOwnChatGptTokens];
+    public static readonly string[] AiOwn = [AiOwnProvider, AiOwnBaseUrl, AiOwnModel, AiOwnApiKey, AiOwnChatGptModel, AiOwnChatGptTokens,
+        AiProfiles, AiActiveProfile];
+
+    /// <summary>The site's AI PROFILES (JSON list, see <c>OwnAi.Profile</c>): several connections kept side by side — "DeepSeek Flash",
+    /// "OpenRouter free" — of which one is used. Each key inside is encrypted on its own. While this setting is absent, the single
+    /// connection of the keys above is read as the one profile (sites set up before profiles existed).</summary>
+    public const string AiProfiles = "assistant.profiles";
+    /// <summary>Id of the profile in use; empty = no own profile, the cloud's relay (when the cloud switched AI on).</summary>
+    public const string AiActiveProfile = "assistant.activeProfile";
 
     /// <summary>Whether finished backups are handed to the connected cloud. Off unless somebody says
     /// otherwise — uploading a customer's whole site somewhere is a decision, not a default.</summary>

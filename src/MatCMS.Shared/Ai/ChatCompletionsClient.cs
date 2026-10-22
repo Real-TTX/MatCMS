@@ -111,6 +111,51 @@ public static class ChatCompletionsClient
         }
     }
 
+    /// <summary>One model a provider offers. <c>Free</c>: it costs nothing per token (OpenRouter states prices — "0" for both, or an
+    /// id ending in <c>:free</c>); a provider that states no prices is never guessed to be free.</summary>
+    public sealed record ModelInfo(string Id, string Name, bool Free);
+
+    /// <summary>The provider's <c>GET /models</c> — the list every OpenAI-compatible server answers (OpenAI, DeepSeek, OpenRouter's
+    /// several hundred). Never throws: (null, reason) on failure.</summary>
+    public static async Task<(List<ModelInfo>? models, string? error)> ListModelsAsync(HttpClient client, string baseUrl, string apiKey, CancellationToken ct = default)
+    {
+        baseUrl = (string.IsNullOrWhiteSpace(baseUrl) ? DefaultBaseUrl : baseUrl).Trim().TrimEnd('/');
+        try
+        {
+            client.Timeout = TimeSpan.FromSeconds(30);
+            using var req = new HttpRequestMessage(HttpMethod.Get, $"{baseUrl}/models");
+            if (!string.IsNullOrWhiteSpace(apiKey)) req.Headers.Add("Authorization", $"Bearer {apiKey.Trim()}");
+            using var resp = await client.SendAsync(req, ct);
+            var raw = await resp.Content.ReadAsStringAsync(ct);
+            if (!resp.IsSuccessStatusCode)
+                return (null, (int)resp.StatusCode == 401 ? "Der API-Schlüssel wurde abgelehnt (HTTP 401)." : $"Anbieter-Fehler {(int)resp.StatusCode}: {ProviderError(raw)}");
+            using var doc = JsonDocument.Parse(raw);
+            if (!doc.RootElement.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Array)
+                return (null, "Der Anbieter hat keine Modellliste geliefert.");
+            var list = new List<ModelInfo>();
+            foreach (var m in data.EnumerateArray())
+            {
+                if (!m.TryGetProperty("id", out var idEl) || idEl.ValueKind != JsonValueKind.String) continue;
+                var id = idEl.GetString()!;
+                var name = m.TryGetProperty("name", out var n) && n.ValueKind == JsonValueKind.String ? n.GetString()! : id;
+                var free = id.EndsWith(":free", StringComparison.OrdinalIgnoreCase);
+                if (!free && m.TryGetProperty("pricing", out var pr) && pr.ValueKind == JsonValueKind.Object)
+                    free = IsZero(pr, "prompt") && IsZero(pr, "completion");
+                list.Add(new ModelInfo(id, name, free));
+            }
+            return (list.OrderBy(x => x.Id, StringComparer.OrdinalIgnoreCase).ToList(), null);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            return (null, ex is TaskCanceledException ? "Der Anbieter hat nicht rechtzeitig geantwortet." : $"Modellliste nicht abrufbar: {ex.Message}");
+        }
+
+        static bool IsZero(JsonElement pricing, string name) =>
+            pricing.TryGetProperty(name, out var v) && (v.ValueKind == JsonValueKind.String ? decimal.TryParse(v.GetString(),
+                System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var d) && d == 0
+                : v.ValueKind == JsonValueKind.Number && v.GetDecimal() == 0);
+    }
+
     /// <summary>The messages in chat-completions form. A message with files becomes a list of parts (its text, then each picture as
     /// a data URL, each PDF as a file part); without, or with files switched off, it stays a plain string — the one shape every
     /// OpenAI-compatible provider understands. Switched off, a picture leaves a line saying it was there.</summary>

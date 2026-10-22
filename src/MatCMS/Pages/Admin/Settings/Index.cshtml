@@ -463,20 +463,23 @@
 @* The site's own AI connection — so the AI works without a cloud. Through the cloud stays the default when the profile has
    AI on; an own connection set up here wins. *@
 <div class="tab-panel" data-panel="ai" hidden>
-    <div class="card">
+    @{ var aiActive = Model.AiProfiles.Active; }
+    @* The status card is a form only for its antiforgery token: "Testen" posts through ai-settings.js. *@
+    <form class="card" id="ai-form" onsubmit="return false">
+        @Html.AntiForgeryToken()
         <h2>@T["settings.ai.status"]</h2>
         <div class="kv">
             <div class="kv-label">@T["settings.ai.statusLabel"]</div>
             <div class="kv-value">
-                @if (Model.AiOwn.UsesKey && Model.AiOwn.Ready)
+                @if (aiActive is not null && Model.AiOwn.Ready)
                 {
-                    <span class="badge badge-on">@T["settings.ai.viaKey"]</span>
+                    <span class="badge badge-on">@aiActive.Name</span>
                 }
-                else if (Model.AiOwn.UsesChatGpt && Model.AiOwn.Ready)
+                else if (aiActive is not null)
                 {
-                    <span class="badge badge-on">@T["settings.ai.viaChatGpt"]</span>
+                    <span class="badge badge-err">@aiActive.Name</span> <span class="muted">@T["settings.ai.profileIncomplete"]</span>
                 }
-                else if (Model.AiOwn.Provider.Length == 0 && Model.AiViaCloud)
+                else if (Model.AiViaCloud)
                 {
                     <span class="badge badge-on">@T["settings.ai.viaCloud"]</span>
                 }
@@ -490,61 +493,74 @@
             <button type="button" class="btn btn-ghost btn-sm" id="ai-test" data-url="@Url.Page("Index", "AiTest")">@T["settings.ai.test"]</button>
             <span class="muted" id="ai-test-result"></span>
         </div>
-    </div>
-
-    <form method="post" asp-page-handler="Ai" class="card" id="ai-form">
-        <h2>@T["settings.ai.connection"]</h2>
-        <div class="help">@T["settings.ai.connectionHelp"]</div>
-        <label class="checkbox-row"><input type="radio" name="provider" value="" checked="@(Model.AiOwn.Provider == "")" /> @T["settings.ai.optCloud"]</label>
-        <label class="checkbox-row"><input type="radio" name="provider" value="openai" checked="@(Model.AiOwn.Provider == "openai")" /> @T["settings.ai.optKey"]</label>
-        <label class="checkbox-row"><input type="radio" name="provider" value="chatgpt" checked="@(Model.AiOwn.Provider == "chatgpt")" /> @T["settings.ai.optChatGpt"]</label>
-
-        <div class="form-section" data-ai-part="openai">
-            <div class="form-grid">
-                <div class="form-field">
-                    <label for="ai-base">@T["settings.ai.baseUrl"]</label>
-                    <input id="ai-base" name="baseUrl" value="@Model.AiOwn.BaseUrl" placeholder="https://api.openai.com/v1" />
-                    <div class="help">@T["settings.ai.baseUrlHelp"]</div>
-                </div>
-                <div class="form-field">
-                    <label for="ai-model">@T["settings.ai.model"]</label>
-                    <input id="ai-model" name="model" value="@Model.AiOwn.Model" placeholder="gpt-4o-mini" />
-                    <div class="help">@T["settings.ai.modelHelp"]</div>
-                </div>
-                <div class="form-field">
-                    <label for="ai-key">@T["settings.ai.apiKey"]</label>
-                    <input id="ai-key" type="password" name="apiKey" autocomplete="new-password" placeholder="@(Model.AiOwn.ApiKey.Length > 0 ? T["settings.ai.keyStored"] : "sk-…")" />
-                    <div class="help">@T["settings.ai.apiKeyHelp"]</div>
-                    @if (Model.AiOwn.ApiKey.Length > 0)
-                    {
-                        <label class="checkbox-row"><input type="checkbox" name="clearKey" value="true" /> @T["settings.ai.clearKey"]</label>
-                    }
-                </div>
-            </div>
-        </div>
-
-        <div class="form-section" data-ai-part="chatgpt" id="ai-chatgpt"
-             data-login="@Url.Page("Index", "AiChatGptLogin")" data-status="@Url.Page("Index", "AiChatGptStatus")" data-logout="@Url.Page("Index", "AiChatGptLogout")"
-             data-model="@Model.AiOwn.ChatGptModel"
-             data-words="@System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, string> { ["connected"] = T["settings.ai.cgConnected"], ["notConnected"] = T["settings.ai.cgNotConnected"], ["code"] = T["settings.ai.cgCode"], ["open"] = T["settings.ai.cgOpen"], ["waiting"] = T["settings.ai.cgWaiting"], ["plan"] = T["settings.ai.cgPlan"] })">
-            <div class="help">@T["settings.ai.cgHelp"]</div>
-            <div class="kv"><div class="kv-label">@T["settings.ai.cgAccount"]</div><div class="kv-value" id="ai-cg-state">…</div></div>
-            <div id="ai-cg-pending" hidden class="alert alert-info"></div>
-            <div class="form-field">
-                <label for="ai-cg-model">@T["settings.ai.model"]</label>
-                <select id="ai-cg-model" name="chatgptModel"><option value="@Model.AiOwn.ChatGptModel">@(Model.AiOwn.ChatGptModel.Length > 0 ? Model.AiOwn.ChatGptModel : "—")</option></select>
-            </div>
-            <div class="form-actions">
-                <button type="button" class="btn btn-ghost btn-sm" id="ai-cg-login">@T["settings.ai.cgLogin"]</button>
-                <button type="button" class="btn btn-ghost btn-sm" id="ai-cg-logout" hidden>@T["settings.ai.cgLogout"]</button>
-            </div>
-            <div class="help">@T["settings.ai.cgWarn"]</div>
-        </div>
-
-        <div class="form-actions">
-            <button type="submit" class="btn">@T["settings.save"]</button>
-        </div>
     </form>
+
+    <div class="card">
+        <h2>@T["settings.ai.profiles"]</h2>
+        <div class="help">@T["settings.ai.profilesHelp"]</div>
+        <table class="data">
+            <thead>
+                <tr><th>@T["settings.ai.name"]</th><th>@T["settings.ai.kind"]</th><th>@T["settings.ai.model"]</th><th style="width:240px;"></th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>@T["settings.ai.optCloud"]</td>
+                    <td class="muted">@T["settings.ai.kindCloud"]</td>
+                    <td class="muted">@(Model.AiViaCloud ? T["settings.ai.cloudModel"] : T["settings.ai.cloudOff"])</td>
+                    <td>
+                        <div class="actions">
+                            @if (aiActive is null)
+                            {
+                                <span class="badge badge-on">@T["settings.ai.active"]</span>
+                            }
+                            else
+                            {
+                                <form class="inline-form" method="post" asp-page-handler="AiActivate">
+                                    <input type="hidden" name="id" value="" />
+                                    <button type="submit" class="btn btn-sm btn-ghost">@T["settings.ai.activate"]</button>
+                                </form>
+                            }
+                        </div>
+                    </td>
+                </tr>
+                @foreach (var pr in Model.AiProfiles.Profiles)
+                {
+                    var isActive = pr.Id == Model.AiProfiles.ActiveId;
+                    <tr>
+                        <td><a asp-page="AiProfile" asp-route-id="@pr.Id"><strong>@pr.Name</strong></a></td>
+                        <td>@(pr.Kind == "chatgpt" ? T["settings.ai.kindChatGpt"] : T["settings.ai.kindKey"])</td>
+                        <td class="mono">@pr.ModelShown</td>
+                        <td>
+                            <div class="actions">
+                                @if (isActive)
+                                {
+                                    <span class="badge badge-on">@T["settings.ai.active"]</span>
+                                }
+                                else
+                                {
+                                    <form class="inline-form" method="post" asp-page-handler="AiActivate">
+                                        <input type="hidden" name="id" value="@pr.Id" />
+                                        <button type="submit" class="btn btn-sm">@T["settings.ai.activate"]</button>
+                                    </form>
+                                }
+                                <a class="btn btn-sm btn-ghost" asp-page="AiProfile" asp-route-id="@pr.Id">@T["action.edit"]</a>
+                                @if (!isActive)
+                                {
+                                    <form class="inline-form" method="post" asp-page-handler="AiDelete" data-confirm="@T["settings.ai.deleteConfirm", pr.Name]">
+                                        <input type="hidden" name="id" value="@pr.Id" />
+                                        <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
+                                    </form>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <div class="list-actions">
+            <a class="btn" asp-page="AiProfile">@T["settings.ai.newProfile"]</a>
+        </div>
+    </div>
 </div>
 
 @* ============ FEHLERHANDLING ============ *@

@@ -1692,6 +1692,7 @@ a.tab { display: inline-block; text-decoration: none; }
 .btn[hidden], .ai-wrap [hidden] { display: none !important; }
 .ai-compose-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .ai-hint { font-size: 12px; }
+.ai-compose-bar .ai-profile { width: auto; max-width: 220px; padding: 4px 8px; font-size: 13px; }
 .ai-files:empty { display: none; }
 .ai-side { display: flex; flex-direction: column; padding: 0; overflow: hidden; min-height: 0; }
 .ai-side-bar { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--line); }

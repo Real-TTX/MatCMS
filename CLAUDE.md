@@ -365,6 +365,13 @@ through the cloud relay — the key never lives on the site.
   chatgptTokens`) are NOT under `ai.` (the cloud's group would overwrite them), key and sign-in are DataProtection-encrypted (purpose
   `MatCMS.AiSecrets`), they are in `SettingKeys.Protected` (no rollout, content op or restore writes them) and **never in a backup**
   (`ContentTransferService` leaves them out): a ChatGPT refresh token ROTATES and may be used once — a copy elsewhere kills the sign-in here.
+- **AI profiles** (Einstellungen → KI, `Pages/Admin/Settings/AiProfile`): several own connections side by side ("DeepSeek Flash",
+  "OpenRouter kostenlos"), ONE active — `assistant.profiles` (JSON list, each key encrypted on its own) + `assistant.activeProfile`
+  (empty = the cloud's relay); both in `SettingKeys.AiOwn`, so protected and in no backup. `OwnAi.GetAsync` returns the ACTIVE profile,
+  so `SiteAiTransport` did not change. A site from before profiles has no `assistant.profiles` row: `OwnAi.Read` presents its loose
+  keys as the profile (active if it was in use) and the first save writes the list and clears them. All ChatGPT profiles share the one
+  sign-in. "Modelle laden" = `ChatCompletionsClient.ListModelsAsync` (the provider's `GET /models`; free = OpenRouter's prices "0" or
+  `:free`, never guessed). The assistant switches the active profile from its compose bar (site-wide, like the KI tab).
 - **SVG** is allowed now (upload, assistant attachments, the assistant's own `create_svg` for logos/icons, `update_settings` logo +
   favicon): `Services/SafeSvg.cs` REBUILDS the file from an allow-list (drawing elements and presentation attributes; script,
   `foreignObject`, `image`, animation elements and every `on…` dropped; an unknown wrapper like `<a>` is unwrapped; references only `#id`;

@@ -77,6 +77,19 @@
                 <div class="ai-compose-bar">
                     <input type="file" id="ai-file" multiple hidden accept=".jpg,.jpeg,.png,.webp,.gif,.pdf,.docx,.txt,.md,.csv,.json,.html,.htm,.xml" />
                     <button type="button" class="btn btn-ghost btn-sm" id="ai-attach" title="@T["assistant.attachHelp"]" @(Model.Enabled ? "" : "disabled")><i class="ti ti-paperclip"></i> @T["assistant.attach"]</button>
+                    @if (Model.Profiles.Profiles.Count > 0)
+                    {
+                        <select id="ai-profile" class="ai-profile" data-url="@Url.Page("Index", "Profile")" title="@T["assistant.profile"]" aria-label="@T["assistant.profile"]">
+                            @if (Model.CloudAi || Model.Profiles.Active is null)
+                            {
+                                <option value="" selected="@(Model.Profiles.Active is null)">@T["settings.ai.viaCloud"]</option>
+                            }
+                            @foreach (var pr in Model.Profiles.Profiles)
+                            {
+                                <option value="@pr.Id" selected="@(pr.Id == Model.Profiles.ActiveId)">@pr.Name</option>
+                            }
+                        </select>
+                    }
                     <span class="muted ai-hint">@T["assistant.hint"]</span>
                     <span class="ai-scope-gap"></span>
                     <button type="button" class="btn btn-ghost btn-sm" id="ai-stop" hidden>@T["assistant.stop"]</button>

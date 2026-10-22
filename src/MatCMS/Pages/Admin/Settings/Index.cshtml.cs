@@ -33,6 +33,8 @@ public class IndexModel : PageModel
 
     /// <summary>The site's own AI connection (KI tab). The key is never rendered back — only whether one is stored.</summary>
     public OwnAi.Config AiOwn { get; private set; } = new("", "", "", "", false, "");
+    /// <summary>The saved AI profiles and the one in use (KI tab).</summary>
+    public OwnAi.ProfileSet AiProfiles { get; private set; } = new(new(), "");
     /// <summary>Whether the cloud profile switched the relay on — the way AI goes when the site has no connection of its own.</summary>
     public bool AiViaCloud { get; private set; }
 
@@ -109,6 +111,7 @@ public class IndexModel : PageModel
         Cloud = await _cloud.GetSettingsAsync();
         if (Cloud.Configured) SyncReport = await _sync.LastReportAsync() ?? new();
         AiOwn = await _ownAi.GetAsync(HttpContext.RequestAborted);
+        AiProfiles = await _ownAi.ProfilesAsync(HttpContext.RequestAborted);
         AiViaCloud = existing.TryGetValue(SettingKeys.AiTransport, out var at) && at == "cloud";
 
         if (preview && Cloud.Configured)
@@ -123,16 +126,27 @@ public class IndexModel : PageModel
     // Its own handlers, not SaveKeysAsync: the key is encrypted, an empty key field means keep (the stored one is never sent to
     // the page), and the ChatGPT sign-in is a little dialog of its own (start, poll, sign out) answered as JSON.
 
-    public async Task<IActionResult> OnPostAiAsync(string? provider, string? baseUrl, string? model, string? apiKey, bool clearKey, string? chatgptModel)
+    /// <summary>Makes one profile the one in use; an empty id = no own profile (the cloud's relay).</summary>
+    public async Task<IActionResult> OnPostAiActivateAsync(string? id)
     {
-        var p = provider is "openai" or "chatgpt" ? provider : "";
-        await _ownAi.SetAsync(SettingKeys.AiOwnProvider, p);
-        await _ownAi.SetAsync(SettingKeys.AiOwnBaseUrl, (baseUrl ?? "").Trim().TrimEnd('/'));
-        await _ownAi.SetAsync(SettingKeys.AiOwnModel, (model ?? "").Trim());
-        await _ownAi.SetAsync(SettingKeys.AiOwnChatGptModel, (chatgptModel ?? "").Trim());
-        if (clearKey) await _ownAi.SetAsync(SettingKeys.AiOwnApiKey, "");
-        else if (!string.IsNullOrWhiteSpace(apiKey)) await _ownAi.SetAsync(SettingKeys.AiOwnApiKey, _ownAi.Protect(apiKey.Trim()));
-        TempData["Flash"] = "KI-Verbindung gespeichert.";
+        var set = await _ownAi.ProfilesAsync(HttpContext.RequestAborted);
+        var target = set.Profiles.FirstOrDefault(p => p.Id == id);
+        await _ownAi.SaveProfilesAsync(set with { ActiveId = target?.Id ?? "" }, HttpContext.RequestAborted);
+        TempData["Flash"] = target is null ? "KI läuft jetzt über die Cloud." : $"KI-Profil „{target.Name}“ ist aktiv.";
+        return RedirectToPage(new { tab = "ai" });
+    }
+
+    /// <summary>Deletes a profile — never the active one (switch first), so the site cannot lose its AI by a stray click.</summary>
+    public async Task<IActionResult> OnPostAiDeleteAsync(string? id)
+    {
+        var set = await _ownAi.ProfilesAsync(HttpContext.RequestAborted);
+        if (id is null || id == set.ActiveId || set.Profiles.RemoveAll(p => p.Id == id) == 0)
+        {
+            TempData["FlashError"] = "Das aktive Profil kann nicht gelöscht werden.";
+            return RedirectToPage(new { tab = "ai" });
+        }
+        await _ownAi.SaveProfilesAsync(set, HttpContext.RequestAborted);
+        TempData["Flash"] = "KI-Profil gelöscht.";
         return RedirectToPage(new { tab = "ai" });
     }
 

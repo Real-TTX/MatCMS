@@ -25,9 +25,11 @@ public class IndexModel : PageModel
     private readonly AssistantBlocks _blocks;
     private readonly AssistantAgent _agent;
     private readonly Localizer _t;
+    private readonly OwnAi _own;
 
-    public IndexModel(AppDbContext db, AssistantService assistant, AssistantBlocks blocks, AssistantAgent agent, Localizer t)
+    public IndexModel(AppDbContext db, AssistantService assistant, AssistantBlocks blocks, AssistantAgent agent, Localizer t, OwnAi own)
     {
+        _own = own;
         _db = db;
         _assistant = assistant;
         _blocks = blocks;
@@ -46,6 +48,9 @@ public class IndexModel : PageModel
     public string SitePrompt { get; private set; } = "";
     public string OperatorInstruction { get; private set; } = "";
     public string Tab { get; private set; } = "chat";
+    /// <summary>The site's AI profiles — switched right here, so a cheap model and a strong one are one click apart.</summary>
+    public OwnAi.ProfileSet Profiles { get; private set; } = new(new(), "");
+    public bool CloudAi { get; private set; }
 
     public sealed record ConversationRow(int Id, string Title, string Scope, DateTime UpdatedAt, int Runs, int Changes, int Tokens, string CreatedBy);
 
@@ -60,7 +65,9 @@ public class IndexModel : PageModel
         (ScopeText, PreviewUrl) = await DescribeScopeAsync(ScopePageId, ScopeBlockId);
 
         var settings = await _db.SiteSettings.AsNoTracking()
-            .Where(s => s.Key == SettingKeys.AssistantPrompt || s.Key == SettingKeys.AiInstruction || s.Key == SettingKeys.AiActionGuides).ToDictionaryAsync(s => s.Key, s => s.Value);
+            .Where(s => s.Key == SettingKeys.AssistantPrompt || s.Key == SettingKeys.AiInstruction || s.Key == SettingKeys.AiActionGuides || s.Key == SettingKeys.AiTransport).ToDictionaryAsync(s => s.Key, s => s.Value);
+        Profiles = await _own.ProfilesAsync(HttpContext.RequestAborted);
+        CloudAi = settings.TryGetValue(SettingKeys.AiTransport, out var tr) && tr == "cloud";
         SitePrompt = settings.TryGetValue(SettingKeys.AssistantPrompt, out var sp) && !string.IsNullOrWhiteSpace(sp) ? sp : AssistantPrompt.Default.Trim();
         OperatorInstruction = AssistantAgent.OperatorText(settings.TryGetValue(SettingKeys.AiInstruction, out var oi) ? oi ?? "" : "",
             settings.TryGetValue(SettingKeys.AiActionGuides, out var ag) ? ag ?? "" : "");
@@ -132,6 +139,14 @@ public class IndexModel : PageModel
     }
 
     public IActionResult OnPostCancel(int id) => new JsonResult(new { ok = _assistant.Cancel(id) });
+
+    /// <summary>Activates another AI profile ("" = the cloud) — the same switch as on Einstellungen → KI.</summary>
+    public async Task<IActionResult> OnPostProfileAsync(string? id)
+    {
+        var set = await _own.ProfilesAsync(HttpContext.RequestAborted);
+        await _own.SaveProfilesAsync(set with { ActiveId = set.Profiles.Any(p => p.Id == id) ? id! : "" }, HttpContext.RequestAborted);
+        return new JsonResult(new { ok = true });
+    }
 
     public async Task<IActionResult> OnPostUndoAsync(int id)
     {

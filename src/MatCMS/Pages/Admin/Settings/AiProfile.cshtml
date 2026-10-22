@@ -1,0 +1,101 @@
+@page "{id?}"
+@model MatCMS.Pages.Admin.Settings.AiProfileModel
+@{
+    var p = Model.Profile;
+    ViewData["Title"] = Model.IsNew ? T["settings.ai.newProfile"] : p.Name;
+    var preset = AiProfileModel.Presets.FirstOrDefault(x => x.Url.Length > 0 && string.Equals(x.Url, p.BaseUrl, StringComparison.OrdinalIgnoreCase)).Id
+                 ?? (p.BaseUrl.Length == 0 ? "openai" : "custom");
+}
+<div class="page-head">
+    <h1>@(Model.IsNew ? T["settings.ai.newProfile"] : p.Name)</h1>
+</div>
+
+<form method="post" class="card" id="ai-form" asp-route-id="@(Model.IsNew ? null : p.Id)">
+    <input type="hidden" name="id" value="@(Model.IsNew ? "" : p.Id)" disabled="@Model.IsNew" />
+    <div class="form-grid">
+        <div class="form-field">
+            <label for="ai-name">@T["settings.ai.name"]</label>
+            <input id="ai-name" name="name" value="@p.Name" maxlength="80" placeholder="@T["settings.ai.namePlaceholder"]" />
+            <div class="help">@T["settings.ai.nameHelp"]</div>
+        </div>
+    </div>
+
+    <div class="form-section">
+        <label class="checkbox-row"><input type="radio" name="provider" value="openai" checked="@(p.Kind != "chatgpt")" /> @T["settings.ai.optKey"]</label>
+        <label class="checkbox-row"><input type="radio" name="provider" value="chatgpt" checked="@(p.Kind == "chatgpt")" /> @T["settings.ai.optChatGpt"]</label>
+    </div>
+
+    <div class="form-section" data-ai-part="openai">
+        <div class="form-grid">
+            <div class="form-field">
+                <label for="ai-preset">@T["settings.ai.preset"]</label>
+                <select id="ai-preset">
+                    @foreach (var pr in AiProfileModel.Presets)
+                    {
+                        <option value="@pr.Id" data-url="@pr.Url" data-model="@pr.ModelHint" selected="@(pr.Id == preset)">@(pr.Label.Length > 0 ? pr.Label : T["settings.ai.presetCustom"])</option>
+                    }
+                </select>
+            </div>
+            <div class="form-field">
+                <label for="ai-base">@T["settings.ai.baseUrl"]</label>
+                <input id="ai-base" name="baseUrl" value="@p.BaseUrl" placeholder="https://api.openai.com/v1" spellcheck="false" />
+                <div class="help">@T["settings.ai.baseUrlHelp"]</div>
+            </div>
+            <div class="form-field">
+                <label for="ai-key">@T["settings.ai.apiKey"]</label>
+                <input id="ai-key" type="password" name="apiKey" autocomplete="new-password" placeholder="@(Model.HasKey ? T["settings.ai.keyStored"] : "sk-…")" />
+                <div class="help">@T["settings.ai.apiKeyHelp"]</div>
+                @if (Model.HasKey)
+                {
+                    <label class="checkbox-row"><input type="checkbox" name="clearKey" value="true" /> @T["settings.ai.clearKey"]</label>
+                }
+            </div>
+            <div class="form-field">
+                <label for="ai-model">@T["settings.ai.model"]</label>
+                <input id="ai-model" name="model" value="@p.Model" list="ai-model-list" placeholder="gpt-4o-mini" spellcheck="false" autocomplete="off" />
+                <datalist id="ai-model-list"></datalist>
+                <div class="help">@T["settings.ai.modelHelp"]</div>
+                <div class="form-actions" style="margin-top:6px;">
+                    <button type="button" class="btn btn-ghost btn-sm" id="ai-models" data-free="@T["settings.ai.free"]" data-url="@Url.Page("AiProfile", "Models")">@T["settings.ai.loadModels"]</button>
+                    <label class="checkbox-row" style="margin:0;"><input type="checkbox" id="ai-free-only" /> @T["settings.ai.freeOnly"]</label>
+                    <span class="muted" id="ai-models-info"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-section" data-ai-part="chatgpt" id="ai-chatgpt"
+         data-login="@Url.Page("Index", "AiChatGptLogin")" data-status="@Url.Page("Index", "AiChatGptStatus")" data-logout="@Url.Page("Index", "AiChatGptLogout")"
+         data-model="@p.ChatGptModel"
+         data-words="@System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, string> { ["connected"] = T["settings.ai.cgConnected"], ["notConnected"] = T["settings.ai.cgNotConnected"], ["code"] = T["settings.ai.cgCode"], ["open"] = T["settings.ai.cgOpen"], ["waiting"] = T["settings.ai.cgWaiting"], ["plan"] = T["settings.ai.cgPlan"] })">
+        <div class="help">@T["settings.ai.cgHelp"] @T["settings.ai.cgShared"]</div>
+        <div class="kv"><div class="kv-label">@T["settings.ai.cgAccount"]</div><div class="kv-value" id="ai-cg-state">…</div></div>
+        <div id="ai-cg-pending" hidden class="alert alert-info"></div>
+        <div class="form-field">
+            <label for="ai-cg-model">@T["settings.ai.model"]</label>
+            <select id="ai-cg-model" name="chatgptModel"><option value="@p.ChatGptModel">@(p.ChatGptModel.Length > 0 ? p.ChatGptModel : "—")</option></select>
+        </div>
+        <div class="form-actions">
+            <button type="button" class="btn btn-ghost btn-sm" id="ai-cg-login">@T["settings.ai.cgLogin"]</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="ai-cg-logout" hidden>@T["settings.ai.cgLogout"]</button>
+        </div>
+        <div class="help">@T["settings.ai.cgWarn"]</div>
+    </div>
+
+    <div class="form-section">
+        <label class="checkbox-row"><input type="checkbox" name="activate" value="true" checked="@(Model.IsNew || Model.IsActive)" /> @T["settings.ai.activateOnSave"]</label>
+        <div class="form-actions">
+            <button type="button" class="btn btn-ghost btn-sm" id="ai-test" data-form data-url="@Url.Page("AiProfile", "Test")">@T["settings.ai.test"]</button>
+            <span class="muted" id="ai-test-result"></span>
+        </div>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn">@T["action.save"]</button>
+        <a class="btn btn-ghost" asp-page="Index" asp-route-tab="ai">@T["action.cancel"]</a>
+    </div>
+</form>
+
+@section Scripts {
+    <script src="~/js/ai-settings.js" asp-append-version="true"></script>
+}

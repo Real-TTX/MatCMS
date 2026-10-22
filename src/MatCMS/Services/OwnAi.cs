@@ -25,7 +25,8 @@ public sealed class OwnAi
         _protector = protection.CreateProtector("MatCMS.AiSecrets");
     }
 
-    public sealed record Config(string Provider, string BaseUrl, string Model, string ApiKey, bool HasChatGpt, string ChatGptModel)
+    /// <summary>What a call goes through: the ACTIVE profile, decrypted. <c>Provider</c> "" = no own profile (the cloud's relay).</summary>
+    public sealed record Config(string Provider, string BaseUrl, string Model, string ApiKey, bool HasChatGpt, string ChatGptModel, string Name = "")
     {
         public bool UsesKey => Provider == "openai";
         public bool UsesChatGpt => Provider == "chatgpt";
@@ -33,13 +34,101 @@ public sealed class OwnAi
         public bool Ready => UsesKey ? ApiKey.Length > 0 && Model.Length > 0 : UsesChatGpt && HasChatGpt && ChatGptModel.Length > 0;
     }
 
+    /// <summary>One saved connection. <c>Key</c> is stored ENCRYPTED (never decrypted for a page — only <see cref="GetAsync"/> does,
+    /// for the call). All ChatGPT profiles share the site's one ChatGPT sign-in; they differ in the model.</summary>
+    public sealed class Profile
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        /// <summary>"openai" (API key, any compatible server) or "chatgpt".</summary>
+        public string Kind { get; set; } = "openai";
+        public string BaseUrl { get; set; } = "";
+        public string Model { get; set; } = "";
+        public string Key { get; set; } = "";
+        public string ChatGptModel { get; set; } = "";
+
+        public string ModelShown => Kind == "chatgpt" ? ChatGptModel : Model;
+    }
+
+    public sealed record ProfileSet(List<Profile> Profiles, string ActiveId)
+    {
+        public Profile? Active => Profiles.FirstOrDefault(p => p.Id == ActiveId);
+    }
+
+    private static readonly System.Text.Json.JsonSerializerOptions Json = new() { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase };
+
     public async Task<Config> GetAsync(CancellationToken ct = default)
     {
+        var set = await ProfilesAsync(ct);
+        var hasChatGpt = (await GetRawAsync(SettingKeys.AiOwnChatGptTokens, ct)).Length > 0;
+        if (set.Active is not { } p) return new Config("", "", "", "", hasChatGpt, "");
+        return new Config(p.Kind, p.BaseUrl, p.Model, Unprotect(p.Key), hasChatGpt, p.ChatGptModel, p.Name);
+    }
+
+    /// <summary>The saved profiles and which one is in use. A site from before profiles has none stored: its single connection is
+    /// returned as the one profile, active if it was in use — and becomes a stored profile on the first save.</summary>
+    public async Task<ProfileSet> ProfilesAsync(CancellationToken ct = default)
+    {
         var map = await _db.SiteSettings.AsNoTracking().Where(s => SettingKeys.AiOwn.Contains(s.Key)).ToDictionaryAsync(s => s.Key, s => s.Value, ct);
-        string G(string k) => map.TryGetValue(k, out var v) ? (v ?? "").Trim() : "";
-        var provider = G(SettingKeys.AiOwnProvider) is "openai" or "chatgpt" ? G(SettingKeys.AiOwnProvider) : "";
-        return new Config(provider, G(SettingKeys.AiOwnBaseUrl), G(SettingKeys.AiOwnModel), Unprotect(G(SettingKeys.AiOwnApiKey)),
-            G(SettingKeys.AiOwnChatGptTokens).Length > 0, G(SettingKeys.AiOwnChatGptModel));
+        return Read(k => map.TryGetValue(k, out var v) ? (v ?? "").Trim() : "");
+    }
+
+    /// <summary>Profiles from the raw settings — no database, no decryption, so <see cref="AiService"/> can ask cheaply.</summary>
+    public static ProfileSet Read(Func<string, string> get)
+    {
+        var json = get(SettingKeys.AiProfiles);
+        if (json.Length > 0)
+        {
+            List<Profile>? list = null;
+            try { list = System.Text.Json.JsonSerializer.Deserialize<List<Profile>>(json, Json); } catch (System.Text.Json.JsonException) { }
+            return new ProfileSet((list ?? new()).Where(p => p.Id.Length > 0).ToList(), get(SettingKeys.AiActiveProfile));
+        }
+        // Before profiles: one connection in loose keys. Turned into a profile with the same values (its key stays the
+        // ciphertext it was — the same protector reads it).
+        var legacy = get(SettingKeys.AiOwnProvider);
+        var hasKeyProfile = get(SettingKeys.AiOwnApiKey).Length > 0 || get(SettingKeys.AiOwnModel).Length > 0;
+        var hasChatGptProfile = get(SettingKeys.AiOwnChatGptModel).Length > 0;
+        var profiles = new List<Profile>();
+        if (hasKeyProfile)
+            profiles.Add(new Profile
+            {
+                Id = "legacy-key", Kind = "openai", BaseUrl = get(SettingKeys.AiOwnBaseUrl), Model = get(SettingKeys.AiOwnModel),
+                Key = get(SettingKeys.AiOwnApiKey), Name = DefaultName("openai", get(SettingKeys.AiOwnBaseUrl), get(SettingKeys.AiOwnModel)),
+            });
+        if (hasChatGptProfile)
+            profiles.Add(new Profile { Id = "legacy-chatgpt", Kind = "chatgpt", ChatGptModel = get(SettingKeys.AiOwnChatGptModel), Name = "ChatGPT · " + get(SettingKeys.AiOwnChatGptModel) });
+        var active = legacy == "openai" && hasKeyProfile ? "legacy-key" : legacy == "chatgpt" && hasChatGptProfile ? "legacy-chatgpt" : "";
+        return new ProfileSet(profiles, active);
+    }
+
+    /// <summary>Whether the active profile is set up far enough to try a call — from raw settings, without decrypting.</summary>
+    public static bool ActiveReady(Func<string, string> get)
+    {
+        var p = Read(get).Active;
+        if (p is null) return false;
+        return p.Kind == "chatgpt"
+            ? get(SettingKeys.AiOwnChatGptTokens).Length > 0 && p.ChatGptModel.Length > 0
+            : p.Key.Length > 0 && p.Model.Length > 0;
+    }
+
+    /// <summary>Stores the whole set. The loose keys of the old single connection are cleared — from now on the profiles are what
+    /// counts (the ChatGPT sign-in stays: it is the account every ChatGPT profile uses).</summary>
+    public async Task SaveProfilesAsync(ProfileSet set, CancellationToken ct = default)
+    {
+        var active = set.Profiles.Any(p => p.Id == set.ActiveId) ? set.ActiveId : "";
+        await SetAsync(SettingKeys.AiProfiles, System.Text.Json.JsonSerializer.Serialize(set.Profiles, Json), ct);
+        await SetAsync(SettingKeys.AiActiveProfile, active, ct);
+        foreach (var k in new[] { SettingKeys.AiOwnProvider, SettingKeys.AiOwnBaseUrl, SettingKeys.AiOwnModel, SettingKeys.AiOwnApiKey, SettingKeys.AiOwnChatGptModel })
+            await SetAsync(k, "", ct);
+    }
+
+    /// <summary>A name for a profile nobody named: the provider read from the address, and the model.</summary>
+    public static string DefaultName(string kind, string baseUrl, string model)
+    {
+        if (kind == "chatgpt") return "ChatGPT" + (model.Length > 0 ? " · " + model : "");
+        var host = Uri.TryCreate(baseUrl, UriKind.Absolute, out var u) ? u.Host : "api.openai.com";
+        var provider = host.Contains("deepseek") ? "DeepSeek" : host.Contains("openrouter") ? "OpenRouter" : host.Contains("openai") ? "OpenAI" : host;
+        return provider + (model.Length > 0 ? " · " + model : "");
     }
 
     public string Protect(string plain) => _protector.Protect(plain);

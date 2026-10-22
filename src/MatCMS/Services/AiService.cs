@@ -23,12 +23,7 @@ public class AiService
     /// relay on. Read from the settings only — whether a key is still valid, the first call says.</summary>
     public bool Enabled => OwnConfigured || _site.Get(SettingKeys.AiTransport) is "cloud";
 
-    private bool OwnConfigured => _site.Get(SettingKeys.AiOwnProvider) switch
-    {
-        "openai" => _site.Get(SettingKeys.AiOwnApiKey).Length > 0 && _site.Get(SettingKeys.AiOwnModel).Length > 0,
-        "chatgpt" => _site.Get(SettingKeys.AiOwnChatGptTokens).Length > 0 && _site.Get(SettingKeys.AiOwnChatGptModel).Length > 0,
-        _ => false,
-    };
+    private bool OwnConfigured => OwnAi.ActiveReady(k => _site.Get(k).Trim());
 
     /// <summary>One call as it is, with the whole answer (model, tokens, the cloud's note). The assistant builds its own
     /// messages, including the cloud's instruction, so nothing is added here.</summary>

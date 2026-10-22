@@ -250,6 +250,16 @@
     }
 
     document.getElementById('ai-attach').addEventListener('click', function () { fileInput.click(); });
+
+    // The AI profile: switched for the whole site, from the next model call on (a run in progress takes it at its next step).
+    // A page that had no usable AI before is reloaded, so the input it greyed out comes back.
+    var profile = document.getElementById('ai-profile');
+    if (profile) profile.addEventListener('change', function () {
+        profile.disabled = true;
+        post(profile.getAttribute('data-url'), { id: profile.value }).then(function () {
+            if (document.getElementById('ai-input').disabled) location.reload();
+        }).finally(function () { profile.disabled = false; });
+    });
     fileInput.addEventListener('change', function () {
         Array.prototype.forEach.call(fileInput.files, function (f) { pending.push(f); });
         fileInput.value = '';

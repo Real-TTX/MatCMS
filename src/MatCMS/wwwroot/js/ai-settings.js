@@ -1,4 +1,4 @@
-// Einstellungen → KI: which connection the site uses (cloud / own API key / own ChatGPT account), "Testen", and the ChatGPT
+// Einstellungen → KI and one AI profile: "Testen", the address presets, "Modelle laden" (with "nur kostenlose"), and the ChatGPT
 // sign-in by device code — start it, show the code and the link, poll until it is confirmed, then offer the account's models.
 (function () {
     'use strict';
@@ -6,9 +6,10 @@
     if (!form) return;
     var token = form.querySelector('input[name="__RequestVerificationToken"]').value;
 
-    function post(url) {
-        var fd = new FormData();
-        fd.append('__RequestVerificationToken', token);
+    // withForm: the profile page sends what is in the form (test or list models BEFORE saving); the KI tab only its token.
+    function post(url, withForm) {
+        var fd = withForm ? new FormData(form) : new FormData();
+        if (!withForm) fd.append('__RequestVerificationToken', token);
         return fetch(url, { method: 'POST', body: fd, credentials: 'same-origin' }).then(function (r) { return r.json(); });
     }
 
@@ -24,10 +25,48 @@
     if (test) test.addEventListener('click', function () {
         test.disabled = true;
         testOut.textContent = '…';
-        post(test.getAttribute('data-url')).then(function (r) {
+        post(test.getAttribute('data-url'), test.hasAttribute('data-form')).then(function (r) {
             testOut.textContent = r.ok ? '✓ ' + (r.model ? r.model + ': ' : '') + r.text : '✗ ' + (r.error || '');
         }).catch(function () { testOut.textContent = '✗'; }).finally(function () { test.disabled = false; });
     });
+
+    // ---- Address presets and the provider's model list (profile page) ----
+    var preset = document.getElementById('ai-preset'), base = document.getElementById('ai-base'), model = document.getElementById('ai-model');
+    if (preset && base) preset.addEventListener('change', function () {
+        var o = preset.options[preset.selectedIndex];
+        var url = o.getAttribute('data-url') || '';
+        if (url) base.value = url;
+        else { base.value = ''; base.focus(); }
+        if (model) model.placeholder = o.getAttribute('data-model') || '';
+    });
+    var loadModels = document.getElementById('ai-models'), freeOnly = document.getElementById('ai-free-only');
+    var list = document.getElementById('ai-model-list'), info = document.getElementById('ai-models-info');
+    var models = [];
+    function fillModels() {
+        list.innerHTML = '';
+        var shown = models.filter(function (m) { return !freeOnly || !freeOnly.checked || m.free; });
+        shown.forEach(function (m) {
+            var o = document.createElement('option');
+            o.value = m.id;
+            o.label = (m.name !== m.id ? m.name : '') + (m.free ? ' · ' + (info.getAttribute('data-free') || 'free') : '');
+            list.appendChild(o);
+        });
+        info.textContent = models.length ? shown.length + ' / ' + models.length : '';
+    }
+    if (loadModels) {
+        info.setAttribute('data-free', loadModels.getAttribute('data-free') || 'kostenlos');
+        loadModels.addEventListener('click', function () {
+            loadModels.disabled = true;
+            info.textContent = '…';
+            post(loadModels.getAttribute('data-url'), true).then(function (r) {
+                if (!r.ok) { models = []; list.innerHTML = ''; info.textContent = '✗ ' + (r.error || ''); return; }
+                models = r.models || [];
+                fillModels();
+                if (model) model.focus();
+            }).catch(function () { info.textContent = '✗'; }).finally(function () { loadModels.disabled = false; });
+        });
+        if (freeOnly) freeOnly.addEventListener('change', fillModels);
+    }
 
     // ---- ChatGPT ----
     var box = document.getElementById('ai-chatgpt');

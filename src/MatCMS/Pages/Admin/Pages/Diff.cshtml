@@ -19,7 +19,6 @@
 }
 <div class="page-head">
     <h1>@T["diff.title"]</h1>
-    <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@Model.Source.Id">@T["diff.back"]</a>
 </div>
 
 @if (Model.Locales.Count == 0)
@@ -117,6 +116,10 @@ else
         </div>
     </div>
 }
+
+<div class="list-actions">
+    <a class="btn btn-ghost" asp-page="Edit" asp-route-id="@Model.Source.Id">@T["diff.back"]</a>
+</div>
 
 @section Scripts {
     <script>

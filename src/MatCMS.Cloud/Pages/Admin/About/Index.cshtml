@@ -5,13 +5,6 @@
 }
 <div class="page-head">
     <h1>@T["about.title"]</h1>
-    <div class="list-toolbar">
-        <a class="btn btn-sm" asp-page="Index" asp-route-check="true">@T["about.checkUpdates"]</a>
-        @if (User.IsInRole("Admin"))
-        {
-            <a class="btn btn-sm btn-ghost" asp-page="/Admin/Hosting/Index" asp-fragment="updates">@T["hosting.navUpdates"]</a>
-        }
-    </div>
 </div>
 
 @* The cloud's own version — the same card as Hosting → Updates, read-only here (updating is a Hosting action). *@
@@ -35,3 +28,10 @@
     </div>
 </div>
 
+<div class="form-actions">
+    <a class="btn" asp-page="Index" asp-route-check="true">@T["about.checkUpdates"]</a>
+    @if (User.IsInRole("Admin"))
+    {
+        <a class="btn btn-ghost" asp-page="/Admin/Hosting/Index" asp-fragment="updates">@T["hosting.navUpdates"]</a>
+    }
+</div>

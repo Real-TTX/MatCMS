@@ -6,11 +6,6 @@
 }
 <div class="page-head">
     <h1>@T["cleanup.title"]</h1>
-    <div class="list-toolbar">
-        <form method="post" asp-page-handler="AnalyzeAll" class="inline-form">
-            <button type="submit" class="btn">@T["cleanup.analyzeAll"]</button>
-        </form>
-    </div>
 </div>
 
 <table class="data">
@@ -70,5 +65,8 @@
 </table>
 
 <div class="list-actions">
+    <form method="post" asp-page-handler="AnalyzeAll" class="inline-form">
+        <button type="submit" class="btn">@T["cleanup.analyzeAll"]</button>
+    </form>
     <a class="btn btn-ghost" asp-page="/Admin/Instances/Index">@T["action.back"]</a>
 </div>

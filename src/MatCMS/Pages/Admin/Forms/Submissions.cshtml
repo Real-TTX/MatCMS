@@ -5,7 +5,6 @@
 }
 <div class="page-head">
     <h1>@Model.Current.Name – @T["forms.submissions"]</h1>
-    <a class="btn btn-sm btn-ghost" asp-page="Index">@T["action.back"]</a>
 </div>
 
 @if (Model.Items.Count == 0)
@@ -62,3 +61,7 @@ else
         </tbody>
     </table>
 }
+
+<div class="list-actions">
+    <a class="btn btn-ghost" asp-page="Index">@T["action.back"]</a>
+</div>

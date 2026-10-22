@@ -9,9 +9,6 @@
         @Model.Item.Subject
         <span class="muted" style="font-size:14px;font-weight:400;"> — @(Model.Owner?.Name)</span>
     </h1>
-    <div class="list-toolbar">
-        <a class="btn btn-sm btn-ghost" asp-page="Details" asp-route-id="@Model.Item.InstanceId" asp-route-tab="mail">@T["action.back"]</a>
-    </div>
 </div>
 
 <div class="card">
@@ -78,4 +75,8 @@
 <div class="card">
     <h2>@T["spool.source"]</h2>
     <pre class="mail-source">@Model.Item.Body</pre>
+</div>
+
+<div class="list-actions">
+    <a class="btn btn-ghost" asp-page="Details" asp-route-id="@Model.Item.InstanceId" asp-route-tab="mail">@T["action.back"]</a>
 </div>

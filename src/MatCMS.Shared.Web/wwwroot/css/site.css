@@ -491,6 +491,21 @@ html.mat-langm-lock { overflow: hidden; }
 .hero--overlay.hero--fit-contain .hero-carousel__slide img,
 .hero--overlay.hero--fit-contain .hero-ov-img { object-fit: contain; width: 100%; height: 100%; }
 .hero--overlay.hero--fit-contain .hero-carousel__slide { background: transparent; }
+/* Overlay + "Füllen" (cover, the default): the photo is the whole section, edge to edge and as tall as the
+   screen — no blurred frame, no section padding around it. The framed look above (whole photo on its own
+   blurred copy) is what "Einpassen" (contain) asks for. It used to be the ONLY overlay look, so "Füllen" and
+   the height did nothing here, and every site's template had to override it. "Bildhöhe" sets the height.
+   :where() keeps these at ONE class of weight, so a template's own `.hero--overlay { min-height: … }` still wins. */
+.hero--overlay:where(:not(.hero--fit-contain)) { padding: 0; min-height: clamp(460px, 88vh, 1100px); }
+.hero--overlay:where(:not(.hero--fit-contain))::before { display: none; }
+.hero--overlay:where(:not(.hero--fit-contain)) .hero-ov-img {
+    position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; object-fit: cover;
+}
+.hero--overlay.hero-ov--sm { min-height: 320px; }
+.hero--overlay.hero-ov--md { min-height: 460px; }
+.hero--overlay.hero-ov--lg { min-height: 620px; }
+.hero--overlay.hero-ov--full { min-height: 100vh; min-height: 100svh; }
+@media (max-width: 760px) { .hero--overlay:where(:not(.hero--fit-contain)) { min-height: 78svh; } }
 /* Optional width cap for the banner image band, centred (portrait-ish photos read better narrower). */
 .hero-image.hero--w-narrow { max-width: 1100px; margin-left: auto; margin-right: auto; }
 

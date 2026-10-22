@@ -123,7 +123,7 @@
 }
 else if (overlay)
 {
-    <section class="hero hero--overlay@(centerCls)@(multi ? " hero--overlay-slides" : "")@(fitCls)" style="--hero-bg:url('@safeImage')">
+    <section class="hero hero--overlay@(centerCls)@(multi ? " hero--overlay-slides" : "")@(fitCls)@(imgH.Length > 0 ? " hero-ov--" + imgH : "")" style="--hero-bg:url('@safeImage')">
         @if (multi)
         {
             @* Cycling backdrop: the slides fill the frame (cover) and cross-fade/slide behind the text. *@
@@ -131,8 +131,8 @@ else if (overlay)
         }
         else
         {
-            @* A natural <img> (not a cover background) so the WHOLE photo is shown, never cropped — capped
-               to a sensible height; a blurred copy of the same photo fills the sides instead of empty bars. *@
+            @* "Füllen" (default): the img covers the whole section, edge to edge (site.css). "Einpassen": a natural
+               <img>, the WHOLE photo, capped in height, a blurred copy of it filling the sides. *@
             <img class="hero-ov-img" src="@safeImage" alt="" style="@(singlePos.Length > 0 ? "object-position:" + singlePos : null)" />
         }
         <div class="hero-ov-text">
@@ -209,7 +209,8 @@ else
            give the overlay a min-height taller than a single image; an in-flow carousel then left a dark
            strip below it. So the carousel and its slides are absolutely positioned to cover the whole
            section (top AND bottom), with a min-height fallback for themes that set none. */
-        .hero--overlay-slides { padding: 0; min-height: clamp(360px, 60vh, 640px); }
+        .hero--overlay-slides { padding: 0; }
+        .hero--overlay-slides.hero--fit-contain { min-height: clamp(360px, 60vh, 640px); }   /* "Füllen" takes its height from site.css */
         .hero--overlay-slides .hero-carousel,
         .hero--overlay-slides .hero-carousel__track,
         .hero--overlay-slides .hero-carousel__slide { position: absolute; inset: 0; }

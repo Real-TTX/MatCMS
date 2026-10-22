@@ -14,6 +14,17 @@ public class BlockRegistry
     public static readonly HashSet<string> BuiltinTypes =
         Builtin.Select(b => b.Type).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>What a NEW block of a type starts with, beyond its fields' defaults — NOT a field default: a field default also
+    /// fills a missing value of an EXISTING block in the editor, and a hero stored without "heroStyle" renders as a banner, so a
+    /// default of "overlay" would show the wrong style there and silently switch it on the next save. Editor v2 keeps the same
+    /// list in its STARTERS (editor-v2.js); the classic editor and the AI assistant read this one.</summary>
+    public static readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> NewBlockData =
+        new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            // A new hero opens with the photo edge to edge and the title on it.
+            ["hero"] = new Dictionary<string, string> { ["heroStyle"] = "overlay" },
+        };
+
     /// <summary>The built-in block definitions ("system components") — read-only reference list.</summary>
     public static IReadOnlyList<BlockDefinition> Builtins => Builtin;
 

@@ -194,6 +194,10 @@ public sealed class AssistantBlocks
                 if (kv.Key is not ("type" or "children" or "id")) dataNode[kv.Key] = kv.Value?.DeepClone();
         }
         var data = ValidateData(def, dataNode, parentType is null, warnings, $"{path}.data");
+        // A new block starts like one added in the editor (a new hero = overlay) — unless the model chose otherwise. A block that
+        // carries an id is an existing one being re-sent: it keeps what it had.
+        if (obj["id"] is null && BlockRegistry.NewBlockData.TryGetValue(def.Type, out var start))
+            foreach (var (k, v) in start) if (!dataNode.ContainsKey(k)) data[k] = v;
 
         var children = new List<Input>();
         if (obj["children"] is JsonNode kids)

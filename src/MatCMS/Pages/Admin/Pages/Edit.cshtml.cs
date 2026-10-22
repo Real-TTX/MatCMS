@@ -602,7 +602,8 @@ public class EditModel : PageModel
 
         // Insert at the requested index (from an "insert between blocks" zone), else append.
         var siblings = page.Blocks.Where(b => b.ParentId == parentId).OrderBy(b => b.SortOrder).ToList();
-        var block = new ContentBlock { PageId = id, ParentId = parentId, BlockType = def.Type, DataJson = "{}" };
+        var block = new ContentBlock { PageId = id, ParentId = parentId, BlockType = def.Type,
+            DataJson = BlockRegistry.NewBlockData.TryGetValue(def.Type, out var start) ? System.Text.Json.JsonSerializer.Serialize(start) : "{}" };
         var insertAt = position is int p && p >= 0 && p <= siblings.Count ? p : siblings.Count;
         siblings.Insert(insertAt, block);
         for (var i = 0; i < siblings.Count; i++) siblings[i].SortOrder = i; // contiguous reindex

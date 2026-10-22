@@ -317,7 +317,9 @@
     var STARTERS = {
         "el-heading": { text: t("starter.heading") },
         "el-text": { body: "<p>" + esc(t("starter.text")) + "</p>" },
-        "el-button": { text: t("starter.button"), url: "#" }
+        "el-button": { text: t("starter.button"), url: "#" },
+        // Same as BlockRegistry.NewBlockData: a new hero is the full-bleed photo with the title on it.
+        "hero": { heroStyle: "overlay" }
     };
     function initialData(type) {
         var d = {};

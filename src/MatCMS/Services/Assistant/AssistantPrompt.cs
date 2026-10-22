@@ -63,6 +63,7 @@ public static class AssistantPrompt
             - Alle Blöcke auf oberster Ebene haben zusätzlich: _width ("" | "narrow" | "full"), _spaceTop / _spaceBottom ("" | "s" | "m" | "l"). Jeder Block: _hidden ("" | "1" = ausgeblendet), _css (CSS nur für diesen Block; ohne Selektor gilt es für den Block, mit "& h2 {…}" für sein Inneres).
             - Bilder: nur URLs aus list_media (/uploads/…) oder https-Adressen. Links: /seite, #anker, https://…, mailto:, tel:.
             - HTML-Felder: nur einfaches HTML (p, h2, h3, ul, ol, li, strong, em, a, br); Skripte werden entfernt.
+            - Hero mit großem Foto, randlos über volle Breite und Höhe, Text darauf: heroStyle "overlay" (Standard für neue Hero-Blöcke; heroFit "cover" ist Standard; heroStyle "" = Titel über dem Bild). Höhe über imageHeight ("sm" | "md" | "lg" | "full"; leer = fast bildschirmhoch), Ausschnitt über imagePosition. heroFit "contain" zeigt das ganze Bild mit unscharfem Rand.
 
             ## Werkzeuge
 

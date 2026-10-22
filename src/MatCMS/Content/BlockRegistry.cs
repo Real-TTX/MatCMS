@@ -32,6 +32,9 @@ public class BlockRegistry
     /// <summary>All block definitions: built-in blocks, user-defined components, and plugin blocks.</summary>
     public IReadOnlyList<BlockDefinition> All => _all ??= BuildAll();
 
+    /// <summary>Forgets the list built for this request — a component was just made or changed in it.</summary>
+    public void Reset() => _all = null;
+
     /// <summary>Picker category per built-in block type (localised as "blockcat.&lt;value&gt;" in the view).
     /// Components → "custom", plugin blocks → "plugins" (set below). Unlisted types default to "design".</summary>
     private static readonly Dictionary<string, string> CategoryByType = new(StringComparer.OrdinalIgnoreCase)

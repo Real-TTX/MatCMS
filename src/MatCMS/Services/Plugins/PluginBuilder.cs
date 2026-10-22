@@ -139,12 +139,20 @@ internal sealed class PluginBuilder : IPluginBuilder, IAdminBuilder, ISettingsBu
     public void Sitemap(PluginSitemapProvider provider) { ArgumentNullException.ThrowIfNull(provider); _slice.Sitemaps.Add(new(Info.Key, Info, provider)); }
     public void MediaReferences(PluginMediaProvider provider) { ArgumentNullException.ThrowIfNull(provider); _slice.MediaRefs.Add(new(Info.Key, Info, provider)); }
 
-    public void Operation(string name, PluginOperationHandler handler)
+    public void Operation(string name, PluginOperationHandler handler) => AddOperation(name, handler, null);
+
+    public void Operation(PluginOperationSpec spec, PluginOperationHandler handler)
+    {
+        ArgumentNullException.ThrowIfNull(spec);
+        AddOperation(spec.Name, handler, spec);
+    }
+
+    private void AddOperation(string? name, PluginOperationHandler handler, PluginOperationSpec? spec)
     {
         ArgumentNullException.ThrowIfNull(handler);
         if (!EventName.IsMatch(name ?? "")) throw new InvalidOperationException($"Operation '{name}': a name is lower-case letters, digits, '.', '_' or '-', starting with a letter.");
         if (_slice.Operations.Any(o => o.Name == name)) throw new InvalidOperationException($"Operation '{name}' is declared twice.");
-        _slice.Operations.Add(new PluginRegistry.OperationEntry(Info.Key, Info, name!, handler));
+        _slice.Operations.Add(new PluginRegistry.OperationEntry(Info.Key, Info, name!, handler, spec));
     }
 
     private static readonly System.Text.RegularExpressions.Regex MailKey = new(@"^[a-z][a-z0-9_-]{0,40}(\.[a-z0-9_-]{1,40}){1,3}$", System.Text.RegularExpressions.RegexOptions.Compiled);

@@ -339,6 +339,17 @@ through the cloud relay — the key never lives on the site.
   text goes through `SafeHtml`, `_css` loses every `<`. **Blocks with a raw-HTML field (the HTML block) are not offered at all** — an
   attached document could steer the model into writing markup onto a live page. What does not fit is dropped WITH a warning that goes back to
   the model, so it corrects itself. `BlockGenerator` stays for the cloud's MCP content ops.
+- **Beyond pages** (`AssistantToolsMore.cs`): `plugin_action` runs the operations plugins DESCRIBE (`IPluginBuilder.Operation(PluginOperationSpec, …)`: name,
+  description, example arguments, `Writes`, `PersonalData`, `Internal`) — the blog's `post.list/read/create/update/delete` (`BlogOps`), the shop's
+  `product.list/read/create/update`, `category.list/create/update`, coupons, variants, attributes (`ShopAiOps`). The prompt lists them under
+  „Plugin-Aktionen“. Never offered: undescribed ops, `PersonalData` (orders — every answer goes to an outside model) and `Internal` ones
+  (only the host runs them: `RunOperationAsync(allowInternal: true)`; the cloud's content ops get a refusal). A write answers with `undo`
+  ({name, args}, usually an internal `*.restore`/`*.remove`), journalled as kind `op` and run OUTSIDE the undo transaction (the plugin has its
+  own connection; SQLite's write lock would make it wait). Components (create/update, the registry is reset so the new type is a block at once),
+  templates (files body/styles/login/article/maintenance/plugin parts; `script.js` is never written; create a copy, activate) and script plugins
+  (compiled with `PluginRunner.Check` first; a new one is saved OFF, a running one whose code changed is switched OFF until the admin looks).
+  Markup for layouts and components is REFUSED, not cleaned, when anything in it runs (`AssistantMarkup`: script/iframe/object/base/meta/link,
+  `on*`, `srcdoc`, `javascript:`/`data:` addresses, CSS expressions) — the refusal names it so the model rewrites it.
 - **Undo is per run** (`AiChange`, `AssistantUndo`): the first time a run touches a page / menu (menu+locale) / template / setting, its state
   is journalled; created things are journalled as null. Undo restores blocks and menu entries WITH THEIR OLD IDS (SQLite never reuses one)
   and only the newest run with changes may be undone, then the one before — a run may build on the previous one. A tool that fails half-way

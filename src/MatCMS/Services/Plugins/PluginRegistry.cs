@@ -102,7 +102,8 @@ public sealed class PluginRegistry
     public sealed record OptionSourceEntry(string Owner, PluginInfo Info, string Name, Func<IPluginContext, CancellationToken, Task<IReadOnlyList<FieldOption>>> Provider);
 
     /// <summary>A named operation (cloud / MCP).</summary>
-    public sealed record OperationEntry(string Owner, PluginInfo Info, string Name, PluginOperationHandler Handler);
+    /// <summary><c>Spec</c>: the description, when the plugin gave one (only then is it offered to the AI assistant).</summary>
+    public sealed record OperationEntry(string Owner, PluginInfo Info, string Name, PluginOperationHandler Handler, PluginOperationSpec? Spec = null);
 
     /// <summary>One plugin's registrations. Built privately during a load, then published whole.</summary>
     public sealed class Slice

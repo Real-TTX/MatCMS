@@ -188,7 +188,7 @@ public sealed class AssistantAgent
             .ToDictionaryAsync(s => s.Key, s => s.Value, ct);
         string S(string k) => settings.TryGetValue(k, out var v) ? v ?? "" : "";
         var context = await ContextAsync(conv, S(SettingKeys.SiteName), S(SettingKeys.Languages), ct);
-        return AssistantPrompt.Build(OperatorText(S(SettingKeys.AiInstruction), S(SettingKeys.AiActionGuides)), S(SettingKeys.AssistantPrompt), _blocks.CatalogText(), context);
+        return AssistantPrompt.Build(OperatorText(S(SettingKeys.AiInstruction), S(SettingKeys.AiActionGuides)), S(SettingKeys.AssistantPrompt), _blocks.CatalogText() + _tools.PluginActionsText(), context);
     }
 
     /// <summary>What the cloud's profile says to the assistant: its standing instruction plus, from the per-action map, the

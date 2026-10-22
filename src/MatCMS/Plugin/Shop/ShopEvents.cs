@@ -124,14 +124,18 @@ internal static class ShopEvents
         if (o["compare_cents"] is JsonValue cc && cc.TryGetValue<long>(out var cmp) && cmp > 0) compare = cmp;
         else if (o["compare_price"] is { } cp && Money.TryParse(cp.ToString(), out var cmp2) && cmp2 > 0) compare = cmp2;
         var tags = o["tags"] is JsonArray ta ? string.Join(", ", ta.Select(x => x?.ToString() ?? "")) : o["tags"]?.ToString() ?? "";
-        await store.SaveProductAsync(new Product
+        var newId = await store.SaveProductAsync(new Product
         {
             Category = category, Tags = ShopTags.Normalise(tags), Featured = o["featured"] is JsonValue fv && fv.TryGetValue<bool>(out var feat) && feat,
             Slug = slug, Title = title, Summary = (o["summary"]?.GetValue<string>() ?? "").Trim(), DescriptionHtml = SafeHtml.Sanitize(o["description_html"]?.GetValue<string>()),
             Kind = ProductKind.Normalise(o["kind"]?.GetValue<string>()), PriceCents = cents, CompareCents = compare > cents ? compare : 0, TaxBp = bp, Sku = o["sku"]?.GetValue<string>() ?? "",
             TrackStock = stock is not null, Stock = stock ?? 0, Active = o["publish"]?.GetValue<bool>() ?? true
         }, ct);
-        return Answer("applied", $"Produkt „{title}“ angelegt ({Money.Format(cents, cfg.Currency)}, /shop/{slug}).");
+        var done = Answer("applied", $"Produkt „{title}“ angelegt ({Money.Format(cents, cfg.Currency)}, /shop/{slug}).");
+        done["data"] = new JsonObject { ["id"] = newId, ["slug"] = slug };
+        // The undo of a product made a moment ago: the assistant's "Rückgängig" removes it again.
+        done["undo"] = new JsonObject { ["name"] = "product.remove", ["args"] = new JsonObject { ["id"] = newId } };
+        return done;
     }
 
     /// <summary>The cloud's / an agent's "write a coupon": the same rules as the form (a code that exists is skipped, never overwritten).</summary>

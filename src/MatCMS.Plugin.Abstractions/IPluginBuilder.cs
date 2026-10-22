@@ -251,6 +251,12 @@ public interface IPluginBuilder
     void Operation(string name, PluginOperationHandler handler);
 
     /// <summary>
+    /// An operation WITH a description: what it does and which arguments it takes, in words an AI reads. Only described operations are
+    /// offered to the site's AI assistant (an undescribed one would have to be guessed at); the cloud and MCP reach both kinds.
+    /// </summary>
+    void Operation(PluginOperationSpec spec, PluginOperationHandler handler);
+
+    /// <summary>
     /// A mail the plugin sends, with its default wording. It appears under <i>Admin → Mailvorlagen</i> from the first load on and the operator
     /// may edit it; <see cref="IPluginMail.SendAsync"/> then sends the edited version. The key must start with the plugin's key and a dot.
     /// </summary>

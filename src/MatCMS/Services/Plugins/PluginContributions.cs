@@ -298,10 +298,17 @@ public sealed class PluginContributions
     /// <summary>True when a loaded plugin offers an operation of this name.</summary>
     public bool HasOperation(string name) => _registry.Operations.Any(o => o.Name == name);
 
-    /// <summary>Runs the operation of this name. Throws when none is loaded; what the handler throws propagates (the caller reports the op failed).</summary>
-    public async Task<JsonNode?> RunOperationAsync(IServiceProvider sp, string name, JsonNode? args, CancellationToken ct = default)
+    /// <summary>The operations the site's AI assistant may use: described ones, neither internal nor carrying customers' data (every answer the
+    /// assistant reads goes to an outside model provider).</summary>
+    public IReadOnlyList<PluginRegistry.OperationEntry> AssistantOperations =>
+        _registry.Operations.Where(o => o.Spec is { Internal: false, PersonalData: false }).ToList();
+
+    /// <summary>Runs the operation of this name. Throws when none is loaded; what the handler throws propagates (the caller reports the op failed).
+    /// An INTERNAL operation (an undo) runs only when the host itself asks (<paramref name="allowInternal"/>).</summary>
+    public async Task<JsonNode?> RunOperationAsync(IServiceProvider sp, string name, JsonNode? args, CancellationToken ct = default, bool allowInternal = false)
     {
         var op = _registry.Operations.FirstOrDefault(o => o.Name == name) ?? throw new InvalidOperationException($"Keine geladene Plugin-Aktion '{name}'.");
+        if (op.Spec?.Internal == true && !allowInternal) throw new InvalidOperationException($"Die Plugin-Aktion '{name}' ist nur intern nutzbar.");
         var ctx = PluginRequestContext.ForBackground(op.Info, sp, _registry);
         return await op.Handler(ctx, args, ct);
     }

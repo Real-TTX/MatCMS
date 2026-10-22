@@ -127,13 +127,24 @@ public sealed class ShopPlugin : IPlugin
         b.On("host.member.export", ShopEvents.ExportAsync);
         b.On("host.member.confirmed", (ctx, payload) => ShopEvents.ConfirmedAsync(ctx, payload));
         b.On("shop.payment.paid", (ctx, payload) => ShopEvents.ExternalPaidAsync(ctx, payload));
-        b.Operation("product.create", ShopEvents.CreateProductAsync);
-        b.Operation("coupon.create", ShopEvents.CreateCouponAsync);
-        b.Operation("order.list", ShopOps.ListOrdersAsync);
-        b.Operation("order.update", ShopOps.UpdateOrderAsync);
-        b.Operation("variant.set", ShopOps.SetVariantsAsync);
-        b.Operation("attribute.create", ShopOps.CreateAttributeAsync);
-        b.Operation("product.attributes", ShopOps.SetProductAttributesAsync);
+        // Described (ShopAiOps), so the site's AI assistant can use them too; the order operations carry customers' data and are kept from it.
+        b.Operation(ShopAiOps.ProductList, ShopAiOps.ListProductsAsync);
+        b.Operation(ShopAiOps.ProductRead, ShopAiOps.ReadProductAsync);
+        b.Operation(ShopAiOps.ProductCreate, ShopEvents.CreateProductAsync);
+        b.Operation(ShopAiOps.ProductUpdate, ShopAiOps.UpdateProductAsync);
+        b.Operation(ShopAiOps.CategoryList, ShopAiOps.ListCategoriesAsync);
+        b.Operation(ShopAiOps.CategoryCreate, ShopAiOps.CreateCategoryAsync);
+        b.Operation(ShopAiOps.CategoryUpdate, ShopAiOps.UpdateCategoryAsync);
+        b.Operation(ShopAiOps.CouponCreate, ShopEvents.CreateCouponAsync);
+        b.Operation(ShopAiOps.VariantSet, ShopOps.SetVariantsAsync);
+        b.Operation(ShopAiOps.AttributeCreate, ShopOps.CreateAttributeAsync);
+        b.Operation(ShopAiOps.ProductAttributes, ShopOps.SetProductAttributesAsync);
+        b.Operation(ShopAiOps.OrderList, ShopOps.ListOrdersAsync);
+        b.Operation(ShopAiOps.OrderUpdate, ShopOps.UpdateOrderAsync);
+        b.Operation(ShopAiOps.ProductRestore, ShopAiOps.RestoreProductAsync);
+        b.Operation(ShopAiOps.ProductRemove, ShopAiOps.RemoveProductAsync);
+        b.Operation(ShopAiOps.CategoryRestore, ShopAiOps.RestoreCategoryAsync);
+        b.Operation(ShopAiOps.CategoryRemove, ShopAiOps.RemoveCategoryAsync);
 
         // A first shipping rate, so a shop that sells something physical is not stuck on "no shipping" before anybody has looked at the tab. Editable, deletable.
         b.Lifecycle.OnInstall(async ctx =>

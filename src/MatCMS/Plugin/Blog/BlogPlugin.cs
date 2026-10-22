@@ -103,8 +103,13 @@ public sealed class BlogPlugin : IPlugin
             (await ctx.Data.Table("posts").QueryAsync(DataQuery.Everything.Eq("IsPublished", true).Eq("Locale", "de").Where("PublishedAt", DataOp.Le, DateTime.UtcNow), ct))
                 .Select(BlogStore.From).Select(p => new SitemapEntry("/blog/" + p.Slug, p.UpdatedAt)).Prepend(new SitemapEntry("/blog")));
 
-        // The cloud's (and an agent's) "write a post".
-        b.Operation("post.create", CreateFromCloudAsync);
+        // Posts for the cloud, MCP and the site's AI assistant (BlogOps): described, so the assistant can use them; every write answers with its undo.
+        b.Operation(BlogOps.List, BlogOps.ListAsync);
+        b.Operation(BlogOps.Read, BlogOps.ReadAsync);
+        b.Operation(BlogOps.Create, BlogOps.CreateAsync);
+        b.Operation(BlogOps.Update, BlogOps.UpdateAsync);
+        b.Operation(BlogOps.Delete, BlogOps.DeleteAsync);
+        b.Operation(BlogOps.Restore, BlogOps.RestoreAsync);
     }
 
     private static string ReadStrings(string culture)
@@ -114,31 +119,5 @@ public sealed class BlogPlugin : IPlugin
         using var s = asm.GetManifestResourceStream(name)!;
         using var r = new StreamReader(s);
         return r.ReadToEnd();
-    }
-
-    /// <summary>Adds a post on behalf of the cloud. Add-only by slug, and the body is sanitised before it is stored — it comes from an AI and is
-    /// shown raw on the public site, which is the whole reason <see cref="SafeHtml"/> exists.</summary>
-    private static async Task<JsonNode?> CreateFromCloudAsync(IPluginContext ctx, JsonNode? args, CancellationToken ct)
-    {
-        var payload = args as JsonObject ?? throw new InvalidOperationException("PayloadJson ist kein Objekt.");
-        var title = (payload["title"]?.GetValue<string>() ?? "").Trim();
-        var slug = MatCMS.Pages.Admin.Pages.IndexModel.Slugify(payload["slug"]?.GetValue<string>() ?? title);
-        var publish = payload["publish"]?.GetValue<bool>() ?? true;
-        static JsonObject Answer(string status, string message) => new() { ["status"] = status, ["message"] = message };
-        if (string.IsNullOrWhiteSpace(title)) return Answer("failed", ctx.T("blog.noTitle"));
-        if (string.IsNullOrWhiteSpace(slug)) return Answer("failed", ctx.T("blog.noSlug"));
-
-        var posts = ctx.Data.Table("posts");
-        if (await BlogStore.SlugTakenAsync(posts, slug, Localizer.DefaultCulture, 0, ct)) return Answer("skipped-exists", ctx.T("blog.exists", slug));
-
-        await BlogStore.SaveAsync(posts, new BlogPost
-        {
-            Title = title, Slug = slug,
-            Excerpt = SafeHtml.Sanitize(payload["excerpt"]?.GetValue<string>()),
-            ContentHtml = SafeHtml.Sanitize(payload["contentHtml"]?.GetValue<string>()),
-            Tags = (payload["tags"]?.GetValue<string>() ?? "").Trim(),
-            Locale = Localizer.DefaultCulture, IsPublished = publish, PublishedAt = DateTime.UtcNow
-        }, ct);
-        return Answer("applied", ctx.T("blog.created", slug, ctx.T(publish ? "blog.createdPublished" : "blog.createdDraft")));
     }
 }

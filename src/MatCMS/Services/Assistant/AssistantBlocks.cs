@@ -49,6 +49,17 @@ public sealed class AssistantBlocks
 
     public void KnowMedia(string url) => _media.Add(url);
 
+    /// <summary>After the assistant made or changed a component: the registry builds its list again (it caches it for the request) and the
+    /// catalogue and validation see the new block type at once.</summary>
+    public async Task ReloadAsync(CancellationToken ct = default)
+    {
+        _registry.Reset();
+        await LoadAsync(ct);
+    }
+
+    /// <summary>Every block type there is (built-in, components, plugins) — what a new component's type must not be.</summary>
+    public HashSet<string> AllTypes() => _registry.All.Select(d => d.Type).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>The block types the assistant may use.</summary>
     public IEnumerable<BlockDefinition> Usable() => _registry.All.Where(d => !HasRawHtml(d.Fields));
 

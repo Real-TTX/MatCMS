@@ -24,19 +24,21 @@ public sealed record AssistantScope(int? PageId, int? BlockId, bool Locked);
 /// <para>Plugin pages (the shop's product page …) are shown but not written: their layout belongs to the plugin's editor
 /// flow, and a slug change or a delete would break the plugin's routes.</para>
 /// </summary>
-public sealed class AssistantTools
+public sealed partial class AssistantTools
 {
     private readonly AppDbContext _db;
     private readonly AssistantBlocks _blocks;
     private readonly Localizer _t;
     private readonly AssistantFiles _files;
+    private readonly IServiceProvider _services;
 
     public int ConversationId { get; set; }
     public int Run { get; set; }
     public AssistantScope Scope { get; set; } = new(null, null, false);
 
-    public AssistantTools(AppDbContext db, AssistantBlocks blocks, Localizer t, AssistantFiles files)
+    public AssistantTools(AppDbContext db, AssistantBlocks blocks, Localizer t, AssistantFiles files, IServiceProvider services)
     {
+        _services = services;
         _db = db;
         _blocks = blocks;
         _t = t;
@@ -45,7 +47,9 @@ public sealed class AssistantTools
 
     /// <summary>The tools as the prompt describes them: name, arguments, what it does. The order is the order a sensible
     /// run uses them in.</summary>
-    public static readonly (string Name, string Args, string What, bool Writes)[] Catalog =
+    public static readonly (string Name, string Args, string What, bool Writes)[] Catalog = [.. PageCatalog, .. MoreCatalog];
+
+    private static (string Name, string Args, string What, bool Writes)[] PageCatalog =>
     [
         ("site_overview", "{}", "Überblick: Website-Name, Sprachen, alle Seiten (id, slug, Titel, Sprache, veröffentlicht, im Menü), Menüs, Design, Formulare.", false),
         ("read_page", "{\"page\": id oder slug, \"locale\"?: \"de\"}", "Eine Seite mit allen Blöcken als Baum: id, type, data (alle Felder), children.", false),
@@ -90,6 +94,20 @@ public sealed class AssistantTools
                 "update_theme" => await UpdateThemeAsync(args, ct),
                 "update_settings" => await UpdateSettingsAsync(args, ct),
                 "create_svg" => await CreateSvgAsync(args, ct),
+                "plugin_action" => await PluginActionAsync(args, ct),
+                "list_components" => await ListComponentsAsync(ct),
+                "read_component" => await ReadComponentAsync(args, ct),
+                "create_component" => await CreateComponentAsync(args, ct),
+                "update_component" => await UpdateComponentAsync(args, ct),
+                "list_templates" => await ListTemplatesAsync(ct),
+                "read_template" => await ReadTemplateAsync(args, ct),
+                "update_template" => await UpdateTemplateAsync(args, ct),
+                "create_template" => await CreateTemplateAsync(args, ct),
+                "activate_template" => await ActivateTemplateAsync(args, ct),
+                "list_plugins" => await ListPluginsAsync(ct),
+                "read_plugin" => await ReadPluginAsync(args, ct),
+                "create_plugin" => await CreatePluginAsync(args, ct),
+                "update_plugin" => await UpdatePluginAsync(args, ct),
                 _ => Fail($"Unbekanntes Werkzeug „{tool}“.", $"Es gibt kein Werkzeug \"{tool}\". Verfügbar: {string.Join(", ", Catalog.Select(c => c.Name))}."),
             };
         }

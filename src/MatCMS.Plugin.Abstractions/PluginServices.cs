@@ -323,6 +323,15 @@ public delegate Task<IEnumerable<SitemapEntry>> PluginSitemapProvider(IPluginCon
 /// <summary>Delivers the media files (<c>/uploads/…</c> addresses) the plugin uses, so the cleanup does not offer them as unused.</summary>
 public delegate Task<IEnumerable<string>> PluginMediaProvider(IPluginContext ctx, CancellationToken ct);
 
+/// <summary>
+/// A described operation (<see cref="IPluginBuilder.Operation(PluginOperationSpec, PluginOperationHandler)"/>). <c>Arguments</c> is an example
+/// argument object as text — the clearest description of a JSON shape. <c>Writes</c>: it changes data (the assistant shows it as a change, a
+/// read-only run refuses it). <c>PersonalData</c>: its answer carries customers' data (orders, addresses) — never offered to the AI assistant,
+/// whose every answer goes to an outside model provider. <c>Internal</c>: only the host may run it — the undo of an earlier write (see the
+/// <c>undo</c> an answer may carry); neither the cloud, MCP nor the assistant can ask for it, because it writes back stored values unchecked.
+/// </summary>
+public sealed record PluginOperationSpec(string Name, string Description, string Arguments = "{}", bool Writes = true, bool PersonalData = false, bool Internal = false);
+
 /// <summary>Carries out a named operation sent by the cloud or an agent (MCP) with a JSON argument, and answers with JSON.</summary>
 public delegate Task<JsonNode?> PluginOperationHandler(IPluginContext ctx, JsonNode? args, CancellationToken ct);
 

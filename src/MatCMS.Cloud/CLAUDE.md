@@ -632,6 +632,15 @@ revision matches and nothing threw — a template named for activation that neve
 own without aborting the apply. Skipped items are not an error (that is what `add`/`once` are for)
 but are shown next to *synchron*, so it never reads as "everything from the profile is here".
 
+### SSO behind the edge
+
+The edge forwards a customer domain to the host address with the Host REWRITTEN, so an instance cannot tell from the request
+where the browser is. `/sso/start` therefore runs the flow on the instance's canonical address (`site.canonicalUrl`, pushed when a
+domain is published): it first sends the browser there (`?here=1` stops the loop the rewrite would cause), so the flow cookie and the
+callback are on the same address. The cloud's `SsoRedirectAllowed` accepts the callback on any address IT knows for the instance
+(reported URL, `ProxyDomain`, `HostDomain`, further domains; published ones over https only) — never one the request brings.
+Before, only the reported address counted and the instance sent its host address: "Die Rücksprungadresse passt nicht zur Instanz".
+
 ### Behind a reverse proxy
 
 `UseForwardedHeaders` is enabled in **both** apps, and it has to be configured to do anything in

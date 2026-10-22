@@ -676,7 +676,7 @@ textarea.code { font-family: var(--font-mono, ui-monospace, monospace); font-siz
 .update-result.warn { color: #b45309; }
 
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 8px; }
-.stat { background: var(--surface); border: 1px solid var(--line); padding: 22px; }
+.stat { background: var(--surface); border: 1px solid var(--line); padding: 22px; min-width: 0; overflow-wrap: anywhere; }
 .stat .n { font-family: var(--font-head); font-size: 34px; font-weight: 700; color: var(--black); }
 .stat .l { color: var(--muted); font-size: 14px; text-transform: uppercase; letter-spacing: .06em; }
 .stat a { text-decoration: none; }
@@ -1731,7 +1731,12 @@ table.data th.num, table.data td.num { text-align: right; }
 /* Dashboard cards of one row are the same height: each shows a fixed number of rows and ends in its "Alle anzeigen"
    footer, so a busy card does not stretch its row and a quiet one does not leave a hole. On a phone they stack and
    simply grow; an expanded card (in-place "Alle anzeigen") grows too. */
-.dash-grid > .card.dash-card { display: flex; flex-direction: column; height: 530px; }
+/* A MINIMUM height, never a fixed one: the list cards are cut to CardRows lines anyway, but a card of facts (Website, with an
+   update badge and a few wrapped lines) grew past a fixed 530 px and its content ran out over the bottom edge. Cards in a row
+   stretch to the tallest, so the row stays even. */
+.dash-grid:has(> .card.dash-card) { align-items: stretch; }
+.dash-grid > .card.dash-card { display: flex; flex-direction: column; min-height: 530px; }
+.dash-card .kv-label { flex-basis: 130px; }   /* a card is narrower than a page: the 200 px label column left the values too little */
 .dash-card table.data td { padding-top: 8px; padding-bottom: 8px; }
 /* One line per row in a card (the full text is on the list page), so six rows always fit. */
 .dash-card table.data:not(.dash-attention) { table-layout: fixed; width: 100%; }

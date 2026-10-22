@@ -1,4 +1,5 @@
 @model MatCMS.Pages.Admin.IndexModel
+@functions { static string Short(string? v) => string.IsNullOrEmpty(v) ? "" : v.Split('-')[0]; }
 <div class="card dash-card">
     <h2>@T["dashboard.website"]</h2>
     <div class="kv">
@@ -26,8 +27,9 @@
     <div class="kv">
         <div class="kv-label">@T["dashboard.version"]</div>
         <div class="kv-value">
-            <span class="mono">@Model.Version</span>
-            @if (Model.UpdateAvailable) { <span class="badge badge-new">@T["dashboard.updateTo", Model.LatestVersion ?? ""]</span> }
+            @* The release number only (1.13.312) — the build stamp behind it is for the title, it made the badge wider than the card. *@
+            <span class="mono" title="@Model.Version">@Short(Model.Version)</span>
+            @if (Model.UpdateAvailable) { <span class="badge badge-new" title="@Model.LatestVersion">@T["dashboard.updateTo", Short(Model.LatestVersion)]</span> }
         </div>
     </div>
     <div class="kv">

@@ -44,7 +44,7 @@
                     {
                         var focus = Focus.Position(it.Src);
                         <figure class="slider-slide">
-                            <img src="@MatCMS.Services.ThumbnailService.Url(it.Src, 1400)" alt="@it.Alt" loading="lazy"@(string.IsNullOrEmpty(focus) ? "" : $" style=\"object-position:{focus}\"") />
+                            <img src="@MatCMS.Services.ThumbnailService.Url(it.Src, 1400)" alt="@it.Alt" loading="lazy" style="@(string.IsNullOrEmpty(focus) ? null : "object-position:" + focus)" />
                             @if (!string.IsNullOrWhiteSpace(it.Caption))
                             {
                                 <figcaption>@it.Caption</figcaption>

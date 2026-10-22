@@ -380,11 +380,18 @@ public class ContentTransferService
         // Media-library records travel with the asset files.
         if (options.Assets)
         {
-            dto.Media = (await _db.Media.AsNoTracking().OrderBy(m => m.Id).ToListAsync())
+            // Everything a picture carries besides its file: the focal point (it used to be left out, so every restore put the
+            // subject of every cropped picture back in the middle), the edit and its original, the size, and — by URL, ids are
+            // renumbered on import — the picture a copy was made from.
+            var allMedia = await _db.Media.AsNoTracking().OrderBy(m => m.Id).ToListAsync();
+            var urlOf = allMedia.ToDictionary(m => m.Id, m => m.Url);
+            dto.Media = allMedia
                 .Select(m => new MediaDto
                 {
                     Url = m.Url, FileName = m.FileName, Alt = m.Alt, Tags = m.Tags,
-                    ContentType = m.ContentType, SizeBytes = m.SizeBytes, SortOrder = m.SortOrder, CreatedAt = m.CreatedAt
+                    ContentType = m.ContentType, SizeBytes = m.SizeBytes, SortOrder = m.SortOrder, CreatedAt = m.CreatedAt,
+                    FocalX = m.FocalX, FocalY = m.FocalY, CropJson = m.CropJson, OriginalUrl = m.OriginalUrl, Width = m.Width, Height = m.Height,
+                    SourceUrl = m.SourceMediaId is int sid && urlOf.TryGetValue(sid, out var su) ? su : null,
                 }).ToList();
         }
 
@@ -1169,9 +1176,21 @@ public class ContentTransferService
                     ContentType = m.ContentType ?? "",
                     SizeBytes = m.SizeBytes,
                     SortOrder = m.SortOrder,
-                    CreatedAt = m.CreatedAt == default ? DateTime.UtcNow : m.CreatedAt
+                    CreatedAt = m.CreatedAt == default ? DateTime.UtcNow : m.CreatedAt,
+                    FocalX = m.FocalX is int fx ? Math.Clamp(fx, 0, 100) : null,
+                    FocalY = m.FocalY is int fy ? Math.Clamp(fy, 0, 100) : null,
+                    CropJson = m.CropJson,
+                    OriginalUrl = m.OriginalUrl is { } ou && ou.StartsWith("/uploads/", StringComparison.Ordinal) && !ou.Contains("..") ? ou : null,
+                    Width = m.Width,
+                    Height = m.Height,
                 });
             }
+            await _db.SaveChangesAsync();
+            // The copies find their source again by URL.
+            var byUrl = await _db.Media.ToDictionaryAsync(x => x.Url, x => x);
+            foreach (var m in dto.Media.Where(m => !string.IsNullOrWhiteSpace(m.SourceUrl) && !string.IsNullOrWhiteSpace(m.Url)))
+                if (byUrl.TryGetValue(m.Url!, out var copy) && byUrl.TryGetValue(m.SourceUrl!, out var source) && source.Id != copy.Id)
+                    copy.SourceMediaId = source.Id;
             await _db.SaveChangesAsync();
             summary.Add($"{dto.Media.Count} Medien");
         }
@@ -1728,6 +1747,14 @@ public class ContentTransferService
         public long SizeBytes { get; set; }
         public int SortOrder { get; set; }
         public DateTime CreatedAt { get; set; }
+        public int? FocalX { get; set; }
+        public int? FocalY { get; set; }
+        public string? CropJson { get; set; }
+        public string? OriginalUrl { get; set; }
+        public int? Width { get; set; }
+        public int? Height { get; set; }
+        /// <summary>The URL of the picture this one was made from (ids are renumbered on import).</summary>
+        public string? SourceUrl { get; set; }
     }
 
     private sealed class MenuDto

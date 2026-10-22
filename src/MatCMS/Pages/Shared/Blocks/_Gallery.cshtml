@@ -95,7 +95,7 @@
                         var cfocus = Focus.Position(it.Src);
                         <figure class="gallery-slide" data-tags="@it.Tags">
                             <a href="@it.Src" class="gallery__link" data-lightbox data-caption="@it.Caption">
-                                <img src="@MatCMS.Services.ThumbnailService.Url(it.Src, 1400)" alt="@it.Alt" loading="lazy"@(string.IsNullOrEmpty(cfocus) ? "" : $" style=\"object-position:{cfocus}\"") />
+                                <img src="@MatCMS.Services.ThumbnailService.Url(it.Src, 1400)" alt="@it.Alt" loading="lazy" style="@(string.IsNullOrEmpty(cfocus) ? null : "object-position:" + cfocus)" />
                             </a>
                             @if (!string.IsNullOrWhiteSpace(it.Caption))
                             {
@@ -121,7 +121,7 @@
                     <figure class="gallery__item" data-tags="@it.Tags">
                         @{ var gfocus = Focus.Position(it.Src); }
                         <a href="@it.Src" class="gallery__link" data-lightbox data-caption="@it.Caption"@thumbAttr>
-                            <img src="@MatCMS.Services.ThumbnailService.Url(it.Src, 1200)" alt="@it.Alt" loading="lazy"@(string.IsNullOrEmpty(gfocus) ? "" : $" style=\"object-position:{gfocus}\"") />
+                            <img src="@MatCMS.Services.ThumbnailService.Url(it.Src, 1200)" alt="@it.Alt" loading="lazy" style="@(string.IsNullOrEmpty(gfocus) ? null : "object-position:" + gfocus)" />
                         </a>
                         @if (!string.IsNullOrWhiteSpace(it.Caption))
                         {

@@ -409,3 +409,21 @@ plugin menu icons are Tabler names (`ti-star`).
 `<html data-dlg-ok/-cancel>`) returns a Promise. A form asks with `data-confirm="…"` (a `.btn-danger` submit or
 `data-confirm-danger` makes OK red); never `onsubmit="return confirm(…)"`. Plugin action buttons (`ActionButton(confirm:)`)
 render `data-confirm` too.
+
+## The media library ("Bild bearbeiten")
+
+A click on an item opens an INFO dialog (preview, kind, dimensions, size, focal point, URL, alt, tags, "Verwendet auf" from
+`MediaEditor.UsesAsync`); editing is a separate dialog (`Pages/Admin/Media`, `wwwroot/js/media-library.js`, Cropper.js in the browser).
+- **"Übernehmen" edits IN PLACE — the URL stays**, so every page that uses the picture shows the edit. The first edit sets the original
+  aside (`Media.OriginalUrl`, deleted with the item and by the cleanup); every later edit starts from the original with the stored settings
+  (`Media.CropJson`), "Auf Original zurücksetzen" copies it back. "Als neues Bild" makes a copy row (`SourceMediaId`). The server re-encodes
+  whatever the browser sends (`MediaEditor`, ImageSharp — metadata stripped, size limits); the browser's file is never stored as it came.
+- **Thumbnail URLs carry a version** (`/thumb/{w}/{name}?v=…`, thumbs are served immutable): `ThumbnailService.Invalidate` deletes the scaled
+  copies and bumps the version — never just "forget" it (two edits within one tick would keep the old URL). `/uploads` is `no-cache`, since an
+  address no longer means one content forever.
+- **SVG is code, not pixels:** "SVG bearbeiten" (text + live preview, saved through `SafeSvg`) and a focal point — no crop/resize. GIF gets
+  only the focal point (re-encoding would lose the animation). "Datei ersetzen" keeps the address too (raster re-encoded into the item's format).
+- **Focal point in blocks** is `style="@(x == null ? null : "object-position:" + x)"` — Razor drops a null attribute. A whole `style="…"`
+  written as a string is HTML-ENCODED and silently does nothing (it did, in Hero/Gallery/ImageText/Slider, for a long time).
+- **Backups carry** focal point, edit settings, original, width/height and the copy's source (by URL); an `OriginalUrl` from a backup must be
+  a plain `/uploads/` path.

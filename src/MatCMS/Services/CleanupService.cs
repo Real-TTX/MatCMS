@@ -102,6 +102,7 @@ public class CleanupService
             foreach (var m in rows)
             {
                 DeleteMediaFiles(m.Url);
+                if (m.OriginalUrl is not null) DeleteMediaFiles(m.OriginalUrl);   // the original an in-place edit set aside
                 _db.Media.Remove(m);
                 media++;
             }

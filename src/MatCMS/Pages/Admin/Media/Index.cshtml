@@ -2,8 +2,17 @@
 @model MatCMS.Pages.Admin.Media.IndexModel
 @{
     ViewData["Title"] = T["media.title"];
-    // id → url of everything in the library, so a cropped image can point the cropper at its ORIGINAL.
-    var urlById = Model.Items.GroupBy(x => x.Id).ToDictionary(g => g.Key, g => g.First().Url);
+    var words = new Dictionary<string, string>
+    {
+        ["uploading"] = T["action.uploading"], ["uploadFailed"] = T["media.uploadFailed"], ["copied"] = T["media.copied"],
+        ["saving"] = T["media.saving"], ["saveFailed"] = T["media.saveFailed"], ["noUses"] = T["media.noUses"], ["usesLoading"] = T["media.usesLoading"],
+        ["focalCenter"] = T["media.focalCenter"], ["edited"] = T["media.edited"], ["notEdited"] = T["media.notEdited"],
+        ["resetConfirm"] = T["media.resetConfirm"], ["replaceConfirm"] = T["media.replaceConfirm"], ["leaveConfirm"] = T["media.leaveConfirm"],
+        ["deleteUsed"] = T["media.deleteUsed"], ["output"] = T["media.output"], ["svgInvalid"] = T["media.svgInvalid"],
+        ["kindImage"] = T["media.kindImage"], ["kindSvg"] = T["media.kindSvg"], ["kindGif"] = T["media.kindGif"], ["kindFile"] = T["media.kindFile"],
+        ["usePage"] = T["media.usePage"], ["useTemplate"] = T["media.useTemplate"], ["useSetting"] = T["media.useSetting"], ["useMenu"] = T["media.useMenu"],
+        ["useForm"] = T["media.useForm"], ["useComponent"] = T["media.useComponent"], ["usePlugin"] = T["media.usePlugin"],
+    };
 }
 <link rel="stylesheet" href="~/lib/cropper/cropper.min.css" asp-append-version="true" />
 <div data-list data-list-key="media" class="list-view-tiles">
@@ -16,20 +25,9 @@
                 <button type="button" class="vt-btn" data-view="table" title="@T["media.viewTable"]" aria-label="@T["media.viewTable"]"><i class="ti ti-list" aria-hidden="true"></i></button>
             </div>
             <button type="button" id="media-upload-btn" class="btn btn-sm">@T["media.upload"]</button>
-            <input type="file" id="media-file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip" multiple style="display:none;" />
+            <input type="file" id="media-file" accept="image/*,.svg,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip" multiple hidden />
         </div>
     </div>
-<style>
-    /* Non-image media (PDF/Doc/…) show an extension badge instead of a thumbnail. */
-    .media-thumb-file { display: flex; align-items: center; justify-content: center; background: var(--bg-alt, #f1efe9); }
-    .media-fileext { font: 700 13px/1 var(--font-head, sans-serif); letter-spacing: .06em; color: #6b6257;
-        border: 2px solid currentColor; border-radius: 6px; padding: 8px 11px; }
-    /* Crop controls inside the media preview */
-    .mm-crop-start { margin-top: 8px; }
-    .crop-tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-top: 8px; }
-    .crop-ratios, .crop-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-    .crop-note { margin-top: 6px; font-size: 12px; color: #6b6257; }
-</style>
 
 @if (Model.AllTags.Count > 0)
 {
@@ -51,31 +49,17 @@
     @foreach (var m in Model.Items)
     {
         var tagList = MatCMS.Content.TagUtil.Split(m.Tags).ToList();
-        var mext = System.IO.Path.GetExtension(m.FileName ?? m.Url ?? "").ToLowerInvariant();
-        var mIsImg = mext is ".png" or ".jpg" or ".jpeg" or ".gif" or ".webp" or ".svg";
-        <button type="button" class="media-card"
-                data-search="@(m.FileName + " " + m.Tags)"
-                data-id="@m.Id"
-                data-url="@m.Url"
-                data-name="@m.FileName"
-                data-tags="@m.Tags"
-                data-alt="@m.Alt"
-                data-type="@m.ContentType"
-                data-size="@m.SizeBytes"
-                data-source-id="@(m.SourceMediaId?.ToString() ?? "")"
-                data-source-url="@(m.SourceMediaId is int sid && urlById.TryGetValue(sid, out var su) ? su : "")"
-                data-cropjson="@m.CropJson"
-                data-focalx="@(m.FocalX?.ToString() ?? "")"
-                data-focaly="@(m.FocalY?.ToString() ?? "")"
-                data-isimg="@(mIsImg && mext != ".gif" && mext != ".svg" ? "1" : "")"
-                title="@T["media.clickHint"]">
-            @if (mIsImg)
+        var isImg = MatCMS.Services.MediaEditor.IsImage(m);
+        var ext = MatCMS.Services.MediaEditor.Ext(m.Url);
+        <button type="button" class="media-card" data-search="@(m.FileName + " " + m.Tags)"
+                data-media="@System.Text.Json.JsonSerializer.Serialize(MatCMS.Pages.Admin.Media.IndexModel.Dto(m))" title="@T["media.clickHint"]">
+            @if (isImg)
             {
-                <div class="media-thumb" style="background-image:url('@m.Url')"></div>
+                <div class="media-thumb@(ext == ".svg" ? " media-thumb-svg" : "")" style="background-image:url('@MatCMS.Services.ThumbnailService.Url(m.Url, 320)')"></div>
             }
             else
             {
-                <div class="media-thumb media-thumb-file"><span class="media-fileext">@(string.IsNullOrEmpty(mext) ? "FILE" : mext.TrimStart('.').ToUpperInvariant())</span></div>
+                <div class="media-thumb media-thumb-file"><span class="media-fileext">@(string.IsNullOrEmpty(ext) ? "FILE" : ext.TrimStart('.').ToUpperInvariant())</span></div>
             }
             <div class="media-meta">
                 <div class="media-name" title="@m.FileName">@m.FileName</div>
@@ -94,25 +78,16 @@
 </div>
 
     <table class="data" data-list-table>
-        <thead><tr><th>@T["media.colFile"]</th><th>@T["media.colType"]</th><th>@T["media.colSize"]</th><th>@T["media.tags"]</th></tr></thead>
+        <thead><tr><th>@T["media.colFile"]</th><th>@T["media.colType"]</th><th>@T["media.colDims"]</th><th>@T["media.colSize"]</th><th>@T["media.tags"]</th></tr></thead>
         <tbody>
             @foreach (var m in Model.Items)
             {
                 var rTags = MatCMS.Content.TagUtil.Split(m.Tags).ToList();
                 var sizeStr = m.SizeBytes < 1048576 ? (m.SizeBytes / 1024.0).ToString("0.#") + " KB" : (m.SizeBytes / 1048576.0).ToString("0.#") + " MB";
-                var rext = System.IO.Path.GetExtension(m.FileName ?? m.Url ?? "").ToLowerInvariant();
-                var rIsImg = rext is ".png" or ".jpg" or ".jpeg" or ".webp";
-                <tr class="media-row" data-search="@(m.FileName + " " + m.Tags)"
-                    data-id="@m.Id" data-url="@m.Url" data-name="@m.FileName" data-tags="@m.Tags"
-                    data-alt="@m.Alt" data-type="@m.ContentType" data-size="@m.SizeBytes"
-                    data-source-id="@(m.SourceMediaId?.ToString() ?? "")"
-                    data-source-url="@(m.SourceMediaId is int rsid && urlById.TryGetValue(rsid, out var rsu) ? rsu : "")"
-                    data-cropjson="@m.CropJson"
-                    data-focalx="@(m.FocalX?.ToString() ?? "")"
-                    data-focaly="@(m.FocalY?.ToString() ?? "")"
-                    data-isimg="@(rIsImg ? "1" : "")" style="cursor:pointer;">
+                <tr class="media-row" data-search="@(m.FileName + " " + m.Tags)" data-media="@System.Text.Json.JsonSerializer.Serialize(MatCMS.Pages.Admin.Media.IndexModel.Dto(m))">
                     <td><strong>@m.FileName</strong></td>
                     <td class="mono">@m.ContentType</td>
+                    <td class="muted">@(m.Width is > 0 ? $"{m.Width} × {m.Height}" : "")</td>
                     <td class="muted">@sizeStr</td>
                     <td>@foreach (var t in rTags) { <span class="mini-chip">@t</span> }</td>
                 </tr>
@@ -122,45 +97,39 @@
     <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
 </div>
 
-@* ---- Detail dialog ---- *@
+<div id="media-lib" data-words="@System.Text.Json.JsonSerializer.Serialize(words)"
+     data-focal="@Url.Page("Index", "Focal")" data-edit="@Url.Page("Index", "Edit")" data-reset="@Url.Page("Index", "Reset")"
+     data-replace="@Url.Page("Index", "Replace")" data-svg="@Url.Page("Index", "Svg")" data-uses="@Url.Page("Index", "Uses")">
+    @Html.AntiForgeryToken()
+</div>
+
+@* ============ INFO ============ *@
 <div class="modal-overlay" id="media-modal">
     <div class="modal modal-media" role="dialog" aria-modal="true" aria-labelledby="mm-title">
         <div class="modal-head">
-            <h2 id="mm-title">@T["media.detail"]</h2>
-            <button type="button" class="modal-close" id="mm-close" aria-label="@T["action.close"]"><i class="ti ti-x" aria-hidden="true"></i></button>
+            <h2 id="mm-title">@T["media.info"]</h2>
+            <button type="button" class="modal-close" data-close aria-label="@T["action.close"]"><i class="ti ti-x" aria-hidden="true"></i></button>
         </div>
         <div class="modal-body media-modal-body">
-            <div class="media-preview" id="mm-preview">
-                <img id="mm-img" src="" alt="" />
-                <span class="mm-focal-dot" id="mm-focal-dot" hidden aria-hidden="true"></span>
-                <div class="mm-preview-tools">
-                    <button type="button" class="btn btn-sm mm-crop-start" id="mm-crop-start" hidden>
-                        <i class="ti ti-crop" aria-hidden="true"></i> @T["media.crop"]
-                    </button>
-                    <button type="button" class="btn btn-sm btn-ghost mm-focal-start" id="mm-focal-start" hidden>
-                        <i class="ti ti-focus-2" aria-hidden="true"></i> @T["media.focal"]
-                    </button>
+            <div class="med-info-left">
+                <div class="med-preview" id="mm-preview"><img id="mm-img" src="" alt="" /><span class="med-file-ext" id="mm-ext" hidden></span></div>
+                <div class="med-actions">
+                    <button type="button" class="btn btn-sm" id="mm-edit" hidden><i class="ti ti-pencil" aria-hidden="true"></i> @T["media.editImage"]</button>
+                    <button type="button" class="btn btn-sm" id="mm-edit-svg" hidden><i class="ti ti-code" aria-hidden="true"></i> @T["media.editSvg"]</button>
+                    <button type="button" class="btn btn-sm btn-ghost" id="mm-focal" hidden><i class="ti ti-focus-2" aria-hidden="true"></i> @T["media.focal"]</button>
+                    <button type="button" class="btn btn-sm btn-ghost" id="mm-replace"><i class="ti ti-replace" aria-hidden="true"></i> @T["media.replace"]</button>
+                    <a class="btn btn-sm btn-ghost" id="mm-download" href="#" download><i class="ti ti-download" aria-hidden="true"></i> @T["media.download"]</a>
+                    <input type="file" id="mm-replace-file" hidden />
                 </div>
-                <div class="crop-note" id="mm-focal-note" hidden>@T["media.focalHint"]
-                    <button type="button" class="btn btn-sm btn-ghost" id="mm-focal-reset">@T["media.focalReset"]</button>
-                    <button type="button" class="btn btn-sm" id="mm-focal-done">@T["action.done"]</button>
-                </div>
-                <div class="crop-tools" id="mm-crop-tools" hidden>
-                    <div class="crop-ratios">
-                        <button type="button" class="btn btn-sm btn-ghost" data-ratio="0">@T["media.cropFree"]</button>
-                        <button type="button" class="btn btn-sm btn-ghost" data-ratio="1">1:1</button>
-                        <button type="button" class="btn btn-sm btn-ghost" data-ratio="1.7777">16:9</button>
-                        <button type="button" class="btn btn-sm btn-ghost" data-ratio="1.3333">4:3</button>
-                    </div>
-                    <div class="crop-actions">
-                        <button type="button" class="btn btn-sm" id="mm-crop-save">@T["media.cropSave"]</button>
-                        <button type="button" class="btn btn-sm btn-ghost" id="mm-crop-cancel">@T["action.cancel"]</button>
-                    </div>
-                </div>
-                <div class="crop-note" id="mm-crop-note" hidden>@T["media.cropFromOriginal"]</div>
             </div>
             <div class="media-detail">
                 <div class="media-detail-name" id="mm-name"></div>
+                <div class="kv"><div class="kv-label">@T["media.kind"]</div><div class="kv-value" id="mm-kind"></div></div>
+                <div class="kv"><div class="kv-label">@T["media.dims"]</div><div class="kv-value" id="mm-dims"></div></div>
+                <div class="kv"><div class="kv-label">@T["media.colSize"]</div><div class="kv-value" id="mm-size"></div></div>
+                <div class="kv"><div class="kv-label">@T["media.uploaded"]</div><div class="kv-value" id="mm-created"></div></div>
+                <div class="kv" id="mm-focal-row"><div class="kv-label">@T["media.focal"]</div><div class="kv-value" id="mm-focal-value"></div></div>
+                <div class="kv" id="mm-edited-row"><div class="kv-label">@T["media.editState"]</div><div class="kv-value" id="mm-edited"></div></div>
 
                 <div class="form-field">
                     <label for="mm-url">@T["media.url"]</label>
@@ -172,19 +141,14 @@
 
                 <form id="mm-save-form" method="post" asp-page-handler="Save" asp-route-tag="@Model.ActiveTag" class="media-detail-form">
                     <input type="hidden" name="id" id="mm-id" />
-                    <input type="hidden" name="focalX" id="mm-focalx" />
-                    <input type="hidden" name="focalY" id="mm-focaly" />
-
                     <div class="form-field">
                         <label for="mm-alt">@T["media.alt"]</label>
                         <input id="mm-alt" name="alt" placeholder="@T["media.altPlaceholder"]" />
                     </div>
-
                     <div class="form-field">
                         <label for="mm-tag-entry">@T["media.tags"]</label>
                         <div class="tag-input" id="mm-tag-input">
-                            <input type="text" id="mm-tag-entry" class="tag-entry" placeholder="@T["media.tagAdd"]"
-                                   autocomplete="off" list="mm-tag-list" hidden />
+                            <input type="text" id="mm-tag-entry" class="tag-entry" placeholder="@T["media.tagAdd"]" autocomplete="off" list="mm-tag-list" hidden />
                             <button type="button" class="tag-add-chip" id="mm-tag-add" title="@T["media.tagAdd"]" aria-label="@T["media.tagAdd"]">+</button>
                         </div>
                         <input type="hidden" name="tags" id="mm-tags" />
@@ -202,19 +166,20 @@
                                     <button type="button" class="mini-chip mini-chip-add" data-tag="@t">+ @t</button>
                                 }
                             </div>
-                            <div class="help">@T["media.suggestHint"]</div>
                         }
                     </div>
-
-                    <div class="media-detail-info" id="mm-info"></div>
                 </form>
+
+                <div class="form-field">
+                    <label>@T["media.uses"]</label>
+                    <ul class="med-uses" id="mm-uses"></ul>
+                </div>
             </div>
 
-            @* Full-width action bar spanning both columns: positive → negative, destructive set apart. *@
             <div class="modal-foot action-bar">
                 <button type="submit" form="mm-save-form" class="btn">@T["action.save"]</button>
-                <button type="button" class="btn btn-ghost" id="mm-cancel">@T["action.cancel"]</button>
-                <form method="post" asp-page-handler="Delete" asp-route-tag="@Model.ActiveTag" class="media-delete-form act-danger"
+                <button type="button" class="btn btn-ghost" data-close>@T["action.close"]</button>
+                <form method="post" asp-page-handler="Delete" asp-route-tag="@Model.ActiveTag" class="media-delete-form act-danger" id="mm-delete-form"
                       data-confirm="@T["media.confirmDelete"]">
                     <input type="hidden" name="id" id="mm-del-id" />
                     <button type="submit" class="btn btn-danger">@T["action.delete"]</button>
@@ -224,251 +189,113 @@
     </div>
 </div>
 
+@* ============ BILD BEARBEITEN ============ *@
+<div class="modal-overlay" id="med-editor">
+    <div class="modal med-editor" role="dialog" aria-modal="true" aria-labelledby="me-title">
+        <div class="modal-head">
+            <h2 id="me-title">@T["media.editImage"]</h2>
+            <button type="button" class="modal-close" data-close aria-label="@T["action.close"]"><i class="ti ti-x" aria-hidden="true"></i></button>
+        </div>
+        <div class="tabs med-tabs" role="tablist">
+            <button type="button" class="tab active" data-me-tab="crop"><i class="ti ti-crop" aria-hidden="true"></i> @T["media.tabCrop"]</button>
+            <button type="button" class="tab" data-me-tab="size"><i class="ti ti-dimensions" aria-hidden="true"></i> @T["media.tabSize"]</button>
+            <button type="button" class="tab" data-me-tab="focal"><i class="ti ti-focus-2" aria-hidden="true"></i> @T["media.focal"]</button>
+        </div>
+        <div class="med-editor-body">
+            <div class="med-stage" id="me-stage">
+                <div class="med-crop-wrap" id="me-crop-wrap"><img id="me-img" alt="" /></div>
+                <div class="med-focal-wrap" id="me-focal-wrap" hidden>
+                    <img id="me-focal-img" alt="" />
+                    <span class="med-focal-dot" id="me-focal-dot" hidden aria-hidden="true"></span>
+                </div>
+            </div>
+            <aside class="med-side">
+                <div data-me-panel="crop">
+                    <div class="med-side-label">@T["media.ratio"]</div>
+                    <div class="med-chips" id="me-ratios">
+                        <button type="button" class="med-chip is-active" data-ratio="free">@T["media.cropFree"]</button>
+                        <button type="button" class="med-chip" data-ratio="orig">@T["media.ratioOriginal"]</button>
+                        <button type="button" class="med-chip" data-ratio="1">1:1</button>
+                        <button type="button" class="med-chip" data-ratio="1.3333">4:3</button>
+                        <button type="button" class="med-chip" data-ratio="1.5">3:2</button>
+                        <button type="button" class="med-chip" data-ratio="1.7778">16:9</button>
+                        <button type="button" class="med-chip" data-ratio="0.8">4:5</button>
+                        <button type="button" class="med-chip" data-ratio="0.5625">9:16</button>
+                    </div>
+                    <div class="med-side-label">@T["media.rotate"]</div>
+                    <div class="med-chips">
+                        <button type="button" class="med-chip" data-op="rotL" title="@T["media.rotateLeft"]" aria-label="@T["media.rotateLeft"]"><i class="ti ti-rotate-2"></i></button>
+                        <button type="button" class="med-chip" data-op="rotR" title="@T["media.rotateRight"]" aria-label="@T["media.rotateRight"]"><i class="ti ti-rotate-clockwise-2"></i></button>
+                        <button type="button" class="med-chip" data-op="flipH" title="@T["media.flipH"]" aria-label="@T["media.flipH"]"><i class="ti ti-flip-vertical"></i></button>
+                        <button type="button" class="med-chip" data-op="flipV" title="@T["media.flipV"]" aria-label="@T["media.flipV"]"><i class="ti ti-flip-horizontal"></i></button>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" data-op="clear">@T["media.cropClear"]</button>
+                    <div class="help" id="me-from-original" hidden>@T["media.fromOriginal"]</div>
+                </div>
+                <div data-me-panel="size" hidden>
+                    <div class="form-field">
+                        <label for="me-w">@T["media.width"]</label>
+                        <input id="me-w" type="number" min="16" max="8000" inputmode="numeric" />
+                    </div>
+                    <div class="form-field">
+                        <label for="me-h">@T["media.height"]</label>
+                        <input id="me-h" type="number" min="16" max="8000" inputmode="numeric" />
+                    </div>
+                    <div class="med-chips" id="me-presets">
+                        <button type="button" class="med-chip" data-w="0">@T["media.sizeFull"]</button>
+                        <button type="button" class="med-chip" data-w="2560">2560</button>
+                        <button type="button" class="med-chip" data-w="1920">1920</button>
+                        <button type="button" class="med-chip" data-w="1200">1200</button>
+                        <button type="button" class="med-chip" data-w="800">800</button>
+                    </div>
+                    <div class="help">@T["media.sizeHelp"]</div>
+                </div>
+                <div data-me-panel="focal" hidden>
+                    <div class="help">@T["media.focalHint"]</div>
+                    <div class="med-focal-previews" id="me-focal-previews">
+                        <figure><div class="med-fp" data-ar="16/9"></div><figcaption>16:9</figcaption></figure>
+                        <figure><div class="med-fp" data-ar="1/1"></div><figcaption>1:1</figcaption></figure>
+                        <figure><div class="med-fp" data-ar="3/4"></div><figcaption>3:4</figcaption></figure>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" id="me-focal-reset">@T["media.focalReset"]</button>
+                </div>
+                <div class="med-output muted" id="me-output"></div>
+            </aside>
+        </div>
+        <div class="modal-foot med-editor-foot">
+            <button type="button" class="btn btn-ghost" data-close>@T["action.cancel"]</button>
+            <button type="button" class="btn btn-ghost" id="me-reset" hidden>@T["media.resetOriginal"]</button>
+            <span class="med-gap"></span>
+            <button type="button" class="btn btn-ghost" id="me-copy">@T["media.saveCopy"]</button>
+            <button type="button" class="btn" id="me-apply">@T["media.apply"]</button>
+        </div>
+    </div>
+</div>
+
+@* ============ SVG BEARBEITEN ============ *@
+<div class="modal-overlay" id="med-svg">
+    <div class="modal med-editor" role="dialog" aria-modal="true" aria-labelledby="ms-title">
+        <div class="modal-head">
+            <h2 id="ms-title">@T["media.editSvg"]</h2>
+            <button type="button" class="modal-close" data-close aria-label="@T["action.close"]"><i class="ti ti-x" aria-hidden="true"></i></button>
+        </div>
+        <div class="med-editor-body med-svg-body">
+            <div class="med-svg-code"><textarea id="ms-code" spellcheck="false" aria-label="SVG"></textarea></div>
+            <div class="med-svg-preview">
+                <div class="med-preview med-preview-check"><img id="ms-img" alt="" /></div>
+                <div class="help">@T["media.svgHelp"]</div>
+                <div class="med-error" id="ms-error" hidden></div>
+            </div>
+        </div>
+        <div class="modal-foot med-editor-foot">
+            <button type="button" class="btn btn-ghost" data-close>@T["action.cancel"]</button>
+            <span class="med-gap"></span>
+            <button type="button" class="btn" id="ms-save">@T["action.save"]</button>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <script src="~/lib/cropper/cropper.min.js" asp-append-version="true"></script>
-    <script>
-        (function () {
-            // ---- Upload ----
-            var btn = document.getElementById('media-upload-btn');
-            var file = document.getElementById('media-file');
-            btn.addEventListener('click', function () { file.click(); });
-            file.addEventListener('change', function () {
-                if (!file.files || !file.files.length) return;
-                btn.disabled = true; btn.textContent = '@T["action.uploading"]';
-                var files = Array.prototype.slice.call(file.files);
-                var chain = Promise.resolve();
-                files.forEach(function (f) {
-                    chain = chain.then(function () {
-                        var fd = new FormData(); fd.append('file', f);
-                        return fetch('/admin/api/upload', { method: 'POST', body: fd })
-                            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-                            .then(function (r) { if (!r.ok) MatDialog.alert(r.j.error || '@T["media.uploadFailed"]'); });
-                    });
-                });
-                chain.then(function () { window.location.reload(); });
-            });
-
-            // ---- Detail dialog ----
-            var modal = document.getElementById('media-modal');
-            var img = document.getElementById('mm-img');
-            var nameEl = document.getElementById('mm-name');
-            var urlEl = document.getElementById('mm-url');
-            var altEl = document.getElementById('mm-alt');
-            var infoEl = document.getElementById('mm-info');
-            var idEl = document.getElementById('mm-id');
-            var delIdEl = document.getElementById('mm-del-id');
-
-            // ---- Tag chip picker ----
-            var tagsHidden = document.getElementById('mm-tags');
-            var tagBox = document.getElementById('mm-tag-input');
-            var tagEntry = document.getElementById('mm-tag-entry');
-            var tagAdd = document.getElementById('mm-tag-add');
-            var chips = [];
-            // The entry is hidden behind a "+" chip; clicking it reveals an inline input.
-            function showEntry() { tagAdd.hidden = true; tagEntry.hidden = false; tagEntry.focus(); }
-            function hideEntry() { tagEntry.hidden = true; tagAdd.hidden = false; }
-            tagAdd.addEventListener('click', showEntry);
-            function renderChips() {
-                Array.prototype.slice.call(tagBox.querySelectorAll('.tag-chip-item')).forEach(function (el) { el.remove(); });
-                chips.forEach(function (tag) {
-                    var el = document.createElement('span');
-                    el.className = 'tag-chip-item';
-                    el.textContent = tag;
-                    var x = document.createElement('button');
-                    x.type = 'button'; x.className = 'tag-x'; x.setAttribute('aria-label', '@T["posts.tagRemove"]'); x.textContent = '×';
-                    x.addEventListener('click', function () { removeTag(tag); tagEntry.focus(); });
-                    el.appendChild(x);
-                    tagBox.insertBefore(el, tagEntry);
-                });
-                tagsHidden.value = chips.join(', ');
-            }
-            function addTag(raw) {
-                var t = (raw || '').replace(/,/g, ' ').trim();
-                if (!t) return;
-                if (chips.some(function (c) { return c.toLowerCase() === t.toLowerCase(); })) return;
-                chips.push(t); renderChips();
-            }
-            function removeTag(tag) { chips = chips.filter(function (c) { return c !== tag; }); renderChips(); }
-            function setTags(str) {
-                var seen = {};
-                chips = (str || '').split(',').map(function (s) { return s.trim(); }).filter(function (c) {
-                    if (!c) return false; var k = c.toLowerCase(); if (seen[k]) return false; seen[k] = 1; return true;
-                });
-                renderChips();
-            }
-            tagEntry.addEventListener('keydown', function (e) {
-                if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(tagEntry.value); tagEntry.value = ''; }
-                else if (e.key === 'Escape') { e.preventDefault(); tagEntry.value = ''; hideEntry(); }
-                else if (e.key === 'Backspace' && !tagEntry.value && chips.length) { removeTag(chips[chips.length - 1]); }
-            });
-            tagEntry.addEventListener('blur', function () {
-                if (tagEntry.value.trim()) { addTag(tagEntry.value); tagEntry.value = ''; }
-                hideEntry();
-            });
-            tagBox.addEventListener('click', function (e) { if (e.target === tagBox) tagEntry.focus(); });
-            document.getElementById('mm-save-form').addEventListener('submit', function () {
-                if (tagEntry.value.trim()) { addTag(tagEntry.value); tagEntry.value = ''; }
-            });
-
-            function fmtBytes(n) {
-                n = parseInt(n, 10) || 0;
-                if (n < 1024) return n + ' B';
-                if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
-                return (n / 1024 / 1024).toFixed(1) + ' MB';
-            }
-            function open(card) {
-                var d = card.dataset;
-                img.src = d.url; img.alt = d.alt || d.name || '';
-                nameEl.textContent = d.name || '';
-                urlEl.value = d.url || '';
-                altEl.value = d.alt || '';
-                setTags(d.tags || ''); tagEntry.value = ''; hideEntry();
-                idEl.value = d.id; delIdEl.value = d.id;
-                infoEl.textContent = [d.type, fmtBytes(d.size)].filter(Boolean).join('  ·  ');
-                setupCrop(d);
-                setupFocal(d);
-                modal.classList.add('open');
-            }
-            function close() { resetCrop(); focalMode(false); modal.classList.remove('open'); }
-
-            // ---- Focal point (which spot stays visible when the image is cropped to fill a box) ----
-            var preview = document.getElementById('mm-preview');
-            var focalStartBtn = document.getElementById('mm-focal-start');
-            var focalNote = document.getElementById('mm-focal-note');
-            var focalDot = document.getElementById('mm-focal-dot');
-            var focalResetBtn = document.getElementById('mm-focal-reset');
-            var focalDoneBtn = document.getElementById('mm-focal-done');
-            var focalXEl = document.getElementById('mm-focalx');
-            var focalYEl = document.getElementById('mm-focaly');
-            // Pixel-place the marker on the actual image box (the preview centres the image with padding,
-            // so percent-of-container would drift). Re-run on image load and window resize.
-            function repositionDot() {
-                var x = focalXEl.value, y = focalYEl.value;
-                if (x === '' || y === '') { focalDot.hidden = true; return; }
-                focalDot.style.left = (img.offsetLeft + img.offsetWidth * (x / 100)) + 'px';
-                focalDot.style.top = (img.offsetTop + img.offsetHeight * (y / 100)) + 'px';
-                focalDot.hidden = false;
-            }
-            function focalMode(on) { preview.classList.toggle('focal-active', on); focalNote.hidden = !on; }
-            function setupFocal(d) {
-                focalMode(false);
-                focalStartBtn.hidden = d.isimg !== '1';
-                focalXEl.value = d.focalx || ''; focalYEl.value = d.focaly || '';
-                repositionDot();
-            }
-            focalStartBtn.addEventListener('click', function () { focalMode(true); });
-            focalDoneBtn.addEventListener('click', function () { focalMode(false); });
-            focalResetBtn.addEventListener('click', function () { focalXEl.value = ''; focalYEl.value = ''; focalDot.hidden = true; });
-            img.addEventListener('load', repositionDot);
-            window.addEventListener('resize', repositionDot);
-            img.addEventListener('click', function (e) {
-                if (!preview.classList.contains('focal-active')) return;
-                var r = img.getBoundingClientRect();
-                var x = Math.max(0, Math.min(100, Math.round(((e.clientX - r.left) / r.width) * 100)));
-                var y = Math.max(0, Math.min(100, Math.round(((e.clientY - r.top) / r.height) * 100)));
-                focalXEl.value = x; focalYEl.value = y; repositionDot();
-            });
-
-            // ---- Crop (Cropper.js) ----
-            // Crop makes a NEW file; the original is never touched. For an image that IS already a crop we
-            // load its ORIGINAL into the cropper (so cropped-away area can be recovered) and pre-set the box.
-            var cropStartBtn = document.getElementById('mm-crop-start');
-            var cropTools = document.getElementById('mm-crop-tools');
-            var cropNote = document.getElementById('mm-crop-note');
-            var cropSaveBtn = document.getElementById('mm-crop-save');
-            var cropper = null;
-            var cropCtx = null;
-
-            function resetCrop() {
-                if (cropper) { try { cropper.destroy(); } catch (e) {} cropper = null; }
-                if (cropTools) cropTools.hidden = true;
-                if (cropStartBtn) cropStartBtn.hidden = !(cropCtx && cropCtx.isImg);
-                if (cropSaveBtn) cropSaveBtn.disabled = false;
-            }
-            function setupCrop(d) {
-                cropCtx = {
-                    isImg: d.isimg === '1',
-                    id: parseInt(d.id, 10),
-                    sourceId: d.sourceId ? parseInt(d.sourceId, 10) : parseInt(d.id, 10),
-                    displayUrl: d.url,
-                    sourceUrl: d.sourceUrl || d.url,
-                    cropjson: d.cropjson || ''
-                };
-                resetCrop();
-                if (cropNote) cropNote.hidden = !(cropCtx.isImg && d.sourceId);
-            }
-            function beginCrop() {
-                if (!cropCtx || !cropCtx.isImg || typeof Cropper === 'undefined') return;
-                cropStartBtn.hidden = true;
-                cropTools.hidden = false;
-                var base = cropCtx.sourceUrl;               // crop FROM the original
-                var init = function () {
-                    if (cropper) { try { cropper.destroy(); } catch (e) {} }
-                    cropper = new Cropper(img, {
-                        viewMode: 1, autoCropArea: 1, background: false, movable: false, zoomable: false, rotatable: false,
-                        ready: function () {
-                            if (!cropCtx.cropjson) return;
-                            try { var r = JSON.parse(cropCtx.cropjson); cropper.setData({ x: r.x, y: r.y, width: r.width, height: r.height }); } catch (e) {}
-                        }
-                    });
-                };
-                if (img.getAttribute('src') === base && img.complete) { init(); }
-                else { img.onload = function () { img.onload = null; init(); }; img.src = base; }
-            }
-
-            if (cropStartBtn) cropStartBtn.addEventListener('click', beginCrop);
-            document.getElementById('mm-crop-cancel').addEventListener('click', function () {
-                var url = cropCtx ? cropCtx.displayUrl : img.src;
-                resetCrop();
-                img.src = url; // back to the shown image
-            });
-            cropTools.querySelectorAll('[data-ratio]').forEach(function (b) {
-                b.addEventListener('click', function () {
-                    if (!cropper) return;
-                    var r = parseFloat(b.dataset.ratio);
-                    cropper.setAspectRatio(r > 0 ? r : NaN);
-                });
-            });
-            cropSaveBtn.addEventListener('click', function () {
-                if (!cropper || !cropCtx) return;
-                var data = cropper.getData(true); // rounded px, relative to the ORIGINAL we loaded
-                cropSaveBtn.disabled = true;
-                fetch('/admin/api/crop', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ sourceId: cropCtx.sourceId, x: data.x, y: data.y, w: data.width, h: data.height })
-                }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-                  .then(function (res) {
-                      if (!res.ok) { MatDialog.alert(res.j.error || '@T["media.cropFailed"]'); cropSaveBtn.disabled = false; return; }
-                      window.location.reload();
-                  }).catch(function () { MatDialog.alert('@T["media.cropFailed"]'); cropSaveBtn.disabled = false; });
-            });
-
-            document.querySelectorAll('.media-card, .media-row').forEach(function (c) {
-                c.addEventListener('click', function () { open(c); });
-            });
-            document.getElementById('mm-close').addEventListener('click', close);
-            document.getElementById('mm-cancel').addEventListener('click', close);
-            modal.addEventListener('click', function (e) { if (e.target === modal) close(); });
-            document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && modal.classList.contains('open')) close(); });
-
-            // Tag suggestion chips → add as a chip.
-            var suggest = document.getElementById('mm-suggest');
-            if (suggest) {
-                suggest.addEventListener('click', function (e) {
-                    var chip = e.target.closest('.mini-chip-add');
-                    if (!chip) return;
-                    addTag(chip.getAttribute('data-tag'));
-                    tagEntry.focus();
-                });
-            }
-
-            // Copy URL.
-            document.getElementById('mm-copy').addEventListener('click', function () {
-                var b = this, u = urlEl.value;
-                (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject())
-                    .then(function () { var t = b.textContent; b.textContent = '@T["media.copied"]'; setTimeout(function () { b.textContent = t; }, 1200); })
-                    .catch(function () { urlEl.select(); document.execCommand('copy'); });
-            });
-        })();
-    </script>
+    <script src="~/js/media-library.js" asp-append-version="true"></script>
 }

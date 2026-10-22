@@ -30,8 +30,9 @@ public class Media
     /// original later. Null for a normal upload.</summary>
     public int? SourceMediaId { get; set; }
 
-    /// <summary>The crop rectangle used, as JSON {"x","y","width","height"} in ORIGINAL pixels — so
-    /// "re-crop" can reopen the original with the last selection. Null for a normal upload.</summary>
+    /// <summary>The edit that made this picture from its original, as the image editor's own JSON (crop rectangle in ORIGINAL
+    /// pixels, rotation, flip, target width) — so "Bearbeiten" reopens the original with the last settings. Older rows hold
+    /// only {"x","y","width","height"}, which reads the same. Null for a picture that was never edited.</summary>
     public string? CropJson { get; set; }
 
     /// <summary>Focal point in PERCENT (0–100) — the spot that must stay visible when the image is
@@ -40,4 +41,15 @@ public class Media
     /// gallery, image+text …), so a face/subject is never cut off by the crop.</summary>
     public int? FocalX { get; set; }
     public int? FocalY { get; set; }
+
+    /// <summary>For an image EDITED IN PLACE ("Übernehmen" in the image editor): the untouched original, kept as its own file
+    /// (<c>/uploads/…</c>, no library row of its own). The edit always starts from it again — a third crop of a crop of a crop
+    /// would lose quality and area every time — and "Auf Original zurücksetzen" copies it back. Null = never edited in place.
+    /// The media keeps its <see cref="Url"/>, so every page that shows the picture shows the edit.</summary>
+    public string? OriginalUrl { get; set; }
+
+    /// <summary>Pixel size of the picture (the viewBox for an SVG), for the library's info and for the editor. Null = unknown
+    /// (an upload from before it was recorded; filled the first time the library sees it).</summary>
+    public int? Width { get; set; }
+    public int? Height { get; set; }
 }

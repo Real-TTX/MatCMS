@@ -371,14 +371,59 @@ textarea.cp-sample-inp { resize: vertical; min-height: 0; }
 .modal-media { max-width: 860px; }
 .media-modal-body { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 24px; }
 .media-modal-body > .action-bar { grid-column: 1 / -1; margin-top: 4px; }
-.media-preview { position: relative; display: flex; align-items: flex-start; justify-content: center; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
-.media-preview img { max-width: 100%; max-height: 420px; border-radius: 6px; }
-.media-preview.focal-active img { cursor: crosshair; }
-.mm-preview-tools { display: flex; gap: 8px; flex-wrap: wrap; }
-/* Focal-point marker: the spot that stays visible when the image is cropped to fill a box. */
-.mm-focal-dot { position: absolute; width: 20px; height: 20px; margin: -10px 0 0 -10px; border-radius: 50%;
-    border: 2px solid #fff; background: rgba(47,125,149,.75); box-shadow: 0 0 0 2px rgba(0,0,0,.4), 0 1px 6px rgba(0,0,0,.4);
-    pointer-events: none; z-index: 5; }
+/* The info dialog: the picture, what can be done with it, and its facts. */
+.med-info-left { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.med-preview { position: relative; display: flex; align-items: center; justify-content: center; min-height: 220px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px; overflow: hidden; }
+.med-preview img { display: block; max-width: 100%; max-height: 420px; border-radius: 6px; }
+/* Pictures that may be transparent stand on a checkerboard, so a white logo on nothing is still visible. */
+.med-preview-check { background-color: var(--surface); background-image: linear-gradient(45deg, var(--surface-2) 25%, transparent 25%), linear-gradient(-45deg, var(--surface-2) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, var(--surface-2) 75%), linear-gradient(-45deg, transparent 75%, var(--surface-2) 75%); background-size: 18px 18px; background-position: 0 0, 0 9px, 9px -9px, -9px 0; }
+.med-file-ext { font: 700 18px/1 var(--font-head, sans-serif); letter-spacing: .06em; color: var(--text-muted); border: 2px solid currentColor; border-radius: 8px; padding: 12px 16px; }
+.med-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.med-uses { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.med-uses .mini-chip { margin-right: 4px; }
+.media-detail .kv { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 10px; padding: 6px 0; }
+.media-detail .kv-label, .media-detail .kv-value { font-size: 13px; }
+.media-detail .kv[hidden] { display: none; }
+.media-thumb-svg { background-size: contain !important; background-repeat: no-repeat; background-color: var(--surface-2); }
+
+/* The image editor: a large stage, a side panel per tab, the decision in the foot. */
+.modal.med-editor { width: min(1240px, 96vw); max-width: 96vw; display: flex; flex-direction: column; max-height: 94vh; }
+.med-tabs { padding: 0 24px; margin: 0; border-bottom: 1px solid var(--line); }
+.med-tabs .tab .ti { margin-right: 4px; }
+.med-editor-body { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 0; flex: 1 1 auto; min-height: 0; }
+.med-stage { position: relative; background: var(--surface-2); min-height: 420px; height: min(68vh, 760px); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+/* A definite box: Cropper.js measures its parent once, and an auto-sized one measured too small. */
+.med-crop-wrap { position: absolute; inset: 16px; }
+.med-crop-wrap img { display: block; max-width: 100%; }
+.med-focal-wrap { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; padding: 16px; }
+.med-focal-wrap img { max-width: 100%; max-height: 100%; cursor: crosshair; border-radius: 4px; box-shadow: 0 2px 10px rgba(0,0,0,.15); }
+.med-focal-dot { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; border: 2px solid #fff; background: rgba(37,99,235,.65); box-shadow: 0 0 0 2px rgba(0,0,0,.45), 0 1px 6px rgba(0,0,0,.4); pointer-events: none; }
+.med-side { border-left: 1px solid var(--line); padding: 18px 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+.med-side [data-me-panel] { display: flex; flex-direction: column; gap: 12px; }
+.med-side [data-me-panel][hidden] { display: none; }
+.med-side-label { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); }
+.med-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.med-chip { border: 1px solid var(--border-strong); background: var(--surface); color: var(--ink); border-radius: 8px; padding: 6px 10px; font: inherit; font-size: 13px; cursor: pointer; min-width: 38px; }
+.med-chip:hover { background: var(--hover); }
+.med-chip.is-active { background: var(--black); color: var(--on-ink); border-color: var(--black); }
+.med-focal-previews { display: grid; grid-template-columns: 1.6fr 1fr .8fr; gap: 8px; align-items: end; }
+.med-focal-previews figure { margin: 0; }
+.med-focal-previews figcaption { font-size: 11px; color: var(--text-muted); text-align: center; margin-top: 4px; }
+.med-fp { width: 100%; background-size: cover; background-repeat: no-repeat; border-radius: 6px; border: 1px solid var(--line); background-color: var(--surface-2); }
+.med-output { font-size: 12px; margin-top: auto; }
+.med-editor-foot { padding: 14px 24px; border-top: 1px solid var(--line); }
+.med-gap { flex: 1; }
+.med-svg-body { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
+.med-svg-code textarea { width: 100%; height: min(68vh, 760px); min-height: 420px; border: 0; border-right: 1px solid var(--line); resize: none; padding: 14px 16px; font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--surface); color: var(--ink); }
+.med-svg-preview { padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; }
+.med-svg-preview .med-preview { min-height: 300px; }
+.med-error { color: var(--err-fg); background: var(--err-bg); border: 1px solid var(--err-line); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
+@media (max-width: 900px) {
+    .med-editor-body, .med-svg-body { grid-template-columns: 1fr; }
+    .med-stage { height: 52vh; min-height: 300px; }
+    .med-side { border-left: 0; border-top: 1px solid var(--line); }
+    .med-svg-code textarea { height: 40vh; min-height: 240px; border-right: 0; border-bottom: 1px solid var(--line); }
+}
 .media-detail { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .media-detail-name { font-weight: 600; font-size: 14px; word-break: break-word; }
 .media-detail-form { display: flex; flex-direction: column; gap: 14px; margin: 0; }
@@ -1237,7 +1282,7 @@ a.tab { display: inline-block; text-decoration: none; }
     .card { padding: 18px 16px; }
     .media-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
     .media-modal-body { grid-template-columns: 1fr; gap: 16px; }
-    .media-preview img { max-height: 240px; }
+    .med-preview img { max-height: 240px; }
     .stat-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
     .opt-row { grid-template-columns: 1fr; }
     /* One column: a colour field (swatch, hex, clear button) does not fit twice next to each other. */

@@ -213,6 +213,7 @@ builder.Services.AddHttpClient(PostImportService.HttpClientName, c =>
 builder.Services.AddScoped<PostImportService>();
 // Stateless apart from the file cache it manages, so one instance for the whole app.
 builder.Services.AddSingleton<ThumbnailService>();
+builder.Services.AddScoped<MediaEditor>();
 builder.Services.AddScoped<VersionService>();
 builder.Services.AddScoped<EmailService>();
 // Self-hosted form anti-spam (honeypot + signed timing + PoW + captcha). Stateless apart from the
@@ -349,6 +350,8 @@ builder.Services.AddRazorPages(options =>
 });
 
 var app = builder.Build();
+// The thumbnail versions read the uploads folder; resolved once here so the first page already links versioned thumbnails.
+app.Services.GetRequiredService<ThumbnailService>();
 
 // --- Behind a reverse proxy ------------------------------------------------
 // Without this the app only ever sees what the proxy speaks to it: http, the proxy's own address,
@@ -537,6 +540,9 @@ app.UseStaticFiles(new StaticFileOptions
     OnPrepareResponse = ctx =>
     {
         ctx.Context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        // A picture can be edited IN PLACE (same address, new content): the browser must ask again (a cheap 304 when nothing
+        // changed) instead of guessing a freshness from the file's age and showing the old picture for days.
+        ctx.Context.Response.Headers.CacheControl = "no-cache";
         // An SVG opened at its own address is a document: no script, no outside fetches, whatever is in it (SafeSvg cleans it
         // on upload; this is the second wall).
         if (ctx.File.Name.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
@@ -960,6 +966,9 @@ app.MapPost("/admin/api/upload", async (HttpRequest request, IWebHostEnvironment
             await file.CopyToAsync(stream);
 
     var url = $"/uploads/{name}";
+    (int? w, int? h) dims = (null, null);
+    if (ext == ".svg") dims = MatCMS.Services.MediaEditor.SvgSize(await File.ReadAllTextAsync(Path.Combine(uploads, name)));
+    else if (isImage) try { var info = Image.Identify(Path.Combine(uploads, name)); dims = (info.Width, info.Height); } catch { /* not readable: no size */ }
     // Record it in the media library, appended after existing media (highest SortOrder).
     var nextOrder = (await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
         .MaxAsync(db.Media, m => (int?)m.SortOrder) ?? 0) + 1;
@@ -969,83 +978,17 @@ app.MapPost("/admin/api/upload", async (HttpRequest request, IWebHostEnvironment
         FileName = file.FileName,
         ContentType = ext == ".svg" ? "image/svg+xml" : file.ContentType ?? "",
         SizeBytes = size,
-        SortOrder = nextOrder
+        SortOrder = nextOrder,
+        // The size the library shows and the image editor starts from (null for a document or an unreadable file).
+        Width = dims.w,
+        Height = dims.h
     });
     await db.SaveChangesAsync();
 
     return Results.Ok(new { url });
 }).RequireAuthorization("Admin");
 
-// Crop an existing upload to a NEW file (the original is never touched), record it in the library with a
-// link back to the original + the rectangle used, so it can be re-cropped from the full original later.
-// The rectangle arrives in ORIGINAL pixels (the browser converts from the displayed size).
-app.MapPost("/admin/api/crop", async (HttpRequest request, IWebHostEnvironment env, MatCMS.Data.AppDbContext db, CancellationToken ct) =>
-{
-    JsonElement body;
-    try { body = await request.ReadFromJsonAsync<JsonElement>(cancellationToken: ct); }
-    catch { return Results.BadRequest(new { error = "Ungültige Anfrage." }); }
-
-    int GetInt(string n) => body.TryGetProperty(n, out var e) && e.ValueKind == JsonValueKind.Number && e.TryGetInt32(out var v) ? v : int.MinValue;
-    var sourceId = GetInt("sourceId");
-    int x = GetInt("x"), y = GetInt("y"), w = GetInt("w"), h = GetInt("h");
-    if (sourceId <= 0) return Results.BadRequest(new { error = "sourceId fehlt." });
-    if (x < 0 || y < 0 || w <= 0 || h <= 0) return Results.BadRequest(new { error = "Ungültiges Rechteck." });
-
-    var source = await db.Media.FindAsync(new object?[] { sourceId }, ct);
-    if (source is null) return Results.NotFound(new { error = "Quelle nicht gefunden." });
-    if (!source.Url.StartsWith("/uploads/", StringComparison.OrdinalIgnoreCase))
-        return Results.BadRequest(new { error = "Nur eigene Uploads können zugeschnitten werden." });
-
-    var ext = Path.GetExtension(source.Url).ToLowerInvariant();
-    string[] cropable = [".png", ".jpg", ".jpeg", ".webp"]; // GIF (animation) / SVG deliberately excluded
-    if (!cropable.Contains(ext)) return Results.BadRequest(new { error = "Dieser Bildtyp kann nicht zugeschnitten werden." });
-
-    var uploads = MatCMS.Services.StoragePaths.Uploads(env);
-    var srcPath = Path.Combine(uploads, Path.GetFileName(source.Url));
-    if (!File.Exists(srcPath)) return Results.NotFound(new { error = "Quelldatei fehlt." });
-
-    var name = $"{Guid.NewGuid():N}{ext}";
-    var destPath = Path.Combine(uploads, name);
-    try
-    {
-        using var image = await Image.LoadAsync(srcPath, ct);
-        // Clamp into the image so a rounding error at the very edge cannot throw.
-        var cx = Math.Clamp(x, 0, image.Width - 1);
-        var cy = Math.Clamp(y, 0, image.Height - 1);
-        var cw = Math.Clamp(w, 1, image.Width - cx);
-        var ch = Math.Clamp(h, 1, image.Height - cy);
-        image.Mutate(c => c.Crop(new Rectangle(cx, cy, cw, ch)));
-        image.Metadata.ExifProfile = null;
-        image.Metadata.IptcProfile = null;
-        image.Metadata.XmpProfile = null;
-        await image.SaveAsync(destPath, ct);
-    }
-    catch
-    {
-        try { if (File.Exists(destPath)) File.Delete(destPath); } catch { /* best effort */ }
-        return Results.BadRequest(new { error = "Zuschneiden fehlgeschlagen." });
-    }
-
-    var url = $"/uploads/{name}";
-    var nextOrder = (await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
-        .MaxAsync(db.Media, m => (int?)m.SortOrder, ct) ?? 0) + 1;
-    var media = new MatCMS.Models.Media
-    {
-        Url = url,
-        FileName = "zuschnitt-" + source.FileName,
-        Alt = source.Alt,
-        Tags = source.Tags,
-        ContentType = ext is ".png" ? "image/png" : ext is ".webp" ? "image/webp" : "image/jpeg",
-        SizeBytes = new FileInfo(destPath).Length,
-        SortOrder = nextOrder,
-        // Re-cropping a crop should still point at the TRUE original, so you never chain quality loss.
-        SourceMediaId = source.SourceMediaId ?? source.Id,
-        CropJson = JsonSerializer.Serialize(new { x, y, width = w, height = h }),
-    };
-    db.Media.Add(media);
-    await db.SaveChangesAsync(ct);
-    return Results.Ok(new { url, id = media.Id });
-}).RequireAuthorization("Admin");
+// Cropping, rotating and resizing are the media library's image editor now (Pages/Admin/Media, Services/MediaEditor.cs).
 
 // Media library listing (admin only) — used by the image picker.
 app.MapGet("/admin/api/media", async (MatCMS.Data.AppDbContext db) =>

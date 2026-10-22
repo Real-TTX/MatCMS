@@ -419,6 +419,12 @@ namespace MatCMS.Data.Migrations
                     b.Property<int?>("FocalY")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("Height")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("OriginalUrl")
+                        .HasColumnType("TEXT");
+
                     b.Property<long>("SizeBytes")
                         .HasColumnType("INTEGER");
 
@@ -435,6 +441,9 @@ namespace MatCMS.Data.Migrations
                     b.Property<string>("Url")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<int?>("Width")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 

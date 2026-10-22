@@ -114,7 +114,7 @@
                     }
                     else
                     {
-                        <img src="@safeImage" alt=""@(singlePos.Length > 0 ? $" style=\"object-position:{singlePos}\"" : "") />
+                        <img src="@safeImage" alt="" style="@(singlePos.Length > 0 ? "object-position:" + singlePos : null)" />
                     }
                 </div>
             </div>
@@ -133,7 +133,7 @@ else if (overlay)
         {
             @* A natural <img> (not a cover background) so the WHOLE photo is shown, never cropped — capped
                to a sensible height; a blurred copy of the same photo fills the sides instead of empty bars. *@
-            <img class="hero-ov-img" src="@safeImage" alt="" />
+            <img class="hero-ov-img" src="@safeImage" alt="" style="@(singlePos.Length > 0 ? "object-position:" + singlePos : null)" />
         }
         <div class="hero-ov-text">
             <div class="container">
@@ -178,7 +178,7 @@ else
             }
             else
             {
-                <img src="@safeImage" alt=""@(singlePos.Length > 0 ? $" style=\"object-position:{singlePos}\"" : "") />
+                <img src="@safeImage" alt="" style="@(singlePos.Length > 0 ? "object-position:" + singlePos : null)" />
             }
         </div>
     }

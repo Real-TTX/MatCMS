@@ -54,6 +54,41 @@ public class ThumbnailService
     {
         _env = env;
         _log = log;
+        UploadsDir ??= StoragePaths.Uploads(env);
+    }
+
+    // ---- versions: a thumbnail URL changes when its picture does ----------------------------------------------------
+    // /thumb/… is served "immutable" for a year. A picture edited IN PLACE (the image editor's "Übernehmen") keeps its
+    // /uploads/ address, so the thumbnail address carries the file's version (last write, cached) — a new edit is a new URL
+    // the browser has never seen, the old one simply falls out of its cache.
+    private static string? UploadsDir;
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, long> Versions = new(StringComparer.Ordinal);
+
+    private static long VersionOf(string name)
+    {
+        if (UploadsDir is null) return 0;
+        return Versions.GetOrAdd(name, n =>
+        {
+            try { var p = Path.Combine(UploadsDir, n); return File.Exists(p) ? File.GetLastWriteTimeUtc(p).Ticks / TimeSpan.TicksPerMillisecond : 0; }
+            catch { return 0; }
+        });
+    }
+
+    /// <summary>Forgets the scaled copies of a picture whose file changed: the cached files (rebuilt on the next ask) and its
+    /// version (so its thumbnail URLs change).</summary>
+    public void Invalidate(string fileName)
+    {
+        var safe = Path.GetFileName(fileName ?? "");
+        if (safe.Length == 0) return;
+        // A NEW version, never just "forget": a re-read mtime can land on the same value (two edits within one tick), and
+        // the version must not depend on which instance's folder the static was first pointed at.
+        var now = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
+        Versions.AddOrUpdate(safe, now, (_, old) => Math.Max(old + 1, now));
+        var root = StoragePaths.Thumbs(_env);
+        if (!Directory.Exists(root)) return;
+        foreach (var dir in Directory.EnumerateDirectories(root))
+            foreach (var suffix in new[] { ".webp", ".failed" })
+                try { var t = Path.Combine(dir, safe + suffix); if (File.Exists(t)) File.Delete(t); } catch { /* best effort */ }
     }
 
     /// <summary>True when this upload URL can be served as a thumbnail at all.</summary>
@@ -79,7 +114,8 @@ public class ThumbnailService
         if (name.Length == 0 || name.Contains('/')) return src;   // uploads/ is flat; a slash is not ours
         if (!IsScalable(name)) return src;
 
-        return $"/thumb/{width}/{name}";
+        var v = VersionOf(name);
+        return v > 0 ? $"/thumb/{width}/{name}?v={v}" : $"/thumb/{width}/{name}";
     }
 
     /// <summary>

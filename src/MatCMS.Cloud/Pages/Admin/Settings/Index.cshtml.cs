@@ -118,6 +118,8 @@ public class IndexModel : PageModel
                          select new AiUsageRow(i.Name, u.Tokens, u.Calls)).ToListAsync();
         AiTokensTotal = AiUsage.Sum(r => (long)r.Tokens);
         AiCallsTotal = AiUsage.Sum(r => r.Calls);
+        AiProfiles = HttpContext.RequestServices.GetRequiredService<AiProfileService>().Get();
+        AiLive = await HttpContext.RequestServices.GetRequiredService<AiService>().GetConfigAsync();
         ChatGpt = await _chatgpt.GetStatusAsync(poll: false, HttpContext.RequestAborted);
         if (ChatGpt.Connected) ChatGptModels = await _chatgpt.ListModelsAsync(HttpContext.RequestAborted);
         return Page();
@@ -205,20 +207,22 @@ public class IndexModel : PageModel
         return RedirectToPage(new { tab = "smtp" });
     }
 
-    /// <summary>Central AI provider connection. The key is stored SecretProtector-encrypted with the
-    /// same empty-keeps / explicit-clear rule as the SMTP password, and never echoed back to the form.</summary>
-    public async Task<IActionResult> OnPostAiAsync(string? provider, string? model, string? baseUrl, string? apiKey, bool clearKey)
+    // ---- AI profiles (KI tab): the list, activating and deleting; one profile is edited on Settings/AiProfile ----
+
+    public AiProfileService.ProfileSet AiProfiles { get; private set; } = new(new(), "");
+    public AiService.AiConfig AiLive { get; private set; } = new("", "", "", "");
+
+    public async Task<IActionResult> OnPostAiActivateAsync([FromServices] AiProfileService profiles, string id)
     {
-        await _cloud.SaveAsync(new Dictionary<string, string?>
-        {
-            [SettingKeys.AiProvider] = string.IsNullOrWhiteSpace(provider) ? "openai" : provider.Trim().ToLowerInvariant(),
-            [SettingKeys.AiModel] = model?.Trim(),
-            [SettingKeys.AiBaseUrl] = baseUrl?.Trim().TrimEnd('/'),
-            [SettingKeys.AiApiKey] = clearKey ? ""
-                : string.IsNullOrEmpty(apiKey) ? Get(SettingKeys.AiApiKey)
-                : _secrets.Protect(apiKey),
-        });
-        TempData["Flash"] = "KI-Einstellungen gespeichert.";
+        var p = await profiles.ActivateAsync(id);
+        TempData[p is null ? "FlashError" : "Flash"] = p is null ? "Profil nicht gefunden." : $"KI-Profil „{p.Name}“ ist aktiv – alle Instanzen nutzen es ab dem nächsten Aufruf.";
+        return RedirectToPage(new { tab = "ai" });
+    }
+
+    public async Task<IActionResult> OnPostAiDeleteAsync([FromServices] AiProfileService profiles, string id)
+    {
+        var ok = await profiles.DeleteAsync(id);
+        TempData[ok ? "Flash" : "FlashError"] = ok ? "KI-Profil gelöscht." : "Das aktive Profil kann nicht gelöscht werden.";
         return RedirectToPage(new { tab = "ai" });
     }
 

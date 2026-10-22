@@ -1,0 +1,104 @@
+@page "{id?}"
+@model MatCMS.Cloud.Pages.Admin.Settings.AiProfileModel
+@{
+    var p = Model.Profile;
+    ViewData["Title"] = Model.IsNew ? T["aiprof.new"] : p.Name;
+    var chat = p.Kind == "chatgpt";
+    var preset = AiProfileModel.Presets.FirstOrDefault(x => x.Url.Length > 0 && string.Equals(x.Url, p.BaseUrl, StringComparison.OrdinalIgnoreCase)).Id
+                 ?? (p.BaseUrl.Length == 0 ? "openai" : "custom");
+}
+<div class="page-head">
+    <h1>@(Model.IsNew ? T["aiprof.new"] : p.Name)</h1>
+</div>
+
+<form method="post" class="card" id="aip-form" asp-route-id="@(Model.IsNew ? null : p.Id)">
+    <input type="hidden" name="id" value="@p.Id" disabled="@Model.IsNew" />
+    <div class="form-grid">
+        <div class="form-field">
+            <label for="aip-name">@T["aiprof.name"]</label>
+            <input id="aip-name" name="name" value="@p.Name" maxlength="80" placeholder="@T["aiprof.namePlaceholder"]" />
+            <div class="help">@T["aiprof.nameHelp"]</div>
+        </div>
+        <div class="form-field">
+            <label>@T["aiprof.kind"]</label>
+            <label class="checkbox-row"><input type="radio" name="kind" value="openai" checked="@(!chat)" /> @T["settings.aiProviderOpenai"]</label>
+            <label class="checkbox-row"><input type="radio" name="kind" value="chatgpt" checked="@chat" /> @T["settings.aiProviderChatGpt"]</label>
+        </div>
+    </div>
+
+    <div class="form-section" data-aip-part="openai">
+        <div class="form-grid">
+            <div class="form-row">
+                <div class="form-field">
+                    <label for="aip-preset">@T["aiprof.provider"]</label>
+                    <select id="aip-preset">
+                        @foreach (var pr in AiProfileModel.Presets)
+                        {
+                            <option value="@pr.Id" data-url="@pr.Url" data-model="@pr.ModelHint" selected="@(pr.Id == preset)">@(pr.Label.Length > 0 ? pr.Label : T["aiprof.custom"])</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label for="aip-base">@T["settings.aiBaseUrl"]</label>
+                    <input id="aip-base" name="baseUrl" value="@p.BaseUrl" placeholder="https://api.openai.com/v1" spellcheck="false" />
+                </div>
+            </div>
+            <div class="form-field">
+                <label for="aip-key">@T["settings.aiApiKey"]</label>
+                <input id="aip-key" name="apiKey" type="password" autocomplete="new-password" placeholder="@(Model.HasKey ? T["settings.aiApiKeyKeep"] : "sk-…")" spellcheck="false" />
+                @if (Model.HasKey)
+                {
+                    <label class="checkbox-row"><input type="checkbox" name="clearKey" value="true" /> @T["settings.aiApiKeyClear"]</label>
+                }
+                <div class="help">@T["settings.aiApiKeyHint"]</div>
+            </div>
+            <div class="form-field">
+                <label for="aip-model">@T["settings.aiModel"]</label>
+                <input id="aip-model" name="model" value="@(chat ? "" : p.Model)" list="aip-models-list" placeholder="gpt-4o-mini" spellcheck="false" autocomplete="off" />
+                <datalist id="aip-models-list"></datalist>
+                <div class="help">@T["aiprof.modelHelp"]</div>
+                <div class="form-actions" style="margin-top:6px;">
+                    <button type="button" class="btn btn-ghost btn-sm" id="aip-load" data-url="@Url.Page("AiProfile", "Models")">@T["aiprof.loadModels"]</button>
+                    <label class="checkbox-row" style="margin:0;"><input type="checkbox" id="aip-free" /> @T["aiprof.freeOnly"]</label>
+                    <span class="muted" id="aip-models-info" data-free="@T["aiprof.free"]"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-section" data-aip-part="chatgpt">
+        @if (Model.ChatGptConnected)
+        {
+            <div class="form-field">
+                <label for="aip-cg-model">@T["settings.aiModel"]</label>
+                <select id="aip-cg-model" name="chatgptModel">
+                    @if (chat && p.Model.Length > 0 && Model.ChatGptModels.All(m => m.Slug != p.Model)) { <option value="@p.Model" selected>@p.Model</option> }
+                    @foreach (var m in Model.ChatGptModels) { <option value="@m.Slug" selected="@(chat && m.Slug == p.Model)">@m.Name</option> }
+                </select>
+                <div class="help">@T["aiprof.chatgptShared"]</div>
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-info">@T["aiprof.chatgptFirst"] <a asp-page="Index" asp-route-tab="ai">@T["settings.tabAi"] →</a></div>
+            <input type="hidden" name="chatgptModel" value="@(chat ? p.Model : "")" />
+        }
+    </div>
+
+    <div class="form-section">
+        <label class="checkbox-row"><input type="checkbox" name="activate" value="true" checked="@(Model.IsNew || Model.IsActive)" /> @T["aiprof.activateOnSave"]</label>
+        <div class="form-actions">
+            <button type="button" class="btn btn-ghost btn-sm" id="aip-test" data-url="@Url.Page("AiProfile", "Test")">@T["settings.aiTest"]</button>
+            <span class="muted" id="aip-test-result"></span>
+        </div>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn">@T["settings.save"]</button>
+        <a class="btn btn-ghost" asp-page="Index" asp-route-tab="ai">@T["action.cancel"]</a>
+    </div>
+</form>
+
+@section Scripts {
+    <script src="~/js/ai-profile.js" asp-append-version="true"></script>
+}

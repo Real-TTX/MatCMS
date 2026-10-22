@@ -87,6 +87,15 @@
 @* ============ API ============ *@
 <div class="tab-panel" data-panel="api" hidden>
     <partial name="_ApiKeyList" model="Model.ApiKeys" />
+
+    @* ChatGPT (or another client) connecting TO this cloud through the OAuth connector — access to the cloud, like the keys above;
+       the opposite direction of the KI tab, where the cloud calls a provider. *@
+    <div class="card">
+        <h2>@T["settings.connectHeading"]</h2>
+        <div class="actions" style="margin:8px 0 4px;">
+            <a class="btn" asp-page="/Admin/OAuthClients/Index">@T["settings.connectClientsBtn"]</a>
+        </div>
+    </div>
 </div>
 
 @* ============ SMTP ============ *@
@@ -158,63 +167,83 @@
 
 @* ============ KI (AI) ============ *@
 <div class="tab-panel" data-panel="ai" hidden>
-    @{ var aiProviderIsChatGpt = string.Equals((Model.Get(SettingKeys.AiProvider) ?? "").Trim(), "chatgpt", StringComparison.OrdinalIgnoreCase); }
-    <form method="post" asp-page-handler="Ai">
-        <div class="card">
-            <h2>@T["settings.aiHeading"]</h2>
-            <div class="form-grid">
-                <div class="form-row">
-                    <div class="form-field">
-                        <label>@T["settings.aiProvider"]</label>
-                        <select name="provider">
-                            <option value="openai" selected="@(!aiProviderIsChatGpt)">@T["settings.aiProviderOpenai"]</option>
-                            <option value="chatgpt" selected="@aiProviderIsChatGpt">@T["settings.aiProviderChatGpt"]</option>
-                        </select>
-                        <div class="help">@T["settings.aiProviderHint"]</div>
-                    </div>
-                    <div class="form-field">
-                        <label>@T["settings.aiModel"]</label>
-                        <input name="model" value="@Model.Get(SettingKeys.AiModel)" placeholder="gpt-4o-mini" spellcheck="false" list="chatgpt-models" />
-                        <datalist id="chatgpt-models">
-                            @foreach (var m in Model.ChatGptModels) { <option value="@m.Slug">@m.Name</option> }
-                        </datalist>
-                        <div class="help">@T["settings.aiModelChatGptHint"]</div>
-                    </div>
-                </div>
-                <div class="form-field">
-                    <label>@T["settings.aiApiKey"]</label>
-                    <input name="apiKey" type="password" autocomplete="new-password"
-                           placeholder="@(string.IsNullOrEmpty(Model.Get(SettingKeys.AiApiKey)) ? "sk-…" : T["settings.aiApiKeyKeep"])" spellcheck="false" />
-                    @if (!string.IsNullOrEmpty(Model.Get(SettingKeys.AiApiKey)))
-                    {
-                        <label class="checkbox-row">
-                            <input type="checkbox" name="clearKey" value="true" />
-                            @T["settings.aiApiKeyClear"]
-                        </label>
-                    }
-                    <div class="help">@T["settings.aiApiKeyHint"]</div>
-                </div>
-                <div class="form-field">
-                    <label>@T["settings.aiBaseUrl"]</label>
-                    <input name="baseUrl" value="@Model.Get(SettingKeys.AiBaseUrl)" placeholder="https://api.openai.com/v1" spellcheck="false" />
-                    <div class="help">@T["settings.aiBaseUrlHint"]</div>
-                </div>
+    @{ var aiActive = Model.AiProfiles.Active; }
+    <div class="card">
+        <h2>@T["aiprof.live"]</h2>
+        <div class="kv">
+            <div class="kv-label">@T["aiprof.profile"]</div>
+            <div class="kv-value">
+                @if (aiActive is not null) { <span class="badge @(Model.AiLive.IsConfigured ? "badge-on" : "badge-err")">@aiActive.Name</span> }
+                else if (Model.AiLive.IsConfigured) { <span class="badge badge-on">@T["aiprof.ownLive"]</span> }
+                else { <span class="badge badge-err">@T["aiprof.none"]</span> }
             </div>
-            <div style="margin-top:14px;"><button type="submit" class="btn">@T["settings.save"]</button></div>
         </div>
-    </form>
-    <form method="post" asp-page-handler="AiTest" style="margin-bottom:14px;">
-        <button type="submit" class="btn btn-ghost">@T["settings.aiTest"]</button>
-        <span class="help">@T["settings.aiTestHint"]</span>
-    </form>
+        @if (Model.AiLive.IsConfigured)
+        {
+            <div class="kv">
+                <div class="kv-label">@T["settings.aiModel"]</div>
+                <div class="kv-value"><span class="mono">@Model.AiLive.Model</span> <span class="muted">· @(Model.AiLive.IsChatGpt ? T["settings.aiProviderChatGpt"] : new Uri(Model.AiLive.BaseUrl).Host)</span></div>
+            </div>
+        }
+        <form method="post" asp-page-handler="AiTest" class="form-actions">
+            <button type="submit" class="btn btn-ghost btn-sm">@T["settings.aiTest"]</button>
+            <span class="help">@T["settings.aiTestHint"]</span>
+        </form>
+    </div>
 
-    @* Mit ChatGPT anmelden: Geräte-Code wie bei Codex und Hermes. Eigene Formulare, nicht im KI-Formular oben (keine verschachtelten Formulare). *@
+    <div class="card">
+        <h2>@T["aiprof.title"]</h2>
+        <div class="help">@T["aiprof.help"]</div>
+        <table class="data">
+            <thead><tr><th>@T["aiprof.name"]</th><th>@T["aiprof.kind"]</th><th>@T["settings.aiModel"]</th><th style="width:240px;"></th></tr></thead>
+            <tbody>
+                @if (Model.AiProfiles.Profiles.Count == 0)
+                {
+                    <partial name="_EmptyRow" model='@T["aiprof.empty"]' />
+                }
+                @foreach (var pr in Model.AiProfiles.Profiles)
+                {
+                    var isActive = pr.Id == Model.AiProfiles.ActiveId;
+                    <tr>
+                        <td><a asp-page="AiProfile" asp-route-id="@pr.Id"><strong>@pr.Name</strong></a></td>
+                        <td>@(pr.Kind == "chatgpt" ? T["aiprof.kindChatGpt"] : T["aiprof.kindKey"])</td>
+                        <td class="mono">@pr.Model</td>
+                        <td>
+                            <div class="actions">
+                                @if (isActive)
+                                {
+                                    <span class="badge badge-on">@T["aiprof.active"]</span>
+                                }
+                                else
+                                {
+                                    <form class="inline-form" method="post" asp-page-handler="AiActivate" asp-route-id="@pr.Id" data-confirm="@T["aiprof.activateConfirm", pr.Name]">
+                                        <button type="submit" class="btn btn-sm">@T["aiprof.activate"]</button>
+                                    </form>
+                                }
+                                <a class="btn btn-sm btn-ghost" asp-page="AiProfile" asp-route-id="@pr.Id">@T["action.edit"]</a>
+                                @if (!isActive)
+                                {
+                                    <form class="inline-form" method="post" asp-page-handler="AiDelete" asp-route-id="@pr.Id" data-confirm="@T["aiprof.deleteConfirm", pr.Name]">
+                                        <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
+                                    </form>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <div class="list-actions">
+            <a class="btn" asp-page="AiProfile">@T["aiprof.new"]</a>
+        </div>
+    </div>
+
     <div class="card" data-chatgpt data-start-url="@Url.Page("/Admin/Settings/Index", "ChatGptStart")" data-status-url="@Url.Page("/Admin/Settings/Index", "ChatGptStatus")"
          data-t-valid="@T["settings.chatgptValid"]" data-t-expired="@T["settings.chatgptExpired"]" data-t-copied="@T["settings.chatgptCopied"]" data-t-copy="@T["settings.chatgptCopy"]"
          data-pending-code="@Model.ChatGpt.Pending?.UserCode" data-pending-url="@Model.ChatGpt.Pending?.VerificationUrl"
          data-pending-expires="@Model.ChatGpt.Pending?.ExpiresAt.ToString("o")" data-pending-interval="@Model.ChatGpt.Pending?.IntervalSeconds">
         <h2>@T["settings.chatgptHeading"]</h2>
-        <p class="muted">@T["settings.chatgptIntro"]</p>
+        <div class="help">@T["settings.chatgptIntro"] @T["aiprof.chatgptShared"]</div>
         @if (Model.ChatGpt.Connected)
         {
             <div class="kv"><div class="kv-label">@T["settings.chatgptAccount"]</div><div class="kv-value">@(Model.ChatGpt.Email ?? Model.ChatGpt.AccountId ?? "–")</div></div>
@@ -224,14 +253,6 @@
             }
             <div class="kv"><div class="kv-label">@T["settings.chatgptSince"]</div><div class="kv-value">@Model.ChatGpt.ConnectedAt?.ToString("yyyy-MM-dd HH:mm") UTC</div></div>
             <div class="kv"><div class="kv-label">@T["settings.chatgptTokenUntil"]</div><div class="kv-value">@Model.ChatGpt.AccessExpiresAt?.ToString("yyyy-MM-dd HH:mm") UTC</div></div>
-            @if (aiProviderIsChatGpt)
-            {
-                <p><span class="badge badge-on">@T["settings.chatgptActive"]</span></p>
-            }
-            else
-            {
-                <div class="alert alert-info">@T["settings.chatgptNotActive"]</div>
-            }
             <form method="post" asp-page-handler="ChatGptLogout" data-confirm="@T["settings.chatgptLogoutConfirm"]">
                 <button type="submit" class="btn btn-ghost btn-danger">@T["settings.chatgptLogout"]</button>
             </form>
@@ -285,15 +306,6 @@
         }
     </div>
 
-    @* Connect ChatGPT to THIS cloud via the native OAuth connector. Separate from the relay above: that key
-       lets the cloud call OpenAI; this grants a client access to the cloud. *@
-    <div class="card">
-        <h2>@T["settings.connectHeading"]</h2>
-        <div class="actions" style="margin:8px 0 4px;">
-            <a class="btn" asp-page="/Admin/OAuthClients/Index">@T["settings.connectClientsBtn"]</a>
-            <a class="btn btn-ghost" href="?tab=api">@T["nav.apikeys"]</a>
-        </div>
-    </div>
 </div>
 
 @* ============ SICHERUNG ============ *@

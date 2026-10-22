@@ -133,21 +133,29 @@ public class OauthAuthorizeModel : PageModel
 
         var inst = await _db.Instances.FirstOrDefaultAsync(i => i.PublicId == client_id);
         if (inst is null || inst.Status != InstanceStatus.Approved) return (null, "unknown");
-        if (!SsoRedirectAllowed(inst, redirect_uri!)) return (null, "redirect");
+        var further = await _db.InstanceDomains.AsNoTracking().Where(d => d.InstanceId == inst.Id).Select(d => d.Domain).ToListAsync();
+        if (!SsoRedirectAllowed(inst, further, redirect_uri!)) return (null, "redirect");
         if (!await _scope.CanAccessInstanceAsync(inst.Id)) return (null, null);   // valid, but not allowed
         return (inst, null);
     }
 
-    /// <summary>The redirect_uri must be the instance's own <c>/sso/callback</c> (same authority as its
-    /// reported PreviewUrl) — the whole trust of the front channel rests on this check.</summary>
-    private static bool SsoRedirectAllowed(Instance inst, string redirectUri)
+    /// <summary>The redirect_uri must be the instance's own <c>/sso/callback</c> on an address THIS CLOUD knows for it — the whole trust of
+    /// the front channel rests on this check. Known: the reported address (<see cref="Instance.PreviewUrl"/>), the customer domain and the
+    /// host address the cloud published, and its further domains. One address used to be all: a site reached through the edge saw its host
+    /// address in the request and was refused on its customer domain's flow. Never an address the request itself brings.</summary>
+    public static bool SsoRedirectAllowed(Instance inst, IEnumerable<string> furtherDomains, string redirectUri)
     {
         if (!Uri.TryCreate(redirectUri, UriKind.Absolute, out var ru)) return false;
         if (ru.Scheme != Uri.UriSchemeHttps && ru.Scheme != Uri.UriSchemeHttp) return false;
         if (!ru.AbsolutePath.EndsWith("/sso/callback", StringComparison.OrdinalIgnoreCase)) return false;
-        var known = inst.PreviewUrl;
-        return !string.IsNullOrWhiteSpace(known) && Uri.TryCreate(known, UriKind.Absolute, out var ku)
-            && string.Equals(ru.GetLeftPart(UriPartial.Authority), ku.GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase);
+        var authority = ru.GetLeftPart(UriPartial.Authority);
+        if (Uri.TryCreate(inst.PreviewUrl, UriKind.Absolute, out var ku) && string.Equals(authority, ku.GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase))
+            return true;
+        // A published domain is reached over https only (the proxy holds its certificate).
+        if (ru.Scheme != Uri.UriSchemeHttps || !ru.IsDefaultPort) return false;
+        var hosts = new[] { inst.ProxyDomain, inst.HostDomain }.Concat(furtherDomains)
+            .Where(h => !string.IsNullOrWhiteSpace(h)).Select(h => h!.Trim().TrimEnd('.'));
+        return hosts.Any(h => string.Equals(h, ru.Host, StringComparison.OrdinalIgnoreCase));
     }
 
     private string BuildRedirect(string uri, string? code = null, string? error = null)

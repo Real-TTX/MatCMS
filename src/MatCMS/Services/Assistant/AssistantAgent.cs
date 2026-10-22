@@ -200,7 +200,7 @@ public sealed class AssistantAgent
         catch (Exception ex)
         {
             _log.LogError(ex, "Assistant run {Conversation}/{Run} failed", conversationId, run);
-            await StepAsync(conv.Id, run, "error", "Interner Fehler: " + ex.Message, null, CancellationToken.None);
+            await StepAsync(conv.Id, run, "error", "Interner Fehler: " + ex.GetBaseException().Message, null, CancellationToken.None);
             end = ("error", "Ein interner Fehler hat den Auftrag beendet.");
         }
         finally
@@ -364,14 +364,29 @@ public sealed class AssistantAgent
             ConversationId = conversationId, Run = run, Kind = kind, Text = Trim(text, 20000),
             DataJson = data?.ToJsonString(new JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }),
         });
-        await _db.SaveChangesAsync(ct);
+        await SaveAsync(ct);
     }
 
     private async Task SaveHistoryAsync(AiConversation conv, List<HistoryMessage> history, CancellationToken ct)
     {
         conv.HistoryJson = JsonSerializer.Serialize(history);
         conv.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync(ct);
+        await SaveAsync(ct);
+    }
+
+    /// <summary>Saves the run's bookkeeping, waiting out a moment of "database is locked": a plugin action (the shop, the blog) writes through
+    /// its own connection, and under load SQLite can refuse the next write of THIS one for an instant — which used to end a run that was
+    /// going perfectly well with "Interner Fehler".</summary>
+    private async Task SaveAsync(CancellationToken ct)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try { await _db.SaveChangesAsync(ct); return; }
+            catch (DbUpdateException e) when (attempt < 4 && e.GetBaseException() is Microsoft.Data.Sqlite.SqliteException { SqliteErrorCode: 5 or 6 })
+            {
+                await Task.Delay(200 * attempt, ct);
+            }
+        }
     }
 
     private static string Trim(string s, int max) => s.Length > max ? s[..max] : s;

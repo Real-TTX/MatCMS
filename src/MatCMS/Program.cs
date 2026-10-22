@@ -809,17 +809,35 @@ app.MapPost("/api/cloud/link", async (
 // JIT-provisions a local user and signs them in. Local login always stays available alongside this.
 static string SsoB64Url(byte[] b) => Convert.ToBase64String(b).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
+// Where the SSO flow lives: the site's canonical address when one is set, else the address of the request. Behind the cloud's edge
+// the request does NOT say where the browser is — the edge forwards a customer domain (matcms.de) to the host address with the Host
+// rewritten, so the site saw "matcms.cloud2…", built that callback, and the cloud refused it ("Die Rücksprungadresse passt nicht zur
+// Instanz"). The flow cookie must sit on the address the callback lands on, so /sso/start first sends the browser to the canonical
+// address (once — the flag stops the loop the rewrite would otherwise cause) and runs from there.
+static string SsoBase(HttpContext ctx, MatCMS.Services.SiteContext site)
+{
+    var canonical = (site.Get(MatCMS.Services.SettingKeys.CanonicalUrl) ?? "").Trim().TrimEnd('/');
+    return Uri.TryCreate(canonical, UriKind.Absolute, out var c) && (c.Scheme == Uri.UriSchemeHttps || c.Scheme == Uri.UriSchemeHttp)
+        ? c.GetLeftPart(UriPartial.Authority)
+        : $"{ctx.Request.Scheme}://{ctx.Request.Host}";
+}
+
 app.MapGet("/sso/start", async (HttpContext ctx, MatCMS.Services.SiteContext site, MatCMS.Services.CloudService cloud,
-    Microsoft.AspNetCore.DataProtection.IDataProtectionProvider dp, string? returnUrl, string? via) =>
+    Microsoft.AspNetCore.DataProtection.IDataProtectionProvider dp, string? returnUrl, string? via, string? here) =>
 {
     var enabled = site.Get(MatCMS.Services.SettingKeys.SsoEnabled) is "1" or "true" or "on" or "yes";
     var client = enabled ? await cloud.GetSsoClientAsync() : null;
     if (client is null) return Results.Redirect("/login");   // SSO off or not linked → normal login
 
+    // On the canonical address first (see SsoBase): the flow cookie set below must be where the callback will arrive.
+    var ssoBase = SsoBase(ctx, site);
+    if (here != "1" && !string.Equals(ssoBase, $"{ctx.Request.Scheme}://{ctx.Request.Host}", StringComparison.OrdinalIgnoreCase))
+        return Results.Redirect($"{ssoBase}/sso/start?here=1&returnUrl={Uri.EscapeDataString(returnUrl ?? "")}" + (via is null ? "" : $"&via={Uri.EscapeDataString(via)}"));
+
     var verifier = SsoB64Url(System.Security.Cryptography.RandomNumberGenerator.GetBytes(48));
     var challenge = SsoB64Url(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.ASCII.GetBytes(verifier)));
     var state = SsoB64Url(System.Security.Cryptography.RandomNumberGenerator.GetBytes(24));
-    var redirectUri = $"{ctx.Request.Scheme}://{ctx.Request.Host}/sso/callback";
+    var redirectUri = $"{ssoBase}/sso/callback";
     var safeReturn = (!string.IsNullOrEmpty(returnUrl) && returnUrl.StartsWith("/") && !returnUrl.StartsWith("//")) ? returnUrl : "/admin";
 
     // c: started from the cloud's switcher — that session always gets the admin bar (the way back).
@@ -834,7 +852,7 @@ app.MapGet("/sso/start", async (HttpContext ctx, MatCMS.Services.SiteContext sit
     return Results.Redirect(url);
 }).RequireRateLimiting("login");
 
-app.MapGet("/sso/callback", async (HttpContext ctx, MatCMS.Services.CloudService cloud, MatCMS.Services.AuthService auth,
+app.MapGet("/sso/callback", async (HttpContext ctx, MatCMS.Services.SiteContext site, MatCMS.Services.CloudService cloud, MatCMS.Services.AuthService auth,
     MatCMS.Data.AppDbContext db, Microsoft.AspNetCore.DataProtection.IDataProtectionProvider dp, string? code, string? state, string? error) =>
 {
     var raw = ctx.Request.Cookies["matcms.ssoflow"];
@@ -862,7 +880,7 @@ app.MapGet("/sso/callback", async (HttpContext ctx, MatCMS.Services.CloudService
             System.Text.Encoding.ASCII.GetBytes(state), System.Text.Encoding.ASCII.GetBytes(expectedState)))
         return Results.Redirect("/login?sso=failed");
 
-    var redirectUri = $"{ctx.Request.Scheme}://{ctx.Request.Host}/sso/callback";
+    var redirectUri = $"{SsoBase(ctx, site)}/sso/callback";   // the one /sso/start sent — the cloud compares them
     var claims = await cloud.ExchangeSsoCodeAsync(code, verifier, redirectUri, ctx.RequestAborted);
     if (claims is null) return Results.Redirect("/login?sso=failed");
 

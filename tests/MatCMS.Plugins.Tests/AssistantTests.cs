@@ -25,6 +25,8 @@ public sealed class FakeAi : IAiTransport
     {
         lock (Requests) Requests.Add(request);
         var text = _answers.Count > 0 ? _answers.Dequeue() : "{\"message\":\"Fertig.\",\"actions\":[],\"done\":true}";
+        // "ERROR:…" plays a provider that failed with that message.
+        if (text.StartsWith("ERROR:")) return Task.FromResult(new AiResponse { Ok = false, Error = text[6..], Model = "fake-model" });
         return Task.FromResult(new AiResponse { Ok = true, Text = text, Model = "fake-model", PromptTokens = 10, CompletionTokens = 5 });
     }
 }
@@ -51,6 +53,18 @@ public sealed class AssistantApp : IDisposable
     }
 
     public HttpClient Browser() => App.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = true });
+
+    private readonly SemaphoreSlim _adminGate = new(1, 1);
+    private HttpClient? _admin;
+
+    /// <summary>ONE signed-in browser for all tests of a class: /login allows ten sign-ins a minute per address, and a class with many tests
+    /// would run into that limit.</summary>
+    public async Task<HttpClient> AdminAsync()
+    {
+        await _adminGate.WaitAsync();
+        try { if (_admin is null) { var c = Browser(); await AppFactory.LoginAsync(c); _admin = c; } return _admin; }
+        finally { _adminGate.Release(); }
+    }
 
     public T Use<T>(Func<AppDbContext, T> read)
     {

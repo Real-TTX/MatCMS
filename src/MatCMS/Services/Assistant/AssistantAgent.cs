@@ -16,7 +16,8 @@ namespace MatCMS.Services.Assistant;
 /// account), and the relay stays one plain request. An answer that is not that object is asked for again twice, then
 /// shown as it is.</para>
 /// <para>Bounded: at most <see cref="MaxCallsPerRun"/> model calls and <see cref="MaxActionsPerReply"/> actions per answer.
-/// A run that hits the limit stops and says so; the editor can tell it to go on.</para>
+/// A run that hits the limit stops and says so; the editor can tell it to go on. Every run ends with an "end" step that says how
+/// (done, waiting for the user, stopped, failed) — the page's status line.</para>
 /// </summary>
 public sealed class AssistantAgent
 {
@@ -28,7 +29,27 @@ public sealed class AssistantAgent
     private readonly Localizer _t;
     private readonly ILogger<AssistantAgent> _log;
 
-    public const int MaxCallsPerRun = 30, MaxActionsPerReply = 8;
+    public const int MaxCallsPerRun = 50, MaxActionsPerReply = 8;
+
+    /// <summary>A busy or slow provider is asked again this often (with a growing pause) before the run gives up.</summary>
+    public const int MaxRetries = 2;
+
+    /// <summary>The first pause before asking again (then 4×). A field so the tests need not wait.</summary>
+    public static TimeSpan RetryPause { get; set; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>How often a model that only ANNOUNCED its next step ("done": false, no actions) is told to go on.</summary>
+    public const int MaxNudges = 2;
+
+    /// <summary>Errors worth one more try: timeouts, rate limits, the provider's own 5xx.</summary>
+    public static bool Transient(string? error)
+    {
+        var e = (error ?? "").ToLowerInvariant();
+        return e.Contains("nicht rechtzeitig") || e.Contains("timeout") || e.Contains("429") || e.Contains("überlast") || e.Contains("rate limit")
+            || System.Text.RegularExpressions.Regex.IsMatch(e, @"\b5\d\d\b") || e.Contains("verbindung");
+    }
+
+    /// <summary>The answer ends in a question to the user — then "nothing to do" means "waiting for you", not "stuck".</summary>
+    public static bool AsksUser(string message) => message.TrimEnd().TrimEnd(')', '*', '_', '"', '“', '“').EndsWith('?');
 
     /// <summary>Older tool results are shortened to this in the request — the newest few stay whole.</summary>
     private const int OldResultChars = 2500, KeepWholeResults = 4;
@@ -61,12 +82,15 @@ public sealed class AssistantAgent
         _tools.Run = run;
         _tools.Scope = new AssistantScope(conv.ScopePageId, conv.ScopeBlockId, conv.ScopeLocked);
         var history = ReadHistory(conv.HistoryJson);
+        (string State, string Text) end = ("stalled", "Die KI hat aufgehört, ohne den Auftrag abzuschließen.");
         try
         {
             await _blocks.LoadAsync(ct);
             var (imageIndex, images) = await AttachmentsOfRunAsync(conv.Id, run, ct);
             var system = await SystemPromptAsync(conv, ct);
             var badAnswers = 0;
+            var nudges = 0;
+            var retries = 0;
             var finished = false;
             for (var call = 0; call < MaxCallsPerRun && !finished; call++)
             {
@@ -81,9 +105,20 @@ public sealed class AssistantAgent
                 };
                 if (!answer.Ok)
                 {
+                    // A provider that is busy or slow for a moment is asked again (it does not count as a step); anything else ends the run.
+                    if (retries < MaxRetries && Transient(answer.Error))
+                    {
+                        retries++;
+                        await StepAsync(conv.Id, run, "info", $"Der KI-Anbieter antwortet gerade nicht ({answer.Error}) – neuer Versuch {retries}/{MaxRetries} …", null, ct);
+                        await Task.Delay(RetryPause * (retries * retries), ct);
+                        call--;
+                        continue;
+                    }
                     await StepAsync(conv.Id, run, "error", answer.Error ?? "Der KI-Aufruf ist fehlgeschlagen.", meta, ct);
+                    end = ("error", "Der KI-Anbieter hat einen Fehler gemeldet.");
                     break;
                 }
+                retries = 0;
 
                 var parsed = Parse(answer.Text);
                 if (parsed is null)
@@ -96,6 +131,7 @@ public sealed class AssistantAgent
                         continue;
                     }
                     await StepAsync(conv.Id, run, "assistant", answer.Text ?? "", meta, ct);
+                    end = ("stalled", "Die KI hat nicht im verlangten Format geantwortet.");
                     break;
                 }
 
@@ -105,7 +141,26 @@ public sealed class AssistantAgent
                 // where it reads true, rather than before them.
                 var closing = parsed.Done && parsed.Actions.Count > 0 && parsed.Message.Length > 0;
                 if (!closing) await StepAsync(conv.Id, run, "assistant", parsed.Message, meta, ct);
-                if (parsed.Actions.Count == 0) break;
+                if (parsed.Actions.Count == 0)
+                {
+                    if (parsed.Done || AsksUser(parsed.Message))
+                    {
+                        end = AsksUser(parsed.Message) ? ("waiting", "Die KI wartet auf deine Antwort.") : ("done", "Fertig.");
+                        break;
+                    }
+                    // "done": false and nothing to do — it announced the next step instead of taking it. That used to end the run
+                    // half-way, and the editor had to type "weiter". It is told to go on, twice; then the run stops and says so.
+                    if (nudges++ < MaxNudges)
+                    {
+                        history.Add(new("user", "Du hast \"done\": false gesetzt, aber keine Aktion geschickt. Mach jetzt weiter und schicke die nächsten Aktionen. "
+                            + "Ist der Auftrag erledigt, antworte mit \"done\": true und einer kurzen Zusammenfassung. Brauchst du eine Antwort des Nutzers, stelle die Frage und setze \"done\": true."));
+                        await SaveHistoryAsync(conv, history, ct);
+                        continue;
+                    }
+                    end = ("stalled", "Die KI hat nicht weitergemacht.");
+                    break;
+                }
+                nudges = 0;
 
                 var results = new JsonArray();
                 var problems = false;
@@ -134,18 +189,19 @@ public sealed class AssistantAgent
 
                 // "done" with actions that all went through ends the run; a refusal or a warning gets the model one more look.
                 finished = parsed.Done && !problems;
-                if (call == MaxCallsPerRun - 1 && !finished)
-                    await StepAsync(conv.Id, run, "info", $"Nach {MaxCallsPerRun} Schritten angehalten. Schreib „weiter“, wenn die KI weitermachen soll.", null, ct);
+                if (finished) end = ("done", "Fertig.");
+                else if (call == MaxCallsPerRun - 1) end = ("limit", $"Nach {MaxCallsPerRun} Schritten angehalten, damit ein Auftrag nicht endlos läuft.");
             }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            await StepAsync(conv.Id, run, "info", "Abgebrochen.", null, CancellationToken.None);
+            end = ("cancelled", "Abgebrochen.");
         }
         catch (Exception ex)
         {
             _log.LogError(ex, "Assistant run {Conversation}/{Run} failed", conversationId, run);
             await StepAsync(conv.Id, run, "error", "Interner Fehler: " + ex.Message, null, CancellationToken.None);
+            end = ("error", "Ein interner Fehler hat den Auftrag beendet.");
         }
         finally
         {
@@ -155,6 +211,10 @@ public sealed class AssistantAgent
             // Whatever a failed tool left half-done in the change tracker must not ride along with the final save.
             foreach (var e in _db.ChangeTracker.Entries().Where(e => e.Entity is not AiConversation && e.State != EntityState.Unchanged).ToList())
                 e.State = EntityState.Detached;
+            // The LAST step of every run says how it ended — the page shows it as the run's status line ("Fertig", "wartet auf dich",
+            // "angehalten" with a button to go on), so nobody has to guess from the last message whether the AI is still at it. Written
+            // after the half-done changes were dropped: its save must not carry them.
+            _db.AiSteps.Add(new AiStep { ConversationId = conv.Id, Run = run, Kind = "end", Text = end.Text, DataJson = new JsonObject { ["state"] = end.State }.ToJsonString() });
             await _db.SaveChangesAsync(CancellationToken.None);
         }
     }

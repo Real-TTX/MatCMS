@@ -156,6 +156,8 @@
             box.appendChild(c);
             if (step.previewUrl) setPreview(step.previewUrl, !!d.changed);
             else if (d.changed) setPreview(currentUrl, true);
+        } else if (step.kind === 'end') {
+            box.appendChild(endLine(step, d.state || 'stalled'));
         } else if (step.kind === 'error') {
             var e = el('div', 'ai-line is-error');
             e.appendChild(el('i', 'ti ti-alert-circle'));
@@ -169,6 +171,39 @@
             box.appendChild(i);
             if (d.undo) setPreview(currentUrl, true);
         }
+    }
+
+    // How a run ended, as ONE clear line at its end: done, waiting for you, stopped (with "Weitermachen", which sends "weiter" —
+    // no typing), failed, cancelled. Only the newest run keeps its button.
+    function endLine(step, state) {
+        var map = {
+            done: ['is-done', 'ti-circle-check', W.endDone],
+            waiting: ['is-waiting', 'ti-message-question', W.endWaiting],
+            limit: ['is-stopped', 'ti-player-pause', W.endStopped],
+            stalled: ['is-stopped', 'ti-player-pause', W.endStopped],
+            error: ['is-error', 'ti-alert-circle', W.endError],
+            cancelled: ['is-stopped', 'ti-player-stop', W.endCancelled]
+        };
+        var m = map[state] || map.stalled;
+        var line = el('div', 'ai-end ' + m[0]);
+        line.appendChild(el('i', 'ti ' + m[1]));
+        var txt = el('span', 'ai-end-text', m[2]);
+        line.appendChild(txt);
+        if (step.text && state !== 'done' && state !== 'waiting' && state !== 'cancelled') line.appendChild(el('span', 'ai-end-why', step.text));
+        if (state === 'limit' || state === 'stalled' || state === 'error') {
+            log.querySelectorAll('.ai-goon').forEach(function (b) { b.remove(); });
+            var go = el('button', 'btn btn-sm ai-goon');
+            go.type = 'button';
+            go.innerHTML = '<i class="ti ti-player-play"></i> ';
+            go.appendChild(document.createTextNode(W.goOn));
+            go.addEventListener('click', function () {
+                if (running) return;
+                input.value = W.goOnText;
+                form.requestSubmit();
+            });
+            line.appendChild(go);
+        }
+        return line;
     }
 
     function setUndo(run) {
@@ -191,7 +226,13 @@
         runBoxes[run].appendChild(b);
     }
 
+    // A run that ends while the tab is in the background says so in the tab title.
+    var baseTitle = document.title;
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) document.title = baseTitle; });
+
     function setWorking(on) {
+        if (running && !on && document.hidden) document.title = W.titleDone + ' · ' + baseTitle;
+        if (on) log.querySelectorAll('.ai-goon').forEach(function (b) { b.remove(); });
         running = on;
         sendBtn.disabled = on;
         stopBtn.hidden = !on;

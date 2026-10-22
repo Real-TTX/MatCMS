@@ -40,17 +40,21 @@ public sealed class AssistantRunner : BackgroundService
 
     public bool IsRunning(int conversationId) => _running.ContainsKey(conversationId);
 
+    private readonly DateTime _startedUtc = DateTime.UtcNow;
+
     protected override async Task ExecuteAsync(CancellationToken stop)
     {
         try
         {
             using var scope = _scopes.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var stuck = await db.AiConversations.Where(c => c.Status == "running").ToListAsync(stop);
-            foreach (var c in stuck)
+            // Only what a restart really interrupted: a run started in the first moment after this start (before this query ran) is
+            // "running" too, and marking IT idle told the page it was over while it went on in the background.
+            var stuck = await db.AiConversations.Where(c => c.Status == "running" && c.UpdatedAt < _startedUtc).ToListAsync(stop);
+            foreach (var c in stuck.Where(c => !IsRunning(c.Id)))
             {
                 c.Status = "idle";
-                db.AiSteps.Add(new AiStep { ConversationId = c.Id, Run = c.Runs, Kind = "info", Text = "Unterbrochen – die Website wurde neu gestartet." });
+                db.AiSteps.Add(new AiStep { ConversationId = c.Id, Run = c.Runs, Kind = "end", Text = "Unterbrochen – die Website wurde neu gestartet.", DataJson = """{"state":"stalled"}""" });
             }
             if (stuck.Count > 0) await db.SaveChangesAsync(stop);
         }

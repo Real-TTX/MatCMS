@@ -16,7 +16,7 @@ public class AssistantMoreTests : IClassFixture<AssistantApp>
     private readonly AssistantApp _app;
     public AssistantMoreTests(AssistantApp app) => _app = app;
 
-    private async Task<HttpClient> AdminAsync() { var c = _app.Browser(); await AppFactory.LoginAsync(c); return c; }
+    private Task<HttpClient> AdminAsync() => _app.AdminAsync();
 
     private async Task<(int id, JsonArray steps)> SendAsync(HttpClient c, string message)
     {
@@ -189,6 +189,36 @@ public class AssistantMoreTests : IClassFixture<AssistantApp>
         changed = _app.Use(db => db.Plugins.AsNoTracking().Single(p => p.Id == running));
         Assert.Equal(("// v1", true), (changed.Code, changed.Enabled));
         Assert.False(_app.Use(db => db.Plugins.Any(p => p.Name == "Neu von KI")));
+    }
+
+    private static string EndState(JsonArray steps) =>
+        steps.Select(s => s!.AsObject()).Last(s => s["kind"]!.GetValue<string>() == "end")["data"]!["state"]!.GetValue<string>();
+
+    [Fact]
+    public async Task A_model_that_only_announces_is_told_to_go_on_a_busy_provider_is_asked_again_and_every_run_says_how_it_ended()
+    {
+        AssistantAgent.RetryPause = TimeSpan.FromMilliseconds(10);
+        var admin = await AdminAsync();
+        _app.Ai.Say(
+            """{"message":"Ich lege jetzt die Seite an.","actions":[],"done":false}""",
+            "ERROR:Die KI hat nicht rechtzeitig geantwortet.",
+            Act("create_page", """{"title":"Angekündigt","slug":"angekuendigt","blocks":[]}"""),
+            """{"message":"Erledigt: Seite angelegt.","actions":[],"done":true}""");
+        var (_, steps) = await SendAsync(admin, "Leg eine Seite an.");
+        Assert.True(_app.Use(db => db.Pages.Any(p => p.Slug == "angekuendigt")));
+        Assert.Contains(steps, s => s!["text"]!.GetValue<string>().Contains("neuer Versuch"));
+        Assert.Equal("done", EndState(steps));
+
+        _app.Ai.Say("""{"message":"Soll die Seite ins Menü?","actions":[],"done":false}""");
+        (_, steps) = await SendAsync(admin, "Und jetzt?");
+        Assert.Equal("waiting", EndState(steps));
+
+        _app.Ai.Say(
+            """{"message":"Gleich.","actions":[],"done":false}""",
+            """{"message":"Gleich.","actions":[],"done":false}""",
+            """{"message":"Gleich.","actions":[],"done":false}""");
+        (_, steps) = await SendAsync(admin, "Mach was.");
+        Assert.Equal("stalled", EndState(steps));
     }
 
     [Theory]

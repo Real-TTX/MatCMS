@@ -11,6 +11,17 @@
         if (m) m.hidden = true;
         if (b) b.setAttribute("aria-expanded", "false");
     }
+    // A button-anchored list (right-aligned to its button) runs off the screen when the button is not near
+    // the right edge — a switcher placed in a template's header on a phone. Shift it back inside with 8px to
+    // spare. A list that is in flow (the burger menu) needs nothing.
+    function fit(m) {
+        m.style.transform = "";
+        if (getComputedStyle(m).position !== "absolute") return;
+        var r = m.getBoundingClientRect(), vw = document.documentElement.clientWidth, dx = 0;
+        if (r.right > vw - 8) dx = vw - 8 - r.right;
+        if (r.left + dx < 8) dx = 8 - r.left;
+        if (dx) m.style.transform = "translateX(" + Math.round(dx) + "px)";
+    }
     function closeAll() {
         document.querySelectorAll(".mat-lang.open").forEach(close);
     }
@@ -24,7 +35,7 @@
             if (!wasOpen) {
                 w.classList.add("open");
                 var m = w.querySelector(".mat-lang-menu");
-                if (m) m.hidden = false;
+                if (m) { m.hidden = false; fit(m); }
                 btn.setAttribute("aria-expanded", "true");
             }
             return;

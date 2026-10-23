@@ -893,12 +893,15 @@ html.mat-langm-lock { overflow: hidden; }
     .main-nav a::after { display: none; }
     .nav-toggle:checked ~ .main-nav { display: flex; }
     .lang-switch { padding: 12px 0 0; margin: 0; border-left: none; }
-    /* Fallback dropdown inside the collapsed mobile nav: own row, menu opens in-flow (no clipping).
-       ONLY the inline switcher (in the nav / placed via {{languages:dropdown}}) — NOT the fixed
-       overlay: making the overlay's menu static detached it from its button, so it opened somewhere
-       else entirely. The overlay keeps its absolute, button-anchored menu on every screen size. */
-    .mat-lang:not(.mat-lang--overlay) { margin: 12px 0 0; align-self: flex-start; }
-    .mat-lang:not(.mat-lang--overlay) .mat-lang-menu { position: static; margin-top: 8px; box-shadow: none; }
+    /* Inside the collapsed mobile nav the dropdown is its own row and its list opens IN FLOW, below the
+       button, as wide as the nav. It used to be static for EVERY inline switcher while .mat-lang stayed a
+       flex ROW: the list then sat beside the button — in the burger menu next to it, in a template's header
+       ({{languages:dropdown}}, kabri.es) pushed off the right edge of the screen. A switcher outside the nav
+       keeps its button-anchored list (lang-switch.js moves it back into the viewport); so does the overlay.
+       The list's links must not inherit the nav's rows (padding + bottom rule). */
+    .main-nav .mat-lang:not(.mat-lang--overlay) { display: flex; flex-direction: column; align-items: flex-start; align-self: stretch; margin: 14px 0 0; }
+    .main-nav .mat-lang:not(.mat-lang--overlay) .mat-lang-menu { position: static; margin-top: 8px; width: 100%; max-width: none; box-shadow: none; }
+    .main-nav .mat-lang-menu a { padding: 11px 12px; border-bottom: 0; }
     /* On mobile the burger sits top-right — so the floating FALLBACK overlay must get out of its way:
        park it bottom-right and open its menu upward. (The clean answer is to place
        {{languages:dropdown}} in the template header so it integrates and no overlay is injected at all.) */

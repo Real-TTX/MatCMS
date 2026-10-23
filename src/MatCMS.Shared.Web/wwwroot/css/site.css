@@ -841,7 +841,9 @@ html.mat-langm-lock { overflow: hidden; }
 .footer-nav a:hover { color: var(--accent); }
 
 .footer-brand img { height: 48px; width: auto; margin: 0 auto 16px; opacity: .9; }
-.footer-text { color: var(--muted); font-size: 14px; margin: 0; }
+/* margin auto: a template that caps the line length (`.footer-text { max-width: 70ch }`) would otherwise leave the
+   capped box at the LEFT edge, its centred text visibly off-centre under the centred menu and logo. */
+.footer-text { color: var(--muted); font-size: 14px; margin: 0 auto; }
 
 /* ---------- Utility ---------- */
 .text-center { text-align: center; }

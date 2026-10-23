@@ -22,6 +22,12 @@ internal static class ShopStrings
     {
         ("shop.slot.name", "Shop-Baustein", "Shop piece"), ("shop.slot.desc", "Ein Stück einer Shop-Seite (Galerie, Warenkorb-Positionen, Kassenformular …) — nur auf den Shop-Seiten (Seiten → „Shop – …“).", "A piece of a shop page (gallery, cart lines, checkout form …) — only on the shop's own pages (Pages → “Shop – …”)."),
         ("shop.slot.field", "Baustein", "Piece"), ("shop.slot.fieldHelp", "Was der Shop an dieser Stelle zeigt. Die Texte um den Baustein herum gestaltest du frei; die Formulare des Shops (Kaufen, Warenkorb, Kasse) bleiben als Ganzes erhalten.", "What the shop shows here. The words around it are yours to design; the shop's forms (buy, cart, checkout) stay whole."),
+        // ---- what the shop tells the AI bot (ShopBotData) ----------------------------------------------------
+        ("shop.bot.kind", "Produkt", "Product"), ("shop.bot.price", "Preis {0}", "Price {0}"), ("shop.bot.was", "(statt {0})", "(was {0})"),
+        ("shop.bot.inStock", "Auf Lager", "In stock"), ("shop.bot.soldOut", "Ausverkauft", "Sold out"),
+        ("shop.bot.noOrders", "Dieses Kundenkonto hat noch keine Bestellungen.", "This account has no orders yet."),
+        ("shop.bot.ordersHead", "Die letzten {0} von {1} Bestellungen dieses Kundenkontos:", "The latest {0} of {1} orders of this account:"),
+        ("shop.bot.refunded", "erstattet {0}", "refunded {0}"), ("shop.bot.tracking", "Sendungsverfolgung {0}", "Tracking {0}"),
         // ---- generic ---------------------------------------------------------------------------------------
         ("action.cancel", "Abbrechen", "Cancel"), ("action.delete", "Löschen", "Delete"), ("action.edit", "Bearbeiten", "Edit"), ("action.save", "Speichern", "Save"), ("action.search", "Suchen …", "Search …"),
 

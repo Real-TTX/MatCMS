@@ -127,6 +127,9 @@ public sealed class ShopPlugin : IPlugin
         b.On("host.member.export", ShopEvents.ExportAsync);
         b.On("host.member.confirmed", (ctx, payload) => ShopEvents.ConfirmedAsync(ctx, payload));
         b.On("shop.payment.paid", (ctx, payload) => ShopEvents.ExternalPaidAsync(ctx, payload));
+        // A site-wide helper (the AI bot): the products for a search, and the orders of the ONE account the host names (ShopBotData).
+        b.On("site.search", ShopBotData.SearchAsync);
+        b.On("member.data", ShopBotData.MemberDataAsync);
         // Described (ShopAiOps), so the site's AI assistant can use them too; the order operations carry customers' data and are kept from it.
         b.Operation(ShopAiOps.ProductList, ShopAiOps.ListProductsAsync);
         b.Operation(ShopAiOps.ProductRead, ShopAiOps.ReadProductAsync);

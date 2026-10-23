@@ -26,7 +26,7 @@ public sealed record BuiltInPlugin(string Key, string Name, string Description, 
 public static class BuiltInPlugins
 {
     /// <summary>All built-in plugins.</summary>
-    public static IReadOnlyList<BuiltInPlugin> All { get; } = new[] { Plugin.Blog.BlogPlugin.Definition, Plugin.Shop.ShopPlugin.Definition };
+    public static IReadOnlyList<BuiltInPlugin> All { get; } = new[] { Plugin.Blog.BlogPlugin.Definition, Plugin.Shop.ShopPlugin.Definition, Plugin.Bot.BotPlugin.Definition };
 
     /// <summary>The built-in plugin with this key, or null.</summary>
     public static BuiltInPlugin? Find(string? key) => All.FirstOrDefault(b => string.Equals(b.Key, key, StringComparison.OrdinalIgnoreCase));

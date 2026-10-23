@@ -109,5 +109,6 @@
   "blog.exists": "Post “{0}” already exists.",
   "blog.noTitle": "No title given.",
   "blog.noSlug": "No valid slug could be derived.",
-  "blog.notFound": "Post not found."
+  "blog.notFound": "Post not found.",
+  "blog.search.kind": "Blog post"
 }

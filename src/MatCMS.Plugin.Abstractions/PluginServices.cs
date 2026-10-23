@@ -364,7 +364,56 @@ public interface IPluginSite
     /// put it on paper (a PDF). Null for anything else: an address outside the library, a file that is gone or too big, a picture that cannot be read.
     /// </summary>
     Task<PluginImage?> LoadImageAsync(string url, int maxWidth = 600, CancellationToken ct = default);
+
+    /// <summary>True when the site has AI: its own connection (Einstellungen → KI) or the cloud's relay. Whether a key still works, the first call says.</summary>
+    bool AiEnabled { get; }
+
+    /// <summary>
+    /// One call to the site's AI — the connection the operator chose (the active AI profile, else the cloud relay); a plugin never holds a key of its own.
+    /// Never throws for a provider's refusal: the answer says <see cref="PluginAiAnswer.Ok"/> = false with a reason. Everything in the messages leaves the
+    /// server for the provider, so a plugin sends personal data only where the operator agreed to it.
+    /// </summary>
+    Task<PluginAiAnswer> AskAiAsync(PluginAiCall call, CancellationToken ct = default);
+
+    /// <summary>
+    /// Searches the site's published PAGES (title, description and the text of their blocks) and returns the best hits with an excerpt around the match.
+    /// A page only for members is found only when <paramref name="visitor"/> may open it (signed in, holding its role); hidden blocks, unpublished pages and
+    /// the pages plugins own are never found. Plugins that hold content of their own (posts, products) answer the event <c>site.search</c> with
+    /// <c>{ "items": [ { "title", "url", "text" } ] }</c> for the payload <c>{ "q", "max", "locale" }</c>.
+    /// </summary>
+    Task<IReadOnlyList<SiteSearchHit>> SearchPagesAsync(string query, int max = 5, PluginMember? visitor = null, string? locale = null, CancellationToken ct = default);
 }
+
+/// <summary>One message of a conversation with the site's AI.</summary>
+/// <param name="Role"><c>system</c>, <c>user</c> or <c>assistant</c>.</param>
+/// <param name="Content">The text.</param>
+public sealed record PluginAiMessage(string Role, string Content);
+
+/// <summary>What a plugin asks the site's AI.</summary>
+/// <param name="Messages">The conversation, the instruction first.</param>
+public sealed record PluginAiCall(IReadOnlyList<PluginAiMessage> Messages)
+{
+    /// <summary>The longest answer wanted, in tokens. A reasoning model spends part of it on thinking, so leave room (the host clamps it to its own maximum).</summary>
+    public int MaxTokens { get; init; } = 2000;
+    /// <summary>The answer must be one JSON object (asked for where the provider supports it; read leniently either way).</summary>
+    public bool Json { get; init; }
+}
+
+/// <summary>The AI's answer.</summary>
+/// <param name="Ok">False when there was no answer — <paramref name="Error"/> says why.</param>
+/// <param name="Text">The answer ("" when none).</param>
+/// <param name="Error">Why there is no answer, in words for the operator.</param>
+/// <param name="PromptTokens">Tokens of the question as the provider counted them (0 when it did not say).</param>
+/// <param name="CompletionTokens">Tokens of the answer as the provider counted them (0 when it did not say).</param>
+/// <param name="Model">The model that answered, when known.</param>
+public sealed record PluginAiAnswer(bool Ok, string Text, string? Error = null, int PromptTokens = 0, int CompletionTokens = 0, string? Model = null);
+
+/// <summary>A page found by <see cref="IPluginSite.SearchPagesAsync"/>.</summary>
+/// <param name="Title">The page's title.</param>
+/// <param name="Url">Its local address.</param>
+/// <param name="Text">An excerpt of its text around the match, plain text.</param>
+/// <param name="Score">How well it matched (higher is better; only for ordering).</param>
+public sealed record SiteSearchHit(string Title, string Url, string Text, double Score);
 
 /// <summary>A picture ready for a document: JPEG bytes and the size in pixels.</summary>
 public sealed record PluginImage(byte[] Jpeg, int Width, int Height);

@@ -1,4 +1,6 @@
 using System.Net;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace MatCMS.Plugin.Tests;
@@ -109,7 +111,11 @@ public class BlogEndToEndTests : IClassFixture<AppFactory>
 
         // the plugin list shows it as a built-in plugin and its edit link leads to its own page
         var plugins = await admin.GetStringAsync("/admin/plugins");
-        var id = System.Text.RegularExpressions.Regex.Match(plugins, @"/admin/plugins/edit/(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase).Groups[1].Value;
+        // The blog's own row: the list holds the other built-in plugins too, and its first link is not necessarily the blog's.
+        string id;
+        using (var scope = _app.Services.CreateScope())
+            id = (await scope.ServiceProvider.GetRequiredService<MatCMS.Data.AppDbContext>().Plugins.FirstAsync(p => p.Key == "blog")).Id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        Assert.Contains("/admin/plugins/edit/" + id, plugins, StringComparison.OrdinalIgnoreCase);
         var builtIn = await admin.GetAsync("/admin/plugins/edit/" + id);
         Assert.Equal(HttpStatusCode.Redirect, builtIn.StatusCode);
         var pageUrl = builtIn.Headers.Location!.ToString();

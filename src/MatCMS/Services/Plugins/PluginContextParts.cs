@@ -223,6 +223,39 @@ internal sealed class PluginSiteFacade : IPluginSite
 
     public string TemplatePart(string part) => TemplateSchema.EffectivePart(Site.ActiveTemplate, part);
 
+    public bool AiEnabled => (_services.GetService(typeof(AiService)) as AiService)?.Enabled == true;
+
+    public async Task<PluginAiAnswer> AskAiAsync(PluginAiCall call, CancellationToken ct = default)
+    {
+        if (_services.GetService(typeof(AiService)) is not AiService ai || !ai.Enabled) return new PluginAiAnswer(false, "", "KI ist für diese Website nicht eingerichtet.");
+        var messages = (call?.Messages ?? Array.Empty<PluginAiMessage>())
+            .Where(m => !string.IsNullOrEmpty(m.Content))
+            .Select(m => new MatCMS.Shared.AiMessage { Role = m.Role is "system" or "assistant" ? m.Role : "user", Content = m.Content })
+            .ToList();
+        if (messages.Count == 0) return new PluginAiAnswer(false, "", "Keine Nachricht.");
+        try
+        {
+            var r = await ai.SendAsync(new MatCMS.Shared.AiRequest
+            {
+                Purpose = "plugin", Messages = messages, MaxTokens = Math.Clamp(call!.MaxTokens, 64, 16000), Json = call.Json
+            }, ct);
+            return new PluginAiAnswer(r.Ok, r.Text ?? "", r.Ok ? null : r.Error ?? "Keine Antwort.", r.PromptTokens, r.CompletionTokens, r.Model);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return new PluginAiAnswer(false, "", ex.GetBaseException().Message);
+        }
+    }
+
+    public Task<IReadOnlyList<SiteSearchHit>> SearchPagesAsync(string query, int max = 5, PluginMember? visitor = null, string? locale = null, CancellationToken ct = default)
+    {
+        var db = _services.GetService(typeof(AppDbContext)) as AppDbContext ?? throw new InvalidOperationException("Die Datenbank ist in diesem Zusammenhang nicht verfügbar.");
+        var cache = _services.GetService(typeof(Microsoft.Extensions.Caching.Memory.IMemoryCache)) as Microsoft.Extensions.Caching.Memory.IMemoryCache
+                    ?? throw new InvalidOperationException("Der Zwischenspeicher ist nicht verfügbar.");
+        var loc = string.IsNullOrWhiteSpace(locale) ? Site.ActiveLocales.FirstOrDefault() ?? "de" : locale.Trim().ToLowerInvariant();
+        return SiteSearch.SearchAsync(db, cache, query ?? "", max, visitor, loc, ct);
+    }
+
     public string RenderTemplatePart(string part, IReadOnlyDictionary<string, string> tokens)
     {
         var html = TemplateSchema.EffectivePart(Site.ActiveTemplate, part);

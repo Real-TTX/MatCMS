@@ -110,6 +110,9 @@ public sealed class BlogPlugin : IPlugin
         b.Operation(BlogOps.Update, BlogOps.UpdateAsync);
         b.Operation(BlogOps.Delete, BlogOps.DeleteAsync);
         b.Operation(BlogOps.Restore, BlogOps.RestoreAsync);
+
+        // A site-wide search (the AI bot) asks every plugin for what it holds: the blog answers with its published posts.
+        b.On("site.search", BlogSearch.SearchAsync);
     }
 
     private static string ReadStrings(string culture)

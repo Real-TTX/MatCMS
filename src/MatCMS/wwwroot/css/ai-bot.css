@@ -1,0 +1,70 @@
+/* The AI bot's widget (ai-bot.js). Its colour is the site's accent unless the operator chose one (--mb-c on <html>); everything else follows the page's
+   own font and line colour, so it sits in any template. Prefixed .mb- so a template's rules do not reach in, and it does not reach out. */
+.mb-launcher, .mb-panel { --mb-accent: var(--mb-c, var(--accent, #2563eb)); font-family: inherit; box-sizing: border-box; }
+.mb-panel *, .mb-launcher * { box-sizing: border-box; }
+
+.mb-launcher {
+    position: fixed; bottom: 20px; z-index: 1500; width: 58px; height: 58px; border-radius: 50%; border: 0; cursor: pointer;
+    background: var(--mb-accent); color: #fff; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .22); transition: transform .15s ease, box-shadow .15s ease;
+}
+.mb-launcher:hover { transform: translateY(-2px); box-shadow: 0 14px 34px rgba(0, 0, 0, .26); }
+.mb-launcher:focus-visible { outline: 3px solid color-mix(in srgb, var(--mb-accent) 40%, transparent); outline-offset: 3px; }
+.mb-launcher svg { width: 26px; height: 26px; }
+.mb-launcher.mb-right { right: 20px; } .mb-launcher.mb-left { left: 20px; }
+html.mb-open .mb-launcher { display: none; }
+
+.mb-panel {
+    display: flex; flex-direction: column; background: #fff; color: #1f2329; border: 1px solid var(--line, #e3e6ea);
+    border-radius: 16px; overflow: hidden; font-size: 15px; line-height: 1.5; text-align: left;
+}
+.mb-panel[hidden] { display: none; }
+.mb-floating { position: fixed; bottom: 20px; z-index: 1501; width: 380px; max-width: calc(100vw - 32px); height: 580px; max-height: calc(100vh - 40px); box-shadow: 0 24px 60px rgba(0, 0, 0, .25); }
+.mb-floating.mb-right { right: 20px; } .mb-floating.mb-left { left: 20px; }
+.mb-inline { height: 560px; max-width: 760px; margin: 18px 0 0; box-shadow: 0 10px 30px rgba(0, 0, 0, .06); }
+.mat-bot-section .mat-bot-intro { color: var(--muted, #6b7280); max-width: 680px; }
+
+.mb-head { display: flex; align-items: center; gap: 10px; padding: 12px 12px 12px 14px; background: var(--mb-accent); color: #fff; }
+.mb-name { flex: 1; font-size: 16px; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; }
+.mb-avatar {
+    width: 34px; height: 34px; border-radius: 50%; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; overflow: hidden;
+    background: rgba(255, 255, 255, .22); font-size: 13px; font-weight: 700; letter-spacing: .03em;
+}
+.mb-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mb-icon { border: 0; background: transparent; color: inherit; width: 34px; height: 34px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+.mb-icon:hover { background: rgba(255, 255, 255, .18); }
+.mb-icon svg { width: 19px; height: 19px; }
+
+.mb-log { flex: 1; overflow-y: auto; padding: 16px 14px 8px; background: #f7f8fa; display: flex; flex-direction: column; gap: 10px; }
+.mb-msg { display: flex; }
+.mb-user { justify-content: flex-end; }
+.mb-bubble-text { max-width: 86%; padding: 9px 13px; border-radius: 14px; overflow-wrap: anywhere; }
+.mb-user .mb-bubble-text { background: var(--mb-accent); color: #fff; border-bottom-right-radius: 4px; white-space: pre-wrap; }
+.mb-bot .mb-bubble-text { background: #fff; color: #1f2329; border: 1px solid #e6e8ec; border-bottom-left-radius: 4px; }
+.mb-bubble-text.mb-error { border-color: #f1c2c2; background: #fff6f6; color: #8a1f1f; }
+.mb-text p { margin: 0 0 .5em; } .mb-text p:last-child { margin-bottom: 0; }
+.mb-text ul, .mb-text ol { margin: .2em 0 .5em; padding-left: 1.2em; }
+.mb-text a, .mb-sources a { color: var(--mb-accent); text-decoration: underline; text-underline-offset: 2px; }
+.mb-sources { margin-top: 8px; padding-top: 7px; border-top: 1px solid #eef0f3; font-size: 12.5px; color: #6b7280; }
+.mb-typing { color: #6b7280; font-style: italic; }
+
+.mb-note { padding: 6px 14px; font-size: 11.5px; color: #6b7280; background: #f7f8fa; border-top: 1px solid #eef0f3; }
+.mb-form { display: flex; align-items: flex-end; gap: 8px; padding: 10px; border-top: 1px solid #e6e8ec; background: #fff; margin: 0; }
+.mb-input {
+    flex: 1; resize: none; border: 1px solid #d9dde3; border-radius: 12px; padding: 9px 12px; font: inherit; font-size: 15px; line-height: 1.4;
+    max-height: 140px; min-height: 40px; background: #fff; color: #1f2329; margin: 0;
+}
+.mb-input:focus { outline: none; border-color: var(--mb-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--mb-accent) 18%, transparent); }
+.mb-send { width: 40px; height: 40px; flex: 0 0 auto; border: 0; border-radius: 12px; background: var(--mb-accent); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+.mb-send:disabled, .mb-input:disabled { opacity: .55; cursor: default; }
+
+@media (max-width: 600px) {
+    .mb-floating { inset: 0; width: 100%; max-width: none; height: 100%; max-height: none; border-radius: 0; border: 0; }
+    html.mb-open, html.mb-open body { overflow: hidden; }
+    .mb-launcher { bottom: 16px; width: 54px; height: 54px; }
+    .mb-launcher.mb-right { right: 16px; } .mb-launcher.mb-left { left: 16px; }
+    /* The language switcher's floating fallback parks bottom-right on a phone: the bubble moves up out of its way. */
+    body:has(.mat-lang--overlay) .mb-launcher.mb-right { bottom: 70px; }
+    .mb-inline { height: 70vh; }
+}
+@media (prefers-reduced-motion: reduce) { .mb-launcher { transition: none; } }

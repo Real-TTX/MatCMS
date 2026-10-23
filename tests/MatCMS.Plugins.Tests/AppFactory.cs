@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace MatCMS.Plugin.Tests;
 
@@ -14,6 +15,9 @@ public sealed class AppFactory : WebApplicationFactory<Program>
 {
     /// <summary>The content root of this instance (holds <c>appdata/</c> and <c>Resources/</c>).</summary>
     public string Root { get; } = Path.Combine(Path.GetTempPath(), "matcms-app-" + Guid.NewGuid().ToString("N"));
+
+    /// <summary>Services to replace before the application starts (a fake AI in place of the relay). Set it before the first request.</summary>
+    public Action<IServiceCollection>? ExtraServices { get; init; }
 
     public AppFactory()
     {
@@ -30,6 +34,7 @@ public sealed class AppFactory : WebApplicationFactory<Program>
         builder.UseContentRoot(Root);
         builder.UseSetting("ConnectionStrings:Default", "Data Source=" + Path.Combine(Root, "appdata", "matcms.db"));
         builder.UseEnvironment("Production");
+        if (ExtraServices is { } extra) builder.ConfigureServices(extra);
     }
 
     /// <summary>A browser: keeps cookies, follows nothing on its own.</summary>

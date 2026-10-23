@@ -186,7 +186,7 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
 - **"MatCMS ships no plugins" still holds for script plugins and the seeder.** What does ship is the *built-in* plugin
   (`Kind = builtin`, `Services/Plugins/BuiltInPlugins.cs`): compiled into the image, written against the same API, enabled on a
   new site, can be switched off, never deleted, exported or overwritten (a bundle or cloud rollout with its key is refused).
-  Two exist: **the shop** (`src/MatCMS/Plugin/Shop/`, namespace `MatCMS.Plugin.Shop`, **off on a new site** — `BuiltInPlugin.EnabledOnNewSite` — see `docs/shop-plugin.md`
+  Three exist: **the AI bot** (`src/MatCMS/Plugin/Bot/`, off on a new site — see "The AI bot" below), **the shop** (`src/MatCMS/Plugin/Shop/`, namespace `MatCMS.Plugin.Shop`, **off on a new site** — `BuiltInPlugin.EnabledOnNewSite` — see `docs/shop-plugin.md`
   and "The shop" below) and **the blog** (`src/MatCMS/Plugin/Blog/`, namespace `MatCMS.Plugin.Blog`): it *adopts* the existing `Posts`
   table (nothing moved), registers `/blog/{slug}`, the `posts` block, its admin section, the dashboard tile, the sitemap
   entries and the cloud operation `post.create`. The core no longer knows posts except for the backup, which reads the table
@@ -398,6 +398,26 @@ through the cloud relay — the key never lives on the site.
   never scaled (`ThumbnailService`) or read as a bitmap (`LoadImageAsync`, the shop's invoice logo stays a raster picture).
 - Tests: `AssistantTests` (the whole app in memory, `FakeAi` in place of the relay), `OwnAiTests` (shared provider clients, the KI tab,
   encryption, backup exclusion).
+
+## The AI bot (built-in plugin `bot`)
+
+A chat assistant for a site's VISITORS (not the editors' assistant above): `src/MatCMS/Plugin/Bot/`, `wwwroot/js/ai-bot.js` + `wwwroot/css/ai-bot.css`.
+Built in, **off on a new site** (`EnabledOnNewSite: false`). Name, greeting, avatar, colour (template accent by default), bubble on/off + position,
+basic instruction, fallback, sources, customer data, limits and history are its settings (`BotConfig`).
+
+- **What it needed became general plugin API** (on `IPluginSite`, one implementation in `PluginSiteFacade`): `AiEnabled` + `AskAiAsync(PluginAiCall)` —
+  the site's active AI connection, a plugin never holds a key — and `SearchPagesAsync` (`Services/SiteSearch.cs`: published pages, never plugin-owned
+  ones, hidden blocks or unpublished pages; members-only pages only for a visitor who may open them; texts cached a minute per language). Two event
+  conventions: **`site.search`** `{q,max,locale}` → `{items:[{title,url,text,score,kind}]}` (the blog answers with posts, the shop with products) and
+  **`member.data`** `{member_id}` → `{title,text,url}` (the shop: the account's LINKED orders, as the customer sees them — no payment refs, no keys).
+- **The boundary is code, not prompt** (`BotAsk`): the member id comes from `ctx.Member` only, there is no tool or field naming a customer, so "show me
+  customer 17's orders" has nothing to work with. Customer data only with the operator's switch `memberData` (off by default — it goes to the AI
+  provider). The browser's history is the visitor's own words: only `user`/`assistant` roles, cut, last six turns.
+- **Limits before the model is asked**: per visitor and day (questions, tokens) and per site and month (tokens), in table `usage`. A visitor is a hash of
+  address + browser + DAY (`BotStore.VisitorKey`), deleted after two days. Conversations (`chats`) only while `keepDays` > 0, cleaned by a job.
+- The widget renders everything as DOM text; from an answer only `**bold**`, lists and links to `/local` or `https://` addresses become markup. The
+  conversation lives in `sessionStorage` (this tab). A site that switches the bot on needs a paragraph in its privacy statement.
+- Tests: `BotTests` (whole app, `FakeAi`, shop on: own orders yes, another customer's no, members-only page, limits, history roles, chats).
 
 ## Fonts are served by this server (LocalFonts)
 

@@ -109,5 +109,6 @@
   "blog.exists": "Beitrag „{0}“ existiert bereits.",
   "blog.noTitle": "Kein Titel angegeben.",
   "blog.noSlug": "Kein gültiger Slug ableitbar.",
-  "blog.notFound": "Beitrag nicht gefunden."
+  "blog.notFound": "Beitrag nicht gefunden.",
+  "blog.search.kind": "Blogbeitrag"
 }

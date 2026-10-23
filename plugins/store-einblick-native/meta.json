@@ -1,0 +1,6 @@
+{
+  "Key": "store-einblick-native",
+  "Name": "Store-Einblick (Native)",
+  "Version": "1.0",
+  "Description": "Zeigt auf der Website den Plugin-Store einer MatCMS-Cloud: Plugins (Skript oder Native), Templates und Komponenten – als Block, in Template-Farben, ohne Schlüssel über den öffentlichen Katalog der Cloud. Native Variante (kompiliert, braucht „Native Plugins erlauben“); dieselbe gibt es als Skript (store-einblick)."
+}

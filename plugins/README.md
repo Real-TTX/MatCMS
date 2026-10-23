@@ -12,10 +12,12 @@ Store der Cloud oder einen Bundle-Import.
 | `cookie-consent/` | Cookie-Banner — Einwilligung für Statistik/Marketing/externe Medien, blockiert bis zur Zustimmung | aktuell, im Global Store |
 | `bewertungen/` | Bewertungen (früher eingebaut) | Altbestand, ersetzt durch Leserstimmen (dort „Aus Bewertungen übernehmen“) |
 | `google-reviews/` | Google Bewertungen (früher eingebaut) | Altbestand; Vorgabe-Konfiguration steht in `meta.json` unter `DefaultConfig` (reist nicht im Bundle mit) |
+| `store-einblick/` | Store-Einblick — zeigt den Store einer MatCMS-Cloud (Plugins mit Art, Templates, Komponenten) als Block; liest `GET {cloud}/api/public/store`, ohne Schlüssel | aktuell, Skript-Variante (`plugin.csx` lädt `showcase.csx`) |
+| `store-einblick-native/` | Store-Einblick (Native) — **dieselbe** Code-Datei `../store-einblick/showcase.csx`, als DLL kompiliert; `StoreEinblickTests` prüft, dass beide Varianten dasselbe HTML zeichnen | aktuell, Native-Variante (`./pack-native.ps1 -Path ./store-einblick-native`) |
 | `todo-verwaltung-beispiel/` | Todo-Verwaltung (Beispiel, früher eingebaut) | Anschauungsbeispiel für die Plugin-API |
 
 ## Aufbau eines Plugins
-- `plugin.csx` — der Code (C#-Skript, Globals = `PluginContext` in `src/MatCMS/Services/PluginRuntime.cs`).
+- `plugin.csx` — der Code (weitere `*.csx` im Ordner packt `pack.ps1` als `files/<name>` mit, für `#load`) (C#-Skript, Globals = `PluginContext` in `src/MatCMS/Services/PluginRuntime.cs`).
 - `meta.json` — `Key`, `Name`, `Version`, `Description`. Der Key ist die Identität: ein Import mit
   gleichem Key aktualisiert das Plugin an Ort und Stelle.
 - `README.md` (wo nötig) — was es kann, Konfiguration, Fallen.

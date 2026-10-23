@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Store-Einblick as a NATIVE plugin. The code is the script variant's own file (../store-einblick/showcase.csx), compiled here as plain
+       C#: one source, two kinds of plugin. The settings below keep the plugin loadable and unloadable (docs/plugin-system-v2.md, section 7). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <RootNamespace>StoreEinblick</RootNamespace>
+    <AssemblyName>StoreEinblick</AssemblyName>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\store-einblick\showcase.csx" Link="showcase.cs" />
+    <ProjectReference Include="..\..\src\MatCMS.Plugin.Abstractions\MatCMS.Plugin.Abstractions.csproj">
+      <Private>false</Private>
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </ProjectReference>
+  </ItemGroup>
+
+</Project>

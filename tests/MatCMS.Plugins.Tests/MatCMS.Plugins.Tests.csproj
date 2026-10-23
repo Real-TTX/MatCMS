@@ -19,10 +19,13 @@
     <ProjectReference Include="..\..\src\MatCMS\MatCMS.csproj" />
     <!-- Built before the tests so its output exists; the tests load the DLL from disk like the host does. -->
     <ProjectReference Include="..\Fixtures\RefPlugin\RefPlugin.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <!-- A real store plugin in both kinds (plugins/store-einblick + store-einblick-native): StoreEinblickTests run the two side by side. -->
+    <ProjectReference Include="..\..\plugins\store-einblick-native\StoreEinblick.csproj" ReferenceOutputAssembly="false" Private="false" />
   </ItemGroup>
 
   <ItemGroup>
     <None Include="..\Fixtures\ref-plugin.csx" Link="fixtures\ref-plugin.csx" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\plugins\store-einblick\*.csx" Link="fixtures\store-einblick\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- The native fixture lands in fixtures/refplugin/ next to the test assembly, exactly as a plugin's src/
@@ -32,6 +35,10 @@
       <RefPluginFiles Include="$(MSBuildProjectDirectory)\..\Fixtures\RefPlugin\bin\$(Configuration)\net10.0\RefPlugin.*" />
     </ItemGroup>
     <Copy SourceFiles="@(RefPluginFiles)" DestinationFolder="$(OutDir)fixtures\refplugin" />
+    <ItemGroup>
+      <StoreEinblickFiles Include="$(MSBuildProjectDirectory)\..\..\plugins\store-einblick-native\bin\$(Configuration)\net10.0\StoreEinblick.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(StoreEinblickFiles)" DestinationFolder="$(OutDir)fixtures\store-einblick-native" />
   </Target>
 
 </Project>

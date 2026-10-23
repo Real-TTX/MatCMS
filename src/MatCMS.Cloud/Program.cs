@@ -988,6 +988,19 @@ static async Task<MatCMS.Cloud.Models.Instance?> CatalogCallerAsync(
     return instance?.Status == MatCMS.Cloud.Models.InstanceStatus.Approved ? instance : null;
 }
 
+// The store's shop window for the PUBLIC — no key, no instance: what the "Store-Einblick" plugin shows on a website. Read only, only what the
+// catalogue says about each entry (StoreService.PublicCatalogAsync), kept five minutes so a busy page does not turn into a query per visitor.
+app.MapGet("/api/public/store", async (HttpContext ctx, StoreService store, Microsoft.Extensions.Caching.Memory.IMemoryCache cache) =>
+{
+    var json = await Microsoft.Extensions.Caching.Memory.CacheExtensions.GetOrCreateAsync(cache, "public-store", async e =>
+    {
+        e.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);
+        return (await store.PublicCatalogAsync(ctx.RequestAborted)).ToJsonString();
+    });
+    ctx.Response.Headers.CacheControl = "public, max-age=300";
+    return Results.Text(json!, "application/json; charset=utf-8");
+}).RequireRateLimiting("instanceApi");
+
 app.MapGet("/api/store/{publicId}/catalog", async (
     HttpContext ctx, string publicId, InstanceService instances, StoreService store) =>
 {

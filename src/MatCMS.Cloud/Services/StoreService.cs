@@ -224,6 +224,35 @@ public class StoreService
             .OrderBy(c => c.Name).ToListAsync()
     };
 
+    /// <summary>
+    /// The store as the PUBLIC may see it (<c>GET /api/public/store</c>, read by the "Store-Einblick" plugin on a website): names, versions,
+    /// descriptions and the kind of each plugin (script or native, read from the bundle's own manifest) — never a bundle, a template's code or
+    /// anything else an instance downloads. Built from the same rows as the instances' catalogue, so the two cannot disagree.
+    /// </summary>
+    public async Task<System.Text.Json.Nodes.JsonObject> PublicCatalogAsync(CancellationToken ct = default)
+    {
+        var plugins = new System.Text.Json.Nodes.JsonArray();
+        foreach (var p in await _db.StorePlugins.AsNoTracking().OrderBy(p => p.Name).ToListAsync(ct))
+        {
+            var native = NativeBundleInfo.Read(p.Bundle);
+            plugins.Add(new System.Text.Json.Nodes.JsonObject
+            {
+                ["key"] = p.Key, ["name"] = p.Name, ["version"] = p.Version, ["description"] = p.Description,
+                ["kind"] = native is null ? "script" : "native", ["api"] = native?.Api ?? "", ["updated"] = p.UploadedAt.ToString("yyyy-MM-dd")
+            });
+        }
+        var templates = new System.Text.Json.Nodes.JsonArray();
+        foreach (var t in await _db.StoreTemplates.AsNoTracking().OrderBy(t => t.Name).Select(t => new { t.Name, t.Description, t.AccentColor }).ToListAsync(ct))
+            templates.Add(new System.Text.Json.Nodes.JsonObject { ["name"] = t.Name, ["description"] = t.Description, ["accent"] = t.AccentColor });
+        var components = new System.Text.Json.Nodes.JsonArray();
+        foreach (var c in await _db.StoreComponents.AsNoTracking().OrderBy(c => c.Name).Select(c => new { c.Type, c.Name, c.Description }).ToListAsync(ct))
+            components.Add(new System.Text.Json.Nodes.JsonObject { ["type"] = c.Type, ["name"] = c.Name, ["description"] = c.Description });
+        return new System.Text.Json.Nodes.JsonObject
+        {
+            ["format"] = 1, ["generated"] = DateTime.UtcNow.ToString("O"), ["plugins"] = plugins, ["templates"] = templates, ["components"] = components
+        };
+    }
+
     /// <summary>A component by its type exactly as stored (what the catalogue lists); see <see cref="GetComponentAsync"/> for the
     /// lower-casing lookup of the operator API.</summary>
     public Task<StoreComponent?> GetComponentExactAsync(string type, CancellationToken ct = default) =>

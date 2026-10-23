@@ -36,13 +36,7 @@ public class AiProfileModel : PageModel
     public IReadOnlyList<ChatGptAuthService.ModelInfo> ChatGptModels { get; private set; } = Array.Empty<ChatGptAuthService.ModelInfo>();
 
     /// <summary>Starting points for the address — the providers people actually use, plus "own server".</summary>
-    public static readonly (string Id, string Label, string Url, string ModelHint)[] Presets =
-    [
-        ("openai", "OpenAI", "https://api.openai.com/v1", "gpt-4o-mini"),
-        ("deepseek", "DeepSeek", "https://api.deepseek.com", "deepseek-chat"),
-        ("openrouter", "OpenRouter", "https://openrouter.ai/api/v1", "deepseek/deepseek-chat-v3-0324:free"),
-        ("custom", "", "", ""),
-    ];
+    public static readonly (string Id, string Label, string Url, string ModelHint)[] Presets = MatCMS.Shared.Ai.AiPresets.All;
 
     public async Task<IActionResult> OnGetAsync(string? id)
     {

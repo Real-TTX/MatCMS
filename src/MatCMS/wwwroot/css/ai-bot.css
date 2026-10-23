@@ -48,6 +48,14 @@ html.mb-open .mb-launcher { display: none; }
 .mb-sources { margin-top: 8px; padding-top: 7px; border-top: 1px solid #eef0f3; font-size: 12.5px; color: #6b7280; }
 .mb-typing { color: #6b7280; font-style: italic; }
 
+/* hidden must win over the display rules above (the form is flex): the consent box takes the input's place until the visitor agreed. */
+.mb-panel [hidden] { display: none !important; }
+.mb-consent { padding: 12px 14px 14px; border-top: 1px solid #e6e8ec; background: #fff; font-size: 13px; line-height: 1.5; color: #374151; max-height: 55%; overflow-y: auto; }
+.mb-consent .mb-text p { margin: 0 0 .6em; }
+.mb-consent a { color: var(--mb-accent); text-decoration: underline; text-underline-offset: 2px; }
+.mb-agree { display: block; width: 100%; margin-top: 6px; padding: 11px 14px; border: 0; border-radius: 12px; background: var(--mb-accent); color: #fff; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+.mb-agree:hover { filter: brightness(1.06); }
+
 .mb-note { padding: 6px 14px; font-size: 11.5px; color: #6b7280; background: #f7f8fa; border-top: 1px solid #eef0f3; }
 .mb-form { display: flex; align-items: flex-end; gap: 8px; padding: 10px; border-top: 1px solid #e6e8ec; background: #fff; margin: 0; }
 .mb-input {

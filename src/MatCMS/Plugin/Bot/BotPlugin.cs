@@ -73,6 +73,9 @@ public sealed class BotPlugin : IPlugin
             ["color"] = cfg.UseAccent ? "" : cfg.Color,
             ["position"] = cfg.Position,
             ["maxChars"] = cfg.MaxQuestionChars,
+            ["consent"] = cfg.Consent
+                ? new JsonObject { ["text"] = cfg.ConsentFor(lang), ["button"] = cfg.ConsentButton.Length > 0 ? cfg.ConsentButton : W("bot.w.agree"), ["version"] = cfg.ConsentVersion(lang) }
+                : null,
             ["t"] = new JsonObject
             {
                 ["open"] = W("bot.w.open"), ["close"] = W("bot.w.close"), ["send"] = W("bot.w.send"), ["thinking"] = W("bot.w.thinking"),

@@ -25,6 +25,15 @@ internal sealed record BotConfig
     public long PerMonthTokens { get; init; } = 2_000_000;
     public string LimitText { get; init; } = "";
     public int KeepDays { get; init; }
+    public bool Consent { get; init; }
+    public string ConsentTemplate { get; init; } = "thirdcountry";
+    public string ConsentProvider { get; init; } = "";
+    public string ConsentCountry { get; init; } = "";
+    public string PrivacyUrl { get; init; } = "/datenschutz";
+    public string ConsentText { get; init; } = "";
+    public string ConsentButton { get; init; } = "";
+
+    public static readonly string[] ConsentTemplates = { "eu", "dpf", "thirdcountry", "custom" };
 
     public static void Declare(ISettingsBuilder s)
     {
@@ -52,6 +61,18 @@ internal sealed record BotConfig
         s.Add(new SettingSpec("perVisitorTokens", "bot.set.perVisitorTokens", SettingKind.Number) { Default = "60000", Min = 0, Help = "bot.set.zeroUnlimited" });
         s.Add(new SettingSpec("perMonth", "bot.set.perMonth", SettingKind.Number) { Default = "2000000", Min = 0, Help = "bot.set.perMonthHelp" });
         s.Add(new SettingSpec("limitText", "bot.set.limitText", SettingKind.TextArea));
+
+        s.Add(new SettingSpec("consent", "bot.set.consent", SettingKind.Bool) { Default = "false", Help = "bot.set.consentHelp", Group = "bot.set.gConsent" });
+        s.Add(new SettingSpec("consentTemplate", "bot.set.consentTemplate", SettingKind.Choice)
+        {
+            Default = "thirdcountry", Help = "bot.set.consentTemplateHelp",
+            Options = ConsentTemplates.Select(t => new FieldOption(t, "bot.set.ct." + t)).ToArray()
+        });
+        s.Add(new SettingSpec("consentProvider", "bot.set.consentProvider") { Help = "bot.set.consentProviderHelp" });
+        s.Add(new SettingSpec("consentCountry", "bot.set.consentCountry") { Help = "bot.set.consentCountryHelp" });
+        s.Add(new SettingSpec("privacyUrl", "bot.set.privacyUrl") { Default = "/datenschutz" });
+        s.Add(new SettingSpec("consentText", "bot.set.consentText", SettingKind.TextArea) { Help = "bot.set.consentTextHelp" });
+        s.Add(new SettingSpec("consentButton", "bot.set.consentButton"));
 
         s.Add(new SettingSpec("keepDays", "bot.set.keepDays", SettingKind.Number) { Default = "0", Min = 0, Max = 365, Help = "bot.set.keepDaysHelp", Group = "bot.set.gHistory" });
     }
@@ -82,9 +103,40 @@ internal sealed record BotConfig
             PerVisitorTokens = Num(s.Get("perVisitorTokens"), 60_000),
             PerMonthTokens = Num(s.Get("perMonth"), 2_000_000),
             LimitText = s.Get("limitText").Trim(),
-            KeepDays = (int)Math.Clamp(Num(s.Get("keepDays"), 0), 0, 365)
+            KeepDays = (int)Math.Clamp(Num(s.Get("keepDays"), 0), 0, 365),
+            Consent = On(s.Get("consent"), false),
+            ConsentTemplate = ConsentTemplates.Contains(s.Get("consentTemplate")) ? s.Get("consentTemplate") : "thirdcountry",
+            ConsentProvider = s.Get("consentProvider").Trim(),
+            ConsentCountry = s.Get("consentCountry").Trim(),
+            PrivacyUrl = SafeLink(s.Get("privacyUrl")) is { Length: > 0 } pu ? pu : "/datenschutz",
+            ConsentText = s.Get("consentText").Trim(),
+            ConsentButton = s.Get("consentButton").Trim()
         };
     }
+
+    /// <summary>A link the consent text may point at: a local path or an https address.</summary>
+    public static string SafeLink(string? url)
+    {
+        var u = (url ?? "").Trim();
+        if (u.Length == 0 || u.IndexOfAny(new[] { '"', '\'', '<', '>', '(', ')', '\\', ' ' }) >= 0) return "";
+        return (u.StartsWith('/') && !u.StartsWith("//")) || u.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ? u : "";
+    }
+
+    /// <summary>
+    /// The consent text the visitor sees, in his language: the operator's own text, or the chosen template with provider, country and the privacy
+    /// statement filled in. Markdown-light like the answers (the widget turns only **bold**, lists and safe links into markup).
+    /// </summary>
+    public string ConsentFor(string lang)
+    {
+        var raw = ConsentTemplate == "custom" && ConsentText.Length > 0 ? ConsentText : BotStrings.For(lang, "bot.consent." + (ConsentTemplate == "custom" ? "thirdcountry" : ConsentTemplate));
+        var provider = ConsentProvider.Length > 0 ? ConsentProvider : BotStrings.For(lang, "bot.consent.someProvider");
+        var country = ConsentCountry.Length > 0 ? ConsentCountry : BotStrings.For(lang, "bot.consent.someCountry");
+        return raw.Replace("{provider}", provider).Replace("{country}", country).Replace("{privacy}", PrivacyUrl);
+    }
+
+    /// <summary>Changes whenever the text the visitor agreed to changes — an old consent then no longer counts, he is asked again.</summary>
+    public string ConsentVersion(string lang) =>
+        Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(ConsentFor(lang))))[..12].ToLowerInvariant();
 
     /// <summary>A picture address the widget may show: a local path or an https address, nothing that could carry script.</summary>
     public static string SafeImage(string? url)

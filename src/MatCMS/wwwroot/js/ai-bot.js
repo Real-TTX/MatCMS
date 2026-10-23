@@ -103,8 +103,19 @@
         form.addEventListener("submit", function (e) { e.preventDefault(); ask(input.value); input.value = ""; input.style.height = "auto"; });
         form.appendChild(input); form.appendChild(send);
         if (!cfg.on) { input.disabled = true; send.disabled = true; }
-        root.appendChild(head); root.appendChild(log); root.appendChild(note); root.appendChild(form);
-        var p = { root: root, log: log, input: input, send: send };
+        // Consent first, where the operator asks for it: the text and one button stand where the input will be. The server checks it as well.
+        var consent = null;
+        if (cfg.consent) {
+            consent = el("div", "mb-consent");
+            consent.appendChild(rich(cfg.consent.text));
+            var agree = el("button", "mb-agree", cfg.consent.button); agree.type = "button";
+            agree.addEventListener("click", function () { state.consent = cfg.consent.version; save(); renderAll(); panels.forEach(function (q) { if (q.root.offsetParent) q.input.focus(); }); });
+            consent.appendChild(agree);
+        }
+        root.appendChild(head); root.appendChild(log);
+        if (consent) root.appendChild(consent);
+        root.appendChild(note); root.appendChild(form);
+        var p = { root: root, log: log, input: input, send: send, consent: consent, form: form, note: note };
         panels.push(p);
         render(p);
         return p;
@@ -136,20 +147,25 @@
         state.msgs.forEach(function (m) { p.log.appendChild(bubbleFor(m)); });
         if (busy) { var t = el("div", "mb-msg mb-bot"); t.appendChild(el("div", "mb-bubble-text mb-typing", cfg.name + " " + cfg.t.thinking)); p.log.appendChild(t); }
         p.input.disabled = busy || !cfg.on; p.send.disabled = busy || !cfg.on;
+        var waiting = needsConsent();
+        if (p.consent) p.consent.hidden = !waiting;
+        p.form.hidden = waiting; p.note.hidden = waiting;
         p.log.scrollTop = p.log.scrollHeight;
     }
+    function needsConsent() { return !!(cfg.consent && cfg.on && state.consent !== cfg.consent.version); }
     function renderAll() { panels.forEach(render); }
 
     function ask(text) {
         text = String(text || "").trim();
-        if (!text || busy || !cfg.on) return;
+        if (!text || busy || !cfg.on || needsConsent()) return;
         var history = state.msgs.filter(function (m) { return !m.error; }).slice(-6).map(function (m) { return { role: m.role, text: m.text }; });
         state.msgs.push({ role: "user", text: text }); busy = true; save(); renderAll();
-        var body = new URLSearchParams({ q: text, history: JSON.stringify(history), session: state.session, lang: lang });
+        var body = new URLSearchParams({ q: text, history: JSON.stringify(history), session: state.session, lang: lang, consent: state.consent || "" });
         fetch("/ai-bot/ask", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: body })
             .then(function (r) { return r.json(); })
             .then(function (j) {
-                if (j && j.ok) state.msgs.push({ role: "assistant", text: String(j.answer || ""), sources: j.sources || [] });
+                if (j && j.consent) { state.consent = null; state.msgs.pop(); }      // the text changed since the visitor agreed: ask again, drop the unsent question
+                else if (j && j.ok) state.msgs.push({ role: "assistant", text: String(j.answer || ""), sources: j.sources || [] });
                 else state.msgs.push({ role: "assistant", text: (j && j.error) || cfg.t.error, error: true });
             })
             .catch(function () { state.msgs.push({ role: "assistant", text: cfg.t.error, error: true }); })

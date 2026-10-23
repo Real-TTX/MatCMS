@@ -415,6 +415,7 @@ basic instruction, fallback, sources, customer data, limits and history are its 
   provider). The browser's history is the visitor's own words: only `user`/`assistant` roles, cut, last six turns.
 - **Limits before the model is asked**: per visitor and day (questions, tokens) and per site and month (tokens), in table `usage`. A visitor is a hash of
   address + browser + DAY (`BotStore.VisitorKey`), deleted after two days. Conversations (`chats`) only while `keepDays` > 0, cleaned by a job.
+- **Consent before the first question** (settings group Einwilligung, off by default): the operator ticks it and picks a text template — provider in the EU / USA under the Data Privacy Framework / third country without an adequacy decision (e.g. China, Art. 49(1)(a)) / own text, with `{provider}`, `{country}`, `{privacy}` filled in (`BotConfig.ConsentFor`). The widget shows the text and one button where the input will be; `/ai-bot/ask` CHECKS it too (`consent` must equal `BotConfig.ConsentVersion`, a hash of the text) — a request that skips the window reaches no model, and a changed text asks again. Not legal advice; the templates say so in the admin.
 - The widget renders everything as DOM text; from an answer only `**bold**`, lists and links to `/local` or `https://` addresses become markup. The
   conversation lives in `sessionStorage` (this tab). A site that switches the bot on needs a paragraph in its privacy statement.
 - Tests: `BotTests` (whole app, `FakeAi`, shop on: own orders yes, another customer's no, members-only page, limits, history roles, chats).

@@ -191,6 +191,38 @@ public class BotTests : IClassFixture<BotFixture>
     }
 
     [Fact]
+    public async Task With_consent_switched_on_nothing_reaches_the_ai_before_the_visitor_agreed_and_a_new_text_asks_again()
+    {
+        await _f.SetBotAsync(new JsonObject { ["memberData"] = "true", ["keepDays"] = "7", ["consent"] = "true", ["consentTemplate"] = "thirdcountry", ["consentProvider"] = "DeepSeek", ["consentCountry"] = "China" });
+        try
+        {
+            var c = Visitor();
+            var config = (JsonObject)JsonNode.Parse(await c.GetStringAsync("/ai-bot/config?lang=de"))!;
+            var text = config["consent"]!["text"]!.GetValue<string>();
+            Assert.Contains("**DeepSeek in China**", text);
+            Assert.Contains("Art. 49 Abs. 1 lit. a DSGVO", text);
+            Assert.Contains("[Datenschutzerklärung](/datenschutz)", text);
+            var version = config["consent"]!["version"]!.GetValue<string>();
+
+            int before; lock (_f.Ai.Requests) before = _f.Ai.Requests.Count;
+            var refused = (JsonObject)JsonNode.Parse(await (await c.PostAsync("/ai-bot/ask", new FormUrlEncodedContent(new Dictionary<string, string> { ["q"] = "Öffnungszeiten?", ["lang"] = "de" }))).Content.ReadAsStringAsync())!;
+            Assert.False(refused["ok"]!.GetValue<bool>());
+            Assert.True(refused["consent"]!.GetValue<bool>());
+            lock (_f.Ai.Requests) Assert.Equal(before, _f.Ai.Requests.Count);              // nothing left for the provider
+
+            _f.Ai.Say("Montag bis Freitag.");
+            var ok = (JsonObject)JsonNode.Parse(await (await c.PostAsync("/ai-bot/ask", new FormUrlEncodedContent(new Dictionary<string, string> { ["q"] = "Öffnungszeiten?", ["lang"] = "de", ["consent"] = version }))).Content.ReadAsStringAsync())!;
+            Assert.True(ok["ok"]!.GetValue<bool>());
+
+            // The operator changes the provider: the old agreement no longer counts.
+            await _f.SetBotAsync(new JsonObject { ["memberData"] = "true", ["keepDays"] = "7", ["consent"] = "true", ["consentTemplate"] = "eu", ["consentProvider"] = "Mistral AI" });
+            var again = (JsonObject)JsonNode.Parse(await (await c.PostAsync("/ai-bot/ask", new FormUrlEncodedContent(new Dictionary<string, string> { ["q"] = "Öffnungszeiten?", ["lang"] = "de", ["consent"] = version }))).Content.ReadAsStringAsync())!;
+            Assert.True(again["consent"]!.GetValue<bool>());
+        }
+        finally { await _f.SetBotAsync(new JsonObject { ["memberData"] = "true", ["keepDays"] = "7" }); }
+    }
+
+    [Fact]
     public async Task The_widget_is_on_every_page_and_conversations_are_kept_only_when_asked()
     {
         var c = Visitor();

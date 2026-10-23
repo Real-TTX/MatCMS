@@ -32,6 +32,7 @@ internal static class BotAdmin
                 Ui.Stat(ctx.T("bot.ov.tokensToday"), N(todayTokens)),
                 Ui.Stat(ctx.T("bot.ov.month"), N(monthTokens), monthHint, monthTone)),
             Ui.Alert(cfg.MemberData ? ctx.T("bot.ov.memberOn") : ctx.T("bot.ov.memberOff"), cfg.MemberData ? UiTone.Info : UiTone.Default),
+            Ui.Alert(cfg.Consent ? ctx.T("bot.ov.consentOn") : ctx.T("bot.ov.consentOff"), cfg.Consent ? UiTone.Success : UiTone.Default),
             cfg.Bubble ? null : Ui.Alert(ctx.T("bot.ov.bubbleOff"), UiTone.Info)), ctx.T("bot.ov.title"));
     }
 

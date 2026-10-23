@@ -29,6 +29,10 @@ internal static class BotAsk
         if (question.Length == 0) return Fail(W("bot.w.error"));
         if (question.Length > cfg.MaxQuestionChars) return Fail(string.Format(CultureInfo.InvariantCulture, W("bot.w.tooLong"), cfg.MaxQuestionChars));
         if (!ctx.Site.AiEnabled) return Fail(W("bot.w.unavailable"));
+        // The consent is checked HERE too, not only drawn by the widget: a request that skips the window gets no answer, and nothing leaves for the
+        // provider. The widget sends the version of the text it showed — a changed text is a new question to the visitor.
+        if (cfg.Consent && ctx.Request.F("consent") != cfg.ConsentVersion(lang))
+            return PluginResult.Json(new JsonObject { ["ok"] = false, ["consent"] = true, ["error"] = W("bot.w.consentNeeded") });
 
         // ---- limits, before anything is spent ----
         var store = new BotStore(ctx.Data);

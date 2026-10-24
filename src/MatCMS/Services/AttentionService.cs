@@ -51,7 +51,7 @@ public sealed class AttentionService
             a.Add(new(level, key, icon, _t["dashboard.attn." + key + ".title"],
                 args.Length == 0 ? _t["dashboard.attn." + key] : _t["dashboard.attn." + key, args], url, detail, lastError));
 
-        if (Get(SettingKeys.SetupComplete) != "1") Add("info", "ti-compass", "setup", Page("/Admin/Setup/Index"), null, null);
+        if (!SettingKeys.IsSetupDone(Get)) Add("info", "ti-compass", "setup", Page("/Admin/Setup/Index"), null, null);
         if (Get(SettingKeys.MaintenanceEnabled) == "1")
             Add("warn", "ti-barrier-block", "maintenance", Settings("maintenance"), Get(SettingKeys.MaintenanceTitle) is { } mt ? D("maintenanceTitle", mt) : null, null);
 

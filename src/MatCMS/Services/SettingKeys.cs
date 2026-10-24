@@ -88,6 +88,14 @@ public static class SettingKeys
     // "1" once the setup wizard has been completed (drives the dashboard prompt).
     public const string SetupComplete = "setup.complete";
 
+    /// <summary>
+    /// Whether the site still needs the setup wizard: not once it was completed, and not on a site a cloud set up — a profile that was applied
+    /// (<see cref="CloudAppliedRevision"/> above 0) brought the admin, the theme, the mail and the settings the wizard asks for, so its "Welcome! Set
+    /// up …" on a freshly provisioned instance only sent the operator through steps that were already done. The wizard itself stays reachable.
+    /// </summary>
+    public static bool IsSetupDone(Func<string, string?> get) =>
+        get(SetupComplete) == "1" || (int.TryParse(get(CloudAppliedRevision), out var revision) && revision > 0);
+
     /// <summary>Site-wide DEFAULT anti-spam level for forms ("0".."3"; empty = "1"). A form may override
     /// it with its own <c>Form.SpamLevel</c>. A SETTING (not env) so the cloud can roll one policy out to
     /// a whole fleet — see <see cref="FormGuard"/>. 0 off, 1 invisible, 2 +proof-of-work, 3 +captcha.</summary>

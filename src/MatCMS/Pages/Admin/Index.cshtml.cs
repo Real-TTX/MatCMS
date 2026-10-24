@@ -109,7 +109,7 @@ public class IndexModel : PageModel
 
         var settings = await _db.SiteSettings.AsNoTracking().ToDictionaryAsync(s => s.Key, s => s.Value);
         string? Get(string k) => settings.TryGetValue(k, out var v) && !string.IsNullOrWhiteSpace(v) ? v : null;
-        SetupComplete = Get(SettingKeys.SetupComplete) == "1";
+        SetupComplete = SettingKeys.IsSetupDone(Get);
         Maintenance = Get(SettingKeys.MaintenanceEnabled) == "1";
         SiteName = Get(SettingKeys.SiteName);
         CanonicalUrl = Get(SettingKeys.CanonicalUrl);

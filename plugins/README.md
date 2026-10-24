@@ -14,6 +14,7 @@ Store der Cloud oder einen Bundle-Import.
 | `google-reviews/` | Google Bewertungen (früher eingebaut) | Altbestand; Vorgabe-Konfiguration steht in `meta.json` unter `DefaultConfig` (reist nicht im Bundle mit) |
 | `store-einblick/` | Store-Einblick — zeigt den Store einer MatCMS-Cloud (Plugins mit Art, Templates, Komponenten) als Block; liest `GET {cloud}/api/public/store`, ohne Schlüssel | aktuell, Skript-Variante (`plugin.csx` lädt `showcase.csx`) |
 | `store-einblick-native/` | Store-Einblick (Native) — **dieselbe** Code-Datei `../store-einblick/showcase.csx`, als DLL kompiliert; `StoreEinblickTests` prüft, dass beide Varianten dasselbe HTML zeichnen | aktuell, Native-Variante (`./pack-native.ps1 -Path ./store-einblick-native`) |
+| `coverage-map/` | Abdeckungskarte — Block mit anklickbarer Europakarte (Länder + Region Norditalien `IT-N`, Status verfügbar/teilweise/demnächst/geplant, Liste mit Hinweisen); Umrisse in `map.csx`, erzeugt von `tools/build-map.mjs` aus Natural Earth 1:50m (`tools/ne50.geojson`) | aktuell, im Global Store; benutzt auf corner-society.com |
 | `todo-verwaltung-beispiel/` | Todo-Verwaltung (Beispiel, früher eingebaut) | Anschauungsbeispiel für die Plugin-API |
 
 ## Aufbau eines Plugins

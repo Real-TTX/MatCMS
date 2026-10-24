@@ -26,6 +26,7 @@
   <ItemGroup>
     <None Include="..\Fixtures\ref-plugin.csx" Link="fixtures\ref-plugin.csx" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\plugins\store-einblick\*.csx" Link="fixtures\store-einblick\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\plugins\coverage-map\*.csx" Link="fixtures\coverage-map\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- The native fixture lands in fixtures/refplugin/ next to the test assembly, exactly as a plugin's src/

@@ -190,6 +190,7 @@ public static class DbSeeder
         await db.SaveChangesAsync();
 
         await MigrateLegacyContactAsync(db);
+        await FixContactMessageFieldAsync(db);
         await MigrateListBlocksAsync(db);
         await MigrateFeaturesAsync(db);
         await UpgradeTemplatesAsync(db);
@@ -414,6 +415,26 @@ public static class DbSeeder
         {
             // Column already exists (fresh DB or a previous run) — nothing to do.
         }
+    }
+
+    /// <summary>
+    /// The seeded "Kontakt" form gave its message field ("nachricht") a ONE-line text box; every site started with it, and the AI assistant, which
+    /// places the existing form, put that box on every contact page. Fixed once per site: the field becomes a text area if it is still the seeded
+    /// one-liner. A marker keeps the fix from running again, so an operator who wants the one-liner back can have it.
+    /// </summary>
+    private static async Task FixContactMessageFieldAsync(AppDbContext db)
+    {
+        const string marker = "fix.contactMessageTextarea";
+        if (await db.SiteSettings.AnyAsync(x => x.Key == marker)) return;
+        var form = await db.Forms.FirstOrDefaultAsync(f => f.Slug == "kontakt");
+        if (form is not null)
+        {
+            var elements = FormDefinition.Parse(form.DefinitionJson);
+            var message = FormDefinition.Flatten(elements).FirstOrDefault(e => e.Id == "nachricht" && e.Type == "text");
+            if (message is not null) { message.Type = "textarea"; form.DefinitionJson = FormDefinition.Serialize(elements); }
+        }
+        db.SiteSettings.Add(new SiteSetting { Key = marker, Value = "1" });
+        await db.SaveChangesAsync();
     }
 
     /// <summary>
@@ -830,7 +851,7 @@ public static class DbSeeder
                     new FormOption { Value = "Service Anfrage", Label = "Service Anfrage" }
                 ]
             },
-            new() { Id = "nachricht", Type = "text", Label = "Nachricht", Required = true },
+            new() { Id = "nachricht", Type = "textarea", Label = "Nachricht", Required = true },
         };
         return FormDefinition.Serialize(elements);
     }

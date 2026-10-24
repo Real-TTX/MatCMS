@@ -138,7 +138,7 @@ public class ContentOpApplier
         // The field definition travels as the "fields" array; it is a structured field list (not raw HTML),
         // rendered by the form builder — stored as-is, defaulting to empty when absent.
         var fields = payload["fields"];
-        var definitionJson = fields is JsonArray ? fields.ToJsonString() : "[]";
+        var definitionJson = fields is JsonArray arr ? NormalizeFormFields(arr) : "[]";
         var successMessage = payload["successMessage"]?.GetValue<string>();
         var submitLabel = payload["submitLabel"]?.GetValue<string>();
 
@@ -152,6 +152,42 @@ public class ContentOpApplier
         });
         await _db.SaveChangesAsync(ct);
         return Report(op, "applied", $"Formular „{slug}“ angelegt.");
+    }
+
+    /// <summary>
+    /// A model writes form fields in its own words: "message", "multiline" or "long_text" for what the form builder calls a text area, and often no id.
+    /// Unknown types used to fall through to a one-line text box (a "Nachricht" field the size of a name field), and a field without an id cannot be
+    /// submitted. So: the known synonyms become the builder's types, a field named like a message becomes a text area, a missing id is made from the
+    /// label, and ids are unique.
+    /// </summary>
+    internal static string NormalizeFormFields(JsonArray fields)
+    {
+        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var f in fields.OfType<JsonObject>())
+        {
+            var type = (f["type"]?.GetValue<string>() ?? "text").Trim().ToLowerInvariant().Replace("-", "").Replace("_", "");
+            var label = f["label"]?.GetValue<string>() ?? "";
+            type = type switch
+            {
+                "textarea" or "message" or "multiline" or "longtext" or "comment" or "comments" => "textarea",
+                "heading" or "headline" => "title",
+                "paragraph" or "info" or "hint" => "description",
+                "tel" or "telephone" or "phone" => "phone",
+                "mail" or "email" => "email",
+                "dropdown" or "select" => "select",
+                "" => "text",
+                _ => type
+            };
+            if (type == "text" && System.Text.RegularExpressions.Regex.IsMatch(label, @"^\s*(nachricht|ihre nachricht|message|your message|anliegen|kommentar|bemerkung|mitteilung|beschreibung)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                type = "textarea";
+            f["type"] = type;
+            var id = (f["id"]?.GetValue<string>() ?? "").Trim();
+            if (id.Length == 0) id = Slugify(label).Replace("-", "_");
+            if (id.Length == 0) id = "feld";
+            var unique = id; for (var n = 2; !used.Add(unique); n++) unique = id + "_" + n;
+            f["id"] = unique;
+        }
+        return fields.ToJsonString();
     }
 
     private async Task<ContentOpReport> SetSettingAsync(PendingContentOp op, CancellationToken ct)

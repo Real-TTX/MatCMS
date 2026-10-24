@@ -325,7 +325,7 @@ public class ContentTools
         McpContext me, InstanceService instances,
         [Description("The instance id, as returned by list_instances.")] string instanceId,
         [Description("The form name shown in the admin, e.g. \"Kontakt\".")] string name,
-        [Description("A JSON array of field definitions, e.g. [{\"type\":\"text\",\"label\":\"Name\",\"required\":true},{\"type\":\"email\",\"label\":\"E-Mail\"}].")] string fieldsJson,
+        [Description("A JSON array of field definitions {id, type, label, required, placeholder, options}. Types: text (one line), textarea (several lines — use it for a message), email, phone, number, date, daterange, select / multiselect (with options [{value,label}]), richselect, title (a heading), description (a paragraph of text), group. E.g. [{\"id\":\"name\",\"type\":\"text\",\"label\":\"Name\",\"required\":true},{\"id\":\"email\",\"type\":\"email\",\"label\":\"E-Mail\",\"required\":true},{\"id\":\"nachricht\",\"type\":\"textarea\",\"label\":\"Nachricht\",\"required\":true}].")] string fieldsJson,
         [Description("URL-safe slug used to reference the form from a form block. Falls back to a slug of the name if empty.")] string? slug = null,
         [Description("Optional confirmation message shown after a successful submission.")] string? successMessage = null,
         [Description("Optional submit button label (default \"Absenden\").")] string? submitLabel = null,

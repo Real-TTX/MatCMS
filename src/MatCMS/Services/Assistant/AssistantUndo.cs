@@ -77,6 +77,7 @@ public sealed class AssistantUndo
                 case "setting": lines.Add(await RevertSettingAsync(c, ct)); break;
                 case "media": lines.Add(await RevertMediaAsync(c, ct)); break;
                 case "component": lines.Add(await RevertComponentAsync(c, ct)); break;
+                case "form": lines.Add(await RevertFormAsync(c, ct)); break;
                 case "templatefiles": lines.Add(await RevertTemplateFilesAsync(c, ct)); break;
                 case "template-new": lines.Add(await RevertTemplateNewAsync(c, ct)); break;
                 case "template-active": lines.Add(await RevertTemplateActiveAsync(c, ct)); break;
@@ -110,6 +111,27 @@ public sealed class AssistantUndo
         {
             return $"„{name}“ nicht rückgängig gemacht: {e.Message}";
         }
+    }
+
+    private sealed record FormState(string Name, string DefinitionJson, string? SuccessMessage, string? SubmitLabel);
+
+    /// <summary>A form the run created goes again — unless somebody already sent it something, then it stays (submissions are not the assistant's
+    /// to delete); a form it changed gets its name, fields and texts back.</summary>
+    private async Task<string> RevertFormAsync(AiChange c, CancellationToken ct)
+    {
+        var form = await _db.Forms.FirstOrDefaultAsync(x => x.Id == int.Parse(c.Key), ct);
+        if (form is null) return "";
+        if (c.BeforeJson is null)
+        {
+            if (await _db.FormSubmissions.AnyAsync(s => s.FormId == form.Id, ct)) return $"Formular „{form.Name}“ bleibt – es hat schon Einsendungen";
+            _db.Forms.Remove(form);
+            await _db.SaveChangesAsync(ct);
+            return $"Formular „{form.Name}“ entfernt";
+        }
+        var s = JsonSerializer.Deserialize<FormState>(c.BeforeJson)!;
+        form.Name = s.Name; form.DefinitionJson = s.DefinitionJson; form.SuccessMessage = s.SuccessMessage; form.SubmitLabel = s.SubmitLabel;
+        await _db.SaveChangesAsync(ct);
+        return $"Formular „{form.Name}“ wiederhergestellt";
     }
 
     private sealed record ComponentState(string Name, string Description, string Icon, string FieldsJson, string TemplateHtml);

@@ -47,7 +47,7 @@ public sealed partial class AssistantTools
 
     /// <summary>The tools as the prompt describes them: name, arguments, what it does. The order is the order a sensible
     /// run uses them in.</summary>
-    public static readonly (string Name, string Args, string What, bool Writes)[] Catalog = [.. PageCatalog, .. MoreCatalog];
+    public static readonly (string Name, string Args, string What, bool Writes)[] Catalog = [.. PageCatalog, .. FormCatalog, .. MoreCatalog];
 
     private static (string Name, string Args, string What, bool Writes)[] PageCatalog =>
     [
@@ -94,6 +94,9 @@ public sealed partial class AssistantTools
                 "update_theme" => await UpdateThemeAsync(args, ct),
                 "update_settings" => await UpdateSettingsAsync(args, ct),
                 "create_svg" => await CreateSvgAsync(args, ct),
+                "read_form" => await ReadFormAsync(args, ct),
+                "create_form" => await CreateFormAsync(args, ct),
+                "update_form" => await UpdateFormAsync(args, ct),
                 "plugin_action" => await PluginActionAsync(args, ct),
                 "list_components" => await ListComponentsAsync(ct),
                 "read_component" => await ReadComponentAsync(args, ct),

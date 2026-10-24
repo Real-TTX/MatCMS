@@ -339,6 +339,7 @@ through the cloud relay — the key never lives on the site.
   text goes through `SafeHtml`, `_css` loses every `<`. **Blocks with a raw-HTML field (the HTML block) are not offered at all** — an
   attached document could steer the model into writing markup onto a live page. What does not fit is dropped WITH a warning that goes back to
   the model, so it corrects itself. `BlockGenerator` stays for the cloud's MCP content ops.
+- **Forms** (`AssistantToolsForms.cs`): `read_form`, `create_form`, `update_form` write the builder's definition through the builder's own clean-up (`FormDefinition.Sanitize`, shared with Admin → Formulare; `ContentOpApplier.NormalizeFormFields` puts a model's words for types right — "message" → textarea). The assistant NEVER sets where submissions go (the notification), a form's slug or deletes a form: a document could otherwise steer it into mailing every visitor's message elsewhere. Undo removes a created form unless it already has submissions.
 - **Beyond pages** (`AssistantToolsMore.cs`): `plugin_action` runs the operations plugins DESCRIBE (`IPluginBuilder.Operation(PluginOperationSpec, …)`: name,
   description, example arguments, `Writes`, `PersonalData`, `Internal`) — the blog's `post.list/read/create/update/delete` (`BlogOps`), the shop's
   `product.list/read/create/update`, `category.list/create/update`, coupons, variants, attributes (`ShopAiOps`). The prompt lists them under

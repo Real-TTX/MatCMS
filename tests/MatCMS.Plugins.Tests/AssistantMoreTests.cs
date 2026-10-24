@@ -235,4 +235,40 @@ public class AssistantMoreTests : IClassFixture<AssistantApp>
     [InlineData("<base href=\"https://evil.example/\">", false)]
     public void The_markup_check_lets_layouts_through_and_stops_what_runs(string html, bool ok) =>
         Assert.Equal(ok, AssistantMarkup.Problems(html).Count == 0);
+
+    [Fact]
+    public async Task Forms_are_built_and_changed_with_the_builders_types_placed_on_a_page_never_rerouted_and_undo_takes_them_back()
+    {
+        var admin = await AdminAsync();
+        var kontaktBefore = _app.Use(db => db.Forms.AsNoTracking().First(f => f.Slug == "kontakt"));
+        _app.Ai.Say(
+            Act("create_form", """{"name":"Rückruf","fields":[{"type":"text","label":"Name","required":true},{"type":"phone","label":"Telefon"},{"type":"message","label":"Anliegen"},{"type":"select","label":"Zeit","options":["Vormittag","Nachmittag"]},{"type":"multiselect","label":"Themen","options":["Website","Shop"]}]}"""),
+            Act("create_page", """{"title":"Rückruf","slug":"rueckruf","published":true,"blocks":[{"type":"form","data":{"form":"rueckruf","heading":"Wir rufen zurück"}}]}"""),
+            Act("update_form", """{"form":"kontakt","name":"Kontakt (neu)","fields":[{"id":"name","type":"text","label":"Name"},{"id":"nachricht","type":"textarea","label":"Nachricht"}],"notifyEmails":"fremd@example.org","slug":"anders"}"""));
+        var (conv, steps) = await SendAsync(admin, "Bau mir ein Rückruf-Formular und vereinfache das Kontaktformular.");
+
+        var acts = Actions(steps);
+        Assert.All(acts.Take(3), a => Assert.True(a["ok"]!.GetValue<bool>(), a.ToJsonString()));
+        Assert.Contains("create_form", _app.Ai.Requests.Last().Messages[0].Content);       // the tool is in the prompt
+
+        var form = _app.Use(db => db.Forms.AsNoTracking().First(f => f.Slug == "rueckruf"));
+        var els = MatCMS.Content.FormDefinition.Parse(form.DefinitionJson);
+        Assert.Equal(new[] { "text", "phone", "textarea", "select", "multiselect" }, els.Select(e => e.Type));
+        Assert.Equal(new[] { "Vormittag", "Nachmittag" }, els[3].Options.Select(o => o.Value));
+        Assert.Equal(2, els[4].Options.Count);                                                // multiselect keeps its options
+        Assert.Contains("<textarea", await _app.Browser().GetStringAsync("/rueckruf"));
+
+        var kontakt = _app.Use(db => db.Forms.AsNoTracking().First(f => f.Id == kontaktBefore.Id));
+        Assert.Equal("Kontakt (neu)", kontakt.Name);
+        Assert.Equal("kontakt", kontakt.Slug);                                                 // the slug stays: blocks point at it
+        Assert.Equal(kontaktBefore.NotifyEnabled, kontakt.NotifyEnabled);                     // where submissions go is the admin's
+        Assert.Equal(kontaktBefore.NotifyJson, kontakt.NotifyJson);
+        Assert.Contains(acts[2]["warnings"]!.AsArray(), w => w!.ToString().Contains("notifyEmails"));
+
+        await UndoAsync(admin, conv);
+        Assert.False(_app.Use(db => db.Forms.Any(f => f.Slug == "rueckruf")));
+        var restored = _app.Use(db => db.Forms.AsNoTracking().First(f => f.Id == kontaktBefore.Id));
+        Assert.Equal(kontaktBefore.Name, restored.Name);
+        Assert.Equal(kontaktBefore.DefinitionJson, restored.DefinitionJson);
+    }
 }

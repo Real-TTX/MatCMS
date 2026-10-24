@@ -80,7 +80,40 @@ public static class FormDefinition
 
     /// <summary>Element types that render an actual input and hold a value.</summary>
     public static bool IsInput(string? type) =>
-        type is "text" or "textarea" or "date" or "daterange" or "number" or "phone" or "email" or "select" or "richselect";
+        type is "text" or "textarea" or "date" or "daterange" or "number" or "phone" or "email" or "select" or "richselect" or "multiselect";
+
+    /// <summary>Every element type the form builder offers (inputs, plus the heading, the text paragraph and the group).</summary>
+    public static readonly string[] Types = ["title", "description", "text", "textarea", "date", "daterange", "number", "phone", "email", "select", "richselect", "multiselect", "group"];
+
+    /// <summary>The types that carry a list of options. multiselect is one of them: the builder edits its options, and a check that did not count it
+    /// threw them away on every save (and the submission skipped the field).</summary>
+    public static bool HasOptions(string? type) => type is "select" or "richselect" or "multiselect";
+
+    /// <summary>
+    /// Cleans one element before it is stored — the builder's save and the AI assistant's form tools go through the same rules: an unknown type
+    /// becomes a text field, a condition without a field is dropped, only option types keep options (without empty values), a group holds no group.
+    /// </summary>
+    public static void Sanitize(FormElement el, Func<string> newId)
+    {
+        el.Type = Types.Contains(el.Type) ? el.Type : "text";
+        if (el.Condition is not null && !el.Condition.IsSet) el.Condition = null;
+        if (!HasOptions(el.Type)) el.Options = new();
+        else el.Options = el.Options.Where(o => !string.IsNullOrWhiteSpace(o.Value)).ToList();
+
+        if (el.Type == "group")
+        {
+            foreach (var child in el.Fields)
+            {
+                if (string.IsNullOrWhiteSpace(child.Id)) child.Id = newId();
+                child.Type = Types.Contains(child.Type) && child.Type != "group" ? child.Type : "text";   // no nested groups
+                child.Condition = child.Condition is not null && child.Condition.IsSet ? child.Condition : null;
+                if (!HasOptions(child.Type)) child.Options = new();
+                else child.Options = child.Options.Where(o => !string.IsNullOrWhiteSpace(o.Value)).ToList();
+                child.Fields = new();
+            }
+        }
+        else el.Fields = new();
+    }
 
     public static List<FormElement> Parse(string? json)
     {

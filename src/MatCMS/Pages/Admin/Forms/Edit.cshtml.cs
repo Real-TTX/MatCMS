@@ -325,32 +325,6 @@ public class EditModel : PageModel
         _ => "Feld"
     };
 
-    // Clean up an element coming from the client before persisting.
-    private static void Sanitize(FormElement el)
-    {
-        el.Type ??= "text";
-        if (el.Condition is not null && !el.Condition.IsSet) el.Condition = null;
-
-        // Options belong to select AND richselect (the rich variant also carries image/description/tags).
-        static bool SelectLike(string? t) => t is "select" or "richselect";
-        if (!SelectLike(el.Type)) el.Options = new();
-        else el.Options = el.Options.Where(o => !string.IsNullOrWhiteSpace(o.Value)).ToList();
-
-        if (el.Type == "group")
-        {
-            foreach (var child in el.Fields)
-            {
-                if (string.IsNullOrWhiteSpace(child.Id)) child.Id = GenId();
-                if (child.Type == "group") child.Type = "text"; // no nested groups
-                child.Condition = child.Condition is not null && child.Condition.IsSet ? child.Condition : null;
-                if (!SelectLike(child.Type)) child.Options = new();
-                else child.Options = child.Options.Where(o => !string.IsNullOrWhiteSpace(o.Value)).ToList();
-                child.Fields = new();
-            }
-        }
-        else
-        {
-            el.Fields = new();
-        }
-    }
+    // Clean up an element coming from the client before persisting — the same rules the AI assistant's form tools use.
+    private static void Sanitize(FormElement el) => FormDefinition.Sanitize(el, GenId);
 }

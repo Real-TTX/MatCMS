@@ -34,12 +34,7 @@
         fr.addEventListener('load', function () { fr.classList.add('is-loaded'); });
         fr.src = src;
     }
-    // The switcher's own picture of the CURRENT site: one frame, after the page has loaded, desktop only.
-    var own = toggle.querySelector('iframe[data-src]');
-    if (own && desktop.matches) {
-        if (document.readyState === 'complete') load(own);
-        else window.addEventListener('load', function () { load(own); });
-    }
+    // (The switcher's own picture of the CURRENT site is filled by admin-shell.js, for the cloud and a site alike.)
     var loaded = false;
     function open(on) {
         menu.hidden = !on;

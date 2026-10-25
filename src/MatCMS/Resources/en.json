@@ -135,6 +135,7 @@
   "nav.groupContent": "Content",
   "nav.groupDesign": "Design",
   "nav.groupSystem": "Administration",
+  "nav.backToCloud": "Back to the cloud",
   "nav.menu": "Menu",
   "plugins.title": "Plugins",
   "plugins.intro": "Write your own plugins in C#. A plugin can register admin menu entries and access the framework/data via <code>Service&lt;T&gt;()</code>. <strong>Caution:</strong> plugin code runs with full access — only enable trusted code.",

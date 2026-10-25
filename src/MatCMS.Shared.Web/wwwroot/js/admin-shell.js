@@ -34,9 +34,12 @@
             if (openMenu === menu) { closeMenu(); return; }
             closeMenu();
             menu.hidden = false;
+            // The user's menu at the foot opens upwards; a switcher under the logo (data-menu-place="bottom") opens downwards.
             var r = btn.getBoundingClientRect();
             menu.style.left = Math.max(8, r.left) + 'px';
-            menu.style.top = Math.max(8, r.top - menu.offsetHeight - 6) + 'px';
+            menu.style.top = (btn.getAttribute('data-menu-place') === 'bottom'
+                ? r.bottom + 6
+                : Math.max(8, r.top - menu.offsetHeight - 6)) + 'px';
             btn.setAttribute('aria-expanded', 'true');
             openMenu = menu; openBtn = btn;
             var first = menu.querySelector('.mat-menu__item');
@@ -49,6 +52,20 @@
         if (openMenu) { var b = openBtn; closeMenu(); b.focus(); } else setNav(false);
     });
     window.addEventListener('resize', closeMenu);
+
+    // --- the switcher's small picture of the current site (cloud and connected site alike): one frame, filled after the page
+    // has loaded and only on a desktop — a phone shows the initial underneath ---
+    var own = document.querySelector('.inst-switch-shot iframe[data-src]');
+    if (own && window.matchMedia('(min-width: 861px)').matches) {
+        var fill = function () {
+            var src = own.getAttribute('data-src');
+            if (!src) return;
+            own.removeAttribute('data-src');
+            own.addEventListener('load', function () { own.classList.add('is-loaded'); });
+            own.src = src;
+        };
+        if (document.readyState === 'complete') fill(); else window.addEventListener('load', fill);
+    }
 
     // --- live site pictures in tile views: the frame renders at desktop width (its CSS width) and is scaled to the
     // tile's real width, so it fills the tile at every screen size instead of a fixed factor leaving a gap ---

@@ -471,6 +471,10 @@ bar's right padding is the compact content padding in steps (28/24/16 px — nev
 a scrollbar gutter), and both keep a thin scrollbar's room always (`.mat-main` and, while the bar is shown,
 `html:has(> body.has-adminbar)`: `scrollbar-gutter: stable`). Measured with real scrollbars (Playwright hides them unless
 `--hide-scrollbars` is dropped); change one of these and measure again.
+A cloud-connected site's admin has the cloud's menu switcher on the SAME pixels under its logo, offering only THIS site and
+"Zurück zur Cloud" (to this site's page on the cloud) — never the other sites. A template's own sticky header below the
+site's bar uses `top: var(--mat-adminbar-h, 0)`, never the pixels (FEUSYS had copied the old `top: 67px`: a 15px gap once the
+bar became 52; site.css's `html body.has-adminbar .site-header` outweighs such a copy).
 Live site pictures in tile views (`.instance-tile-shot`, `.payload-tile-shot`) are scaled to the tile's real width by
 `admin-shell.js` (`--shot-scale`), never by a fixed factor. The sign-in, 2FA, OAuth and error
 pages (`body.login-page.login-matui`) are MatUi's auth card through the same bridge. A state is a tint behind the WHOLE item

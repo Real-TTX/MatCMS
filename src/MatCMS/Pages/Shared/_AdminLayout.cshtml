@@ -65,6 +65,29 @@
                 </a>
                 <button type="button" class="mat-btn mat-btn--ghost mat-btn--icon mat-nav__close" data-admin-close aria-label="@T["nav.menu"]"><i class="ti ti-x" aria-hidden="true"></i></button>
             </div>
+            @if (cloudLink is not null)
+            {
+                @* A site connected to a cloud has the cloud's switcher in the same place (MatUi's menu switcher, SHELL-15), so moving
+                   between the two never changes where it is — but from here it offers only THIS site and the way back to the cloud:
+                   the other sites are the cloud's business, and a site does not list its neighbours. *@
+                var siteName = string.IsNullOrWhiteSpace(Site.SiteName) ? Context.Request.Host.Host : Site.SiteName;
+                <div class="inst-ctx mat-nav__switch">
+                    <div class="inst-picker">
+                        <button type="button" class="mat-switcher inst-picker-btn" data-admin-menu="site-switch-menu" data-menu-place="bottom" aria-haspopup="menu" aria-expanded="false">
+                            <span class="mat-switcher__icon inst-switch-shot">
+                                <span class="inst-picker-initial">@siteName.Trim().FirstOrDefault().ToString().ToUpperInvariant()</span>
+                                @* The site's own home page, small: one frame, after the page has loaded, desktop only (admin-shell.js). *@
+                                <iframe data-src="/" title="@siteName" tabindex="-1" scrolling="no" aria-hidden="true"></iframe>
+                            </span>
+                            <span class="mat-switcher__text">
+                                <small>@T["adminbar.viewWebsite"]</small>
+                                <span class="mat-switcher__name inst-picker-name">@siteName</span>
+                            </span>
+                            <i class="ti ti-selector mat-switcher__chev" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </div>
+            }
             @* Content, then design and configuration, then administration and system. Every line — the CMS's own
                and the plugins' — comes from the AdminNav registry, ordered within its group.
                Inside a plugin section that has a menu of its own (the shop), that menu replaces the main one, with a way back. *@
@@ -149,6 +172,15 @@
         </div>
     </div>
 
+    @if (cloudLink is not null)
+    {
+        @* The site switcher's popup: this site (where you are) and the way back to the cloud — to this site's page there. *@
+        <div class="mat-menu" id="site-switch-menu" role="menu" aria-label="@T["adminbar.viewWebsite"]" hidden>
+            <a class="mat-menu__item" role="menuitemradio" aria-checked="true" href="/admin"><i class="ti ti-world" aria-hidden="true"></i><span>@(string.IsNullOrWhiteSpace(Site.SiteName) ? Context.Request.Host.Host : Site.SiteName)</span><i class="ti ti-check mat-menu__check" aria-hidden="true"></i></a>
+            <div class="mat-menu__sep" role="separator"></div>
+            <a class="mat-menu__item" role="menuitem" href="@cloudLink"><i class="ti ti-arrow-left" aria-hidden="true"></i><span>@T["nav.backToCloud"]</span></a>
+        </div>
+    }
     @* The user's context menu (SHELL-03): account, the website, the admin language, sign out last. *@
     <div class="mat-menu" id="admin-user-menu" role="menu" aria-label="@displayName" hidden>
         <div class="mat-menu__head">

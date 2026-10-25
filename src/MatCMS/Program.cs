@@ -646,7 +646,8 @@ app.Use(async (ctx, next) =>
         p.StartsWith("/logout", StringComparison.OrdinalIgnoreCase) ||
         p.StartsWith("/_status", StringComparison.OrdinalIgnoreCase) ||
         p.StartsWith("/set-language", StringComparison.OrdinalIgnoreCase) ||
-        p.StartsWith("/fonts/", StringComparison.OrdinalIgnoreCase);   // the maintenance page itself uses them
+        p.StartsWith("/fonts/", StringComparison.OrdinalIgnoreCase) ||   // the maintenance page itself uses them
+        p.StartsWith("/pwa/", StringComparison.OrdinalIgnoreCase);       // the back office's app files (manifest, worker, offline page)
     if (exempt)
     {
         await next();
@@ -671,6 +672,14 @@ app.Use(async (ctx, next) =>
 
 // Google Fonts from this server (LocalFonts): fetched once into appdata/fonts, no visitor ever contacts Google.
 MatCMS.Shared.Web.LocalFonts.MapLocalFonts(app, StoragePaths.DataDir(app.Environment));
+// The back office as an installable app (manifest, service worker, offline page under /pwa/). Its offline handling covers
+// /admin and /login only: the public site is the visitors', and the worker never touches its pages.
+MatCMS.Shared.Web.Pwa.MapPwa(app, ctx =>
+{
+    var name = ctx.RequestServices.GetRequiredService<SiteContext>().SiteName;
+    var lang = System.Globalization.CultureInfo.CurrentUICulture.Name.Split('-')[0];
+    return new MatCMS.Shared.Web.PwaInfo(name, MatCMS.Shared.Web.Pwa.ShortName(name), "matcms", "/admin", string.IsNullOrEmpty(lang) ? "de" : lang);
+});
 app.MapRazorPages();
 
 // Public plugin routes. ASP.NET cannot unregister an endpoint, so plugins do not get endpoints of their

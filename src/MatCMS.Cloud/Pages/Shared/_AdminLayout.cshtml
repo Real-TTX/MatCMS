@@ -48,6 +48,7 @@
     <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/admin.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/cloud.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/admin-matui.css" asp-append-version="true" />
+    @MatCMS.Shared.Web.Pwa.Head(theme, MatCMS.Shared.Web.Pwa.ShortName(Cloud.CloudName), "cloud")
     <link rel="icon" href="@Cloud.LogoUrl" />
     @* Own confirm/alert/prompt dialogs — loaded early, inline page scripts call MatDialog. *@
     <script src="~/_content/MatCMS.Shared.Web/js/mat-dialogs.js" asp-append-version="true"></script>

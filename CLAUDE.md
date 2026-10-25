@@ -481,6 +481,22 @@ pages (`body.login-page.login-matui`) are MatUi's auth card through the same bri
 plus icon and words (MatUi COLOR-04/08) — never a coloured bar on one side: the bridge turns the old bars of the attention
 rows, the dashboard tiles and the assistant's steps into that; do not add a new one. The page editor v2 (own layout) is not moved yet.
 
+**On a phone a record table is a stack of cards** (MatUi TABLE-02): `admin-shell.js` writes each cell's column name as `data-label`
+(from the table head) and adds `.has-labels`; `admin-matui.css` (≤ 600 px) draws title, label/value rows and actions. Left as they
+are: tables one types into (inputs, selects, row editors) and the ones with a phone layout of their own (attention, cleanup,
+notification matrix) — they scroll sideways. A new table needs nothing for this; a new special one is added to that exception list.
+
+**Both back offices are installable apps (PWA)** — `MatCMS.Shared.Web/Pwa.cs` (+ `js/pwa.js`, icons in `wwwroot/pwa/`, rendered
+from MatUi's logo tile with the registry glyph: `template` for the CMS, `cloud` for the cloud). `/pwa/manifest.webmanifest`,
+`/pwa/sw.js` (scope `/`, `Service-Worker-Allowed: /`), `/pwa/offline`; `Pwa.Head(theme, shortName, icon)` in every admin layout and
+sign-in page writes manifest, `theme-color` (= the top bar's colour, per the user's scheme), iOS's home-screen meta and the
+`apple-touch-icon`. The CMS's maintenance mode lets `/pwa/` through. **The worker never caches a page**: back-office pages are
+signed in, hold antiforgery tokens and personal data — static files are cached (versioned cache-first, the rest
+stale-while-revalidate), a failed back-office navigation gets the offline page (it reconnects by itself), and on a SITE the worker
+answers only `/admin` and `/login` navigations — the public site is the visitors' and stays untouched. `pwa.js`: a bar when the
+connection drops, a form is not sent while offline (its input stays), and back online a page without unsaved input reloads
+(no stale lists). On a touch screen fields are 16 px (iOS zooms into smaller ones); zoom itself stays allowed. Tests: `PwaTests`.
+
 **Colours in the back office only through variables** — light/dark/system is a per-user choice (`User.Theme`
 in both apps, account page → Darstellung) that the admin layouts write into `<html data-theme>`. The variables
 (`--surface`, `--surface-2`, `--sidebar`, `--hover`, `--border-strong`, `--text-2`, `--text-muted`, `--on-ink`,

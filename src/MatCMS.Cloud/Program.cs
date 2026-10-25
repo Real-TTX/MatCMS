@@ -442,6 +442,13 @@ app.Use(async (ctx, next) =>
 
 // Google Fonts from this server (LocalFonts) — the admin's own fonts too: no browser contacts Google.
 MatCMS.Shared.Web.LocalFonts.MapLocalFonts(app, Path.Combine(app.Environment.ContentRootPath, "appdata"));
+// The cloud as an installable app (manifest, service worker, offline page under /pwa/) — all of it is back office.
+MatCMS.Shared.Web.Pwa.MapPwa(app, ctx =>
+{
+    var name = ctx.RequestServices.GetRequiredService<CloudContext>().CloudName;
+    var lang = CultureInfo.CurrentUICulture.Name.Split('-')[0];
+    return new MatCMS.Shared.Web.PwaInfo(name, MatCMS.Shared.Web.Pwa.ShortName(name), "cloud", "/", string.IsNullOrEmpty(lang) ? "de" : lang);
+});
 app.MapRazorPages();
 
 // --- Remote MCP server (/mcp) ---------------------------------------------

@@ -311,6 +311,29 @@ html[data-theme] :is(.admin--matui, .login-matui) .form-field textarea:focus,
 :is(.admin--matui, .login-matui) .checkbox-row + .help { margin: 0 0 var(--mat-space-4) 26px; }
 :is(.admin--matui, .login-matui) .help { color: var(--mat-text-muted); font-size: var(--mat-fs-sm); }
 
+/* ---- 3d2. Phone and installed app (PWA) ----------------------------------------------------------- */
+/* The connection bar of pwa.js: bottom centre, above the home indicator, MatUi's toast look. A state in words plus a tint. */
+.pwa-net { position: fixed; z-index: var(--mat-z-toast, 500); left: 50%; transform: translateX(-50%);
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px)); width: max-content; max-width: calc(100vw - 24px);
+  display: flex; align-items: center; gap: var(--mat-space-3); padding: 8px 8px 8px 14px;
+  background: var(--mat-surface, #fff); color: var(--mat-text, #1f1e1b); border: 1px solid color-mix(in srgb, var(--mat-warning, #c47500) 45%, var(--mat-border, #ccc));
+  border-radius: var(--mat-radius-lg, 8px); box-shadow: var(--mat-shadow-2); font: 500 var(--mat-fs-sm, 13px)/1.35 var(--mat-font, system-ui, sans-serif); }
+.pwa-net[hidden] { display: none; }
+.pwa-net.is-ok { border-color: color-mix(in srgb, var(--mat-success, #0f9d58) 45%, var(--mat-border, #ccc)); }
+.pwa-net__btn { flex: none; min-height: 34px; padding: 0 12px; border: 1px solid var(--mat-border-strong, #bbb); border-radius: var(--mat-radius, 6px);
+  background: var(--mat-surface, #fff); color: var(--mat-text, #1f1e1b); font: inherit; font-weight: 600; cursor: pointer; }
+.pwa-net__btn[hidden] { display: none; }
+@media (pointer: coarse) { .pwa-net__btn { min-height: 44px; } }
+/* Touch: no 300 ms wait for a double tap on controls, no grey flash (the controls have their own pressed state). Zoom stays allowed. */
+:is(.admin--matui, .login-matui) :is(a, button, .btn, label, summary, [role="button"]) { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+/* iOS zooms into a field whose text is under 16 px when it is focused — and stays zoomed. On a touch screen fields get 16 px (the
+   compact density's 14 px stays for a mouse). */
+@media (pointer: coarse) {
+  :is(.admin--matui, .login-matui) :is(input:not([type=checkbox]):not([type=radio]):not([type=range]), select, textarea, .list-search) { font-size: 16px !important; }
+}
+/* An installed app has no browser bar around it: the page must not rubber-band the whole frame (the scroller is .mat-main). */
+@media (display-mode: standalone) { html, body { overscroll-behavior: none; } }
+
 /* ---- 3e. Sign-in, 2FA, OAuth and error pages = MatUi's auth card (SHELL-11) ---------------------- */
 body.login-matui { background: var(--mat-bg); font-family: var(--mat-font); font-size: var(--mat-fs-md); color: var(--mat-text); }
 .login-matui .login-card { border: 1px solid var(--mat-border); border-radius: var(--mat-radius-xl); box-shadow: var(--mat-shadow-2); padding: var(--mat-space-8) var(--mat-space-8) var(--mat-space-6); max-width: 400px; }

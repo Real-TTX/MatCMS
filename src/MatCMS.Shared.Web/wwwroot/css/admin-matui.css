@@ -107,6 +107,8 @@ body.admin--matui { display: block; height: auto; overflow: hidden; background: 
 .admin--matui .mat-menu__item--danger .ti { color: inherit; }
 .admin--matui .mat-menu__head small { display: block; color: var(--mat-text-muted); font-size: var(--mat-fs-xs); }
 .admin--matui .mat-burger .ti { font-size: 1.35rem; }
+/* On a phone the breadcrumb's first entry (the site / the cloud) is hidden (mat-hide-sm): the next one must not keep its "/" in front. */
+@media (max-width: 720px) { .admin--matui .mat-crumbs li.mat-hide-sm + li::before { display: none; } }
 .admin--matui .mat-nav__close .ti { font-size: 1.2rem; }
 /* The page: block flow (the admin's pages space themselves with margins, MatUi's flex gap would add to them). */
 .admin--matui .mat-page.admin-content { display: block; max-width: none; padding-top: var(--mat-space-6); }
@@ -204,6 +206,40 @@ html[data-theme="dark"] .admin--matui .mat-vs.is-active { background: var(--mat-
 :is(.admin--matui, .login-matui) table.data th { text-transform: none; letter-spacing: 0; font-weight: 600; font-size: var(--mat-fs-sm); color: var(--mat-text-muted); background: var(--mat-surface-2); }
 :is(.admin--matui, .login-matui) table.data tbody tr:hover { background: var(--mat-surface-2); }
 :is(.admin--matui, .login-matui) .card table.data { border: 0; border-radius: 0; }
+/* On a phone admin.css makes a table a sideways scroller (display: block; overflow-x: auto); the frame's overflow: hidden
+   above must not undo that — it did, and every column past the second was cut off and out of reach (the instance list). */
+@media (max-width: 860px) {
+  :is(.admin--matui, .login-matui) table.data { overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+}
+/* A LIST table on a phone is a stack of cards (MatUi TABLE-02): no head row, every row a card, every value under the name of its
+   column (data-label, written by admin-shell.js). The first cell is the card's title. Sideways scrolling hid most columns of a list
+   (the instances: name and status visible, profile, hosting, version and heartbeat out of sight); special tables keep their own shape. */
+@media (max-width: 600px) {
+  .admin--matui table.data.has-labels { display: block; overflow: visible; border: 0; border-radius: 0; background: none; white-space: normal; }
+  .admin--matui table.data.has-labels thead { display: none; }
+  .admin--matui table.data.has-labels tbody { display: flex; flex-direction: column; gap: var(--mat-space-2); }
+  .admin--matui table.data.has-labels tr { display: block; padding: var(--mat-space-2) var(--mat-space-3); background: var(--mat-surface);
+    border: 1px solid var(--mat-border); border-radius: var(--mat-radius-lg); }
+  .admin--matui table.data.has-labels tr[hidden] { display: none; }
+  .admin--matui table.data.has-labels tbody tr:hover { background: var(--mat-surface); }
+  /* A grid: the column's name on the left, EVERYTHING of the cell stacked on the right (a cell may hold a link and a muted line;
+     as a flex row they stood side by side and squeezed each other). */
+  .admin--matui table.data.has-labels td { display: grid; grid-template-columns: 34% minmax(0, 1fr); column-gap: var(--mat-space-3); align-items: baseline;
+    min-width: 0; padding: 5px 0; border: 0; white-space: normal; overflow-wrap: anywhere; text-align: left; width: auto; }
+  .admin--matui table.data.has-labels td > * { grid-column: 2; min-width: 0; max-width: 100%; justify-self: start; }   /* a pill keeps its size */
+  .admin--matui table.data.has-labels td::before { content: attr(data-label); grid-column: 1; grid-row: 1 / span 20; min-width: 0;
+    color: var(--mat-text-muted); font-size: var(--mat-fs-xs); font-weight: 600; }
+  /* no column name (actions, a tick box) and the card's title: plain flow */
+  .admin--matui table.data.has-labels td[data-label=""], .admin--matui table.data.has-labels td:first-child { display: block; }
+  .admin--matui table.data.has-labels td[data-label=""]::before { content: none; }
+  .admin--matui table.data.has-labels td:first-child { font-weight: 600; font-size: var(--mat-fs-md); padding-bottom: var(--mat-space-2);
+    border-bottom: 1px solid var(--mat-border); margin-bottom: var(--mat-space-1); }
+  .admin--matui table.data.has-labels td:first-child::before { content: none; }
+  .admin--matui table.data.has-labels td:first-child .muted, .admin--matui table.data.has-labels td:first-child small { font-weight: 400; font-size: var(--mat-fs-sm); }
+  .admin--matui table.data.has-labels td:last-child:has(.actions, .btn, form) { padding-top: var(--mat-space-2); }
+  /* the "no records" row and a group's heading row: one cell across, no label, no title rule */
+  .admin--matui table.data.has-labels td[colspan] { border-bottom: 0; margin: 0; padding: 4px 0; font-weight: 400; font-size: var(--mat-fs-sm); }
+}
 
 /* The framed list toolbar = MatUi's toolbar (LIST-02): a card-like bar above the list. */
 :is(.admin--matui, .login-matui) [data-list] .page-head .list-toolbar { border-radius: var(--mat-radius-lg); padding: var(--mat-space-2) var(--mat-space-3); box-shadow: var(--mat-shadow-1); }
@@ -237,6 +273,10 @@ html[data-theme] :is(.admin--matui, .login-matui) .form-field select:focus,
 html[data-theme] :is(.admin--matui, .login-matui) .form-field textarea:focus,
 :is(.admin--matui, .login-matui) .list-search:focus { border-color: var(--mat-accent); box-shadow: var(--mat-focus-ring); outline: none; }
 :is(.admin--matui, .login-matui) input[type=checkbox], :is(.admin--matui, .login-matui) input[type=radio] { accent-color: var(--mat-accent); }
+
+/* Code inside a code block belongs to the block: MatUi's inline code chip (a light ground) inside the admin's dark
+   .code-block left light text on a light chip — unreadable (Admin → Über, "So aktualisieren"). */
+:is(.admin--matui, .login-matui) pre code { background: none; border: 0; padding: 0; color: inherit; font-size: inherit; }
 
 /* ---- 3c. Status without side bars (COLOR-04, COLOR-08) ------------------------------------------
    MatUi marks a state with a tint behind the WHOLE item plus an icon and words, never with a coloured bar

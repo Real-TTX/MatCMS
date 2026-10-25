@@ -53,6 +53,29 @@
     });
     window.addEventListener('resize', closeMenu);
 
+    // --- list tables on a phone (MatUi TABLE-02): every row becomes a card and every cell carries the name of its
+    // column (data-label, read from the table's head), which the CSS writes in front of the value. Done here once for
+    // all lists instead of in each of their views; a cell that already has a data-label keeps it ---
+    // Every record table with a head row. Left as they are: tables with a phone layout of their own (attention, cleanup,
+    // notification matrix) and tables one types into (row editors, inputs, selects) — a form in cards would lose its columns.
+    document.querySelectorAll('table.data:not(.attention-list):not(.dash-attention):not(.cleanup-list):not(.notify-matrix)').forEach(function (t) {
+        if (!t.tHead || t.closest('.row-editor') || t.querySelector('tbody input:not([type=checkbox]):not([type=radio]):not([type=hidden]), tbody select, tbody textarea')) return;
+        var heads = [];
+        t.querySelectorAll('thead tr:first-child > th, thead tr:first-child > td').forEach(function (th) {
+            var span = parseInt(th.getAttribute('colspan') || '1', 10);
+            for (var i = 0; i < span; i++) heads.push(i === 0 ? th.textContent.trim() : '');
+        });
+        if (!heads.length) return;
+        t.classList.add('has-labels');
+        t.querySelectorAll('tbody > tr').forEach(function (tr) {
+            var col = 0;
+            Array.prototype.forEach.call(tr.children, function (cell) {
+                if (!cell.hasAttribute('data-label')) cell.setAttribute('data-label', heads[col] || '');
+                col += parseInt(cell.getAttribute('colspan') || '1', 10);
+            });
+        });
+    });
+
     // --- the switcher's small picture of the current site (cloud and connected site alike): one frame, filled after the page
     // has loaded and only on a desktop — a phone shows the initial underneath ---
     var own = document.querySelector('.inst-switch-shot iframe[data-src]');

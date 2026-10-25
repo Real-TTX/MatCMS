@@ -1746,6 +1746,10 @@ table.data th.num, table.data td.num { text-align: right; }
 .dash-grid:has(> .card.dash-card) { align-items: stretch; }
 .dash-grid > .card.dash-card { display: flex; flex-direction: column; min-height: 530px; }
 .dash-card .kv-label { flex-basis: 130px; }   /* a card is narrower than a page: the 200 px label column left the values too little */
+/* …but on a phone a .kv is a COLUMN (label above value), where a flex-basis is a HEIGHT: the 130 px left a 130 px gap
+   under every label of a dashboard card (the cloud's "System" card). This rule is more specific than the phone rule's
+   ".kv-label { flex: none }", so it has to be undone here. */
+@media (max-width: 620px) { .dash-card .kv-label { flex-basis: auto; } }
 .dash-card table.data td { padding-top: 8px; padding-bottom: 8px; }
 /* One line per row in a card (the full text is on the list page), so six rows always fit. */
 .dash-card table.data:not(.dash-attention) { table-layout: fixed; width: 100%; }

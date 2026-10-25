@@ -353,6 +353,19 @@
                 </div>
             </div>
             <div class="form-field">
+                <label>@T["settings.logoDark"]</label>
+                <div class="image-field" data-upload>
+                    <div class="preview" data-preview></div>
+                    <div class="image-controls">
+                        <input name="Values[@SettingKeys.LogoDarkUrl]" value="@V(SettingKeys.LogoDarkUrl)" placeholder="@T["settings.logoDarkPlaceholder"]" data-url />
+                        <div style="margin-top:8px;">
+                            <button type="button" class="btn btn-ghost btn-sm" data-lib-btn>@T["settings.pickImage"]</button>
+                        </div>
+                        <div class="help">@T["settings.logoDarkHelp"]</div>
+                    </div>
+                </div>
+            </div>
+            <div class="form-field">
                 <label>@T["settings.favicon"]</label>
                 <div class="image-field" data-upload>
                     <div class="preview" data-preview></div>

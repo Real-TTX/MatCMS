@@ -62,11 +62,11 @@
         <aside class="mat-nav" id="mat-nav">
             <div class="mat-nav__brand">
                 <a href="/admin" title="@Site.SiteName">
-                    @if (Site.UsesDefaultLogo)
+                    @if (Site.LogoDarkUrl is { } darkLogo)
                     {
-                        @* MatCMS's own logo has a dark twin (admin.css shows the one that fits the scheme); a site's own logo is shown as it is. *@
+                        @* A dark twin (the site's own, or MatCMS's while its logo is in use): admin.css shows the one that fits the scheme. *@
                         <img class="admin-logo logo-light" src="@Site.LogoUrl" alt="@Site.SiteName" />
-                        <img class="admin-logo logo-dark" src="@MatCMS.Services.SiteContext.DefaultLogoDark" alt="@Site.SiteName" />
+                        <img class="admin-logo logo-dark" src="@darkLogo" alt="@Site.SiteName" />
                     }
                     else
                     {

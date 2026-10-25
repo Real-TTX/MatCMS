@@ -1,5 +1,9 @@
 using System.Net;
 using System.Text.Json.Nodes;
+using MatCMS.Data;
+using MatCMS.Models;
+using MatCMS.Services;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace MatCMS.Plugin.Tests;
@@ -73,5 +77,40 @@ public class PwaTests : IClassFixture<AppFactory>
         var admin = await c.GetStringAsync("/admin");
         Assert.Contains("class=\"admin-logo logo-light\" src=\"/img/logo.svg\"", admin);
         Assert.Contains("class=\"admin-logo logo-dark\" src=\"/img/logo-dark.svg\"", admin);
+    }
+
+    [Fact]
+    public async Task A_site_s_own_logo_gets_its_own_dark_twin_in_the_back_office_or_none()
+    {
+        var c = _app.Browser();
+        await AppFactory.LoginAsync(c);
+        try
+        {
+            Set(SettingKeys.LogoUrl, "/uploads/own.png");
+            var admin = await c.GetStringAsync("/admin");
+            // a logo of its own and no dark one: shown as it is, MatCMS's dark logo must not stand in for it
+            Assert.Contains("class=\"admin-logo\" src=\"/uploads/own.png\"", admin);
+            Assert.DoesNotContain("logo-dark", admin);
+
+            Set(SettingKeys.LogoDarkUrl, "/uploads/own-dark.png");
+            admin = await c.GetStringAsync("/admin");
+            Assert.Contains("class=\"admin-logo logo-light\" src=\"/uploads/own.png\"", admin);
+            Assert.Contains("class=\"admin-logo logo-dark\" src=\"/uploads/own-dark.png\"", admin);
+            Assert.Contains("name=\"Values[LogoDarkUrl]\" value=\"/uploads/own-dark.png\"", await c.GetStringAsync("/admin/settings"));
+        }
+        finally
+        {
+            Set(SettingKeys.LogoUrl, null);
+            Set(SettingKeys.LogoDarkUrl, null);
+        }
+    }
+
+    private void Set(string key, string? value)
+    {
+        using var scope = _app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.SiteSettings.RemoveRange(db.SiteSettings.Where(s => s.Key == key));
+        if (value is not null) db.SiteSettings.Add(new SiteSetting { Key = key, Value = value });
+        db.SaveChanges();
     }
 }

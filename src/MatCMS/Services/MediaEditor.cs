@@ -262,6 +262,7 @@ public sealed class MediaEditor
             uses.Add(new Use("setting", key switch
             {
                 SettingKeys.LogoUrl => "Logo",
+                SettingKeys.LogoDarkUrl => "Logo (dunkel)",
                 SettingKeys.FaviconUrl => "Favicon",
                 _ => key,
             }, "/admin/settings"));

@@ -40,6 +40,7 @@ public static class InstanceSettingCatalog
         new Group("Website", [
             new Entry("SiteName", "Name der Website"),
             new Entry("LogoUrl", "Logo (URL)"),
+            new Entry("LogoDarkUrl", "Logo für den dunklen Admin (URL)"),
             new Entry("FaviconUrl", "Favicon (URL)"),
             new Entry("FooterText", "Fußzeilen-Text"),
             new Entry("ContactRecipient", "Empfänger für Formular-Mails"),

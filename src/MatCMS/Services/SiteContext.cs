@@ -264,6 +264,10 @@ public class SiteContext
     public const string DefaultLogo = "/img/logo.svg", DefaultLogoDark = "/img/logo-dark.svg";
     /// <summary>True while the site shows MatCMS's own logo (no logo of its own set) — then the back office can show its dark twin.</summary>
     public bool UsesDefaultLogo => string.Equals(LogoUrl, DefaultLogo, StringComparison.OrdinalIgnoreCase);
+    /// <summary>The logo the DARK back office shows: the site's own dark logo, else MatCMS's dark twin while MatCMS's logo is in use,
+    /// else null — a logo drawn for a light ground is then shown in both schemes (dark text on the dark sidebar, which is why the
+    /// setting exists). Only the back office uses it; the public site has no dark scheme.</summary>
+    public string? LogoDarkUrl => Get(SettingKeys.LogoDarkUrl) is { Length: > 0 } own ? own : UsesDefaultLogo ? DefaultLogoDark : null;
     // Without a favicon of its own a site used its LOGO — with MatCMS's logo that is the whole word mark, unreadable at 16 px.
     // MatCMS's mark alone is the favicon then; a site with a logo of its own keeps using that, as before.
     public string FaviconUrl => Get(SettingKeys.FaviconUrl, UsesDefaultLogo ? "/img/favicon.svg" : LogoUrl);

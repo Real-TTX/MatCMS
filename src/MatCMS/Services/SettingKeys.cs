@@ -4,6 +4,8 @@ public static class SettingKeys
 {
     public const string SiteName = "SiteName";
     public const string LogoUrl = "LogoUrl";
+    /// <summary>The logo for the DARK back office (a light-text twin of <see cref="LogoUrl"/>); empty = the light logo is shown in both schemes.</summary>
+    public const string LogoDarkUrl = "LogoDarkUrl";
     public const string FaviconUrl = "FaviconUrl";
     public const string TopBarLink1Text = "TopBarLink1Text";
     public const string TopBarLink1Url = "TopBarLink1Url";
@@ -242,7 +244,7 @@ public static class SettingKeys
     // The constants remain for the one-time migration in DbSeeder.
     public static readonly string[] All =
     [
-        CanonicalUrl, BehindHttpsProxy, SiteName, LogoUrl, FaviconUrl,
+        CanonicalUrl, BehindHttpsProxy, SiteName, LogoUrl, LogoDarkUrl, FaviconUrl,
         FooterText, ContactRecipient, AntiSpamLevel, AdminBar, MembersSelfRegistration
     ];
 

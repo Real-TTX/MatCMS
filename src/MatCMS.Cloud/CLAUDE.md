@@ -260,7 +260,7 @@ show the result, not just the values.
 - The component preview borrows the theme of the template the profile activates
   (`CLOUD_PREVIEW_THEME`), so a block is judged in the design it will actually live in.
 - **Instance address** (`Instance.PreviewUrl`) feeds the two *Website öffnen* / *Verwaltung öffnen*
-  buttons in the topbar switcher (opened first-party in a NEW TAB — there is no iframe view any more,
+  buttons of the Cloud | Website | Admin switch in the bar (opened first-party — there is no iframe view any more,
   see below) and the switcher's live thumbnails. Two sources feed it, in order:
   the URL the instance reports, and — for a local instance — `Instance.LocalPort`, read from the
   container's published port. The second is flagged as guessed in the UI because it only resolves

@@ -1178,62 +1178,59 @@ html.mat-langm-lock { overflow: hidden; }
 @media (max-width: 560px) { .fc-d { font-size: 1.8rem; padding: 9px 6px; min-width: 20px; } .fc-c { font-size: 1.4rem; } }
 
 /* --- Admin bar over the live site (logged-in back-office admins) ------------------------------ */
-/* The admin bar over the LIVE site mirrors the back-office chrome: white bar, 67px (border inside the
-   border-box, so it matches .admin-topbar byte-for-byte), a GREY logo block on the left exactly like the
-   admin's sidebar/brand column, and icon actions on the right. Sticky in normal flow — pushes the site
-   down, never overlaps. */
-.mat-adminbar { position: sticky; top: 0; z-index: 2147483000; background: #fff;
-    height: 67px; box-sizing: border-box; border-bottom: 1px solid #e5e7eb; box-shadow: 0 1px 4px rgba(0,0,0,.04); }
-/* No horizontal padding: the grey brand block touches the left edge like the admin's 250px sidebar
-   column. The actions carry their own right padding. */
-.mat-adminbar-inner { display: flex; align-items: center; justify-content: space-between;
-    height: 100%; box-sizing: border-box; }
+/* The bar over the LIVE site is the back office's top bar (MatUi, compact): the menu's logo column on the left
+   (236px, the menu's ground), the view switch and the icon actions on the right. The public site does not load
+   matui.css (it would restyle the customer's template), so the few MatUi values it needs are set ON the bar as
+   its own variables — the same numbers as the tokens in lib/matui/matui.css. Always light: the site underneath
+   has no dark mode. Sticky in normal flow — pushes the site down, never overlaps. */
+.mat-adminbar {
+    --mab-h: 52px; --mab-nav-w: 236px;
+    --mab-bg: #f5f4f1; --mab-nav: #eeede9; --mab-line: rgba(31, 30, 27, .13); --mab-hover: #efeeea;
+    --mab-text: #1f1e1b; --mab-muted: #5d5b55; --mab-accent: #2563eb; --mab-accent-soft: rgba(37, 99, 235, .19);
+    --mab-accent-text: #1d4ed8; --mab-danger-bg: rgba(217, 45, 74, .10); --mab-danger: #b3203b;
+    position: sticky; top: 0; z-index: 2147483000; height: var(--mab-h); box-sizing: border-box;
+    background: var(--mab-bg); border-bottom: 1px solid var(--mab-line); color: var(--mab-text);
+    font: 400 14px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+/* No horizontal padding: the logo column touches the left edge like the back office's menu. The actions carry their own right padding. */
+.mat-adminbar-inner { display: flex; align-items: center; justify-content: space-between; height: 100%; box-sizing: border-box; }
 /* The site's OWN sticky header must stick BELOW the admin bar, not fight it for the same top:0. Offset =
-   the bar's full 67px height. Only when the bar renders. */
-body.has-adminbar .site-header { top: 67px; }
-/* Grey logo block, NO text — the same brand column the admin back-office shows (250px, #edeff2, right
-   border, 40px logo), so the live site and the admin look like one product. */
-.mab-brand { display: inline-flex; align-items: center; height: 100%; width: 250px; box-sizing: border-box;
-    padding: 0 14px; background: #edeff2; border-right: 1px solid #dfe1e6; text-decoration: none; flex: 0 0 auto; }
-/* Same sizing as the admin's .admin-logo — max-height + max-width:100% so it fits the block and never
-   collapses to 0 width (which a bare width:auto does inside an auto-width flex parent). */
-.mab-logo { max-height: 40px; max-width: 100%; width: auto; object-fit: contain; }
-.mab-right { display: inline-flex; align-items: center; gap: 4px; padding-right: 24px; flex: 0 0 auto; }
-/* Icon-only action buttons (edit page, zur Cloud, account, logout) — coloured by what they do, 34px. */
+   the bar's full height. Only when the bar renders. */
+body.has-adminbar .site-header { top: 52px; }
+/* The logo column, NO text — the same column the back office's menu shows, so the live site and the admin look like one product. */
+.mab-brand { display: inline-flex; align-items: center; height: 100%; width: var(--mab-nav-w); box-sizing: border-box;
+    padding: 0 14px; background: var(--mab-nav); border-right: 1px solid var(--mab-line); text-decoration: none; flex: 0 0 auto; }
+/* max-height + max-width:100% so it fits the column and never collapses to 0 width (which a bare width:auto does inside an auto-width flex parent). */
+.mab-logo { max-height: 34px; max-width: 100%; width: auto; object-fit: contain; }
+.mab-right { display: inline-flex; align-items: center; gap: 4px; padding-right: 20px; flex: 0 0 auto; }
+/* Icon-only actions (account, logout): MatUi's ghost icon buttons, 34px, muted until hovered. "Edit this page" is the
+   bar's main action and the one icon in the accent, filled (MatUi SHELL-17). */
 .mab-stool { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px;
-    border: 0; border-radius: 9px; background: transparent; cursor: pointer; font-size: 18px;
-    text-decoration: none; color: #374151; font-family: inherit; }
-.mab-stool:hover { background: #f0f2f5; }
-.mab-stool.mab-edit  { color: #2563eb; }
-.mab-stool.mab-cloud { color: #059669; }
-.mab-stool.mab-account { color: #7c3aed; }
-.mab-stool.mab-out   { color: #dc2626; margin-left: 6px; border-left: 1px solid #e5e7eb; border-radius: 0 9px 9px 0; width: 42px; }
-.mab-stool.mab-out:hover { background: #fee2e2; }
-/* Mobile: the grey block shrinks (logo scales down via max-width) and the switch segments narrow a touch,
-   so the whole row — logo, switch, zur-Cloud, account, logout — fits one line on a phone. */
+    border: 0; border-radius: 6px; background: transparent; cursor: pointer; font-size: 18px;
+    text-decoration: none; color: var(--mab-muted); font-family: inherit; transition: background .12s ease, color .12s ease; }
+.mab-stool:hover { background: var(--mab-hover); color: var(--mab-text); }
+.mab-stool.mab-edit { background: var(--mab-accent); color: #fff; margin-right: 4px; }
+.mab-stool.mab-edit:hover { background: color-mix(in oklab, var(--mab-accent) 86%, black); color: #fff; }
+.mab-stool.mab-out:hover { background: var(--mab-danger-bg); color: var(--mab-danger); }
+/* Mobile: the logo column shrinks (the logo scales down via max-width) and the switch segments narrow a touch,
+   so the whole row — logo, switch, account, logout — fits one line on a phone. */
 @media (max-width: 640px) {
-    .mab-brand { width: 130px; padding: 0 10px; }
+    .mab-brand { width: 120px; padding: 0 10px; }
     .mab-right { padding-right: 10px; gap: 2px; }
-    .mat-vs { width: 38px; }
+    .mat-vs { width: 36px; }
 }
 
-/* Cloud | Website | Admin — the ONE view switcher, shared across the cloud's instance view, the public
-   site's admin bar and the instance back-office (site.css is loaded on all three). A segmented control
-   34px high so it never grows the 67px bar; the current view is filled in its colour, the others show a
-   coloured icon and switch same-tab. `_ViewSwitch.cshtml` renders it. */
+/* Cloud | Website | Admin — the ONE view switcher, shared across the cloud's bar, the public site's admin bar and
+   the instance back-office (site.css is loaded on all three). MatUi's segmented control: 34px high, a hairline
+   around it, muted icons, the current view tinted in the accent (one colour, not one per view). `_ViewSwitch.cshtml`
+   renders it; inside the back office admin-matui.css takes the values from the tokens. */
 .mat-viewswitch { display: inline-flex; align-items: center; flex: 0 0 auto;
-    border: 1px solid #e5e7eb; border-radius: 9px; overflow: hidden; background: #fff; }
-.mat-vs { display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 34px;
-    border: 0; background: transparent; cursor: pointer; text-decoration: none; font-size: 18px; color: #6b7280; }
-.mat-vs + .mat-vs { border-left: 1px solid #e5e7eb; }
-.mat-vs:hover { background: #f6f7f9; }
-.mat-vs.vs-cloud { color: #059669; }
-.mat-vs.vs-web   { color: #2563eb; }
-.mat-vs.vs-admin { color: #7c3aed; }
-.mat-vs.is-active { color: #fff; }
-.mat-vs.is-active.vs-cloud { background: #059669; }
-.mat-vs.is-active.vs-web   { background: #2563eb; }
-.mat-vs.is-active.vs-admin { background: #7c3aed; }
+    border: 1px solid rgba(31, 30, 27, .13); border-radius: 6px; overflow: hidden; background: #fff; }
+.mat-vs { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 32px;
+    border: 0; background: transparent; cursor: pointer; text-decoration: none; font-size: 17px; color: #5d5b55; }
+.mat-vs + .mat-vs { border-left: 1px solid rgba(31, 30, 27, .13); }
+.mat-vs:hover { background: #efeeea; color: #1f1e1b; }
+.mat-vs.is-active { background: rgba(37, 99, 235, .19); color: #1d4ed8; }
 
 /* ============ Element blocks (editor v2: el-section, el-columns, el-heading …) ============
    A section is a band; inside it elements stack with an even gap. Colours come from the template's

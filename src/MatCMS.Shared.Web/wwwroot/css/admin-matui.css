@@ -118,13 +118,35 @@ body.admin--matui { display: block; height: auto; overflow: hidden; background: 
 
 /* The cloud: a page without the menu (admin-bare) is the bar and the page alone. */
 .mat-app.admin-bare { grid-template-columns: minmax(0, 1fr); }
-/* The cloud's instance switcher stands where the breadcrumb stands: the context, a slash, the page. */
-.admin--matui .inst-head { display: flex; align-items: center; gap: var(--mat-space-2); flex: 1 1 auto; min-width: 0; }
-.admin--matui .inst-head-sep { color: var(--mat-text-faint); flex: none; }
-.admin--matui .inst-head-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--mat-fs-sm); font-weight: 620; color: var(--mat-text); }
-.admin--matui .inst-picker-btn { height: var(--mat-control-h); min-width: 0; border-color: var(--mat-border-strong); border-radius: var(--mat-radius); font-family: var(--mat-font); font-size: var(--mat-fs-sm); }
-.admin--matui .inst-picker-btn:hover { background: var(--mat-surface-3); border-color: var(--mat-border-strong); }
-.admin--matui .inst-picker-name { font-size: var(--mat-fs-sm); }
+/* The cloud's context switcher is MatUi's menu switcher under the logo (SHELL-15). cloud.css sized it for the top
+   bar (36 px, 190-340 px wide, display font); in the menu it is the full-width two-line switcher. */
+:root[data-density="compact"] .admin--matui .mat-nav__switch { padding: 0 8px 6px; }
+.admin--matui .mat-nav .inst-ctx > .inst-picker { flex: 1 1 auto; }
+.admin--matui .mat-nav .inst-picker-btn { height: auto; min-height: var(--mat-control-h-lg); min-width: 0; max-width: none; width: 100%;
+  padding: 5px 8px; gap: 10px; border-color: var(--mat-border-strong); border-radius: var(--mat-radius);
+  font-family: var(--mat-font); font-size: var(--mat-fs-sm); font-weight: 400; }
+.admin--matui .mat-nav .inst-picker-btn:hover { border-color: var(--mat-text-faint); }
+.admin--matui .mat-nav .mat-switcher__icon .ti { font-size: 1.1rem; }
+.admin--matui .mat-nav .inst-picker-name { font-size: var(--mat-fs-sm); }
+/* The current site's picture in the switcher: its desktop page scaled into a 48x32 frame, its initial underneath
+   until it has loaded (and on a phone, where it is never loaded). */
+.admin--matui .inst-switch-shot { position: relative; width: 48px; height: 32px; overflow: hidden; border: 1px solid var(--mat-border); background: var(--mat-surface-3); }
+.admin--matui .inst-switch-shot .inst-picker-initial { font-weight: 650; font-size: var(--mat-fs-sm); }
+.admin--matui .inst-switch-shot iframe { position: absolute; top: 0; left: 0; width: 1180px; height: 787px; border: 0;
+  transform: scale(.0407); transform-origin: 0 0; pointer-events: none; opacity: 0; transition: opacity .2s ease; }
+.admin--matui .inst-switch-shot iframe.is-loaded { opacity: 1; }
+/* The list opens under the switcher and is wider than the menu: it reaches over the page. */
+.admin--matui .mat-nav .inst-picker-menu { width: 420px; max-width: calc(100vw - 24px); border-color: var(--mat-border-strong); border-radius: var(--mat-radius-lg); box-shadow: var(--mat-shadow-2); }
+.admin--matui .inst-picker-item { border-radius: var(--mat-radius); }
+.admin--matui .inst-picker-item:hover { background: var(--mat-surface-2); }
+.admin--matui .inst-picker-item.is-current { background: var(--mat-accent-soft); outline: 0; }
+.admin--matui .inst-picker-search { border-color: var(--mat-border-strong); border-radius: var(--mat-radius); }
+
+/* The live pictures of the sites in the cloud's tile views fill their tile: admin-shell.js sets --shot-scale from the
+   tile's width (the frame renders at desktop width and is scaled down; a fixed factor left a gap on wide screens). */
+.admin--matui .instance-tile-shot { height: auto; aspect-ratio: 16 / 10; }
+.admin--matui .instance-tile-shot iframe { transform: scale(var(--shot-scale, .28)); }
+.admin--matui .payload-tile-shot iframe { transform: scale(var(--shot-scale, .26)); }
 
 /* ---- 3b. The admin's components in MatUi's look ------------------------------------------------ */
 :is(.admin--matui, .login-matui) h1, :is(.admin--matui, .login-matui) h2, :is(.admin--matui, .login-matui) h3, :is(.admin--matui, .login-matui) h4 { font-family: var(--mat-font); font-weight: 650; letter-spacing: 0; color: var(--mat-text); }

@@ -461,7 +461,12 @@ admin's own classes (`.btn`, `.card`, `table.data`, `.tabs`, `.form-field`) in M
 classes. `matui.js` is NOT loaded yet: it handles `data-confirm` too, and with `mat-dialogs.js` every question would be asked
 twice — `js/admin-shell.js` does the shell (drawer, user menu, theme → `Account?handler=Theme`) until then. Icons stay Tabler
 (plugins name Tabler icons). The cloud's `_AdminLayout` is the same shell (groups Betrieb / Verwaltung); its instance
-switcher (`_ContextPicker`) stands where the breadcrumb stands, followed by `/ title`. The sign-in, 2FA, OAuth and error
+switcher (`_ContextPicker`) is MatUi's menu switcher under the logo (`mat-nav__switch` > `mat-switcher`), showing a small
+live picture of the CURRENT site (one frame, desktop only, after load — `context-picker.js`); the bar has the breadcrumb
+(cloud / site / page). The admin bar over the public site (`_AdminBar`, `.mat-adminbar` in site.css) has the same look with
+the MatUi values set as its OWN variables — the public site never loads matui.css (it would restyle the customer's template).
+Live site pictures in tile views (`.instance-tile-shot`, `.payload-tile-shot`) are scaled to the tile's real width by
+`admin-shell.js` (`--shot-scale`), never by a fixed factor. The sign-in, 2FA, OAuth and error
 pages (`body.login-page.login-matui`) are MatUi's auth card through the same bridge. A state is a tint behind the WHOLE item
 plus icon and words (MatUi COLOR-04/08) — never a coloured bar on one side: the bridge turns the old bars of the attention
 rows, the dashboard tiles and the assistant's steps into that; do not add a new one. The page editor v2 (own layout) is not moved yet.

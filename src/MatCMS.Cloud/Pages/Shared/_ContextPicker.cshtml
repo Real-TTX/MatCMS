@@ -14,11 +14,37 @@
     // The Cloud|Website|Admin switch is NOT here — it lives in the topbar's right side (_AdminLayout →
     // _ViewSwitch), so it reads the same as on the instance. This partial is just the instance PICKER.
 }
-<div class="inst-ctx">
+@{
+    // The switcher sits under the logo in the menu (MatUi's menu switcher, SHELL-15). For a site it shows that site:
+    // a small live picture, so the operator sees WHICH site is open, not only its name (they all look alike by name).
+    var curUrl = current?.PreviewUrl;
+    var curShot = current is not null && !string.IsNullOrWhiteSpace(curUrl)
+                  && !MatCMS.Cloud.Services.MixedContent.IsBlocked(ViewContext.HttpContext.Request.IsHttps, curUrl);
+}
+<div class="inst-ctx mat-nav__switch">
 <div class="inst-picker" data-inst-picker>
-    <button type="button" class="inst-picker-btn" data-inst-toggle aria-haspopup="listbox" aria-expanded="false">
-        <span class="inst-picker-name">@currentName</span>
-        <i class="ti ti-chevron-down inst-picker-caret" aria-hidden="true"></i>
+    <button type="button" class="mat-switcher inst-picker-btn" data-inst-toggle aria-haspopup="listbox" aria-expanded="false">
+        @if (current is null)
+        {
+            <span class="mat-switcher__icon"><i class="ti ti-cloud" aria-hidden="true"></i></span>
+        }
+        else
+        {
+            <span class="mat-switcher__icon inst-switch-shot">
+                <span class="inst-picker-initial">@((current.Name ?? "?").Trim().FirstOrDefault().ToString().ToUpperInvariant())</span>
+                @if (curShot)
+                {
+                    @* One frame, the current site's, filled after the page has loaded (context-picker.js) — never the whole list. *@
+                    <iframe data-src="@curUrl" title="@current.Name" tabindex="-1" scrolling="no" aria-hidden="true"
+                            referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts"></iframe>
+                }
+            </span>
+        }
+        <span class="mat-switcher__text">
+            <small>@(current is null ? T["instances.viewCloud"] : T["instances.viewWebsite"])</small>
+            <span class="mat-switcher__name inst-picker-name">@currentName</span>
+        </span>
+        <i class="ti ti-selector mat-switcher__chev" aria-hidden="true"></i>
     </button>
     <div class="inst-picker-menu" data-inst-menu hidden role="dialog" aria-label="@T["picker.title"]">
         @* On a phone the menu is a full-screen dialog: this head (title + close) only shows there. The search is

@@ -50,6 +50,20 @@
     });
     window.addEventListener('resize', closeMenu);
 
+    // --- live site pictures in tile views: the frame renders at desktop width (its CSS width) and is scaled to the
+    // tile's real width, so it fills the tile at every screen size instead of a fixed factor leaving a gap ---
+    var shots = document.querySelectorAll('.instance-tile-shot, .payload-tile-shot');
+    if (shots.length && 'ResizeObserver' in window) {
+        var fit = new ResizeObserver(function (entries) {
+            entries.forEach(function (e) {
+                var frame = e.target.querySelector('iframe');
+                if (!frame || !frame.offsetWidth) return;
+                e.target.style.setProperty('--shot-scale', (e.target.clientWidth / frame.offsetWidth).toFixed(4));
+            });
+        });
+        shots.forEach(function (s) { fit.observe(s); });
+    }
+
     // --- theme: system -> light -> dark, written on <html> at once and kept on the user ---
     var order = ['system', 'light', 'dark'];
     var themeBtn = document.querySelector('[data-admin-theme]');

@@ -53,6 +53,15 @@
     <script src="~/_content/MatCMS.Shared.Web/js/mat-dialogs.js" asp-append-version="true"></script>
 </head>
 <body class="admin admin--matui">
+    @{
+        // What you are looking at — the cloud itself or one of its sites. ViewData["InstanceId"] names the instance
+        // being viewed; absent means the cloud. The Cloud|Website|Admin switch in the bar goes to that instance through
+        // its SSO (same tab, auto-approved), so the operator lands signed in.
+        var currentInstanceId = ViewData["InstanceId"] as int?;
+        var vsInstance = currentInstanceId is int vsid
+            ? (await Switcher.InstancesAsync()).FirstOrDefault(i => i.Id == vsid) : null;
+        var vsUrl = vsInstance?.PreviewUrl?.Trim().TrimEnd('/');
+    }
     @* A page may drop the menu (admin-bare): it then has the bar alone. *@
     <div class="mat-app@(bare ? " admin-bare" : "")" data-admin-app>
     @if (!bare)
@@ -65,6 +74,9 @@
                 </a>
                 <button type="button" class="mat-btn mat-btn--ghost mat-btn--icon mat-nav__close" data-admin-close aria-label="@T["nav.menu"]"><i class="ti ti-x" aria-hidden="true"></i></button>
             </div>
+            @* The context switcher (MatUi's menu switcher, SHELL-15) under the logo, on every page: the cloud or one
+               of its sites, with a picture of each — the same question everywhere, answered in the same place. *@
+            <partial name="_ContextPicker" model="currentInstanceId" />
             @{ var isAdmin = User.IsInRole("Admin"); }
             <nav class="mat-nav__scroll admin-nav" aria-label="@T["nav.menu"]">
                 <ul class="mat-nav__list">
@@ -124,29 +136,29 @@
                 {
                     <button type="button" class="mat-burger" data-admin-toggle aria-label="@T["nav.menu"]" aria-controls="mat-nav" aria-expanded="false"><i class="ti ti-menu-2" aria-hidden="true"></i></button>
                 }
-                @* The context switcher, on every page. What you are looking at — the cloud itself or one
-                   of its sites — is the same question everywhere, so it is answered in the same place
-                   everywhere instead of only on the page that happens to embed a site. It stands where
-                   MatUi's breadcrumb stands: the context first, then the page.
-                   ViewData["InstanceId"] names the instance being viewed; absent means the cloud. *@
-                @{
-                    var currentInstanceId = ViewData["InstanceId"] as int?;
-                    // For the Cloud|Website|Admin switch on the right: the instance being viewed (if any) and
-                    // its address. Same-tab SSO links, so the operator lands logged in on the instance.
-                    var vsInstance = currentInstanceId is int vsid
-                        ? (await Switcher.InstancesAsync()).FirstOrDefault(i => i.Id == vsid) : null;
-                    var vsUrl = vsInstance?.PreviewUrl?.Trim().TrimEnd('/');
-                }
-                <div class="inst-head mat-crumbs">
-                    <partial name="_ContextPicker" model="currentInstanceId" />
-                    @if (ViewData["NoTopbarTitle"] is not true)
-                    {
-                        @* Left out where the switcher already names the thing — repeating it beside itself
-                           adds a line of header and no information. *@
-                        <span class="inst-head-sep" aria-hidden="true">/</span>
-                        <span class="inst-head-title" aria-current="page">@title</span>
-                    }
-                </div>
+                @* MatUi's breadcrumb: the cloud, the site being viewed (if any), the page. On a site's own page
+                   (NoTopbarTitle) the site's name IS the title. *@
+                <nav class="mat-crumbs" aria-label="Breadcrumb">
+                    <ol>
+                        <li class="mat-hide-sm"><a asp-page="/Admin/Index">@Cloud.CloudName</a></li>
+                        @if (vsInstance is not null)
+                        {
+                            if (ViewData["NoTopbarTitle"] is true)
+                            {
+                                <li aria-current="page">@vsInstance.Name</li>
+                            }
+                            else
+                            {
+                                <li><a asp-page="/Admin/Instances/Details" asp-route-id="@vsInstance.Id">@vsInstance.Name</a></li>
+                                <li aria-current="page">@title</li>
+                            }
+                        }
+                        else
+                        {
+                            <li aria-current="page">@title</li>
+                        }
+                    </ol>
+                </nav>
                 <div class="mat-topbar__actions">
                     @* The Cloud|Website|Admin switch appears only when an instance is the context (somewhere to switch TO);
                        "Cloud" is the active segment here. Web/Admin go through the instance's SSO (auto-approved).

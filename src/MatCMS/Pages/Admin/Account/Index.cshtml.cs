@@ -83,4 +83,15 @@ public class IndexModel : PageModel
         TempData["Flash"] = "Einstellung gespeichert.";
         return RedirectToPage();
     }
+
+    /// <summary>The theme button at the foot of the menu (system → light → dark): saves the colour scheme
+    /// alone, by fetch, and leaves the admin bar setting as it is (OnPostAppearance writes both).</summary>
+    public async Task<IActionResult> OnPostThemeAsync(string? theme)
+    {
+        var user = await CurrentUserAsync();
+        if (user is null) return Unauthorized();
+        user.Theme = theme is "dark" or "system" ? theme : null;
+        await _db.SaveChangesAsync();
+        return new NoContentResult();
+    }
 }

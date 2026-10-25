@@ -3,12 +3,13 @@
    Tabler icon ("ti-star"); anything else (older plugins brought an emoji) already got the neutral plugin icon
    in the registry — the back office shows no emojis. An entry is active on its own URL and below it.
    A plugin section with a menu of its own (the shop) is still ONE line here; opening it replaces the whole sidebar
-   with its menu (_AdminNavSub). *@
+   with its menu (_AdminNavSub). Markup is MatUi's menu (SHELL-02): an item is .mat-nav__item, the current one
+   is-active + aria-current, a count is .mat-nav__badge at the right end (SHELL-14). *@
 @model MatCMS.Plugin.AdminGroup
 @inject MatCMS.Services.AdminNav Nav
 @foreach (var entry in await Nav.GroupAsync(Model, Context.RequestServices, Context.RequestAborted))
 {
     var path = entry.Url.Split('?')[0];
     var active = path.StartsWith('/') && Context.Request.Path.StartsWithSegments(path, StringComparison.OrdinalIgnoreCase);
-    <a class="@(active ? "active" : "")" href="@entry.Url"><i class="ti @entry.Icon" aria-hidden="true"></i> @(entry.IsCore ? T[entry.Label].ToString() : entry.Label)@if (entry.Badge is not null) { <span class="nav-badge">@entry.Badge</span> }@if (entry.Links is { Count: > 0 }) { <i class="ti ti-chevron-right nav-more" aria-hidden="true"></i> }</a>
+    <li><a class="mat-nav__item@(active ? " is-active" : "")" href="@entry.Url" aria-current="@(active ? "page" : null)"><i class="ti @entry.Icon" aria-hidden="true"></i><span>@(entry.IsCore ? T[entry.Label].ToString() : entry.Label)</span>@if (entry.Badge is not null) { <span class="mat-nav__badge">@entry.Badge</span> }@if (entry.Links is { Count: > 0 }) { <i class="ti ti-chevron-right mat-nav__chev" aria-hidden="true"></i> }</a></li>
 }

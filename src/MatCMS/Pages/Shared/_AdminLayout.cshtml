@@ -34,158 +34,150 @@
     var cloudLink = string.IsNullOrEmpty(cloudUrl)
         ? null
         : (!string.IsNullOrEmpty(cloudId) ? $"{cloudUrl}/Admin/Instances/Open/{Uri.EscapeDataString(cloudId)}" : cloudUrl);
+    // MatUi's shell (SHELL-03): the user at the foot of the menu, opening a context menu; initials for the avatar.
+    var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "";
+    var initials = string.Concat(displayName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(w => char.ToUpperInvariant(w[0])));
+    var theme = Site.ThemeFor(User);
 }
 <!DOCTYPE html>
-<html lang="@currentCulture" data-dlg-ok="@T["dialog.ok"]" data-dlg-cancel="@T["action.cancel"]" data-theme="@Site.ThemeFor(User)">
+@* MatUi (MatDesign's toolkit, copied into MatCMS.Shared.Web/lib/matui, CODE-03): data-app picks the registered accent,
+   data-theme the user's scheme, data-density="compact" the tighter back-office spacing (admin-matui.css). *@
+<html lang="@currentCulture" data-app="matcms" data-theme="@theme" data-density="compact" data-dlg-ok="@T["dialog.ok"]" data-dlg-cancel="@T["action.cancel"]">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>@title – @Site.SiteName Admin</title>
-    <link href="/fonts/css2?family=Geologica:wght@@500;600;700&family=Inter:wght@@400;500;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/lib/tabler-icons/tabler-icons.min.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/lib/matui/matui.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/admin.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/admin-matui.css" asp-append-version="true" />
     <link rel="icon" href="@Site.FaviconUrl" />
     @* Own confirm/alert/prompt dialogs — loaded early, inline page scripts call MatDialog. *@
     <script src="~/_content/MatCMS.Shared.Web/js/mat-dialogs.js" asp-append-version="true"></script>
 </head>
-<body class="admin">
-    <aside class="admin-sidebar">
-        <div class="admin-brand">
-            <a class="admin-brand-link" asp-page="/Admin/Index" title="@Site.SiteName">
-                <img class="admin-logo" src="@Site.LogoUrl" alt="@Site.SiteName" />
-            </a>
-        </div>
-        <nav class="admin-nav">
-            @* Content, then design and configuration, then administration and system. Every line — the CMS's own
-               and the plugins' — comes from the AdminNav registry, ordered within its group. *@
-            @* Inside a plugin section that has a menu of its own (the shop), that menu replaces the main one, with a way back. *@
-            @{ var submenu = await Nav.SubmenuAsync(Context.Request.Path, Context.RequestServices, Context.RequestAborted); }
-            @if (submenu is not null)
-            {
-                @await Html.PartialAsync("_AdminNavSub", submenu)
-            }
-            else
-            {
-                @await Html.PartialAsync("_AdminNavGroup", MatCMS.Plugin.AdminGroup.Content)
-                <div class="admin-nav-sep" role="separator"></div>
-                @await Html.PartialAsync("_AdminNavGroup", MatCMS.Plugin.AdminGroup.Design)
-                <div class="admin-nav-sep" role="separator"></div>
-                @await Html.PartialAsync("_AdminNavGroup", MatCMS.Plugin.AdminGroup.System)
-                @if (Nav.HasPluginEntries(MatCMS.Plugin.AdminGroup.Plugins))
-                {
-                    <div class="admin-nav-plugins">
-                        @await Html.PartialAsync("_AdminNavGroup", MatCMS.Plugin.AdminGroup.Plugins)
-                    </div>
-                }
-            }
-        </nav>
-        <div class="admin-nav-foot">
-            <div class="admin-foot-actions">
-                <a class="admin-foot-btn admin-foot-icon" href="/" target="_blank" rel="noopener" title="@T["nav.viewSite"]" aria-label="@T["nav.viewSite"]"><i class="ti ti-world" aria-hidden="true"></i></a>
-                @if (cultures.Count > 1)
-                {
-                    <div class="admin-foot-lang" data-lang>
-                        <button type="button" class="admin-foot-btn" data-lang-toggle aria-haspopup="true" aria-expanded="false" title="@T["admin.language"]">@currentCulture.ToUpperInvariant()</button>
-                        <div class="admin-foot-lang-menu" data-lang-menu hidden>
-                            @foreach (var c in cultures)
-                            {
-                                var lc = _uiLang(c);
-                                <form method="post" action="/set-language">
-                                    <input type="hidden" name="returnUrl" value="@returnUrl" />
-                                    <input type="hidden" name="culture" value="@lc" />
-                                    <button type="submit" class="admin-lang-opt@(lc == currentCulture ? " is-current" : "")">@T["lang." + lc] <span class="muted mono">@lc.ToUpperInvariant()</span></button>
-                                </form>
-                            }
-                        </div>
-                    </div>
-                }
-                @* Persönliches Konto (Passwort, 2FA) ist eine Konto-Sache, kein Verwaltungsbereich —
-                   es sitzt bei den Session-Aktionen (neben Abmelden), nicht als eigener Menüpunkt. *@
-                <a class="admin-foot-btn admin-foot-icon" asp-page="/Admin/Account/Index" title="@T["nav.account"]" aria-label="@T["nav.account"]"><i class="ti ti-user-circle" aria-hidden="true"></i></a>
-                <form method="post" asp-page="/Logout" class="admin-foot-logout">
-                    <button type="submit" class="admin-foot-btn"><i class="ti ti-logout" aria-hidden="true"></i> @T["nav.logout"]</button>
-                </form>
+<body class="admin admin--matui">
+    <div class="mat-app" data-admin-app>
+        <aside class="mat-nav" id="mat-nav">
+            <div class="mat-nav__brand">
+                <a href="/admin" title="@Site.SiteName">
+                    <img class="admin-logo" src="@Site.LogoUrl" alt="@Site.SiteName" />
+                </a>
+                <button type="button" class="mat-btn mat-btn--ghost mat-btn--icon mat-nav__close" data-admin-close aria-label="@T["nav.menu"]"><i class="ti ti-x" aria-hidden="true"></i></button>
             </div>
-            <a class="admin-cms-foot" asp-page="/Admin/About/Index" title="@T["nav.about"]">
-                <span class="cms">MatCMS</span>
-                <span class="admin-version">v@(Version.Current)</span>
-            </a>
-        </div>
-    </aside>
-    <div class="admin-backdrop" data-admin-backdrop></div>
+            @* Content, then design and configuration, then administration and system. Every line — the CMS's own
+               and the plugins' — comes from the AdminNav registry, ordered within its group.
+               Inside a plugin section that has a menu of its own (the shop), that menu replaces the main one, with a way back. *@
+            <nav class="mat-nav__scroll admin-nav" aria-label="@T["nav.menu"]">
+                <ul class="mat-nav__list">
+                    @{ var submenu = await Nav.SubmenuAsync(Context.Request.Path, Context.RequestServices, Context.RequestAborted); }
+                    @if (submenu is not null)
+                    {
+                        @await Html.PartialAsync("_AdminNavSub", submenu)
+                    }
+                    else
+                    {
+                        <li class="mat-nav__group" role="presentation">@T["nav.groupContent"]</li>
+                        @await Html.PartialAsync("_AdminNavGroup", MatCMS.Plugin.AdminGroup.Content)
+                        <li class="mat-nav__group" role="presentation">@T["nav.groupDesign"]</li>
+                        @await Html.PartialAsync("_AdminNavGroup", MatCMS.Plugin.AdminGroup.Design)
+                        <li class="mat-nav__group" role="presentation">@T["nav.groupSystem"]</li>
+                        @await Html.PartialAsync("_AdminNavGroup", MatCMS.Plugin.AdminGroup.System)
+                        @if (Nav.HasPluginEntries(MatCMS.Plugin.AdminGroup.Plugins))
+                        {
+                            <li class="mat-nav__group" role="presentation">@T["nav.plugins"]</li>
+                            @await Html.PartialAsync("_AdminNavGroup", MatCMS.Plugin.AdminGroup.Plugins)
+                        }
+                    }
+                </ul>
+            </nav>
+            <div class="mat-nav__foot">
+                <div class="mat-nav__account">
+                    <button type="button" class="mat-user" data-admin-menu="admin-user-menu" aria-haspopup="menu" aria-expanded="false">
+                        <span class="mat-avatar" aria-hidden="true">@initials</span>
+                        <span class="mat-user__text">
+                            <span class="mat-user__name">@displayName</span>
+                            <span class="mat-user__role">@role</span>
+                        </span>
+                        <i class="ti ti-chevron-up mat-user__chev" aria-hidden="true"></i>
+                    </button>
+                    @* The 3-state theme button (SHELL-04): system → light → dark, kept on the user (Account?handler=Theme). *@
+                    <button type="button" class="mat-theme" data-admin-theme data-theme-state="@theme"
+                            data-save="@Url.Page("/Admin/Account/Index", "Theme")"
+                            data-names="@T["account.themeSystem"]|@T["account.themeLight"]|@T["account.themeDark"]"
+                            title="@T["account.theme"]" aria-label="@T["account.theme"]">
+                        <i class="ti ti-device-desktop" data-theme-icon="system" aria-hidden="true"></i>
+                        <i class="ti ti-sun" data-theme-icon="light" aria-hidden="true"></i>
+                        <i class="ti ti-moon" data-theme-icon="dark" aria-hidden="true"></i>
+                    </button>
+                </div>
+                <a class="mat-nav__version" asp-page="/Admin/About/Index" title="@T["nav.about"]">MatCMS v@(Version.Current)</a>
+            </div>
+        </aside>
+        <div class="mat-backdrop" data-admin-close></div>
 
-    <div class="admin-main">
-        <header class="admin-topbar">
-            <button type="button" class="admin-menu-toggle" data-admin-toggle aria-label="@T["nav.menu"]" aria-expanded="false">
-                <span></span><span></span><span></span>
-            </button>
-            <div class="admin-topbar-title">@title</div>
-            <div class="admin-topbar-right">
-                @* One control language everywhere: the Cloud | Website | Admin switch ("Admin" active here,
-                   Cloud is a SEGMENT of the switch — not a separate button — so its place never shifts),
-                   then account + logout, always top-right in the same spot. *@
-                <div class="admin-topbar-tools">
+        <div class="mat-main">
+            <header class="mat-topbar">
+                <button type="button" class="mat-burger" data-admin-toggle aria-label="@T["nav.menu"]" aria-controls="mat-nav" aria-expanded="false"><i class="ti ti-menu-2" aria-hidden="true"></i></button>
+                <nav class="mat-crumbs" aria-label="Breadcrumb">
+                    <ol>
+                        <li class="mat-hide-sm"><a href="/admin">@Site.SiteName</a></li>
+                        <li aria-current="page">@title</li>
+                    </ol>
+                </nav>
+                @* The Cloud | Website | Admin switch stays in the bar (the one way between the three views);
+                   account and sign-out moved into the user menu at the foot of the sidebar (SHELL-03). *@
+                <div class="mat-topbar__actions">
                     <partial name="_ViewSwitch" model="@(new MatCMS.Shared.Web.ViewSwitch(
                         Active: "admin",
                         CloudUrl: cloudLink, WebUrl: "/", AdminUrl: null,
                         CloudLabel: T["adminbar.viewCloud"], WebLabel: T["adminbar.viewWebsite"], AdminLabel: T["adminbar.viewAdmin"]))" />
-                    <a class="mab-stool mab-account" asp-page="/Admin/Account/Index" title="@T["nav.account"]" aria-label="@T["nav.account"]"><i class="ti ti-user-circle" aria-hidden="true"></i></a>
-                    <form method="post" asp-page="/Logout" style="margin:0;">
-                        <button type="submit" class="mab-stool mab-out" title="@T["nav.logout"]" aria-label="@T["nav.logout"]"><i class="ti ti-logout-2" aria-hidden="true"></i></button>
-                    </form>
                 </div>
-            </div>
-        </header>
+            </header>
 
-        <main class="admin-content">
-            @if (TempData["Flash"] is string flash && !string.IsNullOrWhiteSpace(flash))
-            {
-                <div class="alert alert-success">@flash</div>
-            }
-            @if (TempData["FlashError"] is string flashError && !string.IsNullOrWhiteSpace(flashError))
-            {
-                <div class="alert alert-error">@flashError</div>
-            }
-            @RenderBody()
-        </main>
+            <main class="mat-page mat-page--wide admin-content" id="main">
+                @if (TempData["Flash"] is string flash && !string.IsNullOrWhiteSpace(flash))
+                {
+                    <div class="alert alert-success">@flash</div>
+                }
+                @if (TempData["FlashError"] is string flashError && !string.IsNullOrWhiteSpace(flashError))
+                {
+                    <div class="alert alert-error">@flashError</div>
+                }
+                @RenderBody()
+            </main>
+        </div>
     </div>
 
-    <script>
-        // Mobile admin menu: off-canvas drawer toggle.
-        (function () {
-            var body = document.body;
-            var toggle = document.querySelector('[data-admin-toggle]');
-            var backdrop = document.querySelector('[data-admin-backdrop]');
-            function setOpen(open) {
-                body.classList.toggle('nav-open', open);
-                if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    @* The user's context menu (SHELL-03): account, the website, the admin language, sign out last. *@
+    <div class="mat-menu" id="admin-user-menu" role="menu" aria-label="@displayName" hidden>
+        <div class="mat-menu__head">
+            <span class="mat-avatar" aria-hidden="true">@initials</span>
+            <div><strong>@displayName</strong><small>@role</small></div>
+        </div>
+        <a class="mat-menu__item" role="menuitem" asp-page="/Admin/Account/Index"><i class="ti ti-user-circle" aria-hidden="true"></i><span>@T["nav.account"]</span></a>
+        <a class="mat-menu__item" role="menuitem" href="/" target="_blank" rel="noopener"><i class="ti ti-world" aria-hidden="true"></i><span>@T["nav.viewSite"]</span></a>
+        @if (cultures.Count > 1)
+        {
+            <div class="mat-menu__sep" role="separator"></div>
+            @foreach (var c in cultures)
+            {
+                var lc = _uiLang(c);
+                <form method="post" action="/set-language" class="mat-menu__form">
+                    <input type="hidden" name="returnUrl" value="@returnUrl" />
+                    <input type="hidden" name="culture" value="@lc" />
+                    <button type="submit" class="mat-menu__item" role="menuitemradio" aria-checked="@(lc == currentCulture ? "true" : "false")"><i class="ti @(lc == currentCulture ? "ti-check" : "ti-language")" aria-hidden="true"></i><span>@T["lang." + lc]</span></button>
+                </form>
             }
-            if (toggle) toggle.addEventListener('click', function () { setOpen(!body.classList.contains('nav-open')); });
-            if (backdrop) backdrop.addEventListener('click', function () { setOpen(false); });
-            // Close when a nav link is followed.
-            document.querySelectorAll('.admin-sidebar a').forEach(function (a) {
-                a.addEventListener('click', function () { setOpen(false); });
-            });
-            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') setOpen(false); });
-        })();
+        }
+        <div class="mat-menu__sep" role="separator"></div>
+        <form method="post" asp-page="/Logout" class="mat-menu__form">
+            <button type="submit" class="mat-menu__item mat-menu__item--danger" role="menuitem"><i class="ti ti-logout" aria-hidden="true"></i><span>@T["nav.logout"]</span></button>
+        </form>
+    </div>
+    @Html.AntiForgeryToken()
 
-        // Language dropdown in the sidebar footer (the "EN"/"DE" button).
-        (function () {
-            var wrap = document.querySelector('[data-lang]');
-            if (!wrap) return;
-            var btn = wrap.querySelector('[data-lang-toggle]');
-            var menu = wrap.querySelector('[data-lang-menu]');
-            function close() { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); }
-            btn.addEventListener('click', function (e) {
-                e.stopPropagation();
-                var open = menu.hidden;
-                menu.hidden = !open; btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-            });
-            document.addEventListener('click', function (e) { if (!wrap.contains(e.target)) close(); });
-            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
-        })();
-    </script>
+    <script src="~/_content/MatCMS.Shared.Web/js/admin-shell.js" asp-append-version="true"></script>
     <script src="~/js/media-picker.js" asp-append-version="true"></script>
     <script src="~/_content/MatCMS.Shared.Web/js/ui-fields.js" asp-append-version="true"></script>
     <script src="~/_content/MatCMS.Shared.Web/js/admin-list.js" asp-append-version="true"></script>

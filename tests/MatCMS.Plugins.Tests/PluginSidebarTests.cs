@@ -143,7 +143,7 @@ public class ShopSidebarTests : IClassFixture<AppFactory>, IAsyncLifetime
 
     private static string Sidebar(string html)
     {
-        var side = html[html.IndexOf("<nav class=\"admin-nav\"", StringComparison.Ordinal)..];
+        var side = html[html.IndexOf("<nav class=\"mat-nav__scroll admin-nav\"", StringComparison.Ordinal)..];
         return side[..side.IndexOf("</nav>", StringComparison.Ordinal)];
     }
 
@@ -162,14 +162,14 @@ public class ShopSidebarTests : IClassFixture<AppFactory>, IAsyncLifetime
         foreach (var page in new[] { "", "/dashboard", "/orders", "/products", "/categories", "/customers", "/shipping", "/_settings?group=set.groupStripe" })
         {
             var inside = Sidebar(Decode(await admin.GetStringAsync("/admin/p/shop" + page)));
-            Assert.Contains("<a class=\"admin-nav-back\" href=\"/admin\"", inside);
+            Assert.Contains("<a class=\"mat-nav__item admin-nav-back\" href=\"/admin\"", inside);
             Assert.Contains("admin-nav-section", inside);
             foreach (var path in new[] { "dashboard", "orders", "products", "categories", "customers", "shipping", "_settings" })
                 Assert.Contains($"href=\"/admin/p/shop/{path}", inside);
             Assert.DoesNotContain("href=\"/admin/pages\"", inside);                                // the main menu is not drawn next to it
         }
-        Assert.Contains("<a class=\"active\" href=\"/admin/p/shop/dashboard\"", Sidebar(Decode(await admin.GetStringAsync("/admin/p/shop"))));   // the shop's start page is its dashboard
-        Assert.Contains("<a class=\"active\" href=\"/admin/p/shop/orders\"", Sidebar(Decode(await admin.GetStringAsync("/admin/p/shop/orders"))));
+        Assert.Contains("<a class=\"mat-nav__item is-active\" href=\"/admin/p/shop/dashboard\"", Sidebar(Decode(await admin.GetStringAsync("/admin/p/shop"))));   // the shop's start page is its dashboard
+        Assert.Contains("<a class=\"mat-nav__item is-active\" href=\"/admin/p/shop/orders\"", Sidebar(Decode(await admin.GetStringAsync("/admin/p/shop/orders"))));
 
         var dash = Decode(await admin.GetStringAsync("/admin/p/shop"));
         Assert.Contains("Zu versenden", dash); Assert.Contains("Umsatz, 30 Tage", dash); Assert.Contains("Letzte Bestellungen", dash);
@@ -186,7 +186,7 @@ public class ShopSidebarTests : IClassFixture<AppFactory>, IAsyncLifetime
         foreach (var page in new[] { "shipping", "payment", "coupons", "taxes", "legal", "numbers" })
         {
             var html = Decode(await admin.GetStringAsync("/admin/p/shop/" + page));
-            Assert.Contains("<a class=\"active\" href=\"/admin/p/shop/shipping\"", Sidebar(html));
+            Assert.Contains("<a class=\"mat-nav__item is-active\" href=\"/admin/p/shop/shipping\"", Sidebar(html));
             var sub = html[html.IndexOf("class=\"ui-subnav\"", StringComparison.Ordinal)..];
             sub = sub[..sub.IndexOf("</nav>", StringComparison.Ordinal)];
             Assert.Equal(6, Count(sub, "<a href="));

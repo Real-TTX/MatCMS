@@ -1,0 +1,192 @@
+/* ==========================================================================
+   The back office on MatUi — the bridge between MatCMS's admin classes and MatDesign's toolkit.
+
+   Loaded LAST, after lib/matui/matui.css, site.css and admin.css. Three layers:
+   1. Density "compact" (data-density on <html>): a back office with ~20 menu entries and dense forms
+      needs less air than MatUi's default. Written the way it would sit in MatUi's own tokens (an
+      opt-in attribute on <html> like data-theme and data-scheme; heights under 44 px only for a fine
+      pointer, never under 32 px — MOBILE-04), so it can move upstream unchanged.
+   2. The token bridge: every variable admin.css and site.css colour with (--surface, --line, --ink,
+      --accent, the --ok/err/info/warn tints …) now READS a MatUi token. Light, dark and system come
+      from matui.tokens.css; the dark set of admin.css is overridden, not needed any more.
+   3. The admin's own components in MatUi's look (sentence case, radius, control heights, flat
+      borders) until the pages are moved onto mat-* classes one by one.
+   The public site never loads this file.
+   ========================================================================== */
+
+/* ---- 1. Density: compact ---------------------------------------------------------------------- */
+:root[data-density="compact"] {
+  --mat-nav-w: 236px;
+  --mat-topbar-h: 52px;
+  --mat-content-pad: clamp(16px, 2.4vw, 28px);
+  --mat-fs-md: .875rem;                        /* 14 px body text */
+}
+@media (pointer: fine) {
+  :root[data-density="compact"] {
+    --mat-control-h: 34px;
+    --mat-control-h-lg: 40px;
+    --mat-nav-item-height: 32px;
+    --mat-nav-item-gap: 10px;
+    --mat-nav-item-pad-x: 10px;
+    --mat-table-pad-y: 9px;
+    --mat-table-pad-x: 14px;
+  }
+}
+/* No property for these yet (upstream they would become --mat-nav-group-pad-* / --mat-nav-brand-pad). */
+:root[data-density="compact"] .mat-nav__brand { padding: 14px 14px 10px; }
+:root[data-density="compact"] .mat-nav__scroll { padding: 0 8px 8px; }
+:root[data-density="compact"] .mat-nav__group { padding: 14px 10px 4px; font-size: var(--mat-fs-xs); }
+:root[data-density="compact"] .mat-nav__list > li:first-child.mat-nav__group { padding-top: 4px; }
+:root[data-density="compact"] .mat-nav__foot { padding: 8px 8px calc(8px + var(--mat-safe-bottom)); gap: 4px; }
+:root[data-density="compact"] .mat-user { min-height: var(--mat-control-h); padding: 4px 8px; gap: 10px; }
+:root[data-density="compact"] .mat-avatar { width: 28px; height: 28px; font-size: var(--mat-fs-xs); }
+:root[data-density="compact"] .mat-page { padding-top: var(--mat-space-5); }
+
+/* ---- 2. Token bridge: MatCMS's variables read MatUi's ----------------------------------------- */
+/* html[data-theme] is the selector admin.css writes its light and dark sets with; this file comes later, so it wins in
+   every mode, and the values follow the mode by themselves because the --mat-* tokens do. */
+html[data-theme],
+html[data-theme="dark"] {
+  --black: var(--mat-text);
+  --ink: var(--mat-text);
+  --muted: var(--mat-text-muted);
+  --line: var(--mat-border);
+  --bg: var(--mat-surface);
+  --bg-alt: var(--mat-bg);
+  --accent: var(--mat-accent);
+  --accent-dark: var(--mat-accent-hover);
+  --surface: var(--mat-surface);
+  --surface-2: var(--mat-surface-2);
+  --sidebar: var(--mat-nav-bg);
+  --hover: var(--mat-surface-3);
+  --border-strong: var(--mat-border-strong);
+  --text-2: var(--mat-text);
+  --text-muted: var(--mat-text-muted);
+  --on-ink: var(--mat-surface);
+  --ok-bg: var(--mat-success-bg); --ok-fg: var(--mat-success-text); --ok-line: color-mix(in srgb, var(--mat-success) 35%, transparent);
+  --err-bg: var(--mat-danger-bg); --err-fg: var(--mat-danger-text); --err-line: color-mix(in srgb, var(--mat-danger) 35%, transparent);
+  --info-bg: var(--mat-info-bg); --info-fg: var(--mat-info-text); --info-line: color-mix(in srgb, var(--mat-info) 35%, transparent);
+  --warn-bg: var(--mat-warning-bg); --warn-fg: var(--mat-warning-text); --warn-line: color-mix(in srgb, var(--mat-warning) 35%, transparent);
+  --font-body: var(--mat-font);
+  --font-head: var(--mat-font);
+}
+@media (prefers-color-scheme: dark) {
+  html[data-theme="system"] {
+    --black: var(--mat-text); --ink: var(--mat-text); --muted: var(--mat-text-muted); --line: var(--mat-border);
+    --bg: var(--mat-surface); --bg-alt: var(--mat-bg); --surface: var(--mat-surface); --surface-2: var(--mat-surface-2);
+    --sidebar: var(--mat-nav-bg); --hover: var(--mat-surface-3); --border-strong: var(--mat-border-strong);
+    --text-2: var(--mat-text); --text-muted: var(--mat-text-muted); --on-ink: var(--mat-surface);
+    --ok-bg: var(--mat-success-bg); --ok-fg: var(--mat-success-text); --ok-line: color-mix(in srgb, var(--mat-success) 35%, transparent);
+    --err-bg: var(--mat-danger-bg); --err-fg: var(--mat-danger-text); --err-line: color-mix(in srgb, var(--mat-danger) 35%, transparent);
+    --info-bg: var(--mat-info-bg); --info-fg: var(--mat-info-text); --info-line: color-mix(in srgb, var(--mat-info) 35%, transparent);
+    --warn-bg: var(--mat-warning-bg); --warn-fg: var(--mat-warning-text); --warn-line: color-mix(in srgb, var(--mat-warning) 35%, transparent);
+  }
+}
+
+/* ---- 3a. The shell ---------------------------------------------------------------------------- */
+/* body.admin was the grid of the old shell; the grid is .mat-app now. body keeps .admin for the page rules scoped to it. */
+body.admin--matui { display: block; height: auto; overflow: hidden; background: var(--mat-bg); font-family: var(--mat-font); font-size: var(--mat-fs-md); line-height: var(--mat-lh); color: var(--mat-text); }
+.admin--matui .mat-nav__brand > a { flex: 1 1 auto; min-width: 0; }
+/* A fixed height and a cap on the width: an SVG logo without a size of its own collapsed to nothing in the flex row. */
+.admin--matui .admin-logo { display: block; height: 34px; width: auto; max-width: 190px; object-fit: contain; object-position: left center; }
+/* Tabler glyphs where MatUi has its sprite (plugins name Tabler icons): the same box and colour as .mat-icon. */
+.admin--matui .mat-nav__item > .ti:first-child { flex: none; width: 1.25em; font-size: 1.1rem; text-align: center; color: var(--mat-text-muted); }
+.admin--matui .mat-nav__item.is-active > .ti:first-child { color: var(--mat-accent-text); }
+.admin--matui .mat-nav__item > span:not(.mat-nav__badge) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin--matui .mat-nav__chev { margin-left: auto; }
+.admin--matui .mat-nav__badge + .mat-nav__chev { margin-left: var(--mat-space-2); }
+.admin--matui .admin-nav-back { color: var(--mat-text-muted); }
+.admin--matui .admin-nav-section { display: flex; align-items: center; gap: var(--mat-space-2); color: var(--mat-text); font-size: var(--mat-fs-sm); }
+.admin--matui .admin-nav-section .ti { color: var(--mat-accent-text); font-size: 1.1rem; }
+.admin--matui .mat-theme .ti { font-size: 1.15rem; }
+.admin--matui .mat-nav__version { color: var(--mat-text-muted); text-decoration: none; padding: 0 var(--mat-space-2); }
+.admin--matui .mat-nav__version:hover { color: var(--mat-accent-text); }
+.admin--matui .mat-menu .ti { font-size: 1.1rem; color: var(--mat-text-muted); }
+.admin--matui .mat-menu__item--danger .ti { color: inherit; }
+.admin--matui .mat-menu__head small { display: block; color: var(--mat-text-muted); font-size: var(--mat-fs-xs); }
+.admin--matui .mat-burger .ti { font-size: 1.35rem; }
+.admin--matui .mat-nav__close .ti { font-size: 1.2rem; }
+/* The page: block flow (the admin's pages space themselves with margins, MatUi's flex gap would add to them). */
+.admin--matui .mat-page.admin-content { display: block; max-width: none; padding-top: var(--mat-space-6); }
+:root[data-density="compact"] .admin--matui .mat-page.admin-content { padding-top: var(--mat-space-5); }
+/* The Cloud | Website | Admin switch: a quiet segmented control in MatUi's colours. */
+.admin--matui .mat-viewswitch { border: 1px solid var(--mat-border); border-radius: var(--mat-radius); background: var(--mat-surface); overflow: hidden; }
+.admin--matui .mat-vs { height: calc(var(--mat-control-h) - 2px); width: var(--mat-control-h); color: var(--mat-text-muted); }
+.admin--matui .mat-vs + .mat-vs { border-left: 1px solid var(--mat-border); }
+.admin--matui .mat-vs:hover { background: var(--mat-surface-3); color: var(--mat-text); }
+.admin--matui .mat-vs.is-active { background: var(--mat-accent-soft-strong); color: var(--mat-accent-text); }
+
+/* ---- 3b. The admin's components in MatUi's look ------------------------------------------------ */
+.admin--matui h1, .admin--matui h2, .admin--matui h3, .admin--matui h4 { font-family: var(--mat-font); font-weight: 650; letter-spacing: 0; color: var(--mat-text); }
+/* Links of the page in the accent; the menu, buttons and the switch keep their own colours. */
+.admin--matui .mat-page a:not([class]) { color: var(--mat-accent-text); }
+.admin--matui .muted { color: var(--mat-text-muted); }
+
+/* Buttons = .mat-btn (primary), .btn-ghost = --secondary, .btn-danger = --danger */
+.admin--matui .btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--mat-space-2);
+  min-height: var(--mat-btn-height, var(--mat-control-h)); padding: 0 var(--mat-btn-pad-x, var(--mat-space-4));
+  border: 1px solid transparent; border-radius: var(--mat-btn-radius, var(--mat-radius));
+  background: var(--mat-accent); color: var(--mat-on-accent);
+  font-family: var(--mat-font); font-size: var(--mat-fs-sm); font-weight: 600; letter-spacing: 0; text-transform: none; line-height: 1;
+  transition: background var(--mat-dur-fast) var(--mat-ease), border-color var(--mat-dur-fast) var(--mat-ease), color var(--mat-dur-fast) var(--mat-ease);
+}
+.admin--matui .btn:hover { background: var(--mat-accent-hover); border-color: transparent; color: var(--mat-on-accent); text-decoration: none; }
+.admin--matui .btn-ghost, .admin--matui .btn-outline { background: var(--mat-surface); border-color: var(--mat-border-strong); color: var(--mat-text); }
+.admin--matui .btn-ghost:hover, .admin--matui .btn-outline:hover { background: var(--mat-surface-3); border-color: var(--mat-border-strong); color: var(--mat-text); }
+.admin--matui .btn-danger { background: var(--mat-surface); border-color: color-mix(in srgb, var(--mat-danger) 45%, transparent); color: var(--mat-danger-text); }
+.admin--matui .btn-danger:hover { background: var(--mat-danger-bg); border-color: var(--mat-danger); color: var(--mat-danger-text); }
+.admin--matui .btn-sm { min-height: var(--mat-control-h-sm); padding: 0 var(--mat-space-3); font-size: var(--mat-fs-sm); }
+.admin--matui .btn-icon { width: var(--mat-control-h); min-height: var(--mat-control-h); height: var(--mat-control-h); padding: 0; }
+.admin--matui .btn-icon.btn-sm { width: var(--mat-control-h-sm); min-height: var(--mat-control-h-sm); height: var(--mat-control-h-sm); }
+.admin--matui .btn:focus-visible { outline: none; box-shadow: var(--mat-focus-ring); }
+
+/* Cards, tiles, alerts: a surface with a hairline and MatUi's radius, no shadow beyond --mat-shadow-1 */
+.admin--matui .card { border: 1px solid var(--mat-border); border-radius: var(--mat-card-radius, var(--mat-radius-lg)); box-shadow: var(--mat-shadow-1); padding: var(--mat-space-5); margin-bottom: var(--mat-space-5); }
+.admin--matui .card h2 { font-size: var(--mat-fs-lg); margin-bottom: var(--mat-space-3); }
+.admin--matui .stat { border: 1px solid var(--mat-border); border-radius: var(--mat-radius-lg); padding: var(--mat-space-4); box-shadow: var(--mat-shadow-1); }
+.admin--matui .stat .n { font-family: var(--mat-font); font-size: var(--mat-fs-2xl); font-weight: 650; line-height: 1.1; }
+.admin--matui .stat .l { font-size: var(--mat-fs-sm); text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--mat-text-muted); }
+.admin--matui .stat.is-warn { border-top: 1px solid var(--mat-border); box-shadow: inset 0 3px 0 var(--mat-warning); }
+.admin--matui .stat.is-err { border-top: 1px solid var(--mat-border); box-shadow: inset 0 3px 0 var(--mat-danger); }
+.admin--matui .alert { border-radius: var(--mat-radius); font-size: var(--mat-fs-md); padding: var(--mat-space-3) var(--mat-space-4); margin-bottom: var(--mat-space-5); }
+
+/* Tables = .mat-table inside a card-like frame */
+.admin--matui table.data { font-size: var(--mat-table-font-size, var(--mat-fs-sm)); border: 1px solid var(--mat-border); border-radius: var(--mat-radius-lg); border-collapse: separate; border-spacing: 0; overflow: hidden; }
+.admin--matui table.data th, .admin--matui table.data td { padding: var(--mat-table-pad-y, var(--mat-space-3)) var(--mat-table-pad-x, var(--mat-space-4)); font-size: inherit; }
+.admin--matui table.data th { text-transform: none; letter-spacing: 0; font-weight: 600; font-size: var(--mat-fs-sm); color: var(--mat-text-muted); background: var(--mat-surface-2); }
+.admin--matui table.data tbody tr:hover { background: var(--mat-surface-2); }
+.admin--matui .card table.data { border: 0; border-radius: 0; }
+
+/* The framed list toolbar = MatUi's toolbar (LIST-02): a card-like bar above the list. */
+.admin--matui [data-list] .page-head .list-toolbar { border-radius: var(--mat-radius-lg); padding: var(--mat-space-2) var(--mat-space-3); box-shadow: var(--mat-shadow-1); }
+.admin--matui .list-search { min-height: var(--mat-control-h); height: var(--mat-control-h); }
+
+/* Tabs = .mat-tabs */
+.admin--matui .tabs { box-shadow: none; border-bottom: 1px solid var(--mat-border); gap: var(--mat-space-1); margin-bottom: var(--mat-space-5); }
+.admin--matui .tab { font-size: var(--mat-fs-sm); padding: 0 var(--mat-space-3); min-height: var(--mat-control-h); color: var(--mat-text-muted); margin-bottom: -1px; }
+.admin--matui .tab:hover { color: var(--mat-text); }
+.admin--matui .tab.active { color: var(--mat-accent-text); border-bottom-color: var(--mat-accent); }
+
+/* Badges = MatUi pills */
+.admin--matui .badge { font-size: var(--mat-fs-xs); font-weight: 600; letter-spacing: 0; padding: 2px 8px; }
+
+/* Fields = .mat-field / .mat-label / .mat-input */
+.admin--matui .form-field { margin-bottom: var(--mat-space-4); }
+.admin--matui .form-field label { text-transform: none; letter-spacing: 0; font-size: var(--mat-fs-sm); font-weight: 600; color: var(--mat-text); margin-bottom: var(--mat-space-1); }
+html[data-theme] .admin--matui .form-field .mat-input,
+html[data-theme] .admin--matui .form-field input:not([type=checkbox]):not([type=radio]):not([type=hidden]),
+html[data-theme] .admin--matui .form-field select,
+html[data-theme] .admin--matui .form-field textarea,
+.admin--matui .list-search {
+  min-height: var(--mat-input-height, var(--mat-control-h)); height: auto; padding: 6px var(--mat-input-pad-x, var(--mat-space-3));
+  border: 1px solid var(--mat-border-strong); border-radius: var(--mat-input-radius, var(--mat-radius));
+  background: var(--mat-surface); color: var(--mat-text); font-size: var(--mat-fs-md);
+}
+html[data-theme] .admin--matui .form-field textarea { padding-top: var(--mat-space-2); line-height: var(--mat-lh); }
+html[data-theme] .admin--matui .form-field .mat-input:focus,
+html[data-theme] .admin--matui .form-field input:not([type=checkbox]):not([type=radio]):not([type=hidden]):focus,
+html[data-theme] .admin--matui .form-field select:focus,
+html[data-theme] .admin--matui .form-field textarea:focus,
+.admin--matui .list-search:focus { border-color: var(--mat-accent); box-shadow: var(--mat-focus-ring); outline: none; }
+.admin--matui input[type=checkbox], .admin--matui input[type=radio] { accent-color: var(--mat-accent); }

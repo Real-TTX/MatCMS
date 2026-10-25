@@ -480,6 +480,8 @@
   "instances.outcome.skipped-once": "nur einmalig",
   "instances.outcome.failed": "fehlgeschlagen",
   "nav.settings": "Einstellungen",
+  "nav.groupOperations": "Betrieb",
+  "nav.groupSystem": "Verwaltung",
   "nav.users": "Benutzer",
   "nav.apikeys": "API-Schlüssel",
   "nav.logs": "Protokoll",

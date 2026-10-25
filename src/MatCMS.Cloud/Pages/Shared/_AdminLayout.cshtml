@@ -10,15 +10,18 @@
 }
 @{
     var title = ViewData["Title"] as string ?? "Admin";
+    // An item of MatUi's menu is current with is-active (+ aria-current, written by Item below).
     string Active(string path) =>
-        Context.Request.Path.StartsWithSegments(path, StringComparison.OrdinalIgnoreCase) ? "active" : "";
+        Context.Request.Path.StartsWithSegments(path, StringComparison.OrdinalIgnoreCase) ? "is-active" : "";
     // "Neue Instanz" is reached from Hosting and belongs to it; the rest of /admin/instances is "Instanzen".
     string ActiveInstances() =>
         ActiveExact("/admin/instances/new") != "" ? "" : Active("/admin/instances") + Active("/admin/cleanup");
     string ActiveHosting() => Active("/admin/hosting") + ActiveExact("/admin/instances/new");
     string ActiveExact(params string[] paths) =>
-        paths.Any(p => string.Equals(Context.Request.Path.Value?.TrimEnd('/'), p, StringComparison.OrdinalIgnoreCase)) ? "active" : "";
+        paths.Any(p => string.Equals(Context.Request.Path.Value?.TrimEnd('/'), p, StringComparison.OrdinalIgnoreCase)) ? "is-active" : "";
     var displayName = User.FindFirst("DisplayName")?.Value ?? User.Identity?.Name ?? "Admin";
+    var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "";
+    var initials = string.Concat(displayName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(w => char.ToUpperInvariant(w[0])));
 
     // Only offer cultures that actually have a translation file (Resources/<lang>.json).
     var allUiCultures = LocOptions.Value.SupportedUICultures ?? new System.Collections.Generic.List<System.Globalization.CultureInfo>();
@@ -29,143 +32,125 @@
     var currentCulture = System.Globalization.CultureInfo.CurrentUICulture.Name.Split('-', 2)[0];
     if (string.IsNullOrEmpty(currentCulture)) currentCulture = MatCMS.Cloud.Services.Localizer.FallbackCulture;
     var returnUrl = Context.Request.Path + Context.Request.QueryString;
+    var bare = ViewData["NoSidebar"] is true;
 }
 <!DOCTYPE html>
-<html lang="@currentCulture" data-dlg-ok="@T["dialog.ok"]" data-dlg-cancel="@T["action.cancel"]" data-theme="@theme">
+@* The same MatUi shell as the CMS's back office (MatCMS.Shared.Web: lib/matui/matui.css, css/admin-matui.css,
+   js/admin-shell.js) — the two admins look and work alike. The cloud keeps its instance switcher in the bar. *@
+<html lang="@currentCulture" data-app="matcms" data-theme="@theme" data-density="compact" data-dlg-ok="@T["dialog.ok"]" data-dlg-cancel="@T["action.cancel"]">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>@title – @Cloud.CloudName</title>
-    <link href="/fonts/css2?family=Geologica:wght@@500;600;700&family=Inter:wght@@400;500;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/lib/tabler-icons/tabler-icons.min.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/lib/matui/matui.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/admin.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/cloud.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/admin-matui.css" asp-append-version="true" />
     <link rel="icon" href="@Cloud.LogoUrl" />
     @* Own confirm/alert/prompt dialogs — loaded early, inline page scripts call MatDialog. *@
     <script src="~/_content/MatCMS.Shared.Web/js/mat-dialogs.js" asp-append-version="true"></script>
 </head>
-@* A page may drop the sidebar — the embedded site view wants the whole window for the site and
-   carries its own bar at the top. *@
-<body class="admin@(ViewData["NoSidebar"] is true ? " admin-bare" : "")">
-@if (ViewData["NoSidebar"] is not true)
-{
-    <aside class="admin-sidebar">
-        <div class="admin-brand">
-            <a class="admin-brand-link" asp-page="/Admin/Index" title="@Cloud.CloudName">
-                <img class="admin-logo logo-light" src="@Cloud.LogoUrl" alt="@Cloud.CloudName" />
-                <img class="admin-logo logo-dark" src="/img/logo-dark.svg" alt="@Cloud.CloudName" />
-            </a>
-        </div>
-        @{ var isAdmin = User.IsInRole("Admin"); }
-        <nav class="admin-nav">
-            @* Hosting is ONE item and the first: everything about hosts, containers, images and domains is in its
-               tabs. It is Admin-only (fleet-wide); an Operator only manages its own instances. The fleet areas below
-               are hidden AND server-side blocked (AuthorizeFolder "Admin" in Program.cs). *@
-            @if (isAdmin)
-            {
-                <a class="@ActiveHosting()" asp-page="/Admin/Hosting/Index"><i class="ti ti-server-2" aria-hidden="true"></i> @T["hosting.title"]</a>
-            }
-            <a class="@ActiveInstances()" asp-page="/Admin/Instances/Index"><i class="ti ti-device-desktop" aria-hidden="true"></i> @T["nav.instances"]</a>
-            <a class="@Active("/admin/stats")" asp-page="/Admin/Stats/Index"><i class="ti ti-chart-bar" aria-hidden="true"></i> @T["stats.title"]</a>
-            @if (isAdmin)
-            {
-                <a class="@Active("/admin/profiles")" asp-page="/Admin/Profiles/Index"><i class="ti ti-adjustments" aria-hidden="true"></i> @T["nav.profiles"]</a>
-                <a class="@Active("/admin/store")" asp-page="/Admin/Store/Index"><i class="ti ti-package" aria-hidden="true"></i> @T["nav.store"]</a>
-                <a class="@Active("/admin/mail")" asp-page="/Admin/Mail/Index"><i class="ti ti-mail" aria-hidden="true"></i> @T["spool.title"]</a>
-                <a class="@Active("/admin/backups")" asp-page="/Admin/Backups/Index"><i class="ti ti-device-floppy" aria-hidden="true"></i> @T["backups.title"]</a>
-                <div class="admin-nav-sep" role="separator"></div>
-                <a class="@(Active("/admin/settings") + Active("/admin/apikeys") + Active("/admin/oauthclients"))" asp-page="/Admin/Settings/Index"><i class="ti ti-settings" aria-hidden="true"></i> @T["nav.settings"]</a>
-                <a class="@Active("/admin/notifications")" asp-page="/Admin/Notifications/Index"><i class="ti ti-bell" aria-hidden="true"></i> @T["notify.title"]</a>
-                <a class="@Active("/admin/users")" asp-page="/Admin/Users/Index"><i class="ti ti-users" aria-hidden="true"></i> @T["nav.users"]</a>
-                <a class="@Active("/admin/logs")" asp-page="/Admin/Logs/Index"><i class="ti ti-list-details" aria-hidden="true"></i> @T["nav.logs"]</a>
-            }
-        </nav>
-        <div class="admin-nav-foot">
-            <div class="admin-foot-actions">
-                @if (cultures.Count > 1)
-                {
-                    <div class="admin-foot-lang" data-lang>
-                        <button type="button" class="admin-foot-btn" data-lang-toggle aria-haspopup="true" aria-expanded="false" title="@T["admin.language"]">@currentCulture.ToUpperInvariant()</button>
-                        <div class="admin-foot-lang-menu" data-lang-menu hidden>
-                            @foreach (var c in cultures)
-                            {
-                                var lc = _uiLang(c);
-                                <form method="post" action="/set-language">
-                                    <input type="hidden" name="returnUrl" value="@returnUrl" />
-                                    <input type="hidden" name="culture" value="@lc" />
-                                    <button type="submit" class="admin-lang-opt@(lc == currentCulture ? " is-current" : "")">@MatCMS.Cloud.Services.Localizer.DisplayName(lc) <span class="muted mono">@lc.ToUpperInvariant()</span></button>
-                                </form>
-                            }
-                        </div>
-                    </div>
-                }
-                @* Personal account (password, 2FA) is a per-account area (Operators have one too), not a
-                   management area — it sits with the session actions here, not as its own nav item. *@
-                <a class="admin-foot-btn admin-foot-icon" asp-page="/Admin/Account/Index" title="@T["nav.account"]" aria-label="@T["nav.account"]"><i class="ti ti-user-circle" aria-hidden="true"></i></a>
-                <form method="post" asp-page="/Logout" class="admin-foot-logout">
-                    <button type="submit" class="admin-foot-btn"><i class="ti ti-logout" aria-hidden="true"></i> @T["nav.logout"]</button>
-                </form>
+<body class="admin admin--matui">
+    @* A page may drop the menu (admin-bare): it then has the bar alone. *@
+    <div class="mat-app@(bare ? " admin-bare" : "")" data-admin-app>
+    @if (!bare)
+    {
+        <aside class="mat-nav" id="mat-nav">
+            <div class="mat-nav__brand">
+                <a asp-page="/Admin/Index" title="@Cloud.CloudName">
+                    <img class="admin-logo logo-light" src="@Cloud.LogoUrl" alt="@Cloud.CloudName" />
+                    <img class="admin-logo logo-dark" src="/img/logo-dark.svg" alt="@Cloud.CloudName" />
+                </a>
+                <button type="button" class="mat-btn mat-btn--ghost mat-btn--icon mat-nav__close" data-admin-close aria-label="@T["nav.menu"]"><i class="ti ti-x" aria-hidden="true"></i></button>
             </div>
-            <a class="admin-cms-foot" asp-page="/Admin/About/Index" title="@T["about.title"]">
-                <span class="cms">MatCMS.Cloud</span>
-                <span class="admin-version">v@(Version.Current)</span>
-            </a>
-        </div>
-    </aside>
-    <div class="admin-backdrop" data-admin-backdrop></div>
-}
-
-
-    <div class="admin-main">
-        <header class="admin-topbar">
-            @if (ViewData["NoSidebar"] is true)
-            {
-                @* The brand keeps its place and its background — losing the navigation should not
-                   feel like leaving the product. It is the same block the sidebar shows, moved into
-                   the only bar this page has. *@
-                <div class="admin-topbar-brand">
-                    @* Deliberately the SAME markup and classes as the sidebar's brand, inside a
-                       block that repeats the sidebar's own width, background and padding — so the
-                       logo lands on exactly the same pixels and nothing in that corner moves when a
-                       page drops the menu. *@
-                    <div class="admin-brand">
-                        <a class="admin-brand-link" asp-page="/Admin/Index" title="@Cloud.CloudName">
-                            <img class="admin-logo logo-light" src="@Cloud.LogoUrl" alt="@Cloud.CloudName" />
-                <img class="admin-logo logo-dark" src="/img/logo-dark.svg" alt="@Cloud.CloudName" />
-                        </a>
-                    </div>
+            @{ var isAdmin = User.IsInRole("Admin"); }
+            <nav class="mat-nav__scroll admin-nav" aria-label="@T["nav.menu"]">
+                <ul class="mat-nav__list">
+                    @* Hosting is ONE item and the first: everything about hosts, containers, images and domains is in its
+                       tabs. It is Admin-only (fleet-wide); an Operator only manages its own instances. The fleet areas below
+                       are hidden AND server-side blocked (AuthorizeFolder "Admin" in Program.cs). *@
+                    @if (isAdmin)
+                    {
+                        <li class="mat-nav__group" role="presentation">@T["nav.groupOperations"]</li>
+                        @Item(ActiveHosting(), "/Admin/Hosting/Index", "ti-server-2", T["hosting.title"])
+                    }
+                    @Item(ActiveInstances(), "/Admin/Instances/Index", "ti-device-desktop", T["nav.instances"])
+                    @Item(Active("/admin/stats"), "/Admin/Stats/Index", "ti-chart-bar", T["stats.title"])
+                    @if (isAdmin)
+                    {
+                        @Item(Active("/admin/profiles"), "/Admin/Profiles/Index", "ti-adjustments", T["nav.profiles"])
+                        @Item(Active("/admin/store"), "/Admin/Store/Index", "ti-package", T["nav.store"])
+                        @Item(Active("/admin/mail"), "/Admin/Mail/Index", "ti-mail", T["spool.title"])
+                        @Item(Active("/admin/backups"), "/Admin/Backups/Index", "ti-device-floppy", T["backups.title"])
+                        <li class="mat-nav__group" role="presentation">@T["nav.groupSystem"]</li>
+                        @Item(Active("/admin/settings") + Active("/admin/apikeys") + Active("/admin/oauthclients"), "/Admin/Settings/Index", "ti-settings", T["nav.settings"])
+                        @Item(Active("/admin/notifications"), "/Admin/Notifications/Index", "ti-bell", T["notify.title"])
+                        @Item(Active("/admin/users"), "/Admin/Users/Index", "ti-users", T["nav.users"])
+                        @Item(Active("/admin/logs"), "/Admin/Logs/Index", "ti-list-details", T["nav.logs"])
+                    }
+                </ul>
+            </nav>
+            <div class="mat-nav__foot">
+                <div class="mat-nav__account">
+                    <button type="button" class="mat-user" data-admin-menu="admin-user-menu" aria-haspopup="menu" aria-expanded="false">
+                        <span class="mat-avatar" aria-hidden="true">@initials</span>
+                        <span class="mat-user__text">
+                            <span class="mat-user__name">@displayName</span>
+                            <span class="mat-user__role">@role</span>
+                        </span>
+                        <i class="ti ti-chevron-up mat-user__chev" aria-hidden="true"></i>
+                    </button>
+                    @* The 3-state theme button (SHELL-04): system → light → dark, kept on the user (Account?handler=Theme). *@
+                    <button type="button" class="mat-theme" data-admin-theme data-theme-state="@theme"
+                            data-save="@Url.Page("/Admin/Account/Index", "Theme")"
+                            data-names="@T["account.themeSystem"]|@T["account.themeLight"]|@T["account.themeDark"]"
+                            title="@T["account.theme"]" aria-label="@T["account.theme"]">
+                        <i class="ti ti-device-desktop" data-theme-icon="system" aria-hidden="true"></i>
+                        <i class="ti ti-sun" data-theme-icon="light" aria-hidden="true"></i>
+                        <i class="ti ti-moon" data-theme-icon="dark" aria-hidden="true"></i>
+                    </button>
                 </div>
-            }
-            <button type="button" class="admin-menu-toggle" data-admin-toggle aria-label="@T["nav.menu"]" aria-expanded="false">
-                <span></span><span></span><span></span>
-            </button>
-            @* The context switcher, on every page. What you are looking at — the cloud itself or one
-               of its sites — is the same question everywhere, so it is answered in the same place
-               everywhere instead of only on the page that happens to embed a site.
-               ViewData["InstanceId"] names the instance being viewed; absent means the cloud. *@
-            @{
-                var currentInstanceId = ViewData["InstanceId"] as int?;
-                // For the Cloud|Website|Admin switch on the right: the instance being viewed (if any) and
-                // its address. Same-tab SSO links, so the operator lands logged in on the instance.
-                var vsInstance = currentInstanceId is int vsid
-                    ? (await Switcher.InstancesAsync()).FirstOrDefault(i => i.Id == vsid) : null;
-                var vsUrl = vsInstance?.PreviewUrl?.Trim().TrimEnd('/');
-            }
-            <div class="inst-head">
-                <partial name="_ContextPicker" model="currentInstanceId" />
-                @if (ViewData["NoTopbarTitle"] is not true)
-                {
-                    @* Left out where the switcher already names the thing — repeating it beside itself
-                       adds a line of header and no information. *@
-                    <div class="admin-topbar-title">@title</div>
-                }
+                <a class="mat-nav__version" asp-page="/Admin/About/Index" title="@T["about.title"]">MatCMS.Cloud v@(Version.Current)</a>
             </div>
-            <div class="admin-topbar-right">
-                @* Account + Logout are ALWAYS top-right (also on the cloud overview). The Cloud|Website|Admin
-                   switch appears only when an instance is the context (somewhere to switch TO); "Cloud" is the
-                   active segment here. Web/Admin go through the instance's SSO (auto-approved). *@
-                <div class="admin-topbar-tools">
+        </aside>
+        <div class="mat-backdrop" data-admin-close></div>
+    }
+
+        <div class="mat-main">
+            <header class="mat-topbar">
+                @if (!bare)
+                {
+                    <button type="button" class="mat-burger" data-admin-toggle aria-label="@T["nav.menu"]" aria-controls="mat-nav" aria-expanded="false"><i class="ti ti-menu-2" aria-hidden="true"></i></button>
+                }
+                @* The context switcher, on every page. What you are looking at — the cloud itself or one
+                   of its sites — is the same question everywhere, so it is answered in the same place
+                   everywhere instead of only on the page that happens to embed a site. It stands where
+                   MatUi's breadcrumb stands: the context first, then the page.
+                   ViewData["InstanceId"] names the instance being viewed; absent means the cloud. *@
+                @{
+                    var currentInstanceId = ViewData["InstanceId"] as int?;
+                    // For the Cloud|Website|Admin switch on the right: the instance being viewed (if any) and
+                    // its address. Same-tab SSO links, so the operator lands logged in on the instance.
+                    var vsInstance = currentInstanceId is int vsid
+                        ? (await Switcher.InstancesAsync()).FirstOrDefault(i => i.Id == vsid) : null;
+                    var vsUrl = vsInstance?.PreviewUrl?.Trim().TrimEnd('/');
+                }
+                <div class="inst-head mat-crumbs">
+                    <partial name="_ContextPicker" model="currentInstanceId" />
+                    @if (ViewData["NoTopbarTitle"] is not true)
+                    {
+                        @* Left out where the switcher already names the thing — repeating it beside itself
+                           adds a line of header and no information. *@
+                        <span class="inst-head-sep" aria-hidden="true">/</span>
+                        <span class="inst-head-title" aria-current="page">@title</span>
+                    }
+                </div>
+                <div class="mat-topbar__actions">
+                    @* The Cloud|Website|Admin switch appears only when an instance is the context (somewhere to switch TO);
+                       "Cloud" is the active segment here. Web/Admin go through the instance's SSO (auto-approved).
+                       Account and sign-out are in the user menu at the foot of the menu (SHELL-03). *@
                     @if (!string.IsNullOrEmpty(vsUrl))
                     {
                         <partial name="_ViewSwitch" model="@(new MatCMS.Shared.Web.ViewSwitch(
@@ -174,65 +159,74 @@
                             AdminUrl: $"{vsUrl}/sso/start?returnUrl=/admin&via=cloud",
                             CloudLabel: T["instances.viewCloud"], WebLabel: T["instances.viewWebsite"], AdminLabel: T["instances.viewAdmin"]))" />
                     }
-                    <a class="mab-stool mab-account" asp-page="/Admin/Account/Index" title="@T["nav.account"]" aria-label="@T["nav.account"]"><i class="ti ti-user-circle" aria-hidden="true"></i></a>
-                    <form method="post" asp-page="/Logout" style="margin:0;">
-                        <button type="submit" class="mab-stool mab-out" title="@T["nav.logout"]" aria-label="@T["nav.logout"]"><i class="ti ti-logout-2" aria-hidden="true"></i></button>
-                    </form>
+                    @await RenderSectionAsync("TopbarActions", required: false)
+                    @if (bare)
+                    {
+                        @* No menu, so no user at its foot: account and sign-out stay in the bar. *@
+                        <a class="mat-btn mat-btn--ghost mat-btn--icon" asp-page="/Admin/Account/Index" title="@T["nav.account"]" aria-label="@T["nav.account"]"><i class="ti ti-user-circle" aria-hidden="true"></i></a>
+                        <form method="post" asp-page="/Logout" class="mat-menu__form">
+                            <button type="submit" class="mat-btn mat-btn--ghost mat-btn--icon" title="@T["nav.logout"]" aria-label="@T["nav.logout"]"><i class="ti ti-logout-2" aria-hidden="true"></i></button>
+                        </form>
+                    }
                 </div>
-                @await RenderSectionAsync("TopbarActions", required: false)
-            </div>
-        </header>
+            </header>
 
-        <main class="admin-content">
-            @if (TempData["Flash"] is string flash && !string.IsNullOrWhiteSpace(flash))
-            {
-                <div class="alert alert-success">@flash</div>
-            }
-            @if (TempData["FlashError"] is string flashError && !string.IsNullOrWhiteSpace(flashError))
-            {
-                <div class="alert alert-error">@flashError</div>
-            }
-            @RenderBody()
-        </main>
+            <main class="mat-page mat-page--wide admin-content" id="main">
+                @if (TempData["Flash"] is string flash && !string.IsNullOrWhiteSpace(flash))
+                {
+                    <div class="alert alert-success">@flash</div>
+                }
+                @if (TempData["FlashError"] is string flashError && !string.IsNullOrWhiteSpace(flashError))
+                {
+                    <div class="alert alert-error">@flashError</div>
+                }
+                @RenderBody()
+            </main>
+        </div>
     </div>
 
-    <script>
-        // Mobile admin menu: off-canvas drawer toggle.
-        (function () {
-            var body = document.body;
-            var toggle = document.querySelector('[data-admin-toggle]');
-            var backdrop = document.querySelector('[data-admin-backdrop]');
-            function setOpen(open) {
-                body.classList.toggle('nav-open', open);
-                if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    @* The user's context menu (SHELL-03): account, the admin language, sign out last. *@
+    <div class="mat-menu" id="admin-user-menu" role="menu" aria-label="@displayName" hidden>
+        <div class="mat-menu__head">
+            <span class="mat-avatar" aria-hidden="true">@initials</span>
+            <div><strong>@displayName</strong><small>@role</small></div>
+        </div>
+        <a class="mat-menu__item" role="menuitem" asp-page="/Admin/Account/Index"><i class="ti ti-user-circle" aria-hidden="true"></i><span>@T["nav.account"]</span></a>
+        @if (cultures.Count > 1)
+        {
+            <div class="mat-menu__sep" role="separator"></div>
+            @foreach (var c in cultures)
+            {
+                var lc = _uiLang(c);
+                <form method="post" action="/set-language" class="mat-menu__form">
+                    <input type="hidden" name="returnUrl" value="@returnUrl" />
+                    <input type="hidden" name="culture" value="@lc" />
+                    <button type="submit" class="mat-menu__item" role="menuitemradio" aria-checked="@(lc == currentCulture ? "true" : "false")"><i class="ti @(lc == currentCulture ? "ti-check" : "ti-language")" aria-hidden="true"></i><span>@MatCMS.Cloud.Services.Localizer.DisplayName(lc)</span></button>
+                </form>
             }
-            if (toggle) toggle.addEventListener('click', function () { setOpen(!body.classList.contains('nav-open')); });
-            if (backdrop) backdrop.addEventListener('click', function () { setOpen(false); });
-            document.querySelectorAll('.admin-sidebar a').forEach(function (a) {
-                a.addEventListener('click', function () { setOpen(false); });
-            });
-            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') setOpen(false); });
-        })();
+        }
+        <div class="mat-menu__sep" role="separator"></div>
+        <form method="post" asp-page="/Logout" class="mat-menu__form">
+            <button type="submit" class="mat-menu__item mat-menu__item--danger" role="menuitem"><i class="ti ti-logout" aria-hidden="true"></i><span>@T["nav.logout"]</span></button>
+        </form>
+    </div>
+    @Html.AntiForgeryToken()
 
-        // Language dropdown in the sidebar footer (the "EN"/"DE" button).
-        (function () {
-            var wrap = document.querySelector('[data-lang]');
-            if (!wrap) return;
-            var btn = wrap.querySelector('[data-lang-toggle]');
-            var menu = wrap.querySelector('[data-lang-menu]');
-            function close() { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); }
-            btn.addEventListener('click', function (e) {
-                e.stopPropagation();
-                var open = menu.hidden;
-                menu.hidden = !open; btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-            });
-            document.addEventListener('click', function (e) { if (!wrap.contains(e.target)) close(); });
-            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
-        })();
-    </script>
+    <script src="~/_content/MatCMS.Shared.Web/js/admin-shell.js" asp-append-version="true"></script>
     <script src="~/_content/MatCMS.Shared.Web/js/admin-list.js" asp-append-version="true"></script>
     @* Belongs to the switcher in the bar above, so it loads wherever that bar does. *@
     <script src="~/js/context-picker.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
+@functions {
+    // One item of the menu: MatUi's markup (SHELL-02), Tabler icon in front, current one marked.
+    private Microsoft.AspNetCore.Html.IHtmlContent Item(string active, string page, string icon, string label)
+    {
+        var on = active.Contains("is-active");
+        var href = Url.Page(page);
+        var html = $"<li><a class=\"mat-nav__item{(on ? " is-active" : "")}\" href=\"{href}\"{(on ? " aria-current=\"page\"" : "")}>"
+                 + $"<i class=\"ti {icon}\" aria-hidden=\"true\"></i><span>{System.Net.WebUtility.HtmlEncode(label)}</span></a></li>";
+        return new Microsoft.AspNetCore.Html.HtmlString(html);
+    }
+}

@@ -82,4 +82,14 @@ public class IndexModel : PageModel
         return RedirectToPage();
     }
 
+    /// <summary>The theme button at the foot of the menu (system → light → dark): saves the colour scheme by fetch.</summary>
+    public async Task<IActionResult> OnPostThemeAsync(string? theme)
+    {
+        var user = await CurrentUserAsync();
+        if (user is null) return Unauthorized();
+        user.Theme = theme is "dark" or "system" ? theme : null;
+        await _db.SaveChangesAsync();
+        return new NoContentResult();
+    }
+
 }

@@ -451,7 +451,7 @@ The cloud's admin must look and behave exactly like the CMS's — the class-by-c
 in `src/MatCMS.Cloud/CLAUDE.md`. Never invent a parallel CSS class for something the admin already
 ships.
 
-**The CMS back office runs on MatUi (in progress).** MatDesign's toolkit is COPIED (CODE-03) into
+**Both back offices run on MatUi (in progress).** MatDesign's toolkit is COPIED (CODE-03) into
 `MatCMS.Shared.Web/wwwroot/lib/matui/matui.css` (version in its first line; update by copying `/ui/matui.css` of a MatDesign
 release again). The CMS's `_AdminLayout` is MatUi's shell (`mat-app`, `mat-nav` with group headings, `mat-topbar` with the
 breadcrumb, the user and the theme button at the foot, `mat-page`); `<html data-app="matcms" data-density="compact">`.
@@ -460,7 +460,8 @@ itself), every admin variable (`--surface`, `--line`, `--accent`, the status tin
 admin's own classes (`.btn`, `.card`, `table.data`, `.tabs`, `.form-field`) in MatUi's look until the pages move to `mat-*`
 classes. `matui.js` is NOT loaded yet: it handles `data-confirm` too, and with `mat-dialogs.js` every question would be asked
 twice — `js/admin-shell.js` does the shell (drawer, user menu, theme → `Account?handler=Theme`) until then. Icons stay Tabler
-(plugins name Tabler icons). The cloud's layout is not moved yet, so the two admins differ until it is.
+(plugins name Tabler icons). The cloud's `_AdminLayout` is the same shell (groups Betrieb / Verwaltung); its instance
+switcher (`_ContextPicker`) stands where the breadcrumb stands, followed by `/ title`. The page editor v2 (own layout) is not moved yet.
 
 **Colours in the back office only through variables** — light/dark/system is a per-user choice (`User.Theme`
 in both apps, account page → Darstellung) that the admin layouts write into `<html data-theme>`. The variables

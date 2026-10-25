@@ -88,7 +88,7 @@ html[data-theme="dark"] {
 body.admin--matui { display: block; height: auto; overflow: hidden; background: var(--mat-bg); font-family: var(--mat-font); font-size: var(--mat-fs-md); line-height: var(--mat-lh); color: var(--mat-text); }
 .admin--matui .mat-nav__brand > a { flex: 1 1 auto; min-width: 0; }
 /* A fixed height and a cap on the width: an SVG logo without a size of its own collapsed to nothing in the flex row. */
-.admin--matui .admin-logo { display: block; height: 34px; width: auto; max-width: 190px; object-fit: contain; object-position: left center; }
+.admin--matui .admin-logo { height: 34px; width: auto; max-width: 190px; object-fit: contain; object-position: left center; }
 /* Tabler glyphs where MatUi has its sprite (plugins name Tabler icons): the same box and colour as .mat-icon. */
 .admin--matui .mat-nav__item > .ti:first-child { flex: none; width: 1.25em; font-size: 1.1rem; text-align: center; color: var(--mat-text-muted); }
 .admin--matui .mat-nav__item.is-active > .ti:first-child { color: var(--mat-accent-text); }
@@ -115,6 +115,16 @@ body.admin--matui { display: block; height: auto; overflow: hidden; background: 
 .admin--matui .mat-vs + .mat-vs { border-left: 1px solid var(--mat-border); }
 .admin--matui .mat-vs:hover { background: var(--mat-surface-3); color: var(--mat-text); }
 .admin--matui .mat-vs.is-active { background: var(--mat-accent-soft-strong); color: var(--mat-accent-text); }
+
+/* The cloud: a page without the menu (admin-bare) is the bar and the page alone. */
+.mat-app.admin-bare { grid-template-columns: minmax(0, 1fr); }
+/* The cloud's instance switcher stands where the breadcrumb stands: the context, a slash, the page. */
+.admin--matui .inst-head { display: flex; align-items: center; gap: var(--mat-space-2); flex: 1 1 auto; min-width: 0; }
+.admin--matui .inst-head-sep { color: var(--mat-text-faint); flex: none; }
+.admin--matui .inst-head-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--mat-fs-sm); font-weight: 620; color: var(--mat-text); }
+.admin--matui .inst-picker-btn { height: var(--mat-control-h); min-width: 0; border-color: var(--mat-border-strong); border-radius: var(--mat-radius); font-family: var(--mat-font); font-size: var(--mat-fs-sm); }
+.admin--matui .inst-picker-btn:hover { background: var(--mat-surface-3); border-color: var(--mat-border-strong); }
+.admin--matui .inst-picker-name { font-size: var(--mat-fs-sm); }
 
 /* ---- 3b. The admin's components in MatUi's look ------------------------------------------------ */
 .admin--matui h1, .admin--matui h2, .admin--matui h3, .admin--matui h4 { font-family: var(--mat-font); font-weight: 650; letter-spacing: 0; color: var(--mat-text); }

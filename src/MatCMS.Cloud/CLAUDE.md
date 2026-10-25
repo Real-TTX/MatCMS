@@ -105,7 +105,8 @@ Matmon.Cloud's `src/`-layout or PostgreSQL.
 - **i18n**: `Services/Localizer.cs` + flat `Resources/<culture>.json` maps, used as `@T["key"]` in
   views. Copy the class verbatim; the admin UI is authored in **German** (`de.json` is the fallback
   culture).
-- **UI**: `_AdminLayout.cshtml` sidebar shell, Tabler-Icons + Geologica/Inter from Google Fonts,
+- **UI**: `_AdminLayout.cshtml` = MatUi's shell, the SAME as the CMS's (`lib/matui/matui.css`, `css/admin-matui.css`,
+  `js/admin-shell.js` from MatCMS.Shared.Web; see the root CLAUDE.md), Tabler-Icons, the system font,
   hand-written vanilla JS — **no** SPA framework, no Bootstrap, no npm build step.
 
 ### The admin must look and work exactly like MatCMS's

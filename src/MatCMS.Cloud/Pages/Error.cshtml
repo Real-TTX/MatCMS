@@ -5,15 +5,17 @@
     Layout = null;
 }
 <!DOCTYPE html>
-<html lang="de">
+<html lang="de" data-app="matcms" data-theme="light" data-density="compact">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>@T["error.title"]</title>
+    <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/lib/matui/matui.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/admin.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/admin-matui.css" asp-append-version="true" />
 </head>
-<body class="login-page">
+<body class="login-page login-matui">
     <div class="login-card">
         <h1>@T["error.title"]</h1>
         <p class="muted">@T["error.text"]</p>

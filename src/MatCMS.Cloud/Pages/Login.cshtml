@@ -5,7 +5,7 @@
     Layout = null;
 }
 <!DOCTYPE html>
-<html lang="de">
+<html lang="de" data-app="matcms" data-theme="light" data-density="compact">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -18,13 +18,14 @@
         if (window.top !== window.self) { try { window.top.location.replace(window.location.href); } catch (e) {} }
     </script>
     <title>@T["login.pageTitle"] – @Cloud.CloudName</title>
-    <link href="/fonts/css2?family=Geologica:wght@@500;600;700&family=Inter:wght@@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/lib/matui/matui.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/admin.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/cloud.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/admin-matui.css" asp-append-version="true" />
     <link rel="icon" href="@Cloud.LogoUrl" />
 </head>
-<body class="login-page">
+<body class="login-page login-matui">
     <div class="login-card">
         <img class="login-logo" src="@Cloud.LogoUrl" alt="@Cloud.CloudName" />
         <h1>@T["login.heading"]</h1>

@@ -127,13 +127,13 @@ body.admin--matui { display: block; height: auto; overflow: hidden; background: 
 .admin--matui .inst-picker-name { font-size: var(--mat-fs-sm); }
 
 /* ---- 3b. The admin's components in MatUi's look ------------------------------------------------ */
-.admin--matui h1, .admin--matui h2, .admin--matui h3, .admin--matui h4 { font-family: var(--mat-font); font-weight: 650; letter-spacing: 0; color: var(--mat-text); }
+:is(.admin--matui, .login-matui) h1, :is(.admin--matui, .login-matui) h2, :is(.admin--matui, .login-matui) h3, :is(.admin--matui, .login-matui) h4 { font-family: var(--mat-font); font-weight: 650; letter-spacing: 0; color: var(--mat-text); }
 /* Links of the page in the accent; the menu, buttons and the switch keep their own colours. */
-.admin--matui .mat-page a:not([class]) { color: var(--mat-accent-text); }
-.admin--matui .muted { color: var(--mat-text-muted); }
+:is(.admin--matui, .login-matui) .mat-page a:not([class]) { color: var(--mat-accent-text); }
+:is(.admin--matui, .login-matui) .muted { color: var(--mat-text-muted); }
 
 /* Buttons = .mat-btn (primary), .btn-ghost = --secondary, .btn-danger = --danger */
-.admin--matui .btn {
+:is(.admin--matui, .login-matui) .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: var(--mat-space-2);
   min-height: var(--mat-btn-height, var(--mat-control-h)); padding: 0 var(--mat-btn-pad-x, var(--mat-space-4));
   border: 1px solid transparent; border-radius: var(--mat-btn-radius, var(--mat-radius));
@@ -141,62 +141,102 @@ body.admin--matui { display: block; height: auto; overflow: hidden; background: 
   font-family: var(--mat-font); font-size: var(--mat-fs-sm); font-weight: 600; letter-spacing: 0; text-transform: none; line-height: 1;
   transition: background var(--mat-dur-fast) var(--mat-ease), border-color var(--mat-dur-fast) var(--mat-ease), color var(--mat-dur-fast) var(--mat-ease);
 }
-.admin--matui .btn:hover { background: var(--mat-accent-hover); border-color: transparent; color: var(--mat-on-accent); text-decoration: none; }
-.admin--matui .btn-ghost, .admin--matui .btn-outline { background: var(--mat-surface); border-color: var(--mat-border-strong); color: var(--mat-text); }
-.admin--matui .btn-ghost:hover, .admin--matui .btn-outline:hover { background: var(--mat-surface-3); border-color: var(--mat-border-strong); color: var(--mat-text); }
-.admin--matui .btn-danger { background: var(--mat-surface); border-color: color-mix(in srgb, var(--mat-danger) 45%, transparent); color: var(--mat-danger-text); }
-.admin--matui .btn-danger:hover { background: var(--mat-danger-bg); border-color: var(--mat-danger); color: var(--mat-danger-text); }
-.admin--matui .btn-sm { min-height: var(--mat-control-h-sm); padding: 0 var(--mat-space-3); font-size: var(--mat-fs-sm); }
-.admin--matui .btn-icon { width: var(--mat-control-h); min-height: var(--mat-control-h); height: var(--mat-control-h); padding: 0; }
-.admin--matui .btn-icon.btn-sm { width: var(--mat-control-h-sm); min-height: var(--mat-control-h-sm); height: var(--mat-control-h-sm); }
-.admin--matui .btn:focus-visible { outline: none; box-shadow: var(--mat-focus-ring); }
+:is(.admin--matui, .login-matui) .btn:hover { background: var(--mat-accent-hover); border-color: transparent; color: var(--mat-on-accent); text-decoration: none; }
+:is(.admin--matui, .login-matui) .btn-ghost, :is(.admin--matui, .login-matui) .btn-outline { background: var(--mat-surface); border-color: var(--mat-border-strong); color: var(--mat-text); }
+:is(.admin--matui, .login-matui) .btn-ghost:hover, :is(.admin--matui, .login-matui) .btn-outline:hover { background: var(--mat-surface-3); border-color: var(--mat-border-strong); color: var(--mat-text); }
+:is(.admin--matui, .login-matui) .btn-danger { background: var(--mat-surface); border-color: color-mix(in srgb, var(--mat-danger) 45%, transparent); color: var(--mat-danger-text); }
+:is(.admin--matui, .login-matui) .btn-danger:hover { background: var(--mat-danger-bg); border-color: var(--mat-danger); color: var(--mat-danger-text); }
+:is(.admin--matui, .login-matui) .btn-sm { min-height: var(--mat-control-h-sm); padding: 0 var(--mat-space-3); font-size: var(--mat-fs-sm); }
+:is(.admin--matui, .login-matui) .btn-icon { width: var(--mat-control-h); min-height: var(--mat-control-h); height: var(--mat-control-h); padding: 0; }
+:is(.admin--matui, .login-matui) .btn-icon.btn-sm { width: var(--mat-control-h-sm); min-height: var(--mat-control-h-sm); height: var(--mat-control-h-sm); }
+:is(.admin--matui, .login-matui) .btn:focus-visible { outline: none; box-shadow: var(--mat-focus-ring); }
 
 /* Cards, tiles, alerts: a surface with a hairline and MatUi's radius, no shadow beyond --mat-shadow-1 */
-.admin--matui .card { border: 1px solid var(--mat-border); border-radius: var(--mat-card-radius, var(--mat-radius-lg)); box-shadow: var(--mat-shadow-1); padding: var(--mat-space-5); margin-bottom: var(--mat-space-5); }
-.admin--matui .card h2 { font-size: var(--mat-fs-lg); margin-bottom: var(--mat-space-3); }
-.admin--matui .stat { border: 1px solid var(--mat-border); border-radius: var(--mat-radius-lg); padding: var(--mat-space-4); box-shadow: var(--mat-shadow-1); }
-.admin--matui .stat .n { font-family: var(--mat-font); font-size: var(--mat-fs-2xl); font-weight: 650; line-height: 1.1; }
-.admin--matui .stat .l { font-size: var(--mat-fs-sm); text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--mat-text-muted); }
-.admin--matui .stat.is-warn { border-top: 1px solid var(--mat-border); box-shadow: inset 0 3px 0 var(--mat-warning); }
-.admin--matui .stat.is-err { border-top: 1px solid var(--mat-border); box-shadow: inset 0 3px 0 var(--mat-danger); }
-.admin--matui .alert { border-radius: var(--mat-radius); font-size: var(--mat-fs-md); padding: var(--mat-space-3) var(--mat-space-4); margin-bottom: var(--mat-space-5); }
+:is(.admin--matui, .login-matui) .card { border: 1px solid var(--mat-border); border-radius: var(--mat-card-radius, var(--mat-radius-lg)); box-shadow: var(--mat-shadow-1); padding: var(--mat-space-5); margin-bottom: var(--mat-space-5); }
+:is(.admin--matui, .login-matui) .card h2 { font-size: var(--mat-fs-lg); margin-bottom: var(--mat-space-3); }
+:is(.admin--matui, .login-matui) .stat { border: 1px solid var(--mat-border); border-radius: var(--mat-radius-lg); padding: var(--mat-space-4); box-shadow: var(--mat-shadow-1); }
+:is(.admin--matui, .login-matui) .stat .n { font-family: var(--mat-font); font-size: var(--mat-fs-2xl); font-weight: 650; line-height: 1.1; }
+:is(.admin--matui, .login-matui) .stat .l { font-size: var(--mat-fs-sm); text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--mat-text-muted); }
+:is(.admin--matui, .login-matui) .alert { border-radius: var(--mat-radius); font-size: var(--mat-fs-md); padding: var(--mat-space-3) var(--mat-space-4); margin-bottom: var(--mat-space-5); }
 
 /* Tables = .mat-table inside a card-like frame */
-.admin--matui table.data { font-size: var(--mat-table-font-size, var(--mat-fs-sm)); border: 1px solid var(--mat-border); border-radius: var(--mat-radius-lg); border-collapse: separate; border-spacing: 0; overflow: hidden; }
-.admin--matui table.data th, .admin--matui table.data td { padding: var(--mat-table-pad-y, var(--mat-space-3)) var(--mat-table-pad-x, var(--mat-space-4)); font-size: inherit; }
-.admin--matui table.data th { text-transform: none; letter-spacing: 0; font-weight: 600; font-size: var(--mat-fs-sm); color: var(--mat-text-muted); background: var(--mat-surface-2); }
-.admin--matui table.data tbody tr:hover { background: var(--mat-surface-2); }
-.admin--matui .card table.data { border: 0; border-radius: 0; }
+:is(.admin--matui, .login-matui) table.data { font-size: var(--mat-table-font-size, var(--mat-fs-sm)); border: 1px solid var(--mat-border); border-radius: var(--mat-radius-lg); border-collapse: separate; border-spacing: 0; overflow: hidden; }
+:is(.admin--matui, .login-matui) table.data th, :is(.admin--matui, .login-matui) table.data td { padding: var(--mat-table-pad-y, var(--mat-space-3)) var(--mat-table-pad-x, var(--mat-space-4)); font-size: inherit; }
+:is(.admin--matui, .login-matui) table.data th { text-transform: none; letter-spacing: 0; font-weight: 600; font-size: var(--mat-fs-sm); color: var(--mat-text-muted); background: var(--mat-surface-2); }
+:is(.admin--matui, .login-matui) table.data tbody tr:hover { background: var(--mat-surface-2); }
+:is(.admin--matui, .login-matui) .card table.data { border: 0; border-radius: 0; }
 
 /* The framed list toolbar = MatUi's toolbar (LIST-02): a card-like bar above the list. */
-.admin--matui [data-list] .page-head .list-toolbar { border-radius: var(--mat-radius-lg); padding: var(--mat-space-2) var(--mat-space-3); box-shadow: var(--mat-shadow-1); }
-.admin--matui .list-search { min-height: var(--mat-control-h); height: var(--mat-control-h); }
+:is(.admin--matui, .login-matui) [data-list] .page-head .list-toolbar { border-radius: var(--mat-radius-lg); padding: var(--mat-space-2) var(--mat-space-3); box-shadow: var(--mat-shadow-1); }
+:is(.admin--matui, .login-matui) .list-search { min-height: var(--mat-control-h); height: var(--mat-control-h); }
 
 /* Tabs = .mat-tabs */
-.admin--matui .tabs { box-shadow: none; border-bottom: 1px solid var(--mat-border); gap: var(--mat-space-1); margin-bottom: var(--mat-space-5); }
-.admin--matui .tab { font-size: var(--mat-fs-sm); padding: 0 var(--mat-space-3); min-height: var(--mat-control-h); color: var(--mat-text-muted); margin-bottom: -1px; }
-.admin--matui .tab:hover { color: var(--mat-text); }
-.admin--matui .tab.active { color: var(--mat-accent-text); border-bottom-color: var(--mat-accent); }
+:is(.admin--matui, .login-matui) .tabs { box-shadow: none; border-bottom: 1px solid var(--mat-border); gap: var(--mat-space-1); margin-bottom: var(--mat-space-5); }
+:is(.admin--matui, .login-matui) .tab { font-size: var(--mat-fs-sm); padding: 0 var(--mat-space-3); min-height: var(--mat-control-h); color: var(--mat-text-muted); margin-bottom: -1px; }
+:is(.admin--matui, .login-matui) .tab:hover { color: var(--mat-text); }
+:is(.admin--matui, .login-matui) .tab.active { color: var(--mat-accent-text); border-bottom-color: var(--mat-accent); }
 
 /* Badges = MatUi pills */
-.admin--matui .badge { font-size: var(--mat-fs-xs); font-weight: 600; letter-spacing: 0; padding: 2px 8px; }
+:is(.admin--matui, .login-matui) .badge { font-size: var(--mat-fs-xs); font-weight: 600; letter-spacing: 0; padding: 2px 8px; }
 
 /* Fields = .mat-field / .mat-label / .mat-input */
-.admin--matui .form-field { margin-bottom: var(--mat-space-4); }
-.admin--matui .form-field label { text-transform: none; letter-spacing: 0; font-size: var(--mat-fs-sm); font-weight: 600; color: var(--mat-text); margin-bottom: var(--mat-space-1); }
-html[data-theme] .admin--matui .form-field .mat-input,
-html[data-theme] .admin--matui .form-field input:not([type=checkbox]):not([type=radio]):not([type=hidden]),
-html[data-theme] .admin--matui .form-field select,
-html[data-theme] .admin--matui .form-field textarea,
-.admin--matui .list-search {
+:is(.admin--matui, .login-matui) .form-field { margin-bottom: var(--mat-space-4); }
+:is(.admin--matui, .login-matui) .form-field label { text-transform: none; letter-spacing: 0; font-size: var(--mat-fs-sm); font-weight: 600; color: var(--mat-text); margin-bottom: var(--mat-space-1); }
+html[data-theme] :is(.admin--matui, .login-matui) .form-field .mat-input,
+html[data-theme] :is(.admin--matui, .login-matui) .form-field input:not([type=checkbox]):not([type=radio]):not([type=hidden]),
+html[data-theme] :is(.admin--matui, .login-matui) .form-field select,
+html[data-theme] :is(.admin--matui, .login-matui) .form-field textarea,
+:is(.admin--matui, .login-matui) .list-search {
   min-height: var(--mat-input-height, var(--mat-control-h)); height: auto; padding: 6px var(--mat-input-pad-x, var(--mat-space-3));
   border: 1px solid var(--mat-border-strong); border-radius: var(--mat-input-radius, var(--mat-radius));
   background: var(--mat-surface); color: var(--mat-text); font-size: var(--mat-fs-md);
 }
-html[data-theme] .admin--matui .form-field textarea { padding-top: var(--mat-space-2); line-height: var(--mat-lh); }
-html[data-theme] .admin--matui .form-field .mat-input:focus,
-html[data-theme] .admin--matui .form-field input:not([type=checkbox]):not([type=radio]):not([type=hidden]):focus,
-html[data-theme] .admin--matui .form-field select:focus,
-html[data-theme] .admin--matui .form-field textarea:focus,
-.admin--matui .list-search:focus { border-color: var(--mat-accent); box-shadow: var(--mat-focus-ring); outline: none; }
-.admin--matui input[type=checkbox], .admin--matui input[type=radio] { accent-color: var(--mat-accent); }
+html[data-theme] :is(.admin--matui, .login-matui) .form-field textarea { padding-top: var(--mat-space-2); line-height: var(--mat-lh); }
+html[data-theme] :is(.admin--matui, .login-matui) .form-field .mat-input:focus,
+html[data-theme] :is(.admin--matui, .login-matui) .form-field input:not([type=checkbox]):not([type=radio]):not([type=hidden]):focus,
+html[data-theme] :is(.admin--matui, .login-matui) .form-field select:focus,
+html[data-theme] :is(.admin--matui, .login-matui) .form-field textarea:focus,
+:is(.admin--matui, .login-matui) .list-search:focus { border-color: var(--mat-accent); box-shadow: var(--mat-focus-ring); outline: none; }
+:is(.admin--matui, .login-matui) input[type=checkbox], :is(.admin--matui, .login-matui) input[type=radio] { accent-color: var(--mat-accent); }
+
+/* ---- 3c. Status without side bars (COLOR-04, COLOR-08) ------------------------------------------
+   MatUi marks a state with a tint behind the WHOLE item plus an icon and words, never with a coloured bar
+   on one side. admin.css drew such bars on the attention rows, the dashboard tiles and the assistant's steps. */
+:is(.admin--matui, .login-matui) table.dash-attention tr td:first-child,
+:is(.admin--matui, .login-matui) table.attention-list tr { box-shadow: none; }
+/* The row's icon carries the tone: a small tinted circle, the icon in the tone's text colour. */
+:is(.admin--matui, .login-matui) table.dash-attention td.dash-icon .ti {
+  display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%;
+  font-size: 17px; background: var(--mat-surface-3); color: var(--mat-text-muted);
+}
+:is(.admin--matui, .login-matui) table.dash-attention tr.lvl-err td.dash-icon .ti { background: var(--mat-danger-bg); color: var(--mat-danger-text); }
+:is(.admin--matui, .login-matui) table.dash-attention tr.lvl-warn td.dash-icon .ti { background: var(--mat-warning-bg); color: var(--mat-warning-text); }
+:is(.admin--matui, .login-matui) table.dash-attention tr.lvl-info td.dash-icon .ti { background: var(--mat-info-bg); color: var(--mat-info-text); }
+/* A tile that asks for attention: tinted as a whole, its number in the tone. */
+:is(.admin--matui, .login-matui) .stat.is-warn { border-top-width: 1px; background: color-mix(in srgb, var(--mat-warning) 8%, var(--mat-surface)); border-color: color-mix(in srgb, var(--mat-warning) 38%, var(--mat-border)); }
+:is(.admin--matui, .login-matui) .stat.is-err { border-top-width: 1px; background: color-mix(in srgb, var(--mat-danger) 7%, var(--mat-surface)); border-color: color-mix(in srgb, var(--mat-danger) 38%, var(--mat-border)); }
+:is(.admin--matui, .login-matui) .stat.is-warn .n { color: var(--mat-warning-text); }
+:is(.admin--matui, .login-matui) .stat.is-err .n { color: var(--mat-danger-text); }
+/* The assistant's steps: a line all round; warning and error tinted as a whole. */
+:is(.admin--matui, .login-matui) .ai-act { border-left-width: 1px; border-radius: var(--mat-radius); }
+:is(.admin--matui, .login-matui) .ai-act.is-warn { border-color: color-mix(in srgb, var(--mat-warning) 38%, var(--mat-border)); background: color-mix(in srgb, var(--mat-warning) 8%, var(--mat-surface)); }
+:is(.admin--matui, .login-matui) .ai-act.is-error { border-color: color-mix(in srgb, var(--mat-danger) 38%, var(--mat-border)); }
+
+/* ---- 3d. Smaller things --------------------------------------------------------------------------- */
+/* "Built in", "Update available": an accent tint like MatUi's pills, not a black block. */
+:is(.admin--matui, .login-matui) .badge-new { background: var(--mat-accent-soft-strong); color: var(--mat-accent-text); }
+/* The rows of the plugin list and the block list: a card's radius. */
+:is(.admin--matui, .login-matui) .block-item { border-radius: var(--mat-radius-lg); border-color: var(--mat-border); }
+/* A checkbox with its hint below: the hint belongs to it (indented under the label), the next field keeps its distance. */
+:is(.admin--matui, .login-matui) .checkbox-row:has(+ .help) { margin-bottom: 2px; }
+:is(.admin--matui, .login-matui) .checkbox-row + .help { margin: 0 0 var(--mat-space-4) 26px; }
+:is(.admin--matui, .login-matui) .help { color: var(--mat-text-muted); font-size: var(--mat-fs-sm); }
+
+/* ---- 3e. Sign-in, 2FA, OAuth and error pages = MatUi's auth card (SHELL-11) ---------------------- */
+body.login-matui { background: var(--mat-bg); font-family: var(--mat-font); font-size: var(--mat-fs-md); color: var(--mat-text); }
+.login-matui .login-card { border: 1px solid var(--mat-border); border-radius: var(--mat-radius-xl); box-shadow: var(--mat-shadow-2); padding: var(--mat-space-8) var(--mat-space-8) var(--mat-space-6); max-width: 400px; }
+.login-matui .login-logo { height: 36px; margin-bottom: var(--mat-space-6); }
+.login-matui .login-card h1 { font-size: var(--mat-fs-xl); text-transform: none; letter-spacing: 0; margin-bottom: var(--mat-space-5); }
+.login-matui .checkbox-row { font-size: var(--mat-fs-sm); color: var(--mat-text-muted); margin-bottom: var(--mat-space-5); }
+.login-matui .login-back { font-size: var(--mat-fs-sm); color: var(--mat-text-muted); }
+.login-matui .login-back:hover { color: var(--mat-accent-text); }

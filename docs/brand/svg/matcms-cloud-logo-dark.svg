@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 186 48" role="img" aria-label="MatCMS Cloud">
+  <!-- MatCMS "Blöcke": the block editor as a picture (a header bar, columns). The text is pinned to its width with textLength, so whatever font renders it, it never runs past the box. -->
+  <rect width="48" height="48" rx="11" fill="#2563eb"/><rect x="10" y="10" width="28" height="8" rx="2.5" fill="#fff"/><rect x="10" y="21" width="13" height="17" rx="2.5" fill="#fff" fill-opacity=".9"/><rect x="26" y="21" width="12" height="7" rx="2.5" fill="#fff" fill-opacity=".65"/><rect x="26" y="31" width="12" height="7" rx="2.5" fill="#fff" fill-opacity=".65"/>
+  <text x="60" y="25" font-family="'Segoe UI Variable Display','Segoe UI',system-ui,-apple-system,'SF Pro Display','Helvetica Neue',Arial,sans-serif" font-size="30" font-weight="800" textLength="122" lengthAdjust="spacingAndGlyphs" fill="#ecebe6">Mat<tspan fill="#7aa2ff">CMS</tspan></text>
+  <text x="61" y="45" font-family="'Segoe UI Variable Display','Segoe UI',system-ui,-apple-system,'SF Pro Display','Helvetica Neue',Arial,sans-serif" font-size="15" font-weight="700" letter-spacing="2.4" fill="#7aa2ff">CLOUD</text>
+</svg>

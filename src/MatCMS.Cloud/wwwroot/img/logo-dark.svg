@@ -1,21 +1,6 @@
-<!-- The viewBox is trimmed to the ink (was 0 0 232 66, with ~8 units of empty air above the caps).
-     The admin caps the logo at 40px HEIGHT, so every unit of unused height was shrinking everything
-     inside it: the same drawing in a shorter box simply renders larger. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 6 232 58" role="img" aria-label="MatCMS Cloud – the fleet">
-  <!-- Same wordmark as MatCMS (identical font stack, size, weight and colours) so the two products
-       read as one family. "Cloud" takes the tagline slot underneath, in the accent colour. -->
-  <text x="0" y="42" font-family="'Arial Black', 'Arial Bold', Arial, sans-serif" font-size="48" font-weight="900" letter-spacing="0.5">
-    <tspan fill="#eceef1">Mat</tspan><tspan fill="#2563eb">CMS</tspan>
-  </text>
-  <!-- Short on purpose: the logo is a mark, not an explanation. textLength is the line's own natural
-       width plus even tracking (3 units per gap), the same tracking MatCMS's logo uses — the two
-       lines differ in length because they are different words, but they are set identically.
-
-       In the ACCENT colour, which is what "CLOUD" used to carry. The wordmark above is identical in
-       both products, so with the word Cloud gone the colour is the only thing left that tells the
-       two apart at a glance — and it does it without adding a word. -->
-  <text x="2" y="60" font-family="Arial, sans-serif" font-size="16" font-weight="700"
-        textLength="111" lengthAdjust="spacing">
-    <tspan fill="#2563eb">THE FLEET</tspan>
-  </text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 186 48" role="img" aria-label="MatCMS Cloud">
+  <!-- MatCMS "Blöcke": the block editor as a picture (a header bar, columns). The text is pinned to its width with textLength, so whatever font renders it, it never runs past the box. -->
+  <rect width="48" height="48" rx="11" fill="#2563eb"/><rect x="10" y="10" width="28" height="8" rx="2.5" fill="#fff"/><rect x="10" y="21" width="13" height="17" rx="2.5" fill="#fff" fill-opacity=".9"/><rect x="26" y="21" width="12" height="7" rx="2.5" fill="#fff" fill-opacity=".65"/><rect x="26" y="31" width="12" height="7" rx="2.5" fill="#fff" fill-opacity=".65"/>
+  <text x="60" y="25" font-family="'Segoe UI Variable Display','Segoe UI',system-ui,-apple-system,'SF Pro Display','Helvetica Neue',Arial,sans-serif" font-size="30" font-weight="800" textLength="122" lengthAdjust="spacingAndGlyphs" fill="#ecebe6">Mat<tspan fill="#7aa2ff">CMS</tspan></text>
+  <text x="61" y="45" font-family="'Segoe UI Variable Display','Segoe UI',system-ui,-apple-system,'SF Pro Display','Helvetica Neue',Arial,sans-serif" font-size="15" font-weight="700" letter-spacing="2.4" fill="#7aa2ff">CLOUD</text>
 </svg>

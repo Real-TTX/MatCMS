@@ -61,4 +61,17 @@ public class PwaTests : IClassFixture<AppFactory>
         Assert.Contains("apple-touch-icon", admin);
         Assert.Contains("name=\"theme-color\"", admin);
     }
+
+    [Fact]
+    public async Task A_site_with_MatCMS_s_own_logo_gets_the_mark_as_favicon_and_the_dark_logo_in_the_back_office()
+    {
+        var c = _app.Browser();
+        // the word mark is unreadable at 16 px: the mark alone is the tab icon, on the site and on the sign-in page
+        Assert.Contains("rel=\"icon\" href=\"/img/favicon.svg\"", await c.GetStringAsync("/"));
+        Assert.Contains("rel=\"icon\" href=\"/img/favicon.svg\"", await c.GetStringAsync("/login"));
+        await AppFactory.LoginAsync(c);
+        var admin = await c.GetStringAsync("/admin");
+        Assert.Contains("class=\"admin-logo logo-light\" src=\"/img/logo.svg\"", admin);
+        Assert.Contains("class=\"admin-logo logo-dark\" src=\"/img/logo-dark.svg\"", admin);
+    }
 }

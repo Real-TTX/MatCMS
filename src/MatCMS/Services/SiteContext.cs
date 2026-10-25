@@ -260,7 +260,13 @@ public class SiteContext
     public string SiteName => Get(SettingKeys.SiteName, "MatCMS");
     public string LogoUrl => Get(SettingKeys.LogoUrl, "/img/logo.svg");
     /// <summary>Favicon URL; falls back to the site logo when no separate favicon is configured.</summary>
-    public string FaviconUrl => Get(SettingKeys.FaviconUrl, LogoUrl);
+    /// <summary>MatCMS's own logo (the default of <see cref="LogoUrl"/>); it has a dark twin, <see cref="DefaultLogoDark"/>.</summary>
+    public const string DefaultLogo = "/img/logo.svg", DefaultLogoDark = "/img/logo-dark.svg";
+    /// <summary>True while the site shows MatCMS's own logo (no logo of its own set) — then the back office can show its dark twin.</summary>
+    public bool UsesDefaultLogo => string.Equals(LogoUrl, DefaultLogo, StringComparison.OrdinalIgnoreCase);
+    // Without a favicon of its own a site used its LOGO — with MatCMS's logo that is the whole word mark, unreadable at 16 px.
+    // MatCMS's mark alone is the favicon then; a site with a logo of its own keeps using that, as before.
+    public string FaviconUrl => Get(SettingKeys.FaviconUrl, UsesDefaultLogo ? "/img/favicon.svg" : LogoUrl);
     public string FooterText => Get(SettingKeys.FooterText, "© MatCMS");
 
     // --- Custom code / tracking (Settings → Code) ---

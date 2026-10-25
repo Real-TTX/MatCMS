@@ -1,14 +1,5 @@
-<!-- The viewBox is trimmed to the ink (was 0 0 232 66, with ~8 units of empty air above the caps).
-     The admin caps the logo at 40px HEIGHT, so every unit of unused height was shrinking everything
-     inside it: the same drawing in a shorter box simply renders larger. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 6 232 58" role="img" aria-label="MatCMS – the site">
-  <text x="0" y="42" font-family="'Arial Black', 'Arial Bold', Arial, sans-serif" font-size="48" font-weight="900" letter-spacing="0.5">
-    <tspan fill="#010101">Mat</tspan><tspan fill="#2563eb">CMS</tspan>
-  </text>
-  <!-- Short on purpose: the logo is a mark, not an explanation. textLength is set to the line's own
-       natural width plus even tracking (3 units per gap), NOT to the wordmark's width — pinning
-       eight characters across 228 units would tear them apart. It still guarantees the line can
-       never run past the box, whatever font ends up rendering it. -->
-  <text x="2" y="60" font-family="Arial, sans-serif" font-size="16" font-weight="700"
-        textLength="93" lengthAdjust="spacing" fill="#1a1a1a">THE SITE</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 208 48" role="img" aria-label="MatCMS">
+  <!-- MatCMS "Blöcke": the block editor as a picture (a header bar, columns). The text is pinned to its width with textLength, so whatever font renders it, it never runs past the box. -->
+  <rect width="48" height="48" rx="11" fill="#2563eb"/><rect x="10" y="10" width="28" height="8" rx="2.5" fill="#fff"/><rect x="10" y="21" width="13" height="17" rx="2.5" fill="#fff" fill-opacity=".9"/><rect x="26" y="21" width="12" height="7" rx="2.5" fill="#fff" fill-opacity=".65"/><rect x="26" y="31" width="12" height="7" rx="2.5" fill="#fff" fill-opacity=".65"/>
+  <text x="60" y="36.5" font-family="'Segoe UI Variable Display','Segoe UI',system-ui,-apple-system,'SF Pro Display','Helvetica Neue',Arial,sans-serif" font-size="36" font-weight="800" textLength="146" lengthAdjust="spacingAndGlyphs" fill="#0f172a">Mat<tspan fill="#2563eb">CMS</tspan></text>
 </svg>

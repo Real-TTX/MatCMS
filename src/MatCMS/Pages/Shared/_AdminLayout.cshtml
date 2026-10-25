@@ -62,7 +62,16 @@
         <aside class="mat-nav" id="mat-nav">
             <div class="mat-nav__brand">
                 <a href="/admin" title="@Site.SiteName">
-                    <img class="admin-logo" src="@Site.LogoUrl" alt="@Site.SiteName" />
+                    @if (Site.UsesDefaultLogo)
+                    {
+                        @* MatCMS's own logo has a dark twin (admin.css shows the one that fits the scheme); a site's own logo is shown as it is. *@
+                        <img class="admin-logo logo-light" src="@Site.LogoUrl" alt="@Site.SiteName" />
+                        <img class="admin-logo logo-dark" src="@MatCMS.Services.SiteContext.DefaultLogoDark" alt="@Site.SiteName" />
+                    }
+                    else
+                    {
+                        <img class="admin-logo" src="@Site.LogoUrl" alt="@Site.SiteName" />
+                    }
                 </a>
                 <button type="button" class="mat-btn mat-btn--ghost mat-btn--icon mat-nav__close" data-admin-close aria-label="@T["nav.menu"]"><i class="ti ti-x" aria-hidden="true"></i></button>
             </div>

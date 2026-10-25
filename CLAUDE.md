@@ -497,6 +497,12 @@ answers only `/admin` and `/login` navigations — the public site is the visito
 connection drops, a form is not sent while offline (its input stays), and back online a page without unsaved input reloads
 (no stale lists). On a touch screen fields are 16 px (iOS zooms into smaller ones); zoom itself stays allowed. Tests: `PwaTests`.
 
+**The MatCMS logo is "Blöcke"** — an accent tile (#2563eb, rx 11/48) with a header bar and columns, the block editor as a picture,
+next to the word mark "Mat**CMS**" (system font 800, `textLength` pins its width so any font fits the box). Files: CMS
+`wwwroot/img/logo.svg` + `logo-dark.svg` + `favicon.svg` (the mark alone), cloud the same with "CLOUD" under the word mark and its own
+cloud glyph as tab icon; the app icons `MatCMS.Shared.Web/wwwroot/pwa/matcms-*`. A site with MatCMS's own logo (`SiteContext.UsesDefaultLogo`)
+shows the dark twin in a dark back office and the mark as favicon; a site's own logo is shown as it is, as before.
+
 **Colours in the back office only through variables** — light/dark/system is a per-user choice (`User.Theme`
 in both apps, account page → Darstellung) that the admin layouts write into `<html data-theme>`. The variables
 (`--surface`, `--surface-2`, `--sidebar`, `--hover`, `--border-strong`, `--text-2`, `--text-muted`, `--on-ink`,

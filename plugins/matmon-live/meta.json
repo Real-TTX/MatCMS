@@ -1,0 +1,6 @@
+{
+  "Key": "matmon-live",
+  "Name": "Matmon Live",
+  "Version": "1.0",
+  "Description": "Für matmon.eu: der Live-Status der Matmon Cloud und der Sensorkatalog als Blöcke – im Hintergrund aus den anonymen APIs der Cloud gelesen, mit mitgeliefertem Katalog, falls die Cloud nicht antwortet."
+}

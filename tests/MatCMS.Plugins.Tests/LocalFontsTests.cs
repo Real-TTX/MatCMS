@@ -32,8 +32,9 @@ public class LocalFontsTests : IClassFixture<AppFactory>
             var html = await c.GetStringAsync(path);
             Assert.DoesNotContain("fonts.googleapis.com", html);
             Assert.DoesNotContain("fonts.gstatic.com", html);
-            Assert.Contains("/fonts/css2?family=", html);
         }
+        // The public site loads its web fonts through this server; the sign-in page is MatUi's and uses the system font.
+        Assert.Contains("/fonts/css2?family=", await c.GetStringAsync("/"));
         await AppFactory.LoginAsync(c);
         var admin = await c.GetStringAsync("/admin");
         Assert.DoesNotContain("fonts.googleapis.com", admin);

@@ -160,17 +160,8 @@
                     </ol>
                 </nav>
                 <div class="mat-topbar__actions">
-                    @* The Cloud|Website|Admin switch appears only when an instance is the context (somewhere to switch TO);
-                       "Cloud" is the active segment here. Web/Admin go through the instance's SSO (auto-approved).
-                       Account and sign-out are in the user menu at the foot of the menu (SHELL-03). *@
-                    @if (!string.IsNullOrEmpty(vsUrl))
-                    {
-                        <partial name="_ViewSwitch" model="@(new MatCMS.Shared.Web.ViewSwitch(
-                            Active: "cloud", CloudUrl: null,
-                            WebUrl: $"{vsUrl}/sso/start?returnUrl=/&via=cloud",
-                            AdminUrl: $"{vsUrl}/sso/start?returnUrl=/admin&via=cloud",
-                            CloudLabel: T["instances.viewCloud"], WebLabel: T["instances.viewWebsite"], AdminLabel: T["instances.viewAdmin"]))" />
-                    }
+                    @* The bar's own actions first: the Cloud|Website|Admin switch is always the LAST thing, so it stands on
+                       the same pixels here, on the site's bar and in the site's back office. *@
                     @await RenderSectionAsync("TopbarActions", required: false)
                     @if (bare)
                     {
@@ -179,6 +170,17 @@
                         <form method="post" asp-page="/Logout" class="mat-menu__form">
                             <button type="submit" class="mat-btn mat-btn--ghost mat-btn--icon" title="@T["nav.logout"]" aria-label="@T["nav.logout"]"><i class="ti ti-logout-2" aria-hidden="true"></i></button>
                         </form>
+                    }
+                    @* The switch appears only when an instance is the context (somewhere to switch TO); "Cloud" is the active
+                       segment here. Web/Admin go through the instance's SSO (auto-approved). Account and sign-out are in the
+                       user menu at the foot of the menu (SHELL-03). *@
+                    @if (!string.IsNullOrEmpty(vsUrl))
+                    {
+                        <partial name="_ViewSwitch" model="@(new MatCMS.Shared.Web.ViewSwitch(
+                            Active: "cloud", CloudUrl: null,
+                            WebUrl: $"{vsUrl}/sso/start?returnUrl=/&via=cloud",
+                            AdminUrl: $"{vsUrl}/sso/start?returnUrl=/admin&via=cloud",
+                            CloudLabel: T["instances.viewCloud"], WebLabel: T["instances.viewWebsite"], AdminLabel: T["instances.viewAdmin"]))" />
                     }
                 </div>
             </header>

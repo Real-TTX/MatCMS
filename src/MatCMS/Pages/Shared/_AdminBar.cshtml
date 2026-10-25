@@ -21,19 +21,21 @@
         <a class="mab-brand" href="/admin" title="@Site.SiteName" aria-label="@Site.SiteName">
             <img class="mab-logo" src="@Site.LogoUrl" alt="@Site.SiteName" />
         </a>
+        @* The Cloud|Website|Admin switch is the LAST thing in the bar, here and in both back offices, so it sits on the
+           same pixels in all three views and switching never moves it; this bar's own actions stand to its left. *@
         <div class="mab-right">
             @if (editId is int pid)
             {
                 <a class="mab-stool mab-edit" href="/admin/pages/editor/@pid" title="@T["adminbar.editPage"]" aria-label="@T["adminbar.editPage"]"><i class="ti ti-edit" aria-hidden="true"></i></a>
             }
+            <a class="mab-stool mab-account" asp-page="/Admin/Account/Index" title="@T["nav.account"]" aria-label="@T["nav.account"]"><i class="ti ti-user-circle" aria-hidden="true"></i></a>
+            <form method="post" asp-page="/Logout" class="mab-logout">
+                <button type="submit" class="mab-stool mab-out" title="@T["nav.logout"]" aria-label="@T["nav.logout"]"><i class="ti ti-logout-2" aria-hidden="true"></i></button>
+            </form>
             <partial name="_ViewSwitch" model="@(new MatCMS.Shared.Web.ViewSwitch(
                 Active: "web",
                 CloudUrl: cloudLink, WebUrl: null, AdminUrl: "/admin",
                 CloudLabel: T["adminbar.viewCloud"], WebLabel: T["adminbar.viewWebsite"], AdminLabel: T["adminbar.viewAdmin"]))" />
-            <a class="mab-stool mab-account" asp-page="/Admin/Account/Index" title="@T["nav.account"]" aria-label="@T["nav.account"]"><i class="ti ti-user-circle" aria-hidden="true"></i></a>
-            <form method="post" asp-page="/Logout" class="mab-logout" style="margin:0;">
-                <button type="submit" class="mab-stool mab-out" title="@T["nav.logout"]" aria-label="@T["nav.logout"]"><i class="ti ti-logout-2" aria-hidden="true"></i></button>
-            </form>
         </div>
     </div>
 </div>

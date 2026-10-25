@@ -1202,7 +1202,15 @@ body.has-adminbar .site-header { top: 52px; }
     padding: 0 14px; background: var(--mab-nav); border-right: 1px solid var(--mab-line); text-decoration: none; flex: 0 0 auto; }
 /* max-height + max-width:100% so it fits the column and never collapses to 0 width (which a bare width:auto does inside an auto-width flex parent). */
 .mab-logo { max-height: 34px; max-width: 100%; width: auto; object-fit: contain; }
-.mab-right { display: inline-flex; align-items: center; gap: 4px; padding-right: 20px; flex: 0 0 auto; }
+/* The right padding is the back office's top bar's (MatUi's compact content padding: 28 / 24 / 16 px, the same steps as admin-matui.css), so the switch at the end lands on the same pixels in all three views. */
+.mab-right { display: inline-flex; align-items: center; gap: 4px; padding-right: calc(28px + env(safe-area-inset-right, 0px)); flex: 0 0 auto; }
+@media (max-width: 1199px) { .mab-right { padding-right: calc(24px + env(safe-area-inset-right, 0px)); } }
+@media (max-width: 899px) { .mab-right { padding-right: calc(16px + env(safe-area-inset-right, 0px)); } }
+.mab-logout { margin: 0; display: inline-flex; }
+/* While the bar is shown (signed-in admins only) the window's scrollbar is the back office's: thin, its room always kept.
+   Otherwise the switch would sit a normal scrollbar's width further in than in the admin, or move when a page scrolls. */
+html:has(> body.has-adminbar) { scrollbar-width: thin; scrollbar-gutter: stable; }
+.mab-right > .mat-viewswitch { margin-left: 4px; }
 /* Icon-only actions (account, logout): MatUi's ghost icon buttons, 34px, muted until hovered. "Edit this page" is the
    bar's main action and the one icon in the accent, filled (MatUi SHELL-17). */
 .mab-stool { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px;
@@ -1212,21 +1220,21 @@ body.has-adminbar .site-header { top: 52px; }
 .mab-stool.mab-edit { background: var(--mab-accent); color: #fff; margin-right: 4px; }
 .mab-stool.mab-edit:hover { background: color-mix(in oklab, var(--mab-accent) 86%, black); color: #fff; }
 .mab-stool.mab-out:hover { background: var(--mab-danger-bg); color: var(--mab-danger); }
-/* Mobile: the logo column shrinks (the logo scales down via max-width) and the switch segments narrow a touch,
-   so the whole row — logo, switch, account, logout — fits one line on a phone. */
+/* Mobile: the logo column shrinks (the logo scales down via max-width), so the whole row — logo, account, logout,
+   switch — fits one line on a phone. The switch keeps its size and its place, as everywhere. */
 @media (max-width: 640px) {
     .mab-brand { width: 120px; padding: 0 10px; }
-    .mab-right { padding-right: 10px; gap: 2px; }
-    .mat-vs { width: 36px; }
+    .mab-right { gap: 2px; }
 }
 
 /* Cloud | Website | Admin — the ONE view switcher, shared across the cloud's bar, the public site's admin bar and
    the instance back-office (site.css is loaded on all three). MatUi's segmented control: 34px high, a hairline
    around it, muted icons, the current view tinted in the accent (one colour, not one per view). `_ViewSwitch.cshtml`
-   renders it; inside the back office admin-matui.css takes the values from the tokens. */
+   renders it. Fixed pixel sizes on purpose (34 x 34 with its line): it must be the SAME control on the same pixels in
+   the site's bar and both back offices, at every screen and pointer — admin-matui.css only recolours it for dark mode. */
 .mat-viewswitch { display: inline-flex; align-items: center; flex: 0 0 auto;
     border: 1px solid rgba(31, 30, 27, .13); border-radius: 6px; overflow: hidden; background: #fff; }
-.mat-vs { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 32px;
+.mat-vs { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 32px;
     border: 0; background: transparent; cursor: pointer; text-decoration: none; font-size: 17px; color: #5d5b55; }
 .mat-vs + .mat-vs { border-left: 1px solid rgba(31, 30, 27, .13); }
 .mat-vs:hover { background: #efeeea; color: #1f1e1b; }

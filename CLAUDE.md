@@ -465,6 +465,12 @@ switcher (`_ContextPicker`) is MatUi's menu switcher under the logo (`mat-nav__s
 live picture of the CURRENT site (one frame, desktop only, after load — `context-picker.js`); the bar has the breadcrumb
 (cloud / site / page). The admin bar over the public site (`_AdminBar`, `.mat-adminbar` in site.css) has the same look with
 the MatUi values set as its OWN variables — the public site never loads matui.css (it would restyle the customer's template).
+**The Cloud | Website | Admin switch sits on the SAME pixels in all three views** (site bar, CMS admin, cloud): it is always
+the LAST element of its bar (other actions go to its left), its size is fixed px in site.css (never `--mat-control-h`), the
+bar's right padding is the compact content padding in steps (28/24/16 px — never `vw`, which shrinks where the window keeps
+a scrollbar gutter), and both keep a thin scrollbar's room always (`.mat-main` and, while the bar is shown,
+`html:has(> body.has-adminbar)`: `scrollbar-gutter: stable`). Measured with real scrollbars (Playwright hides them unless
+`--hide-scrollbars` is dropped); change one of these and measure again.
 Live site pictures in tile views (`.instance-tile-shot`, `.payload-tile-shot`) are scaled to the tile's real width by
 `admin-shell.js` (`--shot-scale`), never by a fixed factor. The sign-in, 2FA, OAuth and error
 pages (`body.login-page.login-matui`) are MatUi's auth card through the same bridge. A state is a tint behind the WHOLE item

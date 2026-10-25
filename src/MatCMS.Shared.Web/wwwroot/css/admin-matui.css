@@ -18,9 +18,11 @@
 :root[data-density="compact"] {
   --mat-nav-w: 236px;
   --mat-topbar-h: 52px;
-  --mat-content-pad: clamp(16px, 2.4vw, 28px);
+  --mat-content-pad: 28px;                     /* in steps, never vw: the site's bar repeats them, and vw differs where the window keeps a scrollbar gutter */
   --mat-fs-md: .875rem;                        /* 14 px body text */
 }
+@media (max-width: 1199px) { :root[data-density="compact"] { --mat-content-pad: 24px; } }
+@media (max-width: 899px) { :root[data-density="compact"] { --mat-content-pad: 16px; } }
 @media (pointer: fine) {
   :root[data-density="compact"] {
     --mat-control-h: 34px;
@@ -109,12 +111,27 @@ body.admin--matui { display: block; height: auto; overflow: hidden; background: 
 /* The page: block flow (the admin's pages space themselves with margins, MatUi's flex gap would add to them). */
 .admin--matui .mat-page.admin-content { display: block; max-width: none; padding-top: var(--mat-space-6); }
 :root[data-density="compact"] .admin--matui .mat-page.admin-content { padding-top: var(--mat-space-5); }
-/* The Cloud | Website | Admin switch: a quiet segmented control in MatUi's colours. */
-.admin--matui .mat-viewswitch { border: 1px solid var(--mat-border); border-radius: var(--mat-radius); background: var(--mat-surface); overflow: hidden; }
-.admin--matui .mat-vs { height: calc(var(--mat-control-h) - 2px); width: var(--mat-control-h); color: var(--mat-text-muted); }
-.admin--matui .mat-vs + .mat-vs { border-left: 1px solid var(--mat-border); }
-.admin--matui .mat-vs:hover { background: var(--mat-surface-3); color: var(--mat-text); }
-.admin--matui .mat-vs.is-active { background: var(--mat-accent-soft-strong); color: var(--mat-accent-text); }
+/* The Cloud | Website | Admin switch is the LAST thing in the bar and sits on the same pixels in the site's bar and both
+   back offices: its size and light colours are site.css's (fixed px, the same at every pointer), the bar's right padding is
+   the content padding there and here, and the actions group drops MatUi's -8px (meant for ghost icons; a framed control
+   lines up with the content edge, as MatUi does for a primary/secondary button). Only dark mode recolours it here. */
+.admin--matui .mat-topbar__actions { margin-right: 0; gap: var(--mat-space-1); }
+/* The scrollbar must not move it either: the page area always keeps its (thin, MatUi) scrollbar's room, scrolling or not —
+   the site's bar does the same on the window (site.css, html:has(.has-adminbar)), so the switch's distance to the window's
+   edge is one number everywhere. */
+.admin--matui .mat-main { scrollbar-gutter: stable; }
+html[data-theme="dark"] .admin--matui .mat-viewswitch { border-color: var(--mat-border); background: var(--mat-surface); }
+html[data-theme="dark"] .admin--matui .mat-vs { color: var(--mat-text-muted); }
+html[data-theme="dark"] .admin--matui .mat-vs + .mat-vs { border-left-color: var(--mat-border); }
+html[data-theme="dark"] .admin--matui .mat-vs:hover { background: var(--mat-surface-3); color: var(--mat-text); }
+html[data-theme="dark"] .admin--matui .mat-vs.is-active { background: var(--mat-accent-soft-strong); color: var(--mat-accent-text); }
+@media (prefers-color-scheme: dark) {
+  html[data-theme="system"] .admin--matui .mat-viewswitch { border-color: var(--mat-border); background: var(--mat-surface); }
+  html[data-theme="system"] .admin--matui .mat-vs { color: var(--mat-text-muted); }
+  html[data-theme="system"] .admin--matui .mat-vs + .mat-vs { border-left-color: var(--mat-border); }
+  html[data-theme="system"] .admin--matui .mat-vs:hover { background: var(--mat-surface-3); color: var(--mat-text); }
+  html[data-theme="system"] .admin--matui .mat-vs.is-active { background: var(--mat-accent-soft-strong); color: var(--mat-accent-text); }
+}
 
 /* The cloud: a page without the menu (admin-bare) is the bar and the page alone. */
 .mat-app.admin-bare { grid-template-columns: minmax(0, 1fr); }

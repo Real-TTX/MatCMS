@@ -444,6 +444,16 @@ never the second. `Resources/hr.json`/`sk.json` stay on disk (19 of ~1180 keys) 
 language is a finished translation plus one entry in `AdminUiCultures`; `tools/i18n-audit.js` audits
 exactly the languages that are offered.
 
+**Standardsprache and Standardroute are two settings.** `i18n.default` (which language is the default; read at
+startup, a change needs a restart) and `i18n.rootRoute` ("Standardsprache unter „/“", Settings → Sprachen; empty/"1"
+= on, the behaviour every site had): on, the default language has the prefix-less URLs and `/de/…` redirects there;
+off, it lives under its own prefix like the others (`/de`, `/de/kontakt`) and `/`, `/kontakt` redirect there. The
+`/{culture}/{slug?}` route exists for EVERY supported culture so the switch needs no restart (the settings page sets
+`Localizer.SetDefaultAtRoot` live; restore/cloud op take effect at the next start). The redirects are 302 on purpose
+— a cached 301 would outlive switching back. Every public page URL goes through `Localizer.PrefixFor` /
+`SiteContext.LocalizedUrl` — never write `locale == DefaultCulture ? "" : "/" + locale` by hand again (there were
+three copies). Plugin routes accept the default language's prefix only while the Standardroute is off.
+
 Razor Pages use the `Index/Create/Edit` triple with `OnGetAsync` / `OnPost<Action>Async` and PRG via
 `TempData["Flash"]` / `TempData["FlashError"]`.
 

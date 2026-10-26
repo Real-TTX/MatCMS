@@ -61,6 +61,9 @@ public class IndexModel : PageModel
     /// <summary>Chosen DEFAULT (root) content language (Sprachen tab). Applied after a restart.</summary>
     [BindProperty] public string DefaultLanguage { get; set; } = Localizer.DefaultCulture;
 
+    /// <summary>The "Standardroute" (Sprachen tab): the default language at "/" (true) or under its own prefix like the others.</summary>
+    [BindProperty] public bool DefaultAtRoot { get; set; } = true;
+
     /// <summary>The configured default (root) language — the stored setting, or the running default.</summary>
     public string CurrentDefaultLanguage { get; private set; } = Localizer.DefaultCulture;
 
@@ -107,6 +110,7 @@ public class IndexModel : PageModel
         CurrentDefaultLanguage = existing.TryGetValue(SettingKeys.DefaultLanguage, out var dl) && !string.IsNullOrWhiteSpace(dl)
             ? dl.Trim().ToLowerInvariant() : Localizer.DefaultCulture;
         DefaultLanguage = CurrentDefaultLanguage;
+        DefaultAtRoot = Localizer.DefaultAtRoot;
         AllPages = await _db.Pages.AsNoTracking()
             .Where(p => p.Locale == Localizer.DefaultCulture)
             .OrderBy(p => p.Title).ToListAsync();
@@ -294,7 +298,10 @@ public class IndexModel : PageModel
 
         await UpsertSettingAsync(SettingKeys.Languages, csv);
         await UpsertSettingAsync(SettingKeys.DefaultLanguage, newDefault);
+        await UpsertSettingAsync(SettingKeys.DefaultAtRoot, DefaultAtRoot ? "1" : "0");
         await _db.SaveChangesAsync();
+        // The Standardroute needs no restart: the routes for every language prefix exist anyway, only the redirects and the links change.
+        Localizer.SetDefaultAtRoot(DefaultAtRoot ? "1" : "0");
 
         TempData["Flash"] = newDefault != Localizer.DefaultCulture
             ? "Sprachen gespeichert. Die neue Standardsprache wird nach einem Neustart des Servers aktiv."

@@ -24,11 +24,14 @@ internal sealed class PluginRouteTransformer(PluginRegistry registry) : DynamicR
         if (registry.Routes.Count == 0) return NotMine();
 
         var path = http.Request.Path.Value ?? "/";
-        var rest = StripCulture(path);
+        var rest = StripCulture(path, out var culture);
+        // The default language's prefix is an address only while the Standardroute is off; with it on, "/de/shop" stays what it always was.
+        if (culture == Localizer.DefaultCulture && Localizer.DefaultAtRoot) return NotMine();
         var match = registry.MatchRoute(rest, http.Request.Method);
         if (match is null) return NotMine();
-        // A route that has no other languages answers on the plain address only: "/en/blog/x" stays a 404.
-        if (match.Value.Route.Options.DefaultLanguageOnly && rest != path) return NotMine();
+        // A route that has no other languages answers on the plain address and under the default language's own prefix only
+        // ("/de/blog/x" when the Standardroute is off): "/en/blog/x" stays a 404.
+        if (match.Value.Route.Options.DefaultLanguageOnly && culture is not null && culture != Localizer.DefaultCulture) return NotMine();
 
         http.Items[ItemKey] = new PluginMatch(match.Value.Route, match.Value.Values, rest);
         return new ValueTask<RouteValueDictionary>(new RouteValueDictionary { ["page"] = "/PluginPage" });
@@ -37,17 +40,23 @@ internal sealed class PluginRouteTransformer(PluginRegistry registry) : DynamicR
     // The null the framework reads as "this endpoint does not apply, keep looking".
     private static ValueTask<RouteValueDictionary> NotMine() => new((RouteValueDictionary)null!);
 
-    /// <summary>Removes a leading language segment (<c>/en/shop/x</c> gives <c>/shop/x</c>) — only for the
-    /// non-default languages, whose pages live under such a prefix.</summary>
-    internal static string StripCulture(string path)
+    /// <summary>Removes a leading language segment (<c>/en/shop/x</c> gives <c>/shop/x</c>) — any content language, the default one
+    /// included (its pages live under "/de" when the Standardroute is off). <paramref name="culture"/> is the segment taken, or null.</summary>
+    internal static string StripCulture(string path, out string? culture)
     {
+        culture = null;
         var trimmed = path.TrimStart('/');
         var slash = trimmed.IndexOf('/');
         var first = slash < 0 ? trimmed : trimmed.Substring(0, slash);
-        if (first.Length > 0 && Localizer.NonDefaultCultures.Contains(first, StringComparer.OrdinalIgnoreCase))
+        if (first.Length > 0 && Localizer.SupportedCultures.Contains(first, StringComparer.OrdinalIgnoreCase))
+        {
+            culture = first.ToLowerInvariant();
             return slash < 0 ? "/" : trimmed.Substring(slash);
+        }
         return path;
     }
+
+    internal static string StripCulture(string path) => StripCulture(path, out _);
 }
 
 /// <summary>A small fixed-window limit on anonymous plugin POSTs per client address. Reading a plugin

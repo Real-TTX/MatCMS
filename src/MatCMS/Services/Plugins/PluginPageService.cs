@@ -188,7 +188,7 @@ public sealed class PluginPageService
             var ctx = PluginRequestContext.ForBackground(entry.Info, _services, _registry, editorPreview: true);
             var url = await entry.Spec.Preview(ctx, ct);
             if (string.IsNullOrWhiteSpace(url) || !url.StartsWith('/') || url.StartsWith("//")) return null;
-            return page.Locale == Localizer.DefaultCulture ? url : "/" + page.Locale + url;
+            return Localizer.PrefixFor(page.Locale) + url;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

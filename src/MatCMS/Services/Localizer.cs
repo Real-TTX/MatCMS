@@ -33,6 +33,25 @@ public class Localizer
         if (SupportedCultures.Contains(code)) DefaultCulture = code;
     }
 
+    /// <summary>The "Standardroute": true = the default language lives at the prefix-less URLs (/ , /kontakt), false = it has its own
+    /// prefix like every other language (/de, /de/kontakt) and the prefix-less URLs redirect there. Set from <c>i18n.rootRoute</c>.</summary>
+    public static bool DefaultAtRoot { get; private set; } = true;
+
+    /// <summary>Applies the <c>i18n.rootRoute</c> setting: only an explicit "0"/"false"/"off" moves the default language under its prefix,
+    /// so a site that never saw the setting keeps the URLs it always had.</summary>
+    public static void SetDefaultAtRoot(string? value) =>
+        DefaultAtRoot = (value ?? "").Trim().ToLowerInvariant() is not ("0" or "false" or "off" or "no");
+
+    /// <summary>The URL prefix of a content locale for this site: "" for the default language at the root, else "/{locale}".</summary>
+    public static string PrefixFor(string? locale) => PrefixFor(locale, DefaultCulture, DefaultAtRoot);
+
+    /// <summary>The rule itself, without the site's state (tests): an empty locale means the default one.</summary>
+    public static string PrefixFor(string? locale, string defaultCulture, bool defaultAtRoot)
+    {
+        var l = string.IsNullOrEmpty(locale) ? defaultCulture : locale;
+        return l == defaultCulture && defaultAtRoot ? "" : "/" + l;
+    }
+
     /// <summary>
     /// The ROUTABLE culture universe: languages the build ships routes/RequestLocalization for. Which
     /// of these are actually ACTIVE on a site is an admin setting (<c>i18n.languages</c>, see

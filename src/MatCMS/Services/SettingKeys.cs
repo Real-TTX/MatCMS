@@ -27,6 +27,10 @@ public static class SettingKeys
     // i18n: the DEFAULT (root) content language served at prefix-less URLs. Empty = "de". Applied at
     // startup (Localizer.SetDefaultCulture) → a change needs an app restart. Managed under Settings → Sprachen.
     public const string DefaultLanguage = "i18n.default";
+    // i18n: the "Standardroute" — is the default language served at "/" (empty or "1", the behaviour every site had) or under its own
+    // prefix like the others ("0": "/" sends to "/de", "/kontakt" to "/de/kontakt")? Read at startup AND switched live by the settings
+    // page (Localizer.SetDefaultAtRoot); written elsewhere (restore, cloud op) it takes effect with the next start.
+    public const string DefaultAtRoot = "i18n.rootRoute";
 
     // Machine translation (Settings → Sprachen): provider "deepl" | "libretranslate" | "" (off).
     // DeepL free keys end in ":fx" (api-free.deepl.com); LibreTranslate needs a reachable URL

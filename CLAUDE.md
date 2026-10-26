@@ -499,8 +499,9 @@ connection drops, a form is not sent while offline (its input stays), and back o
 
 **The MatCMS logo is "Blöcke"** — an accent tile (#2563eb, rx 11/48) with a header bar and columns, the block editor as a picture,
 next to the word mark "Mat**CMS**" (system font 800, `textLength` pins its width so any font fits the box). Files: CMS
-`wwwroot/img/logo.svg` + `logo-dark.svg` + `favicon.svg` (the mark alone), cloud the same with "CLOUD" under the word mark and its own
-cloud glyph as tab icon; the app icons `MatCMS.Shared.Web/wwwroot/pwa/matcms-*`. A site with MatCMS's own logo (`SiteContext.UsesDefaultLogo`)
+`wwwroot/img/logo.svg` + `logo-dark.svg` + `favicon.svg` (the mark alone), cloud the same with "CLOUD" under the word mark and
+the SAME mark as tab icon (it once had a cloud glyph there — it did not match the logo); only its installed-app icon
+(`pwa/cloud-*`) keeps the cloud glyph, so the two apps differ on a home screen. App icons `MatCMS.Shared.Web/wwwroot/pwa/`. A site with MatCMS's own logo (`SiteContext.UsesDefaultLogo`)
 shows the dark twin in a dark back office and the mark as favicon. A site with a logo of its own may name its dark twin in
 `LogoDarkUrl` (Einstellungen → Allgemein, rollable) — `SiteContext.LogoDarkUrl` = that, else MatCMS's dark logo while MatCMS's logo is in
 use, else none (the one logo in both schemes). Only the back office's sidebar uses it; the public site has no dark scheme.

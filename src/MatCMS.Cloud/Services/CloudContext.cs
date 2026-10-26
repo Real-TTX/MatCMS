@@ -39,9 +39,9 @@ public class CloudContext
 
     public string LogoUrl => "/img/logo.svg";
 
-    /// <summary>The tab icon: the cloud's own app glyph (a cloud on the accent tile) — the full logo is unreadable at 16 px, and a
-    /// tab of the cloud should not look like a tab of one of its sites.</summary>
-    public string FaviconUrl => "/img/favicon.svg";
+    /// <summary>The tab icon: the logo's mark alone (the full logo is unreadable at 16 px). It once was the cloud glyph, which did not
+    /// match the logo beside it; the cloud glyph is left to the installed app's icon (pwa/cloud-*).</summary>
+    public string FaviconUrl => "/img/favicon.svg?v=bloecke";   // a new query, or browsers keep showing the cached cloud glyph
 
     /// <summary>Absolute base URL for links in notification mails. Falls back to the current request,
     /// which is only correct when not behind a scheme-changing proxy — hence the setting.</summary>

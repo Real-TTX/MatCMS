@@ -65,6 +65,14 @@ public static class MmLive
         }, RenderSensorsAsync);
 
         b.Job("refresh", JobSchedule.EveryInterval(TimeSpan.FromMinutes(5)), ctx => RefreshAsync(ctx, CancellationToken.None));
+
+        // The number of sensor types for text elsewhere on the site (the home page's feature card asks for it in the browser): one
+        // source, so the home page and /sensors cannot disagree.
+        b.Route("/matmon-live/count", (ctx, ct) =>
+        {
+            if (_catalogFetched == DateTime.MinValue) _ = RefreshAsync(ctx, CancellationToken.None);
+            return Task.FromResult(PluginResult.Json(new JsonObject { ["count"] = _catalog.Sensors.Count }));
+        }, new PublicRouteOptions { Methods = PluginMethod.Get });
     }
 
     private static string Cloud(IPluginContext ctx)

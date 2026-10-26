@@ -111,5 +111,6 @@ public class MatmonLiveTests : IClassFixture<AppFactory>
         Assert.Contains("42 sensor types", html);                                  // 45 in the snapshot, three internal ones hidden
         Assert.Contains("id=\"cat-network\"", html);
         Assert.DoesNotContain(">Probe Heartbeat<", html);                          // internal types are hidden
+        Assert.Contains("\"count\":42", await browser.GetStringAsync("/matmon-live/count"));   // the same number for the home page
     }
 }

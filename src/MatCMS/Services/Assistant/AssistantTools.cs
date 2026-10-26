@@ -880,10 +880,10 @@ public sealed partial class AssistantTools
         return list;
     }
 
-    /// <summary>Where a page is on the public site: the default language at the root, others under their prefix.</summary>
+    /// <summary>Where a page is on the public site: the default language at the root (unless the Standardroute is off), others under their prefix.</summary>
     public static string PublicUrl(string slug, string locale)
     {
-        var prefix = locale == Localizer.DefaultCulture ? "" : "/" + locale;
+        var prefix = Localizer.PrefixFor(locale);
         return slug == "home" ? (prefix.Length == 0 ? "/" : prefix) : $"{prefix}/{slug}";
     }
 

@@ -154,6 +154,11 @@ html[data-theme="dark"] .admin--matui .mat-vs.is-active { background: var(--mat-
 .admin--matui .inst-switch-shot iframe { position: absolute; top: 0; left: 0; width: 1180px; height: 787px; border: 0;
   transform: scale(.0407); transform-origin: 0 0; pointer-events: none; opacity: 0; transition: opacity .2s ease; }
 .admin--matui .inst-switch-shot iframe.is-loaded { opacity: 1; }
+/* A site's stored picture of its home page (/_preview.webp, SitePreview) in place of the live frame — switcher, tiles, site picker
+   alike: the top of the page, filling the box. Until it has arrived the box shows what is underneath (initial, background). */
+.site-shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block;
+  border: 0; pointer-events: none; opacity: 0; transition: opacity .2s ease; }
+.site-shot.is-loaded { opacity: 1; }
 /* The list opens under the switcher and is wider than the menu: it reaches over the page. */
 .admin--matui .mat-nav .inst-picker-menu { width: 420px; max-width: calc(100vw - 24px); border-color: var(--mat-border-strong); border-radius: var(--mat-radius-lg); box-shadow: var(--mat-shadow-2); }
 .admin--matui .inst-picker-item { border-radius: var(--mat-radius); }

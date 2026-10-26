@@ -341,13 +341,13 @@ public class SiteContext
     public static string PageUrl(Page p) => LocalizedUrl(p.Locale, p.Slug);
 
     /// <summary>
-    /// Builds a public URL for (locale, slug): the default locale keeps root URLs (/, /kontakt);
-    /// every other locale is served under a "/{locale}" prefix (/en, /en/about).
+    /// Builds a public URL for (locale, slug): the default locale keeps root URLs (/, /kontakt) unless the site
+    /// switched its "Standardroute" off (then /de, /de/kontakt); every other locale is served under a "/{locale}" prefix (/en, /en/about).
     /// </summary>
     public static string LocalizedUrl(string? locale, string? slug)
     {
         var isHome = string.IsNullOrEmpty(slug) || slug == "home";
-        var prefix = string.IsNullOrEmpty(locale) || locale == Localizer.DefaultCulture ? "" : "/" + locale;
+        var prefix = Localizer.PrefixFor(locale);
         if (isHome) return prefix.Length == 0 ? "/" : prefix;
         return prefix + "/" + slug;
     }

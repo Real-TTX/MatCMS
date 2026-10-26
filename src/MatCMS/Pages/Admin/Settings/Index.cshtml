@@ -810,6 +810,11 @@
                 <tbody id="lang-rows"></tbody>
             </table>
             <div id="lang-hidden"></div>
+            <label class="checkbox-row" style="margin-top:14px;">
+                <input type="checkbox" name="DefaultAtRoot" value="true" id="lang-root" checked="@(Model.DefaultAtRoot ? "checked" : null)" />
+                @T["settings.langRootRoute"]
+            </label>
+            <div class="help">@Html.Raw(T["settings.langRootRouteHelp"])</div>
             <p class="help" style="margin-top:12px;">@Html.Raw(T["settings.langHelp"])</p>
             <div style="margin-top:8px;"><button type="submit" class="btn">@T["action.save"]</button></div>
         </div>
@@ -871,7 +876,7 @@
                 active.forEach(function (code) {
                     var tr = document.createElement("tr");
                     var isDef = code === def;
-                    var url = isDef ? "/" : "/" + code + "/";
+                    var url = isDef && document.getElementById("lang-root").checked ? "/" : "/" + code + "/";
                     tr.innerHTML =
                         '<td><strong>' + NAMES[code] + '</strong>' + (isDef ? ' <span class="badge badge-on">@T["settings.langDefaultBadge"]</span>' : '') + '</td>' +
                         '<td><span class="mono">' + code + '</span></td>' +
@@ -896,6 +901,7 @@
                 hd.type = "hidden"; hd.name = "DefaultLanguage"; hd.value = def; hidden.appendChild(hd);
             }
 
+            document.getElementById("lang-root").addEventListener("change", render);
             document.getElementById("lang-add").onclick = function () {
                 dsel.innerHTML = "";
                 Object.keys(NAMES).forEach(function (code) {

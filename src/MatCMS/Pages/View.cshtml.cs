@@ -30,6 +30,11 @@ public class ViewModel : PageModel
 
     public async Task<IActionResult> OnGetAsync(string? slug, string? culture)
     {
+        // The "Standardroute": the default language has ONE address — at the root or under its prefix — and the other one sends there,
+        // keeping the query. Temporary (302) on purpose: the setting can be switched back, and a cached 301 would keep visitors on the
+        // old address after that.
+        if (LocaleRedirect(Request.Path.Value, slug, culture) is { } target)
+            return Redirect(target + Request.QueryString);
         var locale = ResolveLocale(culture);
         var page = await LoadAsync(slug, locale);
         // Admins may preview unpublished (draft) pages; everyone else gets 404.
@@ -242,6 +247,22 @@ public class ViewModel : PageModel
 
     private static string Normalize(string? slug) =>
         string.IsNullOrWhiteSpace(slug) ? "home" : slug.Trim().ToLowerInvariant();
+
+    /// <summary>Where a request for the default language belongs when it came in at its other address, or null when it is right where it is:
+    /// with the Standardroute on, "/de/kontakt" goes to "/kontakt"; with it off, "/kontakt" (and "/") goes to "/de/kontakt" ("/de").
+    /// Other languages are never moved.</summary>
+    internal static string? LocaleRedirect(string? path, string? slug, string? culture) =>
+        LocaleRedirect(path, slug, culture, Localizer.DefaultCulture, Localizer.DefaultAtRoot);
+
+    internal static string? LocaleRedirect(string? path, string? slug, string? culture, string defaultCulture, bool defaultAtRoot)
+    {
+        var prefixed = !string.IsNullOrEmpty(culture);
+        if (prefixed && culture != defaultCulture) return null;
+        var wanted = Localizer.PrefixFor(defaultCulture, defaultCulture, defaultAtRoot);     // "" or "/de"
+        if (prefixed == (wanted.Length > 0)) return null;                                     // already at its address
+        var key = string.IsNullOrWhiteSpace(slug) ? "home" : slug.Trim();
+        return key == "home" ? (wanted.Length == 0 ? "/" : wanted) : wanted + "/" + key;
+    }
 
     private static string ResolveLocale(string? culture) =>
         Localizer.IsSupported(culture) ? culture! : Localizer.DefaultCulture;

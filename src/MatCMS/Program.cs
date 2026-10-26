@@ -70,18 +70,19 @@ builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite(connect
 // DB/table/row leaves the built-in "de". An env var wins (handy for containers). A change needs a restart.
 {
     var configuredDefault = Environment.GetEnvironmentVariable("MATCMS_DEFAULT_LANG");
-    if (string.IsNullOrWhiteSpace(configuredDefault))
+    string? rootRoute = null;
+    try
     {
-        try
-        {
-            var opts = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connectionString).Options;
-            using var probe = new AppDbContext(opts);
+        var opts = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connectionString).Options;
+        using var probe = new AppDbContext(opts);
+        if (string.IsNullOrWhiteSpace(configuredDefault))
             configuredDefault = probe.SiteSettings.AsNoTracking()
                 .FirstOrDefault(s => s.Key == SettingKeys.DefaultLanguage)?.Value;
-        }
-        catch { /* fresh DB / not migrated yet → keep the built-in default */ }
+        rootRoute = probe.SiteSettings.AsNoTracking().FirstOrDefault(s => s.Key == SettingKeys.DefaultAtRoot)?.Value;
     }
+    catch { /* fresh DB / not migrated yet → keep the built-in default */ }
     Localizer.SetDefaultCulture(configuredDefault);
+    Localizer.SetDefaultAtRoot(rootRoute);
 }
 
 // Persist data-protection keys so auth cookies survive container restarts.
@@ -213,6 +214,7 @@ builder.Services.AddHttpClient(PostImportService.HttpClientName, c =>
 builder.Services.AddScoped<PostImportService>();
 // Stateless apart from the file cache it manages, so one instance for the whole app.
 builder.Services.AddSingleton<ThumbnailService>();
+builder.Services.AddSingleton<SitePreview>();
 builder.Services.AddScoped<MediaEditor>();
 builder.Services.AddScoped<VersionService>();
 builder.Services.AddScoped<EmailService>();
@@ -337,13 +339,13 @@ builder.Services.AddRazorPages(options =>
     // Everything under /Admin requires the Admin role.
     options.Conventions.AuthorizeFolder("/Admin", "Admin");
 
-    // Multilingual content routing: the default locale (de) keeps its existing root URLs
-    // (handled by the page's own "/{slug?}" route). Every non-default locale gets a second
-    // route on the same View page: "/{culture}/{slug?}" (e.g. /en, /en/about), constrained to
-    // the supported non-default cultures so it never shadows the default slug route.
-    if (Localizer.NonDefaultCultures.Count > 0)
+    // Multilingual content routing: the page's own "/{slug?}" route answers the prefix-less URLs, a second route on
+    // the same View page answers "/{culture}/{slug?}" (/en, /en/about) — for EVERY supported culture, the default one
+    // included: with the "Standardroute" off the default language lives at /de/…, with it on /de/… is a redirect to the
+    // prefix-less URL (View.OnGetAsync decides, live, from Localizer.DefaultAtRoot). Constrained to the culture codes, so
+    // it never shadows a page slug.
     {
-        var pattern = string.Join("|", Localizer.NonDefaultCultures
+        var pattern = string.Join("|", Localizer.SupportedCultures
             .Select(System.Text.RegularExpressions.Regex.Escape));
         options.Conventions.AddPageRoute("/View", $"{{culture:regex(^({pattern})$)}}/{{slug?}}");
     }
@@ -1029,13 +1031,40 @@ app.MapGet("/admin/api/media", async (MatCMS.Data.AppDbContext db) =>
     return Results.Ok(items);
 }).RequireAuthorization("Admin");
 
+// The site's picture of its home page (SitePreview): shown by the admin's switcher and the cloud's tiles and site picker instead of the live
+// site in a frame. Public — it shows the public home page — and revalidated on every use (no-cache + ETag), so a new picture is seen at once.
+app.MapGet("/_preview.webp", (HttpContext http, SitePreview preview) =>
+{
+    if (!preview.Exists) return Results.NotFound();
+    var at = File.GetLastWriteTimeUtc(preview.ImagePath);
+    http.Response.Headers.CacheControl = "no-cache";
+    return Results.File(preview.ImagePath, "image/webp", lastModified: at,
+        entityTag: new Microsoft.Net.Http.Headers.EntityTagHeaderValue("\"" + at.Ticks.ToString("x") + "\""));
+});
+
+// The admin's browser hands in a new picture (admin-shell.js takes it when the layout says it is due). The body is the image itself.
+app.MapPost("/admin/api/site-preview", async (HttpContext http, SitePreview preview, MatCMS.Data.AppDbContext db,
+    Microsoft.AspNetCore.Antiforgery.IAntiforgery antiforgery) =>
+{
+    try { await antiforgery.ValidateRequestAsync(http); }
+    catch (Microsoft.AspNetCore.Antiforgery.AntiforgeryValidationException) { return Results.BadRequest(new { error = "Sicherheits-Token fehlt." }); }
+    if (http.Request.ContentLength is null or > 6 * 1024 * 1024) return Results.BadRequest(new { error = "Bild fehlt oder ist zu groß." });
+    using var buffer = new MemoryStream();
+    await http.Request.Body.CopyToAsync(buffer, http.RequestAborted);
+    if (buffer.Length > 6 * 1024 * 1024) return Results.BadRequest(new { error = "Bild zu groß." });
+    buffer.Position = 0;
+    return await preview.SaveAsync(buffer, db, http.RequestAborted)
+        ? Results.Ok(new { ok = true, url = "/_preview.webp?v=" + preview.Version })
+        : Results.BadRequest(new { error = "Kein lesbares Bild." });
+}).RequireAuthorization("Admin");
+
 // Published pages (admin only) — used by the internal link picker for URL fields.
 app.MapGet("/admin/api/pages", async (MatCMS.Data.AppDbContext db) =>
 {
     var items = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
         db.Pages.AsNoTracking().Where(p => p.IsPublished && p.OwnerPlugin == null)
             .OrderBy(p => p.Locale).ThenBy(p => p.Title)
-            .Select(p => new { title = p.Title, url = p.Slug == "home" ? "/" : "/" + p.Slug, locale = p.Locale }));
+            .Select(p => new { title = p.Title, url = SiteContext.LocalizedUrl(p.Locale, p.Slug), locale = p.Locale }));
     return Results.Ok(items);
 }).RequireAuthorization("Admin");
 
@@ -1046,7 +1075,7 @@ app.MapGet("/admin/api/link-targets", async (HttpContext http, MatCMS.Data.AppDb
     var groups = new List<object>();
     var pages = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
         db.Pages.AsNoTracking().Where(p => p.IsPublished && p.OwnerPlugin == null).OrderBy(p => p.Locale).ThenBy(p => p.Title)
-            .Select(p => new { title = p.Title, url = p.Slug == "home" ? "/" : "/" + p.Slug }));
+            .Select(p => new { title = p.Title, url = SiteContext.LocalizedUrl(p.Locale, p.Slug) }));
     if (pages.Count > 0) groups.Add(new { group = t["nav.pages"].ToString(), items = pages });
     foreach (var g in await plugins.LinkTargetsAsync(http.RequestServices, http.RequestAborted))
         groups.Add(new { group = g.Group, items = g.Items.Select(i => new { title = i.Label, url = i.Url }).ToList() });

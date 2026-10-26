@@ -444,6 +444,16 @@ never the second. `Resources/hr.json`/`sk.json` stay on disk (19 of ~1180 keys) 
 language is a finished translation plus one entry in `AdminUiCultures`; `tools/i18n-audit.js` audits
 exactly the languages that are offered.
 
+**Standardsprache and Standardroute are two settings.** `i18n.default` (which language is the default; read at
+startup, a change needs a restart) and `i18n.rootRoute` ("Standardsprache unter „/“", Settings → Sprachen; empty/"1"
+= on, the behaviour every site had): on, the default language has the prefix-less URLs and `/de/…` redirects there;
+off, it lives under its own prefix like the others (`/de`, `/de/kontakt`) and `/`, `/kontakt` redirect there. The
+`/{culture}/{slug?}` route exists for EVERY supported culture so the switch needs no restart (the settings page sets
+`Localizer.SetDefaultAtRoot` live; restore/cloud op take effect at the next start). The redirects are 302 on purpose
+— a cached 301 would outlive switching back. Every public page URL goes through `Localizer.PrefixFor` /
+`SiteContext.LocalizedUrl` — never write `locale == DefaultCulture ? "" : "/" + locale` by hand again (there were
+three copies). Plugin routes accept the default language's prefix only while the Standardroute is off.
+
 Razor Pages use the `Index/Create/Edit` triple with `OnGetAsync` / `OnPost<Action>Async` and PRG via
 `TempData["Flash"]` / `TempData["FlashError"]`.
 
@@ -521,6 +531,24 @@ plugin menu icons are Tabler names (`ti-star`).
 `<html data-dlg-ok/-cancel>`) returns a Promise. A form asks with `data-confirm="…"` (a `.btn-danger` submit or
 `data-confirm-danger` makes OK red); never `onsubmit="return confirm(…)"`. Plugin action buttons (`ActionButton(confirm:)`)
 render `data-confirm` too.
+
+## The site's picture of itself (SitePreview)
+
+The admin's site switcher and the cloud's instance tiles, site picker and top-bar switcher used to load every site LIVE in an iframe
+(the switcher's on every single admin page). Now a site keeps a picture of its home page: `appdata/site-preview.webp`, served
+public at **`/_preview.webp`** (no-cache + ETag, so a new picture is seen at once and an unchanged one costs a 304).
+- **Taken in the admin's browser, not on the server** (no browser in the image): `Services/SitePreview.cs` decides when one is due
+  (none yet, a content fingerprint changed — published pages' last change, active template, header menu, site name/logo — or older
+  than 7 days; never twice within 10 min) and `_AdminLayout` then renders `[data-site-shot-due]`; `admin-shell.js` loads `/` into an
+  off-screen same-origin frame, loads the vendored `wwwroot/lib/modern-screenshot` (MIT) INTO that frame and draws the frame's own
+  document, posts the WebP to `POST /admin/api/site-preview` (Admin + antiforgery header), the server re-encodes it with ImageSharp
+  (top cut-out, 800×500). Only on sites connected to a cloud (they are the ones showing it), desktop only.
+- Traps found on the way: the library waits for EVERY `<img>` of the page — lazy ones below the fold never load in a hidden frame, so
+  without `timeout: 3000` it waits its default 30 s; Git Bash rewrites a CDP navigate path "/admin" into a Windows path (test with
+  `MSYS_NO_PATHCONV=1`).
+- **Where it is shown:** `img.site-shot[data-fallback]` (CSS in `admin-matui.css`). A site without a picture (or an older version
+  without the endpoint) answers 404 and `admin-shell.js` swaps in the live frame it always had (never on a phone for the small ones).
+  The instance Details page keeps its live frame on purpose.
 
 ## The media library ("Bild bearbeiten")
 

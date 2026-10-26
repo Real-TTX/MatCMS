@@ -3,6 +3,9 @@
 @inject MatCMS.Services.VersionService Version
 @inject Microsoft.Extensions.Options.IOptions<Microsoft.AspNetCore.Builder.RequestLocalizationOptions> LocOptions
 @inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment Env
+@inject MatCMS.Services.SitePreview Preview
+@inject MatCMS.Data.AppDbContext Db
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @{
     var title = ViewData["Title"] as string ?? "Admin";
     var displayName = User.FindFirst("DisplayName")?.Value ?? User.Identity?.Name ?? "Admin";
@@ -34,6 +37,9 @@
     var cloudLink = string.IsNullOrEmpty(cloudUrl)
         ? null
         : (!string.IsNullOrEmpty(cloudId) ? $"{cloudUrl}/Admin/Instances/Open/{Uri.EscapeDataString(cloudId)}" : cloudUrl);
+    // The site's picture of its home page (SitePreview): only a site connected to a cloud shows it (here and in the cloud). When it is
+    // missing or out of date, this admin's browser takes a new one in the background (admin-shell.js).
+    var (shotVersion, shotDue) = cloudLink is null ? ((string?)null, false) : await Preview.StateAsync(Db);
     // MatUi's shell (SHELL-03): the user at the foot of the menu, opening a context menu; initials for the avatar.
     var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "";
     var initials = string.Concat(displayName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(w => char.ToUpperInvariant(w[0])));
@@ -87,7 +93,14 @@
                             <span class="mat-switcher__icon inst-switch-shot">
                                 <span class="inst-picker-initial">@siteName.Trim().FirstOrDefault().ToString().ToUpperInvariant()</span>
                                 @* The site's own home page, small: one frame, after the page has loaded, desktop only (admin-shell.js). *@
-                                <iframe data-src="/" title="@siteName" tabindex="-1" scrolling="no" aria-hidden="true"></iframe>
+                                @if (shotVersion is not null)
+                                {
+                                    <img class="site-shot" src="/_preview.webp?v=@shotVersion" alt="" aria-hidden="true" data-fallback="/" />
+                                }
+                                else
+                                {
+                                    <iframe data-src="/" title="@siteName" tabindex="-1" scrolling="no" aria-hidden="true"></iframe>
+                                }
                             </span>
                             <span class="mat-switcher__text">
                                 <small>@T["adminbar.viewWebsite"]</small>
@@ -219,6 +232,11 @@
     </div>
     @Html.AntiForgeryToken()
 
+    @if (shotDue)
+    {
+        <div hidden data-site-shot-due data-lib="@Url.Content("~/lib/modern-screenshot/modern-screenshot.js")"
+             data-token="@Antiforgery.GetAndStoreTokens(Context).RequestToken"></div>
+    }
     <script src="~/_content/MatCMS.Shared.Web/js/admin-shell.js" asp-append-version="true"></script>
     <script src="~/js/media-picker.js" asp-append-version="true"></script>
     <script src="~/_content/MatCMS.Shared.Web/js/ui-fields.js" asp-append-version="true"></script>

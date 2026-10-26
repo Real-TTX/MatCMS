@@ -214,6 +214,7 @@ builder.Services.AddHttpClient(PostImportService.HttpClientName, c =>
 builder.Services.AddScoped<PostImportService>();
 // Stateless apart from the file cache it manages, so one instance for the whole app.
 builder.Services.AddSingleton<ThumbnailService>();
+builder.Services.AddSingleton<SitePreview>();
 builder.Services.AddScoped<MediaEditor>();
 builder.Services.AddScoped<VersionService>();
 builder.Services.AddScoped<EmailService>();
@@ -1028,6 +1029,33 @@ app.MapGet("/admin/api/media", async (MatCMS.Data.AppDbContext db) =>
         db.Media.AsNoTracking().OrderByDescending(m => m.Id)
             .Select(m => new { url = m.Url, name = m.FileName, tags = m.Tags }));
     return Results.Ok(items);
+}).RequireAuthorization("Admin");
+
+// The site's picture of its home page (SitePreview): shown by the admin's switcher and the cloud's tiles and site picker instead of the live
+// site in a frame. Public — it shows the public home page — and revalidated on every use (no-cache + ETag), so a new picture is seen at once.
+app.MapGet("/_preview.webp", (HttpContext http, SitePreview preview) =>
+{
+    if (!preview.Exists) return Results.NotFound();
+    var at = File.GetLastWriteTimeUtc(preview.ImagePath);
+    http.Response.Headers.CacheControl = "no-cache";
+    return Results.File(preview.ImagePath, "image/webp", lastModified: at,
+        entityTag: new Microsoft.Net.Http.Headers.EntityTagHeaderValue("\"" + at.Ticks.ToString("x") + "\""));
+});
+
+// The admin's browser hands in a new picture (admin-shell.js takes it when the layout says it is due). The body is the image itself.
+app.MapPost("/admin/api/site-preview", async (HttpContext http, SitePreview preview, MatCMS.Data.AppDbContext db,
+    Microsoft.AspNetCore.Antiforgery.IAntiforgery antiforgery) =>
+{
+    try { await antiforgery.ValidateRequestAsync(http); }
+    catch (Microsoft.AspNetCore.Antiforgery.AntiforgeryValidationException) { return Results.BadRequest(new { error = "Sicherheits-Token fehlt." }); }
+    if (http.Request.ContentLength is null or > 6 * 1024 * 1024) return Results.BadRequest(new { error = "Bild fehlt oder ist zu groß." });
+    using var buffer = new MemoryStream();
+    await http.Request.Body.CopyToAsync(buffer, http.RequestAborted);
+    if (buffer.Length > 6 * 1024 * 1024) return Results.BadRequest(new { error = "Bild zu groß." });
+    buffer.Position = 0;
+    return await preview.SaveAsync(buffer, db, http.RequestAborted)
+        ? Results.Ok(new { ok = true, url = "/_preview.webp?v=" + preview.Version })
+        : Results.BadRequest(new { error = "Kein lesbares Bild." });
 }).RequireAuthorization("Admin");
 
 // Published pages (admin only) — used by the internal link picker for URL fields.

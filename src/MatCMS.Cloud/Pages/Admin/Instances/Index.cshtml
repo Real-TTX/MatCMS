@@ -86,8 +86,8 @@
                     }
                     else
                     {
-                        <iframe src="@i.PreviewUrl" title="@i.Name" loading="lazy" tabindex="-1" scrolling="no"
-                                referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts"></iframe>
+                        @* The site's stored picture of its home page (SitePreview); a site without one shows the live frame (admin-shell.js). *@
+                        <img class="site-shot" src="@(i.PreviewUrl!.TrimEnd('/'))/_preview.webp" alt="" loading="lazy" referrerpolicy="no-referrer" data-fallback="@i.PreviewUrl" />
                     }
                 </div>
                 <div class="instance-tile-body">

@@ -34,9 +34,9 @@
                 <span class="inst-picker-initial">@((current.Name ?? "?").Trim().FirstOrDefault().ToString().ToUpperInvariant())</span>
                 @if (curShot)
                 {
-                    @* One frame, the current site's, filled after the page has loaded (context-picker.js) — never the whole list. *@
-                    <iframe data-src="@curUrl" title="@current.Name" tabindex="-1" scrolling="no" aria-hidden="true"
-                            referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts"></iframe>
+                    @* The site's stored picture of its home page (SitePreview on the instance); a site without one falls back to the live
+                       frame (admin-shell.js) — the frame used to be loaded on EVERY page of the cloud. *@
+                    <img class="site-shot" src="@(curUrl!.TrimEnd('/'))/_preview.webp" alt="" aria-hidden="true" referrerpolicy="no-referrer" data-fallback="@curUrl" />
                 }
             </span>
         }
@@ -88,8 +88,9 @@
                         @* data-src, not src: every thumbnail is a whole customer website with its scripts. They are loaded
                            only on the desktop and only when their entry scrolls into view (context-picker.js) — loading
                            all of them at once made phone browsers give up ("can't show this page"). *@
-                        <iframe data-src="@i.PreviewUrl" title="@i.Name" tabindex="-1" scrolling="no"
-                                referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts"></iframe>
+                        @* The site's stored picture (lazy: the menu is hidden until it is opened, and a hidden picture is not fetched);
+                           without one, the live frame as before. *@
+                        <img class="site-shot" src="@(i.PreviewUrl!.TrimEnd('/'))/_preview.webp" alt="" aria-hidden="true" loading="lazy" referrerpolicy="no-referrer" data-fallback="@i.PreviewUrl" />
                     }
                 </span>
                 <span class="inst-picker-meta">

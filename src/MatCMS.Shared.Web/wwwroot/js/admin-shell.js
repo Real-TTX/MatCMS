@@ -90,6 +90,100 @@
         if (document.readyState === 'complete') fill(); else window.addEventListener('load', fill);
     }
 
+    // --- a site's stored picture of its home page (/_preview.webp): faded in when it has arrived; a site that has none yet (or is
+    // older than the picture) answers 404, and the box falls back to the live frame it always had ---
+    function liveFrame(img) {
+        var src = img.getAttribute('data-fallback');
+        var box = img.parentNode;
+        img.remove();
+        if (!src || !box) return;
+        // the small pictures of the bar and the site picker never load a live site on a phone (the initial stays)
+        if (box.matches('.inst-switch-shot, .inst-picker-shot') && !window.matchMedia('(min-width: 861px)').matches) return;
+        var fr = document.createElement('iframe');
+        fr.setAttribute('tabindex', '-1'); fr.setAttribute('scrolling', 'no'); fr.setAttribute('aria-hidden', 'true');
+        fr.setAttribute('referrerpolicy', 'no-referrer');
+        if (/^https?:/i.test(src)) fr.setAttribute('sandbox', 'allow-same-origin allow-scripts');
+        fr.addEventListener('load', function () { fr.classList.add('is-loaded'); });
+        fr.src = src;
+        box.appendChild(fr);
+        // tiles scale their frame to the tile's width (see below); a frame added later is measured here
+        if (box.matches('.instance-tile-shot, .payload-tile-shot') && fr.offsetWidth)
+            box.style.setProperty('--shot-scale', (box.clientWidth / fr.offsetWidth).toFixed(4));
+    }
+    document.querySelectorAll('img.site-shot').forEach(function (img) {
+        var shown = function () { img.classList.add('is-loaded'); };
+        if (img.complete && img.naturalWidth) shown();
+        else if (img.complete && img.getAttribute('src')) liveFrame(img);
+        else {
+            img.addEventListener('load', shown);
+            img.addEventListener('error', function () { liveFrame(img); });
+        }
+    });
+
+    // --- taking that picture (CMS admin of a site connected to a cloud): when the layout says one is due, the home page is loaded into
+    // a hidden same-origin frame at desktop size, drawn with the vendored modern-screenshot INSIDE that frame (its own document), and
+    // posted; the server re-encodes it. Desktop only, after the page has settled, at most one try per ten minutes per tab. ---
+    var due = document.querySelector('[data-site-shot-due]');
+    if (due && window.matchMedia('(min-width: 861px)').matches && window.fetch && window.Promise) {
+        var tried = 0;
+        try { tried = +(sessionStorage.getItem('matSiteShot') || 0); } catch (e) { /* private mode */ }
+        if (Date.now() - tried > 10 * 60 * 1000) {
+            var take = function () {
+                try { sessionStorage.setItem('matSiteShot', String(Date.now())); } catch (e) { /* private mode */ }
+                var fr = document.createElement('iframe');
+                fr.setAttribute('aria-hidden', 'true'); fr.setAttribute('tabindex', '-1');
+                // Off screen, NOT transparent: Chromium throttles drawing in a frame with opacity 0, and the picture then takes half a minute.
+                fr.style.cssText = 'position:fixed;left:-20000px;top:0;width:1280px;height:800px;border:0;pointer-events:none';
+                var done = function () { if (fr.parentNode) fr.parentNode.removeChild(fr); };
+                var timer = setTimeout(done, 60000);
+                fr.addEventListener('load', function () {
+                    var w = fr.contentWindow, d = fr.contentDocument;
+                    if (!w || !d || !d.head) { done(); return; }
+                    var s = d.createElement('script');
+                    s.src = due.getAttribute('data-lib');
+                    s.onerror = done;
+                    s.onload = function () {
+                        (d.fonts && d.fonts.ready ? d.fonts.ready : Promise.resolve())
+                            .then(function () { return new Promise(function (r) { setTimeout(r, 1500); }); })
+                            .then(function () {
+                                var bg = w.getComputedStyle(d.body).backgroundColor;
+                                return w.modernScreenshot.domToBlob(d.documentElement, {
+                                    // timeout: the library waits for EVERY picture of the page, and a lazy one below the fold never loads in a
+                                    // hidden frame — it would wait its default 30 s for pictures the cut-out does not even show
+                                    width: 1280, height: 800, scale: 0.75, type: 'image/webp', quality: 0.85, timeout: 3000,
+                                    backgroundColor: bg && bg !== 'rgba(0, 0, 0, 0)' ? bg : '#ffffff'
+                                });
+                            })
+                            .then(function (blob) {
+                                return fetch('/admin/api/site-preview', {
+                                    method: 'POST', credentials: 'same-origin', body: blob,
+                                    headers: { 'Content-Type': blob.type || 'image/webp', 'RequestVerificationToken': due.getAttribute('data-token') }
+                                });
+                            })
+                            .then(function (r) { return r.ok ? r.json() : null; })
+                            .then(function (j) {
+                                var box = document.querySelector('.inst-switch-shot');
+                                if (!j || !j.url || !box) return;
+                                box.querySelectorAll('iframe, img.site-shot').forEach(function (x) { x.remove(); });
+                                var img = new Image();
+                                img.className = 'site-shot'; img.alt = ''; img.setAttribute('aria-hidden', 'true');
+                                img.onload = function () { img.classList.add('is-loaded'); };
+                                img.src = j.url;
+                                box.appendChild(img);
+                            })
+                            .catch(function () { /* no picture this time; the live frame stays */ })
+                            .then(function () { clearTimeout(timer); done(); });
+                    };
+                    d.head.appendChild(s);
+                });
+                fr.src = '/';
+                document.body.appendChild(fr);
+            };
+            var later = function () { setTimeout(function () { (window.requestIdleCallback || function (f) { f(); })(take); }, 2500); };
+            if (document.readyState === 'complete') later(); else window.addEventListener('load', later);
+        }
+    }
+
     // --- live site pictures in tile views: the frame renders at desktop width (its CSS width) and is scaled to the
     // tile's real width, so it fills the tile at every screen size instead of a fixed factor leaving a gap ---
     var shots = document.querySelectorAll('.instance-tile-shot, .payload-tile-shot');

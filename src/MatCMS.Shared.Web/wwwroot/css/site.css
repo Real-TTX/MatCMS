@@ -890,7 +890,7 @@ html.mat-langm-lock { overflow: hidden; }
         top: 100%; left: 0; right: 0;
         flex-direction: column;
         gap: 0;
-        background: #fff;
+        background: var(--bg, #fff); /* the page colour, not white: a dark site (or a dark mode of one) had light words on white */
         border-bottom: 1px solid var(--line);
         padding: 8px 24px 20px;
     }
@@ -940,7 +940,7 @@ html.mat-langm-lock { overflow: hidden; }
     .mat-hassub > .mat-sub {
         position: absolute; top: 100%; left: 0; z-index: 500;
         flex-direction: column; min-width: 210px; padding: 8px 0;
-        background: #fff; border: 1px solid rgba(0,0,0,.10); border-radius: 12px;
+        background: var(--bg, #fff); border: 1px solid rgba(0,0,0,.10); border-radius: 12px;
         box-shadow: 0 16px 40px rgba(0,0,0,.16);
     }
     .mat-hassub:hover > .mat-sub, .mat-hassub:focus-within > .mat-sub, .mat-hassub.open > .mat-sub { display: flex; }
@@ -948,7 +948,7 @@ html.mat-langm-lock { overflow: hidden; }
     .main-nav > .mat-hassub:last-child > .mat-sub { left: auto; right: 0; }
     .mat-sub a {
         display: block; padding: 8px 20px; margin: 0; white-space: nowrap;
-        color: #1a1a1a; font-size: 15px; line-height: 1.5; border: 0;
+        color: var(--black, #1a1a1a); font-size: 15px; line-height: 1.5; border: 0;
     }
     .mat-sub a::after { display: none !important; } /* kill inherited underline/caret animations */
     .mat-sub a:hover { background: rgba(0,0,0,.06); }

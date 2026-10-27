@@ -87,8 +87,10 @@ public class MatmonLiveTests : IClassFixture<AppFactory>
         {
             ["partners"] = new JsonArray(
                 new JsonObject { ["id"] = withLogo, ["name"] = "Netz & <Co>", ["description"] = "Monitoring für den Mittelstand.", ["website"] = "https://netz.example",
-                    ["city"] = "Stuttgart", ["country"] = "DE", ["logoUrl"] = cloud.Url + "/api/partners/" + withLogo + "/logo", ["pageUrl"] = "https://cloud.example/netz" },
-                new JsonObject { ["id"] = Guid.NewGuid().ToString(), ["name"] = "Evil", ["website"] = "javascript:alert(1)", ["country"] = "AT" },
+                    ["city"] = "Stuttgart", ["country"] = "DE", ["logoUrl"] = cloud.Url + "/api/partners/" + withLogo + "/logo", ["pageUrl"] = "https://cloud.example/netz",
+                    ["email"] = "hallo@netz.example", ["phone"] = "+49 711 123-456" },
+                new JsonObject { ["id"] = Guid.NewGuid().ToString(), ["name"] = "Evil", ["website"] = "javascript:alert(1)", ["country"] = "AT",
+                    ["email"] = "x\"onmouseover=\"alert(1)@evil.example", ["phone"] = "javascript:alert(1)" },
                 new JsonObject { ["id"] = "not-a-guid", ["name"] = "Broken" })
         }.ToJsonString();
         cloud.Bytes["/api/partners/" + withLogo + "/logo"] = pngLogo;
@@ -135,6 +137,9 @@ public class MatmonLiveTests : IClassFixture<AppFactory>
         Assert.Contains("href=\"https://cloud.example/netz\"", html);
         Assert.Contains(">Evil<", html);
         Assert.DoesNotContain("javascript:alert", html);
+        Assert.Contains("href=\"mailto:hallo@netz.example\"", html);                // the public contact, as links
+        Assert.Contains("href=\"tel:+49711123456\"", html);
+        Assert.DoesNotContain("onmouseover", html);                                 // a crafted address is left out, not escaped into a link
         Assert.DoesNotContain(">Broken<", html);
         Assert.Contains("/matmon-live/partner-logo/" + withLogo, html);              // the logo through this site, never the cloud's address
         Assert.DoesNotContain(cloud.Url, html);

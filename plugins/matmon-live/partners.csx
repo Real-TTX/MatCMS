@@ -16,7 +16,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using MatCMS.Plugin;
 
-public sealed record MmPartner(string Id, string Name, string Description, string Website, string City, string Country, bool HasLogo, string PageUrl);
+public sealed record MmPartner(string Id, string Name, string Description, string Website, string City, string Country, bool HasLogo, string PageUrl,
+    string Email = "", string Phone = "");
 
 public static class MmPartners
 {
@@ -59,6 +60,14 @@ public static class MmPartners
     public static string SafeUrl(string url) =>
         Uri.TryCreate(url, UriKind.Absolute, out var u) && (u.Scheme == Uri.UriSchemeHttps || u.Scheme == Uri.UriSchemeHttp) ? u.AbsoluteUri : "";
 
+    /// <summary>A public e-mail address the partner chose to show, or "" - only plain name@domain, so it can stand in a mailto: link.</summary>
+    public static string SafeEmail(string email) =>
+        email.Length is > 3 and <= 200 && System.Text.RegularExpressions.Regex.IsMatch(email, @"^[^\s@<>""'()\\,;:]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$") ? email : "";
+
+    /// <summary>A phone number, or "" - digits, spaces and + ( ) - / . only, so it can stand in a tel: link.</summary>
+    public static string SafePhone(string phone) =>
+        phone.Length is >= 5 and <= 40 && phone.All(c => char.IsAsciiDigit(c) || c is ' ' or '+' or '(' or ')' or '-' or '/' or '.') ? phone : "";
+
     public static IReadOnlyList<MmPartner>? Parse(string json)
     {
         try
@@ -66,7 +75,7 @@ public static class MmPartners
             if (JsonNode.Parse(json) is not JsonObject o || o["partners"] is not JsonArray arr) return null;
             return arr.OfType<JsonObject>()
                 .Select(p => new MmPartner(S(p["id"]), S(p["name"]), S(p["description"]), SafeUrl(S(p["website"])), S(p["city"]), S(p["country"]),
-                    S(p["logoUrl"]).Length > 0, SafeUrl(S(p["pageUrl"]))))
+                    S(p["logoUrl"]).Length > 0, SafeUrl(S(p["pageUrl"])), SafeEmail(S(p["email"])), SafePhone(S(p["phone"]))))
                 .Where(p => Guid.TryParse(p.Id, out _) && p.Name.Length > 0)
                 .OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
                 .ToList();
@@ -83,7 +92,7 @@ public static class MmPartners
         try
         {
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
-            http.DefaultRequestHeaders.UserAgent.ParseAdd("MatCMS-Matmon-Live/1.2");
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("MatCMS-Matmon-Live/1.3");
             var list = Parse(await http.GetStringAsync(MmLive.Cloud(ctx) + "/api/partners", ct));
             if (list is not null) { _list = list; foreach (var gone in Logos.Keys.Where(k => list.All(p => p.Id != k)).ToList()) Logos.TryRemove(gone, out _); }
             _fetched = DateTime.UtcNow;
@@ -109,7 +118,7 @@ public static class MmPartners
             try
             {
                 using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
-                http.DefaultRequestHeaders.UserAgent.ParseAdd("MatCMS-Matmon-Live/1.2");
+                http.DefaultRequestHeaders.UserAgent.ParseAdd("MatCMS-Matmon-Live/1.3");
                 using var res = await http.GetAsync(MmLive.Cloud(ctx) + "/api/partners/" + id + "/logo", HttpCompletionOption.ResponseHeadersRead, ct);
                 if (!res.IsSuccessStatusCode) return logo is null ? PluginResult.NotFound() : Answer(logo);
                 var bytes = await res.Content.ReadAsByteArrayAsync(ct);
@@ -176,7 +185,7 @@ public static class MmPartners
             foreach (var p in list)
             {
                 var place = string.Join(", ", new[] { p.City, p.Country }.Where(x => x.Length > 0));
-                var contact = p.PageUrl.Length > 0 ? p.PageUrl : p.Website;
+                var contact = p.PageUrl.Length > 0 ? p.PageUrl : p.Website.Length > 0 ? p.Website : p.Email.Length > 0 ? "mailto:" + p.Email : "";
                 sb.Append($"<article class=\"mm-card mmp-card\" data-country=\"{E(p.Country)}\" data-text=\"{E((p.Name + " " + p.Description + " " + place).ToLowerInvariant())}\">");
                 sb.Append("<div class=\"mmp-logo\">");
                 if (p.HasLogo) sb.Append($"<img src=\"/matmon-live/partner-logo/{E(p.Id)}\" alt=\"{E(p.Name)}\" loading=\"lazy\">");
@@ -184,6 +193,11 @@ public static class MmPartners
                 sb.Append("</div><h3>").Append(E(p.Name)).Append("</h3>");
                 if (place.Length > 0) sb.Append("<p class=\"mmp-place\"><i class=\"ti ti-map-pin\" aria-hidden=\"true\"></i>").Append(E(place)).Append("</p>");
                 if (p.Description.Length > 0) sb.Append("<p>").Append(E(p.Description)).Append("</p>");
+                if (p.Email.Length > 0)
+                    sb.Append("<p class=\"mmp-place\"><i class=\"ti ti-mail\" aria-hidden=\"true\"></i><a href=\"mailto:").Append(E(p.Email)).Append("\">").Append(E(p.Email)).Append("</a></p>");
+                if (p.Phone.Length > 0)
+                    sb.Append("<p class=\"mmp-place\"><i class=\"ti ti-phone\" aria-hidden=\"true\"></i><a href=\"tel:")
+                        .Append(E(new string(p.Phone.Where(c => char.IsAsciiDigit(c) || c == '+').ToArray()))).Append("\">").Append(E(p.Phone)).Append("</a></p>");
                 sb.Append("<div class=\"mmp-actions\">");
                 if (contact.Length > 0)
                     sb.Append($"<a class=\"btn\" href=\"{E(contact)}\" target=\"_blank\" rel=\"noopener\">").Append(E(ctx.T("mmp.contact"))).Append("</a>");
@@ -216,7 +230,7 @@ public static class MmPartners
         + ".mmp .mmp-logo img{max-height:56px;max-width:180px;width:auto;height:auto;object-fit:contain}"
         + ".mmp .mmp-logo span{width:56px;height:56px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:22px;"
         + "background:color-mix(in srgb,var(--accent,#295cff) 12%,transparent);color:var(--accent,#295cff)}"
-        + ".mmp .mmp-card h3{margin:0;font-size:18px}.mmp .mmp-place{display:flex;align-items:center;gap:6px;font-size:14px}"
+        + ".mmp .mmp-card h3{margin:0;font-size:18px}.mmp .mmp-place{display:flex;align-items:center;gap:6px;font-size:14px;margin:0}.mmp .mmp-place a{color:inherit;overflow-wrap:anywhere}"
         + ".mmp .mmp-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto;padding-top:6px}"
         + ".mmp .mmp-actions .btn{padding:8px 14px;font-size:14px}"
         + ".mmp .mmp-ghost{background:transparent!important;color:var(--accent,#295cff)!important;border:1px solid var(--line,#e5e7eb)!important}"

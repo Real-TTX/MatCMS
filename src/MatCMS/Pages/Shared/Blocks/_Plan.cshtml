@@ -13,6 +13,8 @@
     var buttonUrl = Model.StrOr("buttonUrl", "#");
     var highlight = Model.Str("highlight") == "yes";
     var highlightLabel = Model.Str("highlightLabel");
+    var linkText = Model.Str("linkText");
+    var linkUrl = Model.StrOr("linkUrl", "#");
 }
 @* Rendered by the pricing block for each of its plans; the colour variables come from there. *@
 <div class="pr-plan@(highlight ? " is-featured" : "")">
@@ -46,5 +48,10 @@
     {
         <span class="pr-spacer"></span>
         <a class="pr-btn" href="@buttonUrl">@buttonText</a>
+    }
+    @if (!string.IsNullOrWhiteSpace(linkText))
+    {
+        @if (string.IsNullOrWhiteSpace(buttonText)) { <span class="pr-spacer"></span> }
+        <a class="pr-link" href="@linkUrl">@linkText</a>
     }
 </div>

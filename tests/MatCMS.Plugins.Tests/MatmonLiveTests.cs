@@ -18,6 +18,8 @@ internal sealed class PathStub : IDisposable
     private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
     private readonly CancellationTokenSource _stop = new();
     public Dictionary<string, string> Answers { get; } = new();
+    /// <summary>Binary answers (a logo), sent as they are.</summary>
+    public Dictionary<string, byte[]> Bytes { get; } = new();
     public string Url => "http://127.0.0.1:" + ((IPEndPoint)_listener.LocalEndpoint).Port;
 
     public PathStub()
@@ -38,7 +40,9 @@ internal sealed class PathStub : IDisposable
                         while (!head.ToString().Contains("\r\n\r\n")) { var n = await stream.ReadAsync(buf); if (n == 0) return; head.Append(Encoding.ASCII.GetString(buf, 0, n)); }
                         var path = head.ToString().Split(' ')[1];
                         var ok = Answers.TryGetValue(path, out var answer);
-                        var body = Encoding.UTF8.GetBytes(ok ? answer! : "nope");
+                        var raw = Bytes.TryGetValue(path, out var bin);
+                        ok |= raw;
+                        var body = raw ? bin! : Encoding.UTF8.GetBytes(ok ? answer! : "nope");
                         var header = $"HTTP/1.1 {(ok ? "200 OK" : "404 Not Found")}\r\nContent-Type: application/json\r\nContent-Length: {body.Length}\r\nConnection: close\r\n\r\n";
                         await stream.WriteAsync(Encoding.ASCII.GetBytes(header));
                         await stream.WriteAsync(body);
@@ -77,6 +81,18 @@ public class MatmonLiveTests : IClassFixture<AppFactory>
             ["sensorTypes"] = new JsonArray(new JsonObject { ["key"] = "ping", ["name"] = "Ping", ["category"] = "Network" })
         }.ToJsonString();
 
+        var pngLogo = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, 1, 2, 3 };
+        var withLogo = Guid.NewGuid().ToString();
+        cloud.Answers["/api/partners"] = new JsonObject
+        {
+            ["partners"] = new JsonArray(
+                new JsonObject { ["id"] = withLogo, ["name"] = "Netz & <Co>", ["description"] = "Monitoring für den Mittelstand.", ["website"] = "https://netz.example",
+                    ["city"] = "Stuttgart", ["country"] = "DE", ["logoUrl"] = cloud.Url + "/api/partners/" + withLogo + "/logo", ["pageUrl"] = "https://cloud.example/netz" },
+                new JsonObject { ["id"] = Guid.NewGuid().ToString(), ["name"] = "Evil", ["website"] = "javascript:alert(1)", ["country"] = "AT" },
+                new JsonObject { ["id"] = "not-a-guid", ["name"] = "Broken" })
+        }.ToJsonString();
+        cloud.Bytes["/api/partners/" + withLogo + "/logo"] = pngLogo;
+
         using (var scope = _app.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -84,7 +100,7 @@ public class MatmonLiveTests : IClassFixture<AppFactory>
             {
                 Key = "matmon-live", Name = "Matmon Live", Version = "1.0", Kind = PluginKind.Script, Enabled = true,
                 Code = Fixture("plugin.csx"),
-                FilesJson = System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, string> { ["snapshot.csx"] = Fixture("snapshot.csx"), ["live.csx"] = Fixture("live.csx") }),
+                FilesJson = System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, string> { ["snapshot.csx"] = Fixture("snapshot.csx"), ["live.csx"] = Fixture("live.csx"), ["partners.csx"] = Fixture("partners.csx") }),
                 ConfigJson = new JsonObject { ["cloudUrl"] = cloud.Url }.ToJsonString()
             };
             db.Plugins.Add(row);
@@ -93,6 +109,7 @@ public class MatmonLiveTests : IClassFixture<AppFactory>
             await db.SaveChangesAsync();
             db.ContentBlocks.Add(new ContentBlock { PageId = page.Id, BlockType = "matmon_status", SortOrder = 0, DataJson = "{\"heading\":\"Service status\"}" });
             db.ContentBlocks.Add(new ContentBlock { PageId = page.Id, BlockType = "matmon_sensors", SortOrder = 1, DataJson = "{\"heading\":\"{count} sensor types\"}" });
+            db.ContentBlocks.Add(new ContentBlock { PageId = page.Id, BlockType = "matmon_partners", SortOrder = 2, DataJson = "{\"heading\":\"Find a partner\"}" });
             await db.SaveChangesAsync();
             await scope.ServiceProvider.GetRequiredService<PluginRunner>().ReloadAsync(row.Id);
             var registry = scope.ServiceProvider.GetRequiredService<PluginRegistry>();
@@ -111,6 +128,20 @@ public class MatmonLiveTests : IClassFixture<AppFactory>
         Assert.Contains("42 sensor types", html);                                  // 45 in the snapshot, three internal ones hidden
         Assert.Contains("id=\"cat-network\"", html);
         Assert.DoesNotContain(">Probe Heartbeat<", html);                          // internal types are hidden
-        Assert.Contains("\"count\":42", await browser.GetStringAsync("/matmon-live/count"));   // the same number for the home page
+        Assert.Contains("\"count\":42", await browser.GetStringAsync("/matmon-live/count"));
+
+        // Partners: listed with their text encoded, an unsafe "website" is no link, a bad id is left out, contact = the partner page.
+        Assert.Contains("Netz &amp; &lt;Co&gt;", html);
+        Assert.Contains("href=\"https://cloud.example/netz\"", html);
+        Assert.Contains(">Evil<", html);
+        Assert.DoesNotContain("javascript:alert", html);
+        Assert.DoesNotContain(">Broken<", html);
+        Assert.Contains("/matmon-live/partner-logo/" + withLogo, html);              // the logo through this site, never the cloud's address
+        Assert.DoesNotContain(cloud.Url, html);
+        var logo = await browser.GetAsync("/matmon-live/partner-logo/" + withLogo);
+        Assert.Equal(HttpStatusCode.OK, logo.StatusCode);
+        Assert.Equal("image/png", logo.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(pngLogo, await logo.Content.ReadAsByteArrayAsync());
+        Assert.Equal(HttpStatusCode.NotFound, (await browser.GetAsync("/matmon-live/partner-logo/" + Guid.NewGuid())).StatusCode);   // not a listed partner   // the same number for the home page
     }
 }

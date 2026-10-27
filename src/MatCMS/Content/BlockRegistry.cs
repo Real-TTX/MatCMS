@@ -596,6 +596,9 @@ public class BlockRegistry
                     Options = [ new("no", "block.opt.yesno.no"), new("yes", "block.opt.yesno.yes") ] },
                 new BlockField { Id = "highlightLabel", Label = "block.plan.f.highlightLabel", Type = FieldType.Text,
                     Placeholder = "Beliebt", ShowWhenField = "highlight", ShowWhenValue = "yes" },
+                // A quieter second way under the button ("Partner finden", "Alle Details") — a plan often has one action and one place to read more.
+                new BlockField { Id = "linkText", Label = "block.plan.f.linkText", Type = FieldType.Text, Placeholder = "Partner finden" },
+                new BlockField { Id = "linkUrl", Label = "block.plan.f.linkUrl", Type = FieldType.Url, Placeholder = "/partner" },
             ]
         },
         new BlockDefinition

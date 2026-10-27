@@ -1072,6 +1072,8 @@ html.mat-langm-lock { overflow: hidden; }
 /* The spacer grows, pinning every button to the card's foot so the buttons line up however long the lists are. */
 .pr-spacer { flex: 1 0 30px; }
 .pr-btn { display: block; text-align: center; padding: 14px 20px; border-radius: 12px; font-weight: 700; text-decoration: none; color: var(--ink, #1a1a1a); background: color-mix(in srgb, var(--ink,#14151a) 7%, #fff); transition: transform .15s ease, box-shadow .15s ease; }
+.pr-link { display: block; text-align: center; margin-top: 12px; font-size: 14px; font-weight: 600; color: var(--hcg-solid, var(--accent)); text-decoration: none; }
+.pr-link:hover { text-decoration: underline; }
 .pr-plan.is-featured .pr-btn { color: #fff; background: var(--hcg); box-shadow: 0 12px 30px color-mix(in srgb, var(--hcg-solid) 35%, transparent); }
 .pr-btn:hover { transform: translateY(-2px); }
 .pr-extras { margin-top: 64px; padding: 44px 40px; border: 1px solid var(--line, #e6e6e6); border-radius: 24px; background: color-mix(in srgb, var(--hcg-solid) 4%, #fff); text-align: center; }

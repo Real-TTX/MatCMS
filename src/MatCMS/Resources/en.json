@@ -1183,6 +1183,8 @@
   "block.plan.f.features": "Features",
   "block.plan.f.highlight": "Highlight",
   "block.plan.f.highlightLabel": "Highlight label",
+  "block.plan.f.linkText": "Second link: text",
+  "block.plan.f.linkUrl": "Second link: target",
   "block.comparison.name": "Comparison (pro/con)",
   "block.comparison.desc": "Two columns: the advantages with checks on the left, the alternative with crosses on the right.",
   "block.comparison.item": "Point",

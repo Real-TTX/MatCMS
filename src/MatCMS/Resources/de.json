@@ -1183,6 +1183,8 @@
   "block.plan.f.features": "Leistungen",
   "block.plan.f.highlight": "Hervorheben",
   "block.plan.f.highlightLabel": "Text der Hervorhebung",
+  "block.plan.f.linkText": "Zweiter Link: Text",
+  "block.plan.f.linkUrl": "Zweiter Link: Ziel",
   "block.comparison.name": "Vergleich (Pro/Contra)",
   "block.comparison.desc": "Zwei Spalten: links die Vorteile mit Häkchen, rechts die Alternative mit Kreuzen.",
   "block.comparison.item": "Punkt",

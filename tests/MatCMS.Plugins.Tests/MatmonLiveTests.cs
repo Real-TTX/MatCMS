@@ -94,6 +94,13 @@ public class MatmonLiveTests : IClassFixture<AppFactory>
                 new JsonObject { ["id"] = "not-a-guid", ["name"] = "Broken" })
         }.ToJsonString();
         cloud.Bytes["/api/partners/" + withLogo + "/logo"] = pngLogo;
+        // The changelog: GitHub's commit list, as the stand-in answers it
+        JsonObject Commit(string msg, string when) => new() { ["commit"] = new JsonObject { ["message"] = msg, ["committer"] = new JsonObject { ["date"] = when } } };
+        cloud.Answers["/repos/Real-TTX/Matmon/commits?sha=main&per_page=100"] = new JsonArray(
+            Commit("feat(windows): an online setup, and the setup's buttons in one line\n\nlong body", "2026-10-26T20:00:00Z"),
+            Commit("fix(updates): an interrupted download no longer leaves the <page> locked", "2026-10-26T19:00:00Z"),
+            Commit("docs: the cloud's public partner list", "2026-10-26T18:00:00Z"),
+            Commit("API tokens and a maintenance-window API for CI/CD", "2026-10-25T09:00:00Z")).ToJsonString();
 
         using (var scope = _app.Services.CreateScope())
         {
@@ -102,8 +109,8 @@ public class MatmonLiveTests : IClassFixture<AppFactory>
             {
                 Key = "matmon-live", Name = "Matmon Live", Version = "1.0", Kind = PluginKind.Script, Enabled = true,
                 Code = Fixture("plugin.csx"),
-                FilesJson = System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, string> { ["snapshot.csx"] = Fixture("snapshot.csx"), ["live.csx"] = Fixture("live.csx"), ["partners.csx"] = Fixture("partners.csx") }),
-                ConfigJson = new JsonObject { ["cloudUrl"] = cloud.Url }.ToJsonString()
+                FilesJson = System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, string> { ["snapshot.csx"] = Fixture("snapshot.csx"), ["live.csx"] = Fixture("live.csx"), ["partners.csx"] = Fixture("partners.csx"), ["changelog.csx"] = Fixture("changelog.csx") }),
+                ConfigJson = new JsonObject { ["cloudUrl"] = cloud.Url, ["githubApi"] = cloud.Url }.ToJsonString()
             };
             db.Plugins.Add(row);
             var page = new Page { Title = "Status", Slug = "mm-status", Locale = "de", IsPublished = true };
@@ -112,6 +119,7 @@ public class MatmonLiveTests : IClassFixture<AppFactory>
             db.ContentBlocks.Add(new ContentBlock { PageId = page.Id, BlockType = "matmon_status", SortOrder = 0, DataJson = "{\"heading\":\"Service status\"}" });
             db.ContentBlocks.Add(new ContentBlock { PageId = page.Id, BlockType = "matmon_sensors", SortOrder = 1, DataJson = "{\"heading\":\"{count} sensor types\"}" });
             db.ContentBlocks.Add(new ContentBlock { PageId = page.Id, BlockType = "matmon_partners", SortOrder = 2, DataJson = "{\"heading\":\"Find a partner\"}" });
+            db.ContentBlocks.Add(new ContentBlock { PageId = page.Id, BlockType = "matmon_changelog", SortOrder = 3, DataJson = "{\"heading\":\"What's new\"}" });
             await db.SaveChangesAsync();
             await scope.ServiceProvider.GetRequiredService<PluginRunner>().ReloadAsync(row.Id);
             var registry = scope.ServiceProvider.GetRequiredService<PluginRegistry>();
@@ -147,6 +155,14 @@ public class MatmonLiveTests : IClassFixture<AppFactory>
         Assert.Equal(HttpStatusCode.OK, logo.StatusCode);
         Assert.Equal("image/png", logo.Content.Headers.ContentType?.MediaType);
         Assert.Equal(pngLogo, await logo.Content.ReadAsByteArrayAsync());
-        Assert.Equal(HttpStatusCode.NotFound, (await browser.GetAsync("/matmon-live/partner-logo/" + Guid.NewGuid())).StatusCode);   // not a listed partner   // the same number for the home page
+        Assert.Equal(HttpStatusCode.NotFound, (await browser.GetAsync("/matmon-live/partner-logo/" + Guid.NewGuid())).StatusCode);   // not a listed partner
+
+        // Changelog: new things by day, the scope as a tag, fixes folded away, docs left out, everything encoded
+        Assert.Contains("An online setup, and the setup's buttons in one line", WebUtility.HtmlDecode(html));
+        Assert.Contains("<em>windows</em>", html);
+        Assert.Contains("API tokens and a maintenance-window API for CI/CD", html);
+        Assert.Contains("the &lt;page&gt; locked", html);
+        Assert.Contains("mmc-fixes", html);
+        Assert.DoesNotContain("public partner list", html);   // the same number for the home page
     }
 }

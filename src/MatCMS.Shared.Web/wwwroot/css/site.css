@@ -130,6 +130,11 @@ h1, h2, h3, h4 {
 }
 
 .main-nav a:hover::after { width: 100%; }
+/* No underline where it means nothing: an entry that opens a dropdown (it flashed on and off while the pointer moved into the
+   menu below), and an entry a template draws as a BUTTON (.btn, or the template's own class on the menu item, see
+   "nav-button" in a layout) - a filled button with a line growing under it reads as a glitch. */
+.main-nav .mat-hassub > a::after,
+.main-nav a.btn::after, .main-nav a.nav-button::after, .main-nav .nav-button > a::after { display: none; }
 
 /* Language switcher (public header) */
 .lang-switch {

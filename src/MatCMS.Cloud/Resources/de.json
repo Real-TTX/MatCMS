@@ -107,7 +107,7 @@
   "profiles.aiEnabledHint": "Schaltet die KI-Funktionen der zugewiesenen Instanzen frei. Der Anbieter-Schlüssel bleibt in der Cloud (Einstellungen → KI).",
   "profiles.aiInstruction": "Dauer-Anweisung / Kontext für die KI",
   "profiles.aiInstructionPlaceholder": "z. B. Ferienwohnung an der Ostsee. Ton: warm, einladend. Sprache: Deutsch. Immer Meerblick und ruhige Lage erwähnen.",
-  "profiles.aiInstructionHint": "Wird jeder KI-Aktion auf zugewiesenen Instanzen vorangestellt (Text, Theme, Meta, Teaser …). So kennt die KI Marke, Ton und Fakten, ohne dass du sie wiederholst.",
+  "profiles.aiInstructionHint": "Steht vor jeder KI-Nutzung auf zugewiesenen Instanzen – KI-Assistent, Chat-Bot, Plugins, Theme, Meta, Teaser. Danach kommt „Über diese Website“, das jede Instanz selbst pflegt (Einstellungen → KI).",
   "profiles.aiBudget": "Monatliches Token-Budget je Instanz",
   "profiles.aiBudgetUnlimited": "leer = unbegrenzt",
   "profiles.aiBudgetHint": "Die Cloud vergibt es und setzt es durch; die Instanz sieht die Zahl nicht. Über dem Budget pausieren die KI-Funktionen bis zum Monatswechsel.",
@@ -1589,5 +1589,7 @@
   "aiprof.notSignedIn": "Nicht angemeldet",
   "aiprof.chatgptIntro": "Dieses Profil meldet sich wie die Codex-App bei einem ChatGPT-Konto an: Code anzeigen lassen, bei OpenAI eingeben, fertig. Jedes ChatGPT-Profil hat seine eigene Anmeldung – zwei Konten sind zwei Profile.",
   "aiprof.saveFirst": "Erst das Profil speichern – danach meldest du dich hier mit dem ChatGPT-Konto an, das es nutzen soll.",
-  "aiprof.chatgptAccount": "ChatGPT-Konto dieses Profils"
+  "aiprof.chatgptAccount": "ChatGPT-Konto dieses Profils",
+  "profiles.aiGuideBot": "Chat-Bot für Besucher",
+  "profiles.aiGuideBotPlaceholder": "z. B. Nie Preise nennen, immer auf das Kontaktformular verweisen."
 }

@@ -363,10 +363,18 @@ through the cloud relay — the key never lives on the site.
 - **Scope**: opened from editor v2 (sparkles in the top bar = this page, on a block = that block) or the classic editor, with
   `?pageId=&blockId=` — NOT `page`, which Razor Pages keeps as a route name (the query value never arrived). "Nur hier ändern" makes the
   tools refuse writes outside the page/block; reading stays allowed. The editor saves unsaved work before it hands over.
-- **The prompt** = the cloud's `ai.instruction` + the profile's per-action guide `assistant` (`AssistantAgent.OperatorText`) → the site's own
-  basic instruction (`assistant.prompt`, edited in the Grundanweisung tab; empty = `AssistantPrompt.Default`; NOT under `ai.`, which is the
-  cloud's group) → the fixed part nobody edits (protocol, tools, catalogue) → the situation. "Vollständige Anweisung anzeigen" shows the
-  exact text.
+- **The prompt** = the site's layers (below) → the assistant's own basic instruction (`assistant.prompt`, edited in the Grundanweisung tab;
+  empty = `AssistantPrompt.Default`; NOT under `ai.`, which is the cloud's group) → the fixed part nobody edits (protocol, tools, catalogue)
+  → the situation. "Vollständige Anweisung anzeigen" shows the exact text.
+- **Three layers, the same for EVERY use of AI on a site** (`AiService.PreambleText` — the one place; assistant, SEO/theme helpers and every
+  plugin's `AskAiAsync` get it): the cloud operator's `ai.instruction` → the site's own **"Über diese Website"** (`site.aiContext`,
+  Einstellungen → KI; works without a cloud, travels in backups) → the operator's guide for THIS use from `ai.actionGuides`
+  (`assistant`, `seo`, `theme`, `plugin:{key}` — the bot is `plugin:bot`; the old `pagegen`/`sitegen` are dropped on the next profile save).
+  After them comes the user's own text: how ONE helper works (assistant's basic instruction, the bot's rules + its setting). Instructions
+  are NOT part of an AI profile — a profile is the connection, swapped freely; the brand must not change with the model. A plugin cannot
+  leave the layers out (the host puts them in front of its messages); a plugin's instruction is an ordinary setting of its own. The KI tab
+  pre-fills "Über diese Website" with a hand-written basic instruction while it was never saved, but stores it only on save (copied
+  silently, the assistant would read it twice).
 - **Attachments** (`AssistantFiles`, ≤ 6 per message): pictures go into the media library (tag `KI-Anhang`, usable on a page at once) and a
   ≤ 1600 px JPEG copy rides as `AiAttachment` on THIS run's user message (`appdata/ai-files/{conversation}`, deleted with it); PDF (PdfPig)
   and DOCX go into the library and their TEXT into the message; txt/md/csv/json/html are read only. The cloud drops pictures for a model

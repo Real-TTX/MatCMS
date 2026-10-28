@@ -40,29 +40,42 @@ public class AiService
     {
         if (!Enabled) return (false, null, "KI ist für diese Website nicht aktiviert.");
         var msgs = new List<AiMessage>();
-        // Global, cloud-rolled-out context first — brand/tone/language/facts the model must honour on
-        // EVERY action. Its own system message, ahead of the per-action prompt, so it colours the result
-        // without replacing the action's own instructions. Empty = nothing added.
-        var context = (_site.Get(SettingKeys.AiInstruction) ?? "").Trim();
-        if (context.Length > 0)
-            msgs.Add(new AiMessage { Role = "system", Content = "Kontext dieser Website (immer beachten):\n" + context });
-        // Per-action operator guidance (rolled out from the profile, keyed by purpose): augments the
-        // built-in action prompt below WITHOUT replacing it, so "how it builds pages" can be steered per
-        // action without touching code. Empty / unknown purpose = nothing added.
-        var guide = ActionGuide(purpose);
-        if (guide.Length > 0)
-            msgs.Add(new AiMessage { Role = "system", Content = "Zusätzliche Vorgabe für diese Aktion (immer beachten):\n" + guide });
+        var preamble = Preamble(purpose);
+        if (preamble.Length > 0) msgs.Add(new AiMessage { Role = "system", Content = preamble });
         msgs.AddRange(messages.Select(m => new AiMessage { Role = m.role, Content = m.content }));
         var req = new AiRequest { Purpose = purpose, MaxTokens = maxTokens, Messages = msgs };
         var answer = await _transport.SendAsync(req, ct);
         return (answer.Ok, answer.Text, answer.Ok ? null : answer.Error ?? "Unbekannter Grund.");
     }
 
-    /// <summary>The operator's extra guidance for one action ("pagegen"/"sitegen"/"theme"/"seo"), from the
-    /// rolled-out <c>ai.actionGuides</c> JSON map (purpose → text). Empty when unset or malformed.</summary>
-    private string ActionGuide(string purpose)
+    /// <summary>What every use of AI on this site is told before its own prompt (see <see cref="PreambleText"/>).</summary>
+    public string Preamble(string purpose) => PreambleText(k => _site.Get(k), purpose);
+
+    /// <summary>
+    /// The layers EVERY model call on this site starts with, in this order: the cloud operator's standing instruction
+    /// (<c>ai.instruction</c>), the site's own "Über diese Website" (<c>site.aiContext</c>), and the operator's guidance for THIS
+    /// use (<c>ai.actionGuides</c>[purpose]: "assistant", "seo", "theme", "plugin:{key}"). What follows is the user's own prompt
+    /// — the assistant's basic instruction, the bot's rules and its operator's text, an action's task.
+    /// <para>One function for all of them on purpose: the bot used to call the model past this and never heard the brand
+    /// or tone the cloud rolled out. A plugin cannot leave it out — the host puts it in front of <c>AskAiAsync</c>.</para>
+    /// </summary>
+    public static string PreambleText(Func<string, string?> get, string purpose)
     {
-        var json = (_site.Get(SettingKeys.AiActionGuides) ?? "").Trim();
+        var parts = new List<string>();
+        var op = (get(SettingKeys.AiInstruction) ?? "").Trim();
+        if (op.Length > 0) parts.Add("Vorgabe des Betreibers (immer beachten):\n" + op);
+        var site = (get(SettingKeys.AiSiteContext) ?? "").Trim();
+        if (site.Length > 0) parts.Add("Über diese Website (immer beachten):\n" + site);
+        var guide = ActionGuide(get(SettingKeys.AiActionGuides), purpose);
+        if (guide.Length > 0) parts.Add("Vorgabe des Betreibers für diese Aufgabe (immer beachten):\n" + guide);
+        return string.Join("\n\n", parts);
+    }
+
+    /// <summary>The operator's extra guidance for one use, from the rolled-out <c>ai.actionGuides</c> JSON map
+    /// (purpose → text). Empty when unset or malformed.</summary>
+    public static string ActionGuide(string? guidesJson, string purpose)
+    {
+        var json = (guidesJson ?? "").Trim();
         if (json.Length == 0) return "";
         try
         {
@@ -71,6 +84,9 @@ public class AiService
         }
         catch { return ""; }
     }
+
+    /// <summary>The <c>ai.actionGuides</c> key of a plugin's calls (<c>AskAiAsync</c>).</summary>
+    public static string PluginPurpose(string pluginKey) => "plugin:" + pluginKey;
 
     /// <summary>Proposes new values for a template's design parameters to match a design instruction.
     /// Returns the model's raw text — asked for as a bare JSON object <c>{ "paramId": "newValue", … }</c>

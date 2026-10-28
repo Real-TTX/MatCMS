@@ -1211,7 +1211,9 @@ the admin UI uses. There is no second restore path and no second backup format.
   `AiResponse.Note`) is retried without it, each switch once. `AiRequest.Json` asks for JSON mode; `AiMessage.Attachments` (images, PDF,
   base64) become `image_url`/`file` parts (chat completions) or `input_image`/`input_file` (ChatGPT account); `RelayAsync` bounds them
   (≤ 8, ≤ ~10 MB each, whitelisted types). The profile's per-action guides now have `assistant` (replacing `pagegen`/`sitegen`, whose old
-  text the KI tab shows in the new field until it is saved).
+  text the KI tab shows in the new field until it is saved) and `plugin:bot` (the visitors' chat bot; any `plugin:{key}` reaches that
+  plugin's AI calls — entries the form has no field for are kept on save). `ai.instruction` reaches EVERY use of AI on the site, the bot
+  and plugins included; after it comes the site's own "Über diese Website" (root `CLAUDE.md`, "Three layers").
 - **MCP server (`/mcp`)** — a remote **Model Context Protocol** server so an AI client (ChatGPT, Claude,
   Cursor) drives the cloud directly, instead of hand-wiring HTTP calls. Built INTO this app (official
   `ModelContextProtocol.AspNetCore` SDK, HTTP/streamable transport, `app.MapMcp("/mcp")`), **not** a

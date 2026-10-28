@@ -86,7 +86,7 @@ public class AssistantTests : IClassFixture<AssistantApp>
     private readonly AssistantApp _app;
     public AssistantTests(AssistantApp app) => _app = app;
 
-    private async Task<HttpClient> AdminAsync() { var c = _app.Browser(); await AppFactory.LoginAsync(c); return c; }
+    private Task<HttpClient> AdminAsync() => _app.AdminAsync();
 
     /// <summary>Sends a message like the page does and waits until the run is over. Returns the conversation id and its steps.</summary>
     private async Task<(int id, JsonArray steps, JsonObject state)> SendAsync(HttpClient c, string message, int? id = null, int? page = null, int? block = null,
@@ -315,13 +315,65 @@ public class AssistantTests : IClassFixture<AssistantApp>
     }
 
     [Fact]
-    public void The_cloud_profile_speaks_first_with_its_instruction_and_the_assistant_guide_and_nothing_else_of_its_map()
+    public async Task About_this_website_starts_from_a_hand_written_basic_instruction_is_saved_only_on_save_and_reaches_the_assistant()
     {
-        var text = AssistantAgent.OperatorText("Marke: Röstkunst.", "{\"assistant\":\"Nie Seiten löschen.\",\"seo\":\"kurz\"}");
-        Assert.Equal("Marke: Röstkunst.\n\nNie Seiten löschen.", text);
-        Assert.Equal("Marke: Röstkunst.", AssistantAgent.OperatorText("Marke: Röstkunst.", "kaputt"));
+        async Task SetAsync(string key, string? value)
+        {
+            using var scope = _app.App.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.SiteSettings.RemoveRange(db.SiteSettings.Where(s => s.Key == key));
+            if (value is not null) db.SiteSettings.Add(new SiteSetting { Key = key, Value = value });
+            await db.SaveChangesAsync();
+        }
+        try
+        {
+            await SetAsync(SettingKeys.AiSiteContext, null);
+            await SetAsync(SettingKeys.AssistantPrompt, "Wir sind die Kaffeeroesterei Kruemel und siezen.");
+            var admin = await AdminAsync();
+            var settings = await admin.GetStringAsync("/admin/settings?tab=ai");
+            Assert.Contains("Wir sind die Kaffeeroesterei Kruemel und siezen.</textarea>", settings);   // offered as the start …
+            using (var scope = _app.App.Services.CreateScope())                                          // … not stored
+                Assert.False(await scope.ServiceProvider.GetRequiredService<AppDbContext>().SiteSettings.AnyAsync(s => s.Key == SettingKeys.AiSiteContext));
+
+            var res = await AppFactory.PostAsync(admin, "/admin/settings?handler=AiContext", new() { ["context"] = "Wir duzen alle.", ["__RequestVerificationToken"] = AppFactory.Token(settings)! });
+            Assert.Equal(HttpStatusCode.Redirect, res.StatusCode);
+            Assert.Contains("Wir duzen alle.</textarea>", await admin.GetStringAsync("/admin/settings?tab=ai"));
+            var page = await admin.GetStringAsync("/admin/ai?tab=prompt");
+            Assert.Contains("Wir duzen alle.", page);                                                    // shown as what comes before the basic instruction
+            var full = await admin.GetStringAsync("/admin/ai?handler=FullPrompt");
+            Assert.True(full.IndexOf("Wir duzen alle.") >= 0 && full.IndexOf("Wir duzen alle.") < full.IndexOf("Kaffeeroesterei"));
+
+            // Emptied on purpose stays empty: the basic instruction is not offered again.
+            await AppFactory.PostAsync(admin, "/admin/settings?handler=AiContext", new() { ["context"] = "", ["__RequestVerificationToken"] = AppFactory.Token(settings)! });
+            Assert.DoesNotContain("Kaffeeroesterei Kruemel und siezen.</textarea>", await admin.GetStringAsync("/admin/settings?tab=ai"));
+        }
+        finally
+        {
+            await SetAsync(SettingKeys.AiSiteContext, null);
+            await SetAsync(SettingKeys.AssistantPrompt, null);
+        }
+    }
+
+    [Fact]
+    public void Operator_then_site_context_then_the_guide_for_this_use_come_before_the_assistants_own_instruction()
+    {
+        var settings = new Dictionary<string, string>
+        {
+            [SettingKeys.AiInstruction] = "Marke: Röstkunst.",
+            [SettingKeys.AiSiteContext] = "Wir siezen.",
+            [SettingKeys.AiActionGuides] = "{\"assistant\":\"Nie Seiten löschen.\",\"seo\":\"kurz\",\"plugin:bot\":\"Keine Preise.\"}",
+        };
+        string? Get(string k) => settings.TryGetValue(k, out var v) ? v : null;
+        var text = AssistantAgent.Layers(Get);
+        Assert.True(text.IndexOf("Marke: Röstkunst.") < text.IndexOf("Wir siezen.") && text.IndexOf("Wir siezen.") < text.IndexOf("Nie Seiten löschen."));
+        Assert.DoesNotContain("kurz", text);                                       // another use's guide is not this one's
+        Assert.DoesNotContain("Keine Preise.", text);
+        Assert.Contains("Keine Preise.", AiService.PreambleText(Get, AiService.PluginPurpose("bot")));
+        settings[SettingKeys.AiActionGuides] = "kaputt";
+        Assert.DoesNotContain("kaputt", AssistantAgent.Layers(Get));
         var prompt = AssistantPrompt.Build(text, "", "- hero …", "Heute.");
-        Assert.True(prompt.IndexOf("Nie Seiten löschen.") < prompt.IndexOf("Du bist der KI-Assistent"));
+        Assert.True(prompt.IndexOf("Wir siezen.") < prompt.IndexOf("Du bist der KI-Assistent"));
+        Assert.Equal("", AiService.PreambleText(_ => null, "assistant"));    // nothing set = nothing added
     }
 
     [Fact]

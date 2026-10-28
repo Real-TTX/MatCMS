@@ -62,7 +62,7 @@ internal sealed class PluginRequestContext : IPluginContext
     }
 
     public IPluginEvents Events => _events ??= new PluginEventBus(_registry, _services, User, Locale);
-    public IPluginSite Site => _site ??= new PluginSiteFacade(_services);
+    public IPluginSite Site => _site ??= new PluginSiteFacade(_services, Plugin.Key);
     public string T(string key, params object[] args) => PluginStrings.Translate(Slice, Locale, key, args);
 
     public PluginInfo Plugin { get; }

@@ -2098,8 +2098,8 @@
   "assistant.promptResetBtn": "Restore default",
   "assistant.promptResetConfirm": "Discard your own basic instruction and use the built-in default?",
   "assistant.promptReset": "Default basic instruction restored.",
-  "assistant.operatorTitle": "Instruction from the cloud",
-  "assistant.operatorHelp": "This instruction comes from the connected cloud's profile and comes before the basic instruction. It can only be changed there.",
+  "assistant.operatorTitle": "Comes before the basic instruction",
+  "assistant.operatorHelp": "What every AI of this website is told – the assistant, the chat bot, SEO texts, plugins: the instruction from the cloud (if connected) and \"About this website\" from Settings → AI.",
   "assistant.fullTitle": "Complete instruction",
   "assistant.fullHelp": "Exactly the text the AI gets as its instruction on every step: cloud instruction, basic instruction, answer format, tools, every block with its fields and the situation.",
   "assistant.fullShow": "Show",
@@ -2222,5 +2222,12 @@
   "assistant.goOn": "Go on",
   "assistant.goOnText": "Please go on.",
   "assistant.titleDone": "Done",
-  "settings.ai.cgSaveFirst": "Save the profile first – then sign in here with the ChatGPT account this profile should use."
+  "settings.ai.cgSaveFirst": "Save the profile first – then sign in here with the ChatGPT account this profile should use.",
+  "assistant.operatorNone": "Nothing yet. Under Settings → AI you describe once who this website is – brand, tone, form of address, facts.",
+  "assistant.operatorEdit": "Edit \"About this website\"",
+  "settings.ai.context": "About this website",
+  "settings.ai.contextHelp": "Applies to every AI of this website: the assistant, the chat bot, SEO texts and plugins. Describe who the website is – company, offer, audience, tone, form of address, fixed facts. How a single helper works is set with that helper (AI assistant → basic instruction, bot → settings).",
+  "settings.ai.contextPlaceholder": "Example: We are Müller's bakery in Freiburg, a family business since 1952. We address customers formally, write warmly and plainly, no sales talk. Open Mon–Sat 6 am–6 pm.",
+  "settings.ai.contextFromPrompt": "Prefilled with the AI assistant's own basic instruction – cut it down to what applies to every AI and save. Nothing is stored until you click \"Save\".",
+  "settings.ai.contextCloud": "Before it comes the instruction from the cloud (changed only there):"
 }

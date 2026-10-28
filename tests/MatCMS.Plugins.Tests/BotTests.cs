@@ -170,6 +170,33 @@ public class BotTests : IClassFixture<BotFixture>
     private void AiRequestOf(out MatCMS.Shared.AiRequest req) { lock (_f.Ai.Requests) req = _f.Ai.Requests[^1]; }
 
     [Fact]
+    public async Task The_operator_and_the_site_speak_first_and_the_bot_hears_its_own_guide_and_nobody_elses()
+    {
+        var keys = new[] { SettingKeys.AiInstruction, SettingKeys.AiSiteContext, SettingKeys.AiActionGuides };
+        async Task SetAsync(params string[] values)
+        {
+            using var scope = _f.App.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.SiteSettings.RemoveRange(db.SiteSettings.Where(s => keys.Contains(s.Key)));
+            for (var i = 0; i < values.Length; i++) db.SiteSettings.Add(new SiteSetting { Key = keys[i], Value = values[i] });
+            await db.SaveChangesAsync();
+        }
+        try
+        {
+            await SetAsync("Marke: Röstkunst.", "Wir sind ein Café in Freiburg und siezen.", "{\"plugin:bot\":\"Nie Preise nennen.\",\"assistant\":\"Nie Seiten löschen.\"}");
+            var (_, prompt) = await AskAsync(Visitor(), "Öffnungszeiten?");
+            Assert.Contains("Marke: Röstkunst.", prompt);
+            Assert.Contains("siezen", prompt);
+            Assert.Contains("Nie Preise nennen.", prompt);
+            Assert.DoesNotContain("Nie Seiten löschen.", prompt);                    // the assistant's guide is not the bot's
+            Assert.True(prompt.IndexOf("siezen") < prompt.IndexOf("Chat-Assistent der Website"));   // the site first, then the bot's rules
+            AiRequestOf(out var req);
+            Assert.Equal("plugin:bot", req.Purpose);
+        }
+        finally { await SetAsync(); }
+    }
+
+    [Fact]
     public async Task The_daily_limit_stops_a_visitor_before_the_model_is_asked()
     {
         await _f.SetBotAsync(new JsonObject { ["memberData"] = "true", ["keepDays"] = "7", ["perVisitor"] = "2", ["limitText"] = "Genug für heute." });

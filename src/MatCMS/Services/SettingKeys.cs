@@ -138,9 +138,15 @@ public static class SettingKeys
     public const string AiInstruction = "ai.instruction";
 
     /// <summary>Per-action AI guidance rolled out from the cloud profile: a JSON map purpose→text
-    /// ("pagegen"/"sitegen"/"theme"/"seo"), each augmenting that action's built-in prompt. Empty = none.
+    /// ("assistant", "theme", "seo", "plugin:{key}" — e.g. "plugin:bot"), each augmenting that use's own prompt. Empty = none.
     /// Set only via the cloud profile — never edited on the instance.</summary>
     public const string AiActionGuides = "ai.actionGuides";
+
+    /// <summary>"Über diese Website" (Einstellungen → KI): what EVERY use of AI on this site is told — brand, tone, form of
+    /// address, facts. Edited on the site, so it works without a cloud; the cloud's <see cref="AiInstruction"/> comes before it.
+    /// Not under <c>ai.</c> (the cloud's group) and not one of the AI keys of <see cref="AiOwn"/>: it is content and travels in
+    /// a backup. How ONE helper works (the assistant's <see cref="AssistantPrompt"/>, the bot's own setting) is not in here.</summary>
+    public const string AiSiteContext = "site.aiContext";
 
     /// <summary>The AI assistant's basic instruction (Admin → KI-Assistent → Grundanweisung), edited ON the site: how it
     /// works, what it may and may not do. Empty = the built-in default (<c>AssistantPrompt.Default</c>). Not under

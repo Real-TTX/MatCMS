@@ -492,7 +492,7 @@ public class EditModel : PageModel
     /// (empty/0 = unlimited). Saving this tab adds the group; the remove button takes it out. The
     /// provider key is NOT here — it lives centrally on the cloud (Einstellungen → KI).</summary>
     public async Task<IActionResult> OnPostAiAsync(int id, bool enabled, string? budget, string? instruction, bool backupBeforeAiChange,
-        string? guideAssistant, string? guideTheme, string? guideSeo)
+        string? guideAssistant, string? guideTheme, string? guideSeo, string? guideBot)
     {
         var profile = await _db.Profiles.FindAsync(id);
         if (profile is null) return RedirectToPage("Index");
@@ -512,10 +512,20 @@ public class EditModel : PageModel
         // so an unset profile stays clean). Rolled out with the AI group; TouchAsync below bumps the revision.
         var guides = new Dictionary<string, string>();
         void Add(string key, string? val) { var t = (val ?? "").Trim(); if (t.Length > 0) guides[key] = t; }
-        // The AI assistant replaced the page and site generators (CMS 1.14); their guidance went into its field.
+        // Entries this form has no field for (another plugin's "plugin:{key}") are kept; the two generators' keys are not —
+        // the AI assistant replaced them (CMS 1.14) and their guidance went into its field.
+        try
+        {
+            var old = string.IsNullOrWhiteSpace(profile.AiActionGuidesJson) ? null
+                : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(profile.AiActionGuidesJson);
+            foreach (var (k, v) in old ?? new())
+                if (k is not ("pagegen" or "sitegen" or "assistant" or "theme" or "seo" or "plugin:bot")) Add(k, v);
+        }
+        catch (System.Text.Json.JsonException) { /* a broken map is rewritten from the form */ }
         Add("assistant", guideAssistant);
         Add("theme", guideTheme);
         Add("seo", guideSeo);
+        Add("plugin:bot", guideBot);
         profile.AiActionGuidesJson = guides.Count == 0 ? null : System.Text.Json.JsonSerializer.Serialize(guides);
 
         await _db.SaveChangesAsync();

@@ -3,8 +3,9 @@ using System.Text;
 namespace MatCMS.Services.Assistant;
 
 /// <summary>
-/// What the assistant is told on every call, in this order: the cloud operator's instruction (if the profile has one), the
-/// site's own basic instruction (editable under KI-Assistent → Grundanweisung, <see cref="Default"/> when empty), then the
+/// What the assistant is told on every call, in this order: the layers every use of AI on the site gets (the cloud
+/// operator's instruction, "Über diese Website", the operator's guidance for the assistant — <c>AiService.PreambleText</c>), the
+/// assistant's own basic instruction (editable under KI-Assistent → Grundanweisung, <see cref="Default"/> when empty), then the
 /// part nobody edits — the answer protocol, the tools and the block catalogue — and last where the editor opened it.
 /// <para>The split is deliberate: the editable part says HOW to work (tone, care, what to avoid), the fixed part says how
 /// to TALK to this site. An instruction that could rewrite the protocol would let one careless edit break every action.</para>
@@ -34,11 +35,12 @@ public static class AssistantPrompt
         """;
 
     /// <summary>The complete system prompt of one call.</summary>
-    public static string Build(string? operatorInstruction, string? sitePrompt, string catalog, string context)
+    /// <param name="layers">What every use of AI on the site starts with (<c>AiService.PreambleText</c>), headings included.</param>
+    public static string Build(string? layers, string? sitePrompt, string catalog, string context)
     {
         var sb = new StringBuilder();
-        var op = (operatorInstruction ?? "").Trim();
-        if (op.Length > 0) sb.Append("Vorgabe des Betreibers (immer beachten):\n").Append(op).Append("\n\n");
+        var pre = (layers ?? "").Trim();
+        if (pre.Length > 0) sb.Append(pre).Append("\n\n");
         var basic = (sitePrompt ?? "").Trim();
         sb.Append(basic.Length > 0 ? basic : Default.Trim()).Append("\n\n");
         sb.Append(Protocol(catalog));

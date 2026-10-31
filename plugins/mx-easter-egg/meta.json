@@ -1,0 +1,6 @@
+{
+  "Key": "mx-easter-egg",
+  "Name": "MX Easter Egg (Arcade)",
+  "Version": "2.0",
+  "Description": "Die MATTHIX Arcade von matthix.de: LEBEN (Conway) und KALTGANG (Raycaster im Rechenzentrum, drei Level, Störungen, Patchkabel). Nur Dateien unter /plugin-assets/mx-easter-egg/ — das Template lädt sie beim Klick auf „Spielen“."
+}

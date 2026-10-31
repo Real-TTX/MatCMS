@@ -168,7 +168,12 @@ internal sealed class PluginEventBus : IPluginEvents
 internal sealed class PluginSiteFacade : IPluginSite
 {
     private readonly IServiceProvider _services;
-    public PluginSiteFacade(IServiceProvider services) => _services = services;
+    private readonly string _pluginKey;
+    public PluginSiteFacade(IServiceProvider services, string pluginKey = "")
+    {
+        _services = services;
+        _pluginKey = pluginKey;
+    }
 
     private SiteContext Site => _services.GetService(typeof(SiteContext)) as SiteContext
                                 ?? throw new InvalidOperationException("Die Website ist in diesem Zusammenhang nicht verfügbar.");
@@ -233,11 +238,15 @@ internal sealed class PluginSiteFacade : IPluginSite
             .Select(m => new MatCMS.Shared.AiMessage { Role = m.Role is "system" or "assistant" ? m.Role : "user", Content = m.Content })
             .ToList();
         if (messages.Count == 0) return new PluginAiAnswer(false, "", "Keine Nachricht.");
+        // The site's layers (operator, "Über diese Website", the operator's guidance for this plugin) go first — the plugin
+        // cannot leave them out; its own system text follows and is the more specific one.
+        var preamble = ai.Preamble(AiService.PluginPurpose(_pluginKey));
+        if (preamble.Length > 0) messages.Insert(0, new MatCMS.Shared.AiMessage { Role = "system", Content = preamble });
         try
         {
             var r = await ai.SendAsync(new MatCMS.Shared.AiRequest
             {
-                Purpose = "plugin", Messages = messages, MaxTokens = Math.Clamp(call!.MaxTokens, 64, 16000), Json = call.Json
+                Purpose = AiService.PluginPurpose(_pluginKey), Messages = messages, MaxTokens = Math.Clamp(call!.MaxTokens, 64, 16000), Json = call.Json
             }, ct);
             return new PluginAiAnswer(r.Ok, r.Text ?? "", r.Ok ? null : r.Error ?? "Keine Antwort.", r.PromptTokens, r.CompletionTokens, r.Model);
         }

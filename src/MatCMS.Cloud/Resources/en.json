@@ -107,7 +107,7 @@
   "profiles.aiEnabledHint": "Enables the AI features of the assigned instances. The provider key stays in the cloud (Settings → AI).",
   "profiles.aiInstruction": "Standing instruction / context for the AI",
   "profiles.aiInstructionPlaceholder": "e.g. Vacation rental on the Baltic coast. Tone: warm, inviting. Language: German. Always mention the sea view and the quiet location.",
-  "profiles.aiInstructionHint": "Prepended to every AI action on assigned instances (text, theme, meta, teaser …). This way the AI knows your brand, tone and facts without you repeating them.",
+  "profiles.aiInstructionHint": "Comes before every use of AI on assigned instances – AI assistant, chat bot, plugins, theme, meta, teaser. After it comes \"About this website\", which each instance keeps itself (Settings → AI).",
   "profiles.aiBudget": "Monthly token budget per instance",
   "profiles.aiBudgetUnlimited": "empty = unlimited",
   "profiles.aiBudgetHint": "The cloud grants and enforces it; the instance never sees the number. Over budget, AI features pause until the month rolls over.",
@@ -1589,5 +1589,7 @@
   "aiprof.notSignedIn": "Not signed in",
   "aiprof.chatgptIntro": "This profile signs in to a ChatGPT account like the Codex app: show a code, enter it at OpenAI, done. Every ChatGPT profile has its own sign-in – two accounts are two profiles.",
   "aiprof.saveFirst": "Save the profile first – then sign in here with the ChatGPT account it should use.",
-  "aiprof.chatgptAccount": "This profile's ChatGPT account"
+  "aiprof.chatgptAccount": "This profile's ChatGPT account",
+  "profiles.aiGuideBot": "Chat bot for visitors",
+  "profiles.aiGuideBotPlaceholder": "e.g. Never name prices, always point to the contact form."
 }

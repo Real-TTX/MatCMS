@@ -243,27 +243,17 @@ public sealed class AssistantAgent
     private async Task<string> SystemPromptAsync(AiConversation conv, CancellationToken ct)
     {
         var settings = await _db.SiteSettings.AsNoTracking()
-            .Where(s => s.Key == SettingKeys.AiInstruction || s.Key == SettingKeys.AiActionGuides || s.Key == SettingKeys.AssistantPrompt
+            .Where(s => s.Key == SettingKeys.AiInstruction || s.Key == SettingKeys.AiActionGuides || s.Key == SettingKeys.AiSiteContext || s.Key == SettingKeys.AssistantPrompt
                      || s.Key == SettingKeys.SiteName || s.Key == SettingKeys.Languages)
             .ToDictionaryAsync(s => s.Key, s => s.Value, ct);
         string S(string k) => settings.TryGetValue(k, out var v) ? v ?? "" : "";
         var context = await ContextAsync(conv, S(SettingKeys.SiteName), S(SettingKeys.Languages), ct);
-        return AssistantPrompt.Build(OperatorText(S(SettingKeys.AiInstruction), S(SettingKeys.AiActionGuides)), S(SettingKeys.AssistantPrompt), _blocks.CatalogText() + _tools.PluginActionsText(), context);
+        return AssistantPrompt.Build(Layers(S), S(SettingKeys.AssistantPrompt), _blocks.CatalogText() + _tools.PluginActionsText(), context);
     }
 
-    /// <summary>What the cloud's profile says to the assistant: its standing instruction plus, from the per-action map, the
-    /// guidance for "assistant". Both are the operator's; the site's own basic instruction comes after them.</summary>
-    public static string OperatorText(string instruction, string guidesJson)
-    {
-        var guide = "";
-        try
-        {
-            var map = string.IsNullOrWhiteSpace(guidesJson) ? null : JsonSerializer.Deserialize<Dictionary<string, string>>(guidesJson);
-            if (map is not null && map.TryGetValue("assistant", out var g)) guide = (g ?? "").Trim();
-        }
-        catch (JsonException) { /* a broken map is no guidance */ }
-        return string.Join("\n\n", new[] { instruction.Trim(), guide }.Where(x => x.Length > 0));
-    }
+    /// <summary>What stands before the assistant's basic instruction: the layers every use of AI on this site gets (operator,
+    /// "Über diese Website", the operator's guidance for "assistant") — <see cref="AiService.PreambleText"/>, never a copy.</summary>
+    public static string Layers(Func<string, string?> get) => AiService.PreambleText(get, "assistant");
 
     /// <summary>Where the assistant stands: the date, the site, and the page/block it was opened on.</summary>
     public async Task<string> ContextAsync(AiConversation conv, string siteName, string languages, CancellationToken ct)

@@ -1183,6 +1183,8 @@
   "block.plan.f.features": "Leistungen",
   "block.plan.f.highlight": "Hervorheben",
   "block.plan.f.highlightLabel": "Text der Hervorhebung",
+  "block.plan.f.linkText": "Zweiter Link: Text",
+  "block.plan.f.linkUrl": "Zweiter Link: Ziel",
   "block.comparison.name": "Vergleich (Pro/Contra)",
   "block.comparison.desc": "Zwei Spalten: links die Vorteile mit Häkchen, rechts die Alternative mit Kreuzen.",
   "block.comparison.item": "Punkt",
@@ -2096,8 +2098,8 @@
   "assistant.promptResetBtn": "Standard wiederherstellen",
   "assistant.promptResetConfirm": "Die eigene Grundanweisung verwerfen und den eingebauten Standard verwenden?",
   "assistant.promptReset": "Standard-Grundanweisung wiederhergestellt.",
-  "assistant.operatorTitle": "Vorgabe aus der Cloud",
-  "assistant.operatorHelp": "Diese Vorgabe kommt aus dem Profil der verbundenen Cloud und steht vor der Grundanweisung. Ändern lässt sie sich nur dort.",
+  "assistant.operatorTitle": "Steht vor der Grundanweisung",
+  "assistant.operatorHelp": "Was jede KI dieser Website gesagt bekommt – der Assistent, der Chat-Bot, SEO-Texte, Plugins: die Vorgabe aus der Cloud (falls verbunden) und „Über diese Website“ aus Einstellungen → KI.",
   "assistant.fullTitle": "Vollständige Anweisung",
   "assistant.fullHelp": "Genau der Text, den die KI bei jedem Schritt als Anweisung bekommt: Cloud-Vorgabe, Grundanweisung, Antwortformat, Werkzeuge, alle Blöcke mit ihren Feldern und die Situation.",
   "assistant.fullShow": "Anzeigen",
@@ -2220,5 +2222,12 @@
   "assistant.goOn": "Weitermachen",
   "assistant.goOnText": "Mach weiter.",
   "assistant.titleDone": "Fertig",
-  "settings.ai.cgSaveFirst": "Erst das Profil speichern – danach meldest du dich hier mit dem ChatGPT-Konto an, das dieses Profil nutzen soll."
+  "settings.ai.cgSaveFirst": "Erst das Profil speichern – danach meldest du dich hier mit dem ChatGPT-Konto an, das dieses Profil nutzen soll.",
+  "assistant.operatorNone": "Noch nichts. Unter Einstellungen → KI beschreibst du einmal, wer diese Website ist – Marke, Ton, Anrede, Fakten.",
+  "assistant.operatorEdit": "„Über diese Website“ bearbeiten",
+  "settings.ai.context": "Über diese Website",
+  "settings.ai.contextHelp": "Gilt für jede KI dieser Website: den Assistenten, den Chat-Bot, SEO-Texte und Plugins. Beschreibe, wer die Website ist – Firma, Angebot, Zielgruppe, Ton, Anrede (du/Sie), feste Fakten. Wie ein einzelner Helfer arbeitet, steht bei ihm selbst (KI-Assistent → Grundanweisung, Bot → Einstellungen).",
+  "settings.ai.contextPlaceholder": "Beispiel: Wir sind die Bäckerei Müller in Freiburg, Familienbetrieb seit 1952. Wir siezen unsere Kunden, schreiben warm und bodenständig, ohne Werbesprech. Öffnungszeiten Mo–Sa 6–18 Uhr.",
+  "settings.ai.contextFromPrompt": "Vorbelegt mit der selbst geschriebenen Grundanweisung des KI-Assistenten – kürze sie auf das, was für jede KI gilt, und speichere. Gespeichert wird erst mit „Speichern“.",
+  "settings.ai.contextCloud": "Davor steht die Vorgabe aus der Cloud (nur dort zu ändern):"
 }

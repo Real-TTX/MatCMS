@@ -75,7 +75,7 @@ public static class MmLive
         }, new PublicRouteOptions { Methods = PluginMethod.Get });
     }
 
-    private static string Cloud(IPluginContext ctx)
+    public static string Cloud(IPluginContext ctx)
     {
         var raw = (ctx.Settings.Get("cloudUrl") ?? "").Trim().TrimEnd('/');
         return Uri.TryCreate(raw, UriKind.Absolute, out var u) && (u.Scheme == Uri.UriSchemeHttps || u.Scheme == Uri.UriSchemeHttp)
@@ -217,7 +217,8 @@ public static class MmLive
     }
 
     // Theme-able: the site's accent and lines; the three status colours are fixed meanings (green, amber, red).
-    private const string Css = "<style>.mm-live .mm-narrow{max-width:760px}.mm-live .mm-intro{color:var(--muted,#6b7280);max-width:720px;margin:0 0 20px}"
+    // public: the partner block (partners.csx) draws its cards with these classes too, on a page that may have no status/catalogue block.
+    public const string Css = "<style>.mm-live .mm-narrow{max-width:760px}.mm-live .mm-intro{color:var(--muted,#6b7280);max-width:720px;margin:0 0 20px}"
         + ".mm-live .mm-alert{display:flex;gap:14px;align-items:flex-start;padding:16px 18px;border-radius:12px;border:1px solid;margin:0 0 18px}.mm-live .mm-alert i{font-size:24px;line-height:1}"
         + ".mm-live .mm-alert strong{display:block;font-size:17px}.mm-live .mm-ok{background:#ecfdf3;border-color:#a6e9c1;color:#05603a}.mm-live .mm-warn{background:#fffaeb;border-color:#fedf89;color:#93370d}"
         + ".mm-live .mm-err{background:#fef3f2;border-color:#fecdca;color:#912018}.mm-live .mm-info{background:color-mix(in srgb,var(--accent,#295cff) 8%,#fff);border-color:color-mix(in srgb,var(--accent,#295cff) 30%,#fff);color:var(--ink,#111827)}"

@@ -15,12 +15,17 @@ Store der Cloud oder einen Bundle-Import.
 | `store-einblick/` | Store-Einblick — zeigt den Store einer MatCMS-Cloud (Plugins mit Art, Templates, Komponenten) als Block; liest `GET {cloud}/api/public/store`, ohne Schlüssel | aktuell, Skript-Variante (`plugin.csx` lädt `showcase.csx`) |
 | `store-einblick-native/` | Store-Einblick (Native) — **dieselbe** Code-Datei `../store-einblick/showcase.csx`, als DLL kompiliert; `StoreEinblickTests` prüft, dass beide Varianten dasselbe HTML zeichnen | aktuell, Native-Variante (`./pack-native.ps1 -Path ./store-einblick-native`) |
 | `coverage-map/` | Abdeckungskarte — Block mit anklickbarer Europakarte (Länder + Region Norditalien `IT-N`, Status verfügbar/teilweise/demnächst/geplant, Liste mit Hinweisen); Umrisse in `map.csx`, erzeugt von `tools/build-map.mjs` aus Natural Earth 1:50m (`tools/ne50.geojson`) | aktuell, im Global Store; benutzt auf corner-society.com |
+<<<<<<< HEAD
 | `matmon-live/` | Matmon Live — für matmon.eu: Blöcke **Dienststatus** (`/api/status` der Matmon Cloud, alle 5 min per Job) und **Sensorkatalog** (`/api/sensor-types`, alle 6 h; mitgelieferter Stand in `snapshot.csx` aus `tools/snapshot.mjs`, ein älterer Katalog verdrängt nie einen neueren) | aktuell, auf matmon.eu |
 | `forum/` | Forum (Native) — Kategorien und Foren mit Rechten, Themen/Beiträge mit BBCode, Zitate, Abos, Suche, Profile, Meldungen, Moderation; Mitglieder = Konten der Website (siehe `forum/README.md`) | neu, Paket mit `./pack-native.ps1 -Path ./forum` |
+=======
+| `matmon-live/` | Matmon Live — für matmon.eu: Blöcke **Partner** (`/api/partners`, Logos über die eigene Seite durchgereicht: `/matmon-live/partner-logo/{id}`), **Dienststatus** (`/api/status` der Matmon Cloud, alle 5 min per Job) und **Sensorkatalog** (`/api/sensor-types`, alle 6 h; mitgelieferter Stand in `snapshot.csx` aus `tools/snapshot.mjs`, ein älterer Katalog verdrängt nie einen neueren) | aktuell, auf matmon.eu |
+| `mx-easter-egg/` | MATTHIX Arcade von matthix.de: nur Dateien unter `assets/` (egg.js = Hülle, spiel-leben.js, spiel-kaltgang.js = Raycaster mit drei Leveln), ausgeliefert unter `/plugin-assets/mx-easter-egg/`; das Template „MATTHIX Klar“ lädt sie beim Klick auf „Spielen“ | aktuell, auf matthix.de |
+>>>>>>> origin/main
 | `todo-verwaltung-beispiel/` | Todo-Verwaltung (Beispiel, früher eingebaut) | Anschauungsbeispiel für die Plugin-API |
 
 ## Aufbau eines Plugins
-- `plugin.csx` — der Code (weitere `*.csx` im Ordner packt `pack.ps1` als `files/<name>` mit, für `#load`) (C#-Skript, Globals = `PluginContext` in `src/MatCMS/Services/PluginRuntime.cs`).
+- `plugin.csx` — der Code (weitere `*.csx` im Ordner packt `pack.ps1` als `files/<name>` mit, für `#load`; ein Ordner `assets/` wird als Asset-Dateien unter `/plugin-assets/<key>/` mitgepackt) (C#-Skript, Globals = `PluginContext` in `src/MatCMS/Services/PluginRuntime.cs`).
 - `meta.json` — `Key`, `Name`, `Version`, `Description`. Der Key ist die Identität: ein Import mit
   gleichem Key aktualisiert das Plugin an Ort und Stelle.
 - `README.md` (wo nötig) — was es kann, Konfiguration, Fallen.

@@ -453,6 +453,10 @@
                     <label for="guideSeo">@T["profiles.aiGuideSeo"]</label>
                     <textarea id="guideSeo" name="guideSeo" rows="2" placeholder="@T["profiles.aiGuideSeoPlaceholder"]">@Guide("seo")</textarea>
                 </div>
+                <div class="form-field">
+                    <label for="guideBot">@T["profiles.aiGuideBot"]</label>
+                    <textarea id="guideBot" name="guideBot" rows="2" placeholder="@T["profiles.aiGuideBotPlaceholder"]">@Guide("plugin:bot")</textarea>
+                </div>
             </details>
             <label class="checkbox-row" style="margin-top:10px;">
                 <input type="checkbox" name="backupBeforeAiChange" value="true" checked="@(Model.Item.BackupBeforeAiChange ? "checked" : null)" />

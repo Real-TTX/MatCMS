@@ -180,14 +180,19 @@
             <button type="submit" name="reset" value="true" class="btn btn-ghost" data-confirm="@T["assistant.promptResetConfirm"]">@T["assistant.promptResetBtn"]</button>
         </div>
     </form>
-    @if (!string.IsNullOrWhiteSpace(Model.OperatorInstruction))
-    {
-        <div class="card">
-            <h2>@T["assistant.operatorTitle"]</h2>
-            <div class="help">@T["assistant.operatorHelp"]</div>
-            <pre class="ai-pre">@Model.OperatorInstruction</pre>
-        </div>
-    }
+    <div class="card">
+        <h2>@T["assistant.operatorTitle"]</h2>
+        <div class="help">@T["assistant.operatorHelp"]</div>
+        @if (!string.IsNullOrWhiteSpace(Model.Layers))
+        {
+            <pre class="ai-pre">@Model.Layers</pre>
+        }
+        else
+        {
+            <p class="muted">@T["assistant.operatorNone"]</p>
+        }
+        <p><a class="btn btn-ghost btn-sm" asp-page="/Admin/Settings/Index" asp-route-tab="ai">@T["assistant.operatorEdit"]</a></p>
+    </div>
     <div class="card">
         <h2>@T["assistant.fullTitle"]</h2>
         <div class="help">@T["assistant.fullHelp"]</div>

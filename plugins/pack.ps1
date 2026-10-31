@@ -1,4 +1,4 @@
-# Packs plugins/<Key>/ (plugin.csx + meta.json, and every further *.csx as files/<name> for #load) into a MatCMS plugin bundle — plugin.json in the exact
+# Packs plugins/<Key>/ (plugin.csx + meta.json, every further *.csx as files/<name> for #load, and assets/ as the plugin's asset files) into a MatCMS plugin bundle — plugin.json in the exact
 # shape PluginPackager.Export writes (Format 1), so the cloud store and an instance import it unchanged.
 #   ./pack.ps1 -Key leserstimmen                → plugins/dist/leserstimmen-<version>.zip
 #   ./pack.ps1 -Key leserstimmen -Out x.zip
@@ -30,6 +30,15 @@ try {
         $fe = $zip.CreateEntry('files/' + $_.Name)
         $fw = New-Object System.IO.StreamWriter($fe.Open(), (New-Object System.Text.UTF8Encoding($false)))
         $fw.Write([System.IO.File]::ReadAllText($_.FullName, [System.Text.Encoding]::UTF8)); $fw.Dispose()
+    }
+    # Asset files (JS/CSS/pictures the plugin serves at /plugin-assets/<key>/) travel under assets/ (PluginBundle.AssetFolder).
+    $assets = Join-Path $dir 'assets'
+    if (Test-Path $assets) {
+        Get-ChildItem $assets -Recurse -File | ForEach-Object {
+            $rel = $_.FullName.Substring($assets.Length + 1).Replace('\', '/')
+            $ae = $zip.CreateEntry('assets/' + $rel)
+            $as = $ae.Open(); $bytes = [System.IO.File]::ReadAllBytes($_.FullName); $as.Write($bytes, 0, $bytes.Length); $as.Dispose()
+        }
     }
 } finally { $zip.Dispose() }
 Get-Item $Out | Select-Object FullName, Length

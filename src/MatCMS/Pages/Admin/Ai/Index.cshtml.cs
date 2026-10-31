@@ -46,7 +46,8 @@ public class IndexModel : PageModel
     public bool ScopeLocked { get; private set; }
     public string? PreviewUrl { get; private set; }
     public string SitePrompt { get; private set; } = "";
-    public string OperatorInstruction { get; private set; } = "";
+    /// <summary>What stands before the basic instruction (cloud operator, "Über diese Website", the operator's guidance for the assistant).</summary>
+    public string Layers { get; private set; } = "";
     public string Tab { get; private set; } = "chat";
     /// <summary>The site's AI profiles — switched right here, so a cheap model and a strong one are one click apart.</summary>
     public OwnAi.ProfileSet Profiles { get; private set; } = new(new(), "");
@@ -65,12 +66,12 @@ public class IndexModel : PageModel
         (ScopeText, PreviewUrl) = await DescribeScopeAsync(ScopePageId, ScopeBlockId);
 
         var settings = await _db.SiteSettings.AsNoTracking()
-            .Where(s => s.Key == SettingKeys.AssistantPrompt || s.Key == SettingKeys.AiInstruction || s.Key == SettingKeys.AiActionGuides || s.Key == SettingKeys.AiTransport).ToDictionaryAsync(s => s.Key, s => s.Value);
+            .Where(s => s.Key == SettingKeys.AssistantPrompt || s.Key == SettingKeys.AiInstruction || s.Key == SettingKeys.AiActionGuides
+                     || s.Key == SettingKeys.AiSiteContext || s.Key == SettingKeys.AiTransport).ToDictionaryAsync(s => s.Key, s => s.Value);
         Profiles = await _own.ProfilesAsync(HttpContext.RequestAborted);
         CloudAi = settings.TryGetValue(SettingKeys.AiTransport, out var tr) && tr == "cloud";
         SitePrompt = settings.TryGetValue(SettingKeys.AssistantPrompt, out var sp) && !string.IsNullOrWhiteSpace(sp) ? sp : AssistantPrompt.Default.Trim();
-        OperatorInstruction = AssistantAgent.OperatorText(settings.TryGetValue(SettingKeys.AiInstruction, out var oi) ? oi ?? "" : "",
-            settings.TryGetValue(SettingKeys.AiActionGuides, out var ag) ? ag ?? "" : "");
+        Layers = AssistantAgent.Layers(k => settings.TryGetValue(k, out var v) ? v : "");
 
         var convs = await _db.AiConversations.AsNoTracking().OrderByDescending(c => c.UpdatedAt).Take(200).ToListAsync();
         var changeCounts = await _db.AiChanges.AsNoTracking().GroupBy(c => c.ConversationId).Select(g => new { g.Key, N = g.Count() }).ToDictionaryAsync(x => x.Key, x => x.N);
@@ -184,7 +185,7 @@ public class IndexModel : PageModel
         var settings = await _db.SiteSettings.AsNoTracking().ToDictionaryAsync(s => s.Key, s => s.Value);
         string S(string k) => settings.TryGetValue(k, out var v) ? v ?? "" : "";
         var context = await _agent.ContextAsync(conv, S(SettingKeys.SiteName), S(SettingKeys.Languages), HttpContext.RequestAborted);
-        var text = AssistantPrompt.Build(AssistantAgent.OperatorText(S(SettingKeys.AiInstruction), S(SettingKeys.AiActionGuides)), S(SettingKeys.AssistantPrompt), _blocks.CatalogText(), context);
+        var text = AssistantPrompt.Build(AssistantAgent.Layers(S), S(SettingKeys.AssistantPrompt), _blocks.CatalogText(), context);
         return Content(text, "text/plain; charset=utf-8");
     }
 }

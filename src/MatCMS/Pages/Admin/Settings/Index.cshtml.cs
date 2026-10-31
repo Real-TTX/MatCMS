@@ -39,6 +39,12 @@ public class IndexModel : PageModel
     public Dictionary<string, string> AiAccounts { get; } = new();
     /// <summary>Whether the cloud profile switched the relay on — the way AI goes when the site has no connection of its own.</summary>
     public bool AiViaCloud { get; private set; }
+    /// <summary>"Über diese Website" — what every use of AI here is told (<see cref="SettingKeys.AiSiteContext"/>).</summary>
+    public string AiContext { get; private set; } = "";
+    /// <summary>True when <see cref="AiContext"/> is the assistant's own basic instruction offered as a start, not a stored value.</summary>
+    public bool AiContextPrefilled { get; private set; }
+    /// <summary>The cloud operator's standing instruction, shown read-only above the field it precedes.</summary>
+    public string AiCloudInstruction { get; private set; } = "";
 
     /// <summary>Current cloud link (Cloud tab). The token is never rendered back — only whether one
     /// is stored — so it cannot be read out of the page source.</summary>
@@ -121,6 +127,16 @@ public class IndexModel : PageModel
         foreach (var p in AiProfiles.Profiles.Where(p => p.Kind == "chatgpt"))
             if (await _chatgpt.For(p.Id).GetStatusAsync(poll: false, HttpContext.RequestAborted) is { Connected: true } st) AiAccounts[p.Id] = st.Email ?? "✓";
         AiViaCloud = existing.TryGetValue(SettingKeys.AiTransport, out var at) && at == "cloud";
+        AiCloudInstruction = existing.TryGetValue(SettingKeys.AiInstruction, out var ci) ? (ci ?? "").Trim() : "";
+        if (existing.TryGetValue(SettingKeys.AiSiteContext, out var sc)) AiContext = sc ?? "";
+        else if (existing.TryGetValue(SettingKeys.AssistantPrompt, out var ap) && !string.IsNullOrWhiteSpace(ap))
+        {
+            // Never saved yet, but the assistant's basic instruction was written by hand — before this field existed, that
+            // was the only place to say who the site is. Offered as the starting text, stored only when the operator saves:
+            // copied silently, the assistant would read it twice.
+            AiContext = ap.Trim();
+            AiContextPrefilled = true;
+        }
 
         if (preview && Cloud.Configured)
         {
@@ -156,6 +172,19 @@ public class IndexModel : PageModel
         await _ownAi.SaveProfilesAsync(set, HttpContext.RequestAborted);
         await _ownAi.ForgetSignInAsync(id, HttpContext.RequestAborted);
         TempData["Flash"] = "KI-Profil gelöscht.";
+        return RedirectToPage(new { tab = "ai" });
+    }
+
+    /// <summary>Saves "Über diese Website". Its own handler: the KI tab's other forms post profiles, not settings.</summary>
+    public async Task<IActionResult> OnPostAiContextAsync(string? context)
+    {
+        var value = (context ?? "").Replace("\r\n", "\n").Trim();
+        if (value.Length > 20000) value = value[..20000];
+        var row = await _db.SiteSettings.FirstOrDefaultAsync(s => s.Key == SettingKeys.AiSiteContext);
+        if (row is null) _db.SiteSettings.Add(new SiteSetting { Key = SettingKeys.AiSiteContext, Value = value });
+        else row.Value = value;
+        await _db.SaveChangesAsync();
+        TempData["Flash"] = "„Über diese Website“ gespeichert.";
         return RedirectToPage(new { tab = "ai" });
     }
 

@@ -574,6 +574,25 @@
             <a class="btn" asp-page="AiProfile">@T["settings.ai.newProfile"]</a>
         </div>
     </div>
+
+    @* What every use of AI on the site is told — the profile above is only the connection, swapped freely; this is not tied to it. *@
+    <form method="post" asp-page-handler="AiContext" class="card">
+        <h2>@T["settings.ai.context"]</h2>
+        <div class="help">@T["settings.ai.contextHelp"]</div>
+        @if (Model.AiCloudInstruction.Length > 0)
+        {
+            <div class="help">@T["settings.ai.contextCloud"]</div>
+            <pre class="ai-pre">@Model.AiCloudInstruction</pre>
+        }
+        @if (Model.AiContextPrefilled)
+        {
+            <div class="alert alert-info">@T["settings.ai.contextFromPrompt"]</div>
+        }
+        <div class="form-field">
+            <textarea name="context" rows="10" placeholder="@T["settings.ai.contextPlaceholder"]">@Model.AiContext</textarea>
+        </div>
+        <div><button type="submit" class="btn">@T["action.save"]</button></div>
+    </form>
 </div>
 
 @* ============ FEHLERHANDLING ============ *@

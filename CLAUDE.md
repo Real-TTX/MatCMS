@@ -166,7 +166,11 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
   `plugins.allowNative` (default OFF, operator-set, live) is the gate; an import, a cloud rollout, a backup or an MCP
   `set_setting` can bring the files, never the permission — it is in `SettingKeys.Protected` (with the cloud link keys),
   which the restore, `CloudSyncService.ApplySettingsAsync` and `ContentOpApplier` all honour. A new outside path that
-  writes settings must honour it too. Imported plugins stay disabled, as always. The DLL's SHA-256 is checked at import
+  writes settings must honour it too. The ONE outside way is a decision of its own: the cloud operator's "Native Plugins" switch
+  (profile: allow | deny | leave alone; instance Details → Konfiguration overrides it for one site; REST
+  `PUT /api/v1/instances/{id}/native-plugins`, MCP `set_instance_native_plugins`, profile field `nativePlugins`), carried as the
+  wire field `InstanceConfig.NativePlugins` and applied by `CloudSyncService.ApplyNativePluginsAsync` (reloads the native plugins).
+  Never as a free settings row (still refused), never by a backup. Imported plugins stay disabled, as always. The DLL's SHA-256 is checked at import
   AND at every load. Backups carry native plugins with their files (`plugins-native/{key}/{version}/`), put down BEFORE
   the plugins are started.
 - **Unloading is real but depends on the plugin.** `NativePluginHost` releases the `AssemblyLoadContext` and checks with a

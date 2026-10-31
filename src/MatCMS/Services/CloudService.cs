@@ -555,6 +555,9 @@ public class CloudService
         var activate = !string.IsNullOrWhiteSpace(config.ActivateTemplate)
                        && Picked("activate", config.ActivateTemplate);
         if (!activate) config.ActivateTemplate = null;
+        // The native-plugin permission is a row of its own in the preview ("setting:plugins.allowNative"); a partial apply
+        // that did not tick it must not flip it on the way.
+        if (!Picked("setting", SettingKeys.AllowNativePlugins)) config.NativePlugins = null;
 
         // A payload nobody picked from is "not synced" rather than "synced as empty" — EXCEPT for
         // templates when an activation was ticked: the applier performs the switch inside

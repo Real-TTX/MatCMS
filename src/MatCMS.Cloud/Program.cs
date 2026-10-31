@@ -542,7 +542,10 @@ app.MapGet("/api/instances/{publicId}/config", async (
     if (instance.Profile is null)
         return Results.Ok(new InstanceConfig { Revision = 0 });
 
-    return Results.Ok(await profiles.BuildConfigAsync(instance.Profile, ctx.RequestAborted));
+    var config = await profiles.BuildConfigAsync(instance.Profile, ctx.RequestAborted);
+    // A site's own native-plugin decision wins over its profile's (Instance.NativePlugins).
+    if (NativePluginsPolicy.Normalize(instance.NativePlugins) is { Length: > 0 } own) config.NativePlugins = own;
+    return Results.Ok(config);
 }).RequireRateLimiting("instanceApi");
 
 // The full log an instance uploads on demand (Variante B). Authenticated by the instance token like the

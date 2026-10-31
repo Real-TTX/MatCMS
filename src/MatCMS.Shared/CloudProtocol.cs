@@ -342,6 +342,29 @@ public sealed class InstanceConfig
     /// provisioned site can shed its well-known default login without ever risking a lock-out. Default
     /// false, and an instance that predates the field simply ignores it (the default admin stays).</summary>
     public bool RemoveDefaultAdmin { get; set; }
+
+    /// <summary>
+    /// The operator's decision about compiled (native) plugins on this site: "allow", "deny", or null/empty = leave the site's own
+    /// switch alone. A field of its own on purpose: the setting <c>plugins.allowNative</c> stays protected against every GENERIC
+    /// writer (free profile rows, content ops, restored backups), because a package that brings compiled code must never bring the
+    /// permission to run it as well. This field is the one explicit way the cloud's operator may decide it. A site that predates the
+    /// field ignores it (its switch stays as it is).
+    /// </summary>
+    public string? NativePlugins { get; set; }
+}
+
+/// <summary>The wire values of <see cref="InstanceConfig.NativePlugins"/>.</summary>
+public static class NativePluginsPolicy
+{
+    public const string Allow = "allow", Deny = "deny";
+
+    /// <summary>"allow", "deny" or "" (= don't touch) — anything else is "don't touch", never a guess.</summary>
+    public static string Normalize(string? value) => value?.Trim().ToLowerInvariant() switch
+    {
+        Allow or "true" or "1" or "on" => Allow,
+        Deny or "false" or "0" or "off" => Deny,
+        _ => ""
+    };
 }
 
 /// <summary>

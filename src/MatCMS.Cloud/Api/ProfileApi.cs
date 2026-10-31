@@ -369,7 +369,20 @@ public static class ProfileApi
             if (inst is null) return Send(ProfileOpsService.InstanceNotFound);
             return Send(await ops.ResyncAsync(inst));
         }).RequireRateLimiting("operatorApi");
+
+        // { "nativePlugins": "allow" | "deny" | "" } — this site's own decision about compiled plugins, over its profile's ("" = follow the profile).
+        app.MapPut("/api/v1/instances/{publicId}/native-plugins", async (HttpContext ctx, string publicId, NativePluginsBody body, ApiKeyService keys, InstanceService instances, ProfileOpsService ops) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireManage(key!) is { } g) return g;
+            var inst = await instances.FindForKeyAsync(publicId, key!);
+            if (inst is null) return Send(ProfileOpsService.InstanceNotFound);
+            return Send(await ops.SetNativePluginsAsync(inst, body.NativePlugins));
+        }).RequireRateLimiting("operatorApi");
     }
+
+    private sealed record NativePluginsBody(string? NativePlugins);
 
     /// <summary>A service result as HTTP: the data on success, <c>{ error }</c> with its status otherwise.</summary>
     private static IResult Send(ProfileOpsService.Result r) =>

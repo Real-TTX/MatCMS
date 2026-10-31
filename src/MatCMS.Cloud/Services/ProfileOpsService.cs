@@ -1,3 +1,4 @@
+using MatCMS.Shared;
 using System.Text.Json;
 using MatCMS.Cloud.Models;
 using MatCMS.Cloud.Data;
@@ -83,11 +84,12 @@ public sealed class ProfileOpsService
         var mailTemplates = await _db.ProfileMailTemplates.AsNoTracking().Where(x => x.ProfileId == id)
             .Select(x => new { x.Key, x.Name, x.Subject, x.Enabled, x.IsHtml }).ToListAsync();
         var instances = await _db.Instances.AsNoTracking().Where(i => i.ProfileId == id)
-            .Select(i => new { i.PublicId, i.Name, appliedRevision = i.AppliedRevision }).ToListAsync();
+            .Select(i => new { i.PublicId, i.Name, appliedRevision = i.AppliedRevision, nativePlugins = i.NativePlugins }).ToListAsync();
         return Result.Done(new
         {
             p.Id, p.Name, p.Description, p.JoinCode, p.AutoApprove, p.IsDefault, p.Revision,
             p.ActivateTemplateName,
+            nativePlugins = p.NativePlugins,
             sync = new { p.SyncSettings, p.SyncSmtp, p.SyncTranslation, p.SyncBackup, p.SyncUsers, p.SyncPlugins, p.SyncComponents, p.SyncTemplates, p.SyncMailTemplates, p.SyncAi },
             modes = new
             {
@@ -117,7 +119,7 @@ public sealed class ProfileOpsService
         bool? NotifyOffline, bool? NotifyUpdate, string? NotifyRecipients, string? ActivateTemplateName,
         bool? SyncSettings, bool? SyncUsers, bool? SyncPlugins, bool? SyncComponents, bool? SyncTemplates, bool? SyncMailTemplates,
         bool? RemoveDefaultAdmin, string? SettingsMode, string? UsersMode, string? PluginsMode, string? ComponentsMode,
-        string? TemplatesMode, string? MailTemplatesMode);
+        string? TemplatesMode, string? MailTemplatesMode, string? NativePlugins = null);
 
     /// <summary>Only the fields given change.</summary>
     public async Task<Result> PatchAsync(int id, Patch b)
@@ -139,6 +141,8 @@ public sealed class ProfileOpsService
         if (b.SyncTemplates is { } st) p.SyncTemplates = st;
         if (b.SyncMailTemplates is { } sm) p.SyncMailTemplates = sm;
         if (b.RemoveDefaultAdmin is { } rd) p.RemoveDefaultAdmin = rd;
+        // "allow" | "deny" | "" (leave each site alone); anything unknown is "", never a guess.
+        if (b.NativePlugins is not null) p.NativePlugins = NativePluginsPolicy.Normalize(b.NativePlugins);
         if (b.SettingsMode is not null) p.SettingsMode = ParseMode(b.SettingsMode, p.SettingsMode);
         // Users never "keep": add-only is unconditional on the instance, so the profile must not promise more.
         if (b.UsersMode is not null) p.UsersMode = ParseMode(b.UsersMode, p.UsersMode) is var um && um == SyncMode.Keep ? SyncMode.Add : um;
@@ -560,6 +564,26 @@ public sealed class ProfileOpsService
         inst.LastSyncError = null;
         await _db.SaveChangesAsync();
         return Result.Done(new { ok = true, message = "Neu-Synchronisierung vorgemerkt — die Instanz zieht die Konfiguration beim nächsten Kontakt." });
+    }
+
+    /// <summary>
+    /// One site's own decision about compiled plugins, over its profile's: "allow", "deny", or ""/null = follow the profile.
+    /// The site is told to re-apply its configuration (the same path as "Neu synchronisieren"), which carries the decision.
+    /// </summary>
+    public async Task<Result> SetNativePluginsAsync(Instance inst, string? value)
+    {
+        var policy = NativePluginsPolicy.Normalize(value);
+        inst.NativePlugins = policy.Length == 0 ? null : policy;
+        if (inst.ProfileId is not null) { inst.ResyncRequestedAt = DateTime.UtcNow; inst.LastSyncError = null; }
+        await _db.SaveChangesAsync();
+        var what = policy switch { NativePluginsPolicy.Allow => "erlaubt", NativePluginsPolicy.Deny => "verboten", _ => "wie im Profil" };
+        return Result.Done(new
+        {
+            ok = true, nativePlugins = inst.NativePlugins ?? "",
+            message = inst.ProfileId is null
+                ? $"Native Plugins: {what}. Die Instanz hat kein Profil und bekommt erst mit einem Profil eine Konfiguration."
+                : $"Native Plugins: {what}. Die Instanz übernimmt das beim nächsten Kontakt."
+        });
     }
 
     public static Result InstanceNotFound => NoInstance;

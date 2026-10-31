@@ -97,6 +97,10 @@ public class Instance
     /// this side did nothing — the next beat overwrites it with the instance's own unchanged number.</summary>
     public DateTime? ResyncRequestedAt { get; set; }
 
+    /// <summary>Overrides the profile's <see cref="Profile.NativePlugins"/> for THIS site: "allow", "deny", or null = what the
+    /// profile says. So one site can run a compiled plugin without every site of its profile being allowed to.</summary>
+    public string? NativePlugins { get; set; }
+
     /// <summary>Public URL of the site, for the "open" link. Reported by the instance, editable.</summary>
     public string? Url { get; set; }
 

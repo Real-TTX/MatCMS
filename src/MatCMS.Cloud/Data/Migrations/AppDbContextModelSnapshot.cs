@@ -374,6 +374,9 @@ namespace MatCMS.Cloud.Data.Migrations
                     b.Property<bool>("NamePinned")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("NativePlugins")
+                        .HasColumnType("TEXT");
+
                     b.Property<int?>("NodeId")
                         .HasColumnType("INTEGER");
 
@@ -1067,6 +1070,10 @@ namespace MatCMS.Cloud.Data.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("NativePlugins")
                         .IsRequired()
                         .HasColumnType("TEXT");
 

@@ -278,7 +278,8 @@ public class ProfileService
             ActivateTemplate = profile.SyncTemplates ? profile.ActivateTemplateName : null,
             // Independent of the user rollout: the instance's own guards (default password untouched +
             // another Admin present) decide whether it is safe to drop the default admin.
-            RemoveDefaultAdmin = profile.RemoveDefaultAdmin
+            RemoveDefaultAdmin = profile.RemoveDefaultAdmin,
+            NativePlugins = NativePluginsPolicy.Normalize(profile.NativePlugins) is { Length: > 0 } np ? np : null
         };
 
         // Each payload is resolved the same way: what the profile SELECTED from the global store,

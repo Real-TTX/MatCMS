@@ -598,6 +598,28 @@
         }
     </div>
 
+    @* This site's own decision about compiled plugins, over its profile's — so ONE site can run a native plugin without every
+       site of its profile being allowed to. Admin-only, like the profile assignment. *@
+    @if (Model.IsAdmin)
+    {
+        var profileNative = Model.Item.Profile?.NativePlugins ?? "";
+        <div class="card">
+            <h2>@T["instances.nativePlugins"]</h2>
+            <p class="muted">@T["instances.nativePlugins.hint"]</p>
+            <form method="post" asp-page-handler="NativePlugins" asp-route-id="@Model.Item.Id">
+                <div class="form-field">
+                    <label for="nativePlugins">@T["profiles.nativePlugins"]</label>
+                    <select id="nativePlugins" name="nativePlugins">
+                        <option value="" selected="@(Model.Item.NativePlugins is null ? "selected" : null)">@T["instances.nativePlugins.profile", T[$"profiles.nativePlugins.{(profileNative.Length == 0 ? "keep" : profileNative)}"]]</option>
+                        <option value="allow" selected="@(Model.Item.NativePlugins == "allow" ? "selected" : null)">@T["profiles.nativePlugins.allow"]</option>
+                        <option value="deny" selected="@(Model.Item.NativePlugins == "deny" ? "selected" : null)">@T["profiles.nativePlugins.deny"]</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn">@T["settings.save"]</button>
+            </form>
+        </div>
+    }
+
     @* Every completed apply, newest first. Appended only when the instance reports a NEW run, so a
        repeated heartbeat does not fill this with duplicates. *@
     @if (Model.Runs.Count > 0)

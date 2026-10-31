@@ -109,7 +109,7 @@ public class DetailsModel : PageModel, IAsyncPageFilter
     /// <summary>Admin-only, even on one's own instance: enrollment decisions, profile assignment and
     /// token rotation are fleet/operator-config matters, not day-to-day instance management.</summary>
     private static readonly string[] AdminOnlyHandlers =
-        { "OnPostApproveAsync", "OnPostRejectAsync", "OnPostAssignProfileAsync", "OnPostResyncAsync", "OnPostRotateAsync" };
+        { "OnPostApproveAsync", "OnPostRejectAsync", "OnPostAssignProfileAsync", "OnPostResyncAsync", "OnPostRotateAsync", "OnPostNativePluginsAsync" };
 
     /// <summary>Single security choke point for THIS page: every handler (GET and each POST) takes the
     /// instance <c>id</c>, so one filter can enforce both the per-instance access scope (an Operator
@@ -448,6 +448,17 @@ public class DetailsModel : PageModel, IAsyncPageFilter
 
         TempData["Flash"] = "Profil zugewiesen.";
         return RedirectToPage(new { id });
+    }
+
+    /// <summary>This site's own decision about native plugins (over its profile's); the work is ProfileOpsService's, shared with REST/MCP.</summary>
+    public async Task<IActionResult> OnPostNativePluginsAsync(int id, string? nativePlugins, [FromServices] Services.ProfileOpsService ops)
+    {
+        var item = await _db.Instances.FindAsync(id);
+        if (item is null) return RedirectToPage("Index");
+        await ops.SetNativePluginsAsync(item, nativePlugins);
+        TempData["Flash"] = (item.NativePlugins switch { "allow" => "Native Plugins erlaubt", "deny" => "Native Plugins verboten", _ => "Native Plugins wie im Profil" })
+            + (item.ProfileId is null ? " — die Instanz hat noch kein Profil und bekommt den Wert erst mit einem." : " — die Instanz übernimmt das beim nächsten Kontakt.");
+        return Redirect(Url.Page("Details", new { id }) + "?tab=config");
     }
 
     public async Task<IActionResult> OnPostResyncAsync(int id)

@@ -65,10 +65,11 @@ public class ProfileTools
         string? activateTemplateName = null,
         bool? syncSettings = null, bool? syncUsers = null, bool? syncPlugins = null, bool? syncComponents = null, bool? syncTemplates = null, bool? syncMailTemplates = null,
         bool? removeDefaultAdmin = null,
+        [Description("Compiled (native) plugins on the profile's sites: allow | deny | empty string = leave each site's own switch alone.")] string? nativePlugins = null,
         string? settingsMode = null, string? usersMode = null, string? pluginsMode = null, string? componentsMode = null, string? templatesMode = null, string? mailTemplatesMode = null) =>
         WriteAsync(me, () => ops.PatchAsync(profileId, new ProfileOpsService.Patch(name, description, autoApprove, autoUpdateLocal,
             notifyOffline, notifyUpdate, notifyRecipients, activateTemplateName, syncSettings, syncUsers, syncPlugins, syncComponents,
-            syncTemplates, syncMailTemplates, removeDefaultAdmin, settingsMode, usersMode, pluginsMode, componentsMode, templatesMode, mailTemplatesMode)));
+            syncTemplates, syncMailTemplates, removeDefaultAdmin, settingsMode, usersMode, pluginsMode, componentsMode, templatesMode, mailTemplatesMode, nativePlugins)));
 
     [McpServerTool(Name = "set_profile_ai"), Description("AI settings of a profile: whether its sites may use the cloud's AI, a monthly token budget per site (0 = unlimited), an instruction added to every request, and whether a site takes a backup before an AI change." + Rollout)]
     public static Task<object> SetProfileAi(McpContext me, ProfileOpsService ops, int profileId,
@@ -190,5 +191,12 @@ public class ProfileTools
     {
         RequireManage(me);
         return Unwrap(await ops.ResyncAsync(await InstanceAsync(instances, me, instanceId, ct)));
+    }
+
+    [McpServerTool(Name = "set_instance_native_plugins"), Description("Allow or forbid compiled (native) plugins on ONE site, over its profile: allow | deny | empty string = follow the profile. Native plugins run with every right of the site's process — confirm with the user first. The site applies it on its next heartbeat.")]
+    public static async Task<object> SetInstanceNativePlugins(McpContext me, InstanceService instances, ProfileOpsService ops, string instanceId, string nativePlugins, CancellationToken ct)
+    {
+        RequireManage(me);
+        return Unwrap(await ops.SetNativePluginsAsync(await InstanceAsync(instances, me, instanceId, ct), nativePlugins));
     }
 }

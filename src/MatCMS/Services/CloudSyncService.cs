@@ -25,12 +25,14 @@ public class CloudSyncService
     private readonly AppDbContext _db;
     private readonly IWebHostEnvironment _env;
     private readonly ILogger<CloudSyncService> _log;
+    private readonly IServiceProvider? _services;
 
-    public CloudSyncService(AppDbContext db, IWebHostEnvironment env, ILogger<CloudSyncService> log)
+    public CloudSyncService(AppDbContext db, IWebHostEnvironment env, ILogger<CloudSyncService> log, IServiceProvider? services = null)
     {
         _db = db;
         _env = env;
         _log = log;
+        _services = services;
     }
 
     public sealed record SyncResult(bool Ok, int Revision, string? Error, List<string> Applied,
@@ -321,6 +323,9 @@ public class CloudSyncService
                 else ReportSkippedOnce("plugin", config.Plugins.Select(p => p.Key));
             }
 
+            // After the plugins, so a native plugin that arrived in this same run starts with the permission it needs.
+            if (await ApplyNativePluginsAsync(config.NativePlugins, ct) is true) applied.Add("Native Plugins");
+
             if (dryRun)
             {
                 // Nothing was written, so there is no state to record — and the change tracker is
@@ -458,6 +463,35 @@ public class CloudSyncService
     ///   the same invariant that makes the whole user sync add-only.</item>
     /// </list>
     /// Idempotent: once the default is gone (or was never the default), later applies are no-ops.</summary>
+    /// <summary>
+    /// The cloud operator's decision about compiled plugins (<see cref="InstanceConfig.NativePlugins"/>). The ONE outside path
+    /// that may write <see cref="SettingKeys.AllowNativePlugins"/> — the free settings rows, content ops and restores still refuse
+    /// it, so a package can never bring both the code and the permission. A change reloads the native plugins at once (off must
+    /// mean off; on, the enabled ones start). Returns true when something changed (or would, in a preview).
+    /// </summary>
+    private async Task<bool> ApplyNativePluginsAsync(string? wanted, CancellationToken ct)
+    {
+        var policy = NativePluginsPolicy.Normalize(wanted);
+        if (policy.Length == 0) return false;
+        var value = policy == NativePluginsPolicy.Allow ? "1" : "0";
+        var row = await _db.SiteSettings.FirstOrDefaultAsync(s => s.Key == SettingKeys.AllowNativePlugins, ct);
+        var now = row?.Value is "1" or "true";
+        if (now == (value == "1"))
+        {
+            Report("setting", SettingKeys.AllowNativePlugins, "skipped-exists", "Wert ist bereits gesetzt");
+            return false;
+        }
+        Report("setting", SettingKeys.AllowNativePlugins, row is null ? "installed" : "updated", policy == NativePluginsPolicy.Allow ? "erlaubt" : "verboten");
+        if (_dryRun) return true;
+        if (row is null) _db.SiteSettings.Add(new SiteSetting { Key = SettingKeys.AllowNativePlugins, Value = value });
+        else row.Value = value;
+        await SaveAsync(ct);
+        if (_services?.GetService<PluginRunner>() is { } runner)
+            foreach (var id in await _db.Plugins.AsNoTracking().Where(p => p.Kind == PluginKind.Native).Select(p => p.Id).ToListAsync(ct))
+                await runner.ReloadAsync(id);
+        return true;
+    }
+
     private async Task RemoveDefaultAdminAsync(CancellationToken ct)
     {
         var admin = await _db.Users.FirstOrDefaultAsync(u => u.Username == "admin", ct);

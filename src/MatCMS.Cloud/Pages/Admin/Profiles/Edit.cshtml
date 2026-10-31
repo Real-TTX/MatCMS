@@ -182,6 +182,18 @@
                 @T["profiles.removeDefaultAdmin"]
             </label>
             <div class="help">@T["profiles.removeDefaultAdmin.hint"]</div>
+
+            @* Compiled plugins run with every right of the site: a decision of its own, never a free settings row (the sites refuse that key there). *@
+            <div class="form-field" style="margin-top:14px;">
+                <label for="nativePlugins">@T["profiles.nativePlugins"]</label>
+                <select id="nativePlugins" name="nativePlugins">
+                    @foreach (var option in new[] { "", "allow", "deny" })
+                    {
+                        <option value="@option" selected="@(Model.Item.NativePlugins == option ? "selected" : null)">@T[$"profiles.nativePlugins.{(option.Length == 0 ? "keep" : option)}"]</option>
+                    }
+                </select>
+                <div class="help">@T["profiles.nativePlugins.hint"]</div>
+            </div>
         </div>
 
         <div class="list-actions">

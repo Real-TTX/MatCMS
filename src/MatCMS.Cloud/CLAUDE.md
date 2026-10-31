@@ -269,7 +269,10 @@ show the result, not just the values.
   actually reached, so a site with no canonical URL configured still has an address here.
 - **A native plugin bundle (`Kind: native`, compiled assemblies under `src/`) is shown read-only** in the store and profile plugin editors
   (`Services/NativeBundleInfo.cs`: entry, API, SHA-256, the files) and re-packed with its `Code` untouched — there is no source to edit and the manifest's
-  `Code` is only the note an older instance shows. Upload limit 90 MB (a native plugin may bring 60 MB of assemblies). `plugins.allowNative` is never rolled out.
+  `Code` is only the note an older instance shows. Upload limit 90 MB (a native plugin may bring 60 MB of assemblies). `plugins.allowNative` is never rolled out as a SETTING (the sites refuse the key in free rows); the operator decides it with the
+  dedicated "Native Plugins" switch — `Profile.NativePlugins` ("" = leave each site alone, "allow", "deny") and `Instance.NativePlugins`
+  (null = the profile's, overrides it for one site; set through `ProfileOpsService.SetNativePluginsAsync`, which requests a resync) —
+  merged in the `/config` endpoint into `InstanceConfig.NativePlugins`.
 - Plugins are edited **in place**: the bundle is unpacked, `plugin.json` rewritten, every other entry
   copied byte for byte (`Repack` in `Pages/Admin/Profiles/Plugin.cshtml.cs`, second copy for the store
   in `Pages/Admin/Store/Plugin.cshtml.cs`). Repacking rather than

@@ -304,7 +304,9 @@ public static class SettingKeys
     /// Keys no OUTSIDE source may write: a cloud rollout, a content operation (MCP `set_setting`) or a restored backup.
     /// The cloud link keys, because one site's configuration must not hijack another's connection — and
     /// <see cref="AllowNativePlugins"/>, because a package that brings compiled code and also the permission to run it
-    /// would make the permission worth nothing. It is set on the site, by whoever operates the site.
+    /// would make the permission worth nothing. It is set on the site, by whoever operates the site — or by the cloud's
+    /// operator through the ONE dedicated profile/instance switch (<c>InstanceConfig.NativePlugins</c>, applied by
+    /// <c>CloudSyncService.ApplyNativePluginsAsync</c>), never through a generic path.
     /// </summary>
     public static readonly string[] Protected = [.. Cloud, AllowNativePlugins, .. AiOwn];
 }

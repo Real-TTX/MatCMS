@@ -164,6 +164,13 @@ public class Profile
     /// is to shed the well-known default after provisioning your own account.</summary>
     public bool RemoveDefaultAdmin { get; set; }
 
+    /// <summary>
+    /// The sites' switch for compiled (native) plugins: "allow", "deny" or "" = leave each site's own choice alone (the default).
+    /// Native plugins run with every right of the site's process, so this is a deliberate operator decision with a wire field of its
+    /// own — never a free settings row, which the sites refuse for this key. <see cref="Instance.NativePlugins"/> overrides it per site.
+    /// </summary>
+    public string NativePlugins { get; set; } = "";
+
     public bool SyncPlugins { get; set; }
     public bool SyncComponents { get; set; }
     public bool SyncTemplates { get; set; }

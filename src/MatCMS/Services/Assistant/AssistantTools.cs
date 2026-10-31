@@ -122,7 +122,8 @@ public sealed partial class AssistantTools
         catch (Exception e) when (e is DbUpdateException or InvalidOperationException or JsonException or FormatException)
         {
             Discard();
-            return Fail($"„{tool}“ fehlgeschlagen", "Fehler beim Ausführen: " + e.Message);
+            // The inner exception names the real cause (a constraint, a lock); EF's own message only says "see the inner exception".
+            return Fail($"„{tool}“ fehlgeschlagen", "Fehler beim Ausführen: " + (e is DbUpdateException ? e.GetBaseException().Message : e.Message));
         }
     }
 

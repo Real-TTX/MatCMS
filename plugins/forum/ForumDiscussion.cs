@@ -12,12 +12,15 @@ namespace MatCMS.Plugin.Forum;
 /// <para>The forum knows no article. Two events tie it to whoever owns the content, both carrying a <c>source</c> like <c>blog:12</c>:
 /// <c>content.discussion</c> {source, title, url} — the forum answers {html} with the discussion to show under the content; and
 /// <c>content.item</c> {source} — the owner answers {title, url} when the content exists and is public (the forum asks before it starts a thread,
-/// so nobody can open discussions about things that are not there). The blog is the first owner; a shop could add products the same way.</para>
+/// so nobody can open discussions about things that are not there). The blog is the first owner (<c>blog:{slug}</c>); a shop could add products
+/// the same way.</para>
 /// </summary>
 internal static partial class ForumPublic
 {
-    /// <summary>What a source looks like: an owner and an id, nothing that could break out of an address or a query.</summary>
-    private static readonly Regex SourceRx = new("^[a-z][a-z0-9-]{0,30}:[A-Za-z0-9_-]{1,64}$", RegexOptions.CultureInvariant);
+    /// <summary>What a source looks like: an owner (letters and digits only — the first hyphen of an address separates it) and the content's own
+    /// stable name, nothing that could break out of an address or a query. The blog names a post by its SLUG, not its id: a restore inserts the posts
+    /// anew with new ids, and a discussion keyed by id then pointed at the wrong post (it did, on the first demo).</summary>
+    private static readonly Regex SourceRx = new("^[a-z][a-z0-9]{0,30}:[a-z0-9][a-z0-9_-]{0,119}$", RegexOptions.CultureInvariant);
 
     /// <summary>At most this many posts are shown under an article; a longer discussion links to the rest in the forum.</summary>
     private const int DiscussionShown = 50;
@@ -87,7 +90,7 @@ internal static partial class ForumPublic
 
         sb.Append("<div class=\"forum-disc-actions\">");
         if (thread is null || !thread.Closed) sb.Append($"<a class=\"btn\" href=\"{E(write)}\">{E(ctx.T("forum.disc.write"))}</a>");
-        if (thread is not null) sb.Append($"<a class=\"btn btn-ghost\" href=\"{E(ForumUrls.Thread(thread))}\">{E(ctx.T("forum.disc.open"))}</a>");
+        if (thread is not null) sb.Append($"<a class=\"btn btn-outline\" href=\"{E(ForumUrls.Thread(thread))}\">{E(ctx.T("forum.disc.open"))}</a>");
         sb.Append("</div></div></div></section>");
         // Back from writing (?kommentar=id): to the new comment — a redirect cannot carry a #fragment.
         sb.Append("<script>(function(){var k=new URLSearchParams(location.search).get('kommentar');var el=k&&/^[0-9]+$/.test(k)&&document.getElementById('kommentar-'+k);if(el)el.scrollIntoView({block:'center'});})();</script>");
@@ -166,7 +169,8 @@ internal static partial class ForumPublic
 
     /// <summary>The look under an article: the site's own variables (accent, lines, fonts), so it belongs to the page it sits on.</summary>
     private const string DiscussionCss = """
-        .forum-disc{max-width:820px;margin:0 auto;border-top:1px solid var(--line,#e5e7eb);padding-top:28px}
+        .forum-disc-wrap.section{padding-top:0}
+        .forum-disc{max-width:760px;margin:0 auto;border-top:1px solid var(--line,#e5e7eb);padding-top:28px}
         .forum-disc-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:14px}
         .forum-disc-head h2{margin:0;font-size:1.4rem}
         .forum-disc-count{color:var(--muted,#6b7280);font-size:.95rem}

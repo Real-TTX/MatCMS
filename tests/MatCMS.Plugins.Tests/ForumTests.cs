@@ -428,29 +428,29 @@ public class ForumTests : IClassFixture<ForumApp>
         // Off until a board is named: the post shows no discussion and the address does not exist.
         await _f.SetAsync(("discussionBoard", ""));
         Assert.DoesNotContain("id=\"diskussion\"", await guest.GetStringAsync("/blog/neuer-prozessor"));
-        Assert.Equal(HttpStatusCode.NotFound, (await guest.GetAsync($"/forum/artikel/blog-{postId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await guest.GetAsync("/forum/artikel/blog-neuer-prozessor")).StatusCode);
 
         await _f.SetAsync(("discussionBoard", "kommentare"));
         var page = WebUtility.HtmlDecode(await guest.GetStringAsync("/blog/neuer-prozessor"));
         Assert.Contains("id=\"diskussion\"", page);
         Assert.Contains("Noch keine Beiträge", page);
-        Assert.Contains($"href=\"/forum/artikel/blog-{postId}\"", page);
+        Assert.Contains("href=\"/forum/artikel/blog-neuer-prozessor\"", page);
 
         // A guest is sent to sign in; a draft, an unknown post or a malformed source have no discussion.
-        Assert.Equal(HttpStatusCode.Redirect, (await guest.GetAsync($"/forum/artikel/blog-{postId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await guest.GetAsync("/forum/artikel/blog-neuer-prozessor")).StatusCode);
         var anna = await _f.AsAsync("annadisc");
-        Assert.Equal(HttpStatusCode.NotFound, (await anna.GetAsync($"/forum/artikel/blog-{draftId}")).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await anna.GetAsync("/forum/artikel/blog-999999")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await anna.GetAsync("/forum/artikel/blog-entwurf-x")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await anna.GetAsync("/forum/artikel/blog-gibt-es-nicht")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await anna.GetAsync("/forum/artikel/x")).StatusCode);
 
         // The first comment starts the thread — titled like the post, in the named board — and leads back to the post.
-        var first = await SubmitAsync(anna, $"/forum/artikel/blog-{postId}", new() { ["body"] = "Spannender Test, [b]danke[/b]!", ["action"] = "save" });
+        var first = await SubmitAsync(anna, "/forum/artikel/blog-neuer-prozessor", new() { ["body"] = "Spannender Test, [b]danke[/b]!", ["action"] = "save" });
         Assert.Equal(HttpStatusCode.Redirect, first.StatusCode);
         Assert.StartsWith("/blog/neuer-prozessor?kommentar=", Location(first));
 
         // The second goes to the same thread (the address now leads there).
         var ben = await _f.AsAsync("bendisc");
-        var to = await ben.GetAsync($"/forum/artikel/blog-{postId}");
+        var to = await ben.GetAsync("/forum/artikel/blog-neuer-prozessor");
         Assert.Equal(HttpStatusCode.Redirect, to.StatusCode);
         var threadUrl = Location(to).Split('?')[0];
         Assert.StartsWith("/forum/t/", threadUrl);

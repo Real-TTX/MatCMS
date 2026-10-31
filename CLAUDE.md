@@ -189,7 +189,7 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
 - **The forum** (`plugins/forum`, native, key `forum`, see its README) is the store's first larger native plugin: boards with rights, threads,
   BBCode (`ForumMarkup`: encode first, only its own tags out), members = the site's accounts, moderation by a member role. `ForumTests` load its
   built DLL into the whole application. **Article discussions** (like Golem.de): with the forum setting `discussionBoard` (a board's slug) every
-  blog post has ONE thread there (`threads.source` = `blog:{id}`), started by the first comment at `/forum/artikel/blog-{id}`; the post page shows the
+  blog post has ONE thread there (`threads.source` = `blog:{slug}` — the slug, not the id: a restore inserts the posts anew with new ids), started by the first comment at `/forum/artikel/blog-{slug}`; the post page shows the
   thread's posts under the article. Two event conventions carry it, so neither plugin knows the other: `content.discussion` {source, title, url} → {html}
   (the blog collects it under every post; drawn for a guest — an event knows no visitor, writing happens on the forum's page) and `content.item`
   {source} → {title, url} (the owner says whether the content exists and is public; the forum asks before it opens a thread). A shop could add

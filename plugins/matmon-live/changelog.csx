@@ -1,7 +1,8 @@
 // Matmon live — "What's new": the changelog of Matmon, read from the public commit history of the repository on GitHub
 // (Real-TTX/Matmon, branch main). Matmon's commits are written as release notes ("feat(windows): an online setup …"), so they ARE
 // the changelog: new things and fixes, by day. Fetched by the server (never by the visitor's browser), at most once an hour,
-// the last good list kept when GitHub does not answer. docs/chore/refactor/test/ci/build commits and merges are left out.
+// the last good list kept when GitHub does not answer. docs/chore/refactor/test/ci/build commits, commits named after a
+// document ("CLAUDE.md: ...") and merges are left out.
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -78,6 +79,10 @@ public static class MmChangelog
         string type = "", scope = "", text = line;
         if (m.Success) { type = m.Groups["type"].Value; scope = m.Groups["scope"].Value; text = m.Groups["text"].Value; }
         if (Skip.Contains(type)) return null;
+        // A commit named after a file ("CLAUDE.md: ...", "README.md: ...") is a change to that document, not to Matmon;
+        // and nothing that names the development assistant reaches the public page.
+        if (!m.Success && System.Text.RegularExpressions.Regex.IsMatch(line, @"^[\w./-]+\.(md|txt|ya?ml|json)\s*:", System.Text.RegularExpressions.RegexOptions.IgnoreCase)) return null;
+        if (line.Contains("claude", StringComparison.OrdinalIgnoreCase) || line.Contains("co-authored", StringComparison.OrdinalIgnoreCase)) return null;
         text = System.Text.RegularExpressions.Regex.Replace(text, @"\s*\(#\d+\)\s*$", "").Trim();
         if (text.Length == 0) return null;
         text = char.ToUpperInvariant(text[0]) + text.Substring(1);
@@ -92,7 +97,7 @@ public static class MmChangelog
         try
         {
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-            http.DefaultRequestHeaders.UserAgent.ParseAdd("MatCMS-Matmon-Live/1.4");
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("MatCMS-Matmon-Live/1.5");
             http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
             var json = await http.GetStringAsync(Api(ctx) + "/repos/" + Repo(ctx) + "/commits?sha=main&per_page=100", ct);
             if (JsonNode.Parse(json) is JsonArray arr)

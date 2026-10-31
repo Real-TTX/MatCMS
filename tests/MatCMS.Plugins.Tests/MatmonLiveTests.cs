@@ -100,6 +100,8 @@ public class MatmonLiveTests : IClassFixture<AppFactory>
             Commit("feat(windows): an online setup, and the setup's buttons in one line\n\nlong body", "2026-10-26T20:00:00Z"),
             Commit("fix(updates): an interrupted download no longer leaves the <page> locked", "2026-10-26T19:00:00Z"),
             Commit("docs: the cloud's public partner list", "2026-10-26T18:00:00Z"),
+            Commit("CLAUDE.md: the console's update screen shows the instance's steps", "2026-10-26T17:00:00Z"),
+            Commit("README.md: install snippets", "2026-10-26T16:30:00Z"),
             Commit("API tokens and a maintenance-window API for CI/CD", "2026-10-25T09:00:00Z")).ToJsonString();
 
         using (var scope = _app.Services.CreateScope())
@@ -164,5 +166,8 @@ public class MatmonLiveTests : IClassFixture<AppFactory>
         Assert.Contains("the &lt;page&gt; locked", html);
         Assert.Contains("mmc-fixes", html);
         Assert.DoesNotContain("public partner list", html);   // the same number for the home page
+        Assert.DoesNotContain("update screen shows", html);   // a commit named after a document (CLAUDE.md) is not a change
+        Assert.DoesNotContain("install snippets", html);
+        Assert.DoesNotContain("CLAUDE", html, StringComparison.OrdinalIgnoreCase);
     }
 }

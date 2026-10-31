@@ -497,8 +497,8 @@ ships.
 `MatCMS.Shared.Web/wwwroot/lib/matui/matui.css` (version in its first line; update by copying `/ui/matui.css` of a MatDesign
 release again). The CMS's `_AdminLayout` is MatUi's shell (`mat-app`, `mat-nav` with group headings, `mat-topbar` with the
 breadcrumb, the user and the theme button at the foot, `mat-page`); `<html data-app="matcms" data-density="compact">`.
-`css/admin-matui.css` is the bridge, loaded last: the compact density (written like a MatUi token set — a candidate for MatUi
-itself), every admin variable (`--surface`, `--line`, `--accent`, the status tints …) READING a `--mat-*` token, and the
+`css/admin-matui.css` is the bridge, loaded last: the compact density is MatUi's own since 0.11 (`data-density="compact"`; the bridge
+wrote it first and keeps only the two table-padding properties its `table.data` reads), every admin variable (`--surface`, `--line`, `--accent`, the status tints …) READING a `--mat-*` token, and the
 admin's own classes (`.btn`, `.card`, `table.data`, `.tabs`, `.form-field`) in MatUi's look until the pages move to `mat-*`
 classes. The plugin toolkit's own classes belong in it too — `UiRenderer` draws admin fields as `.field` and sub-menus as `.ui-subnav`; left out,
 every plugin's forms (forum, shop, blog) stood 46 px tall and square beside the core's 35 px ones and read as "not MatCMS". `matui.js` is NOT loaded yet: it handles `data-confirm` too, and with `mat-dialogs.js` every question would be asked

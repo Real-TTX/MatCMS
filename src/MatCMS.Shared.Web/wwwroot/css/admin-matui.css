@@ -2,10 +2,7 @@
    The back office on MatUi — the bridge between MatCMS's admin classes and MatDesign's toolkit.
 
    Loaded LAST, after lib/matui/matui.css, site.css and admin.css. Three layers:
-   1. Density "compact" (data-density on <html>): a back office with ~20 menu entries and dense forms
-      needs less air than MatUi's default. Written the way it would sit in MatUi's own tokens (an
-      opt-in attribute on <html> like data-theme and data-scheme; heights under 44 px only for a fine
-      pointer, never under 32 px — MOBILE-04), so it can move upstream unchanged.
+   1. Density "compact": MatUi's own since 0.11 (the attribute data-density="compact" on <html>); this file wrote it first.
    2. The token bridge: every variable admin.css and site.css colour with (--surface, --line, --ink,
       --accent, the --ok/err/info/warn tints …) now READS a MatUi token. Light, dark and system come
       from matui.tokens.css; the dark set of admin.css is overridden, not needed any more.
@@ -14,35 +11,11 @@
    The public site never loads this file.
    ========================================================================== */
 
-/* ---- 1. Density: compact ---------------------------------------------------------------------- */
-:root[data-density="compact"] {
-  --mat-nav-w: 236px;
-  --mat-topbar-h: 52px;
-  --mat-content-pad: 28px;                     /* in steps, never vw: the site's bar repeats them, and vw differs where the window keeps a scrollbar gutter */
-  --mat-fs-md: .875rem;                        /* 14 px body text */
-}
-@media (max-width: 1199px) { :root[data-density="compact"] { --mat-content-pad: 24px; } }
-@media (max-width: 899px) { :root[data-density="compact"] { --mat-content-pad: 16px; } }
-@media (pointer: fine) {
-  :root[data-density="compact"] {
-    --mat-control-h: 34px;
-    --mat-control-h-lg: 40px;
-    --mat-nav-item-height: 32px;
-    --mat-nav-item-gap: 10px;
-    --mat-nav-item-pad-x: 10px;
-    --mat-table-pad-y: 9px;
-    --mat-table-pad-x: 14px;
-  }
-}
-/* No property for these yet (upstream they would become --mat-nav-group-pad-* / --mat-nav-brand-pad). */
-:root[data-density="compact"] .mat-nav__brand { padding: 14px 14px 10px; }
-:root[data-density="compact"] .mat-nav__scroll { padding: 0 8px 8px; }
-:root[data-density="compact"] .mat-nav__group { padding: 14px 10px 4px; font-size: var(--mat-fs-xs); }
-:root[data-density="compact"] .mat-nav__list > li:first-child.mat-nav__group { padding-top: 4px; }
-:root[data-density="compact"] .mat-nav__foot { padding: 8px 8px calc(8px + var(--mat-safe-bottom)); gap: 4px; }
-:root[data-density="compact"] .mat-user { min-height: var(--mat-control-h); padding: 4px 8px; gap: 10px; }
-:root[data-density="compact"] .mat-avatar { width: 28px; height: 28px; font-size: var(--mat-fs-xs); }
-:root[data-density="compact"] .mat-page { padding-top: var(--mat-space-5); }
+/* ---- 1. Density: compact ----------------------------------------------------------------------
+   Lives in MatUi itself since 0.11 (data-density="compact" on <html>: tokens in matui.tokens.css, the menu's spacing in
+   matui.shell.css, the table cells in matui.lists.css). This file carried it as layer 1 until then. What is left: the admin's own tables
+   (table.data) read the cell padding from the two properties, which MatUi 0.11 only uses inside its .mat-table rule. */
+@media (pointer: fine) { :root[data-density="compact"] { --mat-table-pad-y: 9px; --mat-table-pad-x: 14px; } }
 
 /* ---- 2. Token bridge: MatCMS's variables read MatUi's ----------------------------------------- */
 /* html[data-theme] is the selector admin.css writes its light and dark sets with; this file comes later, so it wins in

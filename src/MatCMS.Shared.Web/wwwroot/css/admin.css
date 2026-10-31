@@ -1365,6 +1365,7 @@ a.tab { display: inline-block; text-decoration: none; }
    because it is admin chrome — the cloud's own store browsing gets the same look for free. */
 .modal-store { max-width: 900px; width: 100%; }
 .modal-store .modal-body { max-height: 70vh; overflow-y: auto; }
+.modal-store .modal-foot { padding: 14px 24px; border-top: 1px solid var(--line); justify-content: flex-end; }
 .store-search { margin: 4px 0 14px; }
 .store-search .list-search { width: 100%; }
 .store-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }

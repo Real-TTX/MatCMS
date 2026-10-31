@@ -175,10 +175,13 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
   EF's static provider cache (cleared by `EfInternals`, the one reflection into EF) AND the provider shared with the
   host's own contexts (a plugin context needs its OWN service provider). `PluginSystemTests` unloads a real DLL with an
   EF context; if it fails after an EF update, that is the cause.
-- **Known gap: after a plugin has answered a request over HTTP it is not freed yet** — even the reference plugin lingers once the full
-  application served one of its routes (found with the forum, `ForumUnloadTests`); `PluginSystemTests` unload without HTTP and pass. Something
-  in the web path keeps the load context; until it is found an unload after traffic shows "Neustart nötig". A plugin's redirect also cannot carry
-  a `#fragment` (`PluginResults.SafeLocal` turns it into "/") — the forum jumps to a post with `?p=` instead.
+- **Nothing long-lived in the host may hold a plugin's object strongly** — a delegate is enough to keep the whole load context alive, and `gcroot`
+  does not show that last step (a delegate's hold on its collectible method is runtime-internal). Two holders found with the forum: `AdminNav`'s badge
+  cache kept the section (with its badge provider) in a singleton — now a `ConditionalWeakTable` keyed by the section; and the route match in
+  `HttpContext.Items`, which `PluginPage` now removes as soon as it read it. `PluginHttpUnloadTests`/`ForumUnloadTests` serve pages, open the admin
+  and switch the plugin off through Admin → Plugins (a request of its own, as on a site). In a test, unloading in the test's own code right after a
+  request, or while holding an undisposed `HttpResponseMessage` of a plugin route, keeps the request alive and looks like a leak.
+  A plugin's redirect cannot carry a `#fragment` (`PluginResults.SafeLocal` turns it into "/") — the forum jumps to a post with `?p=` instead.
 - **The forum** (`plugins/forum`, native, key `forum`, see its README) is the store's first larger native plugin: boards with rights, threads,
   BBCode (`ForumMarkup`: encode first, only its own tags out), members = the site's accounts, moderation by a member role. `ForumTests` load its
   built DLL into the whole application.

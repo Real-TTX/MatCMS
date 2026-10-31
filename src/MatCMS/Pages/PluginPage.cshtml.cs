@@ -47,6 +47,9 @@ public class PluginPageModel : PageModel
     private async Task<IActionResult> RunAsync()
     {
         if (HttpContext.Items[PluginRouteTransformer.ItemKey] is not PluginMatch match) return NotFound();
+        // Taken out at once: the match holds the plugin's handler, and an HttpContext can outlive its request (a response still being read, a pooled
+        // context) — an unloaded native plugin must not be kept alive by a request that is long over.
+        HttpContext.Items.Remove(PluginRouteTransformer.ItemKey);
 
         var route = match.Route;
         var options = route.Options;

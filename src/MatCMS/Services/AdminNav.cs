@@ -54,8 +54,13 @@ public sealed class AdminNav
     };
 
     private readonly PluginRegistry _registry;
-    private readonly Dictionary<string, (PluginRegistry.SectionEntry Section, DateTime At, string? Value)> _badges = new(StringComparer.Ordinal);
-    private readonly object _lock = new();
+    /// <summary>
+    /// The last counter of each section, keyed by the section itself and held WEAKLY: this navigation is a singleton, and a strong reference to a section
+    /// (it carries the plugin's badge provider) kept an unloaded native plugin's load context alive — "Neustart nötig" after every switch-off from the back
+    /// office, whose sidebar had asked for the counter. A reloaded plugin brings a new section object, so its old counter is not reused either.
+    /// </summary>
+    private readonly System.Runtime.CompilerServices.ConditionalWeakTable<PluginRegistry.SectionEntry, BadgeHit> _badges = new();
+    private sealed record BadgeHit(DateTime At, string? Value);
 
     /// <summary>How long a computed counter is reused: the sidebar is drawn on every admin page.</summary>
     private static readonly TimeSpan BadgeTtl = TimeSpan.FromSeconds(15);
@@ -123,9 +128,7 @@ public sealed class AdminNav
     private async Task<string?> BadgeAsync(PluginRegistry.SectionEntry section, PluginBadgeProvider provider, IServiceProvider services, CancellationToken ct)
     {
         var key = section.Owner;
-        lock (_lock)
-            // The section object changes when the plugin is reloaded, which drops the old counter at once.
-            if (_badges.TryGetValue(key, out var hit) && ReferenceEquals(hit.Section, section) && DateTime.UtcNow - hit.At < BadgeTtl) return hit.Value;
+        if (_badges.TryGetValue(section, out var hit) && DateTime.UtcNow - hit.At < BadgeTtl) return hit.Value;
         string? value = null;
         try
         {
@@ -148,7 +151,7 @@ public sealed class AdminNav
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         catch (Exception ex) { _registry.AddLog(key, "Badge: " + ex.Message); }
-        lock (_lock) _badges[key] = (section, DateTime.UtcNow, value);
+        _badges.AddOrUpdate(section, new BadgeHit(DateTime.UtcNow, value));
         return value;
     }
 

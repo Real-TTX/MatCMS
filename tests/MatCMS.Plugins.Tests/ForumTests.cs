@@ -424,24 +424,42 @@ public class ForumTests : IClassFixture<ForumApp>
 public class ForumUnloadTests
 {
     /// <summary>
-    /// Loaded, installed (its tables made, its first board seeded), unloaded: nothing of the forum may keep its load context alive — no static cache of a
-    /// plugin type in the host, no reflection-based JSON. It is checked BEFORE the first page is served on purpose: after a request over HTTP even the host's
-    /// own reference plugin is not freed yet (something in the web path holds it — a host matter, not the forum's), so a check after pages would test the host.
+    /// The forum after real use — a member wrote a thread, visitors read the overview, a board and the thread, the administrator opened its back-office
+    /// pages — is switched off in Admin → Plugins, and its load context is freed: nothing of the forum may stay behind (no static cache of a plugin type,
+    /// no reflection-based JSON). The switch-off is a request of its own, as on a site (see PluginHttpUnloadTests for why not unload in the test's own code).
     /// </summary>
     [Fact]
-    public async Task The_forum_can_be_unloaded_and_freed()
+    public async Task The_forum_is_freed_when_the_admin_switches_it_off_after_use()
     {
         using var f = new ForumApp();
-        await f.InstallAsync();
-        Assert.True(Unload(f), "the forum's load context is still alive after unloading — something holds it (reflection JSON over a plugin type? a static cache?)");
-        Assert.Equal(HttpStatusCode.NotFound, (await f.App.Browser().GetAsync("/forum/allgemeines")).StatusCode);
-    }
+        var alice = await f.AsAsync("alice");
+        var page = await alice.GetStringAsync("/forum/allgemeines/neu");
+        using var made = await alice.PostAsync("/forum/allgemeines/neu", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["title"] = "Vor dem Ausschalten", ["body"] = "Ein [b]Beitrag[/b].", ["action"] = "save", ["__RequestVerificationToken"] = AppFactory.Token(page)!
+        }));
+        var thread = made.Headers.Location!.ToString();
+        var guest = f.App.Browser();
+        foreach (var url in new[] { "/forum", "/forum/allgemeines", thread, "/forum/suche?q=Beitrag", "/" })
+            Assert.Equal(HttpStatusCode.OK, (await guest.GetAsync(url)).StatusCode);
+        var admin = await f.AsAsync("admin");
+        foreach (var url in new[] { "/admin", "/admin/p/forum/dashboard", "/admin/p/forum/threads" })
+            Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync(url)).StatusCode);
 
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static bool Unload(ForumApp f)
-    {
-        using var scope = f.App.Services.CreateScope();
-        return scope.ServiceProvider.GetRequiredService<NativePluginHost>().Unload("forum", scope.ServiceProvider.GetRequiredService<PluginRegistry>());
+        int id;
+        using (var scope = f.App.Services.CreateScope()) id = scope.ServiceProvider.GetRequiredService<AppDbContext>().Plugins.Single(p => p.Key == "forum").Id;
+        var list = await admin.GetStringAsync("/admin/plugins");
+        var off = await admin.PostAsync("/admin/plugins?handler=Toggle&id=" + id,
+            new FormUrlEncodedContent(new Dictionary<string, string> { ["__RequestVerificationToken"] = AppFactory.Token(list)! }));
+        Assert.Equal(HttpStatusCode.Redirect, off.StatusCode);
+
+        using (var scope = f.App.Services.CreateScope())
+        {
+            Assert.False(scope.ServiceProvider.GetRequiredService<NativePluginHost>().IsLoaded("forum"));
+            var log = scope.ServiceProvider.GetRequiredService<PluginRegistry>().LogOf("forum");
+            Assert.False(log.Any(l => l.Contains("Neustart") || l.Contains("Speicher")), string.Join(" || ", log));
+        }
+        Assert.Equal(HttpStatusCode.NotFound, (await guest.GetAsync("/forum/allgemeines")).StatusCode);
     }
 }
 

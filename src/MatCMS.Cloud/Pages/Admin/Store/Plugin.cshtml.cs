@@ -23,12 +23,17 @@ public class PluginModel : PageModel
 {
     private readonly AppDbContext _db;
     private readonly Services.ProfileService _profiles;
+    private readonly Services.StoreService _store;
 
-    public PluginModel(AppDbContext db, Services.ProfileService profiles)
+    public PluginModel(AppDbContext db, Services.ProfileService profiles, Services.StoreService store)
     {
         _db = db;
         _profiles = profiles;
+        _store = store;
     }
+
+    /// <summary>The plugin's pictures for the sites' store dialog, cover first.</summary>
+    public List<Services.StoreService.PluginImageInfo> Images { get; private set; } = new();
 
     public StorePlugin Item { get; private set; } = new();
     public string Code { get; private set; } = "";
@@ -53,6 +58,7 @@ public class PluginModel : PageModel
         Native = Services.NativeBundleInfo.Read(item.Bundle);
         Assets = StoreBundle.ReadAssets(item.Bundle);
         Files = StoreBundle.ReadFiles(item.Bundle);
+        Images = await _store.ListPluginImagesAsync(item.Key) ?? new();
         UsedBy = await _db.ProfileStorePlugins.AsNoTracking()
             .Where(x => x.StorePluginId == item.Id).Select(x => x.Profile!.Name).ToListAsync();
         return Page();
@@ -143,6 +149,63 @@ public class PluginModel : PageModel
             TempData["Flash"] = "Plugin aus dem Store entfernt. Auf den Instanzen bleibt es bestehen.";
         }
         return RedirectToPage("Index");
+    }
+
+    // ---- Pictures. Every handler goes back to the gallery (#bilder); the work is StoreService's, shared with the API. ----
+
+    private async Task<string?> KeyOfAsync(int id) =>
+        await _db.StorePlugins.AsNoTracking().Where(p => p.Id == id).Select(p => p.Key).FirstOrDefaultAsync();
+
+    private IActionResult BackToImages(int id) => Redirect(Url.Page("Plugin", new { id }) + "#bilder");
+
+    public async Task<IActionResult> OnPostImageAddAsync(int id, List<IFormFile>? images, string? caption)
+    {
+        if (await KeyOfAsync(id) is not { } key) return RedirectToPage("Index");
+        if (images is null || images.Count == 0) { TempData["FlashError"] = "Bitte ein Bild auswählen."; return BackToImages(id); }
+        var added = 0;
+        var errors = new List<string>();
+        foreach (var file in images)
+        {
+            if (file.Length > Services.StoreService.MaxPluginImageBytes) { errors.Add($"{file.FileName}: zu groß (max. {Services.StoreService.MaxPluginImageBytes / 1024 / 1024} MB)."); continue; }
+            using var ms = new MemoryStream();
+            await file.CopyToAsync(ms);
+            var (newId, error) = await _store.AddPluginImageAsync(key, ms.ToArray(), images.Count == 1 ? caption : null);
+            if (newId is null) errors.Add($"{file.FileName}: {error}"); else added++;
+        }
+        if (added > 0) TempData["Flash"] = added == 1 ? "Bild hinzugefügt." : $"{added} Bilder hinzugefügt.";
+        if (errors.Count > 0) TempData["FlashError"] = string.Join(" ", errors);
+        return BackToImages(id);
+    }
+
+    public async Task<IActionResult> OnPostImageCaptionAsync(int id, int imageId, string? caption)
+    {
+        if (await KeyOfAsync(id) is not { } key) return RedirectToPage("Index");
+        if (await _store.SetPluginImageCaptionAsync(key, imageId, caption)) TempData["Flash"] = "Bildunterschrift gespeichert.";
+        return BackToImages(id);
+    }
+
+    public async Task<IActionResult> OnPostImageMoveAsync(int id, int imageId, int delta)
+    {
+        if (await KeyOfAsync(id) is not { } key) return RedirectToPage("Index");
+        await _store.MovePluginImageAsync(key, imageId, delta);
+        return BackToImages(id);
+    }
+
+    public async Task<IActionResult> OnPostImageDeleteAsync(int id, int imageId)
+    {
+        if (await KeyOfAsync(id) is not { } key) return RedirectToPage("Index");
+        if (await _store.DeletePluginImageAsync(key, imageId)) TempData["Flash"] = "Bild entfernt.";
+        return BackToImages(id);
+    }
+
+    /// <summary>A picture for the gallery on this page (the sites fetch theirs through the instance API).</summary>
+    public async Task<IActionResult> OnGetImageAsync(int id, int imageId)
+    {
+        var img = await _store.GetPluginImageAsync(imageId);
+        if (img is null || img.StorePluginId != id) return NotFound();
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        Response.Headers.CacheControl = "private, max-age=86400, immutable";
+        return File(img.Data, img.ContentType);
     }
 
     public async Task<IActionResult> OnGetDownloadAsync(int id)

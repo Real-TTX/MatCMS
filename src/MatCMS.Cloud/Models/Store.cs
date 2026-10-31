@@ -33,6 +33,27 @@ public class StorePlugin
     public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
 }
 
+/// <summary>
+/// A picture of a store plugin (a screenshot, a sample of what it draws), shown in the store dialog on the sites.
+/// Kept OUT of the bundle on purpose: the bundle is what a site imports, and a screenshot has no business on its disk.
+/// A row of its own, so uploading a new bundle keeps the pictures and they cascade away with the plugin.
+/// </summary>
+public class StorePluginImage
+{
+    public int Id { get; set; }
+    public int StorePluginId { get; set; }
+    public StorePlugin? StorePlugin { get; set; }
+
+    /// <summary>Position in the gallery; the lowest is the card's cover.</summary>
+    public int Sort { get; set; }
+
+    /// <summary>image/png, image/jpeg or image/webp — read from the file's own first bytes, never from what the upload claimed.</summary>
+    public string ContentType { get; set; } = "";
+    public byte[] Data { get; set; } = [];
+    public string Caption { get; set; } = "";
+    public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
+}
+
 /// <summary>A theme in the store. <see cref="Name"/> is the identity.</summary>
 public class StoreTemplate
 {

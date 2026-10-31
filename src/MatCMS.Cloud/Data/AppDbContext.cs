@@ -54,6 +54,7 @@ public class AppDbContext : DbContext
 
     // The global store plus the per-profile selections out of it.
     public DbSet<StorePlugin> StorePlugins => Set<StorePlugin>();
+    public DbSet<StorePluginImage> StorePluginImages => Set<StorePluginImage>();
     public DbSet<StoreTemplate> StoreTemplates => Set<StoreTemplate>();
     public DbSet<StoreComponent> StoreComponents => Set<StoreComponent>();
     public DbSet<StoreMailTemplate> StoreMailTemplates => Set<StoreMailTemplate>();
@@ -183,6 +184,8 @@ public class AppDbContext : DbContext
 
         // --- Store: identity is the same key the instance uses, so it must be unique here too ---
         b.Entity<StorePlugin>().HasIndex(p => p.Key).IsUnique();
+        b.Entity<StorePluginImage>().HasOne(x => x.StorePlugin).WithMany().HasForeignKey(x => x.StorePluginId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<StorePluginImage>().HasIndex(x => new { x.StorePluginId, x.Sort });
         b.Entity<StoreTemplate>().HasIndex(t => t.Name).IsUnique();
         b.Entity<StoreComponent>().HasIndex(c => c.Type).IsUnique();
 

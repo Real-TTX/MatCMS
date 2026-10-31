@@ -470,6 +470,13 @@ partial serves plugins, templates and components; they differ only in the route 
 `InstallFromCloud` handler expects. Closing it strips `?browse=true` from the URL so a reload does
 not reopen it.
 
+**A store plugin has pictures** (screenshots; `StorePluginImage`, migration `StorePluginImages`; the "Bilder" card of
+`Store/Plugin`, REST `GET|POST /api/v1/store/plugins/{key}/images`, `GET|PATCH|DELETE …/images/{id}` — raw bytes like the bundle,
+so REST only, not MCP; all through `StoreService`). Up to 8, PNG/JPEG/WebP ≤ 3 MB, the type SNIFFED from the bytes (the cloud
+has no image library, so they are stored as they came; no SVG). They are kept out of the bundle and out of the profile
+revision. The catalogue names them (`CatalogPlugin.Images`), a site fetches each through `/api/store/{publicId}/image/{id}`
+(instance auth, nosniff, sandbox CSP) and serves it to its own admin. Not yet in the cloud's configuration backup.
+
 There is **no separate "Global" tab** on a profile. The operator thinks in "templates this profile
 rolls out", not in where a row is stored, so each payload tab shows **one list** containing both the
 profile's own items and the ones it takes from the store, with a *Global* / *eigenes* badge in the

@@ -133,6 +133,76 @@
 
 </form>
 
+    @* The pictures the sites' store dialog shows (cover = the first). Their own forms, outside plugin-form — forms cannot nest — and
+       each saves at once, so there is nothing here the Save button below would have to carry. *@
+    <div class="card" id="bilder">
+        <h2>@T["store.images"] <span class="muted" style="font-size:13px;font-weight:400;">@Model.Images.Count / @MatCMS.Cloud.Services.StoreService.MaxPluginImages</span></h2>
+        <p class="muted">@T["store.imagesHint"]</p>
+        @if (Model.Images.Count > 0)
+        {
+            <div class="media-grid store-shots-edit">
+                @for (var i = 0; i < Model.Images.Count; i++)
+                {
+                    var img = Model.Images[i];
+                    var src = Url.Page("Plugin", "Image", new { id = Model.Item.Id, imageId = img.Id });
+                    <div class="media-card store-shot-card">
+                        <a class="media-thumb" href="@src" target="_blank" rel="noopener" style="background-image:url('@src')" aria-label="@T["store.imageOpen"]"></a>
+                        @if (i == 0)
+                        {
+                            <span class="badge badge-new store-shot-cover">@T["store.imageCover"]</span>
+                        }
+                        <div class="media-meta">
+                            <form method="post" asp-page-handler="ImageCaption" asp-route-id="@Model.Item.Id" class="store-shot-caption">
+                                <input type="hidden" name="imageId" value="@img.Id" />
+                                <input name="caption" value="@img.Caption" maxlength="200" placeholder="@T["store.imageCaption"]" aria-label="@T["store.imageCaption"]" />
+                                <button type="submit" class="btn btn-ghost btn-sm btn-icon" title="@T["settings.save"]" aria-label="@T["settings.save"]"><i class="ti ti-check" aria-hidden="true"></i></button>
+                            </form>
+                            <div class="actions">
+                                <span class="muted mono" style="font-size:11px;margin-right:auto;">@(img.Size / 1024) KB</span>
+                                @if (i > 0)
+                                {
+                                    <form class="inline-form" method="post" asp-page-handler="ImageMove" asp-route-id="@Model.Item.Id">
+                                        <input type="hidden" name="imageId" value="@img.Id" /><input type="hidden" name="delta" value="-1" />
+                                        <button type="submit" class="btn btn-ghost btn-sm btn-icon" title="@T["store.imageEarlier"]" aria-label="@T["store.imageEarlier"]"><i class="ti ti-arrow-left" aria-hidden="true"></i></button>
+                                    </form>
+                                }
+                                @if (i < Model.Images.Count - 1)
+                                {
+                                    <form class="inline-form" method="post" asp-page-handler="ImageMove" asp-route-id="@Model.Item.Id">
+                                        <input type="hidden" name="imageId" value="@img.Id" /><input type="hidden" name="delta" value="1" />
+                                        <button type="submit" class="btn btn-ghost btn-sm btn-icon" title="@T["store.imageLater"]" aria-label="@T["store.imageLater"]"><i class="ti ti-arrow-right" aria-hidden="true"></i></button>
+                                    </form>
+                                }
+                                <form class="inline-form" method="post" asp-page-handler="ImageDelete" asp-route-id="@Model.Item.Id" data-confirm="@T["store.imageDeleteConfirm"]">
+                                    <input type="hidden" name="imageId" value="@img.Id" />
+                                    <button type="submit" class="btn btn-ghost btn-sm btn-icon btn-danger" title="@T["common.delete"]" aria-label="@T["common.delete"]"><partial name="_IconTrash" /></button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        @if (Model.Images.Count < MatCMS.Cloud.Services.StoreService.MaxPluginImages)
+        {
+            <form method="post" asp-page-handler="ImageAdd" asp-route-id="@Model.Item.Id" enctype="multipart/form-data" class="store-shot-add">
+                <div class="form-row">
+                    <div class="form-field">
+                        <label for="images">@T["store.imageAdd"]</label>
+                        <input id="images" name="images" type="file" accept="image/png,image/jpeg,image/webp" multiple required />
+                        <div class="help">@T["store.imageAddHint"]</div>
+                    </div>
+                    <div class="form-field">
+                        <label for="icaption">@T["store.imageCaption"]</label>
+                        <input id="icaption" name="caption" maxlength="200" />
+                        <div class="help">@T["store.imageCaptionHint"]</div>
+                    </div>
+                </div>
+                <div><button type="submit" class="btn btn-ghost">@T["store.imageUpload"]</button></div>
+            </form>
+        }
+    </div>
+
 }
 
 @* Save, download, back, delete on one line, positive before negative: what to do with this record

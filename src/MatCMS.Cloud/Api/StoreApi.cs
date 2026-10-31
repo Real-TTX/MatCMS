@@ -192,7 +192,66 @@ public static class StoreApi
             if (RequireStore(key!) is { } g) return g;
             return await store.DeletePluginAsync(pluginKey) ? Results.Ok(new { ok = true }) : NotFound("Plugin");
         }).RequireRateLimiting("operatorApi");
+
+        // ---- a plugin's pictures (the store dialog's gallery). Bytes travel raw, like the bundle — REST only, not MCP. ----
+        app.MapGet("/api/v1/store/plugins/{pluginKey}/images", async (HttpContext ctx, string pluginKey, ApiKeyService keys, StoreService store) =>
+        {
+            var (_, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            var list = await store.ListPluginImagesAsync(pluginKey, ctx.RequestAborted);
+            return list is null ? NotFound("Plugin") : Results.Ok(new { images = list.Select(i => new { id = i.Id, sort = i.Sort, contentType = i.ContentType, size = i.Size, caption = i.Caption }) });
+        }).RequireRateLimiting("operatorApi");
+
+        app.MapGet("/api/v1/store/plugins/{pluginKey}/images/{id:int}", async (HttpContext ctx, string pluginKey, int id, ApiKeyService keys, StoreService store) =>
+        {
+            var (_, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            var img = await store.GetPluginImageAsync(id, ctx.RequestAborted);
+            if (img is null || (await store.ListPluginImagesAsync(pluginKey, ctx.RequestAborted))?.Any(i => i.Id == id) != true) return NotFound("Bild");
+            ctx.Response.Headers["X-Content-Type-Options"] = "nosniff";
+            return Results.File(img.Data, img.ContentType);
+        }).RequireRateLimiting("operatorApi");
+
+        // POST the raw picture as the body (PNG, JPEG or WebP, ≤ 3 MB); ?caption= optional. Added at the end of the gallery.
+        app.MapPost("/api/v1/store/plugins/{pluginKey}/images", async (HttpContext ctx, string pluginKey, string? caption, ApiKeyService keys, StoreService store) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireStore(key!) is { } g) return g;
+            using var ms = new MemoryStream();
+            var buffer = new byte[81920];
+            int read;
+            while ((read = await ctx.Request.Body.ReadAsync(buffer, ctx.RequestAborted)) > 0)
+            {
+                ms.Write(buffer, 0, read);
+                if (ms.Length > StoreService.MaxPluginImageBytes) return BadReq($"Das Bild ist zu groß (max. {StoreService.MaxPluginImageBytes / 1024 / 1024} MB).");
+            }
+            var (id, err) = await store.AddPluginImageAsync(pluginKey, ms.ToArray(), caption, ctx.RequestAborted);
+            return id is null ? (err == "Plugin nicht gefunden." ? NotFound("Plugin") : BadReq(err!)) : Results.Ok(new { ok = true, id });
+        }).RequireRateLimiting("operatorApi").DisableAntiforgery();
+
+        // { "caption": "…" } and/or { "move": -1 | 1 } — one picture's caption or its place in the gallery.
+        app.MapPatch("/api/v1/store/plugins/{pluginKey}/images/{id:int}", async (HttpContext ctx, string pluginKey, int id, ImagePatch body, ApiKeyService keys, StoreService store) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireStore(key!) is { } g) return g;
+            var found = true;
+            if (body.Caption is not null) found = await store.SetPluginImageCaptionAsync(pluginKey, id, body.Caption, ctx.RequestAborted);
+            if (found && body.Move is { } m && m != 0) found = await store.MovePluginImageAsync(pluginKey, id, m, ctx.RequestAborted);
+            return found ? Results.Ok(new { ok = true }) : NotFound("Bild");
+        }).RequireRateLimiting("operatorApi");
+
+        app.MapDelete("/api/v1/store/plugins/{pluginKey}/images/{id:int}", async (HttpContext ctx, string pluginKey, int id, ApiKeyService keys, StoreService store) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireStore(key!) is { } g) return g;
+            return await store.DeletePluginImageAsync(pluginKey, id, ctx.RequestAborted) ? Results.Ok(new { ok = true }) : NotFound("Bild");
+        }).RequireRateLimiting("operatorApi");
     }
+
+    private sealed record ImagePatch(string? Caption, int? Move);
 
     // ---- helpers ----
     private static IResult BadReq(string msg) => Results.Json(new { error = msg }, statusCode: StatusCodes.Status400BadRequest);

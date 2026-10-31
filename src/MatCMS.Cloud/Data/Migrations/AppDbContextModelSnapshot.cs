@@ -15,7 +15,7 @@ namespace MatCMS.Cloud.Data.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.12");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.13");
 
             modelBuilder.Entity("MatCMS.Cloud.Models.AiUsage", b =>
                 {
@@ -1701,6 +1701,40 @@ namespace MatCMS.Cloud.Data.Migrations
                     b.ToTable("StorePlugins");
                 });
 
+            modelBuilder.Entity("MatCMS.Cloud.Models.StorePluginImage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Caption")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<byte[]>("Data")
+                        .IsRequired()
+                        .HasColumnType("BLOB");
+
+                    b.Property<int>("Sort")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("StorePluginId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StorePluginId", "Sort");
+
+                    b.ToTable("StorePluginImages");
+                });
+
             modelBuilder.Entity("MatCMS.Cloud.Models.StoreTemplate", b =>
                 {
                     b.Property<int>("Id")
@@ -2196,6 +2230,17 @@ namespace MatCMS.Cloud.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Instance");
+                });
+
+            modelBuilder.Entity("MatCMS.Cloud.Models.StorePluginImage", b =>
+                {
+                    b.HasOne("MatCMS.Cloud.Models.StorePlugin", "StorePlugin")
+                        .WithMany()
+                        .HasForeignKey("StorePluginId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("StorePlugin");
                 });
 
             modelBuilder.Entity("MatCMS.Cloud.Models.UserInstance", b =>

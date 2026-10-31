@@ -224,6 +224,11 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
   nothing here: the catalogue follows the assembly. Editor blueprints (`PluginBlueprints`) are loaded for real by `BlueprintTests`.
 - **Native bundles in the cloud are read-only:** the store and profile editors show entry, API, checksum and the `src/` files instead of a code editor, and
   `Repack` leaves a native bundle's `Code` (the note for older instances) alone (`MatCMS.Cloud/Services/NativeBundleInfo.cs`). The cloud still never loads one.
+- **Store plugins have pictures** (`StorePluginImage`, cloud; up to 8 PNG/JPEG/WebP ≤ 3 MB, type read from the bytes — no SVG): NOT in the bundle (a screenshot has
+  no business on a site's disk) and not part of a profile (no revision bump). `CatalogPlugin.Images` (ids + captions, additive) tells a site which exist; the site
+  fetches each with its OWN instance credentials (`/api/store/{publicId}/image/{id}`, `CloudCatalogService.GetImageAsync`, an hour in memory) and serves it to its
+  admin itself (`Plugins?handler=StoreImage`) — the address a site reaches its cloud by may be an internal Docker name the admin's browser cannot reach. The store
+  dialog shows the first as the card's cover and all of them as a gallery (`.store-card-cover`, `.store-viewer`).
 - **Customer accounts, visitor routes and the rest of what a shop needed** (all in `MatCMS.Plugin.Abstractions`, implemented in `Services/Plugins/PluginAccessParts.cs` and
   `PluginRequestContext.cs`): `ctx.Member` (the signed-in customer of the guest area — read from the DATABASE on every request, so a deleted or switched-off account stops being
   "the member" at once, cookie or not), `ctx.Members` (find / create / sign in / change password / delete — the account itself is `SiteMember`, now with `Email`, confirmation and
@@ -486,7 +491,8 @@ breadcrumb, the user and the theme button at the foot, `mat-page`); `<html data-
 `css/admin-matui.css` is the bridge, loaded last: the compact density (written like a MatUi token set — a candidate for MatUi
 itself), every admin variable (`--surface`, `--line`, `--accent`, the status tints …) READING a `--mat-*` token, and the
 admin's own classes (`.btn`, `.card`, `table.data`, `.tabs`, `.form-field`) in MatUi's look until the pages move to `mat-*`
-classes. `matui.js` is NOT loaded yet: it handles `data-confirm` too, and with `mat-dialogs.js` every question would be asked
+classes. The plugin toolkit's own classes belong in it too — `UiRenderer` draws admin fields as `.field` and sub-menus as `.ui-subnav`; left out,
+every plugin's forms (forum, shop, blog) stood 46 px tall and square beside the core's 35 px ones and read as "not MatCMS". `matui.js` is NOT loaded yet: it handles `data-confirm` too, and with `mat-dialogs.js` every question would be asked
 twice — `js/admin-shell.js` does the shell (drawer, user menu, theme → `Account?handler=Theme`) until then. Icons stay Tabler
 (plugins name Tabler icons). The cloud's `_AdminLayout` is the same shell (groups Betrieb / Verwaltung); its instance
 switcher (`_ContextPicker`) is MatUi's menu switcher under the logo (`mat-nav__switch` > `mat-switcher`), showing a small

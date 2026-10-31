@@ -168,6 +168,95 @@ public class StoreService
         return true;
     }
 
+    // ---- Plugin pictures (screenshots in the store dialog) -----------------------------
+    // Not part of the bundle and not part of a profile: a picture changes nothing a site runs, so no profile is touched.
+
+    /// <summary>At most this many pictures per plugin, each at most this large — the store dialog shows a few, and every site fetches them.</summary>
+    public const int MaxPluginImages = 8;
+    public const int MaxPluginImageBytes = 3 * 1024 * 1024;
+
+    public sealed record PluginImageInfo(int Id, int Sort, string ContentType, int Size, string Caption);
+
+    /// <summary>
+    /// The picture's type from its own first bytes. PNG, JPEG and WebP only: no SVG (it is code, and these are shown in every site's admin),
+    /// no GIF. The cloud ships no image library, so the bytes are kept as they came — which is why the type is never taken on trust.
+    /// </summary>
+    public static string? SniffImage(byte[] b)
+    {
+        if (b.Length >= 8 && b[0] == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47 && b[4] == 0x0D && b[5] == 0x0A && b[6] == 0x1A && b[7] == 0x0A) return "image/png";
+        if (b.Length >= 3 && b[0] == 0xFF && b[1] == 0xD8 && b[2] == 0xFF) return "image/jpeg";
+        if (b.Length >= 12 && b[0] == 'R' && b[1] == 'I' && b[2] == 'F' && b[3] == 'F' && b[8] == 'W' && b[9] == 'E' && b[10] == 'B' && b[11] == 'P') return "image/webp";
+        return null;
+    }
+
+    public async Task<List<PluginImageInfo>?> ListPluginImagesAsync(string key, CancellationToken ct = default)
+    {
+        var id = await _db.StorePlugins.Where(x => x.Key == key).Select(x => (int?)x.Id).FirstOrDefaultAsync(ct);
+        if (id is null) return null;
+        return await _db.StorePluginImages.AsNoTracking().Where(x => x.StorePluginId == id).OrderBy(x => x.Sort).ThenBy(x => x.Id)
+            .Select(x => new PluginImageInfo(x.Id, x.Sort, x.ContentType, x.Data.Length, x.Caption)).ToListAsync(ct);
+    }
+
+    public Task<StorePluginImage?> GetPluginImageAsync(int id, CancellationToken ct = default) =>
+        _db.StorePluginImages.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
+
+    private static string CleanCaption(string? caption)
+    {
+        var c = (caption ?? "").Trim();
+        return c.Length > 200 ? c[..200] : c;
+    }
+
+    /// <summary>Adds a picture at the end of the gallery. Returns the new id, or an error in words.</summary>
+    public async Task<(int? id, string? error)> AddPluginImageAsync(string key, byte[] data, string? caption, CancellationToken ct = default)
+    {
+        var plugin = await _db.StorePlugins.FirstOrDefaultAsync(x => x.Key == key, ct);
+        if (plugin is null) return (null, "Plugin nicht gefunden.");
+        if (data.Length == 0) return (null, "Die Datei ist leer.");
+        if (data.Length > MaxPluginImageBytes) return (null, $"Das Bild ist zu groß (max. {MaxPluginImageBytes / 1024 / 1024} MB).");
+        var type = SniffImage(data);
+        if (type is null) return (null, "Nur PNG, JPEG oder WebP.");
+        var have = await _db.StorePluginImages.Where(x => x.StorePluginId == plugin.Id).Select(x => x.Sort).ToListAsync(ct);
+        if (have.Count >= MaxPluginImages) return (null, $"Höchstens {MaxPluginImages} Bilder pro Plugin.");
+        var row = new StorePluginImage
+        {
+            StorePluginId = plugin.Id, Sort = have.Count == 0 ? 0 : have.Max() + 1, ContentType = type, Data = data, Caption = CleanCaption(caption)
+        };
+        _db.StorePluginImages.Add(row);
+        await _db.SaveChangesAsync(ct);
+        return (row.Id, null);
+    }
+
+    public async Task<bool> DeletePluginImageAsync(string key, int imageId, CancellationToken ct = default)
+    {
+        var row = await _db.StorePluginImages.FirstOrDefaultAsync(x => x.Id == imageId && x.StorePlugin!.Key == key, ct);
+        if (row is null) return false;
+        _db.StorePluginImages.Remove(row);
+        await _db.SaveChangesAsync(ct);
+        return true;
+    }
+
+    /// <summary>Moves a picture one place earlier (<paramref name="delta"/> &lt; 0) or later (&gt; 0); the gallery is renumbered 0, 1, 2 … on the way.</summary>
+    public async Task<bool> MovePluginImageAsync(string key, int imageId, int delta, CancellationToken ct = default)
+    {
+        var list = await _db.StorePluginImages.Where(x => x.StorePlugin!.Key == key).OrderBy(x => x.Sort).ThenBy(x => x.Id).ToListAsync(ct);
+        var i = list.FindIndex(x => x.Id == imageId);
+        if (i < 0) return false;
+        var j = Math.Clamp(i + Math.Sign(delta), 0, list.Count - 1);
+        (list[i], list[j]) = (list[j], list[i]);
+        for (var n = 0; n < list.Count; n++) list[n].Sort = n;
+        await _db.SaveChangesAsync(ct);
+        return true;
+    }
+
+    public async Task<bool> SetPluginImageCaptionAsync(string key, int imageId, string? caption, CancellationToken ct = default)
+    {
+        var row = await _db.StorePluginImages.FirstOrDefaultAsync(x => x.Id == imageId && x.StorePlugin!.Key == key, ct);
+        if (row is null) return false;
+        row.Caption = CleanCaption(caption);
+        await _db.SaveChangesAsync(ct);
+        return true;
+    }
+
     // ---- shared helpers ----
     private async Task TouchAsync(IEnumerable<int> profileIds, CancellationToken ct)
     {
@@ -211,11 +300,22 @@ public class StoreService
             .Select(c => new StoreComponentRow(c.Type, c.Name, c.Description, c.Icon, null)).ToListAsync(ct);
 
     /// <summary>What an instance may browse in the store: plugins, templates and components with the few fields a picker needs.</summary>
-    public async Task<StoreCatalog> CatalogAsync() => new StoreCatalog
+    public async Task<StoreCatalog> CatalogAsync()
     {
-        Plugins = await _db.StorePlugins.AsNoTracking()
-            .Select(p => new CatalogPlugin { Key = p.Key, Name = p.Name, Version = p.Version, Description = p.Description })
-            .OrderBy(p => p.Name).ToListAsync(),
+        // The pictures' ids and captions only — never their bytes, which a site fetches one by one when its dialog shows them.
+        var images = (await _db.StorePluginImages.AsNoTracking().OrderBy(x => x.Sort).ThenBy(x => x.Id)
+                .Select(x => new { x.StorePluginId, x.Id, x.Caption }).ToListAsync())
+            .ToLookup(x => x.StorePluginId, x => new CatalogImage { Id = x.Id, Caption = x.Caption });
+        var plugins = await _db.StorePlugins.AsNoTracking().OrderBy(p => p.Name)
+            .Select(p => new { p.Id, Plugin = new CatalogPlugin { Key = p.Key, Name = p.Name, Version = p.Version, Description = p.Description } })
+            .ToListAsync();
+        foreach (var p in plugins) p.Plugin.Images = images[p.Id].ToList();
+        return await CatalogRestAsync(plugins.Select(p => p.Plugin).ToList());
+    }
+
+    private async Task<StoreCatalog> CatalogRestAsync(List<CatalogPlugin> plugins) => new StoreCatalog
+    {
+        Plugins = plugins,
         Templates = await _db.StoreTemplates.AsNoTracking()
             .Select(t => new CatalogTemplate { Name = t.Name, Description = t.Description, AccentColor = t.AccentColor })
             .OrderBy(t => t.Name).ToListAsync(),

@@ -34,6 +34,19 @@
                     @foreach (var item in Model.Items)
                     {
                         <div class="store-card" data-store-search="@($"{item.Title} {item.Sub} {item.Description}")">
+                            @if (item.Images is { Count: > 0 } imgs)
+                            {
+                                @* The cover opens the whole gallery. The list rides as JSON in an attribute (encoded by Razor) and is read
+                                   with JSON.parse — the script builds the viewer from text and addresses, never from markup. *@
+                                <button type="button" class="store-card-cover" data-store-gallery="@System.Text.Json.JsonSerializer.Serialize(imgs.Select(i => new { url = i.Url, caption = i.Caption }))"
+                                        data-store-title="@item.Title" aria-label="@T["store.dialogPictures", imgs.Count]">
+                                    <img src="@imgs[0].Url" alt="@imgs[0].Caption" loading="lazy" onerror="this.parentNode.hidden=true" />
+                                    @if (imgs.Count > 1)
+                                    {
+                                        <span class="store-card-count"><i class="ti ti-photo" aria-hidden="true"></i> @imgs.Count</span>
+                                    }
+                                </button>
+                            }
                             @if (!string.IsNullOrWhiteSpace(item.Accent))
                             {
                                 <span class="store-card-strip" style="background:@item.Accent;"></span>
@@ -72,6 +85,20 @@
             <button type="button" class="btn btn-ghost" data-store-close>@T["action.close"]</button>
         </div>
     </div>
+    @* The gallery of one offering, over the dialog. *@
+    <div class="store-viewer" id="store-viewer" role="dialog" aria-modal="true" aria-labelledby="store-viewer-title" hidden>
+        <div class="store-viewer-head">
+            <strong id="store-viewer-title"></strong>
+            <span class="muted" id="store-viewer-count"></span>
+            <button type="button" class="modal-close" data-viewer-close aria-label="@T["action.close"]"><i class="ti ti-x" aria-hidden="true"></i></button>
+        </div>
+        <div class="store-viewer-stage">
+            <button type="button" class="store-viewer-nav" data-viewer-step="-1" aria-label="@T["store.viewerPrev"]"><i class="ti ti-chevron-left" aria-hidden="true"></i></button>
+            <img id="store-viewer-img" alt="" />
+            <button type="button" class="store-viewer-nav" data-viewer-step="1" aria-label="@T["store.viewerNext"]"><i class="ti ti-chevron-right" aria-hidden="true"></i></button>
+        </div>
+        <div class="store-viewer-caption" id="store-viewer-caption"></div>
+    </div>
 </div>
 
 <script>
@@ -90,9 +117,53 @@
             window.history.replaceState({}, '', url);
         }
 
+        // The gallery: one offering's pictures over the dialog; arrow keys step, Escape closes the gallery first, then the dialog.
+        var viewer = document.getElementById('store-viewer');
+        var vImg = document.getElementById('store-viewer-img');
+        var vCap = document.getElementById('store-viewer-caption');
+        var vCount = document.getElementById('store-viewer-count');
+        var vTitle = document.getElementById('store-viewer-title');
+        var shots = [], at = 0, opener = null;
+        function show(i) {
+            at = (i + shots.length) % shots.length;
+            vImg.src = shots[at].url;
+            vImg.alt = shots[at].caption || '';
+            vCap.textContent = shots[at].caption || '';
+            vCount.textContent = shots.length > 1 ? (at + 1) + ' / ' + shots.length : '';
+            viewer.querySelectorAll('[data-viewer-step]').forEach(function (b) { b.hidden = shots.length < 2; });
+        }
+        function closeViewer() { viewer.hidden = true; vImg.removeAttribute('src'); if (opener) opener.focus(); }
+        dialog.querySelectorAll('[data-store-gallery]').forEach(function (b) {
+            b.addEventListener('click', function () {
+                try { shots = JSON.parse(b.getAttribute('data-store-gallery') || '[]'); } catch (e) { shots = []; }
+                if (!shots.length) return;
+                opener = b;
+                vTitle.textContent = b.getAttribute('data-store-title') || '';
+                viewer.hidden = false;
+                show(0);
+                viewer.querySelector('[data-viewer-close]').focus();
+            });
+        });
+        if (viewer) {
+            viewer.querySelectorAll('[data-viewer-step]').forEach(function (b) {
+                b.addEventListener('click', function () { show(at + parseInt(b.getAttribute('data-viewer-step'), 10)); });
+            });
+            viewer.querySelector('[data-viewer-close]').addEventListener('click', closeViewer);
+            viewer.addEventListener('click', function (e) { if (e.target === viewer) closeViewer(); });
+        }
+
         dialog.querySelectorAll('[data-store-close]').forEach(function (b) { b.addEventListener('click', close); });
         dialog.addEventListener('click', function (e) { if (e.target === dialog) close(); });
-        document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && dialog.classList.contains('open')) close(); });
+        document.addEventListener('keydown', function (e) {
+            if (!dialog.classList.contains('open')) return;
+            if (viewer && !viewer.hidden) {
+                if (e.key === 'Escape') closeViewer();
+                else if (e.key === 'ArrowLeft' && shots.length > 1) show(at - 1);
+                else if (e.key === 'ArrowRight' && shots.length > 1) show(at + 1);
+                return;
+            }
+            if (e.key === 'Escape') close();
+        });
 
         var search = document.getElementById('store-search');
         var grid = document.getElementById('store-grid');

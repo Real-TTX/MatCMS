@@ -707,6 +707,19 @@ public sealed class CatalogPlugin
     public string Name { get; set; } = "";
     public string Version { get; set; } = "";
     public string Description { get; set; } = "";
+
+    /// <summary>
+    /// The plugin's pictures, cover first. Additive: an older cloud sends none, an older site ignores the field. A site fetches the bytes
+    /// with its own instance credentials (<c>/api/store/{publicId}/image/{id}</c>) and serves them to its admin itself — the address a
+    /// site talks to its cloud by may be one the admin's browser cannot reach (an internal Docker name).
+    /// </summary>
+    public List<CatalogImage> Images { get; set; } = new();
+}
+
+public sealed class CatalogImage
+{
+    public int Id { get; set; }
+    public string Caption { get; set; } = "";
 }
 
 public sealed class CatalogTemplate

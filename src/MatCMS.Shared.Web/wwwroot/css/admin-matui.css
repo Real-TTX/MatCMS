@@ -260,24 +260,36 @@ html[data-theme="dark"] .admin--matui .mat-vs.is-active { background: var(--mat-
 :is(.admin--matui, .login-matui) .badge { font-size: var(--mat-fs-xs); font-weight: 600; letter-spacing: 0; padding: 2px 8px; }
 
 /* Fields = .mat-field / .mat-label / .mat-input */
-:is(.admin--matui, .login-matui) .form-field { margin-bottom: var(--mat-space-4); }
-:is(.admin--matui, .login-matui) .form-field label { text-transform: none; letter-spacing: 0; font-size: var(--mat-fs-sm); font-weight: 600; color: var(--mat-text); margin-bottom: var(--mat-space-1); }
-html[data-theme] :is(.admin--matui, .login-matui) .form-field .mat-input,
-html[data-theme] :is(.admin--matui, .login-matui) .form-field input:not([type=checkbox]):not([type=radio]):not([type=hidden]),
-html[data-theme] :is(.admin--matui, .login-matui) .form-field select,
-html[data-theme] :is(.admin--matui, .login-matui) .form-field textarea,
+:is(.admin--matui, .login-matui) :is(.form-field, .field) { margin-bottom: var(--mat-space-4); }
+:is(.admin--matui, .login-matui) :is(.form-field, .field) label { text-transform: none; letter-spacing: 0; font-size: var(--mat-fs-sm); font-weight: 600; color: var(--mat-text); margin-bottom: var(--mat-space-1); }
+html[data-theme] :is(.admin--matui, .login-matui) :is(.form-field, .field) .mat-input,
+html[data-theme] :is(.admin--matui, .login-matui) :is(.form-field, .field) input:not([type=checkbox]):not([type=radio]):not([type=hidden]),
+html[data-theme] :is(.admin--matui, .login-matui) :is(.form-field, .field) select,
+html[data-theme] :is(.admin--matui, .login-matui) :is(.form-field, .field) textarea,
 :is(.admin--matui, .login-matui) .list-search {
   min-height: var(--mat-input-height, var(--mat-control-h)); height: auto; padding: 6px var(--mat-input-pad-x, var(--mat-space-3));
   border: 1px solid var(--mat-border-strong); border-radius: var(--mat-input-radius, var(--mat-radius));
   background: var(--mat-surface); color: var(--mat-text); font-size: var(--mat-fs-md);
 }
-html[data-theme] :is(.admin--matui, .login-matui) .form-field textarea { padding-top: var(--mat-space-2); line-height: var(--mat-lh); }
-html[data-theme] :is(.admin--matui, .login-matui) .form-field .mat-input:focus,
-html[data-theme] :is(.admin--matui, .login-matui) .form-field input:not([type=checkbox]):not([type=radio]):not([type=hidden]):focus,
-html[data-theme] :is(.admin--matui, .login-matui) .form-field select:focus,
-html[data-theme] :is(.admin--matui, .login-matui) .form-field textarea:focus,
+html[data-theme] :is(.admin--matui, .login-matui) :is(.form-field, .field) textarea { padding-top: var(--mat-space-2); line-height: var(--mat-lh); }
+html[data-theme] :is(.admin--matui, .login-matui) :is(.form-field, .field) .mat-input:focus,
+html[data-theme] :is(.admin--matui, .login-matui) :is(.form-field, .field) input:not([type=checkbox]):not([type=radio]):not([type=hidden]):focus,
+html[data-theme] :is(.admin--matui, .login-matui) :is(.form-field, .field) select:focus,
+html[data-theme] :is(.admin--matui, .login-matui) :is(.form-field, .field) textarea:focus,
 :is(.admin--matui, .login-matui) .list-search:focus { border-color: var(--mat-accent); box-shadow: var(--mat-focus-ring); outline: none; }
 :is(.admin--matui, .login-matui) input[type=checkbox], :is(.admin--matui, .login-matui) input[type=radio] { accent-color: var(--mat-accent); }
+/* The plugin toolkit's fields (.field, UiRenderer) are the same fields: they were left out of this bridge and stood 46 px tall,
+   square and in 15 px next to every core form — "the forum/shop does not look like MatCMS". Its help line and checkbox rows too. */
+:is(.admin--matui, .login-matui) .field .help { font-size: var(--mat-fs-sm); color: var(--mat-text-muted); margin-top: var(--mat-space-1); }
+/* In the toolkit's grid form the grid gap is the spacing; the field's own margin on top of it doubled the air between fields. */
+:is(.admin--matui, .login-matui) .form-grid > .field { margin-bottom: 0; }
+/* The toolkit's sub-menu (plugin settings groups, Ui.Split) = the sidebar's items: muted text, a soft accent behind the open one. */
+:is(.admin--matui, .login-matui) .ui-subnav { border-radius: var(--mat-radius-lg, var(--mat-radius)); border-color: var(--mat-border); background: var(--mat-surface); padding: var(--mat-space-2); }
+html[data-theme] :is(.admin--matui, .login-matui) .ui-subnav a { border-radius: var(--mat-radius); color: var(--mat-text); font-size: var(--mat-fs-md); padding: 7px 10px; }
+:is(.admin--matui, .login-matui) .ui-subnav a .ti { color: var(--mat-text-muted); opacity: 1; }
+html[data-theme] :is(.admin--matui, .login-matui) .ui-subnav a:hover { background: var(--mat-surface-3); color: var(--mat-text); }
+html[data-theme] :is(.admin--matui, .login-matui) .ui-subnav a.active { background: var(--mat-accent-soft-strong); color: var(--mat-text); font-weight: 600; }
+:is(.admin--matui, .login-matui) .ui-subnav a.active .ti { color: var(--mat-accent-text); }
 
 /* Code inside a code block belongs to the block: MatUi's inline code chip (a light ground) inside the admin's dark
    .code-block left light text on a light chip — unreadable (Admin → Über, "So aktualisieren"). */

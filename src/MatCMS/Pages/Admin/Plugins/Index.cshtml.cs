@@ -68,8 +68,20 @@ public class IndexModel : PageModel
             Description: p.Description,
             RouteValue: p.Key,
             InstalledVersion: Items.FirstOrDefault(i => i.Key == p.Key)?.Version,
-            Version: p.Version)).ToList(),
+            Version: p.Version,
+            Images: (p.Images ?? []).Select(img => new Shared.StoreImage(
+                Url.Page("/Admin/Plugins/Index", "StoreImage", new { imageId = img.Id })!, img.Caption)).ToList())).ToList(),
         Error: CatalogError);
+
+    /// <summary>A store plugin's picture for the dialog, passed through from the cloud (see <see cref="CloudCatalogService.GetImageAsync"/>).</summary>
+    public async Task<IActionResult> OnGetStoreImageAsync(int imageId)
+    {
+        var cache = HttpContext.RequestServices.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>();
+        if (await _catalog.GetImageAsync(imageId, cache, HttpContext.RequestAborted) is not { } img) return NotFound();
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        Response.Headers.CacheControl = "private, max-age=3600";
+        return File(img.data, img.type);
+    }
 
     public async Task OnGetAsync(bool browse = false)
     {

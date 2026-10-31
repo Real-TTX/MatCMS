@@ -11,9 +11,14 @@ namespace MatCMS.Pages.Shared;
 /// Drives the badge and whether the button reads "install" or "update".</param>
 /// <param name="Version">Version offered by the store, or null for things that have none.</param>
 /// <param name="Accent">Optional colour for the card's strip (templates).</param>
+/// <param name="Images">Pictures (plugins): the first is the card's cover, all of them open as a gallery. Addresses on THIS site.</param>
 public sealed record StoreItem(
     string Title, string Sub, string Description, string RouteValue,
-    string? InstalledVersion = null, string? Version = null, string? Accent = null);
+    string? InstalledVersion = null, string? Version = null, string? Accent = null,
+    IReadOnlyList<StoreImage>? Images = null);
+
+/// <summary>One picture of a store offering: where this site serves it, and its caption.</summary>
+public sealed record StoreImage(string Url, string Caption);
 
 /// <summary>
 /// Everything <c>_StoreDialog.cshtml</c> needs: the catalogue for ONE kind of thing, plus how to

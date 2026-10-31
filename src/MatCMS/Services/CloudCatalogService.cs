@@ -3,6 +3,7 @@ using MatCMS.Data;
 using MatCMS.Models;
 using MatCMS.Shared;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 namespace MatCMS.Services;
 
 /// <summary>
@@ -34,6 +35,39 @@ public class CloudCatalogService
 
     /// <summary>True when a cloud is connected at all — the browse button only makes sense then.</summary>
     public async Task<bool> IsAvailableAsync() => (await _cloud.GetSettingsAsync()).Configured;
+
+    /// <summary>
+    /// A store plugin's picture, fetched from the cloud with this site's own credentials and handed to the admin by the site itself:
+    /// the address a site reaches its cloud by can be one the admin's browser cannot (an internal Docker name), and the cloud answers
+    /// only instances. Kept in memory for an hour (keyed by cloud + instance + id — an id is never reused there); null when the cloud
+    /// has no such picture or is out of reach, which the dialog shows as a card without a picture.
+    /// </summary>
+    public async Task<(byte[] data, string type)?> GetImageAsync(int id, Microsoft.Extensions.Caching.Memory.IMemoryCache cache, CancellationToken ct = default)
+    {
+        var settings = await _cloud.GetSettingsAsync();
+        if (!settings.Configured) return null;
+        var cacheKey = $"store-image|{settings.Url}|{settings.InstanceId}|{id}";
+        if (cache.TryGetValue(cacheKey, out (byte[] data, string type) hit)) return hit;
+        try
+        {
+            var client = CreateClient(settings);
+            using var res = await client.GetAsync($"{settings.Url}/api/store/{settings.InstanceId}/image/{id}", ct);
+            if (!res.IsSuccessStatusCode) return null;
+            var type = res.Content.Headers.ContentType?.MediaType ?? "";
+            // Only what the cloud is allowed to store; anything else is not passed on to the admin's browser.
+            if (type is not ("image/png" or "image/jpeg" or "image/webp")) return null;
+            if (res.Content.Headers.ContentLength is > 4 * 1024 * 1024) return null;
+            var data = await res.Content.ReadAsByteArrayAsync(ct);
+            if (data.Length > 4 * 1024 * 1024) return null;
+            cache.Set(cacheKey, (data, type), TimeSpan.FromHours(1));
+            return (data, type);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            _log.LogInformation(ex, "Store picture {Id} not fetched", id);
+            return null;
+        }
+    }
 
     /// <summary>Fetches the catalogue. Never throws — a cloud that is down must not break the
     /// plugins page, it just means there is nothing to browse right now.</summary>

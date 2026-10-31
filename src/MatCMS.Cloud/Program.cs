@@ -1016,6 +1016,22 @@ app.MapGet("/api/store/{publicId}/catalog", async (
     return Results.Ok(await store.CatalogAsync());
 }).RequireRateLimiting("instanceApi");
 
+// A store plugin's picture, for the site's store dialog. Same caller check as the catalogue; the bytes were type-checked on upload and
+// go out with that type, nosniff and a sandbox, so even a picture that is something else underneath is never run as a page.
+app.MapGet("/api/store/{publicId}/image/{id:int}", async (
+    HttpContext ctx, string publicId, int id, InstanceService instances, StoreService store) =>
+{
+    if (await CatalogCallerAsync(ctx, publicId, instances) is null) return Results.Unauthorized();
+
+    var img = await store.GetPluginImageAsync(id);
+    if (img is null) return Results.NotFound();
+    ctx.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    ctx.Response.Headers["Content-Security-Policy"] = "default-src 'none'; sandbox";
+    // An id is never reused and a picture is never changed in place (a new one is a new row), so the answer may be kept.
+    ctx.Response.Headers.CacheControl = "private, max-age=86400, immutable";
+    return Results.File(img.Data, img.ContentType);
+}).RequireRateLimiting("instanceApi");
+
 app.MapGet("/api/store/{publicId}/plugin/{key}", async (
     HttpContext ctx, string publicId, string key, InstanceService instances, StoreService store) =>
 {

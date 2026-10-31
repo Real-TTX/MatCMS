@@ -16,6 +16,7 @@ Store der Cloud oder einen Bundle-Import.
 | `store-einblick-native/` | Store-Einblick (Native) — **dieselbe** Code-Datei `../store-einblick/showcase.csx`, als DLL kompiliert; `StoreEinblickTests` prüft, dass beide Varianten dasselbe HTML zeichnen | aktuell, Native-Variante (`./pack-native.ps1 -Path ./store-einblick-native`) |
 | `coverage-map/` | Abdeckungskarte — Block mit anklickbarer Europakarte (Länder + Region Norditalien `IT-N`, Status verfügbar/teilweise/demnächst/geplant, Liste mit Hinweisen); Umrisse in `map.csx`, erzeugt von `tools/build-map.mjs` aus Natural Earth 1:50m (`tools/ne50.geojson`) | aktuell, im Global Store; benutzt auf corner-society.com |
 | `matmon-live/` | Matmon Live — für matmon.eu: Blöcke **Dienststatus** (`/api/status` der Matmon Cloud, alle 5 min per Job) und **Sensorkatalog** (`/api/sensor-types`, alle 6 h; mitgelieferter Stand in `snapshot.csx` aus `tools/snapshot.mjs`, ein älterer Katalog verdrängt nie einen neueren) | aktuell, auf matmon.eu |
+| `forum/` | Forum (Native) — Kategorien und Foren mit Rechten, Themen/Beiträge mit BBCode, Zitate, Abos, Suche, Profile, Meldungen, Moderation; Mitglieder = Konten der Website (siehe `forum/README.md`) | neu, Paket mit `./pack-native.ps1 -Path ./forum` |
 | `todo-verwaltung-beispiel/` | Todo-Verwaltung (Beispiel, früher eingebaut) | Anschauungsbeispiel für die Plugin-API |
 
 ## Aufbau eines Plugins

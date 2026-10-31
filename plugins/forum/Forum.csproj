@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The forum as a NATIVE plugin (a compiled DLL; it runs only where the operator allowed native plugins). The settings below keep
+       it loadable and unloadable (docs/plugin-system-v2.md, section 7); tests/Fixtures/RefPlugin is the reference. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <RootNamespace>MatCMS.Plugin.Forum</RootNamespace>
+    <AssemblyName>Forum</AssemblyName>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\MatCMS.Plugin.Abstractions\MatCMS.Plugin.Abstractions.csproj">
+      <Private>false</Private>
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </ProjectReference>
+  </ItemGroup>
+
+</Project>

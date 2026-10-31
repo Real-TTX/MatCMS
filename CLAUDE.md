@@ -175,6 +175,13 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
   EF's static provider cache (cleared by `EfInternals`, the one reflection into EF) AND the provider shared with the
   host's own contexts (a plugin context needs its OWN service provider). `PluginSystemTests` unloads a real DLL with an
   EF context; if it fails after an EF update, that is the cause.
+- **Known gap: after a plugin has answered a request over HTTP it is not freed yet** — even the reference plugin lingers once the full
+  application served one of its routes (found with the forum, `ForumUnloadTests`); `PluginSystemTests` unload without HTTP and pass. Something
+  in the web path keeps the load context; until it is found an unload after traffic shows "Neustart nötig". A plugin's redirect also cannot carry
+  a `#fragment` (`PluginResults.SafeLocal` turns it into "/") — the forum jumps to a post with `?p=` instead.
+- **The forum** (`plugins/forum`, native, key `forum`, see its README) is the store's first larger native plugin: boards with rights, threads,
+  BBCode (`ForumMarkup`: encode first, only its own tags out), members = the site's accounts, moderation by a member role. `ForumTests` load its
+  built DLL into the whole application.
 - **Debug builds keep every temporary alive until the method ends**, which alone keeps a load context from being
   collected. Code and tests that check unloading hold nothing of the plugin in their own frame (`NoInlining` helpers).
 - **Tests: `dotnet test tests/MatCMS.Plugins.Tests`.** They run on in-memory SQLite and temporary folders and never touch

@@ -21,6 +21,8 @@
     <ProjectReference Include="..\Fixtures\RefPlugin\RefPlugin.csproj" ReferenceOutputAssembly="false" Private="false" />
     <!-- A real store plugin in both kinds (plugins/store-einblick + store-einblick-native): StoreEinblickTests run the two side by side. -->
     <ProjectReference Include="..\..\plugins\store-einblick-native\StoreEinblick.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <!-- The forum (plugins/forum), a native plugin of its own: ForumTests run it inside the whole application. -->
+    <ProjectReference Include="..\..\plugins\forum\Forum.csproj" ReferenceOutputAssembly="false" Private="false" />
   </ItemGroup>
 
   <ItemGroup>
@@ -41,6 +43,10 @@
       <StoreEinblickFiles Include="$(MSBuildProjectDirectory)\..\..\plugins\store-einblick-native\bin\$(Configuration)\net10.0\StoreEinblick.dll" />
     </ItemGroup>
     <Copy SourceFiles="@(StoreEinblickFiles)" DestinationFolder="$(OutDir)fixtures\store-einblick-native" />
+    <ItemGroup>
+      <ForumFiles Include="$(MSBuildProjectDirectory)\..\..\plugins\forum\bin\$(Configuration)\net10.0\Forum.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ForumFiles)" DestinationFolder="$(OutDir)fixtures\forum" />
   </Target>
 
 </Project>

@@ -1,0 +1,6 @@
+{
+  "Key": "forum",
+  "Name": "Forum",
+  "Version": "1.0",
+  "Description": "Ein Diskussionsforum für die Website: Kategorien und Foren mit Lese- und Schreibrechten, Themen und Beiträge mit BBCode und Zitaten, angeheftete und geschlossene Themen, Abos per E-Mail, Suche, Profile, Meldungen und Moderation im Admin. Die Mitglieder sind die Konten der Website. Natives Plugin (braucht „Native Plugins erlauben“)."
+}

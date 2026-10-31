@@ -405,6 +405,74 @@ public class ForumTests : IClassFixture<ForumApp>
     }
 
     [Fact]
+    public async Task A_blog_post_gets_its_discussion_in_one_thread_and_shows_it_under_the_post()
+    {
+        await NoFloodAsync();
+        var admin = await _f.AsAsync("admin");
+        await SubmitAsync(admin, "/admin/p/forum/boards/new", new()
+        {
+            ["title"] = "Artikel-Kommentare", ["slug"] = "kommentare", ["read"] = "all", ["write"] = "members", ["role"] = "", ["sort"] = "90"
+        });
+        long postId, draftId;
+        using (var scope = _f.App.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var when = DateTime.UtcNow.AddDays(-1).ToString("yyyy-MM-dd HH:mm:ss.fffffff", System.Globalization.CultureInfo.InvariantCulture);
+            await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO Posts (Title, Slug, Excerpt, ContentHtml, Tags, AttachmentsJson, GalleryJson, GalleryLayout, Locale, IsPublished, PublishedAt, CreatedAt, UpdatedAt) VALUES ('Neuer Prozessor im Test', 'neuer-prozessor', 'Kurz.', '<p>Text</p>', '', '[]', '[]', 'grid', 'de', 1, {when}, {when}, {when})");
+            await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO Posts (Title, Slug, Excerpt, ContentHtml, Tags, AttachmentsJson, GalleryJson, GalleryLayout, Locale, IsPublished, PublishedAt, CreatedAt, UpdatedAt) VALUES ('Entwurf', 'entwurf-x', '', '<p>x</p>', '', '[]', '[]', 'grid', 'de', 0, {when}, {when}, {when})");
+            postId = db.Database.SqlQueryRaw<long>("SELECT Id AS Value FROM Posts WHERE Slug = 'neuer-prozessor'").AsEnumerable().Single();
+            draftId = db.Database.SqlQueryRaw<long>("SELECT Id AS Value FROM Posts WHERE Slug = 'entwurf-x'").AsEnumerable().Single();
+        }
+        var guest = await _f.AsAsync("guest");
+
+        // Off until a board is named: the post shows no discussion and the address does not exist.
+        await _f.SetAsync(("discussionBoard", ""));
+        Assert.DoesNotContain("id=\"diskussion\"", await guest.GetStringAsync("/blog/neuer-prozessor"));
+        Assert.Equal(HttpStatusCode.NotFound, (await guest.GetAsync($"/forum/artikel/blog-{postId}")).StatusCode);
+
+        await _f.SetAsync(("discussionBoard", "kommentare"));
+        var page = WebUtility.HtmlDecode(await guest.GetStringAsync("/blog/neuer-prozessor"));
+        Assert.Contains("id=\"diskussion\"", page);
+        Assert.Contains("Noch keine Beiträge", page);
+        Assert.Contains($"href=\"/forum/artikel/blog-{postId}\"", page);
+
+        // A guest is sent to sign in; a draft, an unknown post or a malformed source have no discussion.
+        Assert.Equal(HttpStatusCode.Redirect, (await guest.GetAsync($"/forum/artikel/blog-{postId}")).StatusCode);
+        var anna = await _f.AsAsync("annadisc");
+        Assert.Equal(HttpStatusCode.NotFound, (await anna.GetAsync($"/forum/artikel/blog-{draftId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await anna.GetAsync("/forum/artikel/blog-999999")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await anna.GetAsync("/forum/artikel/x")).StatusCode);
+
+        // The first comment starts the thread — titled like the post, in the named board — and leads back to the post.
+        var first = await SubmitAsync(anna, $"/forum/artikel/blog-{postId}", new() { ["body"] = "Spannender Test, [b]danke[/b]!", ["action"] = "save" });
+        Assert.Equal(HttpStatusCode.Redirect, first.StatusCode);
+        Assert.StartsWith("/blog/neuer-prozessor?kommentar=", Location(first));
+
+        // The second goes to the same thread (the address now leads there).
+        var ben = await _f.AsAsync("bendisc");
+        var to = await ben.GetAsync($"/forum/artikel/blog-{postId}");
+        Assert.Equal(HttpStatusCode.Redirect, to.StatusCode);
+        var threadUrl = Location(to).Split('?')[0];
+        Assert.StartsWith("/forum/t/", threadUrl);
+        Assert.Equal(HttpStatusCode.Redirect, (await ReplyAsync(ben, threadUrl, "Ich warte noch auf die Preise.")).StatusCode);
+
+        var thread = WebUtility.HtmlDecode(await guest.GetStringAsync(threadUrl));
+        Assert.Contains("Neuer Prozessor im Test", thread);
+        Assert.Contains("Diskussion zum Artikel:", thread);
+        Assert.Contains("href=\"/blog/neuer-prozessor\"", thread);
+
+        page = WebUtility.HtmlDecode(await guest.GetStringAsync("/blog/neuer-prozessor"));
+        Assert.Contains("2 Beiträge", page);
+        Assert.Contains("<strong>danke</strong>", page);                 // BBCode becomes markup through the forum's own renderer
+        Assert.Contains("Ich warte noch auf die Preise.", page);
+        Assert.Contains("Im Forum öffnen", page);
+
+        // The board lists the thread like any other.
+        Assert.Contains("Neuer Prozessor im Test", WebUtility.HtmlDecode(await guest.GetStringAsync("/forum/kommentare")));
+        await _f.SetAsync(("discussionBoard", ""));
+    }
+
+    [Fact]
     public async Task The_back_office_pages_render_and_the_dashboard_knows_the_forum()
     {
         var admin = await _f.AsAsync("admin");

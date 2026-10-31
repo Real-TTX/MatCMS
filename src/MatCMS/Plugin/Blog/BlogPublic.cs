@@ -136,7 +136,26 @@ internal static class BlogPublic
         if (!partHtml.Contains("{{post_source}}")) tokens["post_body"] += sourceHtml;
         var rendered = ctx.Site.RenderTemplatePart("post", tokens);
 
-        return PluginResult.Page(rendered + PostPageStyle, post.Title, post.Excerpt, meta);
+        // What other plugins show under a post — the forum's discussion of it (convention "content.discussion": {source, title, url} → {html}).
+        // Plugin code is trusted like the host; a plugin that is off or has nothing to say answers nothing.
+        var under = new StringBuilder();
+        foreach (var answer in await ctx.Events.CollectAsync("content.discussion",
+                     new JsonObject { ["source"] = "blog:" + post.Id, ["title"] = post.Title, ["url"] = "/blog/" + post.Slug, ["locale"] = "de" }, ct))
+            if (answer is JsonObject o && o["html"]?.GetValue<string>() is { Length: > 0 } h) under.Append(h);
+
+        return PluginResult.Page(rendered + under + PostPageStyle, post.Title, post.Excerpt, meta);
+    }
+
+    /// <summary>
+    /// Convention <c>content.item</c> {source: "blog:{id}"} → {title, url}: whether a post exists and is public. Asked by the forum before it opens a
+    /// discussion about a post — so nobody can start discussions about posts that are drafts, scheduled or gone.
+    /// </summary>
+    public static async Task<JsonNode?> ContentItemAsync(IPluginContext ctx, JsonNode? payload, CancellationToken ct)
+    {
+        var source = payload?["source"]?.GetValue<string>() ?? "";
+        if (!source.StartsWith("blog:", StringComparison.Ordinal) || !long.TryParse(source[5..], out var id)) return null;
+        if (await BlogStore.GetAsync(ctx.Data.Table("posts"), id, ct) is not { } post || !post.IsPublished || post.PublishedAt > DateTime.UtcNow) return null;
+        return new JsonObject { ["title"] = post.Title, ["url"] = "/blog/" + post.Slug };
     }
 
     private static List<(string Url, string Extra)> ParseList(string? json, string extraField)

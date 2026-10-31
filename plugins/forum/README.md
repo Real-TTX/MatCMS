@@ -18,6 +18,11 @@ Ein Diskussionsforum für eine MatCMS-Seite – die Grundfunktionen eines klassi
   „Braucht Aufmerksamkeit“), Mitglieder (sperren, Signatur entfernen), Einstellungen. Mitglieder melden Beiträge.
 - **Schutz**: Jeder Text wird kodiert, Markup entsteht nur aus dem erlaubten BBCode (Links nur http/https/mailto/lokal, Bilder
   nur https oder `/uploads/`), Antiforgery auf allen Formularen, Mindestabstand zwischen Beiträgen, Honeypot gegen Bots.
+- **Artikel-Diskussionen** (wie bei Golem.de): In den Einstellungen (Gruppe „Artikel-Diskussionen“) ein Forum nennen, z. B. `news`.
+  Dann hat jeder Blog-Beitrag dort ein eigenes Thema mit dem Titel des Beitrags; es entsteht beim ersten Kommentar
+  (`/forum/artikel/blog-{id}`, nur angemeldet, nur für veröffentlichte Beiträge). Unter dem Beitrag stehen alle Beiträge der
+  Diskussion (höchstens 50, dann ein Link ins Forum), „Mitdiskutieren“ und „Im Forum öffnen“; das Thema verlinkt zurück auf den
+  Beitrag. Blog und Forum reden über die Ereignisse `content.discussion` und `content.item`.
 - **Einbindung**: Sitemap (nur öffentliche Foren), Link-Auswahl (Foren), Website-Suche/KI-Bot (`site.search`, nur öffentliche
   Foren), Dashboard-Kachel und -Karte, Mailvorlagen (`forum.reply`, `forum.newthread`, `forum.report`), Template-Teile
   (`forum-index.html`, `forum-board.html`, `forum-thread.html`, `forum-post.html`), CSS über die Variablen der Website

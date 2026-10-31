@@ -132,6 +132,17 @@ internal static class ForumStrings
         // ---- settings ----
         ("forum.set.groupGeneral", "Allgemein", "General"), ("forum.set.groupMembers", "Mitglieder", "Members"), ("forum.set.groupPosting", "Schreiben", "Posting"),
         ("forum.set.groupMail", "E-Mail", "E-mail"), ("forum.set.groupLook", "Darstellung", "Appearance"),
+        ("forum.set.groupDiscussion", "Artikel-Diskussionen", "Article discussions"),
+        ("forum.set.discussionBoard", "Forum für Artikel-Diskussionen", "Board for article discussions"),
+        ("forum.set.discussionBoardHelp", "Die Adresse eines Forums (z. B. news). Dann hat jeder Blog-Beitrag dort sein eigenes Thema, das beim ersten Kommentar entsteht, und unter dem Beitrag erscheint die Diskussion mit einem Knopf zum Mitdiskutieren. Leer = aus.", "The address of a board (e.g. news). Every blog post then has its own thread there, started by the first comment, and the discussion appears under the post with a button to join in. Empty = off."),
+        // ---- the discussion under an article ----
+        ("forum.disc.title", "Diskussion", "Discussion"), ("forum.disc.one", "1 Beitrag", "1 post"), ("forum.disc.many", "{0} Beiträge", "{0} posts"),
+        ("forum.disc.none", "Noch keine Beiträge – schreib den ersten!", "No posts yet – write the first one!"),
+        ("forum.disc.membersOnly", "Die Diskussion zu diesem Artikel ist für angemeldete Mitglieder.", "The discussion of this article is for signed-in members."),
+        ("forum.disc.all", "Alle {0} Beiträge im Forum lesen", "Read all {0} posts in the forum"),
+        ("forum.disc.write", "Mitdiskutieren", "Join the discussion"), ("forum.disc.open", "Im Forum öffnen", "Open in the forum"),
+        ("forum.disc.first", "Dein Kommentar", "Your comment"), ("forum.disc.send", "Kommentar senden", "Send comment"),
+        ("forum.disc.about", "Diskussion zum Artikel:", "Discussion of the article:"),
         ("forum.set.title", "Name des Forums", "Name of the forum"), ("forum.set.intro", "Einleitung", "Introduction"),
         ("forum.set.introHelp", "Ein, zwei Sätze über der Forenübersicht (auch die Beschreibung für Suchmaschinen).", "One or two sentences above the overview (also the description for search engines)."),
         ("forum.set.indexing", "Von Suchmaschinen finden lassen", "Let search engines find it"),

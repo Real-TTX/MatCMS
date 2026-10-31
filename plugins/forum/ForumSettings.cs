@@ -5,7 +5,8 @@ internal static class ForumSettings
 {
     public const string TitleKey = "title", Intro = "intro", Registration = "registration", ModRole = "modRole", ThreadsPerPage = "threadsPerPage",
         PostsPerPage = "postsPerPage", FloodSeconds = "floodSeconds", EditMinutes = "editMinutes", Signatures = "signatures", Images = "images",
-        NotifyEmail = "notifyEmail", Subscriptions = "subscriptions", TimeZone = "timeZone", CustomCss = "customCss", Indexing = "indexing";
+        NotifyEmail = "notifyEmail", Subscriptions = "subscriptions", TimeZone = "timeZone", CustomCss = "customCss", Indexing = "indexing",
+        DiscussionBoard = "discussionBoard";
 
     public const string DefaultModRole = "forum-moderator";
 
@@ -26,7 +27,11 @@ internal static class ForumSettings
         s.Text(NotifyEmail, "forum.set.notify", "", "forum.set.notifyHelp");
         s.Add(new SettingSpec(TimeZone, "forum.set.timeZone") { Default = "Europe/Berlin", Help = "forum.set.timeZoneHelp", Group = "forum.set.groupLook" });
         s.TextArea(CustomCss, "forum.set.css", "", "forum.set.cssHelp");
+        s.Add(new SettingSpec(DiscussionBoard, "forum.set.discussionBoard") { Default = "", Help = "forum.set.discussionBoardHelp", Group = "forum.set.groupDiscussion" });
     }
+
+    /// <summary>The address (slug) of the board that holds the discussions of the site's articles; empty = the feature is off.</summary>
+    public static string DiscussionBoardSlug(IPluginContext ctx) => (ctx.Settings.Get(DiscussionBoard) ?? "").Trim().ToLowerInvariant();
 
     public static string Title(IPluginContext ctx) => ctx.Settings.Get(TitleKey) is { Length: > 0 } t ? t : "Forum";
     public static bool RegistrationOpen(IPluginContext ctx) => ctx.Settings.GetBool(Registration);

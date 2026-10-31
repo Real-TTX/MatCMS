@@ -9,7 +9,7 @@ namespace MatCMS.Plugin.Forum;
 /// <para>Every form is antiforgery-protected (a visitor's browser must not be made to post by another page), every value that came from a member is
 /// encoded where it is written, and a post's text only becomes markup through <see cref="ForumMarkup"/>.</para>
 /// </summary>
-internal static class ForumPublic
+internal static partial class ForumPublic
 {
     private const int MaxBody = 20000, MaxTitle = 120, MaxSignature = 300;
     private static readonly string Icon = "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"/></svg>";
@@ -337,7 +337,7 @@ internal static class ForumPublic
         {
             ["title"] = thread.Title, ["meta"] = meta, ["badges_html"] = badges, ["toolbar_html"] = Toolbar(ctx, v, ForumUrls.Thread(thread)),
             ["crumbs_html"] = Crumbs(ctx, (board.Title, ForumUrls.Board(board))), ["actions_html"] = actions.ToString(),
-            ["notice_html"] = Ok(ctx), ["posts_html"] = postsHtml.ToString(), ["pager_html"] = Pager(ctx, page, pages, p => ForumUrls.Thread(thread, p)),
+            ["notice_html"] = SourceLink(ctx, thread) + Ok(ctx), ["posts_html"] = postsHtml.ToString(), ["pager_html"] = Pager(ctx, page, pages, p => ForumUrls.Thread(thread, p)),
             ["reply_html"] = reply, ["mod_html"] = v.IsMod ? await ModPanelAsync(ctx, store, thread, ct) : ""
         });
         var description = posts.FirstOrDefault() is { } first && page == 1 ? ForumMarkup.Plain(first.Body, 160) : null;

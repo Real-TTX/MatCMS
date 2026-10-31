@@ -113,6 +113,7 @@ public sealed class BlogPlugin : IPlugin
 
         // A site-wide search (the AI bot) asks every plugin for what it holds: the blog answers with its published posts.
         b.On("site.search", BlogSearch.SearchAsync);
+        b.On("content.item", BlogPublic.ContentItemAsync);
     }
 
     private static string ReadStrings(string culture)

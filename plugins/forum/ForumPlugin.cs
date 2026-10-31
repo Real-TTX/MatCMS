@@ -36,6 +36,7 @@ public sealed class ForumPlugin : IPlugin
         b.Route("/forum/p/{id}", ForumPublic.PostAsync, read);
         b.Route("/forum/p/{id}/bearbeiten", ForumPublic.EditPostAsync, form);
         b.Route("/forum/p/{id}/melden", ForumPublic.ReportAsync, form);
+        b.Route("/forum/artikel/{source}", ForumPublic.ArticleDiscussionAsync, form);
         b.Route("/forum/{board}", ForumPublic.BoardAsync, read);
         b.Route("/forum/{board}/neu", ForumPublic.NewThreadAsync, form);
 
@@ -68,6 +69,8 @@ public sealed class ForumPlugin : IPlugin
         });
         b.On(HostEvents.MemberExport, ExportAsync);
         b.On("site.search", SiteSearchAsync);
+        // The discussion under an article (see ForumDiscussion.cs): one thread per piece of content, shown where the content is.
+        b.On("content.discussion", ForumPublic.DiscussionAsync);
 
         // A fresh forum is not an empty page: one category with one board to start in. Only on the first load ever — a board deleted later stays deleted.
         b.Lifecycle.OnInstall(async ctx =>

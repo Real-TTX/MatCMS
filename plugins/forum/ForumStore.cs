@@ -15,7 +15,8 @@ internal sealed record Board(long Id, string Title, string Slug, string Descript
     long ThreadCount, long PostCount, long LastPostId, DateTime? LastPostAt, long LastThreadId, string LastThreadTitle, string LastAuthor, long LastAuthorId);
 
 internal sealed record ForumThread(long Id, long BoardId, string Title, long AuthorId, string AuthorName, DateTime CreatedAt,
-    DateTime LastPostAt, long LastPostId, string LastAuthor, long LastAuthorId, long ReplyCount, long ViewCount, bool Sticky, bool Closed, long FirstPostId);
+    DateTime LastPostAt, long LastPostId, string LastAuthor, long LastAuthorId, long ReplyCount, long ViewCount, bool Sticky, bool Closed, long FirstPostId,
+    string Source = "", string SourceUrl = "");
 
 internal sealed record ForumPost(long Id, long ThreadId, long BoardId, long AuthorId, string AuthorName, string Body, DateTime CreatedAt, DateTime? EditedAt, string EditedBy);
 
@@ -62,7 +63,9 @@ internal sealed class ForumStore
             .Int("board_id", required: true).Text("title", required: true).Int("author_id", def: "0").Text("author_name", def: "")
             .Timestamp("created_at").Timestamp("last_post_at").Int("last_post_id", def: "0").Text("last_author", def: "").Int("last_author_id", def: "0")
             .Int("reply_count", def: "0").Int("view_count", def: "0").Bool("sticky", def: "0").Bool("closed", def: "0").Int("first_post_id", def: "0")
-            .Index("board_id", "last_post_at").Index("author_id").Index("last_post_at"));
+            // The discussion of a piece of content elsewhere on the site ("blog:12"): one thread per source, its address for the way back.
+            .Text("source", def: "").Text("source_url", def: "")
+            .Index("board_id", "last_post_at").Index("author_id").Index("last_post_at").Index("source"));
         d.Table("posts", t => t
             .Int("thread_id", required: true).Int("board_id", required: true).Int("author_id", def: "0").Text("author_name", def: "")
             .Text("body", required: true).Timestamp("created_at").Timestamp("edited_at").Text("edited_by", def: "")
@@ -92,7 +95,7 @@ internal sealed class ForumStore
 
     private static ForumThread ToThread(DataRow r) => new(r.Id, r.Int("board_id"), r.Text("title"), r.Int("author_id"), r.Text("author_name"),
         Utc(r.Timestamp("created_at")), Utc(r.Timestamp("last_post_at")), r.Int("last_post_id"), r.Text("last_author"), r.Int("last_author_id"),
-        r.Int("reply_count"), r.Int("view_count"), r.Bool("sticky"), r.Bool("closed"), r.Int("first_post_id"));
+        r.Int("reply_count"), r.Int("view_count"), r.Bool("sticky"), r.Bool("closed"), r.Int("first_post_id"), r.Text("source"), r.Text("source_url"));
 
     private static ForumPost ToPost(DataRow r) => new(r.Id, r.Int("thread_id"), r.Int("board_id"), r.Int("author_id"), r.Text("author_name"), r.Text("body"),
         Utc(r.Timestamp("created_at")), UtcN(r.Timestamp("edited_at")), r.Text("edited_by"));
@@ -114,7 +117,7 @@ internal sealed class ForumStore
         await Boards.FindByAsync("slug", slug, ct) is { } r ? ToBoard(r) : null;
 
     /// <summary>Addresses below /forum that are pages of the forum itself, so no board may take them.</summary>
-    public static readonly string[] ReservedSlugs = ["t", "p", "suche", "aktuell", "mitglied", "registrieren", "neu", "abos", "u", "new", "search", "latest"];
+    public static readonly string[] ReservedSlugs = ["t", "p", "suche", "aktuell", "mitglied", "registrieren", "neu", "abos", "u", "new", "search", "latest", "artikel"];
 
     public static string Slugify(string text)
     {
@@ -208,6 +211,10 @@ internal sealed class ForumStore
     // ---- threads and posts --------------------------------------------------------------------------------------
 
     public async Task<ForumThread?> ThreadAsync(long id, CancellationToken ct = default) => await Threads.GetAsync(id, ct) is { } r ? ToThread(r) : null;
+
+    /// <summary>The discussion thread of a piece of content ("blog:12"), or null while nobody has written about it yet.</summary>
+    public async Task<ForumThread?> ThreadBySourceAsync(string source, CancellationToken ct = default) =>
+        source.Length == 0 ? null : await Threads.FindAsync(DataQuery.Everything.Eq("source", source).OrderBy("id"), ct) is { } r ? ToThread(r) : null;
     public async Task<ForumPost?> PostAsync(long id, CancellationToken ct = default) => await Posts.GetAsync(id, ct) is { } r ? ToPost(r) : null;
 
     /// <summary>One page of a board: the pinned threads first, then by last activity.</summary>
@@ -281,7 +288,8 @@ internal sealed class ForumStore
     }
 
     /// <summary>Starts a thread with its first post — one transaction with every counter it changes.</summary>
-    public async Task<(long ThreadId, long PostId)> CreateThreadAsync(Board board, PluginMember author, string title, string body, CancellationToken ct = default)
+    public async Task<(long ThreadId, long PostId)> CreateThreadAsync(Board board, PluginMember author, string title, string body, CancellationToken ct = default,
+        string source = "", string sourceUrl = "")
     {
         var now = DateTime.UtcNow;
         var name = AuthorName(author);
@@ -292,7 +300,7 @@ internal sealed class ForumStore
             var threadId = await d.Table("threads").InsertAsync(new Dictionary<string, object?>
             {
                 ["board_id"] = board.Id, ["title"] = title, ["author_id"] = author.Id, ["author_name"] = name, ["created_at"] = now, ["last_post_at"] = now,
-                ["last_author"] = name, ["last_author_id"] = author.Id
+                ["last_author"] = name, ["last_author_id"] = author.Id, ["source"] = source, ["source_url"] = sourceUrl
             }, ct);
             var postId = await d.Table("posts").InsertAsync(new Dictionary<string, object?>
             {

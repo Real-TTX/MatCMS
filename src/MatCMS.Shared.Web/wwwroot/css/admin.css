@@ -929,7 +929,8 @@ a.tab { display: inline-block; text-decoration: none; }
     display: none;
     position: fixed; inset: 0;
     background: rgba(15, 15, 16, .55);
-    z-index: 100;
+    /* MatUi's dialog layer: the old 100 sat below the sticky top bar (--mat-z-topbar 200), which stayed bright over the backdrop. */
+    z-index: var(--mat-z-dialog, 400);
     align-items: flex-start;
     justify-content: center;
     padding: 60px 20px;

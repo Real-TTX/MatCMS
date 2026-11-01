@@ -186,6 +186,13 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
   and switch the plugin off through Admin → Plugins (a request of its own, as on a site). In a test, unloading in the test's own code right after a
   request, or while holding an undisposed `HttpResponseMessage` of a plugin route, keeps the request alive and looks like a leak.
   A plugin's redirect cannot carry a `#fragment` (`PluginResults.SafeLocal` turns it into "/") — the forum jumps to a post with `?p=` instead.
+- **Plugin API endpoints for other programs** (`IPluginBuilder.Api(method, pattern, handler, ApiRouteOptions)`, served by `Services/Plugins/PluginApiEndpoint.cs` at
+  `/api/v1/{plugin}/{path}`; `GET /api/v1` lists them with `allowed` for the calling key). Auth is a **site API key** (`SiteApiKey`, Admin → API-Schlüssel,
+  `SiteApiKeyService`): `msk_…`, shown ONCE, stored as SHA-256 only, Bearer or `X-Api-Key`, rights `{plugin}:{read|write|personal}` (write implies read,
+  personal stands ALONE — orders/customer data), optional expiry, revoke. 600 calls/min per key, JSON body ≤ 4 MB (`RequestData.Json()`), answers `no-store`.
+  The handler never sees the key — only its name (`RequestData.ApiCaller`), which goes into history as `api:{name}`. Antiforgery off, the route is exempt
+  from maintenance mode (an ERP sync must keep running). Keys are **not in backups** (a restored copy elsewhere must not accept the live site's ERP).
+  The shop's ERP endpoints: `Plugin/Shop/ShopApi.cs`, documented for customers in `docs/shop-api.md`.
 - **The forum** (`plugins/forum`, native, key `forum`, see its README) is the store's first larger native plugin: boards with rights, threads,
   BBCode (`ForumMarkup`: encode first, only its own tags out), members = the site's accounts, moderation by a member role. `ForumTests` load its
   built DLL into the whole application. **Article discussions** (like Golem.de): with the forum setting `discussionBoard` (a board's slug) every
@@ -332,6 +339,11 @@ A built-in plugin (off until switched on), written against the plugin API and no
   deleted with the cart). **Search suggestions** are `/shop/suggest` + a script that builds its list from text nodes only. **CSV** is written by `ShopCsv` only (formula guard: a leading `= + - @` gets a quote); the product
   **import** has a dry run and never writes in it. The **sales report** counts from the day of payment minus refunds. Cloud/MCP **operations** for orders, variants and attributes live in `ShopOps.cs` (a READ answers with `data`);
   orders hold personal data, so their tools need the restore right.
+- **ERP API** (`ShopApi.cs` + the `ShopStore` partial in `ShopStoreApi.cs` — a store file name keeps the text-key scan off it): the ERP's key is the **SKU** of a
+  product OR a variant (`sku` indexed on both tables, new `gtin` beside it). `PUT products/{sku}` is an upsert that changes only the fields sent (201 new / 200 changed,
+  a variant SKU sent as a product SKU is 409), `DELETE` only deactivates, `POST stock` / `POST prices` are batches (≤ 5000) answering per line (`add` is an
+  atomic `IncrementAsync`, never below 0; `stock: null` = not counted), categories by slug, orders through `ShopOps` with the PersonalData right
+  (the `by` argument names the key). Prices stay gross cents; a variant's price is written as its delta.
 - **Downloads** are private files streamed by `ShopDownloads.ServeAsync`: paid order, the order's secret key (or the owner, or the admin), a download row that is not revoked or
   expired, a count that is taken atomically.
 - Texts: `ShopStrings.All` (key, German, English in one row); a test checks that every key used in the code has both.

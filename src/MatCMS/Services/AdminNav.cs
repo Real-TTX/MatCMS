@@ -48,6 +48,7 @@ public sealed class AdminNav
 
         new("nav.stats", "/admin/stats", "ti-chart-bar", AdminGroup.System, 10),
         new("nav.users", "/admin/users", "ti-users", AdminGroup.System, 20),
+        new("nav.apikeys", "/admin/apikeys", "ti-api", AdminGroup.System, 25),
         new("nav.backup", "/admin/backup", "ti-device-floppy", AdminGroup.System, 30),
         new("nav.logs", "/admin/logs", "ti-list-details", AdminGroup.System, 40),
         new("nav.cleanup", "/admin/cleanup", "ti-eraser", AdminGroup.System, 50),

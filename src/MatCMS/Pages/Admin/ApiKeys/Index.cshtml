@@ -1,0 +1,118 @@
+@page
+@model MatCMS.Pages.Admin.ApiKeys.IndexModel
+@{
+    ViewData["Title"] = T["apikeys.title"];
+    var now = DateTime.UtcNow;
+}
+<div class="page-head">
+    <h1>@T["apikeys.title"]</h1>
+</div>
+
+@if (Model.NewKey is { } fresh)
+{
+    @* Shown once: the key exists in clear only on this page, right after it was made. *@
+    <div class="alert alert-success">
+        <strong>@T["apikeys.newKeyTitle"]</strong>
+        <p style="margin:.4em 0;">@T["apikeys.newKeyHint"]</p>
+        <input class="mono" readonly value="@fresh" onclick="this.select()" style="width:100%;" aria-label="@T["apikeys.newKeyTitle"]" />
+    </div>
+}
+
+<table class="data">
+    <thead>
+        <tr>
+            <th>@T["apikeys.colName"]</th>
+            <th>@T["apikeys.colKey"]</th>
+            <th>@T["apikeys.colRights"]</th>
+            <th>@T["apikeys.colUsed"]</th>
+            <th>@T["apikeys.colState"]</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @if (Model.Items.Count == 0)
+        {
+            @await Html.PartialAsync("_EmptyRow", T["apikeys.none"].ToString())
+        }
+        @foreach (var k in Model.Items)
+        {
+            <tr>
+                <td><strong>@k.Name</strong><div class="muted" style="font-size:12px;">@T["apikeys.created", k.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy")]</div></td>
+                <td class="mono">@(k.Prefix)…</td>
+                <td>
+                    @foreach (var r in k.Rights.Split(',', StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        <span class="badge">@r</span>
+                    }
+                </td>
+                <td class="muted">@(k.LastUsedAt is { } u ? u.ToLocalTime().ToString("dd.MM.yyyy HH:mm") + " · " + k.Uses.ToString("N0") + "×" : "—")</td>
+                <td>
+                    @if (k.RevokedAt is not null)
+                    {
+                        <span class="badge badge-err">@T["apikeys.revoked"]</span>
+                    }
+                    else if (k.ExpiresAt is { } exp && exp <= now)
+                    {
+                        <span class="badge badge-off">@T["apikeys.expired"]</span>
+                    }
+                    else
+                    {
+                        <span class="badge badge-on">@T["apikeys.active"]</span>
+                        @if (k.ExpiresAt is { } until)
+                        {
+                            <div class="muted" style="font-size:12px;">@T["apikeys.until", until.ToLocalTime().ToString("dd.MM.yyyy")]</div>
+                        }
+                    }
+                </td>
+                <td>
+                    <div class="actions">
+                        @if (k.RevokedAt is null)
+                        {
+                            <form class="inline-form" method="post" asp-page-handler="Revoke" asp-route-id="@k.Id" data-confirm="@T["apikeys.confirmRevoke", k.Name]">
+                                <button type="submit" class="btn btn-sm btn-ghost">@T["apikeys.revoke"]</button>
+                            </form>
+                        }
+                        <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@k.Id" data-confirm="@T["apikeys.confirmDelete", k.Name]">
+                            <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+<div class="list-actions">
+    <a class="btn" asp-page="Create">@T["apikeys.create"]</a>
+</div>
+
+@* What a key can call: the routes of the loaded plugins, so whoever connects the ERP does not have to ask. *@
+<div class="card" style="margin-top:24px;">
+    <h2>@T["apikeys.endpoints"]</h2>
+    <p class="help">@T["apikeys.endpointsHint", Model.Origin]</p>
+    @if (Model.Routes.Count == 0)
+    {
+        <p class="muted">@T["apikeys.noEndpoints"]</p>
+    }
+    else
+    {
+        <table class="data">
+            <thead><tr><th style="width:90px;">@T["apikeys.colMethod"]</th><th>@T["apikeys.colPath"]</th><th>@T["apikeys.colAccess"]</th><th>@T["apikeys.colWhat"]</th></tr></thead>
+            <tbody>
+                @foreach (var r in Model.Routes.OrderBy(r => r.Owner).ThenBy(r => r.Pattern.Template).ThenBy(r => r.Method))
+                {
+                    <tr>
+                        <td><span class="badge">@r.Method</span></td>
+                        <td class="mono">/api/v1/@r.Owner@r.Pattern.Template</td>
+                        <td>@r.Owner:@MatCMS.Services.SiteApiKeyService.Word(r.Options.Access)</td>
+                        <td>@r.Options.Summary
+                            @if (!string.IsNullOrWhiteSpace(r.Options.Example))
+                            {
+                                <details><summary class="muted" style="font-size:12px;">@T["apikeys.example"]</summary><pre class="code-block" style="white-space:pre-wrap;font-size:12px;">@r.Options.Example</pre></details>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>

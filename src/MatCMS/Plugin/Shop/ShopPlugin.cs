@@ -131,6 +131,8 @@ public sealed class ShopPlugin : IPlugin
         b.On("site.search", ShopBotData.SearchAsync);
         b.On("member.data", ShopBotData.MemberDataAsync);
         // Described (ShopAiOps), so the site's AI assistant can use them too; the order operations carry customers' data and are kept from it.
+        // The API for an ERP or merchandise system: products by article number, stock and prices in batches, orders (ShopApi.cs).
+        ShopApi.Register(b);
         b.Operation(ShopAiOps.ProductList, ShopAiOps.ListProductsAsync);
         b.Operation(ShopAiOps.ProductRead, ShopAiOps.ReadProductAsync);
         b.Operation(ShopAiOps.ProductCreate, ShopEvents.CreateProductAsync);

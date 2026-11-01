@@ -261,6 +261,7 @@ builder.Services.AddSingleton<CloudState>();
 builder.Services.AddScoped<CloudService>();
 builder.Services.AddScoped<CloudSyncService>();
 builder.Services.AddScoped<CloudCatalogService>();
+builder.Services.AddScoped<SiteApiKeyService>();
 // Applies cloud-offered content operations (AI changes via the MCP server) through the site's own
 // validated writers. Resolved on demand by CloudService while handling a heartbeat response.
 builder.Services.AddScoped<ContentOpApplier>();
@@ -649,7 +650,8 @@ app.Use(async (ctx, next) =>
         p.StartsWith("/_status", StringComparison.OrdinalIgnoreCase) ||
         p.StartsWith("/set-language", StringComparison.OrdinalIgnoreCase) ||
         p.StartsWith("/fonts/", StringComparison.OrdinalIgnoreCase) ||   // the maintenance page itself uses them
-        p.StartsWith("/pwa/", StringComparison.OrdinalIgnoreCase);       // the back office's app files (manifest, worker, offline page)
+        p.StartsWith("/pwa/", StringComparison.OrdinalIgnoreCase) ||     // the back office's app files (manifest, worker, offline page)
+        p.StartsWith("/api/v1", StringComparison.OrdinalIgnoreCase);     // other programs (an ERP) keep working while the site is prepared
     if (exempt)
     {
         await next();
@@ -690,6 +692,8 @@ app.MapRazorPages();
 // like /shop/{slug} wins over a CMS page of the same path — but only for the fixed prefixes a plugin has
 // registered, never for the host's reserved ones (see PluginRoutePattern.Reserved).
 app.MapDynamicPageRoute<MatCMS.Services.Plugins.PluginRouteTransformer>("{**plugin}", null!, -100);
+// The plugins' API for other programs (an ERP filling the shop): /api/v1/{plugin}/…, authenticated by the site's API keys, JSON only.
+MatCMS.Services.Plugins.PluginApiEndpoint.Map(app);
 
 // Serves a file attached to a template (see TemplateAsset). Public and cacheable — these are static
 // site assets (scripts, styles, fonts) a template brings with it, referenced via {{asset:name}}.

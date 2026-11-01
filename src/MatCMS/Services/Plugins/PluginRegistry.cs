@@ -46,6 +46,9 @@ public sealed class PluginRegistry
     /// <summary>A public route registered through <see cref="IPluginBuilder.Route"/>.</summary>
     public sealed record RouteEntry(string Owner, PluginInfo Info, PluginRoutePattern Pattern, PluginHandler Handler, PublicRouteOptions Options);
 
+    /// <summary>An API route registered through <see cref="IPluginBuilder.Api"/>; <see cref="Pattern"/> is relative to <c>/api/v1/{Owner}</c>.</summary>
+    public sealed record ApiRouteEntry(string Owner, PluginInfo Info, string Method, PluginRoutePattern Pattern, PluginHandler Handler, ApiRouteOptions Options);
+
     /// <summary>A page inside an admin section. <see cref="Tab"/> null = a detail page without a tab.</summary>
     public sealed record SectionPage(PluginRoutePattern Pattern, string? Tab, PluginHandler Handler);
 
@@ -118,6 +121,7 @@ public sealed class PluginRegistry
         internal Dictionary<string, Func<PluginRequest, string>> Pages { get; } = new(StringComparer.Ordinal);
         internal Dictionary<string, Func<PluginRequest, string>> PublicPages { get; } = new(StringComparer.Ordinal);
         internal List<RouteEntry> Routes { get; } = new();
+        internal List<ApiRouteEntry> ApiRoutes { get; } = new();
         internal List<SectionEntry> Sections { get; } = new();
         internal List<string> Head { get; } = new();
         internal List<string> Body { get; } = new();
@@ -174,6 +178,7 @@ public sealed class PluginRegistry
         public IReadOnlyList<AdminMenuEntry> AdminMenu = Array.Empty<AdminMenuEntry>();
         public IReadOnlyList<PluginBlock> Blocks = Array.Empty<PluginBlock>();
         public IReadOnlyList<RouteEntry> Routes = Array.Empty<RouteEntry>();
+        public IReadOnlyList<ApiRouteEntry> ApiRoutes = Array.Empty<ApiRouteEntry>();
         public IReadOnlyList<SectionEntry> Sections = Array.Empty<SectionEntry>();
         public IReadOnlyDictionary<string, Func<PluginRequest, string>> Pages = new Dictionary<string, Func<PluginRequest, string>>();
         public IReadOnlyDictionary<string, Func<PluginRequest, string>> PublicPages = new Dictionary<string, Func<PluginRequest, string>>();
@@ -256,6 +261,8 @@ public sealed class PluginRegistry
             // Most specific first (more literal segments), a catch-all last; ties keep load order.
             Routes = slices.SelectMany(s => s.Routes)
                 .OrderBy(r => r.Pattern.HasCatchAll).ThenByDescending(r => r.Pattern.Specificity).ToList(),
+            ApiRoutes = slices.SelectMany(s => s.ApiRoutes)
+                .OrderBy(r => r.Pattern.HasCatchAll).ThenByDescending(r => r.Pattern.Specificity).ToList(),
             Sections = slices.SelectMany(s => s.Sections).ToList(),
             Pages = pages,
             PublicPages = publicPages,
@@ -290,6 +297,26 @@ public sealed class PluginRegistry
     public IReadOnlyList<PluginBlock> Blocks => _snap.Blocks;
     /// <summary>The public routes of all plugins, most specific first.</summary>
     public IReadOnlyList<RouteEntry> Routes => _snap.Routes;
+    /// <summary>The API routes of all plugins, most specific first.</summary>
+    public IReadOnlyList<ApiRouteEntry> ApiRoutes => _snap.ApiRoutes;
+
+    /// <summary>
+    /// The API route of <paramref name="owner"/> for a path (relative to <c>/api/v1/{owner}</c>, with a leading slash) and method.
+    /// <c>MethodNotAllowed</c> is true when the path exists for another method only — the caller then gets a 405, not a 404.
+    /// </summary>
+    public (ApiRouteEntry? Route, Dictionary<string, string>? Values, bool MethodNotAllowed) MatchApi(string owner, string path, string method)
+    {
+        var other = false;
+        foreach (var r in _snap.ApiRoutes)
+        {
+            if (!string.Equals(r.Owner, owner, StringComparison.Ordinal)) continue;
+            var v = r.Pattern.Match(path);
+            if (v is null) continue;
+            if (string.Equals(r.Method, method, StringComparison.OrdinalIgnoreCase)) return (r, v, false);
+            other = true;
+        }
+        return (null, null, other);
+    }
     /// <summary>The admin sections of all plugins.</summary>
     public IReadOnlyList<SectionEntry> Sections => _snap.Sections;
     /// <summary>The published slice of a plugin, or null when it is not loaded.</summary>

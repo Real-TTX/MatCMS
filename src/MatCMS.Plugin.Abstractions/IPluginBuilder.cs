@@ -70,6 +70,30 @@ public sealed record PublicRouteOptions
     public bool Webhook { get; init; }
 }
 
+/// <summary>What an API route needs the caller's key to allow, for this plugin (the key's rights are per plugin and per kind).</summary>
+public enum ApiAccess
+{
+    /// <summary>Reading (a GET). A key with <see cref="Write"/> may read too.</summary>
+    Read = 0,
+    /// <summary>Changing data (create, update, stock, prices).</summary>
+    Write = 1,
+    /// <summary>Reading or changing data about people (orders, customers): a right of its own, never implied by another.</summary>
+    PersonalData = 2
+}
+
+/// <summary>How an API route (<see cref="IPluginBuilder.Api"/>) is offered.</summary>
+public sealed record ApiRouteOptions
+{
+    /// <summary>The right the caller's key must have for this plugin.</summary>
+    public ApiAccess Access { get; init; } = ApiAccess.Read;
+
+    /// <summary>One line for the list of endpoints the site shows its operator (Admin → API-Schlüssel) and a key gets from <c>GET /api/v1</c>.</summary>
+    public string Summary { get; init; } = "";
+
+    /// <summary>An example body or answer (JSON text) for that list; empty = none.</summary>
+    public string Example { get; init; } = "";
+}
+
 /// <summary>Computes the small counter next to a sidebar entry ("3 new reviews"). Return null or "" for none. Runs on
 /// every admin page, so keep it to a cheap count.</summary>
 public delegate Task<string?> PluginBadgeProvider(IPluginContext ctx, CancellationToken ct);
@@ -169,6 +193,16 @@ public interface IPluginBuilder
     /// language is available as <see cref="IPluginContext.Locale"/>. A page answers inside the site layout.
     /// </summary>
     void Route(string pattern, PluginHandler handler, PublicRouteOptions? options = null);
+
+    /// <summary>
+    /// An endpoint for another PROGRAM (an ERP, a merchandise system, a script): <c>/api/v1/{plugin key}/{pattern}</c>, e.g. <c>Api("PUT", "products/{sku}", …)</c>
+    /// answers <c>PUT /api/v1/shop/products/4711</c>. The host authenticates the caller with an API key of the site (Admin → API-Schlüssel, sent as
+    /// <c>Authorization: Bearer …</c>) that must carry this plugin's right for <see cref="ApiRouteOptions.Access"/>, limits the calls per key, reads a JSON
+    /// body (at most <see cref="RequestData.MaxApiBody"/>; <see cref="RequestData.Json"/>) and expects JSON back (<see cref="PluginResult.Json"/>). No
+    /// cookies, no member, no antiforgery — the key is the whole authority. <paramref name="method"/> is GET, POST, PUT, PATCH or DELETE; the
+    /// pattern is a path template as for <see cref="Route"/>, relative to the plugin's API address.
+    /// </summary>
+    void Api(string method, string pattern, PluginHandler handler, ApiRouteOptions? options = null);
 
     /// <summary>Back-office entries.</summary>
     IAdminBuilder Admin { get; }

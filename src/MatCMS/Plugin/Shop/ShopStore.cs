@@ -26,10 +26,10 @@ internal sealed partial class ShopStore
             .Json("gallery", def: "[]").Text("kind", def: "physical").Int("price_cents", def: "0").Int("tax_bp", def: "1900").Text("sku")
             .Bool("track_stock", def: "0").Int("stock", def: "0").Int("weight_g", def: "0").Text("category").Int("max_per_order", def: "0")
             .Bool("active", def: "1").Int("sort", def: "0").Timestamp("created").Timestamp("updated").Text("tags").Bool("featured", def: "0").Int("compare_cents", def: "0").Json("var_options", def: "[]")
-            .Text("seo_title").Text("seo_description").Text("cats_extra")
-            .UniqueIndex("slug").Index("active", "sort").Index("category"));
+            .Text("seo_title").Text("seo_description").Text("cats_extra").Text("gtin")
+            .UniqueIndex("slug").Index("active", "sort").Index("category").Index("sku"));
         d.Table("variants", t => t.Int("product_id", required: true, def: "0").Text("name", required: true, def: "").Text("sku").Int("price_delta", def: "0")
-            .Bool("track_stock", def: "0").Int("stock", def: "0").Bool("active", def: "1").Int("sort", def: "0").Text("image").Index("product_id"));
+            .Bool("track_stock", def: "0").Int("stock", def: "0").Bool("active", def: "1").Int("sort", def: "0").Text("image").Text("gtin").Index("product_id").Index("sku"));
         d.Table("product_files", t => t.Int("product_id", required: true, def: "0").Text("file_name", required: true, def: "").Text("storage_name", required: true, def: "")
             .Int("size", def: "0").Int("sort", def: "0").Index("product_id"));
         d.Table("categories", t => t.Text("slug", required: true, def: "").Text("name", required: true, def: "").Int("sort", def: "0").Int("parent_id", def: "0").Text("image", def: "").Text("description", def: "").Text("tags", def: "").Text("rule", def: "").UniqueIndex("slug"));
@@ -93,7 +93,7 @@ internal sealed partial class ShopStore
         Id = r.Id, Slug = r.Text("slug"), Title = r.Text("title"), Summary = r.Text("summary"), DescriptionHtml = r.Text("description"), Image = r.Text("image"),
         ExtraCategories = r.Text("cats_extra"), SeoTitle = r.Text("seo_title"), SeoDescription = r.Text("seo_description"),
         GalleryJson = r.Text("gallery") is { Length: > 0 } g ? g : "[]", VariantOptions = r.Text("var_options") is { Length: > 0 } vo ? vo : "[]", Kind = ProductKind.Normalise(r.Text("kind")),
-        PriceCents = r.Int("price_cents"), TaxBp = (int)r.Int("tax_bp"), Sku = r.Text("sku"), TrackStock = r.Bool("track_stock"), Stock = r.Int("stock"),
+        PriceCents = r.Int("price_cents"), TaxBp = (int)r.Int("tax_bp"), Sku = r.Text("sku"), Gtin = r.Text("gtin"), TrackStock = r.Bool("track_stock"), Stock = r.Int("stock"),
         WeightGrams = (int)r.Int("weight_g"), Category = r.Text("category"), Tags = r.Text("tags"), Featured = r.Bool("featured"), CompareCents = r.Int("compare_cents"), MaxPerOrder = (int)r.Int("max_per_order"), Active = r.Bool("active"), Sort = (int)r.Int("sort"),
         CreatedUtc = r.Timestamp("created") ?? DateTime.UtcNow, UpdatedUtc = r.Timestamp("updated") ?? DateTime.UtcNow
     };
@@ -102,7 +102,7 @@ internal sealed partial class ShopStore
     {
         ["slug"] = p.Slug, ["title"] = p.Title, ["summary"] = p.Summary, ["description"] = p.DescriptionHtml, ["image"] = p.Image, ["gallery"] = p.GalleryJson, ["var_options"] = p.VariantOptions,
         ["cats_extra"] = p.ExtraCategories, ["seo_title"] = p.SeoTitle, ["seo_description"] = p.SeoDescription,
-        ["kind"] = p.Kind, ["price_cents"] = p.PriceCents, ["tax_bp"] = p.TaxBp, ["sku"] = p.Sku, ["track_stock"] = p.TrackStock, ["stock"] = p.Stock,
+        ["kind"] = p.Kind, ["price_cents"] = p.PriceCents, ["tax_bp"] = p.TaxBp, ["sku"] = p.Sku, ["gtin"] = p.Gtin, ["track_stock"] = p.TrackStock, ["stock"] = p.Stock,
         ["weight_g"] = p.WeightGrams, ["category"] = p.Category, ["tags"] = ShopTags.Normalise(p.Tags), ["featured"] = p.Featured, ["compare_cents"] = Math.Max(0, p.CompareCents), ["max_per_order"] = p.MaxPerOrder, ["active"] = p.Active, ["sort"] = p.Sort, ["updated"] = DateTime.UtcNow
     };
 
@@ -219,7 +219,7 @@ internal sealed partial class ShopStore
 
     private static Variant VariantOf(DataRow r) => new()
     {
-        Id = r.Id, ProductId = r.Int("product_id"), Name = r.Text("name"), Sku = r.Text("sku"), PriceDeltaCents = r.Int("price_delta"),
+        Id = r.Id, ProductId = r.Int("product_id"), Name = r.Text("name"), Sku = r.Text("sku"), Gtin = r.Text("gtin"), PriceDeltaCents = r.Int("price_delta"),
         TrackStock = r.Bool("track_stock"), Stock = r.Int("stock"), Active = r.Bool("active"), Sort = (int)r.Int("sort"), Image = r.Text("image")
     };
 
@@ -244,7 +244,7 @@ internal sealed partial class ShopStore
     {
         var values = new Dictionary<string, object?>
         {
-            ["product_id"] = v.ProductId, ["name"] = v.Name, ["sku"] = v.Sku, ["price_delta"] = v.PriceDeltaCents, ["track_stock"] = v.TrackStock,
+            ["product_id"] = v.ProductId, ["name"] = v.Name, ["sku"] = v.Sku, ["gtin"] = v.Gtin, ["price_delta"] = v.PriceDeltaCents, ["track_stock"] = v.TrackStock,
             ["stock"] = v.Stock, ["active"] = v.Active, ["sort"] = v.Sort, ["image"] = v.Image
         };
         if (v.Id == 0) return await T("variants").InsertAsync(values, ct);

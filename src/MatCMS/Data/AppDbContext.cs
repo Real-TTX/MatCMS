@@ -26,6 +26,8 @@ public class AppDbContext : DbContext
     // Public-site visitor accounts and their role vocabulary (the "guest area" login).
     public DbSet<SiteMember> SiteMembers => Set<SiteMember>();
     public DbSet<SiteRole> SiteRoles => Set<SiteRole>();
+    // Keys of other programs for the plugins' API (/api/v1/{plugin}/…).
+    public DbSet<SiteApiKey> SiteApiKeys => Set<SiteApiKey>();
     public DbSet<MatCMS.Models.LogEntry> Logs => Set<MatCMS.Models.LogEntry>();
     public DbSet<StatCounter> StatCounters => Set<StatCounter>();
 
@@ -36,6 +38,7 @@ public class AppDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder b)
     {
+        b.Entity<SiteApiKey>().HasIndex(k => k.Hash).IsUnique();
         b.Entity<AiStep>().HasIndex(s => new { s.ConversationId, s.Id });
         b.Entity<AiChange>().HasIndex(c => new { c.ConversationId, c.Run });
         b.Entity<AiStep>().HasOne<AiConversation>().WithMany().HasForeignKey(s => s.ConversationId).OnDelete(DeleteBehavior.Cascade);

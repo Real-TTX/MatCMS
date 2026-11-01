@@ -243,6 +243,22 @@ internal sealed class PluginBuilder : IPluginBuilder, IAdminBuilder, ISettingsBu
         _slice.Routes.Add(new PluginRegistry.RouteEntry(Info.Key, Info, p, handler, opts));
     }
 
+    private static readonly string[] ApiMethods = ["GET", "POST", "PUT", "PATCH", "DELETE"];
+
+    public void Api(string method, string pattern, PluginHandler handler, ApiRouteOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        var m = (method ?? "").Trim().ToUpperInvariant();
+        if (Array.IndexOf(ApiMethods, m) < 0)
+            throw new InvalidOperationException($"Api '{pattern}': method '{method}' is not one of {string.Join(", ", ApiMethods)}.");
+        // Relative to the plugin's own API address (/api/v1/{key}); a leading slash is allowed and changes nothing.
+        var rel = "/" + (pattern ?? "").Trim().Trim('/');
+        var p = PluginRoutePattern.TryParse(rel, out var why) ?? throw new InvalidOperationException($"Api '{pattern}': {why}.");
+        if (_slice.ApiRoutes.Any(r => r.Method == m && r.Pattern.Template == p.Template))
+            throw new InvalidOperationException($"Api '{m} {pattern}' is declared twice.");
+        _slice.ApiRoutes.Add(new PluginRegistry.ApiRouteEntry(Info.Key, Info, m, p, handler, options ?? new ApiRouteOptions()));
+    }
+
     public IAdminSection Section(string label, string icon = "ti-plug", AdminGroup group = AdminGroup.Plugins, int order = 100)
     {
         if (_sectionDeclared)

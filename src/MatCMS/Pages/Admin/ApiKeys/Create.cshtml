@@ -1,0 +1,70 @@
+@page
+@model MatCMS.Pages.Admin.ApiKeys.CreateModel
+@using MatCMS.Plugin
+@{
+    ViewData["Title"] = T["apikeys.create"];
+}
+<div class="page-head">
+    <h1>@T["apikeys.create"]</h1>
+</div>
+
+@if (Model.Error is { } err)
+{
+    <div class="alert alert-error">@err</div>
+}
+
+<form method="post" id="key-form">
+    <div class="card">
+        <div class="form-field">
+            <label for="name">@T["apikeys.colName"]</label>
+            <input id="name" name="name" maxlength="80" required placeholder="@T["apikeys.namePlaceholder"]" value="@(Request.HasFormContentType ? Request.Form["name"].ToString() : "")" />
+            <div class="help">@T["apikeys.nameHint"]</div>
+        </div>
+        <div class="form-field">
+            <label for="expires">@T["apikeys.expires"]</label>
+            <input id="expires" name="expires" type="date" />
+            <div class="help">@T["apikeys.expiresHint"]</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>@T["apikeys.colRights"]</h2>
+        @if (Model.Plugins.Count == 0)
+        {
+            <p class="muted">@T["apikeys.noEndpoints"]</p>
+        }
+        else
+        {
+            <table class="data">
+                <thead><tr><th>Plugin</th><th>@T["apikeys.read"]</th><th>@T["apikeys.write"]</th><th>@T["apikeys.personal"]</th></tr></thead>
+                <tbody>
+                    @foreach (var p in Model.Plugins)
+                    {
+                        <tr>
+                            <td><strong>@p.Name</strong> <span class="muted mono">@p.Key</span></td>
+                            @foreach (var (access, word) in new[] { (ApiAccess.Read, "read"), (ApiAccess.Write, "write"), (ApiAccess.PersonalData, "personal") })
+                            {
+                                <td>
+                                    @if (p.Kinds.Contains(access) || (access == ApiAccess.Read && p.Kinds.Contains(ApiAccess.Write)))
+                                    {
+                                        <input type="checkbox" name="rights" value="@(p.Key + ":" + word)" aria-label="@p.Name @word" />
+                                    }
+                                    else
+                                    {
+                                        <span class="muted">—</span>
+                                    }
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <p class="help">@T["apikeys.rightsHint"]</p>
+        }
+    </div>
+</form>
+
+<div class="form-actions">
+    <button type="submit" class="btn" form="key-form">@T["apikeys.createButton"]</button>
+    <a class="btn btn-ghost" asp-page="Index">@T["action.back"]</a>
+</div>

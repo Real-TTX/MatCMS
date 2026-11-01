@@ -84,7 +84,8 @@ internal static class ShopOps
         var cfg = ShopConfig.From(ctx.Settings);
         var number = Str(o, "number");
         if (await store.OrderByNumberAsync(number, ct) is not { } order) return Answer("failed", $"Keine Bestellung „{number}“.");
-        const string who = "agent";
+        // Who did it, for the order's history: an API call names its key ("api:ERP Lager"), the agent tools stay "agent".
+        var who = Str(o, "by") is { Length: > 0 } by ? by : "agent";
         var action = Str(o, "action").ToLowerInvariant();
         switch (action)
         {

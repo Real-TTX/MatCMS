@@ -47,12 +47,29 @@ public sealed class RequestData
     /// <summary>The largest body a webhook route reads (1 MB — a payment notification is a few kilobytes).</summary>
     public const int MaxWebhookBody = 1024 * 1024;
 
+    /// <summary>The largest body an API route reads (4 MB — a batch of a few thousand stock lines or products).</summary>
+    public const int MaxApiBody = 4 * 1024 * 1024;
+
+    /// <summary>
+    /// Who called an API route (<see cref="IPluginBuilder.Api"/>): the NAME of the site's API key that was presented, for a log line or a
+    /// "changed by". Empty for every other kind of request. The key itself never reaches a plugin.
+    /// </summary>
+    public string ApiCaller { get; init; } = "";
+
     /// <summary>A header value, or "".</summary>
     public string Header(string name) => Headers.TryGetValue(name, out var v) ? v : "";
     /// <summary>A cookie value, or "".</summary>
     public string Cookie(string name) => Cookies.TryGetValue(name, out var v) ? v : "";
     /// <summary>The body as UTF-8 text.</summary>
     public string BodyText => System.Text.Encoding.UTF8.GetString(Body);
+
+    /// <summary>The body read as JSON (an API route's input), or null when it is empty or not JSON.</summary>
+    public JsonNode? Json()
+    {
+        if (Body.Length == 0) return null;
+        try { return JsonNode.Parse(Body); }
+        catch (System.Text.Json.JsonException) { return null; }
+    }
     /// <summary>The uploaded file posted under a field name, or null.</summary>
     public UploadedFile? File(string field) => Files.FirstOrDefault(f => string.Equals(f.Field, field, StringComparison.Ordinal));
 }

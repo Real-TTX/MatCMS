@@ -59,6 +59,8 @@ internal sealed record Product
     /// <summary>The tax rate in hundredths of a percent (1900 = 19 %).</summary>
     public int TaxBp { get; init; } = 1900;
     public string Sku { get; init; } = "";
+    /// <summary>The EAN / GTIN (a barcode number), as an ERP knows the article; empty = none.</summary>
+    public string Gtin { get; init; } = "";
     /// <summary>False = unlimited (a download, a service).</summary>
     public bool TrackStock { get; init; }
     public long Stock { get; init; }
@@ -150,6 +152,8 @@ internal sealed record Variant
     public long ProductId { get; init; }
     public string Name { get; init; } = "";
     public string Sku { get; init; } = "";
+    /// <summary>The EAN / GTIN of this variant; empty = none.</summary>
+    public string Gtin { get; init; } = "";
     public long PriceDeltaCents { get; init; }
     public bool TrackStock { get; init; }
     public long Stock { get; init; }

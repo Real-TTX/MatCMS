@@ -36,7 +36,7 @@
             <div class="form-field">
                 <label for="nodeId">@T["nodes.where"]</label>
                 <select id="nodeId" name="nodeId">
-                    <option value="" disabled="@(Model.NextPort is null ? "disabled" : null)">@T["nodes.thisHost"]@(Model.NextPort is null ? " — " + T["settings.hostingNoPort"] : "")</option>
+                    <option value="" disabled="@(Model.NextPort is null ? "disabled" : null)">@Hosts.Text(null, null)@(Model.NextPort is null ? " — " + T["settings.hostingNoPort"] : "")</option>
                     @foreach (var n in Model.Nodes)
                     {
                         var on = n.IsOnline(DateTime.UtcNow);
@@ -67,7 +67,7 @@
         </div>
 
         <div class="kv">
-            <div class="kv-label">@T["settings.hostingNextPort"]@(Model.Nodes.Count > 0 ? " (" + T["nodes.thisHost"] + ")" : "")</div>
+            <div class="kv-label">@T["settings.hostingNextPort"]@(Model.Nodes.Count > 0 ? " (" + Hosts.Name(null, null) + ")" : "")</div>
             <div class="kv-value">
                 @if (Model.NextPort is int np)
                 {

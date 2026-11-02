@@ -29,8 +29,8 @@
         <tbody>
             @* "Dieser Host" is not a row in the database — it is the cloud's own daemon — but it is a host like the
                others, so it is listed first and has the same page. *@
-            <tr data-search="@T["nodes.thisHost"]">
-                <td><a asp-page="Details"><strong>@T["nodes.thisHost"]</strong></a></td>
+            <tr data-search="@Hosts.Text(null, null)">
+                <td><a asp-page="Details"><strong>@Hosts.Html(null, null)</strong></a></td>
                 <td><span class="badge @(Model.LocalReachable ? "badge-on" : "badge-off")">@(Model.LocalReachable ? T["nodes.online"] : T["settings.dockerUnreachable"])</span></td>
                 <td class="muted">@T["nodes.thisHostHint"]</td>
                 <td class="muted">—</td>

@@ -51,7 +51,7 @@ public sealed class CloudConfigBackupService
             SettingKeys.HostingWildcardEnabled, SettingKeys.HostingWildcardDnsProvider, SettingKeys.HostingWildcardDnsCredentials,
             SettingKeys.HostingEdgeTrustedIps, SettingKeys.HostingEdgeEnabled, SettingKeys.HostingEdgeUseHostProxy, SettingKeys.HostingEdgeMode,
             SettingKeys.HostingEdgeCaddyAdminUrl, SettingKeys.HostingEdgeCaddyServer, SettingKeys.HostingEdgeMatcadUrl, SettingKeys.HostingEdgeMatcadToken,
-            SettingKeys.HostingPortFrom, SettingKeys.HostingPortTo, SettingKeys.HostingNamePattern },
+            SettingKeys.HostingPortFrom, SettingKeys.HostingPortTo, SettingKeys.HostingNamePattern, SettingKeys.HostingLocalName },
     };
 
     /// <summary>Stored encrypted (SecretProtector) — exported only inside the passphrase-protected block.</summary>

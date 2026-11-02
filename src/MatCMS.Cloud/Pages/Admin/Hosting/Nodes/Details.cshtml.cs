@@ -417,6 +417,11 @@ public class DetailsModel : PageModel
             TempData[err is null ? "Flash" : "FlashError"] = err ?? "Node gespeichert.";
             return Back(id, "settings");
         }
+        if (await _nodes.SetLocalNameAsync(name, HttpContext.RequestAborted) is { } nameErr)
+        {
+            TempData["FlashError"] = nameErr;
+            return Back(id, "settings");
+        }
         await _cloud.SaveAsync(new Dictionary<string, string?>
         {
             // Nur ein gültiger Bereich wird gespeichert. Ein verdrehter oder unsinniger würde beim Anlegen entweder nie

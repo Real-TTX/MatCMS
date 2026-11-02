@@ -606,6 +606,7 @@
   "nodes.title": "Nodes",
   "nodes.thisHost": "This host",
   "nodes.thisHostHint": "The cloud’s Docker daemon",
+  "nodes.localNameHint": "What this host is called in the cloud, e.g. cloud2. The tag “This host” always follows it. Empty = “This host”.",
   "nodes.hostColumn": "Host",
   "nodes.host": "Host",
   "nodes.agent": "Agent",

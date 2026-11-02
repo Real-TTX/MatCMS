@@ -124,6 +124,10 @@ public static class SettingKeys
     /// normalisierten Seitennamen ersetzt.</summary>
     public const string HostingNamePattern = "hosting.namePattern";
 
+    /// <summary>The operator's name for the cloud's own host (e.g. "cloud2"), shown with the tag "Dieser Host" behind
+    /// it. Empty = it is called "Dieser Host". Unique among the hosts, like a node's name.</summary>
+    public const string HostingLocalName = "hosting.localName";
+
     // --- Notifications ------------------------------------------------------
     /// <summary>The notification matrix (JSON, <c>NotificationService</c>): who gets which event. Once saved it
     /// replaces the three keys below, which stay only so the first load can translate them into it.</summary>

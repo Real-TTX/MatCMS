@@ -29,17 +29,21 @@ public class MigrationService
     private readonly MigrationQueue _queue;
     private readonly NotificationService _notify;
     private readonly ILogger<MigrationService> _log;
+    private readonly CloudContext _cloud;
 
     public MigrationService(AppDbContext db, NodeService nodes, InstanceService instances, ProxyService proxy,
-        DockerHostService docker, MigrationQueue queue, ILogger<MigrationService> log, NotificationService notify)
+        DockerHostService docker, MigrationQueue queue, ILogger<MigrationService> log, NotificationService notify,
+        CloudContext cloud)
     {
+        _cloud = cloud;
         _db = db; _nodes = nodes; _instances = instances; _proxy = proxy; _docker = docker; _queue = queue; _log = log; _notify = notify;
     }
 
     /// <summary>How long the target gets to prove it runs: its first beat (every ~60 s) after a cold start.</summary>
     public static readonly TimeSpan VerifyTimeout = TimeSpan.FromMinutes(5);
 
-    public static string HostName(Node? n) => n?.Name ?? "Dieser Host";
+    /// <summary>The host's name as the move's log keeps it ("cloud2 (Dieser Host)" for a named local host).</summary>
+    private string HostName(Node? n) => n?.Name ?? (NodeService.LocalName(_cloud) is { } l ? $"{l} (Dieser Host)" : "Dieser Host");
 
     /// <summary>Whether <paramref name="transferId"/> belongs to a move that is running and in which the node takes part in the given
     /// role: the source uploads the data, the target downloads it. A node may only touch the one move it is part of.</summary>

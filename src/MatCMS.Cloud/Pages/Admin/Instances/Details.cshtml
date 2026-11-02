@@ -139,6 +139,7 @@
                     else
                     {
                         <span class="badge badge-on">@T["instances.local"]</span>
+                        @if (Hosts.LocalName is not null) { <a asp-page="/Admin/Hosting/Nodes/Details">@Hosts.LocalName</a> }
                     }
                     <span class="muted mono">@Model.Item.LocalContainerName</span>
                     @* The published host port is what the operator needs to reach the container

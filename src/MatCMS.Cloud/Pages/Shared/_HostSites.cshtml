@@ -23,7 +23,7 @@
         {
             var i = s.Instance;
             var tags = (s.Running ? "running" : "stopped") + (s.UpdateAvailable ? " update" : "");
-            var hostName = s.Host.NodeId is null ? T["nodes.thisHost"] : s.Host.Name;
+            var hostName = Hosts.Name(s.Host.NodeId, s.Host.Name);
             <tr data-search="@(i?.Name + " " + s.ContainerName + " " + hostName + " " + i?.ProxyDomain)" data-tags="@tags">
                 <td>
                     @if (i is not null) { <a asp-page="/Admin/Instances/Details" asp-route-id="@i.Id" asp-route-tab="hosting"><strong>@i.Name</strong></a> }
@@ -32,7 +32,7 @@
                 </td>
                 @if (Model.ShowHost)
                 {
-                    <td class="nowrap"><a asp-page="/Admin/Hosting/Nodes/Details" asp-route-id="@s.Host.NodeId">@hostName</a></td>
+                    <td class="nowrap"><a asp-page="/Admin/Hosting/Nodes/Details" asp-route-id="@s.Host.NodeId">@Hosts.Html(s.Host.NodeId, s.Host.Name)</a></td>
                 }
                 <td class="nowrap">
                     <span class="badge @(s.Running ? "badge-on" : "badge-err")">@s.State</span>

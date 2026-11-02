@@ -47,7 +47,7 @@
                     <td colspan="5">
                         <a class="group-title" asp-page="/Admin/Instances/Details" asp-route-id="@i.Id" asp-route-tab="hosting">@i.Name</a>
                         <span class="group-meta">
-                            @(i.Node?.Name ?? T["nodes.thisHost"].ToString()) · @T["domains.addressCount", g.Rows.Count]
+                            @Hosts.Html(i.Node) · @T["domains.addressCount", g.Rows.Count]
                         </span>
                     </td>
                 </tr>

@@ -86,7 +86,7 @@ public static class NodeApi
                 // "Dieser Host" — the cloud's own daemon, configured by the cloud-wide settings (/api/v1/hosting/proxy).
                 local = new
                 {
-                    id = "local", dockerConfigured = docker.Configured, dockerReachable = await docker.IsReachableAsync(ctx.RequestAborted),
+                    id = "local", name = nodes.LocalHostName, thisHost = true, dockerConfigured = docker.Configured, dockerReachable = await docker.IsReachableAsync(ctx.RequestAborted),
                     instances = await nodes.CountLocalInstancesAsync(), proxy = proxy.PublicConfig(),
                 },
                 nodes = list.Select(n => NodeService.PublicJson(n, counts.GetValueOrDefault(n.Id), withInventory: false)),
@@ -117,6 +117,14 @@ public static class NodeApi
         {
             var (_, error) = await CallerAsync(ctx, keys, cloudWide: true);
             if (error is not null) return error;
+            // "local" is the cloud's own host: only its name is set here (its proxy and ports are /api/v1/hosting/…).
+            if (id == "local")
+            {
+                if (b.Name is null) return Results.Json(new { error = "Für „local“ lässt sich hier nur name setzen." }, statusCode: StatusCodes.Status400BadRequest);
+                var lerr = await nodes.SetLocalNameAsync(b.Name, ctx.RequestAborted);
+                if (lerr is not null) return Results.Json(new { error = lerr }, statusCode: StatusCodes.Status409Conflict);
+                return Results.Ok(new { id = "local", name = nodes.LocalHostName, thisHost = true });
+            }
             var n = await nodes.FindByPublicIdAsync(id);
             if (n is null) return NotFound();
             var err = await nodes.UpdateAsync(n, b, ctx.RequestAborted);

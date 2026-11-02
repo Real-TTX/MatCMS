@@ -26,9 +26,10 @@ public class DetailsModel : PageModel, IAsyncPageFilter
 
     public DetailsModel(AppDbContext db, InstanceService instances, ReleaseWatcher releases, HostingActionsService hosting, BackupStore backups, OperatorScope scope,
         MatCMS.Cloud.Services.Proxy.ProxyService proxy, MatCMS.Cloud.Services.Nodes.MigrationService migrations, DockerHostService docker,
-        StatsService stats)
+        StatsService stats, MatCMS.Cloud.Services.Nodes.HostLabels hostLabels)
     {
         _stats = stats;
+        _hostLabels = hostLabels;
         _db = db;
         _instances = instances;
         _releases = releases;
@@ -43,6 +44,7 @@ public class DetailsModel : PageModel, IAsyncPageFilter
     private readonly MatCMS.Cloud.Services.Nodes.MigrationService _migrations;
     private readonly DockerHostService _docker;
     private readonly StatsService _stats;
+    private readonly MatCMS.Cloud.Services.Nodes.HostLabels _hostLabels;
 
     /// <summary>The Statistik tab: the site's visitor statistics for the chosen period (?days=).</summary>
     public StatsSummary Stats { get; private set; } = null!;
@@ -64,7 +66,7 @@ public class DetailsModel : PageModel, IAsyncPageFilter
         if (Item.NodeId is not null)
         {
             var ok = await _docker.IsReachableAsync(HttpContext.RequestAborted);
-            MoveTargets.Add(("local", "Dieser Host" + (ok ? "" : " — Docker nicht erreichbar"), ok));
+            MoveTargets.Add(("local", _hostLabels.Text(null, null) + (ok ? "" : " — Docker nicht erreichbar"), ok));
         }
         var now = DateTime.UtcNow;
         foreach (var n in await _db.Nodes.AsNoTracking().Where(n => !n.Revoked && n.Id != Item.NodeId).OrderBy(n => n.Name).ToListAsync())

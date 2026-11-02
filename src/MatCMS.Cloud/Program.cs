@@ -124,6 +124,7 @@ builder.Services.AddHttpClient();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<TwoFactorService>();
 builder.Services.AddScoped<CloudContext>();
+builder.Services.AddScoped<MatCMS.Cloud.Services.Nodes.HostLabels>();
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<AiService>();
 builder.Services.AddScoped<AiProfileService>();

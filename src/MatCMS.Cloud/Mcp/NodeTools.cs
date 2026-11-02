@@ -42,7 +42,7 @@ public class NodeTools
         {
             local = new
             {
-                id = "local", dockerReachable = await docker.IsReachableAsync(ct),
+                id = "local", name = nodes.LocalHostName, thisHost = true, dockerReachable = await docker.IsReachableAsync(ct),
                 instances = await nodes.CountLocalInstancesAsync(ct), proxy = proxy.PublicConfig(),
             },
             nodes = list.Select(n => NodeService.PublicJson(n, counts.GetValueOrDefault(n.Id), withInventory: false)),
@@ -71,7 +71,7 @@ public class NodeTools
     }
 
     [McpServerTool(Name = "update_node"), Description(
-        "Change a node's name, port range for new sites, or its reverse-proxy settings (same fields as configure_proxy, applied to THIS node; the proxy is reached from the node, not from the cloud). Omitted parameters keep their value. Requires the hosting right on an all-instances key.")]
+        "Change a node's name, port range for new sites, or its reverse-proxy settings (same fields as configure_proxy, applied to THIS node; the proxy is reached from the node, not from the cloud). Omitted parameters keep their value. nodeId 'local' (the cloud's own host) takes only name — shown with the tag 'Dieser Host' behind it; an empty name resets it to 'Dieser Host'. Requires the hosting right on an all-instances key.")]
     public static async Task<object> UpdateNode(McpContext me, NodeService nodes,
         [Description("The node id.")] string nodeId,
         string? name = null, int? portFrom = null, int? portTo = null,
@@ -85,6 +85,13 @@ public class NodeTools
         CancellationToken ct = default)
     {
         RequireCloudWide(me);
+        if (nodeId == "local")
+        {
+            // The cloud's own host: only its name lives here (its proxy and ports are configure_proxy & co.).
+            if (name is null) throw new McpException("Für „local“ lässt sich mit update_node nur name setzen.");
+            if (await nodes.SetLocalNameAsync(name, ct) is { } lerr) throw new McpException(lerr);
+            return new { id = "local", name = nodes.LocalHostName, thisHost = true };
+        }
         var n = await ResolveAsync(nodes, nodeId, ct);
         var err = await nodes.UpdateAsync(n, new NodeService.NodeInput(name, portFrom, portTo, provider, matcadUrl, matcadToken, clearMatcadToken,
             caddyAdminUrl, caddyServer, upstream, network, upstreamHost, autoDomainEnabled, autoDomainBase, address), ct);

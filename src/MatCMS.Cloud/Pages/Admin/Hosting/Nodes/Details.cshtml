@@ -4,7 +4,7 @@
 @{
     var n = Model.Item;
     var h = Model.Host;
-    var name = n?.Name ?? T["nodes.thisHost"];
+    var name = Hosts.Name(n);
     ViewData["Title"] = name;
     var now = DateTime.UtcNow;
     var on = n?.IsOnline(now) ?? (h?.Online ?? false);
@@ -14,7 +14,7 @@
 <partial name="_HostingTabs" model='"nodes"' />
 
 <div class="page-head">
-    <h1>@name</h1>
+    <h1>@Hosts.Html(n)</h1>
     <div class="list-toolbar">
         @if (n?.Revoked == true) { <span class="badge badge-err">@T["nodes.revoked"]</span> }
         else if (n is not null && n.LastSeenAt is null) { <span class="badge badge-new">@T["nodes.neverSeen"]</span> }
@@ -314,6 +314,14 @@
                 <div class="form-field">
                     <label for="name">@T["common.name"]</label>
                     <input id="name" name="name" value="@n.Name" required />
+                </div>
+            }
+            else
+            {
+                <div class="form-field">
+                    <label for="name">@T["common.name"]</label>
+                    <input id="name" name="name" value="@Hosts.LocalName" placeholder="@Hosts.LocalTag" maxlength="80" />
+                    <div class="help">@T["nodes.localNameHint"]</div>
                 </div>
             }
             @* Der Portbereich gilt für beide Wege: auch eine Instanz hinter einem Proxy braucht einen Port auf dem Host,

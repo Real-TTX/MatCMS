@@ -769,7 +769,7 @@ login same-site; it is not used by this flow.
   **Docker** (the images with the cleanup, fetched when the tab opens — `?handler=Images`, because for a node it is a
   round trip to its agent, jobs `images.list`/`images.prune`; an older agent answers "unknown job" and the tab says
   to update it), Proxy (`_ProxyFields`, automatic addresses + wildcard, a node's edge address), Einstellungen (ports,
-  "Dieser Host"'s name pattern; a node's name, token, revoke, delete) and a node's Aufträge. Image versions come from
+  "Dieser Host"'s name pattern and NAME; a node's name, token, revoke, delete) and a node's Aufträge. Image versions come from
   `HostImagesService` for every host: the `matcms.version` label both Dockerfiles bake in, else the release tag GHCR
   has under the image's digest (`GhcrClient.ResolveDigestsAsync`, newest 30 releases, cached per digest), else what a
   container on it reports; "lokal gebaut" when no digest names a registry host. The old `Hosting/Docker` redirects
@@ -950,7 +950,7 @@ Design and increments: `docs/hosting-platform.md`. Increments 1–4 are built:
   `--node-agent` mode (`Program.cs` leaves before the web app is built, like `--self-update`): no DB, only
   the engine, its daemon and an OUTBOUND long poll to `POST /api/nodes/{id}/heartbeat` (`X-MatCMS-Node-Token`,
   SHA-256 stored, shown once). The protocol is cloud-internal (`NodeProtocol`, not `MatCMS.Shared`) — instances
-  never see it, `CloudProtocol.Version` does not move. "Dieser Host" is **virtual** (`Instance.NodeId` null); a
+  never see it, `CloudProtocol.Version` does not move. "Dieser Host" is **virtual** (`Instance.NodeId` null; its NAME is the setting `hosting.localName`, shown everywhere through `HostLabels` with the badge "Dieser Host" behind it — never write `T["nodes.thisHost"]` for a host name again; unique against the node names); a
   site found in a node's inventory is `InstanceHosting.Node` — kept apart from `Local` so everything that talks
   to the cloud's OWN daemon (removal, bulk/auto update, the `localhost:<port>` preview guess) cannot silently
   hit another machine. Callers keep one shape: `HostingActionsService`, `ProxyService`, `HostingService` call

@@ -10,7 +10,6 @@
     var memUsed = d.Hosts.Sum(h => h.Mem);
     var memTotal = d.Hosts.Where(h => h.MemTotal is not null).Sum(h => h.MemTotal!.Value);
     var updates = Model.Candidates.Count + Model.OutdatedAgents.Count + (Model.CloudUpdateAvailable ? 1 : 0);
-    string HostName(HostingOverviewService.HostRow h) => h.NodeId is null ? T["nodes.thisHost"] : h.Name;
 }
 <partial name="_HostingTabs" model='"overview"' />
 
@@ -56,7 +55,7 @@
                 {
                     <tr>
                         <td>
-                            <a asp-page="Nodes/Details" asp-route-id="@h.NodeId" class="nowrap"><strong>@HostName(h)</strong></a>
+                            <a asp-page="Nodes/Details" asp-route-id="@h.NodeId" class="nowrap"><strong>@Hosts.Html(h.NodeId, h.Name)</strong></a>
                             <div class="nowrap">
                                 @if (h.Revoked) { <span class="badge badge-err">@T["nodes.revoked"]</span> }
                                 else if (h.Online) { <span class="badge badge-on">@T["nodes.online"]</span> }
@@ -119,7 +118,7 @@
                     {
                         <tr>
                             <td><a asp-page="/Admin/Instances/Details" asp-route-id="@i.Id" asp-route-tab="hosting">@i.Name</a></td>
-                            <td>@(i.Node?.Name ?? T["nodes.thisHost"])</td>
+                            <td>@Hosts.Html(i.Node)</td>
                             <td class="mono muted">@(i.Version ?? "?")</td>
                         </tr>
                     }

@@ -55,6 +55,7 @@ public class NodeService
         var n = (name ?? "").Trim();
         if (n.Length == 0) return (null, null, "Bitte einen Namen angeben.");
         if (await _db.Nodes.AnyAsync(x => x.Name == n, ct)) return (null, null, $"Ein Node „{n}“ gibt es schon.");
+        if (IsLocalName(n)) return (null, null, $"„{n}“ heißt schon dieser Host.");
         var token = NewToken();
         var node = new Node { PublicId = NewPublicId(), Name = n, TokenHash = InstanceService.HashToken(token) };
         _db.Nodes.Add(node);
@@ -92,6 +93,26 @@ public class NodeService
         await _db.SaveChangesAsync(ct);
     }
 
+    /// <summary>The operator's name for the cloud's own host, or null ("Dieser Host"). See <see cref="HostLabels"/>.</summary>
+    public static string? LocalName(CloudContext cloud) =>
+        cloud.Get(SettingKeys.HostingLocalName)?.Trim() is { Length: > 0 } v ? v : null;
+
+    /// <summary>This cloud's <see cref="LocalName(CloudContext)"/>.</summary>
+    public string? LocalHostName => LocalName(_cloud);
+
+    private bool IsLocalName(string n) => string.Equals(LocalName(_cloud), n, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Names the cloud's own host (empty = back to "Dieser Host"). Unique among the hosts — a move's log and
+    /// every host list would otherwise show two hosts of the same name.</summary>
+    public async Task<string?> SetLocalNameAsync(string? name, CancellationToken ct = default)
+    {
+        var n = (name ?? "").Trim();
+        if (n.Length > 80) return "Der Name ist zu lang (höchstens 80 Zeichen).";
+        if (n.Length > 0 && await _db.Nodes.AnyAsync(x => x.Name == n, ct)) return $"Ein Node „{n}“ gibt es schon.";
+        await _cloud.SaveAsync(new Dictionary<string, string?> { [SettingKeys.HostingLocalName] = n });
+        return null;
+    }
+
     /// <summary>Partial update (null = keep), for UI, API and MCP alike. The Matcad key is encrypted and never
     /// read back.</summary>
     public sealed record NodeInput(string? Name = null, int? PortFrom = null, int? PortTo = null,
@@ -106,6 +127,7 @@ public class NodeService
             var n = b.Name.Trim();
             if (n.Length == 0) return "Der Name darf nicht leer sein.";
             if (await _db.Nodes.AnyAsync(x => x.Id != node.Id && x.Name == n, ct)) return $"Ein Node „{n}“ gibt es schon.";
+            if (IsLocalName(n)) return $"„{n}“ heißt schon dieser Host.";
             node.Name = n;
         }
         if (b.PortFrom is { } f) node.PortFrom = Math.Clamp(f, 1, 65535);

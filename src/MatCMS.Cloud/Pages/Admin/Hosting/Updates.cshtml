@@ -39,7 +39,7 @@ else
                         <tr>
                             <td><input type="checkbox" name="ids" value="@i.PublicId" checked data-check-item aria-label="@i.Name" /></td>
                             <td><a asp-page="/Admin/Instances/Details" asp-route-id="@i.Id" asp-route-tab="hosting">@i.Name</a></td>
-                            <td>@(i.Node?.Name ?? T["nodes.thisHost"])</td>
+                            <td>@Hosts.Html(i.Node)</td>
                             <td class="mono muted">@(i.Version ?? "?")</td>
                             <td class="muted">→</td>
                             <td class="mono">@Model.LatestVersion</td>

@@ -131,7 +131,7 @@ public class ShopBlockPagesTests : IClassFixture<AppFactory>, IAsyncLifetime
     public async Task Every_role_has_a_page_with_a_starting_layout_that_is_not_served_at_its_own_address()
     {
         var pages = await Db(db => db.Pages.Include(p => p.Blocks).AsNoTracking().Where(p => p.OwnerPlugin == "shop").ToListAsync());
-        Assert.Equal(new[] { "account", "cart", "catalog", "categories", "checkout", "order", "product", "tags" }, pages.Where(p => p.Locale == "de").Select(p => p.PluginRole!).OrderBy(x => x).ToArray());
+        Assert.Equal(new[] { "account", "brand", "brands", "cart", "catalog", "categories", "checkout", "order", "product", "tags" }, pages.Where(p => p.Locale == "de").Select(p => p.PluginRole!).OrderBy(x => x).ToArray());
         Assert.All(pages, p => { Assert.Equal("_shop-" + p.PluginRole, p.Slug); Assert.True(p.IsPublished); Assert.False(p.ShowInNav); Assert.True(p.Blocks.Count >= 3, p.PluginRole); });
         Assert.Equal(pages.Select(p => p.PluginRole).Distinct().Count(), pages.Select(p => p.TranslationGroup).Distinct().Count());   // one translation group per role
 

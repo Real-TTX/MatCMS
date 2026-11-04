@@ -69,7 +69,8 @@ PUT /api/v1/shop/products/ESP-1000
 ```
 
 Weitere Felder: `summary`, `description_html`, `weight_g`, `kind` (`physical`/`digital`), `image` (Adresse), `gallery` (Liste),
-`tags` (Liste oder Text), `categories` (weitere Kategorien), `featured`, `slug` (nur beim Anlegen).
+`tags` (Liste oder Text), `categories` (weitere Kategorien), `brand` (Marke – Adresse oder Name; eine neue Marke wird angelegt, `""` nimmt sie weg),
+`featured`, `slug` (nur beim Anlegen).
 
 Ein **neues** Produkt braucht `title` und einen Preis. Varianten werden über ihre eigene SKU gefunden. Eine Variante hat entweder
 `price_cents` (ihr Endpreis) oder `price_delta_cents` (Aufpreis). Mit `"variants_replace": true` werden Varianten, die nicht mehr in der Liste stehen,

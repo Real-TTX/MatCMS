@@ -60,7 +60,7 @@ internal static class ShopExport
     }
 
     public static readonly string[] ProductColumns =
-        { "slug", "title", "summary", "description", "price", "compare", "tax", "sku", "category", "extra_categories", "tags", "stock", "weight", "active", "featured", "kind", "image", "gallery", "seo_title", "seo_description", "pickup_only" };
+        { "slug", "title", "summary", "description", "price", "compare", "tax", "sku", "category", "extra_categories", "tags", "stock", "weight", "active", "featured", "kind", "image", "gallery", "seo_title", "seo_description", "pickup_only", "brand" };
 
     public static async Task<byte[]> ProductsAsync(ShopStore store, Format f, CancellationToken ct)
     {
@@ -72,7 +72,7 @@ internal static class ShopExport
             {
                 Text(p.Slug, f), Text(p.Title, f), Text(p.Summary, f), Text(p.DescriptionHtml, f), Money(p.PriceCents, f), p.CompareCents > 0 ? Money(p.CompareCents, f) : "", Percent(p.TaxBp, f), Text(p.Sku, f),
                 Text(p.Category, f), Text(p.ExtraCategories.Replace(",", "|"), f), Text(string.Join("|", ShopTags.Split(p.Tags)), f), p.TrackStock ? Number(p.Stock) : "", Number(p.WeightGrams), Yes(p.Active), Yes(p.Featured), Text(p.Kind, f),
-                Text(p.Image, f), Text(gallery, f), Text(p.SeoTitle, f), Text(p.SeoDescription, f), Yes(p.PickupOnly)
+                Text(p.Image, f), Text(gallery, f), Text(p.SeoTitle, f), Text(p.SeoDescription, f), Yes(p.PickupOnly), Text(p.Brand, f)
             });
         }
         return Document(rows, f);
@@ -81,7 +81,7 @@ internal static class ShopExport
     /// <summary>The empty form for an import: the header the importer knows and one example row, so nobody has to guess the columns.</summary>
     public static byte[] TemplateBytes(Format f)
     {
-        var example = new[] { "tasse-blau", "Tasse „Blau“", "Handgemacht, spülmaschinenfest", "<p>Steinzeug, 300 ml.</p>", Money(1990, f), Money(2490, f), Percent(1900, f), "TASSE-B", "Geschirr", "Küche|Geschenke", "neu|handgemacht", "25", "420", "1", "0", "physical", "", "", "Blaue Tasse aus Steinzeug", "Handgemachte Tasse, 300 ml, spülmaschinenfest." };
+        var example = new[] { "tasse-blau", "Tasse „Blau“", "Handgemacht, spülmaschinenfest", "<p>Steinzeug, 300 ml.</p>", Money(1990, f), Money(2490, f), Percent(1900, f), "TASSE-B", "Geschirr", "Küche|Geschenke", "neu|handgemacht", "25", "420", "1", "0", "physical", "", "", "Blaue Tasse aus Steinzeug", "Handgemachte Tasse, 300 ml, spülmaschinenfest.", "0", "Töpferei Blau" };
         return Document(new[] { ProductColumns.Select(c => c), example.Select((c, i) => i is 5 or 4 or 6 or 11 or 12 or 13 or 14 ? c : Text(c, f)) }, f);
     }
 
@@ -114,7 +114,8 @@ internal static class ShopExport
         ["tags"] = "tags", ["schlagwörter"] = "tags", ["schlagworte"] = "tags", ["stock"] = "stock", ["bestand"] = "stock", ["weight"] = "weight", ["gewicht"] = "weight",
         ["active"] = "active", ["aktiv"] = "active", ["featured"] = "featured", ["hervorgehoben"] = "featured", ["kind"] = "kind", ["art"] = "kind", ["image"] = "image", ["bild"] = "image",
         ["gallery"] = "gallery", ["galerie"] = "gallery", ["seo_title"] = "seo_title", ["meta-titel"] = "seo_title", ["seo_description"] = "seo_description", ["meta-beschreibung"] = "seo_description",
-        ["pickup_only"] = "pickup_only", ["nur abholung"] = "pickup_only", ["abholung"] = "pickup_only"
+        ["pickup_only"] = "pickup_only", ["nur abholung"] = "pickup_only", ["abholung"] = "pickup_only",
+        ["brand"] = "brand", ["marke"] = "brand", ["hersteller"] = "brand", ["vendor"] = "brand", ["manufacturer"] = "brand"
     };
 
     private static readonly Dictionary<string, string> VariantAliases = new(StringComparer.OrdinalIgnoreCase)
@@ -191,6 +192,14 @@ internal static class ShopExport
                 if (Has("seo_title")) p = p with { SeoTitle = Cell("seo_title").Length > 120 ? Cell("seo_title")[..120] : Cell("seo_title") };
                 if (Has("seo_description")) p = p with { SeoDescription = Cell("seo_description").Length > 320 ? Cell("seo_description")[..320] : Cell("seo_description") };
                 if (Has("category") && Cell("category").Length > 0) p = p with { Category = await CategoryFor(Cell("category"), r + 1) };
+                // A brand by its address or name; one that does not exist yet is made (in a dry run only named). An empty cell takes the brand off.
+                if (Has("brand"))
+                {
+                    var bt = Cell("brand");
+                    if (bt.Length == 0) p = p with { Brand = "" };
+                    else if (await store.ResolveBrandAsync(bt, !dryRun, ct) is { } br) p = p with { Brand = br.Slug };
+                    else p = p with { Brand = MatCMS.Pages.Admin.Pages.IndexModel.Slugify(bt) };
+                }
                 if (Has("extra_categories")) p = p with { ExtraCategories = string.Join(",", (await Task.WhenAll(Cell("extra_categories").Split('|', StringSplitOptions.RemoveEmptyEntries).Select(x => CategoryFor(x.Trim(), r + 1)))).Where(x => x.Length > 0 && x != p.Category).Distinct()) };
 
                 if (problem is not null) { lines.Add(new(r + 1, subject, "übersprungen: " + problem, false)); skipped++; continue; }

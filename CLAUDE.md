@@ -347,6 +347,9 @@ A built-in plugin (off until switched on), written against the plugin API and no
 - **"Nur Abholung"**: a product flag `pickup_only` and a rate flag `pickup`; a cart with such a product gets ONLY pickup rates (`ShopOrders.ShippingOptions`), `Pick` preselects
   a delivery over a free pickup, and collected goods are taxed in the home country (`ShopOrders.TaxCountry` — checkout and `PlaceAsync` re-run the tax/coupon chain once when the
   chosen rate is a pickup). See docs/shop-plugin.md "Collection only".
+- **Brands ("Marken")**: a table `brands` (logo, picture, short text, details shown ONLY on the brand's page, website, SEO) and `products.brand` (slug); `/shop/brands` and
+  `/shop/brands/{slug}` (block pages `brands`/`brand`, JSON-LD `Brand` + breadcrumbs, sitemap), `?brand=` filter, block `shop_brands` (logo wall / cards / carousel), menu element,
+  CSV/ERP/ops by NAME through `ShopStore.ResolveBrandAsync`. An attribute "Marke" is taken over by one button (Shop → Marken). See docs/shop-plugin.md "Brands".
 - **Downloads** are private files streamed by `ShopDownloads.ServeAsync`: paid order, the order's secret key (or the owner, or the admin), a download row that is not revoked or
   expired, a count that is taken atomically.
 - Texts: `ShopStrings.All` (key, German, English in one row); a test checks that every key used in the code has both.

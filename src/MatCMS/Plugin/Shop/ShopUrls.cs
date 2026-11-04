@@ -10,8 +10,12 @@ internal static class ShopUrls
     public const string Root = "/shop";
     public const string CategoriesPage = "/shop/categories";
     public const string TagsPage = "/shop/tags";
+    public const string BrandsPage = "/shop/brands";
 
     public static string Category(string slug) => "/shop/categories/" + Uri.EscapeDataString(slug);
+
+    /// <summary>A brand's own page.</summary>
+    public static string Brand(string slug) => "/shop/brands/" + Uri.EscapeDataString(slug);
 
     public static string Product(string slug) => "/shop/" + Uri.EscapeDataString(slug);
 

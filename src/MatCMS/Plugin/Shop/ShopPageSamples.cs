@@ -19,6 +19,10 @@ internal static class ShopPageSamples
             case "catalog": return ShopUrls.Root;
             case "categories": return ShopUrls.CategoriesPage;
             case "tags": return ShopUrls.TagsPage;
+            case "brands": return ShopUrls.BrandsPage;
+            case "brand":
+                var b = (await store.BrandsAsync(true, ct)).FirstOrDefault();
+                return b is null ? null : ShopUrls.Brand(b.Slug);
             case "cart": return "/shop/cart";
             case "product":
                 var p = (await store.FindProductsAsync(new ProductQuery { Take = 1, FeaturedOnly = false }, ct)).Items.FirstOrDefault();
@@ -39,6 +43,8 @@ internal static class ShopPageSamples
             "catalog" => await ShopPublic.CatalogViewAsync(ctx, ct),
             "categories" => await ShopPublic.CategoriesViewAsync(ctx, ct),
             "tags" => await ShopPublic.TagsViewAsync(ctx, ct),
+            "brands" => await ShopBrands.BrandsViewAsync(ctx, ct),
+            "brand" => (await store.BrandsAsync(true, ct)).FirstOrDefault() is { } br ? await ShopBrands.BrandViewAsync(ctx, store, br, ct) : null,
             "product" => (await store.FindProductsAsync(new ProductQuery { Take = 1 }, ct)).Items.FirstOrDefault() is { } p ? await ShopPublic.ProductViewAsync(ctx, cfg, store, p, ct) : null,
             _ => null
         };

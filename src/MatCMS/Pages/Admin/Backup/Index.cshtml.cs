@@ -11,8 +11,10 @@ namespace MatCMS.Pages.Admin.Backup;
 // browser keeps streaming until done and only then sees the reject, which looks like an endless
 // restore. Razor Pages ignores these filter attributes on handler METHODS, so they must sit on the
 // PageModel CLASS (applies to all handlers of this page; only Import ever receives large bodies).
-[RequestSizeLimit(200L * 1024 * 1024)]
-[RequestFormLimits(MultipartBodyLengthLimit = 200L * 1024 * 1024)]
+// 1 GB like the cloud's backup store: at 200 MB a shop with every product picture (Topas: 227 MB) wrote a
+// backup its own import then refused.
+[RequestSizeLimit(1024L * 1024 * 1024)]
+[RequestFormLimits(MultipartBodyLengthLimit = 1024L * 1024 * 1024)]
 public class IndexModel : PageModel
 {
     private readonly ContentTransferService _transfer;

@@ -102,6 +102,7 @@ internal static class ShopAdminCatalog
         string? error = null;
         var allCats = await store.CategoriesAsync(ct);
         var allAttrs = await store.AttributesAsync(ct);
+        var allBrands = await store.BrandsAsync(false, ct);
         var attrValues = id == 0 ? new Dictionary<long, List<string>>() : await store.ProductValuesAsync(id, ct);
 
         if (ctx.Request.IsPost)
@@ -215,6 +216,10 @@ internal static class ShopAdminCatalog
                 allCats.Count > 1 ? Ui.Text(ctx.T("shop.adm.extraCategories")) with { Strong = true } : null,
                 allCats.Count > 1 ? Ui.Muted(ctx.T("shop.adm.extraCategoriesHelp")) : null,
                 allCats.Count > 1 ? Ui.Grid(190, ShopCategories.Flatten(cats).Select(t => (UiNode?)Ui.Checkbox("xcat_" + t.Cat.Slug, ShopCategories.Label(cats, t.Cat), ShopMembership.SplitSlugs(product.ExtraCategories).Contains(t.Cat.Slug))).ToArray()) : null,
+                allBrands.Count > 0 || product.Brand.Length > 0
+                    ? (UiNode)(Ui.Select("brand", ctx.T("shop.brand"), product.Brand, new[] { Ui.Option("", "—") }.Concat(allBrands.Select(x => Ui.Option(x.Slug, x.Active ? x.Name : x.Name + " (" + ctx.T("shop.adm.inactive") + ")"))).ToArray())
+                        with { Help = ctx.T("shop.adm.brandFieldHelp") })
+                    : Ui.Muted(ctx.T("shop.adm.brandNone")),
                 Ui.Tags("tags", ctx.T("shop.adm.tags"), ShopTags.Normalise(product.Tags), knownTags) with { Help = ctx.T("shop.adm.tagsHelp") },
                 Ui.Input("slug", ctx.T("shop.adm.slug"), product.Slug) with { Help = ctx.T("shop.adm.slugHelp") },
                 Ui.Input("sku", ctx.T("shop.adm.sku"), product.Sku)),
@@ -290,7 +295,7 @@ internal static class ShopAdminCatalog
         {
             Title = f.F("title").Trim(), Summary = f.F("summary").Trim(), DescriptionHtml = SafeHtml.Sanitize(f.F("description")), Image = ShopPublic.SafeUrl(f.F("image")),
             GalleryJson = CleanGallery(f.F("gallery")), Kind = kind, PriceCents = Math.Max(0, price), CompareCents = Math.Max(0, compare), TaxBp = bp, Sku = f.F("sku").Trim(), Category = f.F("category").Trim(),
-            Tags = ShopTags.Normalise(f.F("tags")), Featured = f.Form.ContainsKey("featured"),
+            Tags = ShopTags.Normalise(f.F("tags")), Featured = f.Form.ContainsKey("featured"), Brand = f.Form.ContainsKey("brand") ? MatCMS.Pages.Admin.Pages.IndexModel.Slugify(f.F("brand")) : current.Brand,
             SeoTitle = Clip(f.F("seo_title").Trim(), 120), SeoDescription = Clip(f.F("seo_description").Trim(), 320),
             TrackStock = f.Form.ContainsKey("track_stock"), PickupOnly = kind != ProductKind.Digital && f.Form.ContainsKey("pickup_only"),
             Stock = Num("stock"), WeightGrams = kind == ProductKind.Digital ? 0 : (int)Math.Min(Num("weight"), int.MaxValue), MaxPerOrder = (int)Math.Min(Num("max"), 100000), Sort = (int)Math.Min(Num("sort"), 100000),

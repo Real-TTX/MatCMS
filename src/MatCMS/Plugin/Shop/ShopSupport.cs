@@ -137,7 +137,7 @@ internal static class ShopHtml
         .shop-subcat .shop-muted{position:absolute;top:10px;right:10px;min-width:24px;padding:2px 9px;border-radius:99px;background:rgba(255,255,255,.92);color:#2a1b12;font-size:.8em;font-weight:600;text-align:center;opacity:1}
         """;
 
-    private const string BaseCss = CardCss + TileCss + """
+    private const string BaseCss = CardCss + TileCss + ShopBrands.BrandCss + """
         .shop-nav{display:flex;gap:18px;flex-wrap:wrap;align-items:center;margin-bottom:24px;padding-bottom:12px;border-bottom:1px solid var(--shop-line,var(--line,rgba(0,0,0,.12)))}
         .shop-nav .spacer{flex:1}body[data-els~="shop.cart"] .shop-nav{display:none}
         .shop-filter{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}.shop-filter input,.shop-filter select{padding:10px 12px;border:1px solid rgba(0,0,0,.25);border-radius:8px;font:inherit;background:transparent;color:inherit}

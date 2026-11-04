@@ -18,6 +18,7 @@ internal static class ShopParts
     public const string ProductDefault = """
         <div class="shop-product{{#unless image_html}} single{{/unless}}"><div{{#unless image_html}} style="display:none"{{/unless}}>{{image_html}}</div><div>
         {{breadcrumbs_html}}
+        {{brand_html}}
         <h1>{{title}}</h1>
         {{#if summary}}<p class="shop-muted">{{summary}}</p>{{/if}}
         <p class="shop-price" style="font-size:1.5em">{{price_html}}</p>
@@ -71,6 +72,23 @@ internal static class ShopParts
         </div>
         """;
 
+    /// <summary>The page of all brands (/shop/brands).</summary>
+    public const string BrandsDefault = """
+        {{crumbs_html}}
+        <h1>{{title}}</h1>
+        {{grid_html}}
+        """;
+
+    /// <summary>A brand's page (/shop/brands/{slug}): logo, name, short text and website, the picture, the details (shown only here) and the brand's products.</summary>
+    public const string BrandDefault = """
+        {{crumbs_html}}
+        {{head_html}}
+        {{image_html}}
+        {{details_html}}
+        {{#if products_heading}}<h2>{{products_heading}}</h2>{{/if}}
+        {{products_html}}{{pager_html}}{{more_html}}
+        """;
+
     /// <summary>The page of all keywords (/shop/tags).</summary>
     public const string TagsDefault = """
         {{crumbs_html}}
@@ -94,6 +112,20 @@ internal static class ShopParts
         {
             Help = "shop.part.tagsHelp",
             Placeholders = new[] { P("title"), P("total"), P("crumbs_html", true), P("tags_html", true) }
+        });
+        b.TemplatePart(new TemplatePartSpec("brands", "shop.part.brands", BrandsDefault)
+        {
+            Help = "shop.part.brandsHelp",
+            Placeholders = new[] { P("title"), P("total"), P("crumbs_html", true), P("grid_html", true) }
+        });
+        b.TemplatePart(new TemplatePartSpec("brand", "shop.part.brand", BrandDefault)
+        {
+            Help = "shop.part.brandHelp",
+            Placeholders = new[]
+            {
+                P("title"), P("name"), P("summary"), P("url"), P("logo_url"), P("image_url"), P("website"), P("total"), P("products_heading"), P("crumbs_html", true), P("head_html", true),
+                P("logo_html", true), P("image_html", true), P("website_html", true), P("details_html", true), P("products_html", true), P("pager_html", true), P("more_html", true)
+            }
         });
         b.TemplatePart(new TemplatePartSpec("account", "shop.part.account", AccountDefault)
         {
@@ -119,7 +151,7 @@ internal static class ShopParts
             Help = "shop.part.productHelp",
             Placeholders = new[]
             {
-                P("title"), P("summary"), P("sku"), P("category"), P("category_url"), P("image_url"), P("image_html", true), P("price"), P("price_old"), P("save_percent"), P("price_html", true), P("tax_note"),
+                P("title"), P("summary"), P("sku"), P("category"), P("category_url"), P("brand"), P("brand_url"), P("brand_logo_url"), P("brand_html", true), P("image_url"), P("image_html", true), P("price"), P("price_old"), P("save_percent"), P("price_html", true), P("tax_note"),
                 P("breadcrumbs_html", true), P("notice_html", true), P("form_html", true), P("sold_out"), P("digital"), P("digital_note"), P("pickup_only"), P("pickup_note"), P("tags_html", true), P("description_html", true),
                 P("description_label"), P("related_html", true), P("attributes_html", true)
             }

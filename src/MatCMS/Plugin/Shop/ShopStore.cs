@@ -26,13 +26,16 @@ internal sealed partial class ShopStore
             .Json("gallery", def: "[]").Text("kind", def: "physical").Int("price_cents", def: "0").Int("tax_bp", def: "1900").Text("sku")
             .Bool("track_stock", def: "0").Int("stock", def: "0").Int("weight_g", def: "0").Text("category").Int("max_per_order", def: "0")
             .Bool("active", def: "1").Int("sort", def: "0").Timestamp("created").Timestamp("updated").Text("tags").Bool("featured", def: "0").Int("compare_cents", def: "0").Json("var_options", def: "[]")
-            .Text("seo_title").Text("seo_description").Text("cats_extra").Text("gtin").Bool("pickup_only", def: "0")
-            .UniqueIndex("slug").Index("active", "sort").Index("category").Index("sku"));
+            .Text("seo_title").Text("seo_description").Text("cats_extra").Text("gtin").Bool("pickup_only", def: "0").Text("brand", def: "")
+            .UniqueIndex("slug").Index("active", "sort").Index("category").Index("sku").Index("brand"));
         d.Table("variants", t => t.Int("product_id", required: true, def: "0").Text("name", required: true, def: "").Text("sku").Int("price_delta", def: "0")
             .Bool("track_stock", def: "0").Int("stock", def: "0").Bool("active", def: "1").Int("sort", def: "0").Text("image").Text("gtin").Index("product_id").Index("sku"));
         d.Table("product_files", t => t.Int("product_id", required: true, def: "0").Text("file_name", required: true, def: "").Text("storage_name", required: true, def: "")
             .Int("size", def: "0").Int("sort", def: "0").Index("product_id"));
         d.Table("categories", t => t.Text("slug", required: true, def: "").Text("name", required: true, def: "").Int("sort", def: "0").Int("parent_id", def: "0").Text("image", def: "").Text("description", def: "").Text("tags", def: "").Text("rule", def: "").UniqueIndex("slug"));
+        // Brands (manufacturers): a page of their own, a gallery; a product names its brand by slug.
+        d.Table("brands", t => t.Text("slug", required: true, def: "").Text("name", required: true, def: "").Text("logo").Text("image").Text("summary").Text("details")
+            .Text("website").Text("seo_title").Text("seo_description").Bool("featured", def: "0").Bool("active", def: "1").Int("sort", def: "0").Timestamp("updated").UniqueIndex("slug"));
         d.Table("attributes", t => t.Text("slug", required: true, def: "").Text("name", required: true, def: "").Text("kind", def: "choice").Text("options").Text("unit")
             .Bool("filterable", def: "1").Text("category").Int("sort", def: "0").UniqueIndex("slug"));
         d.Table("product_attrs", t => t.Int("product_id", required: true, def: "0").Int("attr_id", required: true, def: "0").Text("value", def: "").Index("product_id").Index("attr_id"));
@@ -94,7 +97,7 @@ internal sealed partial class ShopStore
         ExtraCategories = r.Text("cats_extra"), SeoTitle = r.Text("seo_title"), SeoDescription = r.Text("seo_description"),
         GalleryJson = r.Text("gallery") is { Length: > 0 } g ? g : "[]", VariantOptions = r.Text("var_options") is { Length: > 0 } vo ? vo : "[]", Kind = ProductKind.Normalise(r.Text("kind")),
         PriceCents = r.Int("price_cents"), TaxBp = (int)r.Int("tax_bp"), Sku = r.Text("sku"), Gtin = r.Text("gtin"), TrackStock = r.Bool("track_stock"), Stock = r.Int("stock"),
-        WeightGrams = (int)r.Int("weight_g"), Category = r.Text("category"), Tags = r.Text("tags"), Featured = r.Bool("featured"), CompareCents = r.Int("compare_cents"), MaxPerOrder = (int)r.Int("max_per_order"), PickupOnly = r.Bool("pickup_only"), Active = r.Bool("active"), Sort = (int)r.Int("sort"),
+        WeightGrams = (int)r.Int("weight_g"), Category = r.Text("category"), Tags = r.Text("tags"), Featured = r.Bool("featured"), CompareCents = r.Int("compare_cents"), MaxPerOrder = (int)r.Int("max_per_order"), PickupOnly = r.Bool("pickup_only"), Brand = r.Text("brand"), Active = r.Bool("active"), Sort = (int)r.Int("sort"),
         CreatedUtc = r.Timestamp("created") ?? DateTime.UtcNow, UpdatedUtc = r.Timestamp("updated") ?? DateTime.UtcNow
     };
 
@@ -103,7 +106,7 @@ internal sealed partial class ShopStore
         ["slug"] = p.Slug, ["title"] = p.Title, ["summary"] = p.Summary, ["description"] = p.DescriptionHtml, ["image"] = p.Image, ["gallery"] = p.GalleryJson, ["var_options"] = p.VariantOptions,
         ["cats_extra"] = p.ExtraCategories, ["seo_title"] = p.SeoTitle, ["seo_description"] = p.SeoDescription,
         ["kind"] = p.Kind, ["price_cents"] = p.PriceCents, ["tax_bp"] = p.TaxBp, ["sku"] = p.Sku, ["gtin"] = p.Gtin, ["track_stock"] = p.TrackStock, ["stock"] = p.Stock,
-        ["weight_g"] = p.WeightGrams, ["category"] = p.Category, ["tags"] = ShopTags.Normalise(p.Tags), ["featured"] = p.Featured, ["compare_cents"] = Math.Max(0, p.CompareCents), ["max_per_order"] = p.MaxPerOrder, ["pickup_only"] = p.PickupOnly, ["active"] = p.Active, ["sort"] = p.Sort, ["updated"] = DateTime.UtcNow
+        ["weight_g"] = p.WeightGrams, ["category"] = p.Category, ["tags"] = ShopTags.Normalise(p.Tags), ["featured"] = p.Featured, ["compare_cents"] = Math.Max(0, p.CompareCents), ["max_per_order"] = p.MaxPerOrder, ["pickup_only"] = p.PickupOnly, ["brand"] = p.Brand, ["active"] = p.Active, ["sort"] = p.Sort, ["updated"] = DateTime.UtcNow
     };
 
     public async Task<Product?> ProductAsync(long id, CancellationToken ct = default) =>
@@ -144,6 +147,7 @@ internal sealed partial class ShopStore
         if (pq.MinCents is { } minC) q = q.Where("price_cents", DataOp.Ge, minC);
         if (pq.MaxCents is { } maxC) q = q.Where("price_cents", DataOp.Le, maxC);
         if (pq.Ids is { } ids) q = q.Where("id", DataOp.In, ids.ToList());
+        if (pq.Brands is { Count: > 0 } brands) q = q.Where("brand", DataOp.In, brands.ToList());
         // A category means itself AND everything below it — and a product belongs to it by its main category, by a further one it was put into, or by the rule of an automatic collection. That is
         // decided in memory (below), after the database has filtered and ordered the rest.
         HashSet<string>? memberSlugs = null; List<Category> ruleCats = new();

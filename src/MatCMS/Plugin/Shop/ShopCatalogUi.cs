@@ -7,16 +7,19 @@ namespace MatCMS.Plugin.Shop;
 
 /// <summary>What the catalogue page was asked for: the category, keyword, search words, sort order, the attribute filters and the price range. Every link and every hidden field of the page's
 /// forms is built from it, so a filter that is switched on is carried through the other controls and one that is switched off disappears from the address.</summary>
-internal sealed record CatalogState(string Cat, string Tag, string Q, string Sort, IReadOnlyList<AttributeFilter> Filters, long? PriceMin, long? PriceMax)
+internal sealed record CatalogState(string Cat, string Tag, string Q, string Sort, IReadOnlyList<AttributeFilter> Filters, long? PriceMin, long? PriceMax, IReadOnlyList<string>? Brands = null)
 {
+    /// <summary>The brands filtered by (slugs, any of them; <c>?brand=a,b</c>).</summary>
+    public IReadOnlyList<string> BrandList => Brands ?? Array.Empty<string>();
     public string Action => Cat.Length > 0 ? ShopUrls.Category(Cat) : ShopUrls.Root;
     public bool HasPrice => PriceMin is not null || PriceMax is not null;
-    public bool Filtered => Cat.Length > 0 || Tag.Length > 0 || Q.Length > 0 || Filters.Count > 0 || HasPrice;
+    public bool Filtered => Cat.Length > 0 || Tag.Length > 0 || Q.Length > 0 || Filters.Count > 0 || HasPrice || BrandList.Count > 0;
 
     /// <summary>The attribute filters (except <paramref name="withoutAttr"/>) and the price as address pairs.</summary>
-    public List<KeyValuePair<string, string>> Extra(long? withoutAttr = null, bool attrs = true, bool price = true)
+    public List<KeyValuePair<string, string>> Extra(long? withoutAttr = null, bool attrs = true, bool price = true, bool brand = true)
     {
         var l = attrs ? ShopAttributes.ToQuery(Filters.Where(f => f.Attr.Id != withoutAttr).ToList()) : new List<KeyValuePair<string, string>>();
+        if (brand && BrandList.Count > 0) l.Insert(0, new("brand", string.Join(",", BrandList)));
         if (price) l.AddRange(ShopCatalogUi.PricePairs(PriceMin, PriceMax));
         return l;
     }
@@ -25,15 +28,23 @@ internal sealed record CatalogState(string Cat, string Tag, string Q, string Sor
     public string Url(string? tag = null, string? q = null, string? sort = null, IEnumerable<KeyValuePair<string, string>>? extra = null) =>
         ShopUrls.Catalog(Cat, tag ?? Tag, q ?? Q, sort ?? Sort, 1, extra ?? Extra());
 
+    /// <summary>The other filters plus the brands <paramref name="brands"/> instead of the ones set now (none = the brand filter is off).</summary>
+    public List<KeyValuePair<string, string>> WithBrands(IReadOnlyCollection<string> brands)
+    {
+        var l = Extra(brand: false);
+        if (brands.Count > 0) l.Insert(0, new("brand", string.Join(",", brands)));
+        return l;
+    }
+
     /// <summary>The state as hidden fields for a form that changes one part of it.</summary>
-    public string Hidden(bool q = true, bool tag = true, bool sort = true, long? withoutAttr = null, bool attrs = true, bool price = true)
+    public string Hidden(bool q = true, bool tag = true, bool sort = true, long? withoutAttr = null, bool attrs = true, bool price = true, bool brand = true)
     {
         var sb = new StringBuilder();
         void Add(string name, string value) => sb.Append($"<input type=\"hidden\" name=\"{E(name)}\" value=\"{E(value)}\">");
         if (q && Q.Length > 0) Add("q", Q);
         if (tag && Tag.Length > 0) Add("tag", Tag);
         if (sort && Sort.Length > 0) Add("sort", Sort);
-        foreach (var kv in Extra(withoutAttr, attrs, price)) Add(kv.Key, kv.Value);
+        foreach (var kv in Extra(withoutAttr, attrs, price, brand)) Add(kv.Key, kv.Value);
         return sb.ToString();
     }
 }
@@ -67,6 +78,21 @@ internal static class ShopCatalogUi
     {
         if (min is { } a) yield return new("price.min", Euros(a));
         if (max is { } b) yield return new("price.max", Euros(b));
+    }
+
+    /// <summary>The brands as a filter group: each one that has something on this page, as a box that switches it on and off (with how many products it has).</summary>
+    public static string BrandGroup(IPluginContext ctx, CatalogState s, IReadOnlyList<Brand> brands, IReadOnlyDictionary<string, int> counts)
+    {
+        var offered = brands.Where(b => counts.ContainsKey(b.Slug) || s.BrandList.Contains(b.Slug)).ToList();
+        if (offered.Count == 0 || (offered.Count == 1 && s.BrandList.Count == 0)) return "";
+        var sb = new StringBuilder($"<details class=\"shop-fgroup\" open><summary>{E(ctx.T("shop.brand"))}</summary><div class=\"opts\">");
+        foreach (var b in offered.OrderBy(b => b.Name, StringComparer.CurrentCultureIgnoreCase))
+        {
+            var on = s.BrandList.Contains(b.Slug);
+            var next = on ? s.BrandList.Where(x => x != b.Slug).ToList() : s.BrandList.Append(b.Slug).ToList();
+            sb.Append($"<a href=\"{E(s.Url(extra: s.WithBrands(next)))}\" class=\"{(on ? "on" : "")}\" rel=\"nofollow\"><i class=\"box\" aria-hidden=\"true\"></i>{E(b.Name)} <span>{Intl(counts.GetValueOrDefault(b.Slug))}</span></a>");
+        }
+        return sb.Append("</div></details>").ToString();
     }
 
     // ---- the controls ----------------------------------------------------------------------------------------
@@ -123,7 +149,7 @@ internal static class ShopCatalogUi
     }
 
     /// <summary>The filters: the price range, then each attribute that has something to pick — its values as boxes that switch them on and off (with how many products have them), or a from–to for a number.</summary>
-    public static string Filters(IPluginContext ctx, ShopConfig cfg, CatalogState s, IReadOnlyList<ShopAttribute> attrs, IReadOnlyDictionary<long, AttributeFacet> facets, (long Lo, long Hi)? priceExtent)
+    public static string Filters(IPluginContext ctx, ShopConfig cfg, CatalogState s, IReadOnlyList<ShopAttribute> attrs, IReadOnlyDictionary<long, AttributeFacet> facets, (long Lo, long Hi)? priceExtent, string brandGroup = "")
     {
         var sb = new StringBuilder();
         if (priceExtent is { } pe && (pe.Lo != pe.Hi || s.HasPrice))
@@ -133,6 +159,7 @@ internal static class ShopCatalogUi
             sb.Append($"<span aria-hidden=\"true\">–</span><input type=\"number\" inputmode=\"decimal\" step=\"any\" min=\"0\" name=\"price.max\" value=\"{(s.PriceMax is { } b ? Euros(b) : "")}\" placeholder=\"{E(PricePlaceholder(ctx, pe.Hi))}\" aria-label=\"{E(ctx.T("shop.price"))} {E(ctx.T("shop.attrTo"))}\">");
             sb.Append($"<span class=\"cur\">{E(cfg.Currency)}</span><button class=\"shop-btn ghost\" type=\"submit\">{E(ctx.T("shop.attrApply"))}</button></form></details>");
         }
+        sb.Append(brandGroup);
         foreach (var a in attrs)
         {
             if (!facets.TryGetValue(a.Id, out var fc)) continue;
@@ -161,14 +188,16 @@ internal static class ShopCatalogUi
             sb.Append("</div></details>");
         }
         if (sb.Length == 0) return "";
-        var reset = s.Filters.Count > 0 ? $"<a class=\"clear\" href=\"{E(s.Url(extra: s.Extra(attrs: false)))}\" rel=\"nofollow\">{E(ctx.T("shop.attrFilterReset"))}</a>" : "";
+        var reset = s.Filters.Count > 0 || s.BrandList.Count > 0 ? $"<a class=\"clear\" href=\"{E(s.Url(extra: s.Extra(attrs: false, brand: false)))}\" rel=\"nofollow\">{E(ctx.T("shop.attrFilterReset"))}</a>" : "";
         return $"<div class=\"shop-filters\">{sb}{reset}</div>";
     }
 
     /// <summary>What is switched on — the search words, the keyword, each attribute value and the price range — as chips, each with its own × that takes just that one off, and one link that clears all.</summary>
-    public static string Active(IPluginContext ctx, ShopConfig cfg, CatalogState s)
+    public static string Active(IPluginContext ctx, ShopConfig cfg, CatalogState s, IReadOnlyDictionary<string, string>? brandNames = null)
     {
         var chips = new List<(string Label, string Url)>();
+        foreach (var b in s.BrandList)
+            chips.Add((ctx.T("shop.chip.brand", brandNames?.GetValueOrDefault(b) ?? b), s.Url(extra: s.WithBrands(s.BrandList.Where(x => x != b).ToList()))));
         if (s.Q.Length > 0) chips.Add((ctx.T("shop.chip.search", s.Q), s.Url(q: "")));
         if (s.Tag.Length > 0) chips.Add((ctx.T("shop.chip.tag", s.Tag), s.Url(tag: "")));
         string N(double d) => d.ToString("0.##", CultureInfo.InvariantCulture);

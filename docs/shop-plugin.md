@@ -460,3 +460,31 @@ What `docs/shop-vs-shopify.md` listed as missing, built and tested; the rules th
 - **What the customer sees:** a "Nur Abholung" badge on cards (`badges_html`, `pickup_only`) and cart lines, a notice inside the product's `form_html` (always shown, whatever
   the template), "· Nur Abholung" instead of "zzgl. Versand" in `tax_note`, product-page variables `pickup_only`/`pickup_note`, and a line in the cart and checkout.
   No pickup rate set up → the checkout refuses with that reason, and the dashboard's attention list says how many products cannot be ordered.
+
+## Brands ("Marken")
+
+- **A brand is a record of its own** (`brands`: slug, name, logo, header picture, short text `summary`, details `details` (sanitised HTML), the manufacturer's website, SEO title and
+  description, active, featured, sort) and **a product names ONE brand by slug** (`products.brand`, indexed). The slug is fixed once the brand exists; deleting a brand takes it off its
+  products (they stay). Store: `ShopStoreBrands.cs`; `ResolveBrandAsync(text, create)` finds a brand by slug or name (any case) and is what the CSV import (column `brand` /
+  "Marke" / "Hersteller"), the ERP API (`brand`) and the assistant's ops use — an ERP or a spreadsheet knows the manufacturer's NAME, never our slug.
+- **Back office:** Shop → Marken (`ShopAdminBrands`): list with logo, products, status; the form (name, short text, details, website, logo, header picture, SEO, visible, highlighted,
+  order). The product form has a "Marke" drop-down. **Take-over:** a shop that kept the brand as an attribute (slug or name "marke", "brand", "hersteller" …) gets a button that
+  makes a brand of every value (options AND what products hold), gives every product without a brand the one its attribute names, and switches the attribute's filter off — the brand
+  filter replaces it, the attribute and its values stay. An address from before (`/shop?a.marke=Kronos` in a menu, a link, a search result) is answered with a
+  permanent redirect to `?brand=…` once that attribute is no longer a filter.
+- **Public:** `/shop/brands` (all active brands as cards — logo, name, short text, product count) and `/shop/brands/{slug}` (head with logo, name, short text and website, header
+  picture, **the details — shown only here**, the brand's products with paging, "filter the shop by it" = `/shop?brand=slug`). Both are block-editor pages (roles `brands`, `brand`)
+  and template parts (`shop-brands.html`, `shop-brand.html`). A hidden brand has no page (404; an admin sees it with a note and `noindex`).
+- **SEO:** the brand page has its own title (`{name} – Produkte und Infos | {site}` unless an SEO title is set) and description, share tags, and JSON-LD `@graph` with `Brand`
+  (name, url, logo, image, description, `sameAs` = website) and `BreadcrumbList`; the brands page is an `ItemList`; every product's `Product` JSON-LD names its `brand` (and its
+  `gtin`). Brand pages are in the sitemap.
+- **Product page:** variables `brand`, `brand_url`, `brand_logo_url`, `brand_html` (logo link "Mehr von …", above the title in the default part and the starting layout) — and, so
+  a page laid out BEFORE brands existed shows it too, the brand is the first row of `attributes_html` (linked); an attribute that held the brand is not shown a second time.
+- **Catalogue:** `?brand=a,b` (any of them) filters, the filter column has a "Marke" group (counted over the page without filters, like the attributes) and the chip "Marke: …";
+  `CatalogState.Brands` carries it through every other control, `ProductQuery.Brands` is the database filter.
+- **Block `shop_brands`** ("Shop-Marken"): all / highlighted / hand-picked (in the picked order); logo wall, cards with short text, or carousel; columns, name, product count, frame,
+  grey-until-hover, limit, "all brands" link. Each brand links to its page; a brand without a logo shows its name in the logo's place. Also a menu element `shop.brands` (dropdown)
+  and the link-picker group "Shop – Marken".
+- **Operations** (assistant, cloud/MCP): `brand.list`, `brand.save` (create or change, found by slug or name; undo `brand.restore`/`brand.remove`), and `brand` in
+  `product.create`/`product.update`.
+- Not yet: translations of a brand's texts (they show in the main language everywhere), the brand on the product card.

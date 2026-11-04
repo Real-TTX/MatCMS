@@ -34,12 +34,18 @@ internal static class ShopPageLayouts
         },
         "categories" => new[] { Section(Slot("categories.crumbs_html"), Heading("{{categories.title}}"), Slot("categories.tags_html"), Slot("categories.tiles_html")) },
         "tags" => new[] { Section(Slot("tags.crumbs_html"), Heading("{{tags.title}}"), Slot("tags.tags_html")) },
+        "brands" => new[] { Section(Slot("brands.crumbs_html"), Heading("{{brands.title}}"), Slot("brands.grid_html")) },
+        "brand" => new[]
+        {
+            Section(Slot("brand.crumbs_html"), Slot("brand.head_html"), Slot("brand.image_html"), Slot("brand.details_html"),
+                Heading("{{brand.products_heading}}", "h2", "brand.products_heading"), Slot("brand.products_html"), Slot("brand.pager_html"), Slot("brand.more_html"))
+        },
         "product" => new[]
         {
             Section(Slot("product.breadcrumbs_html"),
                 Columns("50-50",
                     Column(Slot("product.image_html")),
-                    Column(Heading("{{product.title}}"), Text("<p>{{product.summary}}</p>", "product.summary"), Slot("product.price_html"), Text("<p><small>{{product.tax_note}}</small></p>"),
+                    Column(Slot("product.brand_html"), Heading("{{product.title}}"), Text("<p>{{product.summary}}</p>", "product.summary"), Slot("product.price_html"), Text("<p><small>{{product.tax_note}}</small></p>"),
                         Slot("product.notice_html"), Slot("product.form_html"), Text("<p><small>{{product.digital_note}}</small></p>", "product.digital_note"),
                         Slot("product.tags_html"), Slot("product.attributes_html"))),
                 Heading("{{product.description_label}}", "h2", "product.description_html"), Slot("product.description_html"), Slot("product.related_html"))

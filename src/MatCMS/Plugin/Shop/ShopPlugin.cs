@@ -40,6 +40,8 @@ public sealed class ShopPlugin : IPlugin
         b.Route("/shop/tags", ShopPublic.TagsPageAsync, get);
         b.Route("/shop/suggest", ShopSuggest.SuggestAsync, get);
         b.Route("/shop/categories/{slug}", ShopPublic.CatalogAsync, get);
+        // Brands: the page of all of them, a brand's own page, the gallery block, a menu element and link targets.
+        ShopBrands.Register(b);
         b.Route("/shop/cart", ShopPublic.CartAsync, form);
         b.Route("/shop/checkout", ShopPublic.CheckoutAsync, form);
         b.Route("/shop/order/{number}", ShopPublic.OrderAsync, form);
@@ -71,6 +73,8 @@ public sealed class ShopPlugin : IPlugin
             .Page("products/{id}", null, ShopAdminCatalog.ProductAsync)
             .Page("categories", "shop.tab.categories", ShopAdminCatalog.CategoriesAsync)
             .Page("categories/{id}", null, ShopAdminCatalog.CategoryAsync)
+            .Page("brands", "shop.tab.brands", ShopAdminBrands.BrandsAsync)
+            .Page("brands/{id}", null, ShopAdminBrands.BrandAsync)
             .Page("attributes", "shop.tab.attributes", ShopAdminAttributes.AttributesAsync)
             .Page("attributes/{id}", null, ShopAdminAttributes.AttributeAsync)
             .Page("coupons", "shop.tab.coupons", ShopAdminCoupons.CouponsAsync)
@@ -90,6 +94,7 @@ public sealed class ShopPlugin : IPlugin
             .Link("shop.tab.orders", "orders", "ti-receipt", badge: true)
             .Link("shop.tab.products", "products", "ti-package")
             .Link("shop.tab.categories", "categories", "ti-category")
+            .Link("shop.tab.brands", "brands", "ti-award")
             .Link("shop.tab.attributes", "attributes", "ti-adjustments")
             .Link("shop.tab.customers", "customers", "ti-users")
             .Link("shop.tab.reports", "reports", "ti-chart-bar")
@@ -106,6 +111,10 @@ public sealed class ShopPlugin : IPlugin
         {
             var store = new ShopStore(ctx.Data);
             var list = new List<SitemapEntry> { new("/shop"), new("/shop/categories"), new("/shop/tags") };
+            // Brands: their page is the one a search for the brand should find (active brands, with or without products — the page has the brand's own text).
+            var brands = await store.BrandsAsync(true, ct);
+            if (brands.Count > 0) list.Add(new SitemapEntry(ShopUrls.BrandsPage));
+            list.AddRange(brands.Select(x => new SitemapEntry(ShopUrls.Brand(x.Slug), x.UpdatedUtc)));
             var (counts, _) = await store.FacetsAsync(ct);
             list.AddRange((await store.CategoriesAsync(ct)).Where(c => counts.ContainsKey(c.Slug)).Select(c => new SitemapEntry(ShopUrls.Category(c.Slug))));
             list.AddRange((await store.ProductsAsync(true, ct: ct)).Items.Select(p => new SitemapEntry(ShopUrls.Product(p.Slug), p.UpdatedUtc)));
@@ -114,6 +123,7 @@ public sealed class ShopPlugin : IPlugin
         b.MediaReferences(async (ctx, ct) =>
         {
             var urls = new List<string>();
+            foreach (var x in await new ShopStore(ctx.Data).BrandsAsync(false, ct)) urls.AddRange(new[] { x.Logo, x.Image }.Where(u => u.Length > 0));
             foreach (var p in (await new ShopStore(ctx.Data).ProductsAsync(false, ct: ct)).Items)
             {
                 if (p.Image.Length > 0) urls.Add(p.Image);
@@ -140,6 +150,10 @@ public sealed class ShopPlugin : IPlugin
         b.Operation(ShopAiOps.CategoryList, ShopAiOps.ListCategoriesAsync);
         b.Operation(ShopAiOps.CategoryCreate, ShopAiOps.CreateCategoryAsync);
         b.Operation(ShopAiOps.CategoryUpdate, ShopAiOps.UpdateCategoryAsync);
+        b.Operation(ShopAiOps.BrandList, ShopAiOps.ListBrandsAsync);
+        b.Operation(ShopAiOps.BrandSave, ShopAiOps.SaveBrandAsync);
+        b.Operation(ShopAiOps.BrandRestore, ShopAiOps.RestoreBrandAsync);
+        b.Operation(ShopAiOps.BrandRemove, ShopAiOps.RemoveBrandAsync);
         b.Operation(ShopAiOps.CouponCreate, ShopEvents.CreateCouponAsync);
         b.Operation(ShopAiOps.VariantSet, ShopOps.SetVariantsAsync);
         b.Operation(ShopAiOps.AttributeCreate, ShopOps.CreateAttributeAsync);

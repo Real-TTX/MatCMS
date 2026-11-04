@@ -183,7 +183,7 @@ public class MenuElementSiteTests : IClassFixture<AppFactory>, IAsyncLifetime
 
         var withElements = JsonNode.Parse(await admin.GetStringAsync("/admin/api/link-targets?elements=true"))!.AsArray();
         var els = withElements.First(g => g!["group"]!.GetValue<string>() == "Plugin-Elemente")!["items"]!.AsArray().Select(i => i!["url"]!.GetValue<string>()).ToArray();
-        Assert.Equal(new[] { "plugin:shop.account", "plugin:shop.cart", "plugin:shop.categories", "plugin:shop.search", "plugin:shop.shop", "plugin:shop.tags" }, els.OrderBy(x => x).ToArray());
+        Assert.Equal(new[] { "plugin:shop.account", "plugin:shop.brands", "plugin:shop.cart", "plugin:shop.categories", "plugin:shop.search", "plugin:shop.shop", "plugin:shop.tags" }, els.OrderBy(x => x).ToArray());
 
         // Admin only.
         var anon = await _app.Browser().GetAsync("/admin/api/link-targets");

@@ -78,6 +78,8 @@ internal sealed record Product
     public int MaxPerOrder { get; init; }
     /// <summary>Cannot be sent (too big, no box left): a cart holding it is offered only the shipping rates marked as pickup.</summary>
     public bool PickupOnly { get; init; }
+    /// <summary>The brand (manufacturer) by its slug (see <see cref="Brand"/>); empty = none.</summary>
+    public string Brand { get; init; } = "";
     public bool Active { get; init; } = true;
     public int Sort { get; init; }
     public DateTime CreatedUtc { get; init; } = DateTime.UtcNow;
@@ -123,6 +125,8 @@ internal sealed record ProductQuery
 {
     public bool ActiveOnly { get; init; } = true;
     public string? Category { get; init; }
+    /// <summary>When set, only products of these brands (slugs; any of them).</summary>
+    public IReadOnlyCollection<string>? Brands { get; init; }
     public string? Tag { get; init; }
     public string? Search { get; init; }
     /// <summary>What a search looks at: "title" (name, article number), "text" (+ summary, keywords) or "all" (+ description).</summary>
@@ -172,6 +176,35 @@ internal sealed record ProductFile
     public string StorageName { get; init; } = "";
     public long Size { get; init; }
     public int Sort { get; init; }
+}
+
+/// <summary>
+/// A brand (a manufacturer): its own page at <c>/shop/brands/{slug}</c> with logo, picture, a short text (what lists and the brand gallery show) and the details (only on its own page), its
+/// products, and what a search engine reads. A product names its brand by slug (<see cref="Product.Brand"/>), so the slug is fixed once the brand exists.
+/// </summary>
+internal sealed record Brand
+{
+    public long Id { get; init; }
+    public string Slug { get; init; } = "";
+    public string Name { get; init; } = "";
+    /// <summary>The logo (a local path or https address): the gallery, the brand's page, the product page.</summary>
+    public string Logo { get; init; } = "";
+    /// <summary>A large picture for the head of the brand's page; empty = none.</summary>
+    public string Image { get; init; } = "";
+    /// <summary>A short plain text: the brand gallery's cards, the page of all brands, the head of the brand's page.</summary>
+    public string Summary { get; init; } = "";
+    /// <summary>The details (sanitised HTML): history, philosophy, highlights — shown ONLY on the brand's own page.</summary>
+    public string DetailsHtml { get; init; } = "";
+    /// <summary>The manufacturer's own website (https), linked from its page and named to search engines.</summary>
+    public string Website { get; init; } = "";
+    public string SeoTitle { get; init; } = "";
+    public string SeoDescription { get; init; } = "";
+    /// <summary>Shown first, and where a gallery asks for the highlighted brands.</summary>
+    public bool Featured { get; init; }
+    /// <summary>Off: no page, not in lists — its products keep the brand and are still sold.</summary>
+    public bool Active { get; init; } = true;
+    public int Sort { get; init; }
+    public DateTime UpdatedUtc { get; init; } = DateTime.UtcNow;
 }
 
 internal sealed record Category

@@ -1384,7 +1384,7 @@ html:has(> body.has-adminbar) { scrollbar-width: thin; scrollbar-gutter: stable;
 .mat-search button { border: 0; background: var(--accent); color: #fff; padding: 0 15px; cursor: pointer; display: inline-flex; align-items: center; }
 .mat-search button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 /* The suggestions under a shop search box (script in the shop plugin: ShopSuggest). The list sits in <body>, so a box that clips its content cannot cut it off; it follows the template's colours. */
-.shop-suggest { position: absolute; z-index: 1000; max-width: min(92vw, 440px); background: var(--bg, #fff); color: var(--text, inherit); border: 1px solid var(--line, rgba(0,0,0,.2)); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.14); overflow: hidden; padding: 4px; }
+.shop-suggest { position: fixed; z-index: 100000; max-width: min(92vw, 440px); overflow-y: auto; overscroll-behavior: contain; background: var(--bg, #fff); color: var(--text, inherit); border: 1px solid var(--line, rgba(0,0,0,.2)); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.14); padding: 4px; }
 .shop-suggest .shop-sg-item { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 8px; color: inherit; text-decoration: none; }
 .shop-suggest .shop-sg-item.on, .shop-suggest .shop-sg-item:hover { background: var(--bg-soft, rgba(0,0,0,.06)); }
 .shop-suggest .shop-sg-item img { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; flex: none; }

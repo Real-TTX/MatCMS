@@ -86,7 +86,7 @@ internal static class ShopSuggest
         var answer = new JsonObject { ["q"] = q, ["products"] = new JsonArray(), ["categories"] = new JsonArray(), ["didYouMean"] = null };
         if (q.Length < 2 || !cfg.ShowSearch) return Json(answer);
         var store = ShopStore.Public(ctx);
-        var found = (await store.FindProductsAsync(new ProductQuery { Search = q, SearchIn = cfg.SearchIn, Sort = "", Take = MaxProducts }, ct)).Items;
+        var found = (await store.FindProductsAsync(new ProductQuery { Search = q, SearchIn = cfg.SearchIn, SearchFields = cfg.SearchFields, Sort = "", Take = MaxProducts }, ct)).Items;
         var products = (JsonArray)answer["products"]!;
         foreach (var p in found)
             products.Add(new JsonObject { ["title"] = p.Title, ["url"] = ShopUrls.Product(p.Slug), ["image"] = ShopPublic.SafeUrl(p.Image), ["price"] = ShopPublic.M(ctx, cfg, p.PriceCents) });

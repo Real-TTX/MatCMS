@@ -163,9 +163,31 @@ internal sealed partial class ShopStore
         if (tagSel.Count > 0) q = q.Where("tags", DataOp.Contains, tagSel.OrderByDescending(t => t.Length).First());
         if (!string.IsNullOrWhiteSpace(pq.Search))
         {
-            var where = new List<DataFilter> { new("title", DataOp.Contains, pq.Search), new("sku", DataOp.Contains, pq.Search) };
-            if (pq.SearchIn != "title") { where.Add(new("summary", DataOp.Contains, pq.Search)); where.Add(new("tags", DataOp.Contains, pq.Search)); }
-            if (pq.SearchIn == "all") where.Add(new("description", DataOp.Contains, pq.Search));
+            // The name always; the rest as the operator ticked it. Category, brand and attribute are matched by their NAMES (a category means itself and everything
+            // below it), each turned into the products it holds — one more OR of the same query, never a second list to merge.
+            var s = pq.Search!;
+            var fields = pq.SearchFields ?? ShopSearchFields.Legacy(pq.SearchIn);
+            var where = new List<DataFilter> { new("title", DataOp.Contains, s) };
+            if (fields.Contains(ShopSearchFields.Sku)) { where.Add(new("sku", DataOp.Contains, s)); where.Add(new("gtin", DataOp.Contains, s)); }
+            if (fields.Contains(ShopSearchFields.Summary)) where.Add(new("summary", DataOp.Contains, s));
+            if (fields.Contains(ShopSearchFields.Tags)) where.Add(new("tags", DataOp.Contains, s));
+            if (fields.Contains(ShopSearchFields.Description)) where.Add(new("description", DataOp.Contains, s));
+            if (fields.Contains(ShopSearchFields.Category))
+            {
+                var allCats = await CategoriesAsync(ct);
+                var hit = allCats.Where(c => c.Name.Contains(s, StringComparison.CurrentCultureIgnoreCase)).SelectMany(c => ShopCategories.SlugsUnder(allCats, c.Slug)).Distinct().ToList();
+                if (hit.Count > 0) where.Add(new("category", DataOp.In, hit));
+            }
+            if (fields.Contains(ShopSearchFields.Brand))
+            {
+                var hit = (await BrandsAsync(true, ct)).Where(b => b.Name.Contains(s, StringComparison.CurrentCultureIgnoreCase)).Select(b => b.Slug).ToList();
+                if (hit.Count > 0) where.Add(new("brand", DataOp.In, hit));
+            }
+            if (fields.Contains(ShopSearchFields.Attributes))
+            {
+                var hit = (await T("product_attrs").QueryAsync(DataQuery.Everything.Where("value", DataOp.Contains, s).Page(0, 5000), ct)).Select(r => r.Int("product_id")).Distinct().ToList();
+                if (hit.Count > 0) where.Add(new("id", DataOp.In, hit));
+            }
             q = q.Either(where.ToArray());
         }
         q = pq.Sort switch

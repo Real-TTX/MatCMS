@@ -378,6 +378,18 @@ public static class UiRenderer
                     if (c.Checked) _sb.Append(" checked");
                     _sb.Append(" /> ").Append(E(c.Label)).Append("</label>");
                     FieldClose(c); break;
+                case UiCheckList cl:
+                    FieldOpen(cl, labelFor: false);
+                    _sb.Append("<div class=\"ui-checks\" role=\"group\" aria-label=\"").Append(E(cl.Label)).Append("\">");
+                    for (var i = 0; i < cl.Options.Count; i++)
+                    {
+                        _sb.Append("<label class=\"check\"><input type=\"checkbox\" value=\"true\" name=\"").Append(E(cl.Name + "~" + i.ToString(System.Globalization.CultureInfo.InvariantCulture))).Append('"');
+                        if (cl.Checked.Contains(cl.Options[i].Value)) _sb.Append(" checked");
+                        if (cl.Disabled) _sb.Append(" disabled");
+                        _sb.Append(" /> ").Append(E(cl.Options[i].Label)).Append("</label>");
+                    }
+                    _sb.Append("</div>");
+                    FieldClose(cl); break;
                 case UiFile file:
                     FieldOpen(file);
                     _sb.Append("<input type=\"file\"");

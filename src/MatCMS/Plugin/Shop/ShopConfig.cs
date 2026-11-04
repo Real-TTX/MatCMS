@@ -19,7 +19,8 @@ internal static class Keys
     public const string ShowCategories = "catalog.showCategories";
     public const string ShowTags = "catalog.showTags";
     public const string ShowFilters = "catalog.showFilters";
-    public const string SearchIn = "catalog.searchIn";
+    public const string SearchIn = "catalog.searchIn";          // the older single choice, read only while the new list was never saved
+    public const string SearchFields = "catalog.searchFields";
     public const string CatPageTags = "catpage.tags";
     public const string CatPageSubs = "catpage.subs";
     public const string CatPageDesc = "catpage.desc";
@@ -87,6 +88,8 @@ internal sealed record ShopConfig
     public bool ShowTags { get; init; } = true;
     public bool ShowFilters { get; init; } = true;
     public string SearchIn { get; init; } = "text";
+    /// <summary>What the shop's search looks at besides the name (<see cref="ShopSearchFields"/>).</summary>
+    public IReadOnlyCollection<string> SearchFields { get; init; } = ShopSearchFields.Parse(ShopSearchFields.Default);
     /// <summary>The page of all categories: the keyword links, the subcategories and the text in a card, the product counts.</summary>
     public bool CatPageTags { get; init; } = true;
     public bool CatPageSubs { get; init; } = true;
@@ -163,6 +166,9 @@ internal sealed record ShopConfig
             InvoiceFooter = s.Get(Keys.InvoiceFooter).Trim(), SellerLogo = ShopPublic.SafeUrl(s.Get(Keys.SellerLogo)),
             ShowSearch = s.GetBool(Keys.ShowSearch), ShowSort = s.GetBool(Keys.ShowSort), ShowCategories = s.GetBool(Keys.ShowCategories), ShowTags = s.GetBool(Keys.ShowTags), ShowFilters = s.GetBool(Keys.ShowFilters),
             SearchIn = s.Get(Keys.SearchIn) is "title" or "all" ? s.Get(Keys.SearchIn) : "text",
+            // A shop that chose "only the name" or "everything" in the older drop-down keeps that until the new list is saved with something else.
+            SearchFields = s.Get(Keys.SearchFields) == ShopSearchFields.Default && s.Get(Keys.SearchIn) is "title" or "all"
+                ? ShopSearchFields.Legacy(s.Get(Keys.SearchIn)) : ShopSearchFields.Parse(s.Get(Keys.SearchFields)),
             CatPageTags = s.GetBool(Keys.CatPageTags), CatPageSubs = s.GetBool(Keys.CatPageSubs), CatPageDesc = s.GetBool(Keys.CatPageDesc), CatPageCounts = s.GetBool(Keys.CatPageCounts), InvoiceAccent = ShopInvoice.AccentOf(s.Get(Keys.InvoiceAccent)),
             Currency = Currencies.Normalise(s.Get(Keys.Currency)),
             Carrier = ShopTracking.Clean(s.Get(Keys.Carrier)), TrackingUrl = ShopTracking.ValidTemplate(s.Get(Keys.TrackingUrl).Trim()) ? s.Get(Keys.TrackingUrl).Trim() : "",
@@ -266,10 +272,10 @@ internal sealed record ShopConfig
         s.Add(new SettingSpec(Keys.RemindHours, "set.remindHours", SettingKind.Number) { Default = "24", Min = 1, Max = 168, Help = "set.remindHoursHelp" });
         s.Add(new SettingSpec(Keys.CustomCss, "set.customCss", SettingKind.TextArea) { Help = "set.customCssHelp" });
         s.Add(new SettingSpec(Keys.ShowSearch, "set.showSearch", SettingKind.Bool) { Group = "set.groupCatalog", Default = "true", Help = "set.showSearchHelp" });
-        s.Add(new SettingSpec(Keys.SearchIn, "set.searchIn", SettingKind.Choice)
+        s.Add(new SettingSpec(Keys.SearchFields, "set.searchFields", SettingKind.MultiChoice)
         {
-            Default = "text", Help = "set.searchInHelp",
-            Options = new[] { new FieldOption("title", "set.searchInTitle"), new FieldOption("text", "set.searchInText"), new FieldOption("all", "set.searchInAll") }
+            Default = ShopSearchFields.Default, Help = "set.searchFieldsHelp",
+            Options = ShopSearchFields.All.Select(f => new FieldOption(f, "set.sf." + f)).ToList()
         });
         s.Add(new SettingSpec(Keys.ShowSort, "set.showSort", SettingKind.Bool) { Default = "true" });
         s.Add(new SettingSpec(Keys.ShowCategories, "set.showCategories", SettingKind.Bool) { Default = "true", Help = "set.showCategoriesHelp" });

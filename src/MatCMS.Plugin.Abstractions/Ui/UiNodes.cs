@@ -353,6 +353,18 @@ public sealed record UiCheckbox(string Name, string Label) : UiField(Name, Label
     public bool Checked { get; init; }
 }
 
+/// <summary>Several switches under one label — any number of <see cref="Options"/> ticked. Each box posts <c>true</c> under <c>{Name}~{index}</c> (its position in
+/// <see cref="Options"/>), so read it by position and never take a posted value as one of yours.</summary>
+/// <param name="Name">Field name (the boxes are <c>{Name}~0</c>, <c>{Name}~1</c> …).</param>
+/// <param name="Label">The label above the boxes.</param>
+public sealed record UiCheckList(string Name, string Label) : UiField(Name, Label)
+{
+    /// <summary>The boxes, in order.</summary>
+    public IReadOnlyList<UiOption> Options { get; init; } = Array.Empty<UiOption>();
+    /// <summary>The values of the ticked boxes.</summary>
+    public IReadOnlyCollection<string> Checked { get; init; } = Array.Empty<string>();
+}
+
 /// <summary>A file chosen on the visitor's computer and posted with the form (the form must be <see cref="UiForm.Upload"/>). It arrives in
 /// <see cref="RequestData.Files"/>, not in <see cref="RequestData.Form"/>. For a private file (a product download) — a picture for the site
 /// belongs in <see cref="UiImage"/>, which uses the media library.</summary>

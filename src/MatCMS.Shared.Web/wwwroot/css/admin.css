@@ -794,6 +794,9 @@ table.data .btn { white-space: nowrap; }
 .form-grid { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr); }
 .form-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
 .check { display: flex; align-items: center; gap: 8px; }
+/* UiCheckList: several switches under one label, close together. */
+.ui-checks { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }
+.ui-checks .check { margin: 0; }
 
 /* Template gallery: each card shows a small live-styled preview instead of raw columns */
 .tpl-grid { display: grid; grid-template-columns: repeat(auto-fill, 256px); gap: 20px; }

@@ -355,6 +355,10 @@ A built-in plugin (off until switched on), written against the plugin API and no
   See docs/shop-plugin.md "Pictures".
 - **Catalogue filters**: `?tag=a,b` = ALL keywords (brands and attribute values stay ANY); `catalog.filterLimit` cuts every filter group to N entries with "Weitere …",
   whose dialog fetches `/shop/filters?group=…` (one group's entries, `CatalogViewAsync(group:)`) only when opened; `?more=group` is the no-script fallback.
+  What the search looks at is `catalog.searchFields` (`ShopSearchFields`: sku/GTIN, summary, description, tags, category, brand, attributes — the last three by NAME);
+  the name always.
+- **Plugin settings can be a multiple choice** (`SettingKind.MultiChoice`): drawn as the toolkit's `UiCheckList` (boxes post `{name}~{index}`, by POSITION), stored as
+  the declared values comma-separated — a posted value is never stored, so an option value may not hold a comma (`PluginBuilder` refuses it).
 - **Downloads** are private files streamed by `ShopDownloads.ServeAsync`: paid order, the order's secret key (or the owner, or the admin), a download row that is not revoked or
   expired, a count that is taken atomically.
 - Texts: `ShopStrings.All` (key, German, English in one row); a test checks that every key used in the code has both.

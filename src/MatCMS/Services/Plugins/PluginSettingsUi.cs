@@ -16,6 +16,15 @@ internal static class PluginSettingsUi
     public static string FieldName(string key) => "s_" + key;
     /// <summary>The name of the "remove the stored secret" box.</summary>
     public static string ClearName(string key) => "clear_" + key;
+    /// <summary>The name of one box of a multiple choice (by the option's position — a value may hold characters a field name should not).</summary>
+    public static string OptionName(string key, int index) => FieldName(key) + "~" + index.ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>The values of a stored multiple choice that are still options (in the declared order).</summary>
+    public static List<string> Chosen(SettingSpec s, string? value)
+    {
+        var have = (value ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return s.Options.Select(o => o.Value).Where(v => have.Contains(v, StringComparer.Ordinal)).ToList();
+    }
 
     private const int MaxText = 4000;
 
@@ -76,6 +85,8 @@ internal static class PluginSettingsUi
                 SettingKind.Image => new UiImage(name, L(s.Label)) { Value = value, Help = help },
                 SettingKind.Color => new UiInput(name, L(s.Label)) { Value = IsColor(value) ? value : (IsColor(s.Default) ? s.Default : "#000000"), Type = UiInputType.Color, Help = help },
                 SettingKind.Secret => new UiInput(name, L(s.Label)) { Type = UiInputType.Password, Help = help, Placeholder = stored.ContainsKey(s.Key) ? secretSet : null },
+                // The boxes post as {name}~{index} — OptionName below reads them the same way.
+                SettingKind.MultiChoice => new UiCheckList(name, L(s.Label)) { Help = help, Options = s.Options.Select(o => new UiOption(o.Value, L(o.Label))).ToList(), Checked = Chosen(s, value) },
                 _ => new UiInput(name, L(s.Label)) { Value = value, Help = help, Required = s.Required }
             };
             children.Add(field);
@@ -141,6 +152,10 @@ internal static class PluginSettingsUi
                     if (raw.Length > 0 && (raw.Length > 500 || raw.IndexOfAny(new[] { '\'', '"', '(', ')', '\\', '<', '>', ' ' }) >= 0 || !((raw.StartsWith('/') && !raw.StartsWith("//")) || raw.StartsWith("https://", StringComparison.OrdinalIgnoreCase))))
                         errors[s.Key] = t("plugins.settings.notImage");
                     else config[s.Key] = raw;
+                    break;
+                case SettingKind.MultiChoice:
+                    // Only declared values can be stored — the boxes post by position, never a value of their own.
+                    config[s.Key] = string.Join(",", s.Options.Where((o, i) => IsTrue(F(OptionName(s.Key, i)))).Select(o => o.Value));
                     break;
                 case SettingKind.Choice:
                     if (s.Options.All(o => o.Value != raw)) errors[s.Key] = t("plugins.settings.choice");

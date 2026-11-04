@@ -46,7 +46,7 @@ internal static partial class ShopPublic
         if (group is null && cat.Length == 0 && ctx.Request.Q("cat").Trim() is { Length: > 0 } old)
             return PageView.Done(PluginResult.RedirectPermanent(ShopUrls.Catalog(old, tag, q, sort, page)));
         var cats = await store.CategoriesAsync(ct);
-        var pq = new ProductQuery { Category = cat.Length > 0 ? cat : null, Tag = tag.Length > 0 ? tag : null, Search = q.Length > 0 ? q : null, SearchIn = cfg.SearchIn, Sort = sort };
+        var pq = new ProductQuery { Category = cat.Length > 0 ? cat : null, Tag = tag.Length > 0 ? tag : null, Search = q.Length > 0 ? q : null, SearchIn = cfg.SearchIn, SearchFields = cfg.SearchFields, Sort = sort };
         var (pMin, pMax) = cfg.ShowFilters ? ShopCatalogUi.ReadPrice(ctx.Request.Q) : ((long?)null, (long?)null);
 
         // Attribute filters (colour, size …) and the price range: the attributes this page may offer, what the address asks for, and — counted over what the page would show WITHOUT the filters — what is left to pick.

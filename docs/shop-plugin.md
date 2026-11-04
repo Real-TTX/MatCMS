@@ -511,3 +511,12 @@ What `docs/shop-vs-shopify.md` listed as missing, built and tested; the rules th
   keywords show the chosen entries and the busiest up to the limit (keywords: 14 while the limit is 0), the rest behind "Weitere … (n)". The dialog
   (`ShopCatalogUi.MoreScript`, `.shop-fdialog`) fetches `/shop/filters?group={brand|tag|a.slug}&cat=…&(the page's query)` only when it opens — every entry of that ONE
   group as `.opts` boxes — and narrows them as one types. Without script (or a failed fetch) the link is the page with `?more={group}`, that group in full.
+
+## What the search looks at
+
+- Einstellungen → Katalog und Suche → "Die Suche durchsucht außer dem Produktnamen" (`catalog.searchFields`, a `SettingKind.MultiChoice`): article number + GTIN,
+  summary, description, keywords, categories, brands, attributes (`ShopSearchFields`; default `sku,summary,tags,category,brand`). The name is always searched.
+  Category, brand and attribute match by their NAMES and become one more OR of the same query (`category IN` the matching categories and everything below them,
+  `brand IN` the matching brands, `id IN` the products with a matching attribute value). Catalogue and suggestions use the same choice.
+- The older single choice `catalog.searchIn` (title | text | all) is no longer offered; a shop that had "title" or "all" keeps that meaning while the new list was
+  never saved (`ShopConfig.From`).

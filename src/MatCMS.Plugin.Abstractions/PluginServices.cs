@@ -26,7 +26,10 @@ public enum SettingKind
     /// <summary>A picture chosen from the media library (or typed as an address): stored as a local path or an https address, empty = none.</summary>
     Image,
     /// <summary>A colour, stored as <c>#rrggbb</c>; <see cref="SettingSpec.Default"/> is what the picker starts with (a colour field cannot be empty).</summary>
-    Color
+    Color,
+    /// <summary>Any number of choices out of <see cref="SettingSpec.Options"/>, drawn as boxes; stored as the chosen values comma-separated in the declared order
+    /// ("" = none chosen). An option's value may not contain a comma.</summary>
+    MultiChoice
 }
 
 /// <summary>One declared setting.</summary>

@@ -141,6 +141,30 @@ internal static class ShopTags
     }
 }
 
+/// <summary>What the shop's search may look at besides the product's name (Einstellungen → Katalog und Suche → "Durchsuchen"). The operator ticks them.</summary>
+internal static class ShopSearchFields
+{
+    public const string Sku = "sku", Summary = "summary", Description = "description", Tags = "tags", Category = "category", Brand = "brand", Attributes = "attributes";
+    /// <summary>In the order the settings page lists them.</summary>
+    public static readonly string[] All = { Sku, Summary, Description, Tags, Category, Brand, Attributes };
+    public const string Default = "sku,summary,tags,category,brand";
+
+    /// <summary>The ticked fields of a stored value (unknown words dropped).</summary>
+    public static List<string> Parse(string? value)
+    {
+        var have = (value ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return All.Where(f => have.Contains(f, StringComparer.Ordinal)).ToList();
+    }
+
+    /// <summary>What the older single choice ("title" | "text" | "all") meant.</summary>
+    public static IReadOnlyCollection<string> Legacy(string? searchIn) => searchIn switch
+    {
+        "title" => new[] { Sku },
+        "all" => new[] { Sku, Summary, Description, Tags },
+        _ => new[] { Sku, Summary, Tags }
+    };
+}
+
 /// <summary>How a list of products is asked for: what to show, in which order, and which part of it.</summary>
 internal sealed record ProductQuery
 {
@@ -151,8 +175,11 @@ internal sealed record ProductQuery
     /// <summary>Keywords, comma-separated: a product must carry all of them (<see cref="ShopTags.Selection"/>).</summary>
     public string? Tag { get; init; }
     public string? Search { get; init; }
-    /// <summary>What a search looks at: "title" (name, article number), "text" (+ summary, keywords) or "all" (+ description).</summary>
+    /// <summary>What a search looks at: "title" (name, article number), "text" (+ summary, keywords) or "all" (+ description) — the older, coarse form;
+    /// <see cref="SearchFields"/> wins when set.</summary>
     public string SearchIn { get; init; } = "text";
+    /// <summary>What a search looks at besides the name (<see cref="ShopSearchFields"/>); null = what <see cref="SearchIn"/> says.</summary>
+    public IReadOnlyCollection<string>? SearchFields { get; init; }
     public bool FeaturedOnly { get; init; }
     /// <summary>Only products with a lower price than their earlier one.</summary>
     public bool OnSaleOnly { get; init; }

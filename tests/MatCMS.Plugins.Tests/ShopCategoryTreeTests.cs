@@ -198,12 +198,12 @@ public class ShopCategoryTreeTests : IClassFixture<AppFactory>, IAsyncLifetime
 
         var html = Decode(await v.GetStringAsync("/shop/categories/seite-oben"));
         Assert.Contains("<p class=\"shop-crumbs\"><a href=\"/shop\">Shop</a> › Seite Oben</p>", html);
-        Assert.Contains("class=\"shop-cathero\" style=\"background-image:url('/uploads/oben.png')\"", html);
+        Assert.Contains("class=\"shop-cathero\" style=\"background-image:url('/thumb/1920/oben.png');background-position:50% 50%\"", html);
         var raw = await v.GetStringAsync("/shop/categories/seite-oben");
         Assert.Contains("Alles &lt;b&gt;rund&lt;/b&gt; um oben.", raw);                                       // the text is text, never markup
         Assert.DoesNotContain("<b>rund</b>", raw);
         Assert.Contains("class=\"shop-subcat\" href=\"/shop/categories/seite-kind\"", html);
-        Assert.Contains("background-image:url('/uploads/kind.png')", html);
+        Assert.Contains("background-image:url('/thumb/640/kind.png')", html);
         Assert.Contains("Seite Kinderprodukt", html);                                                       // a product of the child is in the parent's list
         Assert.Contains("class=\"on\"", html.Substring(html.IndexOf("shop-catnav", StringComparison.Ordinal)));  // the top-level chip of this branch is lit
 
@@ -259,7 +259,7 @@ public class ShopCategoryTreeTests : IClassFixture<AppFactory>, IAsyncLifetime
 
         var tiles = await BlockAsync(v, "shop_categories", """{"by":"category","style":"tiles","counts":"yes","allLink":"no"}""");
         Assert.Contains("class=\"shop-subcat\" href=\"/shop/categories/blk-oben\"", tiles);
-        Assert.Contains("background-image:url('/uploads/b-oben.png')", tiles);
+        Assert.Contains("background-image:url('/thumb/640/b-oben.png')", tiles);
 
         var list = await BlockAsync(v, "shop_categories", """{"by":"category","style":"list","counts":"no","allLink":"no"}""");
         Assert.Contains("Blk Oben <span", list.Replace("Blk Oben ", "Blk Oben <span"));

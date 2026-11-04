@@ -120,13 +120,15 @@ internal static class ShopEvents
                 category = catSlug;
             }
         }
+        // A brand named by an agent ("Marke: Transrotor") is found by its name or address and made when it is new.
+        var brand = (o["brand"]?.GetValue<string>() ?? "").Trim() is { Length: > 0 } brandName ? (await store.ResolveBrandAsync(brandName, true, ct))?.Slug ?? "" : "";
         long compare = 0;
         if (o["compare_cents"] is JsonValue cc && cc.TryGetValue<long>(out var cmp) && cmp > 0) compare = cmp;
         else if (o["compare_price"] is { } cp && Money.TryParse(cp.ToString(), out var cmp2) && cmp2 > 0) compare = cmp2;
         var tags = o["tags"] is JsonArray ta ? string.Join(", ", ta.Select(x => x?.ToString() ?? "")) : o["tags"]?.ToString() ?? "";
         var newId = await store.SaveProductAsync(new Product
         {
-            Category = category, Tags = ShopTags.Normalise(tags), Featured = o["featured"] is JsonValue fv && fv.TryGetValue<bool>(out var feat) && feat,
+            Category = category, Brand = brand, Tags = ShopTags.Normalise(tags), Featured = o["featured"] is JsonValue fv && fv.TryGetValue<bool>(out var feat) && feat,
             Slug = slug, Title = title, Summary = (o["summary"]?.GetValue<string>() ?? "").Trim(), DescriptionHtml = SafeHtml.Sanitize(o["description_html"]?.GetValue<string>()),
             Kind = ProductKind.Normalise(o["kind"]?.GetValue<string>()), PriceCents = cents, CompareCents = compare > cents ? compare : 0, TaxBp = bp, Sku = o["sku"]?.GetValue<string>() ?? "",
             TrackStock = stock is not null, Stock = stock ?? 0, Active = o["publish"]?.GetValue<bool>() ?? true

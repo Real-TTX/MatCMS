@@ -10,7 +10,7 @@ namespace MatCMS.Plugin.Shop;
 internal static partial class ShopPublic
 {
     /// <summary>Words a product's address cannot be: they are the shop's own pages.</summary>
-    public static readonly string[] ReservedSlugs = { "categories", "tags", "cart", "checkout", "order", "download", "invoice", "webhook", "pay", "account", "suggest" };
+    public static readonly string[] ReservedSlugs = { "categories", "brands", "tags", "cart", "checkout", "order", "download", "invoice", "webhook", "pay", "account", "suggest", "filters" };
 
     internal static string M(IPluginContext ctx, ShopConfig cfg, long cents) => Money.Format(cents, cfg.Currency, ctx.Locale);
     private static string Csrf(IPluginContext ctx) => ctx.Antiforgery;
@@ -25,34 +25,68 @@ internal static partial class ShopPublic
     public static async Task<PluginResult> CatalogAsync(IPluginContext ctx, CancellationToken ct) => await ShopPageHost.RunAsync(ctx, "catalog", await CatalogViewAsync(ctx, ct), ct);
 
     /// <summary>What the catalogue says for the request: the values of its page and what it draws without a page of the editors'.</summary>
-    internal static async Task<PageView> CatalogViewAsync(IPluginContext ctx, CancellationToken ct)
+    /// <summary>/shop/filters?group=…&amp;(the catalogue's address) — every entry of ONE filter group, for the "Weitere …" dialog (fetched only when it opens).</summary>
+    public static async Task<PluginResult> FilterOptionsAsync(IPluginContext ctx, CancellationToken ct) =>
+        (await CatalogViewAsync(ctx, ct, ctx.Request.Q("group").Trim() is { Length: > 0 } g ? g : "-")).Early ?? PluginResult.NotFound();
+
+    /// <param name="group">Set by <see cref="FilterOptionsAsync"/>: answer with the entries of this filter group only (the category comes as <c>?cat=</c> then).</param>
+    internal static async Task<PageView> CatalogViewAsync(IPluginContext ctx, CancellationToken ct, string? group = null)
     {
         var cfg = ShopConfig.From(ctx.Settings);
         var store = ShopStore.Public(ctx);
-        var tag = ctx.Request.Q("tag").Trim(); var q = ctx.Request.Q("q").Trim();
+        // Several keywords at once: ?tag=Neuware,Röhre — a product must carry all of them.
+        var tag = string.Join(",", ShopTags.Selection(ctx.Request.Q("tag"))); var q = ctx.Request.Q("q").Trim();
+        // "Weitere …" without script: ?more={group} shows that group in full.
+        var more = ctx.Request.Q("more").Trim();
+        int LimitFor(string g) => g == more ? 0 : cfg.FilterLimit;
         var sort = ProductQuery.NormaliseSort(ctx.Request.Q("sort"));
         var page = int.TryParse(ctx.Request.Q("page"), out var pg) && pg > 0 ? pg : 1;
         // The category is part of the address (/shop/categories/{slug}); the old /shop?cat=… moved there for good.
-        var cat = ctx.Request.R("slug").Trim();
-        if (cat.Length == 0 && ctx.Request.Q("cat").Trim() is { Length: > 0 } old)
+        var cat = group is null ? ctx.Request.R("slug").Trim() : ctx.Request.Q("cat").Trim();
+        if (group is null && cat.Length == 0 && ctx.Request.Q("cat").Trim() is { Length: > 0 } old)
             return PageView.Done(PluginResult.RedirectPermanent(ShopUrls.Catalog(old, tag, q, sort, page)));
         var cats = await store.CategoriesAsync(ct);
-        var pq = new ProductQuery { Category = cat.Length > 0 ? cat : null, Tag = tag.Length > 0 ? tag : null, Search = q.Length > 0 ? q : null, SearchIn = cfg.SearchIn, Sort = sort };
+        var pq = new ProductQuery { Category = cat.Length > 0 ? cat : null, Tag = tag.Length > 0 ? tag : null, Search = q.Length > 0 ? q : null, SearchIn = cfg.SearchIn, SearchFields = cfg.SearchFields, Sort = sort };
         var (pMin, pMax) = cfg.ShowFilters ? ShopCatalogUi.ReadPrice(ctx.Request.Q) : ((long?)null, (long?)null);
 
         // Attribute filters (colour, size …) and the price range: the attributes this page may offer, what the address asks for, and — counted over what the page would show WITHOUT the filters — what is left to pick.
         var filterAttrs = cfg.ShowFilters ? (await store.AttributesAsync(ct)).Where(a => a.Filterable && ShopAttributes.AppliesTo(a, cats, cat)).ToList() : new List<ShopAttribute>();
         var filters = ShopAttributes.ReadFilters(filterAttrs, ctx.Request.Q);
-        var state = new CatalogState(cat, tag, q, sort, filters, pMin, pMax);
+        // The brands asked for (?brand=a,b — any of them); a slug that is not an active brand is ignored.
+        var brandsAll = await store.BrandsAsync(true, ct);
+        var brandSel = ctx.Request.Q("brand").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(s => brandsAll.Any(b => b.Slug == s)).Distinct().Take(20).ToList();
+        // An address from before the brands were taken over from an attribute (?a.marke=Kronos — in menus, links, search results) leads to the brand filter for good.
+        if (brandsAll.Count > 0 && ShopAdminBrands.BrandAttribute(await store.AttributesAsync(ct)) is { Filterable: false } oldAttr
+            && ctx.Request.Q("a." + oldAttr.Slug) is { Length: > 0 } oldValue)
+        {
+            var mapped = oldValue.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(v => brandsAll.FirstOrDefault(b => string.Equals(b.Name, v, StringComparison.OrdinalIgnoreCase))?.Slug).OfType<string>().Concat(brandSel).Distinct().ToList();
+            var keep = new List<KeyValuePair<string, string>>(ShopAttributes.ToQuery(filters));
+            if (mapped.Count > 0) keep.Insert(0, new("brand", string.Join(",", mapped)));
+            keep.AddRange(ShopCatalogUi.PricePairs(pMin, pMax));
+            return PageView.Done(PluginResult.RedirectPermanent(ShopUrls.Catalog(cat, tag, q, sort, page, keep)));
+        }
+        var state = new CatalogState(cat, tag, q, sort, filters, pMin, pMax, brandSel);
         var fx = state.Extra();
         var facets = new Dictionary<long, AttributeFacet>();
         IReadOnlyCollection<long>? only = null;
         (long Lo, long Hi)? priceExtent = null;
-        if (cfg.ShowFilters)
+        var brandGroup = "";
+        // The keywords the products of this page carry (with the selection applied, so each count says what is left with that keyword added), busiest first.
+        var tagCounts = new List<(string Tag, int Count)>();
+        var brandCounts = new Dictionary<string, int>();
+        if (cfg.ShowFilters || cfg.ShowTags)
         {
             var baseItems = (await store.FindProductsAsync(pq, ct)).Items;
-            if (baseItems.Count > 0) priceExtent = (baseItems.Min(p => p.PriceCents), baseItems.Max(p => p.PriceCents));
-            if (filterAttrs.Count > 0)
+            if (cfg.ShowTags)
+                tagCounts = baseItems.SelectMany(p => ShopTags.Split(p.Tags)).GroupBy(t => t, StringComparer.OrdinalIgnoreCase)
+                    .Select(g => (g.First(), g.Count())).OrderByDescending(x => x.Item2).ThenBy(x => x.Item1, StringComparer.OrdinalIgnoreCase).ToList();
+            if (cfg.ShowFilters && baseItems.Count > 0) priceExtent = (baseItems.Min(p => p.PriceCents), baseItems.Max(p => p.PriceCents));
+            brandCounts = baseItems.Where(p => p.Brand.Length > 0).GroupBy(p => p.Brand).ToDictionary(g => g.Key, g => g.Count());
+            if (cfg.ShowFilters && brandsAll.Count > 0)
+                brandGroup = ShopCatalogUi.BrandGroup(ctx, state, brandsAll, brandCounts, LimitFor(ShopCatalogUi.BrandKey));
+            if (cfg.ShowFilters && filterAttrs.Count > 0)
             {
                 var baseIds = baseItems.Select(p => p.Id).ToList();
                 var rows = await store.AttrRowsAsync(baseIds, filterAttrs.Select(a => a.Id).ToList(), ct);
@@ -60,8 +94,17 @@ internal static partial class ShopPublic
                 if (filters.Count > 0) only = ShopAttributes.Match(baseIds, filters, rows).ToList();
             }
         }
-        var (items, total) = await store.FindProductsAsync(pq with { Ids = only, MinCents = pMin, MaxCents = pMax, Skip = (page - 1) * cfg.PerPage, Take = cfg.PerPage }, ct);
-        var (catCounts, tags) = await store.FacetsAsync(ct);
+        if (group is not null)
+        {
+            // The dialog of one group: every entry, as the side column would draw it without a limit.
+            var entries = group == ShopCatalogUi.BrandKey && cfg.ShowFilters ? ShopCatalogUi.BrandEntries(state, brandsAll, brandCounts)
+                : group == ShopCatalogUi.TagKey && cfg.ShowTags ? ShopCatalogUi.TagEntries(state, tagCounts)
+                : filterAttrs.FirstOrDefault(a => ShopAttributes.Key(a) == group && a.Kind != AttributeKind.Number) is { } ga && facets.TryGetValue(ga.Id, out var gf) ? ShopCatalogUi.AttrEntries(ctx, state, ga, gf)
+                : null;
+            return PageView.Done(entries is null ? PluginResult.NotFound() : PluginResult.Fragment(ShopCatalogUi.AllBoxes(entries)));
+        }
+        var (items, total) = await store.FindProductsAsync(pq with { Ids = only, MinCents = pMin, MaxCents = pMax, Brands = brandSel.Count > 0 ? brandSel : null, Skip = (page - 1) * cfg.PerPage, Take = cfg.PerPage }, ct);
+        var (catCounts, _) = await store.FacetsAsync(ct);
         var variants = (await store.VariantsOfAsync(items.Select(p => p.Id), ct)).Where(v => v.Active).GroupBy(v => v.ProductId).ToDictionary(g => g.Key, g => g.ToList());
 
         // The page speaks of the category it shows, when there is one (also the title a search engine sees).
@@ -72,9 +115,9 @@ internal static partial class ShopPublic
         var title = current?.Name ?? (q.Length > 0 ? ctx.T("shop.resultsFor", q) : ctx.T("shop.title"));
         var search = ShopCatalogUi.Find(ctx, cfg, state);
         var sortHtml = ShopCatalogUi.Sort(ctx, cfg, state);
-        var activeHtml = ShopCatalogUi.Active(ctx, cfg, state);
+        var activeHtml = ShopCatalogUi.Active(ctx, cfg, state, brandsAll.ToDictionary(b => b.Slug, b => b.Name));
         var cats2 = ShopCatalogUi.CategoryNav(ctx, cfg, state, cats, catCounts, path);
-        var filtersHtml = cfg.ShowFilters ? ShopCatalogUi.Filters(ctx, cfg, state, filterAttrs, facets, priceExtent) : "";
+        var filtersHtml = cfg.ShowFilters ? ShopCatalogUi.Filters(ctx, cfg, state, filterAttrs, facets, priceExtent, brandGroup, LimitFor) : "";
         // On a category's page: where it sits, its picture and text, and its subcategories as tiles.
         var crumbsHtml = new StringBuilder();
         var subHtml = new StringBuilder();
@@ -84,27 +127,20 @@ internal static partial class ShopPublic
             crumbsHtml.Append($"<p class=\"shop-crumbs\"><a href=\"/shop\">{E(ctx.T("shop.title"))}</a>");
             foreach (var c in path) crumbsHtml.Append(c.Id == current.Id ? $" › {E(c.Name)}" : $" › <a href=\"{E(CatalogUrl(c.Slug, "", "", ""))}\">{E(c.Name)}</a>");
             crumbsHtml.Append("</p>");
-            if (ShopPublic.SafeUrl(current.Image) is { Length: > 0 } hero) imageHtml = $"<div class=\"shop-cathero\" style=\"background-image:url('{E(hero)}')\" role=\"img\" aria-label=\"{E(current.Name)}\"></div>";
+            if (ShopPublic.SafeUrl(current.Image).Length > 0) imageHtml = $"<div class=\"shop-cathero\"{ShopImages.Style(ctx, cfg, current.Image, ShopImages.Wide)} role=\"img\" aria-label=\"{E(current.Name)}\"></div>";
             var kids = ShopCategories.Children(cats, current.Id).Where(c => catCounts.ContainsKey(c.Slug)).ToList();
             if (kids.Count > 0)
             {
                 subHtml.Append("<div class=\"shop-subcats\">");
-                foreach (var c in kids) subHtml.Append(CategoryTile(c, catCounts.GetValueOrDefault(c.Slug), CatalogUrl(c.Slug, "", "", "")));
+                foreach (var c in kids) subHtml.Append(CategoryTile(ctx, cfg, c, catCounts.GetValueOrDefault(c.Slug), CatalogUrl(c.Slug, "", "", "")));
                 subHtml.Append("</div>");
             }
         }
-        var tags2 = new StringBuilder();
-        if (tags.Count > 0 && cfg.ShowTags)
-        {
-            tags2.Append($"<div class=\"shop-fgroup shop-tagsgroup\"><h3>{E(ctx.T("shop.tags"))}</h3><div class=\"shop-tags\" aria-label=\"{E(ctx.T("shop.tags"))}\">");
-            // The busiest keywords, and always the one being filtered by.
-            foreach (var t in tags.Where((x, i) => i < 14 || string.Equals(x.Tag, tag, StringComparison.OrdinalIgnoreCase)))
-            {
-                var on = string.Equals(t.Tag, tag, StringComparison.OrdinalIgnoreCase);
-                tags2.Append($"<a href=\"{E(CatalogUrl(cat, on ? "" : t.Tag, q, sort, 1, fx))}\" class=\"{(on ? "on" : "")}\">{E(t.Tag)}</a>");
-            }
-            tags2.Append("</div></div>");
-        }
+        // The keywords: the busiest (14, or the shop's filter limit) and the switched-on ones; the rest behind "Weitere …".
+        var tags2 = new StringBuilder(cfg.ShowTags ? ShopCatalogUi.TagGroup(ctx, state, tagCounts, more == ShopCatalogUi.TagKey ? 0 : cfg.FilterLimit > 0 ? cfg.FilterLimit : 14) : "");
+        // The dialog's script once, beside the first "Weitere …" (a template may leave either placeholder out).
+        if (tags2.ToString().Contains("shop-fmore", StringComparison.Ordinal)) tags2.Append(ShopCatalogUi.MoreScript);
+        else if (filtersHtml.Contains("shop-fmore", StringComparison.Ordinal)) filtersHtml += ShopCatalogUi.MoreScript;
         var filtered = state.Filtered;
         var count = $"<p class=\"shop-count\">{E(total == 1 ? ctx.T("shop.resultOne") : ctx.T("shop.resultMany", total))}</p>";
         var grid = new StringBuilder();
@@ -114,7 +150,7 @@ internal static partial class ShopPublic
             // "Meinten Sie …?": a word of the search that is nearly one of the shop's own (titles, keywords, categories).
             var dym = q.Length > 0 ? ShopSuggest.DidYouMean(q, await ShopSuggest.VocabularyAsync(store, ct)) : null;
             var dymHtml = dym is null ? "" : $"<p class=\"shop-dym\">{E(ctx.T("shop.sg.didYouMean"))} <a href=\"{E(ShopUrls.Catalog(cat, tag, dym, sort))}\"><strong>{E(dym)}</strong></a>?</p>";
-            grid.Append(filtered && (q.Length > 0 || tag.Length > 0 || filters.Count > 0 || state.HasPrice)
+            grid.Append(filtered && (q.Length > 0 || tag.Length > 0 || filters.Count > 0 || state.HasPrice || brandSel.Count > 0)
                 ? $"<div class=\"shop-nomatch\"><p>{E(ctx.T("shop.noMatch"))}</p>{dymHtml}<a class=\"shop-btn\" href=\"{E(ShopUrls.Catalog(cat, "", "", ""))}\" rel=\"nofollow\">{E(ctx.T("shop.resetFilter"))}</a></div>"
                 : $"<p class=\"shop-muted\">{E(filtered ? ctx.T("shop.noMatch") : ctx.T("shop.empty"))}</p>");
         }
@@ -240,7 +276,7 @@ internal static partial class ShopPublic
         var img = SafeUrl(c.Image);
         var sb = new StringBuilder("<article class=\"shop-catcard\">");
         sb.Append(img.Length > 0
-            ? $"<a class=\"img\" href=\"{url}\" style=\"background-image:url('{E(img)}')\" aria-label=\"{E(c.Name)}\"></a>"
+            ? $"<a class=\"img\" href=\"{url}\"{ShopImages.Style(ctx, cfg, c.Image, ShopImages.Card)} aria-label=\"{E(c.Name)}\"></a>"
             : $"<a class=\"img empty\" href=\"{url}\" aria-label=\"{E(c.Name)}\"><span>{E(c.Name.Length > 0 ? c.Name[..1].ToUpperInvariant() : "")}</span></a>");
         sb.Append($"<div class=\"body\"><h3><a href=\"{url}\">{E(c.Name)}</a></h3>");
         if (cfg.CatPageCounts) sb.Append($"<div class=\"count\">{E(ProductCount(ctx, count))}</div>");
@@ -256,20 +292,22 @@ internal static partial class ShopPublic
     }
 
     /// <summary>The attributes a product has, as a table for its page.</summary>
-    private static async Task<string> AttributesTableAsync(IPluginContext ctx, ShopStore store, Product p, CancellationToken ct)
+    private static async Task<string> AttributesTableAsync(IPluginContext ctx, ShopStore store, Product p, Brand? brand, CancellationToken ct)
     {
         var attrs = await store.AttributesAsync(ct);
         var values = await store.ProductValuesAsync(p.Id, ct);
-        var rows = attrs.Where(a => values.TryGetValue(a.Id, out var v) && v.Count > 0)
+        // With a brand, the brand is the first row (a link to its page), and an attribute that held the brand before ("Marke") is not shown a second time.
+        var brandAttr = brand is null ? null : ShopAdminBrands.BrandAttribute(attrs);
+        var rows = attrs.Where(a => a.Id != brandAttr?.Id && values.TryGetValue(a.Id, out var v) && v.Count > 0)
             .Select(a => $"<tr><th>{E(a.Name)}</th><td>{E(ShopAttributes.Show(a, values[a.Id], ctx.T("shop.attrYes"), ctx.Locale))}</td></tr>").ToList();
+        if (brand is not null) rows.Insert(0, $"<tr><th>{E(ctx.T("shop.brand"))}</th><td><a href=\"{E(ShopUrls.Brand(brand.Slug))}\">{E(brand.Name)}</a></td></tr>");
         return rows.Count == 0 ? "" : $"<h2 class=\"shop-attrh\">{E(ctx.T("shop.attributes"))}</h2><table class=\"shop-attrs\">{string.Concat(rows)}</table>";
     }
 
     /// <summary>A category as a tile: its picture (or a plain block), name and how many products it holds — the markup the catalogue and the category block share.</summary>
-    internal static string CategoryTile(Category c, int count, string url)
+    internal static string CategoryTile(IPluginContext ctx, ShopConfig cfg, Category c, int count, string url)
     {
-        var img = SafeUrl(c.Image);
-        return $"<a class=\"shop-subcat\" href=\"{E(url)}\"><span class=\"img\"{(img.Length > 0 ? $" style=\"background-image:url('{E(img)}')\"" : "")}></span><span class=\"name\">{E(c.Name)}</span><span class=\"shop-muted\">{Intl(count)}</span></a>";
+        return $"<a class=\"shop-subcat\" href=\"{E(url)}\"><span class=\"img\"{ShopImages.Style(ctx, cfg, c.Image, ShopImages.Card)}></span><span class=\"name\">{E(c.Name)}</span><span class=\"shop-muted\">{Intl(count)}</span></a>";
     }
 
     internal static bool SoldOut(Product p, IReadOnlyList<Variant> variants) =>
@@ -305,16 +343,23 @@ internal static partial class ShopPublic
         var tags = ShopTags.Split(p.Tags);
         return ctx.RenderPart("card", new Dictionary<string, string>
         {
-            ["url"] = url, ["title"] = p.Title, ["image_url"] = img, ["image_style"] = img.Length > 0 ? $" style=\"background-image:url('{E(img)}')\"" : "",
+            // image_url is the card-sized stored copy (a card never needs the original); image_original for a template that links to the picture itself.
+            ["url"] = url, ["title"] = p.Title, ["image_url"] = ShopImages.Url(ctx, img, ShopImages.Card), ["image_original"] = img, ["image_focus"] = img.Length > 0 ? ShopImages.Focus(ctx, cfg, img, p.ImageFocus) : "",
+            ["image_style"] = ShopImages.Style(ctx, cfg, p, ShopImages.Card),
             ["summary"] = v.Summary ? Trunc(p.Summary, 110) : "",
             ["summary_html"] = v.Summary && p.Summary.Length > 0 ? $"<div class=\"shop-muted shop-small\">{E(Trunc(p.Summary, 110))}</div>" : "",
             ["price"] = v.Price ? price : "", ["price_old"] = v.Price && p.OnSale && variants.Count == 0 ? M(ctx, cfg, p.CompareCents) : "", ["save_percent"] = p.OnSale && variants.Count == 0 ? Intl(p.SavePercent) : "",
             ["price_html"] = v.Price ? $"<div class=\"shop-price\">{E(price)}{WasHtml(ctx, cfg, p, variants)}</div>" : "",
             ["tags_html"] = v.Tags && tags.Count > 0 ? "<div class=\"shop-tags\">" + string.Concat(tags.Select(t => $"<a href=\"/shop?tag={E(Uri.EscapeDataString(t))}\">{E(t)}</a>")) + "</div>" : "",
-            ["badges_html"] = sold ? $"<div><span class=\"shop-badge bad\">{E(ctx.T("shop.soldOut"))}</span></div>" : p.IsDigital ? $"<div><span class=\"shop-badge\">{E(ctx.T("shop.digital"))}</span></div>" : "",
-            ["sold_out"] = sold ? "1" : "", ["digital"] = p.IsDigital ? "1" : "", ["on_sale"] = p.OnSale && variants.Count == 0 ? "1" : "", ["category"] = p.Category
+            ["badges_html"] = sold ? $"<div><span class=\"shop-badge bad\">{E(ctx.T("shop.soldOut"))}</span></div>" : p.IsDigital ? $"<div><span class=\"shop-badge\">{E(ctx.T("shop.digital"))}</span></div>"
+                : p.PickupOnly ? $"<div><span class=\"shop-badge pickup\">{E(ctx.T("shop.pickupOnly"))}</span></div>" : "",
+            ["sold_out"] = sold ? "1" : "", ["digital"] = p.IsDigital ? "1" : "", ["pickup_only"] = p.PickupOnly && !p.IsDigital ? "1" : "", ["on_sale"] = p.OnSale && variants.Count == 0 ? "1" : "", ["category"] = p.Category
         });
     }
+
+    /// <summary>The small picture of a cart or order line: a variant with its own picture shows it (with the picture's own focus), else the product's.</summary>
+    internal static string LineImage(IPluginContext ctx, ShopConfig cfg, Product p, Variant? v) =>
+        v?.Image is { Length: > 0 } vi ? ShopImages.Style(ctx, cfg, vi, ShopImages.Small) : ShopImages.Style(ctx, cfg, p, ShopImages.Small);
 
     private static string Trunc(string s, int n) => s.Length <= n ? s : s[..n].TrimEnd() + "…";
 
@@ -350,7 +395,7 @@ internal static partial class ShopPublic
         var sold = SoldOut(p, variants);
         var gallery = ParseGallery(p.GalleryJson);
         var images = new StringBuilder();
-        if (SafeUrl(p.Image).Length > 0) images.Append($"<img class=\"main-img\" src=\"{E(SafeUrl(p.Image))}\" alt=\"{E(p.Title)}\">");
+        if (SafeUrl(p.Image).Length > 0) images.Append($"<img class=\"main-img\" src=\"{E(ShopImages.Url(ctx, p.Image, ShopImages.Large))}\" alt=\"{E(p.Title)}\">");
         if (gallery is { Count: > 0 } gal)
         {
             // Several pictures: thumbnails under the main one (the main picture is the first of them). A click shows that picture in the main place, a click on the main picture opens it large
@@ -362,14 +407,14 @@ internal static partial class ShopPublic
             images.Insert(0, $"<div class=\"shop-gal\" id=\"{gid}\">");
             images.Append("<div class=\"shop-thumbs\">");
             for (var i = 0; i < all.Count; i++)
-                images.Append($"<a class=\"th{(i == 0 ? " on" : "")}\" href=\"{E(all[i])}\" data-src=\"{E(all[i])}\" target=\"_blank\" rel=\"noopener\"><img src=\"{E(all[i])}\" alt=\"\" loading=\"lazy\"></a>");
+                images.Append($"<a class=\"th{(i == 0 ? " on" : "")}\" href=\"{E(all[i])}\" data-src=\"{E(ShopImages.Url(ctx, all[i], ShopImages.Large))}\" data-full=\"{E(all[i])}\" target=\"_blank\" rel=\"noopener\"><img src=\"{E(ShopImages.Url(ctx, all[i], ShopImages.Small))}\" alt=\"\" loading=\"lazy\"></a>");
             images.Append("</div></div>");
             images.Append("<script>(function(){var r=document.getElementById('" + gid + "');if(!r)return;var m=r.querySelector('.main-img'),th=[].slice.call(r.querySelectorAll('.th'));if(!m){m=document.createElement('img');m.className='main-img';m.alt='';r.insertBefore(m,r.firstChild);m.src=th[0].dataset.src}"
                 + "function show(i){i=(i+th.length)%th.length;m.src=th[i].dataset.src;th.forEach(function(x){x.classList.remove('on')});th[i].classList.add('on');return i}"
                 + "th.forEach(function(b,i){b.addEventListener('click',function(e){e.preventDefault();show(i)})});"
                 + "m.style.cursor='zoom-in';m.addEventListener('click',function(){var i=th.findIndex(function(x){return x.classList.contains('on')}),o=document.createElement('div');o.className='shop-lightbox';"
                 + "o.innerHTML='<img alt=\"\"><button type=\"button\" class=\"x\" aria-label=\"×\">×</button>'+(th.length>1?'<button type=\"button\" class=\"p\" aria-label=\"‹\">‹</button><button type=\"button\" class=\"n\" aria-label=\"›\">›</button>':'');"
-                + "var im=o.querySelector('img');im.src=th[i].dataset.src;function go(d){i=show(i+d);im.src=th[i].dataset.src}function close(){document.removeEventListener('keydown',key);o.remove()}"
+                + "var im=o.querySelector('img');im.src=th[i].dataset.full;function go(d){i=show(i+d);im.src=th[i].dataset.full}function close(){document.removeEventListener('keydown',key);o.remove()}"
                 + "function key(e){if(e.key==='Escape')close();else if(e.key==='ArrowRight')go(1);else if(e.key==='ArrowLeft')go(-1)}"
                 + "o.addEventListener('click',function(e){var c=e.target.className;if(c==='x'||e.target===o)close();else if(c==='p')go(-1);else if(c==='n')go(1)});document.addEventListener('keydown',key);document.body.appendChild(o)});})();</script>");
         }
@@ -399,11 +444,14 @@ internal static partial class ShopPublic
                 if (plan is null) form.Append(list);
                 else form.Append(ShopVariantPicker.Html(ShopVariants.OptionsFromJson(p.VariantOptions), plan, c => M(ctx, cfg, c), ctx.T("shop.variantNA"))).Append("<noscript>").Append(list).Append("</noscript>");
             }
+            if (p.PickupOnly && !p.IsDigital) form.Append($"<p class=\"shop-pickup\"><strong>{E(ctx.T("shop.pickupOnly"))}</strong> – {E(ctx.T("shop.pickupOnlyNote"))}</p>");
             form.Append($"<div class=\"shop-actions\"><input class=\"shop-qty\" type=\"number\" name=\"qty\" value=\"1\" min=\"1\" max=\"{(p.MaxPerOrder > 0 ? Intl(p.MaxPerOrder) : "999")}\"><button class=\"shop-btn\" type=\"submit\">{E(ctx.T("shop.addToCart"))}</button></div></form>");
             form.Append(await TrustHtmlAsync(ctx, cfg, store, p, ct));
         }
         var ptags = ShopTags.Split(p.Tags);
-        var taxNote = (cfg.SmallBusiness ? ctx.T("shop.smallBusinessNote") : ctx.T("shop.taxIncluded", Money.Percent(p.TaxBp))) + (p.IsDigital ? "" : " · " + ctx.T("shop.plusShipping"));
+        // The brand: its name and page, a small logo link above the title, the first row of the attributes table and its name in the structured data.
+        var (brand, brandValues) = await ShopBrands.ForProductAsync(ctx, store, p, ct);
+        var taxNote = (cfg.SmallBusiness ? ctx.T("shop.smallBusinessNote") : ctx.T("shop.taxIncluded", Money.Percent(p.TaxBp))) + (p.IsDigital ? "" : " · " + ctx.T(p.PickupOnly ? "shop.pickupOnly" : "shop.plusShipping"));
         var values = new Dictionary<string, string>
         {
             ["url"] = ShopUrls.Product(p.Slug), ["on_sale"] = p.OnSale && variants.Count == 0 ? "1" : "",
@@ -413,18 +461,20 @@ internal static partial class ShopPublic
             ["price_html"] = "<span data-shop-price>" + E(PriceText(ctx, cfg, p, variants)) + "</span>" + WasHtml(ctx, cfg, p, variants), ["tax_note"] = taxNote,
             ["breadcrumbs_html"] = crumbs, ["notice_html"] = notice.ToString(), ["form_html"] = form.ToString(), ["sold_out"] = sold ? "1" : "", ["digital"] = p.IsDigital ? "1" : "",
             ["digital_note"] = p.IsDigital ? ctx.T("shop.digitalNote") : "",
-            ["attributes_html"] = await AttributesTableAsync(ctx, store, p, ct),
+            ["pickup_only"] = p.PickupOnly && !p.IsDigital ? "1" : "", ["pickup_note"] = p.PickupOnly && !p.IsDigital ? ctx.T("shop.pickupOnlyNote") : "",
+            ["attributes_html"] = await AttributesTableAsync(ctx, store, p, brand, ct),
             ["tags_html"] = ptags.Count > 0 ? "<div class=\"shop-tags\" style=\"margin-top:14px\">" + string.Concat(ptags.Select(t => $"<a href=\"/shop?tag={E(Uri.EscapeDataString(t))}\">{E(t)}</a>")) + "</div>" : "",
             ["description_html"] = p.DescriptionHtml, ["description_label"] = ctx.T("shop.description"),      // sanitised when it was saved
             ["related_html"] = await RelatedAsync(ctx, cfg, store, p, ct)
         };
+        foreach (var kv in brandValues) values[kv.Key] = kv.Value;
         // What a search engine and a shared link show: the title and description the editors wrote for them, else the product's own.
         var seoTitle = p.SeoTitle.Length > 0 ? p.SeoTitle : p.Title;
         var seoDescription = p.SeoDescription.Length > 0 ? p.SeoDescription : p.Summary.Length > 0 ? Trunc(p.Summary, 160) : null;
         var meta = new List<KeyValuePair<string, string>> { new("og:type", "product"), new("og:title", seoTitle), new("og:url", ctx.Site.Origin + ShopUrls.Product(p.Slug)) };
         if (seoDescription is not null) meta.Add(new("og:description", seoDescription));
         if (SafeUrl(p.Image).Length > 0) meta.Add(new("og:image", p.Image.StartsWith('/') ? ctx.Site.Origin + p.Image : p.Image));
-        return new PageView(null, seoTitle, seoDescription, values, ctx.RenderPart("product", values)) { Tail = JsonLd(ctx, cfg, p, variants, sold), Meta = meta };
+        return new PageView(null, seoTitle, seoDescription, values, ctx.RenderPart("product", values)) { Tail = JsonLd(ctx, cfg, p, variants, sold, brand), Meta = meta };
     }
 
     /// <summary>Up to four other products: first the ones of the same category, then those that share a keyword.</summary>
@@ -464,7 +514,7 @@ internal static partial class ShopPublic
     }
 
     /// <summary>schema.org Product markup for search engines (name, picture, price, availability).</summary>
-    private static string JsonLd(IPluginContext ctx, ShopConfig cfg, Product p, IReadOnlyList<Variant> variants, bool sold)
+    private static string JsonLd(IPluginContext ctx, ShopConfig cfg, Product p, IReadOnlyList<Variant> variants, bool sold, Brand? brand = null)
     {
         var o = new JsonObject
         {
@@ -477,6 +527,8 @@ internal static partial class ShopPublic
         };
         if (SafeUrl(p.Image).Length > 0) o["image"] = p.Image.StartsWith('/') ? ctx.Site.Origin + p.Image : p.Image;
         if (p.Sku.Length > 0) o["sku"] = p.Sku;
+        if (p.Gtin.Length > 0) o["gtin"] = p.Gtin;
+        if (brand is not null) o["brand"] = new JsonObject { ["@type"] = "Brand", ["name"] = brand.Name, ["url"] = ctx.Site.Origin + ShopUrls.Brand(brand.Slug) };
         return "<script type=\"application/ld+json\">" + o.ToJsonString().Replace("<", "\\u003c") + "</script>";
     }
 
@@ -590,11 +642,10 @@ internal static partial class ShopPublic
             foreach (var l in priced.Lines)
             {
                 var key = $"{Intl(l.Product.Id)}-{Intl(l.Variant?.Id ?? 0)}";
-                var img = SafeUrl(l.Variant?.Image is { Length: > 0 } vi ? vi : l.Product.Image);          // a variant with its own picture shows it
                 var url = ShopUrls.Product(l.Product.Slug);
                 linesForm.Append("<div class=\"shop-line\">");
-                linesForm.Append($"<a class=\"img\" href=\"{E(url)}\"{(img.Length > 0 ? $" style=\"background-image:url('{E(img)}')\"" : "")} aria-label=\"{E(l.Title)}\"></a>");
-                linesForm.Append($"<div class=\"info\"><a class=\"title\" href=\"{E(url)}\">{E(l.Title)}</a>{(l.VariantTitle.Length > 0 ? "<div class=\"shop-muted shop-small\">" + E(l.VariantTitle) + "</div>" : "")}{(l.Product.IsDigital ? "<div class=\"shop-small\"><span class=\"shop-badge\">" + E(ctx.T("shop.digital")) + "</span></div>" : "")}");
+                linesForm.Append($"<a class=\"img\" href=\"{E(url)}\"{LineImage(ctx, cfg, l.Product, l.Variant)} aria-label=\"{E(l.Title)}\"></a>");
+                linesForm.Append($"<div class=\"info\"><a class=\"title\" href=\"{E(url)}\">{E(l.Title)}</a>{(l.VariantTitle.Length > 0 ? "<div class=\"shop-muted shop-small\">" + E(l.VariantTitle) + "</div>" : "")}{(l.Product.IsDigital ? "<div class=\"shop-small\"><span class=\"shop-badge\">" + E(ctx.T("shop.digital")) + "</span></div>" : l.Product.PickupOnly ? "<div class=\"shop-small\"><span class=\"shop-badge pickup\">" + E(ctx.T("shop.pickupOnly")) + "</span></div>" : "")}");
                 linesForm.Append($"<div class=\"shop-muted shop-small\">{E(M(ctx, cfg, l.UnitCents))}</div>");
                 linesForm.Append($"<div class=\"controls\"><label class=\"shop-qtylabel\"><span class=\"shop-small shop-muted\">{E(ctx.T("shop.qty"))}</span> <input class=\"shop-qty\" type=\"number\" min=\"0\" max=\"999\" name=\"q:{Intl(l.Product.Id)}:{Intl(l.Variant?.Id ?? 0)}\" value=\"{l.Qty}\" onchange=\"this.form.submit()\"></label>");
                 linesForm.Append($"<button class=\"shop-linkbtn\" type=\"submit\" form=\"rm-{key}\">{E(ctx.T("shop.remove"))}</button></div></div>");
@@ -605,7 +656,7 @@ internal static partial class ShopPublic
             if (priced.DiscountCents > 0)
                 summary.Append($"<div><span>{E(ctx.T("shop.coupon.line", priced.CouponCode))}</span><span>−{E(M(ctx, cfg, priced.DiscountCents))}</span></div><div class=\"total\"><span>{E(ctx.T("shop.goodsTotal"))}</span><span>{E(M(ctx, cfg, priced.GoodsCents))}</span></div>");
             else if (priced.FreeShipping) summary.Append($"<div><span>{E(ctx.T("shop.coupon.line", priced.CouponCode))}</span><span>{E(ctx.T("shop.coupon.freeShipping"))}</span></div>");
-            summary.Append($"<div class=\"shop-muted shop-small\"><span>{E(priced.NeedsShipping ? ctx.T("shop.shippingLater") : ctx.T("shop.noShipping"))}</span><span></span></div></div>");
+            summary.Append($"<div class=\"shop-muted shop-small\"><span>{E(!priced.NeedsShipping ? ctx.T("shop.noShipping") : priced.PickupOnly ? ctx.T("shop.pickupOnlyCart") : ctx.T("shop.shippingLater"))}</span><span></span></div></div>");
             summary.Append(await ShippingEstimateAsync(ctx, cfg, store, priced, ct));
             summary.Append($"<a class=\"shop-btn big\" href=\"/shop/checkout\">{E(ctx.T("shop.toCheckout"))}</a>");
             summary.Append(CouponBox(ctx, priced));
@@ -699,17 +750,30 @@ internal static partial class ShopPublic
         long rateId = long.TryParse(f.F("rate"), out var rid) ? rid : 0;
         var country = (shipOther ? shipping.Country : billing.Country).ToUpperInvariant();
         // VAT by the country of delivery, then the cart's coupon (looked at again: it may no longer apply), then what shipping costs there.
-        priced = ShopTax.Apply(priced, cfg, country, billing.Country.ToUpperInvariant());
+        // Goods collected at the shop are taxed at home (ShopOrders.TaxCountry): a chosen pickup runs the chain once more — the same as PlaceAsync does.
         Coupon? coupon = null; string? couponProblem = null;
         var couponCode = (await store.CartAsync(token, ct))?.Coupon ?? "";
-        if (couponCode.Length > 0)
+        var rates = await store.RatesAsync(true, ct);
+        var untaxed = priced;
+        IReadOnlyList<ShippingOption> options = Array.Empty<ShippingOption>();
+        ShippingOption? chosen = null;
+        var taxCountry = country;
+        for (var pass = 0; pass < 2; pass++)
         {
-            var res = await ShopCoupons.ResolveAsync(ctx, store, priced, couponCode, email, ct);
-            if (res.Problem is null) { priced = res.Cart; coupon = res.Coupon; }
-            else { couponProblem = ctx.T("shop.coupon.removed", couponCode, res.Problem); await store.SetCartCouponAsync(token, "", ct); }
+            priced = ShopTax.Apply(untaxed, cfg, taxCountry, billing.Country.ToUpperInvariant());
+            coupon = null;
+            if (couponCode.Length > 0)
+            {
+                var res = await ShopCoupons.ResolveAsync(ctx, store, priced, couponCode, email, ct);
+                if (res.Problem is null) { priced = res.Cart; coupon = res.Coupon; }
+                else { couponProblem = ctx.T("shop.coupon.removed", couponCode, res.Problem); await store.SetCartCouponAsync(token, "", ct); couponCode = ""; }
+            }
+            options = ShopOrders.ShippingOptions(rates, country, priced);
+            chosen = ShopOrders.Pick(options, rateId);
+            var want = ShopOrders.TaxCountry(cfg, country, chosen);
+            if (want == taxCountry) break;
+            taxCountry = want;
         }
-        var options = ShopOrders.ShippingOptions(await store.RatesAsync(true, ct), country, priced);
-        var chosen = ShopOrders.Pick(options, rateId);
         var totals = ShopOrders.Compute(priced, chosen, cfg);
         var methods = await Payments.MethodsAsync(ctx, cfg, totals.Total, ct);
         if (!posted && !methods.Any(m => m.Id == payMethod)) payMethod = "";
@@ -724,7 +788,7 @@ internal static partial class ShopPublic
             if (!billing.IsComplete) errors.Add(ctx.T("shop.err.address"));
             else if (!Countries.Known(billing.Country)) errors.Add(ctx.T("shop.err.country"));
             if (shipOther && (!shipping.IsComplete || !Countries.Known(shipping.Country))) errors.Add(ctx.T("shop.err.shipAddress"));
-            if (priced.NeedsShipping && chosen is null) errors.Add(ctx.T("shop.err.noShipping", Countries.Name(country, ctx.Locale)));
+            if (priced.NeedsShipping && chosen is null) errors.Add(priced.PickupOnly ? ctx.T("shop.err.noPickup") : ctx.T("shop.err.noShipping", Countries.Name(country, ctx.Locale)));
             if (totals.Total > 0 && methods.All(x => x.Id != payMethod)) errors.Add(ctx.T("shop.err.payMethod"));
             if (!f.Form.ContainsKey("terms")) errors.Add(ctx.T("shop.err.terms"));
             if (priced.HasDigital && !f.Form.ContainsKey("waiver")) errors.Add(ctx.T("shop.err.waiver"));
@@ -830,9 +894,10 @@ internal static partial class ShopPublic
             sb.Append("</div></section>");
 
             sb.Append(Sec(ctx.T("shop.shippingMethod")));
-            if (options.Count == 0) sb.Append($"<p class=\"shop-muted\">{E(ctx.T("shop.noShippingFor", Countries.Name((shipOther ? shipping : billing).Country, ctx.Locale)))}</p>");
+            if (priced.PickupOnly) sb.Append($"<p class=\"shop-muted\">{E(ctx.T("shop.pickupOnlyCart"))}</p>");
+            if (options.Count == 0) sb.Append($"<p class=\"shop-muted\">{E(priced.PickupOnly ? ctx.T("shop.err.noPickup") : ctx.T("shop.noShippingFor", Countries.Name((shipOther ? shipping : billing).Country, ctx.Locale)))}</p>");
             foreach (var o in options)
-                sb.Append(Opt($"<input type=\"radio\" name=\"rate\" value=\"{Intl(o.Rate.Id)}\"{(chosen?.Rate.Id == o.Rate.Id ? " checked" : "")}>", o.Rate.Name, o.PriceCents == 0 ? ctx.T("shop.free") : M(ctx, cfg, o.PriceCents)));
+                sb.Append(Opt($"<input type=\"radio\" name=\"rate\" value=\"{Intl(o.Rate.Id)}\"{(chosen?.Rate.Id == o.Rate.Id ? " checked" : "")}>", o.Rate.Name, o.PriceCents == 0 ? ctx.T("shop.free") : M(ctx, cfg, o.PriceCents), o.Rate.Pickup ? ctx.T("shop.pickupHint") : ""));
             sb.Append($"<div><button class=\"shop-btn ghost\" type=\"submit\" name=\"action\" value=\"recalc\" formnovalidate>{E(ctx.T("shop.refreshShipping"))}</button></div></div></section>");
         }
         else sb.Append("</div></section>");
@@ -862,8 +927,7 @@ internal static partial class ShopPublic
         sb.Append($"<aside class=\"shop-checkout-side\"><div class=\"shop-card-box shop-summary\"><h2>{E(ctx.T("shop.yourOrder"))}</h2>");
         foreach (var l in priced.Lines)
         {
-            var img = SafeUrl(l.Variant?.Image is { Length: > 0 } vi ? vi : l.Product.Image);          // a variant with its own picture shows it
-            sb.Append($"<div class=\"shop-sline\"><span class=\"img\"{(img.Length > 0 ? $" style=\"background-image:url('{E(img)}')\"" : "")}><b>{l.Qty}</b></span><span class=\"t\">{E(l.DisplayTitle)}</span><span class=\"p\">{E(M(ctx, cfg, l.LineCents))}</span></div>");
+            sb.Append($"<div class=\"shop-sline\"><span class=\"img\"{LineImage(ctx, cfg, l.Product, l.Variant)}><b>{l.Qty}</b></span><span class=\"t\">{E(l.DisplayTitle)}</span><span class=\"p\">{E(M(ctx, cfg, l.LineCents))}</span></div>");
         }
         sb.Append("<div class=\"shop-sum\" style=\"max-width:none\">");
         sb.Append($"<div><span>{E(ctx.T("shop.subtotal"))}</span><span>{E(M(ctx, cfg, totals.Subtotal))}</span></div>");
@@ -976,8 +1040,7 @@ internal static partial class ShopPublic
         var itemsHtml = new StringBuilder($"<section class=\"shop-card-box\"><h2>{E(ctx.T("shop.item"))}</h2>");
         foreach (var i in items)
         {
-            var img = products.TryGetValue(i.ProductId, out var prod) ? SafeUrl(prod.Image) : "";
-            var thumb = img.Length > 0 ? $"<span class=\"img\" style=\"background-image:url('{E(img)}')\"></span>" : "<span class=\"img\"></span>";
+            var thumb = $"<span class=\"img\"{(products.TryGetValue(i.ProductId, out var prod) ? ShopImages.Style(ctx, cfg, prod, ShopImages.Small) : "")}></span>";
             itemsHtml.Append($"<div class=\"shop-oline\">{thumb}<div><div class=\"t\">{E(i.DisplayTitle)}</div><div class=\"shop-muted shop-small\">{i.Qty} × {E(Mo(i.UnitCents))}</div></div><div class=\"p\">{E(Mo(i.LineCents))}</div></div>");
         }
         itemsHtml.Append("</section>");

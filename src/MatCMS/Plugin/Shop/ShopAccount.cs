@@ -96,7 +96,7 @@ internal static class ShopAccount
         foreach (var i in items.Take(5))
         {
             var img = byId.TryGetValue(i.ProductId, out var p) ? ShopPublic.SafeUrl(p.Image) : "";
-            sb.Append($"<a class=\"th\" href=\"{E(url)}\" title=\"{E(i.DisplayTitle)}\"{(img.Length > 0 ? $" style=\"background-image:url('{E(img)}')\"" : "")}>{(img.Length == 0 && i.DisplayTitle.Length > 0 ? E(i.DisplayTitle[..1].ToUpperInvariant()) : "")}{(i.Qty > 1 ? $"<b>{i.Qty}</b>" : "")}</a>");
+            sb.Append($"<a class=\"th\" href=\"{E(url)}\" title=\"{E(i.DisplayTitle)}\"{(p is not null ? ShopImages.Style(ctx, ShopConfig.From(ctx.Settings), p, ShopImages.Small) : "")}>{(img.Length == 0 && i.DisplayTitle.Length > 0 ? E(i.DisplayTitle[..1].ToUpperInvariant()) : "")}{(i.Qty > 1 ? $"<b>{i.Qty}</b>" : "")}</a>");
         }
         if (items.Count > 5) sb.Append($"<a class=\"th more\" href=\"{E(url)}\">+{items.Count - 5}</a>");
         sb.Append("</div><div class=\"what\">");

@@ -448,3 +448,75 @@ What `docs/shop-vs-shopify.md` listed as missing, built and tested; the rules th
   `order.update` (paid, ship, complete, cancel, note, tracking — through `ShopOrders`, so a move the order cannot make is refused), `variant.set` (by name, in place; `replace` switches the others off, never deletes),
   `attribute.create` (add-only), `product.attributes`. MCP tools: `list_shop_orders`, `update_shop_order`, `set_product_variants`, `create_shop_attribute`, `set_product_attributes`. Orders hold personal data: the tools need the
   key's restore right, also for reading.
+
+## Collection only ("Nur Abholung")
+
+- **A product can be "pickup only"** (`products.pickup_only`, product form → Bestand und Versand, CSV column `pickup_only` / "Nur Abholung", AI op `product.update` with
+  `pickup_only`): something too big to send or without its box. **A shipping rate can be a pickup** (`shipping_rates.pickup`, checkbox on Versand). A cart holding a
+  pickup-only (physical) product is offered **only** pickup rates (`ShopOrders.ShippingOptions`, the one place); a pickup rate has no weight limit (nothing is packed).
+  A cart with no such product sees every rate, and `Pick` preselects the cheapest DELIVERY — a free pickup would otherwise always be the default.
+- **Tax:** goods collected at the shop are supplied there, so with OSS on they are taxed in `tax.homeCountry` (`ShopOrders.TaxCountry`). Because the rate is chosen after
+  tax and coupon are applied, the checkout page and `PlaceAsync` run that chain a second time when the chosen rate turns out to be a pickup (at most two passes).
+- **What the customer sees:** a "Nur Abholung" badge on cards (`badges_html`, `pickup_only`) and cart lines, a notice inside the product's `form_html` (always shown, whatever
+  the template), "· Nur Abholung" instead of "zzgl. Versand" in `tax_note`, product-page variables `pickup_only`/`pickup_note`, and a line in the cart and checkout.
+  No pickup rate set up → the checkout refuses with that reason, and the dashboard's attention list says how many products cannot be ordered.
+
+## Brands ("Marken")
+
+- **A brand is a record of its own** (`brands`: slug, name, logo, header picture, short text `summary`, details `details` (sanitised HTML), the manufacturer's website, SEO title and
+  description, active, featured, sort) and **a product names ONE brand by slug** (`products.brand`, indexed). The slug is fixed once the brand exists; deleting a brand takes it off its
+  products (they stay). Store: `ShopStoreBrands.cs`; `ResolveBrandAsync(text, create)` finds a brand by slug or name (any case) and is what the CSV import (column `brand` /
+  "Marke" / "Hersteller"), the ERP API (`brand`) and the assistant's ops use — an ERP or a spreadsheet knows the manufacturer's NAME, never our slug.
+- **Back office:** Shop → Marken (`ShopAdminBrands`): list with logo, products, status; the form (name, short text, details, website, logo, header picture, SEO, visible, highlighted,
+  order). The product form has a "Marke" drop-down. **Take-over:** a shop that kept the brand as an attribute (slug or name "marke", "brand", "hersteller" …) gets a button that
+  makes a brand of every value (options AND what products hold), gives every product without a brand the one its attribute names, and switches the attribute's filter off — the brand
+  filter replaces it, the attribute and its values stay. An address from before (`/shop?a.marke=Kronos` in a menu, a link, a search result) is answered with a
+  permanent redirect to `?brand=…` once that attribute is no longer a filter.
+- **Public:** `/shop/brands` (all active brands as cards — logo, name, short text, product count) and `/shop/brands/{slug}` (head with logo, name, short text and website, header
+  picture, **the details — shown only here**, the brand's products with paging, "filter the shop by it" = `/shop?brand=slug`). Both are block-editor pages (roles `brands`, `brand`)
+  and template parts (`shop-brands.html`, `shop-brand.html`). A hidden brand has no page (404; an admin sees it with a note and `noindex`).
+- **SEO:** the brand page has its own title (`{name} – Produkte und Infos | {site}` unless an SEO title is set) and description, share tags, and JSON-LD `@graph` with `Brand`
+  (name, url, logo, image, description, `sameAs` = website) and `BreadcrumbList`; the brands page is an `ItemList`; every product's `Product` JSON-LD names its `brand` (and its
+  `gtin`). Brand pages are in the sitemap.
+- **Product page:** variables `brand`, `brand_url`, `brand_logo_url`, `brand_html` (logo link "Mehr von …", above the title in the default part and the starting layout) — and, so
+  a page laid out BEFORE brands existed shows it too, the brand is the first row of `attributes_html` (linked); an attribute that held the brand is not shown a second time.
+- **Catalogue:** `?brand=a,b` (any of them) filters, the filter column has a "Marke" group (counted over the page without filters, like the attributes) and the chip "Marke: …";
+  `CatalogState.Brands` carries it through every other control, `ProductQuery.Brands` is the database filter.
+- **Block `shop_brands`** ("Shop-Marken"): all / highlighted / hand-picked (in the picked order); logo wall, cards with short text, or carousel; columns, name, product count, frame,
+  grey-until-hover, limit, "all brands" link. Each brand links to its page; a brand without a logo shows its name in the logo's place. Also a menu element `shop.brands` (dropdown)
+  and the link-picker group "Shop – Marken".
+- **Operations** (assistant, cloud/MCP): `brand.list`, `brand.save` (create or change, found by slug or name; undo `brand.restore`/`brand.remove`), and `brand` in
+  `product.create`/`product.update`.
+- Not yet: translations of a brand's texts (they show in the main language everywhere), the brand on the product card.
+
+## Pictures: small copies and the crop focus
+
+- **Lists never load an original.** Every picture the shop shows smaller than it is goes through `ShopImages.Url` → `IPluginSite.ImageUrl(url, width)` (the host's
+  `ThumbnailService`): 320 px for cart/order lines, the filmstrip and back-office rows, 640 px for cards, category tiles and logos, 1200 px for a product's main
+  picture, 1920 px for a header picture. The copy is WebP, made once and stored under `appdata/thumbs/{width}/` (the two small widths right after an upload,
+  the others on the first ask), never part of a backup (rebuilt from the original). Links, the lightbox (`data-full`), `og:image` and JSON-LD keep the ORIGINAL.
+  The card part's `image_url` is the 640 copy now; `image_original` and `image_focus` are new placeholders.
+- **Crop focus** (cards, tiles, lines crop with `background-size: cover`): the product's own `image_focus` (`products.image_focus`, "x% y%"; product form → under
+  the main picture: click into the picture, two tiles preview the crop, "Standard verwenden" clears it; CSV column `image_focus`), else the picture's focal point
+  from the media library (`IPluginSite.ImageFocus`), else the shop's default (Einstellungen → Bilder, `images.focus`, nine positions). Category and brand pictures
+  use the latter two. A focus is only ever two percentages (`ShopImages.Clean`) — it lands in a style attribute.
+- The focus picker is general toolkit: `Ui.Image(...) with { FocusName, Focus, FocusDefault }` (`UiRenderer.FocusPicker`, `ui-fields.js`).
+
+## Filters: several keywords, a limit and "Weitere …"
+
+- **Keywords combine:** `?tag=Gebraucht,Röhre` — a product must carry ALL of them (`ShopTags.Selection/HasAll`; the database narrows by the longest, the exact test is in memory).
+  The side column offers the keywords the products of the page carry, counted WITH the selection (what is left if one is added); a click adds a keyword or takes it
+  off (`ShopTags.Toggle`), every chosen one has its own chip. Lists in an address keep their commas readable (`ShopUrls.Catalog`).
+- **Filter limit** (Einstellungen → Katalog und Suche → "Einträge pro Filter", `catalog.filterLimit`, 0 = all, as before): brand, every choice attribute and the
+  keywords show the chosen entries and the busiest up to the limit (keywords: 14 while the limit is 0), the rest behind "Weitere … (n)". The dialog
+  (`ShopCatalogUi.MoreScript`, `.shop-fdialog`) fetches `/shop/filters?group={brand|tag|a.slug}&cat=…&(the page's query)` only when it opens — every entry of that ONE
+  group as `.opts` boxes — and narrows them as one types. Without script (or a failed fetch) the link is the page with `?more={group}`, that group in full.
+
+## What the search looks at
+
+- Einstellungen → Katalog und Suche → "Die Suche durchsucht außer dem Produktnamen" (`catalog.searchFields`, a `SettingKind.MultiChoice`): article number + GTIN,
+  summary, description, keywords, categories, brands, attributes (`ShopSearchFields`; default `sku,summary,tags,category,brand`). The name is always searched.
+  Category, brand and attribute match by their NAMES and become one more OR of the same query (`category IN` the matching categories and everything below them,
+  `brand IN` the matching brands, `id IN` the products with a matching attribute value). Catalogue and suggestions use the same choice.
+- The older single choice `catalog.searchIn` (title | text | all) is no longer offered; a shop that had "title" or "all" keeps that meaning while the new list was
+  never saved (`ShopConfig.From`).

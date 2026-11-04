@@ -378,6 +378,18 @@ public static class UiRenderer
                     if (c.Checked) _sb.Append(" checked");
                     _sb.Append(" /> ").Append(E(c.Label)).Append("</label>");
                     FieldClose(c); break;
+                case UiCheckList cl:
+                    FieldOpen(cl, labelFor: false);
+                    _sb.Append("<div class=\"ui-checks\" role=\"group\" aria-label=\"").Append(E(cl.Label)).Append("\">");
+                    for (var i = 0; i < cl.Options.Count; i++)
+                    {
+                        _sb.Append("<label class=\"check\"><input type=\"checkbox\" value=\"true\" name=\"").Append(E(cl.Name + "~" + i.ToString(System.Globalization.CultureInfo.InvariantCulture))).Append('"');
+                        if (cl.Checked.Contains(cl.Options[i].Value)) _sb.Append(" checked");
+                        if (cl.Disabled) _sb.Append(" disabled");
+                        _sb.Append(" /> ").Append(E(cl.Options[i].Label)).Append("</label>");
+                    }
+                    _sb.Append("</div>");
+                    FieldClose(cl); break;
                 case UiFile file:
                     FieldOpen(file);
                     _sb.Append("<input type=\"file\"");
@@ -406,7 +418,33 @@ public static class UiRenderer
             if (!f.Disabled)
                 _sb.Append("<div style=\"margin-top:8px;\"><button type=\"button\" class=\"btn btn-ghost btn-sm\" data-ui-image-pick>").Append(S("ui.image.pick")).Append("</button></div>");
             _sb.Append("</div></div>");
+            if (!string.IsNullOrWhiteSpace(f.FocusName)) FocusPicker(f);
             FieldClose(f);
+        }
+
+        /// <summary>A CSS position "x% y%" with both numbers 0–100, or "" — a value that goes into a style attribute is never anything else.</summary>
+        private static string CleanFocus(string? v)
+        {
+            var m = System.Text.RegularExpressions.Regex.Match((v ?? "").Trim(), @"^(\d{1,3}(?:\.\d+)?)%\s+(\d{1,3}(?:\.\d+)?)%$");
+            if (!m.Success) return "";
+            static string P(string s) => Math.Clamp((int)Math.Round(double.Parse(s, System.Globalization.CultureInfo.InvariantCulture)), 0, 100).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            return P(m.Groups[1].Value) + "% " + P(m.Groups[2].Value) + "%";
+        }
+
+        // The picture shown whole with a dot where the focus is (a click moves it), beside a tile that crops it the way a list does.
+        private void FocusPicker(UiImage f)
+        {
+            var value = CleanFocus(f.Focus);
+            var def = CleanFocus(f.FocusDefault) is { Length: > 0 } d ? d : "50% 50%";
+            var src = SafeUrl(f.Value).Replace("'", "%27");
+            _sb.Append("<div class=\"ui-focus\" data-ui-focus data-default=\"").Append(E(def)).Append("\"><div class=\"ui-focus-label\">").Append(S("ui.image.focus")).Append("</div>")
+               .Append("<div class=\"ui-focus-row\"><div class=\"ui-focus-pic\" data-ui-focus-pic title=\"").Append(S("ui.image.focusHelp")).Append("\">")
+               .Append("<img alt=\"\" data-ui-focus-img").Append(src.Length > 0 ? " src=\"" + E(src) + "\"" : "").Append("><span class=\"dot\" data-ui-focus-dot></span></div>")
+               .Append("<div class=\"ui-focus-tiles\"><div class=\"ui-focus-tile\" data-ui-focus-tile></div><div class=\"ui-focus-tile wide\" data-ui-focus-tile></div></div></div>")
+               .Append("<input type=\"hidden\" name=\"").Append(E(f.FocusName!)).Append("\" value=\"").Append(E(value)).Append("\" data-ui-focus-value>")
+               .Append("<div class=\"ui-focus-foot\"><span class=\"help\">").Append(S("ui.image.focusHelp")).Append("</span>");
+            if (!f.Disabled) _sb.Append(" <button type=\"button\" class=\"btn btn-ghost btn-sm\" data-ui-focus-reset>").Append(S("ui.image.focusReset")).Append("</button>");
+            _sb.Append("</div></div>");
         }
 
         private void MediaListField(UiMediaList f)

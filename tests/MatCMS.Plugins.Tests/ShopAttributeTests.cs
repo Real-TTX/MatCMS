@@ -223,8 +223,15 @@ public class ShopAttributeSiteTests : IClassFixture<AppFactory>, IAsyncLifetime
         }
         var on = new Dictionary<string, string>
         {
-            ["s_catalog.showSearch"] = "true", ["s_catalog.showSort"] = "true", ["s_catalog.showCategories"] = "true", ["s_catalog.showTags"] = "true", ["s_catalog.showFilters"] = "true", ["s_catalog.searchIn"] = "text"
+            ["s_catalog.showSearch"] = "true", ["s_catalog.showSort"] = "true", ["s_catalog.showCategories"] = "true", ["s_catalog.showTags"] = "true", ["s_catalog.showFilters"] = "true"
         };
+        // The boxes of "Durchsuchen" post by position: sku, summary, description, tags, category, brand, attributes.
+        Dictionary<string, string> Fields(params string[] which)
+        {
+            var d = new Dictionary<string, string>(on);
+            foreach (var w in which) d["s_catalog.searchFields~" + Array.IndexOf(ShopSearchFields.All, w)] = "true";
+            return d;
+        }
         var v = _app.Browser();
         try
         {
@@ -232,20 +239,27 @@ public class ShopAttributeSiteTests : IClassFixture<AppFactory>, IAsyncLifetime
             Assert.Contains("class=\"shop-find\"", normal); Assert.Contains("name=\"sort\"", normal); Assert.Contains("class=\"shop-catnav\"", normal); Assert.Contains("aria-label=\"Schlagwörter\"", normal);
 
             // Everything off: nothing of it above the products.
-            await Save(new Dictionary<string, string> { ["s_catalog.searchIn"] = "text" });
+            await Save(new Dictionary<string, string>());
             var bare = Decode(await v.GetStringAsync("/shop"));
             Assert.DoesNotContain("class=\"shop-find\"", bare); Assert.DoesNotContain("name=\"sort\"", bare); Assert.DoesNotContain("class=\"shop-catnav\"", bare); Assert.DoesNotContain("aria-label=\"Schlagwörter\"", bare);
             Assert.Contains("SW Ding", bare);
 
-            // The search: by name only, by name + summary + keywords (the default), by everything (the description too).
-            await Save(new Dictionary<string, string>(on) { ["s_catalog.searchIn"] = "title" });
+            // The search: the name always, the rest as ticked — nothing else ticked, the summary, the description, the category by its name.
+            await Save(Fields());
             Assert.DoesNotContain("SW Ding", Decode(await v.GetStringAsync("/shop?q=Zimtstern")));
+            Assert.DoesNotContain("SW Ding", Decode(await v.GetStringAsync("/shop?q=SW+Kat")));
             Assert.Contains("SW Ding", Decode(await v.GetStringAsync("/shop?q=SW+Ding")));
-            await Save(new Dictionary<string, string>(on) { ["s_catalog.searchIn"] = "text" });
+            await Save(Fields(ShopSearchFields.Summary, ShopSearchFields.Tags));
             Assert.Contains("SW Ding", Decode(await v.GetStringAsync("/shop?q=Zimtstern")));
+            Assert.Contains("SW Ding", Decode(await v.GetStringAsync("/shop?q=SWKeyword")));
             Assert.DoesNotContain("SW Ding", Decode(await v.GetStringAsync("/shop?q=Lebkuchen")));
-            await Save(new Dictionary<string, string>(on) { ["s_catalog.searchIn"] = "all" });
+            await Save(Fields(ShopSearchFields.Description, ShopSearchFields.Category));
             Assert.Contains("SW Ding", Decode(await v.GetStringAsync("/shop?q=Lebkuchen")));
+            Assert.Contains("SW Ding", Decode(await v.GetStringAsync("/shop?q=SW+Kat")));
+            Assert.DoesNotContain("SW Ding", Decode(await v.GetStringAsync("/shop?q=Zimtstern")));
+            var form = Decode(await admin.GetStringAsync("/admin/p/shop/_settings?group=set.groupCatalog"));
+            Assert.Contains("name=\"s_catalog.searchFields~2\"", form);
+            await Save(Fields(ShopSearchFields.Sku, ShopSearchFields.Summary, ShopSearchFields.Tags, ShopSearchFields.Category, ShopSearchFields.Brand));
 
             // The page of all categories: the keyword links, the product count, the text and the subcategories of a card are switches too.
             Assert.Contains("href=\"/shop/categories?tag=SWTag\"", Decode(await v.GetStringAsync("/shop/categories")));

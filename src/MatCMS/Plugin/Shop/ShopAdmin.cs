@@ -350,8 +350,11 @@ internal static class ShopAdmin
         if (!cfg.StripeReady && !cfg.PayPalReady && !cfg.BankEnabled) notes.Add(new AttentionNote(ctx.T("shop.adm.attNoPayment"), ctx.T("shop.adm.attNoPaymentText"), $"{Section}/_settings") { Tone = UiTone.Error });
         if (cfg.SellerName.Length == 0 || cfg.SellerAddress.Length == 0) notes.Add(new AttentionNote(ctx.T("shop.adm.attSeller"), ctx.T("shop.adm.attSellerText"), $"{Section}/_settings") { Tone = UiTone.Info });
         var physical = await store.ProductsAsync(true, ct: ct);
-        if (physical.Items.Any(p => !p.IsDigital) && (await store.RatesAsync(true, ct)).Count == 0)
+        var activeRates = await store.RatesAsync(true, ct);
+        if (physical.Items.Any(p => !p.IsDigital) && activeRates.Count == 0)
             notes.Add(new AttentionNote(ctx.T("shop.adm.attShipping"), ctx.T("shop.adm.attShippingText"), $"{Section}/shipping") { Tone = UiTone.Error });
+        else if (physical.Items.Count(p => p.PickupOnly && !p.IsDigital) is var pickupOnly and > 0 && !activeRates.Any(r => r.Pickup))
+            notes.Add(new AttentionNote(ctx.T("shop.adm.attPickup"), ctx.T("shop.adm.attPickupText", pickupOnly), $"{Section}/shipping") { Tone = UiTone.Error });
         return notes;
     }
 

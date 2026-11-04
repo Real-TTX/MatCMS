@@ -26,11 +26,25 @@ public class ThumbnailService
     /// <summary>
     /// The only widths that may be generated. A closed list, because the width comes off a URL: with
     /// a free-form width one visitor can ask for ten thousand sizes and fill the volume.
-    /// <para>320 = the filmstrip and the reference cards' screenshot row (they display at ~104&#160;px,
-    /// so this still covers a 3x phone screen). 1200 = a gallery tile or a card's main image, which is
-    /// at most ~700&#160;px wide in a two-column layout and covers it at 2x.</para>
+    /// <para>320 = small pictures in lists (filmstrip, cart lines, admin rows, the reference cards' screenshot row — they
+    /// display at ~40–150&#160;px, so this covers a 2x screen). 640 = a card in a grid of three or four (a shop's product
+    /// card, a blog card, a logo wall). 1200 = a gallery tile, a product's main picture, a card's main image in a
+    /// two-column layout. 1920 = a picture across the whole page (a section background, a header picture).</para>
+    /// <para>A caller asks for the width it NEEDS (<see cref="Url"/>); the next allowed width at or above it is served. The
+    /// image blocks ask for 240/480/800/1400 — with only 320 and 1200 allowed those were never scaled at all and every
+    /// image element served its original.</para>
     /// </summary>
-    public static readonly int[] Widths = [320, 1200];
+    public static readonly int[] Widths = [320, 640, 1200, 1920];
+
+    /// <summary>The widths made right after an upload, so the first list that shows a new picture finds them ready.</summary>
+    public static readonly int[] EagerWidths = [320, 640];
+
+    /// <summary>The allowed width that serves <paramref name="wanted"/> pixels: the smallest at or above it, else the largest.</summary>
+    public static int Snap(int wanted)
+    {
+        foreach (var w in Widths) if (w >= wanted) return w;
+        return Widths[^1];
+    }
 
     /// <summary>
     /// Extensions we scale. GIF is deliberately absent — re-encoding one to a still frame would
@@ -96,8 +110,8 @@ public class ThumbnailService
         Scalable.Contains(Path.GetExtension(fileName).ToLowerInvariant());
 
     /// <summary>
-    /// The thumbnail URL for an image the page is about to render, or <paramref name="src"/> itself
-    /// when there is nothing to gain. Static and free of state so the Razor blocks can call it
+    /// The thumbnail URL for an image the page is about to render at about <paramref name="width"/> pixels (already
+    /// multiplied for a sharp screen), or <paramref name="src"/> itself when there is nothing to gain. Static and free of state so the Razor blocks can call it
     /// without an injection.
     /// <para>Only OUR OWN uploads are rewritten: an <c>https://…</c> source belongs to someone else's
     /// server and we have no file to scale, and any other site-relative path (a template asset, a
@@ -108,7 +122,8 @@ public class ThumbnailService
     {
         if (string.IsNullOrWhiteSpace(src)) return src ?? "";
         if (!src.StartsWith("/uploads/", StringComparison.OrdinalIgnoreCase)) return src;
-        if (!Widths.Contains(width)) return src;
+        if (width <= 0) return src;
+        width = Snap(width);
 
         var name = src[9..];                       // everything after "/uploads/"
         if (name.Length == 0 || name.Contains('/')) return src;   // uploads/ is flat; a slash is not ours
@@ -116,6 +131,21 @@ public class ThumbnailService
 
         var v = VersionOf(name);
         return v > 0 ? $"/thumb/{width}/{name}?v={v}" : $"/thumb/{width}/{name}";
+    }
+
+    /// <summary>
+    /// Makes the small copies of a fresh upload (<see cref="EagerWidths"/>) in the background, so they are stored beside the
+    /// original before a list first asks. Best effort: whatever fails here is simply made on the first ask, as before.
+    /// </summary>
+    public void Warm(string fileName)
+    {
+        var safe = Path.GetFileName(fileName ?? "");
+        if (safe.Length == 0 || !IsScalable(safe)) return;
+        _ = Task.Run(async () =>
+        {
+            foreach (var w in EagerWidths)
+                try { await GetOrCreateAsync(safe, w); } catch { /* made on first ask instead */ }
+        });
     }
 
     /// <summary>

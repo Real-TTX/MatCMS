@@ -39,7 +39,9 @@ internal sealed class PluginBuilder : IPluginBuilder, IAdminBuilder, ISettingsBu
         ArgumentNullException.ThrowIfNull(spec);
         if (!SettingKey.IsMatch(spec.Key ?? "")) throw new InvalidOperationException($"Setting '{spec.Key}': a key starts with a letter and has letters, digits, '.', '_' or '-' (at most 61).");
         if (_slice.SettingSpecs.Any(s => string.Equals(s.Key, spec.Key, StringComparison.Ordinal))) throw new InvalidOperationException($"Setting '{spec.Key}' is declared twice.");
-        if (spec.Kind == SettingKind.Choice && spec.Options.Count == 0) throw new InvalidOperationException($"Setting '{spec.Key}' is a choice without options.");
+        if (spec.Kind is SettingKind.Choice or SettingKind.MultiChoice && spec.Options.Count == 0) throw new InvalidOperationException($"Setting '{spec.Key}' is a choice without options.");
+        if (spec.Kind == SettingKind.MultiChoice && spec.Options.Any(o => o.Value.Contains(',') || o.Value.Length == 0))
+            throw new InvalidOperationException($"Setting '{spec.Key}': the values of a multiple choice are stored comma-separated and may neither be empty nor hold a comma.");
         if (spec.Kind == SettingKind.Number && spec.Default.Length > 0 && !double.TryParse(spec.Default, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _))
             throw new InvalidOperationException($"Setting '{spec.Key}': the default '{spec.Default}' is not a number.");
         _slice.SettingSpecs.Add(spec with { Label = string.IsNullOrWhiteSpace(spec.Label) ? spec.Key : spec.Label });

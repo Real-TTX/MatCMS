@@ -153,7 +153,7 @@ public class MenuLevelsAndShopPagesTests : IClassFixture<AppFactory>, IAsyncLife
         var full = Decode(await v.GetStringAsync("/shop/cart"));
         Assert.Contains("class=\"shop-cartlines\"", full);
         Assert.Contains("2 Artikel", full);
-        Assert.Contains("style=\"background-image:url('/uploads/ding.png')\"", full);                     // the picture
+        Assert.Contains("style=\"background-image:url('/thumb/320/ding.png');background-position:50% 50%\"", full);                     // the picture
         Assert.Contains("class=\"lineprice\">50,00 €", full);
         Assert.Contains("<aside class=\"shop-cartsum\">", full);
         Assert.Contains("class=\"shop-btn big\" href=\"/shop/checkout\">Zur Kasse", full);
@@ -167,13 +167,13 @@ public class MenuLevelsAndShopPagesTests : IClassFixture<AppFactory>, IAsyncLife
         await _shop.WithContextAsync((_, st) => st.SaveProductAsync(new Product { Slug = "gal-eins", Title = "Gal Eins", PriceCents = 1000, Image = "/uploads/a.png", Active = true }));
         var many = Decode(await _app.Browser().GetStringAsync("/shop/gal-viele"));
         Assert.Contains("<div class=\"shop-gal\" id=\"gal-", many);
-        Assert.Contains("<img class=\"main-img\" src=\"/uploads/a.png\"", many);
+        Assert.Contains("<img class=\"main-img\" src=\"/thumb/1200/a.png\"", many);
         // The main picture is the first thumbnail, then the gallery in its order.
-        Assert.Matches("class=\"th on\" href=\"/uploads/a.png\" data-src=\"/uploads/a.png\".*class=\"th\" href=\"/uploads/b.png\".*class=\"th\" href=\"/uploads/c.png\"", many);
+        Assert.Matches("class=\"th on\" href=\"/uploads/a.png\" data-src=\"/thumb/1200/a.png\" data-full=\"/uploads/a.png\".*class=\"th\" href=\"/uploads/b.png\".*class=\"th\" href=\"/uploads/c.png\"", many);
         Assert.Contains("shop-lightbox", many);                                               // a click on the main picture opens it large
         var one = Decode(await _app.Browser().GetStringAsync("/shop/gal-eins"));
         Assert.DoesNotContain("class=\"shop-gal\"", one);
-        Assert.Contains("<img class=\"main-img\" src=\"/uploads/a.png\"", one);
+        Assert.Contains("<img class=\"main-img\" src=\"/thumb/1200/a.png\"", one);
     }
 
     [Fact]
@@ -187,7 +187,7 @@ public class MenuLevelsAndShopPagesTests : IClassFixture<AppFactory>, IAsyncLife
         Assert.Contains("<span class=\"n\">1</span>", page);                                   // the steps are numbered
         Assert.Contains("class=\"shop-opt\"", page);                                            // shipping / payment are cards one picks
         Assert.Contains("class=\"shop-sline\"", page);
-        Assert.Contains("style=\"background-image:url('/uploads/k.png')\"><b>2</b>", page);    // the summary line has the picture and the quantity
+        Assert.Contains("style=\"background-image:url('/thumb/320/k.png');background-position:50% 50%\"><b>2</b>", page);    // the summary line has the picture and the quantity
         Assert.Contains("name=\"terms\"", page);                                                // the confirmation and the button sit in the summary
         Assert.Contains("class=\"shop-btn big\" type=\"submit\"", page);
         Assert.Contains("name=\"email\"", page); Assert.Contains("name=\"b_name\"", page);     // every field the order needs is still there

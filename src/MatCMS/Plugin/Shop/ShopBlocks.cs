@@ -167,7 +167,7 @@ internal static class ShopBlocks
         var img = ShopPublic.SafeUrl(p.Image);
         var label = Field(ctx, "button") is { Length: > 0 } b ? b : ctx.T("shop.view");
         var sb = new StringBuilder("<style>").Append(CardCss).Append("</style><section class=\"section\"><div class=\"container\"><div class=\"shop shop-block\"><div class=\"shop-feature\">");
-        sb.Append(img.Length > 0 ? $"<a class=\"img\" href=\"{E(url)}\" style=\"background-image:url('{E(img)}')\" aria-label=\"{E(p.Title)}\"></a>" : "<span></span>");
+        sb.Append(img.Length > 0 ? $"<a class=\"img\" href=\"{E(url)}\"{ShopImages.Style(ctx, cfg, p, ShopImages.Large)} aria-label=\"{E(p.Title)}\"></a>" : "<span></span>");
         sb.Append($"<div><h3>{E(p.Title)}</h3>");
         if (p.Summary.Length > 0) sb.Append($"<p class=\"shop-muted\">{E(p.Summary)}</p>");
         sb.Append($"<p class=\"shop-price\" style=\"font-size:1.4em\">{E(ShopPublic.PriceText(ctx, cfg, p, variants))}{ShopPublic.WasHtml(ctx, cfg, p, variants)}</p>");

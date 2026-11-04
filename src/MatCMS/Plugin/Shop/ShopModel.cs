@@ -76,6 +76,13 @@ internal sealed record Product
     /// <summary>Shown first where a block or a page asks for the highlighted products.</summary>
     public bool Featured { get; init; }
     public int MaxPerOrder { get; init; }
+    /// <summary>Cannot be sent (too big, no box left): a cart holding it is offered only the shipping rates marked as pickup.</summary>
+    public bool PickupOnly { get; init; }
+    /// <summary>The brand (manufacturer) by its slug (see <see cref="Brand"/>); empty = none.</summary>
+    public string Brand { get; init; } = "";
+    /// <summary>The point of the main picture a cropping tile keeps in view, as a CSS position (<c>"50% 20%"</c>); empty = the picture's own focal point from the
+    /// media library, else the shop's default (<see cref="ShopImages.Focus"/>).</summary>
+    public string ImageFocus { get; init; } = "";
     public bool Active { get; init; } = true;
     public int Sort { get; init; }
     public DateTime CreatedUtc { get; init; } = DateTime.UtcNow;
@@ -114,6 +121,48 @@ internal static class ShopTags
     public static string Normalise(string? text) => string.Join(", ", Split(text));
 
     public static bool Has(Product p, string tag) => Split(p.Tags).Any(t => string.Equals(t, tag, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>The keywords a catalogue address asks for (<c>?tag=Neuware,Röhre</c> — a product must carry ALL of them); at most <see cref="MaxSelected"/>.</summary>
+    public static List<string> Selection(string? query) => Split(query).Take(MaxSelected).ToList();
+    public const int MaxSelected = 10;
+
+    /// <summary>The selection with <paramref name="tag"/> switched on or off, as the address carries it.</summary>
+    public static string Toggle(IReadOnlyList<string> selected, string tag) =>
+        string.Join(",", selected.Any(t => string.Equals(t, tag, StringComparison.OrdinalIgnoreCase))
+            ? selected.Where(t => !string.Equals(t, tag, StringComparison.OrdinalIgnoreCase))
+            : selected.Append(tag));
+
+    /// <summary>True when the product carries every keyword of the selection.</summary>
+    public static bool HasAll(Product p, IReadOnlyList<string> selected)
+    {
+        if (selected.Count == 0) return true;
+        var own = Split(p.Tags);
+        return selected.All(s => own.Any(t => string.Equals(t, s, StringComparison.OrdinalIgnoreCase)));
+    }
+}
+
+/// <summary>What the shop's search may look at besides the product's name (Einstellungen → Katalog und Suche → "Durchsuchen"). The operator ticks them.</summary>
+internal static class ShopSearchFields
+{
+    public const string Sku = "sku", Summary = "summary", Description = "description", Tags = "tags", Category = "category", Brand = "brand", Attributes = "attributes";
+    /// <summary>In the order the settings page lists them.</summary>
+    public static readonly string[] All = { Sku, Summary, Description, Tags, Category, Brand, Attributes };
+    public const string Default = "sku,summary,tags,category,brand";
+
+    /// <summary>The ticked fields of a stored value (unknown words dropped).</summary>
+    public static List<string> Parse(string? value)
+    {
+        var have = (value ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return All.Where(f => have.Contains(f, StringComparer.Ordinal)).ToList();
+    }
+
+    /// <summary>What the older single choice ("title" | "text" | "all") meant.</summary>
+    public static IReadOnlyCollection<string> Legacy(string? searchIn) => searchIn switch
+    {
+        "title" => new[] { Sku },
+        "all" => new[] { Sku, Summary, Description, Tags },
+        _ => new[] { Sku, Summary, Tags }
+    };
 }
 
 /// <summary>How a list of products is asked for: what to show, in which order, and which part of it.</summary>
@@ -121,10 +170,16 @@ internal sealed record ProductQuery
 {
     public bool ActiveOnly { get; init; } = true;
     public string? Category { get; init; }
+    /// <summary>When set, only products of these brands (slugs; any of them).</summary>
+    public IReadOnlyCollection<string>? Brands { get; init; }
+    /// <summary>Keywords, comma-separated: a product must carry all of them (<see cref="ShopTags.Selection"/>).</summary>
     public string? Tag { get; init; }
     public string? Search { get; init; }
-    /// <summary>What a search looks at: "title" (name, article number), "text" (+ summary, keywords) or "all" (+ description).</summary>
+    /// <summary>What a search looks at: "title" (name, article number), "text" (+ summary, keywords) or "all" (+ description) — the older, coarse form;
+    /// <see cref="SearchFields"/> wins when set.</summary>
     public string SearchIn { get; init; } = "text";
+    /// <summary>What a search looks at besides the name (<see cref="ShopSearchFields"/>); null = what <see cref="SearchIn"/> says.</summary>
+    public IReadOnlyCollection<string>? SearchFields { get; init; }
     public bool FeaturedOnly { get; init; }
     /// <summary>Only products with a lower price than their earlier one.</summary>
     public bool OnSaleOnly { get; init; }
@@ -170,6 +225,35 @@ internal sealed record ProductFile
     public string StorageName { get; init; } = "";
     public long Size { get; init; }
     public int Sort { get; init; }
+}
+
+/// <summary>
+/// A brand (a manufacturer): its own page at <c>/shop/brands/{slug}</c> with logo, picture, a short text (what lists and the brand gallery show) and the details (only on its own page), its
+/// products, and what a search engine reads. A product names its brand by slug (<see cref="Product.Brand"/>), so the slug is fixed once the brand exists.
+/// </summary>
+internal sealed record Brand
+{
+    public long Id { get; init; }
+    public string Slug { get; init; } = "";
+    public string Name { get; init; } = "";
+    /// <summary>The logo (a local path or https address): the gallery, the brand's page, the product page.</summary>
+    public string Logo { get; init; } = "";
+    /// <summary>A large picture for the head of the brand's page; empty = none.</summary>
+    public string Image { get; init; } = "";
+    /// <summary>A short plain text: the brand gallery's cards, the page of all brands, the head of the brand's page.</summary>
+    public string Summary { get; init; } = "";
+    /// <summary>The details (sanitised HTML): history, philosophy, highlights — shown ONLY on the brand's own page.</summary>
+    public string DetailsHtml { get; init; } = "";
+    /// <summary>The manufacturer's own website (https), linked from its page and named to search engines.</summary>
+    public string Website { get; init; } = "";
+    public string SeoTitle { get; init; } = "";
+    public string SeoDescription { get; init; } = "";
+    /// <summary>Shown first, and where a gallery asks for the highlighted brands.</summary>
+    public bool Featured { get; init; }
+    /// <summary>Off: no page, not in lists — its products keep the brand and are still sold.</summary>
+    public bool Active { get; init; } = true;
+    public int Sort { get; init; }
+    public DateTime UpdatedUtc { get; init; } = DateTime.UtcNow;
 }
 
 internal sealed record Category
@@ -343,6 +427,9 @@ internal sealed record ShippingRate
     public long FreeFromCents { get; init; }
     /// <summary>Not for parcels heavier than this (0 = no limit).</summary>
     public int MaxWeightGrams { get; init; }
+    /// <summary>The customer collects the goods at the seller's (no parcel): the only kind of rate a cart with a pickup-only product is offered. Goods
+    /// collected are taxed at home — the place of supply is the shop, not the customer's address.</summary>
+    public bool Pickup { get; init; }
     public bool Active { get; init; } = true;
     public int Sort { get; init; }
 

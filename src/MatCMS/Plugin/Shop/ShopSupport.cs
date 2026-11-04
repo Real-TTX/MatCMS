@@ -114,7 +114,8 @@ internal static class ShopHtml
         .shop-btn,.shop a.shop-btn{display:inline-block;padding:11px 22px;border-radius:var(--btn-radius,8px);border:1px solid var(--shop-accent,var(--accent,#1a1a1a));background:var(--shop-accent,var(--accent,#1a1a1a));color:var(--shop-on-accent,#fff);font:inherit;font-weight:600;cursor:pointer;text-decoration:none;transition:filter .15s ease,transform .15s ease}
         .shop-btn:hover:not([disabled]){filter:brightness(.92)}.shop-btn:active:not([disabled]){transform:translateY(1px)}
         .shop-btn.ghost,.shop a.shop-btn.ghost{background:transparent;color:inherit}.shop-btn[disabled]{opacity:.5;cursor:not-allowed}
-        .shop-badge{display:inline-block;padding:2px 10px;border-radius:99px;font-size:.8em;background:rgba(0,0,0,.08)}.shop-badge.ok{background:#d9f0dc;color:#1d5b28}.shop-badge.warn{background:#fdf0cf;color:#6b4e00}.shop-badge.bad{background:#f8d9d9;color:#8a1f1f}
+        .shop-badge{display:inline-block;padding:2px 10px;border-radius:99px;font-size:.8em;background:rgba(0,0,0,.08)}.shop-badge.ok{background:#d9f0dc;color:#1d5b28}.shop-badge.warn{background:#fdf0cf;color:#6b4e00}.shop-badge.bad{background:#f8d9d9;color:#8a1f1f}.shop-badge.pickup{background:#fdf0cf;color:#6b4e00}
+        .shop-pickup{margin:12px 0;padding:10px 14px;border-radius:var(--shop-radius,8px);border:1px solid var(--shop-line,var(--line,rgba(0,0,0,.15)));background:#fdf6e3;font-size:.92em}
         .shop-carousel{position:relative}.shop-carousel .track{display:flex;gap:20px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;padding:2px 2px 12px;scrollbar-width:thin}
         .shop-carousel .track .shop-card{flex:0 0 min(260px,78%);scroll-snap-align:start}
         .shop-carousel button{position:absolute;top:38%;z-index:2;width:42px;height:42px;border-radius:50%;border:1px solid var(--shop-line,var(--line,rgba(0,0,0,.2)));background:var(--shop-bg,var(--bg,#fff));color:inherit;font-size:26px;line-height:1;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)}
@@ -136,7 +137,7 @@ internal static class ShopHtml
         .shop-subcat .shop-muted{position:absolute;top:10px;right:10px;min-width:24px;padding:2px 9px;border-radius:99px;background:rgba(255,255,255,.92);color:#2a1b12;font-size:.8em;font-weight:600;text-align:center;opacity:1}
         """;
 
-    private const string BaseCss = CardCss + TileCss + """
+    private const string BaseCss = CardCss + TileCss + ShopBrands.BrandCss + ShopCatalogUi.MoreCss + """
         .shop-nav{display:flex;gap:18px;flex-wrap:wrap;align-items:center;margin-bottom:24px;padding-bottom:12px;border-bottom:1px solid var(--shop-line,var(--line,rgba(0,0,0,.12)))}
         .shop-nav .spacer{flex:1}body[data-els~="shop.cart"] .shop-nav{display:none}
         .shop-filter{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}.shop-filter input,.shop-filter select{padding:10px 12px;border:1px solid rgba(0,0,0,.25);border-radius:8px;font:inherit;background:transparent;color:inherit}

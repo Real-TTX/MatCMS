@@ -345,6 +345,21 @@ A built-in plugin (off until switched on), written against the plugin API and no
   a variant SKU sent as a product SKU is 409), `DELETE` only deactivates, `POST stock` / `POST prices` are batches (≤ 5000) answering per line (`add` is an
   atomic `IncrementAsync`, never below 0; `stock: null` = not counted), categories by slug, orders through `ShopOps` with the PersonalData right
   (the `by` argument names the key). Prices stay gross cents; a variant's price is written as its delta.
+- **"Nur Abholung"**: a product flag `pickup_only` and a rate flag `pickup`; a cart with such a product gets ONLY pickup rates (`ShopOrders.ShippingOptions`), `Pick` preselects
+  a delivery over a free pickup, and collected goods are taxed in the home country (`ShopOrders.TaxCountry` — checkout and `PlaceAsync` re-run the tax/coupon chain once when the
+  chosen rate is a pickup). See docs/shop-plugin.md "Collection only".
+- **Brands ("Marken")**: a table `brands` (logo, picture, short text, details shown ONLY on the brand's page, website, SEO) and `products.brand` (slug); `/shop/brands` and
+  `/shop/brands/{slug}` (block pages `brands`/`brand`, JSON-LD `Brand` + breadcrumbs, sitemap), `?brand=` filter, block `shop_brands` (logo wall / cards / carousel), menu element,
+  CSV/ERP/ops by NAME through `ShopStore.ResolveBrandAsync`. An attribute "Marke" is taken over by one button (Shop → Marken). See docs/shop-plugin.md "Brands".
+- **Pictures**: a list, card or tile never loads an original — `ShopImages.Url/Style` (→ `IPluginSite.ImageUrl`, the stored WebP copies) with a crop focus: the product's
+  `image_focus` → the media library's focal point (`IPluginSite.ImageFocus`) → the shop default `images.focus`. Links, lightbox, share tags and JSON-LD keep the original.
+  See docs/shop-plugin.md "Pictures".
+- **Catalogue filters**: `?tag=a,b` = ALL keywords (brands and attribute values stay ANY); `catalog.filterLimit` cuts every filter group to N entries with "Weitere …",
+  whose dialog fetches `/shop/filters?group=…` (one group's entries, `CatalogViewAsync(group:)`) only when opened; `?more=group` is the no-script fallback.
+  What the search looks at is `catalog.searchFields` (`ShopSearchFields`: sku/GTIN, summary, description, tags, category, brand, attributes — the last three by NAME);
+  the name always.
+- **Plugin settings can be a multiple choice** (`SettingKind.MultiChoice`): drawn as the toolkit's `UiCheckList` (boxes post `{name}~{index}`, by POSITION), stored as
+  the declared values comma-separated — a posted value is never stored, so an option value may not hold a comma (`PluginBuilder` refuses it).
 - **Downloads** are private files streamed by `ShopDownloads.ServeAsync`: paid order, the order's secret key (or the owner, or the admin), a download row that is not revoked or
   expired, a count that is taken atomically.
 - Texts: `ShopStrings.All` (key, German, English in one row); a test checks that every key used in the code has both.
@@ -604,6 +619,9 @@ A click on an item opens an INFO dialog (preview, kind, dimensions, size, focal 
   aside (`Media.OriginalUrl`, deleted with the item and by the cleanup); every later edit starts from the original with the stored settings
   (`Media.CropJson`), "Auf Original zurücksetzen" copies it back. "Als neues Bild" makes a copy row (`SourceMediaId`). The server re-encodes
   whatever the browser sends (`MediaEditor`, ImageSharp — metadata stripped, size limits); the browser's file is never stored as it came.
+- **Thumbnail widths are a closed list** (`ThumbnailService.Widths` = 320/640/1200/1920): a caller asks `Url(src, w)` for the width it NEEDS and gets the
+  next stored one at or above it (`Snap`) — the image blocks asked for 240/480/800/1400 while only 320/1200 existed and silently served every original.
+  An upload stores the two small widths at once (`Warm`); the rest are made on the first ask. Plugins reach it as `IPluginSite.ImageUrl`.
 - **Thumbnail URLs carry a version** (`/thumb/{w}/{name}?v=…`, thumbs are served immutable): `ThumbnailService.Invalidate` deletes the scaled
   copies and bumps the version — never just "forget" it (two edits within one tick would keep the old URL). `/uploads` is `no-cache`, since an
   address no longer means one content forever.

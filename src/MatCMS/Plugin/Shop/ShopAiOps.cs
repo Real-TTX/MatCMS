@@ -21,10 +21,10 @@ internal static class ShopAiOps
         "Ein Produkt vollständig lesen (Texte, Preise, Bilder, Varianten).", """{"product": "slug"} oder {"id": 12}""", Writes: false);
     public static readonly PluginOperationSpec ProductCreate = new("product.create",
         "Neues Produkt anlegen. Preis brutto: price_cents (Ganzzahl) oder price (\"19,90\"). Eine neue Kategorie wird mit angelegt. image: url aus der Mediathek. description_html: Absätze, Listen, Überschriften.",
-        """{"title": "…", "price_cents": 1990, "slug"?, "summary"?, "description_html"?, "image"?: "/uploads/…", "category"?: "Kaffee", "tags"?: "A, B", "stock"?: 10, "tax_percent"?: 19, "compare_price"?: "24,90", "featured"?: false, "kind"?: "physical|digital", "sku"?, "publish"?: true}""");
+        """{"title": "…", "price_cents": 1990, "slug"?, "summary"?, "description_html"?, "image"?: "/uploads/…", "category"?: "Kaffee", "brand"?: "Hersteller", "tags"?: "A, B", "stock"?: 10, "tax_percent"?: 19, "compare_price"?: "24,90", "featured"?: false, "kind"?: "physical|digital", "sku"?, "publish"?: true}""");
     public static readonly PluginOperationSpec ProductUpdate = new("product.update",
         "Ein Produkt ändern; nicht genannte Felder bleiben. active: false nimmt es aus dem Shop (gelöscht wird nie).",
-        """{"product": "slug" oder "id": 12, "title"?, "summary"?, "description_html"?, "price_cents"?|"price"?, "compare_cents"?|"compare_price"?, "image"?, "gallery"?: ["/uploads/…"], "category"?: "slug", "tags"?, "featured"?, "stock"?: 5|null, "sku"?, "tax_percent"?, "seo_title"?, "seo_description"?, "active"?}""");
+        """{"product": "slug" oder "id": 12, "title"?, "summary"?, "description_html"?, "price_cents"?|"price"?, "compare_cents"?|"compare_price"?, "image"?, "gallery"?: ["/uploads/…"], "category"?: "slug", "brand"?: "Marke (Name oder slug, \"\" = keine)", "tags"?, "pickup_only"?: true, "featured"?, "stock"?: 5|null, "sku"?, "tax_percent"?, "seo_title"?, "seo_description"?, "active"?}""");
     public static readonly PluginOperationSpec CategoryList = new("category.list",
         "Alle Shop-Kategorien als Baum (id, slug, Name, Eltern-id, Bild, Text).", "{}", Writes: false);
     public static readonly PluginOperationSpec CategoryCreate = new("category.create",
@@ -33,6 +33,13 @@ internal static class ShopAiOps
     public static readonly PluginOperationSpec CategoryUpdate = new("category.update",
         "Kategorie ändern (Name, Bild, Text, Eltern, Schlagwörter; die Adresse bleibt).",
         """{"category": "slug", "name"?, "parent"?: "slug"|"", "image"?, "description"?, "tags"?}""");
+    public static readonly PluginOperationSpec BrandList = new("brand.list",
+        "Alle Marken (Hersteller) des Shops: slug, Name, Kurztext, Logo, Website, aktiv, hervorgehoben, Anzahl Produkte.", "{}", Writes: false);
+    public static readonly PluginOperationSpec BrandSave = new("brand.save",
+        "Marke anlegen oder ändern (gefunden über brand = slug oder Name; neu, wenn es sie nicht gibt). summary: kurzer Text für Galerie und Listen; details_html: ausführlich, NUR auf der Markenseite; logo/image: url aus der Mediathek. Nicht genannte Felder bleiben.",
+        """{"brand": "Transrotor", "name"?, "summary"?, "details_html"?, "logo"?: "/uploads/…", "image"?, "website"?: "https://…", "seo_title"?, "seo_description"?, "featured"?: false, "active"?: true}""");
+    public static readonly PluginOperationSpec BrandRestore = new("brand.restore", "Stellt eine Marke wieder her (Rückgängig).", Internal: true);
+    public static readonly PluginOperationSpec BrandRemove = new("brand.remove", "Entfernt eine eben angelegte Marke (Rückgängig).", Internal: true);
     public static readonly PluginOperationSpec CouponCreate = new("coupon.create",
         "Gutschein anlegen: kind percent (percent 0–100) oder fixed (amount_cents), optional Mindestwert, Kategorie, Ablaufdatum.",
         """{"code"?: "SOMMER10", "kind": "percent|fixed|shipping", "percent"?: 10, "amount_cents"?: 500, "min_order_cents"?: 2000, "category"?: "slug", "expires"?: "2026-12-31", "max_uses"?: 100, "note"?}""");
@@ -95,7 +102,7 @@ internal static class ShopAiOps
     private static JsonObject Short(Product p) => new()
     {
         ["id"] = p.Id, ["slug"] = p.Slug, ["url"] = ShopUrls.Product(p.Slug), ["title"] = p.Title, ["priceCents"] = p.PriceCents, ["category"] = p.Category,
-        ["tags"] = p.Tags, ["active"] = p.Active, ["stock"] = p.TrackStock ? p.Stock : null, ["image"] = p.Image, ["featured"] = p.Featured,
+        ["tags"] = p.Tags, ["active"] = p.Active, ["stock"] = p.TrackStock ? p.Stock : null, ["image"] = p.Image, ["featured"] = p.Featured, ["pickupOnly"] = p.PickupOnly, ["brand"] = p.Brand,
     };
 
     // ---- products -----------------------------------------------------------------------------------------------
@@ -150,6 +157,13 @@ internal static class ShopAiOps
         if (o["tags"] is JsonArray ta) n = n with { Tags = ShopTags.Normalise(string.Join(", ", ta.Select(x => x?.ToString() ?? ""))) };
         else if (Str(o, "tags") is { } tags) n = n with { Tags = ShopTags.Normalise(tags) };
         if (Flag(o, "featured") is { } f) n = n with { Featured = f };
+        if (Flag(o, "pickup_only") is { } po) n = n with { PickupOnly = po && !n.IsDigital };
+        if (Str(o, "brand") is { } bt)
+        {
+            if (bt.Trim().Length == 0) n = n with { Brand = "" };
+            else if (await store.ResolveBrandAsync(bt, false, ct) is { } br) n = n with { Brand = br.Slug };
+            else return Answer("failed", $"Die Marke „{bt.Trim()}“ gibt es nicht – erst brand.save.");
+        }
         if ((Flag(o, "active") ?? Flag(o, "publish")) is { } a) n = n with { Active = a };
         if (o.ContainsKey("stock")) n = Whole(o["stock"], out var st) && st >= 0 ? n with { TrackStock = true, Stock = st } : n with { TrackStock = false };
         if (Str(o, "sku") is { } sku) n = n with { Sku = sku.Trim() };
@@ -175,6 +189,69 @@ internal static class ShopAiOps
         if (!Whole(o["id"], out var id)) return Answer("failed", "id fehlt.");
         await new ShopStore(ctx.Data).DeleteProductAsync(id, ct);
         return Answer("applied", "Produkt entfernt.");
+    }
+
+    // ---- brands -------------------------------------------------------------------------------------------------
+
+    private static JsonObject BrandJson(Brand x, int products) => new()
+    {
+        ["id"] = x.Id, ["slug"] = x.Slug, ["name"] = x.Name, ["url"] = ShopUrls.Brand(x.Slug), ["summary"] = x.Summary, ["logo"] = x.Logo, ["image"] = x.Image, ["website"] = x.Website,
+        ["active"] = x.Active, ["featured"] = x.Featured, ["products"] = products,
+    };
+
+    public static async Task<JsonNode?> ListBrandsAsync(IPluginContext ctx, JsonNode? args, CancellationToken ct)
+    {
+        var store = new ShopStore(ctx.Data);
+        var all = await store.BrandsAsync(false, ct);
+        var counts = await store.BrandCountsAsync(false, ct);
+        return Answer("applied", $"{all.Count} Marken", new JsonArray(all.Select(x => (JsonNode)BrandJson(x, counts.GetValueOrDefault(x.Slug))).ToArray()));
+    }
+
+    public static async Task<JsonNode?> SaveBrandAsync(IPluginContext ctx, JsonNode? args, CancellationToken ct)
+    {
+        var o = args as JsonObject ?? throw new InvalidOperationException("PayloadJson ist kein Objekt.");
+        var key = (Str(o, "brand") ?? Str(o, "slug") ?? Str(o, "name") ?? "").Trim();
+        if (key.Length == 0) return Answer("failed", "Welche Marke? brand fehlt.");
+        var store = new ShopStore(ctx.Data);
+        var existing = await store.ResolveBrandAsync(key, false, ct);
+        var x = existing ?? new Brand { Name = key, Active = true, Sort = (await store.BrandsAsync(false, ct)).Count };
+        var before = existing is null ? null : JsonSerializer.SerializeToNode(existing, Json);
+        if (Str(o, "name") is { } name && name.Trim().Length > 0) x = x with { Name = name.Trim() };
+        if (Str(o, "summary") is { } su) x = x with { Summary = su.Trim() };
+        if ((Str(o, "details_html") ?? Str(o, "detailsHtml")) is { } d) x = x with { DetailsHtml = SafeHtml.Sanitize(d) };
+        if (o.ContainsKey("logo")) x = x with { Logo = ShopPublic.SafeUrl(Str(o, "logo")) };
+        if (o.ContainsKey("image")) x = x with { Image = ShopPublic.SafeUrl(Str(o, "image")) };
+        if (Str(o, "website") is { } w) x = x with { Website = ShopBrands.SafeWebsite(w) };
+        if (Str(o, "seo_title") is { } st) x = x with { SeoTitle = st.Trim() };
+        if (Str(o, "seo_description") is { } sd) x = x with { SeoDescription = sd.Trim() };
+        if (Flag(o, "featured") is { } f) x = x with { Featured = f };
+        if (Flag(o, "active") is { } a) x = x with { Active = a };
+        if (existing is null)
+        {
+            var slug = await store.FreeBrandSlugAsync(Str(o, "slug") ?? x.Name, ct);
+            if (slug.Length == 0) return Answer("failed", "Keine gültige Adresse.");
+            var id = await store.SaveBrandAsync(x with { Slug = slug }, ct);
+            return Answer("applied", $"Marke „{x.Name}“ angelegt ({ShopUrls.Brand(slug)}).", new JsonObject { ["id"] = id, ["slug"] = slug }, Undo("brand.remove", new JsonObject { ["id"] = id }));
+        }
+        await store.SaveBrandAsync(x, ct);
+        return Answer("applied", $"Marke „{x.Name}“ geändert.", BrandJson(x, (await store.BrandCountsAsync(false, ct)).GetValueOrDefault(x.Slug)), Undo("brand.restore", before!));
+    }
+
+    public static async Task<JsonNode?> RestoreBrandAsync(IPluginContext ctx, JsonNode? args, CancellationToken ct)
+    {
+        var x = args.Deserialize<Brand>(Json) ?? throw new InvalidOperationException("Keine Marke.");
+        var store = new ShopStore(ctx.Data);
+        if (await store.BrandAsync(x.Id, ct) is null) return Answer("failed", "Die Marke gibt es nicht mehr.");
+        await store.SaveBrandAsync(x, ct);
+        return Answer("applied", $"Marke „{x.Name}“ wiederhergestellt.");
+    }
+
+    public static async Task<JsonNode?> RemoveBrandAsync(IPluginContext ctx, JsonNode? args, CancellationToken ct)
+    {
+        var o = args as JsonObject ?? new JsonObject();
+        if (!Whole(o["id"], out var id)) return Answer("failed", "id fehlt.");
+        await new ShopStore(ctx.Data).DeleteBrandAsync(id, ct);
+        return Answer("applied", "Marke entfernt.");
     }
 
     // ---- categories ---------------------------------------------------------------------------------------------

@@ -73,7 +73,7 @@ internal static class ShopAdminCatalog
     private static string ProductCell(IPluginContext ctx, Product p, IReadOnlyDictionary<string, string> catNames)
     {
         static string E(string? t) => System.Net.WebUtility.HtmlEncode(t ?? "");
-        var img = ShopPublic.SafeUrl(p.Image);
+        var img = ShopImages.Url(ctx, p.Image, ShopImages.Small);
         var thumb = img.Length > 0 ? $"<span class=\"ui-thumb\" style=\"background-image:url('{E(img)}')\"></span>" : "<span class=\"ui-thumb empty\"><i class=\"ti ti-photo\"></i></span>";
         var sb = new System.Text.StringBuilder("<div class=\"ui-media-cell\">").Append(thumb).Append("<div><a href=\"").Append(ProductUrl(p.Id)).Append("\"><strong>").Append(E(p.Title)).Append("</strong></a>");
         if (p.Featured) sb.Append(" <span class=\"badge badge-new\">").Append(E(ctx.T("shop.adm.featured"))).Append("</span>");
@@ -102,6 +102,7 @@ internal static class ShopAdminCatalog
         string? error = null;
         var allCats = await store.CategoriesAsync(ct);
         var allAttrs = await store.AttributesAsync(ct);
+        var allBrands = await store.BrandsAsync(false, ct);
         var attrValues = id == 0 ? new Dictionary<long, List<string>>() : await store.ProductValuesAsync(id, ct);
 
         if (ctx.Request.IsPost)
@@ -190,7 +191,7 @@ internal static class ShopAdminCatalog
                 Ui.TextArea("summary", ctx.T("shop.adm.summary"), product.Summary, 2) with { Help = ctx.T("shop.adm.summaryHelp") },
                 Ui.RichText("description", ctx.T("shop.description"), product.DescriptionHtml)),
             Ui.Card(ctx.T("shop.adm.secPictures"),
-                Ui.Image("image", ctx.T("shop.adm.image"), product.Image),
+                Ui.Image("image", ctx.T("shop.adm.image"), product.Image) with { FocusName = "image_focus", Focus = product.ImageFocus, FocusDefault = ShopImages.Focus(ctx, cfg, product.Image) },
                 Ui.MediaList("gallery", ctx.T("shop.adm.gallery"), product.GalleryJson)),
             AttributesCard(ctx, applicable, allAttrs.Count, attrValues),
             VariantsCard(ctx, cfg, product, options, variantRows),
@@ -215,6 +216,10 @@ internal static class ShopAdminCatalog
                 allCats.Count > 1 ? Ui.Text(ctx.T("shop.adm.extraCategories")) with { Strong = true } : null,
                 allCats.Count > 1 ? Ui.Muted(ctx.T("shop.adm.extraCategoriesHelp")) : null,
                 allCats.Count > 1 ? Ui.Grid(190, ShopCategories.Flatten(cats).Select(t => (UiNode?)Ui.Checkbox("xcat_" + t.Cat.Slug, ShopCategories.Label(cats, t.Cat), ShopMembership.SplitSlugs(product.ExtraCategories).Contains(t.Cat.Slug))).ToArray()) : null,
+                allBrands.Count > 0 || product.Brand.Length > 0
+                    ? (UiNode)(Ui.Select("brand", ctx.T("shop.brand"), product.Brand, new[] { Ui.Option("", "—") }.Concat(allBrands.Select(x => Ui.Option(x.Slug, x.Active ? x.Name : x.Name + " (" + ctx.T("shop.adm.inactive") + ")"))).ToArray())
+                        with { Help = ctx.T("shop.adm.brandFieldHelp") })
+                    : Ui.Muted(ctx.T("shop.adm.brandNone")),
                 Ui.Tags("tags", ctx.T("shop.adm.tags"), ShopTags.Normalise(product.Tags), knownTags) with { Help = ctx.T("shop.adm.tagsHelp") },
                 Ui.Input("slug", ctx.T("shop.adm.slug"), product.Slug) with { Help = ctx.T("shop.adm.slugHelp") },
                 Ui.Input("sku", ctx.T("shop.adm.sku"), product.Sku)),
@@ -222,6 +227,7 @@ internal static class ShopAdminCatalog
                 Ui.Checkbox("track_stock", ctx.T("shop.adm.trackStock"), product.TrackStock),
                 Ui.Input("stock", ctx.T("shop.adm.stockCount"), Intl(product.Stock), UiInputType.Number) with { Help = ctx.T("shop.adm.stockHelp"), Min = "0" },
                 Ui.Input("weight", ctx.T("shop.adm.weight"), Intl(product.WeightGrams), UiInputType.Number) with { Min = "0", Help = ctx.T("shop.adm.weightHelp") },
+                Ui.Checkbox("pickup_only", ctx.T("shop.adm.pickupOnly"), product.PickupOnly) with { Help = ctx.T("shop.adm.pickupOnlyHelp") },
                 Ui.Input("max", ctx.T("shop.adm.maxPerOrder"), Intl(product.MaxPerOrder), UiInputType.Number) with { Min = "0", Help = ctx.T("shop.adm.maxHelp") },
                 Ui.Input("sort", ctx.T("shop.adm.sort"), Intl(product.Sort), UiInputType.Number))
         };
@@ -288,10 +294,11 @@ internal static class ShopAdminCatalog
         return current with
         {
             Title = f.F("title").Trim(), Summary = f.F("summary").Trim(), DescriptionHtml = SafeHtml.Sanitize(f.F("description")), Image = ShopPublic.SafeUrl(f.F("image")),
+            ImageFocus = f.Form.ContainsKey("image_focus") ? ShopImages.Clean(f.F("image_focus")) : current.ImageFocus,
             GalleryJson = CleanGallery(f.F("gallery")), Kind = kind, PriceCents = Math.Max(0, price), CompareCents = Math.Max(0, compare), TaxBp = bp, Sku = f.F("sku").Trim(), Category = f.F("category").Trim(),
-            Tags = ShopTags.Normalise(f.F("tags")), Featured = f.Form.ContainsKey("featured"),
+            Tags = ShopTags.Normalise(f.F("tags")), Featured = f.Form.ContainsKey("featured"), Brand = f.Form.ContainsKey("brand") ? MatCMS.Pages.Admin.Pages.IndexModel.Slugify(f.F("brand")) : current.Brand,
             SeoTitle = Clip(f.F("seo_title").Trim(), 120), SeoDescription = Clip(f.F("seo_description").Trim(), 320),
-            TrackStock = f.Form.ContainsKey("track_stock"),
+            TrackStock = f.Form.ContainsKey("track_stock"), PickupOnly = kind != ProductKind.Digital && f.Form.ContainsKey("pickup_only"),
             Stock = Num("stock"), WeightGrams = kind == ProductKind.Digital ? 0 : (int)Math.Min(Num("weight"), int.MaxValue), MaxPerOrder = (int)Math.Min(Num("max"), 100000), Sort = (int)Math.Min(Num("sort"), 100000),
             Active = f.Form.ContainsKey("active")
         };
@@ -395,7 +402,7 @@ internal static class ShopAdminCatalog
             ShopCategories.Flatten(cats).Select(t =>
             {
                 var c = t.Cat;
-                var img = ShopPublic.SafeUrl(c.Image);
+                var img = ShopImages.Url(ctx, c.Image, ShopImages.Small);
                 var thumb = img.Length > 0 ? $"<span class=\"ui-thumb\" style=\"background-image:url('{E(img)}')\"></span>" : "<span class=\"ui-thumb empty\"><i class=\"ti ti-category\"></i></span>";
                 var desc = c.Description.Length > 90 ? c.Description[..90] + "…" : c.Description;
                 var cell = $"<div class=\"ui-media-cell\" style=\"padding-left:{t.Depth * 28}px\">{(t.Depth > 0 ? "<i class=\"ti ti-corner-down-right muted\" aria-hidden=\"true\"></i>" : "")}{thumb}<div><a href=\"{CategoryUrl(c.Id)}\"><strong>{E(c.Name)}</strong></a><div class=\"muted\">{E(c.Slug)}{(desc.Length > 0 ? " · " + E(desc) : "")}{(c.Tags.Length > 0 ? " · <i class=\"ti ti-tag\" aria-hidden=\"true\"></i> " + E(c.Tags) : "")}</div></div></div>";
@@ -540,7 +547,7 @@ internal static class ShopAdminCatalog
             Ui.Input("price" + suffix, ctx.T("shop.adm.ratePrice"), Money.ForInput(r.PriceCents)),
             Ui.Input("free" + suffix, ctx.T("shop.adm.rateFree"), r.FreeFromCents > 0 ? Money.ForInput(r.FreeFromCents) : "") with { Help = ctx.T("shop.adm.rateFreeHelp") },
             Ui.Input("weight" + suffix, ctx.T("shop.adm.rateWeight"), r.MaxWeightGrams > 0 ? Intl(r.MaxWeightGrams) : "", UiInputType.Number) with { Help = ctx.T("shop.adm.rateWeightHelp") }),
-        Ui.Inline(Ui.Checkbox("active" + suffix, ctx.T("shop.adm.activeLabel"), r.Active || r.Id == 0), deletable ? Ui.Checkbox("del" + suffix, ctx.T("shop.adm.removeRate")) : null));
+        Ui.Inline(Ui.Checkbox("active" + suffix, ctx.T("shop.adm.activeLabel"), r.Active || r.Id == 0), Ui.Checkbox("pickup" + suffix, ctx.T("shop.adm.ratePickup"), r.Pickup) with { Help = ctx.T("shop.adm.ratePickupHelp") }, deletable ? Ui.Checkbox("del" + suffix, ctx.T("shop.adm.removeRate")) : null));
 
     private static ShippingRate ReadRate(RequestData f, string suffix, ShippingRate current, out string? error)
     {
@@ -559,7 +566,7 @@ internal static class ShopAdminCatalog
             if (codes.Any(c => c.Length != 2 || !char.IsAsciiLetter(c[0]) || !char.IsAsciiLetter(c[1]))) error ??= $"Länderkürzel müssen zwei Buchstaben haben ({name}).";
             countries = string.Join(",", codes.Distinct());
         }
-        return current with { Name = name, Countries = countries, PriceCents = price, FreeFromCents = free, MaxWeightGrams = weight, Active = f.Form.ContainsKey("active" + suffix) };
+        return current with { Name = name, Countries = countries, PriceCents = price, FreeFromCents = free, MaxWeightGrams = weight, Pickup = f.Form.ContainsKey("pickup" + suffix), Active = f.Form.ContainsKey("active" + suffix) };
     }
 
     // ---- customers ---------------------------------------------------------------------------------------

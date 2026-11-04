@@ -25,7 +25,7 @@ internal static class ShopApi
         {
             Access = ApiAccess.Write,
             Summary = "Legt ein Produkt mit dieser Artikelnummer an oder ändert es (nur die gesendeten Felder). Varianten per eigener Artikelnummer.",
-            Example = """{ "title": "Espresso Bohne 1 kg", "price_cents": 2490, "tax_percent": 7, "stock": 120, "gtin": "4012345678901", "category": "kaffee", "active": true, "variants": [ { "sku": "ESP-1000-M", "name": "Gemahlen", "price_delta_cents": 0, "stock": 40 } ] }"""
+            Example = """{ "title": "Espresso Bohne 1 kg", "price_cents": 2490, "tax_percent": 7, "stock": 120, "gtin": "4012345678901", "category": "kaffee", "brand": "Röstwerk", "active": true, "variants": [ { "sku": "ESP-1000-M", "name": "Gemahlen", "price_delta_cents": 0, "stock": 40 } ] }"""
         });
         b.Api("DELETE", "products/{sku}", DeactivateAsync, new ApiRouteOptions { Access = ApiAccess.Write, Summary = "Schaltet ein Produkt ab (active = false). Gelöscht wird nichts – Bestellungen verweisen darauf." });
         b.Api("POST", "stock", StockAsync, new ApiRouteOptions
@@ -96,7 +96,7 @@ internal static class ShopApi
         ["sku"] = p.Sku, ["gtin"] = p.Gtin, ["slug"] = p.Slug, ["url"] = ShopUrls.Product(p.Slug), ["title"] = p.Title, ["summary"] = p.Summary,
         ["description_html"] = p.DescriptionHtml, ["kind"] = p.Kind, ["price_cents"] = p.PriceCents, ["compare_cents"] = p.CompareCents,
         ["tax_percent"] = p.TaxBp / 100m, ["currency"] = cfg.Currency, ["active"] = p.Active, ["stock"] = p.TrackStock ? p.Stock : null,
-        ["weight_g"] = p.WeightGrams, ["category"] = p.Category,
+        ["weight_g"] = p.WeightGrams, ["category"] = p.Category, ["brand"] = p.Brand,
         ["categories"] = new JsonArray(p.ExtraCategories.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(x => (JsonNode)x).ToArray()),
         ["tags"] = new JsonArray(ShopTags.Split(p.Tags).Select(x => (JsonNode)x).ToArray()), ["featured"] = p.Featured, ["image"] = p.Image,
         ["gallery"] = JsonNode.Parse(string.IsNullOrWhiteSpace(p.GalleryJson) ? "[]" : p.GalleryJson),
@@ -205,6 +205,14 @@ internal static class ShopApi
             p = p with { GalleryJson = new JsonArray(g.Select(x => ShopPublic.SafeUrl(x?.ToString() ?? "")).Where(x => x.Length > 0).Take(30).Select(x => (JsonNode)x).ToArray()).ToJsonString() };
         if (o["tags"] is JsonArray ta) p = p with { Tags = ShopTags.Normalise(string.Join(", ", ta.Select(x => x?.ToString() ?? ""))) };
         else if (Has(o, "tags")) p = p with { Tags = ShopTags.Normalise(Str(o, "tags")) };
+        // The brand (manufacturer) by its address or name — an ERP knows the manufacturer's name; a new one is made. "" takes it off.
+        if (Has(o, "brand"))
+        {
+            var bt = Str(o, "brand");
+            if (bt.Length == 0) p = p with { Brand = "" };
+            else if (await store.ResolveBrandAsync(bt, true, ct) is { } br) p = p with { Brand = br.Slug };
+            else return Fail(400, $"„{bt}“ ist kein brauchbarer Markenname.");
+        }
         if (Has(o, "category"))
         {
             var cat = Str(o, "category");

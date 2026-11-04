@@ -19,7 +19,8 @@ internal static class Keys
     public const string ShowCategories = "catalog.showCategories";
     public const string ShowTags = "catalog.showTags";
     public const string ShowFilters = "catalog.showFilters";
-    public const string SearchIn = "catalog.searchIn";
+    public const string SearchIn = "catalog.searchIn";          // the older single choice, read only while the new list was never saved
+    public const string SearchFields = "catalog.searchFields";
     public const string CatPageTags = "catpage.tags";
     public const string CatPageSubs = "catpage.subs";
     public const string CatPageDesc = "catpage.desc";
@@ -56,6 +57,8 @@ internal static class Keys
     public const string AccountsAtCheckout = "checkout.accounts";
     public const string GuestCheckout = "checkout.guest";
     public const string PerPage = "catalog.perPage";
+    public const string ImageFocus = "images.focus";
+    public const string FilterLimit = "catalog.filterLimit";
     public const string Carrier = "track.carrier";
     public const string TrackingUrl = "track.url";
     public const string DownloadDays = "downloads.days";
@@ -85,6 +88,8 @@ internal sealed record ShopConfig
     public bool ShowTags { get; init; } = true;
     public bool ShowFilters { get; init; } = true;
     public string SearchIn { get; init; } = "text";
+    /// <summary>What the shop's search looks at besides the name (<see cref="ShopSearchFields"/>).</summary>
+    public IReadOnlyCollection<string> SearchFields { get; init; } = ShopSearchFields.Parse(ShopSearchFields.Default);
     /// <summary>The page of all categories: the keyword links, the subcategories and the text in a card, the product counts.</summary>
     public bool CatPageTags { get; init; } = true;
     public bool CatPageSubs { get; init; } = true;
@@ -132,6 +137,10 @@ internal sealed record ShopConfig
     public bool AccountsAtCheckout { get; init; } = true;
     public bool GuestCheckout { get; init; } = true;
     public int PerPage { get; init; } = 12;
+    /// <summary>Where a tile crops a picture that names no focus of its own (product field, media library focal point): a CSS position.</summary>
+    public string ImageFocus { get; init; } = "50% 50%";
+    /// <summary>How many entries a filter group (brand, an attribute, keywords) shows before "Weitere …" opens the rest in a dialog with a search; 0 = all of them.</summary>
+    public int FilterLimit { get; init; }
     public int DownloadDays { get; init; } = 30;
     public int DownloadLimit { get; init; } = 5;
     public string CustomCss { get; init; } = "";
@@ -157,6 +166,9 @@ internal sealed record ShopConfig
             InvoiceFooter = s.Get(Keys.InvoiceFooter).Trim(), SellerLogo = ShopPublic.SafeUrl(s.Get(Keys.SellerLogo)),
             ShowSearch = s.GetBool(Keys.ShowSearch), ShowSort = s.GetBool(Keys.ShowSort), ShowCategories = s.GetBool(Keys.ShowCategories), ShowTags = s.GetBool(Keys.ShowTags), ShowFilters = s.GetBool(Keys.ShowFilters),
             SearchIn = s.Get(Keys.SearchIn) is "title" or "all" ? s.Get(Keys.SearchIn) : "text",
+            // A shop that chose "only the name" or "everything" in the older drop-down keeps that until the new list is saved with something else.
+            SearchFields = s.Get(Keys.SearchFields) == ShopSearchFields.Default && s.Get(Keys.SearchIn) is "title" or "all"
+                ? ShopSearchFields.Legacy(s.Get(Keys.SearchIn)) : ShopSearchFields.Parse(s.Get(Keys.SearchFields)),
             CatPageTags = s.GetBool(Keys.CatPageTags), CatPageSubs = s.GetBool(Keys.CatPageSubs), CatPageDesc = s.GetBool(Keys.CatPageDesc), CatPageCounts = s.GetBool(Keys.CatPageCounts), InvoiceAccent = ShopInvoice.AccentOf(s.Get(Keys.InvoiceAccent)),
             Currency = Currencies.Normalise(s.Get(Keys.Currency)),
             Carrier = ShopTracking.Clean(s.Get(Keys.Carrier)), TrackingUrl = ShopTracking.ValidTemplate(s.Get(Keys.TrackingUrl).Trim()) ? s.Get(Keys.TrackingUrl).Trim() : "",
@@ -177,6 +189,8 @@ internal sealed record ShopConfig
             NotifyEmail = s.Get(Keys.NotifyEmail).Trim(),
             AccountsAtCheckout = s.GetBool(Keys.AccountsAtCheckout), GuestCheckout = s.GetBool(Keys.GuestCheckout),
             PerPage = (int)Math.Clamp(s.GetInt(Keys.PerPage, 12), 3, 60),
+            FilterLimit = (int)Math.Clamp(s.GetInt(Keys.FilterLimit, 0), 0, 100),
+            ImageFocus = ShopImages.Clean(s.Get(Keys.ImageFocus)) is { Length: > 0 } focus ? focus : "50% 50%",
             DownloadDays = (int)Math.Clamp(s.GetInt(Keys.DownloadDays, 30), 1, 3650), DownloadLimit = (int)Math.Clamp(s.GetInt(Keys.DownloadLimit, 5), 0, 1000),
             CustomCss = s.Get(Keys.CustomCss),
             LowStock = (int)Math.Clamp(s.GetInt(Keys.LowStock, 3), 0, 1000),
@@ -258,19 +272,25 @@ internal sealed record ShopConfig
         s.Add(new SettingSpec(Keys.RemindHours, "set.remindHours", SettingKind.Number) { Default = "24", Min = 1, Max = 168, Help = "set.remindHoursHelp" });
         s.Add(new SettingSpec(Keys.CustomCss, "set.customCss", SettingKind.TextArea) { Help = "set.customCssHelp" });
         s.Add(new SettingSpec(Keys.ShowSearch, "set.showSearch", SettingKind.Bool) { Group = "set.groupCatalog", Default = "true", Help = "set.showSearchHelp" });
-        s.Add(new SettingSpec(Keys.SearchIn, "set.searchIn", SettingKind.Choice)
+        s.Add(new SettingSpec(Keys.SearchFields, "set.searchFields", SettingKind.MultiChoice)
         {
-            Default = "text", Help = "set.searchInHelp",
-            Options = new[] { new FieldOption("title", "set.searchInTitle"), new FieldOption("text", "set.searchInText"), new FieldOption("all", "set.searchInAll") }
+            Default = ShopSearchFields.Default, Help = "set.searchFieldsHelp",
+            Options = ShopSearchFields.All.Select(f => new FieldOption(f, "set.sf." + f)).ToList()
         });
         s.Add(new SettingSpec(Keys.ShowSort, "set.showSort", SettingKind.Bool) { Default = "true" });
         s.Add(new SettingSpec(Keys.ShowCategories, "set.showCategories", SettingKind.Bool) { Default = "true", Help = "set.showCategoriesHelp" });
         s.Add(new SettingSpec(Keys.ShowTags, "set.showTags", SettingKind.Bool) { Default = "true", Help = "set.showTagsHelp" });
         s.Add(new SettingSpec(Keys.ShowFilters, "set.showFilters", SettingKind.Bool) { Default = "true", Help = "set.showFiltersHelp" });
+        s.Add(new SettingSpec(Keys.FilterLimit, "set.filterLimit", SettingKind.Number) { Default = "0", Min = 0, Max = 100, Help = "set.filterLimitHelp" });
         s.Add(new SettingSpec(Keys.CatPageTags, "set.catPageTags", SettingKind.Bool) { Group = "set.groupCatPage", Default = "true", Help = "set.catPageTagsHelp" });
         s.Add(new SettingSpec(Keys.CatPageSubs, "set.catPageSubs", SettingKind.Bool) { Default = "true" });
         s.Add(new SettingSpec(Keys.CatPageDesc, "set.catPageDesc", SettingKind.Bool) { Default = "true" });
         s.Add(new SettingSpec(Keys.CatPageCounts, "set.catPageCounts", SettingKind.Bool) { Default = "true" });
+        s.Add(new SettingSpec(Keys.ImageFocus, "set.imageFocus", SettingKind.Choice)
+        {
+            Group = "set.groupImages", Default = "50% 50%", Help = "set.imageFocusHelp",
+            Options = ShopImages.Positions.Select(p => new FieldOption(p.Value, p.Label)).ToList()
+        });
     }
 }
 

@@ -193,6 +193,15 @@ internal sealed class PluginSiteFacade : IPluginSite
 
     public IReadOnlyList<string> Locales => Site.ActiveLocales;
 
+    public string ImageUrl(string url, int width) => ThumbnailService.Url(url, width);
+
+    // MediaFocus is per request (it loads the few pictures with a focal point once); outside a request there is none to ask.
+    public string? ImageFocus(string url)
+    {
+        try { return (_services.GetService(typeof(MediaFocus)) as MediaFocus)?.Position(url); }
+        catch (InvalidOperationException) { return null; }
+    }
+
     public async Task<string> RenderBlockAsync(string blockType, JsonNode values, CancellationToken ct = default)
     {
         var registry = _services.GetService(typeof(BlockRegistry)) as BlockRegistry ?? throw new InvalidOperationException("Blöcke sind in diesem Zusammenhang nicht verfügbar.");

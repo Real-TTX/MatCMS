@@ -10,18 +10,25 @@ internal static class ShopUrls
     public const string Root = "/shop";
     public const string CategoriesPage = "/shop/categories";
     public const string TagsPage = "/shop/tags";
+    public const string BrandsPage = "/shop/brands";
 
     public static string Category(string slug) => "/shop/categories/" + Uri.EscapeDataString(slug);
+
+    /// <summary>A brand's own page.</summary>
+    public static string Brand(string slug) => "/shop/brands/" + Uri.EscapeDataString(slug);
 
     public static string Product(string slug) => "/shop/" + Uri.EscapeDataString(slug);
 
     /// <summary>An address of the catalogue with the filters that are set (and only those): the category is the path, the rest the query.</summary>
+    // A list (?tag=a,b · ?brand=x,y · ?a.farbe=Rot,Blau) keeps its commas readable — a comma is allowed in a query and no value holds one of its own.
+    private static string V(string value) => Uri.EscapeDataString(value).Replace("%2C", ",");
+
     public static string Catalog(string cat, string tag = "", string q = "", string sort = "", int page = 1, IEnumerable<KeyValuePair<string, string>>? extra = null)
     {
         var parts = new List<string>();
         foreach (var kv in extra ?? Array.Empty<KeyValuePair<string, string>>())
-            parts.Add(Uri.EscapeDataString(kv.Key) + "=" + Uri.EscapeDataString(kv.Value));
-        if (tag.Length > 0) parts.Add("tag=" + Uri.EscapeDataString(tag));
+            parts.Add(Uri.EscapeDataString(kv.Key) + "=" + V(kv.Value));
+        if (tag.Length > 0) parts.Add("tag=" + V(tag));
         if (q.Length > 0) parts.Add("q=" + Uri.EscapeDataString(q));
         if (sort.Length > 0) parts.Add("sort=" + Uri.EscapeDataString(sort));
         if (page > 1) parts.Add("page=" + page.ToString(System.Globalization.CultureInfo.InvariantCulture));

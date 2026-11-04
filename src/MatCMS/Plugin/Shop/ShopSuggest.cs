@@ -86,10 +86,10 @@ internal static class ShopSuggest
         var answer = new JsonObject { ["q"] = q, ["products"] = new JsonArray(), ["categories"] = new JsonArray(), ["didYouMean"] = null };
         if (q.Length < 2 || !cfg.ShowSearch) return Json(answer);
         var store = ShopStore.Public(ctx);
-        var found = (await store.FindProductsAsync(new ProductQuery { Search = q, SearchIn = cfg.SearchIn, Sort = "", Take = MaxProducts }, ct)).Items;
+        var found = (await store.FindProductsAsync(new ProductQuery { Search = q, SearchIn = cfg.SearchIn, SearchFields = cfg.SearchFields, Sort = "", Take = MaxProducts }, ct)).Items;
         var products = (JsonArray)answer["products"]!;
         foreach (var p in found)
-            products.Add(new JsonObject { ["title"] = p.Title, ["url"] = ShopUrls.Product(p.Slug), ["image"] = ShopPublic.SafeUrl(p.Image), ["price"] = ShopPublic.M(ctx, cfg, p.PriceCents) });
+            products.Add(new JsonObject { ["title"] = p.Title, ["url"] = ShopUrls.Product(p.Slug), ["image"] = ShopImages.Url(ctx, p.Image, ShopImages.Small), ["price"] = ShopPublic.M(ctx, cfg, p.PriceCents) });
         var cats = await store.CategoriesAsync(ct);
         var (counts, _) = await store.FacetsAsync(ct);
         var categories = (JsonArray)answer["categories"]!;
@@ -107,7 +107,10 @@ internal static class ShopSuggest
         + "function attach(input){if(input.__sg||path(input.form)!=='/shop')return;input.__sg=1;var box=null,items=[],cur=-1,timer=0,seq=0;input.setAttribute('autocomplete','off');input.setAttribute('role','combobox');input.setAttribute('aria-expanded','false');"
         + "var host=input.closest('.shop-find,.shop-searchbar,.mat-search')||input.parentNode;"
         + "function close(){if(box){box.remove();box=null}items=[];cur=-1;input.setAttribute('aria-expanded','false')}"
-        + "function place(){if(!box)return;var r=host.getBoundingClientRect();box.style.left=(r.left+scrollX)+'px';box.style.top=(r.bottom+scrollY+4)+'px';box.style.minWidth=Math.max(r.width,280)+'px'}"
+        // FIXED to the window, placed under the box on every scroll: a search box in a sticky header stays where it is while the page moves, and a list placed in
+        // page coordinates scrolled away from it (and under the header). A box scrolled out of sight closes its list.
+        + "var raf=0;function place(){raf=0;if(!box)return;var r=host.getBoundingClientRect();if(r.bottom<0||r.top>innerHeight){close();return}var w=Math.max(r.width,280),l=Math.min(r.left,innerWidth-Math.min(w,innerWidth-8)-4);box.style.left=Math.max(4,l)+'px';box.style.top=(r.bottom+4)+'px';box.style.minWidth=Math.min(w,innerWidth-8)+'px';box.style.maxHeight=Math.max(160,innerHeight-r.bottom-16)+'px'}"
+        + "function later(){if(box&&!raf)raf=requestAnimationFrame(place)}"
         + "function mk(tag,cls,txt){var e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e}"
         + "function link(href,main,sub,img){var a=mk('a','shop-sg-item');a.href=href;a.setAttribute('role','option');if(img){var i=mk('img');i.src=img;i.alt='';i.loading='lazy';a.appendChild(i)}else if(sub){a.appendChild(mk('span','ph'))}var s=mk('span','t');s.appendChild(mk('span','n',main));if(sub)s.appendChild(mk('span','p',sub));a.appendChild(s);return a}"
         + "function draw(d){close();if(!d||(!d.products.length&&!d.categories.length&&!d.didYouMean))return;box=mk('div','shop-suggest');box.setAttribute('role','listbox');"
@@ -120,7 +123,7 @@ internal static class ShopSuggest
         + "function ask(){var q=input.value.trim();if(q.length<2){close();return}var n=++seq;fetch('/shop/suggest?q='+encodeURIComponent(q),{credentials:'same-origin'}).then(function(r){return r.ok?r.json():null}).then(function(d){if(n===seq&&input.value.trim()===q)draw(d)}).catch(function(){})}"
         + "input.addEventListener('input',function(){clearTimeout(timer);timer=setTimeout(ask,180)});"
         + "input.addEventListener('keydown',function(e){if(!box)return;if(e.key==='ArrowDown'){e.preventDefault();mark((cur+1)%items.length)}else if(e.key==='ArrowUp'){e.preventDefault();mark((cur-1+items.length)%items.length)}else if(e.key==='Escape'){close()}else if(e.key==='Enter'&&cur>=0){e.preventDefault();location.href=items[cur].href}});"
-        + "document.addEventListener('click',function(e){if(box&&!host.contains(e.target)&&!box.contains(e.target))close()});window.addEventListener('resize',place);input.addEventListener('blur',function(){setTimeout(function(){if(!host.contains(document.activeElement))close()},150)})}"
+        + "document.addEventListener('click',function(e){if(box&&!host.contains(e.target)&&!box.contains(e.target))close()});window.addEventListener('resize',later);window.addEventListener('scroll',later,{passive:true,capture:true});input.addEventListener('blur',function(){setTimeout(function(){if(!host.contains(document.activeElement))close()},150)})}"
         + "function scan(){[].slice.call(document.querySelectorAll('form input[name=q]')).forEach(attach)}"
         + "if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',scan);else scan()})();</script>";
 

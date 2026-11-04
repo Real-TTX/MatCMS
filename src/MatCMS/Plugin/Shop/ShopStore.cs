@@ -26,13 +26,16 @@ internal sealed partial class ShopStore
             .Json("gallery", def: "[]").Text("kind", def: "physical").Int("price_cents", def: "0").Int("tax_bp", def: "1900").Text("sku")
             .Bool("track_stock", def: "0").Int("stock", def: "0").Int("weight_g", def: "0").Text("category").Int("max_per_order", def: "0")
             .Bool("active", def: "1").Int("sort", def: "0").Timestamp("created").Timestamp("updated").Text("tags").Bool("featured", def: "0").Int("compare_cents", def: "0").Json("var_options", def: "[]")
-            .Text("seo_title").Text("seo_description").Text("cats_extra").Text("gtin")
-            .UniqueIndex("slug").Index("active", "sort").Index("category").Index("sku"));
+            .Text("seo_title").Text("seo_description").Text("cats_extra").Text("gtin").Bool("pickup_only", def: "0").Text("brand", def: "").Text("image_focus", def: "")
+            .UniqueIndex("slug").Index("active", "sort").Index("category").Index("sku").Index("brand"));
         d.Table("variants", t => t.Int("product_id", required: true, def: "0").Text("name", required: true, def: "").Text("sku").Int("price_delta", def: "0")
             .Bool("track_stock", def: "0").Int("stock", def: "0").Bool("active", def: "1").Int("sort", def: "0").Text("image").Text("gtin").Index("product_id").Index("sku"));
         d.Table("product_files", t => t.Int("product_id", required: true, def: "0").Text("file_name", required: true, def: "").Text("storage_name", required: true, def: "")
             .Int("size", def: "0").Int("sort", def: "0").Index("product_id"));
         d.Table("categories", t => t.Text("slug", required: true, def: "").Text("name", required: true, def: "").Int("sort", def: "0").Int("parent_id", def: "0").Text("image", def: "").Text("description", def: "").Text("tags", def: "").Text("rule", def: "").UniqueIndex("slug"));
+        // Brands (manufacturers): a page of their own, a gallery; a product names its brand by slug.
+        d.Table("brands", t => t.Text("slug", required: true, def: "").Text("name", required: true, def: "").Text("logo").Text("image").Text("summary").Text("details")
+            .Text("website").Text("seo_title").Text("seo_description").Bool("featured", def: "0").Bool("active", def: "1").Int("sort", def: "0").Timestamp("updated").UniqueIndex("slug"));
         d.Table("attributes", t => t.Text("slug", required: true, def: "").Text("name", required: true, def: "").Text("kind", def: "choice").Text("options").Text("unit")
             .Bool("filterable", def: "1").Text("category").Int("sort", def: "0").UniqueIndex("slug"));
         d.Table("product_attrs", t => t.Int("product_id", required: true, def: "0").Int("attr_id", required: true, def: "0").Text("value", def: "").Index("product_id").Index("attr_id"));
@@ -63,7 +66,7 @@ internal sealed partial class ShopStore
         d.Table("addresses", t => t.Int("member_id", required: true, def: "0").Text("label").Text("name").Text("line1").Text("line2").Text("zip").Text("city")
             .Text("country", def: "DE").Text("phone").Bool("is_default", def: "0").Index("member_id"));
         d.Table("shipping_rates", t => t.Text("name", required: true, def: "").Text("countries", def: "*").Int("price", def: "0").Int("free_from", def: "0")
-            .Int("max_weight", def: "0").Bool("active", def: "1").Int("sort", def: "0"));
+            .Int("max_weight", def: "0").Bool("active", def: "1").Int("sort", def: "0").Bool("pickup", def: "0"));
         d.Table("invoices", t => t.Int("order_id", required: true, def: "0").Text("number", required: true, def: "").Timestamp("issued").Text("html").Text("kind", def: "invoice").Text("pdf").Int("amount", def: "0")
             .UniqueIndex("number").Index("order_id"));
         d.Table("downloads", t => t.Int("order_id", required: true, def: "0").Int("file_id", def: "0").Text("token_hash", required: true, def: "").Timestamp("expires")
@@ -94,7 +97,7 @@ internal sealed partial class ShopStore
         ExtraCategories = r.Text("cats_extra"), SeoTitle = r.Text("seo_title"), SeoDescription = r.Text("seo_description"),
         GalleryJson = r.Text("gallery") is { Length: > 0 } g ? g : "[]", VariantOptions = r.Text("var_options") is { Length: > 0 } vo ? vo : "[]", Kind = ProductKind.Normalise(r.Text("kind")),
         PriceCents = r.Int("price_cents"), TaxBp = (int)r.Int("tax_bp"), Sku = r.Text("sku"), Gtin = r.Text("gtin"), TrackStock = r.Bool("track_stock"), Stock = r.Int("stock"),
-        WeightGrams = (int)r.Int("weight_g"), Category = r.Text("category"), Tags = r.Text("tags"), Featured = r.Bool("featured"), CompareCents = r.Int("compare_cents"), MaxPerOrder = (int)r.Int("max_per_order"), Active = r.Bool("active"), Sort = (int)r.Int("sort"),
+        WeightGrams = (int)r.Int("weight_g"), Category = r.Text("category"), Tags = r.Text("tags"), Featured = r.Bool("featured"), CompareCents = r.Int("compare_cents"), MaxPerOrder = (int)r.Int("max_per_order"), PickupOnly = r.Bool("pickup_only"), Brand = r.Text("brand"), ImageFocus = ShopImages.Clean(r.Text("image_focus")), Active = r.Bool("active"), Sort = (int)r.Int("sort"),
         CreatedUtc = r.Timestamp("created") ?? DateTime.UtcNow, UpdatedUtc = r.Timestamp("updated") ?? DateTime.UtcNow
     };
 
@@ -103,7 +106,7 @@ internal sealed partial class ShopStore
         ["slug"] = p.Slug, ["title"] = p.Title, ["summary"] = p.Summary, ["description"] = p.DescriptionHtml, ["image"] = p.Image, ["gallery"] = p.GalleryJson, ["var_options"] = p.VariantOptions,
         ["cats_extra"] = p.ExtraCategories, ["seo_title"] = p.SeoTitle, ["seo_description"] = p.SeoDescription,
         ["kind"] = p.Kind, ["price_cents"] = p.PriceCents, ["tax_bp"] = p.TaxBp, ["sku"] = p.Sku, ["gtin"] = p.Gtin, ["track_stock"] = p.TrackStock, ["stock"] = p.Stock,
-        ["weight_g"] = p.WeightGrams, ["category"] = p.Category, ["tags"] = ShopTags.Normalise(p.Tags), ["featured"] = p.Featured, ["compare_cents"] = Math.Max(0, p.CompareCents), ["max_per_order"] = p.MaxPerOrder, ["active"] = p.Active, ["sort"] = p.Sort, ["updated"] = DateTime.UtcNow
+        ["weight_g"] = p.WeightGrams, ["category"] = p.Category, ["tags"] = ShopTags.Normalise(p.Tags), ["featured"] = p.Featured, ["compare_cents"] = Math.Max(0, p.CompareCents), ["max_per_order"] = p.MaxPerOrder, ["pickup_only"] = p.PickupOnly, ["brand"] = p.Brand, ["image_focus"] = ShopImages.Clean(p.ImageFocus), ["active"] = p.Active, ["sort"] = p.Sort, ["updated"] = DateTime.UtcNow
     };
 
     public async Task<Product?> ProductAsync(long id, CancellationToken ct = default) =>
@@ -144,6 +147,7 @@ internal sealed partial class ShopStore
         if (pq.MinCents is { } minC) q = q.Where("price_cents", DataOp.Ge, minC);
         if (pq.MaxCents is { } maxC) q = q.Where("price_cents", DataOp.Le, maxC);
         if (pq.Ids is { } ids) q = q.Where("id", DataOp.In, ids.ToList());
+        if (pq.Brands is { Count: > 0 } brands) q = q.Where("brand", DataOp.In, brands.ToList());
         // A category means itself AND everything below it — and a product belongs to it by its main category, by a further one it was put into, or by the rule of an automatic collection. That is
         // decided in memory (below), after the database has filtered and ordered the rest.
         HashSet<string>? memberSlugs = null; List<Category> ruleCats = new();
@@ -154,12 +158,36 @@ internal sealed partial class ShopStore
             ruleCats = ShopMembership.RuleCategories(allCats, memberSlugs);
         }
         var now = DateTime.UtcNow;
-        if (!string.IsNullOrWhiteSpace(pq.Tag)) q = q.Where("tags", DataOp.Contains, pq.Tag);
+        var tagSel = ShopTags.Selection(pq.Tag);
+        // The database narrows by the longest keyword (the rarest, as a rule); the exact test of every keyword is done below.
+        if (tagSel.Count > 0) q = q.Where("tags", DataOp.Contains, tagSel.OrderByDescending(t => t.Length).First());
         if (!string.IsNullOrWhiteSpace(pq.Search))
         {
-            var where = new List<DataFilter> { new("title", DataOp.Contains, pq.Search), new("sku", DataOp.Contains, pq.Search) };
-            if (pq.SearchIn != "title") { where.Add(new("summary", DataOp.Contains, pq.Search)); where.Add(new("tags", DataOp.Contains, pq.Search)); }
-            if (pq.SearchIn == "all") where.Add(new("description", DataOp.Contains, pq.Search));
+            // The name always; the rest as the operator ticked it. Category, brand and attribute are matched by their NAMES (a category means itself and everything
+            // below it), each turned into the products it holds — one more OR of the same query, never a second list to merge.
+            var s = pq.Search!;
+            var fields = pq.SearchFields ?? ShopSearchFields.Legacy(pq.SearchIn);
+            var where = new List<DataFilter> { new("title", DataOp.Contains, s) };
+            if (fields.Contains(ShopSearchFields.Sku)) { where.Add(new("sku", DataOp.Contains, s)); where.Add(new("gtin", DataOp.Contains, s)); }
+            if (fields.Contains(ShopSearchFields.Summary)) where.Add(new("summary", DataOp.Contains, s));
+            if (fields.Contains(ShopSearchFields.Tags)) where.Add(new("tags", DataOp.Contains, s));
+            if (fields.Contains(ShopSearchFields.Description)) where.Add(new("description", DataOp.Contains, s));
+            if (fields.Contains(ShopSearchFields.Category))
+            {
+                var allCats = await CategoriesAsync(ct);
+                var hit = allCats.Where(c => c.Name.Contains(s, StringComparison.CurrentCultureIgnoreCase)).SelectMany(c => ShopCategories.SlugsUnder(allCats, c.Slug)).Distinct().ToList();
+                if (hit.Count > 0) where.Add(new("category", DataOp.In, hit));
+            }
+            if (fields.Contains(ShopSearchFields.Brand))
+            {
+                var hit = (await BrandsAsync(true, ct)).Where(b => b.Name.Contains(s, StringComparison.CurrentCultureIgnoreCase)).Select(b => b.Slug).ToList();
+                if (hit.Count > 0) where.Add(new("brand", DataOp.In, hit));
+            }
+            if (fields.Contains(ShopSearchFields.Attributes))
+            {
+                var hit = (await T("product_attrs").QueryAsync(DataQuery.Everything.Where("value", DataOp.Contains, s).Page(0, 5000), ct)).Select(r => r.Int("product_id")).Distinct().ToList();
+                if (hit.Count > 0) where.Add(new("id", DataOp.In, hit));
+            }
             q = q.Either(where.ToArray());
         }
         q = pq.Sort switch
@@ -170,10 +198,10 @@ internal sealed partial class ShopStore
             "name" => q.OrderBy("title"),
             _ => q.OrderBy("sort").OrderBy("title")
         };
-        if (!string.IsNullOrWhiteSpace(pq.Tag) || pq.OnSaleOnly || memberSlugs is not null)
+        if (tagSel.Count > 0 || pq.OnSaleOnly || memberSlugs is not null)
         {
             // The database only narrowed it down ("bio" is also inside "biodynamisch"; an earlier price is not yet a higher one); the exact test decides.
-            var all = (await T("products").QueryAsync(q, ct)).Select(ProductOf).Where(p => (string.IsNullOrWhiteSpace(pq.Tag) || ShopTags.Has(p, pq.Tag!)) && (!pq.OnSaleOnly || p.OnSale) && (memberSlugs is null || ShopMembership.In(p, memberSlugs, ruleCats, now))).ToList();
+            var all = (await T("products").QueryAsync(q, ct)).Select(ProductOf).Where(p => ShopTags.HasAll(p, tagSel) && (!pq.OnSaleOnly || p.OnSale) && (memberSlugs is null || ShopMembership.In(p, memberSlugs, ruleCats, now))).ToList();
             var paged = pq.Take > 0 ? all.Skip(pq.Skip).Take(pq.Take).ToList() : all;
             return (await LocalizeAsync(paged, ct), all.Count);
         }
@@ -544,7 +572,7 @@ internal sealed partial class ShopStore
     private static ShippingRate RateOf(DataRow r) => new()
     {
         Id = r.Id, Name = r.Text("name"), Countries = r.Text("countries") is { Length: > 0 } c ? c : "*", PriceCents = r.Int("price"), FreeFromCents = r.Int("free_from"),
-        MaxWeightGrams = (int)r.Int("max_weight"), Active = r.Bool("active"), Sort = (int)r.Int("sort")
+        MaxWeightGrams = (int)r.Int("max_weight"), Pickup = r.Bool("pickup"), Active = r.Bool("active"), Sort = (int)r.Int("sort")
     };
 
     public async Task<IReadOnlyList<ShippingRate>> RatesAsync(bool activeOnly = false, CancellationToken ct = default)
@@ -561,7 +589,7 @@ internal sealed partial class ShopStore
     {
         var values = new Dictionary<string, object?>
         {
-            ["name"] = s.Name, ["countries"] = s.Countries, ["price"] = s.PriceCents, ["free_from"] = s.FreeFromCents, ["max_weight"] = s.MaxWeightGrams, ["active"] = s.Active, ["sort"] = s.Sort
+            ["name"] = s.Name, ["countries"] = s.Countries, ["price"] = s.PriceCents, ["free_from"] = s.FreeFromCents, ["max_weight"] = s.MaxWeightGrams, ["pickup"] = s.Pickup, ["active"] = s.Active, ["sort"] = s.Sort
         };
         if (s.Id == 0) return await T("shipping_rates").InsertAsync(values, ct);
         await T("shipping_rates").UpdateAsync(s.Id, values, ct);

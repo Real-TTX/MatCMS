@@ -208,7 +208,8 @@ internal static class ShopMenu
         if (style == "tiles")
         {
             sb.Append("<div class=\"shop-subcats\">");
-            foreach (var c in level) sb.Append(ShopPublic.CategoryTile(c, catCounts[c.Slug], Url(c)));
+            var tileCfg = ShopConfig.From(ctx.Settings);
+            foreach (var c in level) sb.Append(ShopPublic.CategoryTile(ctx, tileCfg, c, catCounts[c.Slug], Url(c)));
             sb.Append("</div>");
             return PluginResult.Fragment(Wrap(ctx, sb.ToString(), ShopHtml.TileCss));
         }

@@ -794,6 +794,9 @@ table.data .btn { white-space: nowrap; }
 .form-grid { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr); }
 .form-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
 .check { display: flex; align-items: center; gap: 8px; }
+/* UiCheckList: several switches under one label, close together. */
+.ui-checks { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }
+.ui-checks .check { margin: 0; }
 
 /* Template gallery: each card shows a small live-styled preview instead of raw columns */
 .tpl-grid { display: grid; grid-template-columns: repeat(auto-fill, 256px); gap: 20px; }
@@ -1145,6 +1148,20 @@ a.tab { display: inline-block; text-decoration: none; }
 .image-field { display: flex; gap: 12px; align-items: flex-start; }
 .image-field .preview { width: 84px; height: 84px; border: 1px solid var(--line); background: var(--surface-2) center/cover no-repeat; flex-shrink: 0; }
 .image-field .image-controls { flex: 1; }
+/* Focus of an image (UiImage.FocusName): the whole picture with a dot, beside two tiles that crop it like a list does. */
+.ui-focus { margin-top: 12px; }
+.ui-focus-label { font-size: 12px; font-weight: 600; color: var(--text-2, var(--muted)); margin-bottom: 6px; }
+.ui-focus-row { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+.ui-focus-pic { position: relative; display: inline-block; line-height: 0; cursor: crosshair; border: 1px solid var(--line); background: var(--surface-2); }
+.ui-focus-pic img { max-width: 260px; max-height: 200px; display: block; }
+.ui-focus-pic .dot { position: absolute; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; border: 2px solid #fff; background: var(--accent, #2563eb); box-shadow: 0 0 0 1px rgba(0,0,0,.45), 0 1px 4px rgba(0,0,0,.4); pointer-events: none; }
+.ui-focus.is-default .ui-focus-pic .dot { background: transparent; border-style: dashed; }
+.ui-focus-tiles { display: flex; gap: 8px; }
+.ui-focus-tile { width: 84px; height: 84px; border: 1px solid var(--line); background: var(--surface-2) center/cover no-repeat; }
+.ui-focus-tile.wide { width: 150px; }
+.ui-focus-foot { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+.ui-focus-foot .help { font-size: 12px; color: var(--text-muted, var(--muted)); }
+.ui-focus.empty { display: none; }
 
 .editor-actions { display: flex; gap: 12px; margin-top: 26px; padding-top: 20px; border-top: 1px solid var(--line); }
 

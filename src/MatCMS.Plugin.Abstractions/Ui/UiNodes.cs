@@ -371,6 +371,13 @@ public sealed record UiImage(string Name, string Label) : UiField(Name, Label)
 {
     /// <summary>The URL of the current image, or "".</summary>
     public string Value { get; init; } = "";
+    /// <summary>When set, the field also offers a FOCUS: the editor clicks into the picture the point that must stay visible when a tile crops it,
+    /// and it is posted under this name as a CSS position (<c>"30% 20%"</c>; "" = <see cref="FocusDefault"/>, nothing chosen).</summary>
+    public string? FocusName { get; init; }
+    /// <summary>The focus chosen so far ("" = none).</summary>
+    public string Focus { get; init; } = "";
+    /// <summary>The position used while no focus is chosen (the default of the site or the picture), shown in the preview. "50% 50%" when empty.</summary>
+    public string? FocusDefault { get; init; }
 }
 
 /// <summary>Several images (gallery) or files (attachments) from the media library, ordered and removable.

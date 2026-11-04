@@ -59,6 +59,38 @@
         });
     });
 
+    // ---- Focus of an image (UiImage.FocusName): a click into the whole picture sets the point a cropping tile keeps in view ----
+    each("[data-ui-focus]", function (fc) {
+        var field = fc.previousElementSibling, url = field && field.querySelector("[data-ui-image-url]");
+        var pic = fc.querySelector("[data-ui-focus-pic]"), img = fc.querySelector("[data-ui-focus-img]"), dot = fc.querySelector("[data-ui-focus-dot]");
+        var value = fc.querySelector("[data-ui-focus-value]"), reset = fc.querySelector("[data-ui-focus-reset]");
+        var tiles = fc.querySelectorAll("[data-ui-focus-tile]"), def = fc.getAttribute("data-default") || "50% 50%";
+        if (!pic || !img || !value) return;
+        function show() {
+            var pos = value.value || def, src = url ? url.value : img.getAttribute("src") || "";
+            if (src && img.getAttribute("src") !== src) img.setAttribute("src", src);
+            fc.classList.toggle("empty", !src);
+            fc.classList.toggle("is-default", !value.value);
+            var p = pos.split(/\s+/);
+            dot.style.left = p[0]; dot.style.top = p[1];
+            Array.prototype.forEach.call(tiles, function (t) {
+                t.style.backgroundImage = src ? "url('" + src.replace(/'/g, "%27") + "')" : "";
+                t.style.backgroundPosition = pos;
+            });
+        }
+        pic.addEventListener("click", function (e) {
+            var r = img.getBoundingClientRect();
+            if (!r.width || !r.height) return;
+            var x = Math.round(Math.min(100, Math.max(0, (e.clientX - r.left) / r.width * 100)));
+            var y = Math.round(Math.min(100, Math.max(0, (e.clientY - r.top) / r.height * 100)));
+            value.value = x + "% " + y + "%";
+            show();
+        });
+        if (reset) reset.addEventListener("click", function () { value.value = ""; show(); });
+        if (url) { url.addEventListener("input", show); url.addEventListener("change", show); }
+        show();
+    });
+
     // ---- Image list (gallery) / file list (attachments): the value is a JSON array ----
     function nameFromUrl(u) { try { return decodeURIComponent((u || "").split("/").pop().split("?")[0]); } catch (e) { return u; } }
     each("[data-ui-medialist]", function (root) {

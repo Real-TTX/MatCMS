@@ -60,7 +60,7 @@ internal static class ShopExport
     }
 
     public static readonly string[] ProductColumns =
-        { "slug", "title", "summary", "description", "price", "compare", "tax", "sku", "category", "extra_categories", "tags", "stock", "weight", "active", "featured", "kind", "image", "gallery", "seo_title", "seo_description", "pickup_only", "brand" };
+        { "slug", "title", "summary", "description", "price", "compare", "tax", "sku", "category", "extra_categories", "tags", "stock", "weight", "active", "featured", "kind", "image", "gallery", "seo_title", "seo_description", "pickup_only", "brand", "image_focus" };
 
     public static async Task<byte[]> ProductsAsync(ShopStore store, Format f, CancellationToken ct)
     {
@@ -72,7 +72,7 @@ internal static class ShopExport
             {
                 Text(p.Slug, f), Text(p.Title, f), Text(p.Summary, f), Text(p.DescriptionHtml, f), Money(p.PriceCents, f), p.CompareCents > 0 ? Money(p.CompareCents, f) : "", Percent(p.TaxBp, f), Text(p.Sku, f),
                 Text(p.Category, f), Text(p.ExtraCategories.Replace(",", "|"), f), Text(string.Join("|", ShopTags.Split(p.Tags)), f), p.TrackStock ? Number(p.Stock) : "", Number(p.WeightGrams), Yes(p.Active), Yes(p.Featured), Text(p.Kind, f),
-                Text(p.Image, f), Text(gallery, f), Text(p.SeoTitle, f), Text(p.SeoDescription, f), Yes(p.PickupOnly), Text(p.Brand, f)
+                Text(p.Image, f), Text(gallery, f), Text(p.SeoTitle, f), Text(p.SeoDescription, f), Yes(p.PickupOnly), Text(p.Brand, f), Text(p.ImageFocus, f)
             });
         }
         return Document(rows, f);
@@ -115,7 +115,8 @@ internal static class ShopExport
         ["active"] = "active", ["aktiv"] = "active", ["featured"] = "featured", ["hervorgehoben"] = "featured", ["kind"] = "kind", ["art"] = "kind", ["image"] = "image", ["bild"] = "image",
         ["gallery"] = "gallery", ["galerie"] = "gallery", ["seo_title"] = "seo_title", ["meta-titel"] = "seo_title", ["seo_description"] = "seo_description", ["meta-beschreibung"] = "seo_description",
         ["pickup_only"] = "pickup_only", ["nur abholung"] = "pickup_only", ["abholung"] = "pickup_only",
-        ["brand"] = "brand", ["marke"] = "brand", ["hersteller"] = "brand", ["vendor"] = "brand", ["manufacturer"] = "brand"
+        ["brand"] = "brand", ["marke"] = "brand", ["hersteller"] = "brand", ["vendor"] = "brand", ["manufacturer"] = "brand",
+        ["image_focus"] = "image_focus", ["bildfokus"] = "image_focus", ["fokus"] = "image_focus"
     };
 
     private static readonly Dictionary<string, string> VariantAliases = new(StringComparer.OrdinalIgnoreCase)
@@ -188,6 +189,8 @@ internal static class ShopExport
                 if (Has("pickup_only") && Cell("pickup_only").Length > 0) p = p with { PickupOnly = Truth(Cell("pickup_only")) };
                 if (Has("kind") && Cell("kind").Length > 0) p = p with { Kind = Cell("kind").ToLowerInvariant() is "digital" or "download" ? ProductKind.Digital : ProductKind.Physical };
                 if (Has("image")) p = p with { Image = ShopPublic.SafeUrl(Cell("image")) };
+                // "50% 20%" — empty = the default again; anything else is a problem of the row, never a style written as it came.
+                if (Has("image_focus")) { var fo = ShopImages.Clean(Cell("image_focus")); if (fo.Length == 0 && Cell("image_focus").Length > 0) problem ??= $"„{Cell("image_focus")}“ ist kein Bildfokus (z. B. 50% 20%)"; else p = p with { ImageFocus = fo }; }
                 if (Has("gallery")) p = p with { GalleryJson = new JsonArray(Cell("gallery").Split('|', StringSplitOptions.RemoveEmptyEntries).Select(u => ShopPublic.SafeUrl(u.Trim())).Where(u => u.Length > 0).Select(u => (JsonNode)new JsonObject { ["url"] = u, ["alt"] = "" }).ToArray()).ToJsonString() };
                 if (Has("seo_title")) p = p with { SeoTitle = Cell("seo_title").Length > 120 ? Cell("seo_title")[..120] : Cell("seo_title") };
                 if (Has("seo_description")) p = p with { SeoDescription = Cell("seo_description").Length > 320 ? Cell("seo_description")[..320] : Cell("seo_description") };

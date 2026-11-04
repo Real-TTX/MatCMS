@@ -488,3 +488,16 @@ What `docs/shop-vs-shopify.md` listed as missing, built and tested; the rules th
 - **Operations** (assistant, cloud/MCP): `brand.list`, `brand.save` (create or change, found by slug or name; undo `brand.restore`/`brand.remove`), and `brand` in
   `product.create`/`product.update`.
 - Not yet: translations of a brand's texts (they show in the main language everywhere), the brand on the product card.
+
+## Pictures: small copies and the crop focus
+
+- **Lists never load an original.** Every picture the shop shows smaller than it is goes through `ShopImages.Url` → `IPluginSite.ImageUrl(url, width)` (the host's
+  `ThumbnailService`): 320 px for cart/order lines, the filmstrip and back-office rows, 640 px for cards, category tiles and logos, 1200 px for a product's main
+  picture, 1920 px for a header picture. The copy is WebP, made once and stored under `appdata/thumbs/{width}/` (the two small widths right after an upload,
+  the others on the first ask), never part of a backup (rebuilt from the original). Links, the lightbox (`data-full`), `og:image` and JSON-LD keep the ORIGINAL.
+  The card part's `image_url` is the 640 copy now; `image_original` and `image_focus` are new placeholders.
+- **Crop focus** (cards, tiles, lines crop with `background-size: cover`): the product's own `image_focus` (`products.image_focus`, "x% y%"; product form → under
+  the main picture: click into the picture, two tiles preview the crop, "Standard verwenden" clears it; CSV column `image_focus`), else the picture's focal point
+  from the media library (`IPluginSite.ImageFocus`), else the shop's default (Einstellungen → Bilder, `images.focus`, nine positions). Category and brand pictures
+  use the latter two. A focus is only ever two percentages (`ShopImages.Clean`) — it lands in a style attribute.
+- The focus picker is general toolkit: `Ui.Image(...) with { FocusName, Focus, FocusDefault }` (`UiRenderer.FocusPicker`, `ui-fields.js`).

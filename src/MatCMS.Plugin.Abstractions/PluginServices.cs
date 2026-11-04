@@ -365,6 +365,21 @@ public interface IPluginSite
     /// </summary>
     Task<PluginImage?> LoadImageAsync(string url, int maxWidth = 600, CancellationToken ct = default);
 
+    /// <summary>
+    /// The address of a SMALLER copy of a media-library picture, for showing it at about <paramref name="width"/> pixels across (already
+    /// doubled for a sharp screen: a 300&#160;px card asks for 600). Use it wherever a picture is shown smaller than it is — lists, cards,
+    /// thumbnails — and keep the original address for links, the lightbox, share tags and structured data. The copy is made once and stored
+    /// (WebP, never enlarged); anything that cannot be scaled (an outside address, SVG, GIF) comes back unchanged, so the result can always be used.
+    /// </summary>
+    string ImageUrl(string url, int width);
+
+    /// <summary>
+    /// The focal point an editor set for a media-library picture (Medien → Bild → Fokuspunkt) as a CSS position (<c>"30% 20%"</c>), or null when it has
+    /// none. For a picture shown CROPPED (<c>background-size: cover</c>, <c>object-fit: cover</c>): put it into <c>background-position</c> /
+    /// <c>object-position</c> so the important part stays in the frame.
+    /// </summary>
+    string? ImageFocus(string url);
+
     /// <summary>True when the site has AI: its own connection (Einstellungen → KI) or the cloud's relay. Whether a key still works, the first call says.</summary>
     bool AiEnabled { get; }
 

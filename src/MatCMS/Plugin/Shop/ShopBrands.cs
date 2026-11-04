@@ -89,9 +89,9 @@ internal static class ShopBrands
     // ---- shared pieces ----------------------------------------------------------------------------------------
 
     /// <summary>The logo as an image, or the name set as a word when there is none — a brand is always recognisable.</summary>
-    internal static string LogoHtml(Brand x)
+    internal static string LogoHtml(IPluginContext ctx, Brand x)
     {
-        var logo = ShopPublic.SafeUrl(x.Logo);
+        var logo = ShopImages.Url(ctx, x.Logo, ShopImages.Card);
         return logo.Length > 0 ? $"<img src=\"{E(logo)}\" alt=\"{E(x.Name)}\" loading=\"lazy\">" : $"<span class=\"ph\">{E(x.Name)}</span>";
     }
 
@@ -99,7 +99,7 @@ internal static class ShopBrands
     internal static string Tile(IPluginContext ctx, Brand x, bool card, bool name, int? count)
     {
         var sb = new StringBuilder($"<a class=\"shop-brand{(card ? " card" : "")}\" href=\"{E(ShopUrls.Brand(x.Slug))}\"{(name || card ? "" : $" aria-label=\"{E(x.Name)}\" title=\"{E(x.Name)}\"")}>");
-        sb.Append("<span class=\"logo\">").Append(LogoHtml(x)).Append("</span>");
+        sb.Append("<span class=\"logo\">").Append(LogoHtml(ctx, x)).Append("</span>");
         // Without a logo the name already stands in its place.
         if ((name || card) && ShopPublic.SafeUrl(x.Logo).Length > 0) sb.Append($"<span class=\"name\">{E(x.Name)}</span>");
         if (card && x.Summary.Length > 0) sb.Append($"<p class=\"summary\">{E(x.Summary.Length > 160 ? x.Summary[..160].TrimEnd() + "…" : x.Summary)}</p>");
@@ -125,7 +125,7 @@ internal static class ShopBrands
         if (x is null || !x.Active) return (null, new Dictionary<string, string> { ["brand"] = "", ["brand_url"] = "", ["brand_logo_url"] = "", ["brand_html"] = "" });
         var url = ShopUrls.Brand(x.Slug);
         var logo = ShopPublic.SafeUrl(x.Logo);
-        var html = $"<a class=\"shop-brandlink\" href=\"{E(url)}\">{(logo.Length > 0 ? $"<img src=\"{E(logo)}\" alt=\"{E(x.Name)}\">" : $"<strong>{E(x.Name)}</strong>")}<span>{E(ctx.T("shop.brand.more", x.Name))}</span></a>";
+        var html = $"<a class=\"shop-brandlink\" href=\"{E(url)}\">{(logo.Length > 0 ? $"<img src=\"{E(ShopImages.Url(ctx, logo, ShopImages.Small))}\" alt=\"{E(x.Name)}\">" : $"<strong>{E(x.Name)}</strong>")}<span>{E(ctx.T("shop.brand.more", x.Name))}</span></a>";
         return (x, new Dictionary<string, string> { ["brand"] = x.Name, ["brand_url"] = url, ["brand_logo_url"] = logo, ["brand_html"] = html });
     }
 
@@ -203,7 +203,7 @@ internal static class ShopBrands
         var image = ShopPublic.SafeUrl(x.Image);
         var website = SafeWebsite(x.Website);
         var websiteHtml = website.Length > 0 ? $"<p class=\"shop-brandsite\"><a href=\"{E(website)}\" target=\"_blank\" rel=\"noopener\">{E(ctx.T("shop.brand.website"))} ↗</a></p>" : "";
-        var logoHtml = logo.Length > 0 ? $"<div class=\"logo\"><img src=\"{E(logo)}\" alt=\"{E(x.Name)}\"></div>" : "";
+        var logoHtml = logo.Length > 0 ? $"<div class=\"logo\"><img src=\"{E(ShopImages.Url(ctx, logo, ShopImages.Card))}\" alt=\"{E(x.Name)}\"></div>" : "";
         var head = $"<div class=\"shop-brandhead\">{logoHtml}<div><h1>{E(x.Name)}</h1>{(x.Summary.Length > 0 ? $"<p class=\"shop-muted\">{E(x.Summary)}</p>" : "")}{websiteHtml}</div></div>";
         var shopLink = ShopUrls.Catalog("", extra: new[] { new KeyValuePair<string, string>("brand", x.Slug) });
         var notice = x.Active ? "" : Alert(ctx.T("shop.brand.inactiveNote"), "info");
@@ -212,7 +212,7 @@ internal static class ShopBrands
             ["title"] = x.Name, ["name"] = x.Name, ["summary"] = x.Summary, ["url"] = url, ["logo_url"] = logo, ["image_url"] = image, ["website"] = website, ["total"] = Intl(total),
             ["crumbs_html"] = $"<p class=\"shop-crumbs\"><a href=\"/shop\">{E(ctx.T("shop.title"))}</a> › <a href=\"{ShopUrls.BrandsPage}\">{E(ctx.T("shop.brands"))}</a> › {E(x.Name)}</p>" + notice,
             ["head_html"] = head, ["logo_html"] = logoHtml, ["website_html"] = websiteHtml,
-            ["image_html"] = image.Length > 0 ? $"<div class=\"shop-brandhero\" style=\"background-image:url('{E(image)}')\" role=\"img\" aria-label=\"{E(x.Name)}\"></div>" : "",
+            ["image_html"] = image.Length > 0 ? $"<div class=\"shop-brandhero\"{ShopImages.Style(ctx, ShopConfig.From(ctx.Settings), image, ShopImages.Wide)} role=\"img\" aria-label=\"{E(x.Name)}\"></div>" : "",
             ["details_html"] = x.DetailsHtml.Length > 0 ? $"<div class=\"shop-desc shop-branddetails\">{x.DetailsHtml}</div>" : "",       // sanitised when it was saved
             ["products_heading"] = total > 0 ? ctx.T("shop.brand.products", x.Name) : "", ["products_html"] = grid.ToString(), ["pager_html"] = pager.ToString(),
             ["more_html"] = total > 0 ? $"<p class=\"shop-more\"><a class=\"shop-btn ghost\" href=\"{E(shopLink)}\">{E(ctx.T("shop.brand.filter", x.Name))}</a></p>" : ""

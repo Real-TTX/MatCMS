@@ -139,7 +139,7 @@ public class ShopBrandsTests : IClassFixture<AppFactory>, IAsyncLifetime
         var logos = await BlockAsync(v, """{"source":"all","style":"logos","showName":"no","grey":"yes"}""");
         Assert.Contains("class=\"shop-brands grey\"", logos);
         Assert.Contains("href=\"/shop/brands/gal-alpha\"", logos);
-        Assert.Contains("<img src=\"/uploads/gal-alpha.png\" alt=\"Gal Alpha\"", logos);
+        Assert.Contains("<img src=\"/thumb/640/gal-alpha.png\" alt=\"Gal Alpha\"", logos);
         Assert.Contains("<span class=\"ph\">Gal Beta</span>", logos);                  // no logo: the name stands in
 
         var cards = await BlockAsync(v, """{"source":"featured","style":"cards"}""");

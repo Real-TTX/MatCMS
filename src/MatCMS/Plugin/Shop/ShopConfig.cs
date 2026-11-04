@@ -56,6 +56,7 @@ internal static class Keys
     public const string AccountsAtCheckout = "checkout.accounts";
     public const string GuestCheckout = "checkout.guest";
     public const string PerPage = "catalog.perPage";
+    public const string ImageFocus = "images.focus";
     public const string Carrier = "track.carrier";
     public const string TrackingUrl = "track.url";
     public const string DownloadDays = "downloads.days";
@@ -132,6 +133,8 @@ internal sealed record ShopConfig
     public bool AccountsAtCheckout { get; init; } = true;
     public bool GuestCheckout { get; init; } = true;
     public int PerPage { get; init; } = 12;
+    /// <summary>Where a tile crops a picture that names no focus of its own (product field, media library focal point): a CSS position.</summary>
+    public string ImageFocus { get; init; } = "50% 50%";
     public int DownloadDays { get; init; } = 30;
     public int DownloadLimit { get; init; } = 5;
     public string CustomCss { get; init; } = "";
@@ -177,6 +180,7 @@ internal sealed record ShopConfig
             NotifyEmail = s.Get(Keys.NotifyEmail).Trim(),
             AccountsAtCheckout = s.GetBool(Keys.AccountsAtCheckout), GuestCheckout = s.GetBool(Keys.GuestCheckout),
             PerPage = (int)Math.Clamp(s.GetInt(Keys.PerPage, 12), 3, 60),
+            ImageFocus = ShopImages.Clean(s.Get(Keys.ImageFocus)) is { Length: > 0 } focus ? focus : "50% 50%",
             DownloadDays = (int)Math.Clamp(s.GetInt(Keys.DownloadDays, 30), 1, 3650), DownloadLimit = (int)Math.Clamp(s.GetInt(Keys.DownloadLimit, 5), 0, 1000),
             CustomCss = s.Get(Keys.CustomCss),
             LowStock = (int)Math.Clamp(s.GetInt(Keys.LowStock, 3), 0, 1000),
@@ -271,6 +275,11 @@ internal sealed record ShopConfig
         s.Add(new SettingSpec(Keys.CatPageSubs, "set.catPageSubs", SettingKind.Bool) { Default = "true" });
         s.Add(new SettingSpec(Keys.CatPageDesc, "set.catPageDesc", SettingKind.Bool) { Default = "true" });
         s.Add(new SettingSpec(Keys.CatPageCounts, "set.catPageCounts", SettingKind.Bool) { Default = "true" });
+        s.Add(new SettingSpec(Keys.ImageFocus, "set.imageFocus", SettingKind.Choice)
+        {
+            Group = "set.groupImages", Default = "50% 50%", Help = "set.imageFocusHelp",
+            Options = ShopImages.Positions.Select(p => new FieldOption(p.Value, p.Label)).ToList()
+        });
     }
 }
 

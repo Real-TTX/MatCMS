@@ -220,7 +220,7 @@ public class BlogPluginTests
         Assert.Contains("<div class=\"section__intro\"><h2>Neu</h2></div>", cards);
         Assert.Contains("<div class=\"posts-grid cols-2\">", cards);
         Assert.Contains("href=\"/blog/hallo\"", cards);
-        Assert.Contains("background-image:url('/uploads/a.jpg')", cards);
+        Assert.Contains("background-image:url('/thumb/640/a.jpg')", cards);
         Assert.Contains("A &lt;b&gt; &amp; &quot;q&quot;", cards);
         Assert.DoesNotContain("<b>", cards);
         Assert.Contains("<span class=\"post-tag\">t1</span>", cards);

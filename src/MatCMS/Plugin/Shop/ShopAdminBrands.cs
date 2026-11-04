@@ -77,7 +77,7 @@ internal static class ShopAdminBrands
             new[] { Ui.Column(ctx.T("shop.brand")), Ui.Column(ctx.T("shop.adm.products"), right: true), Ui.Column(ctx.T("shop.adm.status")), Ui.Column(ctx.T("shop.adm.sort"), right: true), Ui.Column("", actions: true) },
             brands.Select(x =>
             {
-                var logo = ShopPublic.SafeUrl(x.Logo);
+                var logo = ShopImages.Url(ctx, x.Logo, ShopImages.Small);
                 var thumb = logo.Length > 0 ? $"<span class=\"ui-thumb\" style=\"background:#fff url('{E(logo)}') center/contain no-repeat\"></span>" : "<span class=\"ui-thumb empty\"><i class=\"ti ti-award\"></i></span>";
                 var summary = x.Summary.Length > 90 ? x.Summary[..90] + "…" : x.Summary;
                 var cell = $"<div class=\"ui-media-cell\">{thumb}<div><a href=\"{BrandUrl(x.Id)}\"><strong>{E(x.Name)}</strong></a><div class=\"muted\">{E(x.Slug)}{(summary.Length > 0 ? " · " + E(summary) : "")}</div></div></div>";

@@ -73,7 +73,7 @@ internal static class ShopAdminCatalog
     private static string ProductCell(IPluginContext ctx, Product p, IReadOnlyDictionary<string, string> catNames)
     {
         static string E(string? t) => System.Net.WebUtility.HtmlEncode(t ?? "");
-        var img = ShopPublic.SafeUrl(p.Image);
+        var img = ShopImages.Url(ctx, p.Image, ShopImages.Small);
         var thumb = img.Length > 0 ? $"<span class=\"ui-thumb\" style=\"background-image:url('{E(img)}')\"></span>" : "<span class=\"ui-thumb empty\"><i class=\"ti ti-photo\"></i></span>";
         var sb = new System.Text.StringBuilder("<div class=\"ui-media-cell\">").Append(thumb).Append("<div><a href=\"").Append(ProductUrl(p.Id)).Append("\"><strong>").Append(E(p.Title)).Append("</strong></a>");
         if (p.Featured) sb.Append(" <span class=\"badge badge-new\">").Append(E(ctx.T("shop.adm.featured"))).Append("</span>");
@@ -191,7 +191,7 @@ internal static class ShopAdminCatalog
                 Ui.TextArea("summary", ctx.T("shop.adm.summary"), product.Summary, 2) with { Help = ctx.T("shop.adm.summaryHelp") },
                 Ui.RichText("description", ctx.T("shop.description"), product.DescriptionHtml)),
             Ui.Card(ctx.T("shop.adm.secPictures"),
-                Ui.Image("image", ctx.T("shop.adm.image"), product.Image),
+                Ui.Image("image", ctx.T("shop.adm.image"), product.Image) with { FocusName = "image_focus", Focus = product.ImageFocus, FocusDefault = ShopImages.Focus(ctx, cfg, product.Image) },
                 Ui.MediaList("gallery", ctx.T("shop.adm.gallery"), product.GalleryJson)),
             AttributesCard(ctx, applicable, allAttrs.Count, attrValues),
             VariantsCard(ctx, cfg, product, options, variantRows),
@@ -294,6 +294,7 @@ internal static class ShopAdminCatalog
         return current with
         {
             Title = f.F("title").Trim(), Summary = f.F("summary").Trim(), DescriptionHtml = SafeHtml.Sanitize(f.F("description")), Image = ShopPublic.SafeUrl(f.F("image")),
+            ImageFocus = f.Form.ContainsKey("image_focus") ? ShopImages.Clean(f.F("image_focus")) : current.ImageFocus,
             GalleryJson = CleanGallery(f.F("gallery")), Kind = kind, PriceCents = Math.Max(0, price), CompareCents = Math.Max(0, compare), TaxBp = bp, Sku = f.F("sku").Trim(), Category = f.F("category").Trim(),
             Tags = ShopTags.Normalise(f.F("tags")), Featured = f.Form.ContainsKey("featured"), Brand = f.Form.ContainsKey("brand") ? MatCMS.Pages.Admin.Pages.IndexModel.Slugify(f.F("brand")) : current.Brand,
             SeoTitle = Clip(f.F("seo_title").Trim(), 120), SeoDescription = Clip(f.F("seo_description").Trim(), 320),
@@ -401,7 +402,7 @@ internal static class ShopAdminCatalog
             ShopCategories.Flatten(cats).Select(t =>
             {
                 var c = t.Cat;
-                var img = ShopPublic.SafeUrl(c.Image);
+                var img = ShopImages.Url(ctx, c.Image, ShopImages.Small);
                 var thumb = img.Length > 0 ? $"<span class=\"ui-thumb\" style=\"background-image:url('{E(img)}')\"></span>" : "<span class=\"ui-thumb empty\"><i class=\"ti ti-category\"></i></span>";
                 var desc = c.Description.Length > 90 ? c.Description[..90] + "…" : c.Description;
                 var cell = $"<div class=\"ui-media-cell\" style=\"padding-left:{t.Depth * 28}px\">{(t.Depth > 0 ? "<i class=\"ti ti-corner-down-right muted\" aria-hidden=\"true\"></i>" : "")}{thumb}<div><a href=\"{CategoryUrl(c.Id)}\"><strong>{E(c.Name)}</strong></a><div class=\"muted\">{E(c.Slug)}{(desc.Length > 0 ? " · " + E(desc) : "")}{(c.Tags.Length > 0 ? " · <i class=\"ti ti-tag\" aria-hidden=\"true\"></i> " + E(c.Tags) : "")}</div></div></div>";

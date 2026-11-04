@@ -26,7 +26,7 @@ internal sealed partial class ShopStore
             .Json("gallery", def: "[]").Text("kind", def: "physical").Int("price_cents", def: "0").Int("tax_bp", def: "1900").Text("sku")
             .Bool("track_stock", def: "0").Int("stock", def: "0").Int("weight_g", def: "0").Text("category").Int("max_per_order", def: "0")
             .Bool("active", def: "1").Int("sort", def: "0").Timestamp("created").Timestamp("updated").Text("tags").Bool("featured", def: "0").Int("compare_cents", def: "0").Json("var_options", def: "[]")
-            .Text("seo_title").Text("seo_description").Text("cats_extra").Text("gtin").Bool("pickup_only", def: "0").Text("brand", def: "")
+            .Text("seo_title").Text("seo_description").Text("cats_extra").Text("gtin").Bool("pickup_only", def: "0").Text("brand", def: "").Text("image_focus", def: "")
             .UniqueIndex("slug").Index("active", "sort").Index("category").Index("sku").Index("brand"));
         d.Table("variants", t => t.Int("product_id", required: true, def: "0").Text("name", required: true, def: "").Text("sku").Int("price_delta", def: "0")
             .Bool("track_stock", def: "0").Int("stock", def: "0").Bool("active", def: "1").Int("sort", def: "0").Text("image").Text("gtin").Index("product_id").Index("sku"));
@@ -97,7 +97,7 @@ internal sealed partial class ShopStore
         ExtraCategories = r.Text("cats_extra"), SeoTitle = r.Text("seo_title"), SeoDescription = r.Text("seo_description"),
         GalleryJson = r.Text("gallery") is { Length: > 0 } g ? g : "[]", VariantOptions = r.Text("var_options") is { Length: > 0 } vo ? vo : "[]", Kind = ProductKind.Normalise(r.Text("kind")),
         PriceCents = r.Int("price_cents"), TaxBp = (int)r.Int("tax_bp"), Sku = r.Text("sku"), Gtin = r.Text("gtin"), TrackStock = r.Bool("track_stock"), Stock = r.Int("stock"),
-        WeightGrams = (int)r.Int("weight_g"), Category = r.Text("category"), Tags = r.Text("tags"), Featured = r.Bool("featured"), CompareCents = r.Int("compare_cents"), MaxPerOrder = (int)r.Int("max_per_order"), PickupOnly = r.Bool("pickup_only"), Brand = r.Text("brand"), Active = r.Bool("active"), Sort = (int)r.Int("sort"),
+        WeightGrams = (int)r.Int("weight_g"), Category = r.Text("category"), Tags = r.Text("tags"), Featured = r.Bool("featured"), CompareCents = r.Int("compare_cents"), MaxPerOrder = (int)r.Int("max_per_order"), PickupOnly = r.Bool("pickup_only"), Brand = r.Text("brand"), ImageFocus = ShopImages.Clean(r.Text("image_focus")), Active = r.Bool("active"), Sort = (int)r.Int("sort"),
         CreatedUtc = r.Timestamp("created") ?? DateTime.UtcNow, UpdatedUtc = r.Timestamp("updated") ?? DateTime.UtcNow
     };
 
@@ -106,7 +106,7 @@ internal sealed partial class ShopStore
         ["slug"] = p.Slug, ["title"] = p.Title, ["summary"] = p.Summary, ["description"] = p.DescriptionHtml, ["image"] = p.Image, ["gallery"] = p.GalleryJson, ["var_options"] = p.VariantOptions,
         ["cats_extra"] = p.ExtraCategories, ["seo_title"] = p.SeoTitle, ["seo_description"] = p.SeoDescription,
         ["kind"] = p.Kind, ["price_cents"] = p.PriceCents, ["tax_bp"] = p.TaxBp, ["sku"] = p.Sku, ["gtin"] = p.Gtin, ["track_stock"] = p.TrackStock, ["stock"] = p.Stock,
-        ["weight_g"] = p.WeightGrams, ["category"] = p.Category, ["tags"] = ShopTags.Normalise(p.Tags), ["featured"] = p.Featured, ["compare_cents"] = Math.Max(0, p.CompareCents), ["max_per_order"] = p.MaxPerOrder, ["pickup_only"] = p.PickupOnly, ["brand"] = p.Brand, ["active"] = p.Active, ["sort"] = p.Sort, ["updated"] = DateTime.UtcNow
+        ["weight_g"] = p.WeightGrams, ["category"] = p.Category, ["tags"] = ShopTags.Normalise(p.Tags), ["featured"] = p.Featured, ["compare_cents"] = Math.Max(0, p.CompareCents), ["max_per_order"] = p.MaxPerOrder, ["pickup_only"] = p.PickupOnly, ["brand"] = p.Brand, ["image_focus"] = ShopImages.Clean(p.ImageFocus), ["active"] = p.Active, ["sort"] = p.Sort, ["updated"] = DateTime.UtcNow
     };
 
     public async Task<Product?> ProductAsync(long id, CancellationToken ct = default) =>

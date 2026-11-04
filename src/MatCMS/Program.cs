@@ -961,7 +961,7 @@ app.MapGet("/thumb/{width:int}/{file}", async (int width, string file,
 });
 
 // Simple image upload endpoint used by the block editor / settings / media library (admin only).
-app.MapPost("/admin/api/upload", async (HttpRequest request, IWebHostEnvironment env, MatCMS.Data.AppDbContext db) =>
+app.MapPost("/admin/api/upload", async (HttpRequest request, IWebHostEnvironment env, MatCMS.Data.AppDbContext db, MatCMS.Services.ThumbnailService thumbs) =>
 {
     if (!request.HasFormContentType)
         return Results.BadRequest(new { error = "Ungültige Anfrage." });
@@ -1020,6 +1020,8 @@ app.MapPost("/admin/api/upload", async (HttpRequest request, IWebHostEnvironment
         Height = dims.h
     });
     await db.SaveChangesAsync();
+    // The small copies lists and cards show are stored right away, beside the original (the original stays as it came).
+    if (isImage) thumbs.Warm(name);
 
     return Results.Ok(new { url });
 }).RequireAuthorization("Admin");

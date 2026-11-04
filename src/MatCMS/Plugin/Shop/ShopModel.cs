@@ -80,6 +80,9 @@ internal sealed record Product
     public bool PickupOnly { get; init; }
     /// <summary>The brand (manufacturer) by its slug (see <see cref="Brand"/>); empty = none.</summary>
     public string Brand { get; init; } = "";
+    /// <summary>The point of the main picture a cropping tile keeps in view, as a CSS position (<c>"50% 20%"</c>); empty = the picture's own focal point from the
+    /// media library, else the shop's default (<see cref="ShopImages.Focus"/>).</summary>
+    public string ImageFocus { get; init; } = "";
     public bool Active { get; init; } = true;
     public int Sort { get; init; }
     public DateTime CreatedUtc { get; init; } = DateTime.UtcNow;

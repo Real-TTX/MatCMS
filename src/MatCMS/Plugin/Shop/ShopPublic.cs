@@ -102,12 +102,12 @@ internal static partial class ShopPublic
             crumbsHtml.Append($"<p class=\"shop-crumbs\"><a href=\"/shop\">{E(ctx.T("shop.title"))}</a>");
             foreach (var c in path) crumbsHtml.Append(c.Id == current.Id ? $" › {E(c.Name)}" : $" › <a href=\"{E(CatalogUrl(c.Slug, "", "", ""))}\">{E(c.Name)}</a>");
             crumbsHtml.Append("</p>");
-            if (ShopPublic.SafeUrl(current.Image) is { Length: > 0 } hero) imageHtml = $"<div class=\"shop-cathero\" style=\"background-image:url('{E(hero)}')\" role=\"img\" aria-label=\"{E(current.Name)}\"></div>";
+            if (ShopPublic.SafeUrl(current.Image).Length > 0) imageHtml = $"<div class=\"shop-cathero\"{ShopImages.Style(ctx, cfg, current.Image, ShopImages.Wide)} role=\"img\" aria-label=\"{E(current.Name)}\"></div>";
             var kids = ShopCategories.Children(cats, current.Id).Where(c => catCounts.ContainsKey(c.Slug)).ToList();
             if (kids.Count > 0)
             {
                 subHtml.Append("<div class=\"shop-subcats\">");
-                foreach (var c in kids) subHtml.Append(CategoryTile(c, catCounts.GetValueOrDefault(c.Slug), CatalogUrl(c.Slug, "", "", "")));
+                foreach (var c in kids) subHtml.Append(CategoryTile(ctx, cfg, c, catCounts.GetValueOrDefault(c.Slug), CatalogUrl(c.Slug, "", "", "")));
                 subHtml.Append("</div>");
             }
         }
@@ -258,7 +258,7 @@ internal static partial class ShopPublic
         var img = SafeUrl(c.Image);
         var sb = new StringBuilder("<article class=\"shop-catcard\">");
         sb.Append(img.Length > 0
-            ? $"<a class=\"img\" href=\"{url}\" style=\"background-image:url('{E(img)}')\" aria-label=\"{E(c.Name)}\"></a>"
+            ? $"<a class=\"img\" href=\"{url}\"{ShopImages.Style(ctx, cfg, c.Image, ShopImages.Card)} aria-label=\"{E(c.Name)}\"></a>"
             : $"<a class=\"img empty\" href=\"{url}\" aria-label=\"{E(c.Name)}\"><span>{E(c.Name.Length > 0 ? c.Name[..1].ToUpperInvariant() : "")}</span></a>");
         sb.Append($"<div class=\"body\"><h3><a href=\"{url}\">{E(c.Name)}</a></h3>");
         if (cfg.CatPageCounts) sb.Append($"<div class=\"count\">{E(ProductCount(ctx, count))}</div>");
@@ -287,10 +287,9 @@ internal static partial class ShopPublic
     }
 
     /// <summary>A category as a tile: its picture (or a plain block), name and how many products it holds — the markup the catalogue and the category block share.</summary>
-    internal static string CategoryTile(Category c, int count, string url)
+    internal static string CategoryTile(IPluginContext ctx, ShopConfig cfg, Category c, int count, string url)
     {
-        var img = SafeUrl(c.Image);
-        return $"<a class=\"shop-subcat\" href=\"{E(url)}\"><span class=\"img\"{(img.Length > 0 ? $" style=\"background-image:url('{E(img)}')\"" : "")}></span><span class=\"name\">{E(c.Name)}</span><span class=\"shop-muted\">{Intl(count)}</span></a>";
+        return $"<a class=\"shop-subcat\" href=\"{E(url)}\"><span class=\"img\"{ShopImages.Style(ctx, cfg, c.Image, ShopImages.Card)}></span><span class=\"name\">{E(c.Name)}</span><span class=\"shop-muted\">{Intl(count)}</span></a>";
     }
 
     internal static bool SoldOut(Product p, IReadOnlyList<Variant> variants) =>
@@ -326,7 +325,9 @@ internal static partial class ShopPublic
         var tags = ShopTags.Split(p.Tags);
         return ctx.RenderPart("card", new Dictionary<string, string>
         {
-            ["url"] = url, ["title"] = p.Title, ["image_url"] = img, ["image_style"] = img.Length > 0 ? $" style=\"background-image:url('{E(img)}')\"" : "",
+            // image_url is the card-sized stored copy (a card never needs the original); image_original for a template that links to the picture itself.
+            ["url"] = url, ["title"] = p.Title, ["image_url"] = ShopImages.Url(ctx, img, ShopImages.Card), ["image_original"] = img, ["image_focus"] = img.Length > 0 ? ShopImages.Focus(ctx, cfg, img, p.ImageFocus) : "",
+            ["image_style"] = ShopImages.Style(ctx, cfg, p, ShopImages.Card),
             ["summary"] = v.Summary ? Trunc(p.Summary, 110) : "",
             ["summary_html"] = v.Summary && p.Summary.Length > 0 ? $"<div class=\"shop-muted shop-small\">{E(Trunc(p.Summary, 110))}</div>" : "",
             ["price"] = v.Price ? price : "", ["price_old"] = v.Price && p.OnSale && variants.Count == 0 ? M(ctx, cfg, p.CompareCents) : "", ["save_percent"] = p.OnSale && variants.Count == 0 ? Intl(p.SavePercent) : "",
@@ -337,6 +338,10 @@ internal static partial class ShopPublic
             ["sold_out"] = sold ? "1" : "", ["digital"] = p.IsDigital ? "1" : "", ["pickup_only"] = p.PickupOnly && !p.IsDigital ? "1" : "", ["on_sale"] = p.OnSale && variants.Count == 0 ? "1" : "", ["category"] = p.Category
         });
     }
+
+    /// <summary>The small picture of a cart or order line: a variant with its own picture shows it (with the picture's own focus), else the product's.</summary>
+    internal static string LineImage(IPluginContext ctx, ShopConfig cfg, Product p, Variant? v) =>
+        v?.Image is { Length: > 0 } vi ? ShopImages.Style(ctx, cfg, vi, ShopImages.Small) : ShopImages.Style(ctx, cfg, p, ShopImages.Small);
 
     private static string Trunc(string s, int n) => s.Length <= n ? s : s[..n].TrimEnd() + "…";
 
@@ -372,7 +377,7 @@ internal static partial class ShopPublic
         var sold = SoldOut(p, variants);
         var gallery = ParseGallery(p.GalleryJson);
         var images = new StringBuilder();
-        if (SafeUrl(p.Image).Length > 0) images.Append($"<img class=\"main-img\" src=\"{E(SafeUrl(p.Image))}\" alt=\"{E(p.Title)}\">");
+        if (SafeUrl(p.Image).Length > 0) images.Append($"<img class=\"main-img\" src=\"{E(ShopImages.Url(ctx, p.Image, ShopImages.Large))}\" alt=\"{E(p.Title)}\">");
         if (gallery is { Count: > 0 } gal)
         {
             // Several pictures: thumbnails under the main one (the main picture is the first of them). A click shows that picture in the main place, a click on the main picture opens it large
@@ -384,14 +389,14 @@ internal static partial class ShopPublic
             images.Insert(0, $"<div class=\"shop-gal\" id=\"{gid}\">");
             images.Append("<div class=\"shop-thumbs\">");
             for (var i = 0; i < all.Count; i++)
-                images.Append($"<a class=\"th{(i == 0 ? " on" : "")}\" href=\"{E(all[i])}\" data-src=\"{E(all[i])}\" target=\"_blank\" rel=\"noopener\"><img src=\"{E(all[i])}\" alt=\"\" loading=\"lazy\"></a>");
+                images.Append($"<a class=\"th{(i == 0 ? " on" : "")}\" href=\"{E(all[i])}\" data-src=\"{E(ShopImages.Url(ctx, all[i], ShopImages.Large))}\" data-full=\"{E(all[i])}\" target=\"_blank\" rel=\"noopener\"><img src=\"{E(ShopImages.Url(ctx, all[i], ShopImages.Small))}\" alt=\"\" loading=\"lazy\"></a>");
             images.Append("</div></div>");
             images.Append("<script>(function(){var r=document.getElementById('" + gid + "');if(!r)return;var m=r.querySelector('.main-img'),th=[].slice.call(r.querySelectorAll('.th'));if(!m){m=document.createElement('img');m.className='main-img';m.alt='';r.insertBefore(m,r.firstChild);m.src=th[0].dataset.src}"
                 + "function show(i){i=(i+th.length)%th.length;m.src=th[i].dataset.src;th.forEach(function(x){x.classList.remove('on')});th[i].classList.add('on');return i}"
                 + "th.forEach(function(b,i){b.addEventListener('click',function(e){e.preventDefault();show(i)})});"
                 + "m.style.cursor='zoom-in';m.addEventListener('click',function(){var i=th.findIndex(function(x){return x.classList.contains('on')}),o=document.createElement('div');o.className='shop-lightbox';"
                 + "o.innerHTML='<img alt=\"\"><button type=\"button\" class=\"x\" aria-label=\"×\">×</button>'+(th.length>1?'<button type=\"button\" class=\"p\" aria-label=\"‹\">‹</button><button type=\"button\" class=\"n\" aria-label=\"›\">›</button>':'');"
-                + "var im=o.querySelector('img');im.src=th[i].dataset.src;function go(d){i=show(i+d);im.src=th[i].dataset.src}function close(){document.removeEventListener('keydown',key);o.remove()}"
+                + "var im=o.querySelector('img');im.src=th[i].dataset.full;function go(d){i=show(i+d);im.src=th[i].dataset.full}function close(){document.removeEventListener('keydown',key);o.remove()}"
                 + "function key(e){if(e.key==='Escape')close();else if(e.key==='ArrowRight')go(1);else if(e.key==='ArrowLeft')go(-1)}"
                 + "o.addEventListener('click',function(e){var c=e.target.className;if(c==='x'||e.target===o)close();else if(c==='p')go(-1);else if(c==='n')go(1)});document.addEventListener('keydown',key);document.body.appendChild(o)});})();</script>");
         }
@@ -619,10 +624,9 @@ internal static partial class ShopPublic
             foreach (var l in priced.Lines)
             {
                 var key = $"{Intl(l.Product.Id)}-{Intl(l.Variant?.Id ?? 0)}";
-                var img = SafeUrl(l.Variant?.Image is { Length: > 0 } vi ? vi : l.Product.Image);          // a variant with its own picture shows it
                 var url = ShopUrls.Product(l.Product.Slug);
                 linesForm.Append("<div class=\"shop-line\">");
-                linesForm.Append($"<a class=\"img\" href=\"{E(url)}\"{(img.Length > 0 ? $" style=\"background-image:url('{E(img)}')\"" : "")} aria-label=\"{E(l.Title)}\"></a>");
+                linesForm.Append($"<a class=\"img\" href=\"{E(url)}\"{LineImage(ctx, cfg, l.Product, l.Variant)} aria-label=\"{E(l.Title)}\"></a>");
                 linesForm.Append($"<div class=\"info\"><a class=\"title\" href=\"{E(url)}\">{E(l.Title)}</a>{(l.VariantTitle.Length > 0 ? "<div class=\"shop-muted shop-small\">" + E(l.VariantTitle) + "</div>" : "")}{(l.Product.IsDigital ? "<div class=\"shop-small\"><span class=\"shop-badge\">" + E(ctx.T("shop.digital")) + "</span></div>" : l.Product.PickupOnly ? "<div class=\"shop-small\"><span class=\"shop-badge pickup\">" + E(ctx.T("shop.pickupOnly")) + "</span></div>" : "")}");
                 linesForm.Append($"<div class=\"shop-muted shop-small\">{E(M(ctx, cfg, l.UnitCents))}</div>");
                 linesForm.Append($"<div class=\"controls\"><label class=\"shop-qtylabel\"><span class=\"shop-small shop-muted\">{E(ctx.T("shop.qty"))}</span> <input class=\"shop-qty\" type=\"number\" min=\"0\" max=\"999\" name=\"q:{Intl(l.Product.Id)}:{Intl(l.Variant?.Id ?? 0)}\" value=\"{l.Qty}\" onchange=\"this.form.submit()\"></label>");
@@ -905,8 +909,7 @@ internal static partial class ShopPublic
         sb.Append($"<aside class=\"shop-checkout-side\"><div class=\"shop-card-box shop-summary\"><h2>{E(ctx.T("shop.yourOrder"))}</h2>");
         foreach (var l in priced.Lines)
         {
-            var img = SafeUrl(l.Variant?.Image is { Length: > 0 } vi ? vi : l.Product.Image);          // a variant with its own picture shows it
-            sb.Append($"<div class=\"shop-sline\"><span class=\"img\"{(img.Length > 0 ? $" style=\"background-image:url('{E(img)}')\"" : "")}><b>{l.Qty}</b></span><span class=\"t\">{E(l.DisplayTitle)}</span><span class=\"p\">{E(M(ctx, cfg, l.LineCents))}</span></div>");
+            sb.Append($"<div class=\"shop-sline\"><span class=\"img\"{LineImage(ctx, cfg, l.Product, l.Variant)}><b>{l.Qty}</b></span><span class=\"t\">{E(l.DisplayTitle)}</span><span class=\"p\">{E(M(ctx, cfg, l.LineCents))}</span></div>");
         }
         sb.Append("<div class=\"shop-sum\" style=\"max-width:none\">");
         sb.Append($"<div><span>{E(ctx.T("shop.subtotal"))}</span><span>{E(M(ctx, cfg, totals.Subtotal))}</span></div>");
@@ -1019,8 +1022,7 @@ internal static partial class ShopPublic
         var itemsHtml = new StringBuilder($"<section class=\"shop-card-box\"><h2>{E(ctx.T("shop.item"))}</h2>");
         foreach (var i in items)
         {
-            var img = products.TryGetValue(i.ProductId, out var prod) ? SafeUrl(prod.Image) : "";
-            var thumb = img.Length > 0 ? $"<span class=\"img\" style=\"background-image:url('{E(img)}')\"></span>" : "<span class=\"img\"></span>";
+            var thumb = $"<span class=\"img\"{(products.TryGetValue(i.ProductId, out var prod) ? ShopImages.Style(ctx, cfg, prod, ShopImages.Small) : "")}></span>";
             itemsHtml.Append($"<div class=\"shop-oline\">{thumb}<div><div class=\"t\">{E(i.DisplayTitle)}</div><div class=\"shop-muted shop-small\">{i.Qty} × {E(Mo(i.UnitCents))}</div></div><div class=\"p\">{E(Mo(i.LineCents))}</div></div>");
         }
         itemsHtml.Append("</section>");

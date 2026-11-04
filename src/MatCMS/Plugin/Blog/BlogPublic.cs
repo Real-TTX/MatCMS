@@ -24,6 +24,10 @@ internal static class BlogPublic
     private static string SafeImg(string? s) =>
         !string.IsNullOrWhiteSpace(s) && (s.StartsWith('/') || s.StartsWith("http")) && s.IndexOfAny(new[] { '"', '\'', '<', '>' }) < 0 ? s! : "";
 
+    // A card crops the title picture: the focal point set in the media library keeps the important part in the frame. The value is the host's own "x% y%".
+    private static string FocusCss(IPluginContext ctx, string img) =>
+        ctx.Site.ImageFocus(img) is { Length: > 0 } f && f.All(ch => char.IsDigit(ch) || ch is '%' or ' ' or '.') ? ";background-position:" + f : "";
+
     // ---- the post page --------------------------------------------------------------------------
 
     public static async Task<PluginResult> PostPageAsync(IPluginContext ctx, CancellationToken ct)
@@ -84,7 +88,7 @@ internal static class BlogPublic
 
         // Token values for the template's "post" layout part. Everything dynamic is HTML-encoded here; only the post body
         // (trusted stored HTML) is inserted raw.
-        var heroHtml = titleImg.Length > 0 ? $"<div class=\"post-hero\"><img src=\"{Enc(titleImg)}\" alt=\"{Enc(post.Title)}\" /></div>" : "";
+        var heroHtml = titleImg.Length > 0 ? $"<div class=\"post-hero\"><img src=\"{Enc(ctx.Site.ImageUrl(titleImg, 1920))}\" alt=\"{Enc(post.Title)}\" /></div>" : "";
         var excerptHtml = !string.IsNullOrWhiteSpace(post.Excerpt) ? $"<p class=\"post-lead\">{Enc(post.Excerpt)}</p>" : "";
 
         var tags = (post.Tags ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -320,7 +324,7 @@ internal static class BlogPublic
                 var img = SafeImg(p.TitleImage);
                 sb.Append("<article class=\"blog-post\">");
                 if (img.Length > 0)
-                    sb.Append("<a href=\"/blog/").Append(H(p.Slug)).Append("\" class=\"blog-post__imglink\"><div class=\"blog-post__img\" style=\"background-image:url('").Append(H(img)).Append("')\"></div></a>");
+                    sb.Append("<a href=\"/blog/").Append(H(p.Slug)).Append("\" class=\"blog-post__imglink\"><div class=\"blog-post__img\" style=\"background-image:url('").Append(H(ctx.Site.ImageUrl(img, 1200))).Append("')").Append(FocusCss(ctx, img)).Append("\"></div></a>");
                 sb.Append("<p class=\"blog-post__meta\">").Append(H(GermanDate.Long(p.PublishedAt.ToLocalTime()))).Append("</p>");
                 sb.Append("<h2 class=\"blog-post__title\"><a href=\"/blog/").Append(H(p.Slug)).Append("\">").Append(H(p.Title)).Append("</a></h2>");
                 if (!string.IsNullOrWhiteSpace(p.Tags))
@@ -342,7 +346,7 @@ internal static class BlogPublic
             {
                 var img = SafeImg(p.TitleImage);
                 sb.Append("<article class=\"post-card\"><a class=\"post-card__link\" href=\"/blog/").Append(H(p.Slug)).Append("\">");
-                if (img.Length > 0) sb.Append("<div class=\"post-card__img\" style=\"background-image:url('").Append(H(img)).Append("')\"></div>");
+                if (img.Length > 0) sb.Append("<div class=\"post-card__img\" style=\"background-image:url('").Append(H(ctx.Site.ImageUrl(img, 640))).Append("')").Append(FocusCss(ctx, img)).Append("\"></div>");
                 sb.Append("<div class=\"post-card__body\">");
                 if (!string.IsNullOrWhiteSpace(p.Tags))
                 {

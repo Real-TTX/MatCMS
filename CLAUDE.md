@@ -350,6 +350,9 @@ A built-in plugin (off until switched on), written against the plugin API and no
 - **Brands ("Marken")**: a table `brands` (logo, picture, short text, details shown ONLY on the brand's page, website, SEO) and `products.brand` (slug); `/shop/brands` and
   `/shop/brands/{slug}` (block pages `brands`/`brand`, JSON-LD `Brand` + breadcrumbs, sitemap), `?brand=` filter, block `shop_brands` (logo wall / cards / carousel), menu element,
   CSV/ERP/ops by NAME through `ShopStore.ResolveBrandAsync`. An attribute "Marke" is taken over by one button (Shop → Marken). See docs/shop-plugin.md "Brands".
+- **Pictures**: a list, card or tile never loads an original — `ShopImages.Url/Style` (→ `IPluginSite.ImageUrl`, the stored WebP copies) with a crop focus: the product's
+  `image_focus` → the media library's focal point (`IPluginSite.ImageFocus`) → the shop default `images.focus`. Links, lightbox, share tags and JSON-LD keep the original.
+  See docs/shop-plugin.md "Pictures".
 - **Downloads** are private files streamed by `ShopDownloads.ServeAsync`: paid order, the order's secret key (or the owner, or the admin), a download row that is not revoked or
   expired, a count that is taken atomically.
 - Texts: `ShopStrings.All` (key, German, English in one row); a test checks that every key used in the code has both.
@@ -609,6 +612,9 @@ A click on an item opens an INFO dialog (preview, kind, dimensions, size, focal 
   aside (`Media.OriginalUrl`, deleted with the item and by the cleanup); every later edit starts from the original with the stored settings
   (`Media.CropJson`), "Auf Original zurücksetzen" copies it back. "Als neues Bild" makes a copy row (`SourceMediaId`). The server re-encodes
   whatever the browser sends (`MediaEditor`, ImageSharp — metadata stripped, size limits); the browser's file is never stored as it came.
+- **Thumbnail widths are a closed list** (`ThumbnailService.Widths` = 320/640/1200/1920): a caller asks `Url(src, w)` for the width it NEEDS and gets the
+  next stored one at or above it (`Snap`) — the image blocks asked for 240/480/800/1400 while only 320/1200 existed and silently served every original.
+  An upload stores the two small widths at once (`Warm`); the rest are made on the first ask. Plugins reach it as `IPluginSite.ImageUrl`.
 - **Thumbnail URLs carry a version** (`/thumb/{w}/{name}?v=…`, thumbs are served immutable): `ThumbnailService.Invalidate` deletes the scaled
   copies and bumps the version — never just "forget" it (two edits within one tick would keep the old URL). `/uploads` is `no-cache`, since an
   address no longer means one content forever.

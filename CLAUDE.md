@@ -353,6 +353,8 @@ A built-in plugin (off until switched on), written against the plugin API and no
 - **Pictures**: a list, card or tile never loads an original — `ShopImages.Url/Style` (→ `IPluginSite.ImageUrl`, the stored WebP copies) with a crop focus: the product's
   `image_focus` → the media library's focal point (`IPluginSite.ImageFocus`) → the shop default `images.focus`. Links, lightbox, share tags and JSON-LD keep the original.
   See docs/shop-plugin.md "Pictures".
+- **Catalogue filters**: `?tag=a,b` = ALL keywords (brands and attribute values stay ANY); `catalog.filterLimit` cuts every filter group to N entries with "Weitere …",
+  whose dialog fetches `/shop/filters?group=…` (one group's entries, `CatalogViewAsync(group:)`) only when opened; `?more=group` is the no-script fallback.
 - **Downloads** are private files streamed by `ShopDownloads.ServeAsync`: paid order, the order's secret key (or the owner, or the admin), a download row that is not revoked or
   expired, a count that is taken atomically.
 - Texts: `ShopStrings.All` (key, German, English in one row); a test checks that every key used in the code has both.

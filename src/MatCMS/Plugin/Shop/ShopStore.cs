@@ -158,7 +158,9 @@ internal sealed partial class ShopStore
             ruleCats = ShopMembership.RuleCategories(allCats, memberSlugs);
         }
         var now = DateTime.UtcNow;
-        if (!string.IsNullOrWhiteSpace(pq.Tag)) q = q.Where("tags", DataOp.Contains, pq.Tag);
+        var tagSel = ShopTags.Selection(pq.Tag);
+        // The database narrows by the longest keyword (the rarest, as a rule); the exact test of every keyword is done below.
+        if (tagSel.Count > 0) q = q.Where("tags", DataOp.Contains, tagSel.OrderByDescending(t => t.Length).First());
         if (!string.IsNullOrWhiteSpace(pq.Search))
         {
             var where = new List<DataFilter> { new("title", DataOp.Contains, pq.Search), new("sku", DataOp.Contains, pq.Search) };
@@ -174,10 +176,10 @@ internal sealed partial class ShopStore
             "name" => q.OrderBy("title"),
             _ => q.OrderBy("sort").OrderBy("title")
         };
-        if (!string.IsNullOrWhiteSpace(pq.Tag) || pq.OnSaleOnly || memberSlugs is not null)
+        if (tagSel.Count > 0 || pq.OnSaleOnly || memberSlugs is not null)
         {
             // The database only narrowed it down ("bio" is also inside "biodynamisch"; an earlier price is not yet a higher one); the exact test decides.
-            var all = (await T("products").QueryAsync(q, ct)).Select(ProductOf).Where(p => (string.IsNullOrWhiteSpace(pq.Tag) || ShopTags.Has(p, pq.Tag!)) && (!pq.OnSaleOnly || p.OnSale) && (memberSlugs is null || ShopMembership.In(p, memberSlugs, ruleCats, now))).ToList();
+            var all = (await T("products").QueryAsync(q, ct)).Select(ProductOf).Where(p => ShopTags.HasAll(p, tagSel) && (!pq.OnSaleOnly || p.OnSale) && (memberSlugs is null || ShopMembership.In(p, memberSlugs, ruleCats, now))).ToList();
             var paged = pq.Take > 0 ? all.Skip(pq.Skip).Take(pq.Take).ToList() : all;
             return (await LocalizeAsync(paged, ct), all.Count);
         }

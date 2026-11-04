@@ -39,6 +39,7 @@ public sealed class ShopPlugin : IPlugin
         b.Route("/shop/categories", ShopPublic.CategoriesPageAsync, get);
         b.Route("/shop/tags", ShopPublic.TagsPageAsync, get);
         b.Route("/shop/suggest", ShopSuggest.SuggestAsync, get);
+        b.Route("/shop/filters", ShopPublic.FilterOptionsAsync, get);
         b.Route("/shop/categories/{slug}", ShopPublic.CatalogAsync, get);
         // Brands: the page of all of them, a brand's own page, the gallery block, a menu element and link targets.
         ShopBrands.Register(b);

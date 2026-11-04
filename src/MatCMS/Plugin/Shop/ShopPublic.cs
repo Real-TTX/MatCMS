@@ -10,7 +10,7 @@ namespace MatCMS.Plugin.Shop;
 internal static partial class ShopPublic
 {
     /// <summary>Words a product's address cannot be: they are the shop's own pages.</summary>
-    public static readonly string[] ReservedSlugs = { "categories", "brands", "tags", "cart", "checkout", "order", "download", "invoice", "webhook", "pay", "account", "suggest" };
+    public static readonly string[] ReservedSlugs = { "categories", "brands", "tags", "cart", "checkout", "order", "download", "invoice", "webhook", "pay", "account", "suggest", "filters" };
 
     internal static string M(IPluginContext ctx, ShopConfig cfg, long cents) => Money.Format(cents, cfg.Currency, ctx.Locale);
     private static string Csrf(IPluginContext ctx) => ctx.Antiforgery;
@@ -25,16 +25,25 @@ internal static partial class ShopPublic
     public static async Task<PluginResult> CatalogAsync(IPluginContext ctx, CancellationToken ct) => await ShopPageHost.RunAsync(ctx, "catalog", await CatalogViewAsync(ctx, ct), ct);
 
     /// <summary>What the catalogue says for the request: the values of its page and what it draws without a page of the editors'.</summary>
-    internal static async Task<PageView> CatalogViewAsync(IPluginContext ctx, CancellationToken ct)
+    /// <summary>/shop/filters?group=…&amp;(the catalogue's address) — every entry of ONE filter group, for the "Weitere …" dialog (fetched only when it opens).</summary>
+    public static async Task<PluginResult> FilterOptionsAsync(IPluginContext ctx, CancellationToken ct) =>
+        (await CatalogViewAsync(ctx, ct, ctx.Request.Q("group").Trim() is { Length: > 0 } g ? g : "-")).Early ?? PluginResult.NotFound();
+
+    /// <param name="group">Set by <see cref="FilterOptionsAsync"/>: answer with the entries of this filter group only (the category comes as <c>?cat=</c> then).</param>
+    internal static async Task<PageView> CatalogViewAsync(IPluginContext ctx, CancellationToken ct, string? group = null)
     {
         var cfg = ShopConfig.From(ctx.Settings);
         var store = ShopStore.Public(ctx);
-        var tag = ctx.Request.Q("tag").Trim(); var q = ctx.Request.Q("q").Trim();
+        // Several keywords at once: ?tag=Neuware,Röhre — a product must carry all of them.
+        var tag = string.Join(",", ShopTags.Selection(ctx.Request.Q("tag"))); var q = ctx.Request.Q("q").Trim();
+        // "Weitere …" without script: ?more={group} shows that group in full.
+        var more = ctx.Request.Q("more").Trim();
+        int LimitFor(string g) => g == more ? 0 : cfg.FilterLimit;
         var sort = ProductQuery.NormaliseSort(ctx.Request.Q("sort"));
         var page = int.TryParse(ctx.Request.Q("page"), out var pg) && pg > 0 ? pg : 1;
         // The category is part of the address (/shop/categories/{slug}); the old /shop?cat=… moved there for good.
-        var cat = ctx.Request.R("slug").Trim();
-        if (cat.Length == 0 && ctx.Request.Q("cat").Trim() is { Length: > 0 } old)
+        var cat = group is null ? ctx.Request.R("slug").Trim() : ctx.Request.Q("cat").Trim();
+        if (group is null && cat.Length == 0 && ctx.Request.Q("cat").Trim() is { Length: > 0 } old)
             return PageView.Done(PluginResult.RedirectPermanent(ShopUrls.Catalog(old, tag, q, sort, page)));
         var cats = await store.CategoriesAsync(ct);
         var pq = new ProductQuery { Category = cat.Length > 0 ? cat : null, Tag = tag.Length > 0 ? tag : null, Search = q.Length > 0 ? q : null, SearchIn = cfg.SearchIn, Sort = sort };
@@ -64,13 +73,20 @@ internal static partial class ShopPublic
         IReadOnlyCollection<long>? only = null;
         (long Lo, long Hi)? priceExtent = null;
         var brandGroup = "";
-        if (cfg.ShowFilters)
+        // The keywords the products of this page carry (with the selection applied, so each count says what is left with that keyword added), busiest first.
+        var tagCounts = new List<(string Tag, int Count)>();
+        var brandCounts = new Dictionary<string, int>();
+        if (cfg.ShowFilters || cfg.ShowTags)
         {
             var baseItems = (await store.FindProductsAsync(pq, ct)).Items;
-            if (baseItems.Count > 0) priceExtent = (baseItems.Min(p => p.PriceCents), baseItems.Max(p => p.PriceCents));
-            if (brandsAll.Count > 0)
-                brandGroup = ShopCatalogUi.BrandGroup(ctx, state, brandsAll, baseItems.Where(p => p.Brand.Length > 0).GroupBy(p => p.Brand).ToDictionary(g => g.Key, g => g.Count()));
-            if (filterAttrs.Count > 0)
+            if (cfg.ShowTags)
+                tagCounts = baseItems.SelectMany(p => ShopTags.Split(p.Tags)).GroupBy(t => t, StringComparer.OrdinalIgnoreCase)
+                    .Select(g => (g.First(), g.Count())).OrderByDescending(x => x.Item2).ThenBy(x => x.Item1, StringComparer.OrdinalIgnoreCase).ToList();
+            if (cfg.ShowFilters && baseItems.Count > 0) priceExtent = (baseItems.Min(p => p.PriceCents), baseItems.Max(p => p.PriceCents));
+            brandCounts = baseItems.Where(p => p.Brand.Length > 0).GroupBy(p => p.Brand).ToDictionary(g => g.Key, g => g.Count());
+            if (cfg.ShowFilters && brandsAll.Count > 0)
+                brandGroup = ShopCatalogUi.BrandGroup(ctx, state, brandsAll, brandCounts, LimitFor(ShopCatalogUi.BrandKey));
+            if (cfg.ShowFilters && filterAttrs.Count > 0)
             {
                 var baseIds = baseItems.Select(p => p.Id).ToList();
                 var rows = await store.AttrRowsAsync(baseIds, filterAttrs.Select(a => a.Id).ToList(), ct);
@@ -78,8 +94,17 @@ internal static partial class ShopPublic
                 if (filters.Count > 0) only = ShopAttributes.Match(baseIds, filters, rows).ToList();
             }
         }
+        if (group is not null)
+        {
+            // The dialog of one group: every entry, as the side column would draw it without a limit.
+            var entries = group == ShopCatalogUi.BrandKey && cfg.ShowFilters ? ShopCatalogUi.BrandEntries(state, brandsAll, brandCounts)
+                : group == ShopCatalogUi.TagKey && cfg.ShowTags ? ShopCatalogUi.TagEntries(state, tagCounts)
+                : filterAttrs.FirstOrDefault(a => ShopAttributes.Key(a) == group && a.Kind != AttributeKind.Number) is { } ga && facets.TryGetValue(ga.Id, out var gf) ? ShopCatalogUi.AttrEntries(ctx, state, ga, gf)
+                : null;
+            return PageView.Done(entries is null ? PluginResult.NotFound() : PluginResult.Fragment(ShopCatalogUi.AllBoxes(entries)));
+        }
         var (items, total) = await store.FindProductsAsync(pq with { Ids = only, MinCents = pMin, MaxCents = pMax, Brands = brandSel.Count > 0 ? brandSel : null, Skip = (page - 1) * cfg.PerPage, Take = cfg.PerPage }, ct);
-        var (catCounts, tags) = await store.FacetsAsync(ct);
+        var (catCounts, _) = await store.FacetsAsync(ct);
         var variants = (await store.VariantsOfAsync(items.Select(p => p.Id), ct)).Where(v => v.Active).GroupBy(v => v.ProductId).ToDictionary(g => g.Key, g => g.ToList());
 
         // The page speaks of the category it shows, when there is one (also the title a search engine sees).
@@ -92,7 +117,7 @@ internal static partial class ShopPublic
         var sortHtml = ShopCatalogUi.Sort(ctx, cfg, state);
         var activeHtml = ShopCatalogUi.Active(ctx, cfg, state, brandsAll.ToDictionary(b => b.Slug, b => b.Name));
         var cats2 = ShopCatalogUi.CategoryNav(ctx, cfg, state, cats, catCounts, path);
-        var filtersHtml = cfg.ShowFilters ? ShopCatalogUi.Filters(ctx, cfg, state, filterAttrs, facets, priceExtent, brandGroup) : "";
+        var filtersHtml = cfg.ShowFilters ? ShopCatalogUi.Filters(ctx, cfg, state, filterAttrs, facets, priceExtent, brandGroup, LimitFor) : "";
         // On a category's page: where it sits, its picture and text, and its subcategories as tiles.
         var crumbsHtml = new StringBuilder();
         var subHtml = new StringBuilder();
@@ -111,18 +136,11 @@ internal static partial class ShopPublic
                 subHtml.Append("</div>");
             }
         }
-        var tags2 = new StringBuilder();
-        if (tags.Count > 0 && cfg.ShowTags)
-        {
-            tags2.Append($"<div class=\"shop-fgroup shop-tagsgroup\"><h3>{E(ctx.T("shop.tags"))}</h3><div class=\"shop-tags\" aria-label=\"{E(ctx.T("shop.tags"))}\">");
-            // The busiest keywords, and always the one being filtered by.
-            foreach (var t in tags.Where((x, i) => i < 14 || string.Equals(x.Tag, tag, StringComparison.OrdinalIgnoreCase)))
-            {
-                var on = string.Equals(t.Tag, tag, StringComparison.OrdinalIgnoreCase);
-                tags2.Append($"<a href=\"{E(CatalogUrl(cat, on ? "" : t.Tag, q, sort, 1, fx))}\" class=\"{(on ? "on" : "")}\">{E(t.Tag)}</a>");
-            }
-            tags2.Append("</div></div>");
-        }
+        // The keywords: the busiest (14, or the shop's filter limit) and the switched-on ones; the rest behind "Weitere …".
+        var tags2 = new StringBuilder(cfg.ShowTags ? ShopCatalogUi.TagGroup(ctx, state, tagCounts, more == ShopCatalogUi.TagKey ? 0 : cfg.FilterLimit > 0 ? cfg.FilterLimit : 14) : "");
+        // The dialog's script once, beside the first "Weitere …" (a template may leave either placeholder out).
+        if (tags2.ToString().Contains("shop-fmore", StringComparison.Ordinal)) tags2.Append(ShopCatalogUi.MoreScript);
+        else if (filtersHtml.Contains("shop-fmore", StringComparison.Ordinal)) filtersHtml += ShopCatalogUi.MoreScript;
         var filtered = state.Filtered;
         var count = $"<p class=\"shop-count\">{E(total == 1 ? ctx.T("shop.resultOne") : ctx.T("shop.resultMany", total))}</p>";
         var grid = new StringBuilder();

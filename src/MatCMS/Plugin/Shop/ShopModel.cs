@@ -121,6 +121,24 @@ internal static class ShopTags
     public static string Normalise(string? text) => string.Join(", ", Split(text));
 
     public static bool Has(Product p, string tag) => Split(p.Tags).Any(t => string.Equals(t, tag, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>The keywords a catalogue address asks for (<c>?tag=Neuware,Röhre</c> — a product must carry ALL of them); at most <see cref="MaxSelected"/>.</summary>
+    public static List<string> Selection(string? query) => Split(query).Take(MaxSelected).ToList();
+    public const int MaxSelected = 10;
+
+    /// <summary>The selection with <paramref name="tag"/> switched on or off, as the address carries it.</summary>
+    public static string Toggle(IReadOnlyList<string> selected, string tag) =>
+        string.Join(",", selected.Any(t => string.Equals(t, tag, StringComparison.OrdinalIgnoreCase))
+            ? selected.Where(t => !string.Equals(t, tag, StringComparison.OrdinalIgnoreCase))
+            : selected.Append(tag));
+
+    /// <summary>True when the product carries every keyword of the selection.</summary>
+    public static bool HasAll(Product p, IReadOnlyList<string> selected)
+    {
+        if (selected.Count == 0) return true;
+        var own = Split(p.Tags);
+        return selected.All(s => own.Any(t => string.Equals(t, s, StringComparison.OrdinalIgnoreCase)));
+    }
 }
 
 /// <summary>How a list of products is asked for: what to show, in which order, and which part of it.</summary>
@@ -130,6 +148,7 @@ internal sealed record ProductQuery
     public string? Category { get; init; }
     /// <summary>When set, only products of these brands (slugs; any of them).</summary>
     public IReadOnlyCollection<string>? Brands { get; init; }
+    /// <summary>Keywords, comma-separated: a product must carry all of them (<see cref="ShopTags.Selection"/>).</summary>
     public string? Tag { get; init; }
     public string? Search { get; init; }
     /// <summary>What a search looks at: "title" (name, article number), "text" (+ summary, keywords) or "all" (+ description).</summary>

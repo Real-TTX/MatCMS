@@ -13,6 +13,8 @@ internal sealed record CatalogState(string Cat, string Tag, string Q, string Sor
     public IReadOnlyList<string> BrandList => Brands ?? Array.Empty<string>();
     public string Action => Cat.Length > 0 ? ShopUrls.Category(Cat) : ShopUrls.Root;
     public bool HasPrice => PriceMin is not null || PriceMax is not null;
+    /// <summary>The keywords filtered by (a product must carry all of them; <c>?tag=a,b</c>).</summary>
+    public IReadOnlyList<string> TagList => ShopTags.Selection(Tag);
     public bool Filtered => Cat.Length > 0 || Tag.Length > 0 || Q.Length > 0 || Filters.Count > 0 || HasPrice || BrandList.Count > 0;
 
     /// <summary>The attribute filters (except <paramref name="withoutAttr"/>) and the price as address pairs.</summary>
@@ -81,18 +83,121 @@ internal static class ShopCatalogUi
     }
 
     /// <summary>The brands as a filter group: each one that has something on this page, as a box that switches it on and off (with how many products it has).</summary>
-    public static string BrandGroup(IPluginContext ctx, CatalogState s, IReadOnlyList<Brand> brands, IReadOnlyDictionary<string, int> counts)
+    public static string BrandGroup(IPluginContext ctx, CatalogState s, IReadOnlyList<Brand> brands, IReadOnlyDictionary<string, int> counts, int limit = 0)
     {
-        var offered = brands.Where(b => counts.ContainsKey(b.Slug) || s.BrandList.Contains(b.Slug)).ToList();
-        if (offered.Count == 0 || (offered.Count == 1 && s.BrandList.Count == 0)) return "";
-        var sb = new StringBuilder($"<details class=\"shop-fgroup\" open><summary>{E(ctx.T("shop.brand"))}</summary><div class=\"opts\">");
-        foreach (var b in offered.OrderBy(b => b.Name, StringComparer.CurrentCultureIgnoreCase))
+        var all = BrandEntries(s, brands, counts);
+        if (all.Count == 0 || (all.Count == 1 && s.BrandList.Count == 0)) return "";
+        return $"<details class=\"shop-fgroup\" open><summary>{E(ctx.T("shop.brand"))}</summary>{Entries(ctx, s, BrandKey, ctx.T("shop.brand"), all, limit)}</details>";
+    }
+
+    // ---- filter groups: entries, the limit and "Weitere …" -----------------------------------------------
+
+    /// <summary>The group key of the brand filter and of the keywords (an attribute's is its address key, <c>a.farbe</c>).</summary>
+    public const string BrandKey = "brand", TagKey = "tag";
+
+    /// <summary>"Weitere …" and its dialog, on the site's own variables.</summary>
+    public const string MoreCss = """
+        .shop-fmore{display:inline-block;margin-top:8px;font-size:.9em;color:var(--shop-accent,var(--accent,inherit));text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+        .shop-tagsgroup .shop-fmore{display:block}
+        .shop-fdialog{border:0;border-radius:var(--shop-radius,12px);padding:0;width:min(440px,92vw);max-height:80vh;background:var(--shop-bg,var(--bg,#fff));color:inherit;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+        .shop-fdialog[open]{display:flex;flex-direction:column}.shop-fdialog::backdrop{background:rgba(0,0,0,.4)}
+        .shop-fdialog .hd{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--shop-line,var(--line,rgba(0,0,0,.12)))}
+        .shop-fdialog .x{border:0;background:none;color:inherit;font-size:1.6em;line-height:1;cursor:pointer;padding:0 4px}
+        .shop-fdialog .q{margin:12px 18px 4px;padding:9px 12px;border:1px solid var(--shop-line,var(--line,rgba(0,0,0,.2)));border-radius:8px;font:inherit;background:transparent;color:inherit}
+        .shop-fdialog .body{overflow:auto;padding:0 18px 16px;border:0}.shop-fdialog .body .opts{margin-top:4px}
+        """;
+
+    /// <summary>Opens "Weitere …" as a dialog: the group's entries are fetched from <c>data-more</c> only now, a search box narrows them as one types. Without script (or
+    /// when the fetch fails) the link leads to the page with that group in full. The fetched markup is the shop's own, encoded on the server.</summary>
+    public const string MoreScript = """
+        <script>(function(){if(window.__shopMore)return;window.__shopMore=1;
+        document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a.shop-fmore');if(!a||!window.fetch||!window.HTMLDialogElement)return;e.preventDefault();
+        var d=document.createElement('dialog');d.className='shop-fdialog';
+        d.innerHTML='<div class="hd"><strong></strong><button type="button" class="x">×</button></div><input type="search" class="q"><div class="shop-fgroup body"><p class="shop-muted">…</p></div>';
+        d.querySelector('strong').textContent=a.getAttribute('data-title')||'';var x=d.querySelector('.x');x.setAttribute('aria-label',a.getAttribute('data-close')||'');
+        var q=d.querySelector('.q');q.placeholder=a.getAttribute('data-search')||'';q.setAttribute('aria-label',q.placeholder);var body=d.querySelector('.body');
+        document.body.appendChild(d);d.showModal();d.addEventListener('close',function(){d.remove()});x.addEventListener('click',function(){d.close()});
+        d.addEventListener('click',function(ev){if(ev.target===d)d.close()});
+        fetch(a.getAttribute('data-more'),{credentials:'same-origin'}).then(function(r){if(!r.ok)throw 0;return r.text()}).then(function(h){body.innerHTML=h;q.focus()}).catch(function(){location.href=a.href});
+        q.addEventListener('input',function(){var v=q.value.trim().toLowerCase();Array.prototype.forEach.call(body.querySelectorAll('.opts a'),function(o){o.style.display=!v||o.textContent.toLowerCase().indexOf(v)>=0?'':'none'})});
+        });})();</script>
+        """;
+
+    /// <summary>One entry of a filter group: where a click leads (it is switched on or off there), its words, whether it is on, how many products it has.</summary>
+    internal readonly record struct FilterEntry(string Href, string Label, bool On, int Count);
+
+    private static string Box(FilterEntry e) =>
+        $"<a href=\"{E(e.Href)}\" class=\"{(e.On ? "on" : "")}\" rel=\"nofollow\"><i class=\"box\" aria-hidden=\"true\"></i>{E(e.Label)} <span>{Intl(e.Count)}</span></a>";
+
+    private static string Chip(FilterEntry e) => $"<a href=\"{E(e.Href)}\" class=\"{(e.On ? "on" : "")}\" rel=\"nofollow\">{E(e.Label)}</a>";
+
+    /// <summary>All entries of a group as boxes — what the "Weitere …" dialog shows (<c>/shop/filters?group=…</c>).</summary>
+    public static string AllBoxes(IEnumerable<FilterEntry> entries) => "<div class=\"opts\">" + string.Concat(entries.Select(Box)) + "</div>";
+
+    /// <summary>A group's entries: all of them, or — with a <paramref name="limit"/> — the switched-on ones and the busiest up to the limit (in the group's own order) and a
+    /// "Weitere …" that opens the rest in a dialog with a search. The rest is fetched only when the dialog opens; without script the link shows this group in full.</summary>
+    internal static string Entries(IPluginContext ctx, CatalogState s, string group, string title, IReadOnlyList<FilterEntry> all, int limit, bool chips = false)
+    {
+        IReadOnlyList<FilterEntry> shown = all;
+        if (limit > 0 && all.Count > limit)
+        {
+            var keep = all.Where(e => e.On).Concat(all.Where(e => !e.On).OrderByDescending(e => e.Count))
+                .Take(Math.Max(limit, all.Count(e => e.On))).Select(e => e.Href).ToHashSet(StringComparer.Ordinal);
+            shown = all.Where(e => keep.Contains(e.Href)).ToList();
+        }
+        var sb = new StringBuilder(chips ? $"<div class=\"shop-tags\" aria-label=\"{E(title)}\">" : "<div class=\"opts\">");
+        foreach (var e in shown) sb.Append(chips ? Chip(e) : Box(e));
+        sb.Append("</div>");
+        if (shown.Count < all.Count)
+        {
+            var full = s.Url(extra: s.Extra().Append(new("more", group)));
+            var u = s.Url();
+            var qi = u.IndexOf('?');
+            var frag = "/shop/filters?group=" + Uri.EscapeDataString(group) + (s.Cat.Length > 0 ? "&cat=" + Uri.EscapeDataString(s.Cat) : "") + (qi >= 0 ? "&" + u[(qi + 1)..] : "");
+            sb.Append($"<a class=\"shop-fmore\" href=\"{E(full)}\" data-more=\"{E(frag)}\" data-title=\"{E(title)}\" data-search=\"{E(ctx.T("shop.filterSearch"))}\" data-close=\"{E(ctx.T("shop.filterClose"))}\" rel=\"nofollow\">{E(ctx.T("shop.filterMore", all.Count - shown.Count))}</a>");
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>The brands as filter entries: each one that has something on this page (alphabetical), switched on and off one by one.</summary>
+    public static List<FilterEntry> BrandEntries(CatalogState s, IReadOnlyList<Brand> brands, IReadOnlyDictionary<string, int> counts) =>
+        brands.Where(b => counts.ContainsKey(b.Slug) || s.BrandList.Contains(b.Slug)).OrderBy(b => b.Name, StringComparer.CurrentCultureIgnoreCase).Select(b =>
         {
             var on = s.BrandList.Contains(b.Slug);
             var next = on ? s.BrandList.Where(x => x != b.Slug).ToList() : s.BrandList.Append(b.Slug).ToList();
-            sb.Append($"<a href=\"{E(s.Url(extra: s.WithBrands(next)))}\" class=\"{(on ? "on" : "")}\" rel=\"nofollow\"><i class=\"box\" aria-hidden=\"true\"></i>{E(b.Name)} <span>{Intl(counts.GetValueOrDefault(b.Slug))}</span></a>");
-        }
-        return sb.Append("</div></details>").ToString();
+            return new FilterEntry(s.Url(extra: s.WithBrands(next)), b.Name, on, counts.GetValueOrDefault(b.Slug));
+        }).ToList();
+
+    /// <summary>The values of a choice attribute as filter entries (any of them; each switched on and off on its own).</summary>
+    public static List<FilterEntry> AttrEntries(IPluginContext ctx, CatalogState s, ShopAttribute a, AttributeFacet fc)
+    {
+        var mine = s.Filters.FirstOrDefault(f => f.Attr.Id == a.Id);
+        return fc.Values.Select(vc =>
+        {
+            var on = mine?.Values.Contains(vc.Value, StringComparer.OrdinalIgnoreCase) == true;
+            var next = on ? mine!.Values.Where(x => !string.Equals(x, vc.Value, StringComparison.OrdinalIgnoreCase)).ToList() : (mine?.Values ?? Array.Empty<string>()).Append(vc.Value).ToList();
+            var extra = s.Extra(a.Id);
+            if (next.Count > 0) extra.Add(new(ShopAttributes.Key(a), string.Join(",", next)));
+            return new FilterEntry(s.Url(extra: extra), a.Kind == AttributeKind.Bool ? ctx.T("shop.attrYes") : vc.Value, on, vc.Count);
+        }).ToList();
+    }
+
+    /// <summary>The keywords as filter entries: those the products of this page carry (busiest first) and the ones switched on. A click adds a keyword to the selection or
+    /// takes it off — a product must carry all of them, so the counts say what is left with that keyword added.</summary>
+    public static List<FilterEntry> TagEntries(CatalogState s, IReadOnlyList<(string Tag, int Count)> tags)
+    {
+        var sel = s.TagList;
+        var list = tags.ToList();
+        foreach (var t in sel) if (!list.Any(x => string.Equals(x.Tag, t, StringComparison.OrdinalIgnoreCase))) list.Add((t, 0));
+        return list.Select(t => new FilterEntry(s.Url(tag: ShopTags.Toggle(sel, t.Tag)), t.Tag, sel.Any(x => string.Equals(x, t.Tag, StringComparison.OrdinalIgnoreCase)), t.Count)).ToList();
+    }
+
+    /// <summary>The keywords group of the side column ("" when there are none).</summary>
+    public static string TagGroup(IPluginContext ctx, CatalogState s, IReadOnlyList<(string Tag, int Count)> tags, int limit)
+    {
+        var all = TagEntries(s, tags);
+        if (all.Count == 0) return "";
+        return $"<div class=\"shop-fgroup shop-tagsgroup\"><h3>{E(ctx.T("shop.tags"))}</h3>{Entries(ctx, s, TagKey, ctx.T("shop.tags"), all, limit, chips: true)}</div>";
     }
 
     // ---- the controls ----------------------------------------------------------------------------------------
@@ -149,7 +254,7 @@ internal static class ShopCatalogUi
     }
 
     /// <summary>The filters: the price range, then each attribute that has something to pick — its values as boxes that switch them on and off (with how many products have them), or a from–to for a number.</summary>
-    public static string Filters(IPluginContext ctx, ShopConfig cfg, CatalogState s, IReadOnlyList<ShopAttribute> attrs, IReadOnlyDictionary<long, AttributeFacet> facets, (long Lo, long Hi)? priceExtent, string brandGroup = "")
+    public static string Filters(IPluginContext ctx, ShopConfig cfg, CatalogState s, IReadOnlyList<ShopAttribute> attrs, IReadOnlyDictionary<long, AttributeFacet> facets, (long Lo, long Hi)? priceExtent, string brandGroup = "", Func<string, int>? limitFor = null)
     {
         var sb = new StringBuilder();
         if (priceExtent is { } pe && (pe.Lo != pe.Hi || s.HasPrice))
@@ -176,16 +281,8 @@ internal static class ShopCatalogUi
                 continue;
             }
             if (fc.Values.Count == 0) continue;
-            sb.Append($"<details class=\"shop-fgroup\" open><summary>{title}</summary><div class=\"opts\">");
-            foreach (var (value, count) in fc.Values)
-            {
-                var on = mine?.Values.Contains(value, StringComparer.OrdinalIgnoreCase) == true;
-                var next = on ? mine!.Values.Where(x => !string.Equals(x, value, StringComparison.OrdinalIgnoreCase)).ToList() : (mine?.Values ?? Array.Empty<string>()).Append(value).ToList();
-                var extra = s.Extra(a.Id);
-                if (next.Count > 0) extra.Add(new(ShopAttributes.Key(a), string.Join(",", next)));
-                sb.Append($"<a href=\"{E(s.Url(extra: extra))}\" class=\"{(on ? "on" : "")}\" rel=\"nofollow\"><i class=\"box\" aria-hidden=\"true\"></i>{E(a.Kind == AttributeKind.Bool ? ctx.T("shop.attrYes") : value)} <span>{Intl(count)}</span></a>");
-            }
-            sb.Append("</div></details>");
+            var key = ShopAttributes.Key(a);
+            sb.Append($"<details class=\"shop-fgroup\" open><summary>{title}</summary>{Entries(ctx, s, key, a.Name, AttrEntries(ctx, s, a, fc), limitFor?.Invoke(key) ?? 0)}</details>");
         }
         if (sb.Length == 0) return "";
         var reset = s.Filters.Count > 0 || s.BrandList.Count > 0 ? $"<a class=\"clear\" href=\"{E(s.Url(extra: s.Extra(attrs: false, brand: false)))}\" rel=\"nofollow\">{E(ctx.T("shop.attrFilterReset"))}</a>" : "";
@@ -199,7 +296,7 @@ internal static class ShopCatalogUi
         foreach (var b in s.BrandList)
             chips.Add((ctx.T("shop.chip.brand", brandNames?.GetValueOrDefault(b) ?? b), s.Url(extra: s.WithBrands(s.BrandList.Where(x => x != b).ToList()))));
         if (s.Q.Length > 0) chips.Add((ctx.T("shop.chip.search", s.Q), s.Url(q: "")));
-        if (s.Tag.Length > 0) chips.Add((ctx.T("shop.chip.tag", s.Tag), s.Url(tag: "")));
+        foreach (var t in s.TagList) chips.Add((ctx.T("shop.chip.tag", t), s.Url(tag: ShopTags.Toggle(s.TagList, t))));
         string N(double d) => d.ToString("0.##", CultureInfo.InvariantCulture);
         foreach (var f in s.Filters)
         {

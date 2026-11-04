@@ -501,3 +501,13 @@ What `docs/shop-vs-shopify.md` listed as missing, built and tested; the rules th
   from the media library (`IPluginSite.ImageFocus`), else the shop's default (Einstellungen → Bilder, `images.focus`, nine positions). Category and brand pictures
   use the latter two. A focus is only ever two percentages (`ShopImages.Clean`) — it lands in a style attribute.
 - The focus picker is general toolkit: `Ui.Image(...) with { FocusName, Focus, FocusDefault }` (`UiRenderer.FocusPicker`, `ui-fields.js`).
+
+## Filters: several keywords, a limit and "Weitere …"
+
+- **Keywords combine:** `?tag=Gebraucht,Röhre` — a product must carry ALL of them (`ShopTags.Selection/HasAll`; the database narrows by the longest, the exact test is in memory).
+  The side column offers the keywords the products of the page carry, counted WITH the selection (what is left if one is added); a click adds a keyword or takes it
+  off (`ShopTags.Toggle`), every chosen one has its own chip. Lists in an address keep their commas readable (`ShopUrls.Catalog`).
+- **Filter limit** (Einstellungen → Katalog und Suche → "Einträge pro Filter", `catalog.filterLimit`, 0 = all, as before): brand, every choice attribute and the
+  keywords show the chosen entries and the busiest up to the limit (keywords: 14 while the limit is 0), the rest behind "Weitere … (n)". The dialog
+  (`ShopCatalogUi.MoreScript`, `.shop-fdialog`) fetches `/shop/filters?group={brand|tag|a.slug}&cat=…&(the page's query)` only when it opens — every entry of that ONE
+  group as `.opts` boxes — and narrows them as one types. Without script (or a failed fetch) the link is the page with `?more={group}`, that group in full.

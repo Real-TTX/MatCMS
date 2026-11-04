@@ -57,6 +57,7 @@ internal static class Keys
     public const string GuestCheckout = "checkout.guest";
     public const string PerPage = "catalog.perPage";
     public const string ImageFocus = "images.focus";
+    public const string FilterLimit = "catalog.filterLimit";
     public const string Carrier = "track.carrier";
     public const string TrackingUrl = "track.url";
     public const string DownloadDays = "downloads.days";
@@ -135,6 +136,8 @@ internal sealed record ShopConfig
     public int PerPage { get; init; } = 12;
     /// <summary>Where a tile crops a picture that names no focus of its own (product field, media library focal point): a CSS position.</summary>
     public string ImageFocus { get; init; } = "50% 50%";
+    /// <summary>How many entries a filter group (brand, an attribute, keywords) shows before "Weitere …" opens the rest in a dialog with a search; 0 = all of them.</summary>
+    public int FilterLimit { get; init; }
     public int DownloadDays { get; init; } = 30;
     public int DownloadLimit { get; init; } = 5;
     public string CustomCss { get; init; } = "";
@@ -180,6 +183,7 @@ internal sealed record ShopConfig
             NotifyEmail = s.Get(Keys.NotifyEmail).Trim(),
             AccountsAtCheckout = s.GetBool(Keys.AccountsAtCheckout), GuestCheckout = s.GetBool(Keys.GuestCheckout),
             PerPage = (int)Math.Clamp(s.GetInt(Keys.PerPage, 12), 3, 60),
+            FilterLimit = (int)Math.Clamp(s.GetInt(Keys.FilterLimit, 0), 0, 100),
             ImageFocus = ShopImages.Clean(s.Get(Keys.ImageFocus)) is { Length: > 0 } focus ? focus : "50% 50%",
             DownloadDays = (int)Math.Clamp(s.GetInt(Keys.DownloadDays, 30), 1, 3650), DownloadLimit = (int)Math.Clamp(s.GetInt(Keys.DownloadLimit, 5), 0, 1000),
             CustomCss = s.Get(Keys.CustomCss),
@@ -271,6 +275,7 @@ internal sealed record ShopConfig
         s.Add(new SettingSpec(Keys.ShowCategories, "set.showCategories", SettingKind.Bool) { Default = "true", Help = "set.showCategoriesHelp" });
         s.Add(new SettingSpec(Keys.ShowTags, "set.showTags", SettingKind.Bool) { Default = "true", Help = "set.showTagsHelp" });
         s.Add(new SettingSpec(Keys.ShowFilters, "set.showFilters", SettingKind.Bool) { Default = "true", Help = "set.showFiltersHelp" });
+        s.Add(new SettingSpec(Keys.FilterLimit, "set.filterLimit", SettingKind.Number) { Default = "0", Min = 0, Max = 100, Help = "set.filterLimitHelp" });
         s.Add(new SettingSpec(Keys.CatPageTags, "set.catPageTags", SettingKind.Bool) { Group = "set.groupCatPage", Default = "true", Help = "set.catPageTagsHelp" });
         s.Add(new SettingSpec(Keys.CatPageSubs, "set.catPageSubs", SettingKind.Bool) { Default = "true" });
         s.Add(new SettingSpec(Keys.CatPageDesc, "set.catPageDesc", SettingKind.Bool) { Default = "true" });

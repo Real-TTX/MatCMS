@@ -7,29 +7,27 @@
     <h1>@T["about.title"]</h1>
 </div>
 
-<div class="card">
-    <h2>@T["about.version"]</h2>
-    <div class="kv">
-        <span class="kv-label">@T["about.runningVersion"]</span>
-        <span class="kv-value mono">@Model.Current</span>
-    </div>
-    <div class="kv">
-        <span class="kv-label">@T["about.image"]</span>
-        <span class="kv-value mono">@Model.ImageRef</span>
-    </div>
+<div class="about-page">
+    @await Html.PartialAsync("_AboutCard", new MatCMS.Shared.Web.AboutCard("MatCMS", "/img/logo.svg", "/img/logo-dark.svg", 191,
+        Model.Current, [T["about.channelRelease"], T["about.channelNightly"], T["about.channelLocal"]],
+        "https://matcms.de", "matcms.de", "© " + DateTime.UtcNow.Year + " MatCMS · " + T["about.rights"]))
 
-    <div class="update-check" style="margin-top:18px;">
-        <button type="button" id="check-btn" class="btn btn-sm">@T["about.checkUpdates"]</button>
-        <span id="check-result" class="update-result"></span>
+    <div class="card">
+        <h2>@T["about.version"]</h2>
+        <div class="kv">
+            <span class="kv-label">@T["about.image"]</span>
+            <span class="kv-value mono">@Model.ImageRef</span>
+        </div>
+
+        <div class="update-check" style="margin-top:18px;">
+            <button type="button" id="check-btn" class="btn btn-sm">@T["about.checkUpdates"]</button>
+            <span id="check-result" class="update-result"></span>
+        </div>
+
+        <p class="help" style="margin-top:18px;">@T["about.updateVia"]</p>
+        <pre class="code-block"><code>@Model.UpdateCommand</code></pre>
     </div>
 </div>
-
-<div class="card">
-    <h2>@T["about.howToUpdate"]</h2>
-    <p class="help">@T["about.updateVia"]</p>
-    <pre class="code-block"><code>@Model.UpdateCommand</code></pre>
-</div>
-
 @section Scripts {
     <script>
         (function () {

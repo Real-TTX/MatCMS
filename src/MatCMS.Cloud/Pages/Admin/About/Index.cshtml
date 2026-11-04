@@ -7,31 +7,37 @@
     <h1>@T["about.title"]</h1>
 </div>
 
-@* The cloud's own version — the same card as Hosting → Updates, read-only here (updating is a Hosting action). *@
-<partial name="_CloudUpdateCard" model="Model.Card" />
+<div class="about-page">
+    @await Html.PartialAsync("_AboutCard", new MatCMS.Shared.Web.AboutCard("MatCMS Cloud", "/img/logo.svg", "/img/logo-dark.svg", 171,
+        Model.Current, [T["about.channelRelease"], T["about.channelNightly"], T["about.channelLocal"]],
+        "https://matcms.de", "matcms.de", "© " + DateTime.UtcNow.Year + " MatCMS · " + T["about.rights"]))
 
-<div class="card">
-    <h2>@T["about.instanceImage"]</h2>
-    <div class="kv">
-        <div class="kv-label">@T["about.image"]</div>
-        <div class="kv-value mono">@Model.InstanceImageRef</div>
-    </div>
-    <div class="kv">
-        <div class="kv-label">@T["dashboard.latestRelease"]</div>
-        <div class="kv-value mono">@(Model.InstanceLatest ?? T["common.unknown"])</div>
-    </div>
-    <div class="kv">
-        <div class="kv-label">@T["dashboard.lastCheck"]</div>
-        <div class="kv-value muted">
-            @(Model.InstanceChecked is null ? T["common.never"] : Model.InstanceChecked.Value.ToString("dd.MM.yyyy HH:mm") + " UTC")
+    @* The cloud's own version — the same card as Hosting → Updates, read-only here (updating is a Hosting action). *@
+    <partial name="_CloudUpdateCard" model="Model.Card" />
+
+    <div class="card">
+        <h2>@T["about.instanceImage"]</h2>
+        <div class="kv">
+            <div class="kv-label">@T["about.image"]</div>
+            <div class="kv-value mono">@Model.InstanceImageRef</div>
+        </div>
+        <div class="kv">
+            <div class="kv-label">@T["dashboard.latestRelease"]</div>
+            <div class="kv-value mono">@(Model.InstanceLatest ?? T["common.unknown"])</div>
+        </div>
+        <div class="kv">
+            <div class="kv-label">@T["dashboard.lastCheck"]</div>
+            <div class="kv-value muted">
+                @(Model.InstanceChecked is null ? T["common.never"] : Model.InstanceChecked.Value.ToString("dd.MM.yyyy HH:mm") + " UTC")
+            </div>
         </div>
     </div>
-</div>
 
-<div class="form-actions">
-    <a class="btn" asp-page="Index" asp-route-check="true">@T["about.checkUpdates"]</a>
-    @if (User.IsInRole("Admin"))
-    {
-        <a class="btn btn-ghost" asp-page="/Admin/Hosting/Index" asp-fragment="updates">@T["hosting.navUpdates"]</a>
-    }
+    <div class="form-actions">
+        <a class="btn" asp-page="Index" asp-route-check="true">@T["about.checkUpdates"]</a>
+        @if (User.IsInRole("Admin"))
+        {
+            <a class="btn btn-ghost" asp-page="/Admin/Hosting/Index" asp-fragment="updates">@T["hosting.navUpdates"]</a>
+        }
+    </div>
 </div>

@@ -332,3 +332,9 @@ body.login-matui { background: var(--mat-bg); font-family: var(--mat-font); font
 .login-matui .checkbox-row { font-size: var(--mat-fs-sm); color: var(--mat-text-muted); margin-bottom: var(--mat-space-5); }
 .login-matui .login-back { font-size: var(--mat-fs-sm); color: var(--mat-text-muted); }
 .login-matui .login-back:hover { color: var(--mat-accent-text); }
+
+/* "Über …" (Pages/Shared/_AboutCard.cshtml): MatDesign's About card, narrow like Matmon's — the version page is a card
+   and a few lines, not a full-width form. */
+.about-page { max-width: 640px; display: flex; flex-direction: column; gap: var(--mat-space-5); }
+.about-card .about-card__logo { height: 44px; }
+.about-card .mat-card__foot { font-size: var(--mat-fs-sm); }

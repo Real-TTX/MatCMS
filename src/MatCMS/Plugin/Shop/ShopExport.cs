@@ -60,7 +60,7 @@ internal static class ShopExport
     }
 
     public static readonly string[] ProductColumns =
-        { "slug", "title", "summary", "description", "price", "compare", "tax", "sku", "category", "extra_categories", "tags", "stock", "weight", "active", "featured", "kind", "image", "gallery", "seo_title", "seo_description" };
+        { "slug", "title", "summary", "description", "price", "compare", "tax", "sku", "category", "extra_categories", "tags", "stock", "weight", "active", "featured", "kind", "image", "gallery", "seo_title", "seo_description", "pickup_only" };
 
     public static async Task<byte[]> ProductsAsync(ShopStore store, Format f, CancellationToken ct)
     {
@@ -72,7 +72,7 @@ internal static class ShopExport
             {
                 Text(p.Slug, f), Text(p.Title, f), Text(p.Summary, f), Text(p.DescriptionHtml, f), Money(p.PriceCents, f), p.CompareCents > 0 ? Money(p.CompareCents, f) : "", Percent(p.TaxBp, f), Text(p.Sku, f),
                 Text(p.Category, f), Text(p.ExtraCategories.Replace(",", "|"), f), Text(string.Join("|", ShopTags.Split(p.Tags)), f), p.TrackStock ? Number(p.Stock) : "", Number(p.WeightGrams), Yes(p.Active), Yes(p.Featured), Text(p.Kind, f),
-                Text(p.Image, f), Text(gallery, f), Text(p.SeoTitle, f), Text(p.SeoDescription, f)
+                Text(p.Image, f), Text(gallery, f), Text(p.SeoTitle, f), Text(p.SeoDescription, f), Yes(p.PickupOnly)
             });
         }
         return Document(rows, f);
@@ -113,7 +113,8 @@ internal static class ShopExport
         ["category"] = "category", ["kategorie"] = "category", ["extra_categories"] = "extra_categories", ["weitere kategorien"] = "extra_categories",
         ["tags"] = "tags", ["schlagwörter"] = "tags", ["schlagworte"] = "tags", ["stock"] = "stock", ["bestand"] = "stock", ["weight"] = "weight", ["gewicht"] = "weight",
         ["active"] = "active", ["aktiv"] = "active", ["featured"] = "featured", ["hervorgehoben"] = "featured", ["kind"] = "kind", ["art"] = "kind", ["image"] = "image", ["bild"] = "image",
-        ["gallery"] = "gallery", ["galerie"] = "gallery", ["seo_title"] = "seo_title", ["meta-titel"] = "seo_title", ["seo_description"] = "seo_description", ["meta-beschreibung"] = "seo_description"
+        ["gallery"] = "gallery", ["galerie"] = "gallery", ["seo_title"] = "seo_title", ["meta-titel"] = "seo_title", ["seo_description"] = "seo_description", ["meta-beschreibung"] = "seo_description",
+        ["pickup_only"] = "pickup_only", ["nur abholung"] = "pickup_only", ["abholung"] = "pickup_only"
     };
 
     private static readonly Dictionary<string, string> VariantAliases = new(StringComparer.OrdinalIgnoreCase)
@@ -183,6 +184,7 @@ internal static class ShopExport
                 if (Has("weight") && Cell("weight").Length > 0) { if (int.TryParse(Cell("weight"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var w) && w >= 0) p = p with { WeightGrams = w }; else problem ??= $"„{Cell("weight")}“ ist kein Gewicht"; }
                 if (Has("active") && Cell("active").Length > 0) p = p with { Active = Truth(Cell("active")) };
                 if (Has("featured") && Cell("featured").Length > 0) p = p with { Featured = Truth(Cell("featured")) };
+                if (Has("pickup_only") && Cell("pickup_only").Length > 0) p = p with { PickupOnly = Truth(Cell("pickup_only")) };
                 if (Has("kind") && Cell("kind").Length > 0) p = p with { Kind = Cell("kind").ToLowerInvariant() is "digital" or "download" ? ProductKind.Digital : ProductKind.Physical };
                 if (Has("image")) p = p with { Image = ShopPublic.SafeUrl(Cell("image")) };
                 if (Has("gallery")) p = p with { GalleryJson = new JsonArray(Cell("gallery").Split('|', StringSplitOptions.RemoveEmptyEntries).Select(u => ShopPublic.SafeUrl(u.Trim())).Where(u => u.Length > 0).Select(u => (JsonNode)new JsonObject { ["url"] = u, ["alt"] = "" }).ToArray()).ToJsonString() };

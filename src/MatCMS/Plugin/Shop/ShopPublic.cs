@@ -311,8 +311,9 @@ internal static partial class ShopPublic
             ["price"] = v.Price ? price : "", ["price_old"] = v.Price && p.OnSale && variants.Count == 0 ? M(ctx, cfg, p.CompareCents) : "", ["save_percent"] = p.OnSale && variants.Count == 0 ? Intl(p.SavePercent) : "",
             ["price_html"] = v.Price ? $"<div class=\"shop-price\">{E(price)}{WasHtml(ctx, cfg, p, variants)}</div>" : "",
             ["tags_html"] = v.Tags && tags.Count > 0 ? "<div class=\"shop-tags\">" + string.Concat(tags.Select(t => $"<a href=\"/shop?tag={E(Uri.EscapeDataString(t))}\">{E(t)}</a>")) + "</div>" : "",
-            ["badges_html"] = sold ? $"<div><span class=\"shop-badge bad\">{E(ctx.T("shop.soldOut"))}</span></div>" : p.IsDigital ? $"<div><span class=\"shop-badge\">{E(ctx.T("shop.digital"))}</span></div>" : "",
-            ["sold_out"] = sold ? "1" : "", ["digital"] = p.IsDigital ? "1" : "", ["on_sale"] = p.OnSale && variants.Count == 0 ? "1" : "", ["category"] = p.Category
+            ["badges_html"] = sold ? $"<div><span class=\"shop-badge bad\">{E(ctx.T("shop.soldOut"))}</span></div>" : p.IsDigital ? $"<div><span class=\"shop-badge\">{E(ctx.T("shop.digital"))}</span></div>"
+                : p.PickupOnly ? $"<div><span class=\"shop-badge pickup\">{E(ctx.T("shop.pickupOnly"))}</span></div>" : "",
+            ["sold_out"] = sold ? "1" : "", ["digital"] = p.IsDigital ? "1" : "", ["pickup_only"] = p.PickupOnly && !p.IsDigital ? "1" : "", ["on_sale"] = p.OnSale && variants.Count == 0 ? "1" : "", ["category"] = p.Category
         });
     }
 
@@ -399,11 +400,12 @@ internal static partial class ShopPublic
                 if (plan is null) form.Append(list);
                 else form.Append(ShopVariantPicker.Html(ShopVariants.OptionsFromJson(p.VariantOptions), plan, c => M(ctx, cfg, c), ctx.T("shop.variantNA"))).Append("<noscript>").Append(list).Append("</noscript>");
             }
+            if (p.PickupOnly && !p.IsDigital) form.Append($"<p class=\"shop-pickup\"><strong>{E(ctx.T("shop.pickupOnly"))}</strong> – {E(ctx.T("shop.pickupOnlyNote"))}</p>");
             form.Append($"<div class=\"shop-actions\"><input class=\"shop-qty\" type=\"number\" name=\"qty\" value=\"1\" min=\"1\" max=\"{(p.MaxPerOrder > 0 ? Intl(p.MaxPerOrder) : "999")}\"><button class=\"shop-btn\" type=\"submit\">{E(ctx.T("shop.addToCart"))}</button></div></form>");
             form.Append(await TrustHtmlAsync(ctx, cfg, store, p, ct));
         }
         var ptags = ShopTags.Split(p.Tags);
-        var taxNote = (cfg.SmallBusiness ? ctx.T("shop.smallBusinessNote") : ctx.T("shop.taxIncluded", Money.Percent(p.TaxBp))) + (p.IsDigital ? "" : " · " + ctx.T("shop.plusShipping"));
+        var taxNote = (cfg.SmallBusiness ? ctx.T("shop.smallBusinessNote") : ctx.T("shop.taxIncluded", Money.Percent(p.TaxBp))) + (p.IsDigital ? "" : " · " + ctx.T(p.PickupOnly ? "shop.pickupOnly" : "shop.plusShipping"));
         var values = new Dictionary<string, string>
         {
             ["url"] = ShopUrls.Product(p.Slug), ["on_sale"] = p.OnSale && variants.Count == 0 ? "1" : "",
@@ -413,6 +415,7 @@ internal static partial class ShopPublic
             ["price_html"] = "<span data-shop-price>" + E(PriceText(ctx, cfg, p, variants)) + "</span>" + WasHtml(ctx, cfg, p, variants), ["tax_note"] = taxNote,
             ["breadcrumbs_html"] = crumbs, ["notice_html"] = notice.ToString(), ["form_html"] = form.ToString(), ["sold_out"] = sold ? "1" : "", ["digital"] = p.IsDigital ? "1" : "",
             ["digital_note"] = p.IsDigital ? ctx.T("shop.digitalNote") : "",
+            ["pickup_only"] = p.PickupOnly && !p.IsDigital ? "1" : "", ["pickup_note"] = p.PickupOnly && !p.IsDigital ? ctx.T("shop.pickupOnlyNote") : "",
             ["attributes_html"] = await AttributesTableAsync(ctx, store, p, ct),
             ["tags_html"] = ptags.Count > 0 ? "<div class=\"shop-tags\" style=\"margin-top:14px\">" + string.Concat(ptags.Select(t => $"<a href=\"/shop?tag={E(Uri.EscapeDataString(t))}\">{E(t)}</a>")) + "</div>" : "",
             ["description_html"] = p.DescriptionHtml, ["description_label"] = ctx.T("shop.description"),      // sanitised when it was saved
@@ -594,7 +597,7 @@ internal static partial class ShopPublic
                 var url = ShopUrls.Product(l.Product.Slug);
                 linesForm.Append("<div class=\"shop-line\">");
                 linesForm.Append($"<a class=\"img\" href=\"{E(url)}\"{(img.Length > 0 ? $" style=\"background-image:url('{E(img)}')\"" : "")} aria-label=\"{E(l.Title)}\"></a>");
-                linesForm.Append($"<div class=\"info\"><a class=\"title\" href=\"{E(url)}\">{E(l.Title)}</a>{(l.VariantTitle.Length > 0 ? "<div class=\"shop-muted shop-small\">" + E(l.VariantTitle) + "</div>" : "")}{(l.Product.IsDigital ? "<div class=\"shop-small\"><span class=\"shop-badge\">" + E(ctx.T("shop.digital")) + "</span></div>" : "")}");
+                linesForm.Append($"<div class=\"info\"><a class=\"title\" href=\"{E(url)}\">{E(l.Title)}</a>{(l.VariantTitle.Length > 0 ? "<div class=\"shop-muted shop-small\">" + E(l.VariantTitle) + "</div>" : "")}{(l.Product.IsDigital ? "<div class=\"shop-small\"><span class=\"shop-badge\">" + E(ctx.T("shop.digital")) + "</span></div>" : l.Product.PickupOnly ? "<div class=\"shop-small\"><span class=\"shop-badge pickup\">" + E(ctx.T("shop.pickupOnly")) + "</span></div>" : "")}");
                 linesForm.Append($"<div class=\"shop-muted shop-small\">{E(M(ctx, cfg, l.UnitCents))}</div>");
                 linesForm.Append($"<div class=\"controls\"><label class=\"shop-qtylabel\"><span class=\"shop-small shop-muted\">{E(ctx.T("shop.qty"))}</span> <input class=\"shop-qty\" type=\"number\" min=\"0\" max=\"999\" name=\"q:{Intl(l.Product.Id)}:{Intl(l.Variant?.Id ?? 0)}\" value=\"{l.Qty}\" onchange=\"this.form.submit()\"></label>");
                 linesForm.Append($"<button class=\"shop-linkbtn\" type=\"submit\" form=\"rm-{key}\">{E(ctx.T("shop.remove"))}</button></div></div>");
@@ -605,7 +608,7 @@ internal static partial class ShopPublic
             if (priced.DiscountCents > 0)
                 summary.Append($"<div><span>{E(ctx.T("shop.coupon.line", priced.CouponCode))}</span><span>−{E(M(ctx, cfg, priced.DiscountCents))}</span></div><div class=\"total\"><span>{E(ctx.T("shop.goodsTotal"))}</span><span>{E(M(ctx, cfg, priced.GoodsCents))}</span></div>");
             else if (priced.FreeShipping) summary.Append($"<div><span>{E(ctx.T("shop.coupon.line", priced.CouponCode))}</span><span>{E(ctx.T("shop.coupon.freeShipping"))}</span></div>");
-            summary.Append($"<div class=\"shop-muted shop-small\"><span>{E(priced.NeedsShipping ? ctx.T("shop.shippingLater") : ctx.T("shop.noShipping"))}</span><span></span></div></div>");
+            summary.Append($"<div class=\"shop-muted shop-small\"><span>{E(!priced.NeedsShipping ? ctx.T("shop.noShipping") : priced.PickupOnly ? ctx.T("shop.pickupOnlyCart") : ctx.T("shop.shippingLater"))}</span><span></span></div></div>");
             summary.Append(await ShippingEstimateAsync(ctx, cfg, store, priced, ct));
             summary.Append($"<a class=\"shop-btn big\" href=\"/shop/checkout\">{E(ctx.T("shop.toCheckout"))}</a>");
             summary.Append(CouponBox(ctx, priced));
@@ -699,17 +702,30 @@ internal static partial class ShopPublic
         long rateId = long.TryParse(f.F("rate"), out var rid) ? rid : 0;
         var country = (shipOther ? shipping.Country : billing.Country).ToUpperInvariant();
         // VAT by the country of delivery, then the cart's coupon (looked at again: it may no longer apply), then what shipping costs there.
-        priced = ShopTax.Apply(priced, cfg, country, billing.Country.ToUpperInvariant());
+        // Goods collected at the shop are taxed at home (ShopOrders.TaxCountry): a chosen pickup runs the chain once more — the same as PlaceAsync does.
         Coupon? coupon = null; string? couponProblem = null;
         var couponCode = (await store.CartAsync(token, ct))?.Coupon ?? "";
-        if (couponCode.Length > 0)
+        var rates = await store.RatesAsync(true, ct);
+        var untaxed = priced;
+        IReadOnlyList<ShippingOption> options = Array.Empty<ShippingOption>();
+        ShippingOption? chosen = null;
+        var taxCountry = country;
+        for (var pass = 0; pass < 2; pass++)
         {
-            var res = await ShopCoupons.ResolveAsync(ctx, store, priced, couponCode, email, ct);
-            if (res.Problem is null) { priced = res.Cart; coupon = res.Coupon; }
-            else { couponProblem = ctx.T("shop.coupon.removed", couponCode, res.Problem); await store.SetCartCouponAsync(token, "", ct); }
+            priced = ShopTax.Apply(untaxed, cfg, taxCountry, billing.Country.ToUpperInvariant());
+            coupon = null;
+            if (couponCode.Length > 0)
+            {
+                var res = await ShopCoupons.ResolveAsync(ctx, store, priced, couponCode, email, ct);
+                if (res.Problem is null) { priced = res.Cart; coupon = res.Coupon; }
+                else { couponProblem = ctx.T("shop.coupon.removed", couponCode, res.Problem); await store.SetCartCouponAsync(token, "", ct); couponCode = ""; }
+            }
+            options = ShopOrders.ShippingOptions(rates, country, priced);
+            chosen = ShopOrders.Pick(options, rateId);
+            var want = ShopOrders.TaxCountry(cfg, country, chosen);
+            if (want == taxCountry) break;
+            taxCountry = want;
         }
-        var options = ShopOrders.ShippingOptions(await store.RatesAsync(true, ct), country, priced);
-        var chosen = ShopOrders.Pick(options, rateId);
         var totals = ShopOrders.Compute(priced, chosen, cfg);
         var methods = await Payments.MethodsAsync(ctx, cfg, totals.Total, ct);
         if (!posted && !methods.Any(m => m.Id == payMethod)) payMethod = "";
@@ -724,7 +740,7 @@ internal static partial class ShopPublic
             if (!billing.IsComplete) errors.Add(ctx.T("shop.err.address"));
             else if (!Countries.Known(billing.Country)) errors.Add(ctx.T("shop.err.country"));
             if (shipOther && (!shipping.IsComplete || !Countries.Known(shipping.Country))) errors.Add(ctx.T("shop.err.shipAddress"));
-            if (priced.NeedsShipping && chosen is null) errors.Add(ctx.T("shop.err.noShipping", Countries.Name(country, ctx.Locale)));
+            if (priced.NeedsShipping && chosen is null) errors.Add(priced.PickupOnly ? ctx.T("shop.err.noPickup") : ctx.T("shop.err.noShipping", Countries.Name(country, ctx.Locale)));
             if (totals.Total > 0 && methods.All(x => x.Id != payMethod)) errors.Add(ctx.T("shop.err.payMethod"));
             if (!f.Form.ContainsKey("terms")) errors.Add(ctx.T("shop.err.terms"));
             if (priced.HasDigital && !f.Form.ContainsKey("waiver")) errors.Add(ctx.T("shop.err.waiver"));
@@ -830,9 +846,10 @@ internal static partial class ShopPublic
             sb.Append("</div></section>");
 
             sb.Append(Sec(ctx.T("shop.shippingMethod")));
-            if (options.Count == 0) sb.Append($"<p class=\"shop-muted\">{E(ctx.T("shop.noShippingFor", Countries.Name((shipOther ? shipping : billing).Country, ctx.Locale)))}</p>");
+            if (priced.PickupOnly) sb.Append($"<p class=\"shop-muted\">{E(ctx.T("shop.pickupOnlyCart"))}</p>");
+            if (options.Count == 0) sb.Append($"<p class=\"shop-muted\">{E(priced.PickupOnly ? ctx.T("shop.err.noPickup") : ctx.T("shop.noShippingFor", Countries.Name((shipOther ? shipping : billing).Country, ctx.Locale)))}</p>");
             foreach (var o in options)
-                sb.Append(Opt($"<input type=\"radio\" name=\"rate\" value=\"{Intl(o.Rate.Id)}\"{(chosen?.Rate.Id == o.Rate.Id ? " checked" : "")}>", o.Rate.Name, o.PriceCents == 0 ? ctx.T("shop.free") : M(ctx, cfg, o.PriceCents)));
+                sb.Append(Opt($"<input type=\"radio\" name=\"rate\" value=\"{Intl(o.Rate.Id)}\"{(chosen?.Rate.Id == o.Rate.Id ? " checked" : "")}>", o.Rate.Name, o.PriceCents == 0 ? ctx.T("shop.free") : M(ctx, cfg, o.PriceCents), o.Rate.Pickup ? ctx.T("shop.pickupHint") : ""));
             sb.Append($"<div><button class=\"shop-btn ghost\" type=\"submit\" name=\"action\" value=\"recalc\" formnovalidate>{E(ctx.T("shop.refreshShipping"))}</button></div></div></section>");
         }
         else sb.Append("</div></section>");

@@ -45,6 +45,7 @@ internal static class ShopPageRoles
         V("product", "price_old", "Früherer Preis (leer ohne Angebot)", "Earlier price (empty without an offer)"), V("product", "save_percent", "Ersparnis in Prozent (leer ohne Angebot)", "Saving in percent (empty without an offer)"),
         V("product", "on_sale", "Gesetzt, wenn das Produkt im Angebot ist", "Set when the product is on offer"), V("product", "sold_out", "Gesetzt, wenn das Produkt ausverkauft ist", "Set when the product is sold out"),
         V("product", "digital", "Gesetzt bei digitalen Produkten", "Set for digital products"), V("product", "digital_note", "Hinweis zu digitalen Produkten", "Note on digital products"),
+        V("product", "pickup_only", "Gesetzt, wenn das Produkt nur abgeholt werden kann", "Set when the product can only be collected"), V("product", "pickup_note", "Hinweis „nur Abholung“ (leer sonst)", "The “collection only” note (empty otherwise)"),
         V("product", "tax_note", "Hinweis zu Steuer und Versand", "Note on tax and shipping"), V("product", "description_label", "Das Wort „Beschreibung“", "The word “Description”"),
         H("product", "breadcrumbs_html", "Brotkrumen-Navigation", "Breadcrumbs"), H("product", "image_html", "Bilder: Hauptbild mit Galerie", "Pictures: main picture with gallery"),
         H("product", "price_html", "Preis, Statt-Preis und Ersparnis", "Price, earlier price and saving"), H("product", "notice_html", "Hinweise (ausverkauft, nur noch wenige …)", "Notices (sold out, only a few left …)"),

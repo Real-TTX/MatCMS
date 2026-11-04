@@ -20,6 +20,8 @@ internal sealed record PricedCart(IReadOnlyList<PricedLine> Lines, long Subtotal
 {
     public int Count => Lines.Sum(l => l.Qty);
     public bool HasDigital => Lines.Any(l => l.Product.IsDigital);
+    /// <summary>Something in the cart can only be collected: the cart is offered only pickup rates.</summary>
+    public bool PickupOnly => Lines.Any(l => !l.Product.IsDigital && l.Product.PickupOnly);
     /// <summary>"" = the seller's own VAT, "oss" = by the country of delivery, "export" = no VAT (see <see cref="ShopTax"/>).</summary>
     public string TaxNote { get; init; } = "";
     /// <summary>How shipping is taxed for the country this cart goes to; null = as configured.</summary>
@@ -105,17 +107,24 @@ internal static class ShopOrders
         return new PricedCart(result, result.Sum(l => l.LineCents), result.Sum(l => l.TaxCents), physical.Count > 0, physical.Sum(l => l.Product.WeightGrams * l.Qty), notes, changed);
     }
 
-    /// <summary>The ways to ship this cart to a country, cheapest first. Empty when nothing covers it (and the cart has something to ship).</summary>
+    /// <summary>The ways to ship this cart to a country, cheapest first. Empty when nothing covers it (and the cart has something to ship).
+    /// A cart with a pickup-only product gets the pickup rates alone; a pickup rate has no weight limit (nothing is packed).</summary>
     public static IReadOnlyList<ShippingOption> ShippingOptions(IReadOnlyList<ShippingRate> rates, string country, PricedCart cart)
     {
         if (!cart.NeedsShipping) return Array.Empty<ShippingOption>();
-        return rates.Where(r => r.Active && r.Covers(country) && (r.MaxWeightGrams <= 0 || cart.WeightGrams <= r.MaxWeightGrams))
+        var pickupOnly = cart.PickupOnly;
+        return rates.Where(r => r.Active && r.Covers(country) && (!pickupOnly || r.Pickup) && (r.Pickup || r.MaxWeightGrams <= 0 || cart.WeightGrams <= r.MaxWeightGrams))
             .Select(r => new ShippingOption(r, r.FreeFromCents > 0 && cart.SubtotalCents >= r.FreeFromCents ? 0 : cart.ShipTax?.Price(r.PriceCents) ?? r.PriceCents))
             .OrderBy(o => o.PriceCents).ThenBy(o => o.Rate.Sort).ToList();
     }
 
+    /// <summary>The rate the customer chose, else the cheapest DELIVERY: a pickup that costs nothing would otherwise always be the one preselected.</summary>
     public static ShippingOption? Pick(IReadOnlyList<ShippingOption> options, long rateId) =>
-        options.FirstOrDefault(o => o.Rate.Id == rateId) ?? options.FirstOrDefault();
+        options.FirstOrDefault(o => o.Rate.Id == rateId) ?? options.FirstOrDefault(o => !o.Rate.Pickup) ?? options.FirstOrDefault();
+
+    /// <summary>The country goods are taxed by: where they are delivered — or, collected at the shop, the shop's own country (place of supply).</summary>
+    public static string TaxCountry(ShopConfig cfg, string deliveryCountry, ShippingOption? chosen) =>
+        chosen is { Rate.Pickup: true } ? cfg.HomeCountry : deliveryCountry;
 
     /// <summary><paramref name="Subtotal"/> is the goods before the coupon; the total is subtotal − discount + shipping. <paramref name="ShipTaxBp"/> is the rate shipping was taxed with.</summary>
     public sealed record Totals(long Subtotal, long Shipping, long Tax, long Total, long Discount = 0, int ShipTaxBp = 0);
@@ -151,16 +160,29 @@ internal static class ShopOrders
 
                 var country = (priced.NeedsShipping && !f.ShipToBilling ? f.Shipping.Country : f.Billing.Country).ToUpperInvariant();
                 // Tax by the country the goods go to, then the coupon (which is checked again here — the cart's word is not enough), then shipping.
-                priced = ShopTax.Apply(priced, cfg, country, f.Billing.Country.ToUpperInvariant());
+                // Goods collected at the shop are taxed at home: when the chosen rate turns out to be a pickup, the chain runs once more for that country.
+                var rates = await store.RatesAsync(true, ct);
+                var untaxed = priced;
                 Coupon? coupon = null;
-                if (f.Coupon.Length > 0)
+                IReadOnlyList<ShippingOption> options = Array.Empty<ShippingOption>();
+                ShippingOption? chosen = null;
+                var taxCountry = country;
+                for (var pass = 0; pass < 2; pass++)
                 {
-                    var resolved = await ShopCoupons.ResolveAsync(ctx, store, priced, f.Coupon, f.Email, ct);
-                    if (resolved.Problem is not null) return new PlaceResult(null, resolved.Problem);
-                    priced = resolved.Cart; coupon = resolved.Coupon;
+                    priced = ShopTax.Apply(untaxed, cfg, taxCountry, f.Billing.Country.ToUpperInvariant());
+                    coupon = null;
+                    if (f.Coupon.Length > 0)
+                    {
+                        var resolved = await ShopCoupons.ResolveAsync(ctx, store, priced, f.Coupon, f.Email, ct);
+                        if (resolved.Problem is not null) return new PlaceResult(null, resolved.Problem);
+                        priced = resolved.Cart; coupon = resolved.Coupon;
+                    }
+                    options = ShippingOptions(rates, country, priced);
+                    chosen = Pick(options, f.RateId);
+                    var want = TaxCountry(cfg, country, chosen);
+                    if (want == taxCountry) break;
+                    taxCountry = want;
                 }
-                var options = ShippingOptions(await store.RatesAsync(true, ct), country, priced);
-                var chosen = Pick(options, f.RateId);
                 if (priced.NeedsShipping && chosen is null) return new PlaceResult(null, ctx.T("shop.err.noShipping", Countries.Name(country, ctx.Locale)));
                 var totals = Compute(priced, chosen, cfg);
 

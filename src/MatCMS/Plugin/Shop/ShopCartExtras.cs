@@ -22,6 +22,7 @@ internal static partial class ShopPublic
     private const string TruckIcon = "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M3 7h11v9H3zM14 10h4l3 3v3h-7\"/><circle cx=\"7\" cy=\"17.5\" r=\"1.7\"/><circle cx=\"17\" cy=\"17.5\" r=\"1.7\"/></svg>";
     private const string LockIcon = "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><rect x=\"5\" y=\"11\" width=\"14\" height=\"9\" rx=\"2\"/><path d=\"M8 11V8a4 4 0 018 0v3\"/></svg>";
     private const string BackIcon = "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M9 14L4 9l5-5\"/><path d=\"M4 9h10a6 6 0 010 12h-3\"/></svg>";
+    private const string StoreIcon = "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M4 10h16M5 10l1-5h12l1 5M6 10v10h12V10M10 20v-5h4v5\"/></svg>";
     private const string DownloadIcon = "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 4v11M7 11l5 5 5-5M5 20h14\"/></svg>";
 
     /// <summary>
@@ -34,7 +35,10 @@ internal static partial class ShopPublic
         if (p.IsDigital) items.Add((DownloadIcon, E(ctx.T("shop.trust.instant"))));
         else
         {
-            var rates = (await store.RatesAsync(true, ct)).Where(r => r.Active && r.Covers(cfg.HomeCountry)).ToList();
+            var all = (await store.RatesAsync(true, ct)).Where(r => r.Active && r.Covers(cfg.HomeCountry)).ToList();
+            // A pickup-only product promises no delivery; it names where it is collected. A pickup rate is never "shipping" for the others either.
+            if (p.PickupOnly) { if (all.FirstOrDefault(r => r.Pickup) is { } at) items.Add((StoreIcon, E(at.Name))); }
+            var rates = p.PickupOnly ? new List<ShippingRate>() : all.Where(r => !r.Pickup).ToList();
             var free = rates.Where(r => r.FreeFromCents > 0).Select(r => r.FreeFromCents).DefaultIfEmpty(0).Min();
             if (free > 0) items.Add((TruckIcon, E(ctx.T("shop.trust.freeFrom", M(ctx, cfg, free)))));
             else if (rates.Count > 0) items.Add((TruckIcon, E(ctx.T("shop.trust.ships"))));

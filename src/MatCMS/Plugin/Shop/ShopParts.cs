@@ -111,7 +111,7 @@ internal static class ShopParts
             Placeholders = new[]
             {
                 P("url"), P("title"), P("image_url"), P("image_style", true), P("summary"), P("summary_html", true), P("price"), P("price_old"), P("save_percent"), P("price_html", true),
-                P("tags_html", true), P("badges_html", true), P("sold_out"), P("digital"), P("on_sale"), P("category")
+                P("tags_html", true), P("badges_html", true), P("sold_out"), P("digital"), P("pickup_only"), P("on_sale"), P("category")
             }
         });
         b.TemplatePart(new TemplatePartSpec("product", "shop.part.product", ProductDefault)
@@ -120,7 +120,7 @@ internal static class ShopParts
             Placeholders = new[]
             {
                 P("title"), P("summary"), P("sku"), P("category"), P("category_url"), P("image_url"), P("image_html", true), P("price"), P("price_old"), P("save_percent"), P("price_html", true), P("tax_note"),
-                P("breadcrumbs_html", true), P("notice_html", true), P("form_html", true), P("sold_out"), P("digital"), P("digital_note"), P("tags_html", true), P("description_html", true),
+                P("breadcrumbs_html", true), P("notice_html", true), P("form_html", true), P("sold_out"), P("digital"), P("digital_note"), P("pickup_only"), P("pickup_note"), P("tags_html", true), P("description_html", true),
                 P("description_label"), P("related_html", true), P("attributes_html", true)
             }
         });

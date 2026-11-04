@@ -222,6 +222,7 @@ internal static class ShopAdminCatalog
                 Ui.Checkbox("track_stock", ctx.T("shop.adm.trackStock"), product.TrackStock),
                 Ui.Input("stock", ctx.T("shop.adm.stockCount"), Intl(product.Stock), UiInputType.Number) with { Help = ctx.T("shop.adm.stockHelp"), Min = "0" },
                 Ui.Input("weight", ctx.T("shop.adm.weight"), Intl(product.WeightGrams), UiInputType.Number) with { Min = "0", Help = ctx.T("shop.adm.weightHelp") },
+                Ui.Checkbox("pickup_only", ctx.T("shop.adm.pickupOnly"), product.PickupOnly) with { Help = ctx.T("shop.adm.pickupOnlyHelp") },
                 Ui.Input("max", ctx.T("shop.adm.maxPerOrder"), Intl(product.MaxPerOrder), UiInputType.Number) with { Min = "0", Help = ctx.T("shop.adm.maxHelp") },
                 Ui.Input("sort", ctx.T("shop.adm.sort"), Intl(product.Sort), UiInputType.Number))
         };
@@ -291,7 +292,7 @@ internal static class ShopAdminCatalog
             GalleryJson = CleanGallery(f.F("gallery")), Kind = kind, PriceCents = Math.Max(0, price), CompareCents = Math.Max(0, compare), TaxBp = bp, Sku = f.F("sku").Trim(), Category = f.F("category").Trim(),
             Tags = ShopTags.Normalise(f.F("tags")), Featured = f.Form.ContainsKey("featured"),
             SeoTitle = Clip(f.F("seo_title").Trim(), 120), SeoDescription = Clip(f.F("seo_description").Trim(), 320),
-            TrackStock = f.Form.ContainsKey("track_stock"),
+            TrackStock = f.Form.ContainsKey("track_stock"), PickupOnly = kind != ProductKind.Digital && f.Form.ContainsKey("pickup_only"),
             Stock = Num("stock"), WeightGrams = kind == ProductKind.Digital ? 0 : (int)Math.Min(Num("weight"), int.MaxValue), MaxPerOrder = (int)Math.Min(Num("max"), 100000), Sort = (int)Math.Min(Num("sort"), 100000),
             Active = f.Form.ContainsKey("active")
         };
@@ -540,7 +541,7 @@ internal static class ShopAdminCatalog
             Ui.Input("price" + suffix, ctx.T("shop.adm.ratePrice"), Money.ForInput(r.PriceCents)),
             Ui.Input("free" + suffix, ctx.T("shop.adm.rateFree"), r.FreeFromCents > 0 ? Money.ForInput(r.FreeFromCents) : "") with { Help = ctx.T("shop.adm.rateFreeHelp") },
             Ui.Input("weight" + suffix, ctx.T("shop.adm.rateWeight"), r.MaxWeightGrams > 0 ? Intl(r.MaxWeightGrams) : "", UiInputType.Number) with { Help = ctx.T("shop.adm.rateWeightHelp") }),
-        Ui.Inline(Ui.Checkbox("active" + suffix, ctx.T("shop.adm.activeLabel"), r.Active || r.Id == 0), deletable ? Ui.Checkbox("del" + suffix, ctx.T("shop.adm.removeRate")) : null));
+        Ui.Inline(Ui.Checkbox("active" + suffix, ctx.T("shop.adm.activeLabel"), r.Active || r.Id == 0), Ui.Checkbox("pickup" + suffix, ctx.T("shop.adm.ratePickup"), r.Pickup) with { Help = ctx.T("shop.adm.ratePickupHelp") }, deletable ? Ui.Checkbox("del" + suffix, ctx.T("shop.adm.removeRate")) : null));
 
     private static ShippingRate ReadRate(RequestData f, string suffix, ShippingRate current, out string? error)
     {
@@ -559,7 +560,7 @@ internal static class ShopAdminCatalog
             if (codes.Any(c => c.Length != 2 || !char.IsAsciiLetter(c[0]) || !char.IsAsciiLetter(c[1]))) error ??= $"Länderkürzel müssen zwei Buchstaben haben ({name}).";
             countries = string.Join(",", codes.Distinct());
         }
-        return current with { Name = name, Countries = countries, PriceCents = price, FreeFromCents = free, MaxWeightGrams = weight, Active = f.Form.ContainsKey("active" + suffix) };
+        return current with { Name = name, Countries = countries, PriceCents = price, FreeFromCents = free, MaxWeightGrams = weight, Pickup = f.Form.ContainsKey("pickup" + suffix), Active = f.Form.ContainsKey("active" + suffix) };
     }
 
     // ---- customers ---------------------------------------------------------------------------------------

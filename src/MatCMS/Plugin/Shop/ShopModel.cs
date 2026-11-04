@@ -76,6 +76,8 @@ internal sealed record Product
     /// <summary>Shown first where a block or a page asks for the highlighted products.</summary>
     public bool Featured { get; init; }
     public int MaxPerOrder { get; init; }
+    /// <summary>Cannot be sent (too big, no box left): a cart holding it is offered only the shipping rates marked as pickup.</summary>
+    public bool PickupOnly { get; init; }
     public bool Active { get; init; } = true;
     public int Sort { get; init; }
     public DateTime CreatedUtc { get; init; } = DateTime.UtcNow;
@@ -343,6 +345,9 @@ internal sealed record ShippingRate
     public long FreeFromCents { get; init; }
     /// <summary>Not for parcels heavier than this (0 = no limit).</summary>
     public int MaxWeightGrams { get; init; }
+    /// <summary>The customer collects the goods at the seller's (no parcel): the only kind of rate a cart with a pickup-only product is offered. Goods
+    /// collected are taxed at home — the place of supply is the shop, not the customer's address.</summary>
+    public bool Pickup { get; init; }
     public bool Active { get; init; } = true;
     public int Sort { get; init; }
 

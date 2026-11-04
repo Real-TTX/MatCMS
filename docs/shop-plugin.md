@@ -448,3 +448,15 @@ What `docs/shop-vs-shopify.md` listed as missing, built and tested; the rules th
   `order.update` (paid, ship, complete, cancel, note, tracking — through `ShopOrders`, so a move the order cannot make is refused), `variant.set` (by name, in place; `replace` switches the others off, never deletes),
   `attribute.create` (add-only), `product.attributes`. MCP tools: `list_shop_orders`, `update_shop_order`, `set_product_variants`, `create_shop_attribute`, `set_product_attributes`. Orders hold personal data: the tools need the
   key's restore right, also for reading.
+
+## Collection only ("Nur Abholung")
+
+- **A product can be "pickup only"** (`products.pickup_only`, product form → Bestand und Versand, CSV column `pickup_only` / "Nur Abholung", AI op `product.update` with
+  `pickup_only`): something too big to send or without its box. **A shipping rate can be a pickup** (`shipping_rates.pickup`, checkbox on Versand). A cart holding a
+  pickup-only (physical) product is offered **only** pickup rates (`ShopOrders.ShippingOptions`, the one place); a pickup rate has no weight limit (nothing is packed).
+  A cart with no such product sees every rate, and `Pick` preselects the cheapest DELIVERY — a free pickup would otherwise always be the default.
+- **Tax:** goods collected at the shop are supplied there, so with OSS on they are taxed in `tax.homeCountry` (`ShopOrders.TaxCountry`). Because the rate is chosen after
+  tax and coupon are applied, the checkout page and `PlaceAsync` run that chain a second time when the chosen rate turns out to be a pickup (at most two passes).
+- **What the customer sees:** a "Nur Abholung" badge on cards (`badges_html`, `pickup_only`) and cart lines, a notice inside the product's `form_html` (always shown, whatever
+  the template), "· Nur Abholung" instead of "zzgl. Versand" in `tax_note`, product-page variables `pickup_only`/`pickup_note`, and a line in the cart and checkout.
+  No pickup rate set up → the checkout refuses with that reason, and the dashboard's attention list says how many products cannot be ordered.

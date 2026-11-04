@@ -344,6 +344,9 @@ A built-in plugin (off until switched on), written against the plugin API and no
   a variant SKU sent as a product SKU is 409), `DELETE` only deactivates, `POST stock` / `POST prices` are batches (≤ 5000) answering per line (`add` is an
   atomic `IncrementAsync`, never below 0; `stock: null` = not counted), categories by slug, orders through `ShopOps` with the PersonalData right
   (the `by` argument names the key). Prices stay gross cents; a variant's price is written as its delta.
+- **"Nur Abholung"**: a product flag `pickup_only` and a rate flag `pickup`; a cart with such a product gets ONLY pickup rates (`ShopOrders.ShippingOptions`), `Pick` preselects
+  a delivery over a free pickup, and collected goods are taxed in the home country (`ShopOrders.TaxCountry` — checkout and `PlaceAsync` re-run the tax/coupon chain once when the
+  chosen rate is a pickup). See docs/shop-plugin.md "Collection only".
 - **Downloads** are private files streamed by `ShopDownloads.ServeAsync`: paid order, the order's secret key (or the owner, or the admin), a download row that is not revoked or
   expired, a count that is taken atomically.
 - Texts: `ShopStrings.All` (key, German, English in one row); a test checks that every key used in the code has both.

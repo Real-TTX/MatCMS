@@ -248,8 +248,10 @@ internal sealed record Brand
     public string Website { get; init; } = "";
     public string SeoTitle { get; init; } = "";
     public string SeoDescription { get; init; } = "";
-    /// <summary>Shown first, and where a gallery asks for the highlighted brands.</summary>
+    /// <summary>Shown first, and where a gallery asks for the highlighted brands; marked as such (frame, the shop's badge "Premium-Partner", an own section on /shop/brands).</summary>
     public bool Featured { get; init; }
+    /// <summary>A label of its own ("Exklusiv", "Neu im Sortiment") shown on its tile and page; empty = the shop's badge for highlighted brands, if it is one.</summary>
+    public string Badge { get; init; } = "";
     /// <summary>Off: no page, not in lists — its products keep the brand and are still sold.</summary>
     public bool Active { get; init; } = true;
     public int Sort { get; init; }

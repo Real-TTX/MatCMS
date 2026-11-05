@@ -84,7 +84,7 @@ public class MenuElementSiteTests : IClassFixture<AppFactory>, IAsyncLifetime
         using var scope = _app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MatCMS.Data.AppDbContext>();
         var items = db.MenuItems.Where(m => m.Url.StartsWith("plugin:shop.")).ToList();
-        Assert.Equal(new[] { "header:plugin:shop.shop", "toolbar:plugin:shop.account", "toolbar:plugin:shop.cart", "toolbar:plugin:shop.search" },
+        Assert.Equal(new[] { "footer:plugin:shop.withdraw", "header:plugin:shop.shop", "toolbar:plugin:shop.account", "toolbar:plugin:shop.cart", "toolbar:plugin:shop.search" },
             items.Where(i => i.Locale == "de").Select(i => i.Menu + ":" + i.Url).OrderBy(x => x).ToArray());
         var before = items.Count;
         await scope.ServiceProvider.GetRequiredService<PluginRunner>().ReloadAsync(db.Plugins.First(p => p.Key == "shop").Id);
@@ -183,7 +183,7 @@ public class MenuElementSiteTests : IClassFixture<AppFactory>, IAsyncLifetime
 
         var withElements = JsonNode.Parse(await admin.GetStringAsync("/admin/api/link-targets?elements=true"))!.AsArray();
         var els = withElements.First(g => g!["group"]!.GetValue<string>() == "Plugin-Elemente")!["items"]!.AsArray().Select(i => i!["url"]!.GetValue<string>()).ToArray();
-        Assert.Equal(new[] { "plugin:shop.account", "plugin:shop.brands", "plugin:shop.cart", "plugin:shop.categories", "plugin:shop.search", "plugin:shop.shop", "plugin:shop.tags" }, els.OrderBy(x => x).ToArray());
+        Assert.Equal(new[] { "plugin:shop.account", "plugin:shop.brands", "plugin:shop.cart", "plugin:shop.categories", "plugin:shop.search", "plugin:shop.shop", "plugin:shop.tags", "plugin:shop.withdraw" }, els.OrderBy(x => x).ToArray());
 
         // Admin only.
         var anon = await _app.Browser().GetAsync("/admin/api/link-targets");

@@ -37,7 +37,7 @@ internal static class ShopAiOps
         "Alle Marken (Hersteller) des Shops: slug, Name, Kurztext, Logo, Website, aktiv, hervorgehoben, Anzahl Produkte.", "{}", Writes: false);
     public static readonly PluginOperationSpec BrandSave = new("brand.save",
         "Marke anlegen oder ändern (gefunden über brand = slug oder Name; neu, wenn es sie nicht gibt). summary: kurzer Text für Galerie und Listen; details_html: ausführlich, NUR auf der Markenseite; logo/image: url aus der Mediathek. Nicht genannte Felder bleiben.",
-        """{"brand": "Transrotor", "name"?, "summary"?, "details_html"?, "logo"?: "/uploads/…", "image"?, "website"?: "https://…", "seo_title"?, "seo_description"?, "featured"?: false, "active"?: true}""");
+        """{"brand": "Transrotor", "name"?, "summary"?, "details_html"?, "logo"?: "/uploads/…", "image"?, "website"?: "https://…", "seo_title"?, "seo_description"?, "featured"?: false, "badge"?: "Exklusiv", "active"?: true}""");
     public static readonly PluginOperationSpec BrandRestore = new("brand.restore", "Stellt eine Marke wieder her (Rückgängig).", Internal: true);
     public static readonly PluginOperationSpec BrandRemove = new("brand.remove", "Entfernt eine eben angelegte Marke (Rückgängig).", Internal: true);
     public static readonly PluginOperationSpec CouponCreate = new("coupon.create",
@@ -196,7 +196,7 @@ internal static class ShopAiOps
     private static JsonObject BrandJson(Brand x, int products) => new()
     {
         ["id"] = x.Id, ["slug"] = x.Slug, ["name"] = x.Name, ["url"] = ShopUrls.Brand(x.Slug), ["summary"] = x.Summary, ["logo"] = x.Logo, ["image"] = x.Image, ["website"] = x.Website,
-        ["active"] = x.Active, ["featured"] = x.Featured, ["products"] = products,
+        ["active"] = x.Active, ["featured"] = x.Featured, ["badge"] = x.Badge, ["products"] = products,
     };
 
     public static async Task<JsonNode?> ListBrandsAsync(IPluginContext ctx, JsonNode? args, CancellationToken ct)
@@ -225,6 +225,7 @@ internal static class ShopAiOps
         if (Str(o, "seo_title") is { } st) x = x with { SeoTitle = st.Trim() };
         if (Str(o, "seo_description") is { } sd) x = x with { SeoDescription = sd.Trim() };
         if (Flag(o, "featured") is { } f) x = x with { Featured = f };
+        if (Str(o, "badge") is { } bd) x = x with { Badge = ShopBrands.CleanBadge(bd) };
         if (Flag(o, "active") is { } a) x = x with { Active = a };
         if (existing is null)
         {

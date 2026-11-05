@@ -59,6 +59,11 @@ internal static class Keys
     public const string PerPage = "catalog.perPage";
     public const string ImageFocus = "images.focus";
     public const string FilterLimit = "catalog.filterLimit";
+    public const string BrandFeaturedBadge = "brands.featuredBadge";
+    public const string WithdrawIntro = "withdraw.intro";
+    public const string ReturnAddress = "withdraw.returnAddress";
+    public const string ReturnInfo = "withdraw.returnInfo";
+    public const string BrandFeaturedHeading = "brands.featuredHeading";
     public const string Carrier = "track.carrier";
     public const string TrackingUrl = "track.url";
     public const string DownloadDays = "downloads.days";
@@ -141,6 +146,10 @@ internal sealed record ShopConfig
     public string ImageFocus { get; init; } = "50% 50%";
     /// <summary>How many entries a filter group (brand, an attribute, keywords) shows before "Weitere …" opens the rest in a dialog with a search; 0 = all of them.</summary>
     public int FilterLimit { get; init; }
+    /// <summary>"Vertrag widerrufen": the text above the form, the address goods go back to (empty = the seller's) and what a customer is told about the return (empty = a plain text with that address).</summary>
+    public string WithdrawIntro { get; init; } = "";
+    public string ReturnAddress { get; init; } = "";
+    public string ReturnInfo { get; init; } = "";
     public int DownloadDays { get; init; } = 30;
     public int DownloadLimit { get; init; } = 5;
     public string CustomCss { get; init; } = "";
@@ -190,6 +199,7 @@ internal sealed record ShopConfig
             AccountsAtCheckout = s.GetBool(Keys.AccountsAtCheckout), GuestCheckout = s.GetBool(Keys.GuestCheckout),
             PerPage = (int)Math.Clamp(s.GetInt(Keys.PerPage, 12), 3, 60),
             FilterLimit = (int)Math.Clamp(s.GetInt(Keys.FilterLimit, 0), 0, 100),
+            WithdrawIntro = s.Get(Keys.WithdrawIntro).Trim(), ReturnAddress = s.Get(Keys.ReturnAddress).Trim(), ReturnInfo = s.Get(Keys.ReturnInfo).Trim(),
             ImageFocus = ShopImages.Clean(s.Get(Keys.ImageFocus)) is { Length: > 0 } focus ? focus : "50% 50%",
             DownloadDays = (int)Math.Clamp(s.GetInt(Keys.DownloadDays, 30), 1, 3650), DownloadLimit = (int)Math.Clamp(s.GetInt(Keys.DownloadLimit, 5), 0, 1000),
             CustomCss = s.Get(Keys.CustomCss),
@@ -286,6 +296,11 @@ internal sealed record ShopConfig
         s.Add(new SettingSpec(Keys.CatPageSubs, "set.catPageSubs", SettingKind.Bool) { Default = "true" });
         s.Add(new SettingSpec(Keys.CatPageDesc, "set.catPageDesc", SettingKind.Bool) { Default = "true" });
         s.Add(new SettingSpec(Keys.CatPageCounts, "set.catPageCounts", SettingKind.Bool) { Default = "true" });
+        s.Add(new SettingSpec(Keys.WithdrawIntro, "set.withdrawIntro", SettingKind.TextArea) { Group = "set.groupWithdraw", Help = "set.withdrawIntroHelp" });
+        s.Add(new SettingSpec(Keys.ReturnAddress, "set.returnAddress", SettingKind.TextArea) { Help = "set.returnAddressHelp" });
+        s.Add(new SettingSpec(Keys.ReturnInfo, "set.returnInfo", SettingKind.TextArea) { Help = "set.returnInfoHelp" });
+        s.Add(new SettingSpec(Keys.BrandFeaturedBadge, "set.brandFeaturedBadge") { Group = "set.groupBrands", Default = "Premium-Partner", Help = "set.brandFeaturedBadgeHelp" });
+        s.Add(new SettingSpec(Keys.BrandFeaturedHeading, "set.brandFeaturedHeading") { Default = "Unsere Premium-Partner", Help = "set.brandFeaturedHeadingHelp" });
         s.Add(new SettingSpec(Keys.ImageFocus, "set.imageFocus", SettingKind.Choice)
         {
             Group = "set.groupImages", Default = "50% 50%", Help = "set.imageFocusHelp",

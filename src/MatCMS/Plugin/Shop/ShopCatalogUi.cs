@@ -105,6 +105,10 @@ internal static class ShopCatalogUi
         .shop-fdialog .x{border:0;background:none;color:inherit;font-size:1.6em;line-height:1;cursor:pointer;padding:0 4px}
         .shop-fdialog .q{margin:12px 18px 4px;padding:9px 12px;border:1px solid var(--shop-line,var(--line,rgba(0,0,0,.2)));border-radius:8px;font:inherit;background:transparent;color:inherit}
         .shop-fdialog .body{overflow:auto;padding:0 18px 16px;border:0}.shop-fdialog .body .opts{margin-top:4px}
+        .shop-wd-orderrow{display:flex;gap:8px;align-items:center}.shop-wd-orderrow input{flex:1}.shop-wd-items{border:1px solid var(--shop-line,var(--line,rgba(0,0,0,.14)));border-radius:10px;padding:12px 14px;display:grid;gap:6px}
+        .shop-wd-items legend{padding:0 6px;font-weight:600}.shop-check{display:flex;gap:8px;align-items:center}.shop-wd-sum{display:grid;grid-template-columns:max-content 1fr;gap:6px 18px;margin:12px 0}.shop-wd-sum dt{font-weight:600}.shop-wd-sum dd{margin:0;white-space:pre-wrap}
+        .shop-wd-orders{display:grid;gap:4px;margin-top:6px}.shop-wd-order{display:grid;gap:2px;padding:10px 12px;border-radius:8px;text-decoration:none;color:inherit;border:1px solid var(--shop-line,var(--line,rgba(0,0,0,.12)))}
+        .shop-wd-order:hover{border-color:var(--shop-accent,var(--accent,#1a1a1a))}.shop-wd-order .t{font-size:.9em;opacity:.75}.shop-wd-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.shop-wd .shop-card-box{max-width:760px}
         """;
 
     /// <summary>Opens "Weitere …" as a dialog: the group's entries are fetched from <c>data-more</c> only now, a search box narrows them as one types. Without script (or

@@ -125,7 +125,7 @@ internal static class ShopAdminBrands
             {
                 Name = name, Summary = Clip(f.F("summary").Trim(), 600), DetailsHtml = SafeHtml.Sanitize(f.F("details")), Logo = ShopPublic.SafeUrl(f.F("logo")), Image = ShopPublic.SafeUrl(f.F("image")),
                 Website = ShopBrands.SafeWebsite(website), SeoTitle = Clip(f.F("seo_title").Trim(), 120), SeoDescription = Clip(f.F("seo_description").Trim(), 320),
-                Active = f.Form.ContainsKey("active"), Featured = f.Form.ContainsKey("featured"),
+                Active = f.Form.ContainsKey("active"), Featured = f.Form.ContainsKey("featured"), Badge = ShopBrands.CleanBadge(f.F("badge")),
                 Sort = int.TryParse(f.F("sort"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var so) ? Math.Clamp(so, 0, 100000) : 0
             };
             if (name.Length == 0) error = ctx.T("shop.adm.errBrandName");
@@ -165,6 +165,7 @@ internal static class ShopAdminBrands
             Ui.Card(ctx.T("shop.adm.secStatus"),
                 Ui.Checkbox("active", ctx.T("shop.adm.brandActive"), current.Active) with { Help = ctx.T("shop.adm.brandActiveHelp") },
                 Ui.Checkbox("featured", ctx.T("shop.adm.featured"), current.Featured) with { Help = ctx.T("shop.adm.brandFeaturedHelp") },
+                Ui.Input("badge", ctx.T("shop.adm.brandBadge"), current.Badge) with { MaxLength = ShopBrands.MaxBadge, Placeholder = ctx.Settings.Get(Keys.BrandFeaturedBadge), Help = ctx.T("shop.adm.brandBadgeHelp") },
                 Ui.Input("sort", ctx.T("shop.adm.sort"), Intl(current.Sort), UiInputType.Number) with { Min = "0" }),
             Ui.Card(ctx.T("shop.adm.secPlace"),
                 id == 0 ? Ui.Input("slug", ctx.T("shop.adm.slug"), "") with { Help = ctx.T("shop.adm.brandSlugHelp") } : Ui.KeyValue((ctx.T("shop.adm.slug"), current.Slug), (ctx.T("shop.adm.products"), Intl(count))))

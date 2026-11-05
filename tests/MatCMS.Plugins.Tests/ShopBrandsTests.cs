@@ -96,6 +96,28 @@ public class ShopBrandsTests : IClassFixture<AppFactory>, IAsyncLifetime
     }
 
     [Fact]
+    public async Task Highlighted_brands_carry_the_shops_badge_or_their_own_and_stand_in_their_own_section()
+    {
+        await BrandAsync("prem-marke", "Prem Marke", b => b with { Featured = true });
+        await BrandAsync("eigen-marke", "Eigen Marke", b => b with { Badge = "Exklusiv" });
+        await BrandAsync("normal-marke", "Normal Marke");
+        foreach (var slug in new[] { "prem-marke", "eigen-marke", "normal-marke" }) await SetBrandAsync(await _shop.AddProductAsync("Ding " + slug, 1000), slug);
+        var all = Decode(await _app.Browser().GetStringAsync("/shop/brands"));
+        Assert.Contains("<h2>Unsere Premium-Partner</h2>", all);
+        Assert.Contains("<h2>Alle Marken</h2>", all);
+        // The highlighted one: framed, the shop's badge, and in the top section.
+        Assert.Matches("class=\"shop-brand card featured\" href=\"/shop/brands/prem-marke\"><span class=\"badge\">Premium-Partner</span>", all);
+        Assert.True(all.IndexOf("/shop/brands/prem-marke", StringComparison.Ordinal) < all.IndexOf("<h2>Alle Marken</h2>", StringComparison.Ordinal));
+        // A brand's own badge, without being highlighted; a plain one has none.
+        Assert.Contains("href=\"/shop/brands/eigen-marke\"><span class=\"badge\">Exklusiv</span>", all);
+        Assert.DoesNotContain("href=\"/shop/brands/normal-marke\"><span class=\"badge\">", all);
+        // The brand's own page says it too.
+        Assert.Contains("<span class=\"shop-brandbadge\">Premium-Partner</span><h1>Prem Marke</h1>", Decode(await _app.Browser().GetStringAsync("/shop/brands/prem-marke")));
+        Assert.Equal("Exklusiv", ShopBrands.CleanBadge("  Exklusiv  "));
+        Assert.Equal(ShopBrands.MaxBadge, ShopBrands.CleanBadge(new string('x', 99)).Length);
+    }
+
+    [Fact]
     public async Task A_hidden_brand_has_no_page_and_its_products_are_still_sold()
     {
         await BrandAsync("weg-marke", "Weg Marke", b => b with { Active = false });

@@ -26,6 +26,11 @@ internal static class ShopBrands
         .shop-brand:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(0,0,0,.08)}@media(prefers-reduced-motion:reduce){.shop-brand{transition:none}.shop-brand:hover{transform:none}}
         .shop-brand .logo{display:flex;align-items:center;justify-content:center;width:100%;aspect-ratio:3/2}.shop-brand .logo img{max-width:100%;max-height:100%;object-fit:contain}
         .shop-brand .logo .ph{font-weight:700;font-size:1.15em;text-align:center;font-family:var(--shop-font-head,var(--font-head,inherit))}
+        .shop-brand{position:relative}.shop-brand .badge,.shop-brandbadge{display:inline-block;padding:3px 9px;border-radius:999px;background:var(--shop-accent,var(--accent,#1a1a1a));color:var(--shop-on-accent,#fff);font-size:.72em;font-weight:600;letter-spacing:.02em;line-height:1.4;white-space:nowrap}
+        .shop-brand .badge{position:absolute;top:8px;right:8px;z-index:1;max-width:calc(100% - 16px);overflow:hidden;text-overflow:ellipsis}.shop-brandbadge{margin-bottom:6px}
+        .shop-brand.featured{border-color:var(--shop-accent,var(--accent,#1a1a1a));box-shadow:inset 0 0 0 1px var(--shop-accent,var(--accent,#1a1a1a))}
+        .shop-brands.bare .shop-brand.featured,.shop-carousel.bare .shop-brand.featured{border-color:var(--shop-accent,var(--accent,#1a1a1a));background:transparent}
+        .shop-brandsec{margin:0 0 36px}.shop-brandsec>h2{margin:0 0 16px;font-family:var(--shop-font-head,var(--font-head,inherit))}
         .shop-brand .name{font-weight:600;text-align:center;font-family:var(--shop-font-head,var(--font-head,inherit))}.shop-brand .count{font-size:.8em;opacity:.65}
         .shop-brand.card{align-items:stretch;text-align:left}.shop-brand.card .logo{aspect-ratio:auto;height:120px;padding:6px 0}.shop-brand.card .name{text-align:left}.shop-brand.card .summary{font-size:.9em;opacity:.8;margin:0}
         .shop-brands.bare .shop-brand,.shop-carousel.bare .shop-brand{border-color:transparent;background:transparent}.shop-brands.bare .shop-brand:hover,.shop-carousel.bare .shop-brand:hover{box-shadow:none}
@@ -96,9 +101,25 @@ internal static class ShopBrands
     }
 
     /// <summary>One brand in a gallery: logo, optionally the name, the short text (cards) and how many products it has; a link to its page.</summary>
+    internal const int MaxBadge = 40;
+
+    /// <summary>A brand's own label as stored: one line, at most <see cref="MaxBadge"/> characters.</summary>
+    internal static string CleanBadge(string? s)
+    {
+        var t = string.Join(' ', (s ?? "").Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return t.Length > MaxBadge ? t[..MaxBadge].TrimEnd() : t;
+    }
+
+    /// <summary>The label a brand shows: its own, else — for a highlighted brand — the shop's ("Premium-Partner"; empty setting = none).</summary>
+    internal static string BadgeOf(IPluginContext ctx, Brand x) =>
+        x.Badge.Length > 0 ? x.Badge : x.Featured ? CleanBadge(ctx.Settings.Get(Keys.BrandFeaturedBadge)) : "";
+
     internal static string Tile(IPluginContext ctx, Brand x, bool card, bool name, int? count)
     {
-        var sb = new StringBuilder($"<a class=\"shop-brand{(card ? " card" : "")}\" href=\"{E(ShopUrls.Brand(x.Slug))}\"{(name || card ? "" : $" aria-label=\"{E(x.Name)}\" title=\"{E(x.Name)}\"")}>");
+        var badge = BadgeOf(ctx, x);
+        var cls = "shop-brand" + (card ? " card" : "") + (x.Featured ? " featured" : "");
+        var sb = new StringBuilder($"<a class=\"{cls}\" href=\"{E(ShopUrls.Brand(x.Slug))}\"{(name || card ? "" : $" aria-label=\"{E(x.Name + (badge.Length > 0 ? " – " + badge : ""))}\" title=\"{E(x.Name)}\"")}>");
+        if (badge.Length > 0) sb.Append($"<span class=\"badge\">{E(badge)}</span>");
         sb.Append("<span class=\"logo\">").Append(LogoHtml(ctx, x)).Append("</span>");
         // Without a logo the name already stands in its place.
         if ((name || card) && ShopPublic.SafeUrl(x.Logo).Length > 0) sb.Append($"<span class=\"name\">{E(x.Name)}</span>");
@@ -139,17 +160,20 @@ internal static class ShopBrands
         var brands = await store.BrandsAsync(true, ct);
         var counts = await store.BrandCountsAsync(true, ct);
         var grid = new StringBuilder();
+        // The highlighted brands in a section of their own on top (under the shop's heading, "Unsere Premium-Partner"), then all the others; an empty heading = one grid as before.
+        var heading = ctx.Settings.Get(Keys.BrandFeaturedHeading).Trim();
+        var featured = heading.Length > 0 ? brands.Where(x => x.Featured).ToList() : new List<Brand>();
+        var rest = featured.Count > 0 ? brands.Where(x => !x.Featured).ToList() : brands.ToList();
+        var featuredHtml = featured.Count == 0 ? ""
+            : $"<section class=\"shop-brandsec featured\"><h2>{E(heading)}</h2><div class=\"shop-brands\">" + string.Concat(featured.Select(x => Tile(ctx, x, true, true, counts.GetValueOrDefault(x.Slug)))) + "</div></section>";
+        var restHtml = rest.Count == 0 ? ""
+            : (featured.Count > 0 ? $"<section class=\"shop-brandsec\"><h2>{E(ctx.T("shop.brands.all"))}</h2>" : "") + "<div class=\"shop-brands\">" + string.Concat(rest.Select(x => Tile(ctx, x, true, true, counts.GetValueOrDefault(x.Slug)))) + "</div>" + (featured.Count > 0 ? "</section>" : "");
         if (brands.Count == 0) grid.Append($"<p class=\"shop-muted\">{E(ctx.T("shop.brands.empty"))}</p>");
-        else
-        {
-            grid.Append("<div class=\"shop-brands\">");
-            foreach (var x in brands) grid.Append(Tile(ctx, x, true, true, counts.GetValueOrDefault(x.Slug)));
-            grid.Append("</div>");
-        }
+        else grid.Append(featuredHtml).Append(restHtml);
         var title = ctx.T("shop.brands");
         var values = new Dictionary<string, string>
         {
-            ["title"] = title, ["total"] = Intl(brands.Count), ["grid_html"] = grid.ToString(),
+            ["title"] = title, ["total"] = Intl(brands.Count), ["grid_html"] = grid.ToString(), ["featured_html"] = featuredHtml, ["others_html"] = restHtml,
             ["crumbs_html"] = $"<p class=\"shop-crumbs\"><a href=\"/shop\">{E(ctx.T("shop.title"))}</a> › {E(title)}</p>"
         };
         var tail = "<script type=\"application/ld+json\">" + new JsonObject
@@ -204,7 +228,8 @@ internal static class ShopBrands
         var website = SafeWebsite(x.Website);
         var websiteHtml = website.Length > 0 ? $"<p class=\"shop-brandsite\"><a href=\"{E(website)}\" target=\"_blank\" rel=\"noopener\">{E(ctx.T("shop.brand.website"))} ↗</a></p>" : "";
         var logoHtml = logo.Length > 0 ? $"<div class=\"logo\"><img src=\"{E(ShopImages.Url(ctx, logo, ShopImages.Card))}\" alt=\"{E(x.Name)}\"></div>" : "";
-        var head = $"<div class=\"shop-brandhead\">{logoHtml}<div><h1>{E(x.Name)}</h1>{(x.Summary.Length > 0 ? $"<p class=\"shop-muted\">{E(x.Summary)}</p>" : "")}{websiteHtml}</div></div>";
+        var badgeText = BadgeOf(ctx, x);
+        var head = $"<div class=\"shop-brandhead{(x.Featured ? " featured" : "")}\">{logoHtml}<div>{(badgeText.Length > 0 ? $"<span class=\"shop-brandbadge\">{E(badgeText)}</span>" : "")}<h1>{E(x.Name)}</h1>{(x.Summary.Length > 0 ? $"<p class=\"shop-muted\">{E(x.Summary)}</p>" : "")}{websiteHtml}</div></div>";
         var shopLink = ShopUrls.Catalog("", extra: new[] { new KeyValuePair<string, string>("brand", x.Slug) });
         var notice = x.Active ? "" : Alert(ctx.T("shop.brand.inactiveNote"), "info");
         var values = new Dictionary<string, string>

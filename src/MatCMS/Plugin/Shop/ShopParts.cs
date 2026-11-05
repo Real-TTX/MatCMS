@@ -116,7 +116,7 @@ internal static class ShopParts
         b.TemplatePart(new TemplatePartSpec("brands", "shop.part.brands", BrandsDefault)
         {
             Help = "shop.part.brandsHelp",
-            Placeholders = new[] { P("title"), P("total"), P("crumbs_html", true), P("grid_html", true) }
+            Placeholders = new[] { P("title"), P("total"), P("crumbs_html", true), P("grid_html", true), P("featured_html", true), P("others_html", true) }
         });
         b.TemplatePart(new TemplatePartSpec("brand", "shop.part.brand", BrandDefault)
         {

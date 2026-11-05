@@ -111,7 +111,7 @@ public class MatmonLiveTests : IClassFixture<AppFactory>
             {
                 Key = "matmon-live", Name = "Matmon Live", Version = "1.0", Kind = PluginKind.Script, Enabled = true,
                 Code = Fixture("plugin.csx"),
-                FilesJson = System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, string> { ["snapshot.csx"] = Fixture("snapshot.csx"), ["live.csx"] = Fixture("live.csx"), ["partners.csx"] = Fixture("partners.csx"), ["changelog.csx"] = Fixture("changelog.csx") }),
+                FilesJson = System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, string> { ["snapshot.csx"] = Fixture("snapshot.csx"), ["live.csx"] = Fixture("live.csx"), ["partners.csx"] = Fixture("partners.csx"), ["changelog.csx"] = Fixture("changelog.csx"), ["templates.csx"] = Fixture("templates.csx") }),
                 ConfigJson = new JsonObject { ["cloudUrl"] = cloud.Url, ["githubApi"] = cloud.Url }.ToJsonString()
             };
             db.Plugins.Add(row);

@@ -1,6 +1,0 @@
-{
-  "Key": "matmon-templates",
-  "Name": "Matmon Template-Store",
-  "Version": "2.0",
-  "Description": "Für matmon.eu: die öffentliche Seite des Matmon-Template-Stores, der in Matmon Cloud liegt. /templates zeigt die freigegebenen Sets der Cloud (Suche, Schlagwörter, Download), angemeldete Mitglieder reichen Template-Dateien ein und sehen den Stand ihrer Einreichungen; geprüft und freigegeben wird in Matmon Cloud. Braucht den Store-API-Schlüssel der Cloud in den Einstellungen."
-}

@@ -43,6 +43,8 @@ public sealed class ShopPlugin : IPlugin
         b.Route("/shop/categories/{slug}", ShopPublic.CatalogAsync, get);
         // Brands: the page of all of them, a brand's own page, the gallery block, a menu element and link targets.
         ShopBrands.Register(b);
+        // "Vertrag widerrufen" (§ 356a BGB): the page, the dialog's order list, the footer link, its template part and mails.
+        ShopWithdrawals.Register(b);
         b.Route("/shop/cart", ShopPublic.CartAsync, form);
         b.Route("/shop/checkout", ShopPublic.CheckoutAsync, form);
         b.Route("/shop/order/{number}", ShopPublic.OrderAsync, form);
@@ -74,6 +76,8 @@ public sealed class ShopPlugin : IPlugin
             .Page("products/{id}", null, ShopAdminCatalog.ProductAsync)
             .Page("categories", "shop.tab.categories", ShopAdminCatalog.CategoriesAsync)
             .Page("categories/{id}", null, ShopAdminCatalog.CategoryAsync)
+            .Page("withdrawals", "shop.tab.withdrawals", ShopAdminWithdrawals.ListAsync)
+            .Page("withdrawals/{id}", null, ShopAdminWithdrawals.OneAsync)
             .Page("brands", "shop.tab.brands", ShopAdminBrands.BrandsAsync)
             .Page("brands/{id}", null, ShopAdminBrands.BrandAsync)
             .Page("attributes", "shop.tab.attributes", ShopAdminAttributes.AttributesAsync)
@@ -93,6 +97,7 @@ public sealed class ShopPlugin : IPlugin
             // One line in the main menu like every other plugin; opening it shows the shop's own menu (with a way back) on every one of its pages, starting at the dashboard. Conditions and settings are screens with a sub-menu of their own.
             .Link("shop.nav.dashboard", "dashboard", "ti-layout-dashboard")
             .Link("shop.tab.orders", "orders", "ti-receipt", badge: true)
+            .Link("shop.tab.withdrawals", "withdrawals", "ti-arrow-back-up")
             .Link("shop.tab.products", "products", "ti-package")
             .Link("shop.tab.categories", "categories", "ti-category")
             .Link("shop.tab.brands", "brands", "ti-award")

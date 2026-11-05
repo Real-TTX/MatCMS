@@ -25,6 +25,7 @@ internal static class ShopEvents
         // A cart a guest asked a reminder for is found by its address: the address goes with the account.
         if ((payload?["email"]?.GetValue<string>() ?? "").Trim().ToLowerInvariant() is { Length: > 0 } mail) await store.DeleteCartsOfEmailAsync(mail);
         await store.UnlinkMemberAsync(id);
+        await store.UnlinkWithdrawalsOfMemberAsync(id);
     }
 
     public static async Task<JsonNode?> ExportAsync(IPluginContext ctx, JsonNode? payload, CancellationToken ct)

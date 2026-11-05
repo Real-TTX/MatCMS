@@ -10,7 +10,7 @@ namespace MatCMS.Plugin.Shop;
 internal static partial class ShopPublic
 {
     /// <summary>Words a product's address cannot be: they are the shop's own pages.</summary>
-    public static readonly string[] ReservedSlugs = { "categories", "brands", "tags", "cart", "checkout", "order", "download", "invoice", "webhook", "pay", "account", "suggest", "filters" };
+    public static readonly string[] ReservedSlugs = { "categories", "brands", "tags", "cart", "checkout", "order", "download", "invoice", "webhook", "pay", "account", "suggest", "filters", "widerrufen" };
 
     internal static string M(IPluginContext ctx, ShopConfig cfg, long cents) => Money.Format(cents, cfg.Currency, ctx.Locale);
     private static string Csrf(IPluginContext ctx) => ctx.Antiforgery;
@@ -1073,6 +1073,9 @@ internal static partial class ShopPublic
             side.Append("</div>");
         }
 
+        // "Vertrag widerrufen" from the order itself: the order and its items are filled in (the link carries the order's key, as this page's own address does).
+        if (ShopWithdrawals.Offered(order))
+            side.Append($"<div class=\"shop-card-box shop-wd-box\"><h2>{E(ctx.T("shop.wd.title"))}</h2><p class=\"shop-muted shop-small\">{E(ctx.T("shop.wd.boxText"))}</p><a class=\"shop-btn ghost\" href=\"{E(ShopWithdrawals.LinkFor(order, true))}\">{E(ctx.T("shop.wd.button"))}</a></div>");
         side.Append($"<div class=\"shop-card-box\"><h2>{E(ctx.T("shop.billingAddress"))}</h2><div class=\"shop-pre\">{E(order.Billing.Lines())}</div>");
         if (order.Shipping.IsComplete) side.Append($"<h2 style=\"margin-top:16px\">{E(ctx.T("shop.shippingAddress"))}</h2><div class=\"shop-pre\">{E(order.Shipping.Lines())}</div>");
         side.Append("</div>");

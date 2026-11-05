@@ -8,7 +8,7 @@ internal sealed partial class ShopStore
     private static Brand BrandOf(DataRow r) => new()
     {
         Id = r.Id, Slug = r.Text("slug"), Name = r.Text("name"), Logo = r.Text("logo"), Image = r.Text("image"), Summary = r.Text("summary"), DetailsHtml = r.Text("details"),
-        Website = r.Text("website"), SeoTitle = r.Text("seo_title"), SeoDescription = r.Text("seo_description"), Featured = r.Bool("featured"), Active = r.Bool("active"),
+        Website = r.Text("website"), SeoTitle = r.Text("seo_title"), SeoDescription = r.Text("seo_description"), Featured = r.Bool("featured"), Badge = r.Text("badge"), Active = r.Bool("active"),
         Sort = (int)r.Int("sort"), UpdatedUtc = r.Timestamp("updated") ?? DateTime.UtcNow
     };
 
@@ -32,7 +32,7 @@ internal sealed partial class ShopStore
         var values = new Dictionary<string, object?>
         {
             ["name"] = b.Name, ["logo"] = b.Logo, ["image"] = b.Image, ["summary"] = b.Summary, ["details"] = b.DetailsHtml, ["website"] = b.Website, ["seo_title"] = b.SeoTitle,
-            ["seo_description"] = b.SeoDescription, ["featured"] = b.Featured, ["active"] = b.Active, ["sort"] = b.Sort, ["updated"] = DateTime.UtcNow
+            ["seo_description"] = b.SeoDescription, ["featured"] = b.Featured, ["badge"] = ShopBrands.CleanBadge(b.Badge), ["active"] = b.Active, ["sort"] = b.Sort, ["updated"] = DateTime.UtcNow
         };
         if (b.Id > 0) { await T("brands").UpdateAsync(b.Id, values, ct); return b.Id; }
         values["slug"] = b.Slug;

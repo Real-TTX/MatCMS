@@ -520,3 +520,20 @@ What `docs/shop-vs-shopify.md` listed as missing, built and tested; the rules th
   `brand IN` the matching brands, `id IN` the products with a matching attribute value). Catalogue and suggestions use the same choice.
 - The older single choice `catalog.searchIn` (title | text | all) is no longer offered; a shop that had "title" or "all" keeps that meaning while the new list was
   never saved (`ShopConfig.From`).
+
+## Withdrawal ("Vertrag widerrufen", § 356a BGB)
+
+- **The function the law asks for since 19 June 2026**: `/shop/widerrufen` (`ShopWithdrawals`), always reachable — the menu element `shop.withdraw` is added to the
+  FOOTER once (`DefaultMenu = "footer"`), the customer's order page has a box with the link (order and its key filled in), every account order card a button.
+  Steps: name, e-mail, order (typed; a signed-in customer picks it in a dialog that fetches `/shop/widerrufen/orders` — HIS orders only, `RequireMember`) and
+  optionally which items (ticked, when the visitor holds the order: member, or the order's key `t`) and a message → "Weiter" shows exactly what will be sent →
+  **"Widerruf bestätigen"** stores it and sends the receipt at once (mail `shop.withdrawal.received`: content, date and time — the durable medium the law
+  requires) and tells the shop (`shop.admin.withdrawal` to `notify.email`). The confirmation page repeats it with the return instructions.
+- **Every declaration is kept** (table `withdrawals`, never rewritten; number `WR-yyyymmdd-id`), also one whose order cannot be matched (a withdrawal is valid
+  because it was declared): it hangs on the order only when the visitor holds it or the e-mail is the order's; a guest learns nothing about an order he does
+  not hold (same answer, no items). The order's history gets "Widerruf erklärt" and the mail result. Erasing an account unlinks, never deletes them.
+- **The return**: Shop → Widerrufe (list with status filter, attention note on the dashboard while new ones wait): received → return expected → goods back →
+  refunded / rejected / closed, an internal note; each status change is written into the order's history. The money goes back through the ORDER's refund
+  (credit note, provider) — never from this page. Settings "Widerruf und Rücksendung": text above the form, return address (empty = the seller's), return
+  instructions (empty = a standard text with that address). Template part `withdraw` (`shop-withdraw.html`); the form is always the shop's.
+- Not legal advice: the wording of the page, the receipt and the instructions is the operator's to check.

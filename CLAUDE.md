@@ -358,6 +358,11 @@ A built-in plugin (off until switched on), written against the plugin API and no
   whose dialog fetches `/shop/filters?group=…` (one group's entries, `CatalogViewAsync(group:)`) only when opened; `?more=group` is the no-script fallback.
   What the search looks at is `catalog.searchFields` (`ShopSearchFields`: sku/GTIN, summary, description, tags, category, brand, attributes — the last three by NAME);
   the name always.
+- **"Vertrag widerrufen" (§ 356a BGB, mandatory since 19.06.2026)**: `/shop/widerrufen` (`ShopWithdrawals`): form → review → "Widerruf bestätigen" → stored in `withdrawals`
+  (every declaration, matched or not) + the receipt mail at once (content, date, time). A member picks HIS order in a dialog (`/shop/widerrufen/orders`, RequireMember);
+  a guest sees items only with the order's key. Footer menu element seeded once; Shop → Widerrufe follows the return, the refund stays the order's. See docs "Withdrawal".
+- **Brands can be marked**: highlighted brands get a frame, the shop's badge (`brands.featuredBadge`, "Premium-Partner") and their own section on /shop/brands
+  (`brands.featuredHeading`); a brand may carry its own badge (`brands.badge`).
 - **Plugin settings can be a multiple choice** (`SettingKind.MultiChoice`): drawn as the toolkit's `UiCheckList` (boxes post `{name}~{index}`, by POSITION), stored as
   the declared values comma-separated — a posted value is never stored, so an option value may not hold a comma (`PluginBuilder` refuses it).
 - **Downloads** are private files streamed by `ShopDownloads.ServeAsync`: paid order, the order's secret key (or the owner, or the admin), a download row that is not revoked or

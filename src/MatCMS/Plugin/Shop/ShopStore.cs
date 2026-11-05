@@ -35,7 +35,10 @@ internal sealed partial class ShopStore
         d.Table("categories", t => t.Text("slug", required: true, def: "").Text("name", required: true, def: "").Int("sort", def: "0").Int("parent_id", def: "0").Text("image", def: "").Text("description", def: "").Text("tags", def: "").Text("rule", def: "").UniqueIndex("slug"));
         // Brands (manufacturers): a page of their own, a gallery; a product names its brand by slug.
         d.Table("brands", t => t.Text("slug", required: true, def: "").Text("name", required: true, def: "").Text("logo").Text("image").Text("summary").Text("details")
-            .Text("website").Text("seo_title").Text("seo_description").Bool("featured", def: "0").Bool("active", def: "1").Int("sort", def: "0").Timestamp("updated").UniqueIndex("slug"));
+            .Text("website").Text("seo_title").Text("seo_description").Bool("featured", def: "0").Bool("active", def: "1").Int("sort", def: "0").Timestamp("updated").Text("badge", def: "").UniqueIndex("slug"));
+        // Withdrawals declared through "Vertrag widerrufen" (§ 356a BGB): kept as the customer confirmed them, the operator follows the return.
+        d.Table("withdrawals", t => t.Int("order_id", def: "0").Text("order_number").Int("member_id", def: "0").Text("name").Text("email").Json("items", def: "[]").Text("items_text")
+            .Text("what").Text("message").Text("status", def: "received").Text("note").Timestamp("created").Timestamp("updated").Index("status").Index("order_id").Index("member_id"));
         d.Table("attributes", t => t.Text("slug", required: true, def: "").Text("name", required: true, def: "").Text("kind", def: "choice").Text("options").Text("unit")
             .Bool("filterable", def: "1").Text("category").Int("sort", def: "0").UniqueIndex("slug"));
         d.Table("product_attrs", t => t.Int("product_id", required: true, def: "0").Int("attr_id", required: true, def: "0").Text("value", def: "").Index("product_id").Index("attr_id"));

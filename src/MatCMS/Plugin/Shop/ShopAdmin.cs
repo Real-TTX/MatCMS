@@ -328,6 +328,9 @@ internal static class ShopAdmin
         var cfg = ShopConfig.From(ctx.Settings);
         var notes = new List<AttentionNote>();
 
+        // Withdrawals nobody has looked at yet: the law gives the customer his money back within 14 days.
+        if (await store.CountWithdrawalsAsync(ShopWithdrawals.Received, ct) is var wdNew and > 0)
+            notes.Add(new AttentionNote(ctx.T("shop.wd.att", wdNew), ctx.T("shop.wd.attText"), $"{Section}/withdrawals") { Tone = UiTone.Error, Icon = "ti-arrow-back-up" });
         var stale = await store.OrdersWhereAsync(DataQuery.Everything.Eq("status", OrderStatus.Paid).Where("paid", DataOp.Lt, DateTime.UtcNow.AddDays(-3)), ct);
         if (stale.Count > 0) notes.Add(new AttentionNote(ctx.T("shop.adm.attStale", stale.Count), ctx.T("shop.adm.attStaleText"), $"{Section}/orders?status={OrderStatus.Paid}") { Tone = UiTone.Warning, Icon = "ti-package" });
 

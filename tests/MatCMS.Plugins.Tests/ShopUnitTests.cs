@@ -263,7 +263,7 @@ public class ShopUnitTests
             foreach (Match m in Regex.Matches(text, "\"((?:shop|set)\\.[A-Za-z0-9_.]+)\"")) used.Add(m.Groups[1].Value);
         }
         // Names that look like keys but are events or mail keys, not texts.
-        used.ExceptWith(new[] { "shop.payment.methods", "shop.payment.paid", "shop.payment.start", "shop.order.placed", "shop.order.paid", "shop.order.shipped", "shop.order.cancelled", "shop.order.refunded", "shop.order.completed", "shop.admin.order", "shop.cart.reminder" });
+        used.ExceptWith(new[] { "shop.payment.methods", "shop.payment.paid", "shop.payment.start", "shop.order.placed", "shop.order.paid", "shop.order.shipped", "shop.order.cancelled", "shop.order.refunded", "shop.order.completed", "shop.admin.order", "shop.cart.reminder", "shop.withdrawal.received", "shop.admin.withdrawal" });
         used.RemoveWhere(k => k.EndsWith('.'));                                                     // "shop.status." + status: the dynamic ones are checked in the next test
         Assert.True(used.Count > 200, "the scan found only " + used.Count);
         Assert.Empty(used.Where(k => !have.Contains(k)).OrderBy(k => k));

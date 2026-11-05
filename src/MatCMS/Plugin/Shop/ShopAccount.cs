@@ -106,6 +106,8 @@ internal static class ShopAccount
         sb.Append($"<a class=\"shop-btn ghost\" href=\"{E(url)}\">{E(ctx.T("shop.acc.details"))}</a>");
         if (o.Status == OrderStatus.Shipped && ShopTracking.UrlOf(cfg, o) is { Length: > 0 } track)
             sb.Append($"<a class=\"shop-btn\" href=\"{E(track)}\" target=\"_blank\" rel=\"noopener noreferrer\">{Icon("truck")}{E(ctx.T("shop.trackShipment"))}</a>");
+        if (ShopWithdrawals.Offered(o) && o.Status != OrderStatus.AwaitingPayment)
+            sb.Append($"<a class=\"shop-btn ghost\" href=\"{E(ShopWithdrawals.LinkFor(o, false))}\">{E(ctx.T("shop.wd.button"))}</a>");
         if (o.InvoiceNumber.Length > 0)
             sb.Append($"<a class=\"shop-btn ghost\" href=\"/shop/invoice/{E(Uri.EscapeDataString(o.Number))}\" target=\"_blank\" rel=\"noopener\">{Icon("file")}{E(ctx.T("shop.invoice"))}</a>");
         return sb.Append("</footer></article>").ToString();

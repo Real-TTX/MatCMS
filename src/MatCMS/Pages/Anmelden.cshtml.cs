@@ -16,7 +16,8 @@ public class AnmeldenModel : PageModel
 {
     private readonly MemberService _members;
     private readonly SiteContext _site;
-    public AnmeldenModel(MemberService members, SiteContext site) { _members = members; _site = site; }
+    private readonly Localizer T;
+    public AnmeldenModel(MemberService members, SiteContext site, Localizer t) { _members = members; _site = site; T = t; }
 
     public string? Error { get; private set; }
     public string? ReturnUrl { get; private set; }
@@ -66,7 +67,7 @@ public class AnmeldenModel : PageModel
         MemberName = member?.FindFirst("DisplayName")?.Value ?? member?.Identity?.Name;
 
         if (denied && LoggedIn)
-            Error = "Dieses Konto hat keinen Zugriff auf die angeforderte Seite.";
+            Error = T["member.err.denied"];
         else if (LoggedIn && !denied)
             return Redirect(ReturnUrl ?? "/");
 
@@ -81,7 +82,7 @@ public class AnmeldenModel : PageModel
         if (member is null)
         {
             CanRegister = await _members.SelfRegistrationEnabledAsync();
-            Error = "Benutzername oder Passwort ist falsch.";
+            Error = T["member.err.invalid"];
             MemberName = null;
             ResolveTemplate();
             return Page();

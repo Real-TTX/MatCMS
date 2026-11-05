@@ -1,6 +1,6 @@
 @model MatCMS.Content.BlockData
 @{
-    var heading = Model.StrOr("heading", "Anmelden");
+    var heading = Model.StrOr("heading", T["member.signIn"]);
     // Which member (if any) is behind this request — the member scheme is not the default one, so it
     // is asked for by name. Cached per request inside CurrentAsync.
     var member = await MatCMS.Services.MemberService.CurrentAsync(Context);
@@ -17,11 +17,11 @@
             }
             @if (loggedIn)
             {
-                <p>Angemeldet als <strong>@name</strong>.</p>
+                <p>@Html.Raw(T["member.signedInAs", "<strong>" + System.Net.WebUtility.HtmlEncode(name ?? "") + "</strong>"])</p>
                 <form method="post" action="/anmelden?handler=Logout">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="returnUrl" value="@back" />
-                    <button type="submit" class="btn">Abmelden</button>
+                    <button type="submit" class="btn">@T["member.signOut"]</button>
                 </form>
             }
             else
@@ -30,17 +30,17 @@
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="returnUrl" value="@back" />
                     <label class="member-login-field">
-                        <span>Benutzername</span>
+                        <span>@T["member.username"]</span>
                         <input name="username" autocomplete="username" required />
                     </label>
                     <label class="member-login-field">
-                        <span>Passwort</span>
+                        <span>@T["member.password"]</span>
                         <input name="password" type="password" autocomplete="current-password" required />
                     </label>
                     <label class="member-login-remember">
-                        <input type="checkbox" name="remember" value="true" /> Angemeldet bleiben
+                        <input type="checkbox" name="remember" value="true" /> @T["member.remember"]
                     </label>
-                    <button type="submit" class="btn">Anmelden</button>
+                    <button type="submit" class="btn">@T["member.signIn"]</button>
                 </form>
             }
         </div>

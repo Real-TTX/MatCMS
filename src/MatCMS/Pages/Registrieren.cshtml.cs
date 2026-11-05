@@ -12,7 +12,8 @@ namespace MatCMS.Pages;
 public class RegistrierenModel : PageModel
 {
     private readonly MemberService _members;
-    public RegistrierenModel(MemberService members) => _members = members;
+    private readonly Localizer T;
+    public RegistrierenModel(MemberService members, Localizer t) { _members = members; T = t; }
 
     public string? Error { get; private set; }
     public string? ReturnUrl { get; private set; }
@@ -39,9 +40,9 @@ public class RegistrierenModel : PageModel
         var (status, member) = await _members.CreateAsync(Email, password ?? "", Name, HttpContext.RequestAborted);
         switch (status)
         {
-            case MemberService.CreateStatus.InvalidEmail: Error = "Bitte geben Sie eine gültige E-Mail-Adresse an."; return Page();
-            case MemberService.CreateStatus.WeakPassword: Error = $"Das Passwort muss mindestens {MemberService.MinPasswordLength} Zeichen haben."; return Page();
-            case MemberService.CreateStatus.EmailTaken: Error = "Mit dieser E-Mail-Adresse gibt es schon ein Konto. Melden Sie sich an oder lassen Sie sich ein neues Passwort schicken."; return Page();
+            case MemberService.CreateStatus.InvalidEmail: Error = T["member.err.email"]; return Page();
+            case MemberService.CreateStatus.WeakPassword: Error = T["member.err.passwordShort", MemberService.MinPasswordLength]; return Page();
+            case MemberService.CreateStatus.EmailTaken: Error = T["member.err.emailTaken"]; return Page();
         }
         await _members.SignInAsync(HttpContext, member!, persistent: false);
         return Redirect(ReturnUrl ?? "/");

@@ -1,7 +1,7 @@
 @page "/anmelden"
 @model MatCMS.Pages.AnmeldenModel
 @{
-    ViewData["Title"] = "Anmelden";
+    ViewData["Title"] = T["member.signIn"];
     if (Model.HasCustom) { Layout = null; }
 }
 @if (Model.HasCustom)
@@ -10,11 +10,11 @@
        replaces {{login_form}}; the template's CSS/JS are injected so styling and scripts (e.g. a
        counter) work here too. *@
     <!DOCTYPE html>
-    <html lang="de">
+    <html lang="@System.Globalization.CultureInfo.CurrentUICulture.Name">
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Anmelden – @Model.SiteName</title>
+        <title>@T["member.signIn"] – @Model.SiteName</title>
         <style>@Html.Raw(MatCMS.Shared.Web.LocalFonts.Rewrite(Model.CustomCss))</style>
     </head>
     <body>
@@ -22,9 +22,9 @@
         <form class="login-form" method="post">
             @Html.AntiForgeryToken()
             <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
-            <input class="login-user" name="username" placeholder="Benutzername eingeben…" autocomplete="username" required />
-            <input class="login-pass" name="password" type="password" placeholder="Kennwort eingeben…" autocomplete="current-password" required />
-            <button class="login-submit" type="submit">Anmelden</button>
+            <input class="login-user" name="username" placeholder="@T["member.usernamePlaceholder"]" autocomplete="username" required />
+            <input class="login-pass" name="password" type="password" placeholder="@T["member.passwordPlaceholder"]" autocomplete="current-password" required />
+            <button class="login-submit" type="submit">@T["member.signIn"]</button>
         </form>
         @Html.Raw(MatCMS.Shared.Web.LocalFonts.Rewrite(Model.CustomAfter))
         <script>
@@ -56,18 +56,18 @@ else
     <partial name="_MemberAuthStyle" />
     <section class="member-auth">
         <div class="member-auth-card">
-            <h1>Anmelden</h1>
+            <h1>@T["member.signIn"]</h1>
             @if (!string.IsNullOrEmpty(Model.Error))
             {
                 <p class="member-auth-error">@Model.Error</p>
             }
             @if (Model.LoggedIn)
             {
-                <p>Angemeldet als <strong>@Model.MemberName</strong>.</p>
+                <p>@Html.Raw(T["member.signedInAs", "<strong>" + System.Net.WebUtility.HtmlEncode(Model.MemberName ?? "") + "</strong>"])</p>
                 <form method="post" asp-page-handler="Logout">
                     <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
-                    <button type="submit" class="btn">Abmelden</button>
-                    <a class="btn btn-ghost" href="/">Zur Startseite</a>
+                    <button type="submit" class="btn">@T["member.signOut"]</button>
+                    <a class="btn btn-ghost" href="/">@T["member.home"]</a>
                 </form>
             }
             else
@@ -75,23 +75,23 @@ else
                 <form method="post">
                     <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
                     <label class="member-auth-field">
-                        <span>Benutzername oder E-Mail-Adresse</span>
+                        <span>@T["member.usernameOrEmail"]</span>
                         <input name="username" autocomplete="username" required autofocus />
                     </label>
                     <label class="member-auth-field">
-                        <span>Passwort</span>
+                        <span>@T["member.password"]</span>
                         <input name="password" type="password" autocomplete="current-password" required />
                     </label>
                     <label class="member-auth-remember">
-                        <input type="checkbox" name="remember" value="true" /> Angemeldet bleiben
+                        <input type="checkbox" name="remember" value="true" /> @T["member.remember"]
                     </label>
-                    <button type="submit" class="btn">Anmelden</button>
+                    <button type="submit" class="btn">@T["member.signIn"]</button>
                 </form>
                 <p class="member-auth-links">
-                    <a href="/anmelden/vergessen">Passwort vergessen?</a>
+                    <a href="/anmelden/vergessen">@T["member.forgotLink"]</a>
                     @if (Model.CanRegister)
                     {
-                        <a href="/registrieren@(string.IsNullOrEmpty(Model.ReturnUrl) ? "" : "?returnUrl=" + System.Net.WebUtility.UrlEncode(Model.ReturnUrl))">Konto anlegen</a>
+                        <a href="/registrieren@(string.IsNullOrEmpty(Model.ReturnUrl) ? "" : "?returnUrl=" + System.Net.WebUtility.UrlEncode(Model.ReturnUrl))">@T["member.register"]</a>
                     }
                 </p>
             }

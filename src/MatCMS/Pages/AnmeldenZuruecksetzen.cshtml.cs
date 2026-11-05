@@ -8,7 +8,8 @@ namespace MatCMS.Pages;
 public class AnmeldenZuruecksetzenModel : PageModel
 {
     private readonly MemberService _members;
-    public AnmeldenZuruecksetzenModel(MemberService members) => _members = members;
+    private readonly Localizer T;
+    public AnmeldenZuruecksetzenModel(MemberService members, Localizer t) { _members = members; T = t; }
 
     public string Token { get; private set; } = "";
     public bool TokenValid { get; private set; }
@@ -29,7 +30,7 @@ public class AnmeldenZuruecksetzenModel : PageModel
         if (!TokenValid) return Page();
         if ((password ?? "").Length < MemberService.MinPasswordLength)
         {
-            Error = $"Das Passwort muss mindestens {MemberService.MinPasswordLength} Zeichen haben.";
+            Error = T["member.err.passwordShort", MemberService.MinPasswordLength];
             return Page();
         }
         Done = await _members.ResetPasswordAsync(token, password!, HttpContext.RequestAborted);

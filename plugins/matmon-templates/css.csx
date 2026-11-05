@@ -16,6 +16,7 @@ public static class MtCss
         .mtpl input,.mtpl select,.mtpl textarea{padding:9px 12px;border:1px solid var(--t-line);border-radius:8px;font:inherit;background:transparent;color:inherit;max-width:100%}
         .mtpl select option{color:#111}
         .mtpl-active{margin:-6px 0 16px;color:var(--t-muted)}
+        .mtpl-tagrow{margin:-6px 0 18px}
         .mtpl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
         .mtpl-card{border:1px solid var(--t-line);border-radius:var(--t-radius);padding:18px;display:flex;flex-direction:column;gap:8px;background:var(--t-soft)}
         .mtpl-card h2{margin:0;font-size:1.08rem}.mtpl-card h2 a{text-decoration:none}.mtpl-card h2 a:hover{color:var(--t-accent)}.mtpl-card p{margin:0;color:var(--t-muted)}

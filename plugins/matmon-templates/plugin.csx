@@ -1,26 +1,27 @@
-// Matmon template store for matmon.eu: members submit Matmon template files (Matmon → Monitoring → Templates → Export), the operator
-// reviews them in the back office (a mail for every submission), approved ones are listed under /templates for everybody to download.
-// file.csx reads and cleans an uploaded file, store.csx holds the data, public.csx the site's pages, admin.csx the back office,
-// mail.csx the three mails, text.csx the wording, css.csx the look.
+// Matmon template store for matmon.eu. The store itself lives on Matmon Cloud (cloud.matmon.eu): there the operator reviews every
+// submission, the review mails go out and every Matmon instance adds the published sets from Templates → Store. This site is its
+// public face: /templates lists what the cloud publishes, members submit their Matmon template files (Matmon → Templates → Export)
+// and see their submissions' state - all through the cloud's store API with the key in this plugin's settings.
+// cloud.csx talks to the cloud, public.csx draws the site's pages, admin.csx the settings, text.csx the wording, css.csx the look.
 #load "text.csx"
 #load "css.csx"
-#load "file.csx"
-#load "store.csx"
-#load "mail.csx"
+#load "cloud.csx"
 #load "public.csx"
 #load "admin.csx"
 
 Plugin.Strings("en", MtText.En);
 Plugin.Strings("de", MtText.De);
-MtStore.Declare(Plugin);
-MtMail.Declare(Plugin);
 MtPublic.Configure(Plugin);
 MtAdmin.Configure(Plugin);
 
-// An account is deleted: unpublished files go, published templates stay but no longer name the person.
+// An account is deleted here: the cloud drops what it sent that is not published and takes its name off what is.
 Plugin.On(HostEvents.MemberErase, async (ctx, payload, ct) =>
 {
     var id = payload?["id"] is System.Text.Json.Nodes.JsonValue v && v.TryGetValue<long>(out var n) ? n : 0;
-    await MtStore.EraseMemberAsync(ctx, id, "", ct);
+    if (id > 0 && MtCloud.HasKey(ctx))
+    {
+        try { await MtCloud.EraseAuthorAsync(ctx, MtCloud.AuthorRef(ctx, id), ct); }
+        catch (MtCloudException ex) { ctx.Log("Template store: erasing member " + id + " on the cloud failed: " + ex.Message); }
+    }
     return null;
 });

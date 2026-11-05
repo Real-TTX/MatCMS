@@ -1,0 +1,6 @@
+{
+  "Key": "matmon-templates",
+  "Name": "Matmon Template-Store",
+  "Version": "1.0",
+  "Description": "Für matmon.eu: ein Store für Matmon-Templates. Angemeldete Besucher reichen Template-Dateien ein (Export aus Matmon, Format matmon-templates; Geheimnisse werden beim Hochladen entfernt), der Betreiber prüft und gibt frei (Mail bei jeder Einreichung), freigegebene Templates stehen unter /templates zum Herunterladen."
+}

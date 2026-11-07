@@ -849,7 +849,7 @@
   "forms.submitLabel": "Text des Absenden-Buttons",
   "forms.submitLabelHelp": "Beschriftung des Absenden-Buttons. Leer = Standard der jeweiligen Sprache.",
   "forms.notifyEnable": "E-Mail-Benachrichtigung bei neuer Einsendung",
-  "forms.notifyHelp": "Benötigt eingerichtetes SMTP (Einstellungen → SMTP).",
+  "forms.notifyHelp": "Ist niemand ausgewählt, bekommen alle Administratoren mit E-Mail-Adresse die Nachricht. Versand über den E-Mail-Weg der Website (Einstellungen).",
   "forms.notifyUsers": "Empfänger (Benutzer)",
   "forms.notifyNoUsers": "Keine Benutzer vorhanden.",
   "forms.notifyNoEmail": "keine E-Mail hinterlegt",

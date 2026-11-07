@@ -170,7 +170,7 @@ public class ViewModel : PageModel
                 ? "Vielen Dank! Ihre Angaben wurden übermittelt."
                 : form.SuccessMessage!.Trim();
 
-            if (form.NotifyEnabled)
+            if (FormNotify.Sends(form.NotifyEnabled, form.NotifyJson))
                 await TrySendNotificationAsync(form, answered, inputs, values);
         }
 
@@ -188,15 +188,11 @@ public class ViewModel : PageModel
         try
         {
             var notify = FormNotify.Parse(form.NotifyJson);
-            var recipients = new List<string>(notify.Emails);
-            if (notify.UserIds.Count > 0)
-            {
-                var userEmails = await _db.Users.AsNoTracking()
-                    .Where(u => notify.UserIds.Contains(u.Id) && u.Email != null && u.Email != "")
-                    .Select(u => u.Email!)
-                    .ToListAsync();
-                recipients.AddRange(userEmails);
-            }
+            var users = await _db.Users.AsNoTracking().Where(u => u.Email != null && u.Email != "")
+                .Select(u => new { u.Id, u.Role, Email = u.Email! }).ToListAsync();
+            var recipients = notify.Recipients(
+                users.Where(u => notify.UserIds.Contains(u.Id)).Select(u => u.Email),
+                () => users.Where(u => u.Role == FormNotify.AdminRole).Select(u => u.Email));
             if (recipients.Count == 0) return;
 
             // The wording lives in an editable template now (Admin → Mail-Vorlagen); this only

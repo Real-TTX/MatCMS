@@ -850,7 +850,7 @@
   "forms.submitLabel": "Submit-button text",
   "forms.submitLabelHelp": "Label of the submit button. Empty = the language's default.",
   "forms.notifyEnable": "Email notification on new submission",
-  "forms.notifyHelp": "Requires configured SMTP (Settings → SMTP).",
+  "forms.notifyHelp": "If nobody is selected, every administrator with an email address gets the message. Sent through the site's mail setup (Settings).",
   "forms.notifyUsers": "Recipients (users)",
   "forms.notifyNoUsers": "No users available.",
   "forms.notifyNoEmail": "no email on file",

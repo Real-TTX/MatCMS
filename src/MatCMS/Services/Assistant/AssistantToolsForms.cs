@@ -39,7 +39,8 @@ public sealed partial class AssistantTools
     {
         ["id"] = f.Id, ["slug"] = f.Slug, ["name"] = f.Name, ["successMessage"] = f.SuccessMessage, ["submitLabel"] = f.SubmitLabel,
         ["fields"] = JsonNode.Parse(FormDefinition.Serialize(FormDefinition.Parse(f.DefinitionJson))),
-        ["notification"] = f.NotifyEnabled ? "an (vom Nutzer eingestellt)" : "aus (stellt der Nutzer ein)"
+        ["notification"] = FormNotify.IsUnset(f.NotifyEnabled, f.NotifyJson) ? "an die Administratoren (Standard; stellt der Nutzer ein)"
+            : f.NotifyEnabled ? "an (vom Nutzer eingestellt)" : "aus (vom Nutzer abgeschaltet)"
     };
 
     private async Task<ToolOutcome> ReadFormAsync(JsonObject args, CancellationToken ct)

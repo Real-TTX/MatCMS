@@ -89,12 +89,16 @@ public class EditModel : PageModel
         AllUsers = await _db.Users.AsNoTracking().OrderBy(u => u.Username).ToListAsync();
         await LoadSwitcherAsync();
         var notify = FormNotify.Parse(form.NotifyJson);
+        // Never set up: show what actually happens (FormNotify.IsUnset) — on, to the admins — so saving keeps it.
+        var unset = FormNotify.IsUnset(form.NotifyEnabled, form.NotifyJson);
         Settings = new SettingsInput
         {
             SuccessMessage = form.SuccessMessage ?? "",
             SubmitLabel = form.SubmitLabel ?? "",
-            NotifyEnabled = form.NotifyEnabled,
-            NotifyUserIds = notify.UserIds,
+            NotifyEnabled = form.NotifyEnabled || unset,
+            NotifyUserIds = unset
+                ? AllUsers.Where(u => u.Role == FormNotify.AdminRole && !string.IsNullOrWhiteSpace(u.Email)).Select(u => u.Id).ToList()
+                : notify.UserIds,
             NotifyEmails = string.Join("\n", notify.Emails),
             SpamLevel = form.SpamLevel ?? -1
         };

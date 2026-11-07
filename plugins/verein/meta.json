@@ -1,0 +1,6 @@
+{
+  "Key": "verein",
+  "Name": "Verein",
+  "Version": "1.0",
+  "Description": "Vereinsverwaltung für die Website: Mitglieder mit Rollen (Vorsitz, Kasse, Schriftführung …), ein eigener Mitgliederbereich unter /mitglied, Dokumente zum Bestätigen oder Unterschreiben mit Nachweis (wer, wann, Name, Adresse) – z. B. Datenschutz-Einwilligung oder Bildfreigabe –, E-Mail bei jedem neuen Dokument und Erinnerungen, Sitzungen mit Tagesordnung, Zu-/Absagen und Protokoll, Vorlagen für Dokumente, Tagesordnungen und Protokolle, Bilder und Material, die Mitglieder hochladen. Natives Plugin (braucht „Native Plugins erlauben“)."
+}

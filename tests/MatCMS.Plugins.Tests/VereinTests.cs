@@ -773,7 +773,8 @@ public class VereinTests : IClassFixture<VereinApp>
         foreach (var tab in new[] { "Aktiv (", "Erwachsene (", "Kinder (", "Ohne Zugang (", "Inaktiv (", "Alle (" }) Assert.Contains(tab, page);
         Assert.Contains("Ottilie Muster", page);
         Assert.Contains("Mitglied seit", page);
-        Assert.Contains("Rolle: Kassierer/in", page);                                     // the role filter
+        Assert.Contains("Rolle: Kassierer/in", page);                                     // the role filter …
+        Assert.Matches("<option value=\"\"[^>]*>Alle Rollen", html);                       // … opening on everybody
         Assert.Matches("data-tags=\"[^\"]*\\br\\d+\\b", html);                            // rows carry their role tags for it
         Assert.Contains("aktiv · Zugang", page);
         // switched off: gone from the default view, there under "Inaktiv"

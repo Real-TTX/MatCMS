@@ -144,7 +144,9 @@ public static class VereinAdmin
         // a field becomes a filter when it has few distinct values (Figur: Hexe, Narr, Anwärter) – a number per person (Nr.) does not
         var filterFields = fields.Select((f, i) => (f, i, Values: people.Select(p => p.Extra.TryGetValue(f.Label, out var v) ? v.Trim() : "").Where(v => v.Length > 0)
             .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(v => v, StringComparer.OrdinalIgnoreCase).ToList())).Where(x => x.Values.Count is > 0 and <= 12).ToList();
-        var options = roles.Select((r, i) => ("r" + i, "Rolle: " + r))
+        // the first, empty option is "everybody" – without it the drop-down opens on its first role and hides all the others
+        var options = new[] { ("", "Alle Rollen" + (filterFields.Count > 0 ? " und " + string.Join(", ", filterFields.Select(x => x.f.Label)) : "")) }
+            .Concat(roles.Select((r, i) => ("r" + i, "Rolle: " + r)))
             .Concat(filterFields.SelectMany(x => x.Values.Select((v, j) => ($"f{x.i}-{j}", x.f.Label + ": " + v)))).ToArray();
         string Tags(Person p) => string.Join(" ", roles.Select((r, i) => p.Has(r) ? "r" + i : null)
             .Concat(filterFields.SelectMany(x => x.Values.Select((v, j) => p.Extra.TryGetValue(x.f.Label, out var pv) && string.Equals(pv.Trim(), v, StringComparison.OrdinalIgnoreCase) ? $"f{x.i}-{j}" : null)))
@@ -170,7 +172,7 @@ public static class VereinAdmin
             }), searchPlaceholder: "Name, Ort, Telefon, Nr. …", pageSize: 50,
             emptyText: people.Count == 0 ? "Noch keine Mitglieder. Lege das erste an." : "In dieser Ansicht ist niemand.") with
         {
-            Filter = options.Length > 0 ? Ui.ListFilter("Rolle / " + string.Join(" / ", filterFields.Select(x => x.f.Label)).TrimEnd(' ', '/'), options) : null,
+            Filter = options.Length > 1 ? Ui.ListFilter("Rolle / " + string.Join(" / ", filterFields.Select(x => x.f.Label)).TrimEnd(' ', '/'), options) : null,
             Below = new UiNode[] { Ui.Inline(Ui.Button("Neues Mitglied", Root + "members/new", icon: "ti-user-plus"), Ui.Button("Kind eintragen", Root + "children/new", UiButtonKind.Ghost, "ti-mood-kid")) }
         };
         var activeCount = people.Count(p => p.Active);

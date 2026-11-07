@@ -126,15 +126,69 @@ public static class VereinAdmin
         var byId = people.ToDictionary(p => p.Id);
         string Guardians(Person c) => string.Join(", ", c.Guardians.Select(g => byId.TryGetValue(g, out var x) ? x.Name : "").Where(n => n.Length > 0));
 
-        var table = Ui.Table(new[] { Ui.Column("Name"), Ui.Column("Rollen"), Ui.Column("E-Mail / gehört zu"), Ui.Column("Telefon"), Ui.Column("Offen", right: true), Ui.Column("Status") },
-            people.Select(p => Ui.RowFor(p.Name + " " + p.Email + " " + string.Join(" ", p.Roles) + (p.Child ? " kind " + Guardians(p) : ""),
-                Ui.Inline(Ui.Link(p.Name.Length > 0 ? p.Name : p.Email, Root + (p.Child ? "children/" : "members/") + p.Id), p.Child ? Ui.Badge("Kind", UiTone.Info) : !p.HasAccount ? Ui.Badge("ohne Zugang") : null),
-                string.Join(", ", p.Roles), p.Child ? Guardians(p) : p.Email, p.Phone,
-                p.Active ? OpenOf(p) : 0, p.Active ? Ui.Badge("aktiv", UiTone.Success) : Ui.Badge(InactiveLabel(p)))),
-            searchPlaceholder: "Mitglieder durchsuchen …", pageSize: 50, emptyText: "Noch keine Mitglieder. Lege das erste an – es bekommt eine E-Mail mit dem Zugang.");
-        var kids = people.Count(p => p.Child);
-        return Page(Ui.Stack(Ui.PageHead(people.Count + " Mitglieder" + (kids > 0 ? ", davon " + kids + " Kinder" : ""), "Mitglieder",
-            Ui.Button("Liste als CSV", Root + "members/csv", UiButtonKind.Ghost, "ti-file-spreadsheet"), Ui.Button("Kind eintragen", Root + "children/new", UiButtonKind.Ghost, "ti-mood-kid"), Ui.Button("Neues Mitglied", Root + "members/new", icon: "ti-user-plus")), table), "Mitglieder");
+        // Status as tabs (the list opens on the active members), role and the club's own fields (Figur …) as the toolbar's filter.
+        var tabs = new (string Key, string Label, Func<Person, bool> Fits)[]
+        {
+            ("aktiv", "Aktiv", p => p.Active),
+            ("erwachsene", "Erwachsene", p => p.Active && !p.Child),
+            ("kinder", "Kinder", p => p.Active && p.Child),
+            ("ohne-zugang", "Ohne Zugang", p => p.Active && !p.Child && !p.HasAccount),
+            ("inaktiv", "Inaktiv", p => !p.Active),
+            ("alle", "Alle", _ => true)
+        };
+        var chosen = tabs.FirstOrDefault(t => t.Key == ctx.Request.Q("status")) is { Key: not null } tt ? tt : tabs[0];
+        var list = people.Where(chosen.Fits).ToList();
+
+        var roles = VereinSettings.RoleList(ctx);
+        var fields = VereinSettings.Fields(ctx);
+        // a field becomes a filter when it has few distinct values (Figur: Hexe, Narr, Anwärter) – a number per person (Nr.) does not
+        var filterFields = fields.Select((f, i) => (f, i, Values: people.Select(p => p.Extra.TryGetValue(f.Label, out var v) ? v.Trim() : "").Where(v => v.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(v => v, StringComparer.OrdinalIgnoreCase).ToList())).Where(x => x.Values.Count is > 0 and <= 12).ToList();
+        var options = roles.Select((r, i) => ("r" + i, "Rolle: " + r))
+            .Concat(filterFields.SelectMany(x => x.Values.Select((v, j) => ($"f{x.i}-{j}", x.f.Label + ": " + v)))).ToArray();
+        string Tags(Person p) => string.Join(" ", roles.Select((r, i) => p.Has(r) ? "r" + i : null)
+            .Concat(filterFields.SelectMany(x => x.Values.Select((v, j) => p.Extra.TryGetValue(x.f.Label, out var pv) && string.Equals(pv.Trim(), v, StringComparison.OrdinalIgnoreCase) ? $"f{x.i}-{j}" : null)))
+            .Where(t => t is not null));
+
+        var columns = new List<UiColumn> { Ui.Column("Name"), Ui.Column("Rollen") };
+        columns.AddRange(fields.Take(3).Select(f => Ui.Column(f.Label)));
+        columns.AddRange(new[] { Ui.Column("Geboren"), Ui.Column("Mitglied seit"), Ui.Column("Kontakt / gehört zu"), Ui.Column("Offen", right: true), Ui.Column("Status") });
+        var table = Ui.Table(columns, list.Select(p =>
+            {
+                var cells = new List<object?>
+                {
+                    Ui.Inline(Ui.Link(p.Name.Length > 0 ? p.Name : p.Email, Root + (p.Child ? "children/" : "members/") + p.Id), p.Child ? Ui.Badge("Kind", UiTone.Info) : null),
+                    string.Join(", ", p.Roles)
+                };
+                cells.AddRange(fields.Take(3).Select(f => (object?)(p.Extra.TryGetValue(f.Label, out var v) ? v : "")));
+                cells.Add(p.Born.Length > 0 ? V.Date(p.Born) + (Age(p.Born) is int a ? " (" + a + ")" : "") : "");
+                cells.Add(p.Joined.Length > 0 ? V.Date(p.Joined) : "");
+                cells.Add(p.Child ? Guardians(p) : string.Join(" · ", new[] { p.Phone, VereinMail.Parkable(p.Email) ? "" : p.Email }.Where(x => x.Length > 0)));
+                cells.Add(p.Active ? OpenOf(p) : 0);
+                cells.Add(!p.Active ? Ui.Badge(InactiveLabel(p)) : p.Child ? Ui.Badge("aktiv", UiTone.Success) : p.HasAccount ? Ui.Badge("aktiv · Zugang", UiTone.Success) : Ui.Badge("aktiv · ohne Zugang", UiTone.Warning));
+                return Ui.RowFor(p.Name + " " + p.Email + " " + p.Phone + " " + string.Join(" ", p.Roles) + " " + string.Join(" ", p.Extra.Values) + " " + p.City + (p.Child ? " kind " + Guardians(p) : ""), cells.ToArray()) with { Tags = Tags(p) };
+            }), searchPlaceholder: "Name, Ort, Telefon, Nr. …", pageSize: 50,
+            emptyText: people.Count == 0 ? "Noch keine Mitglieder. Lege das erste an." : "In dieser Ansicht ist niemand.") with
+        {
+            Filter = options.Length > 0 ? Ui.ListFilter("Rolle / " + string.Join(" / ", filterFields.Select(x => x.f.Label)).TrimEnd(' ', '/'), options) : null,
+            Below = new UiNode[] { Ui.Inline(Ui.Button("Neues Mitglied", Root + "members/new", icon: "ti-user-plus"), Ui.Button("Kind eintragen", Root + "children/new", UiButtonKind.Ghost, "ti-mood-kid")) }
+        };
+        var activeCount = people.Count(p => p.Active);
+        var kids = people.Count(p => p.Active && p.Child);
+        return Page(Ui.Stack(
+            Ui.PageHead(activeCount + " aktive Mitglieder" + (kids > 0 ? ", davon " + kids + " Kinder" : "") + (people.Count > activeCount ? " · " + (people.Count - activeCount) + " inaktiv" : ""), "Mitglieder",
+                Ui.Button("Liste als CSV", Root + "members/csv", UiButtonKind.Ghost, "ti-file-spreadsheet")),
+            Ui.Tabs(tabs.Select(t => Ui.Tab(t.Label + " (" + people.Count(t.Fits) + ")", Root + "members" + (t.Key == "aktiv" ? "" : "?status=" + t.Key), t.Key == chosen.Key)).ToArray()),
+            table), "Mitglieder");
+    }
+
+    /// <summary>Age in whole years from a yyyy-MM-dd birthday, or null.</summary>
+    internal static int? Age(string born)
+    {
+        if (born.Length < 10 || !DateTime.TryParseExact(born[..10], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var b)) return null;
+        var today = DateTime.ParseExact(V.Today, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var age = today.Year - b.Year - (today.Month < b.Month || (today.Month == b.Month && today.Day < b.Day) ? 1 : 0);
+        return age is >= 0 and < 130 ? age : null;
     }
 
     /// <summary>Why someone is inactive, as the board wrote it on the note's first line ("Ausgetreten", "Verstorben") — else "inaktiv".</summary>

@@ -743,8 +743,10 @@ public class VereinTests : IClassFixture<VereinApp>
         Assert.Contains("an Zora Muster nicht gesendet: kein Zugang oder gesperrte Adresse", log);
         Assert.DoesNotContain("xxx_zora@verein.example", log);                             // never handed to the mailer
 
-        var list = Text(await admin.GetStringAsync("/admin/p/verein/members"));
-        Assert.Contains("ohne Zugang", list);
+        // the list opens on the active members; the inactive one is under its own tab, marked with its note
+        Assert.DoesNotContain("Liste Ohnezugang", Text(await admin.GetStringAsync("/admin/p/verein/members")));
+        var list = Text(await admin.GetStringAsync("/admin/p/verein/members?status=inaktiv"));
+        Assert.Contains("Liste Ohnezugang", list);
         Assert.Contains("Ausgetreten", list);                                              // an inactive member is marked with the note's first line
         var page = Text(await admin.GetStringAsync("/admin/p/verein/members/" + listId));
         Assert.Contains("Zugang einrichten", page);
@@ -759,6 +761,27 @@ public class VereinTests : IClassFixture<VereinApp>
         var account = _app.Db(db => db.Database.SqlQueryRaw<long>("SELECT member_id AS Value FROM p_verein_people WHERE id = " + listId).AsEnumerable().Single());
         Assert.True(account > 0);
         Assert.Equal(account, _app.Db(db => db.SiteMembers.Single(m => m.Email == "liste@verein.example").Id));
+    }
+
+    [Fact]
+    public async Task The_member_list_has_status_tabs_and_filters_by_role_and_own_fields()
+    {
+        var id = await JoinAsync("ottilie", "Kassierer/in");
+        var admin = await _app.AsAsync("admin");
+        var html = await admin.GetStringAsync("/admin/p/verein/members");
+        var page = Text(html);
+        foreach (var tab in new[] { "Aktiv (", "Erwachsene (", "Kinder (", "Ohne Zugang (", "Inaktiv (", "Alle (" }) Assert.Contains(tab, page);
+        Assert.Contains("Ottilie Muster", page);
+        Assert.Contains("Mitglied seit", page);
+        Assert.Contains("Rolle: Kassierer/in", page);                                     // the role filter
+        Assert.Matches("data-tags=\"[^\"]*\\br\\d+\\b", html);                            // rows carry their role tags for it
+        Assert.Contains("aktiv · Zugang", page);
+        // switched off: gone from the default view, there under "Inaktiv"
+        await VereinApp.PostFormAsync(admin, "/admin/p/verein/members/" + id, new() { ["first"] = "Ottilie", ["last"] = "Muster", ["note"] = "Ausgetreten" });
+        Assert.DoesNotContain("Ottilie Muster", Text(await admin.GetStringAsync("/admin/p/verein/members")));
+        var inactive = Text(await admin.GetStringAsync("/admin/p/verein/members?status=inaktiv"));
+        Assert.Contains("Ottilie Muster", inactive);
+        Assert.Contains("Ausgetreten", inactive);
     }
 
     private string LogOfVerein()

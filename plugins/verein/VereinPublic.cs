@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 
 namespace MatCMS.Plugin.Verein;
@@ -84,9 +85,12 @@ public static class VereinPublic
         "" => "",
         "antwort" => Ok("Danke! Deine Antwort ist gespeichert."),
         "upload" => Ok("Danke! Die Datei ist hochgeladen."),
+        "upload-pruefung" => Ok("Danke! Hochgeladen – die anderen Mitglieder sehen es, sobald der Vorstand es freigegeben hat."),
+        "freigegeben" => Ok("Freigegeben – jetzt sehen es alle Mitglieder."),
         "geloescht" => Ok("Die Datei ist gelöscht."),
         "profil" => Ok("Dein Profil ist gespeichert."),
         "passwort" => Ok("Dein Passwort ist geändert."),
+        "kalender" => Ok("Dein Kalender-Link ist bereit."),
         "zusage" => Ok("Danke für deine Rückmeldung!"),
         _ => ""
     };
@@ -122,7 +126,7 @@ public static class VereinPublic
             .OrderBy(m => m.Starts).Take(3).ToList();
         var events = await store.UpcomingAsync(V.Today, publicOnly: false, 4, ct);
         var rsvps = (await store.RsvpsOfMemberAsync(p.MemberId, ct)).ToDictionary(r => r.MeetingId, r => r.Answer);
-        var uploads = (await store.UploadsAsync(ct: ct)).Where(u => u.Shared).Take(6).ToList();
+        var uploads = (await store.UploadsAsync(ct: ct)).Where(u => u.ForEveryone).Take(6).ToList();
 
         var sb = new StringBuilder(Notice(ctx));
         sb.Append("<div class=\"vm-grid2\">");
@@ -387,6 +391,10 @@ public static class VereinPublic
         if (e.Parking.Length > 0) sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-parking\"></i> Parken & Anfahrt</h2><div class=\"vm-text\">").Append(V.Paragraphs(e.Parking)).Append("</div></section>");
         if (e.Notes.Length > 0) sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-info-circle\"></i> Hinweise</h2><div class=\"vm-text\">").Append(V.Paragraphs(e.Notes)).Append("</div></section>");
         if (!e.HasPlan) sb.Append("<p class=\"vm-muted\">Ablauf und weitere Infos folgen – der Vorstand trägt sie nach.</p>");
+        var photos = (await new VereinStore(ctx.Data).UploadsAsync(VereinStore.Photo, ct)).Where(u => u.EventId == e.Id && CanSee(u, who!.Person, who.Board)).ToList();
+        sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-photo\"></i> Bilder (").Append(photos.Count).Append(")</h2>");
+        if (photos.Count > 0) sb.Append("<div class=\"vm-thumbs\">").Append(string.Concat(photos.Take(24).Select(Thumb))).Append("</div>");
+        sb.Append("<p><a class=\"vm-btn ghost small\" href=\"").Append(Base).Append("/dateien?termin=").Append(e.Id).Append("\"><i class=\"ti ti-upload\"></i> Bilder zu diesem Termin ansehen und hochladen</a></p></section>");
         return await ShellAsync(ctx, who!, "dates", e.Title, sb.ToString(), ct);
     }
 
@@ -446,26 +454,46 @@ public static class VereinPublic
             ? "<a class=\"vm-thumb\" href=\"" + Base + "/dateien/" + u.Id + "\" target=\"_blank\" rel=\"noopener\"><img src=\"" + Base + "/dateien/" + u.Id + "\" alt=\"" + V.H(u.Title) + "\" loading=\"lazy\"><span>" + V.H(u.Title) + "</span></a>"
             : "<a class=\"vm-thumb file\" href=\"" + Base + "/dateien/" + u.Id + "\"><i class=\"ti ti-file\"></i><span>" + V.H(u.Title.Length > 0 ? u.Title : u.FileName) + "</span></a>";
 
+    /// <summary>Who sees an upload: everybody once it is shared and released; the uploader and the board always.</summary>
+    internal static bool CanSee(Upload u, Person p, bool board) => u.ForEveryone || u.MemberId == p.MemberId || board;
+
+    /// <summary>The event a photo belongs to by its date (the day it was taken lies within the event's days), or 0.</summary>
+    internal static long EventForDay(IEnumerable<Event> events, string day) =>
+        day.Length < 10 ? 0 : events.FirstOrDefault(e => !e.Draft && string.CompareOrdinal(e.Day, day[..10]) <= 0
+            && string.CompareOrdinal((e.Ends.Length >= 10 ? e.Ends[..10] : e.Day), day[..10]) >= 0)?.Id ?? 0;
+
     private static async Task<PluginResult> FilesAsync(IPluginContext ctx, CancellationToken ct)
     {
         var (who, deny) = await GateAsync(ctx, ct);
         if (deny is not null) return deny;
         var store = new VereinStore(ctx.Data);
+        var events = (await store.EventsAsync(ct)).Where(e => !e.Draft).ToList();
         string? error = null;
 
-        if (ctx.Request.IsPost && ctx.Request.Action == "delete" && long.TryParse(ctx.Request.F("id"), out var delId) && await store.UploadAsync(delId, ct) is Upload del
-            && (del.MemberId == who!.Person.MemberId || who.Board))
+        if (ctx.Request.IsPost && ctx.Request.Action is "delete" or "approve" && long.TryParse(ctx.Request.F("id"), out var oneId) && await store.UploadAsync(oneId, ct) is Upload one)
         {
-            await ctx.Files.DeleteAsync(del.File, ct);
-            await store.Uploads.DeleteAsync(del.Id, ct);
-            return PluginResult.Redirect(Base + "/dateien?ok=geloescht");
+            if (ctx.Request.Action == "approve" && who!.Board)
+            {
+                await store.Uploads.UpdateAsync(one.Id, new Dictionary<string, object?> { ["approved"] = true }, ct);
+                return PluginResult.Redirect(Base + "/dateien?ok=freigegeben" + (one.Kind == VereinStore.Material ? "&art=material" : ""));
+            }
+            if (ctx.Request.Action == "delete" && (one.MemberId == who!.Person.MemberId || who.Board))
+            {
+                await ctx.Files.DeleteAsync(one.File, ct);
+                await store.Uploads.DeleteAsync(one.Id, ct);
+                return PluginResult.Redirect(Base + "/dateien?ok=geloescht");
+            }
         }
         if (ctx.Request.IsPost && ctx.Request.Action == "upload")
         {
-            var files = ctx.Request.Files.Where(f => f.Field == "file" && f.Length > 0).Take(10).ToList();
+            // the page's script sends ONE file per request (with a progress bar) and wants a short answer; without script the whole form comes at once
+            var ajax = ctx.Request.F("ajax") == "1";
+            var files = ctx.Request.Files.Where(f => f.Field == "file" && f.Length > 0).Take(40).ToList();
             var kind = ctx.Request.F("kind") == VereinStore.Material ? VereinStore.Material : VereinStore.Photo;
             var title = V.Clip(ctx.Request.F("title"), 120);
+            var chosenEvent = ctx.Request.F("event");
             var max = VereinSettings.MaxBytes(ctx);
+            var needsApproval = ctx.Settings.GetBool(VereinSettings.UploadApproval) && !who!.Board;
             if (files.Count == 0) error = "Bitte wähle eine Datei aus.";
             else
             {
@@ -478,75 +506,135 @@ public static class VereinPublic
                     byte[] bytes;
                     using (var s = f.OpenRead()) using (var ms = new MemoryStream()) { await s.CopyToAsync(ms, ct); bytes = ms.ToArray(); }
                     if (!V.LooksLike(ext, bytes)) { error = "„" + f.FileName + "“ ist beschädigt oder keine echte " + ext + "-Datei."; break; }
+                    // when it was taken: the photo's own date, else the upload's
+                    var taken = ext is ".jpg" or ".jpeg" ? VereinExif.TakenAt(bytes) : "";
+                    if (taken.Length == 0) taken = V.Local(DateTime.UtcNow).ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture);
+                    var eventId = chosenEvent == "auto" || chosenEvent.Length == 0 ? EventForDay(events, taken)
+                        : long.TryParse(chosenEvent, out var ev) && events.Any(e => e.Id == ev) ? ev : 0;
                     var name = "u/" + Guid.NewGuid().ToString("N") + ext;
                     using (var ms = new MemoryStream(bytes)) await ctx.Files.SaveAsync(name, ms, ct);
                     await store.Uploads.InsertAsync(new Dictionary<string, object?>
                     {
                         ["member_id"] = who!.Person.MemberId, ["kind"] = kind, ["title"] = title.Length > 0 ? title : Path.GetFileNameWithoutExtension(f.FileName),
                         ["file"] = name, ["file_name"] = V.SafeName(f.FileName), ["file_type"] = V.Types[ext], ["size"] = bytes.LongLength,
-                        ["shared"] = ctx.Request.F("private") != "1", ["created"] = DateTime.UtcNow
+                        ["shared"] = ctx.Request.F("private") != "1", ["created"] = DateTime.UtcNow, ["approved"] = !needsApproval, ["event_id"] = eventId, ["taken"] = taken
                     }, ct);
                 }
-                if (error is null) return PluginResult.Redirect(Base + "/dateien?ok=upload");
+                if (ajax) return PluginResult.Json(new System.Text.Json.Nodes.JsonObject { ["ok"] = error is null, ["error"] = error, ["pending"] = needsApproval });
+                if (error is null) return PluginResult.Redirect(Base + "/dateien?ok=" + (needsApproval ? "upload-pruefung" : "upload"));
             }
+            if (ajax) return PluginResult.Json(new System.Text.Json.Nodes.JsonObject { ["ok"] = false, ["error"] = error });
         }
 
         var all = await store.UploadsAsync(ct: ct);
-        var visible = all.Where(u => u.Shared || u.MemberId == who!.Person.MemberId || who.Board).ToList();
+        var visible = all.Where(u => CanSee(u, who!.Person, who.Board)).ToList();
         var people = (await store.PeopleAsync(ct)).ToDictionary(p => p.MemberId, p => p.Name);
+        var eventTitle = events.ToDictionary(e => e.Id, e => e.Title + " (" + V.Date(e.Starts) + ")");
         var filter = ctx.Request.Q("art") == VereinStore.Material ? VereinStore.Material : VereinStore.Photo;
+        long.TryParse(ctx.Request.Q("termin"), out var onlyEvent);
+        var pending = who!.Board ? all.Where(u => !u.Approved).ToList() : new List<Upload>();
 
         var sb = new StringBuilder(Notice(ctx));
+        if (pending.Count > 0)
+        {
+            sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-hourglass\"></i> Warten auf Freigabe (").Append(pending.Count).Append(")</h2><div class=\"vm-gallery\">");
+            foreach (var u in pending)
+                sb.Append("<figure>").Append(Thumb(u)).Append("<figcaption>").Append(V.H(people.TryGetValue(u.MemberId, out var n) ? n : "")).Append(" · ").Append(V.H(V.Date(u.Taken)))
+                  .Append(ApproveButton(ctx, u.Id)).Append(DeleteButton(ctx, u.Id)).Append("</figcaption></figure>");
+            sb.Append("</div></section>");
+        }
+        var recent = events.Where(e => string.CompareOrdinal(e.Day, V.Local(DateTime.UtcNow).AddDays(-120).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)) >= 0
+            && string.CompareOrdinal(e.Day, V.Local(DateTime.UtcNow).AddDays(30).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)) <= 0).OrderByDescending(e => e.Starts).ToList();
         sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-upload\"></i> Hochladen</h2>");
         if (error is not null) sb.Append(Err(error));
-        sb.Append("<form method=\"post\" enctype=\"multipart/form-data\" class=\"vm-form vm-upload\">").Append(ctx.Antiforgery).Append("<input type=\"hidden\" name=\"action\" value=\"upload\">")
-          .Append("<label class=\"vm-field\"><span>Datei(en)</span><input type=\"file\" name=\"file\" multiple required></label>")
+        sb.Append("<form method=\"post\" enctype=\"multipart/form-data\" class=\"vm-form vm-upload\" data-vm-upload>").Append(ctx.Antiforgery).Append("<input type=\"hidden\" name=\"action\" value=\"upload\">")
+          .Append("<label class=\"vm-field\"><span>Fotos oder Dateien – gern viele auf einmal</span><input type=\"file\" name=\"file\" multiple required").Append(filter == VereinStore.Photo ? " accept=\"image/*\"" : "").Append("></label>")
           .Append("<div class=\"vm-row2\"><label class=\"vm-field\"><span>Was ist es?</span><select name=\"kind\"><option value=\"photo\"").Append(filter == VereinStore.Photo ? " selected" : "")
-          .Append(">Bild / Foto</option><option value=\"material\"").Append(filter == VereinStore.Material ? " selected" : "").Append(">Material (PDF, Dokument …)</option></select></label>")
-          .Append("<label class=\"vm-field\"><span>Titel (freiwillig)</span><input name=\"title\" maxlength=\"120\" placeholder=\"z. B. Umzug Remseck 2026\"></label></div>")
+          .Append(">Bilder / Fotos</option><option value=\"material\"").Append(filter == VereinStore.Material ? " selected" : "").Append(">Material (PDF, Dokument …)</option></select></label>")
+          .Append("<label class=\"vm-field\"><span>Termin</span><select name=\"event\"><option value=\"auto\">automatisch (nach dem Aufnahmedatum)</option><option value=\"0\">keinem Termin zuordnen</option>");
+        foreach (var e in recent) sb.Append("<option value=\"").Append(e.Id).Append("\"").Append(e.Id == onlyEvent ? " selected" : "").Append('>').Append(V.H(e.Title + " – " + V.Date(e.Starts))).Append("</option>");
+        sb.Append("</select></label></div>")
+          .Append("<label class=\"vm-field\"><span>Titel (freiwillig)</span><input name=\"title\" maxlength=\"120\" placeholder=\"z. B. Umzug Remseck 2026\"></label>")
           .Append("<label class=\"vm-check\"><input type=\"checkbox\" name=\"private\" value=\"1\"> <span>Nur für mich und den Vorstand sichtbar</span></label>")
-          .Append("<p class=\"vm-muted\">Bitte lade nur eigene Bilder hoch oder solche, die du teilen darf. Erkennbare Personen sollten mit der Veröffentlichung im Mitgliederbereich einverstanden sein. Höchstens ")
-          .Append(V.Size(VereinSettings.MaxBytes(ctx))).Append(" pro Datei.</p><button class=\"vm-btn\" type=\"submit\">Hochladen</button></form></section>");
+          .Append("<p class=\"vm-muted\">Bitte lade nur eigene Bilder hoch oder solche, die du teilen darfst. Erkennbare Personen sollten mit der Veröffentlichung im Mitgliederbereich einverstanden sein. Höchstens ")
+          .Append(V.Size(VereinSettings.MaxBytes(ctx))).Append(" pro Datei.");
+        if (ctx.Settings.GetBool(VereinSettings.UploadApproval) && !who.Board) sb.Append(" Die anderen Mitglieder sehen deine Uploads, sobald der Vorstand sie freigegeben hat.");
+        sb.Append("</p><div class=\"vm-progress-box\" hidden><div class=\"vm-progress big\"><span></span></div><p class=\"vm-progress-text\"></p></div>")
+          .Append("<button class=\"vm-btn\" type=\"submit\">Hochladen</button></form></section>").Append(UploadScript);
 
         sb.Append("<div class=\"vm-tabs\"><a href=\"").Append(Base).Append("/dateien\"").Append(filter == VereinStore.Photo ? " class=\"on\"" : "").Append(">Bilder</a><a href=\"")
           .Append(Base).Append("/dateien?art=material\"").Append(filter == VereinStore.Material ? " class=\"on\"" : "").Append(">Material</a></div>");
-        var shown = visible.Where(u => u.Kind == filter).ToList();
+        var shown = visible.Where(u => u.Kind == filter && (onlyEvent == 0 || u.EventId == onlyEvent)).OrderByDescending(u => u.Taken.Length > 0 ? u.Taken : V.Stamp(u.Created)).ToList();
+        var withEvents = visible.Where(u => u.Kind == filter && u.EventId > 0 && eventTitle.ContainsKey(u.EventId)).Select(u => u.EventId).Distinct().ToList();
+        if (withEvents.Count > 0)
+        {
+            sb.Append("<div class=\"vm-chips-row\"><a href=\"").Append(Base).Append("/dateien").Append(filter == VereinStore.Material ? "?art=material" : "").Append("\"").Append(onlyEvent == 0 ? " class=\"on\"" : "").Append(">Alle</a>");
+            foreach (var id in withEvents)
+                sb.Append("<a href=\"").Append(Base).Append("/dateien?termin=").Append(id).Append(filter == VereinStore.Material ? "&art=material" : "").Append("\"").Append(id == onlyEvent ? " class=\"on\"" : "").Append('>').Append(V.H(eventTitle[id])).Append("</a>");
+            sb.Append("</div>");
+        }
         if (shown.Count == 0) sb.Append("<div class=\"vm-empty\">Hier ist noch nichts – lade gern als Erste/r etwas hoch.</div>");
         else if (filter == VereinStore.Photo)
         {
             sb.Append("<div class=\"vm-gallery\">");
             foreach (var u in shown)
             {
-                sb.Append("<figure>").Append(Thumb(u)).Append("<figcaption>").Append(V.H(people.TryGetValue(u.MemberId, out var n) ? n : "")).Append(" · ").Append(V.H(V.Stamp(u.Created)));
+                sb.Append("<figure>").Append(Thumb(u)).Append("<figcaption>").Append(V.H(people.TryGetValue(u.MemberId, out var n) ? n : "")).Append(" · ").Append(V.H(V.Date(u.Taken.Length > 0 ? u.Taken : V.Stamp(u.Created))));
+                if (u.EventId > 0 && eventTitle.TryGetValue(u.EventId, out var et)) sb.Append(" · <a href=\"").Append(Base).Append("/termine/").Append(u.EventId).Append("\">").Append(V.H(et)).Append("</a>");
                 if (!u.Shared) sb.Append(" · <span class=\"vm-badge\">privat</span>");
-                if (u.MemberId == who!.Person.MemberId || who.Board) sb.Append(DeleteButton(ctx, u.Id));
+                if (!u.Approved) sb.Append(" · <span class=\"vm-badge warn\">wartet auf Freigabe</span>");
+                if (u.MemberId == who.Person.MemberId || who.Board) sb.Append(DeleteButton(ctx, u.Id));
                 sb.Append("</figcaption></figure>");
             }
             sb.Append("</div>");
         }
         else
         {
-            sb.Append("<table class=\"vm-table\"><thead><tr><th>Titel</th><th>Von</th><th>Größe</th><th>Datum</th><th></th></tr></thead><tbody>");
+            sb.Append("<table class=\"vm-table\"><thead><tr><th>Titel</th><th>Von</th><th>Termin</th><th>Größe</th><th>Datum</th><th></th></tr></thead><tbody>");
             foreach (var u in shown)
                 sb.Append("<tr><td><a href=\"").Append(Base).Append("/dateien/").Append(u.Id).Append("\"><i class=\"ti ti-file\"></i> ").Append(V.H(u.Title.Length > 0 ? u.Title : u.FileName)).Append("</a>")
-                  .Append(u.Shared ? "" : " <span class=\"vm-badge\">privat</span>").Append("</td><td>").Append(V.H(people.TryGetValue(u.MemberId, out var n) ? n : "")).Append("</td><td>")
-                  .Append(V.Size(u.Size)).Append("</td><td>").Append(V.H(V.Stamp(u.Created))).Append("</td><td>")
-                  .Append(u.MemberId == who!.Person.MemberId || who.Board ? DeleteButton(ctx, u.Id) : "").Append("</td></tr>");
+                  .Append(u.Shared ? "" : " <span class=\"vm-badge\">privat</span>").Append(u.Approved ? "" : " <span class=\"vm-badge warn\">wartet auf Freigabe</span>")
+                  .Append("</td><td>").Append(V.H(people.TryGetValue(u.MemberId, out var n) ? n : "")).Append("</td><td>").Append(V.H(eventTitle.TryGetValue(u.EventId, out var et) ? et : "–"))
+                  .Append("</td><td>").Append(V.Size(u.Size)).Append("</td><td>").Append(V.H(V.Stamp(u.Created))).Append("</td><td>")
+                  .Append(u.MemberId == who.Person.MemberId || who.Board ? DeleteButton(ctx, u.Id) : "").Append("</td></tr>");
             sb.Append("</tbody></table>");
         }
-        return await ShellAsync(ctx, who!, "files", "Bilder & Material", sb.ToString(), ct);
+        return await ShellAsync(ctx, who, "files", "Bilder & Material", sb.ToString(), ct);
     }
+
+    /// <summary>
+    /// Many photos from a phone at once: every file goes in a request of its own (a whole batch would hit the server's size limit), with one bar for the
+    /// batch. Without script the form posts as it is.
+    /// </summary>
+    private const string UploadScript = """
+<script>(function(){var f=document.querySelector('form[data-vm-upload]');if(!f||!window.FormData||!window.XMLHttpRequest)return;
+f.addEventListener('submit',function(ev){var inp=f.querySelector('input[type=file]');var files=Array.prototype.slice.call(inp.files||[]);if(!files.length)return;ev.preventDefault();
+var box=f.querySelector('.vm-progress-box'),bar=box.querySelector('.vm-progress span'),txt=box.querySelector('.vm-progress-text'),btn=f.querySelector('button[type=submit]');
+box.hidden=false;btn.disabled=true;var total=files.reduce(function(s,x){return s+x.size},0)||1,done=0,i=0,errors=[],pending=false;
+function show(cur){var p=Math.min(100,Math.round((done+cur)/total*100));bar.style.width=p+'%';txt.textContent='Datei '+Math.min(i+1,files.length)+' von '+files.length+' · '+p+' %';}
+function next(){if(i>=files.length){bar.style.width='100%';if(errors.length){txt.textContent=errors.join(' ');btn.disabled=false;return;}location.href=location.pathname+'?ok='+(pending?'upload-pruefung':'upload');return;}
+var fd=new FormData();['__RequestVerificationToken','action','kind','event','title','private'].forEach(function(n){var el=f.elements[n];if(!el)return;if(el.type==='checkbox'){if(el.checked)fd.append(n,el.value);}else fd.append(n,el.value);});
+fd.append('ajax','1');fd.append('file',files[i],files[i].name);var x=new XMLHttpRequest();x.open('POST',f.getAttribute('action')||location.pathname);
+x.upload.onprogress=function(e){if(e.lengthComputable)show(e.loaded/e.total*files[i].size);};
+x.onload=function(){var r={};try{r=JSON.parse(x.responseText)}catch(e){r={ok:false,error:'„'+files[i].name+'“ ging nicht.'}}if(!r.ok)errors.push(r.error||('„'+files[i].name+'“ ging nicht.'));if(r.pending)pending=true;done+=files[i].size;i++;show(0);next();};
+x.onerror=function(){errors.push('„'+files[i].name+'“: keine Verbindung.');done+=files[i].size;i++;next();};x.send(fd);}
+show(0);next();});})();</script>
+""";
 
     private static string DeleteButton(IPluginContext ctx, long id) =>
         "<form method=\"post\" class=\"vm-inline\" data-confirm=\"Datei wirklich löschen?\">" + ctx.Antiforgery + "<input type=\"hidden\" name=\"action\" value=\"delete\"><input type=\"hidden\" name=\"id\" value=\"" + id +
         "\"><button class=\"vm-link-btn\" type=\"submit\" title=\"Löschen\" aria-label=\"Löschen\"><i class=\"ti ti-trash\"></i></button></form>";
+
+    private static string ApproveButton(IPluginContext ctx, long id) =>
+        "<form method=\"post\" class=\"vm-inline\">" + ctx.Antiforgery + "<input type=\"hidden\" name=\"action\" value=\"approve\"><input type=\"hidden\" name=\"id\" value=\"" + id +
+        "\"><button class=\"vm-btn small\" type=\"submit\"><i class=\"ti ti-check\"></i> Freigeben</button></form>";
 
     private static async Task<PluginResult> FileAsync(IPluginContext ctx, CancellationToken ct)
     {
         var (who, deny) = await GateAsync(ctx, ct);
         if (deny is not null) return deny;
         var u = await new VereinStore(ctx.Data).UploadAsync(Id(ctx), ct);
-        if (u is null || !(u.Shared || u.MemberId == who!.Person.MemberId || who.Board)) return PluginResult.NotFound();
+        if (u is null || !CanSee(u, who!.Person, who.Board)) return PluginResult.NotFound();
         return await ServeAsync(ctx, u.File, u.FileName, u.FileType, ct);
     }
 
@@ -566,7 +654,20 @@ public static class VereinPublic
 
         string Card(Person p) => "<div class=\"vm-person\"><span class=\"vm-avatar\">" + V.H(Initials(p)) + "</span><span><strong>" + V.H(p.Name) + "</strong><small>" +
             V.H(string.Join(", ", p.Roles)) + "</small>" + (p.Phone.Length > 0 ? "<a href=\"tel:" + V.H(p.Phone.Replace(" ", "")) + "\">" + V.H(p.Phone) + "</a>" : "") +
-            (p.Email.Length > 0 ? "<a href=\"mailto:" + V.H(p.Email) + "\">" + V.H(p.Email) + "</a>" : "") + "</span></div>";
+            (p.Email.Length > 0 ? "<a href=\"mailto:" + V.H(p.Email) + "\">" + V.H(p.Email) + "</a>" : "") + Details(p) + "</span></div>";
+        // private details by their visibility: the board sees all, the others what the club made visible for everybody
+        var fields = VereinSettings.Fields(ctx);
+        var seeAddress = who.Board || ctx.Settings.GetBool(VereinSettings.AddressForAll);
+        var seeBirthday = who.Board || ctx.Settings.GetBool(VereinSettings.BirthdayForAll);
+        string Details(Person p)
+        {
+            var parts = new List<string>();
+            if (seeAddress && p.Address.Length > 0) parts.Add(V.H(p.Address));
+            if (seeBirthday && p.Born.Length > 0) parts.Add("geb. " + V.H(V.Date(p.Born)));
+            foreach (var f in fields)
+                if ((who.Board || f.ForAll) && p.Extra.TryGetValue(f.Label, out var v) && v.Length > 0) parts.Add(V.H(f.Label) + " " + V.H(v));
+            return parts.Count == 0 ? "" : "<small>" + string.Join(" · ", parts) + "</small>";
+        }
 
         var sb = new StringBuilder("<section class=\"vm-card\"><h2><i class=\"ti ti-star\"></i> Vorstand</h2>");
         sb.Append(vorstand.Count == 0 ? "<p class=\"vm-muted\">Noch niemand eingetragen.</p>" : "<div class=\"vm-people\">" + string.Concat(vorstand.Select(Card)) + "</div>").Append("</section>");
@@ -588,6 +689,28 @@ public static class VereinPublic
 
     private static string Initials(Person p) => string.Concat(new[] { p.First, p.Last }.Where(x => x.Length > 0).Select(x => char.ToUpperInvariant(x[0]))) is { Length: > 0 } s ? s : "?";
 
+    /// <summary>Subscribing in a phone or computer calendar: the member's own secret feed (made on request) and the club's public one.</summary>
+    private static string CalendarCard(IPluginContext ctx, Person p)
+    {
+        var origin = VereinMail.Origin(ctx);
+        string Webcal(string path) => (origin.StartsWith("https://", StringComparison.Ordinal) ? "webcal://" + origin[8..] : origin.Replace("http://", "webcal://")) + path;
+        var sb = new StringBuilder("<section class=\"vm-card\"><h2><i class=\"ti ti-calendar-plus\"></i> Termine im eigenen Kalender</h2>");
+        sb.Append("<p class=\"vm-muted\">Abonniere die Termine in deinem Handy- oder Computer-Kalender – neue und geänderte Termine kommen dann von selbst dazu.</p>");
+        if (p.CalToken.Length == 40)
+        {
+            var path = VereinIcal.PersonalFeed(p.CalToken);
+            sb.Append("<p><strong>Mein Kalender</strong> (mit internen Terminen und meinen Sitzungen):</p><p class=\"vm-actions\"><a class=\"vm-btn\" href=\"").Append(V.H(Webcal(path)))
+              .Append("\"><i class=\"ti ti-calendar-plus\"></i> Abonnieren</a></p><p class=\"vm-muted\" style=\"word-break:break-all\">Adresse zum Kopieren (z. B. für Google Kalender): ")
+              .Append(V.H(origin + path)).Append("</p><p class=\"vm-muted\">Diese Adresse ist geheim – wer sie hat, sieht deine Termine. ");
+            sb.Append("<form method=\"post\" class=\"vm-inline\" data-confirm=\"Neue Adresse erzeugen? Die alte funktioniert dann nicht mehr.\">").Append(ctx.Antiforgery)
+              .Append("<input type=\"hidden\" name=\"action\" value=\"calendar\"><button class=\"vm-link-btn\" type=\"submit\" style=\"font-size:14px;text-decoration:underline\">Neue Adresse erzeugen</button></form></p>");
+        }
+        else
+            sb.Append("<form method=\"post\" class=\"vm-form\">").Append(ctx.Antiforgery).Append("<input type=\"hidden\" name=\"action\" value=\"calendar\"><button class=\"vm-btn\" type=\"submit\"><i class=\"ti ti-calendar-plus\"></i> Meinen Kalender-Link erstellen</button></form>");
+        sb.Append("<p class=\"vm-muted\">Nur die öffentlichen Termine des Vereins: <a href=\"").Append(V.H(Webcal(VereinIcal.PublicFeed))).Append("\">abonnieren</a>.</p></section>");
+        return sb.ToString();
+    }
+
     private static async Task<PluginResult> ProfileAsync(IPluginContext ctx, CancellationToken ct)
     {
         var (who, deny) = await GateAsync(ctx, ct);
@@ -597,8 +720,17 @@ public static class VereinPublic
         string? error = null;
         if (ctx.Request.IsPost && ctx.Request.Action == "profile")
         {
-            await store.People.UpdateAsync(p.Id, new Dictionary<string, object?> { ["phone"] = V.Clip(ctx.Request.F("phone"), 40) }, ct);
+            await store.People.UpdateAsync(p.Id, new Dictionary<string, object?>
+            {
+                ["phone"] = V.Clip(ctx.Request.F("phone"), 40), ["street"] = V.Clip(ctx.Request.F("street"), 120), ["zip"] = V.Clip(ctx.Request.F("zip"), 10), ["city"] = V.Clip(ctx.Request.F("city"), 80)
+            }, ct);
             return PluginResult.Redirect(Base + "/profil?ok=profil");
+        }
+        if (ctx.Request.IsPost && ctx.Request.Action == "calendar")
+        {
+            // a new secret link; the old one stops working at once
+            await store.People.UpdateAsync(p.Id, new Dictionary<string, object?> { ["cal_token"] = VereinIcal.NewToken() }, ct);
+            return PluginResult.Redirect(Base + "/profil?ok=kalender");
         }
         if (ctx.Request.IsPost && ctx.Request.Action == "password")
         {
@@ -616,14 +748,21 @@ public static class VereinPublic
         sb.Append("<div class=\"vm-grid2\"><section class=\"vm-card\"><h2>Meine Angaben</h2><dl class=\"vm-facts\"><dt>Name</dt><dd>").Append(V.H(p.Name)).Append("</dd><dt>E-Mail</dt><dd>")
           .Append(V.H(p.Email)).Append("</dd><dt>Rollen</dt><dd>").Append(V.H(p.Roles.Count > 0 ? string.Join(", ", p.Roles) : "–")).Append("</dd>");
         if (p.Joined.Length > 0) sb.Append("<dt>Mitglied seit</dt><dd>").Append(V.H(V.Date(p.Joined))).Append("</dd>");
+        if (p.Born.Length > 0) sb.Append("<dt>Geburtsdatum</dt><dd>").Append(V.H(V.Date(p.Born))).Append("</dd>");
+        foreach (var f in VereinSettings.Fields(ctx))
+            if (p.Extra.TryGetValue(f.Label, out var v) && v.Length > 0) sb.Append("<dt>").Append(V.H(f.Label)).Append("</dt><dd>").Append(V.H(v)).Append("</dd>");
         sb.Append("</dl><form method=\"post\" class=\"vm-form\">").Append(ctx.Antiforgery).Append("<input type=\"hidden\" name=\"action\" value=\"profile\">")
           .Append("<label class=\"vm-field\"><span>Telefon</span><input name=\"phone\" type=\"tel\" value=\"").Append(V.H(p.Phone)).Append("\" maxlength=\"40\"></label>")
-          .Append("<button class=\"vm-btn\" type=\"submit\">Speichern</button></form><p class=\"vm-muted\">Name oder E-Mail ändern? Bitte kurz an den Vorstand wenden.</p></section>");
+          .Append("<label class=\"vm-field\"><span>Straße und Hausnummer</span><input name=\"street\" value=\"").Append(V.H(p.Street)).Append("\" maxlength=\"120\" autocomplete=\"street-address\"></label>")
+          .Append("<div class=\"vm-row2\"><label class=\"vm-field\"><span>PLZ</span><input name=\"zip\" value=\"").Append(V.H(p.Zip)).Append("\" maxlength=\"10\" autocomplete=\"postal-code\"></label>")
+          .Append("<label class=\"vm-field\"><span>Ort</span><input name=\"city\" value=\"").Append(V.H(p.City)).Append("\" maxlength=\"80\" autocomplete=\"address-level2\"></label></div>")
+          .Append("<button class=\"vm-btn\" type=\"submit\">Speichern</button></form><p class=\"vm-muted\">Name, E-Mail oder Geburtsdatum ändern? Bitte kurz an den Vorstand wenden.</p></section>");
         sb.Append("<section class=\"vm-card\"><h2>Passwort ändern</h2><form method=\"post\" class=\"vm-form\">").Append(ctx.Antiforgery).Append("<input type=\"hidden\" name=\"action\" value=\"password\">")
           .Append("<label class=\"vm-field\"><span>Bisheriges Passwort</span><input name=\"current\" type=\"password\" autocomplete=\"current-password\" required></label>")
           .Append("<label class=\"vm-field\"><span>Neues Passwort</span><input name=\"new\" type=\"password\" autocomplete=\"new-password\" minlength=\"8\" required></label>")
           .Append("<label class=\"vm-field\"><span>Neues Passwort wiederholen</span><input name=\"repeat\" type=\"password\" autocomplete=\"new-password\" minlength=\"8\" required></label>")
           .Append("<button class=\"vm-btn\" type=\"submit\">Passwort ändern</button></form></section></div>");
+        sb.Append(CalendarCard(ctx, p));
         var kids = VereinStore.ChildrenOf(await store.PeopleAsync(ct), p).ToList();
         if (kids.Count > 0)
             sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-mood-kid\"></i> Meine Kinder</h2><ul class=\"vm-list\">")

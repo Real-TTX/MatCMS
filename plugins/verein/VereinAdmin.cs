@@ -16,6 +16,7 @@ public static class VereinAdmin
         b.Admin.Section("Verein", "ti-users-group", AdminGroup.Content, 25)
             .Page("dashboard", null, DashboardAsync)
             .Page("members", null, MembersAsync)
+            .Page("members/csv", null, MembersCsvAsync)
             .Page("members/{id}", null, MemberAsync)
             .Page("children/{id}", null, ChildAsync)
             .Page("docs", null, DocsAsync)
@@ -37,9 +38,25 @@ public static class VereinAdmin
             .Link("Sitzungen", "meetings", "ti-users-group", also: new[] { "meetings/" })
             .Link("Termine", "events", "ti-calendar-event", also: new[] { "events/" })
             .Link("Instagram-Bild", "instagram", "ti-brand-instagram")
-            .Link("Bilder & Material", "uploads", "ti-photo")
+            .Link("Bilder & Material", "uploads", "ti-photo", badge: true)
             .Link("Vorlagen", "templates", "ti-template", also: new[] { "templates/" })
-            .Link("Einstellungen", "_settings", "ti-settings");
+            .Link("Einstellungen", "_settings", "ti-settings")
+            .Badge(async (c, ct) => (await new VereinStore(c.Data).UploadsAsync(ct: ct)).Count(u => !u.Approved) is var n and > 0 ? n.ToString(CultureInfo.InvariantCulture) : null);
+        b.Admin.Attention(async (c, ct) =>
+        {
+            var n = (await new VereinStore(c.Data).UploadsAsync(ct: ct)).Count(u => !u.Approved);
+            return n == 0 ? Array.Empty<AttentionNote>() : new[] { new AttentionNote("Verein", n == 1 ? "1 Upload wartet auf Freigabe" : n + " Uploads warten auf Freigabe", Root + "uploads?status=offen") { Tone = UiTone.Warning } };
+        });
+    }
+
+    /// <summary>The club's own fields as posted (x_0, x_1 … in the order of the settings).</summary>
+    private static Dictionary<string, string> PostedFields(IPluginContext ctx) =>
+        VereinSettings.Fields(ctx).Select((f, i) => (f.Label, Value: V.Clip(ctx.Request.F("x_" + i), 200))).Where(x => x.Value.Length > 0).ToDictionary(x => x.Label, x => x.Value);
+
+    private static UiNode? FieldInputs(IPluginContext ctx, Person? p)
+    {
+        var fields = VereinSettings.Fields(ctx);
+        return fields.Count == 0 ? null : Ui.Grid(220, fields.Select((f, i) => (UiNode?)(Ui.Input("x_" + i, f.Label, p is not null && p.Extra.TryGetValue(f.Label, out var v) ? v : "") with { Help = f.ForAll ? "sehen alle Mitglieder" : "sieht nur der Vorstand" })).ToArray());
     }
 
     private static long Id(IPluginContext ctx) => long.TryParse(ctx.Request.R("id"), out var id) ? id : 0;
@@ -112,7 +129,7 @@ public static class VereinAdmin
             searchPlaceholder: "Mitglieder durchsuchen …", pageSize: 50, emptyText: "Noch keine Mitglieder. Lege das erste an – es bekommt eine E-Mail mit dem Zugang.");
         var kids = people.Count(p => p.Child);
         return Page(Ui.Stack(Ui.PageHead(people.Count + " Mitglieder" + (kids > 0 ? ", davon " + kids + " Kinder" : ""), "Mitglieder",
-            Ui.Button("Kind eintragen", Root + "children/new", UiButtonKind.Ghost, "ti-mood-kid"), Ui.Button("Neues Mitglied", Root + "members/new", icon: "ti-user-plus")), table), "Mitglieder");
+            Ui.Button("Liste als CSV", Root + "members/csv", UiButtonKind.Ghost, "ti-file-spreadsheet"), Ui.Button("Kind eintragen", Root + "children/new", UiButtonKind.Ghost, "ti-mood-kid"), Ui.Button("Neues Mitglied", Root + "members/new", icon: "ti-user-plus")), table), "Mitglieder");
     }
 
     /// <summary>A child: name, birthday, roles, guardians (one or more grown-up members) — no mail, no account; documents and mails go to the guardians.</summary>
@@ -139,6 +156,7 @@ public static class VereinAdmin
             if (guardians.Count == 0) return PluginResult.Redirect(Root + "children/" + (isNew ? "new" : c!.Id), "Bitte mindestens ein Elternteil / eine erziehungsberechtigte Person auswählen.", true);
             var id = await store.SaveChildAsync(c?.Id ?? 0, first, last, V.CleanDate(ctx.Request.F("born")), roles.Where((r, i) => V.Checked(ctx.Request.F("role_" + i))),
                 V.CleanDate(ctx.Request.F("joined")), isNew || V.Checked(ctx.Request.F("active")), V.Clip(ctx.Request.F("note"), 2000), guardians, ct);
+            await store.SaveDetailsAsync(id, V.CleanDate(ctx.Request.F("born")), "", "", "", PostedFields(ctx), ct);
             return PluginResult.Redirect(Root + "children/" + id, isNew ? first + " ist eingetragen." : "Gespeichert.");
         }
 
@@ -146,6 +164,7 @@ public static class VereinAdmin
         var form = Ui.Form(
             Ui.Grid(240, Ui.Input("first", "Vorname", c?.First ?? ""), Ui.Input("last", "Nachname", c?.Last ?? (adults.FirstOrDefault(a => a.Id == preset)?.Last ?? ""))),
             Ui.Grid(240, Ui.Input("born", "Geburtsdatum (freiwillig)", c?.Born ?? "", UiInputType.Date), Ui.Input("joined", "Mitglied seit", c?.Joined ?? "", UiInputType.Date)),
+            FieldInputs(ctx, c),
             Ui.Heading("Gehört zu", 3),
             adults.Count == 0 ? Ui.Alert("Erst ein erwachsenes Mitglied anlegen – ein Kind gehört immer zu jemandem.", UiTone.Warning)
                 : Ui.Grid(240, adults.Select(a => (UiNode?)Ui.Checkbox("g_" + a.Id, a.Name, c?.Guardians.Contains(a.Id) ?? a.Id == preset)).ToArray()),
@@ -215,6 +234,7 @@ public static class VereinAdmin
                 if (await store.PersonOfMemberAsync(account.Id, ct) is Person existing)
                     return PluginResult.Redirect(Root + "members/" + existing.Id, "Zu dieser E-Mail-Adresse gibt es schon ein Mitglied.", true);
                 var id = await store.SavePersonAsync(0, account.Id, first, last, email, phone, chosen, joined, true, note, ct);
+                await store.SaveDetailsAsync(id, V.CleanDate(ctx.Request.F("born")), V.Clip(ctx.Request.F("street"), 120), V.Clip(ctx.Request.F("zip"), 10), V.Clip(ctx.Request.F("city"), 80), PostedFields(ctx), ct);
                 var person = (await store.PersonAsync(id, ct))!;
                 var notice = (first + " " + last).Trim() + " ist angelegt.";
                 // a starting password from the board: only for an account the club just made (a confirmed account keeps its owner's password)
@@ -233,13 +253,16 @@ public static class VereinAdmin
                 return PluginResult.Redirect(Root + "members/" + id, notice);
             }
             await store.SavePersonAsync(p!.Id, p.MemberId, first, last, p.Email, phone, chosen, joined, active, note, ct);
+            await store.SaveDetailsAsync(p.Id, V.CleanDate(ctx.Request.F("born")), V.Clip(ctx.Request.F("street"), 120), V.Clip(ctx.Request.F("zip"), 10), V.Clip(ctx.Request.F("city"), 80), PostedFields(ctx), ct);
             return PluginResult.Redirect(Root + "members/" + p.Id, "Gespeichert.");
         }
 
         var form = Ui.Form(
             Ui.Grid(240, Ui.Input("first", "Vorname", p?.First ?? ""), Ui.Input("last", "Nachname", p?.Last ?? "")),
             isNew ? Ui.Input("email", "E-Mail-Adresse (Benutzername)", "", UiInputType.Email) : Ui.KeyValue(("E-Mail-Adresse", p!.Email)),
-            Ui.Grid(240, Ui.Input("phone", "Telefon", p?.Phone ?? "", UiInputType.Tel), Ui.Input("joined", "Mitglied seit", p?.Joined ?? "", UiInputType.Date)),
+            Ui.Grid(240, Ui.Input("phone", "Telefon", p?.Phone ?? "", UiInputType.Tel), Ui.Input("born", "Geburtsdatum", p?.Born ?? "", UiInputType.Date), Ui.Input("joined", "Mitglied seit", p?.Joined ?? "", UiInputType.Date)),
+            Ui.Grid(200, Ui.Input("street", "Straße und Hausnummer", p?.Street ?? ""), Ui.Input("zip", "PLZ", p?.Zip ?? ""), Ui.Input("city", "Ort", p?.City ?? "")),
+            FieldInputs(ctx, p),
             Ui.Heading("Rollen", 3),
             Ui.Grid(220, roles.Select((r, i) => (UiNode?)Ui.Checkbox("role_" + i, r, p?.Has(r) ?? (isNew && r == roles[^1]))).ToArray()),
             Ui.TextArea("note", "Notiz (nur im Admin)", p?.Note ?? "", 3),
@@ -686,23 +709,60 @@ public static class VereinAdmin
     private static async Task<PluginResult> UploadsAsync(IPluginContext ctx, CancellationToken ct)
     {
         var store = new VereinStore(ctx.Data);
+        if (ctx.Request.IsPost && ctx.Request.Action == "approveall")
+        {
+            var n = await store.Uploads.UpdateWhereAsync(DataQuery.Everything.Eq("approved", false), new Dictionary<string, object?> { ["approved"] = true }, ct);
+            return PluginResult.Redirect(Root + "uploads", n + " freigegeben.");
+        }
         if (ctx.Request.IsPost && long.TryParse(ctx.Request.F("id"), out var id) && await store.UploadAsync(id, ct) is Upload u)
         {
             if (ctx.Request.Action == "delete") { await ctx.Files.DeleteAsync(u.File, ct); await store.Uploads.DeleteAsync(u.Id, ct); return PluginResult.Redirect(Root + "uploads", "Gelöscht."); }
             if (ctx.Request.Action == "share") { await store.Uploads.UpdateAsync(u.Id, new Dictionary<string, object?> { ["shared"] = !u.Shared }, ct); return PluginResult.Redirect(Root + "uploads"); }
+            if (ctx.Request.Action == "approve") { await store.Uploads.UpdateAsync(u.Id, new Dictionary<string, object?> { ["approved"] = true }, ct); return PluginResult.Redirect(Root + "uploads", "Freigegeben."); }
+            if (ctx.Request.Action == "event" && long.TryParse(ctx.Request.F("event"), out var ev))
+            { await store.Uploads.UpdateAsync(u.Id, new Dictionary<string, object?> { ["event_id"] = ev }, ct); return PluginResult.Redirect(Root + "uploads", "Termin geändert."); }
         }
-        var list = await store.UploadsAsync(ct: ct);
+        var pendingOnly = ctx.Request.Q("status") == "offen";
+        var list = (await store.UploadsAsync(ct: ct)).Where(x => !pendingOnly || !x.Approved).ToList();
+        var pendingCount = (await store.UploadsAsync(ct: ct)).Count(x => !x.Approved);
         var people = (await store.PeopleAsync(ct)).ToDictionary(p => p.MemberId, p => p.Name);
-        return Page(Ui.Stack(Ui.PageHead("Was Mitglieder im Mitgliederbereich hochgeladen haben", "Bilder & Material"),
-            Ui.Table(new[] { Ui.Column(""), Ui.Column("Titel"), Ui.Column("Art"), Ui.Column("Von"), Ui.Column("Größe"), Ui.Column("Datum"), Ui.Column("Sichtbar"), Ui.Column("", actions: true) },
+        var events = (await store.EventsAsync(ct)).Where(e => !e.Draft).OrderByDescending(e => e.Starts).Take(60).ToList();
+        var eventOptions = new[] { Ui.Option("0", "– kein Termin –") }.Concat(events.Select(e => Ui.Option(e.Id.ToString(CultureInfo.InvariantCulture), V.Date(e.Starts) + " " + e.Title))).ToArray();
+        string Id(Upload x) => x.Id.ToString(CultureInfo.InvariantCulture);
+        return Page(Ui.Stack(
+            Ui.PageHead("Was Mitglieder im Mitgliederbereich hochgeladen haben", "Bilder & Material",
+                pendingCount > 0 ? Ui.Action("Alle " + pendingCount + " freigeben", new Dictionary<string, string> { ["action"] = "approveall" }, UiButtonKind.Primary, "Alle wartenden Uploads freigeben?", "ti-check") : null),
+            Ui.Tabs(Ui.Tab("Alle", Root + "uploads", !pendingOnly), Ui.Tab("Warten auf Freigabe (" + pendingCount + ")", Root + "uploads?status=offen", pendingOnly)),
+            Ui.Table(new[] { Ui.Column(""), Ui.Column("Titel"), Ui.Column("Von"), Ui.Column("Aufgenommen"), Ui.Column("Termin"), Ui.Column("Status"), Ui.Column("", actions: true) },
                 list.Select(x => Ui.RowFor(x.Title + " " + x.FileName,
                     V.IsImage(Path.GetExtension(x.File).ToLowerInvariant()) ? Ui.Img(Root + "uploads/" + x.Id, x.Title, 48) : Ui.Text(""),
-                    Ui.Link(x.Title.Length > 0 ? x.Title : x.FileName, Root + "uploads/" + x.Id, newTab: true), x.Kind == VereinStore.Photo ? "Bild" : "Material",
-                    people.TryGetValue(x.MemberId, out var n) ? n : "–", V.Size(x.Size), V.Stamp(x.Created),
-                    x.Shared ? Ui.Badge("alle Mitglieder", UiTone.Success) : Ui.Badge("privat"),
-                    Ui.Inline(Ui.Action(x.Shared ? "Privat machen" : "Für alle", new Dictionary<string, string> { ["action"] = "share", ["id"] = x.Id.ToString(CultureInfo.InvariantCulture) }),
-                        Ui.Action("Löschen", new Dictionary<string, string> { ["action"] = "delete", ["id"] = x.Id.ToString(CultureInfo.InvariantCulture) }, UiButtonKind.Danger, "Datei löschen?")))),
-                searchPlaceholder: "Dateien durchsuchen …", pageSize: 50, emptyText: "Noch nichts hochgeladen.")), "Bilder & Material");
+                    Ui.Link(x.Title.Length > 0 ? x.Title : x.FileName, Root + "uploads/" + x.Id, newTab: true),
+                    people.TryGetValue(x.MemberId, out var n) ? n : "–", x.Taken.Length > 0 ? V.Date(x.Taken) : V.Stamp(x.Created),
+                    Ui.Form(Ui.Hidden("action", "event"), Ui.Hidden("id", Id(x)), Ui.Select("event", "", x.EventId.ToString(CultureInfo.InvariantCulture), eventOptions), Ui.Submit("OK", UiButtonKind.Ghost, small: true)),
+                    !x.Approved ? Ui.Badge("wartet auf Freigabe", UiTone.Warning) : x.Shared ? Ui.Badge("alle Mitglieder", UiTone.Success) : Ui.Badge("privat"),
+                    Ui.Inline(
+                        x.Approved ? null : Ui.Action("Freigeben", new Dictionary<string, string> { ["action"] = "approve", ["id"] = Id(x) }, UiButtonKind.Primary, icon: "ti-check"),
+                        Ui.Action(x.Shared ? "Privat machen" : "Für alle", new Dictionary<string, string> { ["action"] = "share", ["id"] = Id(x) }),
+                        Ui.Action("Löschen", new Dictionary<string, string> { ["action"] = "delete", ["id"] = Id(x) }, UiButtonKind.Danger, "Datei löschen?")))),
+                searchPlaceholder: "Dateien durchsuchen …", pageSize: 50, emptyText: pendingOnly ? "Nichts wartet auf Freigabe." : "Noch nichts hochgeladen.")), "Bilder & Material");
+    }
+
+    /// <summary>The member list as a spreadsheet: every person (children too, with their parents), roles, contact, birthday, address and the own fields.</summary>
+    private static async Task<PluginResult> MembersCsvAsync(IPluginContext ctx, CancellationToken ct)
+    {
+        var people = await new VereinStore(ctx.Data).PeopleAsync(ct);
+        var byId = people.ToDictionary(p => p.Id);
+        var fields = VereinSettings.Fields(ctx);
+        static string C(string s) { s ??= ""; if (s.Length > 0 && "=+-@".Contains(s[0])) s = "'" + s; return "\"" + s.Replace("\"", "\"\"") + "\""; }
+        var sb = new StringBuilder("﻿" + string.Join(";", new[] { "Nachname", "Vorname", "Art", "Rollen", "E-Mail", "Telefon", "Geburtsdatum", "Straße", "PLZ", "Ort", "Mitglied seit", "Aktiv", "Gehört zu" }
+            .Concat(fields.Select(f => f.Label)).Select(C)) + "\r\n");
+        foreach (var p in people)
+            sb.Append(string.Join(";", new[]
+            {
+                p.Last, p.First, p.Child ? "Kind" : "Mitglied", string.Join(", ", p.Roles), p.Email, p.Phone, V.Date(p.Born), p.Street, p.Zip, p.City, V.Date(p.Joined), p.Active ? "ja" : "nein",
+                string.Join(", ", p.Guardians.Select(g => byId.TryGetValue(g, out var x) ? x.Name : ""))
+            }.Concat(fields.Select(f => p.Extra.TryGetValue(f.Label, out var v) ? v : "")).Select(C))).Append("\r\n");
+        return PluginResult.File(Encoding.UTF8.GetBytes(sb.ToString()), "text/csv; charset=utf-8", "mitgliederliste-" + V.Today + ".csv");
     }
 
     private static async Task<PluginResult> UploadFileAsync(IPluginContext ctx, CancellationToken ct)

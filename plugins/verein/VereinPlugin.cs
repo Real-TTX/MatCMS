@@ -22,6 +22,8 @@ public sealed class VereinPlugin : IPlugin
         foreach (var spec in VereinMail.Specs) b.MailTemplate(spec);
         VereinPublic.Configure(b);
         VereinAdmin.Configure(b);
+        VereinMenu.Configure(b);
+        VereinIcal.Configure(b);
 
         b.Block(new BlockSpec(EventsBlock, "Vereinstermine", "Die kommenden öffentlichen Termine des Vereins (z. B. die nächsten Umzüge) – gepflegt unter Admin → Verein → Termine.")
         {
@@ -80,6 +82,7 @@ public sealed class VereinPlugin : IPlugin
         sb.Append(events.Count == 0
             ? "<p class=\"vm-muted\" style=\"text-align:center\">" + V.H(F("empty").Trim() is { Length: > 0 } em ? em : "Gerade stehen keine Termine an.") + "</p>"
             : VereinPublic.EventList(events, internalBadge: false));
+        sb.Append("<p class=\"verein-more\"><a href=\"").Append(VereinIcal.PublicFeed).Append("\"><i class=\"ti ti-calendar-plus\" aria-hidden=\"true\"></i> Termine im eigenen Kalender abonnieren</a></p>");
         sb.Append("</div></section>");
         return PluginResult.Fragment(sb.ToString());
     }

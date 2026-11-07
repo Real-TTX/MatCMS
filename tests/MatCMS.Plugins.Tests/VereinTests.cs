@@ -474,6 +474,107 @@ public class VereinTests : IClassFixture<VereinApp>
         Assert.Equal(HttpStatusCode.OK, await SignInAsync("Fasnet2027!"));   // the old one no longer works (the sign-in page shows its error)
     }
 
+    /// <summary>A minimal JPEG whose EXIF says it was taken at the given moment ("yyyy:MM:dd HH:mm:ss").</summary>
+    private static byte[] JpegTakenAt(string when)
+    {
+        var tiff = new List<byte> { 0x49, 0x49, 0x2A, 0x00, 8, 0, 0, 0 };           // "II", 42, IFD0 at 8
+        void U16(int v) { tiff.Add((byte)v); tiff.Add((byte)(v >> 8)); }
+        void U32(int v) { U16(v & 0xFFFF); U16(v >> 16); }
+        U16(1); U16(0x8769); U16(4); U32(1); U32(26); U32(0);                        // IFD0: one entry, ExifIFD at 26
+        U16(1); U16(0x9003); U16(2); U32(20); U32(44); U32(0);                       // ExifIFD: DateTimeOriginal, 20 bytes at 44
+        tiff.AddRange(System.Text.Encoding.ASCII.GetBytes(when)); tiff.Add(0);
+        var app1 = new List<byte> { (byte)'E', (byte)'x', (byte)'i', (byte)'f', 0, 0 };
+        app1.AddRange(tiff);
+        var len = app1.Count + 2;
+        var b = new List<byte> { 0xFF, 0xD8, 0xFF, 0xE1, (byte)(len >> 8), (byte)len };
+        b.AddRange(app1);
+        b.AddRange(new byte[] { 0xFF, 0xD9 });
+        return b.ToArray();
+    }
+
+    [Fact]
+    public async Task Photos_wait_for_release_find_their_event_by_the_date_taken_and_dates_come_as_calendars()
+    {
+        var admin = await _app.AsAsync("admin");
+        await VereinApp.PostFormAsync(admin, "/admin/p/verein/events/new", new() { ["title"] = "Umzug Kalenderstadt", ["kind"] = "Umzug", ["starts"] = "2031-02-08T13:00", ["place"] = "Kalenderstadt", ["public"] = "true" });
+        await VereinApp.PostFormAsync(admin, "/admin/p/verein/events/new", new() { ["title"] = "Interner Hockete", ["kind"] = "Treffen", ["starts"] = "2031-02-10T19:00" });
+        await JoinAsync("paula", "Mitglied");
+        await JoinAsync("quirin", "Mitglied");
+        var paula = await _app.AsAsync("paula");
+
+        var html = await paula.GetStringAsync("/mitglied/dateien");
+        using (var form = new MultipartFormDataContent
+        {
+            { new StringContent(AppFactory.Token(html)!), "__RequestVerificationToken" }, { new StringContent("upload"), "action" }, { new StringContent("photo"), "kind" },
+            { new StringContent("auto"), "event" }, { new StringContent("1"), "ajax" }, { new ByteArrayContent(JpegTakenAt("2031:02:08 14:12:00")), "file", "IMG_1.jpg" }
+        })
+        {
+            var r = await paula.PostAsync("/mitglied/dateien", form);
+            var json = await r.Content.ReadAsStringAsync();
+            Assert.Contains("\"ok\":true", json);
+            Assert.Contains("\"pending\":true", json);
+        }
+        var up = _app.Db(db => db.Database.SqlQueryRaw<string>("select taken || '|' || event_id || '|' || approved as Value from p_verein_uploads order by id desc limit 1").ToList().First());
+        Assert.StartsWith("2031-02-08T14:12|", up);
+        Assert.EndsWith("|0", up);
+
+        var quirin = await _app.AsAsync("quirin");
+        Assert.DoesNotContain("IMG_1", await quirin.GetStringAsync("/mitglied/dateien"));
+        var res = await VereinApp.PostFormAsync(admin, "/admin/p/verein/uploads", new() { ["action"] = "approveall" });
+        Assert.Equal(HttpStatusCode.Redirect, res.StatusCode);
+        Assert.Contains("IMG_1", await quirin.GetStringAsync("/mitglied/dateien"));
+
+        // calendars: the public one only the public event, a member's own one the internal one too
+        var pub = await (await _app.AsAsync("guest")).GetStringAsync("/verein/termine.ics");
+        Assert.Contains("BEGIN:VCALENDAR", pub);
+        Assert.Contains("SUMMARY:Umzug Kalenderstadt", pub);
+        Assert.DoesNotContain("Interner Hockete", pub);
+        await VereinApp.PostFormAsync(paula, "/mitglied/profil", new() { ["action"] = "calendar" });
+        var link = Regex.Match(await paula.GetStringAsync("/mitglied/profil"), "/verein/kalender/[0-9a-f]{40}\\.ics").Value;
+        Assert.NotEmpty(link);
+        var own = await (await _app.AsAsync("guest")).GetStringAsync(link);
+        Assert.Contains("SUMMARY:Interner Hockete", own);
+        Assert.Equal(HttpStatusCode.NotFound, (await (await _app.AsAsync("guest")).GetAsync("/verein/kalender/" + new string('0', 40) + ".ics")).StatusCode);
+
+        // the site's menu gets "Mitglieder" for a member, not for a guest
+        Assert.Contains("/mitglied/dokumente", await paula.GetStringAsync("/"));
+        Assert.DoesNotContain("/mitglied/dokumente", await (await _app.AsAsync("guest")).GetStringAsync("/"));
+    }
+
+    [Fact]
+    public async Task Own_fields_show_by_their_visibility()
+    {
+        await _app.InstallAsync();
+        _app.Db(db =>
+        {
+            var row = db.Plugins.First(p => p.Key == "verein");
+            row.ConfigJson = "{\"customFields\":\"Hexe-Nr. | alle\\nNarr-Nr. | vorstand\"}";
+            return db.SaveChanges();
+        });
+        using (var scope = _app.App.Services.CreateScope())
+            await scope.ServiceProvider.GetRequiredService<PluginRunner>().ReloadAsync(_app.Db(db => db.Plugins.First(p => p.Key == "verein").Id));
+        await _app.AsAsync("rosa");
+        var admin = await _app.AsAsync("admin");
+        var page = await admin.GetStringAsync("/admin/p/verein/members/new");
+        Assert.Contains("Hexe-Nr.", Text(page));
+        await VereinApp.PostFormAsync(admin, "/admin/p/verein/members/new", new()
+        {
+            ["first"] = "Rosa", ["last"] = "Muster", ["email"] = "rosa@verein.example", ["role_6"] = "true", ["x_0"] = "H-17", ["x_1"] = "N-99", ["born"] = "1990-03-04", ["street"] = "Weinsteige 1"
+        });
+        var cfg = _app.Db(db => db.Plugins.First(p => p.Key == "verein").ConfigJson);
+        Assert.Contains("Hexe-Nr.", cfg);
+        // a plain member sees the field for everybody, not the board's one, nor address and birthday
+        await JoinAsync("sepp", "Mitglied");
+        var dir = Text(await (await _app.AsAsync("sepp")).GetStringAsync("/mitglied/mitglieder"));
+        // the list of all members is only for the board by default
+        Assert.DoesNotContain("N-99", dir);
+        var csv = await admin.GetStringAsync("/admin/p/verein/members/csv");
+        Assert.Contains("\"Hexe-Nr.\"", csv);
+        Assert.Contains("\"H-17\"", csv);
+        Assert.Contains("\"N-99\"", csv);
+        Assert.Contains("\"Weinsteige 1\"", csv);
+    }
+
     [Fact]
     public async Task Templates_are_seeded_and_prefill_a_new_document()
     {

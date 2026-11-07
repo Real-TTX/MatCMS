@@ -88,6 +88,11 @@ public static class VereinCss
 .vm .vm-progress{width:140px;height:8px;border-radius:99px;background:var(--vm-soft);overflow:hidden}
 .vm .vm-progress span{display:block;height:100%;background:var(--vm-accent)}
 .vm .vm-details[open] summary{margin-bottom:12px}
+.vm .vm-progress.big{width:100%;height:12px;margin:4px 0}
+.vm .vm-progress-text{margin:6px 0 0;font-size:14px;color:var(--vm-muted)}
+.vm .vm-chips-row{display:flex;flex-wrap:wrap;gap:8px}
+.vm .vm-chips-row a{padding:6px 12px;border-radius:999px;background:var(--vm-soft);text-decoration:none;color:inherit;font-size:14px}
+.vm .vm-chips-row a.on{background:var(--vm-accent);color:#fff}
 .vm-events{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
 .vm-events li{display:flex;gap:16px;align-items:flex-start}
 .vm-events li.is-cancelled .vm-ev strong{text-decoration:line-through}

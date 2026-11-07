@@ -10,6 +10,9 @@ Admin unter Admin → Verein. Erster Einsatz: Schalksteinnarren Besigheim e.V.
   = **Einladung** (`ctx.Members.InviteAsync`): eine einzige Mail mit einem Link, Passwort zweimal eingeben, danach ist die Adresse bestätigt und das
   Mitglied angemeldet in `/mitglied` (keine Bestätigungs-Mail der Website, kein „Passwort vergessen“). Ein bestätigtes Konto wird nur verknüpft
   (Mail mit Anmelde-Link). Der Vorstand kann ein **Startpasswort** setzen (beim Anlegen oder später „Passwort setzen“, nie per Mail). Braucht MatCMS ab 1.13.361.
+- **Persönliche Angaben**: Geburtsdatum, Adresse und **eigene Felder** (Einstellung „Eigene Felder“, eine Zeile je Feld, z. B. `Hexe-Nr. | alle`, `Narr-Nr. | vorstand` – wer es im Mitgliederbereich sieht). Geburtsdatum und Adresse: nur Vorstand oder per Einstellung alle. Mitglieder pflegen Telefon und Adresse selbst. **Kinder** ohne Konto/E-Mail, an ein oder mehrere Mitglieder gebunden. Mitgliederliste als CSV.
+- **Menü**: Angemeldete Mitglieder bekommen im Hauptmenü „Mitglieder“ mit Unterpunkten (Übersicht, Dokumente mit Zähler, Termine, Bilder, Liste, Vorstand, Profil).
+- **Kalender (iCal)**: `/verein/termine.ics` (öffentliche Termine, Link unter dem Termin-Block) und je Mitglied ein geheimer Link `/verein/kalender/{token}.ics` (auch interne Termine und eigene Sitzungen; im Profil erzeugen/erneuern).
 - **Mitgliederbereich `/mitglied`**: Die Anmeldung steht auf `/mitglied` selbst (das Formular schickt an die Anmeldung der Website, die nach
   `/mitglied` zurückführt). Alle Unterseiten schicken Nicht-Angemeldete zurück nach `/mitglied`, nie zur allgemeinen Anmeldeseite. Hinein kommt nur,
   wer im Verein eingetragen und aktiv ist; andere Konten sehen „Kein Zugang“. Seiten: Übersicht, Dokumente, Termine & Sitzungen, Bilder & Material,
@@ -29,7 +32,7 @@ Admin unter Admin → Verein. Erster Einsatz: Schalksteinnarren Besigheim e.V.
 - **Vorlagen** für Dokumente, Tagesordnungen und Protokolle mit Platzhaltern (`{{verein}}`, `{{datum}}`, `{{jahr}}`, im Protokoll `{{titel}}`,
   `{{termin}}`, `{{ort}}`, `{{tagesordnung}}`). Beim ersten Laden kommen fünf Startvorlagen (Datenschutz, Fotos/Videos, zwei Tagesordnungen,
   Protokoll) — Ausgangspunkte, keine Rechtsberatung.
-- **Bilder & Material**: Mitglieder laden hoch (mehrere auf einmal, Größe einstellbar bis 25 MB); erlaubt sind Bilder, PDF, Office, Text, ZIP, MP3,
+- **Bilder & Material**: Mitglieder laden viele Dateien auf einmal hoch (Handy, je Datei eine Anfrage, Fortschrittsbalken); Aufnahmedatum aus dem Foto (EXIF, sonst Hochladedatum), Termin automatisch nach dem Datum oder gewählt; **Freigabe** durch den Vorstand (Einstellung, an bei Lieferung; Zähler im Admin). Mitglieder laden hoch (mehrere auf einmal, Größe einstellbar bis 25 MB); erlaubt sind Bilder, PDF, Office, Text, ZIP, MP3,
   MP4 — nie HTML/SVG/Skripte, Bilder und PDF werden an ihren ersten Bytes geprüft. Ausgeliefert nur an Mitglieder (`nosniff`, CSP mit `sandbox`),
   privat = nur für sich und den Vorstand.
 - **Mails** (Admin → Mailvorlagen): `verein.invite`, `verein.document`, `verein.reminder`, `verein.meeting`, `verein.minutes`; Antwortadresse einstellbar.

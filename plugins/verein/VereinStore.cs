@@ -7,11 +7,15 @@ namespace MatCMS.Plugin.Verein;
 /// ever finds it; documents, invitations and meetings go to the guardians.
 /// </summary>
 public sealed record Person(long Id, long MemberId, string First, string Last, string Email, string Phone, IReadOnlyList<string> Roles, string Joined,
-    bool Active, string Note, DateTime? Created, bool Child = false, IReadOnlyList<long>? GuardianIds = null, string Born = "")
+    bool Active, string Note, DateTime? Created, bool Child = false, IReadOnlyList<long>? GuardianIds = null, string Born = "",
+    string Street = "", string Zip = "", string City = "", IReadOnlyDictionary<string, string>? ExtraValues = null, string CalToken = "")
 {
     public string Name => (First + " " + Last).Trim();
     public bool Has(string role) => Roles.Contains(role, StringComparer.OrdinalIgnoreCase);
     public IReadOnlyList<long> Guardians => GuardianIds ?? Array.Empty<long>();
+    /// <summary>The club's own fields (Hexe-Nr., Narr-Nr. …) by their label.</summary>
+    public IReadOnlyDictionary<string, string> Extra => ExtraValues ?? new Dictionary<string, string>();
+    public string Address => string.Join(", ", new[] { Street, (Zip + " " + City).Trim() }.Where(x => x.Length > 0));
 }
 
 /// <summary>A document the club sends its members: to confirm (a tick), to sign (the full name typed as signature) or only to read.</summary>
@@ -22,7 +26,12 @@ public sealed record Doc(long Id, string Title, string Body, string Kind, string
 public sealed record Answer(long Id, long DocId, long MemberId, string Status, string Signature, string Ip, DateTime? At);
 
 /// <summary>A photo or a file a member uploaded.</summary>
-public sealed record Upload(long Id, long MemberId, string Kind, string Title, string File, string FileName, string FileType, long Size, bool Shared, DateTime? Created);
+public sealed record Upload(long Id, long MemberId, string Kind, string Title, string File, string FileName, string FileType, long Size, bool Shared, DateTime? Created,
+    bool Approved = true, long EventId = 0, string Taken = "")
+{
+    /// <summary>Who may see it besides its uploader and the board: everybody, once it is shared and released.</summary>
+    public bool ForEveryone => Shared && Approved;
+}
 
 /// <summary>A meeting (board meeting, general assembly …) with its agenda and, afterwards, its minutes.</summary>
 public sealed record Meeting(long Id, string Title, string Kind, string Starts, string Place, string Agenda, string Audience, string Status,
@@ -69,13 +78,14 @@ public sealed class VereinStore(IPluginData data)
     {
         b.Table(TPeople, t => t.Int("member_id", required: true).Text("first").Text("last").Text("email").Text("phone").Text("roles")
             .Text("joined").Bool("active", def: "1").Text("note").Timestamp("created")
-            .Bool("child", def: "0").Text("guardians").Text("born").UniqueIndex("member_id"));
+            .Bool("child", def: "0").Text("guardians").Text("born").Text("street").Text("zip").Text("city").Json("extra").Text("cal_token").UniqueIndex("member_id"));
         b.Table(TDocs, t => t.Text("title", required: true).Text("body").Text("kind", required: true).Text("audience", required: true)
             .Text("file").Text("file_name").Text("file_type").Text("due").Bool("archived", def: "0").Timestamp("created").Text("created_by").Index("archived"));
         b.Table(TAnswers, t => t.Int("doc_id", required: true).Int("member_id", required: true).Text("status", required: true).Text("signature")
             .Text("ip").Timestamp("at").UniqueIndex("doc_id", "member_id").Index("member_id"));
         b.Table(TUploads, t => t.Int("member_id", required: true).Text("kind", required: true).Text("title").Text("file", required: true).Text("file_name")
-            .Text("file_type").Int("size", def: "0").Bool("shared", def: "1").Timestamp("created").Index("member_id").Index("kind"));
+            .Text("file_type").Int("size", def: "0").Bool("shared", def: "1").Timestamp("created")
+            .Bool("approved", def: "1").Int("event_id", def: "0").Text("taken").Index("member_id").Index("kind").Index("event_id"));
         b.Table(TMeetings, t => t.Text("title", required: true).Text("kind").Text("starts").Text("place").Text("agenda").Text("audience", required: true)
             .Text("status", required: true).Text("minutes").Text("minutes_status").Timestamp("created").Timestamp("invited_at").Index("starts"));
         b.Table(TRsvps, t => t.Int("meeting_id", required: true).Int("member_id", required: true).Text("answer", required: true).Timestamp("at")
@@ -104,12 +114,29 @@ public sealed class VereinStore(IPluginData data)
 
     private static Person P(DataRow r) => new(r.Id, r.Int("member_id"), r.Text("first"), r.Text("last"), r.Text("email"), r.Text("phone"),
         SplitRoles(r.Text("roles")), r.Text("joined"), r.Bool("active"), r.Text("note"), r.Timestamp("created"), r.Bool("child"),
-        r.Text("guardians").Split(',', StringSplitOptions.RemoveEmptyEntries).Select(x => long.TryParse(x, out var g) ? g : 0).Where(g => g > 0).Distinct().ToList(), r.Text("born"));
+        r.Text("guardians").Split(',', StringSplitOptions.RemoveEmptyEntries).Select(x => long.TryParse(x, out var g) ? g : 0).Where(g => g > 0).Distinct().ToList(), r.Text("born"),
+        r.Text("street"), r.Text("zip"), r.Text("city"), ReadExtra(r), r.Text("cal_token"));
+
+    private static IReadOnlyDictionary<string, string> ReadExtra(DataRow r)
+    {
+        var d = new Dictionary<string, string>();
+        if (r.Json("extra") is System.Text.Json.Nodes.JsonObject o)
+            foreach (var (k, v) in o) if (v is System.Text.Json.Nodes.JsonValue jv && jv.TryGetValue<string>(out var s)) d[k] = s;
+        return d;
+    }
+
+    /// <summary>Writes the private details: birthday, address and the club's own fields (only those still declared are kept).</summary>
+    public Task<int> SaveDetailsAsync(long id, string born, string street, string zip, string city, IReadOnlyDictionary<string, string> extra, CancellationToken ct = default)
+    {
+        var o = new System.Text.Json.Nodes.JsonObject();
+        foreach (var (k, v) in extra) if (v.Length > 0) o[k] = v;
+        return People.UpdateAsync(id, new Dictionary<string, object?> { ["born"] = born, ["street"] = street, ["zip"] = zip, ["city"] = city, ["extra"] = o }, ct);
+    }
     private static Doc D(DataRow r) => new(r.Id, r.Text("title"), r.Text("body"), r.Text("kind"), r.Text("audience"), r.Text("file"), r.Text("file_name"),
         r.Text("file_type"), r.Text("due"), r.Bool("archived"), r.Timestamp("created"), r.Text("created_by"));
     private static Answer A(DataRow r) => new(r.Id, r.Int("doc_id"), r.Int("member_id"), r.Text("status"), r.Text("signature"), r.Text("ip"), r.Timestamp("at"));
     private static Upload U(DataRow r) => new(r.Id, r.Int("member_id"), r.Text("kind"), r.Text("title"), r.Text("file"), r.Text("file_name"), r.Text("file_type"),
-        r.Int("size"), r.Bool("shared"), r.Timestamp("created"));
+        r.Int("size"), r.Bool("shared"), r.Timestamp("created"), r.Bool("approved"), r.Int("event_id"), r.Text("taken"));
     private static Meeting M(DataRow r) => new(r.Id, r.Text("title"), r.Text("kind"), r.Text("starts"), r.Text("place"), r.Text("agenda"), r.Text("audience"),
         r.Text("status"), r.Text("minutes"), r.Text("minutes_status"), r.Timestamp("created"), r.Timestamp("invited_at"));
     private static Rsvp R(DataRow r) => new(r.Id, r.Int("meeting_id"), r.Int("member_id"), r.Text("answer"), r.Timestamp("at"));

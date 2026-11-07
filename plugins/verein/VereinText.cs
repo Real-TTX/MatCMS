@@ -8,7 +8,8 @@ namespace MatCMS.Plugin.Verein;
 public static class VereinSettings
 {
     public const string ClubName = "clubName", Roles = "roles", BoardRoles = "boardRoles", LoginIntro = "loginIntro", ReplyTo = "replyTo",
-        MaxUploadMb = "maxUploadMb", DirectoryForAll = "directoryForAll", EventsTitle = "eventsTitle";
+        MaxUploadMb = "maxUploadMb", DirectoryForAll = "directoryForAll", EventsTitle = "eventsTitle",
+        CustomFields = "customFields", BirthdayForAll = "birthdayForAll", AddressForAll = "addressForAll", UploadApproval = "uploadApproval";
 
     public const string DefaultRoles = "Vorsitzende/r\nStellv. Vorsitzende/r\nKassierer/in\nSchriftführer/in\nBeisitzer/in\nJugendleiter/in\nMitglied";
     public const string DefaultBoard = "Vorsitzende/r\nStellv. Vorsitzende/r\nKassierer/in\nSchriftführer/in\nBeisitzer/in";
@@ -21,7 +22,20 @@ public static class VereinSettings
         .Text(ReplyTo, "Antwortadresse der E-Mails", "", "Wer auf eine E-Mail des Vereins antwortet, schreibt an diese Adresse (z. B. die des Vorstands).")
         .Number(MaxUploadMb, "Größte Datei beim Hochladen (MB)", 15, 1, 25)
         .Bool(DirectoryForAll, "Mitgliederliste für alle Mitglieder", false, "Aus: Mitglieder sehen nur den Vorstand. An: alle sehen alle Mitglieder (Name, Rolle, Telefon).")
-        .Text(EventsTitle, "Überschrift der Termine", "Kommende Termine");
+        .Text(EventsTitle, "Überschrift der Termine", "Kommende Termine")
+        .TextArea(CustomFields, "Eigene Felder", "", "Ein Feld pro Zeile, z. B. „Hexe-Nr. | alle“ oder „Narr-Nr. | vorstand“. Dahinter steht, wer es im Mitgliederbereich sieht: alle Mitglieder oder nur der Vorstand (ohne Angabe: nur Vorstand). Auf der Website erscheint es nie.")
+        .Bool(BirthdayForAll, "Geburtsdatum für alle Mitglieder sichtbar", false, "Aus: nur der Vorstand (und die Person selbst) sieht es.")
+        .Bool(AddressForAll, "Adresse für alle Mitglieder sichtbar", false, "Aus: nur der Vorstand (und die Person selbst) sieht sie.")
+        .Bool(UploadApproval, "Uploads vor dem Veröffentlichen freigeben", true, "An: Was ein Mitglied hochlädt, sehen erst der Vorstand und die Person selbst; die anderen Mitglieder erst nach der Freigabe (durch den Vorstand im Mitgliederbereich oder im Admin).");
+
+    /// <summary>One of the club's own fields and who sees it in the member area.</summary>
+    public sealed record Field(string Label, bool ForAll);
+
+    /// <summary>The declared own fields, in their order. A label is the key its value is stored under – renaming one starts it empty.</summary>
+    public static IReadOnlyList<Field> Fields(IPluginContext ctx) =>
+        ctx.Settings.Get(CustomFields).Replace("\r", "").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(l => l.Split('|', 2)).Select(p => new Field(p[0].Trim(), p.Length > 1 && p[1].Trim().ToLowerInvariant() is "alle" or "all" or "öffentlich" or "mitglieder"))
+            .Where(f => f.Label.Length > 0 && f.Label.Length <= 60).DistinctBy(f => f.Label.ToLowerInvariant()).Take(30).ToList();
 
     public static IReadOnlyList<string> RoleList(IPluginContext ctx) => Lines(ctx.Settings.Get(Roles) is { Length: > 0 } r ? r : DefaultRoles);
     public static IReadOnlyList<string> BoardList(IPluginContext ctx) => Lines(ctx.Settings.Get(BoardRoles) is { Length: > 0 } r ? r : DefaultBoard);

@@ -187,6 +187,7 @@ builder.Services.Configure<RequestLocalizationOptions>(options =>
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<TwoFactorService>();
+builder.Services.AddScoped<MemberTwoFactorService>();
 builder.Services.AddScoped<BlockRegistry>();
 builder.Services.AddScoped<MatCMS.Services.MediaFocus>();
 builder.Services.AddScoped<SiteContext>();

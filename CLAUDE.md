@@ -95,6 +95,13 @@ together by hand:
    an enrolled admin's second factor. A decrypt failure of the secret (cross-instance restore, lost keys)
    disables only the TOTP branch; the key-independent recovery codes still work, so an admin is never
    hard-locked out. (Known v1 gap: `/api/cloud/link` adoption still authenticates by password alone.)
+   **The site's guest-area accounts (`SiteMember`) have their own second factor** on the same algorithm (`Services/MemberTwoFactorService.cs`:
+   own encryption purpose, own cache keys, own pending cookie `matcms.m2fa` on path `/anmelden`): set up by the member at `/anmelden/sicherheit`
+   (QR, recovery codes once; new codes or switching off only with a current code), asked for at `/anmelden/2fa`. **Every password sign-in of a
+   member goes through `MemberService.SignInOrChallengeAsync`** (the sign-in form, the invitation link) — a new one must too, or it walks past the
+   code; a plugin's `ctx.Members.SignInAsync` is refused for such an account. An administrator (Admin → Mitglieder) or a plugin
+   (`ctx.Members.ResetTwoFactorAsync`) can only switch it OFF. Plugins see it as `PluginMember.TwoFactorEnabled` / `MemberAccount.TwoFactorEnabled`
+   and link to `MemberPaths.Security` (`?returnUrl=…&pflicht=1` when their area requires it — the Verein plugin's setting `twoFactor`).
 
 ## Layout
 

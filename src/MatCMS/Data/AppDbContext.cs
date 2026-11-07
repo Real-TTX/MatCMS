@@ -48,6 +48,7 @@ public class AppDbContext : DbContext
         // recovery code twice: the second UPDATE matches 0 rows and throws (handled in TwoFactorService).
         // Marking an existing column as a token only changes the generated WHERE clause — no migration.
         b.Entity<User>().Property(u => u.RecoveryCodes).IsConcurrencyToken();
+        b.Entity<SiteMember>().Property(m => m.RecoveryCodes).IsConcurrencyToken();
         // A slug is unique per locale (the same slug may exist once per content locale).
         b.Entity<Page>().HasIndex(p => new { p.Slug, p.Locale }).IsUnique();
         b.Entity<Page>().HasIndex(p => p.TranslationGroup);

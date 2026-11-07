@@ -55,6 +55,14 @@ public class SiteMember
     /// <summary>When the reset token stops working.</summary>
     public DateTime? ResetTokenExpiresAt { get; set; }
 
+    /// <summary>A second factor (TOTP) is required at sign-in. The member turns it on at <c>/anmelden/sicherheit</c>; an administrator can only
+    /// switch it OFF (a lost phone), never on or read it.</summary>
+    public bool TwoFactorEnabled { get; set; }
+    /// <summary>The TOTP secret, DataProtection-encrypted (purpose <c>MatCMS.TwoFactor.MemberSecret.v1</c>) — never stored in the clear.</summary>
+    public string? TotpSecret { get; set; }
+    /// <summary>The unused recovery codes as SHA-256 hashes, one per line; a concurrency token, so two sign-ins cannot spend the same code.</summary>
+    public string? RecoveryCodes { get; set; }
+
     /// <summary>The role names as a set, split from <see cref="RolesCsv"/>.</summary>
     public IReadOnlyCollection<string> Roles =>
         (RolesCsv ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);

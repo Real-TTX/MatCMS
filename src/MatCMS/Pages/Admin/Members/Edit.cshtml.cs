@@ -18,6 +18,8 @@ public class EditModel : PageModel
     [BindProperty] public InputModel Input { get; set; } = new();
     public List<string> AllRoles { get; private set; } = new();
     public bool IsNew => Input.Id == 0;
+    /// <summary>The member signs in with a second factor (only the owner turns it on; here it can only be switched off).</summary>
+    public bool TwoFactorEnabled { get; private set; }
     public string? Error { get; private set; }
 
     public class InputModel
@@ -43,8 +45,19 @@ public class EditModel : PageModel
                 Id = m.Id, Username = m.Username, DisplayName = m.DisplayName, Email = m.Email,
                 IsActive = m.IsActive, Roles = m.Roles.ToList()
             };
+            TwoFactorEnabled = m.TwoFactorEnabled;
         }
         return Page();
+    }
+
+    /// <summary>Lost phone: switches the member's second factor off; they sign in with the password and may set it up again.</summary>
+    public async Task<IActionResult> OnPostResetTwoFactorAsync(int id, [FromServices] MemberTwoFactorService twoFactor)
+    {
+        var m = await _db.SiteMembers.FindAsync(id);
+        if (m is null) return RedirectToPage("Index");
+        await twoFactor.DisableAsync(m);
+        TempData["Flash"] = "Die Zwei-Faktor-Anmeldung von " + (string.IsNullOrWhiteSpace(m.DisplayName) ? m.Username : m.DisplayName) + " ist ausgeschaltet.";
+        return RedirectToPage(new { id });
     }
 
     public async Task<IActionResult> OnPostAsync()

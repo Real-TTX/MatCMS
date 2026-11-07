@@ -9,7 +9,8 @@ public static class VereinSettings
 {
     public const string ClubName = "clubName", Roles = "roles", BoardRoles = "boardRoles", LoginIntro = "loginIntro", ReplyTo = "replyTo",
         MaxUploadMb = "maxUploadMb", DirectoryForAll = "directoryForAll", EventsTitle = "eventsTitle",
-        CustomFields = "customFields", BirthdayForAll = "birthdayForAll", AddressForAll = "addressForAll", UploadApproval = "uploadApproval";
+        CustomFields = "customFields", BirthdayForAll = "birthdayForAll", AddressForAll = "addressForAll", UploadApproval = "uploadApproval",
+        TwoFactor = "twoFactor";
 
     public const string DefaultRoles = "Vorsitzende/r\nStellv. Vorsitzende/r\nKassierer/in\nSchriftführer/in\nBeisitzer/in\nJugendleiter/in\nMitglied";
     public const string DefaultBoard = "Vorsitzende/r\nStellv. Vorsitzende/r\nKassierer/in\nSchriftführer/in\nBeisitzer/in";
@@ -26,6 +27,8 @@ public static class VereinSettings
         .TextArea(CustomFields, "Eigene Felder", "", "Ein Feld pro Zeile, z. B. „Hexe-Nr. | alle“ oder „Narr-Nr. | vorstand“. Dahinter steht, wer es im Mitgliederbereich sieht: alle Mitglieder oder nur der Vorstand (ohne Angabe: nur Vorstand). Auf der Website erscheint es nie.")
         .Bool(BirthdayForAll, "Geburtsdatum für alle Mitglieder sichtbar", false, "Aus: nur der Vorstand (und die Person selbst) sieht es.")
         .Bool(AddressForAll, "Adresse für alle Mitglieder sichtbar", false, "Aus: nur der Vorstand (und die Person selbst) sieht sie.")
+        .Choice(TwoFactor, "Zwei-Faktor-Anmeldung im Mitgliederbereich", "", new[] { new FieldOption("", "freiwillig (jedes Mitglied kann sie im Profil einschalten)"), new FieldOption("vorstand", "Pflicht für den Vorstand"), new FieldOption("alle", "Pflicht für alle Mitglieder") },
+            "Pflicht: Wer sie noch nicht eingerichtet hat, wird beim Öffnen des Mitgliederbereichs zur Einrichtung geschickt (Code aus einer Authenticator-App, z. B. Google oder Microsoft Authenticator).")
         .Bool(UploadApproval, "Uploads vor dem Veröffentlichen freigeben", true, "An: Was ein Mitglied hochlädt, sehen erst der Vorstand und die Person selbst; die anderen Mitglieder erst nach der Freigabe (durch den Vorstand im Mitgliederbereich oder im Admin).");
 
     /// <summary>One of the club's own fields and who sees it in the member area.</summary>
@@ -40,6 +43,9 @@ public static class VereinSettings
     public static IReadOnlyList<string> RoleList(IPluginContext ctx) => Lines(ctx.Settings.Get(Roles) is { Length: > 0 } r ? r : DefaultRoles);
     public static IReadOnlyList<string> BoardList(IPluginContext ctx) => Lines(ctx.Settings.Get(BoardRoles) is { Length: > 0 } r ? r : DefaultBoard);
     public static string Club(IPluginContext ctx) => ctx.Settings.Get(ClubName) is { Length: > 0 } n ? n.Trim() : ctx.Site.Name;
+    /// <summary>Whether this person must sign in with a second factor before entering the member area.</summary>
+    public static bool TwoFactorRequired(IPluginContext ctx, bool board) => ctx.Settings.Get(TwoFactor) switch { "alle" => true, "vorstand" => board, _ => false };
+
     public static long MaxBytes(IPluginContext ctx) => (long)Math.Clamp(ctx.Settings.GetNumber(MaxUploadMb, 15), 1, 25) * 1024 * 1024;
 
     private static IReadOnlyList<string> Lines(string s) =>

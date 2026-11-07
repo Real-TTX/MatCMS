@@ -61,4 +61,21 @@
             <a class="btn btn-ghost" asp-page="Index">Zurück</a>
         </div>
     </form>
+    @if (!Model.IsNew)
+    {
+        <div class="card" style="margin-top:18px">
+            <h3>Zwei-Faktor-Anmeldung</h3>
+            @if (Model.TwoFactorEnabled)
+            {
+                <p>Eingeschaltet – beim Anmelden fragt die Website nach dem Code aus der App. Hat die Person ihr Handy verloren, hier ausschalten; danach meldet sie sich mit dem Passwort an und kann sie unter <code>/anmelden/sicherheit</code> neu einrichten.</p>
+                <form method="post" asp-page-handler="ResetTwoFactor" asp-route-id="@Model.Input.Id">
+                    <button type="submit" class="btn btn-danger" data-confirm="Zwei-Faktor-Anmeldung dieses Mitglieds ausschalten?">Zwei-Faktor-Anmeldung ausschalten</button>
+                </form>
+            }
+            else
+            {
+                <p class="muted">Aus. Einschalten kann sie nur das Mitglied selbst unter <code>/anmelden/sicherheit</code>.</p>
+            }
+        </div>
+    }
 </div>

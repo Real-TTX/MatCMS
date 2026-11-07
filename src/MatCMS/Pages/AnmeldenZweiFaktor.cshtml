@@ -1,0 +1,25 @@
+@page "/anmelden/2fa"
+@model MatCMS.Pages.AnmeldenZweiFaktorModel
+@{
+    ViewData["Title"] = T["member.2fa.title"];
+}
+<partial name="_MemberAuthStyle" />
+<section class="member-auth">
+    <div class="member-auth-card">
+        <h1>@T["member.2fa.title"]</h1>
+        <p>@T["member.2fa.intro"]</p>
+        @if (!string.IsNullOrEmpty(Model.Error))
+        {
+            <p class="member-auth-error">@Model.Error</p>
+        }
+        <form method="post">
+            <label class="member-auth-field">
+                <span>@T["member.2fa.code"]</span>
+                <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="20" required autofocus />
+            </label>
+            <button type="submit" class="btn">@T["member.2fa.verify"]</button>
+        </form>
+        <p class="member-auth-links">@T["member.2fa.recoveryHint"]</p>
+        <p class="member-auth-links"><a href="/anmelden">@T["member.forgot.back"]</a></p>
+    </div>
+</section>

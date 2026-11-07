@@ -790,4 +790,39 @@ public class VereinTests : IClassFixture<VereinApp>
         using var scope = _app.App.Services.CreateScope();
         return string.Join("\n", scope.ServiceProvider.GetRequiredService<PluginRegistry>().LogOf("verein"));
     }
+    [Fact]
+    public async Task A_required_second_factor_sends_the_member_to_set_it_up_and_the_profile_links_there()
+    {
+        await JoinAsync("pia", "Mitglied");
+        var pia = await _app.AsAsync("pia");
+        var profile = Text(await pia.GetStringAsync("/mitglied/profil"));
+        Assert.Contains("Zwei-Faktor-Anmeldung", profile);
+        Assert.Contains("/anmelden/sicherheit?returnUrl=", await pia.GetStringAsync("/mitglied/profil"));
+        await SetConfigAsync("twoFactor", "alle");
+        try
+        {
+            var res = await pia.GetAsync("/mitglied/dokumente");
+            Assert.Equal(HttpStatusCode.Redirect, res.StatusCode);
+            Assert.StartsWith("/anmelden/sicherheit?pflicht=1", res.Headers.Location!.OriginalString);
+            Assert.Contains("vorgeschrieben", Text(await pia.GetStringAsync(res.Headers.Location!.OriginalString)));
+        }
+        finally { await SetConfigAsync("twoFactor", ""); }
+        Assert.Equal(HttpStatusCode.OK, (await pia.GetAsync("/mitglied/dokumente")).StatusCode);
+    }
+
+    /// <summary>One setting of the plugin, merged into what the other tests stored, then the plugin reloaded.</summary>
+    private async Task SetConfigAsync(string key, string value)
+    {
+        await _app.InstallAsync();
+        _app.Db(db =>
+        {
+            var row = db.Plugins.First(p => p.Key == "verein");
+            var cfg = System.Text.Json.Nodes.JsonNode.Parse(string.IsNullOrEmpty(row.ConfigJson) ? "{}" : row.ConfigJson)!.AsObject();
+            cfg[key] = value;
+            row.ConfigJson = cfg.ToJsonString();
+            return db.SaveChanges();
+        });
+        using var scope = _app.App.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<PluginRunner>().ReloadAsync(_app.Db(db => db.Plugins.First(p => p.Key == "verein").Id));
+    }
 }

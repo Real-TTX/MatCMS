@@ -154,7 +154,7 @@ internal sealed class PluginMembersAccess : IPluginMembers
 
     private static MemberAccount ToAccount(SiteMember m) =>
         new(m.Id, m.Username, string.IsNullOrWhiteSpace(m.DisplayName) ? m.Username : m.DisplayName, m.Email, m.EmailConfirmedAt is not null, m.IsActive,
-            m.Roles.ToList(), DateTime.SpecifyKind(m.CreatedAt, DateTimeKind.Utc));
+            m.Roles.ToList(), DateTime.SpecifyKind(m.CreatedAt, DateTimeKind.Utc)) { TwoFactorEnabled = m.TwoFactorEnabled };
 
     public async Task<MemberAccount?> FindAsync(long id, CancellationToken ct = default) =>
         await Db.SiteMembers.AsNoTracking().FirstOrDefaultAsync(m => m.Id == id, ct) is { } m ? ToAccount(m) : null;
@@ -199,6 +199,8 @@ internal sealed class PluginMembersAccess : IPluginMembers
                    ?? throw new InvalidOperationException("Anmelden braucht eine HTTP-Anfrage.");
         var row = await Db.SiteMembers.FirstOrDefaultAsync(m => m.Id == member.Id, ct);
         if (row is null || !row.IsActive) throw new InvalidOperationException("Dieses Konto gibt es nicht oder es ist gesperrt.");
+        // a plugin signs in without the person's password (a shop, right after creating the account) – never past a second factor
+        if (row.TwoFactorEnabled) throw new InvalidOperationException("Dieses Konto hat eine Zwei-Faktor-Anmeldung – es meldet sich unter /anmelden selbst an.");
         await Service.SignInAsync(http, row, persistent);
     }
 
@@ -215,4 +217,13 @@ internal sealed class PluginMembersAccess : IPluginMembers
     public Task<bool> SetPasswordAsync(long id, string newPassword, CancellationToken ct = default) => Service.SetPasswordAsync(id, newPassword, ct);
 
     public Task<bool> DeleteAsync(long id, CancellationToken ct = default) => Service.DeleteAsync(id, ct);
+
+    public async Task<bool> ResetTwoFactorAsync(long id, CancellationToken ct = default)
+    {
+        var row = await Db.SiteMembers.FirstOrDefaultAsync(m => m.Id == id, ct);
+        if (row is null) return false;
+        if (row.TwoFactorEnabled)
+            await ((MatCMS.Services.MemberTwoFactorService)_services.GetService(typeof(MatCMS.Services.MemberTwoFactorService))!).DisableAsync(row);
+        return true;
+    }
 }

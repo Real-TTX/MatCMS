@@ -45,7 +45,7 @@ public class AnmeldenWillkommenModel : PageModel
         if (password != repeat) { Error = T["member.welcome.mismatch"]; return Page(); }
         if (!await _members.ResetPasswordAsync(token, password!, HttpContext.RequestAborted)) { TokenValid = false; return Page(); }
         // setting the password confirmed the address (ResetPasswordAsync); now the person is in — the reason for this page
-        await _members.SignInAsync(HttpContext, m, persistent: false);
-        return Redirect(ReturnUrl);
+        // (an account that already turned on a second factor still has to give its code)
+        return Redirect(await _members.SignInOrChallengeAsync(HttpContext, m, persistent: false, ReturnUrl));
     }
 }

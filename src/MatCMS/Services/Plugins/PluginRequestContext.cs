@@ -182,7 +182,7 @@ internal sealed class PluginRequestContext : IPluginContext
         if (id is null || http.RequestServices.GetService(typeof(AppDbContext)) is not AppDbContext db) return null;
         var m = await db.SiteMembers.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id.Value, http.RequestAborted);
         return m is null || !m.IsActive ? null
-            : new PluginMember(m.Id, m.Username, string.IsNullOrWhiteSpace(m.DisplayName) ? m.Username : m.DisplayName, m.Email, m.Roles.ToList());
+            : new PluginMember(m.Id, m.Username, string.IsNullOrWhiteSpace(m.DisplayName) ? m.Username : m.DisplayName, m.Email, m.Roles.ToList()) { TwoFactorEnabled = m.TwoFactorEnabled };
     }
 
     private static async Task<byte[]> ReadBodyAsync(HttpContext http, int max)

@@ -751,6 +751,10 @@ namespace MatCMS.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("RecoveryCodes")
+                        .IsConcurrencyToken()
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime?>("ResetTokenExpiresAt")
                         .HasColumnType("TEXT");
 
@@ -761,6 +765,12 @@ namespace MatCMS.Data.Migrations
                     b.Property<string>("RolesCsv")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<string>("TotpSecret")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("TwoFactorEnabled")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Username")
                         .IsRequired()

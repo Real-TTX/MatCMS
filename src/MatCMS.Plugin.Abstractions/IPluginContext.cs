@@ -119,6 +119,18 @@ public sealed record PluginMember(long Id, string Username, string DisplayName, 
 {
     /// <summary>True when the account holds the role.</summary>
     public bool InRole(string role) => Roles.Contains(role, StringComparer.OrdinalIgnoreCase);
+    /// <summary>The account signs in with a second factor (TOTP). A plugin whose area requires one sends a member without it to
+    /// <see cref="MemberPaths.Security"/> (with <c>pflicht=1</c> and a local <c>returnUrl</c>).</summary>
+    public bool TwoFactorEnabled { get; init; }
+}
+
+/// <summary>The site's own member pages a plugin may link to.</summary>
+public static class MemberPaths
+{
+    /// <summary>Sign in (<c>?returnUrl=</c> a local path).</summary>
+    public const string SignIn = "/anmelden";
+    /// <summary>The member's two-factor sign-in: set up, new recovery codes, switch off (<c>?returnUrl=</c> a local path, <c>&amp;pflicht=1</c> says the area requires it).</summary>
+    public const string Security = "/anmelden/sicherheit";
 }
 
 /// <summary>Data of the block being rendered (block renders only).</summary>

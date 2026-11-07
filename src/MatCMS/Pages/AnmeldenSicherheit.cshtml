@@ -1,0 +1,95 @@
+@page "/anmelden/sicherheit"
+@model MatCMS.Pages.AnmeldenSicherheitModel
+@{
+    ViewData["Title"] = T["member.2fa.securityTitle"];
+}
+<partial name="_MemberAuthStyle" />
+<style>
+    .member-auth-card.wide { max-width: 520px; }
+    .member-2fa-qr { display: flex; justify-content: center; margin: 8px 0 14px; }
+    .member-2fa-qr svg { width: 200px; height: 200px; background: #fff; }
+    .member-2fa-secret { font-family: ui-monospace, Consolas, monospace; font-size: .95rem; letter-spacing: .08em; word-break: break-all; background: rgba(0,0,0,.05); border-radius: 6px; padding: 8px 10px; }
+    .member-2fa-codes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 14px; font-family: ui-monospace, Consolas, monospace; background: rgba(0,0,0,.05); border-radius: 8px; padding: 12px 14px; margin: 0 0 14px; }
+    .member-2fa-status { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: .85rem; font-weight: 600; background: #eef8ee; color: #1d6b2a; }
+    .member-2fa-box { border-top: 1px solid rgba(0,0,0,.1); margin-top: 18px; padding-top: 16px; }
+</style>
+<section class="member-auth">
+    <div class="member-auth-card wide">
+        <h1>@T["member.2fa.securityTitle"]</h1>
+        @if (Model.Required && !Model.Member.TwoFactorEnabled)
+        {
+            <p class="member-auth-error">@T["member.2fa.required"]</p>
+        }
+        @if (!string.IsNullOrEmpty(Model.Notice))
+        {
+            <p class="member-auth-ok">@Model.Notice</p>
+        }
+        @if (!string.IsNullOrEmpty(Model.Error))
+        {
+            <p class="member-auth-error">@Model.Error</p>
+        }
+
+        @if (Model.RecoveryCodes is { Count: > 0 } codes)
+        {
+            <p><strong>@T["member.2fa.codesTitle"]</strong></p>
+            <p>@T["member.2fa.codesIntro"]</p>
+            <div class="member-2fa-codes">@foreach (var c in codes) { <span>@c</span> }</div>
+        }
+
+        @if (Model.Member.TwoFactorEnabled)
+        {
+            <p><span class="member-2fa-status">@T["member.2fa.on"]</span></p>
+            <p>@T["member.2fa.onIntro", Model.RemainingCodes]</p>
+            <div class="member-2fa-box">
+                <form method="post" asp-page-handler="Renew">
+                    <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+                    <input type="hidden" name="pflicht" value="@(Model.Required ? "1" : "")" />
+                    <label class="member-auth-field"><span>@T["member.2fa.codeForChange"]</span>
+                        <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="20" required /></label>
+                    <button type="submit" class="btn">@T["member.2fa.renew"]</button>
+                    <button type="submit" class="btn" formaction="?handler=Disable" data-confirm="@T["member.2fa.disableConfirm"]">@T["member.2fa.disable"]</button>
+                </form>
+            </div>
+        }
+        else
+        {
+            <p>@T["member.2fa.setupIntro"]</p>
+            <ol>
+                <li>@T["member.2fa.step1"]</li>
+                <li>@T["member.2fa.step2"]</li>
+                <li>@T["member.2fa.step3"]</li>
+            </ol>
+            <div class="member-2fa-qr" id="member-2fa-qr" data-otpauth="@Model.OtpauthUri"></div>
+            <p>@T["member.2fa.manual"]</p>
+            <p class="member-2fa-secret">@Model.Secret</p>
+            <form method="post" asp-page-handler="Enable">
+                <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+                <input type="hidden" name="pflicht" value="@(Model.Required ? "1" : "")" />
+                <input type="hidden" name="pending" value="@Model.PendingToken" />
+                <label class="member-auth-field"><span>@T["member.2fa.code"]</span>
+                    <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="10" required /></label>
+                <button type="submit" class="btn">@T["member.2fa.enable"]</button>
+            </form>
+        }
+        @if (!string.IsNullOrEmpty(Model.ReturnUrl))
+        {
+            <p class="member-auth-links"><a href="@Model.ReturnUrl">@T["member.2fa.back"]</a></p>
+        }
+    </div>
+</section>
+
+@section Scripts {
+    <script src="~/_content/MatCMS.Shared.Web/lib/qrcode/qrcode.min.js" asp-append-version="true"></script>
+    <script>
+        (function () {
+            var el = document.getElementById('member-2fa-qr');
+            if (!el || typeof qrcode !== 'function') return;
+            var uri = el.getAttribute('data-otpauth');
+            if (!uri) return;
+            var qr = qrcode(0, 'M');
+            qr.addData(uri);
+            qr.make();
+            el.innerHTML = qr.createSvgTag({ cellSize: 5, margin: 4 });
+        })();
+    </script>
+}

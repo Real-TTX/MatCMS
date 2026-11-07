@@ -88,8 +88,8 @@ public class AnmeldenModel : PageModel
             return Page();
         }
 
-        await _members.SignInAsync(HttpContext, member, remember);
-        return Redirect(ReturnUrl ?? "/");
+        // with a second factor this only leads on to /anmelden/2fa — the sign-in happens there
+        return Redirect(await _members.SignInOrChallengeAsync(HttpContext, member, remember, ReturnUrl ?? "/"));
     }
 
     public async Task<IActionResult> OnPostLogoutAsync(string? returnUrl)

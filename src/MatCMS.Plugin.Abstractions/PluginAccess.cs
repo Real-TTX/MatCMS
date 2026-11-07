@@ -16,7 +16,11 @@ namespace MatCMS.Plugin;
 /// <param name="Roles">The roles it holds.</param>
 /// <param name="CreatedUtc">When it was created.</param>
 public sealed record MemberAccount(long Id, string Username, string DisplayName, string Email, bool EmailConfirmed, bool IsActive,
-    IReadOnlyList<string> Roles, DateTime CreatedUtc);
+    IReadOnlyList<string> Roles, DateTime CreatedUtc)
+{
+    /// <summary>The account signs in with a second factor (TOTP), set up by its owner at <see cref="MemberPaths.Security"/>.</summary>
+    public bool TwoFactorEnabled { get; init; }
+}
 
 /// <summary>What came of <see cref="IPluginMembers.CreateAsync"/>.</summary>
 public enum MemberCreateStatus
@@ -90,7 +94,14 @@ public interface IPluginMembers
     /// </summary>
     Task<bool> SetPasswordAsync(long id, string newPassword, CancellationToken ct = default);
 
-    /// <summary>Signs the account in on this request (a cookie is set on the answer). Needs an HTTP request.</summary>
+    /// <summary>
+    /// Switches an account's second factor OFF — for an operator's back office when somebody lost their phone. Turning it on (or reading the secret)
+    /// is only ever the owner's, at <see cref="MemberPaths.Security"/>. False when the account does not exist.
+    /// </summary>
+    Task<bool> ResetTwoFactorAsync(long id, CancellationToken ct = default);
+
+    /// <summary>Signs the account in on this request (a cookie is set on the answer). Needs an HTTP request. Refused (throws) for an account with a
+    /// second factor — such a person signs in at <see cref="MemberPaths.SignIn"/> with their code.</summary>
     Task SignInAsync(MemberAccount member, bool persistent = false, CancellationToken ct = default);
 
     /// <summary>Signs the current visitor out. Needs an HTTP request.</summary>

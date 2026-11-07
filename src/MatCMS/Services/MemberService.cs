@@ -330,6 +330,23 @@ public class MemberService
         http.Items.Remove(ItemsKey);
     }
 
+    /// <summary>
+    /// The one door after a password was proven (sign-in form, invitation link): an account with a second factor is NOT signed in yet — it gets the
+    /// short pending cookie and is sent to <c>/anmelden/2fa</c>; any other is signed in. Returns where to go next. A new way to sign a member in by
+    /// password must come through here, or it walks past the second factor.
+    /// </summary>
+    public async Task<string> SignInOrChallengeAsync(HttpContext http, SiteMember member, bool persistent, string returnUrl)
+    {
+        if (member.TwoFactorEnabled)
+        {
+            var dp = (Microsoft.AspNetCore.DataProtection.IDataProtectionProvider)_services.GetService(typeof(Microsoft.AspNetCore.DataProtection.IDataProtectionProvider))!;
+            MemberTwoFactorCookie.Write(http, dp, new MemberTwoFactorCookie.Pending(member.Id, persistent, returnUrl));
+            return "/anmelden/2fa";
+        }
+        await SignInAsync(http, member, persistent);
+        return returnUrl;
+    }
+
     public Task SignOutAsync(HttpContext http) { http.Items.Remove(ItemsKey); return http.SignOutAsync(Scheme); }
 
     /// <summary>The member behind the current request, or null. Authenticates the member scheme

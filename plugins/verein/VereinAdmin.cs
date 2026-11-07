@@ -246,6 +246,15 @@ public static class VereinAdmin
             isNew ? null : Ui.Card("Entfernen", Ui.Action("Aus dem Verein entfernen", "remove", kind: UiButtonKind.Danger, confirm: "Wirklich entfernen?", icon: "ti-trash"))), isNew ? "Kind eintragen" : c!.Name);
     }
 
+    /// <summary>An account's second factor — false on a host older than that API (its own frame, so a missing member only fails here).</summary>
+    private static bool TwoFactorOf(MemberAccount a)
+    {
+        try { return TwoFactorFlag(a); } catch (MissingMethodException) { return false; }
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static bool TwoFactorFlag(MemberAccount a) => a.TwoFactorEnabled;
+
     private static UiNode PhotoCard(Person p) => Ui.Card("Profilbild",
         p.Photo.Length > 0 ? Ui.Img(Root + "members/" + p.Id + "/photo?v=" + Path.GetFileNameWithoutExtension(p.Photo)[..8], p.Name, 120) : Ui.Muted("Noch kein Bild."),
         Ui.Form(Ui.File("photo", "Bild hochladen (JPG, PNG oder WebP)", "image/jpeg,image/png,image/webp"),
@@ -286,6 +295,12 @@ public static class VereinAdmin
                 var (s, f) = await SendInviteAsync(ctx, p, again.Link, ct);
                 return PluginResult.Redirect(Root + "members/" + p.Id, f > 0 ? "Einladung konnte nicht verschickt werden (siehe Plugin-Protokoll)."
                     : again.Link is null ? "Erinnerung verschickt – das Mitglied hat schon ein Passwort und meldet sich damit an." : "Einladung mit neuem Link verschickt.", f > 0);
+            }
+            if (ctx.Request.Action == "reset2fa" && p is not null && p.HasAccount)
+            {
+                await ctx.Members.ResetTwoFactorAsync(p.MemberId, ct);
+                ctx.Log($"Zwei-Faktor-Anmeldung von {p.Name} ausgeschaltet von {ctx.User.Name}");
+                return PluginResult.Redirect(Root + "members/" + p.Id, "Die Zwei-Faktor-Anmeldung von " + p.Name + " ist ausgeschaltet – sie/er meldet sich mit dem Passwort an und kann sie im Profil neu einrichten.");
             }
             if (ctx.Request.Action == "setpw" && p is not null && p.HasAccount)
             {
@@ -370,9 +385,15 @@ public static class VereinAdmin
         var answers = await store.AnswersOfMemberAsync(p!.MemberId, ct);
         var docs = (await store.DocsAsync(false, ct)).Concat(await store.DocsAsync(true, ct)).ToDictionary(d => d.Id);
         var kids = VereinStore.ChildrenOf(await store.PeopleAsync(ct), p).ToList();
+        var siteAccount = p.HasAccount ? await ctx.Members.FindAsync(p.MemberId, ct) : null;
+        var twoFactorOn = siteAccount is not null && TwoFactorOf(siteAccount);
         var side = new List<UiNode?>
         {
             PhotoCard(p),
+            siteAccount is null ? null : Ui.Card("Zwei-Faktor-Anmeldung",
+                twoFactorOn ? Ui.Badge("eingeschaltet", UiTone.Success) : Ui.Badge(VereinSettings.TwoFactorRequired(ctx, p.Roles.Any(r => VereinSettings.BoardList(ctx).Contains(r, StringComparer.OrdinalIgnoreCase))) ? "aus – Pflicht, wird beim nächsten Öffnen eingerichtet" : "aus", UiTone.Warning),
+                twoFactorOn ? Ui.Muted("Handy verloren? Dann hier ausschalten – das Mitglied meldet sich mit dem Passwort an und richtet sie im Profil neu ein.") : Ui.Muted("Einschalten kann sie nur das Mitglied selbst (Mein Profil)."),
+                twoFactorOn ? Ui.Action("Ausschalten", "reset2fa", kind: UiButtonKind.Danger, confirm: "Zwei-Faktor-Anmeldung von " + p.Name + " ausschalten?", icon: "ti-shield-off") : null),
             Ui.Card("Kinder", kids.Count == 0 ? Ui.Muted("Keine eingetragen.") : Ui.Stack(kids.Select(k => (UiNode?)Ui.Link(k.Name + (k.Born.Length > 0 ? " (" + V.Date(k.Born) + ")" : ""), Root + "children/" + k.Id)).ToArray()),
                 Ui.Button("Kind eintragen", Root + "children/new?eltern=" + p.Id, UiButtonKind.Ghost, "ti-mood-kid", small: true)),
             p.HasAccount ? Ui.Card("Zugang",

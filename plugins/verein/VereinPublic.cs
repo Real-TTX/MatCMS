@@ -45,8 +45,22 @@ public static class VereinPublic
         var p = await new VereinStore(ctx.Data).PersonOfMemberAsync(ctx.Member.Id, ct);
         if (p is null || !p.Active) return (null, NoAccess(ctx));
         var board = VereinSettings.BoardList(ctx);
-        return (new Who(p, p.Roles.Any(r => board.Contains(r, StringComparer.OrdinalIgnoreCase))), null);
+        var isBoard = p.Roles.Any(r => board.Contains(r, StringComparer.OrdinalIgnoreCase));
+        // the club requires a second factor: whoever has none is sent to set it up first, and comes back here afterwards
+        if (VereinSettings.TwoFactorRequired(ctx, isBoard) && !HasTwoFactor(ctx.Member))
+            return (null, PluginResult.Redirect(MemberPaths.Security + "?pflicht=1&returnUrl=" + Uri.EscapeDataString(Base)));
+        return (new Who(p, isBoard), null);
     }
+
+    /// <summary>The member's second factor — false on a host older than that API (the property does not exist there; the call is in its own frame).</summary>
+    internal static bool HasTwoFactor(PluginMember? m)
+    {
+        if (m is null) return false;
+        try { return TwoFactorOf(m); } catch (MissingMethodException) { return false; }
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static bool TwoFactorOf(PluginMember m) => m.TwoFactorEnabled;
 
     private static PluginResult NoAccess(IPluginContext ctx) => Bare(ctx,
         "<div class=\"vm-card vm-login\"><h1>Kein Zugang</h1><p>Mit diesem Konto gibt es keinen Zugang zum Mitgliederbereich von " + V.H(VereinSettings.Club(ctx)) +
@@ -891,6 +905,12 @@ show(0);next();});})();</script>
           .Append("<label class=\"vm-field\"><span>Neues Passwort wiederholen</span><input name=\"repeat\" type=\"password\" autocomplete=\"new-password\" minlength=\"8\" required></label>")
           .Append("<button class=\"vm-btn\" type=\"submit\">Passwort ändern</button></form></section></div>");
         sb.Append(CalendarCard(ctx, p));
+        var twoFactor = HasTwoFactor(ctx.Member);
+        sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-shield-lock\"></i> Zwei-Faktor-Anmeldung</h2><p>")
+          .Append(twoFactor ? "<span class=\"vm-badge ok\">eingeschaltet</span> Beim Anmelden fragen wir zusätzlich nach dem Code aus deiner Authenticator-App."
+                            : "<span class=\"vm-badge warn\">aus</span> Schütze dein Konto zusätzlich mit einem Code von deinem Handy – selbst wer dein Passwort kennt, kommt dann nicht hinein.")
+          .Append("</p><p><a class=\"vm-btn").Append(twoFactor ? " ghost" : "").Append("\" href=\"").Append(MemberPaths.Security).Append("?returnUrl=").Append(Uri.EscapeDataString(Base + "/profil")).Append("\">")
+          .Append(twoFactor ? "Verwalten" : "Jetzt einrichten").Append("</a></p></section>");
         var kids = VereinStore.ChildrenOf(await store.PeopleAsync(ct), p).ToList();
         if (kids.Count > 0)
             sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-mood-kid\"></i> Meine Kinder</h2><ul class=\"vm-list\">")

@@ -84,6 +84,12 @@ public interface IPluginMembers
     /// </summary>
     Task<MemberInviteResult> InviteAsync(string email, string displayName, string returnUrl, CancellationToken ct = default);
 
+    /// <summary>
+    /// Sets a password without knowing the current one — for an operator's back office (a club's board gives a new member a starting password).
+    /// False when the account does not exist or the password is shorter than the site's minimum. Never mail the password; the person can change it.
+    /// </summary>
+    Task<bool> SetPasswordAsync(long id, string newPassword, CancellationToken ct = default);
+
     /// <summary>Signs the account in on this request (a cookie is set on the answer). Needs an HTTP request.</summary>
     Task SignInAsync(MemberAccount member, bool persistent = false, CancellationToken ct = default);
 

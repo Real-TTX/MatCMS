@@ -179,6 +179,12 @@ public static class VereinAdmin
                 return PluginResult.Redirect(Root + "members/" + p.Id, f > 0 ? "Einladung konnte nicht verschickt werden (siehe Plugin-Protokoll)."
                     : again.Link is null ? "Erinnerung verschickt – das Mitglied hat schon ein Passwort und meldet sich damit an." : "Einladung mit neuem Link verschickt.", f > 0);
             }
+            if (ctx.Request.Action == "setpw" && p is not null)
+            {
+                var ok = await ctx.Members.SetPasswordAsync(p.MemberId, ctx.Request.F("newpw"), ct);
+                if (ok) ctx.Log($"Passwort für {p.Name} gesetzt von {ctx.User.Name}");
+                return PluginResult.Redirect(Root + "members/" + p.Id, ok ? "Passwort gesetzt – bitte persönlich weitergeben. " + p.Name + " meldet sich damit unter " + VereinPublic.Base + " an." : "Das Passwort muss mindestens 8 Zeichen haben.", !ok);
+            }
             if (ctx.Request.Action == "remove" && p is not null)
             {
                 await store.People.DeleteAsync(p.Id, ct);
@@ -211,6 +217,13 @@ public static class VereinAdmin
                 var id = await store.SavePersonAsync(0, account.Id, first, last, email, phone, chosen, joined, true, note, ct);
                 var person = (await store.PersonAsync(id, ct))!;
                 var notice = (first + " " + last).Trim() + " ist angelegt.";
+                // a starting password from the board: only for an account the club just made (a confirmed account keeps its owner's password)
+                var initial = ctx.Request.F("initpw");
+                if (initial.Length > 0)
+                {
+                    if (invite.Status == MemberInviteStatus.EmailTaken) notice += " Das Konto hatte schon ein eigenes Passwort – es bleibt.";
+                    else notice += await ctx.Members.SetPasswordAsync(account.Id, initial, ct) ? " Das Startpasswort ist gesetzt – bitte persönlich weitergeben, nicht per E-Mail." : " Das Startpasswort war zu kurz (mindestens 8 Zeichen) und wurde nicht gesetzt.";
+                }
                 if (V.Checked(ctx.Request.F("sendInvite")))
                 {
                     var (_, f) = await SendInviteAsync(ctx, person, invite.Link, ct);
@@ -230,6 +243,7 @@ public static class VereinAdmin
             Ui.Heading("Rollen", 3),
             Ui.Grid(220, roles.Select((r, i) => (UiNode?)Ui.Checkbox("role_" + i, r, p?.Has(r) ?? (isNew && r == roles[^1]))).ToArray()),
             Ui.TextArea("note", "Notiz (nur im Admin)", p?.Note ?? "", 3),
+            isNew ? Ui.Input("initpw", "Startpasswort (freiwillig, mindestens 8 Zeichen)", "", UiInputType.Text) with { Help = "Damit kann sich das Mitglied sofort unter " + VereinPublic.Base + " anmelden. Persönlich weitergeben – es wird nie per E-Mail verschickt." } : null,
             isNew ? Ui.Checkbox("sendInvite", "Einladung mit Zugang per E-Mail schicken", true) : Ui.Checkbox("active", "Aktiv (Zugang zum Mitgliederbereich)", p!.Active),
             Ui.FormActions(Ui.Submit(isNew ? "Anlegen" : "Speichern"), Ui.Button("Zurück", Root + "members", UiButtonKind.Ghost)));
 
@@ -245,6 +259,9 @@ public static class VereinAdmin
             Ui.Card("Zugang",
                 Ui.Muted("Die Einladung enthält einen Link: Passwort festlegen, danach ist das Mitglied direkt im Mitgliederbereich angemeldet. Hat es schon ein Passwort, kommt eine Erinnerung mit dem Link zur Anmeldung."),
                 Ui.Inline(Ui.Action("Einladung erneut senden", "invite", kind: UiButtonKind.Ghost, icon: "ti-mail"))),
+            Ui.Card("Passwort setzen", Ui.Form(
+                Ui.Input("newpw", "Neues Passwort (mindestens 8 Zeichen)", "", UiInputType.Text) with { Help = "Z. B. ein Startpasswort. Persönlich weitergeben – das Mitglied kann es danach im Profil ändern." },
+                Ui.FormActions(Ui.Submit("Passwort setzen", UiButtonKind.Ghost, "action", "setpw", confirm: "Passwort für dieses Mitglied neu setzen?")))),
             Ui.Card("Bestätigungen", answers.Count == 0 ? Ui.Muted("Noch keine.") : Ui.Table(new[] { Ui.Column("Dokument"), Ui.Column("Antwort"), Ui.Column("Wann") },
                 answers.OrderByDescending(a => a.At).Select(a => Ui.Row(docs.TryGetValue(a.DocId, out var d) ? Ui.Link(d.Title, Root + "docs/" + d.Id) : "#" + a.DocId,
                     a.Status == VereinStore.Accepted ? Ui.Badge(a.Signature.Length > 0 ? "unterschrieben" : "bestätigt", UiTone.Success) : Ui.Badge("abgelehnt", UiTone.Error), V.Stamp(a.At))))),

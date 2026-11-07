@@ -261,6 +261,20 @@ public class MemberService
         return true;
     }
 
+    /// <summary>
+    /// Sets a password without the current one — an operator's starting password (back office only). A pending invitation link stays valid, so the
+    /// person may still choose an own password through it; the address stays unconfirmed until they do (or until "Passwort vergessen").
+    /// </summary>
+    public async Task<bool> SetPasswordAsync(long id, string newPassword, CancellationToken ct = default)
+    {
+        if ((newPassword ?? "").Length < MinPasswordLength) return false;
+        var m = await _db.SiteMembers.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (m is null) return false;
+        m.PasswordHash = HashPassword(newPassword!);
+        await _db.SaveChangesAsync(ct);
+        return true;
+    }
+
     // ---- deleting -----------------------------------------------------------------------------------------------
 
     /// <summary>

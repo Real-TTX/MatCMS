@@ -9,7 +9,7 @@ Admin unter Admin → Verein. Erster Einsatz: Schalksteinnarren Besigheim e.V.
   „Mitglied seit“, Notiz, aktiv). Rollen sind frei einstellbar (eine pro Zeile), welche davon zum Vorstand zählen ebenso. Neues Mitglied im Admin
   = **Einladung** (`ctx.Members.InviteAsync`): eine einzige Mail mit einem Link, Passwort zweimal eingeben, danach ist die Adresse bestätigt und das
   Mitglied angemeldet in `/mitglied` (keine Bestätigungs-Mail der Website, kein „Passwort vergessen“). Ein bestätigtes Konto wird nur verknüpft
-  (Mail mit Anmelde-Link). Braucht MatCMS ab 1.13.361.
+  (Mail mit Anmelde-Link). Der Vorstand kann ein **Startpasswort** setzen (beim Anlegen oder später „Passwort setzen“, nie per Mail). Braucht MatCMS ab 1.13.361.
 - **Mitgliederbereich `/mitglied`**: Die Anmeldung steht auf `/mitglied` selbst (das Formular schickt an die Anmeldung der Website, die nach
   `/mitglied` zurückführt). Alle Unterseiten schicken Nicht-Angemeldete zurück nach `/mitglied`, nie zur allgemeinen Anmeldeseite. Hinein kommt nur,
   wer im Verein eingetragen und aktiv ist; andere Konten sehen „Kein Zugang“. Seiten: Übersicht, Dokumente, Termine & Sitzungen, Bilder & Material,

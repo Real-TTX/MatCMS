@@ -212,5 +212,7 @@ internal sealed class PluginMembersAccess : IPluginMembers
     public Task<bool> ChangePasswordAsync(long id, string currentPassword, string newPassword, CancellationToken ct = default) =>
         Service.ChangePasswordAsync(id, currentPassword, newPassword, ct);
 
+    public Task<bool> SetPasswordAsync(long id, string newPassword, CancellationToken ct = default) => Service.SetPasswordAsync(id, newPassword, ct);
+
     public Task<bool> DeleteAsync(long id, CancellationToken ct = default) => Service.DeleteAsync(id, ct);
 }

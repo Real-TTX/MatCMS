@@ -445,6 +445,36 @@ public class VereinTests : IClassFixture<VereinApp>
     }
 
     [Fact]
+    public async Task The_board_gives_a_starting_password_and_can_set_a_new_one()
+    {
+        await _app.InstallAsync();
+        var admin = await _app.AsAsync("admin");
+        var res = await VereinApp.PostFormAsync(admin, "/admin/p/verein/members/new", new()
+        {
+            ["first"] = "Otto", ["last"] = "Start", ["email"] = "otto@verein.example", ["role_6"] = "true", ["initpw"] = "Fasnet2027!"
+        });
+        var personUrl = res.Headers.Location!.OriginalString.Split('?')[0];
+
+        async Task<HttpStatusCode> SignInAsync(string password)
+        {
+            var c = _app.App.Browser();
+            var page = await c.GetStringAsync("/mitglied");
+            var r = await c.PostAsync("/anmelden", new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["username"] = "otto@verein.example", ["password"] = password, ["returnUrl"] = "/mitglied", ["__RequestVerificationToken"] = AppFactory.Token(page)!
+            }));
+            if (r.StatusCode == HttpStatusCode.Redirect) Assert.Contains("Hallo Otto!", Text(await c.GetStringAsync("/mitglied")));
+            return r.StatusCode;
+        }
+        Assert.Equal(HttpStatusCode.Redirect, await SignInAsync("Fasnet2027!"));
+
+        Assert.Contains("mindestens 8", Text(await (await admin.GetAsync((await VereinApp.PostFormAsync(admin, personUrl, new() { ["action"] = "setpw", ["newpw"] = "kurz" })).Headers.Location!.OriginalString)).Content.ReadAsStringAsync()));
+        await VereinApp.PostFormAsync(admin, personUrl, new() { ["action"] = "setpw", ["newpw"] = "Neues-Passwort-1" });
+        Assert.Equal(HttpStatusCode.Redirect, await SignInAsync("Neues-Passwort-1"));
+        Assert.Equal(HttpStatusCode.OK, await SignInAsync("Fasnet2027!"));   // the old one no longer works (the sign-in page shows its error)
+    }
+
+    [Fact]
     public async Task Templates_are_seeded_and_prefill_a_new_document()
     {
         var admin = await _app.AsAsync("admin");

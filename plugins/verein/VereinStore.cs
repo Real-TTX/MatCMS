@@ -11,6 +11,8 @@ public sealed record Person(long Id, long MemberId, string First, string Last, s
     string Street = "", string Zip = "", string City = "", IReadOnlyDictionary<string, string>? ExtraValues = null, string CalToken = "", string Photo = "")
 {
     public string Name => (First + " " + Last).Trim();
+    /// <summary>Has a site account (can sign in, gets mails). A child never; a grown-up member taken over from a list may not yet either.</summary>
+    public bool HasAccount => MemberId > 0;
     public bool Has(string role) => Roles.Contains(role, StringComparer.OrdinalIgnoreCase);
     public IReadOnlyList<long> Guardians => GuardianIds ?? Array.Empty<long>();
     /// <summary>The club's own fields (Hexe-Nr., Narr-Nr. …) by their label.</summary>
@@ -179,6 +181,9 @@ public sealed class VereinStore(IPluginData data)
     }
 
     /// <summary>A child: no account – a negative placeholder in member_id (unique, and no account ever has it), its guardians by their record ids.</summary>
+    /// <summary>A placeholder for the unique member_id of a person without an account: negative, so no account lookup ever finds it.</summary>
+    public static long Placeholder() => -(DateTime.UtcNow.Ticks / 10 + System.Security.Cryptography.RandomNumberGenerator.GetInt32(1, 1000));
+
     public async Task<long> SaveChildAsync(long id, string first, string last, string born, IEnumerable<string> roles, string joined, bool active, string note,
         IEnumerable<long> guardians, CancellationToken ct = default)
     {
@@ -188,7 +193,7 @@ public sealed class VereinStore(IPluginData data)
             ["guardians"] = string.Join(",", guardians.Distinct()), ["child"] = true, ["email"] = "", ["phone"] = ""
         };
         if (id > 0) { await People.UpdateAsync(id, v, ct); return id; }
-        v["member_id"] = -(DateTime.UtcNow.Ticks / 10 + System.Security.Cryptography.RandomNumberGenerator.GetInt32(1, 1000));
+        v["member_id"] = Placeholder();
         v["created"] = DateTime.UtcNow;
         return await People.InsertAsync(v, ct);
     }
@@ -196,9 +201,10 @@ public sealed class VereinStore(IPluginData data)
     /// <summary>The children a person is guardian of.</summary>
     public static IEnumerable<Person> ChildrenOf(IEnumerable<Person> people, Person p) => people.Where(c => c.Child && c.Guardians.Contains(p.Id));
 
-    /// <summary>The active people a document or meeting is meant for — never a child (it has no account; its guardians answer).</summary>
+    /// <summary>The active people a document or meeting is meant for — only people with an account (a child's guardians answer; a member without
+    /// access cannot open the member area yet).</summary>
     public static IEnumerable<Person> Audience(IEnumerable<Person> people, string audience, IReadOnlyCollection<string> boardRoles) =>
-        people.Where(p => p.Active && !p.Child && InAudience(p, audience, boardRoles));
+        people.Where(p => p.Active && !p.Child && p.HasAccount && InAudience(p, audience, boardRoles));
 
     public static bool InAudience(Person p, string audience, IReadOnlyCollection<string> boardRoles)
     {

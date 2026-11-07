@@ -122,20 +122,23 @@ public static class VereinAdmin
         var board = VereinSettings.BoardList(ctx);
         var docs = await store.DocsAsync(false, ct);
         var answers = await store.AllAnswersAsync(ct);
-        int OpenOf(Person p) => p.Child ? 0 : docs.Count(d => VereinStore.InAudience(p, d.Audience, board) && !answers.Any(a => a.DocId == d.Id && a.MemberId == p.MemberId));
+        int OpenOf(Person p) => p.Child || !p.HasAccount ? 0 : docs.Count(d => VereinStore.InAudience(p, d.Audience, board) && !answers.Any(a => a.DocId == d.Id && a.MemberId == p.MemberId));
         var byId = people.ToDictionary(p => p.Id);
         string Guardians(Person c) => string.Join(", ", c.Guardians.Select(g => byId.TryGetValue(g, out var x) ? x.Name : "").Where(n => n.Length > 0));
 
         var table = Ui.Table(new[] { Ui.Column("Name"), Ui.Column("Rollen"), Ui.Column("E-Mail / gehört zu"), Ui.Column("Telefon"), Ui.Column("Offen", right: true), Ui.Column("Status") },
             people.Select(p => Ui.RowFor(p.Name + " " + p.Email + " " + string.Join(" ", p.Roles) + (p.Child ? " kind " + Guardians(p) : ""),
-                Ui.Inline(Ui.Link(p.Name.Length > 0 ? p.Name : p.Email, Root + (p.Child ? "children/" : "members/") + p.Id), p.Child ? Ui.Badge("Kind", UiTone.Info) : null),
+                Ui.Inline(Ui.Link(p.Name.Length > 0 ? p.Name : p.Email, Root + (p.Child ? "children/" : "members/") + p.Id), p.Child ? Ui.Badge("Kind", UiTone.Info) : !p.HasAccount ? Ui.Badge("ohne Zugang") : null),
                 string.Join(", ", p.Roles), p.Child ? Guardians(p) : p.Email, p.Phone,
-                p.Active ? OpenOf(p) : 0, p.Active ? Ui.Badge("aktiv", UiTone.Success) : Ui.Badge("inaktiv"))),
+                p.Active ? OpenOf(p) : 0, p.Active ? Ui.Badge("aktiv", UiTone.Success) : Ui.Badge(InactiveLabel(p)))),
             searchPlaceholder: "Mitglieder durchsuchen …", pageSize: 50, emptyText: "Noch keine Mitglieder. Lege das erste an – es bekommt eine E-Mail mit dem Zugang.");
         var kids = people.Count(p => p.Child);
         return Page(Ui.Stack(Ui.PageHead(people.Count + " Mitglieder" + (kids > 0 ? ", davon " + kids + " Kinder" : ""), "Mitglieder",
             Ui.Button("Liste als CSV", Root + "members/csv", UiButtonKind.Ghost, "ti-file-spreadsheet"), Ui.Button("Kind eintragen", Root + "children/new", UiButtonKind.Ghost, "ti-mood-kid"), Ui.Button("Neues Mitglied", Root + "members/new", icon: "ti-user-plus")), table), "Mitglieder");
     }
+
+    /// <summary>Why someone is inactive, as the board wrote it on the note's first line ("Ausgetreten", "Verstorben") — else "inaktiv".</summary>
+    internal static string InactiveLabel(Person p) => p.Note.Split('\n')[0].Trim() is { Length: > 0 and <= 24 } first ? first : "inaktiv";
 
     /// <summary>A child: name, birthday, roles, guardians (one or more grown-up members) — no mail, no account; documents and mails go to the guardians.</summary>
     private static async Task<PluginResult> ChildAsync(IPluginContext ctx, CancellationToken ct)
@@ -217,6 +220,9 @@ public static class VereinAdmin
 
         if (ctx.Request.IsPost)
         {
+            if (ctx.Request.Action == "access" && p is not null && !p.HasAccount) return await SetUpAccessAsync(ctx, store, p, ct);
+            if (ctx.Request.Action == "invite" && p is not null && !p.HasAccount)
+                return PluginResult.Redirect(Root + "members/" + p.Id, "Dieses Mitglied hat noch keinen Zugang – erst „Zugang einrichten“.", true);
             if (ctx.Request.Action == "invite" && p is not null)
             {
                 // a fresh welcome link while the person has never set a password; a sign-in reminder once they have
@@ -225,7 +231,7 @@ public static class VereinAdmin
                 return PluginResult.Redirect(Root + "members/" + p.Id, f > 0 ? "Einladung konnte nicht verschickt werden (siehe Plugin-Protokoll)."
                     : again.Link is null ? "Erinnerung verschickt – das Mitglied hat schon ein Passwort und meldet sich damit an." : "Einladung mit neuem Link verschickt.", f > 0);
             }
-            if (ctx.Request.Action == "setpw" && p is not null)
+            if (ctx.Request.Action == "setpw" && p is not null && p.HasAccount)
             {
                 var ok = await ctx.Members.SetPasswordAsync(p.MemberId, ctx.Request.F("newpw"), ct);
                 if (ok) ctx.Log($"Passwort für {p.Name} gesetzt von {ctx.User.Name}");
@@ -236,7 +242,7 @@ public static class VereinAdmin
             {
                 if (p.Photo.Length > 0) await ctx.Files.DeleteAsync(p.Photo, ct);
                 await store.People.DeleteAsync(p.Id, ct);
-                if (V.Checked(ctx.Request.F("deleteAccount"))) await ctx.Members.DeleteAsync(p.MemberId, ct);
+                if (V.Checked(ctx.Request.F("deleteAccount")) && p.HasAccount) await ctx.Members.DeleteAsync(p.MemberId, ct);
                 ctx.Log($"Mitglied {p.Name} entfernt von {ctx.User.Name}");
                 return PluginResult.Redirect(Root + "members", p.Name + " ist entfernt.");
             }
@@ -281,14 +287,18 @@ public static class VereinAdmin
                 ctx.Log($"Mitglied {person.Name} angelegt von {ctx.User.Name}");
                 return PluginResult.Redirect(Root + "members/" + id, notice);
             }
-            await store.SavePersonAsync(p!.Id, p.MemberId, first, last, p.Email, phone, chosen, joined, active, note, ct);
+            // without an account the address is only the club's record (parked as xxx_… until access is set up) and may be edited here
+            var keptEmail = p!.HasAccount ? p.Email : V.Clip(ctx.Request.F("email"), 160);
+            await store.SavePersonAsync(p.Id, p.MemberId, first, last, keptEmail, phone, chosen, joined, active, note, ct);
             await store.SaveDetailsAsync(p.Id, V.CleanDate(ctx.Request.F("born")), V.Clip(ctx.Request.F("street"), 120), V.Clip(ctx.Request.F("zip"), 10), V.Clip(ctx.Request.F("city"), 80), PostedFields(ctx), ct);
             return PluginResult.Redirect(Root + "members/" + p.Id, "Gespeichert.");
         }
 
         var form = Ui.Form(
             Ui.Grid(240, Ui.Input("first", "Vorname", p?.First ?? ""), Ui.Input("last", "Nachname", p?.Last ?? "")),
-            isNew ? Ui.Input("email", "E-Mail-Adresse (Benutzername)", "", UiInputType.Email) : Ui.KeyValue(("E-Mail-Adresse", p!.Email)),
+            isNew ? Ui.Input("email", "E-Mail-Adresse (Benutzername)", "", UiInputType.Email)
+                : p!.HasAccount ? Ui.KeyValue(("E-Mail-Adresse", p.Email))
+                : Ui.Input("email", "E-Mail-Adresse (noch kein Zugang)", p.Email) with { Help = "Beginnt sie mit xxx_, ist sie gesperrt: an dieses Mitglied geht keine E-Mail, bis die echte Adresse eingetragen und der Zugang eingerichtet ist." },
             Ui.Grid(240, Ui.Input("phone", "Telefon", p?.Phone ?? "", UiInputType.Tel), Ui.Input("born", "Geburtsdatum", p?.Born ?? "", UiInputType.Date), Ui.Input("joined", "Mitglied seit", p?.Joined ?? "", UiInputType.Date)),
             Ui.Grid(200, Ui.Input("street", "Straße und Hausnummer", p?.Street ?? ""), Ui.Input("zip", "PLZ", p?.Zip ?? ""), Ui.Input("city", "Ort", p?.City ?? "")),
             FieldInputs(ctx, p),
@@ -296,7 +306,7 @@ public static class VereinAdmin
             Ui.Grid(220, roles.Select((r, i) => (UiNode?)Ui.Checkbox("role_" + i, r, p?.Has(r) ?? (isNew && r == roles[^1]))).ToArray()),
             Ui.TextArea("note", "Notiz (nur im Admin)", p?.Note ?? "", 3),
             isNew ? Ui.Input("initpw", "Startpasswort (freiwillig, mindestens 8 Zeichen)", "", UiInputType.Text) with { Help = "Damit kann sich das Mitglied sofort unter " + VereinPublic.Base + " anmelden. Persönlich weitergeben – es wird nie per E-Mail verschickt." } : null,
-            isNew ? Ui.Checkbox("sendInvite", "Einladung mit Zugang per E-Mail schicken", true) : Ui.Checkbox("active", "Aktiv (Zugang zum Mitgliederbereich)", p!.Active),
+            isNew ? Ui.Checkbox("sendInvite", "Einladung mit Zugang per E-Mail schicken", true) : Ui.Checkbox("active", p!.HasAccount ? "Aktiv (Zugang zum Mitgliederbereich)" : "Aktiv", p.Active),
             Ui.FormActions(Ui.Submit(isNew ? "Anlegen" : "Speichern"), Ui.Button("Zurück", Root + "members", UiButtonKind.Ghost)));
 
         if (isNew) return Page(Ui.Stack(Ui.PageHead("Ein Konto für den Mitgliederbereich wird angelegt", "Neues Mitglied"), Ui.Card(form)), "Neues Mitglied");
@@ -309,12 +319,19 @@ public static class VereinAdmin
             PhotoCard(p),
             Ui.Card("Kinder", kids.Count == 0 ? Ui.Muted("Keine eingetragen.") : Ui.Stack(kids.Select(k => (UiNode?)Ui.Link(k.Name + (k.Born.Length > 0 ? " (" + V.Date(k.Born) + ")" : ""), Root + "children/" + k.Id)).ToArray()),
                 Ui.Button("Kind eintragen", Root + "children/new?eltern=" + p.Id, UiButtonKind.Ghost, "ti-mood-kid", small: true)),
-            Ui.Card("Zugang",
+            p.HasAccount ? Ui.Card("Zugang",
                 Ui.Muted("Die Einladung enthält einen Link: Passwort festlegen, danach ist das Mitglied direkt im Mitgliederbereich angemeldet. Hat es schon ein Passwort, kommt eine Erinnerung mit dem Link zur Anmeldung."),
-                Ui.Inline(Ui.Action("Einladung erneut senden", "invite", kind: UiButtonKind.Ghost, icon: "ti-mail"))),
-            Ui.Card("Passwort setzen", Ui.Form(
+                Ui.Inline(Ui.Action("Einladung erneut senden", "invite", kind: UiButtonKind.Ghost, icon: "ti-mail")))
+            : Ui.Card("Zugang einrichten", Ui.Form(
+                Ui.Muted(VereinMail.Parkable(p.Email)
+                    ? "Noch kein Zugang und keine freigegebene E-Mail-Adresse – an dieses Mitglied geht keine E-Mail. Zum Einrichten links die echte Adresse eintragen (ohne xxx_) und speichern."
+                    : "Legt ein Konto mit " + p.Email + " an. Erst damit kann sich das Mitglied anmelden und bekommt E-Mails des Vereins."),
+                Ui.Input("initpw", "Startpasswort (freiwillig, mindestens 8 Zeichen)", "", UiInputType.Text),
+                Ui.Checkbox("sendInvite", "Einladung per E-Mail schicken", false),
+                Ui.FormActions(VereinMail.Parkable(p.Email) ? null : Ui.Submit("Zugang einrichten", UiButtonKind.Primary, "action", "access", confirm: "Konto für " + p.Email + " anlegen?")))),
+            p.HasAccount ? Ui.Card("Passwort setzen", Ui.Form(
                 Ui.Input("newpw", "Neues Passwort (mindestens 8 Zeichen)", "", UiInputType.Text) with { Help = "Z. B. ein Startpasswort. Persönlich weitergeben – das Mitglied kann es danach im Profil ändern." },
-                Ui.FormActions(Ui.Submit("Passwort setzen", UiButtonKind.Ghost, "action", "setpw", confirm: "Passwort für dieses Mitglied neu setzen?")))),
+                Ui.FormActions(Ui.Submit("Passwort setzen", UiButtonKind.Ghost, "action", "setpw", confirm: "Passwort für dieses Mitglied neu setzen?")))) : null,
             Ui.Card("Bestätigungen", answers.Count == 0 ? Ui.Muted("Noch keine.") : Ui.Table(new[] { Ui.Column("Dokument"), Ui.Column("Antwort"), Ui.Column("Wann") },
                 answers.OrderByDescending(a => a.At).Select(a => Ui.Row(docs.TryGetValue(a.DocId, out var d) ? Ui.Link(d.Title, Root + "docs/" + d.Id) : "#" + a.DocId,
                     a.Status == VereinStore.Accepted ? Ui.Badge(a.Signature.Length > 0 ? "unterschrieben" : "bestätigt", UiTone.Success) : Ui.Badge("abgelehnt", UiTone.Error), V.Stamp(a.At))))),
@@ -327,6 +344,29 @@ public static class VereinAdmin
     }
 
     /// <summary>The one invitation mail: with a welcome link it says "set your password", without one (the account had a password already) "sign in".</summary>
+    /// <summary>A member taken over without an account gets one: the club's address must be a real one (not parked as xxx_…); a mail only on request.</summary>
+    private static async Task<PluginResult> SetUpAccessAsync(IPluginContext ctx, VereinStore store, Person p, CancellationToken ct)
+    {
+        var back = Root + "members/" + p.Id;
+        if (VereinMail.Parkable(p.Email) || !p.Email.Contains('@')) return PluginResult.Redirect(back, "Bitte zuerst die echte E-Mail-Adresse eintragen (ohne xxx_) und speichern.", true);
+        var invite = await ctx.Members.InviteAsync(p.Email.Trim(), p.Name, VereinPublic.Base, ct);
+        if (invite.Status == MemberInviteStatus.InvalidEmail || invite.Account is null) return PluginResult.Redirect(back, "Die E-Mail-Adresse ist ungültig.", true);
+        if (await store.PersonOfMemberAsync(invite.Account.Id, ct) is Person other && other.Id != p.Id)
+            return PluginResult.Redirect(back, "Zu dieser E-Mail-Adresse gibt es schon ein Mitglied (" + other.Name + ").", true);
+        await store.People.UpdateAsync(p.Id, new Dictionary<string, object?> { ["member_id"] = invite.Account.Id, ["email"] = p.Email.Trim() }, ct);
+        var person = (await store.PersonAsync(p.Id, ct))!;
+        var notice = "Zugang eingerichtet.";
+        if (ctx.Request.F("initpw") is { Length: > 0 } pw && invite.Status != MemberInviteStatus.EmailTaken)
+            notice += await ctx.Members.SetPasswordAsync(invite.Account.Id, pw, ct) ? " Startpasswort gesetzt – bitte persönlich weitergeben." : " Das Startpasswort war zu kurz und wurde nicht gesetzt.";
+        if (V.Checked(ctx.Request.F("sendInvite")))
+        {
+            var (_, f) = await SendInviteAsync(ctx, person, invite.Link, ct);
+            notice += f == 0 ? " Die Einladung ist verschickt." : " Die Einladung konnte nicht verschickt werden.";
+        }
+        ctx.Log($"Zugang für {person.Name} eingerichtet von {ctx.User.Name}");
+        return PluginResult.Redirect(back, notice);
+    }
+
     private static Task<(int, int)> SendInviteAsync(IPluginContext ctx, Person p, string? welcomeLink, CancellationToken ct) =>
         VereinMail.SendAsync(ctx, VereinMail.Invite, new[] { p }, _ => new Dictionary<string, string>
         {

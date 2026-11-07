@@ -63,7 +63,7 @@ public static class VereinMail
         int sent = 0, failed = 0;
         foreach (var p in people)
         {
-            if (string.IsNullOrWhiteSpace(p.Email)) { failed++; continue; }
+            if (!Sendable(p)) { failed++; ctx.Log($"Mail {template} an {p.Name} nicht gesendet: kein Zugang oder gesperrte Adresse"); continue; }
             var v = values(p);
             v.TryAdd("name", p.First.Length > 0 ? p.First : p.Name);
             v.TryAdd("verein", VereinSettings.Club(ctx));
@@ -74,6 +74,16 @@ public static class VereinMail
         }
         return (sent, failed);
     }
+
+    /// <summary>
+    /// Whether a person may get a mail at all: a grown-up with a site ACCOUNT and an address that is not parked. A list taken over from paper parks
+    /// its addresses as <c>xxx_name@…</c> until the club decides to write to them — such an address, a child, or a member without access never gets
+    /// a mail, whatever button is pressed. (Checked here, in the one method every mail of the plugin goes through.)
+    /// </summary>
+    public static bool Sendable(Person p) => p.HasAccount && !p.Child && Parkable(p.Email) == false && p.Email.Contains('@');
+
+    /// <summary>An address parked with the <c>xxx_</c> prefix (or empty).</summary>
+    public static bool Parkable(string email) => string.IsNullOrWhiteSpace(email) || email.Trim().StartsWith("xxx", StringComparison.OrdinalIgnoreCase);
 
     public static string Task(string kind) => kind switch { VereinStore.Sign => "unterschreiben", VereinStore.Read => "lesen", _ => "bestätigen" };
     public static string Due(string due) => due.Length > 0 ? " bis zum " + V.Date(due) : "";

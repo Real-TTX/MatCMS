@@ -721,4 +721,49 @@ public class VereinTests : IClassFixture<VereinApp>
         Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync("/admin/p/verein/members/" + xaverId + "/photo")).StatusCode);
         Assert.Contains("members/" + xaverId + "/photo", await admin.GetStringAsync("/admin/p/verein/members/" + xaverId));
     }
+    [Fact]
+    public async Task Members_taken_over_from_a_list_get_no_mail_until_access_is_set_up_with_a_real_address()
+    {
+        var zoraId = await JoinAsync("zora", "Mitglied");
+        var admin = await _app.AsAsync("admin");
+        // a list taken over: one member without an account (negative placeholder), one with an account whose address was parked as xxx_…
+        _app.Db(db =>
+        {
+            db.Database.ExecuteSqlRaw("INSERT INTO p_verein_people (member_id, first, last, email, roles, active, child, note) VALUES (-424242, 'Liste', 'Ohnezugang', 'xxx_liste@verein.example', 'Mitglied', 0, 0, 'Ausgetreten')");
+            db.Database.ExecuteSqlRaw("UPDATE p_verein_people SET email = 'xxx_zora@verein.example' WHERE id = " + zoraId);
+            return 0;
+        });
+        var listId = _app.Db(db => db.Database.SqlQueryRaw<long>("SELECT id AS Value FROM p_verein_people WHERE member_id = -424242").AsEnumerable().Single());
+
+        var docId = await NewDocAsync("Nur an Erreichbare", "confirm");                  // with "notify" ticked by the form's default? sent explicitly below
+        var doc = Text(await admin.GetStringAsync("/admin/p/verein/docs/" + docId));
+        Assert.DoesNotContain("Liste Ohnezugang", doc);                                   // no account: not in a document's audience
+        await VereinApp.PostFormAsync(admin, "/admin/p/verein/docs/" + docId, new() { ["action"] = "remind" });
+        var log = _app.Db(db => 0) == 0 ? LogOfVerein() : "";
+        Assert.Contains("an Zora Muster nicht gesendet: kein Zugang oder gesperrte Adresse", log);
+        Assert.DoesNotContain("xxx_zora@verein.example", log);                             // never handed to the mailer
+
+        var list = Text(await admin.GetStringAsync("/admin/p/verein/members"));
+        Assert.Contains("ohne Zugang", list);
+        Assert.Contains("Ausgetreten", list);                                              // an inactive member is marked with the note's first line
+        var page = Text(await admin.GetStringAsync("/admin/p/verein/members/" + listId));
+        Assert.Contains("Zugang einrichten", page);
+        Assert.Contains("keine E-Mail", page);
+        // parked: setting up access is refused
+        var refused = await VereinApp.PostFormAsync(admin, "/admin/p/verein/members/" + listId, new() { ["action"] = "access", ["sendInvite"] = "true" });
+        Assert.Equal(HttpStatusCode.Redirect, refused.StatusCode);
+        Assert.True(_app.Db(db => db.Database.SqlQueryRaw<long>("SELECT member_id AS Value FROM p_verein_people WHERE id = " + listId).AsEnumerable().Single()) < 0);
+        // the real address entered, then access: an account, no mail asked for
+        await VereinApp.PostFormAsync(admin, "/admin/p/verein/members/" + listId, new() { ["first"] = "Liste", ["last"] = "Ohnezugang", ["email"] = "liste@verein.example", ["role_6"] = "true", ["active"] = "true" });
+        Assert.Equal(HttpStatusCode.Redirect, (await VereinApp.PostFormAsync(admin, "/admin/p/verein/members/" + listId, new() { ["action"] = "access" })).StatusCode);
+        var account = _app.Db(db => db.Database.SqlQueryRaw<long>("SELECT member_id AS Value FROM p_verein_people WHERE id = " + listId).AsEnumerable().Single());
+        Assert.True(account > 0);
+        Assert.Equal(account, _app.Db(db => db.SiteMembers.Single(m => m.Email == "liste@verein.example").Id));
+    }
+
+    private string LogOfVerein()
+    {
+        using var scope = _app.App.Services.CreateScope();
+        return string.Join("\n", scope.ServiceProvider.GetRequiredService<PluginRegistry>().LogOf("verein"));
+    }
 }

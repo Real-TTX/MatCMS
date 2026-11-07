@@ -203,10 +203,16 @@ html[data-theme="dark"] .admin--matui .mat-vs.is-active { background: var(--mat-
   /* A grid: the column's name on the left, EVERYTHING of the cell stacked on the right (a cell may hold a link and a muted line;
      as a flex row they stood side by side and squeezed each other). */
   .admin--matui table.data.has-labels td { display: grid; grid-template-columns: 34% minmax(0, 1fr); column-gap: var(--mat-space-3); align-items: baseline;
-    min-width: 0; padding: 5px 0; border: 0; white-space: normal; overflow-wrap: anywhere; text-align: left; width: auto; }
+    min-width: 0; padding: 5px 0; border: 0; white-space: normal; overflow-wrap: anywhere; text-align: left; width: auto;
+    /* a plugin table also carries admin.css's older card rules (data-stack): its 14px flex gap became a ROW gap over the label's 20 rows (a hole
+       under every card line) and its right-aligned, upper-case, width-capped label broke words ("ROLLE/N") — neutralised here */
+    row-gap: 0; text-align: left !important; justify-content: normal; }
   .admin--matui table.data.has-labels td > * { grid-column: 2; min-width: 0; max-width: 100%; justify-self: start; }   /* a pill keeps its size */
   .admin--matui table.data.has-labels td::before { content: attr(data-label); grid-column: 1; grid-row: 1 / span 20; min-width: 0;
-    color: var(--mat-text-muted); font-size: var(--mat-fs-xs); font-weight: 600; }
+    color: var(--mat-text-muted); font-size: var(--mat-fs-xs); font-weight: 600; max-width: none; text-transform: none; letter-spacing: normal; text-align: left; overflow-wrap: normal; }
+  .admin--matui table.data.has-labels[data-stack] tr { padding: var(--mat-space-2) var(--mat-space-3); border-bottom: 1px solid var(--mat-border); }
+  .admin--matui table.data.has-labels[data-stack] td { padding: 5px 0; }
+  .admin--matui table.data.has-labels td.is-empty:not(:first-child) { display: none; }
   /* no column name (actions, a tick box) and the card's title: plain flow */
   .admin--matui table.data.has-labels td[data-label=""], .admin--matui table.data.has-labels td:first-child { display: block; }
   .admin--matui table.data.has-labels td[data-label=""]::before { content: none; }

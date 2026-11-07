@@ -43,7 +43,7 @@ public static class VereinUpload
             var name = me.First.Length > 0 ? me.First : me.Name;
             var title = myReplies.TryGetValue(e.Id, out var a) && a == VereinStore.Yes
                 ? "Hey " + name + ", du warst " + when + " dabei!"
-                : "Hey " + name + ", " + when + " war " + e.Title + "!";
+                : "Hey " + name + ", " + when + " war „" + e.Title + "“!";
             var text = mine > 0
                 ? "Danke für deine " + mine + (mine == 1 ? " Datei" : " Bilder") + " von „" + e.Title + "“. Noch mehr auf dem Handy?"
                 : "Hast du Bilder von „" + e.Title + "“ gemacht? Lade sie hoch – dann haben alle was davon." + (all > 0 ? " " + all + (all == 1 ? " Bild ist" : " Bilder sind") + " schon da." : "");

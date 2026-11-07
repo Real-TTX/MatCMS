@@ -35,10 +35,13 @@
         // unfolded, so its pages are one tap away instead of two.
         if (window.matchMedia(PHONE).matches) {
             var here = location.pathname.replace(/\/+$/, "") || "/";
-            document.querySelectorAll(".main-nav .mat-sub a[href]").forEach(function (a) {
-                var p = (a.getAttribute("href") || "").split(/[?#]/)[0].replace(/\/+$/, "") || "/";
-                if (p !== here) return;
-                for (var h = a.closest(".mat-hassub"); h; h = h.parentElement && h.parentElement.closest(".mat-hassub")) setOpen(h, true);
+            var path = function (a) { return (a.getAttribute("href") || "").split(/[?#]/)[0].replace(/\/+$/, "") || "/"; };
+            var open = function (from) { for (var h = from; h; h = h.parentElement && h.parentElement.closest(".mat-hassub")) setOpen(h, true); };
+            // the page itself in a submenu, or a page below an entry that has one (/mitglied/hochladen under "Mitglieder" = /mitglied)
+            document.querySelectorAll(".main-nav .mat-sub a[href]").forEach(function (a) { if (path(a) === here) open(a.closest(".mat-hassub")); });
+            document.querySelectorAll(".main-nav .mat-hassub").forEach(function (h) {
+                var a = link(h), p = a && path(a);
+                if (p && p !== "/" && here.indexOf(p + "/") === 0) open(h);
             });
         }
     }

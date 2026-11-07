@@ -10,6 +10,7 @@ public static class VereinCss
 .vm .vm-head h1{overflow-wrap:anywhere}
 .vm .vm-head h1{margin:0;font-size:clamp(1.7rem,3vw,2.3rem)}
 .vm .vm-me{display:inline-flex;align-items:center;gap:10px;color:inherit;font-size:14px;font-weight:600;text-decoration:none;padding:4px 12px 4px 4px;border:1px solid var(--vm-line);border-radius:999px;background:#fff}
+@media (max-width:600px){.vm .vm-club{display:none}.vm .vm-head{flex-wrap:nowrap;align-items:center}.vm .vm-me span{display:none}.vm .vm-me{padding:3px}.vm .vm-hint{padding:18px}.vm .vm-hint-icon{display:none}}
 .vm .vm-kicker a{color:inherit;text-decoration:none}.vm .vm-kicker a:hover{text-decoration:underline}
 .vm .vm-main{display:grid;gap:22px}
 .vm .vm-hint{display:flex;gap:16px;align-items:flex-start;padding:20px 22px;border-radius:18px;background:linear-gradient(135deg,var(--vm-accent),color-mix(in srgb,var(--vm-accent) 70%,#000));color:#fff;box-shadow:0 12px 30px color-mix(in srgb,var(--vm-accent) 30%,transparent)}

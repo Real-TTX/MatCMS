@@ -572,6 +572,9 @@ rows, the dashboard tiles and the assistant's steps into that; do not add a new 
 (from the table head) and adds `.has-labels`; `admin-matui.css` (≤ 600 px) draws title, label/value rows and actions. Left as they
 are: tables one types into (inputs, selects, row editors) and the ones with a phone layout of their own (attention, cleanup,
 notification matrix) — they scroll sideways. A new table needs nothing for this; a new special one is added to that exception list.
+A field inside its OWN form in a cell (a row's "assign" select + OK) does not count as typing into the table — such a list becomes cards too. Empty
+cells are left out of a card (`is-empty`). Plugin tables (`UiRenderer`, `data-stack`) also match admin.css's OLDER card rules; the bridge neutralises
+them (its flex gap turned into a row gap over the label's 20 grid rows = a hole under every line, its upper-case capped label broke "ROLLE/N").
 
 **Both back offices are installable apps (PWA)** — `MatCMS.Shared.Web/Pwa.cs` (+ `js/pwa.js`, icons in `wwwroot/pwa/`, rendered
 from MatUi's logo tile with the registry glyph: `template` for the CMS, `cloud` for the cloud). `/pwa/manifest.webmanifest`,

@@ -83,8 +83,8 @@ public static class VereinPublic
     /// </summary>
     private static Task<PluginResult> ShellAsync(IPluginContext ctx, Who who, string active, string title, string body, CancellationToken ct)
     {
-        var crumb = active == "home" ? "Mitgliederbereich · " : "<a href=\"" + Base + "\">Mitgliederbereich</a> · ";
-        var html = "<header class=\"vm-head\"><div><p class=\"vm-kicker\">" + crumb + V.H(VereinSettings.Club(ctx)) + "</p><h1>" + V.H(title) + "</h1></div>" +
+        var crumb = active == "home" ? "Mitgliederbereich" : "<a href=\"" + Base + "\">Mitgliederbereich</a>";
+        var html = "<header class=\"vm-head\"><div><p class=\"vm-kicker\">" + crumb + "<span class=\"vm-club\"> · " + V.H(VereinSettings.Club(ctx)) + "</span></p><h1>" + V.H(title) + "</h1></div>" +
                    "<a class=\"vm-me\" href=\"" + Base + "/profil\" title=\"Mein Profil\">" + VereinPhoto.Avatar(who.Person, Base + "/foto/" + who.Person.Id, Initials(who.Person), 36) +
                    "<span>" + V.H(who.Person.First.Length > 0 ? who.Person.First : who.Person.Name) + "</span></a></header>" +
                    "<div class=\"vm-main\">" + body + "</div>";

@@ -59,7 +59,9 @@
     // Every record table with a head row. Left as they are: tables with a phone layout of their own (attention, cleanup,
     // notification matrix) and tables one types into (row editors, inputs, selects) — a form in cards would lose its columns.
     document.querySelectorAll('table.data:not(.attention-list):not(.dash-attention):not(.cleanup-list):not(.notify-matrix)').forEach(function (t) {
-        if (!t.tHead || t.closest('.row-editor') || t.querySelector('tbody input:not([type=checkbox]):not([type=radio]):not([type=hidden]), tbody select, tbody textarea')) return;
+        // a field inside its OWN little form in a cell (a row's 'assign to …' + OK) is an action, not a table one types into: that list still becomes cards
+        var typed = Array.prototype.some.call(t.querySelectorAll('tbody input:not([type=checkbox]):not([type=radio]):not([type=hidden]), tbody select, tbody textarea'), function (el) { return !el.closest('td form'); });
+        if (!t.tHead || t.closest('.row-editor') || typed) return;
         var heads = [];
         t.querySelectorAll('thead tr:first-child > th, thead tr:first-child > td').forEach(function (th) {
             var span = parseInt(th.getAttribute('colspan') || '1', 10);
@@ -71,6 +73,8 @@
             var col = 0;
             Array.prototype.forEach.call(tr.children, function (cell) {
                 if (!cell.hasAttribute('data-label')) cell.setAttribute('data-label', heads[col] || '');
+                // a cell with nothing in it would be a label without a value on the card – the CSS leaves it out on a phone
+                if (!cell.textContent.trim() && !cell.querySelector('img, svg, input, select, button, i, .badge, .pill')) cell.classList.add('is-empty');
                 col += parseInt(cell.getAttribute('colspan') || '1', 10);
             });
         });

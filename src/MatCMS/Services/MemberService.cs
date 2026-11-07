@@ -121,12 +121,50 @@ public class MemberService
         return (CreateStatus.Created, m);
     }
 
+    public enum InviteStatus { Created, Reinvited, EmailTaken, InvalidEmail }
+
+    /// <summary>How long an invitation link holds — longer than a reset link: an invitation is not expected, it waits in an inbox.</summary>
+    public const int InviteDays = 14;
+
+    /// <summary>
+    /// An account somebody else creates for the person (a club adds its members): no password of its own yet, no confirmation mail — the inviter sends
+    /// the returned token as a link to <c>/anmelden/willkommen</c>, where setting the password confirms the address and signs in. An existing account
+    /// that was never confirmed gets a fresh token; a confirmed one none. The token is stored as a reset token (SHA-256 only), so "Passwort vergessen"
+    /// on the same account simply replaces it.
+    /// </summary>
+    public async Task<(InviteStatus Status, SiteMember? Member, string? Token)> InviteAsync(string email, string displayName, CancellationToken ct = default)
+    {
+        var e = NormalizeEmail(email);
+        if (!IsValidEmail(e)) return (InviteStatus.InvalidEmail, null, null);
+        var existing = await _db.SiteMembers.FirstOrDefaultAsync(m => m.Email == e || m.Username == e, ct);
+        if (existing is not null && existing.EmailConfirmedAt is not null) return (InviteStatus.EmailTaken, existing, null);
+
+        var token = NewToken();
+        var m = existing ?? new SiteMember
+        {
+            // a password nobody knows: the account cannot be signed into before the invitation is taken up
+            Username = e, Email = e, DisplayName = (displayName ?? "").Trim(), PasswordHash = HashPassword(NewToken()), IsActive = true
+        };
+        m.ResetTokenHash = HashToken(token);
+        m.ResetTokenExpiresAt = DateTime.UtcNow.AddDays(InviteDays);
+        if (existing is null) _db.SiteMembers.Add(m);
+        try { await _db.SaveChangesAsync(ct); }
+        catch (DbUpdateException)
+        {
+            _db.Entry(m).State = EntityState.Detached;
+            return (InviteStatus.EmailTaken, null, null);
+        }
+        if (existing is null) await RaiseAsync(MatCMS.Plugin.HostEvents.MemberRegistered, m, ct);
+        return (existing is null ? InviteStatus.Created : InviteStatus.Reinvited, m, token);
+    }
+
     // ---- tokens: confirmation and reset ---------------------------------------------------------------------------
 
     private static string NewToken() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)).Replace('+', '-').Replace('/', '_').TrimEnd('=');
     internal static string HashToken(string token) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 
-    private string Origin()
+    /// <summary>The site's own address for links in mails (canonical URL, else the request's).</summary>
+    internal string Origin()
     {
         var site = _services.GetService(typeof(SiteContext)) as SiteContext;
         var http = (_services.GetService(typeof(IHttpContextAccessor)) as IHttpContextAccessor)?.HttpContext;

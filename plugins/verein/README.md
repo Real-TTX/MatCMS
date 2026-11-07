@@ -7,7 +7,9 @@ Admin unter Admin → Verein. Erster Einsatz: Schalksteinnarren Besigheim e.V.
 
 - **Mitglieder und Rollen**: Die Mitglieder sind Konten der Website; der Verein führt dazu seinen eigenen Eintrag (Name, Telefon, Rollen,
   „Mitglied seit“, Notiz, aktiv). Rollen sind frei einstellbar (eine pro Zeile), welche davon zum Vorstand zählen ebenso. Neues Mitglied im Admin
-  = Konto mit Zufallspasswort + Einladung per Mail („Passwort festlegen“ über `/anmelden/vergessen`); eine schon vorhandene Adresse wird verknüpft.
+  = **Einladung** (`ctx.Members.InviteAsync`): eine einzige Mail mit einem Link, Passwort zweimal eingeben, danach ist die Adresse bestätigt und das
+  Mitglied angemeldet in `/mitglied` (keine Bestätigungs-Mail der Website, kein „Passwort vergessen“). Ein bestätigtes Konto wird nur verknüpft
+  (Mail mit Anmelde-Link). Braucht MatCMS ab 1.13.361.
 - **Mitgliederbereich `/mitglied`**: Die Anmeldung steht auf `/mitglied` selbst (das Formular schickt an die Anmeldung der Website, die nach
   `/mitglied` zurückführt). Alle Unterseiten schicken Nicht-Angemeldete zurück nach `/mitglied`, nie zur allgemeinen Anmeldeseite. Hinein kommt nur,
   wer im Verein eingetragen und aktiv ist; andere Konten sehen „Kein Zugang“. Seiten: Übersicht, Dokumente, Termine & Sitzungen, Bilder & Material,
@@ -19,9 +21,11 @@ Admin unter Admin → Verein. Erster Einsatz: Schalksteinnarren Besigheim e.V.
   Veröffentlichen, „Offene erinnern“, CSV-Liste (mit Schutz vor Formeln), Archiv. Ein Dokument mit Antworten lässt sich nicht löschen.
 - **Sitzungen**: Art, Termin, Ort, Eingeladene, Tagesordnung (aus Vorlage), Einladung per Mail, Zu-/Absagen im Mitgliederbereich (Vorstand sieht
   wer kommt), Protokoll als Entwurf (nur Admin) oder veröffentlicht (für die Eingeladenen; Mail beim ersten Veröffentlichen).
-- **Termine** (Umzüge, Bälle, Ausflüge …): öffentlich oder intern, abgesagt bleibt durchgestrichen stehen. Block **„Vereinstermine“** für jede Seite:
+- **Termine** (Umzüge, Bälle, Ausflüge …): **Entwurf** (nur im Admin) oder veröffentlicht, öffentlich oder intern, abgesagt bleibt durchgestrichen stehen.
+  **Planung** für Mitglieder: Ablauf als Zeitplan (Aufstellung, Zunftmeisterempfang …), Treffpunkt, Parken/Anfahrt, Hinweise – sichtbar auf
+  `/mitglied/termine/{id}`, nie auf der Website. Block **„Vereinstermine“** für jede Seite:
   nur kommende *öffentliche* Termine, Anzahl, „nur diese Art“ (z. B. `Umzug` → „Nächste Umzüge“), Liste oder Karten.
-- **Instagram-Bild** (Admin → Verein → Instagram-Bild): Termine als Bild in zwei Vorlagen – *Terminliste* (die nächsten 3–8, auf Wunsch nur eine Art wie „Umzug“) und *Plakat* (ein Termin groß) –, in drei Formaten (Quadrat 1080², Hochformat 1080×1350, Story 1080×1920), mit Hintergrundfoto aus der Mediathek, Vereinsfarbe, Logo und Hashtag-Zeile aus den Einstellungen. Der Server zeichnet ein SVG (Fotos und Logo als eingebettete JPEGs, Systemschriften), der Browser macht daraus das PNG.
+- **Instagram-Bild** (Admin → Verein → Instagram-Bild): Termine als Bild in drei Vorlagen – *Terminliste* (die nächsten 3–8, auf Wunsch nur eine Art wie „Umzug“), *Saison / Narrenfahrplan* (alle Termine eines Zeitraums, voreingestellt die nächste Fasnet 6.1.–Aschermittwoch, bei vielen Terminen auf mehrere Bilder verteilt) und *Plakat* (ein Termin groß) –, in drei Formaten (Quadrat 1080², Hochformat 1080×1350, Story 1080×1920), mit Hintergrundfoto aus der Mediathek, Vereinsfarbe, Logo und Hashtag-Zeile aus den Einstellungen. Der Server zeichnet ein SVG (Fotos und Logo als eingebettete JPEGs, Systemschriften), der Browser macht daraus das PNG.
 - **Vorlagen** für Dokumente, Tagesordnungen und Protokolle mit Platzhaltern (`{{verein}}`, `{{datum}}`, `{{jahr}}`, im Protokoll `{{titel}}`,
   `{{termin}}`, `{{ort}}`, `{{tagesordnung}}`). Beim ersten Laden kommen fünf Startvorlagen (Datenschutz, Fotos/Videos, zwei Tagesordnungen,
   Protokoll) — Ausgangspunkte, keine Rechtsberatung.

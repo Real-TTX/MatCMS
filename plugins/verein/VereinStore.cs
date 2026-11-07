@@ -1,11 +1,17 @@
 namespace MatCMS.Plugin.Verein;
 
-/// <summary>A person of the club: the club's own record about a site account (the account itself — login, password, e-mail confirmation — is the host's).</summary>
+/// <summary>
+/// A person of the club: the club's own record about a site account (the account itself — login, password, e-mail confirmation — is the host's).
+/// A CHILD has no account, address or mail of its own: it belongs to one or more guardians (other people of the club) and is there for the member list.
+/// Its <see cref="MemberId"/> is a negative placeholder (the column is unique and no account has a negative id), so nothing that looks up an account
+/// ever finds it; documents, invitations and meetings go to the guardians.
+/// </summary>
 public sealed record Person(long Id, long MemberId, string First, string Last, string Email, string Phone, IReadOnlyList<string> Roles, string Joined,
-    bool Active, string Note, DateTime? Created)
+    bool Active, string Note, DateTime? Created, bool Child = false, IReadOnlyList<long>? GuardianIds = null, string Born = "")
 {
     public string Name => (First + " " + Last).Trim();
     public bool Has(string role) => Roles.Contains(role, StringComparer.OrdinalIgnoreCase);
+    public IReadOnlyList<long> Guardians => GuardianIds ?? Array.Empty<long>();
 }
 
 /// <summary>A document the club sends its members: to confirm (a tick), to sign (the full name typed as signature) or only to read.</summary>
@@ -26,10 +32,16 @@ public sealed record Meeting(long Id, string Title, string Kind, string Starts, 
 public sealed record Rsvp(long Id, long MeetingId, long MemberId, string Answer, DateTime? At);
 
 /// <summary>An event of the club (a parade, a ball, a trip). Public ones may be shown on the website by the block „Kommende Termine“; internal ones only in the member area.</summary>
-public sealed record Event(long Id, string Title, string Kind, string Starts, string Ends, string Place, string Description, bool Public, string Link, bool Cancelled, DateTime? Created)
+public sealed record Event(long Id, string Title, string Kind, string Starts, string Ends, string Place, string Description, bool Public, string Link, bool Cancelled, DateTime? Created,
+    bool Draft = false, string Meeting = "", string Parking = "", string Notes = "", string Schedule = "")
 {
     /// <summary>The day the event starts (yyyy-MM-dd), for ordering and „upcoming“.</summary>
     public string Day => Starts.Length >= 10 ? Starts[..10] : Starts;
+    /// <summary>The planned running order: one "time|what" per line (Aufstellung, Zunftmeisterempfang …).</summary>
+    public IReadOnlyList<(string Time, string What)> Steps => Schedule.Replace("\r", "").Split('\n', StringSplitOptions.RemoveEmptyEntries)
+        .Select(l => l.Split('|', 2)).Select(p => (p[0].Trim(), p.Length > 1 ? p[1].Trim() : "")).Where(p => p.Item1.Length + p.Item2.Length > 0).ToList();
+    /// <summary>Anything beyond the basics a member should know.</summary>
+    public bool HasPlan => Steps.Count > 0 || Meeting.Length > 0 || Parking.Length > 0 || Notes.Length > 0;
 }
 
 /// <summary>A template: the starting text of a document, an agenda or minutes.</summary>
@@ -56,7 +68,8 @@ public sealed class VereinStore(IPluginData data)
     public static void Declare(IDataBuilder b)
     {
         b.Table(TPeople, t => t.Int("member_id", required: true).Text("first").Text("last").Text("email").Text("phone").Text("roles")
-            .Text("joined").Bool("active", def: "1").Text("note").Timestamp("created").UniqueIndex("member_id"));
+            .Text("joined").Bool("active", def: "1").Text("note").Timestamp("created")
+            .Bool("child", def: "0").Text("guardians").Text("born").UniqueIndex("member_id"));
         b.Table(TDocs, t => t.Text("title", required: true).Text("body").Text("kind", required: true).Text("audience", required: true)
             .Text("file").Text("file_name").Text("file_type").Text("due").Bool("archived", def: "0").Timestamp("created").Text("created_by").Index("archived"));
         b.Table(TAnswers, t => t.Int("doc_id", required: true).Int("member_id", required: true).Text("status", required: true).Text("signature")
@@ -68,7 +81,8 @@ public sealed class VereinStore(IPluginData data)
         b.Table(TRsvps, t => t.Int("meeting_id", required: true).Int("member_id", required: true).Text("answer", required: true).Timestamp("at")
             .UniqueIndex("meeting_id", "member_id"));
         b.Table(TEvents, t => t.Text("title", required: true).Text("kind").Text("starts", required: true).Text("ends").Text("place").Text("description")
-            .Bool("public", def: "1").Text("link").Bool("cancelled", def: "0").Timestamp("created").Index("starts"));
+            .Bool("public", def: "1").Text("link").Bool("cancelled", def: "0").Timestamp("created")
+            .Bool("draft", def: "0").Text("meeting").Text("parking").Text("notes").Text("schedule").Index("starts"));
         b.Table(TMeta, t => t.Text("name", required: true).Text("value").UniqueIndex("name"));
         b.Table(TTemplates, t => t.Text("name", required: true).Text("kind", required: true).Text("title").Text("body").Timestamp("created").Index("kind"));
     }
@@ -89,7 +103,8 @@ public sealed class VereinStore(IPluginData data)
         csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
     private static Person P(DataRow r) => new(r.Id, r.Int("member_id"), r.Text("first"), r.Text("last"), r.Text("email"), r.Text("phone"),
-        SplitRoles(r.Text("roles")), r.Text("joined"), r.Bool("active"), r.Text("note"), r.Timestamp("created"));
+        SplitRoles(r.Text("roles")), r.Text("joined"), r.Bool("active"), r.Text("note"), r.Timestamp("created"), r.Bool("child"),
+        r.Text("guardians").Split(',', StringSplitOptions.RemoveEmptyEntries).Select(x => long.TryParse(x, out var g) ? g : 0).Where(g => g > 0).Distinct().ToList(), r.Text("born"));
     private static Doc D(DataRow r) => new(r.Id, r.Text("title"), r.Text("body"), r.Text("kind"), r.Text("audience"), r.Text("file"), r.Text("file_name"),
         r.Text("file_type"), r.Text("due"), r.Bool("archived"), r.Timestamp("created"), r.Text("created_by"));
     private static Answer A(DataRow r) => new(r.Id, r.Int("doc_id"), r.Int("member_id"), r.Text("status"), r.Text("signature"), r.Text("ip"), r.Timestamp("at"));
@@ -99,7 +114,7 @@ public sealed class VereinStore(IPluginData data)
         r.Text("status"), r.Text("minutes"), r.Text("minutes_status"), r.Timestamp("created"), r.Timestamp("invited_at"));
     private static Rsvp R(DataRow r) => new(r.Id, r.Int("meeting_id"), r.Int("member_id"), r.Text("answer"), r.Timestamp("at"));
     private static Event E(DataRow r) => new(r.Id, r.Text("title"), r.Text("kind"), r.Text("starts"), r.Text("ends"), r.Text("place"), r.Text("description"),
-        r.Bool("public"), r.Text("link"), r.Bool("cancelled"), r.Timestamp("created"));
+        r.Bool("public"), r.Text("link"), r.Bool("cancelled"), r.Timestamp("created"), r.Bool("draft"), r.Text("meeting"), r.Text("parking"), r.Text("notes"), r.Text("schedule"));
     private static Template T(DataRow r) => new(r.Id, r.Text("name"), r.Text("kind"), r.Text("title"), r.Text("body"), r.Timestamp("created"));
 
     // ---- people -------------------------------------------------------------------------------------------------
@@ -123,9 +138,27 @@ public sealed class VereinStore(IPluginData data)
         return await People.InsertAsync(v, ct);
     }
 
-    /// <summary>The active people a document or meeting is meant for.</summary>
+    /// <summary>A child: no account – a negative placeholder in member_id (unique, and no account ever has it), its guardians by their record ids.</summary>
+    public async Task<long> SaveChildAsync(long id, string first, string last, string born, IEnumerable<string> roles, string joined, bool active, string note,
+        IEnumerable<long> guardians, CancellationToken ct = default)
+    {
+        var v = new Dictionary<string, object?>
+        {
+            ["first"] = first, ["last"] = last, ["born"] = born, ["roles"] = string.Join(",", roles), ["joined"] = joined, ["active"] = active, ["note"] = note,
+            ["guardians"] = string.Join(",", guardians.Distinct()), ["child"] = true, ["email"] = "", ["phone"] = ""
+        };
+        if (id > 0) { await People.UpdateAsync(id, v, ct); return id; }
+        v["member_id"] = -(DateTime.UtcNow.Ticks / 10 + System.Security.Cryptography.RandomNumberGenerator.GetInt32(1, 1000));
+        v["created"] = DateTime.UtcNow;
+        return await People.InsertAsync(v, ct);
+    }
+
+    /// <summary>The children a person is guardian of.</summary>
+    public static IEnumerable<Person> ChildrenOf(IEnumerable<Person> people, Person p) => people.Where(c => c.Child && c.Guardians.Contains(p.Id));
+
+    /// <summary>The active people a document or meeting is meant for — never a child (it has no account; its guardians answer).</summary>
     public static IEnumerable<Person> Audience(IEnumerable<Person> people, string audience, IReadOnlyCollection<string> boardRoles) =>
-        people.Where(p => p.Active && InAudience(p, audience, boardRoles));
+        people.Where(p => p.Active && !p.Child && InAudience(p, audience, boardRoles));
 
     public static bool InAudience(Person p, string audience, IReadOnlyCollection<string> boardRoles)
     {
@@ -196,9 +229,9 @@ public sealed class VereinStore(IPluginData data)
         (await Events.QueryAsync(DataQuery.Everything.OrderBy("starts"), ct)).Select(E).ToList();
     public async Task<Event?> EventAsync(long id, CancellationToken ct = default) => await Events.GetAsync(id, ct) is DataRow r ? E(r) : null;
 
-    /// <summary>Events from today on (an event that started earlier but ends today or later counts too), soonest first.</summary>
+    /// <summary>Events from today on — never a draft (an event that started earlier but ends today or later counts too), soonest first.</summary>
     public async Task<IReadOnlyList<Event>> UpcomingAsync(string today, bool publicOnly, int max, CancellationToken ct = default) =>
-        (await EventsAsync(ct)).Where(e => (!publicOnly || e.Public) && string.CompareOrdinal(e.Ends.Length >= 10 ? e.Ends[..10] : e.Day, today) >= 0)
+        (await EventsAsync(ct)).Where(e => !e.Draft && (!publicOnly || e.Public) && string.CompareOrdinal(e.Ends.Length >= 10 ? e.Ends[..10] : e.Day, today) >= 0)
             .Take(Math.Max(1, max)).ToList();
 
     // ---- templates ----------------------------------------------------------------------------------------------

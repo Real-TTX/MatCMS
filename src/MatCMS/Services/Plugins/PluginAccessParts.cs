@@ -178,6 +178,21 @@ internal sealed class PluginMembersAccess : IPluginMembers
         };
     }
 
+    public async Task<MemberInviteResult> InviteAsync(string email, string displayName, string returnUrl, CancellationToken ct = default)
+    {
+        var (status, member, token) = await Service.InviteAsync(email, displayName, ct);
+        // only a local path may follow the welcome page (never an address outside the site)
+        var back = returnUrl is { Length: > 0 } r && r.StartsWith('/') && !r.StartsWith("//", StringComparison.Ordinal) && !r.StartsWith("/\\", StringComparison.Ordinal) ? r : "/";
+        string? link = token is null ? null : Service.Origin() + "/anmelden/willkommen?token=" + Uri.EscapeDataString(token) + "&returnUrl=" + Uri.EscapeDataString(back);
+        return status switch
+        {
+            MemberService.InviteStatus.Created => new MemberInviteResult(MemberInviteStatus.Created, ToAccount(member!), link),
+            MemberService.InviteStatus.Reinvited => new MemberInviteResult(MemberInviteStatus.Reinvited, ToAccount(member!), link),
+            MemberService.InviteStatus.EmailTaken => new MemberInviteResult(MemberInviteStatus.EmailTaken, member is null ? null : ToAccount(member), null),
+            _ => new MemberInviteResult(MemberInviteStatus.InvalidEmail, null, null)
+        };
+    }
+
     public async Task SignInAsync(MemberAccount member, bool persistent = false, CancellationToken ct = default)
     {
         var http = (_services.GetService(typeof(IHttpContextAccessor)) as IHttpContextAccessor)?.HttpContext

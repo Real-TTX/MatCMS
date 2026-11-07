@@ -1,0 +1,42 @@
+@page "/anmelden/willkommen"
+@model MatCMS.Pages.AnmeldenWillkommenModel
+@{
+    ViewData["Title"] = T["member.welcome.title"];
+}
+<partial name="_MemberAuthStyle" />
+<section class="member-auth">
+    <div class="member-auth-card">
+        <h1>@T["member.welcome.title"]</h1>
+        @if (!Model.TokenValid)
+        {
+            <p class="member-auth-error">@T["member.welcome.invalid"]</p>
+            <p><a class="btn" href="/anmelden">@T["member.signIn"]</a></p>
+            <p class="member-auth-links"><a href="/anmelden/vergessen">@T["member.reset.again"]</a></p>
+        }
+        else
+        {
+            <p>@T["member.welcome.intro"]</p>
+            @if (!string.IsNullOrEmpty(Model.Error))
+            {
+                <p class="member-auth-error">@Model.Error</p>
+            }
+            <form method="post">
+                <input type="hidden" name="token" value="@Model.Token" />
+                <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+                <label class="member-auth-field">
+                    <span>@T["member.welcome.email"]</span>
+                    <input type="email" name="username" value="@Model.Email" autocomplete="username" readonly />
+                </label>
+                <label class="member-auth-field">
+                    <span>@T["member.reset.password", MatCMS.Services.MemberService.MinPasswordLength]</span>
+                    <input name="password" type="password" autocomplete="new-password" minlength="@MatCMS.Services.MemberService.MinPasswordLength" required autofocus />
+                </label>
+                <label class="member-auth-field">
+                    <span>@T["member.welcome.repeat"]</span>
+                    <input name="repeat" type="password" autocomplete="new-password" minlength="@MatCMS.Services.MemberService.MinPasswordLength" required />
+                </label>
+                <button type="submit" class="btn">@T["member.welcome.save"]</button>
+            </form>
+        }
+    </div>
+</section>

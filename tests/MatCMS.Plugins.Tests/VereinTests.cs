@@ -318,6 +318,133 @@ public class VereinTests : IClassFixture<VereinApp>
     }
 
     [Fact]
+    public async Task A_season_becomes_a_narrenfahrplan_split_over_several_pictures_when_it_does_not_fit()
+    {
+        var admin = await _app.AsAsync("admin");
+        for (var i = 0; i < 9; i++)
+            await VereinApp.PostFormAsync(admin, "/admin/p/verein/events/new", new() { ["title"] = "Saisontermin " + i, ["kind"] = "Saison", ["starts"] = $"2031-01-{10 + i}T14:00", ["place"] = "Ort " + i, ["public"] = "true" });
+        var page = await admin.GetStringAsync("/admin/p/verein/instagram?vorlage=saison&von=2031-01-06&bis=2031-02-26&art=Saison&format=square");
+        Assert.Contains("Narrenfahrplan 2031", Text(page));
+        var pictures = Regex.Matches(page, "<svg ").Count;
+        Assert.True(pictures >= 2, "square should not hold 9 dates: " + pictures);
+        Assert.Contains("(1/" + pictures + ")", page);
+        Assert.Contains("Saisontermin 8", Text(page));
+        Assert.Single(Regex.Matches(await admin.GetStringAsync("/admin/p/verein/instagram?vorlage=saison&von=2031-01-06&bis=2031-02-26&art=Saison&format=story"), "<svg "));
+    }
+
+    [Fact]
+    public async Task A_draft_stays_in_the_back_office_and_the_plan_shows_only_to_members()
+    {
+        var admin = await _app.AsAsync("admin");
+        var day = DateTime.UtcNow.AddDays(40).ToString("yyyy-MM-dd");
+        var fields = new Dictionary<string, string>
+        {
+            ["title"] = "Narrentreffen Entwurf", ["kind"] = "Umzug", ["starts"] = day + "T13:00", ["public"] = "true", ["status"] = "draft",
+            ["plan.count"] = "2", ["plan.0.time"] = "11:00", ["plan.0.what"] = "Zunftmeisterempfang", ["plan.1.time"] = "13:30", ["plan.1.what"] = "Aufstellung <b>Nr. 34</b>",
+            ["meeting"] = "Bahnhofstraße", ["parking"] = "Parkhaus am Markt"
+        };
+        var res = await VereinApp.PostFormAsync(admin, "/admin/p/verein/events/new", fields);
+        var id = Regex.Match(res.Headers.Location!.OriginalString, "events/(\\d+)").Groups[1].Value;
+        await JoinAsync("gerd", "Mitglied");
+        var gerd = await _app.AsAsync("gerd");
+        Assert.DoesNotContain("Narrentreffen Entwurf", Text(await gerd.GetStringAsync("/mitglied/termine")));
+        Assert.Equal(HttpStatusCode.NotFound, (await gerd.GetAsync("/mitglied/termine/" + id)).StatusCode);
+        Assert.DoesNotContain("Narrentreffen Entwurf", Text(await admin.GetStringAsync("/admin/p/verein/instagram")));
+
+        fields["status"] = "published";
+        await VereinApp.PostFormAsync(admin, "/admin/p/verein/events/" + id, fields);
+        var detail = await gerd.GetStringAsync("/mitglied/termine/" + id);
+        Assert.Contains("Zunftmeisterempfang", Text(detail));
+        Assert.Contains("Parkhaus am Markt", Text(detail));
+        Assert.DoesNotContain("<b>Nr. 34</b>", detail);
+        _app.Db(db =>
+        {
+            var page = new Page { Title = "T2", Slug = "termine-plan", Locale = "de", IsPublished = true, TranslationGroup = Guid.NewGuid().ToString("N") };
+            page.Blocks.Add(new ContentBlock { BlockType = "verein_events", DataJson = "{\"count\":\"50\"}", SortOrder = 0 });
+            db.Pages.Add(page);
+            return db.SaveChanges();
+        });
+        var site = Text(await (await _app.AsAsync("guest")).GetStringAsync("/termine-plan"));
+        Assert.Contains("Narrentreffen Entwurf", site);
+        Assert.DoesNotContain("Zunftmeisterempfang", site);
+    }
+
+    [Fact]
+    public async Task An_invited_member_sets_a_password_once_and_lands_signed_in_in_the_member_area()
+    {
+        await _app.InstallAsync();
+        var admin = await _app.AsAsync("admin");
+        var res = await VereinApp.PostFormAsync(admin, "/admin/p/verein/members/new", new()
+        {
+            ["first"] = "Hanna", ["last"] = "Neu", ["email"] = "hanna@verein.example", ["role_6"] = "true", ["sendInvite"] = "true"
+        });
+        Assert.Equal(HttpStatusCode.Redirect, res.StatusCode);
+        // an invitation, not a registration: no password the person knows, no confirmation mail of the site, a pending welcome token
+        var row = _app.Db(db => db.SiteMembers.First(m => m.Email == "hanna@verein.example"));
+        Assert.Null(row.EmailConfirmedAt);
+        Assert.True(string.IsNullOrEmpty(row.ConfirmTokenHash));
+        Assert.False(string.IsNullOrEmpty(row.ResetTokenHash));
+
+        // the link the plugin mails (made again here, as "Einladung erneut senden" does)
+        string token;
+        using (var scope = _app.App.Services.CreateScope())
+        {
+            var (status, _, t) = await scope.ServiceProvider.GetRequiredService<MemberService>().InviteAsync("hanna@verein.example", "Hanna Neu");
+            Assert.Equal(MemberService.InviteStatus.Reinvited, status);
+            token = t!;
+        }
+        var c = _app.App.Browser();
+        var url = "/anmelden/willkommen?token=" + Uri.EscapeDataString(token) + "&returnUrl=%2Fmitglied";
+        var page = await c.GetStringAsync(url);
+        Assert.Contains("hanna@verein.example", page);
+        var bad = await VereinApp.PostFormAsync(c, url, new() { ["token"] = token, ["returnUrl"] = "/mitglied", ["password"] = "narri-narro-1", ["repeat"] = "narri-narro-2" });
+        Assert.Equal(HttpStatusCode.OK, bad.StatusCode);
+        var ok = await VereinApp.PostFormAsync(c, url, new() { ["token"] = token, ["returnUrl"] = "/mitglied", ["password"] = "narri-narro-1", ["repeat"] = "narri-narro-1" });
+        Assert.Equal(HttpStatusCode.Redirect, ok.StatusCode);
+        Assert.Equal("/mitglied", ok.Headers.Location!.OriginalString);
+        Assert.Contains("Hallo Hanna!", Text(await c.GetStringAsync("/mitglied")));
+        Assert.NotNull(_app.Db(db => db.SiteMembers.First(m => m.Email == "hanna@verein.example").EmailConfirmedAt));
+
+        // the link works once; a confirmed account is not invited again
+        Assert.Contains("abgelaufen", Text(await _app.App.Browser().GetStringAsync(url)));
+        using (var scope = _app.App.Services.CreateScope())
+            Assert.Equal(MemberService.InviteStatus.EmailTaken, (await scope.ServiceProvider.GetRequiredService<MemberService>().InviteAsync("hanna@verein.example", "x")).Status);
+        // and a return address outside the site is never followed
+        using (var scope = _app.App.Services.CreateScope())
+        {
+            var (_, _, t2) = await scope.ServiceProvider.GetRequiredService<MemberService>().InviteAsync("ida@verein.example", "Ida");
+            var c2 = _app.App.Browser();
+            var u2 = "/anmelden/willkommen?token=" + Uri.EscapeDataString(t2!) + "&returnUrl=https%3A%2F%2Fevil.example";
+            var r2 = await VereinApp.PostFormAsync(c2, u2, new() { ["token"] = t2!, ["returnUrl"] = "//evil.example", ["password"] = "narri-narro-1", ["repeat"] = "narri-narro-1" });
+            Assert.Equal("/", r2.Headers.Location!.OriginalString);
+        }
+    }
+
+    [Fact]
+    public async Task A_child_has_no_account_belongs_to_its_parent_and_counts_in_the_list_but_gets_no_documents()
+    {
+        var parentId = await JoinAsync("karl", "Mitglied");
+        var admin = await _app.AsAsync("admin");
+        Assert.Equal(HttpStatusCode.Redirect, (await VereinApp.PostFormAsync(admin, "/admin/p/verein/children/new?eltern=" + parentId,
+            new() { ["first"] = "Lina", ["last"] = "Muster", ["born"] = "2016-05-04" })).StatusCode);   // no parent ticked → refused
+        var res = await VereinApp.PostFormAsync(admin, "/admin/p/verein/children/new?eltern=" + parentId,
+            new() { ["first"] = "Lina", ["last"] = "Muster", ["born"] = "2016-05-04", ["g_" + parentId] = "true", ["role_6"] = "true" });
+        Assert.Matches("children/\\d+", res.Headers.Location!.OriginalString);
+        Assert.Equal(0, _app.Db(db => db.SiteMembers.Count(m => m.DisplayName.Contains("Lina"))));
+
+        var list = Text(await admin.GetStringAsync("/admin/p/verein/members"));
+        Assert.Contains("Lina Muster", list);
+        Assert.Contains("Karl Muster", list);
+        var docId = await NewDocAsync("Fotoeinwilligung Kinder", "confirm");
+        Assert.DoesNotContain("Lina Muster", Text(await admin.GetStringAsync("/admin/p/verein/docs/" + docId)));
+
+        var karl = await _app.AsAsync("karl");
+        var profile = Text(await karl.GetStringAsync("/mitglied/profil"));
+        Assert.Contains("Meine Kinder", profile);
+        Assert.Contains("Lina Muster", profile);
+    }
+
+    [Fact]
     public async Task Templates_are_seeded_and_prefill_a_new_document()
     {
         var admin = await _app.AsAsync("admin");

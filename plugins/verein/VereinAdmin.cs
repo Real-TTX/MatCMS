@@ -17,6 +17,7 @@ public static class VereinAdmin
             .Page("dashboard", null, DashboardAsync)
             .Page("members", null, MembersAsync)
             .Page("members/{id}", null, MemberAsync)
+            .Page("children/{id}", null, ChildAsync)
             .Page("docs", null, DocsAsync)
             .Page("docs/{id}", null, DocAsync)
             .Page("docs/{id}/file", null, DocFileAsync)
@@ -31,7 +32,7 @@ public static class VereinAdmin
             .Page("templates", null, TemplatesAsync)
             .Page("templates/{id}", null, TemplateAsync)
             .Link("Übersicht", "dashboard", "ti-layout-dashboard")
-            .Link("Mitglieder", "members", "ti-users", also: new[] { "members/" })
+            .Link("Mitglieder", "members", "ti-users", also: new[] { "members/", "children/" })
             .Link("Dokumente", "docs", "ti-file-check", also: new[] { "docs/" })
             .Link("Sitzungen", "meetings", "ti-users-group", also: new[] { "meetings/" })
             .Link("Termine", "events", "ti-calendar-event", also: new[] { "events/" })
@@ -99,14 +100,64 @@ public static class VereinAdmin
         var board = VereinSettings.BoardList(ctx);
         var docs = await store.DocsAsync(false, ct);
         var answers = await store.AllAnswersAsync(ct);
-        int OpenOf(Person p) => docs.Count(d => VereinStore.InAudience(p, d.Audience, board) && !answers.Any(a => a.DocId == d.Id && a.MemberId == p.MemberId));
+        int OpenOf(Person p) => p.Child ? 0 : docs.Count(d => VereinStore.InAudience(p, d.Audience, board) && !answers.Any(a => a.DocId == d.Id && a.MemberId == p.MemberId));
+        var byId = people.ToDictionary(p => p.Id);
+        string Guardians(Person c) => string.Join(", ", c.Guardians.Select(g => byId.TryGetValue(g, out var x) ? x.Name : "").Where(n => n.Length > 0));
 
-        var table = Ui.Table(new[] { Ui.Column("Name"), Ui.Column("Rollen"), Ui.Column("E-Mail"), Ui.Column("Telefon"), Ui.Column("Offen", right: true), Ui.Column("Status") },
-            people.Select(p => Ui.RowFor(p.Name + " " + p.Email + " " + string.Join(" ", p.Roles),
-                Ui.Link(p.Name.Length > 0 ? p.Name : p.Email, Root + "members/" + p.Id), string.Join(", ", p.Roles), p.Email, p.Phone,
+        var table = Ui.Table(new[] { Ui.Column("Name"), Ui.Column("Rollen"), Ui.Column("E-Mail / gehört zu"), Ui.Column("Telefon"), Ui.Column("Offen", right: true), Ui.Column("Status") },
+            people.Select(p => Ui.RowFor(p.Name + " " + p.Email + " " + string.Join(" ", p.Roles) + (p.Child ? " kind " + Guardians(p) : ""),
+                Ui.Inline(Ui.Link(p.Name.Length > 0 ? p.Name : p.Email, Root + (p.Child ? "children/" : "members/") + p.Id), p.Child ? Ui.Badge("Kind", UiTone.Info) : null),
+                string.Join(", ", p.Roles), p.Child ? Guardians(p) : p.Email, p.Phone,
                 p.Active ? OpenOf(p) : 0, p.Active ? Ui.Badge("aktiv", UiTone.Success) : Ui.Badge("inaktiv"))),
             searchPlaceholder: "Mitglieder durchsuchen …", pageSize: 50, emptyText: "Noch keine Mitglieder. Lege das erste an – es bekommt eine E-Mail mit dem Zugang.");
-        return Page(Ui.Stack(Ui.PageHead(people.Count + " Mitglieder", "Mitglieder", Ui.Button("Neues Mitglied", Root + "members/new", icon: "ti-user-plus")), table), "Mitglieder");
+        var kids = people.Count(p => p.Child);
+        return Page(Ui.Stack(Ui.PageHead(people.Count + " Mitglieder" + (kids > 0 ? ", davon " + kids + " Kinder" : ""), "Mitglieder",
+            Ui.Button("Kind eintragen", Root + "children/new", UiButtonKind.Ghost, "ti-mood-kid"), Ui.Button("Neues Mitglied", Root + "members/new", icon: "ti-user-plus")), table), "Mitglieder");
+    }
+
+    /// <summary>A child: name, birthday, roles, guardians (one or more grown-up members) — no mail, no account; documents and mails go to the guardians.</summary>
+    private static async Task<PluginResult> ChildAsync(IPluginContext ctx, CancellationToken ct)
+    {
+        var store = new VereinStore(ctx.Data);
+        var isNew = ctx.Request.R("id") == "new";
+        var c = isNew ? null : await store.PersonAsync(Id(ctx), ct);
+        if (!isNew && (c is null || !c.Child)) return PluginResult.NotFound();
+        var adults = (await store.PeopleAsync(ct)).Where(p => !p.Child).ToList();
+        var roles = VereinSettings.RoleList(ctx);
+
+        if (ctx.Request.IsPost)
+        {
+            if (c is not null && ctx.Request.Action == "remove")
+            {
+                await store.People.DeleteAsync(c.Id, ct);
+                return PluginResult.Redirect(Root + "members", c.Name + " ist entfernt.");
+            }
+            var first = V.Clip(ctx.Request.F("first"), 80);
+            var last = V.Clip(ctx.Request.F("last"), 80);
+            var guardians = adults.Where(a => V.Checked(ctx.Request.F("g_" + a.Id))).Select(a => a.Id).ToList();
+            if (first.Length == 0) return PluginResult.Redirect(Root + "children/" + (isNew ? "new" : c!.Id), "Bitte einen Vornamen eingeben.", true);
+            if (guardians.Count == 0) return PluginResult.Redirect(Root + "children/" + (isNew ? "new" : c!.Id), "Bitte mindestens ein Elternteil / eine erziehungsberechtigte Person auswählen.", true);
+            var id = await store.SaveChildAsync(c?.Id ?? 0, first, last, V.CleanDate(ctx.Request.F("born")), roles.Where((r, i) => V.Checked(ctx.Request.F("role_" + i))),
+                V.CleanDate(ctx.Request.F("joined")), isNew || V.Checked(ctx.Request.F("active")), V.Clip(ctx.Request.F("note"), 2000), guardians, ct);
+            return PluginResult.Redirect(Root + "children/" + id, isNew ? first + " ist eingetragen." : "Gespeichert.");
+        }
+
+        var preset = long.TryParse(ctx.Request.Q("eltern"), out var pg) ? pg : 0;
+        var form = Ui.Form(
+            Ui.Grid(240, Ui.Input("first", "Vorname", c?.First ?? ""), Ui.Input("last", "Nachname", c?.Last ?? (adults.FirstOrDefault(a => a.Id == preset)?.Last ?? ""))),
+            Ui.Grid(240, Ui.Input("born", "Geburtsdatum (freiwillig)", c?.Born ?? "", UiInputType.Date), Ui.Input("joined", "Mitglied seit", c?.Joined ?? "", UiInputType.Date)),
+            Ui.Heading("Gehört zu", 3),
+            adults.Count == 0 ? Ui.Alert("Erst ein erwachsenes Mitglied anlegen – ein Kind gehört immer zu jemandem.", UiTone.Warning)
+                : Ui.Grid(240, adults.Select(a => (UiNode?)Ui.Checkbox("g_" + a.Id, a.Name, c?.Guardians.Contains(a.Id) ?? a.Id == preset)).ToArray()),
+            Ui.Heading("Rollen", 3),
+            Ui.Grid(220, roles.Select((r, i) => (UiNode?)Ui.Checkbox("role_" + i, r, c?.Has(r) ?? r == roles[^1])).ToArray()),
+            Ui.TextArea("note", "Notiz (nur im Admin)", c?.Note ?? "", 3),
+            isNew ? null : Ui.Checkbox("active", "Aktiv", c!.Active),
+            Ui.FormActions(Ui.Submit(isNew ? "Eintragen" : "Speichern"), Ui.Button("Zurück", Root + "members", UiButtonKind.Ghost)));
+        return Page(Ui.Stack(
+            Ui.PageHead("Ein Kind hat keine eigene E-Mail und keinen Zugang – Dokumente und Nachrichten gehen an die Eltern", isNew ? "Kind eintragen" : c!.Name),
+            Ui.Card(form),
+            isNew ? null : Ui.Card("Entfernen", Ui.Action("Aus dem Verein entfernen", "remove", kind: UiButtonKind.Danger, confirm: "Wirklich entfernen?", icon: "ti-trash"))), isNew ? "Kind eintragen" : c!.Name);
     }
 
     private static async Task<PluginResult> MemberAsync(IPluginContext ctx, CancellationToken ct)
@@ -115,14 +166,18 @@ public static class VereinAdmin
         var isNew = ctx.Request.R("id") == "new";
         var p = isNew ? null : await store.PersonAsync(Id(ctx), ct);
         if (!isNew && p is null) return PluginResult.NotFound();
+        if (p is not null && p.Child) return PluginResult.Redirect(Root + "children/" + p.Id);
         var roles = VereinSettings.RoleList(ctx);
 
         if (ctx.Request.IsPost)
         {
             if (ctx.Request.Action == "invite" && p is not null)
             {
-                var (s, f) = await InviteAsync(ctx, p, ct);
-                return PluginResult.Redirect(Root + "members/" + p.Id, f == 0 ? "Einladung verschickt." : "Einladung konnte nicht verschickt werden (siehe Plugin-Protokoll).", f > 0);
+                // a fresh welcome link while the person has never set a password; a sign-in reminder once they have
+                var again = await ctx.Members.InviteAsync(p.Email, p.Name, VereinPublic.Base, ct);
+                var (s, f) = await SendInviteAsync(ctx, p, again.Link, ct);
+                return PluginResult.Redirect(Root + "members/" + p.Id, f > 0 ? "Einladung konnte nicht verschickt werden (siehe Plugin-Protokoll)."
+                    : again.Link is null ? "Erinnerung verschickt – das Mitglied hat schon ein Passwort und meldet sich damit an." : "Einladung mit neuem Link verschickt.", f > 0);
             }
             if (ctx.Request.Action == "remove" && p is not null)
             {
@@ -145,15 +200,12 @@ public static class VereinAdmin
             if (isNew)
             {
                 if (!email.Contains('@')) return PluginResult.Redirect(Root + "members/new", "Bitte eine gültige E-Mail-Adresse eingeben – sie ist der Benutzername.", true);
-                // The account: an existing one of the site is linked, otherwise one is created with a random password the person replaces via the invitation.
-                var account = await ctx.Members.FindByEmailAsync(email, ct);
-                if (account is null)
-                {
-                    var created = await ctx.Members.CreateAsync(email, Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(24)), (first + " " + last).Trim(), ct);
-                    if (created.Status != MemberCreateStatus.Created || created.Account is null)
-                        return PluginResult.Redirect(Root + "members/new", created.Status == MemberCreateStatus.InvalidEmail ? "Die E-Mail-Adresse ist ungültig." : "Das Konto konnte nicht angelegt werden.", true);
-                    account = created.Account;
-                }
+                // The account comes as an INVITATION: no password yet and no confirmation mail of the site – our one mail carries the link that sets the
+                // password, confirms the address and signs in (straight into /mitglied). A confirmed account that already exists is linked as it is.
+                var invite = await ctx.Members.InviteAsync(email, (first + " " + last).Trim(), VereinPublic.Base, ct);
+                if (invite.Status == MemberInviteStatus.InvalidEmail || invite.Account is null)
+                    return PluginResult.Redirect(Root + "members/new", invite.Status == MemberInviteStatus.InvalidEmail ? "Die E-Mail-Adresse ist ungültig." : "Das Konto konnte nicht angelegt werden.", true);
+                var account = invite.Account;
                 if (await store.PersonOfMemberAsync(account.Id, ct) is Person existing)
                     return PluginResult.Redirect(Root + "members/" + existing.Id, "Zu dieser E-Mail-Adresse gibt es schon ein Mitglied.", true);
                 var id = await store.SavePersonAsync(0, account.Id, first, last, email, phone, chosen, joined, true, note, ct);
@@ -161,7 +213,7 @@ public static class VereinAdmin
                 var notice = (first + " " + last).Trim() + " ist angelegt.";
                 if (V.Checked(ctx.Request.F("sendInvite")))
                 {
-                    var (_, f) = await InviteAsync(ctx, person, ct);
+                    var (_, f) = await SendInviteAsync(ctx, person, invite.Link, ct);
                     notice += f == 0 ? " Die Einladung ist verschickt." : " Die Einladung konnte nicht verschickt werden.";
                 }
                 ctx.Log($"Mitglied {person.Name} angelegt von {ctx.User.Name}");
@@ -185,10 +237,13 @@ public static class VereinAdmin
 
         var answers = await store.AnswersOfMemberAsync(p!.MemberId, ct);
         var docs = (await store.DocsAsync(false, ct)).Concat(await store.DocsAsync(true, ct)).ToDictionary(d => d.Id);
+        var kids = VereinStore.ChildrenOf(await store.PeopleAsync(ct), p).ToList();
         var side = new List<UiNode?>
         {
+            Ui.Card("Kinder", kids.Count == 0 ? Ui.Muted("Keine eingetragen.") : Ui.Stack(kids.Select(k => (UiNode?)Ui.Link(k.Name + (k.Born.Length > 0 ? " (" + V.Date(k.Born) + ")" : ""), Root + "children/" + k.Id)).ToArray()),
+                Ui.Button("Kind eintragen", Root + "children/new?eltern=" + p.Id, UiButtonKind.Ghost, "ti-mood-kid", small: true)),
             Ui.Card("Zugang",
-                Ui.Muted("Die Einladung erklärt, wie man ein eigenes Passwort festlegt, und verlinkt den Mitgliederbereich."),
+                Ui.Muted("Die Einladung enthält einen Link: Passwort festlegen, danach ist das Mitglied direkt im Mitgliederbereich angemeldet. Hat es schon ein Passwort, kommt eine Erinnerung mit dem Link zur Anmeldung."),
                 Ui.Inline(Ui.Action("Einladung erneut senden", "invite", kind: UiButtonKind.Ghost, icon: "ti-mail"))),
             Ui.Card("Bestätigungen", answers.Count == 0 ? Ui.Muted("Noch keine.") : Ui.Table(new[] { Ui.Column("Dokument"), Ui.Column("Antwort"), Ui.Column("Wann") },
                 answers.OrderByDescending(a => a.At).Select(a => Ui.Row(docs.TryGetValue(a.DocId, out var d) ? Ui.Link(d.Title, Root + "docs/" + d.Id) : "#" + a.DocId,
@@ -201,10 +256,15 @@ public static class VereinAdmin
             Ui.Columns(new UiNode?[] { Ui.Card("Angaben", form) }, side)), p.Name);
     }
 
-    private static Task<(int, int)> InviteAsync(IPluginContext ctx, Person p, CancellationToken ct) =>
+    /// <summary>The one invitation mail: with a welcome link it says "set your password", without one (the account had a password already) "sign in".</summary>
+    private static Task<(int, int)> SendInviteAsync(IPluginContext ctx, Person p, string? welcomeLink, CancellationToken ct) =>
         VereinMail.SendAsync(ctx, VereinMail.Invite, new[] { p }, _ => new Dictionary<string, string>
         {
-            ["email"] = p.Email, ["password_url"] = VereinMail.Origin(ctx) + "/anmelden/vergessen"
+            ["email"] = p.Email,
+            ["link"] = welcomeLink ?? VereinMail.Origin(ctx) + VereinPublic.Base,
+            ["schritt"] = welcomeLink is null
+                ? "Du hast schon ein Konto auf unserer Website – melde dich hier einfach mit deinem bisherigen Passwort an:"
+                : "Klick auf den Link und lege dein Passwort fest – danach bist du direkt angemeldet (der Link gilt 14 Tage):"
         }, ct);
 
     // ---- documents ----------------------------------------------------------------------------------------------
@@ -526,7 +586,7 @@ public static class VereinAdmin
             Ui.Tabs(Ui.Tab("Kommende", Root + "events", !past), Ui.Tab("Vergangene", Root + "events?vergangen=1", past)),
             Ui.Table(new[] { Ui.Column("Wann"), Ui.Column("Termin"), Ui.Column("Art"), Ui.Column("Ort"), Ui.Column("Sichtbar") },
                 list.Select(e => Ui.RowFor(e.Title + " " + e.Kind + " " + e.Place, V.When(e.Starts), Ui.Link(e.Title, Root + "events/" + e.Id), e.Kind, e.Place,
-                    e.Cancelled ? Ui.Badge("abgesagt", UiTone.Error) : e.Public ? Ui.Badge("öffentlich", UiTone.Success) : Ui.Badge("intern"))),
+                    e.Draft ? Ui.Badge("Entwurf", UiTone.Warning) : e.Cancelled ? Ui.Badge("abgesagt", UiTone.Error) : e.Public ? Ui.Badge("öffentlich", UiTone.Success) : Ui.Badge("intern"))),
                 searchPlaceholder: "Termine durchsuchen …", emptyText: past ? "Keine vergangenen Termine." : "Keine kommenden Termine.")), "Termine");
     }
 
@@ -548,24 +608,60 @@ public static class VereinAdmin
             var v = new Dictionary<string, object?>
             {
                 ["title"] = title, ["kind"] = V.Clip(ctx.Request.F("kind"), 60), ["starts"] = starts, ["ends"] = V.CleanDate(ctx.Request.F("ends")), ["place"] = V.Clip(ctx.Request.F("place"), 200),
-                ["description"] = V.Clip(ctx.Request.F("description"), 2000), ["public"] = V.Checked(ctx.Request.F("public")), ["link"] = link, ["cancelled"] = V.Checked(ctx.Request.F("cancelled"))
+                ["description"] = V.Clip(ctx.Request.F("description"), 2000), ["public"] = V.Checked(ctx.Request.F("public")), ["link"] = link, ["cancelled"] = V.Checked(ctx.Request.F("cancelled")),
+                // planning: a draft is seen only here; the running order and the practical notes are for members
+                ["draft"] = ctx.Request.F("status") == "draft", ["meeting"] = V.Clip(ctx.Request.F("meeting"), 500), ["parking"] = V.Clip(ctx.Request.F("parking"), 1000),
+                ["notes"] = V.Clip(ctx.Request.F("notes"), 3000), ["schedule"] = ReadPlan(ctx)
             };
-            if (isNew) { v["created"] = DateTime.UtcNow; var id = await store.Events.InsertAsync(v, ct); return PluginResult.Redirect(Root + "events/" + id, "Termin angelegt."); }
+            var notice = ctx.Request.F("status") == "draft" ? " Noch ein Entwurf – nur hier im Admin sichtbar." : "";
+            if (isNew) { v["created"] = DateTime.UtcNow; var id = await store.Events.InsertAsync(v, ct); return PluginResult.Redirect(Root + "events/" + id, "Termin angelegt." + notice); }
             await store.Events.UpdateAsync(e!.Id, v, ct);
-            return PluginResult.Redirect(Root + "events/" + e.Id, "Gespeichert.");
+            return PluginResult.Redirect(Root + "events/" + e.Id, "Gespeichert." + notice);
         }
 
-        var form = Ui.Form(
-            Ui.Input("title", "Titel", e?.Title ?? "") with { Help = "z. B. „Umzug in Remseck“" },
-            Ui.Grid(220, Ui.Input("kind", "Art", e?.Kind ?? "") with { Help = "z. B. Umzug, Ball, Ausflug, Narrentreffen" }, Ui.Input("place", "Ort", e?.Place ?? "")),
-            Ui.Grid(220, Ui.Input("starts", "Beginn", e?.Starts ?? "", UiInputType.DateTime), Ui.Input("ends", "Ende (freiwillig)", e?.Ends ?? "", UiInputType.DateTime)),
-            Ui.TextArea("description", "Beschreibung (kurz)", e?.Description ?? "", 3),
-            Ui.Input("link", "Link (freiwillig)", e?.Link ?? "") with { Help = "Eine Seite der Website (/…) oder eine https-Adresse, z. B. die Seite des Veranstalters." },
-            Ui.Checkbox("public", "Öffentlich – auf der Website im Block „Vereinstermine“ zeigen", e?.Public ?? true),
-            Ui.Checkbox("cancelled", "Abgesagt (bleibt durchgestrichen stehen)", e?.Cancelled ?? false),
-            Ui.FormActions(Ui.Submit(isNew ? "Anlegen" : "Speichern"), Ui.Button("Zurück", Root + "events", UiButtonKind.Ghost)));
-        return Page(Ui.Stack(Ui.PageHead(isNew ? "Umzug, Ball, Ausflug …" : V.When(e!.Starts), isNew ? "Neuer Termin" : e!.Title),
-            Ui.Card(form), isNew ? null : Ui.Card("Teilen", Ui.Button("Als Instagram-Bild", Root + "instagram?vorlage=plakat&event=" + e!.Id, UiButtonKind.Ghost, "ti-brand-instagram")), isNew ? null : Ui.Card("Löschen", Ui.Action("Termin löschen", "delete", kind: UiButtonKind.Danger, confirm: "Termin löschen?", icon: "ti-trash"))), isNew ? "Neuer Termin" : e!.Title);
+        var main = new UiNode?[]
+        {
+            Ui.Card("Termin",
+                Ui.Input("title", "Titel", e?.Title ?? "") with { Help = "z. B. „Umzug in Remseck“" },
+                Ui.Grid(220, Ui.Input("kind", "Art", e?.Kind ?? "") with { Help = "z. B. Umzug, Ball, Ausflug, Narrentreffen" }, Ui.Input("place", "Ort", e?.Place ?? "")),
+                Ui.Grid(220, Ui.Input("starts", "Beginn", e?.Starts ?? "", UiInputType.DateTime), Ui.Input("ends", "Ende (freiwillig)", e?.Ends ?? "", UiInputType.DateTime)),
+                Ui.TextArea("description", "Beschreibung (kurz, öffentlich)", e?.Description ?? "", 3),
+                Ui.Input("link", "Link (freiwillig)", e?.Link ?? "") with { Help = "Eine Seite der Website (/…) oder eine https-Adresse, z. B. die Seite des Veranstalters." }),
+            Ui.Card("Planung (für Mitglieder)",
+                Ui.Muted("Nach und nach ergänzen – die Mitglieder sehen das im Mitgliederbereich beim Termin, auf der Website steht es nicht."),
+                Ui.RowEditor("plan", "Ablauf", new[] { Ui.RowColumn("time", "Uhrzeit", placeholder: "13:00", width: "110px"), Ui.RowColumn("what", "Was", placeholder: "Aufstellung, Zunftmeisterempfang, Umzug …") },
+                    (e?.Steps ?? Array.Empty<(string, string)>()).Select((s, i) => Ui.RowValue(i.ToString(CultureInfo.InvariantCulture), s.Time, s.What)), "+ Programmpunkt"),
+                Ui.Input("meeting", "Treffpunkt / Aufstellung", e?.Meeting ?? "") with { Help = "z. B. „Aufstellung Bahnhofstraße, Startnummer 34“" },
+                Ui.TextArea("parking", "Parkmöglichkeiten / Anfahrt", e?.Parking ?? "", 3),
+                Ui.TextArea("notes", "Weitere Hinweise", e?.Notes ?? "", 3) with { Help = "z. B. Häs und Maske mitbringen, Busabfahrt, Verpflegung, Ansprechpartner." })
+        };
+        var side = new UiNode?[]
+        {
+            Ui.Card("Status",
+                Ui.Select("status", "Stand", isNew || e!.Draft ? "draft" : "published", Ui.Option("draft", "Entwurf (nur im Admin)"), Ui.Option("published", "Veröffentlicht")),
+                Ui.Checkbox("public", "Öffentlich – auf der Website im Block „Vereinstermine“", e?.Public ?? true),
+                Ui.Checkbox("cancelled", "Abgesagt (bleibt durchgestrichen stehen)", e?.Cancelled ?? false),
+                Ui.FormActions(Ui.Submit(isNew ? "Anlegen" : "Speichern"), Ui.Button("Zurück", Root + "events", UiButtonKind.Ghost)))
+        };
+        var form = Ui.Form(Ui.Columns(main, side));
+        return Page(Ui.Stack(Ui.PageHead(isNew ? "Umzug, Ball, Ausflug … – erst als Entwurf planen, dann veröffentlichen" : V.When(e!.Starts) + (e.Draft ? " · Entwurf" : ""), isNew ? "Neuer Termin" : e!.Title),
+            form,
+            isNew || e!.Draft ? null : Ui.Card("Teilen", Ui.Button("Als Instagram-Bild", Root + "instagram?vorlage=plakat&event=" + e!.Id, UiButtonKind.Ghost, "ti-brand-instagram")),
+            isNew ? null : Ui.Card("Löschen", Ui.Action("Termin löschen", "delete", kind: UiButtonKind.Danger, confirm: "Termin löschen?", icon: "ti-trash"))), isNew ? "Neuer Termin" : e!.Title);
+    }
+
+    /// <summary>The running order as posted by the row editor (plan.count, plan.{i}.time, plan.{i}.what), stored as "time|what" lines.</summary>
+    private static string ReadPlan(IPluginContext ctx)
+    {
+        if (!int.TryParse(ctx.Request.F("plan.count"), out var n)) return "";
+        var lines = new List<string>();
+        for (var i = 0; i < Math.Min(n, 40); i++)
+        {
+            var time = V.Clip(ctx.Request.F($"plan.{i}.time"), 20).Replace("|", " ").Replace("\n", " ");
+            var what = V.Clip(ctx.Request.F($"plan.{i}.what"), 200).Replace("|", " ").Replace("\n", " ");
+            if (time.Length + what.Length > 0) lines.Add(time + "|" + what);
+        }
+        return string.Join("\n", lines);
     }
 
     // ---- uploads ------------------------------------------------------------------------------------------------

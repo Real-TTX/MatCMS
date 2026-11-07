@@ -6,17 +6,22 @@ namespace MatCMS.Plugin.Verein;
 /// </summary>
 public static class VereinMail
 {
-    public const string Invite = "verein.invite", Document = "verein.document", Reminder = "verein.reminder", Meeting = "verein.meeting", Minutes = "verein.minutes";
+    // "verein.welcome", not the first version's "verein.invite": that one sent people the long way round (forgot password, then sign in); a stored
+    // template is never overwritten, so the new one-link wording needs a key of its own.
+    public const string Invite = "verein.welcome", Document = "verein.document", Reminder = "verein.reminder", Meeting = "verein.meeting", Minutes = "verein.minutes";
 
     private static MailPlaceholder Ph(string t, string d) => new(t, d);
     private static readonly MailPlaceholder[] Common = { Ph("name", "Vorname des Mitglieds"), Ph("verein", "Name des Vereins"), Ph("login_url", "Adresse des Mitgliederbereichs") };
 
     public static IEnumerable<MailTemplateSpec> Specs => new[]
     {
-        new MailTemplateSpec(Invite, "Verein: Zugang zum Mitgliederbereich", "Geht an ein Mitglied, das im Admin angelegt wurde (oder dem die Einladung erneut geschickt wird).",
-            "Dein Zugang zum Mitgliederbereich – {{verein}}",
-            "Hallo {{name}},\n\nfür dich wurde ein Zugang zum Mitgliederbereich von {{verein}} eingerichtet.\n\nSo geht es los:\n1. Lege hier mit deiner E-Mail-Adresse {{email}} ein eigenes Passwort fest:\n{{password_url}}\n2. Melde dich danach hier an:\n{{login_url}}\n\nDort findest du Dokumente zum Bestätigen, Termine und Sitzungen und kannst Bilder und Material hochladen.\n\nViele Grüße\n{{verein}}\n")
-        { Placeholders = Common.Append(Ph("email", "E-Mail-Adresse = Benutzername")).Append(Ph("password_url", "Seite zum Festlegen des Passworts")).ToArray() },
+        new MailTemplateSpec(Invite, "Verein: Einladung in den Mitgliederbereich", "Geht an ein Mitglied, das im Admin angelegt wurde (oder dem die Einladung erneut geschickt wird). Ein Klick auf den Link, Passwort festlegen – fertig und angemeldet.",
+            "Willkommen im Mitgliederbereich – {{verein}}",
+            "Hallo {{name}},\n\nfür dich wurde ein Zugang zum Mitgliederbereich von {{verein}} eingerichtet.\n\n{{schritt}}\n{{link}}\n\nDort findest du Termine und Sitzungen, Dokumente zum Bestätigen und kannst Bilder und Material hochladen. Dein Benutzername ist deine E-Mail-Adresse: {{email}}\n\nViele Grüße\n{{verein}}\n")
+        {
+            Placeholders = Common.Concat(new[] { Ph("email", "E-Mail-Adresse = Benutzername"), Ph("link", "Der Link: Passwort festlegen (neues Konto) oder Anmeldung (Konto gab es schon)"),
+                Ph("schritt", "Der Satz vor dem Link – passend dazu, ob ein Passwort festgelegt oder nur angemeldet wird") }).ToArray()
+        },
 
         new MailTemplateSpec(Document, "Verein: neues Dokument", "Geht an alle Mitglieder, für die ein neues Dokument bestimmt ist.",
             "{{verein}}: {{titel}} – bitte {{aufgabe}}",

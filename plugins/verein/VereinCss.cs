@@ -56,6 +56,7 @@ public static class VereinCss
 .vm .vm-text p{margin:0 0 12px;line-height:1.7}
 .vm .vm-doc{font-size:16.5px}
 .vm .vm-facts{display:grid;grid-template-columns:auto 1fr;gap:6px 18px;margin:0 0 14px}
+.vm .vm-plan th{width:110px;font-variant-numeric:tabular-nums;color:var(--vm-accent);font-size:16px}
 .vm .vm-facts dt{color:var(--vm-muted)}.vm .vm-facts dd{margin:0;font-weight:500}
 .vm .vm-rsvp{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;padding-top:14px;border-top:1px solid var(--vm-line)}
 .vm .vm-rsvp span{font-weight:600;margin-right:6px}

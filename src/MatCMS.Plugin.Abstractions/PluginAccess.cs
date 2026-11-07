@@ -31,6 +31,23 @@ public enum MemberCreateStatus
     WeakPassword
 }
 
+/// <summary>What came of <see cref="IPluginMembers.InviteAsync"/>.</summary>
+public enum MemberInviteStatus
+{
+    /// <summary>A new account, waiting for its password.</summary>
+    Created,
+    /// <summary>The account existed but had never been confirmed: a fresh link replaces the old one.</summary>
+    Reinvited,
+    /// <summary>A confirmed account already uses the address: no link (the person signs in with their own password).</summary>
+    EmailTaken,
+    /// <summary>The address is not a valid e-mail address.</summary>
+    InvalidEmail
+}
+
+/// <summary>The answer of <see cref="IPluginMembers.InviteAsync"/>: the account (also for <see cref="MemberInviteStatus.EmailTaken"/>) and, for Created
+/// and Reinvited, the absolute link to send.</summary>
+public sealed record MemberInviteResult(MemberInviteStatus Status, MemberAccount? Account, string? Link);
+
 /// <summary>The answer of <see cref="IPluginMembers.CreateAsync"/>.</summary>
 /// <param name="Status">What happened.</param>
 /// <param name="Account">The new account when <see cref="MemberCreateStatus.Created"/>, otherwise null.</param>
@@ -57,6 +74,15 @@ public interface IPluginMembers
     /// address — for instance to attach earlier guest orders). Raises <see cref="HostEvents.MemberRegistered"/>.
     /// </summary>
     Task<MemberCreateResult> CreateAsync(string email, string password, string displayName, CancellationToken ct = default);
+
+    /// <summary>
+    /// Invites somebody: creates the account WITHOUT a password and WITHOUT the site's confirmation mail, and returns a one-time link to
+    /// <c>/anmelden/willkommen</c> that the plugin sends in its own words. Opening it, the person sets a password once — that confirms the address, signs
+    /// the person in and leads to <paramref name="returnUrl"/> (a local path). For an account that exists but was never confirmed (an earlier invitation
+    /// not yet used) a fresh link is made (<see cref="MemberInviteStatus.Reinvited"/>); a confirmed account gets none (<see cref="MemberInviteStatus.EmailTaken"/>).
+    /// The link is valid for 14 days.
+    /// </summary>
+    Task<MemberInviteResult> InviteAsync(string email, string displayName, string returnUrl, CancellationToken ct = default);
 
     /// <summary>Signs the account in on this request (a cookie is set on the answer). Needs an HTTP request.</summary>
     Task SignInAsync(MemberAccount member, bool persistent = false, CancellationToken ct = default);

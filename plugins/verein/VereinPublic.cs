@@ -21,6 +21,7 @@ public static class VereinPublic
         b.Route(Base + "/dokumente/{id}", DocAsync, form);
         b.Route(Base + "/dokumente/{id}/datei", DocFileAsync, read);
         b.Route(Base + "/termine", DatesAsync, read);
+        b.Route(Base + "/termine/{id}", EventAsync, read);
         b.Route(Base + "/sitzungen/{id}", MeetingAsync, form);
         b.Route(Base + "/dateien", FilesAsync, form);
         b.Route(Base + "/dateien/{id}", FileAsync, read);
@@ -148,7 +149,7 @@ public static class VereinPublic
         }
         sb.Append("</section></div>");
 
-        sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-calendar-event\"></i> Kommende Termine</h2>").Append(EventList(events, internalBadge: true)).Append("</section>");
+        sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-calendar-event\"></i> Kommende Termine</h2>").Append(EventList(events, internalBadge: true, memberLinks: true)).Append("</section>");
 
         if (uploads.Count > 0)
         {
@@ -302,7 +303,7 @@ public static class VereinPublic
 
     private static string AnswerLabel(string a) => a switch { VereinStore.Yes => "du kommst", VereinStore.No => "du kommst nicht", _ => "du weißt es noch nicht" };
 
-    internal static string EventList(IEnumerable<Event> events, bool internalBadge)
+    internal static string EventList(IEnumerable<Event> events, bool internalBadge, bool memberLinks = false)
     {
         var list = events.ToList();
         if (list.Count == 0) return "<p class=\"vm-muted\">Gerade stehen keine Termine an.</p>";
@@ -311,7 +312,8 @@ public static class VereinPublic
         {
             var (day, month, wd) = V.Badge(e.Starts);
             sb.Append("<li class=\"").Append(e.Cancelled ? "is-cancelled" : "").Append("\"><span class=\"vm-date\"><b>").Append(V.H(day)).Append("</b><small>").Append(V.H(month)).Append("</small><em>")
-              .Append(V.H(wd)).Append("</em></span><span class=\"vm-ev\"><strong>").Append(V.H(e.Title)).Append("</strong>");
+              .Append(V.H(wd)).Append("</em></span><span class=\"vm-ev\"><strong>").Append(memberLinks ? "<a href=\"" + Base + "/termine/" + e.Id + "\">" + V.H(e.Title) + "</a>" : V.H(e.Title)).Append("</strong>");
+            if (memberLinks && e.HasPlan) sb.Append(" <span class=\"vm-badge ok\">Ablauf &amp; Infos</span>");
             if (e.Cancelled) sb.Append(" <span class=\"vm-badge err\">abgesagt</span>");
             if (internalBadge && !e.Public) sb.Append(" <span class=\"vm-badge\">intern</span>");
             sb.Append("<small>").Append(V.H(V.When(e.Starts)));
@@ -345,13 +347,47 @@ public static class VereinPublic
                 : m.MinutesStatus == VereinStore.Final ? "<span class=\"vm-badge ok\">Protokoll</span>" : "") + "</a>";
 
         var sb = new StringBuilder(Notice(ctx));
-        sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-calendar-event\"></i> Termine</h2>").Append(EventList(events, internalBadge: true)).Append("</section>");
+        sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-calendar-event\"></i> Termine</h2>").Append(EventList(events, internalBadge: true, memberLinks: true)).Append("</section>");
         sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-users-group\"></i> Sitzungen</h2>");
         if (upcoming.Count == 0) sb.Append("<p class=\"vm-muted\">Gerade ist keine Sitzung geplant.</p>");
         else sb.Append("<div class=\"vm-rows\">").Append(string.Concat(upcoming.Select(m => MeetingRow(m, true)))).Append("</div>");
         if (past.Count > 0) sb.Append("<h3>Vergangene Sitzungen</h3><div class=\"vm-rows\">").Append(string.Concat(past.Select(m => MeetingRow(m, false)))).Append("</div>");
         sb.Append("</section>");
         return await ShellAsync(ctx, who, "dates", "Termine & Sitzungen", sb.ToString(), ct);
+    }
+
+    /// <summary>One event for members: the basics and the planning — running order, meeting point, parking, notes. A draft is not shown.</summary>
+    private static async Task<PluginResult> EventAsync(IPluginContext ctx, CancellationToken ct)
+    {
+        var (who, deny) = await GateAsync(ctx, ct);
+        if (deny is not null) return deny;
+        var e = await new VereinStore(ctx.Data).EventAsync(Id(ctx), ct);
+        if (e is null || e.Draft) return PluginResult.NotFound();
+
+        var sb = new StringBuilder("<p><a href=\"" + Base + "/termine\">← Termine & Sitzungen</a></p>");
+        sb.Append("<section class=\"vm-card\">");
+        if (e.Cancelled) sb.Append("<div class=\"vm-err\">Dieser Termin ist abgesagt.</div>");
+        sb.Append("<dl class=\"vm-facts\"><dt>Wann</dt><dd>").Append(V.H(V.When(e.Starts)));
+        if (e.Ends.Length > 0 && e.Ends != e.Starts) sb.Append(" – ").Append(V.H(e.Ends[..Math.Min(10, e.Ends.Length)] == e.Day ? V.When(e.Ends).Split(", ").Last() : V.When(e.Ends)));
+        sb.Append("</dd>");
+        if (e.Place.Length > 0) sb.Append("<dt>Wo</dt><dd>").Append(V.H(e.Place)).Append("</dd>");
+        if (e.Kind.Length > 0) sb.Append("<dt>Art</dt><dd>").Append(V.H(e.Kind)).Append("</dd>");
+        if (e.Meeting.Length > 0) sb.Append("<dt>Treffpunkt</dt><dd>").Append(V.H(e.Meeting)).Append("</dd>");
+        sb.Append("</dl>");
+        if (e.Description.Length > 0) sb.Append("<div class=\"vm-text\">").Append(V.Paragraphs(e.Description)).Append("</div>");
+        if (e.Link.StartsWith("https://", StringComparison.Ordinal) || (e.Link.StartsWith('/') && !e.Link.StartsWith("//", StringComparison.Ordinal)))
+            sb.Append("<p><a href=\"").Append(V.H(e.Link)).Append("\">Mehr erfahren →</a></p>");
+        sb.Append("</section>");
+        if (e.Steps.Count > 0)
+        {
+            sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-clock\"></i> Ablauf</h2><table class=\"vm-table vm-plan\"><tbody>");
+            foreach (var (time, what) in e.Steps) sb.Append("<tr><th>").Append(V.H(time)).Append("</th><td>").Append(V.H(what)).Append("</td></tr>");
+            sb.Append("</tbody></table></section>");
+        }
+        if (e.Parking.Length > 0) sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-parking\"></i> Parken & Anfahrt</h2><div class=\"vm-text\">").Append(V.Paragraphs(e.Parking)).Append("</div></section>");
+        if (e.Notes.Length > 0) sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-info-circle\"></i> Hinweise</h2><div class=\"vm-text\">").Append(V.Paragraphs(e.Notes)).Append("</div></section>");
+        if (!e.HasPlan) sb.Append("<p class=\"vm-muted\">Ablauf und weitere Infos folgen – der Vorstand trägt sie nach.</p>");
+        return await ShellAsync(ctx, who!, "dates", e.Title, sb.ToString(), ct);
     }
 
     private static async Task<PluginResult> MeetingAsync(IPluginContext ctx, CancellationToken ct)
@@ -521,7 +557,9 @@ public static class VereinPublic
         var (who, deny) = await GateAsync(ctx, ct);
         if (deny is not null) return deny;
         var board = VereinSettings.BoardList(ctx);
-        var people = (await new VereinStore(ctx.Data).PeopleAsync(ct)).Where(p => p.Active).ToList();
+        var everyone = (await new VereinStore(ctx.Data).PeopleAsync(ct)).Where(p => p.Active).ToList();
+        var people = everyone.Where(p => !p.Child).ToList();
+        var children = everyone.Where(p => p.Child).ToList();
         var all = who!.Board || ctx.Settings.GetBool(VereinSettings.DirectoryForAll);
         var vorstand = people.Where(p => p.Roles.Any(r => board.Contains(r, StringComparer.OrdinalIgnoreCase)))
             .OrderBy(p => board.ToList().FindIndex(r => p.Roles.Contains(r, StringComparer.OrdinalIgnoreCase))).ToList();
@@ -535,6 +573,16 @@ public static class VereinPublic
         if (all)
             sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-users\"></i> Alle Mitglieder (").Append(people.Count).Append(")</h2><div class=\"vm-people\">")
               .Append(string.Concat(people.Select(Card))).Append("</div></section>");
+        if (all && children.Count > 0)
+        {
+            var byId = everyone.ToDictionary(x => x.Id);
+            sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-mood-kid\"></i> Kinder (").Append(children.Count).Append(")</h2><div class=\"vm-people\">");
+            foreach (var c in children)
+                sb.Append("<div class=\"vm-person\"><span class=\"vm-avatar\">").Append(V.H(Initials(c))).Append("</span><span><strong>").Append(V.H(c.Name)).Append("</strong><small>")
+                  .Append(V.H(string.Join(", ", c.Roles))).Append(c.Born.Length > 0 ? " · " + V.H(V.Date(c.Born)) : "").Append("</small><small>gehört zu ")
+                  .Append(V.H(string.Join(", ", c.Guardians.Select(g => byId.TryGetValue(g, out var x) ? x.Name : "").Where(n => n.Length > 0)))).Append("</small></span></div>");
+            sb.Append("</div></section>");
+        }
         return await ShellAsync(ctx, who, "people", "Mitglieder", sb.ToString(), ct);
     }
 
@@ -576,6 +624,11 @@ public static class VereinPublic
           .Append("<label class=\"vm-field\"><span>Neues Passwort</span><input name=\"new\" type=\"password\" autocomplete=\"new-password\" minlength=\"8\" required></label>")
           .Append("<label class=\"vm-field\"><span>Neues Passwort wiederholen</span><input name=\"repeat\" type=\"password\" autocomplete=\"new-password\" minlength=\"8\" required></label>")
           .Append("<button class=\"vm-btn\" type=\"submit\">Passwort ändern</button></form></section></div>");
+        var kids = VereinStore.ChildrenOf(await store.PeopleAsync(ct), p).ToList();
+        if (kids.Count > 0)
+            sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-mood-kid\"></i> Meine Kinder</h2><ul class=\"vm-list\">")
+              .Append(string.Concat(kids.Select(k => "<li><span style=\"padding:10px 12px;background:var(--vm-soft);border-radius:10px;display:block\"><strong>" + V.H(k.Name) + "</strong>" + (k.Born.Length > 0 ? " · geboren " + V.H(V.Date(k.Born)) : "") + (k.Roles.Count > 0 ? " · " + V.H(string.Join(", ", k.Roles)) : "") + "</span></li>")))
+              .Append("</ul><p class=\"vm-muted\">Für deine Kinder bestätigst du Dokumente und bekommst die Nachrichten des Vereins. Änderungen bitte an den Vorstand.</p></section>");
         sb.Append("<section class=\"vm-card\"><h2>Meine Bestätigungen</h2>");
         if (answers.Count == 0) sb.Append("<p class=\"vm-muted\">Noch keine.</p>");
         else

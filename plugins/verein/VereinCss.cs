@@ -60,6 +60,12 @@ public static class VereinCss
 .vm .vm-facts dt{color:var(--vm-muted)}.vm .vm-facts dd{margin:0;font-weight:500}
 .vm .vm-rsvp{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;padding-top:14px;border-top:1px solid var(--vm-line)}
 .vm .vm-rsvp span{font-weight:600;margin-right:6px}
+.vm .vm-reply-row{border:1px solid var(--vm-line);border-radius:12px;padding:12px 14px;margin:0 0 12px;display:grid;gap:10px}
+.vm .vm-reply-row legend{font-weight:700;padding:0 6px}
+.vm .vm-choice{display:flex;flex-wrap:wrap;gap:8px}
+.vm .vm-choice label{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--vm-line);border-radius:999px;padding:8px 14px;cursor:pointer}
+.vm .vm-choice input{accent-color:var(--vm-accent)}
+.vm .vm-choice label:has(input:checked){border-color:var(--vm-accent);background:var(--vm-soft);font-weight:600}
 .vm .vm-table{width:100%;border-collapse:collapse;font-size:15px}
 .vm .vm-table th,.vm .vm-table td{padding:9px 10px;border-bottom:1px solid var(--vm-line);text-align:left;vertical-align:top}
 .vm .vm-table th{font-size:13px;color:var(--vm-muted);font-weight:600}
@@ -81,7 +87,9 @@ public static class VereinCss
 .vm .vm-person>span:last-child{display:flex;flex-direction:column;min-width:0}
 .vm .vm-person small{color:var(--vm-muted)}
 .vm .vm-person a{font-size:14px;overflow:hidden;text-overflow:ellipsis}
-.vm .vm-avatar{flex:none;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:var(--vm-accent);color:#fff;font-weight:700}
+.vm .vm-avatar{flex:none;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:var(--vm-accent);color:#fff;font-weight:700;overflow:hidden}
+.vm .vm-avatar img{width:100%;height:100%;object-fit:cover;display:block}
+.vm .vm-photo-row{display:flex;gap:18px;align-items:center;flex-wrap:wrap}.vm .vm-photo-row form{flex:1;min-width:220px}
 .vm .vm-details summary{display:flex;align-items:center;gap:14px;cursor:pointer;list-style:none}
 .vm .vm-details summary::-webkit-details-marker{display:none}
 .vm .vm-details summary strong{flex:1}

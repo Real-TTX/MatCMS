@@ -18,15 +18,20 @@ public static class VereinAdmin
             .Page("members", null, MembersAsync)
             .Page("members/csv", null, MembersCsvAsync)
             .Page("members/{id}", null, MemberAsync)
+            .Page("members/{id}/photo", null, PhotoAsync)
             .Page("children/{id}", null, ChildAsync)
             .Page("docs", null, DocsAsync)
             .Page("docs/{id}", null, DocAsync)
             .Page("docs/{id}/file", null, DocFileAsync)
             .Page("docs/{id}/csv", null, DocCsvAsync)
+            .Page("docs/{id}/pdf", null, DocPdfAsync)
             .Page("meetings", null, MeetingsAsync)
             .Page("meetings/{id}", null, MeetingAsync)
+            .Page("meetings/{id}/pdf", null, MeetingPdfAsync)
             .Page("events", null, EventsAsync)
             .Page("events/{id}", null, EventAsync)
+            .Page("events/{id}/pdf", null, EventPdfAsync)
+            .Page("events/{id}/csv", null, EventCsvAsync)
             .Page("instagram", null, VereinInstagram.PageAsync)
             .Page("uploads", null, UploadsAsync)
             .Page("uploads/{id}", null, UploadFileAsync)
@@ -144,8 +149,10 @@ public static class VereinAdmin
 
         if (ctx.Request.IsPost)
         {
+            if (c is not null && ctx.Request.Action is "photo" or "nophoto") return await PhotoPostAsync(ctx, store, c, Root + "children/" + c.Id, ct);
             if (c is not null && ctx.Request.Action == "remove")
             {
+                if (c.Photo.Length > 0) await ctx.Files.DeleteAsync(c.Photo, ct);
                 await store.People.DeleteAsync(c.Id, ct);
                 return PluginResult.Redirect(Root + "members", c.Name + " ist entfernt.");
             }
@@ -176,7 +183,27 @@ public static class VereinAdmin
         return Page(Ui.Stack(
             Ui.PageHead("Ein Kind hat keine eigene E-Mail und keinen Zugang – Dokumente und Nachrichten gehen an die Eltern", isNew ? "Kind eintragen" : c!.Name),
             Ui.Card(form),
+            isNew ? null : PhotoCard(c!),
             isNew ? null : Ui.Card("Entfernen", Ui.Action("Aus dem Verein entfernen", "remove", kind: UiButtonKind.Danger, confirm: "Wirklich entfernen?", icon: "ti-trash"))), isNew ? "Kind eintragen" : c!.Name);
+    }
+
+    private static UiNode PhotoCard(Person p) => Ui.Card("Profilbild",
+        p.Photo.Length > 0 ? Ui.Img(Root + "members/" + p.Id + "/photo?v=" + Path.GetFileNameWithoutExtension(p.Photo)[..8], p.Name, 120) : Ui.Muted("Noch kein Bild."),
+        Ui.Form(Ui.File("photo", "Bild hochladen (JPG, PNG oder WebP)", "image/jpeg,image/png,image/webp"),
+            Ui.FormActions(Ui.Submit("Hochladen", UiButtonKind.Ghost, "action", "photo"))) with { Upload = true },
+        p.Photo.Length > 0 ? Ui.Action("Bild entfernen", "nophoto", kind: UiButtonKind.Ghost, icon: "ti-trash", confirm: "Profilbild entfernen?") : null);
+
+    private static async Task<PluginResult> PhotoPostAsync(IPluginContext ctx, VereinStore store, Person p, string back, CancellationToken ct)
+    {
+        if (ctx.Request.Action == "nophoto") { await VereinPhoto.RemoveAsync(ctx, store, p, ct); return PluginResult.Redirect(back, "Profilbild entfernt."); }
+        var error = await VereinPhoto.SaveAsync(ctx, store, p, ctx.Request.File("photo"), ct);
+        return PluginResult.Redirect(back, error ?? "Profilbild gespeichert.", error is not null);
+    }
+
+    private static async Task<PluginResult> PhotoAsync(IPluginContext ctx, CancellationToken ct)
+    {
+        var p = await new VereinStore(ctx.Data).PersonAsync(Id(ctx), ct);
+        return p is null || p.Photo.Length == 0 ? PluginResult.NotFound() : await VereinPhoto.ServeAsync(ctx, p, ct);
     }
 
     private static async Task<PluginResult> MemberAsync(IPluginContext ctx, CancellationToken ct)
@@ -204,8 +231,10 @@ public static class VereinAdmin
                 if (ok) ctx.Log($"Passwort für {p.Name} gesetzt von {ctx.User.Name}");
                 return PluginResult.Redirect(Root + "members/" + p.Id, ok ? "Passwort gesetzt – bitte persönlich weitergeben. " + p.Name + " meldet sich damit unter " + VereinPublic.Base + " an." : "Das Passwort muss mindestens 8 Zeichen haben.", !ok);
             }
+            if (ctx.Request.Action is "photo" or "nophoto" && p is not null) return await PhotoPostAsync(ctx, store, p, Root + "members/" + p.Id, ct);
             if (ctx.Request.Action == "remove" && p is not null)
             {
+                if (p.Photo.Length > 0) await ctx.Files.DeleteAsync(p.Photo, ct);
                 await store.People.DeleteAsync(p.Id, ct);
                 if (V.Checked(ctx.Request.F("deleteAccount"))) await ctx.Members.DeleteAsync(p.MemberId, ct);
                 ctx.Log($"Mitglied {p.Name} entfernt von {ctx.User.Name}");
@@ -277,6 +306,7 @@ public static class VereinAdmin
         var kids = VereinStore.ChildrenOf(await store.PeopleAsync(ct), p).ToList();
         var side = new List<UiNode?>
         {
+            PhotoCard(p),
             Ui.Card("Kinder", kids.Count == 0 ? Ui.Muted("Keine eingetragen.") : Ui.Stack(kids.Select(k => (UiNode?)Ui.Link(k.Name + (k.Born.Length > 0 ? " (" + V.Date(k.Born) + ")" : ""), Root + "children/" + k.Id)).ToArray()),
                 Ui.Button("Kind eintragen", Root + "children/new?eltern=" + p.Id, UiButtonKind.Ghost, "ti-mood-kid", small: true)),
             Ui.Card("Zugang",
@@ -391,6 +421,8 @@ public static class VereinAdmin
                 ("Angelegt", V.Stamp(d.Created) + (d.CreatedBy.Length > 0 ? " von " + d.CreatedBy : "")), ("Status", d.Archived ? "Archiv" : "aktiv"))),
             Ui.Card("Aktionen", Ui.Stack(
                 d.Archived ? null : Ui.Action("Offene erinnern (" + (target.Count - done) + ")", "remind", kind: UiButtonKind.Primary, icon: "ti-mail", confirm: "Erinnerung an alle schicken, die noch nicht geantwortet haben?"),
+                Ui.Button("PDF / Drucken", Root + "docs/" + d.Id + "/pdf", UiButtonKind.Ghost, "ti-printer", small: true),
+                Ui.Button("Nachweis als PDF", Root + "docs/" + d.Id + "/pdf?nachweis=1", UiButtonKind.Ghost, "ti-file-certificate", small: true),
                 Ui.Button("Liste als CSV", Root + "docs/" + d.Id + "/csv", UiButtonKind.Ghost, "ti-file-spreadsheet", small: true),
                 Ui.Action(d.Archived ? "Wieder aktivieren" : "Archivieren", "archive", icon: "ti-archive"),
                 answers.Count == 0 ? Ui.Action("Löschen", "delete", kind: UiButtonKind.Danger, confirm: "Dokument löschen?", icon: "ti-trash") : null))
@@ -459,6 +491,33 @@ public static class VereinAdmin
     {
         var d = await new VereinStore(ctx.Data).DocAsync(Id(ctx), ct);
         return d is null || d.File.Length == 0 ? PluginResult.NotFound() : await VereinPublic.ServeAsync(ctx, d.File, d.FileName, d.FileType, ct);
+    }
+
+    /// <summary>The document on the club's letterhead; <c>?nachweis=1</c> adds everybody's answers (the proof to file away).</summary>
+    private static async Task<PluginResult> DocPdfAsync(IPluginContext ctx, CancellationToken ct)
+    {
+        var store = new VereinStore(ctx.Data);
+        var d = await store.DocAsync(Id(ctx), ct);
+        if (d is null) return PluginResult.NotFound();
+        List<(string, Answer?)>? proof = null;
+        if (ctx.Request.Q("nachweis") == "1")
+        {
+            var people = await store.PeopleAsync(ct);
+            var answers = (await store.AnswersOfDocAsync(d.Id, ct)).ToDictionary(a => a.MemberId);
+            proof = VereinStore.Audience(people, d.Audience, VereinSettings.BoardList(ctx)).OrderBy(p => p.Last).ThenBy(p => p.First)
+                .Select(p => (p.Name, answers.TryGetValue(p.MemberId, out var a) ? a : null)).ToList();
+        }
+        var pdf = VereinPrint.Document(await VereinPrint.LetterheadAsync(ctx, ct), d, proof: proof);
+        return VereinPrint.Result(pdf, d.Title + (proof is null ? "" : " Nachweis"));
+    }
+
+    /// <summary>A meeting's invitation (agenda) or, with <c>?teil=protokoll</c>, its minutes — a draft too, marked as one.</summary>
+    private static async Task<PluginResult> MeetingPdfAsync(IPluginContext ctx, CancellationToken ct)
+    {
+        var m = await new VereinStore(ctx.Data).MeetingAsync(Id(ctx), ct);
+        if (m is null) return PluginResult.NotFound();
+        var minutes = ctx.Request.Q("teil") == "protokoll";
+        return VereinPrint.Result(VereinPrint.Meeting(await VereinPrint.LetterheadAsync(ctx, ct), m, minutes), (minutes ? "Protokoll " : "Einladung ") + m.Title);
     }
 
     /// <summary>The proof as a spreadsheet (semicolon, UTF-8 with BOM for Excel; a leading = + - @ is quoted against formula injection).</summary>
@@ -601,7 +660,9 @@ public static class VereinAdmin
         var side = new List<UiNode?>
         {
             Ui.Card("Einladung", Ui.KeyValue(("Eingeladen", invited.Count + " (" + AudienceLabel(m.Audience) + ")"), ("Verschickt", m.InvitedAt is null ? "noch nicht" : V.Stamp(m.InvitedAt))),
-                m.Status == VereinStore.Planned ? Ui.Action(m.InvitedAt is null ? "Einladung senden" : "Einladung erneut senden", "invite", kind: UiButtonKind.Primary, icon: "ti-mail", confirm: "Einladung an " + invited.Count + " Person(en) schicken?") : null),
+                m.Status == VereinStore.Planned ? Ui.Action(m.InvitedAt is null ? "Einladung senden" : "Einladung erneut senden", "invite", kind: UiButtonKind.Primary, icon: "ti-mail", confirm: "Einladung an " + invited.Count + " Person(en) schicken?") : null,
+                Ui.Inline(Ui.Button("Einladung als PDF", Root + "meetings/" + m.Id + "/pdf", UiButtonKind.Ghost, "ti-printer", small: true),
+                    Ui.Button("Protokoll als PDF", Root + "meetings/" + m.Id + "/pdf?teil=protokoll", UiButtonKind.Ghost, "ti-printer", small: true))),
             Ui.Card("Rückmeldungen", Ui.Table(new[] { Ui.Column("Name"), Ui.Column("Antwort") }, invited.OrderBy(p => p.Last).Select(p =>
             {
                 var r = rsvps.FirstOrDefault(x => x.MemberId == p.MemberId);
@@ -639,7 +700,26 @@ public static class VereinAdmin
 
         if (ctx.Request.IsPost)
         {
-            if (e is not null && ctx.Request.Action == "delete") { await store.Events.DeleteAsync(e.Id, ct); return PluginResult.Redirect(Root + "events", "Termin gelöscht."); }
+            if (e is not null && ctx.Request.Action == "delete")
+            {
+                await store.Replies.DeleteWhereAsync(DataQuery.Everything.Eq("event_id", e.Id), ct);
+                await store.Events.DeleteAsync(e.Id, ct);
+                return PluginResult.Redirect(Root + "events", "Termin gelöscht.");
+            }
+            if (e is not null && ctx.Request.Action == "ask")
+            {
+                if (!e.ReplyOpen(V.Today)) return PluginResult.Redirect(Root + "events/" + e.Id, "Für diesen Termin ist keine Teilnahme-Abfrage offen (abgefragt, veröffentlicht, nicht vorbei?).", true);
+                var (s, f) = await SendAskAsync(ctx, store, e, ct);
+                await store.Events.UpdateAsync(e.Id, new Dictionary<string, object?> { ["asked_at"] = DateTime.UtcNow }, ct);
+                return PluginResult.Redirect(Root + "events/" + e.Id, "Teilnahme-Abfrage: " + Sent(s, f), f > 0);
+            }
+            if (e is not null && ctx.Request.Action == "setreply" && long.TryParse(ctx.Request.F("member"), out var who)
+                && ctx.Request.F("answer") is VereinStore.Yes or VereinStore.No or VereinStore.Maybe or "")
+            {
+                if (ctx.Request.F("answer") == "") await store.Replies.DeleteWhereAsync(DataQuery.Everything.Eq("event_id", e.Id).Eq("member_id", who), ct);
+                else await store.SetReplyAsync(e.Id, who, ctx.Request.F("answer"), "eingetragen vom Vorstand", 0, ct);
+                return PluginResult.Redirect(Root + "events/" + e.Id, "Rückmeldung eingetragen.");
+            }
             var title = V.Clip(ctx.Request.F("title"), 160);
             var starts = V.CleanDate(ctx.Request.F("starts"));
             if (title.Length < 2 || starts.Length == 0) return PluginResult.Redirect(Root + "events/" + (isNew ? "new" : e!.Id), "Bitte Titel und Beginn angeben.", true);
@@ -651,7 +731,10 @@ public static class VereinAdmin
                 ["description"] = V.Clip(ctx.Request.F("description"), 2000), ["public"] = V.Checked(ctx.Request.F("public")), ["link"] = link, ["cancelled"] = V.Checked(ctx.Request.F("cancelled")),
                 // planning: a draft is seen only here; the running order and the practical notes are for members
                 ["draft"] = ctx.Request.F("status") == "draft", ["meeting"] = V.Clip(ctx.Request.F("meeting"), 500), ["parking"] = V.Clip(ctx.Request.F("parking"), 1000),
-                ["notes"] = V.Clip(ctx.Request.F("notes"), 3000), ["schedule"] = ReadPlan(ctx)
+                ["notes"] = V.Clip(ctx.Request.F("notes"), 3000), ["schedule"] = ReadPlan(ctx),
+                // asking who takes part (a parade): replies in the member area, parents answer for their children
+                ["ask"] = V.Checked(ctx.Request.F("ask")), ["ask_required"] = V.Checked(ctx.Request.F("ask_required")), ["ask_due"] = V.CleanDate(ctx.Request.F("ask_due")),
+                ["ask_audience"] = AudienceOptions(ctx).Any(o => o.Value == ctx.Request.F("ask_audience")) ? ctx.Request.F("ask_audience") : VereinStore.AudienceAll
             };
             var notice = ctx.Request.F("status") == "draft" ? " Noch ein Entwurf – nur hier im Admin sichtbar." : "";
             if (isNew) { v["created"] = DateTime.UtcNow; var id = await store.Events.InsertAsync(v, ct); return PluginResult.Redirect(Root + "events/" + id, "Termin angelegt." + notice); }
@@ -681,13 +764,110 @@ public static class VereinAdmin
                 Ui.Select("status", "Stand", isNew || e!.Draft ? "draft" : "published", Ui.Option("draft", "Entwurf (nur im Admin)"), Ui.Option("published", "Veröffentlicht")),
                 Ui.Checkbox("public", "Öffentlich – auf der Website im Block „Vereinstermine“", e?.Public ?? true),
                 Ui.Checkbox("cancelled", "Abgesagt (bleibt durchgestrichen stehen)", e?.Cancelled ?? false),
-                Ui.FormActions(Ui.Submit(isNew ? "Anlegen" : "Speichern"), Ui.Button("Zurück", Root + "events", UiButtonKind.Ghost)))
+                Ui.FormActions(Ui.Submit(isNew ? "Anlegen" : "Speichern"), Ui.Button("Zurück", Root + "events", UiButtonKind.Ghost))),
+            Ui.Card("Teilnahme abfragen",
+                Ui.Checkbox("ask", "Mitglieder sollen zu- oder absagen", e?.Ask ?? false),
+                Ui.Checkbox("ask_required", "Rückmeldung ist Pflicht (z. B. Umzug)", e?.AskRequired ?? false),
+                Ui.Select("ask_audience", "Wer wird gefragt?", e is { AskAudience.Length: > 0 } ? e.AskAudience : VereinStore.AudienceAll, AudienceOptions(ctx)),
+                Ui.Input("ask_due", "Rückmeldung bis (freiwillig)", e?.AskDue ?? "", UiInputType.Date),
+                Ui.Muted("Bei „Alle“ werden auch die Kinder gefragt – für sie antworten ihre Eltern. Die Abfrage erscheint im Mitgliederbereich beim Termin und unter „Zu erledigen“."))
         };
         var form = Ui.Form(Ui.Columns(main, side));
+        var replyCard = e is { Ask: true } ? await RepliesCardAsync(ctx, store, e, ct) : null;
         return Page(Ui.Stack(Ui.PageHead(isNew ? "Umzug, Ball, Ausflug … – erst als Entwurf planen, dann veröffentlichen" : V.When(e!.Starts) + (e.Draft ? " · Entwurf" : ""), isNew ? "Neuer Termin" : e!.Title),
             form,
+            replyCard,
             isNew || e!.Draft ? null : Ui.Card("Teilen", Ui.Button("Als Instagram-Bild", Root + "instagram?vorlage=plakat&event=" + e!.Id, UiButtonKind.Ghost, "ti-brand-instagram")),
             isNew ? null : Ui.Card("Löschen", Ui.Action("Termin löschen", "delete", kind: UiButtonKind.Danger, confirm: "Termin löschen?", icon: "ti-trash"))), isNew ? "Neuer Termin" : e!.Title);
+    }
+
+    /// <summary>Who replied how, with the board's own entries (a reply by phone) and the request by mail.</summary>
+    private static async Task<UiNode> RepliesCardAsync(IPluginContext ctx, VereinStore store, Event e, CancellationToken ct)
+    {
+        var people = await store.PeopleAsync(ct);
+        var byId = people.ToDictionary(p => p.MemberId);
+        var asked = VereinStore.Asked(people, e, VereinSettings.BoardList(ctx)).ToList();
+        var replies = (await store.RepliesAsync(e.Id, ct)).ToDictionary(r => r.MemberId);
+        int Count(string a) => asked.Count(p => replies.TryGetValue(p.MemberId, out var r) && r.Answer == a);
+        var open = asked.Count(p => !replies.ContainsKey(p.MemberId));
+        var choices = new[] { Ui.Option("", "– offen –"), Ui.Option(VereinStore.Yes, "dabei"), Ui.Option(VereinStore.Maybe, "weiß noch nicht"), Ui.Option(VereinStore.No, "nicht dabei") };
+        var table = Ui.Table(new[] { Ui.Column("Name"), Ui.Column("Antwort"), Ui.Column("Bemerkung"), Ui.Column("Wann"), Ui.Column("Eintragen", actions: true) },
+            asked.OrderBy(p => replies.ContainsKey(p.MemberId)).ThenBy(p => p.Last).ThenBy(p => p.First).Select(p =>
+            {
+                replies.TryGetValue(p.MemberId, out var r);
+                var by = r is null || r.By == 0 || r.By == p.MemberId ? "" : byId.TryGetValue(r.By, out var g) ? " (von " + g.First + ")" : "";
+                return Ui.RowFor(p.Name, p.Name + (p.Child ? " (Kind)" : ""),
+                    r is null ? Ui.Badge("offen", UiTone.Warning) : r.Answer == VereinStore.Yes ? Ui.Badge("dabei", UiTone.Success) : r.Answer == VereinStore.No ? Ui.Badge("nicht dabei", UiTone.Error) : Ui.Badge("weiß noch nicht"),
+                    r?.Note ?? "", V.Stamp(r?.At) + by,
+                    Ui.Form(Ui.Hidden("action", "setreply"), Ui.Hidden("member", p.MemberId.ToString(CultureInfo.InvariantCulture)), Ui.Select("answer", "", r?.Answer ?? "", choices), Ui.Submit("OK", UiButtonKind.Ghost, small: true)));
+            }), searchPlaceholder: "Namen suchen …", emptyText: "Niemand wird gefragt.");
+        return Ui.Card("Teilnahme: " + Count(VereinStore.Yes) + " dabei · " + Count(VereinStore.Maybe) + " unsicher · " + Count(VereinStore.No) + " nicht dabei · " + open + " offen",
+            Ui.Inline(
+                e.ReplyOpen(V.Today) ? Ui.Action(e.AskedAt is null ? "Abfrage per E-Mail senden" : "Offene erinnern", "ask", kind: UiButtonKind.Primary, icon: "ti-mail",
+                    confirm: "E-Mail an alle schicken, die noch nicht geantwortet haben (für Kinder an die Eltern)?") : null,
+                Ui.Button("Teilnehmerliste als PDF", Root + "events/" + e.Id + "/pdf", UiButtonKind.Ghost, "ti-printer", small: true),
+                Ui.Button("Als CSV", Root + "events/" + e.Id + "/csv", UiButtonKind.Ghost, "ti-file-spreadsheet", small: true)),
+            e.AskedAt is null ? null : Ui.Muted("Zuletzt per E-Mail gefragt: " + V.Stamp(e.AskedAt)),
+            e.Draft ? Ui.Muted("Noch ein Entwurf – Mitglieder können erst antworten, wenn der Termin veröffentlicht ist.") : null,
+            table);
+    }
+
+    /// <summary>Mails the request to everybody asked who has not answered; for a child, to its guardians (once per guardian, naming the children).</summary>
+    private static async Task<(int, int)> SendAskAsync(IPluginContext ctx, VereinStore store, Event e, CancellationToken ct)
+    {
+        var people = await store.PeopleAsync(ct);
+        var byId = people.ToDictionary(p => p.Id);
+        var replied = (await store.RepliesAsync(e.Id, ct)).Select(r => r.MemberId).ToHashSet();
+        var openPeople = VereinStore.Asked(people, e, VereinSettings.BoardList(ctx)).Where(p => !replied.Contains(p.MemberId)).ToList();
+        var kidsFor = new Dictionary<long, List<string>>();
+        var recipients = new Dictionary<long, Person>();
+        foreach (var p in openPeople)
+        {
+            if (!p.Child) { recipients[p.Id] = p; continue; }
+            foreach (var g in p.Guardians)
+                if (byId.TryGetValue(g, out var parent) && parent.Active && !parent.Child)
+                {
+                    recipients[parent.Id] = parent;
+                    (kidsFor.TryGetValue(parent.Id, out var l) ? l : kidsFor[parent.Id] = new List<string>()).Add(p.First.Length > 0 ? p.First : p.Name);
+                }
+        }
+        return await VereinMail.SendAsync(ctx, VereinMail.EventAsk, recipients.Values, p => new Dictionary<string, string>
+        {
+            ["titel"] = e.Title, ["termin"] = V.When(e.Starts), ["ort"] = e.Place.Length > 0 ? ", " + e.Place : "", ["frist"] = e.AskDue.Length > 0 ? " bis zum " + V.Date(e.AskDue) : "",
+            ["fuer"] = kidsFor.TryGetValue(p.Id, out var k) ? " (auch für " + string.Join(", ", k) + ")" : "",
+            ["pflicht"] = e.AskRequired ? " Die Rückmeldung ist verpflichtend." : "",
+            ["event_url"] = VereinMail.Origin(ctx) + VereinPublic.Base + "/termine/" + e.Id
+        }, ct);
+    }
+
+    private static async Task<List<(Person P, EventReply? R)>> ReplyListAsync(IPluginContext ctx, VereinStore store, Event e, CancellationToken ct)
+    {
+        var replies = (await store.RepliesAsync(e.Id, ct)).ToDictionary(r => r.MemberId);
+        return VereinStore.Asked(await store.PeopleAsync(ct), e, VereinSettings.BoardList(ctx))
+            .OrderBy(p => replies.TryGetValue(p.MemberId, out var r) ? r.Answer switch { VereinStore.Yes => 0, VereinStore.Maybe => 1, _ => 3 } : 2).ThenBy(p => p.Last).ThenBy(p => p.First)
+            .Select(p => (p, replies.TryGetValue(p.MemberId, out var r) ? r : null)).ToList();
+    }
+
+    /// <summary>The list of who takes part, on the club's letterhead — to take along on the day.</summary>
+    private static async Task<PluginResult> EventPdfAsync(IPluginContext ctx, CancellationToken ct)
+    {
+        var store = new VereinStore(ctx.Data);
+        var e = await store.EventAsync(Id(ctx), ct);
+        if (e is null) return PluginResult.NotFound();
+        var list = await ReplyListAsync(ctx, store, e, ct);
+        return VereinPrint.Result(VereinPrint.Participants(await VereinPrint.LetterheadAsync(ctx, ct), e, list), "Teilnehmer " + e.Title);
+    }
+
+    private static async Task<PluginResult> EventCsvAsync(IPluginContext ctx, CancellationToken ct)
+    {
+        var store = new VereinStore(ctx.Data);
+        var e = await store.EventAsync(Id(ctx), ct);
+        if (e is null) return PluginResult.NotFound();
+        static string C(string s) { s ??= ""; if (s.Length > 0 && "=+-@".Contains(s[0])) s = "'" + s; return "\"" + s.Replace("\"", "\"\"") + "\""; }
+        var sb = new StringBuilder("\uFEFF" + string.Join(";", new[] { "Nachname", "Vorname", "Kind", "Antwort", "Bemerkung", "Wann" }.Select(C)) + "\r\n");
+        foreach (var (p, r) in await ReplyListAsync(ctx, store, e, ct))
+            sb.Append(string.Join(";", new[] { p.Last, p.First, p.Child ? "ja" : "", r is null ? "offen" : VereinPublic.ReplyLabel(r.Answer), r?.Note ?? "", V.Stamp(r?.At) }.Select(C))).Append("\r\n");
+        return PluginResult.File(Encoding.UTF8.GetBytes(sb.ToString()), "text/csv; charset=utf-8", "teilnahme-" + VereinPrint.FileName(e.Title) + ".csv");
     }
 
     /// <summary>The running order as posted by the row editor (plan.count, plan.{i}.time, plan.{i}.what), stored as "time|what" lines.</summary>

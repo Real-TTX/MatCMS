@@ -8,7 +8,8 @@ public static class VereinMail
 {
     // "verein.welcome", not the first version's "verein.invite": that one sent people the long way round (forgot password, then sign in); a stored
     // template is never overwritten, so the new one-link wording needs a key of its own.
-    public const string Invite = "verein.welcome", Document = "verein.document", Reminder = "verein.reminder", Meeting = "verein.meeting", Minutes = "verein.minutes";
+    public const string Invite = "verein.welcome", Document = "verein.document", Reminder = "verein.reminder", Meeting = "verein.meeting", Minutes = "verein.minutes",
+        EventAsk = "verein.event";
 
     private static MailPlaceholder Ph(string t, string d) => new(t, d);
     private static readonly MailPlaceholder[] Common = { Ph("name", "Vorname des Mitglieds"), Ph("verein", "Name des Vereins"), Ph("login_url", "Adresse des Mitgliederbereichs") };
@@ -42,6 +43,14 @@ public static class VereinMail
             "Protokoll: {{titel}}",
             "Hallo {{name}},\n\ndas Protokoll von „{{titel}}“ ({{termin}}) steht jetzt im Mitgliederbereich:\n{{meeting_url}}\n\nViele Grüße\n{{verein}}\n")
         { Placeholders = Common.Concat(new[] { Ph("titel", "Titel der Sitzung"), Ph("termin", "Datum und Uhrzeit"), Ph("meeting_url", "Link zur Sitzung") }).ToArray() },
+
+        new MailTemplateSpec(EventAsk, "Verein: Teilnahme an einem Termin erfragen", "Geht an alle, die bei einem Termin noch keine Rückmeldung gegeben haben (für Kinder an ihre Eltern), wenn im Admin „Teilnahme abfragen“ geklickt wird.",
+            "{{titel}} am {{termin}} – bist du dabei?",
+            "Hallo {{name}},\n\nwir planen {{titel}} ({{termin}}{{ort}}) und brauchen deine Rückmeldung{{fuer}}{{frist}}.{{pflicht}}\n\nHier mit einem Klick zu- oder absagen:\n{{event_url}}\n\nViele Grüße\n{{verein}}\n")
+        {
+            Placeholders = Common.Concat(new[] { Ph("titel", "Titel des Termins"), Ph("termin", "Datum und Uhrzeit"), Ph("ort", "„, Ort“ oder leer"), Ph("frist", "„ bis zum …“ oder leer"),
+                Ph("fuer", "„ (auch für Anna, Tim)“ – die Kinder, für die mit geantwortet wird – oder leer"), Ph("pflicht", "Satz, dass die Rückmeldung verpflichtend ist – oder leer"), Ph("event_url", "Link zum Termin") }).ToArray()
+        },
     };
 
     public static string Origin(IPluginContext ctx) => (ctx.Site.Origin ?? "").TrimEnd('/');

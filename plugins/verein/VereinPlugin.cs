@@ -19,6 +19,7 @@ public sealed class VereinPlugin : IPlugin
         VereinStore.Declare(b.Data);
         VereinSettings.Declare(b.Settings);
         VereinInstagram.Declare(b.Settings);
+        VereinPrint.Declare(b.Settings);
         foreach (var spec in VereinMail.Specs) b.MailTemplate(spec);
         VereinPublic.Configure(b);
         VereinAdmin.Configure(b);

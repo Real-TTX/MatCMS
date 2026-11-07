@@ -349,6 +349,9 @@ public interface IPluginSite
     string Origin { get; }
     /// <summary>The languages the site publishes in, the default first.</summary>
     IReadOnlyList<string> Locales { get; }
+    /// <summary>The site's own logo (a local <c>/uploads/…</c> path or an https address), or "" while the site shows MatCMS's default logo —
+    /// what a plugin puts on paper (a letterhead) when it has no picture of its own.</summary>
+    string LogoUrl => "";
     /// <summary>Draws one of the CMS's own content blocks (<c>gallery</c>, <c>text</c>, …) with the given field values, as the page editor would.</summary>
     Task<string> RenderBlockAsync(string blockType, JsonNode values, CancellationToken ct = default);
     /// <summary>The HTML of a layout part of the active template with its <c>{{token}}</c> placeholders still in it — to see which

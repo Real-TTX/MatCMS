@@ -8,7 +8,7 @@ namespace MatCMS.Plugin.Verein;
 /// </summary>
 public sealed record Person(long Id, long MemberId, string First, string Last, string Email, string Phone, IReadOnlyList<string> Roles, string Joined,
     bool Active, string Note, DateTime? Created, bool Child = false, IReadOnlyList<long>? GuardianIds = null, string Born = "",
-    string Street = "", string Zip = "", string City = "", IReadOnlyDictionary<string, string>? ExtraValues = null, string CalToken = "")
+    string Street = "", string Zip = "", string City = "", IReadOnlyDictionary<string, string>? ExtraValues = null, string CalToken = "", string Photo = "")
 {
     public string Name => (First + " " + Last).Trim();
     public bool Has(string role) => Roles.Contains(role, StringComparer.OrdinalIgnoreCase);
@@ -42,8 +42,12 @@ public sealed record Rsvp(long Id, long MeetingId, long MemberId, string Answer,
 
 /// <summary>An event of the club (a parade, a ball, a trip). Public ones may be shown on the website by the block „Kommende Termine“; internal ones only in the member area.</summary>
 public sealed record Event(long Id, string Title, string Kind, string Starts, string Ends, string Place, string Description, bool Public, string Link, bool Cancelled, DateTime? Created,
-    bool Draft = false, string Meeting = "", string Parking = "", string Notes = "", string Schedule = "")
+    bool Draft = false, string Meeting = "", string Parking = "", string Notes = "", string Schedule = "",
+    bool Ask = false, string AskAudience = "", string AskDue = "", bool AskRequired = false, DateTime? AskedAt = null)
 {
+    /// <summary>Replies are taken until the event's day is over (and never for a cancelled one).</summary>
+    public bool ReplyOpen(string today) => Ask && !Cancelled && !Draft && string.CompareOrdinal((Ends.Length >= 10 ? Ends[..10] : Day), today) >= 0;
+
     /// <summary>The day the event starts (yyyy-MM-dd), for ordering and „upcoming“.</summary>
     public string Day => Starts.Length >= 10 ? Starts[..10] : Starts;
     /// <summary>The planned running order: one "time|what" per line (Aufstellung, Zunftmeisterempfang …).</summary>
@@ -52,6 +56,9 @@ public sealed record Event(long Id, string Title, string Kind, string Starts, st
     /// <summary>Anything beyond the basics a member should know.</summary>
     public bool HasPlan => Steps.Count > 0 || Meeting.Length > 0 || Parking.Length > 0 || Notes.Length > 0;
 }
+
+/// <summary>Whether a person takes part in an event the board asked about (a parent answers for a child; <see cref="By"/> = the person who answered).</summary>
+public sealed record EventReply(long Id, long EventId, long MemberId, string Answer, string Note, long By, DateTime? At);
 
 /// <summary>A template: the starting text of a document, an agenda or minutes.</summary>
 public sealed record Template(long Id, string Name, string Kind, string Title, string Body, DateTime? Created);
@@ -62,7 +69,7 @@ public sealed record Template(long Id, string Name, string Kind, string Title, s
 /// </summary>
 public sealed class VereinStore(IPluginData data)
 {
-    public const string TPeople = "people", TDocs = "docs", TAnswers = "answers", TUploads = "uploads", TMeetings = "meetings", TRsvps = "rsvps", TTemplates = "templates", TEvents = "events", TMeta = "meta";
+    public const string TPeople = "people", TDocs = "docs", TAnswers = "answers", TUploads = "uploads", TMeetings = "meetings", TRsvps = "rsvps", TTemplates = "templates", TEvents = "events", TMeta = "meta", TReplies = "event_replies";
 
     // kinds and states (stored values — never renamed)
     public const string Confirm = "confirm", Sign = "sign", Read = "read";
@@ -78,7 +85,7 @@ public sealed class VereinStore(IPluginData data)
     {
         b.Table(TPeople, t => t.Int("member_id", required: true).Text("first").Text("last").Text("email").Text("phone").Text("roles")
             .Text("joined").Bool("active", def: "1").Text("note").Timestamp("created")
-            .Bool("child", def: "0").Text("guardians").Text("born").Text("street").Text("zip").Text("city").Json("extra").Text("cal_token").UniqueIndex("member_id"));
+            .Bool("child", def: "0").Text("guardians").Text("born").Text("street").Text("zip").Text("city").Json("extra").Text("cal_token").Text("photo").UniqueIndex("member_id"));
         b.Table(TDocs, t => t.Text("title", required: true).Text("body").Text("kind", required: true).Text("audience", required: true)
             .Text("file").Text("file_name").Text("file_type").Text("due").Bool("archived", def: "0").Timestamp("created").Text("created_by").Index("archived"));
         b.Table(TAnswers, t => t.Int("doc_id", required: true).Int("member_id", required: true).Text("status", required: true).Text("signature")
@@ -92,7 +99,10 @@ public sealed class VereinStore(IPluginData data)
             .UniqueIndex("meeting_id", "member_id"));
         b.Table(TEvents, t => t.Text("title", required: true).Text("kind").Text("starts", required: true).Text("ends").Text("place").Text("description")
             .Bool("public", def: "1").Text("link").Bool("cancelled", def: "0").Timestamp("created")
-            .Bool("draft", def: "0").Text("meeting").Text("parking").Text("notes").Text("schedule").Index("starts"));
+            .Bool("draft", def: "0").Text("meeting").Text("parking").Text("notes").Text("schedule")
+            .Bool("ask", def: "0").Text("ask_audience").Text("ask_due").Bool("ask_required", def: "0").Timestamp("asked_at").Index("starts"));
+        b.Table(TReplies, t => t.Int("event_id", required: true).Int("member_id", required: true).Text("answer", required: true).Text("note").Int("by", def: "0").Timestamp("at")
+            .UniqueIndex("event_id", "member_id").Index("member_id"));
         b.Table(TMeta, t => t.Text("name", required: true).Text("value").UniqueIndex("name"));
         b.Table(TTemplates, t => t.Text("name", required: true).Text("kind", required: true).Text("title").Text("body").Timestamp("created").Index("kind"));
     }
@@ -106,6 +116,7 @@ public sealed class VereinStore(IPluginData data)
     public IDataTable Templates => data.Table(TTemplates);
     public IDataTable Events => data.Table(TEvents);
     public IDataTable Meta => data.Table(TMeta);
+    public IDataTable Replies => data.Table(TReplies);
 
     // ---- mapping ------------------------------------------------------------------------------------------------
 
@@ -115,7 +126,7 @@ public sealed class VereinStore(IPluginData data)
     private static Person P(DataRow r) => new(r.Id, r.Int("member_id"), r.Text("first"), r.Text("last"), r.Text("email"), r.Text("phone"),
         SplitRoles(r.Text("roles")), r.Text("joined"), r.Bool("active"), r.Text("note"), r.Timestamp("created"), r.Bool("child"),
         r.Text("guardians").Split(',', StringSplitOptions.RemoveEmptyEntries).Select(x => long.TryParse(x, out var g) ? g : 0).Where(g => g > 0).Distinct().ToList(), r.Text("born"),
-        r.Text("street"), r.Text("zip"), r.Text("city"), ReadExtra(r), r.Text("cal_token"));
+        r.Text("street"), r.Text("zip"), r.Text("city"), ReadExtra(r), r.Text("cal_token"), r.Text("photo"));
 
     private static IReadOnlyDictionary<string, string> ReadExtra(DataRow r)
     {
@@ -141,7 +152,9 @@ public sealed class VereinStore(IPluginData data)
         r.Text("status"), r.Text("minutes"), r.Text("minutes_status"), r.Timestamp("created"), r.Timestamp("invited_at"));
     private static Rsvp R(DataRow r) => new(r.Id, r.Int("meeting_id"), r.Int("member_id"), r.Text("answer"), r.Timestamp("at"));
     private static Event E(DataRow r) => new(r.Id, r.Text("title"), r.Text("kind"), r.Text("starts"), r.Text("ends"), r.Text("place"), r.Text("description"),
-        r.Bool("public"), r.Text("link"), r.Bool("cancelled"), r.Timestamp("created"), r.Bool("draft"), r.Text("meeting"), r.Text("parking"), r.Text("notes"), r.Text("schedule"));
+        r.Bool("public"), r.Text("link"), r.Bool("cancelled"), r.Timestamp("created"), r.Bool("draft"), r.Text("meeting"), r.Text("parking"), r.Text("notes"), r.Text("schedule"),
+        r.Bool("ask"), r.Text("ask_audience"), r.Text("ask_due"), r.Bool("ask_required"), r.Timestamp("asked_at"));
+    private static EventReply ER(DataRow r) => new(r.Id, r.Int("event_id"), r.Int("member_id"), r.Text("answer"), r.Text("note"), r.Int("by"), r.Timestamp("at"));
     private static Template T(DataRow r) => new(r.Id, r.Text("name"), r.Text("kind"), r.Text("title"), r.Text("body"), r.Timestamp("created"));
 
     // ---- people -------------------------------------------------------------------------------------------------
@@ -261,6 +274,32 @@ public sealed class VereinStore(IPluginData data)
         (await EventsAsync(ct)).Where(e => !e.Draft && (!publicOnly || e.Public) && string.CompareOrdinal(e.Ends.Length >= 10 ? e.Ends[..10] : e.Day, today) >= 0)
             .Take(Math.Max(1, max)).ToList();
 
+    /// <summary>Who is asked to reply: the active members of the chosen audience; with „alle“ the children too (their guardians answer for them).</summary>
+    public static IEnumerable<Person> Asked(IEnumerable<Person> people, Event e, IReadOnlyCollection<string> boardRoles)
+    {
+        var audience = e.AskAudience.Length > 0 ? e.AskAudience : AudienceAll;
+        return people.Where(p => p.Active && (p.Child ? audience == AudienceAll : InAudience(p, audience, boardRoles)));
+    }
+
+    /// <summary>The people a member answers for: themself (when asked) and their asked children.</summary>
+    public static List<Person> AnswersFor(IReadOnlyList<Person> people, Person me, Event e, IReadOnlyCollection<string> boardRoles)
+    {
+        var asked = Asked(people, e, boardRoles).Select(p => p.Id).ToHashSet();
+        return new[] { me }.Concat(ChildrenOf(people, me)).Where(p => asked.Contains(p.Id)).ToList();
+    }
+
+    public async Task<IReadOnlyList<EventReply>> RepliesAsync(long eventId, CancellationToken ct = default) =>
+        (await Replies.QueryAsync(DataQuery.Everything.Eq("event_id", eventId), ct)).Select(ER).ToList();
+    public async Task<IReadOnlyList<EventReply>> AllRepliesAsync(CancellationToken ct = default) =>
+        (await Replies.QueryAsync(DataQuery.Everything, ct)).Select(ER).ToList();
+
+    public async Task SetReplyAsync(long eventId, long memberId, string answer, string note, long by, CancellationToken ct = default)
+    {
+        var v = new Dictionary<string, object?> { ["answer"] = answer, ["note"] = note, ["by"] = by, ["at"] = DateTime.UtcNow };
+        if (await Replies.FindAsync(DataQuery.Everything.Eq("event_id", eventId).Eq("member_id", memberId), ct) is DataRow r) await Replies.UpdateAsync(r.Id, v, ct);
+        else { v["event_id"] = eventId; v["member_id"] = memberId; await Replies.InsertAsync(v, ct); }
+    }
+
     // ---- templates ----------------------------------------------------------------------------------------------
 
     public async Task<IReadOnlyList<Template>> TemplatesAsync(string? kind = null, CancellationToken ct = default)
@@ -279,8 +318,11 @@ public sealed class VereinStore(IPluginData data)
     /// </summary>
     public async Task EraseMemberAsync(long memberId, IPluginFiles files, CancellationToken ct = default)
     {
+        foreach (var row in await People.QueryAsync(DataQuery.Everything.Eq("member_id", memberId), ct))
+            if (row.Text("photo") is { Length: > 0 } photo) await files.DeleteAsync(photo, ct);
         await People.DeleteWhereAsync(DataQuery.Everything.Eq("member_id", memberId), ct);
         await Rsvps.DeleteWhereAsync(DataQuery.Everything.Eq("member_id", memberId), ct);
+        await Replies.DeleteWhereAsync(DataQuery.Everything.Eq("member_id", memberId), ct);
         foreach (var u in (await Uploads.QueryAsync(DataQuery.Everything.Eq("member_id", memberId), ct)).Select(U))
         {
             await files.DeleteAsync(u.File, ct);

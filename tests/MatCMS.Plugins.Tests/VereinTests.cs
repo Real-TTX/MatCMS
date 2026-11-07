@@ -585,4 +585,140 @@ public class VereinTests : IClassFixture<VereinApp>
         var prefilled = Text(await admin.GetStringAsync("/admin/p/verein/docs/new?vorlage=" + id));
         Assert.DoesNotContain("{{verein}}", prefilled);
     }
+    [Fact]
+    public async Task Documents_and_meetings_print_as_pdf_on_the_letterhead_and_members_get_only_their_own()
+    {
+        await JoinAsync("theo", "Mitglied");
+        var admin = await _app.AsAsync("admin");
+        // merged into what other tests stored (they share the site)
+        _app.Db(db =>
+        {
+            var row = db.Plugins.First(p => p.Key == "verein");
+            var cfg = System.Text.Json.Nodes.JsonNode.Parse(string.IsNullOrEmpty(row.ConfigJson) ? "{}" : row.ConfigJson)!.AsObject();
+            cfg["printHead"] = "Narrenzunft Test e.V.\nHauptstraße 1, 74354 Besigheim"; cfg["printFoot"] = "Bank: Testbank · IBAN DE00"; cfg["printColor"] = "#013daf";
+            row.ConfigJson = cfg.ToJsonString();
+            return db.SaveChanges();
+        });
+        using (var scope = _app.App.Services.CreateScope())
+            await scope.ServiceProvider.GetRequiredService<PluginRunner>().ReloadAsync(_app.Db(db => db.Plugins.First(p => p.Key == "verein").Id));
+        var docId = await NewDocAsync("Druckbare Einwilligung", "sign");
+        var pdf = await admin.GetAsync("/admin/p/verein/docs/" + docId + "/pdf?nachweis=1");
+        Assert.Equal(HttpStatusCode.OK, pdf.StatusCode);
+        Assert.Equal("application/pdf", pdf.Content.Headers.ContentType!.MediaType);
+        var bytes = await pdf.Content.ReadAsByteArrayAsync();
+        var text = System.Text.Encoding.Latin1.GetString(bytes);
+        Assert.StartsWith("%PDF-1.4", text);
+        Assert.Contains("(Narrenzunft Test e.V.)", text);                       // the letterhead from the settings
+        Assert.Contains("Bank: Testbank", text);                                  // the footer
+        Assert.Contains("Nachweis \\(", text);                                  // "(" is escaped inside a PDF string
+        Assert.Contains("Theo Muster", text);
+        Assert.Contains("Druckbare-Einwilligung", pdf.Content.Headers.GetValues("Content-Disposition").Single());
+
+        var theo = await _app.AsAsync("theo");
+        var mine = await theo.GetAsync("/mitglied/dokumente/" + docId + "/pdf");
+        Assert.Equal(HttpStatusCode.OK, mine.StatusCode);
+        var own = System.Text.Encoding.Latin1.GetString(await mine.Content.ReadAsByteArrayAsync());
+        Assert.DoesNotContain("Nachweis \\(", own);                                  // no proof of the others for a member
+        Assert.Contains("(Unterschrift)", own);                                    // a line to sign on paper
+        var board = await NewDocAsync("Nur Vorstand", "read", "board");
+        Assert.Equal(HttpStatusCode.NotFound, (await theo.GetAsync("/mitglied/dokumente/" + board + "/pdf")).StatusCode);
+
+        var res = await VereinApp.PostFormAsync(admin, "/admin/p/verein/meetings/new", new()
+        {
+            ["title"] = "Ausschusssitzung", ["kind"] = "Ausschusssitzung", ["starts"] = DateTime.UtcNow.AddDays(5).ToString("yyyy-MM-dd") + "T19:00",
+            ["place"] = "Vereinsheim", ["audience"] = "all", ["status"] = "planned", ["agenda"] = "1. Begrüßung\n2. Kassenbericht mit einem sehr langen Text, der umbrechen muss, weil er nicht in eine Zeile passt und weiter geht"
+        });
+        var mid = Regex.Match(res.Headers.Location!.OriginalString, "meetings/(\\d+)").Groups[1].Value;
+        var inv = System.Text.Encoding.Latin1.GetString(await (await theo.GetAsync("/mitglied/sitzungen/" + mid + "/pdf")).Content.ReadAsByteArrayAsync());
+        Assert.Contains("(Tagesordnung)", inv);
+        Assert.Contains("(Kassenbericht", inv);
+        // minutes: a draft prints in the back office (marked), never for a member
+        await VereinApp.PostFormAsync(admin, "/admin/p/verein/meetings/" + mid, new() { ["action"] = "minutes", ["minutes"] = "Beschluss gefasst.", ["minutes_status"] = "draft" });
+        Assert.Contains("Entwurf", System.Text.Encoding.Latin1.GetString(await admin.GetByteArrayAsync("/admin/p/verein/meetings/" + mid + "/pdf?teil=protokoll")));
+        Assert.Equal(HttpStatusCode.NotFound, (await theo.GetAsync("/mitglied/sitzungen/" + mid + "/pdf?teil=protokoll")).StatusCode);
+        await VereinApp.PostFormAsync(admin, "/admin/p/verein/meetings/" + mid, new() { ["action"] = "minutes", ["minutes"] = "Beschluss gefasst.", ["minutes_status"] = "final" });
+        var minutes = System.Text.Encoding.Latin1.GetString(await theo.GetByteArrayAsync("/mitglied/sitzungen/" + mid + "/pdf?teil=protokoll"));
+        Assert.Contains("(Beschluss gefasst.)", minutes);
+        Assert.Contains("(Protokollf\\374hrung)", minutes);                       // ü as WinAnsi octal escape
+    }
+
+    [Fact]
+    public async Task An_event_asks_who_takes_part_parents_answer_for_their_children_and_the_board_sees_the_list()
+    {
+        var uliId = await JoinAsync("uli", "Mitglied");
+        await JoinAsync("vera", "Vorsitzende/r");
+        var admin = await _app.AsAsync("admin");
+        await VereinApp.PostFormAsync(admin, "/admin/p/verein/children/new?eltern=" + uliId,
+            new() { ["first"] = "Willi", ["last"] = "Muster", ["g_" + uliId] = "true", ["role_6"] = "true" });
+        var day = DateTime.UtcNow.AddDays(20).ToString("yyyy-MM-dd");
+        var res = await VereinApp.PostFormAsync(admin, "/admin/p/verein/events/new", new()
+        {
+            ["title"] = "Umzug Teilnahmetest", ["kind"] = "Umzug", ["starts"] = day + "T14:00", ["public"] = "true", ["status"] = "published",
+            ["ask"] = "true", ["ask_required"] = "true", ["ask_audience"] = "all", ["ask_due"] = day
+        });
+        var id = Regex.Match(res.Headers.Location!.OriginalString, "events/(\\d+)").Groups[1].Value;
+
+        var uli = await _app.AsAsync("uli");
+        Assert.Contains("Rückmeldung erforderlich", Text(await uli.GetStringAsync("/mitglied")));
+        var page = await uli.GetStringAsync("/mitglied/termine/" + id);
+        var me = Regex.Matches(page, "name=\"a\\.(\\d+)\"").Select(m => m.Groups[1].Value).Distinct().ToList();
+        Assert.Equal(2, me.Count);                                                  // Uli and the child
+        Assert.Contains("Willi Muster", Text(page));
+        Assert.Equal(HttpStatusCode.Redirect, (await VereinApp.PostFormAsync(uli, "/mitglied/termine/" + id, new()
+        {
+            ["action"] = "reply", ["a." + me[0]] = "yes", ["n." + me[0]] = "komme mit <b>Bus</b>", ["a." + me[1]] = "no"
+        })).StatusCode);
+        Assert.DoesNotContain("Rückmeldung erforderlich", Text(await uli.GetStringAsync("/mitglied")));
+
+        var list = Text(await admin.GetStringAsync("/admin/p/verein/events/" + id));
+        Assert.Contains("1 dabei", list);
+        Assert.Contains("1 nicht dabei", list);
+        Assert.Contains("komme mit <b>Bus</b>", list);                              // text, never markup
+        Assert.Contains("(von Uli)", list);                                         // the child's reply came from its parent
+        var vera = await _app.AsAsync("vera");
+        Assert.Contains("Rückmeldungen (für den Vorstand)", Text(await vera.GetStringAsync("/mitglied/termine/" + id)));
+        Assert.DoesNotContain("Rückmeldungen (für den Vorstand)", Text(await uli.GetStringAsync("/mitglied/termine/" + id)));
+
+        // the board enters a reply given by phone; the list prints and exports
+        Assert.Equal(HttpStatusCode.Redirect, (await VereinApp.PostFormAsync(admin, "/admin/p/verein/events/" + id, new() { ["action"] = "setreply", ["member"] = _app.Db(db => db.SiteMembers.Single(m => m.Email == "vera@verein.example").Id).ToString(), ["answer"] = "maybe" })).StatusCode);
+        Assert.Contains("1 unsicher", Text(await admin.GetStringAsync("/admin/p/verein/events/" + id)));
+        Assert.StartsWith("%PDF", System.Text.Encoding.Latin1.GetString(await admin.GetByteArrayAsync("/admin/p/verein/events/" + id + "/pdf")));
+        var csv = await admin.GetStringAsync("/admin/p/verein/events/" + id + "/csv");
+        Assert.Contains("\"Willi\"", csv);
+        Assert.Contains("\"nicht dabei\"", csv);
+    }
+
+    [Fact]
+    public async Task A_profile_picture_is_checked_and_shown_only_to_who_may_see_the_person()
+    {
+        var xaverId = await JoinAsync("xaver", "Mitglied");
+        await JoinAsync("yvonne", "Mitglied");
+        var xaver = await _app.AsAsync("xaver");
+        async Task<HttpResponseMessage> UploadAsync(byte[] bytes, string name)
+        {
+            var html = await xaver.GetStringAsync("/mitglied/profil");
+            using var form = new MultipartFormDataContent
+            {
+                { new StringContent(AppFactory.Token(html)!), "__RequestVerificationToken" }, { new StringContent("photo"), "action" },
+                { new ByteArrayContent(bytes), "photo", name }
+            };
+            return await xaver.PostAsync("/mitglied/profil", form);
+        }
+        var notAPicture = await UploadAsync(System.Text.Encoding.UTF8.GetBytes("<svg onload=alert(1)>"), "bild.jpg");
+        Assert.Equal(HttpStatusCode.OK, notAPicture.StatusCode);                     // the page again, with the error
+        Assert.Contains("JPG, PNG oder WebP", Text(await notAPicture.Content.ReadAsStringAsync()));
+        var ok = await UploadAsync(JpegTakenAt("2026:11:01 10:00:00"), "ich.jpg");
+        Assert.Equal(HttpStatusCode.Redirect, ok.StatusCode);
+        var profile = await xaver.GetStringAsync("/mitglied/profil");
+        Assert.Contains("/mitglied/foto/" + xaverId, profile);
+        Assert.Equal("image/jpeg", (await xaver.GetAsync("/mitglied/foto/" + xaverId)).Content.Headers.ContentType!.MediaType);
+
+        // the list is not open to everybody here: another member does not get the picture, the board (admin page) does
+        var yvonne = await _app.AsAsync("yvonne");
+        Assert.Equal(HttpStatusCode.NotFound, (await yvonne.GetAsync("/mitglied/foto/" + xaverId)).StatusCode);
+        Assert.NotEqual(HttpStatusCode.OK, (await (await _app.AsAsync("guest")).GetAsync("/mitglied/foto/" + xaverId)).StatusCode);
+        var admin = await _app.AsAsync("admin");
+        Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync("/admin/p/verein/members/" + xaverId + "/photo")).StatusCode);
+        Assert.Contains("members/" + xaverId + "/photo", await admin.GetStringAsync("/admin/p/verein/members/" + xaverId));
+    }
 }

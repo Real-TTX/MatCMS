@@ -85,6 +85,8 @@ public class IndexModel : PageModel
         // A redirect may carry a message for the page it lands on (the banner the back office shows after a save).
         if (result.Kind == PluginResult.ResultKind.Redirect && !string.IsNullOrWhiteSpace(result.Notice))
             TempData[result.NoticeIsError ? "FlashError" : "Flash"] = result.Notice;
+        // The plugin's headers (a file's name, its caching) and cookies — the same rules as on its public routes; they used to be dropped here.
+        PluginResults.Apply(result, Response, section.Owner, Request.IsHttps);
         var direct = PluginResults.ToActionResult(result, HttpContext.RequestServices, UiTarget.Admin, csrf);
         if (direct is not null) return direct;
 

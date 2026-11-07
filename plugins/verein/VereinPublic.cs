@@ -21,12 +21,15 @@ public static class VereinPublic
         b.Route(Base + "/dokumente", DocsAsync, read);
         b.Route(Base + "/dokumente/{id}", DocAsync, form);
         b.Route(Base + "/dokumente/{id}/datei", DocFileAsync, read);
+        b.Route(Base + "/dokumente/{id}/pdf", DocPdfAsync, read);
         b.Route(Base + "/termine", DatesAsync, read);
-        b.Route(Base + "/termine/{id}", EventAsync, read);
+        b.Route(Base + "/termine/{id}", EventAsync, form);
         b.Route(Base + "/sitzungen/{id}", MeetingAsync, form);
+        b.Route(Base + "/sitzungen/{id}/pdf", MeetingPdfAsync, read);
         b.Route(Base + "/dateien", FilesAsync, form);
         b.Route(Base + "/dateien/{id}", FileAsync, read);
         b.Route(Base + "/mitglieder", DirectoryAsync, read);
+        b.Route(Base + "/foto/{id}", PhotoAsync, read);
         b.Route(Base + "/profil", ProfileAsync, form);
         b.Route(Base + "/vorstand", BoardAsync, read);
     }
@@ -91,6 +94,7 @@ public static class VereinPublic
         "profil" => Ok("Dein Profil ist gespeichert."),
         "passwort" => Ok("Dein Passwort ist geändert."),
         "kalender" => Ok("Dein Kalender-Link ist bereit."),
+        "foto" => Ok("Dein Profilbild ist gespeichert."),
         "zusage" => Ok("Danke für deine Rückmeldung!"),
         _ => ""
     };
@@ -122,6 +126,7 @@ public static class VereinPublic
         var p = who!.Person;
 
         var open = await OpenDocsAsync(ctx, store, p, ct);
+        var replies = await OpenRepliesAsync(ctx, store, p, ct);
         var meetings = (await MeetingsForAsync(ctx, store, who, ct)).Where(m => m.Status == VereinStore.Planned && string.CompareOrdinal(m.Starts.Length >= 10 ? m.Starts[..10] : m.Starts, V.Today) >= 0)
             .OrderBy(m => m.Starts).Take(3).ToList();
         var events = await store.UpcomingAsync(V.Today, publicOnly: false, 4, ct);
@@ -131,10 +136,13 @@ public static class VereinPublic
         var sb = new StringBuilder(Notice(ctx));
         sb.Append("<div class=\"vm-grid2\">");
         sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-file-check\"></i> Zu erledigen</h2>");
-        if (open.Count == 0) sb.Append("<p class=\"vm-muted\">Alles erledigt – danke!</p>");
+        if (open.Count == 0 && replies.Count == 0) sb.Append("<p class=\"vm-muted\">Alles erledigt – danke!</p>");
         else
         {
             sb.Append("<ul class=\"vm-list\">");
+            foreach (var e in replies) sb.Append("<li><a href=\"").Append(Base).Append("/termine/").Append(e.Id).Append("\"><strong>").Append(V.H(e.Title)).Append("</strong>")
+                .Append("<span>").Append(e.AskRequired ? "Rückmeldung erforderlich" : "Bist du dabei?").Append(" · ").Append(V.H(V.When(e.Starts)))
+                .Append(e.AskDue.Length > 0 ? " · bitte bis " + V.H(V.Date(e.AskDue)) : "").Append("</span></a></li>");
             foreach (var d in open) sb.Append("<li><a href=\"").Append(Base).Append("/dokumente/").Append(d.Id).Append("\"><strong>").Append(V.H(d.Title)).Append("</strong>")
                 .Append("<span>Bitte ").Append(VereinMail.Task(d.Kind)).Append(V.H(VereinMail.Due(d.Due))).Append("</span></a></li>");
             sb.Append("</ul>");
@@ -153,7 +161,7 @@ public static class VereinPublic
         }
         sb.Append("</section></div>");
 
-        sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-calendar-event\"></i> Kommende Termine</h2>").Append(EventList(events, internalBadge: true, memberLinks: true)).Append("</section>");
+        sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-calendar-event\"></i> Kommende Termine</h2>").Append(EventList(events, internalBadge: true, memberLinks: true, replies.Select(e => e.Id).ToHashSet())).Append("</section>");
 
         if (uploads.Count > 0)
         {
@@ -235,6 +243,7 @@ public static class VereinPublic
         if (d.File.Length > 0)
             sb.Append("<p><a class=\"vm-btn ghost\" href=\"").Append(Base).Append("/dokumente/").Append(d.Id).Append("/datei\"><i class=\"ti ti-download\"></i> ")
               .Append(V.H(d.FileName.Length > 0 ? d.FileName : "Datei öffnen")).Append("</a></p>");
+        sb.Append("<p><a class=\"vm-btn ghost small\" href=\"").Append(Base).Append("/dokumente/").Append(d.Id).Append("/pdf\" target=\"_blank\" rel=\"noopener\"><i class=\"ti ti-printer\"></i> Als PDF / drucken</a></p>");
         sb.Append("</article>");
 
         if (mine is not null)
@@ -279,6 +288,29 @@ public static class VereinPublic
         return await ServeAsync(ctx, d.File, d.FileName, d.FileType, ct);
     }
 
+    private static async Task<PluginResult> DocPdfAsync(IPluginContext ctx, CancellationToken ct)
+    {
+        var (who, deny) = await GateAsync(ctx, ct);
+        if (deny is not null) return deny;
+        var store = new VereinStore(ctx.Data);
+        var d = await store.DocAsync(Id(ctx), ct);
+        if (d is null || (!who!.Board && (d.Archived || !VereinStore.InAudience(who.Person, d.Audience, VereinSettings.BoardList(ctx))))) return PluginResult.NotFound();
+        var mine = (await store.AnswersOfMemberAsync(who.Person.MemberId, ct)).FirstOrDefault(a => a.DocId == d.Id);
+        return VereinPrint.Result(VereinPrint.Document(await VereinPrint.LetterheadAsync(ctx, ct), d, mine), d.Title);
+    }
+
+    /// <summary>Invitation for whoever is invited; the minutes only once they are published.</summary>
+    private static async Task<PluginResult> MeetingPdfAsync(IPluginContext ctx, CancellationToken ct)
+    {
+        var (who, deny) = await GateAsync(ctx, ct);
+        if (deny is not null) return deny;
+        var m = await new VereinStore(ctx.Data).MeetingAsync(Id(ctx), ct);
+        if (m is null || (!who!.Board && !VereinStore.InAudience(who.Person, m.Audience, VereinSettings.BoardList(ctx)))) return PluginResult.NotFound();
+        var minutes = ctx.Request.Q("teil") == "protokoll";
+        if (minutes && (m.MinutesStatus != VereinStore.Final || m.Minutes.Trim().Length == 0)) return PluginResult.NotFound();
+        return VereinPrint.Result(VereinPrint.Meeting(await VereinPrint.LetterheadAsync(ctx, ct), m, minutes), (minutes ? "Protokoll " : "Einladung ") + m.Title);
+    }
+
     internal static async Task<PluginResult> ServeAsync(IPluginContext ctx, string file, string name, string type, CancellationToken ct)
     {
         var stream = await ctx.Files.OpenAsync(file, ct);
@@ -307,7 +339,18 @@ public static class VereinPublic
 
     private static string AnswerLabel(string a) => a switch { VereinStore.Yes => "du kommst", VereinStore.No => "du kommst nicht", _ => "du weißt es noch nicht" };
 
-    internal static string EventList(IEnumerable<Event> events, bool internalBadge, bool memberLinks = false)
+    /// <summary>Events that still wait for this member's reply — for themself or for one of their children.</summary>
+    private static async Task<List<Event>> OpenRepliesAsync(IPluginContext ctx, VereinStore store, Person me, CancellationToken ct)
+    {
+        var events = (await store.EventsAsync(ct)).Where(e => e.ReplyOpen(V.Today)).ToList();
+        if (events.Count == 0) return events;
+        var people = await store.PeopleAsync(ct);
+        var board = VereinSettings.BoardList(ctx);
+        var replied = (await store.AllRepliesAsync(ct)).Select(r => (r.EventId, r.MemberId)).ToHashSet();
+        return events.Where(e => VereinStore.AnswersFor(people, me, e, board).Any(p => !replied.Contains((e.Id, p.MemberId)))).ToList();
+    }
+
+    internal static string EventList(IEnumerable<Event> events, bool internalBadge, bool memberLinks = false, ISet<long>? needsReply = null)
     {
         var list = events.ToList();
         if (list.Count == 0) return "<p class=\"vm-muted\">Gerade stehen keine Termine an.</p>";
@@ -318,6 +361,7 @@ public static class VereinPublic
             sb.Append("<li class=\"").Append(e.Cancelled ? "is-cancelled" : "").Append("\"><span class=\"vm-date\"><b>").Append(V.H(day)).Append("</b><small>").Append(V.H(month)).Append("</small><em>")
               .Append(V.H(wd)).Append("</em></span><span class=\"vm-ev\"><strong>").Append(memberLinks ? "<a href=\"" + Base + "/termine/" + e.Id + "\">" + V.H(e.Title) + "</a>" : V.H(e.Title)).Append("</strong>");
             if (memberLinks && e.HasPlan) sb.Append(" <span class=\"vm-badge ok\">Ablauf &amp; Infos</span>");
+            if (needsReply?.Contains(e.Id) == true) sb.Append(" <span class=\"vm-badge warn\">").Append(e.AskRequired ? "Rückmeldung erforderlich" : "Rückmeldung fehlt").Append("</span>");
             if (e.Cancelled) sb.Append(" <span class=\"vm-badge err\">abgesagt</span>");
             if (internalBadge && !e.Public) sb.Append(" <span class=\"vm-badge\">intern</span>");
             sb.Append("<small>").Append(V.H(V.When(e.Starts)));
@@ -351,7 +395,8 @@ public static class VereinPublic
                 : m.MinutesStatus == VereinStore.Final ? "<span class=\"vm-badge ok\">Protokoll</span>" : "") + "</a>";
 
         var sb = new StringBuilder(Notice(ctx));
-        sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-calendar-event\"></i> Termine</h2>").Append(EventList(events, internalBadge: true, memberLinks: true)).Append("</section>");
+        var waiting = (await OpenRepliesAsync(ctx, store, who.Person, ct)).Select(e => e.Id).ToHashSet();
+        sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-calendar-event\"></i> Termine</h2>").Append(EventList(events, internalBadge: true, memberLinks: true, waiting)).Append("</section>");
         sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-users-group\"></i> Sitzungen</h2>");
         if (upcoming.Count == 0) sb.Append("<p class=\"vm-muted\">Gerade ist keine Sitzung geplant.</p>");
         else sb.Append("<div class=\"vm-rows\">").Append(string.Concat(upcoming.Select(m => MeetingRow(m, true)))).Append("</div>");
@@ -365,10 +410,23 @@ public static class VereinPublic
     {
         var (who, deny) = await GateAsync(ctx, ct);
         if (deny is not null) return deny;
-        var e = await new VereinStore(ctx.Data).EventAsync(Id(ctx), ct);
+        var store = new VereinStore(ctx.Data);
+        var e = await store.EventAsync(Id(ctx), ct);
         if (e is null || e.Draft) return PluginResult.NotFound();
+        var people = e.Ask ? await store.PeopleAsync(ct) : Array.Empty<Person>();
+        var board = VereinSettings.BoardList(ctx);
+        var mine = e.Ask ? VereinStore.AnswersFor(people, who!.Person, e, board) : new List<Person>();
 
-        var sb = new StringBuilder("<p><a href=\"" + Base + "/termine\">← Termine & Sitzungen</a></p>");
+        if (ctx.Request.IsPost)
+        {
+            if (ctx.Request.Action != "reply" || !e.ReplyOpen(V.Today) || mine.Count == 0) return PluginResult.Redirect(Base + "/termine/" + e.Id);
+            foreach (var p in mine)
+                if (ctx.Request.F("a." + p.Id) is VereinStore.Yes or VereinStore.No or VereinStore.Maybe)
+                    await store.SetReplyAsync(e.Id, p.MemberId, ctx.Request.F("a." + p.Id), V.Clip(ctx.Request.F("n." + p.Id), 200).Replace("\n", " "), who!.Person.MemberId, ct);
+            return PluginResult.Redirect(Base + "/termine/" + e.Id + "?ok=zusage");
+        }
+
+        var sb = new StringBuilder(Notice(ctx) + "<p><a href=\"" + Base + "/termine\">← Termine & Sitzungen</a></p>");
         sb.Append("<section class=\"vm-card\">");
         if (e.Cancelled) sb.Append("<div class=\"vm-err\">Dieser Termin ist abgesagt.</div>");
         sb.Append("<dl class=\"vm-facts\"><dt>Wann</dt><dd>").Append(V.H(V.When(e.Starts)));
@@ -382,6 +440,7 @@ public static class VereinPublic
         if (e.Link.StartsWith("https://", StringComparison.Ordinal) || (e.Link.StartsWith('/') && !e.Link.StartsWith("//", StringComparison.Ordinal)))
             sb.Append("<p><a href=\"").Append(V.H(e.Link)).Append("\">Mehr erfahren →</a></p>");
         sb.Append("</section>");
+        if (e.Ask && !e.Cancelled) sb.Append(await ReplyCardAsync(ctx, store, e, mine, people, who!.Board, ct));
         if (e.Steps.Count > 0)
         {
             sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-clock\"></i> Ablauf</h2><table class=\"vm-table vm-plan\"><tbody>");
@@ -391,11 +450,53 @@ public static class VereinPublic
         if (e.Parking.Length > 0) sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-parking\"></i> Parken & Anfahrt</h2><div class=\"vm-text\">").Append(V.Paragraphs(e.Parking)).Append("</div></section>");
         if (e.Notes.Length > 0) sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-info-circle\"></i> Hinweise</h2><div class=\"vm-text\">").Append(V.Paragraphs(e.Notes)).Append("</div></section>");
         if (!e.HasPlan) sb.Append("<p class=\"vm-muted\">Ablauf und weitere Infos folgen – der Vorstand trägt sie nach.</p>");
-        var photos = (await new VereinStore(ctx.Data).UploadsAsync(VereinStore.Photo, ct)).Where(u => u.EventId == e.Id && CanSee(u, who!.Person, who.Board)).ToList();
+        var photos = (await store.UploadsAsync(VereinStore.Photo, ct)).Where(u => u.EventId == e.Id && CanSee(u, who!.Person, who.Board)).ToList();
         sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-photo\"></i> Bilder (").Append(photos.Count).Append(")</h2>");
         if (photos.Count > 0) sb.Append("<div class=\"vm-thumbs\">").Append(string.Concat(photos.Take(24).Select(Thumb))).Append("</div>");
         sb.Append("<p><a class=\"vm-btn ghost small\" href=\"").Append(Base).Append("/dateien?termin=").Append(e.Id).Append("\"><i class=\"ti ti-upload\"></i> Bilder zu diesem Termin ansehen und hochladen</a></p></section>");
         return await ShellAsync(ctx, who!, "dates", e.Title, sb.ToString(), ct);
+    }
+
+    internal static string ReplyLabel(string a) => a switch { VereinStore.Yes => "dabei", VereinStore.No => "nicht dabei", _ => "weiß noch nicht" };
+
+    /// <summary>„Bist du dabei?“ for the member and each of their children; the board sees who has answered.</summary>
+    private static async Task<string> ReplyCardAsync(IPluginContext ctx, VereinStore store, Event e, List<Person> mine, IReadOnlyList<Person> people, bool board, CancellationToken ct)
+    {
+        var replies = (await store.RepliesAsync(e.Id, ct)).ToDictionary(r => r.MemberId);
+        var open = e.ReplyOpen(V.Today);
+        var sb = new StringBuilder("<section class=\"vm-card vm-reply\"><h2><i class=\"ti ti-hand-stop\"></i> Teilnahme</h2>");
+        if (e.AskRequired) sb.Append("<p><span class=\"vm-badge warn\">Rückmeldung erforderlich</span></p>");
+        if (e.AskDue.Length > 0) sb.Append("<p class=\"vm-muted\">Bitte bis ").Append(V.H(V.Date(e.AskDue))).Append(" zu- oder absagen.</p>");
+        if (mine.Count == 0) sb.Append("<p class=\"vm-muted\">Für diesen Termin ist von dir keine Rückmeldung nötig.</p>");
+        else if (!open)
+            foreach (var p in mine) sb.Append("<p>").Append(V.H(p.Name)).Append(": <strong>").Append(replies.TryGetValue(p.MemberId, out var r) ? ReplyLabel(r.Answer) : "keine Rückmeldung").Append("</strong></p>");
+        else
+        {
+            sb.Append("<form method=\"post\" class=\"vm-form\">").Append(ctx.Antiforgery).Append("<input type=\"hidden\" name=\"action\" value=\"reply\">");
+            foreach (var p in mine)
+            {
+                replies.TryGetValue(p.MemberId, out var r);
+                sb.Append("<fieldset class=\"vm-reply-row\"><legend>").Append(p.Child ? V.H(p.Name) : "Du").Append("</legend><div class=\"vm-choice\">");
+                foreach (var (val, label) in new[] { (VereinStore.Yes, "Bin dabei"), (VereinStore.Maybe, "Weiß noch nicht"), (VereinStore.No, "Kann nicht") })
+                    sb.Append("<label><input type=\"radio\" name=\"a.").Append(p.Id).Append("\" value=\"").Append(val).Append('"').Append(r?.Answer == val ? " checked" : "").Append("><span>").Append(label).Append("</span></label>");
+                sb.Append("</div><input name=\"n.").Append(p.Id).Append("\" maxlength=\"200\" placeholder=\"Bemerkung (freiwillig, z. B. komme später)\" value=\"").Append(V.H(r?.Note ?? "")).Append("\"></fieldset>");
+            }
+            sb.Append("<button class=\"vm-btn\" type=\"submit\">Rückmeldung speichern</button></form>");
+        }
+        if (board)
+        {
+            var asked = VereinStore.Asked(people, e, VereinSettings.BoardList(ctx)).ToList();
+            int Count(string a) => asked.Count(p => replies.TryGetValue(p.MemberId, out var r) && r.Answer == a);
+            sb.Append("<h3>Rückmeldungen (für den Vorstand)</h3><p class=\"vm-muted\">").Append(Count(VereinStore.Yes)).Append(" dabei · ").Append(Count(VereinStore.Maybe)).Append(" unsicher · ")
+              .Append(Count(VereinStore.No)).Append(" nicht dabei · ").Append(asked.Count(p => !replies.ContainsKey(p.MemberId))).Append(" offen</p><table class=\"vm-table\"><thead><tr><th>Name</th><th>Antwort</th><th>Bemerkung</th></tr></thead><tbody>");
+            foreach (var p in asked.OrderBy(p => replies.ContainsKey(p.MemberId)).ThenBy(p => p.Last))
+            {
+                replies.TryGetValue(p.MemberId, out var r);
+                sb.Append("<tr><td>").Append(V.H(p.Name)).Append("</td><td>").Append(r is null ? "<span class=\"vm-badge warn\">offen</span>" : V.H(ReplyLabel(r.Answer))).Append("</td><td>").Append(V.H(r?.Note ?? "")).Append("</td></tr>");
+            }
+            sb.Append("</tbody></table>");
+        }
+        return sb.Append("</section>").ToString();
     }
 
     private static async Task<PluginResult> MeetingAsync(IPluginContext ctx, CancellationToken ct)
@@ -428,9 +529,10 @@ public static class VereinPublic
                 sb.Append("<button class=\"vm-btn").Append(mine?.Answer == val ? "" : " ghost").Append("\" type=\"submit\" name=\"action\" value=\"").Append(val).Append("\">").Append(label).Append("</button>");
             sb.Append("</form>");
         }
+        sb.Append("<p><a class=\"vm-btn ghost small\" href=\"").Append(Base).Append("/sitzungen/").Append(m.Id).Append("/pdf\" target=\"_blank\" rel=\"noopener\"><i class=\"ti ti-printer\"></i> Einladung als PDF</a></p>");
         sb.Append("</section>");
         if (m.MinutesStatus == VereinStore.Final && m.Minutes.Length > 0)
-            sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-notes\"></i> Protokoll</h2><div class=\"vm-text\">").Append(V.Paragraphs(m.Minutes)).Append("</div></section>");
+            sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-notes\"></i> Protokoll</h2><div class=\"vm-text\">").Append(V.Paragraphs(m.Minutes)).Append("</div><p><a class=\"vm-btn ghost small\" href=\"").Append(Base).Append("/sitzungen/").Append(m.Id).Append("/pdf?teil=protokoll\" target=\"_blank\" rel=\"noopener\"><i class=\"ti ti-printer\"></i> Protokoll als PDF</a></p></section>");
         if (who.Board)
         {
             var rsvps = await store.RsvpsAsync(m.Id, ct);
@@ -652,7 +754,7 @@ show(0);next();});})();</script>
         var vorstand = people.Where(p => p.Roles.Any(r => board.Contains(r, StringComparer.OrdinalIgnoreCase)))
             .OrderBy(p => board.ToList().FindIndex(r => p.Roles.Contains(r, StringComparer.OrdinalIgnoreCase))).ToList();
 
-        string Card(Person p) => "<div class=\"vm-person\"><span class=\"vm-avatar\">" + V.H(Initials(p)) + "</span><span><strong>" + V.H(p.Name) + "</strong><small>" +
+        string Card(Person p) => "<div class=\"vm-person\">" + VereinPhoto.Avatar(p, Base + "/foto/" + p.Id, Initials(p)) + "<span><strong>" + V.H(p.Name) + "</strong><small>" +
             V.H(string.Join(", ", p.Roles)) + "</small>" + (p.Phone.Length > 0 ? "<a href=\"tel:" + V.H(p.Phone.Replace(" ", "")) + "\">" + V.H(p.Phone) + "</a>" : "") +
             (p.Email.Length > 0 ? "<a href=\"mailto:" + V.H(p.Email) + "\">" + V.H(p.Email) + "</a>" : "") + Details(p) + "</span></div>";
         // private details by their visibility: the board sees all, the others what the club made visible for everybody
@@ -679,12 +781,26 @@ show(0);next();});})();</script>
             var byId = everyone.ToDictionary(x => x.Id);
             sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-mood-kid\"></i> Kinder (").Append(children.Count).Append(")</h2><div class=\"vm-people\">");
             foreach (var c in children)
-                sb.Append("<div class=\"vm-person\"><span class=\"vm-avatar\">").Append(V.H(Initials(c))).Append("</span><span><strong>").Append(V.H(c.Name)).Append("</strong><small>")
+                sb.Append("<div class=\"vm-person\">").Append(VereinPhoto.Avatar(c, Base + "/foto/" + c.Id, Initials(c))).Append("<span><strong>").Append(V.H(c.Name)).Append("</strong><small>")
                   .Append(V.H(string.Join(", ", c.Roles))).Append(c.Born.Length > 0 ? " · " + V.H(V.Date(c.Born)) : "").Append("</small><small>gehört zu ")
                   .Append(V.H(string.Join(", ", c.Guardians.Select(g => byId.TryGetValue(g, out var x) ? x.Name : "").Where(n => n.Length > 0)))).Append("</small></span></div>");
             sb.Append("</div></section>");
         }
         return await ShellAsync(ctx, who, "people", "Mitglieder", sb.ToString(), ct);
+    }
+
+    /// <summary>A profile picture, for whoever may see that person in the member list: the board, the person, their guardians, everybody when the
+    /// list is open to all, and the board members (who are listed for everybody).</summary>
+    private static async Task<PluginResult> PhotoAsync(IPluginContext ctx, CancellationToken ct)
+    {
+        var (who, deny) = await GateAsync(ctx, ct);
+        if (deny is not null) return deny;
+        var p = await new VereinStore(ctx.Data).PersonAsync(Id(ctx), ct);
+        if (p is null || p.Photo.Length == 0) return PluginResult.NotFound();
+        var board = VereinSettings.BoardList(ctx);
+        var may = who!.Board || p.Id == who.Person.Id || p.Guardians.Contains(who.Person.Id) || (p.Active && ctx.Settings.GetBool(VereinSettings.DirectoryForAll))
+                  || (p.Active && p.Roles.Any(r => board.Contains(r, StringComparer.OrdinalIgnoreCase)));
+        return may ? await VereinPhoto.ServeAsync(ctx, p, ct) : PluginResult.NotFound();
     }
 
     private static string Initials(Person p) => string.Concat(new[] { p.First, p.Last }.Where(x => x.Length > 0).Select(x => char.ToUpperInvariant(x[0]))) is { Length: > 0 } s ? s : "?";
@@ -726,6 +842,12 @@ show(0);next();});})();</script>
             }, ct);
             return PluginResult.Redirect(Base + "/profil?ok=profil");
         }
+        if (ctx.Request.IsPost && ctx.Request.Action is "photo" or "nophoto")
+        {
+            if (ctx.Request.Action == "nophoto") { await VereinPhoto.RemoveAsync(ctx, store, p, ct); return PluginResult.Redirect(Base + "/profil?ok=foto"); }
+            error = await VereinPhoto.SaveAsync(ctx, store, p, ctx.Request.File("photo"), ct);
+            if (error is null) return PluginResult.Redirect(Base + "/profil?ok=foto");
+        }
         if (ctx.Request.IsPost && ctx.Request.Action == "calendar")
         {
             // a new secret link; the old one stops working at once
@@ -745,6 +867,12 @@ show(0);next();});})();</script>
 
         var sb = new StringBuilder(Notice(ctx));
         if (error is not null) sb.Append(Err(error));
+        sb.Append("<section class=\"vm-card vm-photo-card\"><h2>Profilbild</h2><div class=\"vm-photo-row\">").Append(VereinPhoto.Avatar(p, Base + "/foto/" + p.Id, Initials(p), 96).Replace("class=\"vm-avatar", "id=\"vm-photo-preview\" class=\"vm-avatar"))
+          .Append("<form method=\"post\" enctype=\"multipart/form-data\" class=\"vm-form\">").Append(ctx.Antiforgery)
+          .Append("<label class=\"vm-field\"><span>Neues Bild (wird vor dem Hochladen verkleinert)</span><input type=\"file\" name=\"photo\" accept=\"image/*\" data-vm-photo=\"#vm-photo-preview\" required></label>")
+          .Append("<div class=\"vm-actions\"><button class=\"vm-btn\" type=\"submit\" name=\"action\" value=\"photo\">Hochladen</button>")
+          .Append(p.Photo.Length > 0 ? "<button class=\"vm-btn ghost\" type=\"submit\" name=\"action\" value=\"nophoto\" formnovalidate data-confirm=\"Profilbild entfernen?\">Entfernen</button>" : "")
+          .Append("</div></form></div><p class=\"vm-muted\">Das Bild sehen andere Mitglieder in der Mitgliederliste – auf der Website erscheint es nicht.</p></section>").Append(VereinPhoto.Script);
         sb.Append("<div class=\"vm-grid2\"><section class=\"vm-card\"><h2>Meine Angaben</h2><dl class=\"vm-facts\"><dt>Name</dt><dd>").Append(V.H(p.Name)).Append("</dd><dt>E-Mail</dt><dd>")
           .Append(V.H(p.Email)).Append("</dd><dt>Rollen</dt><dd>").Append(V.H(p.Roles.Count > 0 ? string.Join(", ", p.Roles) : "–")).Append("</dd>");
         if (p.Joined.Length > 0) sb.Append("<dt>Mitglied seit</dt><dd>").Append(V.H(V.Date(p.Joined))).Append("</dd>");

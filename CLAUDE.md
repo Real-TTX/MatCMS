@@ -232,6 +232,10 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
   (validated, then looked up — never from a request), values are parameters, a plugin's tables are `p_{key}_{name}` and
   `__plugin_tables` records the owner; a restore recomputes the destination and never trusts a table name from the backup; only a
   built-in plugin may `Adopt` an existing table. The cleanup reads the text of ALL plugin tables, loaded or not.
+- **A plugin's admin pages answer with the same headers and cookies as its public routes** (`PluginResults.Apply` in `Pages/Admin/P/Index` too — it was
+  missing, so a PDF's `Content-Disposition` or a `Cache-Control` silently fell away in the back office).
+- **`IPluginSite.LogoUrl`** is the site's own logo ("" while MatCMS's default is shown) — a DEFAULT interface member, so a plugin built against it still
+  loads on an older host; the call sits in a `NoInlining` helper wrapped in `catch (MissingMethodException)` (the Verein plugin's letterhead does that).
 - **A plugin's pages are inside the admin's own chrome:** the sidebar is the `AdminNav` registry (core entries and plugin entries
   ordered together by group + order, optional badge), plugin settings live at `/admin/p/{key}/_settings`.
 - **The script editor** (`Pages/Admin/Plugins/Edit.cshtml` + `wwwroot/js/plugin-code-editor.js`) puts CodeMirror (C# mode, vendored with the other modes in

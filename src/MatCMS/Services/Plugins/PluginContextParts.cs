@@ -193,6 +193,8 @@ internal sealed class PluginSiteFacade : IPluginSite
 
     public IReadOnlyList<string> Locales => Site.ActiveLocales;
 
+    public string LogoUrl => Site.UsesDefaultLogo ? "" : Site.LogoUrl;
+
     public string ImageUrl(string url, int width) => ThumbnailService.Url(url, width);
 
     // MediaFocus is per request (it loads the few pictures with a focal point once); outside a request there is none to ask.

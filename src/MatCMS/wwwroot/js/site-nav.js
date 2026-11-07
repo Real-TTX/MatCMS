@@ -31,6 +31,16 @@
             a.insertAdjacentElement("afterend", b);
             b.addEventListener("click", function (e) { e.preventDefault(); setOpen(h, !h.classList.contains("open")); });
         });
+        // On a phone the branch you are in stays open: the submenu holding the current page (a member area, a shop's categories) is shown
+        // unfolded, so its pages are one tap away instead of two.
+        if (window.matchMedia(PHONE).matches) {
+            var here = location.pathname.replace(/\/+$/, "") || "/";
+            document.querySelectorAll(".main-nav .mat-sub a[href]").forEach(function (a) {
+                var p = (a.getAttribute("href") || "").split(/[?#]/)[0].replace(/\/+$/, "") || "/";
+                if (p !== here) return;
+                for (var h = a.closest(".mat-hassub"); h; h = h.parentElement && h.parentElement.closest(".mat-hassub")) setOpen(h, true);
+            });
+        }
     }
 
     // A touch screen without a phone layout: tap once to open the dropdown, again to go.

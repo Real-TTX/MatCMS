@@ -82,13 +82,17 @@ public sealed class VereinApp : IDisposable
         finally { _gate.Release(); }
     }
 
+    /// <summary>Forgets a browser whose person signed out (the next AsAsync would otherwise hand out a signed-out one).</summary>
+    public void SignedOut(string who) { lock (_clients) _clients.Remove(who); }
+
     public static string Cap(string s) => char.ToUpperInvariant(s[0]) + s[1..];
 
     /// <summary>Posts a form of a page the way a browser does (with that page's antiforgery token).</summary>
     public static async Task<HttpResponseMessage> PostFormAsync(HttpClient c, string pageUrl, Dictionary<string, string> fields, string? postUrl = null)
     {
         var html = await c.GetStringAsync(pageUrl);
-        fields["__RequestVerificationToken"] = AppFactory.Token(html) ?? throw new InvalidOperationException("no token on " + pageUrl);
+        // a page without a form of its own (an answered document) has no token; the member profile always has one, and a token is the visitor's, not the page's
+        fields["__RequestVerificationToken"] = AppFactory.Token(html) ?? AppFactory.Token(await c.GetStringAsync("/mitglied/profil")) ?? throw new InvalidOperationException("no token on " + pageUrl);
         return await c.PostAsync(postUrl ?? pageUrl, new FormUrlEncodedContent(fields));
     }
 
@@ -824,5 +828,46 @@ public class VereinTests : IClassFixture<VereinApp>
         });
         using var scope = _app.App.Services.CreateScope();
         await scope.ServiceProvider.GetRequiredService<PluginRunner>().ReloadAsync(_app.Db(db => db.Plugins.First(p => p.Key == "verein").Id));
+    }
+    [Fact]
+    public async Task Yesterdays_event_asks_for_photos_the_upload_page_takes_them_and_sign_out_is_in_the_menu()
+    {
+        await JoinAsync("quentin", "Mitglied");
+        var admin = await _app.AsAsync("admin");
+        var yesterday = DateTime.UtcNow.AddHours(1).AddDays(-1).ToString("yyyy-MM-dd");
+        var res = await VereinApp.PostFormAsync(admin, "/admin/p/verein/events/new", new()
+        {
+            ["title"] = "Umzug Gestern", ["kind"] = "Umzug", ["starts"] = yesterday + "T14:00", ["public"] = "true", ["status"] = "published"
+        });
+        var id = Regex.Match(res.Headers.Location!.OriginalString, "events/(\\d+)").Groups[1].Value;
+
+        var q = await _app.AsAsync("quentin");
+        var home = Text(await q.GetStringAsync("/mitglied"));
+        Assert.Contains("Hey Quentin", home);
+        Assert.Contains("Umzug Gestern", home);
+        Assert.Contains("/mitglied/hochladen?termin=" + id, await q.GetStringAsync("/mitglied"));
+        Assert.DoesNotContain("vm-nav", await q.GetStringAsync("/mitglied"));                     // no second menu inside the page
+
+        var page = await q.GetStringAsync("/mitglied/hochladen?termin=" + id);
+        Assert.Contains("Fotos auswählen", Text(page));
+        Assert.Contains("name=\"event\" value=\"" + id + "\"", page);
+        // what the page's script sends: one file per request, as ajax, to the upload handler
+        using (var form = new MultipartFormDataContent
+        {
+            { new StringContent(AppFactory.Token(page)!), "__RequestVerificationToken" }, { new StringContent("upload"), "action" }, { new StringContent("photo"), "kind" },
+            { new StringContent(id), "event" }, { new StringContent("1"), "ajax" }, { new ByteArrayContent(JpegTakenAt("2026:01:01 10:00:00")), "file", "umzug.jpg" }
+        })
+        {
+            var up = await q.PostAsync("/mitglied/dateien", form);
+            Assert.Contains("\"ok\":true", await up.Content.ReadAsStringAsync());
+        }
+        Assert.Contains("Danke für deine 1 Datei", Text(await q.GetStringAsync("/mitglied")));     // the hint knows
+
+        // the menu has "Abmelden" under "Mitglieder"; the link signs out
+        Assert.Contains("/mitglied/abmelden", await q.GetStringAsync("/"));
+        var bye = await q.GetAsync("/mitglied/abmelden");
+        Assert.Equal(HttpStatusCode.Redirect, bye.StatusCode);
+        Assert.DoesNotContain("Hey Quentin", Text(await q.GetStringAsync("/mitglied")));
+        _app.SignedOut("quentin");
     }
 }

@@ -27,6 +27,7 @@ public static class VereinMenu
         };
         if (board) children.Add(new MenuEntry("Vorstand", B + "/vorstand") { Icon = "clipboard-list", Order = 6 });
         children.Add(new MenuEntry("Mein Profil", B + "/profil") { Icon = "user", Order = 7 });
+        children.Add(new MenuEntry("Abmelden", B + "/abmelden") { Icon = "logout", Order = 99 });
         return new[] { new MenuEntry("Mitglieder", B) { Icon = "users-group", Order = 900, Badge = open > 0 ? open.ToString() : null, Children = children } };
     });
 }

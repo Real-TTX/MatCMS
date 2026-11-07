@@ -7,14 +7,36 @@ public static class VereinCss
 .vm{--vm-accent:var(--verein-accent,var(--accent,#8a1f33));--vm-line:var(--line,rgba(0,0,0,.1));--vm-soft:var(--bg-alt,#f6f3ee);--vm-muted:var(--muted,#6b6b6b)}
 .vm .vm-kicker{font-size:12.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--vm-accent);margin:0 0 6px}
 .vm .vm-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+.vm .vm-head h1{overflow-wrap:anywhere}
 .vm .vm-head h1{margin:0;font-size:clamp(1.7rem,3vw,2.3rem)}
-.vm .vm-me{display:flex;align-items:center;gap:12px;color:var(--vm-muted);font-size:14px;flex-wrap:wrap}
-.vm .vm-layout{display:grid;grid-template-columns:230px 1fr;gap:26px;align-items:start}
-.vm .vm-nav{display:flex;flex-direction:column;gap:4px;position:sticky;top:100px}
-.vm .vm-nav a{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;text-decoration:none;color:inherit;font-weight:500}
-.vm .vm-nav a:hover{background:var(--vm-soft)}
-.vm .vm-nav a.on{background:var(--vm-accent);color:#fff}
-.vm .vm-nav .ti{font-size:19px}
+.vm .vm-me{display:inline-flex;align-items:center;gap:10px;color:inherit;font-size:14px;font-weight:600;text-decoration:none;padding:4px 12px 4px 4px;border:1px solid var(--vm-line);border-radius:999px;background:#fff}
+.vm .vm-kicker a{color:inherit;text-decoration:none}.vm .vm-kicker a:hover{text-decoration:underline}
+.vm .vm-main{display:grid;gap:22px}
+.vm .vm-hint{display:flex;gap:16px;align-items:flex-start;padding:20px 22px;border-radius:18px;background:linear-gradient(135deg,var(--vm-accent),color-mix(in srgb,var(--vm-accent) 70%,#000));color:#fff;box-shadow:0 12px 30px color-mix(in srgb,var(--vm-accent) 30%,transparent)}
+.vm .vm-hint-icon{flex:none;width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.18);display:grid;place-items:center;font-size:26px}
+.vm .vm-hint strong{font-size:1.2rem;display:block;margin-bottom:4px}.vm .vm-hint p{margin:0 0 12px;opacity:.92}
+.vm .vm-hint .vm-btn{background:#fff;color:var(--vm-accent);border-color:#fff}.vm .vm-hint .vm-btn.ghost{background:transparent;color:#fff;border-color:rgba(255,255,255,.7)}
+.vm .vm-up{display:grid;gap:14px}
+.vm .vm-up-drop{position:relative;display:grid;justify-items:center;gap:6px;padding:30px 16px;border:2px dashed color-mix(in srgb,var(--vm-accent) 45%,transparent);border-radius:18px;background:color-mix(in srgb,var(--vm-accent) 6%,#fff);cursor:pointer;text-align:center}
+.vm .vm-up-drop:hover{background:color-mix(in srgb,var(--vm-accent) 11%,#fff)}
+.vm .vm-up-drop input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.vm .vm-up-big{display:inline-flex;align-items:center;gap:10px;padding:14px 26px;border-radius:999px;background:var(--vm-accent);color:#fff;font-weight:700;font-size:1.1rem}
+.vm .vm-up-big .ti{font-size:24px}.vm .vm-up-drop small{color:var(--vm-muted)}
+.vm .vm-up-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}.vm .vm-up-tiles:empty{display:none}
+.vm .vm-up-tile{position:relative;aspect-ratio:1;border-radius:12px;overflow:hidden;background:var(--vm-soft);display:grid;place-items:center}
+.vm .vm-up-tile img{width:100%;height:100%;object-fit:cover;opacity:.55;transition:opacity .3s}
+.vm .vm-up-tile.ok img{opacity:1}
+.vm .vm-up-tile.ok::after{content:"✓";position:absolute;right:6px;top:6px;width:24px;height:24px;border-radius:50%;background:#1e8e3e;color:#fff;display:grid;place-items:center;font-weight:700;font-size:14px}
+.vm .vm-up-tile.bad{outline:3px solid #c62828}
+.vm .vm-up-name{font-size:12px;padding:6px;word-break:break-all;text-align:center}
+.vm .vm-up-bar{position:absolute;left:8px;right:8px;bottom:8px;height:6px;border-radius:9px;background:rgba(255,255,255,.75);overflow:hidden}
+.vm .vm-up-bar b{display:block;height:100%;width:0;background:var(--vm-accent);transition:width .2s}
+.vm .vm-up-tile.ok .vm-up-bar{display:none}
+.vm .vm-up-err{position:absolute;inset:auto 0 0 0;background:rgba(198,40,40,.92);color:#fff;font-size:11px;padding:4px 6px;line-height:1.2}
+.vm .vm-up-status{margin:0;font-weight:600}.vm .vm-up-status:empty{display:none}
+.vm .vm-up-more summary{cursor:pointer;color:var(--vm-muted);font-size:14px}.vm .vm-up-more[open]{display:grid;gap:10px}
+.vm .vm-up-event h2{margin:0 0 4px}.vm .vm-up-event p{margin:0}
+.vm .small{font-size:13px}
 .vm .vm-count{margin-left:auto;background:#d97706;color:#fff;border-radius:999px;font-size:12px;padding:1px 8px;font-weight:700}
 .vm .vm-main{display:flex;flex-direction:column;gap:18px;min-width:0}
 .vm .vm-card{background:#fff;border:1px solid var(--vm-line);border-radius:16px;padding:22px 24px;box-shadow:0 8px 24px rgba(0,0,0,.04)}
@@ -121,9 +143,6 @@ public static class VereinCss
 .verein-events.cards .vm-events li{background:#fff;border:1px solid var(--line,rgba(0,0,0,.1));border-radius:16px;padding:16px;box-shadow:0 8px 22px rgba(0,0,0,.05)}
 .verein-events .verein-more{text-align:center;margin-top:22px}
 @media (max-width:860px){
- .vm .vm-layout{grid-template-columns:1fr}
- .vm .vm-nav{position:static;flex-direction:row;overflow-x:auto;gap:6px;padding-bottom:4px}
- .vm .vm-nav a{white-space:nowrap;background:var(--vm-soft)}
  .vm .vm-grid2,.vm .vm-row2{grid-template-columns:1fr}
  .vm .vm-card{padding:18px 16px}
  .vm .vm-progress{width:70px}

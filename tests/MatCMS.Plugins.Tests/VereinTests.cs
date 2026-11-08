@@ -1056,4 +1056,26 @@ public class VereinTests : IClassFixture<VereinApp>
         }
         finally { await SetConfigAsync("askDefault", "false"); }
     }
+    [Fact]
+    public async Task An_event_that_only_offers_zu_or_absagen_is_answered_at_the_event_and_never_listed_as_missing()
+    {
+        await JoinAsync("frieda", "Mitglied");
+        var admin = await _app.AsAsync("admin");
+        var day = DateTime.UtcNow.AddDays(25).ToString("yyyy-MM-dd");
+        var res = await VereinApp.PostFormAsync(admin, "/admin/p/verein/events/new", new()
+        {
+            ["title"] = "Umzug Freiwillig", ["kind"] = "Umzug", ["starts"] = day + "T14:00", ["public"] = "true", ["status"] = "published", ["ask"] = "true", ["ask_audience"] = "all"
+        });
+        var id = Regex.Match(res.Headers.Location!.OriginalString, "events/(\\d+)").Groups[1].Value;
+        var frieda = await _app.AsAsync("frieda");
+        var home = Text(await frieda.GetStringAsync("/mitglied"));
+        Assert.DoesNotContain("Umzug Freiwillig", home.Split("Nächste Sitzungen")[0].Split("Zu erledigen").Last());   // not a duty on the overview
+        var dates = Text(await frieda.GetStringAsync("/mitglied/termine"));
+        Assert.DoesNotContain("Rückmeldung fehlt", dates);
+        Assert.Contains("Bist du dabei?", dates);                                                                    // an offer, not a warning
+        var page = await frieda.GetStringAsync("/mitglied/termine/" + id);
+        var me = Regex.Matches(page, "name=\"a\\.(\\d+)\"").Select(m => m.Groups[1].Value).Distinct().Single();     // the answer is still possible
+        Assert.Equal(HttpStatusCode.Redirect, (await VereinApp.PostFormAsync(frieda, "/mitglied/termine/" + id, new() { ["action"] = "reply", ["a." + me] = "yes" })).StatusCode);
+        Assert.Contains("1 dabei", Text(await admin.GetStringAsync("/admin/p/verein/events/" + id)));
+    }
 }

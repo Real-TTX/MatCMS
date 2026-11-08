@@ -166,7 +166,8 @@ public static class VereinPublic
         var p = who!.Person;
 
         var open = await OpenDocsAsync(ctx, store, p, ct);
-        var replies = await OpenRepliesAsync(ctx, store, p, ct);
+        // only a REQUIRED reply is a duty: an event that merely offers zu-/absagen is answered on its page and in the list of dates, never listed as missing
+        var replies = (await OpenRepliesAsync(ctx, store, p, ct)).Where(e => e.AskRequired).ToList();
         var meetings = (await MeetingsForAsync(ctx, store, who, ct)).Where(m => m.Status == VereinStore.Planned && string.CompareOrdinal(m.Starts.Length >= 10 ? m.Starts[..10] : m.Starts, V.Today) >= 0)
             .OrderBy(m => m.Starts).Take(3).ToList();
         var events = await store.UpcomingAsync(V.Today, publicOnly: false, 4, ct);
@@ -415,7 +416,7 @@ public static class VereinPublic
             sb.Append("<li class=\"").Append(e.Cancelled ? "is-cancelled" : "").Append("\"><span class=\"vm-date\"><b>").Append(V.H(day)).Append("</b><small>").Append(V.H(month)).Append("</small><em>")
               .Append(V.H(wd)).Append("</em></span><span class=\"vm-ev\"><strong>").Append(memberLinks ? "<a href=\"" + Base + "/termine/" + e.Id + "\">" + V.H(e.Title) + "</a>" : publicLinks && e.Public && !e.Draft ? "<a href=\"" + VereinEvents.PagePath(e.Id) + "\">" + V.H(e.Title) + "</a>" : V.H(e.Title)).Append("</strong>");
             if (memberLinks && e.HasPlan) sb.Append(" <span class=\"vm-badge ok\">Ablauf &amp; Infos</span>");
-            if (needsReply?.Contains(e.Id) == true) sb.Append(" <span class=\"vm-badge warn\">").Append(e.AskRequired ? "Rückmeldung erforderlich" : "Rückmeldung fehlt").Append("</span>");
+            if (needsReply?.Contains(e.Id) == true) sb.Append(e.AskRequired ? " <span class=\"vm-badge warn\">Rückmeldung erforderlich</span>" : " <span class=\"vm-badge\">Bist du dabei?</span>");
             if (e.Cancelled) sb.Append(" <span class=\"vm-badge err\">abgesagt</span>");
             if (internalBadge && !e.Public) sb.Append(" <span class=\"vm-badge\">intern</span>");
             sb.Append("<small>").Append(V.H(V.When(e.Starts)));

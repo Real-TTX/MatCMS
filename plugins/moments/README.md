@@ -33,7 +33,8 @@ Paket: `./pack-native.ps1 -Path ./moments` → `dist/moments-<version>.zip`. Lä
   (`?…&teil=1` antwortet die fertigen Kacheln als JSON); jedes Bild lädt erst, wenn es in die Nähe kommt (`loading=lazy`). Ohne
   Skript bleiben Seitenlinks.
 - **Foto-Seite** `/moments/foto/{id}`: groß, Wischen und Pfeiltasten für vor/zurück, Herz (ohne Neuladen), Herunterladen,
-  Personen und Stichworte markieren, Kommentare. Wer hochgeladen hat, kann Bildunterschrift setzen und löschen.
+  Personen und Stichworte markieren, Kommentare. Am Handy steht das Feld zum Markieren über die volle Breite und der Knopf darunter (1.3: vorher
+  lief die Spalte auf schmalen Handys rechts über den Rand). Wer hochgeladen hat, kann Bildunterschrift setzen und löschen.
 - **Hochladen vom Handy** `/moments/hochladen`: ein großer Knopf, beliebig viele Fotos, jede Kachel füllt sich beim Hochladen.
   Das Handy rechnet Ansicht (2048 px) und Kachel (640 px) selbst aus – das Plugin hat keine Bildbibliothek; das Original geht mit
   (Download), es sei denn, es ist zu groß oder HEIC.

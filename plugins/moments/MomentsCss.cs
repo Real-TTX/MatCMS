@@ -117,9 +117,11 @@ public static class MomentsCss
 .mo .mo-confirm[open] form{position:absolute;z-index:5;top:calc(100% + 6px);left:0;min-width:240px;padding:14px;border-radius:14px;background:#fff;border:1px solid var(--mo-line);box-shadow:0 12px 30px rgba(0,0,0,.15)}
 .mo .mo-confirm form p{margin:0 0 10px}
 .mo .mo-edit{margin-bottom:14px}.mo .mo-edit summary{cursor:pointer;color:var(--mo-accent);font-weight:600}
-.mo .mo-row{display:flex;gap:8px;margin-top:10px}
-.mo .mo-row input,.mo .mo-comment-form textarea{flex:1;min-width:0;font:inherit;font-size:16px;padding:10px 14px;border-radius:12px;border:1.5px solid var(--mo-line);background:#fff;color:var(--mo-ink);box-sizing:border-box}
+/* a field and its button: side by side while both fit; on a phone the field on a line of its own and the button full width under it */
+.mo .mo-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.mo .mo-row input,.mo .mo-comment-form textarea{min-width:0;font:inherit;font-size:16px;padding:10px 14px;border-radius:12px;border:1.5px solid var(--mo-line);background:#fff;color:var(--mo-ink);box-sizing:border-box}
 .mo .mo-row input:focus,.mo .mo-comment-form textarea:focus{outline:none;border-color:var(--mo-accent)}
+.mo .mo-row input{flex:1 1 200px}.mo .mo-row .mo-btn{flex:0 0 auto}
 .mo .mo-tags h2,.mo .mo-comments h2{font-size:1.1rem;margin:6px 0 12px}
 .mo .mo-commentlist{list-style:none;margin:0 0 14px;padding:0;display:grid;gap:14px}
 .mo .mo-commentlist li{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:start}
@@ -157,7 +159,8 @@ public static class MomentsCss
 .mo-block .mo-preview .mo-tile{border-radius:8px}
 
 @media (max-width:760px){
-  .mo .mo-detail{grid-template-columns:1fr;gap:10px}
+  /* minmax(0,…): a plain 1fr column grows to its widest content (a field and a button side by side) and ran past a narrow phone */
+  .mo .mo-detail{grid-template-columns:minmax(0,1fr);gap:10px}.mo .mo-detail > *{min-width:0}
   .mo .mo-welcome{flex-direction:column;align-items:stretch;padding:18px}
   .mo .mo-welcome-actions .mo-btn{flex:1}
   .mo-block .mo-preview{grid-template-columns:repeat(3,1fr)}
@@ -190,6 +193,7 @@ public static class MomentsCss
   .mo .mo-nav.prev{left:6px}.mo .mo-nav.next{right:6px}
   .mo .mo-login{padding:26px 18px;margin-top:8px}
   .mo .mo-card{padding:16px}
+  .mo .mo-row input{flex-basis:100%}.mo .mo-row .mo-btn{flex:1 0 100%}
   .mo .mo-photo-page .mo-alert.ok{white-space:normal;width:calc(100% - 32px);text-align:center}
 }
 """;

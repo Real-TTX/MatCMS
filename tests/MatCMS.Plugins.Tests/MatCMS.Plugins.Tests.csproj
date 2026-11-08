@@ -25,6 +25,8 @@
     <ProjectReference Include="..\..\plugins\forum\Forum.csproj" ReferenceOutputAssembly="false" Private="false" />
     <!-- The club plugin (plugins/verein), native as well: VereinTests run it inside the whole application. -->
     <ProjectReference Include="..\..\plugins\verein\Verein.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <!-- The guest area of a private event (plugins/moments), native: MomentsTests run it inside the whole application. -->
+    <ProjectReference Include="..\..\plugins\moments\Moments.csproj" ReferenceOutputAssembly="false" Private="false" />
   </ItemGroup>
 
   <ItemGroup>
@@ -53,6 +55,10 @@
       <VereinFiles Include="$(MSBuildProjectDirectory)\..\..\plugins\verein\bin\$(Configuration)\net10.0\Verein.dll" />
     </ItemGroup>
     <Copy SourceFiles="@(VereinFiles)" DestinationFolder="$(OutDir)fixtures\verein" />
+    <ItemGroup>
+      <MomentsFiles Include="$(MSBuildProjectDirectory)\..\..\plugins\moments\bin\$(Configuration)\net10.0\Moments.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(MomentsFiles)" DestinationFolder="$(OutDir)fixtures\moments" />
   </Target>
 
 </Project>

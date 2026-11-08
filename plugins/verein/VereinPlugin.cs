@@ -25,6 +25,7 @@ public sealed class VereinPlugin : IPlugin
         VereinAdmin.Configure(b);
         VereinMenu.Configure(b);
         VereinIcal.Configure(b);
+        VereinEvents.Configure(b);
 
         b.Block(new BlockSpec(EventsBlock, "Vereinstermine", "Die kommenden öffentlichen Termine des Vereins (z. B. die nächsten Umzüge) – gepflegt unter Admin → Verein → Termine.")
         {
@@ -38,7 +39,7 @@ public sealed class VereinPlugin : IPlugin
                 {
                     Default = "5", Options = new[] { new FieldOption("3", "3"), new FieldOption("5", "5"), new FieldOption("8", "8"), new FieldOption("12", "12"), new FieldOption("50", "alle") }
                 },
-                new FieldSpec("kind", "Nur diese Art", FieldKind.Text) { Placeholder = "z. B. Umzug", Help = "Leer = alle Arten. Sonst nur Termine, deren Art so heißt." },
+                new FieldSpec("kind", "Nur diese Art", FieldKind.Text) { Placeholder = "z. B. Turnier", Help = "Leer = alle Arten. Sonst nur Termine, deren Art so heißt." },
                 new FieldSpec("layout", "Darstellung", FieldKind.Select) { Default = "list", Options = new[] { new FieldOption("list", "Liste"), new FieldOption("cards", "Karten") } },
                 new FieldSpec("empty", "Text, wenn nichts ansteht") { Placeholder = "Gerade stehen keine Termine an." }
             }
@@ -82,8 +83,9 @@ public sealed class VereinPlugin : IPlugin
         sb.Append("</div>");
         sb.Append(events.Count == 0
             ? "<p class=\"vm-muted\" style=\"text-align:center\">" + V.H(F("empty").Trim() is { Length: > 0 } em ? em : "Gerade stehen keine Termine an.") + "</p>"
-            : VereinPublic.EventList(events, internalBadge: false));
-        sb.Append("<p class=\"verein-more\"><a href=\"").Append(VereinIcal.PublicFeed).Append("\"><i class=\"ti ti-calendar-plus\" aria-hidden=\"true\"></i> Termine im eigenen Kalender abonnieren</a></p>");
+            : VereinPublic.EventList(events, internalBadge: false, publicLinks: true));
+        sb.Append("<p class=\"verein-more\"><a href=\"").Append(VereinEvents.ListPath).Append("\"><i class=\"ti ti-list\" aria-hidden=\"true\"></i> Alle Termine</a> · <a href=\"").Append(VereinIcal.PublicFeed)
+          .Append("\"><i class=\"ti ti-calendar-plus\" aria-hidden=\"true\"></i> Im eigenen Kalender abonnieren</a></p>");
         sb.Append("</div></section>");
         return PluginResult.Fragment(sb.ToString());
     }

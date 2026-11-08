@@ -119,10 +119,10 @@ public class VereinTests : IClassFixture<VereinApp>
         var admin = await _app.AsAsync("admin");
         var page = await admin.GetStringAsync("/admin/p/verein/members/new");
         var fields = new Dictionary<string, string> { ["first"] = VereinApp.Cap(who), ["last"] = "Muster", ["email"] = who + "@verein.example", ["phone"] = "0711 1" };
-        // role checkboxes are role_{index} in the order of the settings
-        var names = Regex.Matches(page, "name=\"(role_\\d+)\"").Select(m => m.Groups[1].Value).ToList();
-        var labels = Regex.Matches(page, "name=\"role_\\d+\"[^>]*/> ([^<]+)</label>").Select(m => WebUtility.HtmlDecode(m.Groups[1].Value)).ToList();
-        foreach (var r in roles) { var i = labels.IndexOf(r); Assert.True(i >= 0, "role " + r + " not offered: " + string.Join(",", labels)); fields[names[i]] = "true"; }
+        // roles are one chip field (comma-separated), the club's roles offered as suggestions; "access" makes the account
+        foreach (var r in roles) Assert.Contains(WebUtility.HtmlEncode(r), page);
+        fields["roles"] = string.Join(",", roles);
+        fields["access"] = "true";
         var res = await VereinApp.PostFormAsync(admin, "/admin/p/verein/members/new", fields);
         Assert.Equal(HttpStatusCode.Redirect, res.StatusCode);
         Assert.Matches("/admin/p/verein/members/\\d+", res.Headers.Location!.OriginalString);
@@ -328,7 +328,7 @@ public class VereinTests : IClassFixture<VereinApp>
         for (var i = 0; i < 9; i++)
             await VereinApp.PostFormAsync(admin, "/admin/p/verein/events/new", new() { ["title"] = "Saisontermin " + i, ["kind"] = "Saison", ["starts"] = $"2031-01-{10 + i}T14:00", ["place"] = "Ort " + i, ["public"] = "true" });
         var page = await admin.GetStringAsync("/admin/p/verein/instagram?vorlage=saison&von=2031-01-06&bis=2031-02-26&art=Saison&format=square");
-        Assert.Contains("Narrenfahrplan 2031", Text(page));
+        Assert.Contains("Terminplan 2031", Text(page));                                      // the title of the setting "Überschrift der Saison" (a club names it Narrenfahrplan, Spielplan …)
         var pictures = Regex.Matches(page, "<svg ").Count;
         Assert.True(pictures >= 2, "square should not hold 9 dates: " + pictures);
         Assert.Contains("(1/" + pictures + ")", page);
@@ -380,7 +380,7 @@ public class VereinTests : IClassFixture<VereinApp>
         var admin = await _app.AsAsync("admin");
         var res = await VereinApp.PostFormAsync(admin, "/admin/p/verein/members/new", new()
         {
-            ["first"] = "Hanna", ["last"] = "Neu", ["email"] = "hanna@verein.example", ["role_6"] = "true", ["sendInvite"] = "true"
+            ["first"] = "Hanna", ["last"] = "Neu", ["email"] = "hanna@verein.example", ["roles"] = "Mitglied", ["access"] = "true", ["sendInvite"] = "true"
         });
         Assert.Equal(HttpStatusCode.Redirect, res.StatusCode);
         // an invitation, not a registration: no password the person knows, no confirmation mail of the site, a pending welcome token
@@ -432,7 +432,7 @@ public class VereinTests : IClassFixture<VereinApp>
         Assert.Equal(HttpStatusCode.Redirect, (await VereinApp.PostFormAsync(admin, "/admin/p/verein/children/new?eltern=" + parentId,
             new() { ["first"] = "Lina", ["last"] = "Muster", ["born"] = "2016-05-04" })).StatusCode);   // no parent ticked → refused
         var res = await VereinApp.PostFormAsync(admin, "/admin/p/verein/children/new?eltern=" + parentId,
-            new() { ["first"] = "Lina", ["last"] = "Muster", ["born"] = "2016-05-04", ["g_" + parentId] = "true", ["role_6"] = "true" });
+            new() { ["first"] = "Lina", ["last"] = "Muster", ["born"] = "2016-05-04", ["guardians"] = "Karl Muster", ["roles"] = "Mitglied" });
         Assert.Matches("children/\\d+", res.Headers.Location!.OriginalString);
         Assert.Equal(0, _app.Db(db => db.SiteMembers.Count(m => m.DisplayName.Contains("Lina"))));
 
@@ -455,7 +455,7 @@ public class VereinTests : IClassFixture<VereinApp>
         var admin = await _app.AsAsync("admin");
         var res = await VereinApp.PostFormAsync(admin, "/admin/p/verein/members/new", new()
         {
-            ["first"] = "Otto", ["last"] = "Start", ["email"] = "otto@verein.example", ["role_6"] = "true", ["initpw"] = "Fasnet2027!"
+            ["first"] = "Otto", ["last"] = "Start", ["email"] = "otto@verein.example", ["roles"] = "Mitglied", ["access"] = "true", ["initpw"] = "Fasnet2027!"
         });
         var personUrl = res.Headers.Location!.OriginalString.Split('?')[0];
 
@@ -563,7 +563,7 @@ public class VereinTests : IClassFixture<VereinApp>
         Assert.Contains("Hexe-Nr.", Text(page));
         await VereinApp.PostFormAsync(admin, "/admin/p/verein/members/new", new()
         {
-            ["first"] = "Rosa", ["last"] = "Muster", ["email"] = "rosa@verein.example", ["role_6"] = "true", ["x_0"] = "H-17", ["x_1"] = "N-99", ["born"] = "1990-03-04", ["street"] = "Weinsteige 1"
+            ["first"] = "Rosa", ["last"] = "Muster", ["email"] = "rosa@verein.example", ["roles"] = "Mitglied", ["access"] = "true", ["x_0"] = "H-17", ["x_1"] = "N-99", ["born"] = "1990-03-04", ["street"] = "Weinsteige 1"
         });
         var cfg = _app.Db(db => db.Plugins.First(p => p.Key == "verein").ConfigJson);
         Assert.Contains("Hexe-Nr.", cfg);
@@ -653,7 +653,7 @@ public class VereinTests : IClassFixture<VereinApp>
         await JoinAsync("vera", "Vorsitzende/r");
         var admin = await _app.AsAsync("admin");
         await VereinApp.PostFormAsync(admin, "/admin/p/verein/children/new?eltern=" + uliId,
-            new() { ["first"] = "Willi", ["last"] = "Muster", ["g_" + uliId] = "true", ["role_6"] = "true" });
+            new() { ["first"] = "Willi", ["last"] = "Muster", ["guardians"] = "Uli Muster", ["roles"] = "Mitglied" });
         var day = DateTime.UtcNow.AddDays(20).ToString("yyyy-MM-dd");
         var res = await VereinApp.PostFormAsync(admin, "/admin/p/verein/events/new", new()
         {
@@ -760,7 +760,7 @@ public class VereinTests : IClassFixture<VereinApp>
         Assert.Equal(HttpStatusCode.Redirect, refused.StatusCode);
         Assert.True(_app.Db(db => db.Database.SqlQueryRaw<long>("SELECT member_id AS Value FROM p_verein_people WHERE id = " + listId).AsEnumerable().Single()) < 0);
         // the real address entered, then access: an account, no mail asked for
-        await VereinApp.PostFormAsync(admin, "/admin/p/verein/members/" + listId, new() { ["first"] = "Liste", ["last"] = "Ohnezugang", ["email"] = "liste@verein.example", ["role_6"] = "true", ["active"] = "true" });
+        await VereinApp.PostFormAsync(admin, "/admin/p/verein/members/" + listId, new() { ["first"] = "Liste", ["last"] = "Ohnezugang", ["email"] = "liste@verein.example", ["roles"] = "Mitglied", ["active"] = "true" });
         Assert.Equal(HttpStatusCode.Redirect, (await VereinApp.PostFormAsync(admin, "/admin/p/verein/members/" + listId, new() { ["action"] = "access" })).StatusCode);
         var account = _app.Db(db => db.Database.SqlQueryRaw<long>("SELECT member_id AS Value FROM p_verein_people WHERE id = " + listId).AsEnumerable().Single());
         Assert.True(account > 0);
@@ -869,5 +869,91 @@ public class VereinTests : IClassFixture<VereinApp>
         Assert.Equal(HttpStatusCode.Redirect, bye.StatusCode);
         Assert.DoesNotContain("Hey Quentin", Text(await q.GetStringAsync("/mitglied")));
         _app.SignedOut("quentin");
+    }
+    [Fact]
+    public async Task Roles_and_own_fields_are_lists_in_the_settings_and_the_board_is_a_tick_per_role()
+    {
+        var admin = await _app.AsAsync("admin");
+        var before = _app.Db(db => db.Plugins.First(p => p.Key == "verein").ConfigJson);
+        try
+        {
+            var page = await admin.GetStringAsync("/admin/p/verein/_settings?group=" + Uri.EscapeDataString("Rollen & Felder"));
+            Assert.Contains("data-ui-rows", page);                                         // a row editor, not a text area
+            Assert.Contains("Kassierer/in", page);
+            var res = await VereinApp.PostFormAsync(admin, "/admin/p/verein/_settings?group=" + Uri.EscapeDataString("Rollen & Felder"), new()
+            {
+                ["action"] = "save-settings",
+                ["s_roles.count"] = "3", ["s_roles.0.name"] = "Kapitän", ["s_roles.0.board"] = "true", ["s_roles.1.name"] = "Spieler|in", ["s_roles.2.name"] = "  ",
+                ["s_customFields.count"] = "1", ["s_customFields.0.name"] = "Spielklasse", ["s_customFields.0.all"] = "true"
+            });
+            Assert.Equal(HttpStatusCode.Redirect, res.StatusCode);
+            var cfg = System.Text.Json.Nodes.JsonNode.Parse(_app.Db(db => db.Plugins.First(p => p.Key == "verein").ConfigJson))!;
+            Assert.Equal("Kapitän | vorstand\nSpieler/in | ", cfg["roles"]!.GetValue<string>());   // one row per line, the empty row dropped, "|" never inside a cell
+            Assert.Equal("Spielklasse | alle", cfg["customFields"]!.GetValue<string>());
+            using (var scope = _app.App.Services.CreateScope())
+                await scope.ServiceProvider.GetRequiredService<PluginRunner>().ReloadAsync(_app.Db(db => db.Plugins.First(p => p.Key == "verein").Id));
+            var form = await admin.GetStringAsync("/admin/p/verein/members/new");
+            Assert.Contains("data-ui-tags", form);                                          // roles as chips with the club's roles as suggestions
+            Assert.Contains("Kapitän", form);
+            Assert.Contains("Spielklasse", form);
+        }
+        finally
+        {
+            _app.Db(db => { db.Plugins.First(p => p.Key == "verein").ConfigJson = before; return db.SaveChanges(); });
+            using var scope = _app.App.Services.CreateScope();
+            await scope.ServiceProvider.GetRequiredService<PluginRunner>().ReloadAsync(_app.Db(db => db.Plugins.First(p => p.Key == "verein").Id));
+        }
+    }
+
+    [Fact]
+    public async Task A_member_can_be_kept_without_access_and_gets_no_account()
+    {
+        var admin = await _app.AsAsync("admin");
+        var res = await VereinApp.PostFormAsync(admin, "/admin/p/verein/members/new", new()
+        {
+            ["first"] = "Gerlinde", ["last"] = "Ohnekonto", ["email"] = "gerlinde@verein.example", ["roles"] = "Mitglied, Ehrenmitglied", ["born"] = "1950-01-02"
+        });
+        Assert.Equal(HttpStatusCode.Redirect, res.StatusCode);
+        Assert.Equal(0, _app.Db(db => db.SiteMembers.Count(m => m.Email == "gerlinde@verein.example")));
+        var page = Text(await admin.GetStringAsync(res.Headers.Location!.OriginalString.Split('?')[0]));
+        Assert.Contains("Zugang einrichten", page);
+        Assert.Contains("Ehrenmitglied", page);
+        var dash = Text(await admin.GetStringAsync("/admin/p/verein/dashboard"));
+        Assert.Contains("Geburtstage", dash);
+        Assert.Contains("Ohne Zugang", dash);
+    }
+
+    [Fact]
+    public async Task Public_events_have_pages_a_calendar_file_and_operations_drafts_and_internal_ones_stay_hidden()
+    {
+        var admin = await _app.AsAsync("admin");
+        var day = DateTime.UtcNow.AddDays(30).ToString("yyyy-MM-dd");
+        var pub = Regex.Match((await VereinApp.PostFormAsync(admin, "/admin/p/verein/events/new", new() { ["title"] = "Sommerfest Öffentlich", ["kind"] = "Fest", ["starts"] = day + "T15:00", ["place"] = "Festplatz", ["public"] = "true", ["status"] = "published", ["meeting"] = "Geheimer Treffpunkt" })).Headers.Location!.OriginalString, "events/(\\d+)").Groups[1].Value;
+        var draft = Regex.Match((await VereinApp.PostFormAsync(admin, "/admin/p/verein/events/new", new() { ["title"] = "Entwurfsfest", ["starts"] = day + "T15:00", ["public"] = "true", ["status"] = "draft" })).Headers.Location!.OriginalString, "events/(\\d+)").Groups[1].Value;
+        var guest = await _app.AsAsync("guest");
+        var page = Text(await guest.GetStringAsync("/verein/termine/" + pub));
+        Assert.Contains("Sommerfest Öffentlich", page);
+        Assert.DoesNotContain("Geheimer Treffpunkt", page);                                 // the planning stays in the member area
+        Assert.Equal(HttpStatusCode.NotFound, (await guest.GetAsync("/verein/termine/" + draft)).StatusCode);
+        Assert.Contains("Sommerfest Öffentlich", Text(await guest.GetStringAsync("/verein/termine")));
+        var ics = await guest.GetAsync("/verein/ics/" + pub);
+        Assert.Equal("text/calendar", ics.Content.Headers.ContentType!.MediaType);
+        Assert.Contains("SUMMARY:Sommerfest Öffentlich", await ics.Content.ReadAsStringAsync());
+        Assert.Contains("/verein/termine/" + pub, await guest.GetStringAsync("/sitemap.xml"));
+
+        // the AI assistant's / cloud's way in
+        using var scope = _app.App.Services.CreateScope();
+        var ops = new PluginContributions(scope.ServiceProvider.GetRequiredService<PluginRegistry>());
+        var made = (System.Text.Json.Nodes.JsonObject)(await ops.RunOperationAsync(scope.ServiceProvider, "event.create", new System.Text.Json.Nodes.JsonObject
+        {
+            ["title"] = "Umzug per KI", ["kind"] = "Umzug", ["starts"] = day + "T13:00", ["place"] = "Irgendwo", ["schedule"] = "11:00|Zunftmeisterempfang", ["link"] = "javascript:alert(1)"
+        }))!;
+        Assert.Equal("applied", made["status"]!.GetValue<string>());
+        var newId = made["data"]!["id"]!.GetValue<long>();
+        Assert.Equal("event.remove", made["undo"]!["name"]!.GetValue<string>());
+        var read = (System.Text.Json.Nodes.JsonObject)(await ops.RunOperationAsync(scope.ServiceProvider, "event.read", new System.Text.Json.Nodes.JsonObject { ["id"] = newId }))!;
+        Assert.Equal("", read["data"]!["link"]!.GetValue<string>());                         // no script address gets in
+        Assert.Equal("skipped-exists", ((System.Text.Json.Nodes.JsonObject)(await ops.RunOperationAsync(scope.ServiceProvider, "event.create", new System.Text.Json.Nodes.JsonObject { ["title"] = "Umzug per KI", ["starts"] = day + "T13:00" }))!)["status"]!.GetValue<string>());
+        Assert.Contains("Umzug per KI", Text(await admin.GetStringAsync("/admin/p/verein/events")));
     }
 }

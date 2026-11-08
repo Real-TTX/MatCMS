@@ -374,6 +374,11 @@ A built-in plugin (off until switched on), written against the plugin API and no
   a guest sees items only with the order's key. Footer menu element seeded once; Shop → Widerrufe follows the return, the refund stays the order's. See docs "Withdrawal".
 - **Brands can be marked**: highlighted brands get a frame, the shop's badge (`brands.featuredBadge`, "Premium-Partner") and their own section on /shop/brands
   (`brands.featuredHeading`); a brand may carry its own badge (`brands.badge`).
+- **Plugin settings can be a list** (`SettingKind.List`, `ISettingsBuilder.List`): rows edited in a row editor (add, remove, move), stored ONE ROW PER LINE —
+  exactly what a text area with "one entry per line" stored, so a setting can switch from TextArea to List without its value changing. With
+  `SettingSpec.Columns` (`SettingColumn`: text, number or check with `On`/`Off` values) a row's cells are joined by `" | "`; a cell loses "|" and line
+  breaks, empty rows are dropped, an unticked check keeps its separator (`"Mitglied | "`) so "new format" stays recognisable. A group page that does not
+  carry the list's editor keeps the stored value.
 - **Plugin settings can be a multiple choice** (`SettingKind.MultiChoice`): drawn as the toolkit's `UiCheckList` (boxes post `{name}~{index}`, by POSITION), stored as
   the declared values comma-separated — a posted value is never stored, so an option value may not hold a comma (`PluginBuilder` refuses it).
 - **Downloads** are private files streamed by `ShopDownloads.ServeAsync`: paid order, the order's secret key (or the owner, or the admin), a download row that is not revoked or

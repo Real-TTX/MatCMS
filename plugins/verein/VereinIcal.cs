@@ -45,7 +45,8 @@ public static class VereinIcal
         return Calendar(ctx, VereinSettings.Club(ctx) + " – meine Termine", events, meetings);
     }
 
-    private static PluginResult Calendar(IPluginContext ctx, string name, IEnumerable<Event> events, IEnumerable<Meeting> meetings)
+    /// <summary>The calendar; with <paramref name="download"/> as a file to open (one event: "add to calendar"), else as a feed to subscribe to.</summary>
+    internal static PluginResult Calendar(IPluginContext ctx, string name, IEnumerable<Event> events, IEnumerable<Meeting> meetings, string? download = null)
     {
         var origin = VereinMail.Origin(ctx);
         var host = new Uri(origin.Length > 0 ? origin : "https://localhost").Host;
@@ -82,7 +83,9 @@ public static class VereinIcal
             L("END:VEVENT");
         }
         L("END:VCALENDAR");
-        return PluginResult.Text(sb.ToString(), "text/calendar; charset=utf-8").WithHeader("Cache-Control", "private, max-age=900");
+        return download is null
+            ? PluginResult.Text(sb.ToString(), "text/calendar; charset=utf-8").WithHeader("Cache-Control", "private, max-age=900")
+            : PluginResult.File(Encoding.UTF8.GetBytes(sb.ToString()), "text/calendar; charset=utf-8", download);
     }
 
     /// <summary>A date with a time is written in UTC (no time-zone block needed); a date alone as an all-day entry.</summary>

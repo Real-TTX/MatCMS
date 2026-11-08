@@ -44,6 +44,20 @@ public static class VereinCss
 .vm .vm-card h2{display:flex;align-items:center;gap:8px;font-size:1.25rem;margin:0 0 14px}
 .vm .vm-card h2 .ti{color:var(--vm-accent)}
 .vm .vm-grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.vm .vm-back{margin:0 0 14px}.vm .vm-back a{text-decoration:none}
+.vm .vm-event-page{display:grid;gap:14px;max-width:760px}.vm .vm-event-page.is-cancelled h1{text-decoration:line-through;opacity:.7}
+.vm .vm-event-head{display:flex;gap:18px;align-items:center}.vm .vm-event-head h1{margin:0;font-size:clamp(1.6rem,3vw,2.2rem)}
+.vm .vm-date.big{width:84px;padding:12px 0}.vm .vm-date.big b{font-size:2rem}
+.vm .vm-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.vm .vm-tile{display:grid;gap:4px;padding:16px;border-radius:16px;background:#fff;border:1px solid var(--vm-line);color:inherit;text-decoration:none;box-shadow:0 6px 18px rgba(0,0,0,.04);transition:transform .15s,box-shadow .15s}
+.vm .vm-tile:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(0,0,0,.08)}
+.vm .vm-tile .ti{font-size:26px;color:var(--vm-accent)}
+.vm .vm-tile strong{font-size:1rem}.vm .vm-tile small{color:var(--vm-muted);font-size:13px}
+.vm .vm-tile.hot{border-color:var(--vm-accent);background:color-mix(in srgb,var(--vm-accent) 7%,#fff)}.vm .vm-tile.hot small{color:var(--vm-accent);font-weight:600}
+.vm .vm-search{display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid var(--vm-line);border-radius:12px;background:#fff}
+.vm .vm-search input{border:0;outline:0;font:inherit;flex:1;background:transparent}
+.vm .vm-person[hidden]{display:none}
+@media (max-width:600px){.vm .vm-tiles{grid-template-columns:1fr 1fr}.vm .vm-grid2{grid-template-columns:1fr}}
 .vm .vm-lead{margin:0;color:var(--vm-muted)}
 .vm .vm-muted{color:var(--vm-muted);font-size:14.5px}
 .vm .vm-empty{padding:28px;text-align:center;color:var(--vm-muted);background:var(--vm-soft);border-radius:14px}
@@ -148,5 +162,8 @@ public static class VereinCss
  .vm .vm-card{padding:18px 16px}
  .vm .vm-progress{width:70px}
 }
+/* last, so it wins over the rules above: the head's picture keeps its size, the hint loses its icon on a phone */
+.vm .vm-me{flex:none}.vm .vm-tile{align-content:start}
+@media (max-width:600px){.vm .vm-hint .vm-hint-icon{display:none}.vm .vm-head h1{font-size:1.6rem}}
 """;
 }

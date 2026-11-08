@@ -12,24 +12,40 @@ public static class VereinSettings
         CustomFields = "customFields", BirthdayForAll = "birthdayForAll", AddressForAll = "addressForAll", UploadApproval = "uploadApproval",
         TwoFactor = "twoFactor";
 
-    public const string DefaultRoles = "Vorsitzende/r\nStellv. Vorsitzende/r\nKassierer/in\nSchriftführer/in\nBeisitzer/in\nJugendleiter/in\nMitglied";
+    /// <summary>The roles as stored since 1.8: one row per role, "| vorstand" marks the board. (Up to 1.7 roles and board were two plain lists.)</summary>
+    public const string DefaultRoles = "Vorsitzende/r | vorstand\nStellv. Vorsitzende/r | vorstand\nKassierer/in | vorstand\nSchriftführer/in | vorstand\nBeisitzer/in | vorstand\nJugendleiter/in | \nMitglied | ";
     public const string DefaultBoard = "Vorsitzende/r\nStellv. Vorsitzende/r\nKassierer/in\nSchriftführer/in\nBeisitzer/in";
+    private const string BoardMark = "vorstand";
 
+    /// <summary>
+    /// The settings in groups (each a page of its own under Einstellungen). Lists — roles, own fields, the letterhead's lines — are edited row by row
+    /// (<see cref="SettingKind.List"/>) and stored one row per line, as the text areas were: an older value reads unchanged. The board used to be a
+    /// second list of role names (<see cref="BoardRoles"/>, no longer offered); it is now a tick per role and the old list is read until roles are saved.
+    /// </summary>
     public static void Declare(ISettingsBuilder s) => s
-        .Text(ClubName, "Name des Vereins", "", "Erscheint im Mitgliederbereich und in den E-Mails. Leer = Name der Website.")
-        .TextArea(Roles, "Rollen", DefaultRoles, "Eine Rolle pro Zeile. Ein Mitglied kann mehrere Rollen haben.")
-        .TextArea(BoardRoles, "Rollen des Vorstands", DefaultBoard, "Wer eine dieser Rollen hat, sieht im Mitgliederbereich die Übersichten (wer hat bestätigt, wer kommt) und alle Mitglieder.")
-        .TextArea(LoginIntro, "Text auf der Anmeldeseite", "Hier geht es zum internen Bereich unseres Vereins. Die Zugangsdaten bekommst du vom Vorstand.")
+        .Add(new SettingSpec(ClubName, "Name des Vereins") { Group = "Allgemein", Help = "Erscheint im Mitgliederbereich, in den E-Mails und auf dem Briefkopf. Leer = Name der Website." })
         .Text(ReplyTo, "Antwortadresse der E-Mails", "", "Wer auf eine E-Mail des Vereins antwortet, schreibt an diese Adresse (z. B. die des Vorstands).")
-        .Number(MaxUploadMb, "Größte Datei beim Hochladen (MB)", 15, 1, 25)
-        .Bool(DirectoryForAll, "Mitgliederliste für alle Mitglieder", false, "Aus: Mitglieder sehen nur den Vorstand. An: alle sehen alle Mitglieder (Name, Rolle, Telefon).")
-        .Text(EventsTitle, "Überschrift der Termine", "Kommende Termine")
-        .TextArea(CustomFields, "Eigene Felder", "", "Ein Feld pro Zeile, z. B. „Hexe-Nr. | alle“ oder „Narr-Nr. | vorstand“. Dahinter steht, wer es im Mitgliederbereich sieht: alle Mitglieder oder nur der Vorstand (ohne Angabe: nur Vorstand). Auf der Website erscheint es nie.")
+        .Text(EventsTitle, "Überschrift der Termine", "Kommende Termine", "Über dem Block „Vereinstermine“ auf der Website, wenn der Block keine eigene hat.")
+        .Add(new SettingSpec(Roles, "Rollen", SettingKind.List)
+        {
+            Group = "Rollen & Felder", Default = DefaultRoles, AddLabel = "Rolle",
+            Help = "Ein Mitglied kann mehrere Rollen haben. Wer eine Vorstandsrolle hat, sieht im Mitgliederbereich die Übersichten (wer hat bestätigt, wer kommt) und alle Mitglieder.",
+            Columns = new[] { new SettingColumn("name", "Rolle") { Placeholder = "z. B. Kassierer/in" }, new SettingColumn("board", "Vorstand") { Kind = UiRowCell.Check, On = BoardMark, Off = "", Width = "7em" } }
+        })
+        .Add(new SettingSpec(CustomFields, "Eigene Felder", SettingKind.List)
+        {
+            AddLabel = "Feld",
+            Help = "Zusätzliche Angaben je Mitglied (z. B. Mitgliedsnummer, Instrument, Spielklasse, Häs-Nummer). Ohne Haken sieht ein Feld nur der Vorstand; auf der Website erscheint es nie. Umbenennen beginnt das Feld leer.",
+            Columns = new[] { new SettingColumn("name", "Feld") { Placeholder = "z. B. Mitgliedsnummer" }, new SettingColumn("all", "Alle sehen es") { Kind = UiRowCell.Check, On = "alle", Off = "vorstand", Width = "9em" } }
+        })
+        .Add(new SettingSpec(DirectoryForAll, "Mitgliederliste für alle Mitglieder", SettingKind.Bool) { Group = "Mitgliederbereich", Default = "false", Help = "Aus: Mitglieder sehen nur den Vorstand. An: alle sehen alle Mitglieder (Name, Rolle, Telefon)." })
         .Bool(BirthdayForAll, "Geburtsdatum für alle Mitglieder sichtbar", false, "Aus: nur der Vorstand (und die Person selbst) sieht es.")
         .Bool(AddressForAll, "Adresse für alle Mitglieder sichtbar", false, "Aus: nur der Vorstand (und die Person selbst) sieht sie.")
-        .Choice(TwoFactor, "Zwei-Faktor-Anmeldung im Mitgliederbereich", "", new[] { new FieldOption("", "freiwillig (jedes Mitglied kann sie im Profil einschalten)"), new FieldOption("vorstand", "Pflicht für den Vorstand"), new FieldOption("alle", "Pflicht für alle Mitglieder") },
+        .TextArea(LoginIntro, "Text auf der Anmeldeseite", "Hier geht es zum internen Bereich unseres Vereins. Die Zugangsdaten bekommst du vom Vorstand.")
+        .Choice(TwoFactor, "Zwei-Faktor-Anmeldung", "", new[] { new FieldOption("", "freiwillig (jedes Mitglied kann sie im Profil einschalten)"), new FieldOption("vorstand", "Pflicht für den Vorstand"), new FieldOption("alle", "Pflicht für alle Mitglieder") },
             "Pflicht: Wer sie noch nicht eingerichtet hat, wird beim Öffnen des Mitgliederbereichs zur Einrichtung geschickt (Code aus einer Authenticator-App, z. B. Google oder Microsoft Authenticator).")
-        .Bool(UploadApproval, "Uploads vor dem Veröffentlichen freigeben", true, "An: Was ein Mitglied hochlädt, sehen erst der Vorstand und die Person selbst; die anderen Mitglieder erst nach der Freigabe (durch den Vorstand im Mitgliederbereich oder im Admin).");
+        .Add(new SettingSpec(UploadApproval, "Uploads vor dem Veröffentlichen freigeben", SettingKind.Bool) { Group = "Bilder & Material", Default = "true", Help = "An: Was ein Mitglied hochlädt, sehen erst der Vorstand und die Person selbst; die anderen Mitglieder erst nach der Freigabe." })
+        .Number(MaxUploadMb, "Größte Datei beim Hochladen (MB)", 15, 1, 25);
 
     /// <summary>One of the club's own fields and who sees it in the member area.</summary>
     public sealed record Field(string Label, bool ForAll);
@@ -40,8 +56,21 @@ public static class VereinSettings
             .Select(l => l.Split('|', 2)).Select(p => new Field(p[0].Trim(), p.Length > 1 && p[1].Trim().ToLowerInvariant() is "alle" or "all" or "öffentlich" or "mitglieder"))
             .Where(f => f.Label.Length > 0 && f.Label.Length <= 60).DistinctBy(f => f.Label.ToLowerInvariant()).Take(30).ToList();
 
-    public static IReadOnlyList<string> RoleList(IPluginContext ctx) => Lines(ctx.Settings.Get(Roles) is { Length: > 0 } r ? r : DefaultRoles);
-    public static IReadOnlyList<string> BoardList(IPluginContext ctx) => Lines(ctx.Settings.Get(BoardRoles) is { Length: > 0 } r ? r : DefaultBoard);
+    /// <summary>The roles' rows: name and whether it is a board role. A value without any "|" is the plain list of 1.7 and before — its board comes from
+    /// the old second setting.</summary>
+    private static IReadOnlyList<(string Name, bool Board)> RoleRows(IPluginContext ctx)
+    {
+        var raw = ctx.Settings.Get(Roles) is { Length: > 0 } r ? r : DefaultRoles;
+        var rows = raw.Replace("\r", "").Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(l => l.Split('|')).Select(p => (Name: p[0].Trim().Replace(",", " "), Mark: p.Length > 1 ? p[1].Trim() : ""))
+            .Where(x => x.Name.Length > 0).DistinctBy(x => x.Name.ToLowerInvariant()).ToList();
+        if (raw.Contains('|')) return rows.Select(x => (x.Name, string.Equals(x.Mark, BoardMark, StringComparison.OrdinalIgnoreCase))).ToList();
+        var legacy = Lines(ctx.Settings.Get(BoardRoles) is { Length: > 0 } b ? b : DefaultBoard);
+        return rows.Select(x => (x.Name, legacy.Contains(x.Name, StringComparer.OrdinalIgnoreCase))).ToList();
+    }
+
+    public static IReadOnlyList<string> RoleList(IPluginContext ctx) => RoleRows(ctx).Select(r => r.Name).ToList();
+    public static IReadOnlyList<string> BoardList(IPluginContext ctx) => RoleRows(ctx).Where(r => r.Board).Select(r => r.Name).ToList();
     public static string Club(IPluginContext ctx) => ctx.Settings.Get(ClubName) is { Length: > 0 } n ? n.Trim() : ctx.Site.Name;
     /// <summary>Whether this person must sign in with a second factor before entering the member area.</summary>
     public static bool TwoFactorRequired(IPluginContext ctx, bool board) => ctx.Settings.Get(TwoFactor) switch { "alle" => true, "vorstand" => board, _ => false };

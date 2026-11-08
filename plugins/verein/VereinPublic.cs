@@ -175,6 +175,19 @@ public static class VereinPublic
 
         var sb = new StringBuilder(Notice(ctx));
         sb.Append(await UploadHintAsync(ctx, store, p, ct));
+        // the area's places as tiles — the site's menu has them too, but on a phone this is where one starts
+        string Tile(string href, string icon, string label, string? note = null, bool hot = false) =>
+            "<a class=\"vm-tile" + (hot ? " hot" : "") + "\" href=\"" + href + "\"><i class=\"ti ti-" + icon + "\" aria-hidden=\"true\"></i><strong>" + V.H(label) + "</strong>" +
+            (note is null ? "" : "<small>" + V.H(note) + "</small>") + "</a>";
+        sb.Append("<nav class=\"vm-tiles\" aria-label=\"Mitgliederbereich\">")
+          .Append(Tile(Base + "/dokumente", "file-check", "Dokumente", open.Count > 0 ? open.Count + " offen" : "alles erledigt", open.Count > 0))
+          .Append(Tile(Base + "/termine", "calendar", "Termine", events.Count > 0 ? "nächster: " + V.Date(events[0].Starts) : null))
+          .Append(Tile(Base + "/hochladen", "photo-up", "Bilder hochladen"))
+          .Append(Tile(Base + "/dateien", "photo", "Bilder & Material"))
+          .Append(Tile(Base + "/mitglieder", "users", "Mitglieder"))
+          .Append(Tile(Base + "/profil", "user", "Mein Profil"));
+        if (who.Board) sb.Append(Tile(Base + "/vorstand", "clipboard-list", "Vorstand"));
+        sb.Append("</nav>");
         sb.Append("<div class=\"vm-grid2\">");
         sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-file-check\"></i> Zu erledigen</h2>");
         if (open.Count == 0 && replies.Count == 0) sb.Append("<p class=\"vm-muted\">Alles erledigt – danke!</p>");
@@ -391,7 +404,7 @@ public static class VereinPublic
         return events.Where(e => VereinStore.AnswersFor(people, me, e, board).Any(p => !replied.Contains((e.Id, p.MemberId)))).ToList();
     }
 
-    internal static string EventList(IEnumerable<Event> events, bool internalBadge, bool memberLinks = false, ISet<long>? needsReply = null)
+    internal static string EventList(IEnumerable<Event> events, bool internalBadge, bool memberLinks = false, ISet<long>? needsReply = null, bool publicLinks = false)
     {
         var list = events.ToList();
         if (list.Count == 0) return "<p class=\"vm-muted\">Gerade stehen keine Termine an.</p>";
@@ -400,7 +413,7 @@ public static class VereinPublic
         {
             var (day, month, wd) = V.Badge(e.Starts);
             sb.Append("<li class=\"").Append(e.Cancelled ? "is-cancelled" : "").Append("\"><span class=\"vm-date\"><b>").Append(V.H(day)).Append("</b><small>").Append(V.H(month)).Append("</small><em>")
-              .Append(V.H(wd)).Append("</em></span><span class=\"vm-ev\"><strong>").Append(memberLinks ? "<a href=\"" + Base + "/termine/" + e.Id + "\">" + V.H(e.Title) + "</a>" : V.H(e.Title)).Append("</strong>");
+              .Append(V.H(wd)).Append("</em></span><span class=\"vm-ev\"><strong>").Append(memberLinks ? "<a href=\"" + Base + "/termine/" + e.Id + "\">" + V.H(e.Title) + "</a>" : publicLinks && e.Public && !e.Draft ? "<a href=\"" + VereinEvents.PagePath(e.Id) + "\">" + V.H(e.Title) + "</a>" : V.H(e.Title)).Append("</strong>");
             if (memberLinks && e.HasPlan) sb.Append(" <span class=\"vm-badge ok\">Ablauf &amp; Infos</span>");
             if (needsReply?.Contains(e.Id) == true) sb.Append(" <span class=\"vm-badge warn\">").Append(e.AskRequired ? "Rückmeldung erforderlich" : "Rückmeldung fehlt").Append("</span>");
             if (e.Cancelled) sb.Append(" <span class=\"vm-badge err\">abgesagt</span>");
@@ -774,8 +787,9 @@ public static class VereinPublic
             .OrderBy(p => board.ToList().FindIndex(r => p.Roles.Contains(r, StringComparer.OrdinalIgnoreCase))).ToList();
 
         string Card(Person p) => "<div class=\"vm-person\">" + VereinPhoto.Avatar(p, Base + "/foto/" + p.Id, Initials(p)) + "<span><strong>" + V.H(p.Name) + "</strong><small>" +
-            V.H(string.Join(", ", p.Roles)) + "</small>" + (p.Phone.Length > 0 ? "<a href=\"tel:" + V.H(p.Phone.Replace(" ", "")) + "\">" + V.H(p.Phone) + "</a>" : "") +
-            (p.Email.Length > 0 ? "<a href=\"mailto:" + V.H(p.Email) + "\">" + V.H(p.Email) + "</a>" : "") + Details(p) + "</span></div>";
+            V.H(string.Join(", ", p.Roles)) + "</small>" + PhoneLinks(p.Phone) +
+            // a parked address (xxx_…, a list taken over) is the board's record, not a way to write to somebody
+            (p.Email.Length > 0 && !VereinMail.Parkable(p.Email) ? "<a href=\"mailto:" + V.H(p.Email) + "\">" + V.H(p.Email) + "</a>" : "") + Details(p) + "</span></div>";
         // private details by their visibility: the board sees all, the others what the club made visible for everybody
         var fields = VereinSettings.Fields(ctx);
         var seeAddress = who.Board || ctx.Settings.GetBool(VereinSettings.AddressForAll);
@@ -790,7 +804,10 @@ public static class VereinPublic
             return parts.Count == 0 ? "" : "<small>" + string.Join(" · ", parts) + "</small>";
         }
 
-        var sb = new StringBuilder("<section class=\"vm-card\"><h2><i class=\"ti ti-star\"></i> Vorstand</h2>");
+        var sb = new StringBuilder();
+        if (all) sb.Append("<label class=\"vm-search\"><i class=\"ti ti-search\" aria-hidden=\"true\"></i><input type=\"search\" placeholder=\"Name, Rolle, Ort …\" data-vm-filter=\".vm-person\" aria-label=\"Mitglieder durchsuchen\"></label>")
+              .Append("<script>(function(){var i=document.querySelector('[data-vm-filter]');if(!i)return;i.addEventListener('input',function(){var q=i.value.trim().toLowerCase();document.querySelectorAll(i.getAttribute('data-vm-filter')).forEach(function(c){c.hidden=q.length>0&&c.textContent.toLowerCase().indexOf(q)<0;});});})();</script>");
+        sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-star\"></i> Vorstand</h2>");
         sb.Append(vorstand.Count == 0 ? "<p class=\"vm-muted\">Noch niemand eingetragen.</p>" : "<div class=\"vm-people\">" + string.Concat(vorstand.Select(Card)) + "</div>").Append("</section>");
         if (all)
             sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-users\"></i> Alle Mitglieder (").Append(people.Count).Append(")</h2><div class=\"vm-people\">")
@@ -821,6 +838,10 @@ public static class VereinPublic
                   || (p.Active && p.Roles.Any(r => board.Contains(r, StringComparer.OrdinalIgnoreCase)));
         return may ? await VereinPhoto.ServeAsync(ctx, p, ct) : PluginResult.NotFound();
     }
+
+    /// <summary>One call link per number ("mobile · landline" as one field).</summary>
+    private static string PhoneLinks(string phone) => string.Concat(phone.Split(new[] { " · ", ";" }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Select(n => "<a href=\"tel:" + V.H(new string(n.Where(c => char.IsDigit(c) || c == '+').ToArray())) + "\">" + V.H(n) + "</a>"));
 
     private static string Initials(Person p) => string.Concat(new[] { p.First, p.Last }.Where(x => x.Length > 0).Select(x => char.ToUpperInvariant(x[0]))) is { Length: > 0 } s ? s : "?";
 

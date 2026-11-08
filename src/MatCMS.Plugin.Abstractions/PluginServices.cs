@@ -29,7 +29,30 @@ public enum SettingKind
     Color,
     /// <summary>Any number of choices out of <see cref="SettingSpec.Options"/>, drawn as boxes; stored as the chosen values comma-separated in the declared order
     /// ("" = none chosen). An option's value may not contain a comma.</summary>
-    MultiChoice
+    MultiChoice,
+    /// <summary>
+    /// A list the operator edits row by row — add, remove, move (roles, the fields of a form, links). Stored as ONE ROW PER LINE, so it reads like a
+    /// <see cref="TextArea"/> with one entry per line, and a setting that was a text area can become a list without its value changing. With
+    /// <see cref="SettingSpec.Columns"/> a row has several cells, stored joined by <c>" | "</c>; a cell never holds a "|" or a line break.
+    /// </summary>
+    List
+}
+
+/// <summary>A column of a <see cref="SettingKind.List"/> setting.</summary>
+/// <param name="Key">The column's name in the form.</param>
+/// <param name="Label">The heading.</param>
+public sealed record SettingColumn(string Key, string Label)
+{
+    /// <summary><see cref="UiRowCell.Text"/> (default), <see cref="UiRowCell.Number"/> or <see cref="UiRowCell.Check"/>.</summary>
+    public UiRowCell Kind { get; init; } = UiRowCell.Text;
+    /// <summary>Greyed hint while empty.</summary>
+    public string? Placeholder { get; init; }
+    /// <summary>A CSS width ("9em"); the column shares what is left when null.</summary>
+    public string? Width { get; init; }
+    /// <summary>For a check column: what is stored when it is ticked …</summary>
+    public string On { get; init; } = "ja";
+    /// <summary>… and when it is not.</summary>
+    public string Off { get; init; } = "";
 }
 
 /// <summary>One declared setting.</summary>
@@ -52,6 +75,10 @@ public sealed record SettingSpec(string Key, string Label, SettingKind Kind = Se
     public bool Required { get; init; }
     /// <summary>A heading the setting is grouped under in the form. Name it on the first setting of the group: the settings after it, without a name, belong to it until the next one is named.</summary>
     public string? Group { get; init; }
+    /// <summary>The cells of a row of a <see cref="SettingKind.List"/>; empty = one text per row.</summary>
+    public IReadOnlyList<SettingColumn> Columns { get; init; } = Array.Empty<SettingColumn>();
+    /// <summary>The text of a <see cref="SettingKind.List"/>'s "add" button ("+ Rolle").</summary>
+    public string? AddLabel { get; init; }
 }
 
 /// <summary>Declares the settings of a plugin. The host shows them as a form (a tab of the plugin's section, and under
@@ -80,6 +107,10 @@ public static class SettingsBuilderExtensions
     /// <summary>A choice out of a list.</summary>
     public static ISettingsBuilder Choice(this ISettingsBuilder s, string key, string label, string def, IEnumerable<FieldOption> options, string? help = null) =>
         s.Add(new SettingSpec(key, label, SettingKind.Choice) { Default = def, Options = options.ToList(), Help = help });
+    /// <summary>A list of single entries, edited row by row, stored one per line (see <see cref="SettingKind.List"/>).</summary>
+    public static ISettingsBuilder List(this ISettingsBuilder s, string key, string label, string def = "", string? help = null, string? addLabel = null) =>
+        s.Add(new SettingSpec(key, label, SettingKind.List) { Default = def, Help = help, AddLabel = addLabel });
+
     /// <summary>A secret.</summary>
     public static ISettingsBuilder Secret(this ISettingsBuilder s, string key, string label, string? help = null) =>
         s.Add(new SettingSpec(key, label, SettingKind.Secret) { Help = help });

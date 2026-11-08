@@ -10,12 +10,15 @@ namespace MatCMS.Plugin.Verein;
 /// </summary>
 public static class VereinInstagram
 {
-    public const string Color = "instaColor", Logo = "instaLogo", Hashtags = "instaHashtags";
+    public const string Color = "instaColor", Logo = "instaLogo", Hashtags = "instaHashtags", SeasonKind = "instaSeason", SeasonTitle = "instaSeasonTitle";
 
     public static void Declare(ISettingsBuilder s) => s
-        .Add(new SettingSpec(Color, "Instagram-Bild: Vereinsfarbe", SettingKind.Color) { Default = "#8a1f33" })
-        .Add(new SettingSpec(Logo, "Instagram-Bild: Logo", SettingKind.Image) { Help = "Erscheint in einem weißen Kreis auf dem Bild (ein Bild aus der Mediathek; transparente Flächen werden weiß)." })
-        .Text(Hashtags, "Instagram-Bild: Zeile unten", "", "z. B. #fasnet #narren #besigheim – leer = Name des Vereins.");
+        .Add(new SettingSpec(Color, "Vereinsfarbe", SettingKind.Color) { Group = "Instagram-Bild", Default = "#8a1f33", Help = "Hintergrund und Akzente der Bilder." })
+        .Add(new SettingSpec(Logo, "Logo", SettingKind.Image) { Help = "Erscheint in einem weißen Kreis auf dem Bild (ein Bild aus der Mediathek; transparente Flächen werden weiß)." })
+        .Choice(SeasonKind, "Zeitraum der Saison", "monate", new[] { new FieldOption("monate", "die nächsten drei Monate"), new FieldOption("jahr", "das laufende Jahr"), new FieldOption("fasnet", "die nächste Fasnet (6. Januar bis Aschermittwoch)") },
+            "Voreinstellung der Vorlage „Saison“ – beim Erstellen lässt sich der Zeitraum ändern.")
+        .Text(SeasonTitle, "Überschrift der Saison", "Terminplan", "z. B. „Saisonplan“, „Spielplan“ oder „Narrenfahrplan“ – die Jahreszahl kommt dazu.")
+        .Text(Hashtags, "Zeile unten", "", "z. B. #fasnet #narren #besigheim – leer = Name des Vereins.");
 
     private static readonly (string Key, string Label, int W, int H)[] Formats = { ("square", "Quadrat 1080 × 1080", 1080, 1080), ("portrait", "Hochformat 1080 × 1350", 1080, 1350), ("story", "Story 1080 × 1920", 1080, 1920) };
 
@@ -30,12 +33,12 @@ public static class VereinInstagram
         long.TryParse(P("event"), out var eventId);
         var kind = P("art").Trim();
         var count = int.TryParse(P("anzahl"), out var n) ? Math.Clamp(n, 1, 8) : 5;
-        var (defFrom, defTo, season) = NextFasnet();
+        var (defFrom, defTo, season) = DefaultSeason(ctx.Settings.Get(SeasonKind));
         var from = V.CleanDate(P("von")) is { Length: 10 } f1 ? f1 : defFrom;
         var to = V.CleanDate(P("bis")) is { Length: 10 } t1 ? t1 : defTo;
         if (string.CompareOrdinal(to, from) < 0) (from, to) = (to, from);
         var heading = P("titel") is { Length: > 0 } t ? V.Clip(t, 40)
-            : template switch { "plakat" => "", "saison" => "Narrenfahrplan " + (from[..4] == to[..4] ? to[..4] : from[..4] + "/" + to[2..4]), _ => "Nächste Termine" };
+            : template switch { "plakat" => "", "saison" => (ctx.Settings.Get(SeasonTitle) is { Length: > 0 } st ? st.Trim() : "Terminplan") + " " + (from[..4] == to[..4] ? to[..4] : from[..4] + "/" + to[2..4]), _ => "Nächste Termine" };
         var photo = P("bild");
         var onlyPublic = ctx.Request.IsPost ? V.Checked(ctx.Request.F("oeffentlich")) : true;
         bool Fits(Event e) => (!onlyPublic || e.Public) && (kind.Length == 0 || string.Equals(e.Kind, kind, StringComparison.OrdinalIgnoreCase));
@@ -68,7 +71,7 @@ public static class VereinInstagram
         var kindSelect = Ui.Select("art", "Nur diese Art", kind, new[] { Ui.Option("", "alle") }.Concat(kinds.Select(k => Ui.Option(k, k))).ToArray());
         var form = Ui.Form(
             Ui.Grid(200,
-                Ui.Select("vorlage", "Vorlage", template, Ui.Option("liste", "Terminliste (die nächsten)"), Ui.Option("saison", "Saison / Narrenfahrplan"), Ui.Option("plakat", "Plakat (ein Termin)")),
+                Ui.Select("vorlage", "Vorlage", template, Ui.Option("liste", "Terminliste (die nächsten)"), Ui.Option("saison", "Saison (alle Termine eines Zeitraums)"), Ui.Option("plakat", "Plakat (ein Termin)")),
                 Ui.Select("format", "Format", format.Key, Formats.Select(f => Ui.Option(f.Key, f.Label)).ToArray()),
                 Ui.Input("titel", "Überschrift", heading)),
             template switch
@@ -77,7 +80,7 @@ public static class VereinInstagram
                 "saison" => Ui.Grid(200, Ui.Input("von", "Von", from, UiInputType.Date), Ui.Input("bis", "Bis", to, UiInputType.Date), kindSelect),
                 _ => Ui.Grid(200, kindSelect, Ui.Select("anzahl", "Wie viele", count.ToString(CultureInfo.InvariantCulture), new[] { "3", "4", "5", "6", "8" }.Select(x => Ui.Option(x, x)).ToArray()))
             },
-            template == "saison" ? Ui.Muted("Voreingestellt ist die " + season + " (6. Januar bis Aschermittwoch). Passen nicht alle Termine auf ein Bild, entstehen mehrere.") : null,
+            template == "saison" ? Ui.Muted("Voreingestellt: " + season + " (Einstellungen → Instagram-Bild). Passen nicht alle Termine auf ein Bild, entstehen mehrere.") : null,
             Ui.Image("bild", "Hintergrundfoto (freiwillig)", photo),
             template == "plakat" ? null : Ui.Checkbox("oeffentlich", "Nur öffentliche Termine", onlyPublic),
             Ui.FormActions(Ui.Submit("Vorschau aktualisieren")));
@@ -105,6 +108,19 @@ public static class VereinInstagram
         return PluginResult.Page(Ui.Stack(
             Ui.PageHead("Termine als Bild für Instagram, Facebook oder WhatsApp – Vorlage wählen, Vorschau ansehen, herunterladen", "Instagram-Bild"),
             Ui.Columns(new UiNode?[] { Ui.Card("Einstellungen", form), Ui.Muted("Farbe, Logo und die Zeile unten stehen in den Einstellungen des Vereins.") }, new UiNode?[] { Ui.Card("Vorschau", preview) })), "Instagram-Bild");
+    }
+
+    /// <summary>The season preselected by the setting: the next three months (default), this year, or the next Fasnet.</summary>
+    public static (string From, string To, string Label) DefaultSeason(string kind)
+    {
+        var today = V.Local(DateTime.UtcNow).Date;
+        string D(DateTime d) => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        return kind switch
+        {
+            "fasnet" => NextFasnet(),
+            "jahr" => (D(new DateTime(today.Year, 1, 1)), D(new DateTime(today.Year, 12, 31)), "das Jahr " + today.Year.ToString(CultureInfo.InvariantCulture)),
+            _ => (D(today), D(today.AddMonths(3)), "die nächsten drei Monate")
+        };
     }
 
     /// <summary>The next Fasnet: 6 January to Ash Wednesday (Easter Sunday − 46 days). After this year's Ash Wednesday it is next year's.</summary>

@@ -15,10 +15,10 @@ public static class VereinPrint
     public const string Logo = "printLogo", Head = "printHead", Foot = "printFoot", Color = "printColor";
 
     public static void Declare(ISettingsBuilder s) => s
-        .Add(new SettingSpec(Logo, "Druckvorlage: Logo", SettingKind.Image) { Help = "Oben links auf jedem PDF (Dokumente, Einladungen, Protokolle). Leer = das Logo des Instagram-Bilds, sonst das Logo der Website." })
-        .TextArea(Head, "Druckvorlage: Briefkopf (rechts oben)", "", "Eine Angabe pro Zeile, die erste fett – z. B. Name des Vereins, Anschrift, Telefon, E-Mail. Leer = Name des Vereins und Adresse der Website.")
-        .TextArea(Foot, "Druckvorlage: Fußzeile", "", "Bis zu drei Zeilen unten auf jeder Seite, z. B. Bankverbindung, Registergericht, Website. Leer = Name des Vereins · Adresse der Website.")
-        .Add(new SettingSpec(Color, "Druckvorlage: Farbe", SettingKind.Color) { Default = "#334155", Help = "Titel, Überschriften und Linien." });
+        .Add(new SettingSpec(Logo, "Logo", SettingKind.Image) { Group = "Druckvorlage (PDF)", Help = "Oben links auf jedem PDF (Dokumente, Einladungen, Protokolle, Teilnehmerlisten). Leer = das Logo des Instagram-Bilds, sonst das Logo der Website." })
+        .Add(new SettingSpec(Head, "Briefkopf (rechts oben)", SettingKind.List) { AddLabel = "Zeile", Help = "Die erste Zeile fett – z. B. Name des Vereins, Anschrift, Telefon, E-Mail. Leer = Name des Vereins und Adresse der Website." })
+        .Add(new SettingSpec(Foot, "Fußzeile", SettingKind.List) { AddLabel = "Zeile", Help = "Bis zu drei Zeilen unten auf jeder Seite, z. B. Bankverbindung, Registergericht, Website. Leer = Name des Vereins · Adresse der Website." })
+        .Add(new SettingSpec(Color, "Farbe", SettingKind.Color) { Default = "#334155", Help = "Titel, Überschriften und Linien." });
 
     /// <summary>What every page carries.</summary>
     internal sealed record Letterhead(string Club, IReadOnlyList<string> Head, IReadOnlyList<string> Foot, (double R, double G, double B) Accent, PluginImage? Logo);

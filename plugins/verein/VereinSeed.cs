@@ -23,7 +23,7 @@ public static class VereinSeed
             """
             {{verein}} möchte das Vereinsleben zeigen – auf der Website, in sozialen Netzwerken (z. B. Instagram, Facebook), in der Presse und in Vereinsdrucksachen.
 
-            Ich bin damit einverstanden, dass Fotos und Videos, auf denen ich (im Häs oder ohne) zu erkennen bin und die bei Veranstaltungen, Umzügen und Vereinsterminen entstehen, für diese Zwecke veröffentlicht werden dürfen. Mein Name wird dabei nur genannt, wenn ich zustimme.
+            Ich bin damit einverstanden, dass Fotos und Videos, auf denen ich zu erkennen bin und die bei Veranstaltungen, Auftritten, Spielen und Vereinsterminen entstehen, für diese Zwecke veröffentlicht werden dürfen. Mein Name wird dabei nur genannt, wenn ich zustimme.
 
             Mir ist bewusst, dass im Internet veröffentlichte Bilder weltweit abrufbar sind und von Dritten kopiert werden können. Ich kann diese Einwilligung jederzeit für die Zukunft widerrufen; Bilder auf der Website und in den Kanälen des Vereins werden dann entfernt, bereits gedruckte Veröffentlichungen bleiben unberührt.
 

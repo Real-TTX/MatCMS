@@ -87,6 +87,7 @@ internal static class PluginSettingsUi
                 SettingKind.Secret => new UiInput(name, L(s.Label)) { Type = UiInputType.Password, Help = help, Placeholder = stored.ContainsKey(s.Key) ? secretSet : null },
                 // The boxes post as {name}~{index} — OptionName below reads them the same way.
                 SettingKind.MultiChoice => new UiCheckList(name, L(s.Label)) { Help = help, Options = s.Options.Select(o => new UiOption(o.Value, L(o.Label))).ToList(), Checked = Chosen(s, value) },
+                SettingKind.List => ListEditor(s, name, L(s.Label), help, value, posted, L),
                 _ => new UiInput(name, L(s.Label)) { Value = value, Help = help, Required = s.Required }
             };
             children.Add(field);
@@ -161,6 +162,16 @@ internal static class PluginSettingsUi
                     if (s.Options.All(o => o.Value != raw)) errors[s.Key] = t("plugins.settings.choice");
                     else config[s.Key] = raw;
                     break;
+                case SettingKind.List:
+                {
+                    // a form without the editor (another group's page, an old client) keeps what is stored
+                    if (!form.ContainsKey(FieldName(s.Key) + ".count")) break;
+                    var rows = ReadRows(s, FieldName(s.Key), form);
+                    var text = string.Join("\n", rows.Select(r => string.Join(CellSeparator, r.Cells)));
+                    if (s.Required && rows.Count == 0) { errors[s.Key] = t("plugins.settings.required"); break; }
+                    config[s.Key] = text;
+                    break;
+                }
                 default:
                     if (raw.Length > MaxText) { errors[s.Key] = t("plugins.settings.tooLong"); break; }
                     if (s.Required && string.IsNullOrWhiteSpace(raw)) { errors[s.Key] = t("plugins.settings.required"); break; }
@@ -169,6 +180,61 @@ internal static class PluginSettingsUi
             }
         }
         return (config, errors);
+    }
+
+    // ---- list settings: rows in a row editor, stored one row per line, cells joined by " | " ------------------------------------------------------
+
+    private const string CellSeparator = " | ";
+    private const int MaxRows = 200, MaxCell = 300;
+
+    /// <summary>The columns of a list setting (one text column when it declares none).</summary>
+    private static IReadOnlyList<SettingColumn> ColumnsOf(SettingSpec s) => s.Columns.Count > 0 ? s.Columns : new[] { new SettingColumn("v", s.Label) };
+
+    /// <summary>A stored value as rows of cells (a row with fewer cells is filled with "").</summary>
+    internal static List<string[]> ParseRows(SettingSpec s, string value)
+    {
+        var cols = ColumnsOf(s);
+        return (value ?? "").Replace("\r", "").Split('\n', StringSplitOptions.RemoveEmptyEntries).Where(l => l.Trim().Length > 0)
+            .Select(l => cols.Count == 1 ? new[] { l.Trim() } : Enumerable.Range(0, cols.Count).Select(i => l.Split('|') is var p && i < p.Length ? p[i].Trim() : "").ToArray())
+            .Take(MaxRows).ToList();
+    }
+
+    private static UiNode ListEditor(SettingSpec s, string name, string label, string? help, string value, IReadOnlyDictionary<string, string>? posted, Func<string, string> L)
+    {
+        var cols = ColumnsOf(s);
+        // after a failed save the rows come back as they were posted, else as stored
+        var rows = posted is not null && posted.ContainsKey(name + ".count") ? ReadRows(s, name, posted).Select(r => r.Cells).ToList() : ParseRows(s, value);
+        return new UiRowEditor(name, label)
+        {
+            Help = help,
+            AddLabel = s.AddLabel is { Length: > 0 } a ? L(a) : "+",
+            MaxRows = MaxRows,
+            Columns = cols.Select(c => new UiRowColumn(c.Key, cols.Count == 1 && s.Columns.Count == 0 ? "" : L(c.Label)) { Kind = c.Kind, Placeholder = c.Placeholder is null ? null : L(c.Placeholder), Width = c.Width }).ToList(),
+            Rows = rows.Select((r, i) => new UiRowValue(i.ToString(CultureInfo.InvariantCulture),
+                cols.Select((c, k) => c.Kind == UiRowCell.Check ? (string.Equals(r[k], c.On, StringComparison.OrdinalIgnoreCase) ? "true" : "") : r[k]).ToList())).ToList()
+        };
+    }
+
+    /// <summary>The posted rows of a list setting, in screen order; empty rows are dropped, a cell loses "|" and line breaks.</summary>
+    private static List<(string[] Cells, bool Empty)> ReadRows(SettingSpec s, string name, IReadOnlyDictionary<string, string> form)
+    {
+        var cols = ColumnsOf(s);
+        string F(string n) => form.TryGetValue(n, out var v) ? v : "";
+        if (!int.TryParse(F(name + ".count"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var count)) count = 0;
+        var rows = new List<(string[], bool)>();
+        for (var i = 0; i < Math.Min(count, MaxRows); i++)
+        {
+            var cells = cols.Select(c =>
+            {
+                var raw = F($"{name}.{i}.{c.Key}");
+                if (c.Kind == UiRowCell.Check) return IsTrue(raw) ? c.On : c.Off;
+                var v = raw.Replace("|", "/").Replace("\r", " ").Replace("\n", " ").Trim();
+                return v.Length > MaxCell ? v[..MaxCell] : v;
+            }).ToArray();
+            var empty = cols.Select((c, k) => c.Kind == UiRowCell.Check || cells[k].Length == 0).All(x => x);
+            rows.Add((cells, empty));
+        }
+        return rows.Where(r => !r.Item2).ToList();
     }
 
     /// <summary>The configuration as the JSON object that is stored.</summary>

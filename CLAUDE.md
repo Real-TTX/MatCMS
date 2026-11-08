@@ -276,11 +276,12 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
   A section with links opens on its FIRST registered page (the shop: `dashboard`; `PluginRegistry.MatchAdminPage`), the bare section address counts as that link being active. An accordion under the line and a separate block with
   separators were both tried and rejected. No tab bar above such pages; `_settings?group=…` shows one group of the plugin's settings with a sub-menu (`Ui.Split` + `Ui.NavItem`; a group is named on its first setting and holds the ones after it, and a group
   form posts and saves only its own fields). `Ui.Columns` is the two-column editor layout. A `Ui.Table` with search, paging or a `Filter` is a LIST in the admin's own shape: the framed toolbar (search + filter select, rows name their values with `Tags`) sits in a page-head ABOVE the table, `Below` holds the "New …" button under it (`.list-actions`) — never a hand-made button row or a loose search box. Filtering a list by status is `Ui.Tabs`, not a row of buttons.
-  A choice out of a list too long for a drop-down (events, customers, products) is `Ui.Lookup`: a select-like button with the current choice; a click opens
-  the link picker's drop-down (`.lp-pop`, a dialog on a phone) with a search box, and the results come from the plugin's own source while one types
-  (`GET {source}?q=&skip=` → `PluginResult.Lookup(items, more)`, 30 a page, the next when scrolled to the end; `Pinned` choices such as "– kein Termin –" on top,
-  `AutoSubmit` saves a row's own form at once — no OK button). Behaviour in `ui-fields.js` (caught on the document, so fragments work), look in admin.css + the
-  bridge. A native plugin that uses it builds the field in a `NoInlining` helper and catches `TypeLoadException`, falling back to a select, so it still loads on an older host.
+  A choice out of a list too long for a drop-down (events, customers, products) is `Ui.Lookup` = MatUi's select whose options come from the server (FORM-25):
+  the renderer writes `.mat-picker[data-picker=select][data-source-url]` with the input and the current choice as an option, matui.js asks the plugin's source
+  (`GET {source}?q=&page=` → `PluginResult.Lookup(items, more)`, which writes MatUi's `{items:[{value,name,description}],more}`; 30 a page, "show more" for the next).
+  "None" is the `Placeholder` (a field that is not required can be cleared); `AutoSubmit` saves a row's own form at once (ui-fields.js) — no OK button. The first
+  version (CMS 1.13.368) had its own drop-down and sent `skip`; the Verein plugin reads both. A native plugin that uses it builds the field in a `NoInlining`
+  helper and catches `TypeLoadException`, falling back to a select, so it still loads on an older host.
   On a phone the row editor (`Ui.RowEditor`, list settings) wraps each row like a small form: a switch carries its column's name beside the box, a row of a name and
   switches (roles, own fields) stays ONE line, longer rows put the further fields two by two. Its cells need `tr > td` to beat the bridge's table padding.
 - **Template parts** (`IPluginBuilder.TemplatePart(TemplatePartSpec)`, `IPluginContext.RenderPart`): a plugin ships HTML files with a built-in default that the ACTIVE template may replace — the template
@@ -557,8 +558,17 @@ breadcrumb, the user and the theme button at the foot, `mat-page`); `<html data-
 wrote it first and keeps only the two table-padding properties its `table.data` reads), every admin variable (`--surface`, `--line`, `--accent`, the status tints …) READING a `--mat-*` token, and the
 admin's own classes (`.btn`, `.card`, `table.data`, `.tabs`, `.form-field`) in MatUi's look until the pages move to `mat-*`
 classes. The plugin toolkit's own classes belong in it too — `UiRenderer` draws admin fields as `.field` and sub-menus as `.ui-subnav`; left out,
-every plugin's forms (forum, shop, blog) stood 46 px tall and square beside the core's 35 px ones and read as "not MatCMS". `matui.js` is NOT loaded yet: it handles `data-confirm` too, and with `mat-dialogs.js` every question would be asked
-twice — `js/admin-shell.js` does the shell (drawer, user menu, theme → `Account?handler=Theme`) until then. Icons stay Tabler
+every plugin's forms (forum, shop, blog) stood 46 px tall and square beside the core's 35 px ones and read as "not MatCMS". **`matui.js` is loaded** (copied with `matui-icons.svg` from the same release; `<html data-mat-sprite>` names the sprite, `data-dlg-*` give its dialogs their German
+titles). The shell stays `js/admin-shell.js`'s (it uses its own `data-admin-*` hooks, so matui.js does not handle them a second time). `mat-dialogs.js` steps aside
+once MatUi is there: `MatDialog.*` hands over to `MatUi.confirm/alert/prompt` and `data-confirm` is answered by matui.js ALONE (with both listening, every question
+was asked twice — the second time after OK, when the form went out again); it only marks a `.btn-danger` question `data-confirm-danger`, which MatUi reads.
+**Every native field is a MatUi field** (`js/admin-fields.js`, loaded after matui.js in both layouts): a `<select>` becomes the select picker, date/time/colour their
+pickers, `datetime-local` a date and a time picker side by side joined into the original field, a number MatUi's stepper (not in tables). The native field stays in
+the form as the picker's input — same name, value, events — and a script that sets `.value`, refills a select or disables/hides it is followed (property override +
+MutationObserver; new fields in dialogs, row-editor rows and fragments too). `data-native` keeps a field native, `select[multiple]` stays. Two bridge traps: the
+field rule's `.mat-input` also hit the search box INSIDE a picker's panel (it lives in the .field) — excluded with `:not(.mat-picker__panel *)` — and admin.css's
+`.field input[type=search]` outweighs MatUi's padding there (put back in the bridge). A field in a row's own form has its label visually hidden (the column names
+it; MatUi takes the panel's title from it). `js/admin-shell.js` does the shell (drawer, user menu, theme → `Account?handler=Theme`). Icons stay Tabler
 (plugins name Tabler icons). The cloud's `_AdminLayout` is the same shell (groups Betrieb / Verwaltung); its instance
 switcher (`_ContextPicker`) is MatUi's menu switcher under the logo (`mat-nav__switch` > `mat-switcher`), showing a small
 live picture of the CURRENT site (one frame, desktop only, after load — `context-picker.js`); the bar has the breadcrumb
@@ -618,7 +628,7 @@ dark mode. The public site never carries `data-theme`; previews of site content 
 QR code) stay white on purpose. The back office is also **emoji-free**: icons are Tabler classes (`ti ti-…`),
 plugin menu icons are Tabler names (`ti-star`).
 
-**No browser dialogs.** `window.confirm/alert/prompt` are never used — `MatDialog.confirm/alert/prompt` from
+**No browser dialogs.** `window.confirm/alert/prompt` are never used — `MatDialog.confirm/alert/prompt` (on a page with matui.js these are MatUi's dialogs) from
 `MatCMS.Shared.Web/wwwroot/js/mat-dialogs.js` (loaded in the <head> of every admin layout, button wording from
 `<html data-dlg-ok/-cancel>`) returns a Promise. A form asks with `data-confirm="…"` (a `.btn-danger` submit or
 `data-confirm-danger` makes OK red); never `onsubmit="return confirm(…)"`. Plugin action buttons (`ActionButton(confirm:)`)

@@ -37,7 +37,7 @@
 <!DOCTYPE html>
 @* The same MatUi shell as the CMS's back office (MatCMS.Shared.Web: lib/matui/matui.css, css/admin-matui.css,
    js/admin-shell.js) — the two admins look and work alike. The cloud keeps its instance switcher in the bar. *@
-<html lang="@currentCulture" data-app="matcms" data-theme="@theme" data-density="compact" data-dlg-ok="@T["dialog.ok"]" data-dlg-cancel="@T["action.cancel"]">
+<html lang="@currentCulture" data-app="matcms" data-theme="@theme" data-density="compact" data-dlg-ok="@T["dialog.ok"]" data-dlg-cancel="@T["action.cancel"]" data-dlg-close="@T["action.close"]" data-dlg-confirm="@T["dialog.confirm"]" data-dlg-notice="@T["dialog.notice"]" data-dlg-input="@T["dialog.input"]" data-mat-sprite="@Url.Content("~/_content/MatCMS.Shared.Web/lib/matui/matui-icons.svg")">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -228,6 +228,9 @@
     @Html.AntiForgeryToken()
 
     <script src="~/_content/MatCMS.Shared.Web/js/admin-shell.js" asp-append-version="true"></script>
+    @* MatUi's behaviour (pickers, stepper, its dialogs) and the layer that makes every native field one of its pickers. *@
+    <script src="~/_content/MatCMS.Shared.Web/lib/matui/matui.js" asp-append-version="true"></script>
+    <script src="~/_content/MatCMS.Shared.Web/js/admin-fields.js" asp-append-version="true"></script>
     <script src="~/_content/MatCMS.Shared.Web/js/admin-list.js" asp-append-version="true"></script>
     @* Belongs to the switcher in the bar above, so it loads wherever that bar does. *@
     <script src="~/js/context-picker.js" asp-append-version="true"></script>

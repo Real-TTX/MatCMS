@@ -12,7 +12,13 @@
 
    The button wording comes from <html data-dlg-ok / data-dlg-cancel> (set by each app's layout, which owns the
    translations); a shared library cannot reach either app's localizer. Loaded in <head>: it only defines
-   things, and inline page scripts may already reference MatDialog. */
+   things, and inline page scripts may already reference MatDialog.
+
+   Where matui.js is loaded too (the admin layouts, at the end of the page), MatUi's own dialogs take over: MatDialog.*
+   hands each question to MatUi.confirm/alert/prompt, and data-confirm is answered by matui.js ALONE — with both
+   listening, every question was asked twice (the second time after the first was answered, when the form went out
+   again). What this file still does there: mark a question as dangerous (a .btn-danger button, data-confirm-danger
+   on the form) the way MatUi reads it, data-confirm-danger on the element that asks, before MatUi's handler runs. */
 (function () {
     "use strict";
     if (window.MatDialog) return;
@@ -85,10 +91,16 @@
         });
     }
 
+    function mat() { return window.MatUi && window.MatUi.confirm ? window.MatUi : null; }
+    function text(message) { return message == null ? "" : String(message); }
+
     window.MatDialog = {
-        confirm: function (message, opts) { return open("confirm", message, null, opts); },
-        alert: function (message, opts) { return open("alert", message, null, opts); },
-        prompt: function (message, value, opts) { return open("prompt", message, value, opts); }
+        confirm: function (message, opts) { var m = mat(); return m ? m.confirm(text(message), opts || {}) : open("confirm", message, null, opts); },
+        alert: function (message, opts) { var m = mat(); return m ? m.alert(text(message), opts || {}) : open("alert", message, null, opts); },
+        prompt: function (message, value, opts) {
+            var m = mat();
+            return m ? m.prompt(text(message), Object.assign({}, opts || {}, { value: value == null ? "" : String(value) })) : open("prompt", message, value, opts);
+        }
     };
 
     // --- declarative data-confirm ------------------------------------------------------------------
@@ -104,6 +116,10 @@
         var form = e.target;
         if (!(form instanceof HTMLFormElement)) return;
         var submitter = e.submitter || null;
+        if (mat()) {
+            if (form.hasAttribute("data-confirm") && isDanger(submitter, form)) form.setAttribute("data-confirm-danger", "");
+            return;
+        }
         var text = (submitter && submitter.getAttribute("data-confirm")) || form.getAttribute("data-confirm");
         if (!text) return;
         if (form.__matConfirmed) { form.__matConfirmed = false; return; }
@@ -118,6 +134,11 @@
     }, true);
     // Links and plain buttons with data-confirm (outside a form submit).
     document.addEventListener("click", function (e) {
+        if (mat()) {
+            var asks = e.target.closest && e.target.closest("[data-confirm]");
+            if (asks && !asks.matches("form") && (asks.classList.contains("btn-danger") || isDanger(asks, asks.form))) asks.setAttribute("data-confirm-danger", "");
+            return;
+        }
         var el = e.target.closest && e.target.closest("a[data-confirm], button[data-confirm]:not([type=submit])");
         if (!el || el.__matConfirmed) { if (el) el.__matConfirmed = false; return; }
         if (el.tagName === "BUTTON" && el.form && (el.type === "submit")) return;   // handled by the submit listener

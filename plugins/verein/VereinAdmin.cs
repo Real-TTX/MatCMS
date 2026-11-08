@@ -1100,21 +1100,22 @@ public static class VereinAdmin
 
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     private static UiNode LookupField(Event? current) =>
-        Ui.Lookup("event", "", Root + "events/lookup", current is null ? "0" : current.Id.ToString(CultureInfo.InvariantCulture),
-            current is null ? "" : EventText(current), Ui.Option("0", "– kein Termin –")) with { AutoSubmit = true, SearchPlaceholder = "Termin suchen (Name, Ort, Monat …)" };
+        Ui.Lookup("event", "Termin", Root + "events/lookup", current is null ? "" : current.Id.ToString(CultureInfo.InvariantCulture),
+            current is null ? "" : EventText(current)) with { AutoSubmit = true, Placeholder = "– kein Termin –" };
 
     private static string EventText(Event e) => e.Title + " · " + V.Date(e.Starts);
 
     /// <summary>
     /// The search behind the event field: <c>?q=</c> matches name, kind, place, date ("14.02.2027") and month ("Februar 2027"), every word must
     /// match; <c>?scope=upcoming</c> only what is still to come. Without a search the recent past comes first (that is what photos belong to), then
-    /// what is ahead. 30 per page, <c>skip</c> for the next.
+    /// what is ahead. 30 per page: <c>page</c> (from 1, MatUi's select) — the first version of the field sent <c>skip</c>, which is read too.
     /// </summary>
     private static async Task<PluginResult> EventLookupAsync(IPluginContext ctx, CancellationToken ct)
     {
         var today = V.Today;
         var words = (ctx.Request.Q("q") ?? "").Trim().ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries);
         int.TryParse(ctx.Request.Q("skip"), NumberStyles.None, CultureInfo.InvariantCulture, out var skip);
+        if (int.TryParse(ctx.Request.Q("page"), NumberStyles.None, CultureInfo.InvariantCulture, out var pageNo) && pageNo > 1) skip = (pageNo - 1) * 30;
         var upcomingOnly = ctx.Request.Q("scope") == "upcoming";
         string Hay(Event e)
         {

@@ -427,13 +427,12 @@ public sealed record UiTags(string Name, string Label) : UiField(Name, Label)
 }
 
 /// <summary>
-/// One choice out of a list too long for a drop-down (events, customers, products …). The field shows the current choice; a click opens a search box
-/// with the choices below it — a drop-down under the field, a dialog on a phone — and they are fetched from <see cref="Source"/> while one types.
-/// Posts the chosen value under <see cref="UiField.Name"/>.
-/// <para><see cref="Source"/> answers <c>GET {Source}?q={text}&amp;skip={n}</c> with <c>{"items":[{"value","label","hint","group"}],"more":true|false}</c> —
-/// build it with <see cref="PluginResult.Lookup"/>: <c>hint</c> is a greyed second text (a date), <c>group</c> a heading drawn where it changes, <c>more</c> says
-/// there are further results, fetched with <c>skip</c> when the list is scrolled to its end. An admin page of the plugin is the usual source. What is posted
-/// is still a value from the browser: check it like any other input, an offered value proves nothing.</para>
+/// One choice out of a list too long for a drop-down (events, customers, products …): MatUi's select whose options come from the server (FORM-25).
+/// The field shows the current choice; a click opens its panel — beside the field, the whole screen on a phone — with a search box, and the choices are
+/// fetched from <see cref="Source"/> while one types. Posts the chosen value under <see cref="UiField.Name"/> ("" when it was cleared).
+/// <para><see cref="Source"/> answers <c>GET {Source}?q={text}&amp;page={n}</c> (n from 1) with <c>{"items":[{"value","name","description"}],"more":true|false}</c> —
+/// build it with <see cref="PluginResult.Lookup"/>. The first page replaces the list, "more" adds a button for the next one. An admin page of the plugin is the
+/// usual source. What is posted is still a value from the browser: check it like any other input, an offered value proves nothing.</para>
 /// </summary>
 /// <param name="Name">Field name.</param>
 /// <param name="Label">Label.</param>
@@ -441,15 +440,16 @@ public sealed record UiLookup(string Name, string Label) : UiField(Name, Label)
 {
     /// <summary>The chosen value ("" = none).</summary>
     public string Value { get; init; } = "";
-    /// <summary>The text of the chosen value, shown in the field. Empty: the label of a <see cref="Pinned"/> choice with that value, else <see cref="Placeholder"/>.</summary>
+    /// <summary>The text of the chosen value, shown in the field before anything was asked. Empty: the label of a <see cref="Pinned"/> choice with that value.</summary>
     public string Display { get; init; } = "";
     /// <summary>The local address that answers the search (see above).</summary>
     public string Source { get; init; } = "";
-    /// <summary>The field's text while nothing is chosen.</summary>
+    /// <summary>The field's text while nothing is chosen (a field that is not <see cref="UiField.Required"/> can be cleared back to it).</summary>
     public string? Placeholder { get; init; }
-    /// <summary>The greyed hint in the search box.</summary>
+    /// <summary>Not shown: MatUi's search field has its own wording. Kept for plugins built against the first version of this field.</summary>
     public string? SearchPlaceholder { get; init; }
-    /// <summary>Choices always offered above the results while the search box is empty ("– no event –", "automatic").</summary>
+    /// <summary>Choices written into the field before the first answer. MatUi keeps only the chosen one once the source answered, so a choice that must
+    /// always be offered belongs into the source's first page; "nothing" is better a <see cref="Placeholder"/> (the field can be cleared).</summary>
     public IReadOnlyList<UiOption> Pinned { get; init; } = Array.Empty<UiOption>();
     /// <summary>Choosing sends the surrounding form at once — a row's own "assign" form then needs no OK button.</summary>
     public bool AutoSubmit { get; init; }
@@ -460,9 +460,9 @@ public sealed record UiLookup(string Name, string Label) : UiField(Name, Label)
 /// <param name="Label">The text shown (and put into the field).</param>
 public sealed record UiLookupItem(string Value, string Label)
 {
-    /// <summary>A greyed second text on the same line (a date, an address).</summary>
+    /// <summary>A greyed second line (a date, an address).</summary>
     public string? Hint { get; init; }
-    /// <summary>A heading drawn above it where the group changes ("Kommende", "Vergangene").</summary>
+    /// <summary>Not shown: MatUi's list from a source has no groups. Put what matters into <see cref="Hint"/>.</summary>
     public string? Group { get; init; }
 }
 

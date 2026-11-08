@@ -551,23 +551,18 @@ textarea.code-area { width: 100%; box-sizing: border-box; font-family: ui-monosp
 .lp-pop-item.on { background: var(--hover); }
 .lp-pop-item[hidden], .lp-pop-group[hidden] { display: none; }
 .lp-pop-empty { padding: 14px 12px; color: var(--text-muted); font-size: 14px; }
-/* Lookup field (Ui.Lookup): the current choice as a select-like button; its search opens in the link picker's drop-down (.lp-pop), on a phone as a
-   dialog over the page. The chosen entry is marked by weight and colour, never by a bar at its side. */
-.ui-lookup { min-width: 0; }
-.ui-lookup-btn { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; box-sizing: border-box; margin: 0; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--surface); color: var(--ink); font: inherit; font-size: 14px; line-height: 1.3; text-align: left; cursor: pointer; }
-.ui-lookup-btn:disabled { opacity: .6; cursor: default; }
-.ui-lookup-text { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ui-lookup-text.is-empty { color: var(--text-muted); }
-.ui-lookup-btn > .ti { flex: none; color: var(--text-muted); }
-/* in a row's own form: the form grid's minmax(0, 1fr) lets the cell shrink under the field, which then lay over the next column */
-table.data td .form-grid:has(.ui-lookup) { grid-template-columns: minmax(240px, 1fr); }
-.ui-lookup-pop .lp-pop-item .u { flex: 0 0 auto; max-width: 48%; }
-.lp-pop-item.is-current .t { font-weight: 600; color: var(--accent); }
-.ui-lookup-back { position: fixed; inset: 0; z-index: 1199; background: rgba(0, 0, 0, .45); }
-html.ui-lookup-open, html.ui-lookup-open body { overflow: hidden; }
-.lp-pop.is-sheet { position: fixed; left: 8px; right: 8px; top: max(10px, env(safe-area-inset-top)); bottom: auto; width: auto; max-height: calc(100dvh - 20px); border-radius: 12px; }
-.ui-lookup-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 6px 0 14px; font-weight: 600; font-size: 15px; }
-.lp-pop.is-sheet .lp-pop-item { padding: 12px 14px; }
+/* A picker in a row's own form (Ui.Lookup, a select made a picker): the form grid's minmax(0, 1fr) let the cell shrink under the field, which then lay
+   over the next column. */
+table.data td .form-grid:has(.mat-picker) { grid-template-columns: minmax(240px, 1fr); }
+/* A field in a row's own form is named by its column: its label is there for MatUi (the title of the picker's panel on a phone) and for screen
+   readers, not for the eye. */
+table.data td .form-grid > .field > label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* Date and time (admin-fields.js): a date picker and a time picker side by side as ONE field; the original field lies under them, invisible, so a
+   browser message about it (required) points here. */
+.mat-datetime { position: relative; display: flex; gap: 6px; min-width: 0; }
+.mat-datetime > .mat-picker { flex: 1 1 0; min-width: 0; }
+.mat-datetime > .mat-picker[data-picker="time"] { flex: 0 0 5.6rem; }
+.mat-datetime > input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; border: 0; opacity: 0; pointer-events: none; }
 
 /* Icon picker — the current icon as a button, the grid in a dialog.
    Die Klassen sind dieselben wie vorher, als das Raster noch dauerhaft im Formular stand: das

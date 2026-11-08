@@ -407,26 +407,25 @@ public static class UiRenderer
             }
         }
 
-        // The current choice is a button (it opens the search) and a hidden input (what is posted). The search itself — box, list, paging — is
-        // ui-fields.js; the field carries its words and the pinned choices as data- attributes, the results come from the plugin's source as JSON.
+        // MatUi's select with options from the server (FORM-25): matui.js adds the button and the panel around the input, asks the source and writes the
+        // chosen value into the input. Written here: the input (what is posted), the current choice and the pinned ones as options, so the closed field can
+        // name its value before anything was asked. data-ui-lookup is the hook for AutoSubmit (ui-fields.js).
         private void LookupField(UiLookup f)
         {
             FieldOpen(f);
-            var pinned = f.Pinned.FirstOrDefault(o => o.Value == f.Value);
-            var text = f.Display.Length > 0 ? f.Display : pinned?.Label ?? (f.Value.Length > 0 ? f.Value : "");
-            var empty = text.Length == 0;
-            if (empty) text = f.Placeholder ?? Sraw("ui.lookup.choose");
-            _sb.Append("<div class=\"ui-lookup\" data-ui-lookup data-source=\"").Append(E(SafeUrl(f.Source))).Append('"');
+            var options = new List<UiOption>();
+            if (f.Value.Length > 0) options.Add(new UiOption(f.Value, f.Display.Length > 0 ? f.Display : f.Pinned.FirstOrDefault(o => o.Value == f.Value)?.Label ?? f.Value));
+            options.AddRange(f.Pinned.Where(o => o.Value != f.Value && o.Value.Length > 0));
+            _sb.Append("<div class=\"mat-picker\" data-picker=\"select\" data-search data-ui-lookup data-source-url=\"").Append(E(SafeUrl(f.Source))).Append('"')
+               .Append(" data-placeholder=\"").Append(E(f.Placeholder ?? Sraw("ui.lookup.choose"))).Append('"');
+            if (!f.Required && !f.Disabled) _sb.Append(" data-clearable");
             if (f.AutoSubmit) _sb.Append(" data-submit");
-            _sb.Append(" data-t-search=\"").Append(E(f.SearchPlaceholder ?? Sraw("ui.lookup.search"))).Append("\" data-t-none=\"").Append(S("ui.lookup.none"))
-               .Append("\" data-t-failed=\"").Append(S("ui.lookup.failed")).Append("\" data-t-loading=\"").Append(S("ui.lookup.loading"))
-               .Append("\" data-t-close=\"").Append(S("ui.close")).Append("\" data-label=\"").Append(E(f.Label)).Append('"');
-            if (f.Pinned.Count > 0)
-                _sb.Append(" data-pinned=\"").Append(E(System.Text.Json.JsonSerializer.Serialize(f.Pinned.Select(o => new { value = o.Value, label = o.Label })))).Append('"');
-            _sb.Append("><input type=\"hidden\" name=\"").Append(E(f.Name)).Append("\" value=\"").Append(E(f.Value)).Append("\" data-ui-lookup-value")
-               .Append(f.Disabled ? " disabled" : "").Append(" /><button type=\"button\" class=\"ui-lookup-btn\" id=\"").Append(E(FieldId(f))).Append("\" aria-haspopup=\"dialog\"")
-               .Append(f.Disabled ? " disabled" : "").Append("><span class=\"ui-lookup-text").Append(empty ? " is-empty" : "").Append("\" data-ui-lookup-text>").Append(E(text))
-               .Append("</span><i class=\"ti ti-selector\" aria-hidden=\"true\"></i></button></div>");
+            _sb.Append("><input type=\"text\" class=\"mat-picker__input\"");
+            Common(f);
+            _sb.Append(" value=\"").Append(E(f.Value)).Append("\" /><div class=\"mat-picker__options\">");
+            foreach (var o in options)
+                _sb.Append("<button type=\"button\" class=\"mat-picker__option\" data-value=\"").Append(E(o.Value)).Append("\"><span class=\"mat-picker__name\">").Append(E(o.Label)).Append("</span></button>");
+            _sb.Append("</div></div>");
             FieldClose(f);
         }
 

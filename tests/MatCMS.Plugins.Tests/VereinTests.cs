@@ -1010,11 +1010,10 @@ public class VereinTests : IClassFixture<VereinApp>
         async Task<System.Text.Json.Nodes.JsonNode> Find(string q) => System.Text.Json.Nodes.JsonNode.Parse(await admin.GetStringAsync("/admin/p/verein/events/lookup?q=" + Uri.EscapeDataString(q)))!;
         var both = (await Find("suchstadt"))["items"]!.AsArray();
         Assert.Equal(2, both.Count);
-        Assert.Equal("Laternenlauf Suchstadt", both[0]!["label"]!.GetValue<string>());                 // what is ahead, soonest first
-        Assert.Equal("11.11.2032 · Umzug", both[0]!["hint"]!.GetValue<string>());
-        Assert.Equal("Kommende Termine", both[0]!["group"]!.GetValue<string>());
+        Assert.Equal("Laternenlauf Suchstadt", both[0]!["name"]!.GetValue<string>());                  // what is ahead, soonest first
+        Assert.Equal("11.11.2032 · Umzug", both[0]!["description"]!.GetValue<string>());
         Assert.Equal(lantern.ToString(), both[0]!["value"]!.GetValue<string>());
-        var november = (await Find("november 2032"))["items"]!.AsArray().Select(i => i!["label"]!.GetValue<string>()).ToList();
+        var november = (await Find("november 2032"))["items"]!.AsArray().Select(i => i!["name"]!.GetValue<string>()).ToList();
         Assert.Contains("Laternenlauf Suchstadt", november);
         Assert.DoesNotContain("Heringsessen Suchstadt", november);
         Assert.Single((await Find("hering suchstadt"))["items"]!.AsArray());
@@ -1026,7 +1025,7 @@ public class VereinTests : IClassFixture<VereinApp>
         var upId = _app.Db(db => db.Database.SqlQueryRaw<long>("select id as Value from p_verein_uploads where title = 'Laternenbild'").ToList().First());
         var list = await admin.GetStringAsync("/admin/p/verein/uploads");
         Assert.Contains("data-ui-lookup", list);
-        Assert.Contains("data-source=\"/admin/p/verein/events/lookup\"", list);
+        Assert.Contains("data-source-url=\"/admin/p/verein/events/lookup\"", list);
         Assert.Contains("data-submit", list);                                                          // choosing saves, no OK button
         long EventOf() => _app.Db(db => db.Database.SqlQueryRaw<long>("select event_id as Value from p_verein_uploads where id = {0}", upId).ToList().First());
         var ok = await VereinApp.PostFormAsync(admin, "/admin/p/verein/uploads", new() { ["action"] = "event", ["id"] = upId.ToString(), ["event"] = lantern.ToString() });
@@ -1035,8 +1034,10 @@ public class VereinTests : IClassFixture<VereinApp>
         Assert.Contains("Laternenlauf Suchstadt · 11.11.2032", await admin.GetStringAsync("/admin/p/verein/uploads"));   // the field shows the choice
         await VereinApp.PostFormAsync(admin, "/admin/p/verein/uploads", new() { ["action"] = "event", ["id"] = upId.ToString(), ["event"] = "987654" });
         Assert.Equal(lantern, EventOf());
-        await VereinApp.PostFormAsync(admin, "/admin/p/verein/uploads", new() { ["action"] = "event", ["id"] = upId.ToString(), ["event"] = "0" });
+        await VereinApp.PostFormAsync(admin, "/admin/p/verein/uploads", new() { ["action"] = "event", ["id"] = upId.ToString(), ["event"] = "" });   // cleared
         Assert.Equal(0, EventOf());
+        // MatUi asks page by page
+        Assert.Contains("\"more\":false", await admin.GetStringAsync("/admin/p/verein/events/lookup?q=suchstadt&page=2"));
 
         // "Neue Termine fragen die Teilnahme ab": the box is ticked on a new event, an operation's new event asks too; no mail goes out by that
         Assert.DoesNotMatch("name=\"ask\"[^>]*checked", await admin.GetStringAsync("/admin/p/verein/events/new"));

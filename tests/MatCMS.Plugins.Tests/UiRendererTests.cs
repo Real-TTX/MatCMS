@@ -198,31 +198,32 @@ public class UiRendererTests
     }
 
     [Fact]
-    public void A_lookup_posts_its_value_shows_the_chosen_text_and_names_its_source_pinned_choices_and_words_for_the_script()
+    public void A_lookup_is_matuis_select_from_a_source_names_its_choice_before_anything_was_asked_and_can_be_cleared()
     {
-        var html = Admin(Ui.Form(Ui.Lookup("event", "Termin", "/admin/p/verein/events/lookup", "12", "<b>Umzug</b> · 09.01.2027", Ui.Option("0", "– kein Termin –")) with { AutoSubmit = true }));
-        Assert.Contains("type=\"hidden\" name=\"event\" value=\"12\" data-ui-lookup-value", html);
-        Assert.Contains("data-source=\"/admin/p/verein/events/lookup\"", html);
+        var html = Admin(Ui.Form(Ui.Lookup("event", "Termin", "/admin/p/verein/events/lookup", "12", "<b>Umzug</b> · 09.01.2027") with { AutoSubmit = true, Placeholder = "– kein Termin –" }));
+        Assert.Contains("class=\"mat-picker\" data-picker=\"select\" data-search data-ui-lookup data-source-url=\"/admin/p/verein/events/lookup\"", html);
+        Assert.Contains("data-placeholder=\"– kein Termin –\"", html);
+        Assert.Contains("data-clearable", html);                                                           // not required: back to "none"
         Assert.Contains("data-submit", html);
-        Assert.Contains("&lt;b&gt;Umzug&lt;/b&gt; · 09.01.2027", html);                                  // the chosen text is text
-        Assert.Contains("data-pinned=\"[{&quot;value&quot;:&quot;0&quot;", html);                       // pinned choices travel as encoded JSON
-        Assert.Contains("class=\"ui-lookup-btn\" id=\"f-event\"", html);                             // the label points at the button
-        // nothing chosen: the pinned choice's label, else the placeholder (greyed)
-        Assert.Contains(">– kein Termin –</span>", Admin(Ui.Lookup("event", "T", "/x", "0", "", Ui.Option("0", "– kein Termin –"))));
-        var empty = Admin(Ui.Lookup("event", "T", "/x") with { Placeholder = "Termin wählen" });
-        Assert.Contains("ui-lookup-text is-empty", empty);
-        Assert.Contains(">Termin wählen</span>", empty);
+        Assert.Contains("<input type=\"text\" class=\"mat-picker__input\" id=\"f-event\" name=\"event\" value=\"12\"", html);   // the label points at it
+        Assert.Contains("data-value=\"12\"><span class=\"mat-picker__name\">&lt;b&gt;Umzug&lt;/b&gt; · 09.01.2027</span>", html);   // the choice is text
+        // nothing chosen: no option written, the placeholder speaks; a required field cannot be cleared
+        var empty = Admin(Ui.Lookup("event", "T", "/x") with { Required = true });
+        Assert.DoesNotContain("class=\"mat-picker__option\"", empty);
+        Assert.DoesNotContain("data-clearable", empty);
+        Assert.Contains(" required", empty);
+        // a pinned choice names a value that has no display text, and is written as an option
+        Assert.Contains(">automatisch</span>", Admin(Ui.Lookup("e", "T", "/x", "auto", "", Ui.Option("auto", "automatisch"))));
         // a source that is not a local or web address is not drawn as one
-        Assert.Contains("data-source=\"#\"", Admin(Ui.Lookup("e", "T", "javascript:alert(1)")));
+        Assert.Contains("data-source-url=\"#\"", Admin(Ui.Lookup("e", "T", "javascript:alert(1)")));
         Assert.DoesNotContain("data-submit", Admin(Ui.Lookup("e", "T", "/x")));
     }
 
     [Fact]
-    public void A_lookup_search_answers_in_the_shape_the_field_reads()
+    public void A_lookup_search_answers_in_matuis_shape()
     {
         var r = PluginResult.Lookup(new[] { Ui.LookupItem("3", "Umzug", "09.01.2027", "Kommende"), Ui.LookupItem("4", "Ball") }, more: true);
-        var json = r.Body!.ToJsonString();
-        Assert.Equal("""{"items":[{"value":"3","label":"Umzug","hint":"09.01.2027","group":"Kommende"},{"value":"4","label":"Ball"}],"more":true}""", json);
+        Assert.Equal("""{"items":[{"value":"3","name":"Umzug","description":"09.01.2027"},{"value":"4","name":"Ball"}],"more":true}""", r.Body!.ToJsonString());
     }
 
     [Fact]

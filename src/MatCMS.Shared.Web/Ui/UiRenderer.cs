@@ -401,9 +401,33 @@ public static class UiRenderer
                 case UiMediaList ml: MediaListField(ml); break;
                 case UiRichText rt: RichTextField(rt); break;
                 case UiTags tg: TagsField(tg); break;
+                case UiLookup lk: LookupField(lk); break;
                 case UiRowEditor re: RowEditorField(re); break;
                 default: throw new NotSupportedException($"The renderer does not know {field.GetType().Name}.");
             }
+        }
+
+        // The current choice is a button (it opens the search) and a hidden input (what is posted). The search itself — box, list, paging — is
+        // ui-fields.js; the field carries its words and the pinned choices as data- attributes, the results come from the plugin's source as JSON.
+        private void LookupField(UiLookup f)
+        {
+            FieldOpen(f);
+            var pinned = f.Pinned.FirstOrDefault(o => o.Value == f.Value);
+            var text = f.Display.Length > 0 ? f.Display : pinned?.Label ?? (f.Value.Length > 0 ? f.Value : "");
+            var empty = text.Length == 0;
+            if (empty) text = f.Placeholder ?? Sraw("ui.lookup.choose");
+            _sb.Append("<div class=\"ui-lookup\" data-ui-lookup data-source=\"").Append(E(SafeUrl(f.Source))).Append('"');
+            if (f.AutoSubmit) _sb.Append(" data-submit");
+            _sb.Append(" data-t-search=\"").Append(E(f.SearchPlaceholder ?? Sraw("ui.lookup.search"))).Append("\" data-t-none=\"").Append(S("ui.lookup.none"))
+               .Append("\" data-t-failed=\"").Append(S("ui.lookup.failed")).Append("\" data-t-loading=\"").Append(S("ui.lookup.loading"))
+               .Append("\" data-t-close=\"").Append(S("ui.close")).Append("\" data-label=\"").Append(E(f.Label)).Append('"');
+            if (f.Pinned.Count > 0)
+                _sb.Append(" data-pinned=\"").Append(E(System.Text.Json.JsonSerializer.Serialize(f.Pinned.Select(o => new { value = o.Value, label = o.Label })))).Append('"');
+            _sb.Append("><input type=\"hidden\" name=\"").Append(E(f.Name)).Append("\" value=\"").Append(E(f.Value)).Append("\" data-ui-lookup-value")
+               .Append(f.Disabled ? " disabled" : "").Append(" /><button type=\"button\" class=\"ui-lookup-btn\" id=\"").Append(E(FieldId(f))).Append("\" aria-haspopup=\"dialog\"")
+               .Append(f.Disabled ? " disabled" : "").Append("><span class=\"ui-lookup-text").Append(empty ? " is-empty" : "").Append("\" data-ui-lookup-text>").Append(E(text))
+               .Append("</span><i class=\"ti ti-selector\" aria-hidden=\"true\"></i></button></div>");
+            FieldClose(f);
         }
 
         private void ImageField(UiImage f)
@@ -511,7 +535,7 @@ public static class UiRenderer
                 }
                 else if (col.Kind == UiRowCell.Check)
                     _sb.Append("<label class=\"row-check\"><input type=\"checkbox\" value=\"true\" data-key=\"").Append(E(col.Key)).Append("\" name=\"").Append(name).Append('"').Append(value == "true" ? " checked" : "")
-                       .Append(f.Disabled ? " disabled" : "").Append(" aria-label=\"").Append(E(col.Header)).Append("\" /></label>");
+                       .Append(f.Disabled ? " disabled" : "").Append(" aria-label=\"").Append(E(col.Header)).Append("\" /><span class=\"row-check-text\" aria-hidden=\"true\">").Append(E(col.Header)).Append("</span></label>");
                 else
                 {
                     _sb.Append("<input type=\"text\"").Append(col.Kind == UiRowCell.Number ? " inputmode=\"decimal\" class=\"num\"" : "").Append(" data-key=\"").Append(E(col.Key)).Append("\" name=\"").Append(name)

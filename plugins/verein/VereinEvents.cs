@@ -127,15 +127,15 @@ public static class VereinEvents
         """{"all"?: false, "search"?: "text", "limit"?: 50}""", Writes: false);
     public static readonly PluginOperationSpec OpRead = new("event.read", "Einen Termin vollständig lesen, mit Planung (Treffpunkt, Ablauf, Hinweise).", """{"id": 12}""", Writes: false);
     public static readonly PluginOperationSpec OpCreate = new("event.create",
-        "Neuen Termin anlegen. starts/ends: \"2027-01-09T14:30\" oder nur \"2027-01-09\". public: auf der Website im Block „Vereinstermine“. draft: nur im Admin. schedule: Ablauf, eine Zeile \"14:30|Umzug\" je Programmpunkt.",
-        """{"title": "Fasnetsumzug in Brackenheim", "kind"?: "Umzug", "starts": "2027-01-09T14:30", "ends"?: "…", "place"?: "74344 Brackenheim", "description"?: "…", "public"?: true, "draft"?: false, "meeting"?: "Treffpunkt", "schedule"?: "17:00|Zunftmeisterempfang"}""");
-    public static readonly PluginOperationSpec OpUpdate = new("event.update", "Einen Termin ändern; nicht genannte Felder bleiben. cancelled: absagen (bleibt durchgestrichen stehen).",
-        """{"id": 12, "title"?, "kind"?, "starts"?, "ends"?, "place"?, "description"?, "public"?, "draft"?, "cancelled"?, "meeting"?, "parking"?, "notes"?, "schedule"?}""");
+        "Neuen Termin anlegen. starts/ends: \"2027-01-09T14:30\" oder nur \"2027-01-09\". public: auf der Website im Block „Vereinstermine“. draft: nur im Admin. schedule: Ablauf, eine Zeile \"14:30|Umzug\" je Programmpunkt. ask: Mitglieder sollen zu- oder absagen (ohne Angabe: die Einstellung des Vereins), ask_required: Rückmeldung ist Pflicht, ask_due: bis wann. Es geht dabei keine E-Mail raus.",
+        """{"title": "Fasnetsumzug in Brackenheim", "kind"?: "Umzug", "starts": "2027-01-09T14:30", "ends"?: "…", "place"?: "74344 Brackenheim", "description"?: "…", "public"?: true, "draft"?: false, "meeting"?: "Treffpunkt", "schedule"?: "17:00|Zunftmeisterempfang", "ask"?: true, "ask_required"?: false, "ask_due"?: "2027-01-05"}""");
+    public static readonly PluginOperationSpec OpUpdate = new("event.update", "Einen Termin ändern; nicht genannte Felder bleiben. cancelled: absagen (bleibt durchgestrichen stehen). ask: Mitglieder sollen zu- oder absagen (Teilnahme abfragen), ask_required: Rückmeldung ist Pflicht, ask_due: bis wann (\"\" = ohne). Es geht dabei keine E-Mail raus.",
+        """{"id": 12, "title"?, "kind"?, "starts"?, "ends"?, "place"?, "description"?, "public"?, "draft"?, "cancelled"?, "meeting"?, "parking"?, "notes"?, "schedule"?, "ask"?, "ask_required"?, "ask_due"?}""");
     public static readonly PluginOperationSpec OpRemove = new("event.remove", "Entfernt einen eben angelegten Termin (Rückgängig).", Internal: true);
     public static readonly PluginOperationSpec OpRestore = new("event.restore", "Stellt einen Termin aus einer Rückgängig-Aufzeichnung wieder her.", Internal: true);
 
     private static readonly string[] TextFields = { "title", "kind", "place", "description", "link", "meeting", "parking", "notes", "schedule" };
-    private static readonly string[] Flags = { "public", "draft", "cancelled" };
+    private static readonly string[] Flags = { "public", "draft", "cancelled", "ask", "ask_required" };
 
     private static JsonObject Answer(string status, string message, JsonNode? data = null, JsonNode? undo = null)
     {
@@ -149,7 +149,7 @@ public static class VereinEvents
     {
         ["id"] = e.Id, ["title"] = e.Title, ["kind"] = e.Kind, ["starts"] = e.Starts, ["ends"] = e.Ends, ["place"] = e.Place, ["description"] = e.Description,
         ["public"] = e.Public, ["draft"] = e.Draft, ["cancelled"] = e.Cancelled, ["link"] = e.Link, ["meeting"] = e.Meeting, ["parking"] = e.Parking,
-        ["notes"] = e.Notes, ["schedule"] = e.Schedule
+        ["notes"] = e.Notes, ["schedule"] = e.Schedule, ["ask"] = e.Ask, ["ask_required"] = e.AskRequired, ["ask_due"] = e.AskDue
     };
 
     /// <summary>The values an operation may write — cleaned like the admin form cleans them.</summary>
@@ -163,7 +163,7 @@ public static class VereinEvents
                 v[f] = f switch { "title" => V.Clip(s, 160), "description" => V.Clip(s, 2000), "notes" => V.Clip(s, 3000), "schedule" => V.Clip(s.Replace("\r", ""), 4000), _ => V.Clip(s, 500) };
             }
         if (v.TryGetValue("link", out var l) && l is string link && link.Length > 0 && !(link.StartsWith("https://", StringComparison.Ordinal) || (link.StartsWith('/') && !link.StartsWith("//", StringComparison.Ordinal)))) v["link"] = "";
-        foreach (var k in new[] { "starts", "ends" })
+        foreach (var k in new[] { "starts", "ends", "ask_due" })
             if (o[k] is JsonValue d && d.TryGetValue<string>(out var ds)) v[k] = V.CleanDate(ds);
         foreach (var f in Flags)
             if (o[f] is JsonValue b && b.TryGetValue<bool>(out var flag)) v[f] = flag;
@@ -196,6 +196,7 @@ public static class VereinEvents
     {
         if (args is not JsonObject o) return Answer("failed", "Argumente fehlen.");
         var v = Values(o, isNew: true);
+        v.TryAdd("ask", ctx.Settings.GetBool(VereinSettings.AskDefault));
         if (v.GetValueOrDefault("title") is not string { Length: >= 2 } title) return Answer("failed", "Bitte einen Titel angeben.");
         if (v.GetValueOrDefault("starts") is not string { Length: >= 10 }) return Answer("failed", "Bitte den Beginn angeben (2027-01-09T14:30 oder 2027-01-09).");
         var store = new VereinStore(ctx.Data);

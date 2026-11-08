@@ -29,6 +29,7 @@ public static class VereinAdmin
             .Page("meetings/{id}", null, MeetingAsync)
             .Page("meetings/{id}/pdf", null, MeetingPdfAsync)
             .Page("events", null, EventsAsync)
+            .Page("events/lookup", null, EventLookupAsync)
             .Page("events/{id}", null, EventAsync)
             .Page("events/{id}/pdf", null, EventPdfAsync)
             .Page("events/{id}/csv", null, EventCsvAsync)
@@ -905,7 +906,7 @@ public static class VereinAdmin
                 Ui.Checkbox("cancelled", "Abgesagt (bleibt durchgestrichen stehen)", e?.Cancelled ?? false),
                 Ui.FormActions(Ui.Submit(isNew ? "Anlegen" : "Speichern"), Ui.Button("Zurück", Root + "events", UiButtonKind.Ghost))),
             Ui.Card("Teilnahme abfragen",
-                Ui.Checkbox("ask", "Mitglieder sollen zu- oder absagen", e?.Ask ?? false),
+                Ui.Checkbox("ask", "Mitglieder sollen zu- oder absagen", e?.Ask ?? ctx.Settings.GetBool(VereinSettings.AskDefault)),
                 Ui.Checkbox("ask_required", "Rückmeldung ist Pflicht", e?.AskRequired ?? false),
                 Ui.Select("ask_audience", "Wer wird gefragt?", e is { AskAudience.Length: > 0 } ? e.AskAudience : VereinStore.AudienceAll, AudienceOptions(ctx)),
                 Ui.Input("ask_due", "Rückmeldung bis (freiwillig)", e?.AskDue ?? "", UiInputType.Date),
@@ -1038,16 +1039,28 @@ public static class VereinAdmin
             if (ctx.Request.Action == "delete") { await ctx.Files.DeleteAsync(u.File, ct); await store.Uploads.DeleteAsync(u.Id, ct); return PluginResult.Redirect(Root + "uploads", "Gelöscht."); }
             if (ctx.Request.Action == "share") { await store.Uploads.UpdateAsync(u.Id, new Dictionary<string, object?> { ["shared"] = !u.Shared }, ct); return PluginResult.Redirect(Root + "uploads"); }
             if (ctx.Request.Action == "approve") { await store.Uploads.UpdateAsync(u.Id, new Dictionary<string, object?> { ["approved"] = true }, ct); return PluginResult.Redirect(Root + "uploads", "Freigegeben."); }
-            if (ctx.Request.Action == "event" && long.TryParse(ctx.Request.F("event"), out var ev))
-            { await store.Uploads.UpdateAsync(u.Id, new Dictionary<string, object?> { ["event_id"] = ev }, ct); return PluginResult.Redirect(Root + "uploads", "Termin geändert."); }
+            if (ctx.Request.Action == "event")
+            {
+                // "" or "0" = no event; anything else must be an event that exists (the field offers only those, but a post is a post)
+                var raw = ctx.Request.F("event");
+                long.TryParse(raw, NumberStyles.None, CultureInfo.InvariantCulture, out var ev);
+                if (ev != 0 && await store.EventAsync(ev, ct) is null) return PluginResult.Redirect(Root + "uploads", "Diesen Termin gibt es nicht.", isError: true);
+                await store.Uploads.UpdateAsync(u.Id, new Dictionary<string, object?> { ["event_id"] = ev }, ct);
+                return PluginResult.Redirect(Root + "uploads" + (PendingView(ctx) ? "?status=offen" : ""), ev == 0 ? "Vom Termin gelöst." : "Termin zugeordnet.");
+            }
         }
         var pendingOnly = ctx.Request.Q("status") == "offen";
         var list = (await store.UploadsAsync(ct: ct)).Where(x => !pendingOnly || !x.Approved).ToList();
         var pendingCount = (await store.UploadsAsync(ct: ct)).Count(x => !x.Approved);
         var people = (await store.PeopleAsync(ct)).ToDictionary(p => p.MemberId, p => p.Name);
-        var events = (await store.EventsAsync(ct)).Where(e => !e.Draft).OrderByDescending(e => e.Starts).Take(60).ToList();
-        var eventOptions = new[] { Ui.Option("0", "– kein Termin –") }.Concat(events.Select(e => Ui.Option(e.Id.ToString(CultureInfo.InvariantCulture), V.Date(e.Starts) + " " + e.Title))).ToArray();
+        var events = (await store.EventsAsync(ct)).ToDictionary(e => e.Id);
         string Id(Upload x) => x.Id.ToString(CultureInfo.InvariantCulture);
+        UiNode EventCell(Upload x)
+        {
+            var e = x.EventId > 0 && events.TryGetValue(x.EventId, out var found) ? found : null;
+            return Ui.Form(Ui.Hidden("action", "event"), Ui.Hidden("id", Id(x)), pendingOnly ? Ui.Hidden("status", "offen") : null,
+                EventField(e, events.Values));
+        }
         return Page(Ui.Stack(
             Ui.PageHead("Was Mitglieder im Mitgliederbereich hochgeladen haben", "Bilder & Material",
                 pendingCount > 0 ? Act("Alle " + pendingCount + " freigeben", new Dictionary<string, string> { ["action"] = "approveall" }, UiButtonKind.Primary, "Alle wartenden Uploads freigeben?", "ti-check") : null),
@@ -1055,15 +1068,72 @@ public static class VereinAdmin
             Ui.Table(new[] { Ui.Column(""), Ui.Column("Titel"), Ui.Column("Von"), Ui.Column("Aufgenommen"), Ui.Column("Termin"), Ui.Column("Status"), Ui.Column("", actions: true) },
                 list.Select(x => Ui.RowFor(x.Title + " " + x.FileName,
                     V.IsImage(Path.GetExtension(x.File).ToLowerInvariant()) ? Ui.Img(Root + "uploads/" + x.Id, x.Title, 48) : Ui.Text(""),
-                    Ui.Link(x.Title.Length > 0 ? x.Title : x.FileName, Root + "uploads/" + x.Id, newTab: true),
+                    Ui.Link(Short(x.Title.Length > 0 ? x.Title : x.FileName), Root + "uploads/" + x.Id, newTab: true),
                     people.TryGetValue(x.MemberId, out var n) ? n : "–", x.Taken.Length > 0 ? V.Date(x.Taken) : V.Stamp(x.Created),
-                    Ui.Form(Ui.Hidden("action", "event"), Ui.Hidden("id", Id(x)), Ui.Select("event", "", x.EventId.ToString(CultureInfo.InvariantCulture), eventOptions), Ui.Submit("OK", UiButtonKind.Ghost, small: true)),
+                    EventCell(x),
                     !x.Approved ? Ui.Badge("wartet auf Freigabe", UiTone.Warning) : x.Shared ? Ui.Badge("alle Mitglieder", UiTone.Success) : Ui.Badge("privat"),
                     Ui.Inline(
                         x.Approved ? null : Act("Freigeben", new Dictionary<string, string> { ["action"] = "approve", ["id"] = Id(x) }, UiButtonKind.Primary, icon: "ti-check"),
                         Act(x.Shared ? "Privat machen" : "Für alle", new Dictionary<string, string> { ["action"] = "share", ["id"] = Id(x) }),
                         Act("Löschen", new Dictionary<string, string> { ["action"] = "delete", ["id"] = Id(x) }, UiButtonKind.Danger, "Datei löschen?")))),
                 searchPlaceholder: "Dateien durchsuchen …", pageSize: 50, emptyText: pendingOnly ? "Nichts wartet auf Freigabe." : "Noch nichts hochgeladen.")), "Bilder & Material");
+    }
+
+    private static string Short(string s) => s.Length > 36 ? s[..35] + "…" : s;
+
+    private static bool PendingView(IPluginContext ctx) => ctx.Request.F("status") == "offen";
+
+    /// <summary>
+    /// The event of an upload: a lookup field (search, results fetched from <c>events/lookup</c> while one types), chosen = saved at once. A host
+    /// older than the field (no <c>Ui.Lookup</c>) gets the drop-down with OK it had before — the plugin keeps loading there.
+    /// </summary>
+    private static UiNode EventField(Event? current, IEnumerable<Event> all)
+    {
+        try { return LookupField(current); }
+        catch (Exception ex) when (ex is TypeLoadException or MissingMethodException or MissingFieldException)
+        {
+            var options = new[] { Ui.Option("0", "– kein Termin –") }.Concat(all.Where(e => !e.Draft || e.Id == current?.Id).OrderByDescending(e => e.Starts).Take(80)
+                .Select(e => Ui.Option(e.Id.ToString(CultureInfo.InvariantCulture), V.Date(e.Starts) + " " + e.Title))).ToArray();
+            return Ui.Inline(Ui.Select("event", "", (current?.Id ?? 0).ToString(CultureInfo.InvariantCulture), options), Ui.Submit("OK", UiButtonKind.Ghost, small: true));
+        }
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static UiNode LookupField(Event? current) =>
+        Ui.Lookup("event", "", Root + "events/lookup", current is null ? "0" : current.Id.ToString(CultureInfo.InvariantCulture),
+            current is null ? "" : EventText(current), Ui.Option("0", "– kein Termin –")) with { AutoSubmit = true, SearchPlaceholder = "Termin suchen (Name, Ort, Monat …)" };
+
+    private static string EventText(Event e) => e.Title + " · " + V.Date(e.Starts);
+
+    /// <summary>
+    /// The search behind the event field: <c>?q=</c> matches name, kind, place, date ("14.02.2027") and month ("Februar 2027"), every word must
+    /// match; <c>?scope=upcoming</c> only what is still to come. Without a search the recent past comes first (that is what photos belong to), then
+    /// what is ahead. 30 per page, <c>skip</c> for the next.
+    /// </summary>
+    private static async Task<PluginResult> EventLookupAsync(IPluginContext ctx, CancellationToken ct)
+    {
+        var today = V.Today;
+        var words = (ctx.Request.Q("q") ?? "").Trim().ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        int.TryParse(ctx.Request.Q("skip"), NumberStyles.None, CultureInfo.InvariantCulture, out var skip);
+        var upcomingOnly = ctx.Request.Q("scope") == "upcoming";
+        string Hay(Event e)
+        {
+            var month = e.Day.Length >= 7 && int.TryParse(e.Day[5..7], NumberStyles.None, CultureInfo.InvariantCulture, out var m) && m is >= 1 and <= 12
+                ? VereinInstagram.MonthNames[m - 1] + " " + e.Day[..4] : "";
+            return (e.Title + " " + e.Kind + " " + e.Place + " " + V.Date(e.Starts) + " " + month).ToLowerInvariant();
+        }
+        var all = (await new VereinStore(ctx.Data).EventsAsync(ct)).Where(e => words.All(w => Hay(e).Contains(w, StringComparison.Ordinal))).ToList();
+        bool Ahead(Event e) => string.CompareOrdinal(e.Ends.Length >= 10 ? e.Ends[..10] : e.Day, today) >= 0;
+        var past = upcomingOnly ? new List<Event>() : all.Where(e => !Ahead(e)).OrderByDescending(e => e.Starts).ToList();
+        var ahead = all.Where(Ahead).OrderBy(e => e.Starts).ToList();
+        var ordered = past.Select(e => (e, "Vergangene Termine")).Concat(ahead.Select(e => (e, "Kommende Termine"))).ToList();
+        const int size = 30;
+        var page = ordered.Skip(Math.Max(0, skip)).Take(size).Select(x =>
+        {
+            var hint = V.Date(x.e.Starts) + (x.e.Kind.Length > 0 ? " · " + x.e.Kind : "") + (x.e.Cancelled ? " · abgesagt" : x.e.Draft ? " · Entwurf" : "");
+            return Ui.LookupItem(x.e.Id.ToString(CultureInfo.InvariantCulture), x.e.Title, hint, x.Item2);
+        });
+        return PluginResult.Lookup(page.ToList(), more: ordered.Count > skip + size);
     }
 
     /// <summary>The member list as a spreadsheet: every person (children too, with their parents), roles, contact, birthday, address and the own fields.</summary>

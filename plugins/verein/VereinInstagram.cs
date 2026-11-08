@@ -22,7 +22,7 @@ public static class VereinInstagram
 
     private static readonly (string Key, string Label, int W, int H)[] Formats = { ("square", "Quadrat 1080 × 1080", 1080, 1080), ("portrait", "Hochformat 1080 × 1350", 1080, 1350), ("story", "Story 1080 × 1920", 1080, 1920) };
 
-    private static readonly string[] MonthNames = { "Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember" };
+    internal static readonly string[] MonthNames = { "Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember" };
 
     /// <summary>
     /// The page. Two templates: the LIST — pick the dates (a period and a kind narrow the choice, every date can be ticked off, a month or the season

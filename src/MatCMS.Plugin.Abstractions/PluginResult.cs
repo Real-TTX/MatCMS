@@ -163,6 +163,20 @@ public sealed class PluginResult
     public static PluginResult Json(JsonNode? body, int status = 200) =>
         new(ResultKind.Json) { Body = body, StatusCode = status, ContentType = "application/json; charset=utf-8" };
 
+    /// <summary>The answer a <see cref="UiLookup"/>'s search expects: the items of this page, and whether there are more after them.</summary>
+    public static PluginResult Lookup(IEnumerable<UiLookupItem> items, bool more = false)
+    {
+        var list = new JsonArray();
+        foreach (var i in items ?? Enumerable.Empty<UiLookupItem>())
+        {
+            var o = new JsonObject { ["value"] = i.Value, ["label"] = i.Label };
+            if (!string.IsNullOrEmpty(i.Hint)) o["hint"] = i.Hint;
+            if (!string.IsNullOrEmpty(i.Group)) o["group"] = i.Group;
+            list.Add(o);
+        }
+        return Json(new JsonObject { ["items"] = list, ["more"] = more });
+    }
+
     /// <summary>A plain-text answer.</summary>
     public static PluginResult Text(string text, string contentType = "text/plain; charset=utf-8", int status = 200) =>
         new(ResultKind.Text) { Content = text ?? "", ContentType = contentType, StatusCode = status };

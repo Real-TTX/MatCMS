@@ -10,7 +10,7 @@ public static class VereinSettings
     public const string ClubName = "clubName", Roles = "roles", BoardRoles = "boardRoles", LoginIntro = "loginIntro", ReplyTo = "replyTo",
         MaxUploadMb = "maxUploadMb", DirectoryForAll = "directoryForAll", EventsTitle = "eventsTitle",
         CustomFields = "customFields", BirthdayForAll = "birthdayForAll", AddressForAll = "addressForAll", UploadApproval = "uploadApproval",
-        TwoFactor = "twoFactor";
+        TwoFactor = "twoFactor", AskDefault = "askDefault";
 
     /// <summary>The roles as stored since 1.8: one row per role, "| vorstand" marks the board. (Up to 1.7 roles and board were two plain lists.)</summary>
     public const string DefaultRoles = "Vorsitzende/r | vorstand\nStellv. Vorsitzende/r | vorstand\nKassierer/in | vorstand\nSchriftführer/in | vorstand\nBeisitzer/in | vorstand\nJugendleiter/in | \nMitglied | ";
@@ -26,6 +26,7 @@ public static class VereinSettings
         .Add(new SettingSpec(ClubName, "Name des Vereins") { Group = "Allgemein", Help = "Erscheint im Mitgliederbereich, in den E-Mails und auf dem Briefkopf. Leer = Name der Website." })
         .Text(ReplyTo, "Antwortadresse der E-Mails", "", "Wer auf eine E-Mail des Vereins antwortet, schreibt an diese Adresse (z. B. die des Vorstands).")
         .Text(EventsTitle, "Überschrift der Termine", "Kommende Termine", "Über dem Block „Vereinstermine“ auf der Website, wenn der Block keine eigene hat.")
+        .Bool(AskDefault, "Neue Termine fragen die Teilnahme ab", false, "An: Bei jedem neuen Termin ist „Mitglieder sollen zu- oder absagen“ schon angehakt. Eine E-Mail geht erst raus, wenn beim Termin „Abfrage per E-Mail senden“ gedrückt wird.")
         .Add(new SettingSpec(Roles, "Rollen", SettingKind.List)
         {
             Group = "Rollen & Felder", Default = DefaultRoles, AddLabel = "Rolle",

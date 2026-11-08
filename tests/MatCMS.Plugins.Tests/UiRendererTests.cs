@@ -178,6 +178,7 @@ public class UiRendererTests
             Ui.Input("i", "I"), Ui.TextArea("t", "T"), Ui.Select("s", "S", "a", Ui.Option("a", "A")), Ui.Checkbox("c", "C"),
             new UiCheckList("cl", "Cl") { Options = new[] { Ui.Option("a", "A"), Ui.Option("b", "B") }, Checked = new[] { "b" } },
             Ui.File("doc", "Doc", ".pdf"), Ui.Image("im", "Im"), Ui.MediaList("ml", "Ml"), Ui.MediaList("fl", "Fl", files: true), Ui.RichText("rt", "Rt"), Ui.Tags("tg", "Tg", "a, b", new[] { "c" }),
+            Ui.Lookup("lk", "Lk", "/admin/p/x/lookup", "1", "Eins", Ui.Option("0", "keiner")),
             Ui.RowEditor("re", "Re", new[] { Ui.RowColumn("a", "A"), Ui.RowColumn("b", "B", UiRowCell.Check) }, new[] { Ui.RowValue("1", "x", "true") }, "Add"),
             Ui.Table(new[] { Ui.Column("c") }, new[] { Ui.Row("x", Ui.Badge("y")) }), Ui.Tabs(Ui.Tab("t", "/")), Ui.Pager(1, 3, "?p={0}"),
             Ui.Split(new[] { Ui.NavItem("A", "/a", "ti-star", true, "Gruppe", "3"), Ui.NavItem("B", "/b") }, Ui.Text("body")),
@@ -194,6 +195,34 @@ public class UiRendererTests
         var covered = all.SelectMany(UiTree.Descendants).Select(n => n.GetType().Name).ToHashSet();
         covered.UnionWith(new[] { nameof(UiHidden) });
         Assert.Empty(known.Except(covered));
+    }
+
+    [Fact]
+    public void A_lookup_posts_its_value_shows_the_chosen_text_and_names_its_source_pinned_choices_and_words_for_the_script()
+    {
+        var html = Admin(Ui.Form(Ui.Lookup("event", "Termin", "/admin/p/verein/events/lookup", "12", "<b>Umzug</b> · 09.01.2027", Ui.Option("0", "– kein Termin –")) with { AutoSubmit = true }));
+        Assert.Contains("type=\"hidden\" name=\"event\" value=\"12\" data-ui-lookup-value", html);
+        Assert.Contains("data-source=\"/admin/p/verein/events/lookup\"", html);
+        Assert.Contains("data-submit", html);
+        Assert.Contains("&lt;b&gt;Umzug&lt;/b&gt; · 09.01.2027", html);                                  // the chosen text is text
+        Assert.Contains("data-pinned=\"[{&quot;value&quot;:&quot;0&quot;", html);                       // pinned choices travel as encoded JSON
+        Assert.Contains("class=\"ui-lookup-btn\" id=\"f-event\"", html);                             // the label points at the button
+        // nothing chosen: the pinned choice's label, else the placeholder (greyed)
+        Assert.Contains(">– kein Termin –</span>", Admin(Ui.Lookup("event", "T", "/x", "0", "", Ui.Option("0", "– kein Termin –"))));
+        var empty = Admin(Ui.Lookup("event", "T", "/x") with { Placeholder = "Termin wählen" });
+        Assert.Contains("ui-lookup-text is-empty", empty);
+        Assert.Contains(">Termin wählen</span>", empty);
+        // a source that is not a local or web address is not drawn as one
+        Assert.Contains("data-source=\"#\"", Admin(Ui.Lookup("e", "T", "javascript:alert(1)")));
+        Assert.DoesNotContain("data-submit", Admin(Ui.Lookup("e", "T", "/x")));
+    }
+
+    [Fact]
+    public void A_lookup_search_answers_in_the_shape_the_field_reads()
+    {
+        var r = PluginResult.Lookup(new[] { Ui.LookupItem("3", "Umzug", "09.01.2027", "Kommende"), Ui.LookupItem("4", "Ball") }, more: true);
+        var json = r.Body!.ToJsonString();
+        Assert.Equal("""{"items":[{"value":"3","label":"Umzug","hint":"09.01.2027","group":"Kommende"},{"value":"4","label":"Ball"}],"more":true}""", json);
     }
 
     [Fact]

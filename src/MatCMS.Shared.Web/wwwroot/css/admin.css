@@ -551,6 +551,23 @@ textarea.code-area { width: 100%; box-sizing: border-box; font-family: ui-monosp
 .lp-pop-item.on { background: var(--hover); }
 .lp-pop-item[hidden], .lp-pop-group[hidden] { display: none; }
 .lp-pop-empty { padding: 14px 12px; color: var(--text-muted); font-size: 14px; }
+/* Lookup field (Ui.Lookup): the current choice as a select-like button; its search opens in the link picker's drop-down (.lp-pop), on a phone as a
+   dialog over the page. The chosen entry is marked by weight and colour, never by a bar at its side. */
+.ui-lookup { min-width: 0; }
+.ui-lookup-btn { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; box-sizing: border-box; margin: 0; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--surface); color: var(--ink); font: inherit; font-size: 14px; line-height: 1.3; text-align: left; cursor: pointer; }
+.ui-lookup-btn:disabled { opacity: .6; cursor: default; }
+.ui-lookup-text { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-lookup-text.is-empty { color: var(--text-muted); }
+.ui-lookup-btn > .ti { flex: none; color: var(--text-muted); }
+/* in a row's own form: the form grid's minmax(0, 1fr) lets the cell shrink under the field, which then lay over the next column */
+table.data td .form-grid:has(.ui-lookup) { grid-template-columns: minmax(240px, 1fr); }
+.ui-lookup-pop .lp-pop-item .u { flex: 0 0 auto; max-width: 48%; }
+.lp-pop-item.is-current .t { font-weight: 600; color: var(--accent); }
+.ui-lookup-back { position: fixed; inset: 0; z-index: 1199; background: rgba(0, 0, 0, .45); }
+html.ui-lookup-open, html.ui-lookup-open body { overflow: hidden; }
+.lp-pop.is-sheet { position: fixed; left: 8px; right: 8px; top: max(10px, env(safe-area-inset-top)); bottom: auto; width: auto; max-height: calc(100dvh - 20px); border-radius: 12px; }
+.ui-lookup-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 6px 0 14px; font-weight: 600; font-size: 15px; }
+.lp-pop.is-sheet .lp-pop-item { padding: 12px 14px; }
 
 /* Icon picker — the current icon as a button, the grid in a dialog.
    Die Klassen sind dieselben wie vorher, als das Raster noch dauerhaft im Formular stand: das
@@ -721,6 +738,8 @@ table.data .row-unread td { font-weight: 600; }
 .row-editor table.data th.row-end, .row-editor table.data td.row-end { width: 44px; text-align: right; }
 .row-editor table.data th.row-check-head, .row-editor .row-check { text-align: center; }
 .row-editor .row-check { display: flex; justify-content: center; align-items: center; }
+.row-editor table.data label.row-check { margin: 0; }   /* not the field label it is inside of: the bridge gives every .field label a margin and weight */
+.row-editor .row-check-text { display: none; font-weight: 400; }   /* the column's name beside the box — only where the table head is gone (phone) */
 .row-editor .row-img { display: flex; align-items: center; gap: 6px; }
 .row-editor .row-img .preview { flex: none; width: 34px; height: 34px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface-2) center / cover no-repeat; }
 .row-editor .row-img input[type=text] { flex: 1 1 auto; }
@@ -2055,16 +2074,28 @@ table.data tr:has(.ui-dot-err) td strong { color: var(--err-fg); }
     .table-scroll:has(> table[data-stack]) { overflow-x: visible; }
 }
 
-/* A row editor on a phone: each row is a small form — the name on its own line, the other fields two by two with their names above them. Squeezing six columns into 390px cut the names to two letters. */
+/* A row editor on a phone: each row is a small form that wraps. Squeezing six columns into 390 px cut the names to two letters; one cell per line
+   (the first answer) made a list of nine roles 2000 px tall, every tick on a line of its own and the bin on another. Now: a switch is the box with its
+   column's name beside it, the bin stays at the end of the row, and
+   - a row that is a name and switches (roles, own fields) is ONE line: name, "☑ Vorstand", bin — the list's own label says what the names are;
+   - a row with more text fields (variants) keeps the name on its own line and the other fields two by two, each with its name above it. */
 @media (max-width: 700px) {
     .row-editor table.data, .row-editor table.data tbody { display: block; width: 100%; }
+    .row-editor table.data { border-width: 1px 0 0; border-radius: 0; }   /* rows are separated by lines; a frame around them would touch the fields */
     .row-editor table.data thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-    .row-editor table.data tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 10px; padding: 12px; border-bottom: 1px solid var(--line); }
+    .row-editor table.data tr { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
     .row-editor table.data tr:last-child { border-bottom: 0; }
-    .row-editor table.data td { display: block; padding: 0; border: 0; min-width: 0; }
-    .row-editor table.data td[data-label]::before { content: attr(data-label); display: block; margin-bottom: 3px; font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
-    .row-editor table.data td:first-child, .row-editor table.data td:has(.row-img) { grid-column: 1 / -1; }
-    .row-editor table.data td.row-end { grid-column: 1 / -1; width: auto; text-align: right; }
-    .row-editor table.data td.row-end::before { display: none; }
+    /* tr > td: one step above the MatUi bridge's cell padding (admin-matui.css, loaded later) — with its 14 px at each side the bin never fitted */
+    .row-editor table.data tr > td { display: block; flex: 1 1 calc(50% - 5px); padding: 0; border: 0; min-width: 0; }
+    .row-editor table.data td:first-child { flex: 1 1 120px; }
+    .row-editor table.data tr:has(td:not(:first-child) input[type=text]) td:first-child, .row-editor table.data td:has(> .row-img) { flex-basis: 100%; }
+    .row-editor table.data td:has(> .row-check), .row-editor table.data td.row-end { flex: 0 0 auto; width: auto; }
+    .row-editor table.data td.row-end { margin-left: auto; }
+    .row-editor table.data td[data-label]::before { content: attr(data-label); display: block; margin-bottom: 3px; font-size: 12px; font-weight: 600; color: var(--muted); }
+    .row-editor table.data td:has(> .row-check)::before, .row-editor table.data td.row-end::before,
+    .row-editor table.data tr:not(:has(td:not(:first-child) input[type=text])) td:first-child::before { display: none; }
     .row-editor table.data td input[type=text] { min-height: 40px; }
+    .row-editor .row-check { justify-content: flex-start; gap: 7px; min-height: 40px; cursor: pointer; }
+    .row-editor .row-check-text { display: inline; font-size: 14px; color: var(--ink); white-space: nowrap; }
+    .row-editor .icon-btn.row-remove { width: 40px; height: 40px; }
 }

@@ -257,6 +257,14 @@ html[data-theme] :is(.admin--matui, .login-matui) :is(.form-field, .field) selec
 html[data-theme] :is(.admin--matui, .login-matui) :is(.form-field, .field) textarea:focus,
 :is(.admin--matui, .login-matui) .list-search:focus { border-color: var(--mat-accent); box-shadow: var(--mat-focus-ring); outline: none; }
 :is(.admin--matui, .login-matui) input[type=checkbox], :is(.admin--matui, .login-matui) input[type=radio] { accent-color: var(--mat-accent); }
+/* The lookup field (Ui.Lookup) is a button that stands where a select would: the same box, the same focus. */
+html[data-theme] :is(.admin--matui, .login-matui) .ui-lookup-btn {
+  min-height: var(--mat-input-height, var(--mat-control-h)); padding: 6px var(--mat-input-pad-x, var(--mat-space-3));
+  border: 1px solid var(--mat-border-strong); border-radius: var(--mat-input-radius, var(--mat-radius));
+  background: var(--mat-surface); color: var(--mat-text); font-size: var(--mat-fs-md);
+}
+html[data-theme] :is(.admin--matui, .login-matui) .ui-lookup-btn:focus-visible { border-color: var(--mat-accent); box-shadow: var(--mat-focus-ring); outline: none; }
+html[data-theme] :is(.admin--matui, .login-matui) .lp-pop.is-sheet { border-radius: var(--mat-radius-lg, 12px); }
 /* The plugin toolkit's fields (.field, UiRenderer) are the same fields: they were left out of this bridge and stood 46 px tall,
    square and in 15 px next to every core form — "the forum/shop does not look like MatCMS". Its help line and checkbox rows too. */
 :is(.admin--matui, .login-matui) .field .help { font-size: var(--mat-fs-sm); color: var(--mat-text-muted); margin-top: var(--mat-space-1); }
@@ -326,6 +334,7 @@ html[data-theme] :is(.admin--matui, .login-matui) .ui-subnav a.active { backgrou
    compact density's 14 px stays for a mouse). */
 @media (pointer: coarse) {
   :is(.admin--matui, .login-matui) :is(input:not([type=checkbox]):not([type=radio]):not([type=range]), select, textarea, .list-search) { font-size: 16px !important; }
+  :is(.admin--matui, .login-matui) .ui-lookup-btn { font-size: 16px; min-height: 44px; }
 }
 /* An installed app has no browser bar around it: the page must not rubber-band the whole frame (the scroller is .mat-main). */
 @media (display-mode: standalone) { html, body { overscroll-behavior: none; } }

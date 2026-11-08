@@ -121,6 +121,13 @@ public static class Ui
         new(name, label) { Value = string.IsNullOrWhiteSpace(valueJson) ? "[]" : valueJson, Files = files };
     /// <summary>Formatted text.</summary>
     public static UiRichText RichText(string name, string label, string value = "") => new(name, label) { Value = value ?? "" };
+    /// <summary>One choice out of a long list, searched on the server while one types — <paramref name="source"/> answers with <see cref="PluginResult.Lookup"/>
+    /// (see <see cref="UiLookup"/>). <paramref name="display"/> is the text of the current <paramref name="value"/>.</summary>
+    public static UiLookup Lookup(string name, string label, string source, string value = "", string display = "", params UiOption[] pinned) =>
+        new(name, label) { Source = source ?? "", Value = value ?? "", Display = display ?? "", Pinned = pinned ?? Array.Empty<UiOption>() };
+    /// <summary>An answer of a lookup's search.</summary>
+    public static UiLookupItem LookupItem(string value, string label, string? hint = null, string? group = null) =>
+        new(value ?? "", label ?? "") { Hint = hint, Group = group };
     /// <summary>Tags as chips.</summary>
     public static UiTags Tags(string name, string label, string value = "", IEnumerable<string>? suggestions = null) =>
         new(name, label) { Value = value ?? "", Suggestions = suggestions?.ToList() ?? new List<string>() };

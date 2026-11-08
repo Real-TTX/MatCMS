@@ -556,7 +556,7 @@
                                         <button type="submit" class="btn btn-sm">@T["settings.ai.activate"]</button>
                                     </form>
                                 }
-                                <a class="btn btn-sm btn-ghost" asp-page="AiProfile" asp-route-id="@pr.Id">@T["action.edit"]</a>
+                                <a class="btn btn-sm btn-ghost" asp-page="AiProfile" asp-route-id="@pr.Id" title="@T["action.edit"]"><i class="ti ti-pencil" aria-hidden="true"></i> <span class="btn-label">@T["action.edit"]</span></a>
                                 @if (!isActive)
                                 {
                                     <form class="inline-form" method="post" asp-page-handler="AiDelete" data-confirm="@T["settings.ai.deleteConfirm", pr.Name]">

@@ -46,7 +46,7 @@
                     <td class="muted">@u.CreatedAt.ToString("dd.MM.yyyy")</td>
                     <td>
                         <div class="actions">
-                            <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@u.Id">@T["action.edit"]</a>
+                            <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@u.Id" title="@T["action.edit"]"><i class="ti ti-pencil" aria-hidden="true"></i> <span class="btn-label">@T["action.edit"]</span></a>
                             <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@u.Id" data-confirm="@T["users.confirmDelete", u.Username]">
                                 <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
                             </form>
@@ -88,7 +88,7 @@
                     <td>@(m.IsActive ? Html.Raw("<span class=\"badge badge-on\">aktiv</span>") : Html.Raw("<span class=\"badge badge-off\">deaktiviert</span>"))</td>
                     <td>
                         <div class="actions">
-                            <a class="btn btn-sm btn-ghost" asp-page="/Admin/Members/Edit" asp-route-id="@m.Id">@T["action.edit"]</a>
+                            <a class="btn btn-sm btn-ghost" asp-page="/Admin/Members/Edit" asp-route-id="@m.Id" title="@T["action.edit"]"><i class="ti ti-pencil" aria-hidden="true"></i> <span class="btn-label">@T["action.edit"]</span></a>
                             <form class="inline-form" method="post" asp-page-handler="DeleteMember" asp-route-memberId="@m.Id" data-confirm="Dieses Mitglied löschen?">
                                 <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
                             </form>

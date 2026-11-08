@@ -65,7 +65,7 @@
                     <td class="muted mono">@p.Revision</td>
                     <td>
                         <div class="actions">
-                            <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@p.Id">@T["action.edit"]</a>
+                            <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@p.Id" title="@T["action.edit"]"><i class="ti ti-pencil" aria-hidden="true"></i> <span class="btn-label">@T["action.edit"]</span></a>
                             <form class="inline-form" method="post" asp-page-handler="Duplicate" asp-route-id="@p.Id">
                                 <button type="submit" class="btn btn-sm btn-ghost" title="@T["profiles.duplicate"]">@T["profiles.duplicate"]</button>
                             </form>

@@ -249,10 +249,11 @@ public static class UiRenderer
             {
                 _sb.Append("<a class=\"").Append(cls).Append("\" href=\"").Append(E(SafeUrl(b.Href))).Append('"');
                 if (b.NewTab) _sb.Append(" target=\"_blank\" rel=\"noopener\"");
-                if (iconOnly) _sb.Append(" title=\"").Append(E(b.Label)).Append("\" aria-label=\"").Append(E(b.Label)).Append('"');
+                if (iconOnly || HasIcon(b.Icon)) _sb.Append(" title=\"").Append(E(b.Label)).Append('"');
+                if (iconOnly) _sb.Append(" aria-label=\"").Append(E(b.Label)).Append('"');
                 DataAttrs(b.Data);
                 _sb.Append('>');
-                Icon(b.Icon); if (!iconOnly) _sb.Append(E(b.Label));
+                Icon(b.Icon); if (!iconOnly) Label(b.Label, b.Icon);
                 _sb.Append("</a>");
                 return;
             }
@@ -261,11 +262,22 @@ public static class UiRenderer
             if (b.Name is not null) _sb.Append(" name=\"").Append(E(b.Name)).Append("\" value=\"").Append(E(b.Value ?? "")).Append('"');
             if (!string.IsNullOrWhiteSpace(b.Confirm)) _sb.Append(" data-confirm=\"").Append(E(b.Confirm)).Append('"');
             if (b.Kind == UiButtonKind.Danger && !string.IsNullOrWhiteSpace(b.Confirm)) _sb.Append(" data-confirm-danger");
-            if (iconOnly) _sb.Append(" title=\"").Append(E(b.Label)).Append("\" aria-label=\"").Append(E(b.Label)).Append('"');
+            if (iconOnly || HasIcon(b.Icon)) _sb.Append(" title=\"").Append(E(b.Label)).Append('"');
+            if (iconOnly) _sb.Append(" aria-label=\"").Append(E(b.Label)).Append('"');
             DataAttrs(b.Data);
             _sb.Append('>');
-            Icon(b.Icon); if (!iconOnly) _sb.Append(E(b.Label));
+            Icon(b.Icon); if (!iconOnly) Label(b.Label, b.Icon);
             _sb.Append("</button>");
+        }
+
+        private static bool HasIcon(string? icon) => !string.IsNullOrWhiteSpace(icon) && icon!.StartsWith("ti-", StringComparison.Ordinal);
+
+        // Beside an icon the words are a span of their own: in a list row on a phone admin-matui.css shows the icon alone (the button keeps the words as its
+        // tooltip, and the span stays for screen readers) — a row of "Freigeben · Für alle · Löschen" took a card's whole width.
+        private void Label(string label, string? icon)
+        {
+            if (HasIcon(icon)) _sb.Append("<span class=\"btn-label\">").Append(E(label)).Append("</span>");
+            else _sb.Append(E(label));
         }
 
         private void ActionButton(UiAction a)
@@ -279,8 +291,9 @@ public static class UiRenderer
                 _sb.Append("<input type=\"hidden\" name=\"").Append(E(kv.Key)).Append("\" value=\"").Append(E(kv.Value)).Append("\" />");
             _sb.Append("<button type=\"submit\" class=\"").Append(ButtonClass(a.Kind, true, iconOnly)).Append('"');
             if (iconOnly) _sb.Append(" title=\"").Append(E(a.Label)).Append("\" aria-label=\"").Append(E(a.Label)).Append('"');
+            else if (HasIcon(a.Icon)) _sb.Append(" title=\"").Append(E(a.Label)).Append('"');
             _sb.Append('>');
-            if (iconOnly) Icon(a.Icon); else { Icon(a.Icon); _sb.Append(E(a.Label)); }
+            if (iconOnly) Icon(a.Icon); else { Icon(a.Icon); Label(a.Label, a.Icon); }
             _sb.Append("</button></form>");
         }
 
@@ -619,7 +632,7 @@ public static class UiRenderer
             if (listed) _sb.Append(" data-list-table");
             _sb.Append("><thead><tr>");
             foreach (var c in t.Columns)
-                _sb.Append("<th").Append(c.Right ? " style=\"text-align:right\"" : "").Append('>').Append(E(c.Header)).Append("</th>");
+                _sb.Append("<th").Append(c.Right ? " style=\"text-align:right\"" : "").Append(c.Phone ? "" : " class=\"ui-hide-phone\"").Append('>').Append(E(c.Header)).Append("</th>");
             _sb.Append("</tr></thead><tbody>");
             if (t.Rows.Count == 0 && !string.IsNullOrWhiteSpace(t.EmptyText))
                 _sb.Append("<tr class=\"list-empty-row\"><td colspan=\"99\">").Append(E(t.EmptyText)).Append("</td></tr>");
@@ -633,7 +646,7 @@ public static class UiRenderer
                 {
                     var col = i < t.Columns.Count ? t.Columns[i] : null;
                     // data-label: on a phone each cell names its column (admin.css turns the row into a card).
-                    _sb.Append("<td").Append(col is { Right: true } ? " style=\"text-align:right\"" : "").Append(col is { Header.Length: > 0 } ? " data-label=\"" + E(col.Header) + "\"" + (i == t.Columns.ToList().FindIndex(c => c.Header.Length > 0) ? " data-primary" : "") : "").Append('>');
+                    _sb.Append("<td").Append(col is { Right: true } ? " style=\"text-align:right\"" : "").Append(col is { Phone: false } ? " class=\"ui-hide-phone\"" : "").Append(col is { Header.Length: > 0 } ? " data-label=\"" + E(col.Header) + "\"" + (i == t.Columns.ToList().FindIndex(c => c.Header.Length > 0) ? " data-primary" : "") : "").Append('>');
                     if (col is { Actions: true }) _sb.Append("<div class=\"actions\">");
                     Node(r.Cells[i]);
                     if (col is { Actions: true }) _sb.Append("</div>");

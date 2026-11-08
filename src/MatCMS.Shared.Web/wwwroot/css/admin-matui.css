@@ -221,6 +221,22 @@ html[data-theme="dark"] .admin--matui .mat-vs.is-active { background: var(--mat-
   .admin--matui table.data.has-labels td:first-child::before { content: none; }
   .admin--matui table.data.has-labels td:first-child .muted, .admin--matui table.data.has-labels td:first-child small { font-weight: 400; font-size: var(--mat-fs-sm); }
   .admin--matui table.data.has-labels td:last-child:has(.actions, .btn, form) { padding-top: var(--mat-space-2); }
+  /* figures on a phone: three in a row, the number and its name; the small print under it stays on the desktop (seven tiles were four screens' rows) */
+  .admin--matui .stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--mat-space-2); }
+  .admin--matui .stat-grid .stat { padding: 10px 10px 9px; }
+  .admin--matui .stat-grid .stat .n { font-size: 22px; line-height: 1.15; }
+  .admin--matui .stat-grid .stat .l { font-size: 11.5px; line-height: 1.25; }
+  .admin--matui .stat-grid .stat .s { display: none; }
+  /* compact: the column's name in a narrower column, tighter lines, the body text a step smaller — a member was a card of 280 px */
+  .admin--matui table.data.has-labels td, .admin--matui table.data.has-labels[data-stack] td { grid-template-columns: 30% minmax(0, 1fr); padding: 2px 0; font-size: var(--mat-fs-sm); }
+  .admin--matui table.data.has-labels td .form-grid:has(.mat-picker) { grid-template-columns: minmax(0, 1fr); }
+  .admin--matui table.data.has-labels td .form-grid:has(> .field):has(> button) { grid-template-columns: minmax(0, 1fr) auto; }
+  .admin--matui table.data.has-labels td:first-child { padding-bottom: 6px; margin-bottom: 4px; }
+  /* columns the plugin keeps off the phone (UiColumn.Phone = false) */
+  .admin--matui table.data .ui-hide-phone { display: none !important; }
+  /* a button with an icon in a list row says it with the icon alone; its words stay its tooltip and are read out */
+  .admin--matui table.data :is(.btn, button):has(> .ti) > .btn-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .admin--matui table.data :is(.btn, button):has(> .ti):has(> .btn-label) { padding-inline: 10px; gap: 0; }
   /* the "no records" row and a group's heading row: one cell across, no label, no title rule */
   .admin--matui table.data.has-labels td[colspan] { border-bottom: 0; margin: 0; padding: 4px 0; font-weight: 400; font-size: var(--mat-fs-sm); }
 }

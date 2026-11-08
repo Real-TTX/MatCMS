@@ -69,7 +69,7 @@
                     {
                         <a class="btn btn-sm btn-ghost" href="/admin/p/@p.Key/_settings"><i class="ti ti-adjustments" aria-hidden="true"></i> @T["plugins.settings.tab"]</a>
                     }
-                    <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@p.Id">@T["action.edit"]</a>
+                    <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@p.Id" title="@T["action.edit"]"><i class="ti ti-pencil" aria-hidden="true"></i> <span class="btn-label">@T["action.edit"]</span></a>
                     @if (MatCMS.Models.PluginKind.Normalize(p.Kind) != MatCMS.Models.PluginKind.BuiltIn)
                     {
                         <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@p.Id" data-confirm="@Model.DeleteConfirm.GetValueOrDefault(p.Key, T["plugins.confirmDelete"].ToString())">

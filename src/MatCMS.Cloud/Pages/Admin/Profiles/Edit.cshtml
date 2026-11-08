@@ -602,7 +602,7 @@
                             <td class="mono">@p.Version</td>
                             <td>
                                 <div class="actions">
-                                    <a class="btn btn-sm btn-ghost" asp-page="/Admin/Store/Plugin" asp-route-id="@p.Id">@T["action.edit"]</a>
+                                    <a class="btn btn-sm btn-ghost" asp-page="/Admin/Store/Plugin" asp-route-id="@p.Id" title="@T["action.edit"]"><i class="ti ti-pencil" aria-hidden="true"></i> <span class="btn-label">@T["action.edit"]</span></a>
                                     <form method="post" asp-page-handler="RemoveFromStore" asp-route-id="@Model.Item.Id" asp-route-kind="plugins" class="inline-form">
                                         <input type="hidden" name="storeId" value="@p.Id" />
                                         <button type="submit" class="btn btn-sm btn-ghost">@T["profiles.removeFromProfile"]</button>
@@ -623,7 +623,7 @@
                             <td class="mono">@p.Version</td>
                             <td>
                                 <div class="actions">
-                                    <a class="btn btn-sm btn-ghost" asp-page="Plugin" asp-route-profileId="@Model.Item.Id" asp-route-id="@p.Id">@T["action.edit"]</a>
+                                    <a class="btn btn-sm btn-ghost" asp-page="Plugin" asp-route-profileId="@Model.Item.Id" asp-route-id="@p.Id" title="@T["action.edit"]"><i class="ti ti-pencil" aria-hidden="true"></i> <span class="btn-label">@T["action.edit"]</span></a>
                                 </div>
                             </td>
                         </tr>
@@ -676,7 +676,7 @@
                             <td class="mono">@c.Type</td>
                             <td>
                                 <div class="actions">
-                                    <a class="btn btn-sm btn-ghost" asp-page="/Admin/Store/Component" asp-route-id="@c.Id">@T["action.edit"]</a>
+                                    <a class="btn btn-sm btn-ghost" asp-page="/Admin/Store/Component" asp-route-id="@c.Id" title="@T["action.edit"]"><i class="ti ti-pencil" aria-hidden="true"></i> <span class="btn-label">@T["action.edit"]</span></a>
                                     <form method="post" asp-page-handler="RemoveFromStore" asp-route-id="@Model.Item.Id" asp-route-kind="components" class="inline-form">
                                         <input type="hidden" name="storeId" value="@c.Id" />
                                         <button type="submit" class="btn btn-sm btn-ghost">@T["profiles.removeFromProfile"]</button>
@@ -696,7 +696,7 @@
                             <td class="mono">@c.Type</td>
                             <td>
                                 <div class="actions">
-                                    <a class="btn btn-sm btn-ghost" asp-page="Component" asp-route-profileId="@Model.Item.Id" asp-route-id="@c.Id">@T["action.edit"]</a>
+                                    <a class="btn btn-sm btn-ghost" asp-page="Component" asp-route-profileId="@Model.Item.Id" asp-route-id="@c.Id" title="@T["action.edit"]"><i class="ti ti-pencil" aria-hidden="true"></i> <span class="btn-label">@T["action.edit"]</span></a>
                                 </div>
                             </td>
                         </tr>
@@ -760,7 +760,7 @@
                             <td class="muted">—</td>
                             <td>
                                 <div class="actions">
-                                    <a class="btn btn-sm btn-ghost" asp-page="/Admin/Store/Template" asp-route-id="@t.Id">@T["action.edit"]</a>
+                                    <a class="btn btn-sm btn-ghost" asp-page="/Admin/Store/Template" asp-route-id="@t.Id" title="@T["action.edit"]"><i class="ti ti-pencil" aria-hidden="true"></i> <span class="btn-label">@T["action.edit"]</span></a>
                                     <form method="post" asp-page-handler="RemoveFromStore" asp-route-id="@Model.Item.Id" asp-route-kind="templates" class="inline-form">
                                         <input type="hidden" name="storeId" value="@t.Id" />
                                         <button type="submit" class="btn btn-sm btn-ghost">@T["profiles.removeFromProfile"]</button>
@@ -784,7 +784,7 @@
                             <td class="muted">@t.HeadingFont / @t.BodyFont</td>
                             <td>
                                 <div class="actions">
-                                    <a class="btn btn-sm btn-ghost" asp-page="Template" asp-route-profileId="@Model.Item.Id" asp-route-id="@t.Id">@T["action.edit"]</a>
+                                    <a class="btn btn-sm btn-ghost" asp-page="Template" asp-route-profileId="@Model.Item.Id" asp-route-id="@t.Id" title="@T["action.edit"]"><i class="ti ti-pencil" aria-hidden="true"></i> <span class="btn-label">@T["action.edit"]</span></a>
                                 </div>
                             </td>
                         </tr>
@@ -871,7 +871,7 @@
                             <td class="muted">@m.Subject</td>
                             <td>
                                 <div class="actions">
-                                    <a class="btn btn-sm btn-ghost" asp-page="MailTemplate" asp-route-profileId="@Model.Item.Id" asp-route-id="@m.Id">@T["action.edit"]</a>
+                                    <a class="btn btn-sm btn-ghost" asp-page="MailTemplate" asp-route-profileId="@Model.Item.Id" asp-route-id="@m.Id" title="@T["action.edit"]"><i class="ti ti-pencil" aria-hidden="true"></i> <span class="btn-label">@T["action.edit"]</span></a>
                                 </div>
                             </td>
                         </tr>

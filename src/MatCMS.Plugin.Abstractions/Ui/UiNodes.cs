@@ -525,6 +525,10 @@ public sealed record UiColumn(string Header)
     public bool Right { get; init; }
     /// <summary>The cells carry actions: no wrapping, narrow.</summary>
     public bool Actions { get; init; }
+    /// <summary>Shown on a phone too (the default). False keeps a column that is only a detail (a number, a date of record, a counter) out of the
+    /// card a row becomes on a phone, so the card holds what one decides by. Ask for it in a <c>NoInlining</c> helper that catches
+    /// <c>MissingMethodException</c> when the plugin must still run on a host before this property.</summary>
+    public bool Phone { get; init; } = true;
 }
 
 /// <summary>A row of a <see cref="UiTable"/>.</summary>

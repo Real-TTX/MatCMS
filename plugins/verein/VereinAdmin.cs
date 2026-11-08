@@ -133,8 +133,8 @@ public static class VereinAdmin
             .Where(t => t is not null));
 
         var columns = new List<UiColumn> { Ui.Column("Name"), Ui.Column("Rollen") };
-        columns.AddRange(fields.Take(3).Select(f => Ui.Column(f.Label)));
-        columns.AddRange(new[] { Ui.Column("Geboren"), Ui.Column("Mitglied seit"), Ui.Column("Kontakt / gehört zu"), Ui.Column("Offen", right: true), Ui.Column("Status") });
+        columns.AddRange(fields.Take(3).Select((f, i) => i == 0 ? Ui.Column(f.Label) : NotOnPhone(Ui.Column(f.Label))));
+        columns.AddRange(new[] { Ui.Column("Geboren"), NotOnPhone(Ui.Column("Mitglied seit")), Ui.Column("Kontakt / gehört zu"), NotOnPhone(Ui.Column("Offen", right: true)), Ui.Column("Status") });
         var table = Ui.Table(columns, list.Select(p =>
             {
                 var cells = new List<object?>
@@ -480,7 +480,7 @@ public static class VereinAdmin
         return Page(Ui.Stack(
             Ui.PageHead("Zum Bestätigen, Unterschreiben oder Lesen – mit Nachweis, wer wann geantwortet hat", "Dokumente"),
             Ui.Tabs(Ui.Tab("Aktuell", Root + "docs", !archived), Ui.Tab("Archiv", Root + "docs?archiv=1", archived)),
-            Ui.Table(new[] { Ui.Column("Titel"), Ui.Column("Art"), Ui.Column("Für"), Ui.Column("Frist"), Ui.Column("Beantwortet"), Ui.Column("Angelegt") }, rows,
+            Ui.Table(new[] { Ui.Column("Titel"), NotOnPhone(Ui.Column("Art")), Ui.Column("Für"), Ui.Column("Frist"), Ui.Column("Beantwortet"), NotOnPhone(Ui.Column("Angelegt")) }, rows,
                 searchPlaceholder: "Dokumente durchsuchen …", emptyText: archived ? "Das Archiv ist leer." : "Noch keine Dokumente.")
                 with { Below = new UiNode[] { Ui.Button("Neues Dokument", Root + "docs/new", icon: "ti-file-plus") } }), "Dokumente");
     }
@@ -679,7 +679,7 @@ public static class VereinAdmin
                 m.MinutesStatus == VereinStore.Final ? Ui.Badge("veröffentlicht", UiTone.Success) : m.Minutes.Length > 0 ? Ui.Badge("Entwurf", UiTone.Warning) : Ui.Text("–")));
         }
         return Page(Ui.Stack(Ui.PageHead("Einladen, Zu- und Absagen sehen, Protokoll schreiben", "Sitzungen"),
-            Ui.Table(new[] { Ui.Column("Sitzung"), Ui.Column("Wann"), Ui.Column("Art"), Ui.Column("Für"), Ui.Column("Rückmeldungen"), Ui.Column("Status"), Ui.Column("Protokoll") }, rows,
+            Ui.Table(new[] { Ui.Column("Sitzung"), Ui.Column("Wann"), NotOnPhone(Ui.Column("Art")), NotOnPhone(Ui.Column("Für")), Ui.Column("Rückmeldungen"), Ui.Column("Status"), Ui.Column("Protokoll") }, rows,
                 searchPlaceholder: "Sitzungen durchsuchen …", emptyText: "Noch keine Sitzungen.")
                 with { Below = new UiNode[] { Ui.Button("Neue Sitzung", Root + "meetings/new", icon: "ti-calendar-plus") } }), "Sitzungen");
     }
@@ -820,7 +820,7 @@ public static class VereinAdmin
         return Page(Ui.Stack(
             Ui.PageHead("Öffentliche Termine erscheinen im Block „Vereinstermine“ auf der Website, interne nur im Mitgliederbereich", "Termine", Ui.Button("Als Instagram-Bild", Root + "instagram", UiButtonKind.Ghost, "ti-brand-instagram")),
             Ui.Tabs(Ui.Tab("Kommende", Root + "events", !past), Ui.Tab("Vergangene", Root + "events?vergangen=1", past)),
-            Ui.Table(new[] { Ui.Column("Termin"), Ui.Column("Wann"), Ui.Column("Art"), Ui.Column("Ort"), Ui.Column("Teilnahme"), Ui.Column("Sichtbar") },
+            Ui.Table(new[] { Ui.Column("Termin"), Ui.Column("Wann"), NotOnPhone(Ui.Column("Art")), Ui.Column("Ort"), Ui.Column("Teilnahme"), NotOnPhone(Ui.Column("Sichtbar")) },
                 list.Select(e => Ui.RowFor(e.Title + " " + e.Kind + " " + e.Place, Ui.Link(e.Title, Root + "events/" + e.Id), V.When(e.Starts), e.Kind, e.Place, Participation(e),
                     e.Draft ? Ui.Badge("Entwurf", UiTone.Warning) : e.Cancelled ? Ui.Badge("abgesagt", UiTone.Error) : e.Public ? Ui.Badge("öffentlich", UiTone.Success) : Ui.Badge("intern"))
                     with { Tags = "k" + Math.Max(0, kinds.FindIndex(k => string.Equals(k, e.Kind, StringComparison.OrdinalIgnoreCase))) }),
@@ -931,7 +931,7 @@ public static class VereinAdmin
         int Count(string a) => asked.Count(p => replies.TryGetValue(p.MemberId, out var r) && r.Answer == a);
         var open = asked.Count(p => !replies.ContainsKey(p.MemberId));
         var choices = new[] { Ui.Option("", "– offen –"), Ui.Option(VereinStore.Yes, "dabei"), Ui.Option(VereinStore.Maybe, "weiß noch nicht"), Ui.Option(VereinStore.No, "nicht dabei") };
-        var table = Ui.Table(new[] { Ui.Column("Name"), Ui.Column("Antwort"), Ui.Column("Bemerkung"), Ui.Column("Wann"), Ui.Column("Eintragen", actions: true) },
+        var table = Ui.Table(new[] { Ui.Column("Name"), Ui.Column("Antwort"), Ui.Column("Bemerkung"), NotOnPhone(Ui.Column("Wann")), Ui.Column("Eintragen", actions: true) },
             asked.OrderBy(p => replies.ContainsKey(p.MemberId)).ThenBy(p => p.Last).ThenBy(p => p.First).Select(p =>
             {
                 replies.TryGetValue(p.MemberId, out var r);
@@ -1065,7 +1065,7 @@ public static class VereinAdmin
             Ui.PageHead("Was Mitglieder im Mitgliederbereich hochgeladen haben", "Bilder & Material",
                 pendingCount > 0 ? Act("Alle " + pendingCount + " freigeben", new Dictionary<string, string> { ["action"] = "approveall" }, UiButtonKind.Primary, "Alle wartenden Uploads freigeben?", "ti-check") : null),
             Ui.Tabs(Ui.Tab("Alle", Root + "uploads", !pendingOnly), Ui.Tab("Warten auf Freigabe (" + pendingCount + ")", Root + "uploads?status=offen", pendingOnly)),
-            Ui.Table(new[] { Ui.Column(""), Ui.Column("Titel"), Ui.Column("Von"), Ui.Column("Aufgenommen"), Ui.Column("Termin"), Ui.Column("Status"), Ui.Column("", actions: true) },
+            Ui.Table(new[] { Ui.Column(""), Ui.Column("Titel"), Ui.Column("Von"), NotOnPhone(Ui.Column("Aufgenommen")), Ui.Column("Termin"), Ui.Column("Status"), Ui.Column("", actions: true) },
                 list.Select(x => Ui.RowFor(x.Title + " " + x.FileName,
                     V.IsImage(Path.GetExtension(x.File).ToLowerInvariant()) ? Ui.Img(Root + "uploads/" + x.Id, x.Title, 48) : Ui.Text(""),
                     Ui.Link(Short(x.Title.Length > 0 ? x.Title : x.FileName), Root + "uploads/" + x.Id, newTab: true),
@@ -1074,10 +1074,21 @@ public static class VereinAdmin
                     !x.Approved ? Ui.Badge("wartet auf Freigabe", UiTone.Warning) : x.Shared ? Ui.Badge("alle Mitglieder", UiTone.Success) : Ui.Badge("privat"),
                     Ui.Inline(
                         x.Approved ? null : Act("Freigeben", new Dictionary<string, string> { ["action"] = "approve", ["id"] = Id(x) }, UiButtonKind.Primary, icon: "ti-check"),
-                        Act(x.Shared ? "Privat machen" : "Für alle", new Dictionary<string, string> { ["action"] = "share", ["id"] = Id(x) }),
-                        Act("Löschen", new Dictionary<string, string> { ["action"] = "delete", ["id"] = Id(x) }, UiButtonKind.Danger, "Datei löschen?")))),
+                        Act(x.Shared ? "Privat machen" : "Für alle sichtbar", new Dictionary<string, string> { ["action"] = "share", ["id"] = Id(x) }, icon: x.Shared ? "ti-lock" : "ti-world"),
+                        Act("Löschen", new Dictionary<string, string> { ["action"] = "delete", ["id"] = Id(x) }, UiButtonKind.Danger, "Datei löschen?", "ti-trash")))),
                 searchPlaceholder: "Dateien durchsuchen …", pageSize: 50, emptyText: pendingOnly ? "Nichts wartet auf Freigabe." : "Noch nichts hochgeladen.")), "Bilder & Material");
     }
+
+    /// <summary>A column that is a detail stays out of the card a row becomes on a phone (UiColumn.Phone, CMS 1.13.371). On an older host the property
+    /// does not exist — the column is simply shown, the page must not fail.</summary>
+    private static UiColumn NotOnPhone(UiColumn c)
+    {
+        try { return OffPhone(c); }
+        catch (Exception ex) when (ex is MissingMethodException or TypeLoadException) { return c; }
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static UiColumn OffPhone(UiColumn c) => c with { Phone = false };
 
     private static string Short(string s) => s.Length > 36 ? s[..35] + "…" : s;
 

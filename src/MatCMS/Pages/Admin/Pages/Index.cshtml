@@ -63,7 +63,7 @@
                     </td>
                     <td>
                         <div class="actions">
-                            <a class="btn btn-sm btn-ghost" asp-page="Editor" asp-route-id="@p.Id">@T["action.edit"]</a>
+                            <a class="btn btn-sm btn-ghost" asp-page="Editor" asp-route-id="@p.Id" title="@T["action.edit"]"><i class="ti ti-pencil" aria-hidden="true"></i> <span class="btn-label">@T["action.edit"]</span></a>
                             @if (p.OwnerPlugin is null)
                             {
                                 <form class="inline-form" method="post" asp-page-handler="Delete" asp-route-id="@p.Id"
@@ -95,7 +95,7 @@
                         </td>
                         <td>
                             <div class="actions">
-                                <a class="btn btn-sm btn-ghost" asp-page="Editor" asp-route-id="@v.Id">@T["action.edit"]</a>
+                                <a class="btn btn-sm btn-ghost" asp-page="Editor" asp-route-id="@v.Id" title="@T["action.edit"]"><i class="ti ti-pencil" aria-hidden="true"></i> <span class="btn-label">@T["action.edit"]</span></a>
                             </div>
                         </td>
                     </tr>

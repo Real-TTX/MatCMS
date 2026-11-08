@@ -190,7 +190,7 @@ public static class VereinPublic
         if (who.Board) sb.Append(Tile(Base + "/vorstand", "clipboard-list", "Vorstand"));
         sb.Append("</nav>");
         sb.Append("<div class=\"vm-grid2\">");
-        sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-file-check\"></i> Zu erledigen</h2>");
+        sb.Append("<section class=\"vm-card vm-todo").Append(open.Count == 0 && replies.Count == 0 ? " is-empty" : "").Append("\"><h2><i class=\"ti ti-file-check\"></i> Zu erledigen</h2>");
         if (open.Count == 0 && replies.Count == 0) sb.Append("<p class=\"vm-muted\">Alles erledigt – danke!</p>");
         else
         {
@@ -627,10 +627,11 @@ var side=f.parentNode;side.querySelectorAll('.vm-badge.warn').forEach(function(x
             foreach (var p in mine)
             {
                 replies.TryGetValue(p.MemberId, out var r);
-                sb.Append("<fieldset class=\"vm-reply-row\"><legend>").Append(p.Child ? V.H(p.Name) : "Du").Append("</legend><div class=\"vm-choice\">");
-                foreach (var (val, label) in new[] { (VereinStore.Yes, "Bin dabei"), (VereinStore.Maybe, "Weiß noch nicht"), (VereinStore.No, "Kann nicht") })
+                var who = p.Child ? p.Name : "Du";
+                sb.Append("<div class=\"vm-reply-row\" role=\"radiogroup\" aria-label=\"").Append(V.H(who)).Append("\"><strong class=\"vm-reply-name\">").Append(V.H(who)).Append("</strong><div class=\"vm-choice\">");
+                foreach (var (val, label) in new[] { (VereinStore.Yes, "Dabei"), (VereinStore.Maybe, "Vielleicht"), (VereinStore.No, "Nicht dabei") })
                     sb.Append("<label><input type=\"radio\" name=\"a.").Append(p.Id).Append("\" value=\"").Append(val).Append('"').Append(r?.Answer == val ? " checked" : "").Append("><span>").Append(label).Append("</span></label>");
-                sb.Append("</div><input name=\"n.").Append(p.Id).Append("\" maxlength=\"200\" placeholder=\"Bemerkung (freiwillig, z. B. komme später)\" value=\"").Append(V.H(r?.Note ?? "")).Append("\"></fieldset>");
+                sb.Append("</div><input class=\"vm-note\" name=\"n.").Append(p.Id).Append("\" maxlength=\"200\" placeholder=\"Bemerkung (freiwillig)\" aria-label=\"Bemerkung für ").Append(V.H(who)).Append("\" value=\"").Append(V.H(r?.Note ?? "")).Append("\"></div>");
             }
             sb.Append("<button class=\"vm-btn\" type=\"submit\">Rückmeldung speichern</button></form>");
         }
@@ -639,13 +640,22 @@ var side=f.parentNode;side.querySelectorAll('.vm-badge.warn').forEach(function(x
             var asked = VereinStore.Asked(people, e, VereinSettings.BoardList(ctx)).ToList();
             int Count(string a) => asked.Count(p => replies.TryGetValue(p.MemberId, out var r) && r.Answer == a);
             sb.Append("<h3>Rückmeldungen (für den Vorstand)</h3><p class=\"vm-muted\">").Append(Count(VereinStore.Yes)).Append(" dabei · ").Append(Count(VereinStore.Maybe)).Append(" unsicher · ")
-              .Append(Count(VereinStore.No)).Append(" nicht dabei · ").Append(asked.Count(p => !replies.ContainsKey(p.MemberId))).Append(" offen</p><table class=\"vm-table\"><thead><tr><th>Name</th><th>Antwort</th><th>Bemerkung</th></tr></thead><tbody>");
-            foreach (var p in asked.OrderBy(p => replies.ContainsKey(p.MemberId)).ThenBy(p => p.Last))
+              .Append(Count(VereinStore.No)).Append(" nicht dabei · ").Append(asked.Count(p => !replies.ContainsKey(p.MemberId))).Append(" offen</p>");
+            // folded by answer, names in a compact list: as a table every one of 40 people was a row of its own, on a phone a long scroll
+            foreach (var (answer, title, open0) in new[] { (VereinStore.Yes, "Dabei", true), (VereinStore.Maybe, "Vielleicht", false), (VereinStore.No, "Nicht dabei", false), ("", "Noch offen", false) })
             {
-                replies.TryGetValue(p.MemberId, out var r);
-                sb.Append("<tr><td>").Append(V.H(p.Name)).Append("</td><td>").Append(r is null ? "<span class=\"vm-badge warn\">offen</span>" : V.H(ReplyLabel(r.Answer))).Append("</td><td>").Append(V.H(r?.Note ?? "")).Append("</td></tr>");
+                var group = asked.Where(p => answer.Length == 0 ? !replies.ContainsKey(p.MemberId) : replies.TryGetValue(p.MemberId, out var x) && x.Answer == answer).OrderBy(p => p.Last).ThenBy(p => p.First).ToList();
+                if (group.Count == 0) continue;
+                sb.Append("<details class=\"vm-group\"").Append(open0 ? " open" : "").Append("><summary>").Append(title).Append(" <span class=\"vm-badge\">").Append(group.Count).Append("</span></summary><ul class=\"vm-names\">");
+                foreach (var p in group)
+                {
+                    replies.TryGetValue(p.MemberId, out var r);
+                    sb.Append("<li>").Append(V.H(p.Name));
+                    if (r is { Note.Length: > 0 }) sb.Append(" <small>– ").Append(V.H(r.Note)).Append("</small>");
+                    sb.Append("</li>");
+                }
+                sb.Append("</ul></details>");
             }
-            sb.Append("</tbody></table>");
         }
         return sb.Append("</section>").ToString();
     }
@@ -675,10 +685,11 @@ var side=f.parentNode;side.querySelectorAll('.vm-badge.warn').forEach(function(x
         if (m.Agenda.Length > 0) sb.Append("<h2>Tagesordnung</h2><div class=\"vm-text\">").Append(V.Paragraphs(m.Agenda)).Append("</div>");
         if (m.Status == VereinStore.Planned)
         {
-            sb.Append("<form method=\"post\" class=\"vm-rsvp\">").Append(ctx.Antiforgery).Append("<span>Kommst du?</span>");
-            foreach (var (val, label) in new[] { (VereinStore.Yes, "Ich komme"), (VereinStore.Maybe, "Weiß noch nicht"), (VereinStore.No, "Ich kann nicht") })
-                sb.Append("<button class=\"vm-btn").Append(mine?.Answer == val ? "" : " ghost").Append("\" type=\"submit\" name=\"action\" value=\"").Append(val).Append("\">").Append(label).Append("</button>");
-            sb.Append("</form>");
+            sb.Append("<form method=\"post\" class=\"vm-rsvp\">").Append(ctx.Antiforgery).Append("<span>Kommst du?</span><span class=\"vm-seg\">");
+            foreach (var (val, label) in new[] { (VereinStore.Yes, "Ich komme"), (VereinStore.Maybe, "Vielleicht"), (VereinStore.No, "Ich kann nicht") })
+                sb.Append("<button class=\"vm-pick").Append(mine?.Answer == val ? " on" : "").Append(val == VereinStore.Yes ? " yes" : val == VereinStore.No ? " no" : "").Append("\" type=\"submit\" name=\"action\" value=\"").Append(val)
+                  .Append("\" aria-pressed=\"").Append(mine?.Answer == val ? "true" : "false").Append("\">").Append(label).Append("</button>");
+            sb.Append("</span></form>");
         }
         sb.Append("<p><a class=\"vm-btn ghost small\" href=\"").Append(Base).Append("/sitzungen/").Append(m.Id).Append("/pdf\" target=\"_blank\" rel=\"noopener\"><i class=\"ti ti-printer\"></i> Einladung als PDF</a></p>");
         sb.Append("</section>");
@@ -881,10 +892,19 @@ var side=f.parentNode;side.querySelectorAll('.vm-badge.warn').forEach(function(x
         var vorstand = people.Where(p => p.Roles.Any(r => board.Contains(r, StringComparer.OrdinalIgnoreCase)))
             .OrderBy(p => board.ToList().FindIndex(r => p.Roles.Contains(r, StringComparer.OrdinalIgnoreCase))).ToList();
 
-        string Card(Person p) => "<div class=\"vm-person\">" + VereinPhoto.Avatar(p, Base + "/foto/" + p.Id, Initials(p)) + "<span><strong>" + V.H(p.Name) + "</strong><small>" +
-            V.H(string.Join(", ", p.Roles)) + "</small>" + PhoneLinks(p.Phone) +
-            // a parked address (xxx_…, a list taken over) is the board's record, not a way to write to somebody
-            (p.Email.Length > 0 && !VereinMail.Parkable(p.Email) ? "<a href=\"mailto:" + V.H(p.Email) + "\">" + V.H(p.Email) + "</a>" : "") + Details(p) + "</span></div>";
+        // One line per person: picture, name, roles, a call and a mail button (icons — a phone and an envelope say what they do); the numbers, the address
+        // and the club's own fields fold out. As cards with everything open, 60 members were a scroll of several screens on a phone.
+        string Card(Person p)
+        {
+            var mailable = p.Email.Length > 0 && !VereinMail.Parkable(p.Email);   // a parked address (xxx_…, a list taken over) is the board's record, not a way to write to somebody
+            var firstPhone = p.Phone.Split(new[] { " · ", ";" }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault() ?? "";
+            var more = PhoneLinks(p.Phone) + (mailable ? "<a href=\"mailto:" + V.H(p.Email) + "\">" + V.H(p.Email) + "</a>" : "") + Details(p);
+            return "<details class=\"vm-person\"><summary>" + VereinPhoto.Avatar(p, Base + "/foto/" + p.Id, Initials(p), 40) + "<span class=\"vm-person-main\"><strong>" + V.H(p.Name) + "</strong><small>" +
+                V.H(string.Join(", ", p.Roles)) + "</small></span><span class=\"vm-person-acts\">" +
+                (firstPhone.Length > 0 ? "<a class=\"vm-icon-btn\" href=\"tel:" + V.H(new string(firstPhone.Where(c => char.IsDigit(c) || c == '+').ToArray())) + "\" title=\"Anrufen: " + V.H(firstPhone) + "\" aria-label=\"" + V.H(p.Name) + " anrufen\"><i class=\"ti ti-phone\" aria-hidden=\"true\"></i></a>" : "") +
+                (mailable ? "<a class=\"vm-icon-btn\" href=\"mailto:" + V.H(p.Email) + "\" title=\"E-Mail: " + V.H(p.Email) + "\" aria-label=\"E-Mail an " + V.H(p.Name) + "\"><i class=\"ti ti-mail\" aria-hidden=\"true\"></i></a>" : "") +
+                "</span></summary>" + (more.Length > 0 ? "<div class=\"vm-person-more\">" + more + "</div>" : "") + "</details>";
+        }
         // private details by their visibility: the board sees all, the others what the club made visible for everybody
         var fields = VereinSettings.Fields(ctx);
         var seeAddress = who.Board || ctx.Settings.GetBool(VereinSettings.AddressForAll);

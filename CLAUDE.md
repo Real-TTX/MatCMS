@@ -282,6 +282,9 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
   "None" is the `Placeholder` (a field that is not required can be cleared); `AutoSubmit` saves a row's own form at once (ui-fields.js) — no OK button. The first
   version (CMS 1.13.368) had its own drop-down and sent `skip`; the Verein plugin reads both. A native plugin that uses it builds the field in a `NoInlining`
   helper and catches `TypeLoadException`, falling back to a select, so it still loads on an older host.
+  On a phone a list row is a compact card (label column 30 %, tighter lines, figures three in a row); a column with `UiColumn.Phone = false` stays off it, and a
+  button with an icon AND words (UiRenderer puts the words in `.btn-label`, the core's list rows too — the pencil of "Bearbeiten") shows the icon alone in a list row
+  there, the words staying its tooltip and accessible name. A native plugin sets `Phone` in a `NoInlining` helper that catches `MissingMethodException`.
   A plugin's card in the admin is `.card.ui-flow`: its pieces get ONE gap (a plain `.card` left a row of buttons glued to the list below it); buttons and
   action forms keep their width, and a row's own form with a field and a button (an answer + OK) puts them side by side.
   On a phone the row editor (`Ui.RowEditor`, list settings) wraps each row like a small form: a switch carries its column's name beside the box, a row of a name and

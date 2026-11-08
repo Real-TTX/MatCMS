@@ -201,5 +201,62 @@ public static class VereinCss
 /* last, so it wins over the rules above: the head's picture keeps its size, the hint loses its icon on a phone */
 .vm .vm-me{flex:none}.vm .vm-tile{align-content:start}
 @media (max-width:600px){.vm .vm-hint .vm-hint-icon{display:none}.vm .vm-head h1{font-size:1.6rem}}
+/* ---- 1.13: the member area on a phone ---- */
+/* a field never sticks out of its card: its padding and border are part of its width */
+.vm input,.vm select,.vm textarea,.vm button{box-sizing:border-box;max-width:100%}
+.vm .vm-head h1{overflow-wrap:break-word;hyphens:auto}
+/* an answer is one segmented row: Dabei | Vielleicht | Nicht dabei */
+.vm .vm-reply-row{border:1px solid var(--vm-line);border-radius:12px;padding:10px 12px;margin:0 0 10px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px 12px}
+.vm .vm-reply-name{font-weight:700}
+.vm .vm-choice{display:inline-flex;flex-wrap:nowrap;gap:0;border:1px solid var(--vm-line);border-radius:999px;overflow:hidden;background:#fff;max-width:100%}
+.vm .vm-choice label{position:relative;flex:1 1 auto;justify-content:center;border:0;border-radius:0;padding:8px 14px;white-space:nowrap;gap:0;font-size:14.5px}
+.vm .vm-choice label+label{border-left:1px solid var(--vm-line)}
+.vm .vm-choice input{position:absolute;opacity:0;pointer-events:none}
+.vm .vm-choice label:has(input:checked){background:var(--vm-accent);color:#fff;font-weight:600}
+.vm .vm-choice label:has(input:focus-visible){box-shadow:inset 0 0 0 2px var(--vm-accent)}
+.vm .vm-reply-row .vm-note{grid-column:1/-1;padding:7px 11px;font-size:14px;border:1px solid var(--vm-line);border-radius:9px;width:100%}
+/* the board's view of the answers: folded groups, names in columns */
+.vm .vm-group{border-top:1px solid var(--vm-line);padding:8px 0}
+.vm .vm-group summary{cursor:pointer;font-weight:600;display:flex;align-items:center;gap:8px}
+.vm .vm-names{list-style:none;margin:8px 0 4px;padding:0;columns:2 220px;column-gap:24px;font-size:14.5px}
+.vm .vm-names li{break-inside:avoid;padding:2px 0}
+.vm .vm-names small{color:var(--vm-muted)}
+/* a meeting's answer */
+.vm .vm-rsvp{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.vm .vm-seg{display:inline-flex;border:1px solid var(--vm-line);border-radius:999px;overflow:hidden;background:#fff}
+.vm .vm-seg .vm-pick+.vm-pick{border-left:1px solid var(--vm-line)}
+.vm .vm-seg .vm-pick.on:not(.yes):not(.no){background:var(--vm-accent);color:#fff}
+/* the member list: one line per person, the rest folds out */
+.vm .vm-people{gap:10px}
+.vm details.vm-person{display:block;padding:0;border:1px solid var(--vm-line);border-radius:12px;background:#fff}
+.vm details.vm-person summary{display:flex;align-items:center;gap:12px;padding:10px 12px;cursor:pointer;list-style:none}
+.vm details.vm-person summary::-webkit-details-marker{display:none}
+.vm .vm-person-main{display:flex;flex-direction:column;min-width:0;flex:1 1 auto}
+.vm .vm-person-main strong{overflow-wrap:anywhere}.vm .vm-person-main small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vm .vm-person-acts{display:flex;gap:6px;flex:none}
+.vm .vm-icon-btn{display:inline-grid;place-items:center;width:38px;height:38px;border-radius:50%;border:1px solid var(--vm-line);color:var(--vm-accent);background:#fff;text-decoration:none;font-size:18px}
+.vm .vm-icon-btn:hover{background:var(--vm-soft)}
+.vm .vm-person-more{display:flex;flex-direction:column;gap:3px;padding:0 12px 12px 64px;font-size:14px}
+.vm .vm-person-more small{color:var(--vm-muted)}
+@media (max-width:600px){
+ .vm .vm-tiles{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+ .vm .vm-tile{padding:12px 6px;justify-items:center;text-align:center;gap:4px;border-radius:14px}
+ .vm .vm-tile .ti{font-size:24px}
+ .vm .vm-tile strong{font-size:12.5px;line-height:1.25}
+ .vm .vm-tile small{display:none}
+ .vm .vm-tile.hot small{display:block;font-size:11px}
+ .vm .vm-todo.is-empty{display:none}
+ .vm .vm-reply-row{grid-template-columns:1fr}
+ .vm .vm-choice{display:flex;width:100%}
+ .vm .vm-choice label{padding:9px 6px}
+ .vm .vm-rsvp .vm-seg{display:flex;width:100%}
+ .vm .vm-rsvp .vm-pick{flex:1;justify-content:center}
+ .vm .vm-people{grid-template-columns:1fr;gap:8px}
+ .vm .vm-person-more{padding-left:12px}
+}
+/* a long word (an e-mail address, a name) may not widen its column — it made the profile's card and the member list wider than the phone */
+.vm .vm-grid2>*,.vm .vm-row2>*,.vm .vm-people>*,.vm .vm-main>*{min-width:0}
+.vm .vm-facts dd,.vm .vm-person-more a{overflow-wrap:anywhere;min-width:0}
+.vm .vm-reply h3{margin-top:22px}
 """;
 }

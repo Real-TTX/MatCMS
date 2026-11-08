@@ -48,7 +48,7 @@
                     <div class="b-sum">@(it.Url.StartsWith("plugin:") ? T["menus.elementOf"] + " " + it.Url["plugin:".Length..] : it.Url)@(it.OpenInNewTab ? " · " + T["menus.newTab"] : "")@(it.Visibility == "in" ? " · " + T["menus.visIn"] : it.Visibility == "out" ? " · " + T["menus.visOut"] : "")</div>
                 </div>
                 <div class="actions">
-                    <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@it.Id">@T["action.edit"]</a>
+                    <a class="btn btn-sm btn-ghost" asp-page="Edit" asp-route-id="@it.Id" title="@T["action.edit"]"><i class="ti ti-pencil" aria-hidden="true"></i> <span class="btn-label">@T["action.edit"]</span></a>
                     <form class="inline-form" method="post" asp-page-handler="DeleteItem" asp-route-id="@Model.Current.Id" asp-route-itemId="@it.Id" asp-route-locale="@Model.SelectedLocale" data-confirm="@T["menus.confirmDelete", it.Label]">
                         <button type="submit" class="btn btn-sm btn-danger btn-icon" title="@T["action.delete"]" aria-label="@T["action.delete"]"><partial name="_IconTrash" /></button>
                     </form>

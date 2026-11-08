@@ -48,7 +48,7 @@ public static class MomentsPublic
     public static async Task<Viewer?> ViewerAsync(IPluginContext ctx, MomentsStore store, CancellationToken ct)
     {
         var admin = ctx.User?.IsAdmin == true;
-        if (ctx.Member is not null && await store.GuestOfMemberAsync(ctx.Member.Id, ct) is Guest g && g.Active) return new Viewer(g, admin);
+        if (ctx.Member is not null && await store.GuestOfMemberAsync(ctx.Member.Id, ctx.Member.Email, ct) is Guest g && g.Active) return new Viewer(g, admin);
         return admin ? new Viewer(null, true) : null;
     }
 
@@ -107,18 +107,24 @@ public static class MomentsPublic
             Throttle.Miss(ctx.Request.ClientIp);
             return LoginPage(ctx, "Dieser Link gilt nicht (mehr). Meldet euch bitte hier an oder fragt uns nach einem neuen Zugang.", "");
         }
-        if (ctx.Member is not null && ctx.Member.Id == guest.MemberId) return PluginResult.Redirect(Base);
+        if (ctx.Member is not null && ctx.Member.Id == guest.MemberId && string.Equals(ctx.Member.Email, guest.Account, StringComparison.OrdinalIgnoreCase))
+            return PluginResult.Redirect(Base);
         return await SignInAsync(ctx, store, guest, "", ct);
     }
 
     private static async Task<PluginResult> SignInAsync(IPluginContext ctx, MomentsStore store, Guest g, string back, CancellationToken ct)
     {
-        var account = g.MemberId > 0 ? await ctx.Members.FindAsync(g.MemberId, ct) : null;
+        // The household's OWN account: by its number only when the address matches too (after a restore elsewhere the number may belong to another
+        // household's new account), else by its address (a site moved together with its accounts), else a new one below.
+        MemberAccount? account = null;
+        if (g.MemberId > 0 && g.Account.Length > 0 && await ctx.Members.FindAsync(g.MemberId, ct) is MemberAccount byId
+            && string.Equals(byId.Email, g.Account, StringComparison.OrdinalIgnoreCase)) account = byId;
+        if (account is null && g.Account.Length > 0) account = await ctx.Members.FindByEmailAsync(g.Account, ct);
         if (account is not null && !account.IsActive) return LoginPage(ctx, "Dieser Zugang ist gesperrt. Bitte sprecht uns an.", back);
         if (account is null)
         {
             // The household's own account. The address only has to be unique and valid in form: ".invalid" is reserved and can never receive mail,
-            // and InviteAsync sends none — the code is the only way in.
+            // and InviteAsync sends none — the code (or the user name and password) is the only way in.
             var email = g.Account.Length > 0 ? g.Account : "gast-" + Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(6)).ToLowerInvariant() + "@moments.invalid";
             var invited = await ctx.Members.InviteAsync(email, g.Name, Base, ct);
             account = invited.Account ?? await ctx.Members.FindByEmailAsync(email, ct);
@@ -127,8 +133,11 @@ public static class MomentsPublic
                 ctx.Log("Konto für Gast " + g.Id + " konnte nicht angelegt werden: " + invited.Status);
                 return LoginPage(ctx, "Die Anmeldung hat gerade nicht geklappt. Bitte versucht es gleich noch einmal.", back);
             }
-            await store.Guests.UpdateAsync(g.Id, new Dictionary<string, object?> { ["member_id"] = account.Id, ["account"] = email }, ct);
         }
+        // always (cheap): binds this household and frees the number from any other one that still holds it
+        if (g.MemberId != account.Id || !string.Equals(g.Account, account.Email, StringComparison.OrdinalIgnoreCase)
+            || (await store.GuestsWithMemberAsync(account.Id, ct)).Count > 1)
+            await store.BindAsync(g.Id, account.Id, account.Email, ct);
         try { await ctx.Members.SignInAsync(account, persistent: true, ct); }
         catch (InvalidOperationException ex)
         {

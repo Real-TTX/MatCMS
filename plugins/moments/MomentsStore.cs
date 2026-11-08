@@ -109,8 +109,27 @@ public sealed class MomentsStore(IPluginData data)
     public async Task<Guest?> GuestAsync(long id, CancellationToken ct = default) => id > 0 && await Guests.GetAsync(id, ct) is DataRow r ? G(r) : null;
     public async Task<Guest?> GuestByCodeAsync(string code, CancellationToken ct = default) =>
         code.Length == 0 ? null : await Guests.FindAsync(DataQuery.Everything.Eq("code", code), ct) is DataRow r ? G(r) : null;
-    public async Task<Guest?> GuestOfMemberAsync(long memberId, CancellationToken ct = default) =>
-        memberId <= 0 ? null : await Guests.FindAsync(DataQuery.Everything.Eq("member_id", memberId), ct) is DataRow r ? G(r) : null;
+    /// <summary>
+    /// The household this site account belongs to: the account's number AND its own address (<see cref="Guest.Account"/>) must match. The number
+    /// alone is not enough — backups carry no accounts, so after a restore into another site a household still holds the number of its old account,
+    /// and the next account made there may get that very number: by the number alone a guest then opened ANOTHER household's area (it happened).
+    /// </summary>
+    public async Task<Guest?> GuestOfMemberAsync(long memberId, string email, CancellationToken ct = default) =>
+        memberId <= 0 || string.IsNullOrEmpty(email) ? null
+            : (await GuestsWithMemberAsync(memberId, ct)).FirstOrDefault(g => g.Account.Length > 0 && string.Equals(g.Account, email, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Every household that holds this account number — the right one and stale ones.</summary>
+    public async Task<IReadOnlyList<Guest>> GuestsWithMemberAsync(long memberId, CancellationToken ct = default) =>
+        memberId <= 0 ? Array.Empty<Guest>() : (await Guests.QueryAsync(DataQuery.Everything.Eq("member_id", memberId), ct)).Select(G).ToList();
+
+    /// <summary>Binds the household to its account, and takes the number away from any other household that still holds it (a stale one). The others
+    /// keep their own account address: their next sign-in finds their own account by it, or makes a new one.</summary>
+    public async Task BindAsync(long guestId, long memberId, string email, CancellationToken ct = default)
+    {
+        foreach (var other in (await GuestsWithMemberAsync(memberId, ct)).Where(x => x.Id != guestId))
+            await Guests.UpdateAsync(other.Id, new Dictionary<string, object?> { ["member_id"] = 0 }, ct);
+        await Guests.UpdateAsync(guestId, new Dictionary<string, object?> { ["member_id"] = memberId, ["account"] = email }, ct);
+    }
 
     /// <summary>The household with this user name, compared without case (a party has a few dozen households — read in memory).</summary>
     public async Task<Guest?> GuestByLoginAsync(string login, CancellationToken ct = default) =>

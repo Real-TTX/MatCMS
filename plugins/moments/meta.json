@@ -1,6 +1,6 @@
 {
   "Key": "moments",
   "Name": "Moments",
-  "Version": "1.3",
+  "Version": "1.4",
   "Description": "Gästebereich für private Veranstaltungen (Hochzeit, Geburtstag, Jubiläum): jeder Haushalt bekommt einen persönlichen Zugang – Code mit Link und QR-Code oder Benutzername und Passwort, ohne E-Mail –, wird mit Namen begrüßt und sieht die Fotos vom Fest – geordnet in Alben (Fotograf, Gästebilder, Fotobox …), beim Scrollen nachgeladen. Gäste laden ihre eigenen Bilder direkt vom Handy hoch; sie erscheinen erst nach der Freigabe. Stichworte und Personen markieren, Herzen und Kommentare, Highlights, Download der Originale (Standortdaten entfernt). Freigabe und Moderation im Admin, Zugangskarten zum Ausdrucken, einzeln als Bild oder PDF oder per WhatsApp. Natives Plugin (braucht „Native Plugins erlauben“)."
 }

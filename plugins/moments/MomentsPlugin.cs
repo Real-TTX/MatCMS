@@ -38,15 +38,21 @@ public sealed class MomentsPlugin : IPlugin
             }
         }, AccessBlockAsync);
 
-        // An account deleted elsewhere (Admin → Mitglieder): the household keeps its code and gets a new account at its next sign-in.
+        // An account deleted elsewhere (Admin → Mitglieder): the household keeps its code and gets a new account at its next sign-in. Every household
+        // that still held the number lets go of it (a stale one from a restore included).
         b.On(HostEvents.MemberErase, async (ctx, payload) =>
         {
             var id = IdOf(payload);
             if (id <= 0) return;
             var store = new MomentsStore(ctx.Data);
-            if (await store.GuestOfMemberAsync(id, default) is Guest g)
+            foreach (var g in await store.GuestsWithMemberAsync(id, default))
                 await store.Guests.UpdateAsync(g.Id, new Dictionary<string, object?> { ["member_id"] = 0, ["account"] = "" }, default);
         });
+
+        // A backup carries no accounts: restored into another site, households still hold the numbers of their old accounts, and a new account there
+        // may get one of them. On every start, a household whose number names no account, or an account with another address, lets go of it — its next
+        // sign-in finds its own account by the address, or makes one.
+        b.Lifecycle.OnLoad(ReleaseStaleAccountsAsync);
         b.On(HostEvents.MemberExport, ExportAsync);
     }
 
@@ -58,6 +64,24 @@ public sealed class MomentsPlugin : IPlugin
 
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     private static bool PreviewOf(IPluginContext ctx) => ctx.IsEditorPreview;
+
+    internal static async Task ReleaseStaleAccountsAsync(IPluginContext ctx)
+    {
+        try
+        {
+            var store = new MomentsStore(ctx.Data);
+            var released = 0;
+            foreach (var g in (await store.GuestsAsync()).Where(g => g.MemberId > 0))
+            {
+                var account = await ctx.Members.FindAsync(g.MemberId);
+                if (account is not null && g.Account.Length > 0 && string.Equals(account.Email, g.Account, StringComparison.OrdinalIgnoreCase)) continue;
+                await store.Guests.UpdateAsync(g.Id, new Dictionary<string, object?> { ["member_id"] = 0 });
+                released++;
+            }
+            if (released > 0) ctx.Log(released + (released == 1 ? " Haushalt hatte" : " Haushalte hatten") + " eine Kontonummer, die nicht (mehr) zu ihm gehört – gelöst.");
+        }
+        catch (Exception ex) { ctx.Log("Kontenabgleich beim Start nicht möglich: " + ex.Message); }
+    }
 
     private static long IdOf(JsonNode? payload) => payload?["id"] is JsonValue v && v.TryGetValue<long>(out var id) ? id : 0;
 
@@ -95,7 +119,7 @@ public sealed class MomentsPlugin : IPlugin
         var id = IdOf(payload);
         if (id <= 0) return null;
         var store = new MomentsStore(ctx.Data);
-        if (await store.GuestOfMemberAsync(id, ct) is not Guest g) return null;
+        if (await ctx.Members.FindAsync(id, ct) is not MemberAccount account || await store.GuestOfMemberAsync(id, account.Email, ct) is not Guest g) return null;
         var photos = new JsonArray();
         foreach (var p in await store.PhotosOfGuestAsync(g.Id, ct)) photos.Add(new JsonObject { ["file"] = p.FileName, ["caption"] = p.Caption, ["taken"] = p.Taken, ["status"] = p.Status, ["at"] = p.Created?.ToString("o") });
         var comments = new JsonArray();
@@ -122,7 +146,7 @@ public static class MomentsMenu
     public static void Configure(IPluginBuilder b) => b.Menu(async (ctx, menu, ct) =>
     {
         if (menu != "header" || ctx.Member is null) return Array.Empty<MenuEntry>();
-        var g = await new MomentsStore(ctx.Data).GuestOfMemberAsync(ctx.Member.Id, ct);
+        var g = await new MomentsStore(ctx.Data).GuestOfMemberAsync(ctx.Member.Id, ctx.Member.Email, ct);
         if (g is null || !g.Active) return Array.Empty<MenuEntry>();
         const string B = MomentsPublic.Base;
         var children = new List<MenuEntry> { new("Alle Fotos", B) { Icon = "photo", Order = 1 } };

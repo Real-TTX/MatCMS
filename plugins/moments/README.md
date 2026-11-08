@@ -56,6 +56,11 @@ Paket: `./pack-native.ps1 -Path ./moments` → `dist/moments-<version>.zip`. Lä
   `ctx.Member` wie überall.
 - **Der QR-Code** wird mit der Kamera-App des Handys gelesen, nicht von der Seite – die Anmeldeseite sagt das unter dem Code-Feld,
   sonst sucht man dort einen Scan-Knopf.
+- **Haushalt und Konto gehören über Nummer UND Adresse zusammen** (1.4). Ein Backup trägt keine Konten: in einer anderen Instanz
+  wiederhergestellt, hielten Haushalte noch die Nummer ihres alten Kontos, und das erste dort neu angelegte Konto bekam genau so eine
+  Nummer – ein Gast landete im Bereich eines ANDEREN Haushalts. Jetzt zählt ein Konto nur, wenn auch seine Adresse (`gast-…@moments.invalid`)
+  zum Haushalt passt; beim Anmelden wird die Nummer bei allen anderen Haushalten gelöst, und beim Start lässt jeder Haushalt eine Nummer
+  los, die auf kein oder ein fremdes Konto zeigt (`MomentsPlugin.ReleaseStaleAccountsAsync`).
 - **„Neuer Code“ löscht auch das Konto** (ebenso ein von Hand geänderter Code oder ein neues Passwort): der alte Link gilt nicht mehr UND jedes damit angemeldete Gerät ist draußen (ein neues
   Konto entsteht beim nächsten Anmelden). Wird ein Konto anderswo gelöscht (Admin → Mitglieder), bleibt der Haushalt mit seinem Code
   und bekommt beim nächsten Anmelden ein neues.

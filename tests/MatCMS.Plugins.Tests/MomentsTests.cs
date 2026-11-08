@@ -389,6 +389,44 @@ public class MomentsTests : IClassFixture<MomentsApp>
         Assert.Contains("Kamera eures Handys", Text(await _app.App.Browser().GetStringAsync("/moments")));
     }
 
+    private long MemberOf(long guestId) =>
+        _app.Db(db => db.Database.SqlQueryRaw<long>("select member_id as Value from p_moments_guests where id = {0}", guestId).AsEnumerable().Single());
+
+    [Fact]
+    public async Task A_stale_account_number_never_opens_another_households_area()
+    {
+        // B first, so B has the lower id — the household whose stale number used to win the lookup
+        var (bId, bCode) = await GuestAsync("Sophie & Ben", "Sophie, Ben");
+        var (_, aCode) = await GuestAsync("Tobias Lang", "Tobias");
+        var a = await SignedInAsync(aCode);
+        var aGuest = _app.Db(db => db.Database.SqlQueryRaw<long>("select id as Value from p_moments_guests where name = 'Tobias Lang'").AsEnumerable().Single());
+        var aMember = MemberOf(aGuest);
+        Assert.True(aMember > 0);
+
+        // as after a restore into another site (backups carry no accounts): B still holds a number — the one A's new account got here — and the
+        // address of its old account
+        _app.Db(db => db.Database.ExecuteSqlRaw("update p_moments_guests set member_id = {0}, account = 'gast-alt0001@moments.invalid' where id = {1}", aMember, bId));
+        var page = Text(await a.GetStringAsync("/moments"));
+        Assert.Contains("Hallo Tobias Lang!", page);
+        Assert.DoesNotContain("Sophie & Ben", page);
+
+        // B signs in with its code: an account of its own, never A's — and A stays A
+        var b = await SignedInAsync(bCode);
+        Assert.Contains("Willkommen, Sophie & Ben!", Text(await b.GetStringAsync("/moments?willkommen=1")));
+        Assert.NotEqual(aMember, MemberOf(bId));
+        Assert.Contains("Hallo Tobias Lang!", Text(await a.GetStringAsync("/moments")));
+
+        // on start, a number that names no account (or another household's) is let go
+        _app.Db(db => db.Database.ExecuteSqlRaw("update p_moments_guests set member_id = {0} where id = {1}", aMember, bId));
+        using (var scope = _app.App.Services.CreateScope())
+        {
+            var plugin = scope.ServiceProvider.GetRequiredService<AppDbContext>().Plugins.Single(p => p.Key == "moments");
+            await scope.ServiceProvider.GetRequiredService<PluginRunner>().ReloadAsync(plugin.Id);
+        }
+        Assert.Equal(0, MemberOf(bId));
+        Assert.Equal(aMember, MemberOf(aGuest));
+    }
+
     /// <summary>Tiles per part of the gallery stream (MomentsPublic.PageSize — the plugin is loaded as a file here, not referenced).</summary>
     private const int StreamPart = 48;
 

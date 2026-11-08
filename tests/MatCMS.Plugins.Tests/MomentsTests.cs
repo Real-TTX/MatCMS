@@ -147,7 +147,7 @@ public class MomentsTests : IClassFixture<MomentsApp>
     }
 
     /// <summary>Uploads a photo as the page's script does without a view (ajax, one file) and answers the JSON.</summary>
-    private static async Task<JsonObject> UploadAsync(HttpClient c, byte[] jpeg, string name = "IMG_0001.jpg", byte[]? view = null)
+    private static async Task<JsonObject> UploadAsync(HttpClient c, byte[] jpeg, string name = "IMG_0001.jpg", byte[]? view = null, long album = -1)
     {
         var page = await c.GetStringAsync("/moments/hochladen");
         Assert.Contains("data-mo-up", page);
@@ -156,6 +156,7 @@ public class MomentsTests : IClassFixture<MomentsApp>
             { new StringContent(AppFactory.Token(page)!), "__RequestVerificationToken" }, { new StringContent("upload"), "action" }, { new StringContent("1"), "ajax" },
             { new ByteArrayContent(jpeg), "file", name }
         };
+        if (album >= 0) form.Add(new StringContent(album.ToString()), "album");
         if (view is not null)
         {
             form.Add(new ByteArrayContent(view), "view", "view.jpg");
@@ -386,6 +387,72 @@ public class MomentsTests : IClassFixture<MomentsApp>
         Assert.True(header.IndexOf("href=\"/moments/abmelden\"", StringComparison.Ordinal) > subEnd);
         // the code form says how the card's QR code works — with the phone's own camera, not on this page
         Assert.Contains("Kamera eures Handys", Text(await _app.App.Browser().GetStringAsync("/moments")));
+    }
+
+    /// <summary>Tiles per part of the gallery stream (MomentsPublic.PageSize — the plugin is loaded as a file here, not referenced).</summary>
+    private const int StreamPart = 48;
+
+    private long AlbumId(string name) =>
+        _app.Db(db => db.Database.SqlQueryRaw<long>("select id as Value from p_moments_albums where name = {0}", name).AsEnumerable().Single());
+
+    [Fact]
+    public async Task Albums_come_first_guests_land_in_theirs_and_the_stream_loads_while_scrolling()
+    {
+        var admin = await _app.AdminAsync();
+        var ids = new List<long>();
+        try
+        {
+            Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(admin, "/admin/p/moments/albums", new Dictionary<string, string> { ["action"] = "add", ["name"] = "Fotograf" })).StatusCode);
+            await PostFormAsync(admin, "/admin/p/moments/albums", new Dictionary<string, string> { ["action"] = "add", ["name"] = "Gästebilder", ["guests"] = "true" });
+            long photographer = AlbumId("Fotograf"), guestsAlbum = AlbumId("Gästebilder");
+
+            // the hosts upload into the album they choose — released at once; a guest's photo lands in the guests' album by itself
+            for (var i = 0; i < StreamPart + 1; i++)
+            {
+                var up = await UploadAsync(admin, Jpeg(), "DSC_" + i + ".jpg", album: photographer);
+                Assert.True(up["ok"]!.GetValue<bool>(), up.ToJsonString());
+                ids.Add(LastPhoto());
+            }
+            Assert.Equal(photographer, _app.Db(db => db.Database.SqlQueryRaw<long>("select album_id as Value from p_moments_photos where id = {0}", ids[0]).AsEnumerable().Single()));
+            var (_, code) = await GuestAsync("Anja & Holger", "Anja, Holger");
+            var guest = await SignedInAsync(code);
+            await UploadAsync(guest, Jpeg(), "gast.jpg", album: photographer);   // a guest cannot choose
+            var guestPhoto = LastPhoto();
+            ids.Add(guestPhoto);
+            Assert.Equal(guestsAlbum, _app.Db(db => db.Database.SqlQueryRaw<long>("select album_id as Value from p_moments_photos where id = {0}", guestPhoto).AsEnumerable().Single()));
+            await PostFormAsync(admin, "/admin/p/moments/review", new Dictionary<string, string> { ["action"] = "approve", ["id"] = guestPhoto.ToString() });
+
+            // the start page: the albums in the hosts' order, then "Alle Fotos" — no stream of photos
+            var start = await guest.GetStringAsync("/moments");
+            var pos = (string a) => start.IndexOf("href=\"/moments?album=" + a + "\"", StringComparison.Ordinal);
+            Assert.True(pos(photographer.ToString()) > 0 && pos(photographer.ToString()) < pos(guestsAlbum.ToString()), "albums not in order");
+            Assert.Contains("href=\"/moments?alle=1\"", start);
+            Assert.DoesNotContain("data-mo-grid", start);
+            await PostFormAsync(admin, "/admin/p/moments/albums", new Dictionary<string, string> { ["action"] = "up", ["id"] = guestsAlbum.ToString() });
+            start = await guest.GetStringAsync("/moments");
+            Assert.True(pos(guestsAlbum.ToString()) < pos(photographer.ToString()), "moving up did not change the order");
+
+            // one album: its photos only, the first part now, the rest while scrolling
+            var album = await guest.GetStringAsync("/moments?album=" + photographer);
+            Assert.DoesNotContain("/moments/foto/" + guestPhoto + "?", album);
+            Assert.Equal(StreamPart, System.Text.RegularExpressions.Regex.Matches(album, "class=\"mo-tile\"").Count);
+            var more = System.Text.RegularExpressions.Regex.Match(album, "data-mo-more=\"([^\"]+)\"");
+            Assert.True(more.Success, "no stream marker");
+            var next = WebUtility.HtmlDecode(more.Groups[1].Value);
+            Assert.Contains("teil=1", next);
+            var part = JsonNode.Parse(await guest.GetStringAsync(next))!;
+            Assert.Single(System.Text.RegularExpressions.Regex.Matches(part["html"]!.GetValue<string>(), "class=\"mo-tile\""));
+            Assert.DoesNotContain("mo-hour", part["html"]!.GetValue<string>());   // the same hour goes on, no second heading
+            Assert.Equal("", part["next"]!.GetValue<string>());
+            // the photo page names its album and steps inside it
+            Assert.Contains("?album=" + photographer, await guest.GetStringAsync("/moments/foto/" + ids[0] + "?album=" + photographer));
+        }
+        finally
+        {
+            // leave the shared app as the other tests expect it: no albums, none of these photos
+            foreach (var id in ids) _app.Db(db => db.Database.ExecuteSqlRaw("delete from p_moments_photos where id = {0}", id));
+            _app.Db(db => db.Database.ExecuteSqlRaw("delete from p_moments_albums"));
+        }
     }
 
     /// <summary>Saves the sign-in settings (Admin → Moments → Einstellungen → Anmeldung).</summary>

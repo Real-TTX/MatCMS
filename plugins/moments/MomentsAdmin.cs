@@ -19,6 +19,8 @@ public static class MomentsAdmin
             .Page("review", null, ReviewAsync)
             .Page("photos", null, PhotosAsync)
             .Page("photos/{id}", null, PhotoAsync)
+            .Page("albums", null, AlbumsAsync)
+            .Page("albums/{id}", null, AlbumAsync)
             .Page("comments", null, CommentsAsync)
             .Page("guests", null, GuestsAsync)
             .Page("guests/{id}", null, GuestAsync)
@@ -27,6 +29,7 @@ public static class MomentsAdmin
             .Link("Übersicht", "overview", "ti-layout-dashboard")
             .Link("Freigabe", "review", "ti-checks", badge: true)
             .Link("Fotos", "photos", "ti-photo", also: new[] { "photos/" })
+            .Link("Alben", "albums", "ti-album", also: new[] { "albums/" })
             .Link("Kommentare", "comments", "ti-message-circle")
             .Link("Gäste", "guests", "ti-users", also: new[] { "guests/" })
             .Link("Personen & Stichworte", "tags", "ti-tags", also: new[] { "tags/" })
@@ -109,6 +112,7 @@ public static class MomentsAdmin
             Ui.PageHead(MomentsSettings.Event(ctx), "Moments",
                 Ui.Button("Gästebereich öffnen", B, UiButtonKind.Ghost, "ti-external-link") with { NewTab = true },
                 Ui.Button("Fotos hochladen", B + "/hochladen", UiButtonKind.Primary, "ti-camera-plus") with { NewTab = true }),
+            (await store.AlbumsAsync(ct)).Count == 0 ? Ui.Alert("Tipp: Mit Alben bekommt die Galerie Struktur – z. B. „Fotograf“, „Gästebilder“, „Fotobox“. Die Galerie zeigt sie zuerst, in eurer Reihenfolge; Fotos der Gäste landen automatisch in eurem Gäste-Album. Admin → Moments → Alben.", UiTone.Info) : null,
             guests.Count == 0 ? Ui.Alert("Legt zuerst die Gäste an: jeder Haushalt bekommt einen persönlichen Zugangscode (mit Link und QR-Code für die Karte). Ohne Code kommt niemand in den Gästebereich.", UiTone.Info) : null,
             Ui.Stats(
                 Ui.Stat("Fotos", M.N(photos.Count(p => p.Approved)), M.Plural(photos.Count(p => p.Featured), "Highlight", "Highlights"), href: Root + "photos"),
@@ -167,16 +171,19 @@ public static class MomentsAdmin
             ("wartet", "Warten", p => p.Pending), ("ausgeblendet", "Ausgeblendet", p => p.Status == MomentsStore.Hidden)
         };
         var tab = tabs.FirstOrDefault(t => t.Key == status) is { Label: not null } found ? found : tabs[0];
+        var albums = (await store.AlbumsAsync(ct)).ToDictionary(a => a.Id);
+        string AlbumOf(Photo p) => albums.TryGetValue(p.AlbumId, out var a) ? a.Name : "";
         var list = all.Where(tab.Fits).OrderByDescending(p => p.Created).ToList();
         return PluginResult.Page(Ui.Stack(
             Ui.PageHead("Alle Fotos im Gästebereich – ausblenden, als Highlight markieren, Personen und Stichworte setzen", "Fotos",
                 Ui.Button("Fotos hochladen", B + "/hochladen", UiButtonKind.Primary, "ti-camera-plus") with { NewTab = true }),
             Ui.Tabs(tabs.Select(t => Ui.Tab(t.Label + " (" + all.Count(t.Fits) + ")", Root + "photos" + (t.Key.Length > 0 ? "?status=" + t.Key : ""), t.Key == tab.Key)).ToArray()),
-            Ui.Table(new[] { Ui.Column(""), Ui.Column("Foto"), Ui.Column("Von"), NotOnPhone(Ui.Column("Aufgenommen")), NotOnPhone(Ui.Column("Reaktionen")), Ui.Column("Status"), Ui.Column("", actions: true) },
-                list.Select(p => Ui.RowFor(p.Caption + " " + p.FileName + " " + MomentsPublic.AuthorName(ctx, p.GuestId, guests),
+            Ui.Table(new[] { Ui.Column(""), Ui.Column("Foto"), Ui.Column("Von"), NotOnPhone(Ui.Column("Album")), NotOnPhone(Ui.Column("Aufgenommen")), NotOnPhone(Ui.Column("Reaktionen")), Ui.Column("Status"), Ui.Column("", actions: true) },
+                list.Select(p => Ui.RowFor(p.Caption + " " + p.FileName + " " + MomentsPublic.AuthorName(ctx, p.GuestId, guests) + " " + AlbumOf(p),
                     Ui.Img(Thumb(p.Id), p.FileName, 56),
                     Ui.Link(Short(p.Caption.Length > 0 ? p.Caption : p.FileName.Length > 0 ? p.FileName : "Foto " + p.Id), Root + "photos/" + p.Id),
                     MomentsPublic.AuthorName(ctx, p.GuestId, guests),
+                    AlbumOf(p) is { Length: > 0 } an ? an : "–",
                     M.Taken(p.Taken),
                     (hearts.TryGetValue(p.Id, out var h) ? h.Count : 0) + " ♥ · " + (comments.TryGetValue(p.Id, out var c) ? c : 0) + " Kommentare",
                     StatusBadge(p),
@@ -213,7 +220,8 @@ public static class MomentsAdmin
             var status = ctx.Request.F("status") is MomentsStore.Approved or MomentsStore.Pending or MomentsStore.Hidden ? ctx.Request.F("status") : p.Status;
             await store.Photos.UpdateAsync(p.Id, new Dictionary<string, object?>
             {
-                ["caption"] = M.Line(ctx.Request.F("caption"), 200), ["taken"] = taken, ["featured"] = ctx.Request.F("featured") is "true" or "on" or "1"
+                ["caption"] = M.Line(ctx.Request.F("caption"), 200), ["taken"] = taken, ["featured"] = ctx.Request.F("featured") is "true" or "on" or "1",
+                ["album_id"] = long.TryParse(ctx.Request.F("album"), NumberStyles.None, CultureInfo.InvariantCulture, out var al) && (al == 0 || await store.AlbumAsync(al, ct) is not null) ? al : p.AlbumId
             }, ct);
             if (status != p.Status) await store.SetStatusAsync(p with { }, status, ct);
             await SaveMarksAsync(store, p.Id, ctx.Request.F("tags"), guestList, ct);
@@ -229,6 +237,8 @@ public static class MomentsAdmin
         var comments = await store.CommentsOfPhotoAsync(p.Id, ct);
         var hearts = (await store.HeartsAsync(ct)).TryGetValue(p.Id, out var h) ? h : new List<long>();
         var takenValue = M.TryTaken(p.Taken, out var td) ? td.ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture) : "";
+        var albumOptions = new List<UiOption> { Ui.Option("0", "kein Album") };
+        albumOptions.AddRange((await store.AlbumsAsync(ct)).Select(a => Ui.Option(M.N(a.Id), a.Name)));
         return PluginResult.Page(Ui.Stack(
             Ui.PageHead(MomentsPublic.AuthorName(ctx, p.GuestId, guests) + " · " + M.Taken(p.Taken), p.Caption.Length > 0 ? p.Caption : "Foto " + p.Id,
                 Ui.Button("Im Gästebereich ansehen", B + "/foto/" + p.Id, UiButtonKind.Ghost, "ti-external-link") with { NewTab = true }),
@@ -239,6 +249,7 @@ public static class MomentsAdmin
                     Ui.Card("Angaben", Ui.Form(
                         Ui.Hidden("action", "save"),
                         Ui.Input("caption", "Bildunterschrift", p.Caption) with { MaxLength = 200 },
+                        Ui.Select("album", "Album", M.N(p.AlbumId), albumOptions.ToArray()),
                         Ui.Tags("tags", "Personen & Stichworte", string.Join(", ", marks), suggestions) with { Help = "Namen aus der Gästeliste werden als Person markiert, alles andere als Stichwort." },
                         Ui.Grid(220,
                             Ui.Input("taken", "Aufgenommen", takenValue, UiInputType.DateTime) with { Help = "Bestimmt die Reihenfolge in der chronologischen Galerie." },
@@ -321,6 +332,135 @@ public static class MomentsAdmin
                         Act("Löschen", Do("delete", x.Id), UiButtonKind.Danger, "Kommentar löschen?", "ti-trash")))),
                 searchPlaceholder: "Kommentare durchsuchen …", pageSize: 50, emptyText: "Keine Kommentare.")
         ), "Kommentare");
+    }
+
+    // ---- albums -------------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// The albums: where photos come from ("Fotograf", "Gästebilder", "Fotobox") in the order the gallery shows them; one of them takes the guests'
+    /// uploads by itself.
+    /// </summary>
+    private static async Task<PluginResult> AlbumsAsync(IPluginContext ctx, CancellationToken ct)
+    {
+        var store = new MomentsStore(ctx.Data);
+        if (ctx.Request.IsPost)
+        {
+            var id = long.TryParse(ctx.Request.F("id"), NumberStyles.None, CultureInfo.InvariantCulture, out var x) ? x : 0;
+            switch (ctx.Request.Action)
+            {
+                case "add":
+                {
+                    var name = M.Line(ctx.Request.F("name"), 60);
+                    if (name.Length == 0) return PluginResult.Redirect(Root + "albums", "Bitte einen Namen eingeben.", true);
+                    if ((await store.AlbumsAsync(ct)).Any(a => string.Equals(a.Name, name, StringComparison.OrdinalIgnoreCase)))
+                        return PluginResult.Redirect(Root + "albums", "Ein Album mit diesem Namen gibt es schon.", true);
+                    var created = await store.AddAlbumAsync(name, ct);
+                    var taken = ctx.Request.F("guests") is "true" or "on" or "1" ? await store.SetGuestAlbumAsync(created, ct) : 0;
+                    return PluginResult.Redirect(Root + "albums", "„" + name + "“ angelegt." + (taken > 0 ? " " + M.Plural(taken, "Gästefoto", "Gästefotos") + " übernommen." : ""));
+                }
+                case "up" or "down" when id > 0:
+                    await store.MoveAlbumAsync(id, ctx.Request.Action == "up" ? -1 : 1, ct);
+                    return PluginResult.Redirect(Root + "albums");
+                case "guests" when id > 0:
+                {
+                    var taken = await store.SetGuestAlbumAsync(id, ct);
+                    return PluginResult.Redirect(Root + "albums", "Fotos der Gäste landen jetzt hier." + (taken > 0 ? " " + M.Plural(taken, "Gästefoto ohne Album wurde", "Gästefotos ohne Album wurden") + " übernommen." : ""));
+                }
+                case "noguests":
+                    await store.SetGuestAlbumAsync(0, ct);
+                    return PluginResult.Redirect(Root + "albums", "Fotos der Gäste landen jetzt in keinem Album.");
+            }
+        }
+        var albums = await store.AlbumsAsync(ct);
+        var photos = await store.PhotosAsync(ct: ct);
+        var count = photos.GroupBy(p => p.AlbumId).ToDictionary(g => g.Key, g => g.Count());
+        var loose = count.TryGetValue(0, out var n0) ? n0 : 0;
+        return PluginResult.Page(Ui.Stack(
+            Ui.PageHead("Die Galerie zeigt die Alben zuerst – in dieser Reihenfolge. Jedes Foto ist in einem Album.", "Alben",
+                Ui.Button("Fotos hochladen", B + "/hochladen", UiButtonKind.Primary, "ti-camera-plus") with { NewTab = true }),
+            Ui.Table(new[] { Ui.Column("Album"), Ui.Column("Fotos", right: true), Ui.Column("Gästefotos"), Ui.Column("", actions: true) },
+                albums.Select((a, i) => Ui.Row(
+                    Ui.Link(a.Name, Root + "albums/" + a.Id),
+                    count.TryGetValue(a.Id, out var n) ? M.N(n) : "0",
+                    a.Guests ? Ui.Badge("landen hier", UiTone.Success) : (object)"–",
+                    Ui.Inline(
+                        i > 0 ? Act("Nach oben", Do("up", a.Id), icon: "ti-arrow-up") : null,
+                        i < albums.Count - 1 ? Act("Nach unten", Do("down", a.Id), icon: "ti-arrow-down") : null,
+                        a.Guests ? null : Act("Gäste-Album", Do("guests", a.Id), icon: "ti-users", confirm: "Sollen die Fotos der Gäste ab jetzt in „" + a.Name + "“ landen? Gästefotos ohne Album kommen gleich mit."),
+                        Ui.Button("Bearbeiten", Root + "albums/" + a.Id, UiButtonKind.Ghost, "ti-pencil")))),
+                emptyText: "Noch keine Alben – ohne Alben zeigt die Galerie alle Fotos in einem Strom."),
+            loose > 0 && albums.Count > 0 ? Ui.Muted(M.Plural(loose, "Foto ist", "Fotos sind") + " in keinem Album – sie stehen nur unter „Alle Fotos“. Zuordnen: beim Foto (Fotos → Foto) oder im Album „Fotos ohne Album übernehmen“.") : null,
+            albums.Any(a => a.Guests) ? Ui.Inline(Act("Gästefotos in kein Album", new Dictionary<string, string> { ["action"] = "noguests" }, icon: "ti-users-minus")) : null,
+            Ui.Card("Neues Album", Ui.Form(
+                Ui.Hidden("action", "add"),
+                Ui.Input("name", "Name", "") with { Required = true, MaxLength = 60, Placeholder = "z. B. Fotograf, Gästebilder, Fotobox" },
+                Ui.Checkbox("guests", "Fotos der Gäste landen hier (beim Hochladen von selbst)", albums.Count > 0 && !albums.Any(a => a.Guests)),
+                Ui.FormActions(Ui.Submit("Anlegen"))))
+        ), "Alben");
+    }
+
+    private static async Task<PluginResult> AlbumAsync(IPluginContext ctx, CancellationToken ct)
+    {
+        var store = new MomentsStore(ctx.Data);
+        if (await store.AlbumAsync(Id(ctx), ct) is not Album a) return PluginResult.NotFound();
+        var here = Root + "albums/" + a.Id;
+        if (ctx.Request.IsPost)
+        {
+            switch (ctx.Request.Action)
+            {
+                case "save":
+                {
+                    var name = M.Line(ctx.Request.F("name"), 60);
+                    if (name.Length == 0) return PluginResult.Redirect(here, "Bitte einen Namen eingeben.", true);
+                    if ((await store.AlbumsAsync(ct)).Any(o => o.Id != a.Id && string.Equals(o.Name, name, StringComparison.OrdinalIgnoreCase)))
+                        return PluginResult.Redirect(here, "Ein Album mit diesem Namen gibt es schon.", true);
+                    await store.Albums.UpdateAsync(a.Id, new Dictionary<string, object?> { ["name"] = name }, ct);
+                    return PluginResult.Redirect(here, "Gespeichert.");
+                }
+                case "adopt":
+                {
+                    // the photos that are in no album yet — all of them, or only the hosts' or only the guests'
+                    var who = ctx.Request.F("who");
+                    var adopt = (await store.PhotosAsync(ct: ct)).Where(p => p.AlbumId == 0 && (who == "gaeste" ? p.GuestId > 0 : who == "gastgeber" ? p.GuestId == 0 : true)).ToList();
+                    foreach (var p in adopt) await store.Photos.UpdateAsync(p.Id, new Dictionary<string, object?> { ["album_id"] = a.Id }, ct);
+                    return PluginResult.Redirect(here, M.Plural(adopt.Count, "Foto", "Fotos") + " übernommen.");
+                }
+                case "delete":
+                    await store.DeleteAlbumAsync(a.Id, ct);
+                    return PluginResult.Redirect(Root + "albums", "„" + a.Name + "“ ist gelöscht. Die Fotos sind noch da (in keinem Album).");
+            }
+        }
+        var photos = await store.PhotosAsync(ct: ct);
+        var mine = photos.Where(p => p.AlbumId == a.Id).OrderBy(p => p.Taken, StringComparer.Ordinal).ToList();
+        var loose = photos.Where(p => p.AlbumId == 0).ToList();
+        return PluginResult.Page(Ui.Stack(
+            Ui.PageHead(M.Plural(mine.Count, "Foto", "Fotos") + (a.Guests ? " · hier landen die Fotos der Gäste" : ""), a.Name,
+                Ui.Button("In der Galerie ansehen", B + "?album=" + a.Id, UiButtonKind.Ghost, "ti-external-link") with { NewTab = true },
+                Ui.Button("Fotos hierher hochladen", B + "/hochladen?album=" + a.Id, UiButtonKind.Primary, "ti-camera-plus") with { NewTab = true }),
+            Ui.Columns(
+                new UiNode?[]
+                {
+                    Ui.Card("Album", Ui.Form(
+                        Ui.Hidden("action", "save"),
+                        Ui.Input("name", "Name", a.Name) with { Required = true, MaxLength = 60 },
+                        Ui.FormActions(Ui.Submit("Speichern")))),
+                    Ui.Card("Fotos (" + mine.Count + ")", mine.Count == 0 ? Ui.Muted("Noch keine.") :
+                        Ui.Grid(90, mine.Take(24).Select(p => (UiNode?)Ui.Img(Thumb(p.Id), p.FileName, 90)).ToArray()))
+                },
+                new UiNode?[]
+                {
+                    loose.Count == 0 ? null : Ui.Card("Fotos ohne Album (" + loose.Count + ")",
+                        Ui.Muted("Fotos, die in keinem Album sind, hierher holen."),
+                        Ui.Inline(
+                            Act("Alle " + loose.Count + " übernehmen", new Dictionary<string, string> { ["action"] = "adopt", ["who"] = "" }, icon: "ti-arrow-bar-to-down"),
+                            loose.Any(p => p.GuestId > 0) && loose.Any(p => p.GuestId == 0)
+                                ? Act("Nur die der Gäste", new Dictionary<string, string> { ["action"] = "adopt", ["who"] = "gaeste" }, icon: "ti-users") : null,
+                            loose.Any(p => p.GuestId > 0) && loose.Any(p => p.GuestId == 0)
+                                ? Act("Nur eure", new Dictionary<string, string> { ["action"] = "adopt", ["who"] = "gastgeber" }, icon: "ti-heart") : null)),
+                    Ui.Card("Löschen", Ui.Muted("Das Album verschwindet, seine Fotos bleiben (in keinem Album, unter „Alle Fotos“)."),
+                        Act("Album löschen", new Dictionary<string, string> { ["action"] = "delete" }, UiButtonKind.Danger, "„" + a.Name + "“ löschen? Die Fotos bleiben.", "ti-trash"))
+                })
+        ), a.Name);
     }
 
     // ---- guests -------------------------------------------------------------------------------------------------

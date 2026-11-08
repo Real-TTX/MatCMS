@@ -52,6 +52,22 @@ public static class MomentsCss
 .mo .mo-strip{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(200px,240px);gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:6px}
 .mo .mo-strip .mo-tile{aspect-ratio:4/5;scroll-snap-align:start;border-radius:14px}
 
+/* the start page with albums: big cards in the hosts' order, then people and keywords */
+.mo .mo-section{margin:0 0 28px}.mo .mo-section > h2{font-size:1.15rem;margin:0 0 12px}
+.mo .mo-albums{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
+.mo .mo-album{display:block;border-radius:16px;overflow:hidden;background:#fff;border:1px solid var(--mo-line);color:inherit;text-decoration:none;box-shadow:0 6px 18px rgba(40,24,12,.06);transition:transform .2s,box-shadow .2s}
+.mo .mo-album:hover{transform:translateY(-2px);box-shadow:0 12px 26px rgba(40,24,12,.12)}
+.mo .mo-album-cover{display:grid;place-items:center;aspect-ratio:4/3;background:var(--mo-soft);overflow:hidden}
+.mo .mo-album-cover img{width:100%;height:100%;object-fit:cover;display:block}.mo .mo-album-cover .ti{font-size:44px;color:var(--mo-accent);opacity:.6}
+.mo .mo-album-text{display:grid;gap:2px;padding:12px 16px 14px}.mo .mo-album-text strong{font-size:1.08rem}.mo .mo-album-text small{color:var(--mo-muted);font-size:13px}
+.mo .mo-chiprow{display:flex;flex-wrap:wrap;gap:8px;margin:0}
+
+/* the stream: what is loaded while scrolling */
+.mo .mo-more{display:flex;justify-content:center;align-items:center;gap:10px;padding:26px 0;color:var(--mo-muted);font-size:14px}
+.mo .mo-more.mo-more-error{color:#8c1d18}
+.mo .mo-spin{width:18px;height:18px;border-radius:50%;border:2.5px solid var(--mo-line);border-top-color:var(--mo-accent);animation:mo-spin .8s linear infinite}
+@keyframes mo-spin{to{transform:rotate(360deg)}}
+
 /* the bar and the chips */
 .mo .mo-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap}
 .mo .mo-seg{display:inline-flex;border:1px solid var(--mo-line);border-radius:999px;padding:3px;background:#fff}
@@ -92,6 +108,7 @@ public static class MomentsCss
 .mo .mo-detail{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:28px;align-items:start}
 .mo .mo-by{display:flex;gap:12px;align-items:center;margin-bottom:12px}.mo .mo-by small{display:block;color:var(--mo-muted)}
 .mo .mo-caption{font-size:1.12rem;margin:0 0 14px}
+.mo .mo-in-album{margin:-4px 0 12px;color:var(--mo-muted);font-size:14px;display:flex;align-items:center;gap:6px}.mo .mo-in-album a{color:var(--mo-accent);font-weight:600;text-decoration:none}
 .mo .mo-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
 .mo .mo-inline{display:inline;margin:0}
 .mo .mo-heart{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:999px;border:1.5px solid var(--mo-line);background:#fff;font:inherit;font-weight:600;font-size:15px;cursor:pointer;color:inherit}
@@ -116,6 +133,8 @@ public static class MomentsCss
 /* upload */
 .mo .mo-card{padding:22px;border-radius:18px;background:#fff;border:1px solid var(--mo-line)}
 .mo .mo-upload form{display:grid;gap:14px}
+.mo .mo-album-pick{display:grid;gap:6px;font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--mo-muted)}
+.mo .mo-album-pick select{font:inherit;font-size:16px;letter-spacing:0;text-transform:none;font-weight:400;color:var(--mo-ink);padding:11px 14px;border-radius:12px;border:1.5px solid var(--mo-line);background:#fff}
 .mo .mo-drop{position:relative;display:grid;justify-items:center;gap:8px;padding:38px 16px;border:2px dashed color-mix(in srgb,var(--mo-accent) 45%,transparent);border-radius:18px;background:color-mix(in srgb,var(--mo-accent) 6%,#fff);cursor:pointer;text-align:center}
 .mo .mo-drop:hover{background:color-mix(in srgb,var(--mo-accent) 11%,#fff)}
 .mo .mo-drop input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
@@ -150,6 +169,9 @@ public static class MomentsCss
 @media (max-width:600px){
   .section.mo{padding-top:22px;padding-bottom:36px}
   .mo .mo-strip{grid-auto-columns:42vw;gap:8px}
+  .mo .mo-albums{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .mo .mo-album{border-radius:12px}.mo .mo-album-text{padding:9px 11px 11px}.mo .mo-album-text strong{font-size:.98rem}
+  .mo .mo-chiprow{flex-wrap:nowrap;overflow-x:auto;margin:0 -12px;padding:0 12px 4px;scrollbar-width:none}
   .mo .mo-head{align-items:center}
   .mo .mo-me{padding:3px}.mo .mo-me-name{display:none}
   .mo .mo-grid{grid-template-columns:repeat(3,1fr);gap:3px;margin:0 -12px}

@@ -25,7 +25,7 @@ function next(){if(busy||!queue.length){say();return;}busy=true;var it=queue.shi
 prepare(it.file).then(function(p){send(it,p);},function(){if(plain.test(it.file.type)&&(!max||it.file.size<=max))send(it,null);else fail(it,'Format geht nicht');});}
 function send(it,p){if(p){var img=new Image();img.alt='';img.src=URL.createObjectURL(p.thumb.blob);it.tile.insertBefore(img,it.tile.firstChild);}
 var fd=new FormData(),tok=f.querySelector('input[name=__RequestVerificationToken]');if(tok)fd.append(tok.name,tok.value);
-fd.append('action','upload');fd.append('ajax','1');fd.append('modified',String(it.file.lastModified||0));fd.append('name',it.file.name||'');
+fd.append('action','upload');fd.append('ajax','1');var al=f.querySelector('[data-mo-album]');if(al)fd.append('album',al.value);fd.append('modified',String(it.file.lastModified||0));fd.append('name',it.file.name||'');
 var orig=plain.test(it.file.type)&&(!max||it.file.size<=max);if(orig)fd.append('file',it.file,it.file.name||'foto.jpg');
 if(p){fd.append('view',p.view.blob,'view.jpg');fd.append('thumb',p.thumb.blob,'thumb.jpg');fd.append('w',String(p.view.w));fd.append('h',String(p.view.h));}
 var x=new XMLHttpRequest();x.open('POST',f.getAttribute('action'));
@@ -54,6 +54,25 @@ hb.innerHTML='<i class="ti ti-heart'+(r.on?'-filled':'')+'" aria-hidden="true"><
 var ok=new URLSearchParams(location.search).get('ok'),target={markiert:'mo-tags',entfernt:'mo-tags',kommentar:'mo-comments','kommentar-pruefung':'mo-comments','kommentar-weg':'mo-comments',text:'mo-info'}[ok||''];
 if(target){var el=document.getElementById(target);if(el)el.scrollIntoView({block:'start'});}
 if(ok&&history.replaceState){var u=new URL(location.href);u.searchParams.delete('ok');history.replaceState(null,'',u.pathname+u.search);}
+})();</script>
+""";
+
+    /// <summary>
+    /// The gallery's stream: when the visitor nears the end of what is shown, the next part is fetched (<c>?…&amp;teil=1</c> answers the tiles as HTML the
+    /// server built and encoded) and appended — so a gallery of hundreds of photos opens with one part and loads the rest while scrolling. The page links
+    /// stay for a browser without the script; a tile's picture itself loads only when it comes near the screen (<c>loading=lazy</c>).
+    /// </summary>
+    public const string Gallery = """
+<script>(function(){var more=document.querySelector('[data-mo-more]'),grid=document.querySelector('[data-mo-grid]');
+if(!more||!grid||!window.fetch||!('IntersectionObserver' in window)){if(more)more.hidden=true;return;}
+var pager=document.querySelector('.mo-pager');if(pager)pager.hidden=true;var busy=false;
+function near(){var b=more.getBoundingClientRect();return b.top<window.innerHeight+900;}
+function load(){var url=more.getAttribute('data-mo-more');if(busy||!url)return;busy=true;more.classList.remove('mo-more-error');
+ fetch(url,{credentials:'same-origin',headers:{'Accept':'application/json'}}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();}).then(function(j){
+  var t=document.createElement('template');t.innerHTML=j.html||'';grid.appendChild(t.content);busy=false;
+  if(j.next){more.setAttribute('data-mo-more',j.next);if(near())requestAnimationFrame(load);}else{io.disconnect();more.remove();}
+ }).catch(function(){busy=false;more.classList.add('mo-more-error');more.textContent='Weitere Fotos konnten nicht geladen werden. Bitte die Seite neu laden.';});}
+var io=new IntersectionObserver(function(es){for(var i=0;i<es.length;i++)if(es[i].isIntersecting){load();break;}},{rootMargin:'900px 0px'});io.observe(more);
 })();</script>
 """;
 }

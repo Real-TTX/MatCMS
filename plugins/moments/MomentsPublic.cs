@@ -21,7 +21,8 @@ public sealed record Viewer(Guest? Guest, bool Admin)
 public static class MomentsPublic
 {
     public const string Base = "/moments";
-    public const int PageSize = 96;
+    /// <summary>Tiles per part of the stream: the first part comes with the page, the next ones while scrolling.</summary>
+    public const int PageSize = 48;
 
     public static void Configure(IPluginBuilder b)
     {
@@ -231,23 +232,34 @@ public static class MomentsPublic
 
     // ---- the gallery --------------------------------------------------------------------------------------------
 
-    /// <summary>The gallery's filter, read from the address and written back into every link (so "next photo" stays inside it).</summary>
-    public sealed record Filter(long Tag, string From, string Sort, bool Hearts, int Page)
+    /// <summary>
+    /// The gallery's filter, read from the address and written back into every link (so "next photo" stays inside it). <see cref="Album"/> opens one
+    /// album, <see cref="All"/> the stream of all photos — the start page shows the albums instead, once there are any.
+    /// </summary>
+    public sealed record Filter(long Tag, string From, string Sort, bool Hearts, int Page, long Album = 0, bool All = false)
     {
         public static Filter Of(RequestData r) => new(
             long.TryParse(r.Q("tag"), NumberStyles.None, CultureInfo.InvariantCulture, out var t) ? t : 0,
             r.Q("von") is var v && (v == "gastgeber" || long.TryParse(v, NumberStyles.None, CultureInfo.InvariantCulture, out _)) ? v : "",
             r.Q("sort") is "neu" or "beliebt" ? r.Q("sort") : "zeit",
             r.Q("herzen") == "1",
-            int.TryParse(r.Q("seite"), NumberStyles.None, CultureInfo.InvariantCulture, out var p) && p > 1 ? Math.Min(p, 10_000) : 1);
+            int.TryParse(r.Q("seite"), NumberStyles.None, CultureInfo.InvariantCulture, out var p) && p > 1 ? Math.Min(p, 10_000) : 1,
+            long.TryParse(r.Q("album"), NumberStyles.None, CultureInfo.InvariantCulture, out var a) ? a : 0,
+            r.Q("alle") == "1");
 
-        public bool Narrowed => Tag > 0 || From.Length > 0 || Hearts;
+        /// <summary>Something narrows the photos (an album counts: it is a part of them).</summary>
+        public bool Narrowed => Tag > 0 || From.Length > 0 || Hearts || Album > 0;
+        /// <summary>The start page: nothing chosen yet.</summary>
+        public bool Start => !Narrowed && !All && Page == 1;
 
         /// <summary>The query of this filter ("" or "?tag=3&amp;sort=neu"), without the page unless <paramref name="withPage"/>.</summary>
-        public string Query(bool withPage = false, long? tag = null, string? from = null, string? sort = null, bool? hearts = null, int? page = null)
+        public string Query(bool withPage = false, long? tag = null, string? from = null, string? sort = null, bool? hearts = null, int? page = null, long? album = null, bool? all = null)
         {
             var parts = new List<string>();
             var tg = tag ?? Tag; var fr = from ?? From; var so = sort ?? Sort; var he = hearts ?? Hearts; var pg = page ?? (withPage ? Page : 1);
+            var al = album ?? Album; var everything = all ?? All;
+            if (al > 0) parts.Add("album=" + M.N(al));
+            else if (everything) parts.Add("alle=1");
             if (tg > 0) parts.Add("tag=" + M.N(tg));
             if (fr.Length > 0) parts.Add("von=" + M.U(fr));
             if (so != "zeit") parts.Add("sort=" + so);
@@ -258,10 +270,10 @@ public static class MomentsPublic
     }
 
     /// <summary>Everything the gallery and the photo page share: the released photos in the filter's order, and what hangs on them.</summary>
-    internal sealed record Album(List<Photo> Photos, IReadOnlyList<Tag> Tags, ILookup<long, PhotoTag> MarksByPhoto, Dictionary<long, List<long>> Hearts,
+    internal sealed record Listing(List<Photo> Photos, IReadOnlyList<Tag> Tags, ILookup<long, PhotoTag> MarksByPhoto, Dictionary<long, List<long>> Hearts,
         Dictionary<long, int> Comments, Dictionary<long, Guest> Guests, int Total = 0);
 
-    internal static async Task<Album> AlbumAsync(IPluginContext ctx, MomentsStore store, Viewer v, Filter f, CancellationToken ct)
+    internal static async Task<Listing> ListingAsync(IPluginContext ctx, MomentsStore store, Viewer v, Filter f, CancellationToken ct)
     {
         var photos = (await store.PhotosAsync(MomentsStore.Approved, ct)).ToList();
         var tags = await store.TagsAsync(ct);
@@ -270,6 +282,7 @@ public static class MomentsPublic
         var comments = (await store.CommentsAsync(ct)).Where(c => c.Visible).GroupBy(c => c.PhotoId).ToDictionary(g => g.Key, g => g.Count());
         var guests = (await store.GuestsAsync(ct)).ToDictionary(g => g.Id);
         IEnumerable<Photo> list = photos;
+        if (f.Album > 0) list = list.Where(p => p.AlbumId == f.Album);
         if (f.Tag > 0) list = list.Where(p => marks[p.Id].Any(m => m.TagId == f.Tag));
         if (f.From == "gastgeber") list = list.Where(p => p.GuestId == 0);
         else if (long.TryParse(f.From, out var from)) list = list.Where(p => p.GuestId == from);
@@ -280,13 +293,13 @@ public static class MomentsPublic
             "beliebt" => list.OrderByDescending(p => hearts.TryGetValue(p.Id, out var h) ? h.Count : 0).ThenBy(p => p.Taken, StringComparer.Ordinal).ThenBy(p => p.Id),
             _ => list.OrderBy(p => p.Taken, StringComparer.Ordinal).ThenBy(p => p.Id)
         };
-        return new Album(list.ToList(), tags, marks, hearts, comments, guests, photos.Count);
+        return new Listing(list.ToList(), tags, marks, hearts, comments, guests, photos.Count);
     }
 
-    internal static string Tile(Photo p, string query, Album? album, string? badge = null, bool large = false)
+    internal static string Tile(Photo p, string query, Listing? listing, string? badge = null, bool large = false)
     {
-        var hearts = album is not null && album.Hearts.TryGetValue(p.Id, out var h) ? h.Count : 0;
-        var comments = album is not null && album.Comments.TryGetValue(p.Id, out var c) ? c : 0;
+        var hearts = listing is not null && listing.Hearts.TryGetValue(p.Id, out var h) ? h.Count : 0;
+        var comments = listing is not null && listing.Comments.TryGetValue(p.Id, out var c) ? c : 0;
         var alt = p.Caption.Length > 0 ? p.Caption : "Foto";
         var sb = new StringBuilder("<a class=\"mo-tile").Append(large ? " large" : "").Append("\" href=\"").Append(Base).Append("/foto/").Append(p.Id).Append(M.H(query)).Append("\">")
             .Append("<img src=\"").Append(Base).Append("/bild/").Append(p.Id).Append("/t\" alt=\"").Append(M.H(alt)).Append("\" loading=\"lazy\" decoding=\"async\">");
@@ -305,15 +318,25 @@ public static class MomentsPublic
     {
         var store = new MomentsStore(ctx.Data);
         var v = await ViewerAsync(ctx, store, ct);
-        if (v is null) return LoginPage(ctx, null, SafeBack(ctx.Request.Q("zurueck")), memberWithoutAccess: ctx.Member is not null);
+        var part = ctx.Request.Q("teil") == "1";
+        if (v is null) return part ? PluginResult.Json(new JsonObject { ["html"] = "", ["next"] = "" }, 403) : LoginPage(ctx, null, SafeBack(ctx.Request.Q("zurueck")), memberWithoutAccess: ctx.Member is not null);
         var f = Filter.Of(ctx.Request);
-        var album = await AlbumAsync(ctx, store, v, f, ct);
+        var listing = await ListingAsync(ctx, store, v, f, ct);
+        // the script asks for the next part of the stream while the visitor scrolls
+        if (part)
+        {
+            var (html, next) = Stream(f, listing, continued: true);
+            return PluginResult.Json(new JsonObject { ["html"] = html, ["next"] = next });
+        }
+        var albums = await store.AlbumsAsync(ct);
+        var album = f.Album > 0 ? albums.FirstOrDefault(a => a.Id == f.Album) : null;
+        if (f.Album > 0 && album is null) return PluginResult.Redirect(Base);
         var title = MomentsSettings.GalleryTitle(ctx);
-        var sb = new StringBuilder(Head(ctx, v, title)).Append(Notice(ctx));
-        var first = !f.Narrowed && f.Page == 1;
+        var heading = album?.Name ?? (f.All ? "Alle Fotos" : title);
+        var sb = new StringBuilder(Head(ctx, v, heading, album is not null || f.All ? "" : null)).Append(Notice(ctx));
         var uploads = v.Admin || ctx.Settings.GetBool(MomentsSettings.GuestUpload);
 
-        if (first)
+        if (f.Start)
         {
             var name = v.Guest?.Name ?? MomentsSettings.Hosts(ctx);
             sb.Append("<section class=\"mo-welcome\"><div><h2>").Append(ctx.Request.Q("willkommen") == "1" ? "Willkommen, " : "Hallo ").Append(M.H(name)).Append("!</h2><p>")
@@ -326,83 +349,153 @@ public static class MomentsPublic
             if (v.Admin && await store.PendingCountAsync(ct) is var pending and > 0)
                 sb.Append("<p class=\"mo-alert\"><i class=\"ti ti-hourglass\" aria-hidden=\"true\"></i> ").Append(M.Plural(pending, "Foto wartet", "Fotos warten"))
                   .Append(" auf eure Freigabe. <a href=\"/admin/p/moments/review\">Jetzt ansehen</a></p>");
-            var featured = album.Photos.Where(p => p.Featured).ToList();
+            var featured = listing.Photos.Where(p => p.Featured).ToList();
             if (featured.Count > 0)
                 sb.Append("<section class=\"mo-highlights\"><h2><i class=\"ti ti-sparkles\" aria-hidden=\"true\"></i> Highlights</h2><div class=\"mo-strip\">")
-                  .Append(string.Concat(featured.Take(12).Select(p => Tile(p, "", album, large: true)))).Append("</div></section>");
+                  .Append(string.Concat(featured.Take(12).Select(p => Tile(p, "", listing, large: true)))).Append("</div></section>");
+            // with albums, the start page is an overview — the albums in the hosts' order, then who is on the photos and the keywords
+            if (albums.Count > 0 && listing.Total > 0 || albums.Count > 0 && v.Admin)
+                return Frame(ctx, sb.Append(Overview(ctx, v, listing, albums, uploads)).ToString(), title);
         }
 
         // the bar: how the photos are ordered, how many there are, what narrows them — only once there is something to order (an empty gallery with
         // sort buttons, "0 Fotos" and a lone "Meine Herzen" looked broken)
-        if (album.Total > 0)
+        if (listing.Total > 0)
         {
             sb.Append("<nav class=\"mo-bar\" aria-label=\"Sortierung\"><div class=\"mo-seg\">");
             foreach (var (key, label) in new[] { ("zeit", "Chronologisch"), ("neu", "Neueste"), ("beliebt", "Beliebteste") })
                 sb.Append("<a href=\"").Append(Base).Append(M.H(f.Query(sort: key))).Append("\"").Append(f.Sort == key ? " class=\"on\" aria-current=\"true\"" : "").Append(">").Append(label).Append("</a>");
-            sb.Append("</div><span class=\"mo-count\">").Append(M.Plural(album.Photos.Count, "Foto", "Fotos")).Append("</span></nav>");
-            sb.Append(Chips(ctx, f, album, v));
+            sb.Append("</div><span class=\"mo-count\">").Append(M.Plural(listing.Photos.Count, "Foto", "Fotos")).Append("</span></nav>");
+            sb.Append(Chips(ctx, f, listing, v));
         }
 
-        if (album.Photos.Count == 0)
+        if (listing.Photos.Count == 0)
         {
             sb.Append("<div class=\"mo-empty\"><i class=\"ti ti-photo\" aria-hidden=\"true\"></i><p>")
-              .Append(f.Narrowed ? "Hier ist (noch) kein Foto." : "Noch sind keine Fotos da.").Append("</p>");
-            if (uploads && !f.Narrowed) sb.Append("<a class=\"mo-btn\" href=\"").Append(Base).Append("/hochladen\"><i class=\"ti ti-camera-plus\" aria-hidden=\"true\"></i> Die ersten hochladen</a>");
-            if (f.Narrowed) sb.Append("<a class=\"mo-btn ghost\" href=\"").Append(Base).Append("\"><i class=\"ti ti-photo\" aria-hidden=\"true\"></i> Alle Fotos zeigen</a>");
+              .Append(album is not null ? "In diesem Album ist noch kein Foto." : f.Narrowed ? "Hier ist (noch) kein Foto." : "Noch sind keine Fotos da.").Append("</p>");
+            if (uploads && (album is null && !f.Narrowed || album is not null && (v.Admin || album.Guests)))
+                sb.Append("<a class=\"mo-btn\" href=\"").Append(Base).Append("/hochladen").Append(album is not null && v.Admin ? "?album=" + M.N(album.Id) : "")
+                  .Append("\"><i class=\"ti ti-camera-plus\" aria-hidden=\"true\"></i> Die ersten hochladen</a>");
+            if (f.Narrowed || f.All) sb.Append("<a class=\"mo-btn ghost\" href=\"").Append(Base).Append("\"><i class=\"ti ti-photo\" aria-hidden=\"true\"></i> Zur Übersicht</a>");
             sb.Append("</div>");
+            return Frame(ctx, sb.ToString(), heading);
         }
-        else
+
+        // the stream: the first part now, the rest while scrolling (the script asks for ?…&teil=1); without a script the pages stay as links
+        var (first, nextUrl) = Stream(f, listing, continued: false);
+        sb.Append("<div class=\"mo-grid\" data-mo-grid>").Append(first).Append("</div>");
+        var pages = (listing.Photos.Count + PageSize - 1) / PageSize;
+        var page = Math.Clamp(f.Page, 1, Math.Max(1, pages));
+        if (nextUrl.Length > 0)
+            sb.Append("<div class=\"mo-more\" data-mo-more=\"").Append(M.H(nextUrl)).Append("\" aria-live=\"polite\"><span class=\"mo-spin\" aria-hidden=\"true\"></span> Weitere Fotos werden geladen …</div>");
+        if (pages > 1)
         {
-            var pages = (album.Photos.Count + PageSize - 1) / PageSize;
-            var page = Math.Min(f.Page, pages);
-            var shown = album.Photos.Skip((page - 1) * PageSize).Take(PageSize).ToList();
-            var query = f.Query();
-            // chronological: a heading for every hour, with the day as soon as the photos span more than one
-            var days = album.Photos.Select(p => p.Taken.Length >= 10 ? p.Taken[..10] : "").Distinct().Count();
-            sb.Append("<div class=\"mo-grid\">");
-            var lastHour = "";
-            foreach (var p in shown)
-            {
-                if (f.Sort == "zeit" && M.TryTaken(p.Taken, out var d))
-                {
-                    var hour = d.ToString("yyyy-MM-ddTHH", CultureInfo.InvariantCulture);
-                    if (hour != lastHour) { sb.Append("<h3 class=\"mo-hour\">").Append(M.H(M.Hour(d, days > 1))).Append("</h3>"); lastHour = hour; }
-                }
-                sb.Append(Tile(p, query, album));
-            }
-            sb.Append("</div>");
-            if (pages > 1)
-            {
-                sb.Append("<nav class=\"mo-pager\" aria-label=\"Seiten\">");
-                if (page > 1) sb.Append("<a class=\"mo-btn ghost\" href=\"").Append(Base).Append(M.H(f.Query(page: page - 1))).Append("\"><i class=\"ti ti-chevron-left\" aria-hidden=\"true\"></i> Zurück</a>");
-                sb.Append("<span>Seite ").Append(page).Append(" von ").Append(pages).Append("</span>");
-                if (page < pages) sb.Append("<a class=\"mo-btn ghost\" href=\"").Append(Base).Append(M.H(f.Query(page: page + 1))).Append("\">Weiter <i class=\"ti ti-chevron-right\" aria-hidden=\"true\"></i></a>");
-                sb.Append("</nav>");
-            }
+            sb.Append("<nav class=\"mo-pager\" aria-label=\"Seiten\">");
+            if (page > 1) sb.Append("<a class=\"mo-btn ghost\" href=\"").Append(Base).Append(M.H(f.Query(page: page - 1))).Append("\"><i class=\"ti ti-chevron-left\" aria-hidden=\"true\"></i> Zurück</a>");
+            sb.Append("<span>Seite ").Append(page).Append(" von ").Append(pages).Append("</span>");
+            if (page < pages) sb.Append("<a class=\"mo-btn ghost\" href=\"").Append(Base).Append(M.H(f.Query(page: page + 1))).Append("\">Weiter <i class=\"ti ti-chevron-right\" aria-hidden=\"true\"></i></a>");
+            sb.Append("</nav>");
         }
-        return Frame(ctx, sb.ToString(), title);
+        return Frame(ctx, sb.Append(MomentsScript.Gallery).ToString(), heading);
+    }
+
+    /// <summary>
+    /// One part of the photo stream (<see cref="PageSize"/> tiles) and the address of the next ("" at the end). Chronologically there is a heading for every
+    /// hour, with the day as soon as the photos span more than one; a <paramref name="continued"/> part does not repeat the hour the part before ended in.
+    /// </summary>
+    private static (string Html, string Next) Stream(Filter f, Listing listing, bool continued)
+    {
+        var pages = (listing.Photos.Count + PageSize - 1) / PageSize;
+        if (pages == 0) return ("", "");
+        var page = Math.Clamp(f.Page, 1, pages);
+        var start = (page - 1) * PageSize;
+        var query = f.Query();
+        var days = listing.Photos.Select(p => p.Taken.Length >= 10 ? p.Taken[..10] : "").Distinct().Count();
+        var lastHour = continued && start > 0 && f.Sort == "zeit" && M.TryTaken(listing.Photos[start - 1].Taken, out var before)
+            ? before.ToString("yyyy-MM-ddTHH", CultureInfo.InvariantCulture) : "";
+        var sb = new StringBuilder();
+        foreach (var p in listing.Photos.Skip(start).Take(PageSize))
+        {
+            if (f.Sort == "zeit" && M.TryTaken(p.Taken, out var d))
+            {
+                var hour = d.ToString("yyyy-MM-ddTHH", CultureInfo.InvariantCulture);
+                if (hour != lastHour) { sb.Append("<h3 class=\"mo-hour\">").Append(M.H(M.Hour(d, days > 1))).Append("</h3>"); lastHour = hour; }
+            }
+            sb.Append(Tile(p, query, listing));
+        }
+        return (sb.ToString(), page < pages ? Base + f.Query(page: page + 1) + "&teil=1" : "");
+    }
+
+    /// <summary>
+    /// The start page once there are albums: the albums in the hosts' order (cover, name, count) and "Alle Fotos" after them, then who is on the photos and
+    /// the keywords — the structure first, the photos one click further. An album without a photo the visitor may see is left out (the hosts see it, to
+    /// fill it).
+    /// </summary>
+    private static string Overview(IPluginContext ctx, Viewer v, Listing listing, IReadOnlyList<Album> albums, bool uploads)
+    {
+        var sb = new StringBuilder("<section class=\"mo-section\"><h2>Alben</h2><div class=\"mo-albums\">");
+        Photo? Cover(IEnumerable<Photo> photos) => photos.OrderByDescending(p => p.Featured)
+            .ThenByDescending(p => listing.Hearts.TryGetValue(p.Id, out var h) ? h.Count : 0).ThenBy(p => p.Taken, StringComparer.Ordinal).FirstOrDefault();
+        void Card(string href, string name, int count, Photo? cover, string? note = null)
+        {
+            sb.Append("<a class=\"mo-album\" href=\"").Append(M.H(href)).Append("\"><span class=\"mo-album-cover\">");
+            if (cover is not null) sb.Append("<img src=\"").Append(Base).Append("/bild/").Append(cover.Id).Append("/t\" alt=\"\" loading=\"lazy\" decoding=\"async\">");
+            else sb.Append("<i class=\"ti ti-photo\" aria-hidden=\"true\"></i>");
+            sb.Append("</span><span class=\"mo-album-text\"><strong>").Append(M.H(name)).Append("</strong><small>").Append(M.Plural(count, "Foto", "Fotos"))
+              .Append(note is null ? "" : " · " + M.H(note)).Append("</small></span></a>");
+        }
+        foreach (var a in albums)
+        {
+            var photos = listing.Photos.Where(p => p.AlbumId == a.Id).ToList();
+            if (photos.Count == 0 && !v.Admin) continue;
+            Card(Base + "?album=" + M.N(a.Id), a.Name, photos.Count, Cover(photos), v.Admin && a.Guests ? "hier landen die Fotos der Gäste" : null);
+        }
+        if (listing.Total > 0) Card(Base + "?alle=1", "Alle Fotos", listing.Total, Cover(listing.Photos));
+        sb.Append("</div></section>");
+
+        var visible = listing.Photos.Select(p => p.Id).ToHashSet();
+        var counts = listing.MarksByPhoto.Where(g => visible.Contains(g.Key)).SelectMany(g => g).GroupBy(m => m.TagId).ToDictionary(g => g.Key, g => g.Count());
+        var used = listing.Tags.Where(t => counts.ContainsKey(t.Id)).OrderByDescending(t => counts[t.Id]).ThenBy(t => t.Name, StringComparer.OrdinalIgnoreCase).ToList();
+        void TagRow(string heading, string icon, string cls, IEnumerable<Tag> tags)
+        {
+            var list = tags.ToList();
+            if (list.Count == 0) return;
+            sb.Append("<section class=\"mo-section\"><h2>").Append(heading).Append("</h2><div class=\"mo-chiprow\">");
+            foreach (var t in list.Take(60))
+                sb.Append("<a class=\"mo-chip").Append(cls).Append("\" href=\"").Append(Base).Append("?alle=1&amp;tag=").Append(t.Id).Append("\"><i class=\"ti ti-").Append(icon).Append("\" aria-hidden=\"true\"></i> ")
+                  .Append(M.H(t.Name)).Append(" <small>").Append(counts[t.Id]).Append("</small></a>");
+            sb.Append("</div></section>");
+        }
+        TagRow("Wer ist drauf?", "user", " person", used.Where(t => t.Kind == MomentsStore.Person));
+        TagRow("Stichworte", "tag", "", used.Where(t => t.Kind != MomentsStore.Person));
+        if (listing.Hearts.Values.Any(h => h.Contains(v.Id)))
+            sb.Append("<p class=\"mo-chiprow\"><a class=\"mo-chip\" href=\"").Append(Base).Append("?alle=1&amp;herzen=1\"><i class=\"ti ti-heart\" aria-hidden=\"true\"></i> Meine Herzen</a></p>");
+        if (listing.Total == 0)
+            sb.Append("<div class=\"mo-empty\"><i class=\"ti ti-photo\" aria-hidden=\"true\"></i><p>Noch sind keine Fotos da.</p>")
+              .Append(uploads ? "<a class=\"mo-btn\" href=\"" + Base + "/hochladen\"><i class=\"ti ti-camera-plus\" aria-hidden=\"true\"></i> Die ersten hochladen</a>" : "").Append("</div>");
+        return sb.ToString();
     }
 
     /// <summary>What narrows the gallery: the active filter (with its ×), then people and keywords with their counts, the own hearts and who uploaded.</summary>
-    private static string Chips(IPluginContext ctx, Filter f, Album album, Viewer v)
+    private static string Chips(IPluginContext ctx, Filter f, Listing listing, Viewer v)
     {
         var sb = new StringBuilder();
-        var counts = album.MarksByPhoto.SelectMany(g => g).GroupBy(m => m.TagId).ToDictionary(g => g.Key, g => g.Count());
+        var counts = listing.MarksByPhoto.SelectMany(g => g).GroupBy(m => m.TagId).ToDictionary(g => g.Key, g => g.Count());
         if (f.Narrowed)
         {
             sb.Append("<div class=\"mo-active\">");
-            if (f.Tag > 0 && album.Tags.FirstOrDefault(t => t.Id == f.Tag) is Tag t)
+            if (f.Tag > 0 && listing.Tags.FirstOrDefault(t => t.Id == f.Tag) is Tag t)
                 sb.Append(ActiveChip(t.Kind == MomentsStore.Person ? "user" : "tag", t.Name, f.Query(tag: 0)));
             if (f.From.Length > 0)
-                sb.Append(ActiveChip("camera", "von " + (f.From == "gastgeber" ? MomentsSettings.Hosts(ctx) : long.TryParse(f.From, out var gid) && album.Guests.TryGetValue(gid, out var gg) ? gg.Name : "einem Gast"), f.Query(from: "")));
+                sb.Append(ActiveChip("camera", "von " + (f.From == "gastgeber" ? MomentsSettings.Hosts(ctx) : long.TryParse(f.From, out var gid) && listing.Guests.TryGetValue(gid, out var gg) ? gg.Name : "einem Gast"), f.Query(from: "")));
             if (f.Hearts) sb.Append(ActiveChip("heart", "Meine Herzen", f.Query(hearts: false)));
             sb.Append("</div>");
         }
-        var used = album.Tags.Where(t => counts.ContainsKey(t.Id) && t.Id != f.Tag).OrderByDescending(t => counts[t.Id]).ThenBy(t => t.Name, StringComparer.OrdinalIgnoreCase).ToList();
+        var used = listing.Tags.Where(t => counts.ContainsKey(t.Id) && t.Id != f.Tag).OrderByDescending(t => counts[t.Id]).ThenBy(t => t.Name, StringComparer.OrdinalIgnoreCase).ToList();
         var people = used.Where(t => t.Kind == MomentsStore.Person).ToList();
         var topics = used.Where(t => t.Kind != MomentsStore.Person).ToList();
         // "Meine Herzen" only for whoever gave one — the chip led to an empty page otherwise
-        var heartsChip = !f.Hearts && album.Hearts.Values.Any(h => h.Contains(v.Id));
+        var heartsChip = !f.Hearts && listing.Hearts.Values.Any(h => h.Contains(v.Id));
         if (people.Count + topics.Count == 0 && !heartsChip) return sb.ToString();
         sb.Append("<div class=\"mo-filters\">");
         if (heartsChip) sb.Append("<a class=\"mo-chip\" href=\"").Append(Base).Append(M.H(f.Query(hearts: true))).Append("\"><i class=\"ti ti-heart\" aria-hidden=\"true\"></i> Meine Herzen</a>");
@@ -549,19 +642,19 @@ public static class MomentsPublic
 
     private static async Task<string> PhotoPageAsync(IPluginContext ctx, MomentsStore store, Viewer v, Photo p, Filter f, string? error, CancellationToken ct)
     {
-        var album = await AlbumAsync(ctx, store, v, f, ct);
+        var listing = await ListingAsync(ctx, store, v, f, ct);
         var query = f.Query();
-        var index = album.Photos.FindIndex(x => x.Id == p.Id);
-        var prev = index > 0 ? album.Photos[index - 1] : null;
-        var next = index >= 0 && index < album.Photos.Count - 1 ? album.Photos[index + 1] : null;
-        var hearts = album.Hearts.TryGetValue(p.Id, out var h) ? h : new List<long>();
+        var index = listing.Photos.FindIndex(x => x.Id == p.Id);
+        var prev = index > 0 ? listing.Photos[index - 1] : null;
+        var next = index >= 0 && index < listing.Photos.Count - 1 ? listing.Photos[index + 1] : null;
+        var hearts = listing.Hearts.TryGetValue(p.Id, out var h) ? h : new List<long>();
         var mine = hearts.Contains(v.Id);
-        var author = AuthorName(ctx, p.GuestId, album.Guests);
+        var author = AuthorName(ctx, p.GuestId, listing.Guests);
         var form = "<input type=\"hidden\" name=\"q\" value=\"" + M.H(query) + "\">" + ctx.Antiforgery;
 
-        var sb = new StringBuilder("<div class=\"mo-photo-page\"><p class=\"mo-back\"><a href=\"").Append(Base).Append(M.H(index >= 0 ? f.Query(page: index / PageSize + 1) : query))
+        var sb = new StringBuilder("<div class=\"mo-photo-page\"><p class=\"mo-back\"><a href=\"").Append(Base).Append(M.H(f.Query()))
             .Append("\"><i class=\"ti ti-chevron-left\" aria-hidden=\"true\"></i> Alle Fotos</a>");
-        if (index >= 0) sb.Append("<span class=\"mo-pos\">").Append(index + 1).Append(" / ").Append(album.Photos.Count).Append("</span>");
+        if (index >= 0) sb.Append("<span class=\"mo-pos\">").Append(index + 1).Append(" / ").Append(listing.Photos.Count).Append("</span>");
         sb.Append("</p>").Append(Notice(ctx));
         if (error is not null) sb.Append(Err(error));
         if (p.Pending) sb.Append("<p class=\"mo-alert\"><i class=\"ti ti-hourglass\" aria-hidden=\"true\"></i> Wartet auf Freigabe – bis dahin sehen es nur ").Append(v.Admin ? "ihr und der Gast, der es hochgeladen hat." : "du und die Gastgeber.").Append("</p>");
@@ -578,13 +671,16 @@ public static class MomentsPublic
         sb.Append("<div class=\"mo-detail\"><div class=\"mo-info\" id=\"mo-info\">");
         sb.Append("<div class=\"mo-by\"><span class=\"mo-avatar\">").Append(M.H(M.Initials(author))).Append("</span><div><strong>").Append(M.H(author)).Append("</strong><small>")
           .Append(M.H(M.Taken(p.Taken))).Append("</small></div></div>");
+        if (p.AlbumId > 0 && await store.AlbumAsync(p.AlbumId, ct) is Album inAlbum)
+            sb.Append("<p class=\"mo-in-album\"><i class=\"ti ti-album\" aria-hidden=\"true\"></i> Album <a href=\"").Append(Base).Append("?album=").Append(inAlbum.Id).Append("\">")
+              .Append(M.H(inAlbum.Name)).Append("</a></p>");
         if (p.Caption.Length > 0) sb.Append("<p class=\"mo-caption\">").Append(M.H(p.Caption)).Append("</p>");
 
         // heart, download, and what the uploader and the hosts may do
         sb.Append("<div class=\"mo-actions\" id=\"herz\">");
         if (p.Approved)
         {
-            var who = string.Join(", ", hearts.Select(g => AuthorName(ctx, g, album.Guests)).Distinct());
+            var who = string.Join(", ", hearts.Select(g => AuthorName(ctx, g, listing.Guests)).Distinct());
             sb.Append("<form method=\"post\" class=\"mo-inline\">").Append(form).Append("<button class=\"mo-heart").Append(mine ? " on" : "").Append("\" name=\"action\" value=\"heart\" type=\"submit\" aria-pressed=\"")
               .Append(mine ? "true" : "false").Append("\"").Append(who.Length > 0 ? " title=\"" + M.H(who) + "\"" : "").Append("><i class=\"ti ti-heart").Append(mine ? "-filled" : "").Append("\" aria-hidden=\"true\"></i> ")
               .Append(hearts.Count > 0 ? hearts.Count.ToString(CultureInfo.InvariantCulture) : "Gefällt mir").Append("</button></form>");
@@ -607,8 +703,8 @@ public static class MomentsPublic
               .Append(M.H(p.Caption)).Append("\" placeholder=\"Was passiert hier?\" aria-label=\"Bildunterschrift\"><button class=\"mo-btn\" type=\"submit\">Speichern</button></form></details>");
 
         // marks: who and what is on it
-        var marks = album.MarksByPhoto[p.Id].ToList();
-        var tagById = album.Tags.ToDictionary(t => t.Id);
+        var marks = listing.MarksByPhoto[p.Id].ToList();
+        var tagById = listing.Tags.ToDictionary(t => t.Id);
         var canTag = v.Admin || ctx.Settings.GetBool(MomentsSettings.GuestTags);
         sb.Append("<section class=\"mo-tags\" id=\"mo-tags\"><h2>Wer und was ist drauf?</h2><div class=\"mo-chiprow\">");
         foreach (var m in marks.Where(m => tagById.ContainsKey(m.TagId)).OrderBy(m => tagById[m.TagId].Kind == MomentsStore.Person ? 0 : 1).ThenBy(m => tagById[m.TagId].Name, StringComparer.OrdinalIgnoreCase))
@@ -625,7 +721,7 @@ public static class MomentsPublic
         sb.Append("</div>");
         if (canTag)
         {
-            var names = (await store.GuestsAsync(ct)).Where(g => g.Active).SelectMany(g => g.PeopleList).Concat(album.Tags.Select(t => t.Name))
+            var names = (await store.GuestsAsync(ct)).Where(g => g.Active).SelectMany(g => g.PeopleList).Concat(listing.Tags.Select(t => t.Name))
                 .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList();
             sb.Append("<form method=\"post\" class=\"mo-row\">").Append(form).Append("<input type=\"hidden\" name=\"action\" value=\"tag\"><input name=\"tag\" list=\"mo-names\" maxlength=\"40\" autocomplete=\"off\" placeholder=\"")
               .Append(ctx.Settings.GetBool(MomentsSettings.NewTags) || v.Admin ? "Name oder Stichwort, z. B. Tanzfläche" : "Name oder Stichwort aus der Liste").Append("\" aria-label=\"Person oder Stichwort\"><button class=\"mo-btn\" type=\"submit\"><i class=\"ti ti-tag\" aria-hidden=\"true\"></i> Markieren</button></form><datalist id=\"mo-names\">");
@@ -635,7 +731,7 @@ public static class MomentsPublic
         sb.Append("</section></div>");
 
         // comments
-        var guests = album.Guests;
+        var guests = listing.Guests;
         var comments = (await store.CommentsOfPhotoAsync(p.Id, ct)).Where(c => c.Visible || v.Admin || (v.Guest is not null && c.GuestId == v.Guest.Id)).ToList();
         sb.Append("<section class=\"mo-comments\" id=\"mo-comments\"><h2>Kommentare").Append(comments.Count > 0 ? " (" + comments.Count + ")" : "").Append("</h2>");
         if (comments.Count == 0) sb.Append("<p class=\"mo-muted\">Noch keine Kommentare.</p>");
@@ -671,8 +767,8 @@ public static class MomentsPublic
         var v = await ViewerAsync(ctx, store, ct);
         if (v is null) return ToLogin(ctx);
         var mine = await store.PhotosOfGuestAsync(v.Id, ct);
-        var album = await AlbumAsync(ctx, store, v, new Filter(0, "", "zeit", false, 1), ct);
-        var hearted = album.Hearts.Count(kv => kv.Value.Contains(v.Id));
+        var listing = await ListingAsync(ctx, store, v, new Filter(0, "", "zeit", false, 1), ct);
+        var hearted = listing.Hearts.Count(kv => kv.Value.Contains(v.Id));
         var sb = new StringBuilder(Head(ctx, v, "Meine Fotos", crumb: "")).Append(Notice(ctx));
         sb.Append("<div class=\"mo-welcome-actions left\">");
         if (v.Admin || ctx.Settings.GetBool(MomentsSettings.GuestUpload))
@@ -688,7 +784,7 @@ public static class MomentsPublic
             if (waiting > 0) sb.Append(", davon ").Append(waiting).Append(" noch nicht freigegeben – die anderen Gäste sehen sie, sobald die Gastgeber sie freigegeben haben");
             sb.Append(".</p><div class=\"mo-grid\">");
             foreach (var p in mine)
-                sb.Append(Tile(p, "", album, p.Pending ? "wartet auf Freigabe" : p.Status == MomentsStore.Hidden ? "ausgeblendet" : null));
+                sb.Append(Tile(p, "", listing, p.Pending ? "wartet auf Freigabe" : p.Status == MomentsStore.Hidden ? "ausgeblendet" : null));
             sb.Append("</div>");
         }
         return Frame(ctx, sb.ToString(), "Meine Fotos");
@@ -711,7 +807,8 @@ public static class MomentsPublic
         }
         var sb = new StringBuilder(Head(ctx, v, "Fotos hochladen", crumb: ""));
         if (!open) sb.Append("<div class=\"mo-empty\"><i class=\"ti ti-lock\" aria-hidden=\"true\"></i><p>Das Hochladen ist geschlossen. Danke für all eure Bilder!</p></div>");
-        else sb.Append(MomentsUpload.Panel(ctx, v));
+        else sb.Append(MomentsUpload.Panel(ctx, v, await store.AlbumsAsync(ct),
+            long.TryParse(ctx.Request.Q("album"), NumberStyles.None, CultureInfo.InvariantCulture, out var preselect) ? preselect : 0));
         return Frame(ctx, sb.ToString(), "Fotos hochladen");
     }
 

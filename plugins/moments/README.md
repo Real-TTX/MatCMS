@@ -21,8 +21,17 @@ Paket: `./pack-native.ps1 -Path ./moments` → `dist/moments-<version>.zip`. Lä
     Alles im Browser gemacht (Canvas, ein paar Zeilen PDF) – der Server hat keine Bild- oder PDF-Bibliothek.
   - „Mehrere auf einmal anlegen“: eine Zeile je Haushalt, `Name | Personen | Tisch | Benutzername | Passwort`.
 - **Persönliche Begrüßung** („Willkommen, Zoe & Fabian!“), optional mit Tisch.
-- **Galerie** `/moments`: chronologisch mit Stunden-Überschriften, „Neueste“, „Beliebteste“; Filter nach Person, Stichwort, Hochlader,
-  „Meine Herzen“; Highlights oben; drei Fotos pro Zeile am Handy.
+- **Alben** (Admin → Moments → Alben): woher die Fotos kommen – „Fotograf“, „Gästebilder“, „Fotobox“. Jedes Foto ist in höchstens
+  EINEM Album (anders als Stichworte). Die Reihenfolge legen die Gastgeber fest; ein Album nimmt die Fotos der Gäste von selbst auf
+  (beim Umschalten kommen die Gästefotos ohne Album gleich mit). Die Gastgeber wählen beim Hochladen das Album (`/moments/hochladen?album=…`).
+  Ein gelöschtes Album lässt seine Fotos da (ohne Album, unter „Alle Fotos“).
+- **Galerie** `/moments`: mit Alben eine **Übersicht** – Begrüßung, Highlights, die Alben als Kacheln (Titelbild, Anzahl) in eurer
+  Reihenfolge, „Alle Fotos“, darunter „Wer ist drauf?“ und „Stichworte“. Ohne Alben gleich der Strom aller Fotos. Ein Album
+  (`?album=`) oder alle (`?alle=1`): chronologisch mit Stunden-Überschriften, „Neueste“, „Beliebteste“; Filter nach Person,
+  Stichwort, Hochlader, „Meine Herzen“; drei Fotos pro Zeile am Handy.
+- **Nachladen beim Scrollen**: die Seite bringt 48 Kacheln mit, die nächsten holt ein Skript, kurz bevor man unten ankommt
+  (`?…&teil=1` antwortet die fertigen Kacheln als JSON); jedes Bild lädt erst, wenn es in die Nähe kommt (`loading=lazy`). Ohne
+  Skript bleiben Seitenlinks.
 - **Foto-Seite** `/moments/foto/{id}`: groß, Wischen und Pfeiltasten für vor/zurück, Herz (ohne Neuladen), Herunterladen,
   Personen und Stichworte markieren, Kommentare. Wer hochgeladen hat, kann Bildunterschrift setzen und löschen.
 - **Hochladen vom Handy** `/moments/hochladen`: ein großer Knopf, beliebig viele Fotos, jede Kachel füllt sich beim Hochladen.

@@ -19,11 +19,17 @@ public sealed record Guest(long Id, string Name, string People, string Code, lon
 /// library. <see cref="GuestId"/> 0 = the hosts (uploaded in the back office or by an administrator on the site).
 /// </summary>
 public sealed record Photo(long Id, long GuestId, string File, string View, string Thumb, string FileName, long Size, int Width, int Height, string Taken,
-    string Caption, string Status, bool Featured, DateTime? Created, DateTime? ApprovedAt)
+    string Caption, string Status, bool Featured, DateTime? Created, DateTime? ApprovedAt, long AlbumId = 0)
 {
     public bool Approved => Status == MomentsStore.Approved;
     public bool Pending => Status == MomentsStore.Pending;
 }
+
+/// <summary>
+/// An album: where a photo comes from ("Fotograf", "Gästebilder", "Fotobox") — every photo is in at most ONE, unlike keywords. The gallery opens with
+/// the albums in the hosts' order (<see cref="Sort"/>); <see cref="Guests"/> marks the one a guest's upload lands in by itself.
+/// </summary>
+public sealed record Album(long Id, string Name, int Sort, bool Guests);
 
 /// <summary>A keyword or a person a photo is marked with. <see cref="Kind"/>: <see cref="MomentsStore.Person"/> or <see cref="MomentsStore.Topic"/>.</summary>
 public sealed record Tag(long Id, string Name, string Kind);
@@ -43,7 +49,8 @@ public sealed record Comment(long Id, long PhotoId, long GuestId, string Text, s
 /// </summary>
 public sealed class MomentsStore(IPluginData data)
 {
-    public const string TGuests = "guests", TPhotos = "photos", TTags = "tags", TPhotoTags = "photo_tags", TComments = "comments", THearts = "hearts", TMeta = "meta";
+    public const string TGuests = "guests", TPhotos = "photos", TTags = "tags", TPhotoTags = "photo_tags", TComments = "comments", THearts = "hearts", TMeta = "meta",
+        TAlbums = "albums";
 
     // stored values — never renamed
     public const string Pending = "pending", Approved = "approved", Hidden = "hidden", Visible = "visible";
@@ -57,7 +64,9 @@ public sealed class MomentsStore(IPluginData data)
             .Text("login").Text("password").UniqueIndex("code").Index("member_id"));
         b.Table(TPhotos, t => t.Int("guest_id", def: "0").Text("file", required: true).Text("view").Text("thumb").Text("file_name").Int("size", def: "0")
             .Int("width", def: "0").Int("height", def: "0").Text("taken").Text("caption").Text("status", required: true).Bool("featured", def: "0")
-            .Timestamp("created").Timestamp("approved_at").Index("status").Index("guest_id").Index("taken"));
+            .Timestamp("created").Timestamp("approved_at")
+            // 1.1: the album (0 = none)
+            .Int("album_id", def: "0").Index("status").Index("guest_id").Index("taken").Index("album_id"));
         b.Table(TTags, t => t.Text("name", required: true).Text("kind", required: true).Timestamp("created").Index("name"));
         b.Table(TPhotoTags, t => t.Int("photo_id", required: true).Int("tag_id", required: true).Int("by", def: "0").Timestamp("created")
             .UniqueIndex("photo_id", "tag_id").Index("tag_id"));
@@ -65,6 +74,7 @@ public sealed class MomentsStore(IPluginData data)
             .Timestamp("created").Index("photo_id").Index("status"));
         b.Table(THearts, t => t.Int("photo_id", required: true).Int("guest_id", required: true).Timestamp("created").UniqueIndex("photo_id", "guest_id"));
         b.Table(TMeta, t => t.Text("name", required: true).Text("value").UniqueIndex("name"));
+        b.Table(TAlbums, t => t.Text("name", required: true).Int("sort", def: "0").Bool("guests", def: "0").Timestamp("created"));
     }
 
     public IDataTable Guests => data.Table(TGuests);
@@ -74,6 +84,7 @@ public sealed class MomentsStore(IPluginData data)
     public IDataTable Comments => data.Table(TComments);
     public IDataTable Hearts => data.Table(THearts);
     public IDataTable Meta => data.Table(TMeta);
+    public IDataTable Albums => data.Table(TAlbums);
 
     // ---- mapping ------------------------------------------------------------------------------------------------
 
@@ -86,7 +97,7 @@ public sealed class MomentsStore(IPluginData data)
     private static Guest G(DataRow r) => new(r.Id, r.Text("name"), r.Text("people"), r.Text("code"), r.Int("member_id"), r.Text("table_name"), r.Text("note"),
         r.Bool("active"), r.Timestamp("created"), r.Timestamp("last_seen"), r.Int("visits"), r.Text("account"), r.Text("login"), r.Text("password"));
     private static Photo P(DataRow r) => new(r.Id, r.Int("guest_id"), r.Text("file"), r.Text("view"), r.Text("thumb"), r.Text("file_name"), r.Int("size"),
-        (int)r.Int("width"), (int)r.Int("height"), r.Text("taken"), r.Text("caption"), r.Text("status"), r.Bool("featured"), r.Timestamp("created"), r.Timestamp("approved_at"));
+        (int)r.Int("width"), (int)r.Int("height"), r.Text("taken"), r.Text("caption"), r.Text("status"), r.Bool("featured"), r.Timestamp("created"), r.Timestamp("approved_at"), r.Int("album_id"));
     private static Tag T(DataRow r) => new(r.Id, r.Text("name"), r.Text("kind"));
     private static PhotoTag PT(DataRow r) => new(r.Id, r.Int("photo_id"), r.Int("tag_id"), r.Int("by"));
     private static Comment C(DataRow r) => new(r.Id, r.Int("photo_id"), r.Int("guest_id"), r.Text("text"), r.Text("status"), r.Timestamp("created"));
@@ -151,6 +162,53 @@ public sealed class MomentsStore(IPluginData data)
         await Comments.DeleteWhereAsync(DataQuery.Everything.Eq("photo_id", p.Id), ct);
         await Hearts.DeleteWhereAsync(DataQuery.Everything.Eq("photo_id", p.Id), ct);
         await Photos.DeleteAsync(p.Id, ct);
+    }
+
+    // ---- albums -------------------------------------------------------------------------------------------------
+
+    private static Album A(DataRow r) => new(r.Id, r.Text("name"), (int)r.Int("sort"), r.Bool("guests"));
+
+    /// <summary>The albums in the hosts' order.</summary>
+    public async Task<IReadOnlyList<Album>> AlbumsAsync(CancellationToken ct = default) =>
+        (await Albums.QueryAsync(DataQuery.Everything.OrderBy("sort").OrderBy("id"), ct)).Select(A).ToList();
+    public async Task<Album?> AlbumAsync(long id, CancellationToken ct = default) => id > 0 && await Albums.GetAsync(id, ct) is DataRow r ? A(r) : null;
+
+    /// <summary>Where a guest's upload goes by itself (0 = no album).</summary>
+    public async Task<long> GuestAlbumAsync(CancellationToken ct = default) => (await AlbumsAsync(ct)).FirstOrDefault(a => a.Guests)?.Id ?? 0;
+
+    /// <summary>A new album at the end of the order.</summary>
+    public async Task<long> AddAlbumAsync(string name, CancellationToken ct = default)
+    {
+        var all = await AlbumsAsync(ct);
+        return await Albums.InsertAsync(new Dictionary<string, object?> { ["name"] = name, ["sort"] = all.Count == 0 ? 1 : all.Max(a => a.Sort) + 1, ["guests"] = false, ["created"] = DateTime.UtcNow }, ct);
+    }
+
+    /// <summary>Moves an album one place up or down (and numbers all of them anew, so equal numbers from an older order cannot stick).</summary>
+    public async Task MoveAlbumAsync(long id, int step, CancellationToken ct = default)
+    {
+        var all = (await AlbumsAsync(ct)).ToList();
+        var i = all.FindIndex(a => a.Id == id);
+        var j = i + Math.Sign(step);
+        if (i < 0 || j < 0 || j >= all.Count) return;
+        (all[i], all[j]) = (all[j], all[i]);
+        for (var k = 0; k < all.Count; k++) await Albums.UpdateAsync(all[k].Id, new Dictionary<string, object?> { ["sort"] = k + 1 }, ct);
+    }
+
+    /// <summary>Makes this album the one guests' uploads land in (only one can be) and takes in the guests' photos that are in no album yet. Answers how many.</summary>
+    public async Task<int> SetGuestAlbumAsync(long id, CancellationToken ct = default)
+    {
+        foreach (var a in await AlbumsAsync(ct)) if (a.Guests != (a.Id == id)) await Albums.UpdateAsync(a.Id, new Dictionary<string, object?> { ["guests"] = a.Id == id }, ct);
+        if (id <= 0) return 0;
+        var loose = (await PhotosAsync(ct: ct)).Where(p => p.GuestId > 0 && p.AlbumId == 0).ToList();
+        foreach (var p in loose) await Photos.UpdateAsync(p.Id, new Dictionary<string, object?> { ["album_id"] = id }, ct);
+        return loose.Count;
+    }
+
+    /// <summary>Removes the album; its photos stay (in no album).</summary>
+    public async Task DeleteAlbumAsync(long id, CancellationToken ct = default)
+    {
+        await Photos.UpdateWhereAsync(DataQuery.Everything.Eq("album_id", id), new Dictionary<string, object?> { ["album_id"] = 0 }, ct);
+        await Albums.DeleteAsync(id, ct);
     }
 
     // ---- tags ---------------------------------------------------------------------------------------------------

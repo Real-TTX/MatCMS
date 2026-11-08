@@ -956,4 +956,42 @@ public class VereinTests : IClassFixture<VereinApp>
         Assert.Equal("skipped-exists", ((System.Text.Json.Nodes.JsonObject)(await ops.RunOperationAsync(scope.ServiceProvider, "event.create", new System.Text.Json.Nodes.JsonObject { ["title"] = "Umzug per KI", ["starts"] = day + "T13:00" }))!)["status"]!.GetValue<string>());
         Assert.Contains("Umzug per KI", Text(await admin.GetStringAsync("/admin/p/verein/events")));
     }
+    [Fact]
+    public async Task The_instagram_list_takes_the_ticked_dates_of_a_period_a_month_is_one_click_and_compact_fits_more()
+    {
+        var admin = await _app.AsAsync("admin");
+        var ids = new List<string>();
+        for (var i = 0; i < 7; i++)
+        {
+            var res = await VereinApp.PostFormAsync(admin, "/admin/p/verein/events/new", new() { ["title"] = "Märzturnier " + i, ["kind"] = "Turnier", ["starts"] = $"2033-03-{10 + i}T10:00", ["place"] = "Platz " + i, ["public"] = "true", ["status"] = "published" });
+            ids.Add(Regex.Match(res.Headers.Location!.OriginalString, "events/(\\d+)").Groups[1].Value);
+        }
+        var url = "/admin/p/verein/instagram?vorlage=liste&format=square&von=2033-03-01&bis=2033-03-31&art=Turnier";
+        var page = await admin.GetStringAsync(url);
+        Assert.Contains("Termine im März 2033", Text(page));                               // the automatic heading names the month
+        Assert.Contains("7 von 7 Terminen ausgewählt", Text(page));
+        Assert.True(Regex.Matches(page, "<svg ").Count >= 2, "7 dates in the normal square list need more than one picture");
+        Assert.Contains("Alle herunterladen", page);
+
+        // tick one off: it is gone from the pictures, the others stay
+        var fields = new Dictionary<string, string>
+        {
+            ["vorlage"] = "liste", ["format"] = "square", ["stil"] = "kompakt", ["von"] = "2033-03-01", ["bis"] = "2033-03-31", ["art"] = "Turnier", ["oeffentlich"] = "true",
+            ["gezeigt"] = string.Join(",", ids), ["titel"] = "Termine im März 2033", ["titel_auto"] = "Termine im März 2033"
+        };
+        foreach (var id in ids.Skip(1)) fields["e_" + id] = "true";
+        var after = Text(await (await VereinApp.PostFormAsync(admin, url, fields)).Content.ReadAsStringAsync());
+        Assert.Contains("6 von 7 Terminen ausgewählt", after);
+        Assert.DoesNotContain("Märzturnier 0</text>", after.Replace("&lt;", "<"));
+        Assert.Contains("Märzturnier 6", after);
+        // compact: six dates on ONE square picture
+        var compact = await (await VereinApp.PostFormAsync(admin, url, new Dictionary<string, string>(fields))).Content.ReadAsStringAsync();
+        Assert.Single(Regex.Matches(compact, "<svg "));
+        // "Keine": nothing chosen, a word instead of a picture
+        var none = new Dictionary<string, string>(fields) { ["sel"] = "keine" };
+        Assert.Contains("Kein Termin ausgewählt", Text(await (await VereinApp.PostFormAsync(admin, url, none)).Content.ReadAsStringAsync()));
+        // the month links: one per month with dates, with their count
+        var start = await admin.GetStringAsync("/admin/p/verein/instagram?art=Turnier&von=2033-03-01&bis=2033-03-31");
+        Assert.Contains("März 2033 (7)", Text(start));
+    }
 }

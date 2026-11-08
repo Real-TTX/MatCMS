@@ -22,92 +22,165 @@ public static class VereinInstagram
 
     private static readonly (string Key, string Label, int W, int H)[] Formats = { ("square", "Quadrat 1080 × 1080", 1080, 1080), ("portrait", "Hochformat 1080 × 1350", 1080, 1350), ("story", "Story 1080 × 1920", 1080, 1920) };
 
+    private static readonly string[] MonthNames = { "Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember" };
+
+    /// <summary>
+    /// The page. Two templates: the LIST — pick the dates (a period and a kind narrow the choice, every date can be ticked off, a month or the season
+    /// is one click) and draw them normal or compact, on as many pictures as they need — and the POSTER, one date big. The old "saison" link
+    /// (a period, compact, the season's title) still lands on the list.
+    /// </summary>
     public static async Task<PluginResult> PageAsync(IPluginContext ctx, CancellationToken ct)
     {
         var store = new VereinStore(ctx.Data);
         string P(string k) => ctx.Request.IsPost ? ctx.Request.F(k) : ctx.Request.Q(k);
-        var template = P("vorlage") is "plakat" or "saison" ? P("vorlage") : "liste";
+        var legacySeason = P("vorlage") == "saison";
+        var template = P("vorlage") == "plakat" ? "plakat" : "liste";
+        var style = P("stil") is "kompakt" or "normal" ? P("stil") : legacySeason ? "kompakt" : "normal";
         var format = Formats.FirstOrDefault(f => f.Key == P("format")) is { Key: not null } ff ? ff : Formats[0];
         var everything = (await store.EventsAsync(ct)).Where(e => !e.Cancelled && !e.Draft).ToList();
-        var all = everything.Where(e => string.CompareOrdinal(e.Ends.Length >= 10 ? e.Ends[..10] : e.Day, V.Today) >= 0).ToList();
+        var upcoming = everything.Where(e => string.CompareOrdinal(e.Ends.Length >= 10 ? e.Ends[..10] : e.Day, V.Today) >= 0).ToList();
         long.TryParse(P("event"), out var eventId);
         var kind = P("art").Trim();
-        var count = int.TryParse(P("anzahl"), out var n) ? Math.Clamp(n, 1, 8) : 5;
-        var (defFrom, defTo, season) = DefaultSeason(ctx.Settings.Get(SeasonKind));
+        var onlyPublic = ctx.Request.IsPost ? V.Checked(ctx.Request.F("oeffentlich")) : ctx.Request.Q("oeffentlich") != "0";
+        bool Fits(Event e) => (!onlyPublic || e.Public) && (kind.Length == 0 || string.Equals(e.Kind, kind, StringComparison.OrdinalIgnoreCase));
+
+        // ---- the period and the chosen dates ----
+        var seasonKind = ctx.Settings.Get(SeasonKind);
+        var (defFrom, defTo, season) = DefaultSeason(seasonKind);
         var from = V.CleanDate(P("von")) is { Length: 10 } f1 ? f1 : defFrom;
         var to = V.CleanDate(P("bis")) is { Length: 10 } t1 ? t1 : defTo;
         if (string.CompareOrdinal(to, from) < 0) (from, to) = (to, from);
-        var heading = P("titel") is { Length: > 0 } t ? V.Clip(t, 40)
-            : template switch { "plakat" => "", "saison" => (ctx.Settings.Get(SeasonTitle) is { Length: > 0 } st ? st.Trim() : "Terminplan") + " " + (from[..4] == to[..4] ? to[..4] : from[..4] + "/" + to[2..4]), _ => "Nächste Termine" };
+        // a period counts every date in it, past ones too (a season's plan is made before and shared during it)
+        var candidates = everything.Where(e => Fits(e) && string.CompareOrdinal(e.Day, from) >= 0 && string.CompareOrdinal(e.Day, to) <= 0).OrderBy(e => e.Starts).ToList();
+        // A date is chosen unless its box was SHOWN and left empty: a date that came into the period with this very change starts ticked.
+        var shown = P("gezeigt").Split(',', StringSplitOptions.RemoveEmptyEntries).Select(x => long.TryParse(x, out var v) ? v : 0).ToHashSet();
+        var bulk = ctx.Request.IsPost ? ctx.Request.F("sel") : "";
+        var chosen = candidates.Where(e => bulk == "alle" || (bulk != "keine" && (!shown.Contains(e.Id) || V.Checked(ctx.Request.F("e_" + e.Id))))).ToList();
+
+        // ---- the heading: automatic until somebody types one of their own ----
+        string Auto()
+        {
+            if (template == "plakat") return "";
+            if (legacySeason || (seasonKind is "fasnet" or "jahr" && from == defFrom && to == defTo))
+                return (ctx.Settings.Get(SeasonTitle) is { Length: > 0 } st ? st.Trim() : "Terminplan") + " " + (from[..4] == to[..4] ? to[..4] : from[..4] + "/" + to[2..4]);
+            string M(string d) => MonthNames[int.Parse(d[5..7], CultureInfo.InvariantCulture) - 1];
+            if (from[..7] == to[..7]) return "Termine im " + M(from) + " " + from[..4];
+            // whole months of one year: "Termine Januar – Februar 2027"
+            var lastOfTo = new DateTime(int.Parse(to[..4], CultureInfo.InvariantCulture), int.Parse(to[5..7], CultureInfo.InvariantCulture), 1).AddMonths(1).AddDays(-1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            if (from[..4] == to[..4] && from[8..] == "01" && to == lastOfTo) return "Termine " + M(from) + " – " + M(to) + " " + from[..4];
+            return string.CompareOrdinal(from, V.Today) <= 0 ? "Nächste Termine" : "Termine";
+        }
+        var auto = Auto();
+        var typed = V.Clip(P("titel"), 40);
+        var heading = typed.Length > 0 && typed != P("titel_auto") ? typed : auto;
+
         var photo = P("bild");
-        var onlyPublic = ctx.Request.IsPost ? V.Checked(ctx.Request.F("oeffentlich")) : true;
-        bool Fits(Event e) => (!onlyPublic || e.Public) && (kind.Length == 0 || string.Equals(e.Kind, kind, StringComparison.OrdinalIgnoreCase));
-
-        var events = all.Where(Fits).ToList();
-        // a season counts every date in its period, past ones too (the plan is made before and shared during it)
-        var seasonEvents = everything.Where(e => Fits(e) && string.CompareOrdinal(e.Day, from) >= 0 && string.CompareOrdinal(e.Day, to) <= 0).ToList();
-        var single = template == "plakat" ? (all.FirstOrDefault(e => e.Id == eventId) ?? all.FirstOrDefault(e => e.Public) ?? all.FirstOrDefault()) : null;
-
         string? photoData = null, logoData = null;
         if (photo.StartsWith("/uploads/", StringComparison.Ordinal) && await ctx.Site.LoadImageAsync(photo, 1400, ct) is PluginImage pi) photoData = DataUrl(pi);
         if (ctx.Settings.Get(Logo) is { Length: > 0 } logo && await ctx.Site.LoadImageAsync(logo, 400, ct) is PluginImage li) logoData = DataUrl(li);
         var color = SafeColor(ctx.Settings.Get(Color));
         var footer = ctx.Settings.Get(Hashtags) is { Length: > 0 } h ? h : VereinSettings.Club(ctx);
-
         var club = VereinSettings.Club(ctx);
-        // one picture, or – a season with more dates than fit – several, numbered
+
+        // ---- the pictures: as many as the chosen dates need ----
+        var single = template == "plakat" ? (upcoming.FirstOrDefault(e => e.Id == eventId) ?? upcoming.FirstOrDefault(e => e.Public) ?? upcoming.FirstOrDefault()) : null;
         var svgs = new List<string>();
         if (template == "plakat") { if (single is not null) svgs.Add(Poster(single, format.W, format.H, color, photoData, logoData, club, footer, heading)); }
-        else if (template == "saison")
+        else if (chosen.Count > 0)
         {
-            var per = SeasonCapacity(format.H);
-            var pages = (seasonEvents.Count + per - 1) / per;
+            var per = style == "kompakt" ? SeasonCapacity(format.H) : ListCapacity(format.H);
+            var pages = (chosen.Count + per - 1) / per;
             for (var i = 0; i < pages; i++)
-                svgs.Add(Season(seasonEvents.Skip(i * per).Take(per).ToList(), i + 1, pages, from, to, format.W, format.H, color, photoData, logoData, club, footer, heading));
-        }
-        else if (events.Count > 0) svgs.Add(List(events.Take(count).ToList(), format.W, format.H, color, photoData, logoData, club, footer, heading));
-
-        var kinds = everything.Select(e => e.Kind).Where(k => k.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        var kindSelect = Ui.Select("art", "Nur diese Art", kind, new[] { Ui.Option("", "alle") }.Concat(kinds.Select(k => Ui.Option(k, k))).ToArray());
-        var form = Ui.Form(
-            Ui.Grid(200,
-                Ui.Select("vorlage", "Vorlage", template, Ui.Option("liste", "Terminliste (die nächsten)"), Ui.Option("saison", "Saison (alle Termine eines Zeitraums)"), Ui.Option("plakat", "Plakat (ein Termin)")),
-                Ui.Select("format", "Format", format.Key, Formats.Select(f => Ui.Option(f.Key, f.Label)).ToArray()),
-                Ui.Input("titel", "Überschrift", heading)),
-            template switch
             {
-                "plakat" => Ui.Select("event", "Termin", single?.Id.ToString(CultureInfo.InvariantCulture) ?? "", all.Select(e => Ui.Option(e.Id.ToString(CultureInfo.InvariantCulture), V.Date(e.Starts) + " – " + e.Title)).ToArray()),
-                "saison" => Ui.Grid(200, Ui.Input("von", "Von", from, UiInputType.Date), Ui.Input("bis", "Bis", to, UiInputType.Date), kindSelect),
-                _ => Ui.Grid(200, kindSelect, Ui.Select("anzahl", "Wie viele", count.ToString(CultureInfo.InvariantCulture), new[] { "3", "4", "5", "6", "8" }.Select(x => Ui.Option(x, x)).ToArray()))
-            },
-            template == "saison" ? Ui.Muted("Voreingestellt: " + season + " (Einstellungen → Instagram-Bild). Passen nicht alle Termine auf ein Bild, entstehen mehrere.") : null,
-            Ui.Image("bild", "Hintergrundfoto (freiwillig)", photo),
-            template == "plakat" ? null : Ui.Checkbox("oeffentlich", "Nur öffentliche Termine", onlyPublic),
-            Ui.FormActions(Ui.Submit("Vorschau aktualisieren")));
+                var part = chosen.Skip(i * per).Take(per).ToList();
+                svgs.Add(style == "kompakt"
+                    ? Season(part, i + 1, pages, chosen[0].Day, chosen[^1].Day, format.W, format.H, color, photoData, logoData, club, footer, heading)
+                    : List(part, i + 1, pages, format.W, format.H, color, photoData, logoData, club, footer, heading));
+            }
+        }
 
-        var name = template switch { "plakat" => "termin", "saison" => "narrenfahrplan", _ => "termine" } + "-" + format.Key;
+        // ---- the form ----
+        var kinds = everything.Select(e => e.Kind).Where(k => k.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(k => k).ToList();
+        string Link(string von, string bis) => VereinAdmin.Root + "instagram?vorlage=liste&stil=" + style + "&format=" + format.Key + "&von=" + von + "&bis=" + bis
+            + (kind.Length > 0 ? "&art=" + Uri.EscapeDataString(kind) : "") + (onlyPublic ? "" : "&oeffentlich=0");
+        // one click per month that has dates (from this month on, a year ahead), and the season
+        var months = everything.Where(Fits).Select(e => e.Day[..7]).Where(m => string.CompareOrdinal(m, V.Today[..7]) >= 0).Distinct().OrderBy(m => m).Take(12).ToList();
+        UiNode Quick() => Ui.Stack(
+            Ui.Muted("Schnell wählen:"),
+            Ui.Inline(new UiNode?[] { Ui.Button("Saison: " + season, Link(defFrom, defTo), UiButtonKind.Ghost, "ti-calendar", small: true) }
+                .Concat(months.Select(m =>
+                {
+                    var first = m + "-01";
+                    var last = new DateTime(int.Parse(m[..4], CultureInfo.InvariantCulture), int.Parse(m[5..7], CultureInfo.InvariantCulture), 1).AddMonths(1).AddDays(-1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                    var n = everything.Count(e => Fits(e) && e.Day[..7] == m);
+                    return (UiNode?)Ui.Button(MonthNames[int.Parse(m[5..7], CultureInfo.InvariantCulture) - 1] + " " + m[..4] + " (" + n + ")", Link(first, last), from == first && to == last ? UiButtonKind.Primary : UiButtonKind.Ghost, small: true);
+                })).ToArray()));
+
+        var chosenIds = chosen.Select(e => e.Id).ToHashSet();
+        UiNode Picker() => candidates.Count == 0
+            ? Ui.Empty("In diesem Zeitraum gibt es keine passenden Termine.")
+            : Ui.Stack(
+                Ui.Hidden("gezeigt", string.Join(",", candidates.Select(e => e.Id))),
+                Ui.Inline(Ui.Text(chosen.Count + " von " + candidates.Count + " Terminen ausgewählt"),
+                    Ui.Submit("Alle", UiButtonKind.Ghost, "sel", "alle", small: true), Ui.Submit("Keine", UiButtonKind.Ghost, "sel", "keine", small: true)),
+                Ui.Grid(300, candidates.Select(e => (UiNode?)Ui.Checkbox("e_" + e.Id, V.Badge(e.Starts).Weekday + " " + V.Date(e.Starts) + " – " + e.Title + (e.Public ? "" : " (intern)"), chosenIds.Contains(e.Id))).ToArray()));
+
+        var form = Ui.Form(
+            Ui.Hidden("titel_auto", auto),
+            Ui.Grid(200,
+                Ui.Select("vorlage", "Vorlage", template, Ui.Option("liste", "Terminliste (Termine auswählen)"), Ui.Option("plakat", "Plakat (ein Termin)")),
+                Ui.Select("format", "Format", format.Key, Formats.Select(f => Ui.Option(f.Key, f.Label)).ToArray()),
+                template == "plakat" ? null : Ui.Select("stil", "Darstellung", style, Ui.Option("normal", "Normal – große Datumskacheln"), Ui.Option("kompakt", "Kompakt – kleinere Schrift, mehr Termine")),
+                Ui.Input("titel", "Überschrift", heading) with { Help = template == "plakat" ? null : "Leer lassen = automatisch (" + auto + ")." }),
+            template == "plakat"
+                ? Ui.Select("event", "Termin", single?.Id.ToString(CultureInfo.InvariantCulture) ?? "", upcoming.Select(e => Ui.Option(e.Id.ToString(CultureInfo.InvariantCulture), V.Date(e.Starts) + " – " + e.Title)).ToArray())
+                : Ui.Grid(200, Ui.Input("von", "Von", from, UiInputType.Date), Ui.Input("bis", "Bis", to, UiInputType.Date),
+                    Ui.Select("art", "Nur diese Art", kind, new[] { Ui.Option("", "alle") }.Concat(kinds.Select(k => Ui.Option(k, k))).ToArray())),
+            template == "plakat" ? null : Ui.Checkbox("oeffentlich", "Nur öffentliche Termine", onlyPublic),
+            template == "plakat" ? null : Quick(),
+            template == "plakat" ? null : Ui.Heading("Termine", 3),
+            template == "plakat" ? null : Picker(),
+            Ui.Image("bild", "Hintergrundfoto (freiwillig)", photo),
+            Ui.FormActions(Ui.Submit("Vorschau aktualisieren", icon: "ti-refresh")));
+
+        var name = (template == "plakat" ? "termin" : "termine-" + (chosen.Count > 0 ? chosen[0].Day : from)) + "-" + format.Key;
         UiNode preview;
         if (svgs.Count == 0)
-            preview = Ui.Empty(template switch { "plakat" => "Kein kommender Termin zum Zeigen.", "saison" => "Keine Termine in diesem Zeitraum.", _ => "Keine passenden kommenden Termine." });
+            preview = Ui.Empty(template == "plakat" ? "Kein kommender Termin zum Zeigen." : candidates.Count == 0 ? "Keine Termine in diesem Zeitraum." : "Kein Termin ausgewählt.");
         else
         {
-            var html = new StringBuilder("<div class=\"vm-ig-list\" style=\"display:flex;flex-direction:column;gap:22px\">");
+            var html = new StringBuilder();
+            if (svgs.Count > 1)
+                html.Append("<p style=\"margin:0 0 14px\">").Append(chosen.Count).Append(" Termine passen nicht auf ein Bild – es sind ").Append(svgs.Count)
+                    .Append(" Bilder (fürs Karussell). <button type=\"button\" class=\"btn btn-sm vm-ig-all\"><i class=\"ti ti-download\"></i> Alle herunterladen</button></p>");
+            html.Append("<div class=\"vm-ig-list\" style=\"display:flex;flex-direction:column;gap:22px\">");
             for (var i = 0; i < svgs.Count; i++)
                 html.Append("<div class=\"vm-ig-item\" style=\"max-width:").Append(format.H > format.W ? 360 : 460).Append("px\">")
                     .Append(svgs[i].Replace("<svg ", "<svg style=\"width:100%;height:auto;display:block;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.18)\" "))
                     .Append("<p style=\"margin-top:12px\"><button type=\"button\" class=\"btn vm-ig-dl\" data-name=\"").Append(name).Append(svgs.Count > 1 ? "-" + (i + 1) : "")
                     .Append("\"><i class=\"ti ti-download\"></i> PNG herunterladen").Append(svgs.Count > 1 ? " (" + (i + 1) + "/" + svgs.Count + ")" : "").Append("</button></p></div>");
-            html.Append("</div><script>(function(){document.querySelectorAll('.vm-ig-dl').forEach(function(b){b.addEventListener('click',function(){var svg=b.closest('.vm-ig-item').querySelector('svg');")
+            html.Append("</div><script>(function(){function dl(b){var svg=b.closest('.vm-ig-item').querySelector('svg');")
                 .Append("var s=new XMLSerializer().serializeToString(svg).replace(/ style=\"[^\"]*\"/,'');var img=new Image();img.onload=function(){var c=document.createElement('canvas');c.width=").Append(format.W)
                 .Append(";c.height=").Append(format.H).Append(";c.getContext('2d').drawImage(img,0,0,").Append(format.W).Append(',').Append(format.H)
                 .Append(");c.toBlob(function(bl){var a=document.createElement('a');a.href=URL.createObjectURL(bl);a.download=b.dataset.name+'.png';document.body.appendChild(a);a.click();a.remove();},'image/png');};")
-                .Append("img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(s);});});})();</script>");
+                .Append("img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(s);}")
+                .Append("document.querySelectorAll('.vm-ig-dl').forEach(function(b){b.addEventListener('click',function(){dl(b);});});")
+                // one after the other: a browser refuses many downloads started in the same moment
+                .Append("var all=document.querySelector('.vm-ig-all');if(all)all.addEventListener('click',function(){var bs=[].slice.call(document.querySelectorAll('.vm-ig-dl'));bs.forEach(function(b,i){setTimeout(function(){dl(b);},i*700);});});})();</script>");
             preview = Ui.Html(html.ToString());
         }
 
         return PluginResult.Page(Ui.Stack(
-            Ui.PageHead("Termine als Bild für Instagram, Facebook oder WhatsApp – Vorlage wählen, Vorschau ansehen, herunterladen", "Instagram-Bild"),
-            Ui.Columns(new UiNode?[] { Ui.Card("Einstellungen", form), Ui.Muted("Farbe, Logo und die Zeile unten stehen in den Einstellungen des Vereins.") }, new UiNode?[] { Ui.Card("Vorschau", preview) })), "Instagram-Bild");
+            Ui.PageHead("Termine als Bild für Instagram, Facebook oder WhatsApp – auswählen, Vorschau ansehen, herunterladen", "Instagram-Bild"),
+            Ui.Columns(new UiNode?[] { Ui.Card("Einstellungen", form), Ui.Muted("Farbe, Logo, Saison und die Zeile unten stehen unter Einstellungen → Instagram-Bild.") }, new UiNode?[] { Ui.Card("Vorschau", preview) })), "Instagram-Bild");
+    }
+
+    /// <summary>How many dates the normal list draws on one picture (a row keeps at least 150 px — the date tile stays readable).</summary>
+    public static int ListCapacity(int h)
+    {
+        var top = h >= 1900 ? 260 : h >= 1300 ? 150 : 110;
+        var avail = h - (top + 110) - (h >= 1900 ? 300 : 140);
+        return Math.Clamp(avail / 150, 1, 8);
     }
 
     /// <summary>The season preselected by the setting: the next three months (default), this year, or the next Fasnet.</summary>
@@ -146,14 +219,14 @@ public static class VereinInstagram
     /// <summary>How many dates fit on one season picture of this height.</summary>
     public static int SeasonCapacity(int h) => Math.Max(1, (SeasonBottom(h) - 70 - (SeasonTop(h) + 190)) / SeasonRow);
 
-    /// <summary>"Saison / Narrenfahrplan": every date of a period, compact — date pill, title, time and place on one row; several pictures when they do not fit.</summary>
+    /// <summary>The compact list ("Saison"): every chosen date — date pill, title, time and place on one row; several pictures when they do not fit.</summary>
     private static string Season(List<Event> events, int page, int pages, string from, string to, int w, int h, string color, string? photo, string? logo, string club, string footer, string heading)
     {
         var sb = new StringBuilder();
         var top = SeasonTop(h);
         sb.Append(LogoBadge(logo, w - 140, top + 20));
         sb.Append("<text x=\"80\" y=\"").Append(top).Append("\" font-family=\"").Append(Body).Append("\" font-size=\"28\" font-weight=\"700\" letter-spacing=\"5\" fill=\"#fff\" opacity=\".85\">").Append(X(club.ToUpperInvariant())).Append("</text>");
-        sb.Append("<text x=\"80\" y=\"").Append(top + 78).Append("\" font-family=\"").Append(Head).Append("\" font-size=\"72\" fill=\"#fff\">").Append(X(heading)).Append("</text>");
+        sb.Append("<text x=\"80\" y=\"").Append(top + 78).Append("\" font-family=\"").Append(Head).Append("\" font-size=\"").Append(Fit(heading, w - 80 - (logo is null ? 80 : 240), 72)).Append("\" fill=\"#fff\">").Append(X(heading)).Append("</text>");
         var period = V.When(from, weekday: false) + " – " + V.When(to, weekday: false) + (pages > 1 ? "   ·   Seite " + page + "/" + pages : "");
         sb.Append("<text x=\"80\" y=\"").Append(top + 128).Append("\" font-family=\"").Append(Body).Append("\" font-size=\"30\" font-weight=\"600\" fill=\"#fff\" opacity=\".9\">").Append(X(period)).Append("</text>");
         var y = top + 190;
@@ -176,6 +249,9 @@ public static class VereinInstagram
         sb.Append("<text x=\"80\" y=\"").Append(SeasonBottom(h)).Append("\" font-family=\"").Append(Body).Append("\" font-size=\"30\" font-weight=\"700\" fill=\"#fff\" opacity=\".85\">").Append(X(footer)).Append("</text>");
         return Frame(w, h, color, photo, sb.ToString());
     }
+
+    /// <summary>A font size at which a heading in the heavy face fits the width (SVG text neither wraps nor shrinks; ~0.7 em per character is that face's average).</summary>
+    private static int Fit(string text, int width, int max) => Math.Clamp((int)(width / Math.Max(1, text.Length * 0.7)), 34, max);
 
     private static string DataUrl(PluginImage img) => "data:image/jpeg;base64," + Convert.ToBase64String(img.Jpeg);
     private static string SafeColor(string c) => System.Text.RegularExpressions.Regex.IsMatch(c ?? "", "^#[0-9a-fA-F]{6}$") ? c : "#8a1f33";
@@ -219,13 +295,13 @@ public static class VereinInstagram
         "<g transform=\"translate(" + x + "," + y + ")\"><circle r=\"70\" fill=\"#fff\"/><image href=\"" + logo + "\" xlink:href=\"" + logo + "\" x=\"-62\" y=\"-62\" width=\"124\" height=\"124\" clip-path=\"url(#lc)\" preserveAspectRatio=\"xMidYMid meet\"/></g>";
 
     /// <summary>"Terminliste": a heading and up to eight dates, each with a date badge.</summary>
-    private static string List(List<Event> events, int w, int h, string color, string? photo, string? logo, string club, string footer, string heading)
+    private static string List(List<Event> events, int page, int pages, int w, int h, string color, string? photo, string? logo, string club, string footer, string heading)
     {
         var sb = new StringBuilder();
         var top = h >= 1900 ? 260 : h >= 1300 ? 150 : 110;
         sb.Append(LogoBadge(logo, w - 140, top - 10));
         sb.Append("<text x=\"80\" y=\"").Append(top - 30).Append("\" font-family=\"").Append(Body).Append("\" font-size=\"30\" font-weight=\"700\" letter-spacing=\"5\" fill=\"#fff\" opacity=\".85\">").Append(X(club.ToUpperInvariant())).Append("</text>");
-        sb.Append("<text x=\"80\" y=\"").Append(top + 50).Append("\" font-family=\"").Append(Head).Append("\" font-size=\"78\" fill=\"#fff\">").Append(X(heading)).Append("</text>");
+        sb.Append("<text x=\"80\" y=\"").Append(top + 50).Append("\" font-family=\"").Append(Head).Append("\" font-size=\"").Append(Fit(heading, w - 80 - (logo is null ? 80 : 240), 78)).Append("\" fill=\"#fff\">").Append(X(heading)).Append("</text>");
         var avail = h - (top + 110) - (h >= 1900 ? 300 : 140);
         var row = Math.Min(190, avail / Math.Max(1, events.Count));
         // few dates: the list sits in the middle of the free space instead of hanging under the heading
@@ -247,6 +323,8 @@ public static class VereinInstagram
             y += row;
         }
         sb.Append("<text x=\"80\" y=\"").Append(h - (h >= 1900 ? 220 : 70)).Append("\" font-family=\"").Append(Body).Append("\" font-size=\"30\" font-weight=\"700\" fill=\"#fff\" opacity=\".85\">").Append(X(footer)).Append("</text>");
+        if (pages > 1)
+            sb.Append("<text x=\"").Append(w - 80).Append("\" y=\"").Append(h - (h >= 1900 ? 220 : 70)).Append("\" text-anchor=\"end\" font-family=\"").Append(Body).Append("\" font-size=\"30\" font-weight=\"700\" fill=\"#fff\" opacity=\".85\">").Append(page).Append(" / ").Append(pages).Append("</text>");
         return Frame(w, h, color, photo, sb.ToString());
     }
 

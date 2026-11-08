@@ -22,7 +22,7 @@ public static class VereinPublic
         b.Route(Base + "/dokumente/{id}", DocAsync, form);
         b.Route(Base + "/dokumente/{id}/datei", DocFileAsync, read);
         b.Route(Base + "/dokumente/{id}/pdf", DocPdfAsync, read);
-        b.Route(Base + "/termine", DatesAsync, read);
+        b.Route(Base + "/termine", DatesAsync, form);         // form: its list answers "Dabei" / "Nicht dabei" with the token of this page
         b.Route(Base + "/termine/{id}", EventAsync, form);
         b.Route(Base + "/sitzungen/{id}", MeetingAsync, form);
         b.Route(Base + "/sitzungen/{id}/pdf", MeetingPdfAsync, read);
@@ -216,7 +216,8 @@ public static class VereinPublic
         }
         sb.Append("</section></div>");
 
-        sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-calendar-event\"></i> Kommende Termine</h2>").Append(EventList(events, internalBadge: true, memberLinks: true, replies.Select(e => e.Id).ToHashSet())).Append("</section>");
+        sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-calendar-event\"></i> Kommende Termine</h2>").Append(await AgendaAsync(ctx, store, p, events, "home", ct))
+          .Append("<p class=\"vm-agenda-more\"><a href=\"").Append(Base).Append("/termine\">Alle Termine →</a></p></section>");
 
         if (uploads.Count > 0)
         {
@@ -431,6 +432,94 @@ public static class VereinPublic
         return sb.Append("</ul>").ToString();
     }
 
+    /// <summary>
+    /// The dates as the member area shows them: a schedule grouped by month, ONE line per date — day, title, time and place, the organiser on a line
+    /// of its own, clipped — and at the right what this member said. Who answers only for themself says "Dabei" / "Nicht dabei" right here (two
+    /// buttons of one small form, the chosen one filled, a click changes it); who answers for children too sees how many are answered and opens the
+    /// date. The list before — the date written out again under every title, two badges each on a line of its own, the whole description — was a wall
+    /// once every date asked for a reply. <paramref name="back"/> ("home", "termine") is where a quick answer returns to.
+    /// </summary>
+    private static async Task<string> AgendaAsync(IPluginContext ctx, VereinStore store, Person me, IReadOnlyList<Event> events, string back, CancellationToken ct)
+    {
+        if (events.Count == 0) return "<p class=\"vm-muted\">Gerade stehen keine Termine an.</p>";
+        var asking = events.Any(e => e.Ask && !e.Cancelled);
+        var people = asking ? await store.PeopleAsync(ct) : Array.Empty<Person>();
+        var board = VereinSettings.BoardList(ctx);
+        var answers = asking ? (await store.AllRepliesAsync(ct)).GroupBy(r => (r.EventId, r.MemberId)).ToDictionary(g => g.Key, g => g.First().Answer) : new Dictionary<(long, long), string>();
+        var today = V.Today;
+        var sb = new StringBuilder("<div class=\"vm-agenda\">");
+        string? month = null;
+        foreach (var e in events)
+        {
+            var title = MonthTitle(e.Starts);
+            if (title != month) { sb.Append("<h3 class=\"vm-agenda-month\">").Append(V.H(title)).Append("</h3>"); month = title; }
+            var (day, _, wd) = V.Badge(e.Starts);
+            sb.Append("<div class=\"vm-agenda-row").Append(e.Cancelled ? " is-cancelled" : "").Append("\"><a class=\"vm-agenda-main\" href=\"").Append(Base).Append("/termine/").Append(e.Id)
+              .Append("\"><span class=\"vm-date sm\"><b>").Append(V.H(day)).Append("</b><em>").Append(V.H(wd)).Append("</em></span><span class=\"vm-agenda-text\"><strong>").Append(V.H(e.Title));
+            if (e.HasPlan) sb.Append(" <i class=\"ti ti-list-details\" title=\"Ablauf &amp; Infos\" aria-label=\"Ablauf &amp; Infos\"></i>");
+            sb.Append("</strong>");
+            var meta = new List<string>();
+            if (TimeOf(e) is { Length: > 0 } time) meta.Add(time);
+            if (e.Place.Length > 0) meta.Add(e.Place);
+            if (meta.Count > 0) sb.Append("<small>").Append(V.H(string.Join(" · ", meta))).Append("</small>");
+            if (e.Description.Length > 0) sb.Append("<small class=\"vm-agenda-desc\">").Append(V.H(e.Description.Split('\n')[0].Trim())).Append("</small>");
+            sb.Append("</span></a><div class=\"vm-agenda-side\">");
+            if (!e.Public) sb.Append("<span class=\"vm-badge\">intern</span>");
+            if (e.Cancelled) sb.Append("<span class=\"vm-badge err\">abgesagt</span>");
+            else if (e.Ask)
+            {
+                var mine = VereinStore.AnswersFor(people, me, e, board);
+                var open = e.ReplyOpen(today);
+                if (mine.Count == 1 && open)
+                {
+                    var self = mine[0];
+                    answers.TryGetValue((e.Id, self.MemberId), out var a);
+                    if (e.AskRequired && a is null) sb.Append("<span class=\"vm-badge warn\">Pflicht</span>");
+                    sb.Append("<form method=\"post\" action=\"").Append(Base).Append("/termine/").Append(e.Id).Append("\" class=\"vm-quick\" aria-label=\"Bist du dabei?\">").Append(ctx.Antiforgery)
+                      .Append("<input type=\"hidden\" name=\"action\" value=\"reply\"><input type=\"hidden\" name=\"back\" value=\"").Append(back).Append("\">")
+                      .Append("<button class=\"vm-pick yes").Append(a == VereinStore.Yes ? " on" : "").Append("\" name=\"a.").Append(self.Id).Append("\" value=\"yes\" aria-pressed=\"").Append(a == VereinStore.Yes ? "true" : "false").Append("\"><i class=\"ti ti-check\" aria-hidden=\"true\"></i> Dabei</button>")
+                      .Append("<button class=\"vm-pick no").Append(a == VereinStore.No ? " on" : "").Append("\" name=\"a.").Append(self.Id).Append("\" value=\"no\" aria-pressed=\"").Append(a == VereinStore.No ? "true" : "false").Append("\">Nicht dabei</button></form>");
+                    if (a == VereinStore.Maybe) sb.Append("<span class=\"vm-badge warn\">vielleicht</span>");
+                }
+                else if (mine.Count > 0)
+                {
+                    var done = mine.Count(x => answers.ContainsKey((e.Id, x.MemberId)));
+                    sb.Append(done == mine.Count ? "<span class=\"vm-badge ok\">beantwortet</span>"
+                        : open ? "<a class=\"vm-badge" + (e.AskRequired ? " warn" : "") + "\" href=\"" + Base + "/termine/" + e.Id + "\">" + done + " von " + mine.Count + " beantwortet →</a>" : "");
+                }
+            }
+            sb.Append("</div></div>");
+        }
+        return sb.Append("</div>").Append(QuickScript).ToString();
+    }
+
+    /// <summary>"Dabei" / "Nicht dabei" without a reload — on a phone the page would start at the top again after every answer. (getAttribute: the form has a field named "action", so f.action is that field.) Without the script (or
+    /// when the request fails) the form is sent as it is and the page comes back with the answer.</summary>
+    private const string QuickScript = """
+<script>(function(){if(window.__vmQuick)return;window.__vmQuick=1;
+document.addEventListener('submit',function(e){var f=e.target;if(!f.classList||!f.classList.contains('vm-quick')||!window.fetch||!window.FormData||f.dataset.plain)return;
+e.preventDefault();var b=e.submitter;var d=new FormData(f);if(b&&b.name)d.append(b.name,b.value);d.append('ajax','1');f.classList.add('is-busy');
+fetch(f.getAttribute('action'),{method:'POST',body:d,credentials:'same-origin',headers:{Accept:'application/json'}}).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(j){if(!j||!j.ok)throw 0;
+f.querySelectorAll('.vm-pick').forEach(function(x){var on=x===b;x.classList.toggle('on',on);x.setAttribute('aria-pressed',on?'true':'false');});
+var side=f.parentNode;side.querySelectorAll('.vm-badge.warn').forEach(function(x){x.remove();});f.classList.remove('is-busy');})
+.catch(function(){f.classList.remove('is-busy');f.dataset.plain='1';if(b&&b.name){var h=document.createElement('input');h.type='hidden';h.name=b.name;h.value=b.value;f.appendChild(h);}f.submit();});});})();</script>
+""";
+
+    private static string MonthTitle(string starts) =>
+        starts.Length >= 7 && int.TryParse(starts[5..7], NumberStyles.None, CultureInfo.InvariantCulture, out var m) && m is >= 1 and <= 12
+            ? VereinInstagram.MonthNames[m - 1] + " " + starts[..4] : "";
+
+    /// <summary>"14:30 Uhr", "14:30–18:00 Uhr", "bis Mo, 10. Februar 2027" — the day itself is in the date tile.</summary>
+    private static string TimeOf(Event e)
+    {
+        static string Hm(string s) => s.Length >= 16 && s[11..16] != "00:00" ? s[11..16] : "";
+        var start = Hm(e.Starts);
+        var endsOtherDay = e.Ends.Length >= 10 && e.Ends[..10] != e.Day;
+        if (endsOtherDay) return (start.Length > 0 ? start + " Uhr " : "") + "bis " + V.When(e.Ends);
+        var end = e.Ends.Length > 0 ? Hm(e.Ends) : "";
+        return start.Length == 0 ? "" : end.Length > 0 && end != start ? start + "–" + end + " Uhr" : start + " Uhr";
+    }
+
     private static async Task<PluginResult> DatesAsync(IPluginContext ctx, CancellationToken ct)
     {
         var (who, deny) = await GateAsync(ctx, ct);
@@ -450,8 +539,7 @@ public static class VereinPublic
                 : m.MinutesStatus == VereinStore.Final ? "<span class=\"vm-badge ok\">Protokoll</span>" : "") + "</a>";
 
         var sb = new StringBuilder(Notice(ctx));
-        var waiting = (await OpenRepliesAsync(ctx, store, who.Person, ct)).Select(e => e.Id).ToHashSet();
-        sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-calendar-event\"></i> Termine</h2>").Append(EventList(events, internalBadge: true, memberLinks: true, waiting)).Append("</section>");
+        sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-calendar-event\"></i> Termine</h2>").Append(await AgendaAsync(ctx, store, who.Person, events, "termine", ct)).Append("</section>");
         sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-users-group\"></i> Sitzungen</h2>");
         if (upcoming.Count == 0) sb.Append("<p class=\"vm-muted\">Gerade ist keine Sitzung geplant.</p>");
         else sb.Append("<div class=\"vm-rows\">").Append(string.Concat(upcoming.Select(m => MeetingRow(m, true)))).Append("</div>");
@@ -475,10 +563,16 @@ public static class VereinPublic
         if (ctx.Request.IsPost)
         {
             if (ctx.Request.Action != "reply" || !e.ReplyOpen(V.Today) || mine.Count == 0) return PluginResult.Redirect(Base + "/termine/" + e.Id);
+            var before = ctx.Request.Form.Keys.Any(k => k.StartsWith("n.", StringComparison.Ordinal)) ? null : (await store.RepliesAsync(e.Id, ct)).ToDictionary(r => r.MemberId, r => r.Note);
             foreach (var p in mine)
                 if (ctx.Request.F("a." + p.Id) is VereinStore.Yes or VereinStore.No or VereinStore.Maybe)
-                    await store.SetReplyAsync(e.Id, p.MemberId, ctx.Request.F("a." + p.Id), V.Clip(ctx.Request.F("n." + p.Id), 200).Replace("\n", " "), who!.Person.MemberId, ct);
-            return PluginResult.Redirect(Base + "/termine/" + e.Id + "?ok=zusage");
+                {
+                    // the list's two buttons send no note: the one written on the date's page stays
+                    var note = before is null ? V.Clip(ctx.Request.F("n." + p.Id), 200).Replace("\n", " ") : before.GetValueOrDefault(p.MemberId, "");
+                    await store.SetReplyAsync(e.Id, p.MemberId, ctx.Request.F("a." + p.Id), note, who!.Person.MemberId, ct);
+                }
+            if (ctx.Request.F("ajax") == "1") return PluginResult.Json(new System.Text.Json.Nodes.JsonObject { ["ok"] = true });
+            return PluginResult.Redirect(ctx.Request.F("back") switch { "termine" => Base + "/termine?ok=zusage", "home" => Base + "?ok=zusage", _ => Base + "/termine/" + e.Id + "?ok=zusage" });
         }
 
         var sb = new StringBuilder(Notice(ctx) + "<p><a href=\"" + Base + "/termine\">← Termine & Sitzungen</a></p>");

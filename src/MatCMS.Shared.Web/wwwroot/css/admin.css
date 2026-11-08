@@ -1931,6 +1931,14 @@ table.data.attention-list td.attention-why { white-space: normal; overflow-wrap:
 html[data-theme] .alert-warning { background: var(--warn-bg); border-color: var(--warn-line); color: var(--warn-fg); }
 .alert-warning { background: #fdf6e3; border-color: #ecd9a0; color: #7a5a00; padding: 14px 18px; margin-bottom: 24px; font-size: 15px; border: 1px solid; }
 .ui-stack > .card, .ui-stack > .alert, .ui-stack > .stat-grid { margin-bottom: 0; }
+/* A plugin's card (UiRenderer: .card.ui-flow) lays its pieces out with ONE gap. As a plain .card its pieces kept only their own margins, and most have
+   none: a row of buttons sat on the list below it, "Kind eintragen" on the last child. Margins up and down give way to the gap (side margins stay);
+   buttons, action forms and links keep their own width instead of stretching across the card. */
+.card.ui-flow { display: flex; flex-direction: column; gap: 14px; }
+.card.ui-flow > * { margin-top: 0; margin-bottom: 0; }
+.card.ui-flow > :is(a, button, .btn, .inline-form, .badge) { align-self: flex-start; }
+/* A row's own form with a field and its button (an answer + OK): side by side, not stacked — every row was twice as tall. */
+table.data td .form-grid:has(> .field):has(> button) { grid-template-columns: minmax(150px, 1fr) auto; align-items: center; gap: 8px; }
 .ui-form { max-width: 860px; }
 /* A form that holds a main and a side column (a product, an order, a category) is an editor, not a settings card: it uses the width there is. */
 .ui-form:has(.ui-cols) { max-width: none; }

@@ -1079,4 +1079,36 @@ public class VereinTests : IClassFixture<VereinApp>
         Assert.Equal(HttpStatusCode.Redirect, (await VereinApp.PostFormAsync(frieda, "/mitglied/termine/" + id, new() { ["action"] = "reply", ["a." + me] = "yes" })).StatusCode);
         Assert.Contains("1 dabei", Text(await admin.GetStringAsync("/admin/p/verein/events/" + id)));
     }
+    [Fact]
+    public async Task The_member_dates_are_a_schedule_by_month_and_a_member_answers_in_the_list_without_losing_a_note()
+    {
+        await JoinAsync("greta", "Mitglied");
+        var admin = await _app.AsAsync("admin");
+        var day = DateTime.UtcNow.AddDays(40);
+        var res = await VereinApp.PostFormAsync(admin, "/admin/p/verein/events/new", new()
+        {
+            ["title"] = "Umzug Listenstadt", ["kind"] = "Umzug", ["starts"] = day.ToString("yyyy-MM-dd") + "T14:30", ["place"] = "Listenstadt", ["description"] = "Narrenzunft Listenstadt\nmehr Text", ["public"] = "true", ["status"] = "published", ["ask"] = "true", ["ask_audience"] = "all"
+        });
+        var id = Regex.Match(res.Headers.Location!.OriginalString, "events/(\\d+)").Groups[1].Value;
+        var greta = await _app.AsAsync("greta");
+        var page = await greta.GetStringAsync("/mitglied/termine");
+        string[] months = { "Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember" };
+        Assert.Contains(months[day.Month - 1] + " " + day.Year, Text(page));                                   // grouped by month
+        Assert.Contains("14:30 Uhr · Listenstadt", Text(page));                                                // the time, not the date again
+        Assert.DoesNotContain("mehr Text", Text(page));                                                        // the first line of the text only
+        Assert.Contains("action=\"/mitglied/termine/" + id + "\" class=\"vm-quick\"", page);                   // "Dabei" / "Nicht dabei" in the list
+        var me = Regex.Match(page, "action=\"/mitglied/termine/" + id + "\" class=\"vm-quick\".*?name=\"a\\.(\\d+)\"", RegexOptions.Singleline).Groups[1].Value;
+
+        // a note written on the date's page …
+        Assert.Equal(HttpStatusCode.Redirect, (await VereinApp.PostFormAsync(greta, "/mitglied/termine/" + id, new() { ["action"] = "reply", ["a." + me] = "yes", ["n." + me] = "komme später" })).StatusCode);
+        // … survives the list's quick answer, which comes back as a short answer (the list stays where it is)
+        var quick = await VereinApp.PostFormAsync(greta, "/mitglied/termine", new() { ["action"] = "reply", ["back"] = "termine", ["ajax"] = "1", ["a." + me] = "no" }, "/mitglied/termine/" + id);
+        Assert.Equal("{\"ok\":true}", await quick.Content.ReadAsStringAsync());
+        var list = Text(await admin.GetStringAsync("/admin/p/verein/events/" + id));
+        Assert.Contains("1 nicht dabei", list);
+        Assert.Contains("komme später", list);
+        // without the script the list's form goes back to the list
+        var plain = await VereinApp.PostFormAsync(greta, "/mitglied/termine", new() { ["action"] = "reply", ["back"] = "termine", ["a." + me] = "yes" }, "/mitglied/termine/" + id);
+        Assert.Equal("/mitglied/termine?ok=zusage", plain.Headers.Location!.OriginalString);
+    }
 }

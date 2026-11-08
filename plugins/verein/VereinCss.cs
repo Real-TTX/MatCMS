@@ -10,7 +10,7 @@ public static class VereinCss
 .vm .vm-head h1{overflow-wrap:anywhere}
 .vm .vm-head h1{margin:0;font-size:clamp(1.7rem,3vw,2.3rem)}
 .vm .vm-me{display:inline-flex;align-items:center;gap:10px;color:inherit;font-size:14px;font-weight:600;text-decoration:none;padding:4px 12px 4px 4px;border:1px solid var(--vm-line);border-radius:999px;background:#fff}
-@media (max-width:600px){.vm .vm-club{display:none}.vm .vm-head{flex-wrap:nowrap;align-items:center}.vm .vm-me span{display:none}.vm .vm-me{padding:3px}.vm .vm-hint{padding:18px}.vm .vm-hint-icon{display:none}}
+@media (max-width:600px){.vm .vm-club{display:none}.vm .vm-head{flex-wrap:nowrap;align-items:center}.vm .vm-me>span:not(.vm-avatar){display:none}.vm .vm-me{padding:3px}.vm .vm-hint{padding:18px}.vm .vm-hint-icon{display:none}}
 .vm .vm-kicker a{color:inherit;text-decoration:none}.vm .vm-kicker a:hover{text-decoration:underline}
 .vm .vm-main{display:grid;gap:22px}
 .vm .vm-hint{display:flex;gap:16px;align-items:flex-start;padding:20px 22px;border-radius:18px;background:linear-gradient(135deg,var(--vm-accent),color-mix(in srgb,var(--vm-accent) 70%,#000));color:#fff;box-shadow:0 12px 30px color-mix(in srgb,var(--vm-accent) 30%,transparent)}
@@ -161,6 +161,42 @@ public static class VereinCss
  .vm .vm-grid2,.vm .vm-row2{grid-template-columns:1fr}
  .vm .vm-card{padding:18px 16px}
  .vm .vm-progress{width:70px}
+}
+/* The member area's schedule (VereinPublic.AgendaAsync): month headings, one line per date, the answer at the right. */
+.vm .vm-agenda{display:flex;flex-direction:column}
+.vm .vm-agenda-month{margin:20px 0 4px;font-size:12.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--vm-muted)}
+.vm .vm-agenda-month:first-child{margin-top:2px}
+.vm .vm-agenda-row{display:flex;align-items:center;gap:14px;padding:10px 0;border-top:1px solid var(--vm-line)}
+.vm .vm-agenda-month+.vm-agenda-row{border-top:0}
+.vm .vm-agenda-main{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:14px;color:inherit;text-decoration:none}
+.vm .vm-agenda-main:hover strong{color:var(--vm-accent)}
+.vm .vm-date.sm{width:50px;padding:6px 2px;border-radius:10px}
+.vm .vm-date.sm b{font-size:1.3rem}
+.vm .vm-date.sm em{font-size:11px;margin-top:1px}
+.vm .vm-agenda-text{display:flex;flex-direction:column;gap:1px;min-width:0}
+.vm .vm-agenda-text strong{font-size:1rem;line-height:1.3}
+.vm .vm-agenda-text strong .ti{color:var(--vm-muted);font-size:.95em;vertical-align:-1px}
+.vm .vm-agenda-text small{color:var(--vm-muted);font-size:13.5px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vm .vm-agenda-desc{font-size:13px!important;opacity:.85}
+.vm .vm-agenda-row.is-cancelled .vm-agenda-text strong{text-decoration:line-through;opacity:.65}
+.vm .vm-agenda-row.is-cancelled .vm-date{opacity:.45}
+.vm .vm-agenda-side{flex:none;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.vm .vm-agenda-side a.vm-badge{text-decoration:none}
+.vm .vm-quick{display:inline-flex;border:1px solid var(--vm-line);border-radius:999px;overflow:hidden;background:#fff}
+.vm .vm-pick{border:0;background:transparent;padding:7px 13px;font:inherit;font-size:13.5px;font-weight:600;color:var(--vm-muted);cursor:pointer;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.vm .vm-pick+.vm-pick{border-left:1px solid var(--vm-line)}
+.vm .vm-pick:hover{background:var(--vm-soft);color:inherit}
+.vm .vm-pick.yes.on{background:#1e7a3c;color:#fff}
+.vm .vm-pick.no.on{background:#6b6b6b;color:#fff}
+.vm .vm-quick.is-busy{opacity:.6;pointer-events:none}
+.vm .vm-agenda-more{margin:12px 0 0;font-weight:600}
+.vm .vm-agenda-more a{color:var(--vm-accent);text-decoration:none}
+@media (max-width:640px){
+ .vm .vm-agenda-row{flex-wrap:wrap;gap:8px 12px}
+ .vm .vm-agenda-main{gap:12px}
+ .vm .vm-agenda-side{width:100%;justify-content:flex-start;padding-left:62px}
+ .vm .vm-agenda-text strong{white-space:normal}
+ .vm .vm-pick{padding:9px 14px}
 }
 /* last, so it wins over the rules above: the head's picture keeps its size, the hint loses its icon on a phone */
 .vm .vm-me{flex:none}.vm .vm-tile{align-content:start}

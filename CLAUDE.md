@@ -282,6 +282,8 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
   "None" is the `Placeholder` (a field that is not required can be cleared); `AutoSubmit` saves a row's own form at once (ui-fields.js) — no OK button. The first
   version (CMS 1.13.368) had its own drop-down and sent `skip`; the Verein plugin reads both. A native plugin that uses it builds the field in a `NoInlining`
   helper and catches `TypeLoadException`, falling back to a select, so it still loads on an older host.
+  A plugin's card in the admin is `.card.ui-flow`: its pieces get ONE gap (a plain `.card` left a row of buttons glued to the list below it); buttons and
+  action forms keep their width, and a row's own form with a field and a button (an answer + OK) puts them side by side.
   On a phone the row editor (`Ui.RowEditor`, list settings) wraps each row like a small form: a switch carries its column's name beside the box, a row of a name and
   switches (roles, own fields) stays ONE line, longer rows put the further fields two by two. Its cells need `tr > td` to beat the bridge's table padding.
 - **Template parts** (`IPluginBuilder.TemplatePart(TemplatePartSpec)`, `IPluginContext.RenderPart`): a plugin ships HTML files with a built-in default that the ACTIVE template may replace — the template

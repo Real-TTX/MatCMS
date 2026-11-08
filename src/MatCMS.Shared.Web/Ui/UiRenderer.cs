@@ -103,7 +103,8 @@ public static class UiRenderer
                 case UiColumns cols:
                     _sb.Append("<div class=\"ui-cols\"><div class=\"ui-cols-main\">"); Children(cols.Main); _sb.Append("</div><aside class=\"ui-cols-side\">"); Children(cols.Side); _sb.Append("</aside></div>"); break;
                 case UiCard c:
-                    _sb.Append(Admin ? "<div class=\"card\">" : "<div class=\"ui-card\">");
+                    // ui-flow: the card's pieces get one gap (admin.css) — a plain .card glued a row of buttons onto the list below it
+                    _sb.Append(Admin ? "<div class=\"card ui-flow\">" : "<div class=\"ui-card\">");
                     if (!string.IsNullOrWhiteSpace(c.Title)) _sb.Append("<h2>").Append(E(c.Title)).Append("</h2>");
                     Children(c.Children); _sb.Append("</div>"); break;
                 case UiPageHead h: PageHead(h); break;

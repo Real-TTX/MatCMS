@@ -146,7 +146,7 @@ public class UiRendererTests
         var tree = Ui.Card("Titel", Ui.Alert("hallo", UiTone.Success), Ui.Button("Los", "/x", UiButtonKind.Ghost), Ui.Input("a", "A"));
         var admin = Admin(tree);
         var pub = Public(tree);
-        Assert.Contains("class=\"card\"", admin);
+        Assert.Contains("class=\"card ui-flow\"", admin);
         Assert.Contains("btn-ghost", admin);
         Assert.Contains("class=\"field\"", admin);
         Assert.Contains("class=\"ui-card\"", pub);

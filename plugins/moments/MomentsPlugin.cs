@@ -113,8 +113,9 @@ public sealed class MomentsPlugin : IPlugin
 }
 
 /// <summary>
-/// For a signed-in household the site's main menu gets the gallery's entry with its pages under it (asked per page view, with the visitor's own context —
-/// anybody else sees nothing of it).
+/// For a signed-in household the site's main menu gets the gallery's entry with its pages under it, and "Abmelden" as the last entry of the menu — the far
+/// right of a header — where people look for it (asked per page view, with the visitor's own context — anybody else sees nothing of it). The host puts a
+/// plugin's entries after the site's own, in their <see cref="MenuEntry.Order"/>.
 /// </summary>
 public static class MomentsMenu
 {
@@ -127,7 +128,10 @@ public static class MomentsMenu
         var children = new List<MenuEntry> { new("Alle Fotos", B) { Icon = "photo", Order = 1 } };
         if (ctx.Settings.GetBool(MomentsSettings.GuestUpload)) children.Add(new MenuEntry("Fotos hochladen", B + "/hochladen") { Icon = "camera-plus", Order = 2 });
         children.Add(new MenuEntry("Meine Fotos", B + "/meine") { Icon = "user-heart", Order = 3 });
-        children.Add(new MenuEntry("Abmelden", B + "/abmelden") { Icon = "logout", Order = 99 });
-        return new[] { new MenuEntry(MomentsSettings.Menu(ctx), B) { Icon = "photo-heart", Order = 900, Children = children } };
+        return new[]
+        {
+            new MenuEntry(MomentsSettings.Menu(ctx), B) { Icon = "photo-heart", Order = 900, Children = children },
+            new MenuEntry("Abmelden", B + "/abmelden") { Icon = "logout", Order = 999 }
+        };
     });
 }

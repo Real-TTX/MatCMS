@@ -328,36 +328,70 @@ public static class MomentsAdmin
     private static async Task<PluginResult> GuestsAsync(IPluginContext ctx, CancellationToken ct)
     {
         var store = new MomentsStore(ctx.Data);
+        var mode = MomentsSettings.Mode(ctx);
         if (ctx.Request.IsPost && ctx.Request.Action == "bulk")
         {
-            // one household per line: "Name | Personen | Tisch" (Personen and Tisch may be left out)
+            // one household per line: "Name | Personen | Tisch | Benutzername | Passwort" (everything after the name may be left out)
             var lines = ctx.Request.F("lines").Replace("\r", "").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Take(500).ToList();
-            var known = (await store.GuestsAsync(ct)).Select(g => g.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var all = await store.GuestsAsync(ct);
+            var known = all.Select(g => g.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var logins = all.Where(g => g.Login.Length > 0).Select(g => g.Login).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var format = MomentsSettings.CodeFormat(ctx);
             var added = 0;
+            var skipped = new List<string>();
             foreach (var line in lines)
             {
                 var parts = line.Split('|').Select(x => x.Trim()).ToArray();
                 var name = M.Line(parts[0], 120);
                 if (name.Length == 0 || known.Contains(name)) continue;
+                var login = parts.Length > 3 ? Passwords.CleanLogin(parts[3]) : "";
+                var password = parts.Length > 4 ? parts[4] : "";
+                if (login is null) { skipped.Add(name + " (Benutzername)"); continue; }
+                if (login.Length > 0 && logins.Contains(login)) { skipped.Add(name + " (Benutzername vergeben)"); continue; }
+                if (login.Length > 0 && password.Length is < Passwords.MinLength or > Passwords.MaxLength) { skipped.Add(name + " (Passwort zu kurz)"); continue; }
                 var people = parts.Length > 1 && parts[1].Length > 0 ? parts[1] : name;
-                await store.SaveGuestAsync(0, name, M.Clip(string.Join(", ", MomentsStore.SplitPeople(people)), 400), parts.Length > 2 ? M.Line(parts[2], 60) : "", "", true, ct);
+                var id = await store.SaveGuestAsync(0, name, M.Clip(string.Join(", ", MomentsStore.SplitPeople(people)), 400), parts.Length > 2 ? M.Line(parts[2], 60) : "", "", true, format, ct);
+                if (login.Length > 0)
+                {
+                    await store.Guests.UpdateAsync(id, new Dictionary<string, object?> { ["login"] = login, ["password"] = Passwords.Hash(password) }, ct);
+                    logins.Add(login);
+                }
                 known.Add(name);
                 added++;
             }
-            return PluginResult.Redirect(Root + "guests", added == 0 ? "Niemand Neues gefunden (schon vorhandene Namen werden übersprungen)." : M.Plural(added, "Haushalt", "Haushalte") + " angelegt – jeder mit eigenem Zugangscode.");
+            var msg = added == 0 ? "Niemand Neues angelegt (schon vorhandene Namen werden übersprungen)." : M.Plural(added, "Haushalt", "Haushalte") + " angelegt – jeder mit eigenem Zugang.";
+            if (skipped.Count > 0) msg += " Nicht angelegt: " + string.Join(", ", skipped.Take(10)) + (skipped.Count > 10 ? " …" : "") + ".";
+            return PluginResult.Redirect(Root + "guests", msg, skipped.Count > 0 && added == 0);
         }
         var guests = await store.GuestsAsync(ct);
         var photos = await store.PhotosAsync(ct: ct);
         var count = photos.GroupBy(p => p.GuestId).ToDictionary(g => g.Key, g => g.Count());
         var signedIn = guests.Count(g => g.Visits > 0);
+        var codes = mode != MomentsSettings.ModePassword;
+        var showLogins = mode != MomentsSettings.ModeCode || guests.Any(g => g.Login.Length > 0);
+        var columns = new List<UiColumn> { Ui.Column("Haushalt"), Ui.Column("Personen"), NotOnPhone(Ui.Column("Tisch")) };
+        if (codes) columns.Add(Ui.Column("Code"));
+        if (showLogins) columns.Add(Ui.Column("Benutzername"));
+        columns.AddRange(new[] { NotOnPhone(Ui.Column("Zuletzt da")), NotOnPhone(Ui.Column("Fotos", right: true)), Ui.Column("Status") });
         return PluginResult.Page(Ui.Stack(
-            Ui.PageHead("Jeder Haushalt bekommt einen persönlichen Zugangscode – mit Link und QR-Code, ohne E-Mail und Passwort.", "Gäste",
-                guests.Count > 0 ? Ui.Button("Zugangskarten drucken", B + "/karten", UiButtonKind.Ghost, "ti-printer") with { NewTab = true } : null),
-            Ui.Table(new[] { Ui.Column("Haushalt"), Ui.Column("Personen"), NotOnPhone(Ui.Column("Tisch")), Ui.Column("Code"), NotOnPhone(Ui.Column("Zuletzt da")), NotOnPhone(Ui.Column("Fotos", right: true)), Ui.Column("Status") },
-                guests.Select(g => Ui.RowFor(g.Name + " " + g.People + " " + g.Table + " " + g.Code,
-                    Ui.Link(g.Name, Root + "guests/" + g.Id), string.Join(", ", g.PeopleList), g.Table, g.CodeShown,
-                    g.LastSeen is null ? "noch nie" : M.Stamp(g.LastSeen), count.TryGetValue(g.Id, out var n) ? M.N(n) : "–",
-                    !g.Active ? Ui.Badge("gesperrt", UiTone.Error) : g.Visits > 0 ? Ui.Badge("angemeldet", UiTone.Success) : Ui.Badge("noch nicht da", UiTone.Muted))),
+            Ui.PageHead(mode switch
+                {
+                    MomentsSettings.ModePassword => "Jeder Haushalt meldet sich mit Benutzername und Passwort an – beides vergebt ihr hier.",
+                    MomentsSettings.ModeBoth => "Jeder Haushalt hat einen persönlichen Code (mit Link und QR-Code) und – wenn ihr wollt – Benutzername und Passwort.",
+                    _ => "Jeder Haushalt bekommt einen persönlichen Zugangscode – mit Link und QR-Code, ohne E-Mail und Passwort."
+                }, "Gäste",
+                guests.Count > 0 ? Ui.Button("Zugangskarten", B + "/karten", UiButtonKind.Ghost, "ti-printer") with { NewTab = true } : null),
+            Ui.Table(columns,
+                guests.Select(g =>
+                {
+                    var cells = new List<object?> { Ui.Link(g.Name, Root + "guests/" + g.Id), string.Join(", ", g.PeopleList), g.Table };
+                    if (codes) cells.Add(g.CodeShown);
+                    if (showLogins) cells.Add(g.Login.Length == 0 ? "–" : g.Login + (g.HasPassword ? "" : " (ohne Passwort)"));
+                    cells.Add(g.LastSeen is null ? "noch nie" : M.Stamp(g.LastSeen));
+                    cells.Add(count.TryGetValue(g.Id, out var n) ? M.N(n) : "–");
+                    cells.Add(!g.Active ? Ui.Badge("gesperrt", UiTone.Error) : g.Visits > 0 ? Ui.Badge("angemeldet", UiTone.Success) : Ui.Badge("noch nicht da", UiTone.Muted));
+                    return Ui.RowFor(g.Name + " " + g.People + " " + g.Table + " " + g.Code + " " + g.Login, cells.ToArray());
+                }),
                 searchPlaceholder: "Gäste durchsuchen …", pageSize: 100, emptyText: "Noch keine Gäste.") with
             {
                 Below = new UiNode[] { Ui.Button("Neuer Haushalt", Root + "guests/new", UiButtonKind.Primary, "ti-plus") }
@@ -365,7 +399,11 @@ public static class MomentsAdmin
             Ui.Muted(signedIn + " von " + guests.Count + " Haushalten waren schon im Gästebereich."),
             Ui.Card("Mehrere auf einmal anlegen", Ui.Form(
                 Ui.Hidden("action", "bulk"),
-                Ui.TextArea("lines", "Ein Haushalt pro Zeile", "", 8) with { Help = "Name | Personen | Tisch – z. B. „Zoe & Fabian | Zoe, Fabian | Startlinie“. Personen und Tisch dürfen fehlen; ein Name, den es schon gibt, wird übersprungen." },
+                Ui.TextArea("lines", "Ein Haushalt pro Zeile", "", 8) with
+                {
+                    Help = "Name | Personen | Tisch | Benutzername | Passwort – z. B. „Zoe & Fabian | Zoe, Fabian | Startlinie“ oder „Zoe & Fabian | | | zoe | Start12345“. " +
+                           "Alles nach dem Namen darf fehlen; ein Name, den es schon gibt, wird übersprungen. Jeder bekommt außerdem einen Code im eingestellten Format."
+                },
                 Ui.FormActions(Ui.Submit("Anlegen"))))
         ), "Gäste");
     }
@@ -373,25 +411,57 @@ public static class MomentsAdmin
     private static async Task<PluginResult> GuestAsync(IPluginContext ctx, CancellationToken ct)
     {
         var store = new MomentsStore(ctx.Data);
+        var mode = MomentsSettings.Mode(ctx);
         var isNew = ctx.Request.R("id") == "new";
         var g = isNew ? null : await store.GuestAsync(Id(ctx), ct);
         if (!isNew && g is null) return PluginResult.NotFound();
         if (ctx.Request.IsPost)
         {
+            var here = Root + "guests/" + (isNew ? "new" : M.N(g!.Id));
             switch (ctx.Request.Action)
             {
                 case "save":
                 {
                     var name = M.Line(ctx.Request.F("name"), 120);
-                    if (name.Length == 0) return PluginResult.Redirect(Root + "guests/" + (isNew ? "new" : M.N(g!.Id)), "Bitte einen Namen eingeben.", true);
+                    if (name.Length == 0) return PluginResult.Redirect(here, "Bitte einen Namen eingeben.", true);
+                    var all = await store.GuestsAsync(ct);
+                    // the code: kept, typed by the hosts ("START12345"), or made in the chosen format for a new household
+                    var typedCode = ctx.Request.F("code");
+                    var code = Codes.Normalize(typedCode);
+                    var codeChanged = typedCode.Trim().Length > 0 && code != (g?.Code ?? "");
+                    if (codeChanged)
+                    {
+                        if (Codes.Problem(typedCode) is string problem) return PluginResult.Redirect(here, problem, true);
+                        if (all.Any(x => x.Id != (g?.Id ?? 0) && x.Code == code)) return PluginResult.Redirect(here, "Diesen Code hat schon ein anderer Haushalt.", true);
+                    }
+                    // user name + password: the password only when one is typed (empty = keep); no user name = no password either
+                    var login = Passwords.CleanLogin(ctx.Request.F("login"));
+                    if (login is null) return PluginResult.Redirect(here, "Ein Benutzername hat 3 bis 40 Zeichen: Buchstaben, Ziffern, Leerzeichen, Punkt, Bindestrich, Unterstrich oder @.", true);
+                    if (login.Length > 0 && all.Any(x => x.Id != (g?.Id ?? 0) && string.Equals(x.Login, login, StringComparison.OrdinalIgnoreCase)))
+                        return PluginResult.Redirect(here, "Diesen Benutzernamen hat schon ein anderer Haushalt.", true);
+                    var password = ctx.Request.F("password");
+                    if (password.Length > 0 && password.Length is < Passwords.MinLength or > Passwords.MaxLength)
+                        return PluginResult.Redirect(here, "Ein Passwort braucht mindestens " + Passwords.MinLength + " Zeichen.", true);
+                    if (login.Length > 0 && password.Length == 0 && (g?.PasswordHash ?? "").Length == 0)
+                        return PluginResult.Redirect(here, "Zum Benutzernamen gehört ein Passwort.", true);
+
                     var people = ctx.Request.F("people") is { Length: > 0 } pp ? pp : name;
                     var id = await store.SaveGuestAsync(g?.Id ?? 0, name, M.Clip(string.Join(", ", MomentsStore.SplitPeople(people)), 400), M.Line(ctx.Request.F("table"), 60),
-                        M.Clip(ctx.Request.F("note"), 2000), isNew || ctx.Request.F("active") is "true" or "on" or "1", ct);
-                    return PluginResult.Redirect(Root + "guests/" + id, isNew ? "Angelegt – der Zugangscode steht rechts." : "Gespeichert.");
+                        M.Clip(ctx.Request.F("note"), 2000), isNew || ctx.Request.F("active") is "true" or "on" or "1", MomentsSettings.CodeFormat(ctx), ct);
+                    var extra = new Dictionary<string, object?> { ["login"] = login };
+                    if (login.Length == 0) extra["password"] = "";
+                    else if (password.Length > 0) extra["password"] = Passwords.Hash(password);
+                    // a changed code or a changed password ends every sign-in made so far — as "Neuer Code" does (a new account at the next sign-in)
+                    var signOut = !isNew && g!.MemberId > 0 && (codeChanged || (password.Length > 0 && g.PasswordHash.Length > 0) || (login.Length == 0 && g.HasPassword && mode == MomentsSettings.ModePassword));
+                    if (codeChanged) extra["code"] = code;
+                    if (signOut) { extra["member_id"] = 0; extra["account"] = ""; }
+                    await store.Guests.UpdateAsync(id, extra, ct);
+                    if (signOut) await ctx.Members.DeleteAsync(g!.MemberId, ct);
+                    return PluginResult.Redirect(Root + "guests/" + id, isNew ? "Angelegt – der Zugang steht rechts." : signOut ? "Gespeichert. Wer mit dem alten Zugang angemeldet war, ist abgemeldet." : "Gespeichert.");
                 }
                 case "newcode" when g is not null:
                     // a new code AND a new account: every phone signed in with the old one is out; the household signs in again with the new code
-                    await store.Guests.UpdateAsync(g.Id, new Dictionary<string, object?> { ["code"] = await store.NewCodeAsync(ct), ["member_id"] = 0, ["account"] = "" }, ct);
+                    await store.Guests.UpdateAsync(g.Id, new Dictionary<string, object?> { ["code"] = await store.NewCodeAsync(MomentsSettings.CodeFormat(ctx), ct), ["member_id"] = 0, ["account"] = "" }, ct);
                     if (g.MemberId > 0) await ctx.Members.DeleteAsync(g.MemberId, ct);
                     return PluginResult.Redirect(Root + "guests/" + g.Id, "Neuer Code erzeugt. Der alte Link gilt nicht mehr, angemeldete Geräte sind abgemeldet.");
                 case "delete" or "deleteall" when g is not null:
@@ -404,6 +474,7 @@ public static class MomentsAdmin
         var photos = g is null ? Array.Empty<Photo>() : await store.PhotosOfGuestAsync(g.Id, ct);
         var tables = (await store.GuestsAsync(ct)).Select(x => x.Table).Where(t => t.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(t => t).ToList();
         var link = ctx.Site.Origin.TrimEnd('/') + B + "/z/" + (g?.Code ?? "");
+        var (codeLength, _) = MomentsSettings.CodeFormat(ctx);
         var form = Ui.Card(isNew ? "Neuer Haushalt" : "Haushalt", Ui.Form(
             Ui.Hidden("action", "save"),
             Ui.Input("name", "Name", g?.Name ?? "") with { Required = true, Placeholder = "z. B. Zoe & Fabian", Help = "So wird der Haushalt begrüßt und so stehen seine Fotos und Kommentare da." },
@@ -411,9 +482,25 @@ public static class MomentsAdmin
             Ui.Grid(220,
                 Ui.Input("table", "Tisch", g?.Table ?? "") with { Help = tables.Count > 0 ? "Bisher: " + string.Join(", ", tables) : "Optional (z. B. „Startlinie“)." },
                 isNew ? null : Ui.Checkbox("active", "Zugang aktiv", g!.Active)),
+            Ui.Input("code", "Zugangscode", g?.CodeShown ?? "") with
+            {
+                Placeholder = isNew ? "leer = wird erzeugt (" + codeLength + " Zeichen)" : "",
+                Help = "Ein eigener Code, z. B. „START12345“: mindestens " + Codes.MinLength + " Buchstaben (A–Z) oder Ziffern, Groß-/Kleinschreibung egal." +
+                       (isNew ? "" : " Ändert ihr ihn, gilt der alte Link nicht mehr und wer damit angemeldet ist, wird abgemeldet.")
+            },
+            Ui.Grid(220,
+                Ui.Input("login", "Benutzername", g?.Login ?? "") with { Placeholder = "z. B. zoe-fabian", Help = mode == MomentsSettings.ModeCode ? "Gilt erst, wenn in den Einstellungen die Anmeldung mit Benutzername und Passwort an ist." : "3 bis 40 Zeichen. Leer = keine Anmeldung mit Passwort." },
+                Ui.Input("password", g?.HasPassword == true ? "Neues Passwort" : "Passwort", "", UiInputType.Password) with
+                {
+                    Placeholder = g?.HasPassword == true ? "leer = bleibt" : "",
+                    Help = "Mindestens " + Passwords.MinLength + " Zeichen. Wird nur verschlüsselt gespeichert – gebt es den Gästen weiter, ablesen könnt ihr es hier später nicht mehr."
+                }),
             Ui.TextArea("note", "Notiz (nur für euch)", g?.Note ?? "", 3),
             Ui.FormActions(Ui.Submit(isNew ? "Anlegen" : "Speichern"))));
-        if (g is null) return PluginResult.Page(Ui.Stack(Ui.PageHead("Jeder Haushalt bekommt beim Anlegen seinen Zugangscode.", "Neuer Haushalt"), form), "Neuer Haushalt");
+        if (g is null) return PluginResult.Page(Ui.Stack(Ui.PageHead("Jeder Haushalt bekommt beim Anlegen seinen Zugang.", "Neuer Haushalt"), form), "Neuer Haushalt");
+        var access = new List<(string, string)>();
+        if (mode != MomentsSettings.ModePassword) { access.Add(("Code", g.CodeShown)); access.Add(("Persönlicher Link", link)); }
+        if (mode != MomentsSettings.ModeCode || g.Login.Length > 0) { access.Add(("Benutzername", g.Login.Length > 0 ? g.Login : "–")); access.Add(("Passwort", g.HasPassword ? "gesetzt" : "–")); }
         return PluginResult.Page(Ui.Stack(
             Ui.PageHead(g.Visits > 0 ? "Zuletzt da: " + M.Stamp(g.LastSeen) + " · " + M.Plural(g.Visits, "Anmeldung", "Anmeldungen") : "Noch nicht im Gästebereich gewesen", g.Name),
             Ui.Columns(
@@ -421,11 +508,16 @@ public static class MomentsAdmin
                 new UiNode?[]
                 {
                     Ui.Card("Zugang",
-                        Ui.KeyValue(("Code", g.CodeShown), ("Persönlicher Link", link)),
-                        Ui.Muted("Der Link (oder der QR-Code auf der Karte) meldet den Haushalt direkt an. Den Code kann man auch auf der Anmeldeseite eingeben."),
+                        Ui.KeyValue(access.ToArray()),
+                        Ui.Muted(mode == MomentsSettings.ModePassword
+                            ? "Der Haushalt meldet sich mit Benutzername und Passwort an. Die Karte trägt den Benutzernamen und eine Zeile für das Passwort."
+                            : "Der Link (oder der QR-Code auf der Karte – einfach mit der Handykamera scannen) meldet den Haushalt direkt an. Den Code kann man auch auf der Anmeldeseite eingeben."),
                         Ui.Inline(
-                            Ui.Button("Karte drucken", B + "/karten?ids=" + g.Id, UiButtonKind.Ghost, "ti-printer") with { NewTab = true },
-                            Act("Neuer Code", new Dictionary<string, string> { ["action"] = "newcode" }, UiButtonKind.Ghost, "Neuen Code erzeugen? Der alte Link und der alte QR-Code gelten danach nicht mehr, und wer damit angemeldet ist, wird abgemeldet.", "ti-refresh"))),
+                            Ui.Button("Karte: drucken, Bild, PDF", B + "/karten?ids=" + g.Id, UiButtonKind.Ghost, "ti-id-badge-2") with { NewTab = true },
+                            Ui.Button("Per WhatsApp", MomentsCards.WhatsAppUrl(ctx, g), UiButtonKind.Ghost, "ti-brand-whatsapp") with { NewTab = true },
+                            mode != MomentsSettings.ModePassword
+                                ? Act("Neuer Code", new Dictionary<string, string> { ["action"] = "newcode" }, UiButtonKind.Ghost, "Neuen Code erzeugen? Der alte Link und der alte QR-Code gelten danach nicht mehr, und wer damit angemeldet ist, wird abgemeldet.", "ti-refresh")
+                                : null)),
                     Ui.Card("Fotos (" + photos.Count + ")", photos.Count == 0 ? Ui.Muted("Noch keine hochgeladen.") :
                         Ui.Grid(90, photos.Take(12).Select(p => (UiNode?)Ui.Img(Thumb(p.Id), p.FileName, 90)).ToArray())),
                     Ui.Card("Entfernen",

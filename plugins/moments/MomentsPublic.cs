@@ -59,17 +59,36 @@ public static class MomentsPublic
             && !v.Contains("//", StringComparison.Ordinal) && !v.Contains('\\') && !v.StartsWith(Base + "/z/", StringComparison.Ordinal) ? v : "";
     }
 
+    /// <summary>The sign-in form's target: a code, or user name and password — whichever the hosts allow (<see cref="MomentsSettings.LoginMode"/>).</summary>
     private static async Task<PluginResult> CodeAsync(IPluginContext ctx, CancellationToken ct)
     {
         var back = SafeBack(ctx.Request.F("zurueck"));
-        if (Throttle.Blocked(ctx.Request.ClientIp)) return LoginPage(ctx, "Zu viele falsche Versuche. Bitte warte ein paar Minuten und versuche es dann noch einmal.", back);
+        var withPassword = ctx.Request.F("benutzer").Length > 0 || ctx.Request.F("passwort").Length > 0;
+        var typedLogin = M.Line(ctx.Request.F("benutzer"), 40);
+        if (Throttle.Blocked(ctx.Request.ClientIp))
+            return LoginPage(ctx, "Zu viele falsche Versuche. Bitte wartet ein paar Minuten und versucht es dann noch einmal.", back, passwordOpen: withPassword, login: typedLogin);
         var store = new MomentsStore(ctx.Data);
+        if (withPassword && MomentsSettings.PasswordLogin(ctx))
+        {
+            var password = ctx.Request.F("passwort");
+            var g = await store.GuestByLoginAsync(Passwords.CleanLogin(typedLogin) ?? "", ct);
+            var ok = false;
+            if (g is { HasPassword: true }) ok = Passwords.Verify(password, g.PasswordHash);
+            else Passwords.Waste(password); // a name nobody has costs the same time as a wrong password
+            if (!ok || g is null || !g.Active)
+            {
+                Throttle.Miss(ctx.Request.ClientIp);
+                return LoginPage(ctx, "Benutzername oder Passwort stimmt nicht. Bitte prüft beides noch einmal – oder fragt uns.", back, passwordOpen: true, login: typedLogin);
+            }
+            return await SignInAsync(ctx, store, g, back, ct);
+        }
+        if (!MomentsSettings.CodeLogin(ctx)) return LoginPage(ctx, "Bitte meldet euch mit eurem Benutzernamen und Passwort an.", back);
         var code = Codes.Normalize(ctx.Request.F("code"));
         var guest = await store.GuestByCodeAsync(code, ct);
         if (guest is null || !guest.Active)
         {
             Throttle.Miss(ctx.Request.ClientIp);
-            return LoginPage(ctx, "Diesen Code kennen wir leider nicht. Bitte prüfe ihn noch einmal – er steht auf eurer Karte (acht Zeichen, z. B. K7XM-4QPA).", back);
+            return LoginPage(ctx, "Diesen Code kennen wir leider nicht. Bitte prüft ihn noch einmal – er steht auf eurer Karte.", back);
         }
         return await SignInAsync(ctx, store, guest, back, ct);
     }
@@ -77,13 +96,15 @@ public static class MomentsPublic
     /// <summary>The personal link of the card (and its QR code): signs the household in and opens the gallery.</summary>
     private static async Task<PluginResult> LinkAsync(IPluginContext ctx, CancellationToken ct)
     {
-        if (Throttle.Blocked(ctx.Request.ClientIp)) return LoginPage(ctx, "Zu viele falsche Versuche. Bitte warte ein paar Minuten.", "");
+        if (Throttle.Blocked(ctx.Request.ClientIp)) return LoginPage(ctx, "Zu viele falsche Versuche. Bitte wartet ein paar Minuten.", "");
+        // the hosts switched to user name + password: an old card's link is no way in any more
+        if (!MomentsSettings.CodeLogin(ctx)) return LoginPage(ctx, "Bitte meldet euch mit eurem Benutzernamen und Passwort an.", "");
         var store = new MomentsStore(ctx.Data);
         var guest = await store.GuestByCodeAsync(Codes.Normalize(ctx.Request.R("code")), ct);
         if (guest is null || !guest.Active)
         {
             Throttle.Miss(ctx.Request.ClientIp);
-            return LoginPage(ctx, "Dieser Link gilt nicht (mehr). Gebt bitte euren Zugangscode ein oder fragt uns nach einem neuen.", "");
+            return LoginPage(ctx, "Dieser Link gilt nicht (mehr). Meldet euch bitte hier an oder fragt uns nach einem neuen Zugang.", "");
         }
         if (ctx.Member is not null && ctx.Member.Id == guest.MemberId) return PluginResult.Redirect(Base);
         return await SignInAsync(ctx, store, guest, "", ct);
@@ -139,23 +160,44 @@ public static class MomentsPublic
                M.H(name) + "</span></a></header>";
     }
 
-    public static string LoginCard(IPluginContext ctx, string? error, string back, string? heading = null, string? intro = null, bool memberWithoutAccess = false, string tag = "h1")
+    /// <summary>
+    /// The sign-in card: the code field (with how the card's QR code works), user name and password, or the code with the other way folded under it —
+    /// as the hosts set it. <paramref name="passwordOpen"/> unfolds the second way after a failed attempt with it.
+    /// </summary>
+    public static string LoginCard(IPluginContext ctx, string? error, string back, string? heading = null, string? intro = null, bool memberWithoutAccess = false, string tag = "h1",
+        bool passwordOpen = false, string login = "")
     {
+        var mode = MomentsSettings.Mode(ctx);
         // on a page of its own the card's heading is the page's h1; inside a block on an ordinary page the page has one already (h2)
         var sb = new StringBuilder("<div class=\"mo-login\"><p class=\"mo-kicker\">").Append(M.H(MomentsSettings.Event(ctx))).Append("</p><").Append(tag).Append(" class=\"mo-login-title\">")
             .Append(M.H(heading is { Length: > 0 } ? heading : MomentsSettings.GalleryTitle(ctx))).Append("</").Append(tag).Append("><p class=\"mo-login-intro\">")
             .Append(M.Text(intro is { Length: > 0 } ? intro : ctx.Settings.Get(MomentsSettings.LoginIntro))).Append("</p>");
         if (error is { Length: > 0 }) sb.Append("<p class=\"mo-alert bad\" role=\"alert\">").Append(M.H(error)).Append("</p>");
-        if (memberWithoutAccess) sb.Append("<p class=\"mo-alert\">Mit diesem Konto gibt es keinen Zugang zum Gästebereich. Gebt euren Zugangscode ein.</p>");
-        sb.Append("<form method=\"post\" action=\"").Append(Base).Append("/anmelden\" class=\"mo-code\">");
-        if (back.Length > 0) sb.Append("<input type=\"hidden\" name=\"zurueck\" value=\"").Append(M.H(back)).Append("\">");
-        sb.Append("<label for=\"mo-code\">Euer Zugangscode</label><input id=\"mo-code\" name=\"code\" required maxlength=\"12\" autocomplete=\"one-time-code\" autocapitalize=\"characters\" ")
-          .Append("autocorrect=\"off\" spellcheck=\"false\" placeholder=\"XXXX-XXXX\" class=\"mo-code-input\"><button class=\"mo-btn\" type=\"submit\"><i class=\"ti ti-door-enter\" aria-hidden=\"true\"></i> Anmelden</button></form></div>");
-        return sb.ToString();
+        if (memberWithoutAccess) sb.Append("<p class=\"mo-alert\">Mit diesem Konto gibt es keinen Zugang zum Gästebereich. Meldet euch mit eurem Zugang von der Karte an.</p>");
+        var hidden = back.Length > 0 ? "<input type=\"hidden\" name=\"zurueck\" value=\"" + M.H(back) + "\">" : "";
+        if (mode != MomentsSettings.ModePassword)
+        {
+            var (length, _) = MomentsSettings.CodeFormat(ctx);
+            sb.Append("<form method=\"post\" action=\"").Append(Base).Append("/anmelden\" class=\"mo-code\">").Append(hidden)
+              .Append("<label for=\"mo-code\">Euer Zugangscode</label><input id=\"mo-code\" name=\"code\" required maxlength=\"40\" autocomplete=\"one-time-code\" autocapitalize=\"characters\" ")
+              .Append("autocorrect=\"off\" spellcheck=\"false\" placeholder=\"").Append(Codes.Shown(new string('X', length))).Append("\" class=\"mo-code-input\">")
+              .Append("<button class=\"mo-btn\" type=\"submit\"><i class=\"ti ti-door-enter\" aria-hidden=\"true\"></i> Anmelden</button></form>")
+              // the card's QR code is read by the phone's own camera, not by this page — say so, or people look for a scan button here
+              .Append("<p class=\"mo-qr-hint\"><i class=\"ti ti-qrcode\" aria-hidden=\"true\"></i><span><strong>Noch einfacher mit dem QR-Code:</strong> ")
+              .Append("Öffnet die Kamera eures Handys, haltet sie auf den QR-Code auf eurer Karte und tippt auf den Link, der erscheint – dann seid ihr sofort angemeldet.</span></p>");
+        }
+        if (mode == MomentsSettings.ModeBoth) sb.Append("<details class=\"mo-alt\"").Append(passwordOpen ? " open" : "").Append("><summary>Mit Benutzername und Passwort anmelden</summary>");
+        if (mode != MomentsSettings.ModeCode)
+            sb.Append("<form method=\"post\" action=\"").Append(Base).Append("/anmelden\" class=\"mo-code mo-pass\">").Append(hidden)
+              .Append("<label for=\"mo-user\">Benutzername</label><input id=\"mo-user\" name=\"benutzer\" required maxlength=\"40\" autocomplete=\"username\" autocapitalize=\"none\" autocorrect=\"off\" spellcheck=\"false\" class=\"mo-text-input\" value=\"")
+              .Append(M.H(login)).Append("\"><label for=\"mo-pass\">Passwort</label><input id=\"mo-pass\" name=\"passwort\" type=\"password\" required maxlength=\"128\" autocomplete=\"current-password\" class=\"mo-text-input\">")
+              .Append("<button class=\"mo-btn\" type=\"submit\"><i class=\"ti ti-door-enter\" aria-hidden=\"true\"></i> Anmelden</button></form>");
+        if (mode == MomentsSettings.ModeBoth) sb.Append("</details>");
+        return sb.Append("</div>").ToString();
     }
 
-    private static PluginResult LoginPage(IPluginContext ctx, string? error, string back, bool memberWithoutAccess = false) =>
-        Frame(ctx, LoginCard(ctx, error, back, memberWithoutAccess: memberWithoutAccess), MomentsSettings.GalleryTitle(ctx));
+    private static PluginResult LoginPage(IPluginContext ctx, string? error, string back, bool memberWithoutAccess = false, bool passwordOpen = false, string login = "") =>
+        Frame(ctx, LoginCard(ctx, error, back, memberWithoutAccess: memberWithoutAccess, passwordOpen: passwordOpen, login: login), MomentsSettings.GalleryTitle(ctx));
 
     /// <summary>Not signed in: to the code form, and back here afterwards.</summary>
     private static PluginResult ToLogin(IPluginContext ctx)
@@ -217,7 +259,7 @@ public static class MomentsPublic
 
     /// <summary>Everything the gallery and the photo page share: the released photos in the filter's order, and what hangs on them.</summary>
     internal sealed record Album(List<Photo> Photos, IReadOnlyList<Tag> Tags, ILookup<long, PhotoTag> MarksByPhoto, Dictionary<long, List<long>> Hearts,
-        Dictionary<long, int> Comments, Dictionary<long, Guest> Guests);
+        Dictionary<long, int> Comments, Dictionary<long, Guest> Guests, int Total = 0);
 
     internal static async Task<Album> AlbumAsync(IPluginContext ctx, MomentsStore store, Viewer v, Filter f, CancellationToken ct)
     {
@@ -238,7 +280,7 @@ public static class MomentsPublic
             "beliebt" => list.OrderByDescending(p => hearts.TryGetValue(p.Id, out var h) ? h.Count : 0).ThenBy(p => p.Taken, StringComparer.Ordinal).ThenBy(p => p.Id),
             _ => list.OrderBy(p => p.Taken, StringComparer.Ordinal).ThenBy(p => p.Id)
         };
-        return new Album(list.ToList(), tags, marks, hearts, comments, guests);
+        return new Album(list.ToList(), tags, marks, hearts, comments, guests, photos.Count);
     }
 
     internal static string Tile(Photo p, string query, Album? album, string? badge = null, bool large = false)
@@ -290,18 +332,23 @@ public static class MomentsPublic
                   .Append(string.Concat(featured.Take(12).Select(p => Tile(p, "", album, large: true)))).Append("</div></section>");
         }
 
-        // the bar: how the photos are ordered, how many there are, what narrows them
-        sb.Append("<nav class=\"mo-bar\" aria-label=\"Sortierung\"><div class=\"mo-seg\">");
-        foreach (var (key, label) in new[] { ("zeit", "Chronologisch"), ("neu", "Neueste"), ("beliebt", "Beliebteste") })
-            sb.Append("<a href=\"").Append(Base).Append(M.H(f.Query(sort: key))).Append("\"").Append(f.Sort == key ? " class=\"on\" aria-current=\"true\"" : "").Append(">").Append(label).Append("</a>");
-        sb.Append("</div><span class=\"mo-count\">").Append(M.Plural(album.Photos.Count, "Foto", "Fotos")).Append("</span></nav>");
-        sb.Append(Chips(ctx, f, album, v));
+        // the bar: how the photos are ordered, how many there are, what narrows them — only once there is something to order (an empty gallery with
+        // sort buttons, "0 Fotos" and a lone "Meine Herzen" looked broken)
+        if (album.Total > 0)
+        {
+            sb.Append("<nav class=\"mo-bar\" aria-label=\"Sortierung\"><div class=\"mo-seg\">");
+            foreach (var (key, label) in new[] { ("zeit", "Chronologisch"), ("neu", "Neueste"), ("beliebt", "Beliebteste") })
+                sb.Append("<a href=\"").Append(Base).Append(M.H(f.Query(sort: key))).Append("\"").Append(f.Sort == key ? " class=\"on\" aria-current=\"true\"" : "").Append(">").Append(label).Append("</a>");
+            sb.Append("</div><span class=\"mo-count\">").Append(M.Plural(album.Photos.Count, "Foto", "Fotos")).Append("</span></nav>");
+            sb.Append(Chips(ctx, f, album, v));
+        }
 
         if (album.Photos.Count == 0)
         {
             sb.Append("<div class=\"mo-empty\"><i class=\"ti ti-photo\" aria-hidden=\"true\"></i><p>")
               .Append(f.Narrowed ? "Hier ist (noch) kein Foto." : "Noch sind keine Fotos da.").Append("</p>");
             if (uploads && !f.Narrowed) sb.Append("<a class=\"mo-btn\" href=\"").Append(Base).Append("/hochladen\"><i class=\"ti ti-camera-plus\" aria-hidden=\"true\"></i> Die ersten hochladen</a>");
+            if (f.Narrowed) sb.Append("<a class=\"mo-btn ghost\" href=\"").Append(Base).Append("\"><i class=\"ti ti-photo\" aria-hidden=\"true\"></i> Alle Fotos zeigen</a>");
             sb.Append("</div>");
         }
         else
@@ -354,9 +401,11 @@ public static class MomentsPublic
         var used = album.Tags.Where(t => counts.ContainsKey(t.Id) && t.Id != f.Tag).OrderByDescending(t => counts[t.Id]).ThenBy(t => t.Name, StringComparer.OrdinalIgnoreCase).ToList();
         var people = used.Where(t => t.Kind == MomentsStore.Person).ToList();
         var topics = used.Where(t => t.Kind != MomentsStore.Person).ToList();
-        if (people.Count + topics.Count == 0 && f.Hearts) return sb.ToString();
+        // "Meine Herzen" only for whoever gave one — the chip led to an empty page otherwise
+        var heartsChip = !f.Hearts && album.Hearts.Values.Any(h => h.Contains(v.Id));
+        if (people.Count + topics.Count == 0 && !heartsChip) return sb.ToString();
         sb.Append("<div class=\"mo-filters\">");
-        if (!f.Hearts) sb.Append("<a class=\"mo-chip\" href=\"").Append(Base).Append(M.H(f.Query(hearts: true))).Append("\"><i class=\"ti ti-heart\" aria-hidden=\"true\"></i> Meine Herzen</a>");
+        if (heartsChip) sb.Append("<a class=\"mo-chip\" href=\"").Append(Base).Append(M.H(f.Query(hearts: true))).Append("\"><i class=\"ti ti-heart\" aria-hidden=\"true\"></i> Meine Herzen</a>");
         foreach (var t in people.Take(40))
             sb.Append("<a class=\"mo-chip person\" href=\"").Append(Base).Append(M.H(f.Query(tag: t.Id))).Append("\"><i class=\"ti ti-user\" aria-hidden=\"true\"></i> ").Append(M.H(t.Name))
               .Append(" <small>").Append(counts[t.Id]).Append("</small></a>");

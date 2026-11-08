@@ -1,6 +1,6 @@
 {
   "Key": "moments",
   "Name": "Moments",
-  "Version": "1.0",
-  "Description": "Gästebereich für private Veranstaltungen (Hochzeit, Geburtstag, Jubiläum): jeder Haushalt bekommt einen persönlichen Zugangscode mit Link und QR-Code – ohne E-Mail und Passwort –, wird mit Namen begrüßt und sieht die Fotos vom Fest. Gäste laden ihre eigenen Bilder direkt vom Handy hoch; sie erscheinen erst nach der Freigabe. Stichworte und Personen markieren, Herzen und Kommentare, Highlights, Download der Originale (Standortdaten entfernt). Freigabe und Moderation im Admin, Zugangskarten zum Ausdrucken. Natives Plugin (braucht „Native Plugins erlauben“)."
+  "Version": "1.1",
+  "Description": "Gästebereich für private Veranstaltungen (Hochzeit, Geburtstag, Jubiläum): jeder Haushalt bekommt einen persönlichen Zugang – Code mit Link und QR-Code oder Benutzername und Passwort, ohne E-Mail –, wird mit Namen begrüßt und sieht die Fotos vom Fest. Gäste laden ihre eigenen Bilder direkt vom Handy hoch; sie erscheinen erst nach der Freigabe. Stichworte und Personen markieren, Herzen und Kommentare, Highlights, Download der Originale (Standortdaten entfernt). Freigabe und Moderation im Admin, Zugangskarten zum Ausdrucken, einzeln als Bild oder PDF oder per WhatsApp. Natives Plugin (braucht „Native Plugins erlauben“)."
 }

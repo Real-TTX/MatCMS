@@ -306,6 +306,9 @@ public class MomentsTests : IClassFixture<MomentsApp>
         var json = JsonNode.Parse(await heart.Content.ReadAsStringAsync())!;
         Assert.True(json["on"]!.GetValue<bool>());
         Assert.Equal(1, json["count"]!.GetValue<int>());
+        // "Meine Herzen" is offered to whoever gave one — not to a guest without any (the chip led to an empty page)
+        Assert.Contains("herzen=1", await a.GetStringAsync("/moments"));
+        Assert.DoesNotContain("herzen=1", await bb.GetStringAsync("/moments"));
 
         // B cannot delete A's photo, nor A's... the hosts can remove the comment in the back office
         var del = await PostFormAsync(bb, page, new Dictionary<string, string> { ["action"] = "delete", ["q"] = "" });
@@ -334,6 +337,14 @@ public class MomentsTests : IClassFixture<MomentsApp>
         Assert.Contains("Tine &amp; Tobi", cards);
         Assert.Contains("/moments/z/", cards);
         Assert.Contains("qrcode.min.js", cards);
+        Assert.Contains("Mit der Handykamera scannen", cards);
+        // every card also leaves on its own: a picture, a PDF, a WhatsApp message with the personal link
+        Assert.Contains("data-png", cards);
+        Assert.Contains("data-pdf", cards);
+        var tine = _app.Db(db => db.Database.SqlQueryRaw<string>("select code as Value from p_moments_guests where name = 'Tine & Tobi'").AsEnumerable().Single());
+        var wa = System.Text.RegularExpressions.Regex.Matches(cards, "href=\"(https://wa\\.me/\\?text=[^\"]+)\"").Select(m => Uri.UnescapeDataString(WebUtility.HtmlDecode(m.Groups[1].Value)))
+            .Single(t => t.Contains("Hallo Tine & Tobi!"));
+        Assert.Contains("/moments/z/" + tine, wa);
         // nobody else gets the codes
         Assert.Equal(HttpStatusCode.NotFound, (await _app.App.Browser().GetAsync("/moments/karten")).StatusCode);
         var (_, code) = await GuestAsync("Frank & Katja", "Frank, Katja");
@@ -364,5 +375,110 @@ public class MomentsTests : IClassFixture<MomentsApp>
         var (_, code) = await GuestAsync("Cüneyt & Vicky", "Cüneyt, Vicky");
         var guest = await SignedInAsync(code);
         Assert.Contains("Hallo Cüneyt & Vicky!", Text(await guest.GetStringAsync("/gaeste-test")));
+
+        // signed in, the header has the gallery with its pages AND "Abmelden" as an entry of its own after it (the far right), not inside the sub-menu
+        var header = await guest.GetStringAsync("/");
+        Assert.Contains("href=\"/moments/abmelden\"", header);
+        var sub = header.IndexOf("class=\"mat-sub\"", StringComparison.Ordinal);
+        Assert.True(sub > 0, "no sub-menu");
+        var subEnd = header.IndexOf("</span>", sub, StringComparison.Ordinal);
+        Assert.DoesNotContain("/moments/abmelden", header[sub..subEnd]);
+        Assert.True(header.IndexOf("href=\"/moments/abmelden\"", StringComparison.Ordinal) > subEnd);
+        // the code form says how the card's QR code works — with the phone's own camera, not on this page
+        Assert.Contains("Kamera eures Handys", Text(await _app.App.Browser().GetStringAsync("/moments")));
+    }
+
+    /// <summary>Saves the sign-in settings (Admin → Moments → Einstellungen → Anmeldung).</summary>
+    private async Task SignInSettingsAsync(string mode, string chars = "mixed", int length = 8)
+    {
+        var admin = await _app.AdminAsync();
+        var res = await PostFormAsync(admin, "/admin/p/moments/_settings?group=Anmeldung", new Dictionary<string, string>
+        {
+            ["action"] = "save-settings", ["s_loginMode"] = mode, ["s_codeChars"] = chars, ["s_codeLength"] = length.ToString()
+        });
+        Assert.Equal(HttpStatusCode.Redirect, res.StatusCode);
+    }
+
+    private string Column(string column, string name) =>
+        _app.Db(db => db.Database.SqlQueryRaw<string>("select " + column + " as Value from p_moments_guests where name = {0}", name).AsEnumerable().Single());
+
+    [Fact]
+    public async Task Codes_can_be_shorter_digits_only_or_typed_by_the_hosts()
+    {
+        await SignInSettingsAsync("code", "digits", 6);
+        try
+        {
+            var (_, digits) = await GuestAsync("Heidi & Michael", "Heidi, Michael");
+            Assert.Matches("^[0-9]{6}$", digits);
+            await SignedInAsync(digits);
+
+            // a code the hosts typed: dashes, spaces and case do not matter
+            var admin = await _app.AdminAsync();
+            var res = await PostFormAsync(admin, "/admin/p/moments/guests/new", new Dictionary<string, string> { ["action"] = "save", ["name"] = "Franzi & Eduard", ["code"] = "start-12345" });
+            Assert.Equal(HttpStatusCode.Redirect, res.StatusCode);
+            Assert.Equal("START12345", Column("code", "Franzi & Eduard"));
+            var c = _app.App.Browser();
+            var signIn = await c.PostAsync("/moments/anmelden", new FormUrlEncodedContent(new Dictionary<string, string> { ["code"] = "Start 12345" }));
+            Assert.Equal("/moments?willkommen=1", signIn.Headers.Location?.OriginalString);
+
+            // taken, too short, or not only letters and digits: refused, nothing stored
+            await PostFormAsync(admin, "/admin/p/moments/guests/new", new Dictionary<string, string> { ["action"] = "save", ["name"] = "Martina & Andi", ["code"] = "START12345" });
+            await PostFormAsync(admin, "/admin/p/moments/guests/new", new Dictionary<string, string> { ["action"] = "save", ["name"] = "Steffen M.", ["code"] = "ab12" });
+            await PostFormAsync(admin, "/admin/p/moments/guests/new", new Dictionary<string, string> { ["action"] = "save", ["name"] = "Kathrin & Marko", ["code"] = "Grüße1234" });
+            Assert.Equal(0, _app.Db(db => db.Database.SqlQueryRaw<long>("select count(*) as Value from p_moments_guests where name in ('Martina & Andi', 'Steffen M.', 'Kathrin & Marko')").AsEnumerable().Single()));
+
+            // changing a household's code ends the sign-ins made with the old one
+            var id = _app.Db(db => db.Database.SqlQueryRaw<long>("select id as Value from p_moments_guests where name = 'Franzi & Eduard'").AsEnumerable().Single());
+            await PostFormAsync(admin, "/admin/p/moments/guests/" + id, new Dictionary<string, string> { ["action"] = "save", ["name"] = "Franzi & Eduard", ["code"] = "ZIEL-2026", ["active"] = "true" });
+            Assert.Equal("ZIEL2026", Column("code", "Franzi & Eduard"));
+            Assert.Contains("name=\"code\"", await c.GetStringAsync("/moments"));
+        }
+        finally { await SignInSettingsAsync("code"); }
+    }
+
+    [Fact]
+    public async Task User_name_and_password_as_the_other_way_in()
+    {
+        await SignInSettingsAsync("both");
+        try
+        {
+            var admin = await _app.AdminAsync();
+            await PostFormAsync(admin, "/admin/p/moments/guests", new Dictionary<string, string> { ["action"] = "bulk", ["lines"] = "Markus & Ulla | Markus, Ulla | | Markus | Start12345" });
+            // only the hash is stored
+            var stored = Column("password", "Markus & Ulla");
+            Assert.StartsWith("v1$", stored);
+            Assert.DoesNotContain("Start12345", stored);
+            Assert.Equal("Markus", Column("login", "Markus & Ulla"));
+
+            // both ways are offered; a wrong password is refused, the user name is not case-sensitive
+            var c = _app.App.Browser();
+            var page = await c.GetStringAsync("/moments");
+            Assert.Contains("name=\"code\"", page);
+            Assert.Contains("name=\"benutzer\"", page);
+            var wrong = await c.PostAsync("/moments/anmelden", new FormUrlEncodedContent(new Dictionary<string, string> { ["benutzer"] = "markus", ["passwort"] = "falsch1234" }));
+            Assert.Contains("stimmt nicht", Text(await wrong.Content.ReadAsStringAsync()));
+            var ok = await c.PostAsync("/moments/anmelden", new FormUrlEncodedContent(new Dictionary<string, string> { ["benutzer"] = "MARKUS", ["passwort"] = "Start12345" }));
+            Assert.Equal("/moments?willkommen=1", ok.Headers.Location?.OriginalString);
+            Assert.Contains("Willkommen, Markus & Ulla!", Text(await c.GetStringAsync("/moments?willkommen=1")));
+
+            // password only: no code field, the card's link is no way in, the card carries the user name and a line for the password
+            await SignInSettingsAsync("password");
+            var stranger = _app.App.Browser();
+            Assert.DoesNotContain("name=\"code\"", await stranger.GetStringAsync("/moments"));
+            Assert.Contains("Benutzernamen und Passwort", Text(await stranger.GetStringAsync("/moments/z/" + Column("code", "Markus & Ulla"))));
+            var cards = Text(await admin.GetStringAsync("/moments/karten"));
+            Assert.Contains("Benutzername", cards);
+            Assert.Contains("Passwort", cards);
+            Assert.DoesNotContain("Start12345", cards);
+
+            // a new password ends the sign-ins made with the old one
+            var id = _app.Db(db => db.Database.SqlQueryRaw<long>("select id as Value from p_moments_guests where name = 'Markus & Ulla'").AsEnumerable().Single());
+            await PostFormAsync(admin, "/admin/p/moments/guests/" + id, new Dictionary<string, string>
+            {
+                ["action"] = "save", ["name"] = "Markus & Ulla", ["login"] = "Markus", ["password"] = "Ziel2026!", ["active"] = "true"
+            });
+            Assert.Contains("name=\"benutzer\"", await c.GetStringAsync("/moments"));
+        }
+        finally { await SignInSettingsAsync("code"); }
     }
 }

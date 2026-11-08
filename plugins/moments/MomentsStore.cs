@@ -3,13 +3,15 @@ namespace MatCMS.Plugin.Moments;
 /// <summary>
 /// A household of guests: one access code, one site account (made on the first sign-in, never with a real address — the plugin sends no mail), one name
 /// to greet ("Zoe &amp; Fabian"). <see cref="People"/> are the first names of who belongs to it, offered when somebody marks who is on a photo.
+/// <see cref="Login"/> and <see cref="PasswordHash"/> are the second way in (Benutzername + Passwort, given by the hosts); empty = none.
 /// </summary>
 public sealed record Guest(long Id, string Name, string People, string Code, long MemberId, string Table, string Note, bool Active, DateTime? Created,
-    DateTime? LastSeen, long Visits, string Account)
+    DateTime? LastSeen, long Visits, string Account, string Login = "", string PasswordHash = "")
 {
     public IReadOnlyList<string> PeopleList => MomentsStore.SplitPeople(People);
-    /// <summary>The code as printed: two groups of four ("K7XM-4QPA").</summary>
-    public string CodeShown => Code.Length == 8 ? Code[..4] + "-" + Code[4..] : Code;
+    /// <summary>The code as printed, in groups ("K7XM-4QPA").</summary>
+    public string CodeShown => Codes.Shown(Code);
+    public bool HasPassword => Login.Length > 0 && PasswordHash.Length > 0;
 }
 
 /// <summary>
@@ -50,7 +52,9 @@ public sealed class MomentsStore(IPluginData data)
     public static void Declare(IDataBuilder b)
     {
         b.Table(TGuests, t => t.Text("name", required: true).Text("people").Text("code", required: true).Int("member_id", def: "0").Text("table_name").Text("note")
-            .Bool("active", def: "1").Timestamp("created").Timestamp("last_seen").Int("visits", def: "0").Text("account").UniqueIndex("code").Index("member_id"));
+            .Bool("active", def: "1").Timestamp("created").Timestamp("last_seen").Int("visits", def: "0").Text("account")
+            // 1.1: Benutzername + Passwort (the hash only). The host adds the columns on load; rows from 1.0 read them as "".
+            .Text("login").Text("password").UniqueIndex("code").Index("member_id"));
         b.Table(TPhotos, t => t.Int("guest_id", def: "0").Text("file", required: true).Text("view").Text("thumb").Text("file_name").Int("size", def: "0")
             .Int("width", def: "0").Int("height", def: "0").Text("taken").Text("caption").Text("status", required: true).Bool("featured", def: "0")
             .Timestamp("created").Timestamp("approved_at").Index("status").Index("guest_id").Index("taken"));
@@ -80,7 +84,7 @@ public sealed class MomentsStore(IPluginData data)
             .Where(x => x.Length is > 0 and <= 60 && x != "???").Distinct(StringComparer.OrdinalIgnoreCase).Take(20).ToList();
 
     private static Guest G(DataRow r) => new(r.Id, r.Text("name"), r.Text("people"), r.Text("code"), r.Int("member_id"), r.Text("table_name"), r.Text("note"),
-        r.Bool("active"), r.Timestamp("created"), r.Timestamp("last_seen"), r.Int("visits"), r.Text("account"));
+        r.Bool("active"), r.Timestamp("created"), r.Timestamp("last_seen"), r.Int("visits"), r.Text("account"), r.Text("login"), r.Text("password"));
     private static Photo P(DataRow r) => new(r.Id, r.Int("guest_id"), r.Text("file"), r.Text("view"), r.Text("thumb"), r.Text("file_name"), r.Int("size"),
         (int)r.Int("width"), (int)r.Int("height"), r.Text("taken"), r.Text("caption"), r.Text("status"), r.Bool("featured"), r.Timestamp("created"), r.Timestamp("approved_at"));
     private static Tag T(DataRow r) => new(r.Id, r.Text("name"), r.Text("kind"));
@@ -97,23 +101,29 @@ public sealed class MomentsStore(IPluginData data)
     public async Task<Guest?> GuestOfMemberAsync(long memberId, CancellationToken ct = default) =>
         memberId <= 0 ? null : await Guests.FindAsync(DataQuery.Everything.Eq("member_id", memberId), ct) is DataRow r ? G(r) : null;
 
-    /// <summary>A fresh code nobody has (checked against the table, so a collision is retried, not stored).</summary>
-    public async Task<string> NewCodeAsync(CancellationToken ct = default)
+    /// <summary>The household with this user name, compared without case (a party has a few dozen households — read in memory).</summary>
+    public async Task<Guest?> GuestByLoginAsync(string login, CancellationToken ct = default) =>
+        login.Length == 0 ? null : (await GuestsAsync(ct)).FirstOrDefault(g => g.Login.Length > 0 && string.Equals(g.Login, login, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>A fresh code nobody has, in the shape the hosts chose (checked against the table, so a collision is retried, not stored).</summary>
+    public async Task<string> NewCodeAsync((int Length, string Chars) format, CancellationToken ct = default)
     {
         for (var i = 0; i < 50; i++)
         {
-            var c = Codes.New();
+            var c = Codes.New(format.Length, format.Chars);
             if (await Guests.FindAsync(DataQuery.Everything.Eq("code", c), ct) is null) return c;
         }
-        throw new InvalidOperationException("Kein freier Zugangscode gefunden.");
+        throw new InvalidOperationException("Kein freier Zugangscode gefunden – stellt in den Einstellungen längere Codes ein.");
     }
 
-    public async Task<long> SaveGuestAsync(long id, string name, string people, string table, string note, bool active, CancellationToken ct = default)
+    public async Task<long> SaveGuestAsync(long id, string name, string people, string table, string note, bool active, (int Length, string Chars) format, CancellationToken ct = default)
     {
         var v = new Dictionary<string, object?> { ["name"] = name, ["people"] = people, ["table_name"] = table, ["note"] = note, ["active"] = active };
         if (id > 0) { await Guests.UpdateAsync(id, v, ct); return id; }
-        v["code"] = await NewCodeAsync(ct);
+        v["code"] = await NewCodeAsync(format, ct);
         v["created"] = DateTime.UtcNow;
+        v["login"] = "";
+        v["password"] = "";
         return await Guests.InsertAsync(v, ct);
     }
 

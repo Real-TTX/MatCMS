@@ -34,6 +34,12 @@ public static class MomentsCss
 .mo .mo-code-input{font:inherit;font-size:1.6rem;letter-spacing:.22em;text-transform:uppercase;text-align:center;padding:14px 12px;border-radius:14px;border:1.5px solid var(--mo-line);background:#fff;width:100%;box-sizing:border-box;color:var(--mo-ink)}
 .mo .mo-code-input:focus{outline:none;border-color:var(--mo-accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--mo-accent) 18%,transparent)}
 .mo .mo-code .mo-btn{padding:14px;font-size:16px}
+.mo .mo-text-input{font:inherit;font-size:16px;padding:12px 14px;border-radius:12px;border:1.5px solid var(--mo-line);background:#fff;width:100%;box-sizing:border-box;color:var(--mo-ink)}
+.mo .mo-text-input:focus{outline:none;border-color:var(--mo-accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--mo-accent) 18%,transparent)}
+.mo .mo-qr-hint{display:flex;gap:12px;align-items:flex-start;text-align:left;margin:18px 0 0;padding:14px 16px;border-radius:14px;background:var(--mo-soft);font-size:14.5px;line-height:1.45;color:var(--mo-ink)}
+.mo .mo-qr-hint .ti{font-size:30px;color:var(--mo-accent);flex:none;line-height:1}
+.mo .mo-alt{margin-top:18px;text-align:left}.mo .mo-alt summary{cursor:pointer;color:var(--mo-accent);font-weight:600;text-align:center;padding:6px 0}
+.mo .mo-alt .mo-code{margin-top:10px}
 
 /* welcome */
 .mo .mo-welcome{display:flex;justify-content:space-between;align-items:center;gap:20px;padding:22px 26px;border-radius:18px;background:var(--mo-soft);margin-bottom:26px}
@@ -72,7 +78,7 @@ public static class MomentsCss
 .mo .mo-tile-meta span{display:inline-flex;align-items:center;gap:3px}
 .mo .mo-tile-badge{position:absolute;left:6px;top:6px;padding:3px 8px;border-radius:999px;background:rgba(255,255,255,.92);color:var(--mo-ink);font-size:11.5px;font-weight:600}
 .mo .mo-empty{display:grid;justify-items:center;gap:10px;padding:50px 20px;border:2px dashed var(--mo-line);border-radius:18px;text-align:center;color:var(--mo-muted)}
-.mo .mo-empty .ti{font-size:42px;color:var(--mo-accent)}.mo .mo-empty p{margin:0}
+.mo .mo-empty > .ti{font-size:42px;color:var(--mo-accent)}.mo .mo-empty p{margin:0}
 .mo .mo-pager{display:flex;justify-content:center;align-items:center;gap:16px;margin-top:26px}
 
 /* one photo */
@@ -137,6 +143,10 @@ public static class MomentsCss
   .mo .mo-welcome-actions .mo-btn{flex:1}
   .mo-block .mo-preview{grid-template-columns:repeat(3,1fr)}
 }
+@media (max-width:440px){
+  /* the three sort buttons fill a phone's width; the count would wrap into a line of its own */
+  .mo .mo-count{display:none}
+}
 @media (max-width:600px){
   .section.mo{padding-top:22px;padding-bottom:36px}
   .mo .mo-strip{grid-auto-columns:42vw;gap:8px}
@@ -148,7 +158,10 @@ public static class MomentsCss
   .mo .mo-tile-meta{font-size:11px;gap:6px;padding:14px 5px 4px}
   .mo .mo-filters{flex-wrap:nowrap;overflow-x:auto;margin:0 -12px 16px;padding:0 12px 4px;scrollbar-width:none}
   .mo .mo-filters::-webkit-scrollbar{display:none}
-  .mo .mo-seg a{padding:7px 11px;font-size:13px}
+  .mo .mo-bar{flex-wrap:nowrap}
+  .mo .mo-seg{min-width:0}
+  .mo .mo-seg a{padding:7px 11px;font-size:13px;white-space:nowrap}
+  .mo .mo-count{white-space:nowrap;font-size:13px}
   .mo .mo-stage{margin:0 -12px 16px;border-radius:0}
   .mo .mo-stage img{max-height:72vh}
   .mo .mo-nav{width:38px;height:38px;font-size:20px;background:rgba(255,255,255,.7)}

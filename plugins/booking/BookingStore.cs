@@ -6,7 +6,7 @@ namespace MatCMS.Plugin.Booking;
 public sealed record Night(long UnitId, DateOnly Day, long BookingId, long BlockId, long Origin);
 
 /// <summary>Occupied without a booking here: owner's use, repairs — or (phase B4) what a portal's calendar says.</summary>
-public sealed record Block(long Id, long UnitId, DateOnly From, DateOnly To, string Reason, string Source)
+public sealed record Block(long Id, long UnitId, DateOnly From, DateOnly To, string Reason, string Source, string Conflict = "")
 {
     /// <summary>Nights from <see cref="From"/> to the day BEFORE <see cref="To"/> — "to" is the day the unit is free again, like a departure.</summary>
     public int Nights => To.DayNumber - From.DayNumber;
@@ -19,7 +19,7 @@ public sealed class UnavailableException(string message) : Exception(message);
 public sealed class BookingStore(IPluginData data)
 {
     public const string TProperties = "properties", TUnits = "units", TSeasons = "seasons", TRates = "rates", TFees = "fees", TNights = "nights",
-        TBlocks = "blocks", TBookings = "bookings", TMeta = "meta", TGuests = "guests", TSequences = "sequences", TKeys = "keys", TPayments = "payments";
+        TBlocks = "blocks", TBookings = "bookings", TMeta = "meta", TGuests = "guests", TSequences = "sequences", TKeys = "keys", TPayments = "payments", TFeeds = "feeds";
 
     public static void Declare(IDataBuilder b)
     {
@@ -28,7 +28,7 @@ public sealed class BookingStore(IPluginData data)
         b.Table(TUnits, t => t.Int("property_id", required: true).Text("name", required: true).Text("slug", required: true).Text("description").Text("image")
             .Int("bedrooms", def: "0").Int("guests_std", def: "2").Int("guests_max", def: "2").Text("contains").Int("buffer_days", def: "0")
             .Int("base_price", def: "0").Int("base_min_nights", def: "1").Int("extra_person", def: "0").Int("sort", def: "0").Bool("active", def: "1")
-            .UniqueIndex("slug").Index("property_id"));
+            .Text("ical_token").UniqueIndex("slug").Index("property_id"));
         b.Table(TSeasons, t => t.Int("property_id", required: true).Text("name", required: true).Text("from_day", required: true).Text("to_day", required: true)
             .Int("rank", def: "1").Text("color").Index("property_id"));
         b.Table(TRates, t => t.Int("unit_id", required: true).Int("season_id", required: true).Int("price", def: "0").Int("min_nights", def: "1")
@@ -39,7 +39,12 @@ public sealed class BookingStore(IPluginData data)
         b.Table(TNights, t => t.Int("unit_id", required: true).Text("night", required: true).Int("booking_id", def: "0").Int("block_id", def: "0").Int("origin", def: "0")
             .UniqueIndex("unit_id", "night").Index("booking_id").Index("block_id"));
         b.Table(TBlocks, t => t.Int("unit_id", required: true).Text("from_day", required: true).Text("to_day", required: true).Text("reason").Text("source")
-            .Text("uid").Timestamp("created").Index("unit_id").Index("source"));
+            .Text("uid").Text("conflict").Timestamp("created").Index("unit_id").Index("source"));
+        // a portal's calendar (Airbnb, Booking.com, Rentlio …) for one unit: fetched every 15 minutes, its events become blocks with source "feed:{id}";
+        // export_token is the address THIS portal gets back — the unit's nights without the ones that came from the portal itself
+        b.Table(TFeeds, t => t.Int("unit_id", required: true).Text("name", required: true).Text("url").Text("export_token", required: true)
+            .Timestamp("last_run").Timestamp("last_ok").Text("last_error").Int("events", def: "0").Text("conflicts").Timestamp("created")
+            .UniqueIndex("export_token").Index("unit_id"));
         // a stay asked for or booked. The guest's contact is kept ON the booking too (what they typed for THIS stay); the guest row is the card index
         b.Table(TBookings, t => t.Text("number").Int("unit_id", required: true).Int("guest_id", def: "0").Text("arrival", required: true).Text("departure", required: true)
             .Int("adults", def: "1").Int("children", def: "0").Text("extras").Text("status", required: true).Text("source").Json("quote").Int("total", def: "0")
@@ -76,7 +81,7 @@ public sealed class BookingStore(IPluginData data)
     private static Fee F(DataRow r) => new(r.Id, r.Int("property_id"), r.Int("unit_id"), r.Text("name"), r.Int("amount"), r.Text("per"), r.Bool("optional"), r.Bool("tourist_tax"),
         r.Text("children") is { Length: > 0 } c ? c : "full", I(r, "sort"));
     private static Block? Bl(DataRow r) => B.Day(r.Text("from_day")) is { } f && B.Day(r.Text("to_day")) is { } t
-        ? new Block(r.Id, r.Int("unit_id"), f, t, r.Text("reason"), r.Text("source")) : null;
+        ? new Block(r.Id, r.Int("unit_id"), f, t, r.Text("reason"), r.Text("source"), r.Text("conflict")) : null;
 
     // ---- reading ------------------------------------------------------------------------------------------------
 
@@ -110,7 +115,7 @@ public sealed class BookingStore(IPluginData data)
     public async Task<List<Night>> NightsAsync(IEnumerable<long> unitIds, DateOnly from, DateOnly to, CancellationToken ct = default) =>
         await NightsIn(data, unitIds, from, to, ct);
 
-    private static async Task<List<Night>> NightsIn(IPluginData d, IEnumerable<long> unitIds, DateOnly from, DateOnly to, CancellationToken ct)
+    internal static async Task<List<Night>> NightsIn(IPluginData d, IEnumerable<long> unitIds, DateOnly from, DateOnly to, CancellationToken ct)
     {
         var ids = unitIds.Distinct().Select(x => (object?)x).ToList();
         if (ids.Count == 0) return new();

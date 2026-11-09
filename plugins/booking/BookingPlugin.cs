@@ -38,6 +38,7 @@ public sealed class BookingPlugin : IPlugin
         BookingAdmin.Configure(b);
         BookingPublic.Configure(b);
         BookingBlocks.Configure(b);
+        BookingIcal.Configure(b);
 
         // what nobody answered in time runs out and frees the calendar; the guest is told
         b.Job("expire", JobSchedule.EveryInterval(TimeSpan.FromMinutes(15)), async (ctx, ct) =>
@@ -53,12 +54,20 @@ public sealed class BookingPlugin : IPlugin
         b.Job("payment-reminders", JobSchedule.EveryInterval(TimeSpan.FromHours(6)), BookingPayments.RemindAsync);
         b.Admin.Attention(async (ctx, ct) =>
         {
+            var notes = new List<AttentionNote>();
             var open = (await BookingFlow.ListAsync(ctx.Data, new[] { BookingStatus.Request }, ct)).Count;
-            return open == 0 ? Array.Empty<AttentionNote>() : new[]
+            if (open > 0)
+                notes.Add(new AttentionNote(open == 1 ? "1 neue Buchungsanfrage" : open + " neue Buchungsanfragen", "Annehmen, Angebot schicken oder ablehnen – sonst läuft die Vormerkung ab.", BookingAdmin.Root + "bookings")
+                { Tone = UiTone.Warning, Icon = "ti-calendar-question" });
+            foreach (var f in await BookingIcal.FeedsAsync(ctx.Data, ct))
             {
-                new AttentionNote(open == 1 ? "1 neue Buchungsanfrage" : open + " neue Buchungsanfragen", "Annehmen, Angebot schicken oder ablehnen – sonst läuft die Vormerkung ab.", BookingAdmin.Root + "bookings")
-                { Tone = UiTone.Warning, Icon = "ti-calendar-question" }
-            };
+                if (f.Conflicts.Length > 0)
+                    notes.Add(new AttentionNote("Doppelbuchung über " + f.Name, f.Conflicts.Replace("\n", " · "), BookingAdmin.Root + "channels") { Tone = UiTone.Error, Icon = "ti-calendar-x" });
+                // an error that lasts: the portal's calendar has not been read for over two hours
+                else if (f.LastError.Length > 0 && f.Url.Length > 0 && (f.LastOk is null || f.LastOk < DateTime.UtcNow.AddHours(-2)))
+                    notes.Add(new AttentionNote("Kalender von " + f.Name + " wird nicht gelesen", f.LastError, BookingAdmin.Root + "channels") { Tone = UiTone.Warning, Icon = "ti-calendar-off" });
+            }
+            return notes;
         });
         b.Route(PricePath, PriceAsync, new PublicRouteOptions { Methods = PluginMethod.Get });
 

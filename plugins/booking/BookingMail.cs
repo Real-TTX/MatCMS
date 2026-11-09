@@ -9,7 +9,7 @@ namespace MatCMS.Plugin.Booking;
 public static class BookingMail
 {
     public const string RequestGuest = "booking.request.guest", RequestHost = "booking.request.host", Offer = "booking.offer", Confirmed = "booking.confirmed",
-        Declined = "booking.declined", Expired = "booking.expired", AcceptedHost = "booking.accepted.host", Cancelled = "booking.cancelled", Reminder = "booking.reminder";
+        Declined = "booking.declined", Expired = "booking.expired", AcceptedHost = "booking.accepted.host", Cancelled = "booking.cancelled", Reminder = "booking.reminder", Conflict = "booking.conflict.host";
 
     private static MailPlaceholder Ph(string t, string d) => new(t, d);
     private static readonly MailPlaceholder[] Common =
@@ -54,6 +54,10 @@ public static class BookingMail
             "Erinnerung: {{was}} für Ihre Buchung {{nummer}}",
             "Hallo {{name}},\n\nwir freuen uns auf Ihren Aufenthalt vom {{anreise}} bis {{abreise}} in {{einheit}}. Bei uns ist {{was}} noch nicht eingegangen – offen sind {{faellig}}.\n\n{{zahlung}}\nVerwendungszweck: {{nummer}}\n\nFalls Sie schon überwiesen haben: vielen Dank, dann hat sich diese Mail überschnitten.\n\nIhre Buchung: {{link}}\n\nViele Grüße\n{{website}}\n")
         { Placeholders = Common.Concat(new[] { Ph("was", "„die Anzahlung“ oder „den Restbetrag“"), Ph("faellig", "Der offene, fällige Betrag"), Ph("zahlung", "Zahlungshinweis aus den Einstellungen") }).ToArray() },
+        new(Conflict, "Buchungen: Doppelbuchung (an den Gastgeber)", "Geht an die Adresse aus den Einstellungen, wenn der Kalender eines Portals (Airbnb, Booking.com …) eine Belegung meldet, die sich mit einer Buchung oder Sperre hier überschneidet – einmal je neuem Konflikt.",
+            "Achtung, Doppelbuchung: {{einheit}} ({{kanal}})",
+            "Der Kalender von {{kanal}} meldet für {{einheit}} eine Belegung, die sich mit einer Buchung oder Sperre auf der Website überschneidet:\n\n{{konflikte}}\n\nBitte bei {{kanal}} oder hier klären – solange bleibt der Konflikt im Admin rot markiert:\n{{admin_link}}\n")
+        { Placeholders = new[] { Ph("einheit", "Die Unterkunft"), Ph("kanal", "Name des Kalenders, z. B. Airbnb"), Ph("konflikte", "Je Konflikt eine Zeile: Zeitraum und womit er sich überschneidet"), Ph("admin_link", "Die Seite Kanäle im Admin"), Ph("website", "Name der Website") } },
         new(AcceptedHost, "Buchungen: Angebot angenommen (an den Gastgeber)", "Geht an die Adresse aus den Einstellungen, wenn ein Gast ein Angebot annimmt.",
             "Gebucht: {{nummer}} {{einheit}}, {{anreise}} – {{abreise}}",
             "{{name}} hat das Angebot angenommen – die Buchung ist bestätigt.\n\n{{einheit}}, {{anreise}} – {{abreise}} ({{naechte}} Nächte), {{personen}}\nGesamt: {{betrag}}\n\n{{admin_link}}\n")

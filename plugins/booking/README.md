@@ -3,7 +3,26 @@
 Ferienhäuser, Villen und Apartments für eine MatCMS-Seite, gebaut nur gegen `MatCMS.Plugin.Abstractions`. Key `booking`, Admin unter
 Admin → Buchungen. Entwurf und Phasen: [`docs/booking-plugin.md`](../../docs/booking-plugin.md). Erste Seiten: Villa Nika, Villa Sogi.
 
-## Stand: Phase B3 (0.3)
+## Stand: Phase B4 (0.4)
+
+### Kalender-Abgleich mit den Portalen (B4)
+
+- **Admin → Buchungen → Kanäle**: je Einheit die eigene Kalender-Adresse und die verbundenen Portale (Airbnb, Booking.com, Vrbo, Rentlio, Google Kalender, andere)
+  mit Stand, Zahl der Belegungen, Fehler und Überschneidungen; „Jetzt lesen“, „Entfernen“ (gibt die Nächte frei), „Neue Adressen erzeugen“ (alle alten tot).
+  Ein Kalender kann statt einer Adresse auch einmal eingefügt werden (Inhalt einer .ics-Datei).
+- **Ausgang** `/buchung/ical/{token}.ics`: der Token der Einheit = alle belegten Nächte (Buchungen, haltende Anfragen, Sperren, andere Portale, bei der
+  ganzen Villa auch die ihrer Apartments) samt Puffertagen, ohne Namen und Preise, einen Monat zurück bis drei Jahre voraus. Der Token eines PORTALS = dasselbe
+  ohne die Nächte, die von diesem Portal kamen — so bekommt Airbnb seine eigenen Reservierungen nicht als fremde Sperre zurück.
+- **Eingang**: Job alle 15 Minuten. Abruf nur https, nur öffentliche Adressen (geprüft auf der aufgelösten IP IM Verbindungsaufbau, auch nach jeder
+  Weiterleitung — kein Weg nach localhost, 10.x, 169.254.x, fc00::/7 …), 2 MB, 20 s, drei Weiterleitungen. Gelesen wird nachsichtig (gefaltete Zeilen,
+  DATE und DATE-TIME, ohne Ende = eine Nacht, STATUS:CANCELLED übersprungen). Die Sperren des Portals werden in EINER Transaktion ersetzt — was das Portal
+  storniert, wird hier frei. Ein fehlgeschlagener Abruf lässt die letzten Sperren stehen.
+- **Überschneidung**: eine Nacht, die hier schon belegt ist, wird nicht überschrieben; die Sperre wird mit den freien Nächten und einem Vermerk geschrieben,
+  rot im Belegungsplan, als Hinweis auf dem Dashboard und einmal je neuem Konflikt per Mail (Vorlage „Doppelbuchung“) an „Neue Anfragen an“. Zwei Ereignisse
+  DESSELBEN Kalenders am selben Tag sind kein Konflikt (Google führt manche Feiertage doppelt).
+- Geprüft gegen einen echten Kalender (Googles Feiertage, 462 Ereignisse) im Testcontainer.
+
+## Stand davor: Phase B3 (0.3)
 
 ### Admin-Werkzeuge (B3)
 
@@ -78,8 +97,10 @@ Aufenthalt, Kinder-Kurtaxe, wählbare Gebühr, zu viele Gäste, Apartment ↔ ga
 Saisons ins nächste Jahr kopieren. `BookingFlowTests`: Anfrage über das Formular (Einwilligung, Honigtopf, belegt, Regeln), Gastseite, Angebot mit
 Nachlass und Annahme über den Link (ohne Token abgewiesen), Ablehnen/Stornieren geben frei, Ablauf durch den Job, Telefonbuchung, die drei Blöcke.
 `BookingB3Tests`: Anzahlung aufgerundet + Rest, Zahlungen → angezahlt/bezahlt, kurzfristig = alles sofort, Erinnerung genau einmal, PDF für Admin und Gast
-(nicht vor der Bestätigung), Gästekartei und Löschen, Belegungsplan.
+(nicht vor der Bestätigung), Gästekartei und Löschen, Belegungsplan. `BookingIcalTests`: Ausgang ohne Gastdaten, Portal-Adresse ohne seine eigenen
+Nächte, eingefügter Kalender sperrt + meldet Überschneidung + neue Fassung ersetzt die alte, nachsichtiges Lesen, Abweisung von http/localhost/127.0.0.1/10.x/::1/169.254.169.254,
+neue Adressen machen die alten ungültig.
 
 ## Nächste Phasen
 
-B4 iCal (Airbnb, Booking.com, Rentlio) · B5 Online-Check-in, Mails, Reinigung · B6 Kundenverbund.
+B5 Online-Check-in, Mails, Reinigung · B6 Kundenverbund.

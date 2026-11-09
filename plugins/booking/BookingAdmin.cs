@@ -27,6 +27,7 @@ public static class BookingAdmin
             .Link("Anfragen & Buchungen", "bookings", "ti-calendar-event", badge: true, also: new[] { "bookings/" })
             .Link("Belegungsplan", "plan", "ti-layout-kanban")
             .Link("Gäste", "guests", "ti-address-book", also: new[] { "guests/" })
+            .Link("Kanäle", "channels", "ti-arrows-exchange")
             .Link("Einheiten", "units", "ti-bed", also: new[] { "units/" })
             .Link("Saisons & Preise", "seasons", "ti-calendar-dollar", also: new[] { "seasons/" })
             .Link("Gebühren & Kurtaxe", "fees", "ti-receipt", also: new[] { "fees/" })
@@ -36,6 +37,7 @@ public static class BookingAdmin
             .Badge(async (c, ct) => (await BookingFlow.ListAsync(c.Data, new[] { BookingStatus.Request }, ct)).Count is var n and > 0 ? n.ToString(CultureInfo.InvariantCulture) : null);
         BookingAdminBookings.Register(section);
         BookingAdminMore.Register(section);
+        BookingAdminChannels.Register(section);
     }
 
     private static long Id(IPluginContext ctx) => long.TryParse(ctx.Request.R("id"), NumberStyles.None, CultureInfo.InvariantCulture, out var id) ? id : 0;

@@ -79,7 +79,9 @@ public static class BookingAdminMore
                     else
                     {
                         var reason = blocks.TryGetValue(n.BlockId, out var bl) ? bl.Reason : "";
-                        sb.Append("<td colspan=\"").Append(span).Append("\" class=\"bar block\" title=\"").Append(B.H("Gesperrt" + (reason.Length > 0 ? ": " + reason : ""))).Append("\"><span>")
+                        var clash = bl?.Conflict ?? "";
+                        sb.Append("<td colspan=\"").Append(span).Append("\" class=\"bar block").Append(bl?.Source.StartsWith("feed:", StringComparison.Ordinal) == true ? " feed" : "").Append(clash.Length > 0 ? " conflict" : "")
+                          .Append("\" title=\"").Append(B.H((clash.Length > 0 ? clash : "Gesperrt" + (reason.Length > 0 ? ": " + reason : "")))).Append("\"><span>")
                           .Append(B.H(reason.Length > 0 ? reason : "gesperrt")).Append("</span></td>");
                     }
                     d = d.AddDays(span);
@@ -111,6 +113,8 @@ public static class BookingAdminMore
 .bk-plan td.request a{background:var(--warn-bg);color:var(--warn-fg);border:1px solid var(--warn-line)}
 .bk-plan td.offer a{background:var(--info-bg);color:var(--info-fg);border:1px solid var(--info-line)}
 .bk-plan td.confirmed a{background:var(--ok-bg);color:var(--ok-fg);border:1px solid var(--ok-line)}
+.bk-plan td.feed span{background:var(--surface-2);border-style:solid;color:var(--text-2);font-weight:600}
+.bk-plan td.conflict span{background:var(--err-bg);color:var(--err-fg);border:1px solid var(--err-line);font-weight:600}
 .bk-plan td.part span{background:repeating-linear-gradient(135deg,transparent 0 5px,var(--hover) 5px 10px);color:var(--text-muted);border:1px dashed var(--line);font-weight:500}
 .bk-plan td.block span{background:repeating-linear-gradient(135deg,var(--surface-2) 0 6px,var(--hover) 6px 12px);color:var(--text-2);border:1px dashed var(--border-strong);font-weight:500}
 .bk-plan-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--text-muted);margin-top:10px}

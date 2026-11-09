@@ -27,6 +27,8 @@
     <ProjectReference Include="..\..\plugins\verein\Verein.csproj" ReferenceOutputAssembly="false" Private="false" />
     <!-- The guest area of a private event (plugins/moments), native: MomentsTests run it inside the whole application. -->
     <ProjectReference Include="..\..\plugins\moments\Moments.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <!-- Holiday homes (plugins/booking), native: BookingTests run it inside the whole application. -->
+    <ProjectReference Include="..\..\plugins\booking\Booking.csproj" ReferenceOutputAssembly="false" Private="false" />
   </ItemGroup>
 
   <ItemGroup>
@@ -59,6 +61,10 @@
       <MomentsFiles Include="$(MSBuildProjectDirectory)\..\..\plugins\moments\bin\$(Configuration)\net10.0\Moments.dll" />
     </ItemGroup>
     <Copy SourceFiles="@(MomentsFiles)" DestinationFolder="$(OutDir)fixtures\moments" />
+    <ItemGroup>
+      <BookingFiles Include="$(MSBuildProjectDirectory)\..\..\plugins\booking\bin\$(Configuration)\net10.0\Booking.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(BookingFiles)" DestinationFolder="$(OutDir)fixtures\booking" />
   </Target>
 
 </Project>

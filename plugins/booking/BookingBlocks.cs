@@ -87,7 +87,7 @@ public static class BookingBlocks
         foreach (var house in units.Select(u => u.PropertyId).Distinct()) fees.AddRange((await store.FeesAsync(house, ct)).Where(f => f.Optional));
         var privacy = ctx.Settings.Get(BookingPlugin.PrivacyKey) is { Length: > 0 } pv ? pv : "/datenschutz";
         string Val(string k) => B.H(B.Day(Q(ctx, k)) is { } d ? B.Iso(d) : "");
-        var today = B.Iso(DateOnly.FromDateTime(DateTime.UtcNow));
+        var today = B.Iso(B.Today);
 
         sb.Append("<form id=\"anfrage\" class=\"bk-form\" method=\"post\" action=\"").Append(BookingPublic.RequestPath).Append("\" data-price=\"").Append(BookingPlugin.PricePath).Append("\">");
         if (fixedUnit is not null) sb.Append("<input type=\"hidden\" name=\"einheit\" value=\"").Append(B.H(fixedUnit.Slug)).Append("\">");
@@ -161,7 +161,7 @@ fees();price();})();
         Head(sb, "bk-calendar-block", F(ctx, "heading").Trim() is { Length: > 0 } h ? h : unit is null ? "Belegung" : "Belegung – " + unit.Name, "");
         if (unit is null) return PluginResult.Fragment(sb.Append("<p class=\"bk-muted\">Noch keine Unterkunft eingerichtet.</p></div></section>").ToString());
         var months = int.TryParse(F(ctx, "months"), out var m) ? Math.Clamp(m, 1, 12) : 6;
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = B.Today;
         var first = new DateOnly(today.Year, today.Month, 1);
         var end = first.AddMonths(months);
         var taken = (await store.NightsAsync(BookingStore.Occupies(unit, units), first, end, ct)).Select(n => n.Day).ToHashSet();

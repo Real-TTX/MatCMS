@@ -1,6 +1,6 @@
 # Buchungs-Plugin — Entwurf
 
-Stand: 09.11.2026 — **B1 und B2 gebaut** (`plugins/booking` 0.2: Objekte, Einheiten, Saisons, Preise, Gebühren/Kurtaxe, Sperren, Preis-Vorschau; Blöcke, Anfrage → Angebot → Bestätigung, Gastseite, Mails, Ablauf; Tests `BookingTests`, `BookingFlowTests`). Noch nicht aus B2: das Bestätigungs-PDF (kommt mit B3). B3–B6 offen.
+Stand: 10.11.2026 — **B1–B3 gebaut** (`plugins/booking` 0.3: Objekte, Einheiten, Saisons, Preise, Gebühren/Kurtaxe, Sperren, Preis-Vorschau; Blöcke, Anfrage → Angebot → Bestätigung, Gastseite, Mails, Ablauf; Belegungsplan, Zahlungen mit Erinnerung, Bestätigungs-PDF, Gästekartei; Tests `BookingTests`, `BookingFlowTests`, `BookingB3Tests`). B4–B6 offen. Demo: `matcms-demo-villa` (Villa Mirta).
 Apartments“): Belegungskalender, Buchungsanfragen, Saisonpreise, Gäste, Abgleich mit Booking.com/Airbnb/Rentlio, Check-in und Übergabe.
 Erste Seiten: **Villa Nika** und **Villa Sogi** (gemeinsame Gäste). Ergänzt `docs/plugin-system-v2.md`; wie beim Shop gilt: was das
 Plugin braucht und die API nicht kann, kommt **in die API**, nicht am Plugin vorbei.

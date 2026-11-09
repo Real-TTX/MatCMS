@@ -60,6 +60,16 @@ public static class B
     public static DateOnly? Day(string? s) =>
         DateOnly.TryParseExact((s ?? "").Trim().Length >= 10 ? s!.Trim()[..10] : s ?? "", "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : null;
 
+    /// <summary>Today where the houses are (Central European time) — in UTC a late evening is already "tomorrow" or still "yesterday".</summary>
+    public static DateOnly Today
+    {
+        get
+        {
+            try { return DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Berlin"))); }
+            catch (TimeZoneNotFoundException) { return DateOnly.FromDateTime(DateTime.UtcNow); }
+        }
+    }
+
     public static string Iso(DateOnly d) => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
     public static string Date(DateOnly d) => d.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
     public static string Date(string s) => Day(s) is { } d ? Date(d) : s;

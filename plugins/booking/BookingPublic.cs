@@ -17,6 +17,7 @@ public static partial class BookingPublic
         // an anonymous form with nothing to forge: no token (a block cannot carry one), rate-limited by the host (20 a minute per address, like a contact form) and with a honeypot
         b.Route(RequestPath, RequestAsync, new PublicRouteOptions { Methods = PluginMethod.Post });
         b.Route(BookingFlow.GuestPath + "{key}", GuestAsync, new PublicRouteOptions { Antiforgery = true });
+        b.Route(BookingFlow.GuestPath + "{key}/pdf", GuestPdfAsync, new PublicRouteOptions { Methods = PluginMethod.Get });
     }
 
     private static readonly KeyValuePair<string, string>[] NoIndex = { new("robots", "noindex, nofollow") };
@@ -40,7 +41,7 @@ public static partial class BookingPublic
         var unit = await store.UnitBySlugAsync(B.Slug(f.F("einheit")), ct);
         if (unit is null || !unit.Active) return Shell("Anfrage", Back("Bitte eine Unterkunft wählen."));
         if (B.Day(f.F("anreise")) is not { } arrival || B.Day(f.F("abreise")) is not { } departure) return Shell("Anfrage", Back("Bitte An- und Abreise angeben."));
-        if (arrival < DateOnly.FromDateTime(DateTime.UtcNow)) return Shell("Anfrage", Back("Die Anreise liegt in der Vergangenheit."));
+        if (arrival < B.Today) return Shell("Anfrage", Back("Die Anreise liegt in der Vergangenheit."));
         var name = B.Clip(f.F("name"), 120);
         var email = B.Clip(f.F("email"), 200);
         if (name.Length < 2) return Shell("Anfrage", Back("Bitte Ihren Namen angeben."));
@@ -125,10 +126,29 @@ public static partial class BookingPublic
         if (b.Status == BookingStatus.Offer && b.OfferUntil >= DateTime.UtcNow)
             sb.Append("<form method=\"post\" class=\"bk-accept\">").Append(ctx.Antiforgery).Append("<input type=\"hidden\" name=\"action\" value=\"accept\">")
               .Append("<p>Mit dem Klick buchen Sie verbindlich zu den genannten Bedingungen.</p><button class=\"bk-btn\" type=\"submit\">Verbindlich buchen</button></form>");
-        if (b.Status == BookingStatus.Confirmed && ctx.Settings.Get(BookingPlugin.PaymentInfoKey) is { Length: > 0 } pay)
-            sb.Append("<div class=\"bk-card\"><h2>Zahlung</h2><p class=\"bk-pre\">").Append(B.H(pay)).Append("</p><p class=\"bk-muted\">Verwendungszweck: ").Append(B.H(b.Number)).Append("</p></div>");
+        if (b.Status == BookingStatus.Confirmed)
+        {
+            var plan = await BookingPayments.PlanAsync(ctx, b, ct);
+            var two = plan.Deposit > 0 && plan.Deposit < plan.Total;
+            sb.Append("<div class=\"bk-card\"><h2>Zahlung</h2><dl class=\"bk-facts\">");
+            if (two) sb.Append("<dt>Anzahlung</dt><dd>").Append(B.H(B.Money(plan.Deposit, cur))).Append(" bis ").Append(B.Date(plan.DepositDue)).Append("</dd>")
+                       .Append("<dt>Rest</dt><dd>").Append(B.H(B.Money(plan.Rest, cur))).Append(" bis ").Append(B.Date(plan.RestDue)).Append("</dd>");
+            else sb.Append("<dt>Gesamtbetrag</dt><dd>").Append(B.H(B.Money(plan.Total, cur))).Append(" bis ").Append(B.Date(plan.DepositDue)).Append("</dd>");
+            sb.Append("<dt>Bezahlt</dt><dd>").Append(B.H(B.Money(plan.Paid, cur))).Append("</dd><dt>Noch offen</dt><dd><strong>").Append(B.H(B.Money(plan.Open, cur))).Append("</strong></dd></dl>");
+            if (ctx.Settings.Get(BookingPlugin.PaymentInfoKey) is { Length: > 0 } pay)
+                sb.Append("<p class=\"bk-pre\">").Append(B.H(pay)).Append("</p><p class=\"bk-muted\">Verwendungszweck: ").Append(B.H(b.Number)).Append("</p>");
+            sb.Append("<p><a class=\"bk-btn bk-btn-ghost\" href=\"").Append(B.H(self + "/pdf")).Append("\">Buchungsbestätigung (PDF)</a></p></div>");
+        }
         sb.Append("<p class=\"bk-muted\">Diese Seite ist nur über den Link in Ihrer E-Mail erreichbar. Fragen? Antworten Sie einfach auf unsere E-Mail.</p>");
         return Shell(title, sb.ToString());
+    }
+
+    /// <summary>The confirmation as PDF — only for a confirmed (or cancelled, to keep the record) booking, only with the key.</summary>
+    private static async Task<PluginResult> GuestPdfAsync(IPluginContext ctx, CancellationToken ct)
+    {
+        var b = await BookingFlow.ByKeyAsync(ctx.Data, ctx.Request.R("key"), ct);
+        if (b is null || b.Status is not (BookingStatus.Confirmed or BookingStatus.Cancelled)) return PluginResult.NotFound();
+        return (await BookingAdminBookings.ConfirmationPdfAsync(ctx, b, ct)).WithHeader("X-Robots-Tag", "noindex");
     }
 
     /// <summary>The bill as a table (lines, the way each was counted, total).</summary>

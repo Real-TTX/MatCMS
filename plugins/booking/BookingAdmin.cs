@@ -25,6 +25,8 @@ public static class BookingAdmin
             .Page("check", null, CheckAsync)
             .Link("Übersicht", "dashboard", "ti-layout-dashboard")
             .Link("Anfragen & Buchungen", "bookings", "ti-calendar-event", badge: true, also: new[] { "bookings/" })
+            .Link("Belegungsplan", "plan", "ti-layout-kanban")
+            .Link("Gäste", "guests", "ti-address-book", also: new[] { "guests/" })
             .Link("Einheiten", "units", "ti-bed", also: new[] { "units/" })
             .Link("Saisons & Preise", "seasons", "ti-calendar-dollar", also: new[] { "seasons/" })
             .Link("Gebühren & Kurtaxe", "fees", "ti-receipt", also: new[] { "fees/" })
@@ -33,6 +35,7 @@ public static class BookingAdmin
             .Link("Einstellungen", "_settings", "ti-settings")
             .Badge(async (c, ct) => (await BookingFlow.ListAsync(c.Data, new[] { BookingStatus.Request }, ct)).Count is var n and > 0 ? n.ToString(CultureInfo.InvariantCulture) : null);
         BookingAdminBookings.Register(section);
+        BookingAdminMore.Register(section);
     }
 
     private static long Id(IPluginContext ctx) => long.TryParse(ctx.Request.R("id"), NumberStyles.None, CultureInfo.InvariantCulture, out var id) ? id : 0;
@@ -65,7 +68,7 @@ public static class BookingAdmin
         };
         var all = await BookingFlow.ListAsync(ctx.Data, null, ct);
         var open = all.Count(x => x.Status is BookingStatus.Request or BookingStatus.Offer);
-        var coming = all.Count(x => x.Status == BookingStatus.Confirmed && x.Departure >= DateOnly.FromDateTime(DateTime.UtcNow));
+        var coming = all.Count(x => x.Status == BookingStatus.Confirmed && x.Departure >= B.Today);
         var seasons = 0; var fees = 0;
         foreach (var h in houses) { seasons += (await store.SeasonsAsync(h.Id, ct)).Count; fees += (await store.FeesAsync(h.Id, ct)).Count; }
         steps.Add(("Saisons und Preise festlegen", seasons > 0, Root + "seasons"));
@@ -445,7 +448,7 @@ public static class BookingAdmin
             Ui.Button("Einheit anlegen", Root + "units/new", icon: "ti-plus"))), "Preis prüfen");
         string P(string k) => ctx.Request.IsPost ? ctx.Request.F(k) : ctx.Request.Q(k);
         var unit = units.FirstOrDefault(u => B.Num(u.Id) == P("unit")) ?? units[0];
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = B.Today;
         var arrival = B.Day(P("arrival")) ?? today.AddDays(30);
         var departure = B.Day(P("departure")) ?? arrival.AddDays(7);
         var adults = Int(P("adults"), 2, 0, 50);

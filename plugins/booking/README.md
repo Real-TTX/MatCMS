@@ -3,7 +3,25 @@
 Ferienhäuser, Villen und Apartments für eine MatCMS-Seite, gebaut nur gegen `MatCMS.Plugin.Abstractions`. Key `booking`, Admin unter
 Admin → Buchungen. Entwurf und Phasen: [`docs/booking-plugin.md`](../../docs/booking-plugin.md). Erste Seiten: Villa Nika, Villa Sogi.
 
-## Stand: Phase B2 (0.2)
+## Stand: Phase B3 (0.3)
+
+### Admin-Werkzeuge (B3)
+
+- **Belegungsplan** (Admin → Buchungen → Belegungsplan): Einheiten × Nächte eines Monats, Buchungen als Balken nach Status (Anfrage/Angebot/bestätigt),
+  Sperren schraffiert, die „ganze Villa“ zeigt „Teil belegt“, solange ein Apartment belegt ist; eine Buchung der ganzen Villa steht in jeder Apartment-Zeile
+  („über Ganze Villa“). Ein Klick auf einen freien Tag öffnet „Neue Buchung“ mit Einheit und Anreise. Nur Admin-Variablen (hell/dunkel).
+- **Zahlungen**: Plan je bestätigter Buchung — Anzahlung (Einstellung %, Standard 30, auf ganze Euro aufgerundet) fällig N Tage nach der Bestätigung,
+  Rest N Tage vor Anreise; liegt die Anreise zu nah, ist alles auf einmal fällig (`BookingPayments.Plan`, rein). Eingänge eintragen/entfernen (Betrag, Tag,
+  Art, Notiz), Stand offen/teilweise/angezahlt/bezahlt in der Liste. **Erinnerung**: ein Job alle 6 Stunden schickt EINE Mail je Fälligkeit, zwei Tage
+  danach (gemerkt in `reminded_deposit/rest`), abschaltbar.
+- **Buchungsbestätigung als PDF** (Admin und Gastseite `/buchung/gast/{schlüssel}/pdf`, erst ab „bestätigt“): Aufenthalt, Preis, Zahlungsplan, Bezahltes,
+  Zahlungshinweis — auf dem Briefkopf aus „Druckvorlage (PDF)“ (Logo, Zeilen rechts oben, Fußzeile, Farbe; leer = Name und Logo der Website).
+  `PdfWriter`/`PrintLayout` sind Kopien aus dem Verein-Plugin (ein natives Plugin nutzt keine fremden Typen).
+- **Gäste**: Kartei (Aufenthalte, zuletzt, Umsatz), Gästekarte mit Notiz und allen Aufenthalten; „Daten löschen“ erst ohne offene/kommende Buchung —
+  dann werden die Aufenthalte anonymisiert (bleiben für die Buchhaltung) und ihre Links ungültig.
+- „Heute“ ist überall mitteleuropäische Zeit (`B.Today`), nicht UTC.
+
+## Stand davor: Phase B2 (0.2)
 
 ### Website und Anfragen (B2)
 
@@ -59,8 +77,9 @@ Admin → Buchungen. Entwurf und Phasen: [`docs/booking-plugin.md`](../../docs/b
 Aufenthalt, Kinder-Kurtaxe, wählbare Gebühr, zu viele Gäste, Apartment ↔ ganzes Haus in beide Richtungen, sechs gleichzeitige Sperren → genau eine,
 Saisons ins nächste Jahr kopieren. `BookingFlowTests`: Anfrage über das Formular (Einwilligung, Honigtopf, belegt, Regeln), Gastseite, Angebot mit
 Nachlass und Annahme über den Link (ohne Token abgewiesen), Ablehnen/Stornieren geben frei, Ablauf durch den Job, Telefonbuchung, die drei Blöcke.
+`BookingB3Tests`: Anzahlung aufgerundet + Rest, Zahlungen → angezahlt/bezahlt, kurzfristig = alles sofort, Erinnerung genau einmal, PDF für Admin und Gast
+(nicht vor der Bestätigung), Gästekartei und Löschen, Belegungsplan.
 
 ## Nächste Phasen
 
-B3 Belegungsplan, Gästekartei, Zahlungen, Bestätigungs-PDF ·
 B4 iCal (Airbnb, Booking.com, Rentlio) · B5 Online-Check-in, Mails, Reinigung · B6 Kundenverbund.

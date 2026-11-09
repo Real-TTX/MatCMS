@@ -32,6 +32,8 @@ public sealed class BookingPlugin : IPlugin
             .Number(OfferKey, "Angebot gilt (Tage)", 3, 1, 30)
             .TextArea(PaymentInfoKey, "Zahlungshinweis", "", "Steht in der Buchungsbestätigung und auf der Seite des Gastes, z. B. Bankverbindung, Anzahlung und bis wann.")
             .Text(PrivacyKey, "Datenschutzerklärung", "/datenschutz", "Die Seite, auf die das Anfrageformular verweist.");
+        BookingPayments.Declare(b.Settings);
+        BookingPrint.Declare(b.Settings);
         foreach (var spec in BookingMail.Specs) b.MailTemplate(spec);
         BookingAdmin.Configure(b);
         BookingPublic.Configure(b);
@@ -48,6 +50,7 @@ public sealed class BookingPlugin : IPlugin
                 await BookingFlow.NoteAsync(ctx.Data, x.Id, "Mail an den Gast: " + await BookingMail.SendAsync(ctx, BookingMail.Expired, x.Email, BookingMail.Values(ctx, x, unit, house, null), ct), ct);
             }
         });
+        b.Job("payment-reminders", JobSchedule.EveryInterval(TimeSpan.FromHours(6)), BookingPayments.RemindAsync);
         b.Admin.Attention(async (ctx, ct) =>
         {
             var open = (await BookingFlow.ListAsync(ctx.Data, new[] { BookingStatus.Request }, ct)).Count;

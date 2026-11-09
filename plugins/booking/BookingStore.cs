@@ -19,7 +19,7 @@ public sealed class UnavailableException(string message) : Exception(message);
 public sealed class BookingStore(IPluginData data)
 {
     public const string TProperties = "properties", TUnits = "units", TSeasons = "seasons", TRates = "rates", TFees = "fees", TNights = "nights",
-        TBlocks = "blocks", TBookings = "bookings", TMeta = "meta", TGuests = "guests", TSequences = "sequences", TKeys = "keys";
+        TBlocks = "blocks", TBookings = "bookings", TMeta = "meta", TGuests = "guests", TSequences = "sequences", TKeys = "keys", TPayments = "payments";
 
     public static void Declare(IDataBuilder b)
     {
@@ -44,12 +44,14 @@ public sealed class BookingStore(IPluginData data)
         b.Table(TBookings, t => t.Text("number").Int("unit_id", required: true).Int("guest_id", def: "0").Text("arrival", required: true).Text("departure", required: true)
             .Int("adults", def: "1").Int("children", def: "0").Text("extras").Text("status", required: true).Text("source").Json("quote").Int("total", def: "0")
             .Text("name").Text("email").Text("phone").Text("message").Text("host_note").Text("locale")
-            .Timestamp("hold_until").Timestamp("offer_until").Timestamp("created").Timestamp("updated").Json("history")
+            .Timestamp("hold_until").Timestamp("offer_until").Timestamp("confirmed_at").Timestamp("reminded_deposit").Timestamp("reminded_rest").Timestamp("created").Timestamp("updated").Json("history")
             .Index("unit_id").Index("status").Index("arrival").Index("guest_id"));
         b.Table(TGuests, t => t.Text("name").Text("email", required: true).Text("phone").Text("country").Text("locale").Text("note")
             .Timestamp("created").Timestamp("updated").UniqueIndex("email"));
         // the guest's secret links, as hashes. Each mail may carry a fresh one (only a hash is kept, so an old one cannot be sent again); all stay valid
         b.Table(TKeys, t => t.Int("booking_id", required: true).Text("hash", required: true).Timestamp("created").UniqueIndex("hash").Index("booking_id"));
+        b.Table(TPayments, t => t.Int("booking_id", required: true).Int("amount", required: true).Text("day", required: true).Text("method").Text("note")
+            .Timestamp("created").Index("booking_id"));
         b.Table(TSequences, t => t.Text("name", required: true).Int("value", def: "0").UniqueIndex("name"));
         b.Table(TMeta, t => t.Text("name", required: true).Text("value").UniqueIndex("name"));
     }

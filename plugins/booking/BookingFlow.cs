@@ -8,7 +8,8 @@ namespace MatCMS.Plugin.Booking;
 /// <summary>A stay asked for or booked. <see cref="Lines"/>/<see cref="Total"/> are the bill as it was made (a snapshot — later price changes never touch it).</summary>
 public sealed record Booking(long Id, string Number, long UnitId, long GuestId, DateOnly Arrival, DateOnly Departure, int Adults, int Children,
     IReadOnlyList<long> Extras, string Status, string Source, IReadOnlyList<QuoteLine> Lines, long Total, string Name, string Email, string Phone,
-    string Message, string HostNote, string Locale, DateTime? HoldUntil, DateTime? OfferUntil, DateTime? Created, IReadOnlyList<(DateTime At, string Text)> History)
+    string Message, string HostNote, string Locale, DateTime? HoldUntil, DateTime? OfferUntil, DateTime? Created, IReadOnlyList<(DateTime At, string Text)> History,
+    DateTime? ConfirmedAt = null)
 {
     public int Nights => Departure.DayNumber - Arrival.DayNumber;
     /// <summary>Its nights are held in the calendar (asked, offered or booked).</summary>
@@ -67,7 +68,7 @@ public static class BookingFlow
             (int)r.Int("adults"), (int)r.Int("children"),
             r.Text("extras").Split(',', StringSplitOptions.RemoveEmptyEntries).Select(x => long.TryParse(x, out var v) ? v : 0).Where(v => v > 0).ToList(),
             r.Text("status"), r.Text("source"), lines, r.Int("total"), r.Text("name"), r.Text("email"), r.Text("phone"), r.Text("message"), r.Text("host_note"),
-            r.Text("locale"), r.Timestamp("hold_until"), r.Timestamp("offer_until"), r.Timestamp("created"), history);
+            r.Text("locale"), r.Timestamp("hold_until"), r.Timestamp("offer_until"), r.Timestamp("created"), history, r.Timestamp("confirmed_at"));
     }
 
     private static string Str(JsonObject o, string k) => o[k] is JsonValue v && v.TryGetValue<string>(out var s) ? s : "";
@@ -190,6 +191,7 @@ public static class BookingFlow
                 throw new BookingException("Nicht möglich: die Buchung ist " + BookingStatus.Label(b.Status) + ".");
             var values = change ?? new Dictionary<string, object?>();
             values["status"] = to; values["updated"] = DateTime.UtcNow; values["history"] = AddHistory(b, history);
+            if (to == BookingStatus.Confirmed) values["confirmed_at"] = DateTime.UtcNow;            // the payment plan counts from here
             await tx.Table(BookingStore.TBookings).UpdateAsync(id, values, ct);
             if (to is BookingStatus.Declined or BookingStatus.Expired or BookingStatus.Cancelled)
                 await tx.Table(BookingStore.TNights).DeleteWhereAsync(DataQuery.Everything.Eq("booking_id", id), ct);

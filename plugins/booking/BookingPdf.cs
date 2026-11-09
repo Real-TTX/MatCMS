@@ -1,0 +1,210 @@
+using System.Globalization;
+using System.Text;
+
+namespace MatCMS.Plugin.Booking;
+
+/// <summary>
+/// A small PDF writer: A4 pages, text in Helvetica (regular and bold), lines and grey boxes — exactly what a letter, an agenda or minutes need and nothing more. It writes a plain PDF 1.4 by hand
+/// (no library, no font files: Helvetica is one of the 14 fonts every PDF reader has) so the image carries no new dependency. Text is WinAnsi, i.e. Western European: German,
+/// French, Spanish … letters and the euro sign are right; a character outside it prints as <c>?</c>.
+/// </summary>
+internal sealed class PdfWriter
+{
+    public const double PageWidth = 595, PageHeight = 842;
+
+    private readonly List<PdfPage> _pages = new();
+    public IReadOnlyList<PdfPage> Pages => _pages;
+    public string Title { get; set; } = "";
+    public string Author { get; set; } = "";
+
+    public PdfPage AddPage() { var p = new PdfPage(); _pages.Add(p); return p; }
+
+    private readonly List<(byte[] Jpeg, int Width, int Height)> _images = new();
+
+    /// <summary>Adds a JPEG for use on pages (<see cref="PdfPage.Image"/>); returns its number.</summary>
+    public int AddImage(byte[] jpeg, int width, int height) { _images.Add((jpeg, width, height)); return _images.Count; }
+
+    // ---- the font metrics (Adobe's AFM widths of Helvetica and Helvetica-Bold, for 32…126) ---------------------
+
+    private static readonly int[] Regular =
+    {
+        278, 278, 355, 556, 556, 889, 667, 191, 333, 333, 389, 584, 278, 333, 278, 278, 556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 278, 278, 584, 584, 584, 556,
+        1015, 667, 667, 722, 722, 667, 611, 778, 722, 278, 500, 667, 556, 833, 722, 778, 667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 278, 278, 278, 469, 556,
+        333, 556, 556, 500, 556, 556, 278, 556, 556, 222, 222, 500, 222, 833, 556, 556, 556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500, 334, 260, 334, 584
+    };
+
+    private static readonly int[] Bold =
+    {
+        278, 333, 474, 556, 556, 889, 722, 238, 333, 333, 389, 584, 278, 333, 278, 278, 556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 333, 333, 584, 584, 584, 611,
+        975, 722, 722, 722, 722, 667, 611, 778, 722, 278, 556, 722, 611, 833, 722, 778, 667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 333, 278, 333, 584, 556,
+        333, 556, 611, 556, 611, 556, 333, 611, 611, 278, 278, 556, 278, 889, 611, 611, 611, 611, 389, 556, 333, 611, 556, 778, 556, 556, 500, 389, 280, 389, 584
+    };
+
+    /// <summary>The letter an accented one is measured as (the AFM widths of the accented forms equal their base letters').</summary>
+    private static char BaseLetter(char c) => c switch
+    {
+        'À' or 'Á' or 'Â' or 'Ã' or 'Ä' or 'Å' => 'A', 'Ç' => 'C', 'È' or 'É' or 'Ê' or 'Ë' => 'E', 'Ì' or 'Í' or 'Î' or 'Ï' => 'I', 'Ñ' => 'N',
+        'Ò' or 'Ó' or 'Ô' or 'Õ' or 'Ö' or 'Ø' => 'O', 'Ù' or 'Ú' or 'Û' or 'Ü' => 'U', 'Ý' or 'Ÿ' => 'Y', 'Š' => 'S', 'Ž' => 'Z',
+        'à' or 'á' or 'â' or 'ã' or 'ä' or 'å' => 'a', 'ç' => 'c', 'è' or 'é' or 'ê' or 'ë' => 'e', 'ì' or 'í' or 'î' or 'ï' => 'i', 'ñ' => 'n',
+        'ò' or 'ó' or 'ô' or 'õ' or 'ö' or 'ø' => 'o', 'ù' or 'ú' or 'û' or 'ü' => 'u', 'ý' or 'ÿ' => 'y', 'š' => 's', 'ž' => 'z', _ => c
+    };
+
+    /// <summary>The byte WinAnsi uses for a character, or <c>?</c> when it has none.</summary>
+    public static byte WinAnsi(char c)
+    {
+        if (c is >= ' ' and <= '~') return (byte)c;
+        if (c is >= ' ' and <= 'ÿ') return (byte)c;                       // Latin-1 and WinAnsi agree here
+        return c switch
+        {
+            '€' => 0x80, '‚' => 0x82, 'ƒ' => 0x83, '„' => 0x84, '…' => 0x85, '†' => 0x86, '‡' => 0x87, 'ˆ' => 0x88, '‰' => 0x89, 'Š' => 0x8A, '‹' => 0x8B, 'Œ' => 0x8C,
+            'Ž' => 0x8E, '‘' => 0x91, '’' => 0x92, '“' => 0x93, '”' => 0x94, '•' => 0x95, '–' => 0x96, '—' => 0x97, '™' => 0x99, 'š' => 0x9A, '›' => 0x9B, 'œ' => 0x9C,
+            'ž' => 0x9E, 'Ÿ' => 0x9F,
+            '−' => (byte)'-',                                                       // a typed minus sign
+            '\t' => (byte)' ', '­' => (byte)'-',
+            _ => (byte)'?'
+        };
+    }
+
+    /// <summary>The width of a text in points.</summary>
+    public static double Width(string text, double size, bool bold)
+    {
+        double units = 0;
+        foreach (var raw in text)
+        {
+            var c = BaseLetter(raw);
+            if (c is >= ' ' and <= '~') units += (bold ? Bold : Regular)[c - ' '];
+            else units += raw switch
+            {
+                'ß' => 611, 'Æ' => 1000, 'æ' => 889, 'Œ' => 1000, 'œ' => 944, '€' => 556, '—' => 1000, '…' => 1000, '•' => 350, '–' => 556, '−' => 333, '°' => 400,
+                '„' or '“' or '”' => bold ? 500 : 333, '‚' or '‘' or '’' => bold ? 278 : 222, '©' or '®' => 737, '·' => 278, ' ' => 278, _ => 556
+            };
+        }
+        return units * size / 1000.0;
+    }
+
+    /// <summary>Breaks a text into lines no wider than <paramref name="maxWidth"/> (at spaces; a word wider than a line is cut). Line breaks in the text are kept.</summary>
+    public static List<string> Wrap(string text, double maxWidth, double size, bool bold)
+    {
+        var lines = new List<string>();
+        foreach (var paragraph in (text ?? "").Replace("\r", "").Split('\n'))
+        {
+            if (paragraph.Trim().Length == 0) { lines.Add(""); continue; }
+            var line = new StringBuilder();
+            foreach (var word in paragraph.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var w = word;
+                while (Width(w, size, bold) > maxWidth)               // a single word that does not fit: cut it where it does
+                {
+                    var cut = w.Length - 1;
+                    while (cut > 1 && Width(w[..cut], size, bold) > maxWidth) cut--;
+                    if (line.Length > 0) { lines.Add(line.ToString()); line.Clear(); }
+                    lines.Add(w[..cut]);
+                    w = w[cut..];
+                }
+                var candidate = line.Length == 0 ? w : line + " " + w;
+                if (line.Length > 0 && Width(candidate, size, bold) > maxWidth) { lines.Add(line.ToString()); line.Clear(); line.Append(w); }
+                else { line.Clear(); line.Append(candidate); }
+            }
+            lines.Add(line.ToString());
+        }
+        return lines;
+    }
+
+    // ---- writing the file ----------------------------------------------------------------------------------
+
+    /// <summary>A PDF string literal for a text: parentheses and backslash escaped, everything outside printable ASCII as an octal escape (so the file stays 7-bit clean).</summary>
+    internal static string Literal(string text)
+    {
+        var sb = new StringBuilder("(");
+        foreach (var ch in text)
+        {
+            var b = WinAnsi(ch);
+            if (b is (byte)'(' or (byte)')' or (byte)'\\') sb.Append('\\').Append((char)b);
+            else if (b is < 32 or > 126) sb.Append('\\').Append(System.Convert.ToString(b, 8).PadLeft(3, '0'));
+            else sb.Append((char)b);
+        }
+        return sb.Append(')').ToString();
+    }
+
+    public byte[] ToBytes()
+    {
+        if (_pages.Count == 0) AddPage();
+        var buffer = new MemoryStream();
+        var offsets = new List<long>();
+        void Write(string s) { var bytes = Encoding.Latin1.GetBytes(s); buffer.Write(bytes, 0, bytes.Length); }
+        void Object(int number, string body) { offsets.Add(buffer.Position); Write($"{number} 0 obj\n{body}\nendobj\n"); }
+
+        Write("%PDF-1.4\n%âãÏÓ\n");
+        // 1 catalogue, 2 page tree, 3 + 4 fonts, then a page and its content per page, then the info dictionary.
+        const int FirstPage = 5;
+        var kids = string.Join(" ", Enumerable.Range(0, _pages.Count).Select(i => $"{FirstPage + i * 2} 0 R"));
+        Object(1, "<< /Type /Catalog /Pages 2 0 R >>");
+        Object(2, $"<< /Type /Pages /Kids [{kids}] /Count {_pages.Count} >>");
+        Object(3, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
+        Object(4, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
+        for (var i = 0; i < _pages.Count; i++)
+        {
+            var content = _pages[i].Content;
+            var firstImage = FirstPage + _pages.Count * 2 + 1;                        // right after the info dictionary
+            var xobjects = _images.Count == 0 ? "" : " /XObject << " + string.Join(" ", Enumerable.Range(0, _images.Count).Select(k => $"/Im{k + 1} {firstImage + k} 0 R")) + " >>";
+            Object(FirstPage + i * 2, $"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {Num(PageWidth)} {Num(PageHeight)}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >>{xobjects} >> /Contents {FirstPage + i * 2 + 1} 0 R >>");
+            Object(FirstPage + i * 2 + 1, $"<< /Length {content.Length} >>\nstream\n{content}\nendstream");
+        }
+        var info = FirstPage + _pages.Count * 2;
+        Object(info, $"<< /Title {Literal(Title)} /Author {Literal(Author)} /Producer (MatCMS Verein) /CreationDate (D:{DateTime.UtcNow:yyyyMMddHHmmss}Z) >>");
+
+        foreach (var (jpeg, w, h) in _images)
+            Object(offsets.Count + 1, $"<< /Type /XObject /Subtype /Image /Width {w} /Height {h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length {jpeg.Length} >>\nstream\n{Encoding.Latin1.GetString(jpeg)}\nendstream");
+
+        var xref = buffer.Position;
+        Write($"xref\n0 {offsets.Count + 1}\n0000000000 65535 f \n");
+        foreach (var o in offsets) Write(o.ToString("0000000000", CultureInfo.InvariantCulture) + " 00000 n \n");
+        Write($"trailer\n<< /Size {offsets.Count + 1} /Root 1 0 R /Info {info} 0 R >>\nstartxref\n{xref}\n%%EOF\n");
+        return buffer.ToArray();
+    }
+
+    internal static string Num(double v) => v.ToString("0.##", CultureInfo.InvariantCulture);
+}
+
+/// <summary>One page. Positions are in points from the TOP-left corner (the way a layout is thought of); the PDF's own origin is bottom-left and is handled here.</summary>
+internal sealed class PdfPage
+{
+    private readonly StringBuilder _content = new();
+    public string Content => _content.ToString();
+
+    private static string N(double v) => PdfWriter.Num(v);
+    private static double Y(double top) => PdfWriter.PageHeight - top;
+
+    /// <summary>Text with its baseline at <paramref name="baseline"/> points from the top.</summary>
+    public void Text(double x, double baseline, string text, double size, bool bold = false, double gray = 0)
+    {
+        if (text.Length == 0) return;
+        _content.Append($"BT /{(bold ? "F2" : "F1")} {N(size)} Tf {N(gray)} g {N(x)} {N(Y(baseline))} Td {PdfWriter.Literal(text)} Tj ET\n");
+    }
+
+    /// <summary>Text whose RIGHT edge is at <paramref name="right"/>.</summary>
+    public void TextRight(double right, double baseline, string text, double size, bool bold = false, double gray = 0) =>
+        Text(right - PdfWriter.Width(text, size, bold), baseline, text, size, bold, gray);
+
+    public void Line(double x1, double top1, double x2, double top2, double width = 0.5, double gray = 0.75) =>
+        _content.Append($"{N(gray)} G {N(width)} w {N(x1)} {N(Y(top1))} m {N(x2)} {N(Y(top2))} l S\n");
+
+    /// <summary>Text in a colour (components 0…1).</summary>
+    public void TextRgb(double x, double baseline, string text, double size, (double R, double G, double B) rgb, bool bold = false)
+    {
+        if (text.Length == 0) return;
+        _content.Append($"BT /{(bold ? "F2" : "F1")} {N(size)} Tf {N(rgb.R)} {N(rgb.G)} {N(rgb.B)} rg {N(x)} {N(Y(baseline))} Td {PdfWriter.Literal(text)} Tj ET\n");
+    }
+
+    /// <summary>A line in a colour.</summary>
+    public void LineRgb(double x1, double top1, double x2, double top2, double width, (double R, double G, double B) rgb) =>
+        _content.Append($"{N(rgb.R)} {N(rgb.G)} {N(rgb.B)} RG {N(width)} w {N(x1)} {N(Y(top1))} m {N(x2)} {N(Y(top2))} l S\n");
+
+    /// <summary>An image added with <see cref="PdfWriter.AddImage"/>, its upper left corner at (<paramref name="x"/>, <paramref name="top"/>).</summary>
+    public void Image(int number, double x, double top, double width, double height) =>
+        _content.Append($"q {N(width)} 0 0 {N(height)} {N(x)} {N(Y(top + height))} cm /Im{number} Do Q\n");
+
+    /// <summary>A filled grey rectangle (<paramref name="top"/> is its upper edge).</summary>
+    public void Box(double x, double top, double width, double height, double gray = 0.95) =>
+        _content.Append($"{N(gray)} g {N(x)} {N(Y(top + height))} {N(width)} {N(height)} re f\n");
+}

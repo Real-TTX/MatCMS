@@ -9,7 +9,7 @@ namespace MatCMS.Plugin.Booking;
 public static class BookingMail
 {
     public const string RequestGuest = "booking.request.guest", RequestHost = "booking.request.host", Offer = "booking.offer", Confirmed = "booking.confirmed",
-        Declined = "booking.declined", Expired = "booking.expired", AcceptedHost = "booking.accepted.host", Cancelled = "booking.cancelled";
+        Declined = "booking.declined", Expired = "booking.expired", AcceptedHost = "booking.accepted.host", Cancelled = "booking.cancelled", Reminder = "booking.reminder";
 
     private static MailPlaceholder Ph(string t, string d) => new(t, d);
     private static readonly MailPlaceholder[] Common =
@@ -50,6 +50,10 @@ public static class BookingMail
             "Stornierung {{nummer}} – {{einheit}}",
             "Hallo {{name}},\n\nIhre Buchung {{nummer}} ({{einheit}}, {{anreise}} – {{abreise}}) ist storniert.\n\n{{grund}}\n\nViele Grüße\n{{website}}\n")
         { Placeholders = Common.Concat(new[] { Ph("grund", "Der Text, den der Gastgeber beim Stornieren geschrieben hat") }).ToArray() },
+        new(Reminder, "Buchungen: Zahlungserinnerung (an den Gast)", "Geht einmal je Fälligkeit an den Gast, wenn Anzahlung oder Rest zwei Tage danach noch nicht eingetragen ist (abschaltbar in den Einstellungen).",
+            "Erinnerung: {{was}} für Ihre Buchung {{nummer}}",
+            "Hallo {{name}},\n\nwir freuen uns auf Ihren Aufenthalt vom {{anreise}} bis {{abreise}} in {{einheit}}. Bei uns ist {{was}} noch nicht eingegangen – offen sind {{faellig}}.\n\n{{zahlung}}\nVerwendungszweck: {{nummer}}\n\nFalls Sie schon überwiesen haben: vielen Dank, dann hat sich diese Mail überschnitten.\n\nIhre Buchung: {{link}}\n\nViele Grüße\n{{website}}\n")
+        { Placeholders = Common.Concat(new[] { Ph("was", "„die Anzahlung“ oder „den Restbetrag“"), Ph("faellig", "Der offene, fällige Betrag"), Ph("zahlung", "Zahlungshinweis aus den Einstellungen") }).ToArray() },
         new(AcceptedHost, "Buchungen: Angebot angenommen (an den Gastgeber)", "Geht an die Adresse aus den Einstellungen, wenn ein Gast ein Angebot annimmt.",
             "Gebucht: {{nummer}} {{einheit}}, {{anreise}} – {{abreise}}",
             "{{name}} hat das Angebot angenommen – die Buchung ist bestätigt.\n\n{{einheit}}, {{anreise}} – {{abreise}} ({{naechte}} Nächte), {{personen}}\nGesamt: {{betrag}}\n\n{{admin_link}}\n")
